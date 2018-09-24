@@ -1,2 +1,5 @@
 .idea
 venv
+.git-latest
+.git-checked-out
+deploy.sh
