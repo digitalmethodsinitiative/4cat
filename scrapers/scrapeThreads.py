@@ -35,6 +35,6 @@ class ThreadScraper(BasicJSONScraper):
         Get URL to scrape for the current job
 
         :param dict data:  Job data - contains the ID of the thread to scrape
-        :return:
+        :return string: URL to scrape
         """
         return "https://a.4cdn.org/tg/thread/%s.json" % self.jobdata["remote_id"]
