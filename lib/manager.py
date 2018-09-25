@@ -33,6 +33,7 @@ class ScraperManager:
         End main loop
         """
         self.looping = False
+        self.log.info("Finishing scrapes.")
 
     def loop(self):
         """
