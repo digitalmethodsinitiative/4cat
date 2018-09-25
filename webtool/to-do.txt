@@ -1,0 +1,15 @@
+!!4CAT Requirements!!
+
+<MOSCOW>
+#Must
+
+- Substring query interface
+	- Efficient querying with FTS/elastic
+		- Test whether this is quick enough and can hold concurrent users
+		- Sphinx Search/Solr/Elasticsearch
+- Live data fetcher
+	- Partha's code running every 30 seconds
+	- Append to 4plebs database every week(?)
+- Login system
+- Penelope integration
+	- What data could be served? Just serving a list of strings as data input?
