@@ -18,6 +18,7 @@ class BasicJSONScraper:
     """
     type = "misc"  # this should match the job type as saved in the database
     jobdata = {}
+    pause = 1  # time to wait between scrapes
 
     queue = None
     log = None
@@ -59,7 +60,7 @@ class BasicJSONScraper:
         """
         while self.looping:
             self.scrape()
-            time.sleep(1)
+            time.sleep(self.pause)
 
     def scrape(self):
         """

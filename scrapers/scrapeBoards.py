@@ -4,6 +4,7 @@ from lib.queue import JobQueue, JobAlreadyExistsException
 
 class BoardScraper(BasicJSONScraper):
     type = "board"
+    pause = 60
 
     def process(self, data):
         # queue board's threads for scraping
