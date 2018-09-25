@@ -3,3 +3,7 @@ venv
 .git-latest
 .git-checked-out
 deploy.sh
+
+*.pyc
+*.log
+*.log.*
