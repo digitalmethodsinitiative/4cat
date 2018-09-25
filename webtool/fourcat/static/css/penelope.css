@@ -1,0 +1,110 @@
+body{
+	margin: 0px;
+	background-color: white;	/*background-color: #ffe;*/
+}
+
+* {
+	font-family: 'Arial', sans-serif;
+	color: black;
+}
+
+#maindiv{
+	width: 700px;
+	max-width: 100%;
+	margin: 0 auto;
+	padding-left: 10px;
+	padding-right: 10px;
+}
+
+svg{
+	max-width: 100%;
+}
+
+line {
+	stroke: #c7c7c7;
+}
+
+text {
+	stroke: maroon;
+	stroke-width: 1px;
+	cursor: pointer;
+	text-anchor: 'middle';
+	fill: maroon;
+	font-family: 'Arial', sans-serif;
+	font-size: 14;
+}
+
+text.chan-node, .chan-indicator {
+	color:  #789922;
+	stroke: #789922;
+	fill: #789922;
+}
+
+text.chan-node:hover{
+	stroke: #789922;
+	fill: #789922;
+}
+
+text.chan-node.clicked{
+	stroke: #cc1105;
+	fill: #cc1105;
+}
+
+text.yt-node, .yt-indicator{
+	color:  red;
+	stroke: red;
+	fill: red;
+	font-family: 'Roboto', 'Arial', sans-serif;
+}
+
+text.yt-node.clicked{
+	stroke: #cc1105;
+	font-family: 'Roboto', 'Arial', sans-serif;
+	fill: red;
+}
+
+.node circle{
+	stroke: #fff;
+	stroke-width: 3px;
+	fill: #555;
+}
+
+#controlpanel{
+	background-color: #f0e0d6;
+	border: 1px solid #d9bfb7;
+	padding: 10px;
+}
+
+
+h1{
+	font-weight: bold;
+}
+
+p{
+	font-size: 12px;
+}
+
+#alertbox{
+	max-width: 98%; 
+}
+
+p#alerts{
+	display: inline;
+	font-weight: bold;
+	color: #cc1105;
+}
+
+#pagetitle{
+	margin-top: 20px;
+	height: 38px;
+}
+
+#pagetitle img{
+	max-height: 60%;
+	display: inline;
+}
+
+#pagetitle h1{
+	display: inline;
+	padding-left: 10px;
+}
