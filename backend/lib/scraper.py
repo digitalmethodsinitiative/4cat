@@ -4,6 +4,7 @@ import json
 import abc
 
 from lib.worker import BasicWorker
+from lib.queue import JobAlreadyClaimedException
 
 
 class BasicJSONScraper(BasicWorker, metaclass=abc.ABCMeta):
@@ -31,7 +32,12 @@ class BasicJSONScraper(BasicWorker, metaclass=abc.ABCMeta):
 
         # claim the job - this is needed so multiple workers don't do the same job
         self.jobdata = job
-        self.queue.claimJob(job["id"])
+
+        try:
+            self.queue.claimJob(job["id"])
+        except JobAlreadyClaimedException:
+            # too bad, so sad
+            return
 
         # request URL
         url = self.get_url(self.jobdata)
