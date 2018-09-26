@@ -4,7 +4,7 @@ import json
 import abc
 
 from lib.worker import BasicWorker
-from lib.queue import JobAlreadyClaimedException
+from lib.queue import JobClaimedException
 
 
 class BasicJSONScraper(BasicWorker, metaclass=abc.ABCMeta):
