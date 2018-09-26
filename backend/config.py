@@ -20,3 +20,4 @@ class config:
     Logs will be saved here - rotated by appended numbers
     """
     log_path = "4cat-scraper.log"
+    image_path = "images"

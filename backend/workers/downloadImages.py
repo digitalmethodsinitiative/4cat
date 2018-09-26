@@ -10,6 +10,9 @@ class ImageDownloader(BasicWorker):
     max_workers = 3
 
     def work(self):
+        return
+
+        # todo
         job = self.queue.getJob("image")
         if not job:
             self.log.info("Image downloader has no jobs, sleeping for 10 seconds")

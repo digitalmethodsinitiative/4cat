@@ -3,6 +3,7 @@ import json
 
 from lib.scraper import BasicJSONScraper
 from lib.database import Database
+from lib.queue import JobAlreadyExistsException
 
 from config import config
 
@@ -20,7 +21,7 @@ class ThreadScraper(BasicJSONScraper):
     # for new posts, any fields not in here will be saved in the "unsorted_data" column
     # for that post as part of a JSONified dict
     known_fields = ["no", "com", "name", "filename", "md5", "fsize", "semantic_url",
-                    "resto", "time", "w", "h", "tn_w", "tn_h", "tim"]
+                    "resto", "time", "w", "h", "tn_w", "tn_h", "tim", "now"]
 
     def __init__(self):
         super().__init__()
@@ -46,7 +47,11 @@ class ThreadScraper(BasicJSONScraper):
         last_reply = max([post["time"] for post in data["posts"]])
         last_post = max([post["no"] for post in data["posts"]])
 
-        thread = self.db.fetchone("SELECT * FROM threads WHERE id = %s", op["no"])
+        thread = self.db.fetchone("SELECT * FROM threads WHERE id = %s", (op["no"],))
+        if not thread:
+            # ?????
+            return
+
         if thread["num_replies"] == num_replies and thread["timestamp_modified"] == last_reply:
             # no updates, no need to check posts any further
             return
@@ -54,19 +59,19 @@ class ThreadScraper(BasicJSONScraper):
         # first post has useful metadata for the *thread*
         thread_update = {
             "num_unique_ips": op["unique_ips"],
-            "num_images": op["image"],
+            "num_images": op["images"],
             "num_replies": num_replies,
-            "limit_bump": op["bumplimit"],
-            "limit_image": op["imagelimit"],
-            "is_sticky": 1 if "sticky" in op and op["sticky"] == 1 else 0,
-            "is_closed": 1 if "closed" in op and op["closed"] == 1 else 0,
+            "limit_bump": op["bumplimit"] if "bumplimit" in op else 0,
+            "limit_image": op["imagelimit"] if "imagelimit" in op else 0,
+            "is_sticky": True if "sticky" in op and op["sticky"] == 1 else False,
+            "is_closed": True if "closed" in op and op["closed"] == 1 else False,
             "last_post": last_post
         }
 
         self.db.update("threads", where={"id": op["no"]}, data=thread_update)
 
         post_dict_scrape = {post["no"]: post for post in data["posts"]}
-        post_dict_db = {post["id"]: post for post in self.db.fetchall("SELECT * FROM posts WHERE thread = %s", (op["no"],))}
+        post_dict_db = {post["id"]: post for post in self.db.fetchall("SELECT * FROM posts WHERE thread_id = %s", (op["no"],))}
 
         # mark deleted posts as such
         deleted = set(post_dict_db.keys()) - set(post_dict_scrape.keys())
@@ -82,12 +87,12 @@ class ThreadScraper(BasicJSONScraper):
                 "id": post_id,
                 "thread_id": op["no"],
                 "timestamp": post["time"],
-                "body": post["com"],
+                "body": post["com"] if "com" in post else "",
                 "author": post["name"],
                 "image_file": post["filename"] + post["ext"] if "filename" in post and "ext" in post else "",
-                "image_4chan": post["tim"] + post["ext"] if "filename" in post and "ext" in post else "",
+                "image_4chan": str(post["tim"]) + post["ext"] if "filename" in post and "ext" in post else "",
                 "image_md5": post["md5"] if "md5" in post else "",
-                "image_filesize": post["fsize"] if "fsize" in post else "",
+                "image_filesize": post["fsize"] if "fsize" in post else 0,
                 "semantic_url": post["semantic_url"] if "semantic_url" in post else "",
                 "is_deleted": False,
                 "unsorted_data": json.dumps({field: post[field] for field in post.keys() if field not in self.known_fields})
@@ -99,14 +104,17 @@ class ThreadScraper(BasicJSONScraper):
             if "md5" not in post:
                 continue
 
-            image_path = config.image_path + "/" + post_data["md5"] + post_data["ext"]
+            image_path = config.image_path + "/" + post["md5"] + post["ext"]
             if post_data["image_4chan"] != "" and not os.path.isfile(image_path):
-                self.queue.addJob("image", details={
-                    "board": thread["board"],
-                    "ext": post["ext"],
-                    "md5": post["md5"],
-                    "tim": post["tim"]
-                })
+                try:
+                    self.queue.addJob("image", details={
+                        "board": thread["board"],
+                        "ext": post["ext"],
+                        "md5": post["md5"],
+                        "tim": post["tim"]
+                    })
+                except JobAlreadyExistsException:
+                    pass
         self.db.commit()
 
     def get_url(self, data):
