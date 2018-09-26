@@ -11,6 +11,7 @@ class BoardScraper(BasicJSONScraper):
     """
     type = "board"
     pause = 60
+    max_workers = 1
 
     def process(self, data):
         """

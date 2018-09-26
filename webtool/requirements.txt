@@ -1,0 +1,4 @@
+html2text
+stop_words
+celery
+rabbitmq

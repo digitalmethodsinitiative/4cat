@@ -10,7 +10,7 @@ class JobQueue:
     A simple job queue
 
     Jobs are basically database records. The job has some information that a scraper (in
-    this case) can use to scrape. The job queue is shared between scrapers so that nothing
+    this case) can use to scrape. The job queue is shared between workers so that nothing
     is scraped twice.
     """
     db = None
@@ -99,7 +99,7 @@ class JobQueue:
         """
         Claim a job
 
-        Marks a job as 'claimed', which means no other scrapers may claim the job, and it will not
+        Marks a job as 'claimed', which means no other workers may claim the job, and it will not
         be returned when the queue is asked for a new job to do.
 
         :param job_id: Job ID to claim
