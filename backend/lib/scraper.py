@@ -37,8 +37,8 @@ class BasicJSONScraper(BasicWorker, metaclass=abc.ABCMeta):
         url = self.get_url(self.jobdata)
         try:
             data = requests.get(url, timeout=5)
-        except requests.HTTPError:
-            self.queue.releaseJob(job["id"])  # try again later
+        except (requests.HTTPError, requests.exceptions.ReadTimeout):
+            self.queue.releaseJob(job["id"], delay=10)  # try again in 10 seconds
             self.log.warning("Could not finish request for %s, releasing job" % url)
             return
 
