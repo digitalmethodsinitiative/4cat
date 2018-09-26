@@ -35,7 +35,7 @@ class BasicJSONScraper(BasicWorker, metaclass=abc.ABCMeta):
 
         try:
             self.queue.claimJob(job["id"])
-        except JobAlreadyClaimedException:
+        except JobClaimedException:
             # too bad, so sad
             return
 
