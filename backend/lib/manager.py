@@ -103,6 +103,7 @@ class WorkerManager:
 
             for member in members:
                 if inspect.isclass(member[1]) and issubclass(member[1], BasicWorker) and not inspect.isabstract(member[1]):
+                    print("Adding worker type %s" % member[0])
                     self.worker_prototypes.append(member[1])
 
         os.chdir("..")

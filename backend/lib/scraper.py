@@ -34,7 +34,7 @@ class BasicJSONScraper(BasicWorker, metaclass=abc.ABCMeta):
         self.queue.claimJob(job["id"])
 
         # request URL
-        url = self.getUrl(self.jobdata)
+        url = self.get_url(self.jobdata)
         try:
             data = requests.get(url, timeout=5)
         except requests.HTTPError:
@@ -55,6 +55,13 @@ class BasicJSONScraper(BasicWorker, metaclass=abc.ABCMeta):
 
         # finally, pass it on
         self.process(jsondata)
+        self.after_process()
+
+    def after_process(self):
+        """
+        After processing, declare job finished
+        """
+        self.queue.finishJob(self.jobdata["id"])
 
     @abc.abstractmethod
     def process(self, data):
@@ -66,7 +73,7 @@ class BasicJSONScraper(BasicWorker, metaclass=abc.ABCMeta):
         pass
 
     @abc.abstractmethod
-    def getUrl(self, data):
+    def get_url(self, data):
         """
         Get URL to scrape
 
