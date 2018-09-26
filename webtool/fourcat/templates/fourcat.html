@@ -1,0 +1,201 @@
+<html>
+<head>
+	<title>4CAT</title>
+	<link href="https://fonts.googleapis.com/css?family=Lekton" rel="stylesheet">
+	<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+	<link rel="stylesheet" type="text/css" href="{{url_for('static', filename='stylesheet.css')}}">
+	<script type=text/javascript src="{{url_for('static', filename='jquery.js')}}"></script>
+	<script type=text/javascript src="{{url_for('static', filename='js/submits.js')}}"></script>
+	<meta charset="UTF-8">
+</head>
+<body>
+
+	<div class="header"><a href="/submissions"><button id='backbutton'>To the forum</button></a><div class="pagetitle"><span>4CAT</span></div></div>
+
+	<div class="container-fluid">
+		<div class="row">
+			<div class="col-lg-9 topdiv">
+				<div id="panel">
+					<div id="filterpanel">
+						<div id='buttonselections'>
+							<!-- <input name='platformselect' type='radio' class='platformselect' id="radio_selectfb">
+							<label for="radio_selectfb">Facebook pages</label>
+							<input name='platformselect' type='radio' class='platformselect' id="radio_selectreddit">
+							<label for="radio_selectreddit">Subreddits</label> -->
+							<input name='platformselect' type='radio' class='platformselect' id="radio_selectchans">
+							<label id='chanlabel' for="radio_selectchans" >4chan/pol/</label></input>
+							<!-- <br> -->
+							<select id="dataselection">
+
+							</select>
+							<button id="btn_loadcsv" id="btn_loadcsv">Show sample</button>
+						</div>
+						<div id='filterinputs'>
+
+							<div class="filterrow">
+								<input type="radio" name="filterradio" class="mainselect" value="substring" checked>
+								<span>Substring filter:</span>
+								<input id="searchinput" type="text" name="dataselected"  maxlength="200">
+								
+								<select id="select_stringlocation">
+									<option class="stringselect" value='0'>Comment</option>
+									<option class="stringselect" value='1'>Post title</option>
+								</select>
+							<input type='checkbox' id='check_frequency'></input> Include trends histogram
+						</div>
+						<div class="filterrow">
+							<input type="radio" name="filterradio" class='mainselect' value="textanalysis">
+							<span>Text analysis:</span>
+							<input class="radio_wordanalysis" id="frequencies" type="radio" name="wordanalysismethod" value="frequencies" checked>
+							<label for="frequencies">Single words</label>
+							<br>
+							<input class="radio_wordanalysis" id="bigrams" type="radio" name="wordanalysismethod" value="bigrams">
+							<label for="bigrams">Bigrams</label>
+							<input class="radio_wordanalysis" id="trigrams" type="radio" name="wordanalysismethod" value="trigrams">
+							<label for="trigrams">Trigrams</label>
+							<!-- <input type='checkbox' name='check_colocations' id='checkcolocations' disabled="disabled"> -->
+						</input>
+						in post containing: <input id="colocationword" type="text" name="colocationword"  maxlength="200" placeholder="e.g. 'poseidon'" disabled="disabled">
+					</input>
+					window size:
+					<select id="windowsize">
+						<option id='window_size2' class="window_size" value='2'>2</option>
+						<option id='window_size3' class="window_size" value='3'>3</option>
+						<option class="window_size" value='4'>4</option>
+						<option class="window_size" value='5'>5</option>
+						<option class="window_size" value='6'>6</option>
+						<option class="window_size" value='7'>7</option>
+						<option class="window_size" value='8'>8</option>
+					</select>
+
+				</div>
+				<div class="filterrow" id='filter_allimgs'>
+					<input type="radio" name="filterradio" class='mainselect' value="allimgs">
+					<span>All images chronologically</span>
+				</div>
+				<div class="filterrow" id='filter_textimgs'>
+					<input type="radio" name="filterradio" class='mainselect' value="textimgs">
+					<span>Images along the word(s):</span>
+					<input id="input_searchimages" type="text" name="imageinput"  maxlength="200" disabled="disabled">
+				</div>
+				<div class="filterrow" id='filter_time'>
+					<input type='checkbox' id='check_time'></input> <span>Filter on time, from</span>
+					<input id="input_mintime" type="date" name="mintimeinput" disabled="disabled"> to
+					<input id="input_maxtime" type="date" name="maxtimeinput" disabled="disabled">
+					<!-- <a target="_blank" href="https://www.epochconverter.com/">Use UNIX timestamp values</a> -->
+				</div>
+				<button class="btn_filterbutton" id="btn_go">Go</button>
+			</div>
+		</div>
+		<div class="loader">Working... Uncompleted tasks time out and fail after 10 minutes<img src='static/hourglass.gif'></div>
+	</div>
+</div>
+<div class="col-lg-3 topdiv">
+	<div id='submitpanel'>
+		<div id="submitpaneltitle">
+			<div class="pagetitle">
+				<span id="submitheader">DATA PANEL</span>
+			</div>
+		</div>
+		<div id="submitform">
+
+					<!-- 	<div class="submitdiv">Username:</div><br><input  maxlength="25" type='text' name='name' id='input_username' placeholder='Your username'><br>
+						<div class="submitdiv">Post title:</div><br><input  maxlength="100" type='text' name='title' id='input_title' placeholder='A catchy post title'><br>
+						<div class="submitdiv">Notes:</div><br><textarea maxlength="500" id='input_notes' placeholder="Description or questions about your post"></textarea><br> 
+
+						<div class="submitdiv">
+							<span>Theme:</span>
+							<select id="themeselection">
+								<option class="selectoption" value='othermeme'>Other</option>
+								<option class="selectoption" value='trumpism'>Trumpism</option>
+								<option class="selectoption" value='conspiracy'>Conspiracy</option>
+								<option class="selectoption" value='antileft'>Anti-left</option>
+								<option class="selectoption" value='lgbtphobe'>LGBT-phobe</option>
+								<option class="selectoption" value='antiislam'>Anti-islam</option>
+								<option class="selectoption" value='misogyny'>Misogyny</option>
+								<option class="selectoption" value='antiusa'>Anti-USA</option>
+								<option class="selectoption" value='racialism'>Racialism</option>
+								<option class="selectoption" value='eunationalism'>European nationalism</option>
+								<option class="selectoption" value='antisemitism'>Antisemitism</option>
+								<option class="selectoption" value='nazism'>Nazism</option>
+								<option class="selectoption" value='historical'>Historical</option>
+								<option class="selectoption" value='christian'>Christian imagery</option>
+								<option class="selectoption" value='egyptian'>Egyptian imagery</option>
+								<option class="selectoption" value='nordic'>Nordic</option>
+								<option class="selectoption" value='esoteric'>Esoteric imagery</option>
+								<option class="selectoption" value='vaporwave'>Vaporwave</option>
+								<option class="selectoption" value='multimeme'>Multi-meme</option>
+							</select>
+							<span>Meme:</span>
+							<select id="memeselection">
+								<option class="selectoption" value='othertheme'>Other</option>
+								<option class="selectoption" value='stats'>Statistics/graphs</option>
+								<option class="selectoption" value='doge'>Comics</option>
+								<option class="selectoption" value='screencaps'>Screencaptures</option>
+								<option class="selectoption" value='comics'>Maps</option>
+								<option class="selectoption" value='flags'>Flags</option>
+								<option class="selectoption" value='pepe'>Pepe the Frog</option>
+								<option class="selectoption" value='happymerchant'>Le Happy Merchant</option>
+								<option class="selectoption" value='feelsguy'>Feels guy</option>
+								<option class="selectoption" value='thinkingemoji'>Thinking emoji</option>
+								<option class="selectoption" value='picardia'>Picardia</option>
+								<option class="selectoption" value='amerimutt'> Amerimutt</option>
+								<option class="selectoption" value='spurdo'>Spurdo</option>
+								<option class="selectoption" value='biggrin'>Biggrin</option>
+								<option class="selectoption" value='anime'>Anime/hentai</option>
+								<option class="selectoption" value='historicalphotos'>Historical photos</option>
+								<option class="selectoption" value='quotes'>Quotation images</option>
+								<option class="selectoption" value='flags'>Flags</option>
+							</select>
+						</div>
+						<br>
+						<button id='submitdata'>submit</button> -->
+						<p>Full data files with <em>all</em> data columns will be returned in this panel</p>
+					</div>
+
+				</div>
+			</div>
+		</div>
+	</div>
+	<div class="container-fluid">
+		<div class="row">
+			<div class="col-lg-12" id="resultsdiv">
+				<div id="resultsheader">
+					<div class="pagetitle">
+						<span id='resultsheadertext'>RESULTS</span>
+					</div>
+					<button id='btn_clear'>clear all results X</button>
+
+				</div>
+				<div id="imagenavigationdiv" class='inactive'>
+					<span id='imagenavigation'>
+						<button id="btn_previmg" class="imgbutton">Previous image</button>
+						<span id="imgnotification"></span>
+						<button id="btn_nextimg" class="imgbutton">Next image</button>
+					</span>
+				</div>
+				<div id="results">
+
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+
+
+<!--Footer-->
+<footer class="page-footer">
+	<!--Copyright-->
+	<div class="footer-copyright">
+		<div class="container-fluid">
+			© 2018 Copyright: <a href="http://www.oilab.eu" target="_blank">Open Intelligence Lab</a>
+
+		</div>
+	</div>
+	<!--/.Copyright-->
+
+</footer>
+<!--/.Footer-->
+
+</body>
+</html>

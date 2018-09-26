@@ -1,0 +1,443 @@
+<html>
+<head>
+	<meta charset="UTF-8">
+	<title>OILab Forum</title>
+	<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+	<link rel="stylesheet" type="text/css" href="{{url_for('static', filename='stylesheet.css')}}">
+	<link href="https://fonts.googleapis.com/css?family=Lekton" rel="stylesheet">
+	<script type="text/javascript" src="{{url_for('static',filename='jquery.js')}}"></script>
+</head>
+<body>
+
+<script type="text/javascript">
+var jsonfile = ('{{inputs|tojson}}')
+</script>
+<script type="text/javascript" src="{{url_for('static', filename='js/submitsuccess.js')}}"></script>
+
+<div class="header"><a href="/"><button id='backbutton'>To the research tool</button></a><div class="pagetitle"><span>OILab FORUM</span></div></div>
+<div class='notificationheader'>
+
+	<h1>Go to <span class="url"> www.oilab.nl:5000</span> to become a meme scientist</h1>
+
+</div>
+<div id='notifications'><span class="entryindicator"></span><span class='soundnotification'>X</span></div>
+<div class="container-fluid">
+	<div class="row">
+		<div class='col-lg-9 submitscreen'>
+			<div id='filterresults'>
+			<button id='btn_submissions'>Front page</button>
+			<div class="pagetitle"><span>Theme:</span></div>
+			<select id="themeselect">
+				<option class="selectoption"value='all' selected>All</option>
+				<option class="selectoption"value='othertheme'>Other</option>
+				<option class="selectoption"value='trumpism'>Trumpism</option>
+				<option class="selectoption"value='conspiracy'>Conspiracy</option>
+				<option class="selectoption"value='antileft'>Anti-left</option>
+				<option class="selectoption"value='lgbtphobe'>LGBT-phobe</option>
+				<option class="selectoption"value='antiislam'>Anti-islam</option>
+				<option class="selectoption"value='misogyny'>Misogyny</option>
+				<option class="selectoption"value='antiusa'>Anti-USA</option>
+				<option class="selectoption"value='racialism'>Racialism</option>
+				<option class="selectoption"value='eunationalism'>European nationalism</option>
+				<option class="selectoption"value='antisemitism'>Antisemitism</option>
+				<option class="selectoption"value='nazism'>Nazism</option>
+				<option class="selectoption"value='historical'>Historical</option>
+				<option class="selectoption"value='christian'>Christian imagery</option>
+				<option class="selectoption"value='egyptian'>Egyptian imagery</option>
+				<option class="selectoption"value='nordic'>Nordic</option>
+				<option class="selectoption"value='esoteric'>Esoteric imagery</option>
+				<option class="selectoption"value='vaporwave'>Vaporwave</option>
+				<option class="selectoption"value='multimeme'>Multi-meme</option>
+			</select>
+			<div class="pagetitle"><span>Meme:</span></div>
+			<select id="memeselect">
+				<option class="selectoption" value='all' selected>All</option>
+				<option class="selectoption" value='othermeme'>Other</option>
+				<option class="selectoption" value='stats'>Statistics/graphs</option>
+				<option class="selectoption" value='doge'>Comics</option>
+				<option class="selectoption" value='screencaps'>Screencaptures</option>
+				<option class="selectoption" value='comics'>Maps</option>
+				<option class="selectoption" value='flags'>Flags</option>
+				<option class="selectoption" value='pepe'>Pepe the Frog</option>
+				<option class="selectoption" value='happymerchant'>Le Happy Merchant</option>
+				<option class="selectoption" value='feelsguy'>Feels guy</option>
+				<option class="selectoption" value='thinkingemoji'>Thinking emoji</option>
+				<option class="selectoption" value='picardia'>Picardia</option>
+				<option class="selectoption" value='amerimutt'> Amerimutt</option>
+				<option class="selectoption" value='spurdo'>Spurdo</option>
+				<option class="selectoption" value='biggrin'>Biggrin</option>
+				<option class="selectoption" value='anime'>Anime/hentai</option>
+				<option class="selectoption" value='historicalphotos'>Historical photos</option>
+				<option class="selectoption" value='quotes'>Quotation images</option>
+				<option class="selectoption" value='flags'>Flags</option>
+			</select>
+			<button id='btn_adminposts'>Admin posts</button>
+			</div>
+			<div class="submissions">
+<!-- 				<div class='submission sticky'>
+					<span class="btn_expand"> + </span>
+					<span class="span_theme">mememagick</span>
+					<span class="span_posttitle">qweqwe</span>
+					<span class="span_username"> by Rooot</span>
+
+					<div class="fullpost" style="display: none;">
+						<div class="div_notes">
+							<p>Sticky post</p>
+						</div>
+						<img src="https://scontent.xx.fbcdn.net/v/t31.0-8/27355534_1908181275877503_5235075060127726605_o.jpg?oh=521cce95c978c432c4ef013ed8c112bc&amp;oe=5ADE0163">
+						<p>Testing a sticky post</p>
+						<p>81</p>
+					</div>
+				</div> -->
+<!-- 				<div class='submission presentation sticky' id='post1'>
+					<span class="btn_expand"> + </span>
+					<span class="span_theme">mememagick</span>
+					<span class="span_posttitle">Presentation slide</span>
+					<span class="span_username"> by Memewario</span>
+
+					<div class="fullpost" style="display: none;">
+						<div class="div_notes">
+							<p>Sticky post</p>
+						</div>
+						<img src="https://scontent.xx.fbcdn.net/v/t31.0-8/27355534_1908181275877503_5235075060127726605_o.jpg?oh=521cce95c978c432c4ef013ed8c112bc&amp;oe=5ADE0163">
+						<p>Testing a sticky post</p>
+						<p>81</p>
+					</div>
+				</div> -->
+				<div class='submission presentation sticky other' id='post2'>
+					<span class="btn_expand"> + </span>
+					<span class="span_theme">other</span>
+					<span class="span_meme">other</span>
+					<span class="span_posttitle">On studying the ephemerality of 4chan</span> <!--title of post-->
+					<span class="span_username"> by Memewario</span>
+					<div class="fullpost" style="display: none;">
+						<div class="div_notes">
+							<p><a href="https://motherboard.vice.com/en_us/article/z4k549/trolling-scholars-debunk-the-idea-that-the-alt-rights-trolls-have-magic-powers">Philips, Beyer and Coleman</a>: “When it comes to 4chan and Anonymous, none of us can step in the same river twice. [...] Taking the time to map—to accurately map—the repeated, fractured, reconfiguring mobilizations emerging from anonymous and pseudo-anonymous spaces online allows us to understand where we are and how we got here.”</p> 
+						</div>
+					</div>
+				</div>
+				<div class='submission presentation sticky other maps'  id='post3'>
+					<span class="btn_expand"> + </span>
+					<span class="span_theme">other</span>
+					<span class="span_meme">maps</span>
+					<span class="span_posttitle">Internet history timeline</span> <!--title of post-->
+					<span class="span_username"> by Memewario</span>
+					<div class="fullpost" style="display: none;">
+						<div class="div_notes">
+							<img class='presentationimg' src="">					<!--(possible) image link-->
+							<!--(possible) notes for post-->
+						</div>
+					</div>
+				</div>
+				<div class='submission presentation sticky trumpism screencaps'  id='post100'>
+					<span class="btn_expand"> + </span>
+					<span class="span_theme">trumpism</span>
+					<span class="span_meme">screencaps</span>
+					<span class="span_posttitle">The GET wall</span> <!--title of post-->
+					<span class="span_username"> by Memewario</span>
+					<div class="fullpost" style="display: none;">
+						<div class="div_notes">
+							<!--(possible) notes for post-->
+						</div>
+						<a href="{{url_for('static', filename='presentationimg/GET_wall.tif')}}"><p>Click to download God Emperor Trump Image Wall(70MB)</p></a>
+					</div>
+				</div>
+				<div class='submission presentation sticky racialism amerimutt' id='post4'>
+					<span class="btn_expand"> + </span>
+					<span class="span_theme">racialism</span>
+					<span class="span_meme">amerimutt</span>
+					<span class="span_posttitle">The Amerimutt wall and the paradox of studying the Alt-Right</span> <!--title of post-->
+					<span class="span_username"> by Memewario</span>
+					<div class="fullpost" style="display: none;">
+						<div class="div_notes">
+							<!--(possible) notes for post-->
+						</div>
+						<img class='presentationimg' src="">
+						<img class='presentationimg' src="">						<!--(possible) image link-->
+						<!--(possible) notes for post-->
+					</div>
+				</div>
+				<div class='submission presentation sticky other maps' id='post5'>
+					<span class="btn_expand"> + </span>
+					<span class="span_theme">other</span>
+					<span class="span_meme">maps</span>
+					<span class="span_posttitle">A diagram of the vernacular web ecology</span> <!--title of post-->
+					<span class="span_username"> by Memewario</span>
+					<div class="fullpost" style="display: none;">
+						<div class="div_notes">
+							<p>“Inspecting the the internet’s cesspool, you can learn a lot about what and how the people above ground are eating.” - Anon</p> 								<!--(possible) notes for post-->
+						</div>
+						<img class='presentationimg' src="">
+						<!--(possible) notes for post-->
+					</div>
+				</div>
+				<div class='submission presentation sticky other other'  id='post6'>
+					<span class="btn_expand"> + </span>
+					<span class="span_theme">other</span>
+					<span class="span_meme">other</span>
+					<span class="span_posttitle">Reactionary political subcultures frame</span> <!--title of post-->
+					<span class="span_username"> by Memewario</span>
+					<div class="fullpost" style="display: none;">
+						<div class="div_notes">
+							<!--(possible) notes for post-->
+						</div>
+						<img class='presentationimg' src="">
+						<h3>Penisbearcats</h3>
+						<img class='presentationimg' src="">
+						<h3>Kermit de la Frog</h3>
+						<img class='presentationimg' src="">
+						<h3>Degeneracy Sucks & So Do You</h3>
+						<img class='presentationimg' src="">
+						<h3>Prussiaball</h3>
+						<img class='presentationimg' src="">
+						<h3>The Traditionalist</h3>
+						<img class='presentationimg' src="">
+						<!--(possible) notes for post-->
+					</div>
+				</div>
+				<div class='submission presentation sticky trumpism other' id='post7'>
+					<span class="btn_expand"> + </span>
+					<span class="span_theme">trumpism</span>
+					<span class="span_meme">other</span>
+					<span class="span_posttitle">Breitbart's Facebook page</span> <!--title of post-->
+					<span class="span_username"> by Memewario</span>
+					<div class="fullpost" style="display: none;">
+						<div class="div_notes">
+							<!--(possible) notes for post-->
+						</div>
+						<img class='presentationimg' src="">
+						<img class='presentationimg' src="">
+						<img class='presentationimg' src="">
+						<img class='presentationimg' src="">
+						<img class='presentationimg' src="">
+						<img class='presentationimg' src="">
+						<!--(possible) notes for post-->
+					</div>
+				</div>
+				<div class='submission presentation sticky antileft other' id='post8'>
+					<span class="btn_expand"> + </span>
+					<span class="span_theme">antileft</span>
+					<span class="span_meme">other</span>
+					<span class="span_posttitle">Anti-Clinton memes</span> <!--title of post-->
+					<span class="span_username"> by Memewario</span>
+					<div class="fullpost" style="display: none;">
+						<div class="div_notes">
+							<!--(possible) notes for post-->
+						</div>
+						<img class='presentationimg' src="">
+						<img class='presentationimg' src="">
+						<img class='presentationimg' src="">
+						<img class='presentationimg' src="">
+						<!--(possible) notes for post-->
+					</div>
+				</div>
+				<div class='submission presentation sticky other other'  id='post9'>
+					<span class="btn_expand"> + </span>
+					<span class="span_theme">other</span>
+					<span class="span_meme">other</span>
+					<span class="span_posttitle">YouTube as Alt-Right space</span> <!--title of post-->
+					<span class="span_username"> by Memewario</span>
+					<div class="fullpost" style="display: none;">
+						<div class="div_notes">
+							<!--(possible) notes for post-->
+						</div>
+						<img class='presentationimg' src="">
+						<img class='presentationimg' src="">
+						<img class='presentationimg' src="">
+						<img class='presentationimg' src="">
+						<img class='presentationimg' src="">
+						<img class='presentationimg' src="">
+						<img class='presentationimg' src="">
+						<img class='presentationimg' src="">
+						<!--(possible) notes for post-->
+					</div>
+				</div>
+				<div class='submission presentation sticky other antileft' id='post10'>
+					<span class="btn_expand"> + </span>
+					<span class="span_theme">antileft</span>
+					<span class="span_meme">other</span>
+					<span class="span_posttitle">r/HillaryForPrison</span> <!--title of post-->
+					<span class="span_username"> by Memewario</span>
+					<div class="fullpost" style="display: none;">
+						<img class='presentationimg' src="">
+						<img class='presentationimg' src="">
+						<!--(possible) notes for post-->
+					</div>
+				</div>
+				<div class='submission presentation sticky trumpism other' id='post11'>
+					<span class="btn_expand"> + </span>
+					<span class="span_theme">trumpism</span>
+					<span class="span_meme">other</span>
+					<span class="span_posttitle">The Meme War on Reddit</span> <!--title of post-->
+					<span class="span_username"> by Memewario</span>
+					<div class="fullpost" style="display: none;">
+						<div class="div_notes">
+							<p>Crazy stuff.</p> <!--(possible) notes for post-->
+						</div>
+						<img class='presentationimg' src="">
+						<img class='presentationimg' src="">
+						<img class='presentationimg' src="">
+					</div>
+				</div>
+				<div class='submission presentation sticky trumpism other' id='post12'>
+					<span class="btn_expand"> + </span>
+					<span class="span_theme">trumpism</span>
+					<span class="span_meme">other</span>
+					<span class="span_posttitle">r/TheDonald's vernacular language</span> <!--title of post-->
+					<span class="span_username"> by Memewario</span>
+					<div class="fullpost" style="display: none;">
+						<img class='presentationimg' src="">
+						<img class='presentationimg' src="">
+						<img class='presentationimg' src="">
+						<img class='presentationimg' src="">
+						<img class='presentationimg' src="">
+						<div class="div_notes">
+							<p>Occurence of Alt-Right term 'cuck' across Reddit; August 2014-May 2017 (normalized)</p> <!--(possible) notes for post-->
+						</div>
+						<img class='presentationimg' src="{{url_for('static', filename='presentationimg/thedonald_altrightlanguage2.png')}}">
+						<div class="div_notes">
+							<p>Occurrence of Alt-Right term 'Keke' in 4chan/pol and TheDonald, July 2017</p> <!--(possible) notes for post-->
+						</div>
+						<a href="https://rationalwiki.org/wiki/Alt-right_glossary"><p>Alt-right glossary</p></a>
+						<img class='presentationimg' src="">
+						<img class='presentationimg' src="">
+						<img class='presentationimg' src="">
+						<img class='presentationimg' src="">
+						<img class='presentationimg' src="">
+						<img class='presentationimg' src="">
+						<img class='presentationimg' src="">
+						<img class='presentationimg' src="">
+					</div>
+				</div>
+				<div class='submission presentation sticky' id='post13'>
+					<span class="btn_expand"> + </span>
+					<span class="span_theme"></span>
+					<span class="span_meme"></span>
+					<span class="span_posttitle">Network of commenters from selected subreddits</span> <!--title of post-->
+					<span class="span_username"> by Memewario</span>
+					<div class="fullpost" style="display: none;">
+						<img class='presentationimg' src="">
+					</div>
+				</div>
+				<div class='submission presentation sticky' id='post14'>
+					<span class="btn_expand"> + </span>
+					<span class="span_theme">conspiracy</span>
+					<span class="span_theme">antileft</span>
+					<span class="span_meme"></span>
+					<span class="span_posttitle">The Pizaggate story</span> <!--title of post-->
+					<span class="span_username"> by Memewario</span>
+					<div class="fullpost" style="display: none;">
+						<img class='presentationimg' src="">
+						<img class='presentationimg' src="">
+						<img class='presentationimg' src="">
+					</div>
+				</div>
+				<div class='submission presentation sticky' id='post15'>
+					<span class="btn_expand"> + </span>
+					<span class="span_theme">Other</span>
+					<span class="span_meme">Other</span>
+					<span class="span_posttitle">4chan memeboards and themeboards</span> <!--title of post-->
+					<span class="span_username"> by Memewario</span>
+					<div class="fullpost" style="display: none;">
+						<div class="div_notes">
+							<p>There are a bunch of memes and memeboards from 4chan and other chans available.</p> <!--(possible) notes for post-->
+						</div>
+						<img class='presentationimg' src="">
+						<img class='presentationimg' src="">
+						<img class='presentationimg' src="">
+						<img class='presentationimg' src="">
+						<img class='presentationimg' src="">
+						<img class='presentationimg' src="">
+						<img class='presentationimg' src="">
+						<img class='presentationimg' src="">
+						<img class='presentationimg' src="">
+						<img class='presentationimg' src="">
+						<img class='presentationimg' src="">
+						<img class='presentationimg' src="">
+						<img class='presentationimg' src="">
+						<img class='presentationimg' src="">
+						<img class='presentationimg' src="">
+						<img class='presentationimg' src="">
+						<img class='presentationimg' src="">
+						<img class='presentationimg' src="">
+						<img class='presentationimg' src="">
+						<img class='presentationimg' src="">
+						<img class='presentationimg' src="">
+						<img class='presentationimg' src="">
+						<img class='presentationimg' src="">
+						<img class='presentationimg' src="">
+						<img class='presentationimg' src="">
+						<img class='presentationimg' src="">
+						<img class='presentationimg' src="">
+						<img class='presentationimg' src="">
+						<img class='presentationimg' src="">
+						<img class='presentationimg' src="">
+						<img class='presentationimg' src="">
+						<img class='presentationimg' src="">
+						<img class='presentationimg' src="">
+						<img class='presentationimg' src="">
+					</div>
+				</div>
+				<div class='submission presentation sticky other' id='post16'>
+					<span class="btn_expand"> + </span>
+					<span class="span_theme">other</span>
+					<span class="span_meme">other</span>
+					<span class="span_posttitle">The international chanosphere</span> <!--title of post-->
+					<span class="span_username"> by Memewario</span>
+					<div class="fullpost" style="display: none;">
+						<img class='presentationimg' src="">
+						<img class='presentationimg' src="">
+						<img class='presentationimg' src="">
+						<img class='presentationimg' src="">
+						<img class='presentationimg' src="">
+						<img class='presentationimg' src="">
+						<img class='presentationimg' src="">
+						<img class='presentationimg' src="">
+						<img class='presentationimg' src="">
+						<img class='presentationimg' src="">
+						<img class='presentationimg' src="">
+					</div>
+				</div>
+		</div>
+	</div>
+	<div class='col-lg-3 submitscreen'>
+		<div id='schedule'>
+			<div class="sidebartitle"><div class='pagetitle'><span>Dive into the Deep Vernacular Web</span></div></div>
+			<div class="sidebarcontent">
+			<p><span class='activity needed'>"Taking the time to map—to accurately map—the repeated, fractured, reconfiguring mobilizations emerging from anonymous and pseudo-anonymous spaces online allows us to understand where we are and how we got here." (<a href="https://motherboard.vice.com/en_us/article/z4k549/trolling-scholars-debunk-the-idea-that-the-alt-rights-trolls-have-magic-powers">Philips, Beyer & Coleman</a>)</span></p>
+		</div>
+		</div>
+		<div id='rules'>
+			<div class="sidebartitle"><div class='pagetitle'><span>Forum rules</span></div></div>
+			<div class="sidebarcontent">
+			<ul>
+				<li>Each entry is a submission of artefacts from the Deep Vernacular Web</li>
+				<li>'Admin posts' shows pre-selected research findings</li>
+				<li>To become a meme scientist yourself, click the top-left button and go to the research tool</li>
+				<li>Search datasets for images, vernacular keywords, or anything you find relevant/interesting</li>
+				<li>Select a theme and meme if your submission matches it. If not, choose 'other'</li>
+				<li>Select a username, title, and your deliberations/questions as a note</li>
+				<li>Submit to the OILab forum</li>
+				<li>You can always return to submit more findings</li>
+			</ul>
+		</div>
+		</div>
+	</div>
+</div>
+</div>
+<!--Footer-->
+<footer class="page-footer">
+	<!--Copyright-->
+	<div class="footer-copyright">
+		<div class="container-fluid">
+			© 2018 Copyright: <a href="http://www.oilab.eu" target="_blank">Open Intelligence Lab</a>
+
+		</div>
+	</div>
+	<!--/.Copyright-->
+
+</footer>
+<!--/.Footer-->
+
+</body>
+</html>

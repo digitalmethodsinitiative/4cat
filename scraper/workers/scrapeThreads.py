@@ -11,6 +11,7 @@ class ThreadScraper(BasicJSONScraper):
     This scrapes individual threads, and saves the posts into the database.
     """
     type = "thread"
+    max_workers = 5
 
     def process(self, data):
         """
