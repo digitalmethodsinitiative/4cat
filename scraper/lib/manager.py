@@ -1,29 +1,33 @@
+import importlib
+import inspect
+import glob
 import time
+import sys
+import os
 
 from lib.keyboard import KeyPoller
 from lib.logger import Logger
+from lib.worker import BasicWorker
+
 from config import config
 
-from scrapers.scrapeThreads import ThreadScraper
-from scrapers.scrapeBoards import BoardScraper
 
-
-class ScraperManager:
+class WorkerManager:
     """
-    Scraper Manager
+    Worker Manager
 
     Simple class that contains the main loop as well as a threaded keyboard poller
     that listens for a keypress (which can be used to end the main loop)
     """
     looping = True
     key_poller = None
-    scraper_threads = []
+    pool = []
+    worker_prototypes = []
 
     def __init__(self):
         """
         Set up key poller
         """
-        print("Welcome!")
         self.key_poller = KeyPoller(self)
         self.log = Logger()
         self.loop()
@@ -33,44 +37,72 @@ class ScraperManager:
         End main loop
         """
         self.looping = False
-        self.log.info("Finishing scrapes.")
+        self.log.info("Quitting after next loop.")
 
     def loop(self):
         """
-        Loop the scraper manager
+        Loop the worker manager
 
-        Every few seconds, this checks if any scrapers have finished, and if so, whether
-        any new ones should be started.
+        Every few seconds, this checks if all worker types have enough workers of their type
+        running, and if not new ones are started.
 
-        If aborted, all scrapers are politely asked to abort too.
+        If aborted, all workers are politely asked to abort too.
         """
-        # manage scrapers
         while self.looping:
-            board_scrapers = len([scraper for scraper in self.scraper_threads if scraper.type == "board"])
-            for i in range(board_scrapers, config.max_board_scrapers):
-                self.log.info("Starting new board scraper")
-                board_scraper = BoardScraper()
-                self.scraper_threads.append(board_scraper)
+            self.load_worker_types()
 
-            thread_scrapers = len([scraper for scraper in self.scraper_threads if scraper.type == "thread"])
-            for i in range(thread_scrapers, config.max_thread_scrapers):
-                self.log.info("Starting new thread scraper")
-                thread_scraper = ThreadScraper()
-                self.scraper_threads.append(thread_scraper)
+            # start new workers, if neededz
+            for worker_type in self.worker_prototypes:
+                active_workers = len([worker for worker in self.pool if worker.type == worker_type.type])
+                if active_workers < worker_type.max_workers:
+                    for i in range(active_workers, worker_type.max_workers):
+                        self.log.info("Starting new worker (%s, %i/%i)" % (worker_type.type, active_workers + 1, worker_type.max_workers))
+                        active_workers += 1
+                        worker = worker_type()
+                        worker.start()
+                        self.pool.append(worker)
 
-            # remove references to finished scrapers
-            for scraper in self.scraper_threads:
-                if not scraper.isAlive():
-                    self.scraper_threads.remove(scraper)
+            # remove references to finished workers
+            for worker in self.pool:
+                if not worker.is_alive():
+                    self.pool.remove(worker)
 
-            self.log.info("Running scrapers: %i" % len(self.scraper_threads))
+            self.log.info("Running workers: %i" % len(self.pool))
 
-            # check in five seconds if any scrapers died and need to be restarted (probably not!)
+            # check in five seconds if any workers died and need to be restarted (probably not!)
             time.sleep(5)
 
-        # let all scrapers end
-        print("Waiting for all scrapers to finish...")
-        for scraper in self.scraper_threads:
-            scraper.abort()
+        # let all workers end
+        print("Waiting for all workers to finish...")
+        for worker in self.pool:
+            worker.abort()
+
+        for worker in self.pool:
+            worker.join()
 
         print("Done!")
+
+    def load_worker_types(self):
+        """
+        See what worker types are available
+
+        Looks for python files in the "workers" folder, then looks for classes that
+        are a subclass of BasicWorker that are available in those files, and not an
+        abstract class themselves. Classes that meet those criteria and have not been
+        loaded yet are added to an internal list of available worker types.
+        """
+        # check for worker files
+        os.chdir("workers")
+        for file in glob.glob("*.py"):
+            module = "workers." + file[:-3]
+            if module in sys.modules:
+                continue
+
+            importlib.import_module(module)
+            members = inspect.getmembers(sys.modules[module])
+
+            for member in members:
+                if inspect.isclass(member[1]) and issubclass(member[1], BasicWorker) and not inspect.isabstract(member[1]):
+                    self.worker_prototypes.append(member[1])
+
+        os.chdir("..")

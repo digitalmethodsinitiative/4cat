@@ -1,6 +1,6 @@
 from lib.queue import JobQueue
 from lib.database import Database
-from lib.manager import ScraperManager
+from lib.manager import WorkerManager
 
 # init
 looping = True
@@ -17,4 +17,4 @@ if queue.getJobCount() == 0:
     queue.addJob("board", None)
 
 # make it happen
-ScraperManager()
+WorkerManager()
