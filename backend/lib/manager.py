@@ -53,10 +53,10 @@ class WorkerManager:
 
             # start new workers, if neededz
             for worker_type in self.worker_prototypes:
-                active_workers = len([worker for worker in self.pool if worker.type == worker_type.type])
+                active_workers = len([worker for worker in self.pool if worker.__class__.__name__ == worker_type.__name__])
                 if active_workers < worker_type.max_workers:
                     for i in range(active_workers, worker_type.max_workers):
-                        self.log.info("Starting new worker (%s, %i/%i)" % (worker_type.type, active_workers + 1, worker_type.max_workers))
+                        self.log.info("Starting new worker (%s, %i/%i)" % (worker_type.__name__, active_workers + 1, worker_type.max_workers))
                         active_workers += 1
                         worker = worker_type()
                         worker.start()
