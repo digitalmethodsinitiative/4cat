@@ -88,7 +88,7 @@ class ThreadScraper(BasicJSONScraper):
                 "thread_id": op["no"],
                 "timestamp": post["time"],
                 "body": post["com"] if "com" in post else "",
-                "author": post["name"],
+                "author": post["name"] if "name" in post else "",
                 "image_file": post["filename"] + post["ext"] if "filename" in post and "ext" in post else "",
                 "image_4chan": str(post["tim"]) + post["ext"] if "filename" in post and "ext" in post else "",
                 "image_md5": post["md5"] if "md5" in post else "",
