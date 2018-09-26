@@ -21,7 +21,7 @@ class JobQueue:
         """
         self.db = Database()
 
-    def getJob(self, type):
+    def getJob(self, type, timestamp=-1):
         """
         Get job of a specific type
 
@@ -29,11 +29,19 @@ class JobQueue:
         kinds of data.
 
         :param string type:  Job type
+        :param int timestamp:  Find jobs that may be claimed after this timestamp. If set to
+                               a negative value (default), any job with a "claim after" time
+                               earlier than the current type is selected.
         :return dict: Job data, or `None` if no job was found
         """
-        job = self.db.fetchone("SELECT * FROM jobs WHERE jobtype = %s AND claimed = 0;", (type,))
+        if timestamp < 0:
+            timestamp = time.time()
+        job = self.db.fetchone("SELECT * FROM jobs WHERE jobtype = %s AND claimed = 0 AND claim_after < %s;", (type, timestamp))
 
         return {key: (json.loads(value) if key == "details" else value) for key, value in job.items()} if job else None
+
+    def getAllJobs(self):
+        return self.db.fetchall("SELECT * FROM jobs")
 
     def getJobCount(self, type="*"):
         """
@@ -49,7 +57,7 @@ class JobQueue:
 
         return int(count["count"])
 
-    def addJob(self, type, details, remote_id=0):
+    def addJob(self, type, details=None, remote_id=0, claim_after=0):
         """
         Add a new job to the queue
 
@@ -61,8 +69,13 @@ class JobQueue:
         :param remote_id:  Remote ID of object to work on. For example, a post or thread ID
         """
         try:
-            self.db.update("INSERT INTO jobs (jobtype, details, timestamp, remote_id) VALUES (%s, %s, %s, %s);",
-                           (type, json.dumps(details), time.time(), remote_id))
+            self.db.insert("jobs", {
+                "jobtype": type,
+                "details": json.dumps(details),
+                "timestamp": time.time(),
+                "remote_id": remote_id,
+                "claim_after": claim_after
+            })
         except psycopg2.IntegrityError:
             self.db.commit()
             raise JobAlreadyExistsException()
@@ -75,17 +88,23 @@ class JobQueue:
 
         :param job_id:  Job ID to finish
         """
-        self.db.update("DELETE FROM jobs WHERE id = %s;", (job_id,))
+        self.db.delete("jobs", where={"id": job_id})
 
-    def releaseJob(self, job_id):
+    def releaseJob(self, job_id, delay=0, claim_after = 0):
         """
         Release a job
 
         The job is no longer marked as claimed, and can be claimed by a worker again.
 
         :param job_id:  Job ID to release
+        :param int delay:  Amount of seconds after which job may be reclaimed
+        :param int claim_after:  UNIX timestamp after which job may be reclaimed. If
+                                `delay` is set, it overrides this parameter.
         """
-        self.db.update("UPDATE jobs SET claimed = 0 WHERE id = %s;", (job_id,))
+        if delay > 0:
+            claim_after = time.time() + delay
+
+        self.db.update("jobs", where={"id": job_id}, data={"claimed": 0, "claim_after": claim_after})
 
     def releaseAll(self):
         """
@@ -93,7 +112,7 @@ class JobQueue:
 
         All claimed jobs are released. This is useful to run when the backend is restarted.
         """
-        self.db.update("UPDATE jobs SET claimed = 0")
+        self.db.execute("UPDATE jobs SET claimed = 0")
 
     def claimJob(self, job_id):
         """
@@ -104,8 +123,7 @@ class JobQueue:
 
         :param job_id: Job ID to claim
         """
-        updated_rows = self.db.update("UPDATE jobs SET claimed = %s WHERE id = %s AND claimed = 0;",
-                                      (time.time(), job_id))
+        updated_rows = self.db.update("jobs", where={"id": job_id, "claimed": 0}, data={"claimed": time.time()})
 
         if updated_rows == 0:
             raise JobClaimedException("Job is already claimed")

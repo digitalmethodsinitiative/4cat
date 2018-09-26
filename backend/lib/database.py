@@ -1,6 +1,8 @@
 import psycopg2
 import psycopg2.extras
 
+from psycopg2.extensions import AsIs
+
 from config import config
 
 
@@ -25,49 +27,11 @@ class Database:
 
     def setup(self):
         """
-        Create, if they don't exist yet, the tables and indexes required for the scraper to work.
+        This used to do something, but now it doesn't really
         """
-        # create jobtype type
-        self.execute("""
-        DO $$ BEGIN
-            CREATE TYPE jobtype AS ENUM ('board', 'thread', 'search', 'misc');
-        EXCEPTION
-            WHEN duplicate_object THEN null;
-        END $$
-        """)
-
-        # create job table
-        self.execute("""
-        CREATE TABLE IF NOT EXISTS jobs (
-            id SERIAL PRIMARY KEY,
-            jobtype jobtype DEFAULT 'misc',
-            remote_id text,
-            details text,
-            owner text,
-            timestamp integer,
-            claimed integer DEFAULT 0
-        );
-        """)
-
-        # make sure there is only ever one job for any one item of a given type  (this hangs psycopg2 somehow...?)
-        # self.execute("""
-        # CREATE UNIQUE INDEX IF NOT EXISTS unique_job ON jobs (
-        #    jobtype,
-        #    remote_id
-        # );
-        # """)
-
-        # create posts table
-        self.execute("""
-        CREATE TABLE IF NOT EXISTS posts (
-            id integer PRIMARY KEY,
-            post text
-        );
-        """)
-
         self.commit()
 
-    def execute(self, query, *args):
+    def query(self, query, *args):
         """
         Execute a query
 
@@ -77,7 +41,7 @@ class Database:
         """
         return self.cursor.execute(query, *args)
 
-    def update(self, query, *args):
+    def execute(self, query, *args):
         """
         Execute a query, and commit afterwards
 
@@ -88,6 +52,97 @@ class Database:
         self.cursor.execute(query, *args)
         self.commit()
 
+    def update(self, table, data, where={}, commit=True):
+        """
+        Update a database record
+
+        :param string table:  Table to update
+        :param dict where:  Simple conditions, parsed as "column1 = value1 AND column2 = value2" etc
+        :param dict data:  Data to set, Column => Value
+        :param bool commit:  Whether to commit after executing the query
+
+        :return int: Number of affected rows. Note that this may be unreliable if `commit` is `False`
+        """
+        where_sql = ["%s = %%s" % column for column in where.keys()]
+        replacements = list(where.values())
+
+        set = ["%s = %%s" % column for column in data.keys()]
+        [replacements.insert(0, value) for value in reversed(list(data.values()))]
+
+        # build query
+        query = "UPDATE " + table + " SET " + ", ".join(set)
+        if len(where_sql) > 0:
+            query += " WHERE " + " AND ".join(where_sql)
+        self.cursor.execute(query, replacements)
+
+        if commit:
+            self.commit()
+
+        return self.cursor.rowcount
+
+    def delete(self, table, where, commit=True):
+        """
+        Delete a database record
+
+        :param string table:  Table to delete from
+        :param dict where:  Simple conditions, parsed as "column1 = value1 AND column2 = value2" etc
+        :param bool commit:  Whether to commit after executing the query
+
+        :return int: Number of affected rows. Note that this may be unreliable if `commit` is `False`
+        """
+        where_sql = ["%s = %%s" % column for column in where.keys()]
+        replacements = list(where.values())
+
+        # build query
+        query = "DELETE FROM " + table + " WHERE " + " AND ".join(where_sql)
+        self.cursor.execute(query, replacements)
+
+        if commit:
+            self.commit()
+
+        return self.cursor.rowcount
+
+    def insert(self, table, data, commit=True):
+        """
+        Create database record
+
+        :param string table:  Table to insert record into
+        :param dict data:   Data to insert
+        :param bool commit: Whether to commit after executing the query
+        :return int: Number of affected rows. Note that this may be unreliable if `commit` is `False`
+        """
+        self.cursor.execute("INSERT INTO " + table + " (%s) VALUES %s",
+                            (AsIs(", ".join(data.keys())), tuple(data.values())))
+
+        if commit:
+            self.commit()
+
+        return self.cursor.rowcount
+
+    def insert_or_update(self, table, data):
+        """
+        Create record, or update if already existing
+
+        Either creates a record, or updates an existing record if a new one cannot be
+        created because a table constraint is violated.
+
+        :param string table:  Table to update/insert
+        :param dict data:  Data, as a column => value dictionary
+
+        :return int: Number of affected rows. Note that this may be unreliable if `commit` is `False`
+        """
+        set = ["%s = %%s" % column for column in data.keys()]
+        replacements = list(data.values())
+
+        replacements.insert(0, tuple(data.values()))
+        replacements.insert(0, AsIs(", ".join(data.keys())))
+
+        self.cursor.execute("INSERT INTO " + table + " (%s) VALUES %s ON CONFLICT DO UPDATE SET " + ", ".join(set),
+                            replacements)
+        self.commit()
+
+        return self.cursor.rowcount
+
     def fetchall(self, query, *args):
         """
         Fetch all rows for a query
@@ -95,7 +150,7 @@ class Database:
         :param args: Replacement values
         :return list: The result rows, as a list
         """
-        self.execute(query, *args)
+        self.query(query, *args)
         try:
             return self.cursor.fetchall()
         except AttributeError:
@@ -109,7 +164,7 @@ class Database:
         :param args: Replacement values
         :return: The row, as a dictionary, or None if there were no rows
         """
-        self.execute(query, *args)
+        self.query(query, *args)
         try:
             return self.cursor.fetchone()
         except AttributeError:

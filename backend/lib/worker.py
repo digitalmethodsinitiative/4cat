@@ -21,6 +21,7 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
     queue = None
     log = None
     looping = True
+    loop_time = 0
 
     def __init__(self):
         """
@@ -44,6 +45,7 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
         This simply calls the work method continually, with a pause in-between calls.
         """
         while self.looping:
+            self.loop_time = time.time()
             self.work()
             time.sleep(self.pause)
 
