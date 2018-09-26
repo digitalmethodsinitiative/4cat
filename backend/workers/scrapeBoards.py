@@ -2,6 +2,7 @@ import time
 
 from lib.scraper import BasicJSONScraper
 from lib.database import Database
+from lib.queue import JobAlreadyExistsException
 
 
 class BoardScraper(BasicJSONScraper):
@@ -36,22 +37,25 @@ class BoardScraper(BasicJSONScraper):
                 thread_data = {
                     "id": thread["no"],
                     "board": self.jobdata["remote_id"],
-                    "positions": ""
+                    "index_positions": ""
                 }
 
                 # schedule a job for scraping the thread's posts
-                self.queue.addJob(type="thread", remote_id=thread["no"], details={"board": self.jobdata["remote_id"]})
+                try:
+                    self.queue.addJob(type="thread", remote_id=thread["no"], details={"board": self.jobdata["remote_id"]})
+                except JobAlreadyExistsException:
+                    pass
 
                 # add database record for thread, if none exists yet
-                thread = self.db.fetchone("SELECT * FROM threads WHERE id = %s", (thread_data["id"],))
-                if not thread:
-                    self.db.insert("thread", thread_data)
+                thread_row = self.db.fetchone("SELECT * FROM threads WHERE id = %s", (thread_data["id"],))
+                if not thread_row:
+                    self.db.insert("threads", thread_data)
 
                 # update timestamps and position
-                position_update = self.loop_time + ":" + position + ",", thread_data["id"]
+                position_update = str(self.loop_time) + ":" + str(position) + ",", thread_data["id"]
                 self.db.execute("UPDATE threads SET timestamp_scraped = %s, timestamp_modified = %s,"
-                                "index_positions = index_positions + %s WHERE id = %s",
-                                (self.loop_time, thread["modified"], position_update))
+                                "index_positions = CONCAT(index_positions, %s) WHERE id = %s",
+                                (self.loop_time, thread["last_modified"], position_update, thread_data["id"]))
 
     def after_process(self):
         """

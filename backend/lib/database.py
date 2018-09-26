@@ -31,7 +31,7 @@ class Database:
         """
         self.commit()
 
-    def query(self, query, *args):
+    def query(self, query, replacements=None):
         """
         Execute a query
 
@@ -39,17 +39,17 @@ class Database:
         :param args: Replacement values
         :return None:
         """
-        return self.cursor.execute(query, *args)
+        return self.cursor.execute(query, replacements)
 
-    def execute(self, query, *args):
+    def execute(self, query, replacements=None):
         """
         Execute a query, and commit afterwards
 
         This is required for UPDATE/INSERT/DELETE/etc to stick
         :param string query:  Query
-        :param args: Replacement values
+        :param replacements: Replacement values
         """
-        self.cursor.execute(query, *args)
+        self.cursor.execute(query, replacements)
         self.commit()
 
     def update(self, table, data, where={}, commit=True):
@@ -156,15 +156,15 @@ class Database:
         except AttributeError:
             return []
 
-    def fetchone(self, query, *args):
+    def fetchone(self, query, replacements):
         """
         Fetch one result row
 
         :param query: Query
-        :param args: Replacement values
+        :param replacements: Replacement values
         :return: The row, as a dictionary, or None if there were no rows
         """
-        self.query(query, *args)
+        self.query(query, replacements)
         try:
             return self.cursor.fetchone()
         except AttributeError:

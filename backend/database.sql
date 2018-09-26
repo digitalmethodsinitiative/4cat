@@ -1,7 +1,7 @@
 -- jobs table
 CREATE TABLE IF NOT EXISTS jobs (
   id          SERIAL PRIMARY KEY,
-  jobtype     text DEFAULT 'misc',
+  jobtype     text    DEFAULT 'misc',
   remote_id   text,
   details     text,
   timestamp   integer,
@@ -19,6 +19,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS unique_job
 -- threads
 CREATE TABLE IF NOT EXISTS threads (
   id                 integer PRIMARY KEY, -- matches 4chan thread ID
+  board              text,
   timestamp          integer DEFAULT 0, -- first known timestamp for this thread
   timestamp_scraped  integer, -- last timestamp this thread was scraped
   timestamp_modified integer, -- last timestamp this thread was modified (reported by 4chan)
@@ -42,7 +43,6 @@ CREATE INDEX IF NOT EXISTS threads_timestamp
 CREATE TABLE IF NOT EXISTS posts (
   id               integer PRIMARY KEY, -- matches 4chan post ID
   thread_id        integer,
-  board            text,
   timestamp        integer,
   body             text,
   author           text,
@@ -81,3 +81,7 @@ CREATE INDEX IF NOT EXISTS mention_mentioned
   ON posts_mention (
     mentioned_id
   );
+
+TRUNCATE threads;
+TRUNCATE posts;
+TRUNCATE jobs;
