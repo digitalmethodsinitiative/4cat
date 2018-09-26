@@ -9,9 +9,9 @@ class JobQueue:
     """
     A simple job queue
 
-    Jobs are basically database records. The job has some information that a scraper (in
-    this case) can use to scrape. The job queue is shared between workers so that nothing
-    is scraped twice.
+    Jobs are basically database records. The job has some information that a worker
+    can use to do its job. The job queue is shared between workers so that nothing
+    is done twice.
     """
     db = None
 
@@ -58,7 +58,7 @@ class JobQueue:
 
         :param type:  Job type
         :param details:  Job details - may be empty, will be stored as JSON
-        :param remote_id:  Remote ID of object to scrape. For example, a post or thread ID
+        :param remote_id:  Remote ID of object to work on. For example, a post or thread ID
         """
         try:
             self.db.update("INSERT INTO jobs (jobtype, details, timestamp, remote_id) VALUES (%s, %s, %s, %s);",
@@ -81,7 +81,7 @@ class JobQueue:
         """
         Release a job
 
-        The job is no longer marked as claimed, and can be claime by a scraper again.
+        The job is no longer marked as claimed, and can be claimed by a worker again.
 
         :param job_id:  Job ID to release
         """
@@ -91,7 +91,7 @@ class JobQueue:
         """
         Release all jobs
 
-        All claimed jobs are released. This is useful to run when the scraper is restarted.
+        All claimed jobs are released. This is useful to run when the backend is restarted.
         """
         self.db.update("UPDATE jobs SET claimed = 0")
 
