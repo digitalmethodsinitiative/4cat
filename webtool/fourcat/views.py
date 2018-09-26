@@ -99,7 +99,7 @@ def search_csv(csv_input, searchquery, platform, histo = 0, query_title = 0, min
 		commentortitle = 'title'
 	else:
 		commentortitle = 'comment'
-	filestring = 'static/data/filters/' + platformselected + '/substringfilters/mentions_' + commentortitle + '_' + searchquery + '_' + mindate + '_' + maxdate + '.csv'
+	filestring = 'fourcat/static/data/filters/' + platformselected + '/substringfilters/mentions_' + commentortitle + '_' + searchquery + '_' + mindate + '_' + maxdate + '.csv'
 	fileexists = checkFileExists(filestring)
 
 	# make a better code later that returns also the freq image if it exists
@@ -209,7 +209,7 @@ def show_images(csv_input,searchterm,platform,mindate,maxdate):
 	print(platformselected)
 
 	pd.set_option('display.max_colwidth', 9999)
-	read_df = pd.read_csv('static/data/' + csv_input + '.csv', encoding="utf-8")
+	read_df = pd.read_csv('fourcat/static/data/' + csv_input + '.csv', encoding="utf-8")
 
 	fulltable = read_df[read_df['imageurl'].str.contains('1', na=False)]
 
@@ -236,20 +236,21 @@ def show_images(csv_input,searchterm,platform,mindate,maxdate):
 @app.route('/wordanalysis/<csv_input>/<filtermethod>/<platform>/<windowsize>/<colocationword>')
 def wordanalysis(csv_input,filtermethod,platform,windowsize=0,colocationword=''):
 	"""
-	Calls
+	Calls nltk to do n-gram text analysis.
+	Probably not for production but might be interesting at a later stage.
 	"""
 	csvstring = csv_input
 	csv_input = csv_input.replace('@','/')
 	platformselected = platform
 
 	# check if the query is already made and the respective csv exists
-	filestring = 'static/data/filters/' + platformselected + '/wordanalysis/' + filtermethod + '_' + colocationword + '_' + csvstring + '_' + windowsize + '.csv'
+	filestring = 'fourcat/static/data/filters/' + platformselected + '/wordanalysis/' + filtermethod + '_' + colocationword + '_' + csvstring + '_' + windowsize + '.csv'
 	fileexists = checkFileExists(filestring)
 	if fileexists:
 		return('file_exists')
 
 	if platformselected != 'chans':
-		read_df = pd.read_csv('static/data/' + csv_input + '.csv', encoding="utf-8")
+		read_df = pd.read_csv('fourcat/static/data/' + csv_input + '.csv', encoding="utf-8")
 	else:
 		# to catch large queries, make sure it's not a stopword
 		if colocationword not in stopwords.words("english") and len(colocationword) > 2:
@@ -339,8 +340,8 @@ def show_submissions():
 @app.route('/penelope')
 @app.route('/penelope/<model>/<word>')
 def penelope(model='yt-rightwing-transcripts', word='trump'):
-	print('static/data/word_embeddings/w2v_model_all-' + model + '.model')
-	sims = sim.getW2vSims('static/data/word_embeddings/w2v_model_all-' + model + '.model.bin', querystring=word, longitudinal=False)
+	print('fourcat/static/data/word_embeddings/w2v_model_all-' + model + '.model')
+	sims = sim.getW2vSims('fourcat/static/data/word_embeddings/w2v_model_all-' + model + '.model.bin', querystring=word, longitudinal=False)
 	
 	print('w2v nearest neighbours:')
 	print(sims)
@@ -349,7 +350,7 @@ def penelope(model='yt-rightwing-transcripts', word='trump'):
 
 @app.route('/w2v/<model>/<word>')
 def w2v(model, word='kek'):
-	sims = sim.getW2vSims('static/data/word_embeddings/w2v_model_all-' + model + '.model.bin', querystring=word, longitudinal=False)
+	sims = sim.getW2vSims('fourcat/static/data/word_embeddings/w2v_model_all-' + model + '.model.bin', querystring=word, longitudinal=False)
 	return sims
 
 @app.route('/celerytest')
