@@ -14,9 +14,12 @@ class BoardScraper(BasicJSONScraper):
     """
     type = "board"
     pause = 1  # we're not checking this often, but using claim-after to schedule jobs
-    max_workers = 2  # should be equivalent to the amount of boards to scrape
+    max_workers = 2  # should probably be equivalent to the amount of boards to scrape
 
     def __init__(self):
+        """
+        Set up database connection - we need one to store the thread data
+        """
         super().__init__()
 
         self.db = Database()
@@ -57,14 +60,6 @@ class BoardScraper(BasicJSONScraper):
                                 "index_positions = CONCAT(index_positions, %s) WHERE id = %s",
                                 (self.loop_time, thread["last_modified"], position_update, thread_data["id"]))
 
-    def after_process(self):
-        """
-        After the job is finished, schedule another scrape a minute later
-        """
-        # scrape again a minute later
-        self.queue.finishJob(self.jobdata["id"])
-        self.queue.addJob("board", remote_id=self.jobdata["remote_id"], details=self.jobdata["details"], claim_after=time.time() + 60)
-
     def get_url(self, data):
         """
         Get URL to scrape for the current job
@@ -72,4 +67,4 @@ class BoardScraper(BasicJSONScraper):
         :param dict data:  Job data - contains the ID of the board to scrape
         :return string: URL to scrape
         """
-        return "https://a.4cdn.org/%s/threads.json" % data["remote_id"]
+        return "http://a.4cdn.org/%s/threads.json" % data["remote_id"]
