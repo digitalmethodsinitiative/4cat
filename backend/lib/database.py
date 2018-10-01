@@ -3,7 +3,7 @@ import psycopg2.extras
 
 from psycopg2.extensions import AsIs
 
-from config import config
+import config
 
 
 class Database:

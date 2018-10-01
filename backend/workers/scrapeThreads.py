@@ -1,11 +1,12 @@
 import os.path
 import json
+import re
 
 from lib.scraper import BasicJSONScraper
 from lib.database import Database
 from lib.queue import JobAlreadyExistsException
 
-from config import config
+import config
 
 
 class ThreadScraper(BasicJSONScraper):
