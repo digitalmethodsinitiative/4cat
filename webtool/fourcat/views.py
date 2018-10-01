@@ -5,7 +5,7 @@ import time
 import ast
 import html
 import datetime
-import os.path
+import os
 import pandas as pd
 import sys
 import fourcat.similarities as sim
@@ -69,6 +69,8 @@ def load_csv(csv_input):
 	else:
 		print('Connecting to database')
 		print(databaselocation)
+		print(os.listdir(os.getcwd()))
+		print(os.getcwd())
 		conn = sqlite3.connect(databaselocation)
 
 		print('Connected to database')
@@ -99,7 +101,7 @@ def search_csv(csv_input, searchquery, platform, histo = 0, query_title = 0, min
 		commentortitle = 'title'
 	else:
 		commentortitle = 'comment'
-	filestring = 'static/data/filters/' + platformselected + '/substringfilters/mentions_' + commentortitle + '_' + searchquery + '_' + mindate + '_' + maxdate + '.csv'
+	filestring = 'fourcat/static/data/filters/' + platformselected + '/substringfilters/mentions_' + commentortitle + '_' + searchquery + '_' + mindate + '_' + maxdate + '.csv'
 	fileexists = checkFileExists(filestring)
 
 	# make a better code later that returns also the freq image if it exists
@@ -131,10 +133,6 @@ def search_csv(csv_input, searchquery, platform, histo = 0, query_title = 0, min
 	pd.set_option('display.max_colwidth', 9999)
 
 	if mindate != '' and maxdate != '':
-		# mindate = datetime.datetime.strptime(mindate, "%Y-%m-%d")
-		# mindate = int(datetime.datetime.timestamp(mindate))
-		# maxdate = datetime.datetime.strptime(maxdate, "%Y-%m-%d")
-		# maxdate = int(datetime.datetime.timestamp(maxdate))
 		print(mindate, maxdate)
 
 	# if it's FB, Reddit or documented 4chan
@@ -157,6 +155,7 @@ def search_csv(csv_input, searchquery, platform, histo = 0, query_title = 0, min
 	else:
 		# to catch large queries, make sure it's not a stopword
 		if query not in stopwords.words("english") and len(query) > 2:
+			print('Connecting to database "' + databaselocation + '"')
 			conn = sqlite3.connect(databaselocation)
 			print('Connected to database "' + databaselocation + '"')
 
@@ -168,7 +167,14 @@ def search_csv(csv_input, searchquery, platform, histo = 0, query_title = 0, min
 				if mindate == '' and maxdate == '':
 					df = pd.read_sql_query("SELECT * FROM pol_content_fts WHERE comment MATCH ?;", conn, params=[query])
 				else:
-					df = pd.read_sql_query("SELECT * FROM pol_content_fts WHERE comment MATCH ? AND timestamp > ? AND timestamp < ?;", conn, params=[query, mindate, maxdate])
+					# optimise this query to get time-based text queries on the basis of the fts table later, not sure what is most efficient
+					df = pd.read_sql_query("""
+						SELECT pol_content.num, pol_content.comment, pol_content.title, pol_content.timestamp FROM pol_content
+						INNER JOIN pol_content_fts
+						ON pol_content.num = pol_content_fts.num
+						WHERE pol_content_fts.comment MATCH ?
+						AND pol_content.timestamp > ? AND pol_content.timestamp < ?;
+						""", conn, params=[query, mindate, maxdate])
 				df_html = df.head()
 				print(df_html)
 				htmltable = df_html.to_html()
@@ -209,7 +215,7 @@ def show_images(csv_input,searchterm,platform,mindate,maxdate):
 	print(platformselected)
 
 	pd.set_option('display.max_colwidth', 9999)
-	read_df = pd.read_csv('static/data/' + csv_input + '.csv', encoding="utf-8")
+	read_df = pd.read_csv('fourcat/static/data/' + csv_input + '.csv', encoding="utf-8")
 
 	fulltable = read_df[read_df['imageurl'].str.contains('1', na=False)]
 
@@ -236,20 +242,21 @@ def show_images(csv_input,searchterm,platform,mindate,maxdate):
 @app.route('/wordanalysis/<csv_input>/<filtermethod>/<platform>/<windowsize>/<colocationword>')
 def wordanalysis(csv_input,filtermethod,platform,windowsize=0,colocationword=''):
 	"""
-	Calls
+	Calls nltk to do n-gram text analysis.
+	Probably not for production but might be interesting at a later stage.
 	"""
 	csvstring = csv_input
 	csv_input = csv_input.replace('@','/')
 	platformselected = platform
 
 	# check if the query is already made and the respective csv exists
-	filestring = 'static/data/filters/' + platformselected + '/wordanalysis/' + filtermethod + '_' + colocationword + '_' + csvstring + '_' + windowsize + '.csv'
+	filestring = 'fourcat/static/data/filters/' + platformselected + '/wordanalysis/' + filtermethod + '_' + colocationword + '_' + csvstring + '_' + windowsize + '.csv'
 	fileexists = checkFileExists(filestring)
 	if fileexists:
 		return('file_exists')
 
 	if platformselected != 'chans':
-		read_df = pd.read_csv('static/data/' + csv_input + '.csv', encoding="utf-8")
+		read_df = pd.read_csv('fourcat/static/data/' + csv_input + '.csv', encoding="utf-8")
 	else:
 		# to catch large queries, make sure it's not a stopword
 		if colocationword not in stopwords.words("english") and len(colocationword) > 2:
@@ -293,9 +300,9 @@ def checkFileExists(inputstring):
 	else:
 		return False
 
-# function for sending data to the main screen
 @app.route('/send', methods=['GET','POST'])
 def accept_submissions():
+	# function for sending data to a main screen. Used for the Transmediale 2018 Meme War workshop.
 	global jsonfile
 	if request.method == 'POST':		
 		content = request.get_json()
@@ -318,29 +325,27 @@ def accept_submissions():
 		return 'success'
 		#return render_template('fourcat.html', inputs=jsonfile)
 
-# function for sending data to the main screen
 @app.route('/update', methods=['GET','POST'])
 def update_submissions():
+	# function for updating data on the main screen. Used for the Transmediale 2018 Meme War workshop.
 	print('request for datafile')
 	updatejson = json.dumps(jsonfile)
 	return updatejson
 
 @app.route('/submissions')
 def show_submissions():
+	# function for updating data on the main screen. Used for the Transmediale 2018 Meme War workshop.
 	inputs = jsonfile
 	print(type(jsonfile))
-	#inputs = json.dumps(inputs)
-	#inputs = str(jsonfile)
-	# print('inputs:')
-	# print(inputs)
 	inputs = json.dumps(inputs)	
 	return render_template('submitsuccess.html', inputs = inputs)
 
 @app.route('/penelope')
 @app.route('/penelope/<model>/<word>')
 def penelope(model='yt-rightwing-transcripts', word='trump'):
-	print('static/data/word_embeddings/w2v_model_all-' + model + '.model')
-	sims = sim.getW2vSims('static/data/word_embeddings/w2v_model_all-' + model + '.model.bin', querystring=word, longitudinal=False)
+	# Function that returns the view of the Penelope word2vec/monadology explorer.
+	print('fourcat/static/data/word_embeddings/w2v_model_all-' + model + '.model')
+	sims = sim.getW2vSims('fourcat/static/data/word_embeddings/w2v_model_all-' + model + '.model.bin', querystring=word, longitudinal=False)
 	
 	print('w2v nearest neighbours:')
 	print(sims)
@@ -349,30 +354,6 @@ def penelope(model='yt-rightwing-transcripts', word='trump'):
 
 @app.route('/w2v/<model>/<word>')
 def w2v(model, word='kek'):
-	sims = sim.getW2vSims('static/data/word_embeddings/w2v_model_all-' + model + '.model.bin', querystring=word, longitudinal=False)
+	# Function that returns the n closest words of a certain word in a word2vec model.
+	sims = sim.getW2vSims('fourcat/static/data/word_embeddings/w2v_model_all-' + model + '.model.bin', querystring=word, longitudinal=False)
 	return sims
-
-@app.route('/celerytest')
-def celerytest():
-	# result = add_together.delay(23, 42)
-	# result.wait()
-	# print(result)
-	return '<body><h1>Celery is running</h1></body>'
-
-# CHANSCRAPER
-def startcode():
-    print('Creating snapshot csv')
-    outputcsv = startSnapshot(False)                #bool represents whether images should be fetched
-    print('Snapshot csv created')
-    # print('Started word analysis...')
-    # startWordAnalysis(outputcsv)
-    print('Resetting variables')
-    resetVariables()
-    # print('Code finished!')
-    print('Waiting a few mins before next update...')
-
-def scheduleChanScraping(timespan):
-    createNewSnapshot()
-    scheduler = BlockingScheduler()
-    scheduler.add_job(startcode, 'interval', minutes=timespan, start_date='2018-09-18 16:45:00') #add , start_date='2018-01-05 17:21:00' later
-    scheduler.start()
