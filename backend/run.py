@@ -1,5 +1,3 @@
-import sys
-
 from lib.queue import JobQueue
 from lib.database import Database
 from lib.manager import WorkerManager
@@ -16,7 +14,7 @@ with open("database.sql", "r") as content_file:
     log.info("Initializing database...")
     database_setup = content_file.read()
     db.execute(database_setup)
-    log.info("Database tables and indexed present.")
+    log.info("Database tables and indexes present.")
 
 # clean up after ourselves
 db.commit()
