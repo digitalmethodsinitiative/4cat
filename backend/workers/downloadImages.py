@@ -2,7 +2,7 @@ import requests
 import time
 
 from lib.worker import BasicWorker
-from config import config
+import config
 
 
 class ImageDownloader(BasicWorker):

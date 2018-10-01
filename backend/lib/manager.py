@@ -9,8 +9,6 @@ from lib.keyboard import KeyPoller
 from lib.logger import Logger
 from lib.worker import BasicWorker
 
-from config import config
-
 
 class WorkerManager:
     """
