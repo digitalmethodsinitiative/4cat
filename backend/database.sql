@@ -23,12 +23,12 @@ CREATE TABLE IF NOT EXISTS threads (
   timestamp          integer DEFAULT 0, -- first known timestamp for this thread
   timestamp_scraped  integer, -- last timestamp this thread was scraped
   timestamp_modified integer, -- last timestamp this thread was modified (reported by 4chan)
-  last_post          integer, -- ID of last post in this thread
+  post_last          integer, -- ID of last post in this thread
   num_unique_ips     integer DEFAULT 0,
   num_replies        integer DEFAULT 0,
   num_images         integer DEFAULT 0,
-  limit_bump         integer DEFAULT 0,
-  limit_image        integer DEFAULT 0,
+  limit_bump         boolean DEFAULT FALSE,
+  limit_image        boolean DEFAULT FALSE,
   is_sticky          boolean DEFAULT FALSE,
   is_closed          boolean DEFAULT FALSE,
   index_positions    text
