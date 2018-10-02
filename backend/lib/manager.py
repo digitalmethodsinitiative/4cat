@@ -6,7 +6,6 @@ import sys
 import os
 
 from lib.keyboard import KeyPoller
-from lib.logger import Logger
 from lib.worker import BasicWorker
 
 
@@ -21,13 +20,15 @@ class WorkerManager:
     key_poller = None
     pool = []
     worker_prototypes = []
+    log = None
 
-    def __init__(self):
+    def __init__(self, logger):
         """
         Set up key poller
         """
         self.key_poller = KeyPoller(self)
-        self.log = Logger()
+        self.log = logger
+
         self.loop()
 
     def abort(self):
@@ -58,7 +59,7 @@ class WorkerManager:
                         self.log.info("Starting new worker (%s, %i/%i)" % (
                         worker_type.__name__, active_workers + 1, worker_type.max_workers))
                         active_workers += 1
-                        worker = worker_type()
+                        worker = worker_type(logger=self.log)
                         worker.start()
                         self.pool.append(worker)
 

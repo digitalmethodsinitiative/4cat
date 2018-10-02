@@ -1,10 +1,12 @@
 import requests
+import random
 import time
 import json
 import abc
 
 from lib.worker import BasicWorker
 from lib.queue import JobClaimedException
+from lib.database import Database
 
 
 class BasicJSONScraper(BasicWorker, metaclass=abc.ABCMeta):
@@ -15,6 +17,15 @@ class BasicJSONScraper(BasicWorker, metaclass=abc.ABCMeta):
     the URL for that job is scraped and the result is parsed as JSON. The parsed JSON is
     then passed to a processor method for further handling.
     """
+    db = None
+
+    def __init__(self, logger):
+        """
+        Set up database connection - we need one to store the thread data
+        """
+        super().__init__(logger)
+
+        self.db = Database(logger=self.log)
 
     def work(self):
         """
