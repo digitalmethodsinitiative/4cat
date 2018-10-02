@@ -1,6 +1,5 @@
 import time
 import json
-import psycopg2
 
 from .database import Database
 
@@ -39,7 +38,7 @@ class JobQueue:
         :return dict: Job data, or `None` if no job was found
         """
         if timestamp < 0:
-            timestamp = time.time()
+            timestamp = int(time.time())
         job = self.db.fetchone("SELECT * FROM jobs WHERE jobtype = %s AND claimed = 0 AND claim_after < %s;", (type, timestamp))
 
         return {key: (json.loads(value) if key == "details" else value) for key, value in job.items()} if job else None
@@ -102,7 +101,7 @@ class JobQueue:
                                 `delay` is set, it overrides this parameter.
         """
         if delay > 0:
-            claim_after = time.time() + delay
+            claim_after = int(time.time()) + delay
 
         self.db.update("jobs", where={"id": job_id}, data={"claimed": 0, "claim_after": claim_after})
 
@@ -123,7 +122,7 @@ class JobQueue:
 
         :param job_id: Job ID to claim
         """
-        updated_rows = self.db.update("jobs", where={"id": job_id, "claimed": 0}, data={"claimed": time.time()})
+        updated_rows = self.db.update("jobs", where={"id": job_id, "claimed": 0}, data={"claimed": int(time.time())})
 
         if updated_rows == 0:
             raise JobClaimedException("Job is already claimed")
