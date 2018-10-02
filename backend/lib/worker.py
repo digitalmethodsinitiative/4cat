@@ -23,14 +23,14 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
     looping = True
     loop_time = 0
 
-    def __init__(self):
+    def __init__(self, logger):
         """
-        Set up queue and log handlers, and start a thread
+        Basic init, just make sure our thread name is meaningful
         """
         super().__init__()
-        self.queue = JobQueue()
-        self.log = Logger()
         self.name = self.type
+        self.log = logger
+        self.queue = JobQueue(logger=self.log)
 
     def abort(self):
         """

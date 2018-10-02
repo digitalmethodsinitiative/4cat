@@ -10,20 +10,18 @@ class Logger:
 
     Sets up a rotating logger that writes to a log file
     """
-    logger = None
+    logger = logging.getLogger("4cat-backend")
 
     def __init__(self):
         """
         Set up log handler
         """
-        self.logger = logging.getLogger("4cat-scraper")
-
         handler = RotatingFileHandler(config.log_path, maxBytes=5242880, backupCount=1)
-        handler.setLevel(logging.INFO)
+        handler.setLevel(logging.WARNING)
         handler.setFormatter(logging.Formatter("%(asctime)-15s | %(message)s", "%d-%m-%Y %H:%M:%S"))
 
         self.logger.addHandler(handler)
-        self.logger.setLevel(logging.INFO)
+        self.logger.setLevel(logging.WARNING)
 
     def log(self, message, level=logging.INFO):
         """

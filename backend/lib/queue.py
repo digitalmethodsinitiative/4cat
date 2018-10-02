@@ -14,12 +14,16 @@ class JobQueue:
     is done twice.
     """
     db = None
+    logger = None
 
-    def __init__(self):
+    def __init__(self, logger=None):
         """
         Set up database handler
         """
-        self.db = Database()
+        if logger:
+            self.logger = logger
+
+        self.db = Database(logger=self.logger)
 
     def getJob(self, type, timestamp=-1):
         """
@@ -62,23 +66,19 @@ class JobQueue:
         Add a new job to the queue
 
         There can only be one job for any combination of job type and remote id. If a job
-        already exists for the given combination, a `JobAlreadyExistsException` is raised.
+        already exists for the given combination, no new job is added.
 
         :param type:  Job type
         :param details:  Job details - may be empty, will be stored as JSON
         :param remote_id:  Remote ID of object to work on. For example, a post or thread ID
         """
-        try:
-            self.db.insert("jobs", {
-                "jobtype": type,
-                "details": json.dumps(details),
-                "timestamp": time.time(),
-                "remote_id": remote_id,
-                "claim_after": claim_after
-            })
-        except psycopg2.IntegrityError:
-            self.db.commit()
-            raise JobAlreadyExistsException()
+        self.db.insert("jobs", data={
+            "jobtype": type,
+            "details": json.dumps(details),
+            "timestamp": int(time.time()),
+            "remote_id": remote_id,
+            "claim_after": claim_after
+        }, safe=True, constraints=("jobtype", "remote_id"))
 
     def finishJob(self, job_id):
         """
