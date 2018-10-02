@@ -3,7 +3,6 @@ import json
 import re
 
 from lib.scraper import BasicJSONScraper
-from lib.database import Database
 from lib.queue import JobAlreadyExistsException
 
 import config
@@ -31,22 +30,12 @@ class ThreadScraper(BasicJSONScraper):
     required_fields = ["no", "resto", "now", "time"]
     required_fields_op = ["no", "resto", "now", "time", "replies", "images"]
 
-    def __init__(self):
-        """
-        Set up database connection - we need one to store the post data
-        """
-        super().__init__()
-
-        self.db = Database()
-
     def process(self, data):
         """
         Process scraped thread data
 
         :param dict data: The thread data, parsed JSON data
         """
-        db = Database()
-
         # add post data to database
         if "posts" not in data or len(data["posts"]) == 0:
             self.log.warning(
@@ -72,6 +61,7 @@ class ThreadScraper(BasicJSONScraper):
 
         if thread["num_replies"] == num_replies and thread["timestamp_modified"] == last_reply:
             # no updates, no need to check posts any further
+            self.log.info("No new messages in thread %s" % op["no"])
             return
 
         # first post has useful metadata for the *thread*
@@ -101,6 +91,7 @@ class ThreadScraper(BasicJSONScraper):
 
         # add new posts
         new = set(post_dict_scrape.keys()) - set(post_dict_db.keys())
+        new_posts = 0
         for post_id in new:
             post = post_dict_scrape[post_id]
 
@@ -109,6 +100,9 @@ class ThreadScraper(BasicJSONScraper):
             if missing != set():
                 self.log.warning("Missing fields %s in scraped post, ignoring" % repr(missing))
                 continue
+
+            # save dimensions as a dumpable dict - no need to make it indexable
+            dimensions = {"w": post["w"], "h": post["h"], "tw": post["tn_w"], "th": post["tn_h"]} if "w" in post else None
 
             post_data = {
                 "id": post_id,
@@ -120,12 +114,15 @@ class ThreadScraper(BasicJSONScraper):
                 "image_4chan": str(post["tim"]) + post["ext"] if "filename" in post else "",
                 "image_md5": post["md5"] if "md5" in post else "",
                 "image_filesize": post["fsize"] if "fsize" in post else 0,
+                "image_dimensions": json.dumps(dimensions),
                 "semantic_url": post["semantic_url"] if "semantic_url" in post else "",
                 "is_deleted": False,
                 "unsorted_data": json.dumps(
                     {field: post[field] for field in post.keys() if field not in self.known_fields})
             }
+
             self.db.insert("posts", post_data, commit=False)
+            new_posts += 1
 
             # find links to other posts in post body and save those links to the database
             if "com" in post:
@@ -140,7 +137,7 @@ class ThreadScraper(BasicJSONScraper):
             image_path = config.image_path + "/" + post["md5"] + post["ext"]
             if not os.path.isfile(image_path):
                 try:
-                    self.queue.addJob("image", details={
+                    self.queue.addJob("image", remote_id=post["md5"], details={
                         "board": thread["board"],
                         "ext": post["ext"],
                         "md5": post["md5"],
@@ -150,6 +147,7 @@ class ThreadScraper(BasicJSONScraper):
                     pass
 
         # save to database
+        self.log.info("Saved %s new posts for thread %s" % (new_posts, op["no"]))
         self.db.commit()
 
     def get_url(self, data):
