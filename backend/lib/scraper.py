@@ -63,11 +63,11 @@ class BasicJSONScraper(BasicWorker, metaclass=abc.ABCMeta):
         try:
             jsondata = json.loads(data.content)
         except json.JSONDecodeError:
-            print(repr(data.content))
+            print(repr(data))
             self.log.warning(
-                "Could not decode JSON response for %s scrape (remote ID %s, job ID %s) - releasing job" % (
+                "Could not decode JSON response for %s scrape (remote ID %s, job ID %s) - retrying later" % (
                     self.type, job["remote_id"], job["id"]))
-            self.queue.releaseJob(job["id"])  # try again later
+            self.queue.releaseJob(job["id"], delay=random.choice(range(5,35)))  # try again later
             return
 
         # finally, pass it on

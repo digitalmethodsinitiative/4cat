@@ -1,7 +1,6 @@
 import time
 
 from lib.scraper import BasicJSONScraper
-from lib.database import Database
 from lib.queue import JobAlreadyExistsException
 
 
@@ -15,14 +14,6 @@ class BoardScraper(BasicJSONScraper):
     type = "board"
     pause = 1  # we're not checking this often, but using claim-after to schedule jobs
     max_workers = 2  # should probably be equivalent to the amount of boards to scrape
-
-    def __init__(self):
-        """
-        Set up database connection - we need one to store the thread data
-        """
-        super().__init__()
-
-        self.db = Database()
 
     def process(self, data):
         """
@@ -47,6 +38,7 @@ class BoardScraper(BasicJSONScraper):
                 try:
                     self.queue.addJob(type="thread", remote_id=thread["no"], details={"board": self.jobdata["remote_id"]})
                 except JobAlreadyExistsException:
+                    # this might happen if the workers can't keep up with the queue
                     pass
 
                 # add database record for thread, if none exists yet

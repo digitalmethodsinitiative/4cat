@@ -10,15 +10,17 @@ class ImageDownloader(BasicWorker):
     max_workers = 3
 
     def work(self):
-        return
-
-        # todo
         job = self.queue.getJob("image")
         if not job:
             self.log.info("Image downloader has no jobs, sleeping for 10 seconds")
             time.sleep(10)
             return
 
+        self.queue.releaseJob(job["id"])
+        self.log.info("Image queued for downloading (not implemented yet): %s" % (str(job["details"]["tim"]) + job["details"]["ext"]))
+        return
+
+        # todo
         try:
             url = "http://i.4cdn.org/%s/%s%s" % (job["board"], job["tim"], job["ext"])
             image = requests.get(url)
