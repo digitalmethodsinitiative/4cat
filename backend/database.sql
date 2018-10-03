@@ -6,7 +6,8 @@ CREATE TABLE IF NOT EXISTS jobs (
   details     text,
   timestamp   integer,
   claim_after integer DEFAULT 0,
-  claimed     integer DEFAULT 0
+  claimed     integer DEFAULT 0,
+  attempts    integer DEFAULT 0
 );
 
 -- enforce

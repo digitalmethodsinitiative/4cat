@@ -1,3 +1,6 @@
+import json
+import sys
+
 from lib.queue import JobQueue
 from lib.database import Database
 from lib.manager import WorkerManager
@@ -6,9 +9,9 @@ from lib.logger import Logger
 # init
 looping = True
 scraper_threads = []
-db = Database()
-queue = JobQueue()
 log = Logger()
+db = Database(logger=log)
+queue = JobQueue(logger=log)
 
 with open("database.sql", "r") as content_file:
     log.info("Initializing database...")
@@ -21,4 +24,4 @@ db.commit()
 queue.releaseAll()
 
 # make it happen
-WorkerManager()
+WorkerManager(logger=log)

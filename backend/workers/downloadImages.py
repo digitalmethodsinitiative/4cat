@@ -16,8 +16,7 @@ class ImageDownloader(BasicWorker):
             time.sleep(10)
             return
 
-        self.queue.releaseJob(job["id"])
-        self.log.info("Image queued for downloading (not implemented yet): %s" % (str(job["details"]["tim"]) + job["details"]["ext"]))
+        self.queue.finishJob(job)
         return
 
         # todo
@@ -27,16 +26,16 @@ class ImageDownloader(BasicWorker):
         except requests.HTTPError:
             # something wrong with our internet connection? or blocked by 4chan?
             # try again in a minute
-            self.queue.releaseJob(job["id"], delay=60)
+            self.queue.releaseJob(job, delay=60)
             return
 
         if image.status_code == 404:
             # image deleted - mark in database? either way, can't complete job
-            self.queue.finishJob(job["id"])
+            self.queue.finishJob(job)
             return
         elif image.status_code != 200:
             # try again in 30 seconds
-            self.queue.releaseJob(job["id"], delay=30)
+            self.queue.releaseJob(job, delay=30)
             self.log.warning("Got response code %s while trying to download image %s" % (image.status_code, url))
             return
 
@@ -47,4 +46,4 @@ class ImageDownloader(BasicWorker):
                 f.write(chunk)
 
         # done!
-        self.queue.finishJob(job["id"])
+        self.queue.finishJob(job)

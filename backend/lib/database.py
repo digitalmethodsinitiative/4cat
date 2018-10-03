@@ -1,7 +1,6 @@
 import psycopg2.extras
 import psycopg2
 
-from psycopg2.extensions import AsIs
 from psycopg2 import sql
 
 import config
@@ -44,7 +43,7 @@ class Database:
         :param args: Replacement values
         :return None:
         """
-        self.log.debug("Executing query %s" %  self.cursor.mogrify(query, replacements))
+        self.log.debug("Executing query %s" % self.cursor.mogrify(query, replacements))
 
         return self.cursor.execute(query, replacements)
 
