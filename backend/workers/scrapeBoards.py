@@ -1,7 +1,6 @@
 import time
 
 from lib.scraper import BasicJSONScraper
-from lib.database import Database
 from lib.queue import JobAlreadyExistsException
 
 
@@ -14,12 +13,7 @@ class BoardScraper(BasicJSONScraper):
     """
     type = "board"
     pause = 1  # we're not checking this often, but using claim-after to schedule jobs
-    max_workers = 2  # should be equivalent to the amount of boards to scrape
-
-    def __init__(self):
-        super().__init__()
-
-        self.db = Database()
+    max_workers = 2  # should probably be equivalent to the amount of boards to scrape
 
     def process(self, data):
         """
@@ -36,14 +30,15 @@ class BoardScraper(BasicJSONScraper):
 
                 thread_data = {
                     "id": thread["no"],
-                    "board": self.jobdata["remote_id"],
+                    "board": self.job["remote_id"],
                     "index_positions": ""
                 }
 
                 # schedule a job for scraping the thread's posts
                 try:
-                    self.queue.addJob(type="thread", remote_id=thread["no"], details={"board": self.jobdata["remote_id"]})
+                    self.queue.addJob(type="thread", remote_id=thread["no"], details={"board": self.job["remote_id"]})
                 except JobAlreadyExistsException:
+                    # this might happen if the workers can't keep up with the queue
                     pass
 
                 # add database record for thread, if none exists yet
@@ -57,19 +52,10 @@ class BoardScraper(BasicJSONScraper):
                                 "index_positions = CONCAT(index_positions, %s) WHERE id = %s",
                                 (self.loop_time, thread["last_modified"], position_update, thread_data["id"]))
 
-    def after_process(self):
-        """
-        After the job is finished, schedule another scrape a minute later
-        """
-        # scrape again a minute later
-        self.queue.finishJob(self.jobdata["id"])
-        self.queue.addJob("board", remote_id=self.jobdata["remote_id"], details=self.jobdata["details"], claim_after=time.time() + 60)
-
-    def get_url(self, data):
+    def get_url(self):
         """
         Get URL to scrape for the current job
 
-        :param dict data:  Job data - contains the ID of the board to scrape
         :return string: URL to scrape
         """
-        return "https://a.4cdn.org/%s/threads.json" % data["remote_id"]
+        return "http://a.4cdn.org/%s/threads.json" % self.job["remote_id"]

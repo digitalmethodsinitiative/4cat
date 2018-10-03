@@ -1,6 +1,5 @@
 import time
 import json
-import psycopg2
 
 from .database import Database
 
@@ -14,12 +13,15 @@ class JobQueue:
     is done twice.
     """
     db = None
+    log = None
 
-    def __init__(self):
+    def __init__(self, logger):
         """
         Set up database handler
         """
-        self.db = Database()
+        self.log = logger
+
+        self.db = Database(logger=self.log)
 
     def getJob(self, type, timestamp=-1):
         """
@@ -35,7 +37,7 @@ class JobQueue:
         :return dict: Job data, or `None` if no job was found
         """
         if timestamp < 0:
-            timestamp = time.time()
+            timestamp = int(time.time())
         job = self.db.fetchone("SELECT * FROM jobs WHERE jobtype = %s AND claimed = 0 AND claim_after < %s;", (type, timestamp))
 
         return {key: (json.loads(value) if key == "details" else value) for key, value in job.items()} if job else None
@@ -62,49 +64,45 @@ class JobQueue:
         Add a new job to the queue
 
         There can only be one job for any combination of job type and remote id. If a job
-        already exists for the given combination, a `JobAlreadyExistsException` is raised.
+        already exists for the given combination, no new job is added.
 
         :param type:  Job type
         :param details:  Job details - may be empty, will be stored as JSON
         :param remote_id:  Remote ID of object to work on. For example, a post or thread ID
         """
-        try:
-            self.db.insert("jobs", {
-                "jobtype": type,
-                "details": json.dumps(details),
-                "timestamp": time.time(),
-                "remote_id": remote_id,
-                "claim_after": claim_after
-            })
-        except psycopg2.IntegrityError:
-            self.db.commit()
-            raise JobAlreadyExistsException()
+        self.db.insert("jobs", data={
+            "jobtype": type,
+            "details": json.dumps(details),
+            "timestamp": int(time.time()),
+            "remote_id": remote_id,
+            "claim_after": claim_after
+        }, safe=True, constraints=("jobtype", "remote_id"))
 
-    def finishJob(self, job_id):
+    def finishJob(self, job):
         """
         Finish a job
 
         This deletes the job from the queue and the database.
 
-        :param job_id:  Job ID to finish
+        :param job:  Job to finish
         """
-        self.db.delete("jobs", where={"id": job_id})
+        self.db.delete("jobs", where={"id": job["id"]})
 
-    def releaseJob(self, job_id, delay=0, claim_after = 0):
+    def releaseJob(self, job, delay=0, claim_after = 0):
         """
         Release a job
 
         The job is no longer marked as claimed, and can be claimed by a worker again.
 
-        :param job_id:  Job ID to release
+        :param job:  Job to release
         :param int delay:  Amount of seconds after which job may be reclaimed
         :param int claim_after:  UNIX timestamp after which job may be reclaimed. If
                                 `delay` is set, it overrides this parameter.
         """
         if delay > 0:
-            claim_after = time.time() + delay
+            claim_after = int(time.time()) + delay
 
-        self.db.update("jobs", where={"id": job_id}, data={"claimed": 0, "claim_after": claim_after})
+        self.db.update("jobs", where={"id": job["id"]}, data={"claimed": 0, "claim_after": claim_after})
 
     def releaseAll(self):
         """
@@ -114,16 +112,16 @@ class JobQueue:
         """
         self.db.execute("UPDATE jobs SET claimed = 0")
 
-    def claimJob(self, job_id):
+    def claimJob(self, job):
         """
         Claim a job
 
         Marks a job as 'claimed', which means no other workers may claim the job, and it will not
         be returned when the queue is asked for a new job to do.
 
-        :param job_id: Job ID to claim
+        :param job: Job to claim
         """
-        updated_rows = self.db.update("jobs", where={"id": job_id, "claimed": 0}, data={"claimed": time.time()})
+        updated_rows = self.db.update("jobs", where={"id": job["id"], "claimed": 0}, data={"claimed": int(time.time()), "attempts": job["attempts"] + 1})
 
         if updated_rows == 0:
             raise JobClaimedException("Job is already claimed")

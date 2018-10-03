@@ -1,10 +1,12 @@
 import requests
+import random
 import time
 import json
 import abc
 
 from lib.worker import BasicWorker
 from lib.queue import JobClaimedException
+from lib.database import Database
 
 
 class BasicJSONScraper(BasicWorker, metaclass=abc.ABCMeta):
@@ -15,6 +17,15 @@ class BasicJSONScraper(BasicWorker, metaclass=abc.ABCMeta):
     the URL for that job is scraped and the result is parsed as JSON. The parsed JSON is
     then passed to a processor method for further handling.
     """
+    db = None
+
+    def __init__(self, logger):
+        """
+        Set up database connection - we need one to store the thread data
+        """
+        super().__init__(logger)
+
+        self.db = Database(logger=self.log)
 
     def work(self):
         """
@@ -31,20 +42,20 @@ class BasicJSONScraper(BasicWorker, metaclass=abc.ABCMeta):
             return
 
         # claim the job - this is needed so multiple workers don't do the same job
-        self.jobdata = job
+        self.job = job
 
         try:
-            self.queue.claimJob(job["id"])
+            self.queue.claimJob(job)
         except JobClaimedException:
             # too bad, so sad
             return
 
         # request URL
-        url = self.get_url(self.jobdata)
+        url = self.get_url()
         try:
             data = requests.get(url, timeout=5)
         except (requests.HTTPError, requests.exceptions.ReadTimeout):
-            self.queue.releaseJob(job["id"], delay=10)  # try again in 10 seconds
+            self.queue.releaseJob(job, delay=10)  # try again in 10 seconds
             self.log.warning("Could not finish request for %s, releasing job" % url)
             return
 
@@ -52,11 +63,17 @@ class BasicJSONScraper(BasicWorker, metaclass=abc.ABCMeta):
         try:
             jsondata = json.loads(data.content)
         except json.JSONDecodeError:
-            print(repr(data.content))
-            self.log.warning(
-                "Could not decode JSON response for %s scrape (remote ID %s, job ID %s) - releasing job" % (
+            if self.job["attempts"] > 2:
+                # todo: determine if this means the thread was deleted
+                self.log.warning("Could not decode JSON response for %s scrape (remote ID %s, job ID %s) after three attempts, aborting" % (
                     self.type, job["remote_id"], job["id"]))
-            self.queue.releaseJob(job["id"])  # try again later
+                self.queue.finishJob(job)
+            else:
+                self.log.info(
+                    "Could not decode JSON response for %s scrape (remote ID %s, job ID %s) - retrying later" % (
+                        self.type, job["remote_id"], job["id"]))
+                self.queue.releaseJob(job, delay=random.choice(range(5, 35)))  # try again later
+
             return
 
         # finally, pass it on
@@ -67,7 +84,7 @@ class BasicJSONScraper(BasicWorker, metaclass=abc.ABCMeta):
         """
         After processing, declare job finished
         """
-        self.queue.finishJob(self.jobdata["id"])
+        self.queue.finishJob(self.job)
 
     @abc.abstractmethod
     def process(self, data):

@@ -3,7 +3,6 @@ import time
 import abc
 
 from lib.queue import JobQueue
-from lib.logger import Logger
 
 class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
     """
@@ -23,14 +22,14 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
     looping = True
     loop_time = 0
 
-    def __init__(self):
+    def __init__(self, logger):
         """
-        Set up queue and log handlers, and start a thread
+        Basic init, just make sure our thread name is meaningful
         """
         super().__init__()
-        self.queue = JobQueue()
-        self.log = Logger()
         self.name = self.type
+        self.log = logger
+        self.queue = JobQueue(logger=self.log)
 
     def abort(self):
         """
@@ -45,7 +44,7 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
         This simply calls the work method continually, with a pause in-between calls.
         """
         while self.looping:
-            self.loop_time = time.time()
+            self.loop_time = int(time.time())
             self.work()
             time.sleep(self.pause)
 

@@ -6,10 +6,7 @@ import sys
 import os
 
 from lib.keyboard import KeyPoller
-from lib.logger import Logger
 from lib.worker import BasicWorker
-
-from config import config
 
 
 class WorkerManager:
@@ -23,13 +20,15 @@ class WorkerManager:
     key_poller = None
     pool = []
     worker_prototypes = []
+    log = None
 
-    def __init__(self):
+    def __init__(self, logger):
         """
         Set up key poller
         """
         self.key_poller = KeyPoller(self)
-        self.log = Logger()
+        self.log = logger
+
         self.loop()
 
     def abort(self):
@@ -53,12 +52,14 @@ class WorkerManager:
 
             # start new workers, if neededz
             for worker_type in self.worker_prototypes:
-                active_workers = len([worker for worker in self.pool if worker.__class__.__name__ == worker_type.__name__])
+                active_workers = len(
+                    [worker for worker in self.pool if worker.__class__.__name__ == worker_type.__name__])
                 if active_workers < worker_type.max_workers:
                     for i in range(active_workers, worker_type.max_workers):
-                        self.log.info("Starting new worker (%s, %i/%i)" % (worker_type.__name__, active_workers + 1, worker_type.max_workers))
+                        self.log.info("Starting new worker (%s, %i/%i)" % (
+                        worker_type.__name__, active_workers + 1, worker_type.max_workers))
                         active_workers += 1
-                        worker = worker_type()
+                        worker = worker_type(logger=self.log)
                         worker.start()
                         self.pool.append(worker)
 
@@ -102,7 +103,8 @@ class WorkerManager:
             members = inspect.getmembers(sys.modules[module])
 
             for member in members:
-                if inspect.isclass(member[1]) and issubclass(member[1], BasicWorker) and not inspect.isabstract(member[1]):
+                if inspect.isclass(member[1]) and issubclass(member[1], BasicWorker) and not inspect.isabstract(
+                        member[1]):
                     print("Adding worker type %s" % member[0])
                     self.worker_prototypes.append(member[1])
 
