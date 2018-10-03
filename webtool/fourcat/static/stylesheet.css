@@ -1,496 +1,993 @@
-@font-face {
-	font-family: 'fixedsys';
-	src: url("fonts/fsex300-webfont.woff")
-}
-
-
-* {
-	font-family: 'fixedsys','Lekton', Courier;
-	font-size: 16px;
-}
-
-.container.fluid {
-  margin: 0 auto;
-  width: 100%;
-}
-
-body{
-	margin: 0;
-}
-
-button{
-	border-radius: 10px;
-	border: 2px solid black;
-	background-color: white;
-	text-align: center;
-	padding: 3px;
-	cursor: pointer;
-}
-
-input, textarea{
-	border: 2px solid black;
-	padding: 3px;
-}
-
-select{
-	border: 2px solid black;
-	padding: 3px;
-	font-family: 'fixedsys','Lekton', Courier;
-	background-color: #f8ed74;;
-}
-
-option.selectoption{
-	font-family: 'fixedsys','Lekton', Courier;
-}
-
-select#dataselection{
-	width: 500px;
-	display: none;
-}
-
-p{
-	margin: 0;
-}
-
-.invisible{
-	display: none;
-}
-
-.header{
-	text-align: center;
-	background-color: #485ba6;
-}
-
-.pagetitle{
-	background-color: black;
-	display: inline-block;
-}
-
-.header span{
-	font-size: 25px;
-	color: white;
-	height: 100%
-}
-
-.col-lg-9.topdiv,.col-lg-3.topdiv{
-	padding-left: 0px;
-	padding-right: 0px;
-}
-
-.col-lg-3.topdiv{
-	background-color: #50ff50;
-	border-top: 2px solid black;
-	border-left: 2px solid black;
-	border-right: 2px solid black;
-}
-
-button{
-	margin:2px;
-}
-
-button:active{
-	background-color: black;
-	color:white;
-}
-
-button::-moz-focus-inner {
-  border: 0;
-}
-
-:focus {
-	outline:none !important;
-}
-button.inactive{
-	background-color: red;
-	display: none;
-}
-
-button#submitdata{
-	width: 100%;
-	margin: 0 auto;
-	margin-top: 10px;
-	text-align: center;
-	display: block;
-}
-
-#filterinputs{
-	padding: 10px;
-}
-
-
-.filterrow{
-	position: relative;
-	margin-top:5px;
-	margin-bottom: 5px;
-	min-height: 35px;
-}
-
-.filterrow button{
-	float: right;
-}
-
-select{
-	max-width: 100%;
-}
-
-#buttonselections{
-	background-color: #f8ed74;
-	padding: 10px;
-	border-top: 2px solid black;
-	border-bottom: 2px solid black;
-}
-
-#submitform{
-	padding: 10px;
-}
-
-#submitform > div.submitdiv{
-	display: inline-block;
-	margin-top: 8px;
-}
-
-.submitdiv > select{
-	max-width: 100px;
-}
-
-#submitform > input, #submitform> textarea{
-	width: 330px;
-}
-
-.loader img{
-	width: 33px;
-}
-
-textarea#notes{
-	height: 50px;
-	width: 250px;
-}
-
-table, th, td{
-	text-align: left;
-	border-collapse: collapse;
-	border: 1px solid black;
-	font-size: 18px;
-	margin-top: 2px;
-	margin-bottom: 2px;
-}
-
-span#imagenavigation{
-	text-align: center;
-	display: inherit;
-}
-
-#results{
-	max-width: 100%;
-	min-height: 300px;
-}
-
-#results img{
-	margin: 0 auto;
-	display: block;
-	max-width: 500px;
-	max-width: 100%;
-	max-height: 600px;
-	border: 5px solid purple;
-	margin-top: 15px;
-}
-
-.imagecheckinput{
-	position: absolute;
-	right: 0;
-	top: 0;
-}
-
-.imagecheckinput label{
-	font-size: 22px;
-}
-
-#searchinput{
-	width: 175px;
-}
-
-#input_maxtime, #input_mintime {
-	max-width: 130px;
-}
-
-input[type="checkbox"].imgsubmit{
-	border: 2px solid black;
-	width: 20px;
-}
-
-input[type="radio"] {
-    display:none;
-}
-
-input[type="radio"] + label {
-    font-size: 18px;
-    margin-right: 13px;
-}
-
-input[type="radio"].mainselect{
-	display: inline;
-}
-
-/*input[type="radio"] + label span {
-    display:inline-block;
-    width:19px;
-    height:19px;
-    border-radius: 20px;
-    background-color: white;
-    border: 2px solid black;
-}*/
-
-input[type="radio"]:checked + label {
-    background-color: black;
-    color: white;
-}
-
-#resultsdiv{
-	padding-left: 0px;
-	padding-right: 0px;
-}
-
-#resultsheader{
-	background: url(img/patternblue.jpg);
-	border-top: 2px solid black;
-	border-bottom: 2px solid black;
-	text-align: center;
-	position: relative;
-}
-
-#imagenavigationdiv{
-	position: relative;
-	background-color: #f8ed74;
-	border-bottom: 2px solid black;
-}
-
-#imagenavigationdiv.inactive{
-	display: none;
-	border: 0px;
-}
-
-
-#resultsheadertext{
-	color: white;
-	font-size: 25px;
-	height: 100%;
-}
-
-.btn_filterbutton{
-	width: 60px;
-	margin-top: 0px;
-}
-
-#btn_clear{
-	position: absolute;
-	right: 2px;
-	background-color: #485ba6;
-	color:white;
-}
-
-#btn_clear:active{
-	background-color: black;
-	color: white;
-}
-
-p.imgpost{
-	max-width: 600px;
-	margin: 0 auto;
-	font-size: 22px;
-}
-
-
-/* BIG SCREEN */
-.notificationheader{
-	background-color: #f8ed74;
-	text-align: center;
-	padding: 10px;
-	border-top: 2px solid black;
-	border-bottom: 2px solid black;
-}
-
-.notificationheader h1{
-	font-size: 33px;
-	color: black;
-	padding-top: 0px;
-	padding-bottom: 0px;
-	margin-top: 0px;
-	margin-bottom: 0px;
-}
-
-.notificationheader span.url{
-	font-size: 33px;
-	background-color: black;
-	color: white;
-}
-
-.col-lg-9.submitscreen{
-	max-height: 85vh;
-	overflow-y: scroll;
-}
-
-#submitform{
-	height: 100%;
-	max-height: 295px;
-	overflow-y: scroll;
-}
-
-#submitpaneltitle{
-	width: 100%;
-	background: url(img/patternblue.jpg);
-	text-align: center;
-	border-bottom: 2px solid black;
-}
-
-#submitheader{
-	color: white;
-	font-size: 25px;
-	height: 100%;
-}
-
-#filterresults{
-	width: 100%;
-	background: url(img/patternblue.jpg);
-	color: white;
-}
-
-.submission{
-	border-top: 2px solid black;
-	width: 100%;
-	font-size: 30px;
-	position: relative;
-}
-
-
-.submission.sticky{
-	border: 2px solid green;
-}
-
-.fullpost{
-	padding: 15px;
-	overflow-x:scroll;
-}
-
-.fullpost > img{
-	max-width: 400px;
-	max-height: 500px;
-	border: 5px solid black;
-}
-
-.div_notes p{
-	font-size: 20px;
-	margin-bottom: 10px;
-}
-
-.span_posttitle{
-	font-size: 35px;
-}
-
-
-.span_theme{
-	position:absolute;
-	top: 24px;
-	right: 15px;
-	color:purple;
-}
-
-.span_meme{
-	position:absolute;
-	right:15px;
-	top: 6px;
-	color:green;
-}
-
-
-.col-lg-9.submitscreen,.col-lg-3.submitscreen{
-	padding-left: 0px;
-	padding-right: 0px;
-}
-
-.col-lg-3.submitscreen span{
-	font-size: 25px;
-	background-color: black;
-	text-align: center;
-	margin: 0 auto;
-}
-
-#rules{
-	background-color: #ff5750;
-}
-
-#schedule{
-	background-color: #50ff50;
-}
-
-.sidebarcontent{
-	padding: 10px;
-	color: black;
-}
-
-.btn_expand{
-	font-size: 30px;
-	cursor: pointer;
-	margin-left: 5px;
-	padding: 10px;
-}
-#backbutton{
-	display: none;
-	position: absolute;
-	left: 0;
-}
-
-span.activity.needed{
-	font-size: 17px;
-	background-color: transparent;
-}
-
-.sidebartitle{
-	border-top: 2px solid black;
-	border-bottom: 2px solid black;
-	width: 100%;
-	background: url(img/patternblue.jpg);
-	text-align: center;
-	color: white;
-}
-
-#schedule > p{
-	color: black;
-}
-
-#schedule > p > span > a{
-	color: #ff5750;;
-}
-
-.presentationimg{
-	max-width: 100% !important;
-	border: 5px solid black;
-	margin-bottom: 5px;
-}
-
-#notifications{
-	position: absolute;
-	right:10px;
-	top:5px;
-	color: yellow;
-
-}
-
-input, textarea{
-	max-width: 100%;
-}
-
-img{
-	cursor: pointer;
-}
-
-.page-footer{
-	padding-top: 10px;
-	padding-bottom: 10px;
-	background: url(img/patterngreen.jpg);
-	border-top: 2px solid black;
-	text-align: right;
-}
-
-label {
-	cursor:pointer;
+@font-face {
+
+	font-family: 'fixedsys';
+
+	src: url("fonts/fsex300-webfont.woff")
+
+}
+
+
+
+
+
+* {
+
+	font-family: 'fixedsys','Lekton', Courier;
+
+	font-size: 16px;
+
+}
+
+.fullpost p, .fullpost ul, .fullpost ul li, .fullpost ul a, .fullpost ul li a {
+	font-size: 20px;
+}
+
+.container.fluid {
+
+  margin: 0 auto;
+
+  width: 100%;
+
+}
+
+
+
+body{
+
+	margin: 0;
+
+}
+
+
+
+button{
+
+	border-radius: 10px;
+
+	border: 2px solid black;
+
+	background-color: white;
+
+	text-align: center;
+
+	padding: 3px;
+
+	cursor: pointer;
+
+}
+
+
+
+input, textarea{
+
+	border: 2px solid black;
+
+	padding: 3px;
+
+}
+
+
+
+select{
+
+	border: 2px solid black;
+
+	padding: 3px;
+
+	font-family: 'fixedsys','Lekton', Courier;
+
+	background-color: #f8ed74;;
+
+}
+
+
+
+option.selectoption{
+
+	font-family: 'fixedsys','Lekton', Courier;
+
+}
+
+
+
+select#dataselection{
+
+	width: 500px;
+
+	display: none;
+
+}
+
+
+
+p{
+
+	margin: 0;
+
+}
+
+
+
+.invisible{
+
+	display: none;
+
+}
+
+
+
+.header{
+
+	text-align: center;
+
+	background-color: #485ba6;
+
+}
+
+
+
+.pagetitle{
+
+	background-color: black;
+
+	display: inline-block;
+
+}
+
+
+
+.header span{
+
+	font-size: 25px;
+
+	color: white;
+
+	height: 100%
+
+}
+
+
+
+.col-lg-9.topdiv,.col-lg-3.topdiv{
+
+	padding-left: 0px;
+
+	padding-right: 0px;
+
+}
+
+
+
+.col-lg-3.topdiv{
+
+	background-color: #50ff50;
+
+	border-top: 2px solid black;
+
+	border-left: 2px solid black;
+
+	border-right: 2px solid black;
+
+}
+
+
+
+button{
+
+	margin:2px;
+
+}
+
+
+
+button:active{
+
+	background-color: black;
+
+	color:white;
+
+}
+
+
+
+button::-moz-focus-inner {
+
+  border: 0;
+
+}
+
+
+
+:focus {
+
+	outline:none !important;
+
+}
+
+button.inactive{
+
+	background-color: red;
+
+	display: none;
+
+}
+
+
+
+button#submitdata{
+
+	width: 100%;
+
+	margin: 0 auto;
+
+	margin-top: 10px;
+
+	text-align: center;
+
+	display: block;
+
+}
+
+
+
+#filterinputs{
+
+	padding: 10px;
+
+}
+
+
+
+
+
+.filterrow{
+
+	position: relative;
+
+	margin-top:5px;
+
+	margin-bottom: 5px;
+
+	min-height: 35px;
+
+}
+
+
+
+.filterrow button{
+
+	float: right;
+
+}
+
+
+
+select{
+
+	max-width: 100%;
+
+}
+
+
+
+#buttonselections{
+
+	background-color: #f8ed74;
+
+	padding: 10px;
+
+	border-top: 2px solid black;
+
+	border-bottom: 2px solid black;
+
+}
+
+
+
+#submitform{
+
+	padding: 10px;
+
+}
+
+
+
+#submitform > div.submitdiv{
+
+	display: inline-block;
+
+	margin-top: 8px;
+
+}
+
+
+
+.submitdiv > select{
+
+	max-width: 100px;
+
+}
+
+
+
+#submitform > input, #submitform> textarea{
+
+	width: 330px;
+
+}
+
+
+
+.loader img{
+
+	width: 33px;
+
+}
+
+
+
+textarea#notes{
+
+	height: 50px;
+
+	width: 250px;
+
+}
+
+
+
+table, th, td{
+
+	text-align: left;
+
+	border-collapse: collapse;
+
+	border: 1px solid black;
+
+	font-size: 18px;
+
+	margin-top: 2px;
+
+	margin-bottom: 2px;
+
+}
+
+
+
+span#imagenavigation{
+
+	text-align: center;
+
+	display: inherit;
+
+}
+
+
+
+#results{
+
+	max-width: 100%;
+
+	min-height: 300px;
+
+}
+
+
+
+#results img{
+
+	margin: 0 auto;
+
+	display: block;
+
+	max-width: 500px;
+
+	max-width: 100%;
+
+	max-height: 600px;
+
+	border: 5px solid purple;
+
+	margin-top: 15px;
+
+}
+
+
+
+.imagecheckinput{
+
+	position: absolute;
+
+	right: 0;
+
+	top: 0;
+
+}
+
+
+
+.imagecheckinput label{
+
+	font-size: 22px;
+
+}
+
+
+
+#searchinput{
+
+	width: 175px;
+
+}
+
+
+
+#input_maxtime, #input_mintime {
+
+	max-width: 130px;
+
+}
+
+
+
+input[type="checkbox"].imgsubmit{
+
+	border: 2px solid black;
+
+	width: 20px;
+
+}
+
+
+
+input[type="radio"] {
+
+    display:none;
+
+}
+
+
+
+input[type="radio"] + label {
+
+    font-size: 18px;
+
+    margin-right: 13px;
+
+}
+
+
+
+input[type="radio"].mainselect{
+
+	display: inline;
+
+}
+
+
+
+/*input[type="radio"] + label span {
+
+    display:inline-block;
+
+    width:19px;
+
+    height:19px;
+
+    border-radius: 20px;
+
+    background-color: white;
+
+    border: 2px solid black;
+
+}*/
+
+
+
+input[type="radio"]:checked + label {
+
+    background-color: black;
+
+    color: white;
+
+}
+
+
+
+#resultsdiv{
+
+	padding-left: 0px;
+
+	padding-right: 0px;
+
+}
+
+
+
+#resultsheader{
+
+	background: url(img/patternblue.jpg);
+
+	border-top: 2px solid black;
+
+	border-bottom: 2px solid black;
+
+	text-align: center;
+
+	position: relative;
+
+}
+
+
+
+#imagenavigationdiv{
+
+	position: relative;
+
+	background-color: #f8ed74;
+
+	border-bottom: 2px solid black;
+
+}
+
+
+
+#imagenavigationdiv.inactive{
+
+	display: none;
+
+	border: 0px;
+
+}
+
+
+
+
+
+#resultsheadertext{
+
+	color: white;
+
+	font-size: 25px;
+
+	height: 100%;
+
+}
+
+
+
+.btn_filterbutton{
+
+	width: 60px;
+
+	margin-top: 0px;
+
+}
+
+
+
+#btn_clear{
+
+	position: absolute;
+
+	right: 2px;
+
+	background-color: #485ba6;
+
+	color:white;
+
+}
+
+
+
+#btn_clear:active{
+
+	background-color: black;
+
+	color: white;
+
+}
+
+
+
+p.imgpost{
+
+	max-width: 600px;
+
+	margin: 0 auto;
+
+	font-size: 22px;
+
+}
+
+
+
+
+
+/* BIG SCREEN */
+
+.notificationheader{
+
+	background-color: #f8ed74;
+
+	text-align: center;
+
+	padding: 10px;
+
+	border-top: 2px solid black;
+
+	border-bottom: 2px solid black;
+
+}
+
+
+
+.notificationheader h1{
+
+	font-size: 33px;
+
+	color: black;
+
+	padding-top: 0px;
+
+	padding-bottom: 0px;
+
+	margin-top: 0px;
+
+	margin-bottom: 0px;
+
+}
+
+
+
+.notificationheader span.url{
+
+	font-size: 33px;
+
+	background-color: black;
+
+	color: white;
+
+}
+
+
+
+.col-lg-9.submitscreen{
+
+	max-height: 85vh;
+
+	overflow-y: scroll;
+
+}
+
+
+
+#submitform{
+
+	height: 100%;
+
+	max-height: 295px;
+
+	overflow-y: scroll;
+
+}
+
+
+
+#submitpaneltitle{
+
+	width: 100%;
+
+	background: url(img/patternblue.jpg);
+
+	text-align: center;
+
+	border-bottom: 2px solid black;
+
+}
+
+
+
+#submitheader{
+
+	color: white;
+
+	font-size: 25px;
+
+	height: 100%;
+
+}
+
+
+
+#filterresults{
+
+	width: 100%;
+
+	background: url(img/patternblue.jpg);
+
+	color: white;
+
+}
+
+
+
+.submission{
+
+	border-top: 2px solid black;
+
+	width: 100%;
+
+	font-size: 30px;
+
+	position: relative;
+
+}
+
+
+
+
+
+.submission.sticky{
+
+	border: 2px solid green;
+
+}
+
+
+
+.fullpost{
+
+	padding: 15px;
+
+	overflow-x:scroll;
+
+}
+
+
+
+.fullpost > img{
+
+	max-width: 400px;
+
+	max-height: 500px;
+
+	border: 5px solid black;
+
+}
+
+
+
+.div_notes p{
+
+	font-size: 20px;
+
+	margin-bottom: 10px;
+
+}
+
+
+
+.span_posttitle{
+
+	font-size: 35px;
+
+}
+
+
+
+
+
+.span_theme{
+
+	position:absolute;
+
+	top: 24px;
+
+	right: 15px;
+
+	color:purple;
+
+}
+
+
+
+.span_meme{
+
+	position:absolute;
+
+	right:15px;
+
+	top: 6px;
+
+	color:green;
+
+}
+
+
+
+
+
+.col-lg-9.submitscreen,.col-lg-3.submitscreen{
+
+	padding-left: 0px;
+
+	padding-right: 0px;
+
+}
+
+
+
+.col-lg-3.submitscreen span{
+
+	font-size: 25px;
+
+	background-color: black;
+
+	text-align: center;
+
+	margin: 0 auto;
+
+}
+
+
+
+#rules{
+
+	background-color: #ff5750;
+
+}
+
+
+
+#schedule{
+
+	background-color: #50ff50;
+
+}
+
+
+
+.sidebarcontent{
+
+	padding: 10px;
+
+	color: black;
+
+}
+
+
+
+.btn_expand{
+
+	font-size: 30px;
+
+	cursor: pointer;
+
+	margin-left: 5px;
+
+	padding: 10px;
+
+}
+
+#backbutton{
+
+	display: none;
+
+	position: absolute;
+
+	left: 0;
+
+}
+
+
+
+span.activity.needed{
+
+	font-size: 17px;
+
+	background-color: transparent;
+
+}
+
+
+
+.sidebartitle{
+
+	border-top: 2px solid black;
+
+	border-bottom: 2px solid black;
+
+	width: 100%;
+
+	background: url(img/patternblue.jpg);
+
+	text-align: center;
+
+	color: white;
+
+}
+
+
+
+#schedule > p{
+
+	color: black;
+
+}
+
+
+
+#schedule > p > span > a{
+
+	color: #ff5750;;
+
+}
+
+
+
+.presentationimg{
+
+	max-width: 100% !important;
+
+	border: 5px solid black;
+
+	margin-bottom: 5px;
+
+}
+
+
+
+#notifications{
+
+	position: absolute;
+
+	right:10px;
+
+	top:5px;
+
+	color: yellow;
+
+
+
+}
+
+
+
+input, textarea{
+
+	max-width: 100%;
+
+}
+
+
+
+img{
+
+	cursor: pointer;
+
+}
+
+
+
+.page-footer{
+
+	padding-top: 10px;
+
+	padding-bottom: 10px;
+
+	background: url(img/patterngreen.jpg);
+
+	border-top: 2px solid black;
+
+	text-align: right;
+
+}
+
+
+
+label {
+
+	cursor:pointer;
+
 }
