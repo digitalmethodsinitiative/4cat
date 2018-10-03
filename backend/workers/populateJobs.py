@@ -1,3 +1,5 @@
+import config
+
 from lib.worker import BasicWorker
 
 
@@ -11,13 +13,12 @@ class JobPopulator(BasicWorker):
         :return:
         """
         normalized_time = self.loop_time - (self.loop_time % 60) + 60
-        boards = ["tg"]
 
         jobs = self.queue.getAllJobs()
-        for board in boards:
+        for board in config.boards:
             scheduled = False
             for job in jobs:
-                if job["jobtype"] == "board":
+                if job["jobtype"] == "board" and job["remote_id"] == board:
                     scheduled = True
 
             if not scheduled:

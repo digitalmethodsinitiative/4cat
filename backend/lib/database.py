@@ -1,9 +1,9 @@
-import psycopg2
 import psycopg2.extras
+import psycopg2
 
-from psycopg2.extensions import AsIs
+from psycopg2 import sql
 
-from config import config
+import config
 
 
 class Database:
@@ -13,15 +13,19 @@ class Database:
     Most importantly, this sets up the database tables if they don't exist yet. Apart
     from that it offers a few wrapper methods for queries
     """
-    connection = None
     cursor = None
+    log = None
 
-    def __init__(self):
+    def __init__(self, logger):
         """
         Set up database connection
         """
         self.connection = psycopg2.connect(dbname=config.db_name, user=config.db_user, password=config.db_password)
         self.cursor = self.connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        self.log = logger
+
+        if self.log == None:
+            raise NotImplementedError
 
         self.setup()
 
@@ -39,6 +43,8 @@ class Database:
         :param args: Replacement values
         :return None:
         """
+        self.log.debug("Executing query %s" % self.cursor.mogrify(query, replacements))
+
         return self.cursor.execute(query, replacements)
 
     def execute(self, query, replacements=None):
@@ -63,16 +69,21 @@ class Database:
 
         :return int: Number of affected rows. Note that this may be unreliable if `commit` is `False`
         """
-        where_sql = ["%s = %%s" % column for column in where.keys()]
-        replacements = list(where.values())
-
-        set = ["%s = %%s" % column for column in data.keys()]
-        [replacements.insert(0, value) for value in reversed(list(data.values()))]
-
         # build query
-        query = "UPDATE " + table + " SET " + ", ".join(set)
-        if len(where_sql) > 0:
-            query += " WHERE " + " AND ".join(where_sql)
+        identifiers = [sql.Identifier(column) for column in data.keys()]
+        identifiers.insert(0, sql.Identifier(table))
+        replacements = list(data.values())
+
+        query = "UPDATE {} SET " + ", ".join(["{} = %s" for column in data])
+        if len(where) > 0:
+            query += " WHERE " + " AND ".join(["{} = %s" for column in where])
+            for column in where.keys():
+                identifiers.append(sql.Identifier(column))
+                replacements.append(where[column])
+
+        query = sql.SQL(query).format(*identifiers)
+
+        self.log.debug("Executing query: %s" % self.cursor.mogrify(query, replacements))
         self.cursor.execute(query, replacements)
 
         if commit:
@@ -90,11 +101,15 @@ class Database:
 
         :return int: Number of affected rows. Note that this may be unreliable if `commit` is `False`
         """
-        where_sql = ["%s = %%s" % column for column in where.keys()]
+        where_sql = ["{} = %s" for column in where.keys()]
         replacements = list(where.values())
 
         # build query
-        query = "DELETE FROM " + table + " WHERE " + " AND ".join(where_sql)
+        identifiers = [sql.Identifier(column) for column in where.keys()]
+        identifiers.insert(0, sql.Identifier(table))
+        query = sql.SQL("DELETE FROM {} WHERE " + " AND ".join(where_sql)).format(*identifiers)
+
+        self.log.debug("Executing query: %s" % self.cursor.mogrify(query, replacements))
         self.cursor.execute(query, replacements)
 
         if commit:
@@ -102,44 +117,43 @@ class Database:
 
         return self.cursor.rowcount
 
-    def insert(self, table, data, commit=True):
+    def insert(self, table, data, commit=True, safe=False, constraints=[]):
         """
         Create database record
 
         :param string table:  Table to insert record into
         :param dict data:   Data to insert
         :param bool commit: Whether to commit after executing the query
+        :param bool safe: If set to `True`, "ON CONFLICT DO NOTHING" is added to the insert query, so that no error is
+                          thrown when the insert violates a unique index or other constraint
+        :param tuple constraints: If `safe` is `True`, this tuple may contain the columns that should be used as a
+                                  constraint, e.g. ON CONFLICT (name, lastname) DO NOTHING
         :return int: Number of affected rows. Note that this may be unreliable if `commit` is `False`
         """
-        self.cursor.execute("INSERT INTO " + table + " (%s) VALUES %s",
-                            (AsIs(", ".join(data.keys())), tuple(data.values())))
+        # escape identifiers
+        identifiers = [sql.Identifier(column) for column in data.keys()]
+        identifiers.insert(0, sql.Identifier(table))
+
+        # construct ON NOTHING bit of query
+        if safe:
+            safe_bit = " ON CONFLICT "
+            if len(constraints) > 0:
+                safe_bit += "(" + ", ".join(["{}" for each in constraints]) + ")"
+                [identifiers.append(sql.Identifier(column)) for column in constraints]
+            safe_bit += " DO NOTHING"
+        else:
+            safe_bit = ""
+
+        # prepare parameter replacements
+        protoquery = "INSERT INTO {} (%s) VALUES %%s" % ", ".join(["{}" for column in data.keys()]) + safe_bit
+        query = sql.SQL(protoquery).format(*identifiers)
+        replacements = (tuple(data.values()),)
+
+        self.log.debug("Executing query: %s" % self.cursor.mogrify(query, replacements))
+        self.cursor.execute(query, replacements)
 
         if commit:
             self.commit()
-
-        return self.cursor.rowcount
-
-    def insert_or_update(self, table, data):
-        """
-        Create record, or update if already existing
-
-        Either creates a record, or updates an existing record if a new one cannot be
-        created because a table constraint is violated.
-
-        :param string table:  Table to update/insert
-        :param dict data:  Data, as a column => value dictionary
-
-        :return int: Number of affected rows. Note that this may be unreliable if `commit` is `False`
-        """
-        set = ["%s = %%s" % column for column in data.keys()]
-        replacements = list(data.values())
-
-        replacements.insert(0, tuple(data.values()))
-        replacements.insert(0, AsIs(", ".join(data.keys())))
-
-        self.cursor.execute("INSERT INTO " + table + " (%s) VALUES %s ON CONFLICT DO UPDATE SET " + ", ".join(set),
-                            replacements)
-        self.commit()
 
         return self.cursor.rowcount
 
@@ -167,7 +181,8 @@ class Database:
         self.query(query, replacements)
         try:
             return self.cursor.fetchone()
-        except AttributeError:
+        except psycopg2.ProgrammingError:
+            self.commit()
             return None
 
     def commit(self):
