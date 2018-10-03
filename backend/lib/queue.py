@@ -13,16 +13,15 @@ class JobQueue:
     is done twice.
     """
     db = None
-    logger = None
+    log = None
 
-    def __init__(self, logger=None):
+    def __init__(self, logger):
         """
         Set up database handler
         """
-        if logger:
-            self.logger = logger
+        self.log = logger
 
-        self.db = Database(logger=self.logger)
+        self.db = Database(logger=self.log)
 
     def getJob(self, type, timestamp=-1):
         """
@@ -79,23 +78,23 @@ class JobQueue:
             "claim_after": claim_after
         }, safe=True, constraints=("jobtype", "remote_id"))
 
-    def finishJob(self, job_id):
+    def finishJob(self, job):
         """
         Finish a job
 
         This deletes the job from the queue and the database.
 
-        :param job_id:  Job ID to finish
+        :param job:  Job to finish
         """
-        self.db.delete("jobs", where={"id": job_id})
+        self.db.delete("jobs", where={"id": job["id"]})
 
-    def releaseJob(self, job_id, delay=0, claim_after = 0):
+    def releaseJob(self, job, delay=0, claim_after = 0):
         """
         Release a job
 
         The job is no longer marked as claimed, and can be claimed by a worker again.
 
-        :param job_id:  Job ID to release
+        :param job:  Job to release
         :param int delay:  Amount of seconds after which job may be reclaimed
         :param int claim_after:  UNIX timestamp after which job may be reclaimed. If
                                 `delay` is set, it overrides this parameter.
@@ -103,7 +102,7 @@ class JobQueue:
         if delay > 0:
             claim_after = int(time.time()) + delay
 
-        self.db.update("jobs", where={"id": job_id}, data={"claimed": 0, "claim_after": claim_after})
+        self.db.update("jobs", where={"id": job["id"]}, data={"claimed": 0, "claim_after": claim_after})
 
     def releaseAll(self):
         """
@@ -113,16 +112,16 @@ class JobQueue:
         """
         self.db.execute("UPDATE jobs SET claimed = 0")
 
-    def claimJob(self, job_id):
+    def claimJob(self, job):
         """
         Claim a job
 
         Marks a job as 'claimed', which means no other workers may claim the job, and it will not
         be returned when the queue is asked for a new job to do.
 
-        :param job_id: Job ID to claim
+        :param job: Job to claim
         """
-        updated_rows = self.db.update("jobs", where={"id": job_id, "claimed": 0}, data={"claimed": int(time.time())})
+        updated_rows = self.db.update("jobs", where={"id": job["id"], "claimed": 0}, data={"claimed": int(time.time()), "attempts": job["attempts"] + 1})
 
         if updated_rows == 0:
             raise JobClaimedException("Job is already claimed")

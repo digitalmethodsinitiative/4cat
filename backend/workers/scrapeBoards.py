@@ -30,13 +30,13 @@ class BoardScraper(BasicJSONScraper):
 
                 thread_data = {
                     "id": thread["no"],
-                    "board": self.jobdata["remote_id"],
+                    "board": self.job["remote_id"],
                     "index_positions": ""
                 }
 
                 # schedule a job for scraping the thread's posts
                 try:
-                    self.queue.addJob(type="thread", remote_id=thread["no"], details={"board": self.jobdata["remote_id"]})
+                    self.queue.addJob(type="thread", remote_id=thread["no"], details={"board": self.job["remote_id"]})
                 except JobAlreadyExistsException:
                     # this might happen if the workers can't keep up with the queue
                     pass
@@ -52,11 +52,10 @@ class BoardScraper(BasicJSONScraper):
                                 "index_positions = CONCAT(index_positions, %s) WHERE id = %s",
                                 (self.loop_time, thread["last_modified"], position_update, thread_data["id"]))
 
-    def get_url(self, data):
+    def get_url(self):
         """
         Get URL to scrape for the current job
 
-        :param dict data:  Job data - contains the ID of the board to scrape
         :return string: URL to scrape
         """
-        return "http://a.4cdn.org/%s/threads.json" % data["remote_id"]
+        return "http://a.4cdn.org/%s/threads.json" % self.job["remote_id"]

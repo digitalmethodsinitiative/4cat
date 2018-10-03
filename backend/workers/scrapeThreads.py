@@ -39,7 +39,7 @@ class ThreadScraper(BasicJSONScraper):
         # add post data to database
         if "posts" not in data or len(data["posts"]) == 0:
             self.log.warning(
-                "JSON response for thread %s contained no posts, could not process" % self.jobdata["remote_id"])
+                "JSON response for thread %s contained no posts, could not process" % self.job["remote_id"])
             return
 
         # check if OP has all the required data
@@ -150,11 +150,10 @@ class ThreadScraper(BasicJSONScraper):
         self.log.info("Saved %s new posts for thread %s" % (new_posts, op["no"]))
         self.db.commit()
 
-    def get_url(self, data):
+    def get_url(self):
         """
         Get URL to scrape for the current job
 
-        :param dict data:  Job data - contains the ID of the thread to scrape
         :return string: URL to scrape
         """
-        return "http://a.4cdn.org/%s/thread/%s.json" % (self.jobdata["details"]["board"], self.jobdata["remote_id"])
+        return "http://a.4cdn.org/%s/thread/%s.json" % (self.job["details"]["board"], self.job["remote_id"])
