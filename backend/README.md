@@ -2,7 +2,9 @@
 
 Runs worker threads in which the magic happens:
 
-- Scraping 4chan
+- Scraping 4chan threads and posts
+- Downloading images
+- Scheduling the above
 - Parsing and processing search requests (todo!)
 
 Run:
@@ -11,9 +13,9 @@ Run:
 
 Needs:
 
-- `pip3 install requests psycopg2-binary`
+- `pip3 install requests psycopg2-binary` or `pip3 install -e requirements.txt`
 - A PostgreSQL database and user with rights on
-  that database.
+  that database (see `config.py`)
 
 ## What it does
 Runs a number of workers in parallel threads, that
@@ -43,3 +45,15 @@ following class properties:
 As a proof of concept, some post data is saved into
 the database, but this should be extended if this is
 to actually scrape things.
+
+## Additional tools
+* `importDump.py` is a script that takes the path of a
+4plebs CSV dump as an argument, and inserts all posts
+and threads contained therein into the database. Run the
+script without arguments for further explanation:
+
+  `python3 importDump.py`
+  
+* `database.sql` contains the description of the database
+used by the backend. Running it should set up your tables
+and indexes if they have not been added yet. 
