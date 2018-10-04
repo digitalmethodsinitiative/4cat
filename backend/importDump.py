@@ -3,7 +3,9 @@ Imports 4plebs database dumps
 """
 import json
 import csv
+import sys
 import re
+import os
 
 from csv import DictReader
 from lib.logger import Logger
@@ -17,6 +19,7 @@ def parse_value(value):
     :param value:  Value to process
     :return:  Parsed value
     """
+    value = value.strip()
     if value == "\\N":
         return ""
 
@@ -49,14 +52,34 @@ columns = ["num", "subnum", "thread_num", "op", "timestamp", "timestamp_expired"
            "deleted", "capcode", "email", "name", "trip", "title", "comment", "sticky", "locked", "poster_hash",
            "poster_country", "exif"]
 
-# todo: extract these from commandline arguments
-csvfile = "trv.csv"
-board = "trv"
+# handle command line arguments
+if len(sys.argv) < 2 or not os.path.isfile(sys.argv[1]):
+    print("Please provide a file to import.")
+    print()
+    print("Usage:")
+    print("  python3 importDump.py <csvfile> [boardname]")
+    print()
+    print("Where csvfile is a path to a 4plebs dump, and boardname is the name of the board")
+    print("contained within. If boardname is omitted, the first word in the csv file name")
+    print("is used as the board name (e.g. pol for pol.dump.csv)")
+    print()
+    print("Example:")
+    print("  python3 importDump.py pol.dump.csv pol")
+    print()
+    sys.exit(1)
+
+csvfile = sys.argv[1]
+board = csvfile.split("/").pop().split(".")[0] if len(sys.argv) < 3 else sys.argv[2]
+
+print("Importing from: %s" % csvfile)
+print("Board to be imported: %s" % board)
 
 # init database - we need the thread data to know whether to insert a new thread for a post
 db = Database(logger=Logger())
 threads = {thread["id"]: thread for thread in
            db.fetchall("SELECT id, timestamp, timestamp_modified, post_last FROM threads")}
+
+link_regex = re.compile(">>([0-9]+)")
 
 # start parsing
 with open(csvfile) as csvdump:
@@ -67,8 +90,7 @@ with open(csvfile) as csvdump:
         # sanitize post data
         post = dict(post)
         post = {key: parse_value(post[key]) for key in post}
-        post = {key: post[key].strip() if post[key] != None else post[key] for key in post}
-        post = {key: "" if post[key] == "N" and key not in ["comment", "name"] else post[key] for key in post}
+        post = {key: "" if post[key] == "N" and key not in ["comment", "name", "title"] else post[key] for key in post}
 
         # see what we need to do with the thread
         post_thread = post["num"] if post["thread_num"] == 0 else post["thread_num"]
@@ -142,7 +164,7 @@ with open(csvfile) as csvdump:
 
         # add links to other posts
         if post["comment"] != "":
-            links = re.findall(">>([0-9]+)", post["comment"])
+            links = re.findall(link_regex, post["comment"])
             for linked_post in links:
                 db.insert("posts_mention", data={"post_id": post["num"], "mentioned_id": linked_post}, commit=False)
 
@@ -163,9 +185,10 @@ print("Updating thread statistics...")
 threads_updated = 0
 for thread in threads:
     posts = db.fetchone("SELECT COUNT(*) AS num FROM posts WHERE thread_id = %s", (thread,))["num"]
-    images = db.fetchone("SELECT COUNT(*) AS num FROM posts WHERE image_file != '' AND thread_id = %s", (thread,))["num"]
+    images = db.fetchone("SELECT COUNT(*) AS num FROM posts WHERE image_file != '' AND thread_id = %s", (thread,))[
+        "num"]
 
-    db.update("threads", data={"num_replies": posts - 1, "num_images": images}, where={"id": thread}, commit=False)
+    db.update("threads", data={"num_replies": posts, "num_images": images}, where={"id": thread}, commit=False)
 
     threads_updated += 1
     if threads_updated % 1000 == 0:
