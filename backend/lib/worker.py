@@ -4,6 +4,7 @@ import abc
 
 from lib.queue import JobQueue
 
+
 class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
     """
     Abstract Worker class

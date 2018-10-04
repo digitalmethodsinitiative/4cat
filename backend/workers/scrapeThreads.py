@@ -106,7 +106,8 @@ class ThreadScraper(BasicJSONScraper):
                 continue
 
             # save dimensions as a dumpable dict - no need to make it indexable
-            dimensions = {"w": post["w"], "h": post["h"], "tw": post["tn_w"], "th": post["tn_h"]} if "w" in post else None
+            dimensions = {"w": post["w"], "h": post["h"], "tw": post["tn_w"],
+                          "th": post["tn_h"]} if "w" in post else None
 
             post_data = {
                 "id": post_id,

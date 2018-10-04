@@ -38,7 +38,8 @@ class JobQueue:
         """
         if timestamp < 0:
             timestamp = int(time.time())
-        job = self.db.fetchone("SELECT * FROM jobs WHERE jobtype = %s AND claimed = 0 AND claim_after < %s;", (type, timestamp))
+        job = self.db.fetchone("SELECT * FROM jobs WHERE jobtype = %s AND claimed = 0 AND claim_after < %s;",
+                               (type, timestamp))
 
         return {key: (json.loads(value) if key == "details" else value) for key, value in job.items()} if job else None
 
@@ -88,7 +89,7 @@ class JobQueue:
         """
         self.db.delete("jobs", where={"id": job["id"]})
 
-    def releaseJob(self, job, delay=0, claim_after = 0):
+    def releaseJob(self, job, delay=0, claim_after=0):
         """
         Release a job
 
@@ -121,7 +122,8 @@ class JobQueue:
 
         :param job: Job to claim
         """
-        updated_rows = self.db.update("jobs", where={"id": job["id"], "claimed": 0}, data={"claimed": int(time.time()), "attempts": job["attempts"] + 1})
+        updated_rows = self.db.update("jobs", where={"id": job["id"], "claimed": 0},
+                                      data={"claimed": int(time.time()), "attempts": job["attempts"] + 1})
 
         if updated_rows == 0:
             raise JobClaimedException("Job is already claimed")
