@@ -79,7 +79,7 @@ else:
     posts = cursor.execute("SELECT * FROM " + table)
     post = posts.fetchone()
     while post:
-        posts_added = process_post(post, db=db, skip=SKIP, posts_added=posts_added)
+        posts_added = process_post(post, db=db, skip=SKIP, posts_added=posts_added, threads=threads, board=board)
         post = posts.fetchone()
 
 print("Done! Committing final transaction...")
