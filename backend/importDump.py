@@ -3,6 +3,7 @@ Imports 4plebs database dumps
 """
 import json
 import csv
+import re
 
 from csv import DictReader
 from lib.logger import Logger
@@ -63,7 +64,6 @@ with open(csvfile) as csvdump:
     posts_added = 0
 
     for post in reader:
-        break
         # sanitize post data
         post = dict(post)
         post = {key: parse_value(post[key]) for key in post}
@@ -123,6 +123,10 @@ with open(csvfile) as csvdump:
             "thread_id": post_thread,
             "body": post["comment"],
             "author": post["name"],
+            "author_type_id": post["capcode"],
+            "author_trip": post["trip"],
+            "subject": post["title"],
+            "country_code": post["poster_country"],
             "image_file": post["media_filename"],
             "image_4chan": post["media_orig"],
             "image_md5": post["media_hash"],
@@ -135,6 +139,12 @@ with open(csvfile) as csvdump:
         }, safe=True, commit=False)
 
         posts_added += 1
+
+        # add links to other posts
+        if post["comment"] != "":
+            links = re.findall(">>([0-9]+)", post["comment"])
+            for linked_post in links:
+                db.insert("posts_mention", data={"post_id": post["num"], "mentioned_id": linked_post}, commit=False)
 
         if posts_added % 1000 == 0:
             print("Processed %i posts." % posts_added)

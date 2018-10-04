@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS threads (
   id                 integer PRIMARY KEY, -- matches 4chan thread ID
   board              text,
   timestamp          integer DEFAULT 0, -- first known timestamp for this thread
+  timestamp_archived integer DEFAULT 0,
   timestamp_scraped  integer, -- last timestamp this thread was scraped
   timestamp_modified integer, -- last timestamp this thread was modified (reported by 4chan)
   post_last          integer, -- ID of last post in this thread
@@ -32,6 +33,7 @@ CREATE TABLE IF NOT EXISTS threads (
   limit_image        boolean DEFAULT FALSE,
   is_sticky          boolean DEFAULT FALSE,
   is_closed          boolean DEFAULT FALSE,
+  is_archived        boolean DEFAULT FALSE,
   index_positions    text
 );
 
@@ -45,8 +47,14 @@ CREATE TABLE IF NOT EXISTS posts (
   id               integer PRIMARY KEY, -- matches 4chan post ID
   thread_id        integer,
   timestamp        integer,
+  subject          text,
   body             text,
   author           text,
+  author_type      text,
+  author_type_id   text,
+  author_trip      text,
+  country_code     text,
+  country_name     text,
   image_file       text,
   image_4chan      text,
   image_md5        text,
