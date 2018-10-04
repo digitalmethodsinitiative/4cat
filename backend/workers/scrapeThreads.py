@@ -113,7 +113,7 @@ class ThreadScraper(BasicJSONScraper):
                 "id": post_id,
                 "thread_id": op["no"],
                 "timestamp": post["time"],
-                "subject": post["sub"] if ["sub"] in post else "",
+                "subject": post["sub"] if "sub" in post else "",
                 "body": post["com"] if "com" in post else "",
                 "author": post["name"] if "name" in post else "",
                 "author_trip": post["trip"] if "trip" in post else "",
