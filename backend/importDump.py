@@ -110,6 +110,7 @@ def process_post(post, db, skip, posts_added):
     db.insert("posts", data={
         "id": post["num"],
         "timestamp": post["timestamp"],
+        "timestamp_deleted": post["deleted"] if int(post["deleted"]) > 1 else 0,
         "thread_id": post_thread,
         "body": post["comment"],
         "author": post["name"],
@@ -124,12 +125,11 @@ def process_post(post, db, skip, posts_added):
                                                                                             "media_filename"] != "" else "",
         "image_filesize": post["media_size"],
         "semantic_url": "",
-        "is_deleted": False,
         "unsorted_data": "{}"
     }, safe=True, commit=False)
 
     # add links to other posts
-    if post["comment"] != "":
+    if len(post["comment"]) > 0 and isinstance(post["comment"], str):
         links = re.findall(link_regex, post["comment"])
         for linked_post in links:
             db.insert("posts_mention", data={"post_id": post["num"], "mentioned_id": linked_post}, commit=False)
@@ -252,6 +252,15 @@ for thread in threads:
     posts = db.fetchone("SELECT COUNT(*) AS num FROM posts WHERE thread_id = %s", (thread,))["num"]
     images = db.fetchone("SELECT COUNT(*) AS num FROM posts WHERE image_file != '' AND thread_id = %s", (thread,))[
         "num"]
+    posts_deleted = \
+    db.fetchone("SELECT COUNT(*) AS num FROM posts WHERE thread_id = %s AND timestamp_deleted > 0", (thread,))["num"]
+
+    update = {"num_replies": posts, "num_images": images}
+
+    # if all posts are deleted, then the thread is deleted - mark thread as such
+    if posts_deleted == posts:
+        last_post = db.fetchone("SELECT MAX(timestamp) as deleted_time FROM posts WHERE thread_id = %s", (thread,))
+        update["timestamp_deleted"] = last_post["deleted_time"]
 
     db.update("threads", data={"num_replies": posts, "num_images": images}, where={"id": thread}, commit=False)
 
