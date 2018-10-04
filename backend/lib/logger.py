@@ -30,7 +30,8 @@ class Logger:
         :param message:  Message to log
         :param level:  Severity level, should be a logger.* constant
         """
-        print("LOG: %s" % message)
+        if level > logging.DEBUG:
+            print("LOG: %s" % message)
         self.logger.log(level, message)
 
     def debug(self, message):
