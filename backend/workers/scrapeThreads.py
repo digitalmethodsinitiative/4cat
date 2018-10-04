@@ -128,7 +128,6 @@ class ThreadScraper(BasicJSONScraper):
                 "image_filesize": post["fsize"] if "fsize" in post else 0,
                 "image_dimensions": json.dumps(dimensions),
                 "semantic_url": post["semantic_url"] if "semantic_url" in post else "",
-                "is_deleted": False,
                 "unsorted_data": json.dumps(
                     {field: post[field] for field in post.keys() if field not in self.known_fields})
             }
