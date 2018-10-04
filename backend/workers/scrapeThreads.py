@@ -76,6 +76,10 @@ class ThreadScraper(BasicJSONScraper):
             "post_last": last_post
         }
 
+        if "archived" in op and op["archived"] == 1:
+            thread_update["is_archived"] = True
+            thread_update["timestamp_archived"] = op["archived_on"]
+
         self.db.update("threads", where={"id": op["no"]}, data=thread_update)
 
         # create a dict mapped as `post id`: `post data` for easier comparisons with existing data
@@ -108,8 +112,14 @@ class ThreadScraper(BasicJSONScraper):
                 "id": post_id,
                 "thread_id": op["no"],
                 "timestamp": post["time"],
+                "subject": post["sub"] if ["sub"] in post else "",
                 "body": post["com"] if "com" in post else "",
                 "author": post["name"] if "name" in post else "",
+                "author_trip": post["trip"] if "trip" in post else "",
+                "author_type": post["id"] if "id" in post else "",
+                "author_type_id": post["capcode"] if "capcode" in post else "",
+                "country_code": post["country"] if "country" in post else "",
+                "country_name": post["country_name"] if "country_name" in post else "",
                 "image_file": post["filename"] + post["ext"] if "filename" in post else "",
                 "image_4chan": str(post["tim"]) + post["ext"] if "filename" in post else "",
                 "image_md5": post["md5"] if "md5" in post else "",
