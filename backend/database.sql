@@ -19,13 +19,13 @@ CREATE UNIQUE INDEX IF NOT EXISTS unique_job
 
 -- threads
 CREATE TABLE IF NOT EXISTS threads (
-  id                 integer PRIMARY KEY, -- matches 4chan thread ID
+  id                 bigint PRIMARY KEY, -- matches 4chan thread ID
   board              text,
   timestamp          integer DEFAULT 0, -- first known timestamp for this thread
   timestamp_archived integer DEFAULT 0,
   timestamp_scraped  integer, -- last timestamp this thread was scraped
   timestamp_modified integer, -- last timestamp this thread was modified (reported by 4chan)
-  post_last          integer, -- ID of last post in this thread
+  post_last          bigint, -- ID of last post in this thread
   num_unique_ips     integer DEFAULT 0,
   num_replies        integer DEFAULT 0,
   num_images         integer DEFAULT 0,
@@ -44,8 +44,8 @@ CREATE INDEX IF NOT EXISTS threads_timestamp
 
 -- posts
 CREATE TABLE IF NOT EXISTS posts (
-  id                integer PRIMARY KEY, -- matches 4chan post ID
-  thread_id         integer,
+  id                bigint PRIMARY KEY, -- matches 4chan post ID
+  thread_id         bigint,
   timestamp         integer,
   timestamp_deleted integer DEFAULT 0,
   subject           text,
@@ -77,8 +77,8 @@ CREATE INDEX IF NOT EXISTS posts_thread
 
 -- post replies
 CREATE TABLE IF NOT EXISTS posts_mention (
-  post_id      integer,
-  mentioned_id integer
+  post_id      bigint,
+  mentioned_id bigint
 );
 
 CREATE INDEX IF NOT EXISTS mention_post
