@@ -97,11 +97,10 @@ class BasicJSONScraper(BasicWorker, metaclass=abc.ABCMeta):
         pass
 
     @abc.abstractmethod
-    def get_url(self, data):
+    def get_url(self):
         """
         Get URL to scrape
-
-        :param data:  Job data
-        :return:
+        
+        :return string:  URL to scrape
         """
         pass
