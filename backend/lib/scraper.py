@@ -26,6 +26,7 @@ class BasicJSONScraper(BasicWorker, metaclass=abc.ABCMeta):
         super().__init__(logger)
 
         self.db = Database(logger=self.log)
+        self.job = {}
 
     def work(self):
         """

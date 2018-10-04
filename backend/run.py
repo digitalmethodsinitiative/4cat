@@ -1,6 +1,3 @@
-import json
-import sys
-
 from lib.queue import JobQueue
 from lib.database import Database
 from lib.manager import WorkerManager

@@ -40,7 +40,7 @@ class ImageDownloader(BasicWorker):
             return
 
         # write image to disk
-        image_location = config.image_path + "/" + job["md5"] + job["ext"]
+        image_location = config.PATH_IMAGES + "/" + job["md5"] + job["ext"]
         with open(image_location, 'wb') as f:
             for chunk in image.iter_content(1024):
                 f.write(chunk)

@@ -16,7 +16,7 @@ class Logger:
         """
         Set up log handler
         """
-        handler = RotatingFileHandler(config.log_path, maxBytes=5242880, backupCount=1)
+        handler = RotatingFileHandler(config.PATH_LOGS, maxBytes=5242880, backupCount=1)
         handler.setLevel(logging.WARNING)
         handler.setFormatter(logging.Formatter("%(asctime)-15s | %(message)s", "%d-%m-%Y %H:%M:%S"))
 
@@ -37,7 +37,7 @@ class Logger:
     def debug(self, message):
         """
         Log DEBUG level message
-        
+
         :param message: Message to log
         """
         self.log(message, logging.DEBUG)
@@ -45,7 +45,7 @@ class Logger:
     def info(self, message):
         """
         Log INFO level message
-        
+
         :param message: Message to log
         """
         self.log(message, logging.INFO)
@@ -53,7 +53,7 @@ class Logger:
     def warning(self, message):
         """
         Log WARNING level message
-        
+
         :param message: Message to log
         """
         self.log(message, logging.WARN)
@@ -61,7 +61,7 @@ class Logger:
     def error(self, message):
         """
         Log ERROR level message
-        
+
         :param message: Message to log
         """
         self.log(message, logging.ERROR)
@@ -69,7 +69,7 @@ class Logger:
     def critical(self, message):
         """
         Log CRITICAL level message
-        
+
         :param message: Message to log
         """
         self.log(message, logging.CRITICAL)

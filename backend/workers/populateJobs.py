@@ -15,7 +15,7 @@ class JobPopulator(BasicWorker):
         normalized_time = self.loop_time - (self.loop_time % 60) + 60
 
         jobs = self.queue.getAllJobs()
-        for board in config.boards:
+        for board in config.BOARDS:
             scheduled = False
             for job in jobs:
                 if job["jobtype"] == "board" and job["remote_id"] == board:

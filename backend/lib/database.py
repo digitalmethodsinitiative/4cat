@@ -20,11 +20,11 @@ class Database:
         """
         Set up database connection
         """
-        self.connection = psycopg2.connect(dbname=config.db_name, user=config.db_user, password=config.db_password)
+        self.connection = psycopg2.connect(dbname=config.DB_NAME, user=config.DB_USER, password=config.DB_PASSWORD)
         self.cursor = self.connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         self.log = logger
 
-        if self.log == None:
+        if self.log is None:
             raise NotImplementedError
 
         self.setup()
@@ -58,7 +58,7 @@ class Database:
         self.cursor.execute(query, replacements)
         self.commit()
 
-    def update(self, table, data, where={}, commit=True):
+    def update(self, table, data, where=None, commit=True):
         """
         Update a database record
 
@@ -69,13 +69,16 @@ class Database:
 
         :return int: Number of affected rows. Note that this may be unreliable if `commit` is `False`
         """
+        if where is None:
+            where = {}
+
         # build query
         identifiers = [sql.Identifier(column) for column in data.keys()]
         identifiers.insert(0, sql.Identifier(table))
         replacements = list(data.values())
 
         query = "UPDATE {} SET " + ", ".join(["{} = %s" for column in data])
-        if len(where) > 0:
+        if where:
             query += " WHERE " + " AND ".join(["{} = %s" for column in where])
             for column in where.keys():
                 identifiers.append(sql.Identifier(column))
@@ -117,7 +120,7 @@ class Database:
 
         return self.cursor.rowcount
 
-    def insert(self, table, data, commit=True, safe=False, constraints=[]):
+    def insert(self, table, data, commit=True, safe=False, constraints=None):
         """
         Create database record
 
@@ -130,6 +133,9 @@ class Database:
                                   constraint, e.g. ON CONFLICT (name, lastname) DO NOTHING
         :return int: Number of affected rows. Note that this may be unreliable if `commit` is `False`
         """
+        if constraints is None:
+            constraints = []
+
         # escape identifiers
         identifiers = [sql.Identifier(column) for column in data.keys()]
         identifiers.insert(0, sql.Identifier(table))
@@ -137,7 +143,7 @@ class Database:
         # construct ON NOTHING bit of query
         if safe:
             safe_bit = " ON CONFLICT "
-            if len(constraints) > 0:
+            if constraints:
                 safe_bit += "(" + ", ".join(["{}" for each in constraints]) + ")"
                 [identifiers.append(sql.Identifier(column)) for column in constraints]
             safe_bit += " DO NOTHING"
