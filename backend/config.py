@@ -3,23 +3,17 @@
 """
 Postgres login details
 """
-db_user = "fourcat"
-db_name = "fourcat"
-db_password = "mosselm4n"
-
-"""
-These probably need some benchmarking!
-"""
-max_thread_scrapers = 10
-max_board_scrapers = 2
+DB_USER = "fourcat"
+DB_NAME = "fourcat"
+DB_PASSWORD = "mosselm4n"
 
 """
 Logs will be saved here - rotated by appended numbers
 """
-log_path = "4cat-scraper.log"
-image_path = "images"
+PATH_LOGS = "4cat-scraper.log"
+PATH_IMAGES = "images"
 
 """
 What to scrape?
 """
-boards = ["tg"]
+BOARDS = ["tg"]

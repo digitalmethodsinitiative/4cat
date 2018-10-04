@@ -145,7 +145,7 @@ class ThreadScraper(BasicJSONScraper):
             if "filename" not in post:
                 continue
 
-            image_path = config.image_path + "/" + post["md5"] + post["ext"]
+            image_path = config.PATH_IMAGES + "/" + post["md5"] + post["ext"]
             if not os.path.isfile(image_path):
                 try:
                     self.queue.addJob("image", remote_id=post["md5"], details={
