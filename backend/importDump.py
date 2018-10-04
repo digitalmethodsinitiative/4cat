@@ -12,7 +12,7 @@ from lib.logger import Logger
 from lib.database import Database
 
 
-def parse_value(value):
+def parse_value(key, value):
     """
     The csv data is a little peculiar, strip some useless values
 
@@ -20,7 +20,7 @@ def parse_value(value):
     :return:  Parsed value
     """
     value = value.strip()
-    if value == "\\N":
+    if value == "N" and key not in ["comment", "name", "title"]:
         return ""
 
     try:
@@ -52,19 +52,28 @@ columns = ["num", "subnum", "thread_num", "op", "timestamp", "timestamp_expired"
            "deleted", "capcode", "email", "name", "trip", "title", "comment", "sticky", "locked", "poster_hash",
            "poster_country", "exif"]
 
+# we need this later to extract quotes/links from posts
+link_regex = re.compile(">>([0-9]+)")
+
 # handle command line arguments
+skip = 0
+for i in range(0, len(sys.argv)):
+    if sys.argv[i][:7] == "--skip=":
+        skip = int(sys.argv[i][7:])
+        del sys.argv[i]
+        break
+
+# show manual if needed
 if len(sys.argv) < 2 or not os.path.isfile(sys.argv[1]):
     print("Please provide a file to import.")
     print()
-    print("Usage:")
-    print("  python3 importDump.py <csvfile> [boardname]")
-    print()
+    print("Usage: python3 importDump.py [--skip=n] <csvfile> [boardname]")
     print("Where csvfile is a path to a 4plebs dump, and boardname is the name of the board")
     print("contained within. If boardname is omitted, the first word in the csv file name")
     print("is used as the board name (e.g. pol for pol.dump.csv)")
     print()
-    print("Example:")
-    print("  python3 importDump.py pol.dump.csv pol")
+    print("Arguments:")
+    print("--skip=n    : Skip first n posts")
     print()
     sys.exit(1)
 
@@ -73,13 +82,13 @@ board = csvfile.split("/").pop().split(".")[0] if len(sys.argv) < 3 else sys.arg
 
 print("Importing from: %s" % csvfile)
 print("Board to be imported: %s" % board)
+if skip > 0:
+    print("Skipping first %i posts." % skip)
 
 # init database - we need the thread data to know whether to insert a new thread for a post
 db = Database(logger=Logger())
 threads = {thread["id"]: thread for thread in
            db.fetchall("SELECT id, timestamp, timestamp_modified, post_last FROM threads")}
-
-link_regex = re.compile(">>([0-9]+)")
 
 # start parsing
 with open(csvfile) as csvdump:
@@ -87,14 +96,19 @@ with open(csvfile) as csvdump:
     posts_added = 0
 
     for post in reader:
+        # skip if needed
+        if posts_added < skip:
+            continue
+
         # sanitize post data
-        post = dict(post)
-        post = {key: parse_value(post[key]) for key in post}
-        post = {key: "" if post[key] == "N" and key not in ["comment", "name", "title"] else post[key] for key in post}
+        # post = dict(post)
+        post = {key: parse_value(key, post[key]) for key in post}
 
         # see what we need to do with the thread
         post_thread = post["num"] if post["thread_num"] == 0 else post["thread_num"]
-        if post_thread in threads.keys():
+        post_thread = int(post_thread)
+
+        if post_thread in threads:
             # thread already exists
 
             thread = threads[post_thread]
@@ -105,7 +119,7 @@ with open(csvfile) as csvdump:
             if int(post["timestamp"]) > int(thread["timestamp_modified"]):
                 updates["timestamp_modified"] = post["timestamp"]
 
-            if post["num"] > thread["post_last"]:
+            if int(post["num"]) > thread["post_last"]:
                 updates["post_last"] = post["num"]
 
             # not part of the dump:
