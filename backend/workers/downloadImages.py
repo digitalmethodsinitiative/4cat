@@ -12,7 +12,7 @@ class ImageDownloader(BasicWorker):
     def work(self):
         job = self.queue.getJob("image")
         if not job:
-            self.log.info("Image downloader has no jobs, sleeping for 10 seconds")
+            self.log.debug("Image downloader has no jobs, sleeping for 10 seconds")
             time.sleep(10)
             return
 
