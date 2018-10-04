@@ -24,7 +24,9 @@ def parse_value(key, value):
     :param value:  Value to process
     :return:  Parsed value
     """
-    value = value.strip()
+    if isinstance(value, str):
+        value = value.strip()
+
     if value == "N" and key not in ["comment", "name", "title"]:
         return ""
 
@@ -53,7 +55,7 @@ def process_post(post, db, skip, posts_added):
         return posts_added
 
     # sanitize post data
-    # post = dict(post)
+    post = dict(post)
     post = {key: parse_value(key, post[key]) for key in post}
 
     # see what we need to do with the thread
@@ -140,6 +142,8 @@ def process_post(post, db, skip, posts_added):
         print("Committing posts %i-%i to database" % (posts_added - 10000, posts_added))
         db.commit()
 
+    return posts_added
+
 
 class fourplebs(csv.Dialect):
     """
@@ -194,7 +198,7 @@ if len(sys.argv) < 2 or not os.path.isfile(sys.argv[1]):
 sourcefile = sys.argv[1]
 board = sourcefile.split("/").pop().split(".")[0] if len(sys.argv) < 3 else sys.argv[2]
 ext = sourcefile.split(".").pop()
-if ext.lowercase() not in ["csv", "db"]:
+if ext.lower() not in ["csv", "db"]:
     print("Source file should be a CSV file or SQlite3 database")
     sys.exit(1)
 
@@ -214,7 +218,7 @@ threads = {thread["id"]: thread for thread in
     ### Start importing posts ###
 """
 posts_added = 0
-if ext.lowercase() == "csv":
+if ext.lower() == "csv":
     # import from CSV dump
     with open(sourcefile) as csvdump:
         reader = DictReader(csvdump, fieldnames=fourplebs.columns, dialect=fourplebs)
@@ -223,6 +227,7 @@ if ext.lowercase() == "csv":
 else:
     # import from SQLite3 database
     sqlite = sqlite3.connect(sourcefile)
+    sqlite.row_factory = sqlite3.Row
     cursor = sqlite.cursor()
 
     # find table name
