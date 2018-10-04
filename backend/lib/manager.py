@@ -68,7 +68,7 @@ class WorkerManager:
                 if not worker.is_alive():
                     self.pool.remove(worker)
 
-            self.log.info("Running workers: %i" % len(self.pool))
+            self.log.debug("Running workers: %i" % len(self.pool))
 
             # check in five seconds if any workers died and need to be restarted (probably not!)
             time.sleep(5)

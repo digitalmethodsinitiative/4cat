@@ -90,6 +90,7 @@ class ThreadScraper(BasicJSONScraper):
         # mark deleted posts as such
         deleted = set(post_dict_db.keys()) - set(post_dict_scrape.keys())
         for post_id in deleted:
+            # print("Post deleted: %s" % repr(post_dict_db[post_id]))
             self.db.update("posts", where={"id": post_id}, data={"is_deleted": True}, commit=False)
         self.db.commit()
 
@@ -158,7 +159,7 @@ class ThreadScraper(BasicJSONScraper):
                     pass
 
         # save to database
-        self.log.info("Updating thread %s, new posts: %s, deleted: %s" % (op["no"], new_posts, len(deleted)))
+        self.log.info("Updating thread %s/%s, new posts: %s, deleted: %s" % (self.job["details"]["board"], op["no"], new_posts, len(deleted)))
         self.db.commit()
 
     def get_url(self):
