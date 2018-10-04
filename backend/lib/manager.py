@@ -57,7 +57,7 @@ class WorkerManager:
                 if active_workers < worker_type.max_workers:
                     for i in range(active_workers, worker_type.max_workers):
                         self.log.info("Starting new worker (%s, %i/%i)" % (
-                        worker_type.__name__, active_workers + 1, worker_type.max_workers))
+                            worker_type.__name__, active_workers + 1, worker_type.max_workers))
                         active_workers += 1
                         worker = worker_type(logger=self.log)
                         worker.start()

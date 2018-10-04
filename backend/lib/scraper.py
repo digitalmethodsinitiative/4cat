@@ -65,8 +65,9 @@ class BasicJSONScraper(BasicWorker, metaclass=abc.ABCMeta):
         except json.JSONDecodeError:
             if self.job["attempts"] > 2:
                 # todo: determine if this means the thread was deleted
-                self.log.warning("Could not decode JSON response for %s scrape (remote ID %s, job ID %s) after three attempts, aborting" % (
-                    self.type, job["remote_id"], job["id"]))
+                self.log.warning(
+                    "Could not decode JSON response for %s scrape (remote ID %s, job ID %s) after three attempts, aborting" % (
+                        self.type, job["remote_id"], job["id"]))
                 self.queue.finishJob(job)
             else:
                 self.log.info(
