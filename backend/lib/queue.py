@@ -33,7 +33,7 @@ class JobQueue:
         :param string type:  Job type
         :param int timestamp:  Find jobs that may be claimed after this timestamp. If set to
                                a negative value (default), any job with a "claim after" time
-                               earlier than the current type is selected.
+                               earlier than the current time is selected.
         :return dict: Job data, or `None` if no job was found
         """
         if timestamp < 0:
@@ -44,6 +44,13 @@ class JobQueue:
         return {key: (json.loads(value) if key == "details" else value) for key, value in job.items()} if job else None
 
     def getAllJobs(self):
+        """
+        Get all jobs
+
+        Returns all jobs, no matter the type or claim-after date
+
+        :return list:
+        """
         return self.db.fetchall("SELECT * FROM jobs")
 
     def getJobCount(self, type="*"):
