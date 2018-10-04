@@ -85,13 +85,13 @@ class ThreadScraper(BasicJSONScraper):
         # create a dict mapped as `post id`: `post data` for easier comparisons with existing data
         post_dict_scrape = {post["no"]: post for post in data["posts"]}
         post_dict_db = {post["id"]: post for post in
-                        self.db.fetchall("SELECT * FROM posts WHERE thread_id = %s", (op["no"],))}
+                        self.db.fetchall("SELECT * FROM posts WHERE thread_id = %s AND timestamp_deleted = 0", (op["no"],))}
 
         # mark deleted posts as such
         deleted = set(post_dict_db.keys()) - set(post_dict_scrape.keys())
         for post_id in deleted:
             # print("Post deleted: %s" % repr(post_dict_db[post_id]))
-            self.db.update("posts", where={"id": post_id}, data={"is_deleted": True}, commit=False)
+            self.db.update("posts", where={"id": post_id}, data={"timestamp_deleted": self.loop_time}, commit=False)
         self.db.commit()
 
         # add new posts

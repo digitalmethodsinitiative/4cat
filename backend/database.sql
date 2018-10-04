@@ -44,25 +44,25 @@ CREATE INDEX IF NOT EXISTS threads_timestamp
 
 -- posts
 CREATE TABLE IF NOT EXISTS posts (
-  id               integer PRIMARY KEY, -- matches 4chan post ID
-  thread_id        integer,
-  timestamp        integer,
-  subject          text,
-  body             text,
-  author           text,
-  author_type      text,
-  author_type_id   text,
-  author_trip      text,
-  country_code     text,
-  country_name     text,
-  image_file       text,
-  image_4chan      text,
-  image_md5        text,
-  image_dimensions text,
-  image_filesize   integer,
-  semantic_url     text,
-  is_deleted       boolean DEFAULT FALSE,
-  unsorted_data    text
+  id                integer PRIMARY KEY, -- matches 4chan post ID
+  thread_id         integer,
+  timestamp         integer,
+  timestamp_deleted integer DEFAULT 0,
+  subject           text,
+  body              text,
+  author            text,
+  author_type       text,
+  author_type_id    text,
+  author_trip       text,
+  country_code      text,
+  country_name      text,
+  image_file        text,
+  image_4chan       text,
+  image_md5         text,
+  image_dimensions  text,
+  image_filesize    integer,
+  semantic_url      text,
+  unsorted_data     text
 );
 
 CREATE INDEX IF NOT EXISTS posts_timestamp
@@ -91,6 +91,7 @@ CREATE INDEX IF NOT EXISTS mention_mentioned
     mentioned_id
   );
 
-TRUNCATE threads;
-TRUNCATE posts;
-TRUNCATE jobs;
+-- TRUNCATE threads;
+-- TRUNCATE posts;
+-- TRUNCATE jobs;
+-- TRUNCATE posts_mention;
