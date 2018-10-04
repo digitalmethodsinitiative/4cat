@@ -61,7 +61,7 @@ class ThreadScraper(BasicJSONScraper):
 
         if thread["num_replies"] == num_replies and thread["timestamp_modified"] == last_reply:
             # no updates, no need to check posts any further
-            self.log.info("No new messages in thread %s" % op["no"])
+            self.log.debug("No new messages in thread %s" % op["no"])
             return
 
         # first post has useful metadata for the *thread*
@@ -158,7 +158,7 @@ class ThreadScraper(BasicJSONScraper):
                     pass
 
         # save to database
-        self.log.info("Saved %s new posts for thread %s" % (new_posts, op["no"]))
+        self.log.info("Updating thread %s, new posts: %s, deleted: %s" % (op["no"], new_posts, len(deleted)))
         self.db.commit()
 
     def get_url(self):

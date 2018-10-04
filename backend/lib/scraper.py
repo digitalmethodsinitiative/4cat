@@ -37,7 +37,7 @@ class BasicJSONScraper(BasicWorker, metaclass=abc.ABCMeta):
         """
         job = self.queue.getJob(self.type)
         if not job:
-            self.log.info("Scraper (%s) has no jobs, sleeping for 10 seconds" % self.type)
+            self.log.debug("Scraper (%s) has no jobs, sleeping for 10 seconds" % self.type)
             time.sleep(10)
             return
 
@@ -100,7 +100,7 @@ class BasicJSONScraper(BasicWorker, metaclass=abc.ABCMeta):
     def get_url(self):
         """
         Get URL to scrape
-        
+
         :return string:  URL to scrape
         """
         pass
