@@ -24,6 +24,8 @@ from fourcat.chanscraper import *
 from fourcat.colocation import *
 from fourcat.startwordanalysis import *
 
+# should clean this up at some point
+
 # HEADERS: num, subnum, thread_num, op, timestamp, timestamp_expired, preview_orig,
 # preview_w, preview_h, media_filename, media_w, media_h, media_size,
 # media_hash, media_orig, spoiler, deleted, capcode, email, name, trip,
@@ -357,3 +359,11 @@ def w2v(model, word='kek'):
 	# Function that returns the n closest words of a certain word in a word2vec model.
 	sims = sim.getW2vSims('fourcat/static/data/word_embeddings/w2v_model_all-' + model + '.model.bin', querystring=word, longitudinal=False)
 	return sims
+
+
+@app.route('/backendtest', methods=['GET','POST'])
+def backendtest():
+	"""
+	Test the backend functions for substring querying
+	"""
+	print('test')
