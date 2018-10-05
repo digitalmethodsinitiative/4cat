@@ -20,7 +20,7 @@ class Database:
         """
         Set up database connection
         """
-        self.connection = psycopg2.connect(dbname=config.DB_NAME, user=config.DB_USER, password=config.DB_PASSWORD)
+        self.connection = psycopg2.connect(dbname=config.DB_NAME, user=config.DB_USER, password=config.DB_PASSWORD, host=config.DB_HOST, port=config.DB_PORT)
         self.cursor = self.connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         self.log = logger
 

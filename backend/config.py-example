@@ -3,6 +3,8 @@
 """
 Postgres login details
 """
+DB_HOST = "localhost"
+DB_PORT = 5432
 DB_USER = "fourcat"
 DB_NAME = "fourcat"
 DB_PASSWORD = "sup3rs3cr3t"
