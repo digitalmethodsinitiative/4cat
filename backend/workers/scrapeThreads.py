@@ -79,7 +79,6 @@ class ThreadScraper(BasicJSONScraper):
         }
 
         if "archived" in op and op["archived"] == 1:
-            thread_update["is_archived"] = True
             thread_update["timestamp_archived"] = op["archived_on"]
 
         self.db.update("threads", where={"id": op["no"]}, data=thread_update)
@@ -152,7 +151,7 @@ class ThreadScraper(BasicJSONScraper):
             md5.update(base64.b64decode(post["md5"]))
             image_path = config.PATH_IMAGES + "/" + md5.hexdigest() + post["ext"]
 
-            if not os.path.isfile(image_path):
+            if os.path.isdir(config.PATH_IMAGES) and not os.path.isfile(image_path):
                 try:
                     self.queue.addJob("image", remote_id=post["md5"], details={
                         "board": thread["board"],
