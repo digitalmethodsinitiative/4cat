@@ -33,7 +33,6 @@ CREATE TABLE IF NOT EXISTS threads (
   limit_image        boolean DEFAULT FALSE,
   is_sticky          boolean DEFAULT FALSE,
   is_closed          boolean DEFAULT FALSE,
-  is_archived        boolean DEFAULT FALSE,
   index_positions    text
 );
 
