@@ -1,4 +1,6 @@
+import hashlib
 import os.path
+import base64
 import json
 import re
 
@@ -145,14 +147,18 @@ class ThreadScraper(BasicJSONScraper):
             if "filename" not in post:
                 continue
 
-            image_path = config.PATH_IMAGES + "/" + post["md5"] + post["ext"]
+            # this is the *one* place where the image path is determined
+            md5 = hashlib.md5()
+            md5.update(base64.b64decode(post["md5"]))
+            image_path = config.PATH_IMAGES + "/" + md5.hexdigest() + post["ext"]
+
             if not os.path.isfile(image_path):
                 try:
                     self.queue.addJob("image", remote_id=post["md5"], details={
                         "board": thread["board"],
                         "ext": post["ext"],
-                        "md5": post["md5"],
-                        "tim": post["tim"]
+                        "tim": post["tim"],
+                        "destination": image_path
                     })
                 except JobAlreadyExistsException:
                     pass
