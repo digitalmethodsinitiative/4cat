@@ -48,7 +48,7 @@ if ext.lower() not in ["csv", "db"]:
 print("Importing from: %s" % sourcefile)
 print("Board to be imported: %s" % board)
 if SKIP > 0:
-    print("SKIPping first %i posts." % SKIP)
+    print("Skipping first %i posts." % SKIP)
 
 """
     ### Init database - we need the thread data to know whether to insert a new thread for a post ###
@@ -60,9 +60,10 @@ threads = {thread["id"]: thread for thread in
 """
     ### Start importing posts ###
 """
-posts_added = 0
 if ext.lower() == "csv":
     # import from CSV dump
+    posts_added = 0
+
     with open(sourcefile) as csvdump:
         reader = DictReader(csvdump, fieldnames=fourplebs.columns, dialect=fourplebs)
         for post in reader:
@@ -76,10 +77,11 @@ else:
     # find table name
     table = cursor.execute("SELECT * FROM sqlite_master WHERE type = 'table'").fetchone()[1]
 
-    posts = cursor.execute("SELECT * FROM " + table)
+    posts_added = SKIP
+    posts = cursor.execute("SELECT * FROM " + table + " LIMIT -1 OFFSET " + str(SKIP))
     post = posts.fetchone()
     while post:
-        posts_added = process_post(post, db=db, skip=SKIP, posts_added=posts_added, threads=threads, board=board)
+        posts_added = process_post(post, db=db, skip=0, posts_added=posts_added, threads=threads, board=board)
         post = posts.fetchone()
 
 print("Done! Committing final transaction...")
