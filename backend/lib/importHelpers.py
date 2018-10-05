@@ -125,7 +125,8 @@ def process_post(post, db, skip, posts_added, threads, board):
     if post["comment"] and isinstance(post["comment"], str):
         links = re.findall(LINK_REGEX, post["comment"])
         for linked_post in links:
-            db.insert("posts_mention", data={"post_id": post["num"], "mentioned_id": linked_post}, commit=False)
+            if len(str(linked_post)) <= 15:
+                db.insert("posts_mention", data={"post_id": post["num"], "mentioned_id": linked_post}, commit=False)
 
     if posts_added % 1000 == 0:
         print("Processed %i posts." % posts_added)
