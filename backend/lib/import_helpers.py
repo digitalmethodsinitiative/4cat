@@ -5,7 +5,7 @@ import json
 import csv
 import re
 
-LINK_REGEX = re.compile(">>([0-9]+)")
+link_regex = re.compile(">>([0-9]+)")
 
 
 def parse_value(key, value):
@@ -30,21 +30,20 @@ def parse_value(key, value):
     return value
 
 
-def process_post(post, db, skip, posts_added, threads, board):
+def process_post(post, db, sequence, threads, board):
     """
     Add one post to the database
 
     :param dict post:  Post data
     :param Database db:  Database handler
-    :param int skip:   How many posts to skip before inserting
+    :param tuple sequence: tuple(posts to skip, number of posts added)
     :param int posts_added:   Posts added so far
     :param dict threads: Thread info, {id: data}
-    :param str board: Board name
     :return:
     """
     # skip if needed
-    posts_added += 1
-    if posts_added <= skip:
+    posts_added = sequence[1] + 1
+    if posts_added <= sequence[0]:
         return posts_added
 
     # sanitize post data
@@ -68,10 +67,6 @@ def process_post(post, db, skip, posts_added, threads, board):
 
         if int(post["num"]) > int(thread["post_last"]):
             updates["post_last"] = post["num"]
-
-        # not part of the dump:
-        # unique_ips, replies, images, bumplimit, imagelimit
-        # some of these could be derived later
 
         if post["sticky"] == "1":
             updates["is_sticky"] = True
@@ -123,9 +118,10 @@ def process_post(post, db, skip, posts_added, threads, board):
 
     # add links to other posts
     if post["comment"] and isinstance(post["comment"], str):
-        links = re.findall(LINK_REGEX, post["comment"])
+        links = re.findall(link_regex, post["comment"])
         for linked_post in links:
-            db.insert("posts_mention", data={"post_id": post["num"], "mentioned_id": linked_post}, commit=False)
+            if len(str(linked_post)) <= 15:
+                db.insert("posts_mention", data={"post_id": post["num"], "mentioned_id": linked_post}, commit=False)
 
     if posts_added % 1000 == 0:
         print("Processed %i posts." % posts_added)
@@ -138,7 +134,7 @@ def process_post(post, db, skip, posts_added, threads, board):
     return posts_added
 
 
-class fourplebs(csv.Dialect):
+class FourPlebs(csv.Dialect):
     """
     CSV Dialect as used in 4plebs database dumps - to be used with Python CSV functions
     """

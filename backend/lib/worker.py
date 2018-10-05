@@ -1,3 +1,6 @@
+"""
+Worker class that all workers should implement
+"""
 import threading
 import time
 import abc

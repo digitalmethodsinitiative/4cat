@@ -1,3 +1,8 @@
+"""
+Manager for a pool of workers
+
+Also known as "employer"
+"""
 import importlib
 import inspect
 import glob
@@ -27,6 +32,8 @@ class WorkerManager:
         Set up key poller
         """
         self.key_poller = KeyPoller(self)
+        self.key_poller.start()
+
         self.log = logger
 
         self.loop()

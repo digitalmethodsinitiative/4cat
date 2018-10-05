@@ -1,3 +1,6 @@
+"""
+Database wrapper
+"""
 import psycopg2.extras
 import psycopg2
 
@@ -20,7 +23,8 @@ class Database:
         """
         Set up database connection
         """
-        self.connection = psycopg2.connect(dbname=config.DB_NAME, user=config.DB_USER, password=config.DB_PASSWORD)
+        self.connection = psycopg2.connect(dbname=config.DB_NAME, user=config.DB_USER, password=config.DB_PASSWORD,
+                                           host=config.DB_HOST, port=config.DB_PORT)
         self.cursor = self.connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         self.log = logger
 
@@ -145,7 +149,8 @@ class Database:
             safe_bit = " ON CONFLICT "
             if constraints:
                 safe_bit += "(" + ", ".join(["{}" for each in constraints]) + ")"
-                [identifiers.append(sql.Identifier(column)) for column in constraints]
+                for column in constraints:
+                    identifiers.append(sql.Identifier(column))
             safe_bit += " DO NOTHING"
         else:
             safe_bit = ""

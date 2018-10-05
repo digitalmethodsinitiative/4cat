@@ -32,8 +32,8 @@ class stringQuery(BasicWorker):
         allowed_cols = ['post_vector', 'body_vector', 'title_vector']
 
     def work(self):
-        job = self.queue.getJob("query")
 
+        job = self.queue.get_job("query")
         if not job:
             self.log.info("No string queries")
             # for debugging:
