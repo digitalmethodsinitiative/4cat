@@ -1,4 +1,6 @@
 import requests
+import random
+import base64
 import time
 
 from lib.worker import BasicWorker
@@ -16,12 +18,8 @@ class ImageDownloader(BasicWorker):
             time.sleep(10)
             return
 
-        self.queue.finishJob(job)
-        return
-
-        # todo
         try:
-            url = "http://i.4cdn.org/%s/%s%s" % (job["board"], job["tim"], job["ext"])
+            url = "http://i.4cdn.org/%s/%s%s" % (job["details"]["board"], job["details"]["tim"], job["details"]["ext"])
             image = requests.get(url)
         except requests.HTTPError:
             # something wrong with our internet connection? or blocked by 4chan?
@@ -35,12 +33,17 @@ class ImageDownloader(BasicWorker):
             return
         elif image.status_code != 200:
             # try again in 30 seconds
-            self.queue.releaseJob(job, delay=30)
-            self.log.warning("Got response code %s while trying to download image %s" % (image.status_code, url))
+            if job["attempts"] > 2:
+                self.log.warning("Could not download image %s after x retries (last response code %s), aborting", (url, image.status_code))
+                self.queue.finishJob(job)
+            else:
+                self.log.info("Got response code %s while trying to download image %s, retrying later" % (image.status_code, url))
+                self.queue.releaseJob(job, delay=random.choice(range(5, 35)))
+
             return
 
         # write image to disk
-        image_location = config.PATH_IMAGES + "/" + job["md5"] + job["ext"]
+        image_location = job["details"]["destination"]
         with open(image_location, 'wb') as f:
             for chunk in image.iter_content(1024):
                 f.write(chunk)
