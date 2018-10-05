@@ -5,15 +5,15 @@ Postgres login details
 """
 DB_USER = "fourcat"
 DB_NAME = "fourcat"
-DB_PASSWORD = "mosselm4n"
+DB_PASSWORD = "sup3rs3cr3t"
 
 """
 Logs will be saved here - rotated by appended numbers
 """
-PATH_LOGS = "4cat-scraper.log"
-PATH_IMAGES = "images"
+PATH_LOGS = "4cat-backend.log"
+PATH_IMAGES = "/images"
 
 """
 What to scrape?
 """
-BOARDS = ["tg"]
+BOARDS = ["tg", "v"]
