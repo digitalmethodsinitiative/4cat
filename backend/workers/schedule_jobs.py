@@ -1,9 +1,15 @@
+"""
+Schedules jobs so the other workers have something to do
+"""
 import config
 
 from lib.worker import BasicWorker
 
 
-class JobPopulator(BasicWorker):
+class JobScheduler(BasicWorker):
+    """
+    This does no work itself, but schedules jobs for other workers at regular intervals.
+    """
     pause = 10
     max_workers = 1
 
@@ -14,7 +20,7 @@ class JobPopulator(BasicWorker):
         """
         normalized_time = self.loop_time - (self.loop_time % 60) + 60
 
-        jobs = self.queue.getAllJobs()
+        jobs = self.queue.get_all_jobs()
         for board in config.BOARDS:
             scheduled = False
             for job in jobs:
@@ -23,4 +29,4 @@ class JobPopulator(BasicWorker):
 
             if not scheduled:
                 self.log.info("Scheduling board scrape for /%s/" % board)
-                self.queue.addJob("board", remote_id=board, claim_after=normalized_time)
+                self.queue.add_job("board", remote_id=board, claim_after=normalized_time)

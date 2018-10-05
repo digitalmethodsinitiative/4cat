@@ -3,6 +3,7 @@ venv
 .git-latest
 .git-checked-out
 deploy.sh
+backend/config.py
 
 *.pyc
 *.log

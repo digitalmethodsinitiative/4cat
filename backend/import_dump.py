@@ -8,15 +8,15 @@ import os
 from csv import DictReader
 from lib.logger import Logger
 from lib.database import Database
-from lib.importHelpers import fourplebs, process_post
+from lib.import_helpers import FourPlebs, process_post
 
-"""
-   ### Interpret and validate command line arguments ###
-"""
-SKIP = 0
+#
+# Interpret and validate command line arguments
+#
+skip = 0
 for i in range(0, len(sys.argv)):
     if sys.argv[i][:7] == "--skip=":
-        SKIP = int(sys.argv[i][7:])
+        skip = int(sys.argv[i][7:])
         del sys.argv[i]
         break
 
@@ -47,26 +47,28 @@ if ext.lower() not in ["csv", "db"]:
 
 print("Importing from: %s" % sourcefile)
 print("Board to be imported: %s" % board)
-if SKIP > 0:
-    print("SKIPping first %i posts." % SKIP)
+if skip > 0:
+    print("Skipping first %i posts." % skip)
 
-"""
-    ### Init database - we need the thread data to know whether to insert a new thread for a post ###
-"""
+#
+# Init database - we need the thread data to know whether to insert a new thread for a post
+#
 db = Database(logger=Logger())
 threads = {thread["id"]: thread for thread in
            db.fetchall("SELECT id, timestamp, timestamp_modified, post_last FROM threads")}
 
-"""
-    ### Start importing posts ###
-"""
-posts_added = 0
+#
+# Start importing posts
+#
 if ext.lower() == "csv":
     # import from CSV dump
+    posts_added = 0
+
     with open(sourcefile) as csvdump:
-        reader = DictReader(csvdump, fieldnames=fourplebs.columns, dialect=fourplebs)
+        reader = DictReader(csvdump, fieldnames=FourPlebs.columns, dialect=FourPlebs)
         for post in reader:
-            posts_added = process_post(post, db=db, skip=SKIP, posts_added=posts_added, threads=threads, board=board)
+            post["board"] = board
+            posts_added = process_post(post, db=db, sequence=(skip, posts_added), threads=threads, board=board)
 else:
     # import from SQLite3 database
     sqlite = sqlite3.connect(sourcefile)
@@ -76,19 +78,20 @@ else:
     # find table name
     table = cursor.execute("SELECT * FROM sqlite_master WHERE type = 'table'").fetchone()[1]
 
-    posts = cursor.execute("SELECT * FROM " + table)
+    posts_added = skip
+    posts = cursor.execute("SELECT * FROM " + table + " LIMIT -1 OFFSET " + str(skip))
     post = posts.fetchone()
     while post:
-        posts_added = process_post(post, db=db, skip=SKIP, posts_added=posts_added, threads=threads, board=board)
+        posts_added = process_post(post, db=db, sequence=(0, posts_added), threads=threads, board=board)
         post = posts.fetchone()
 
 print("Done! Committing final transaction...")
 db.commit()
 print("Done!")
 
-"""
-    ### Update thread stats that we can derive ourselves ###
-"""
+#
+# Update thread stats that we can derive ourselves
+#
 print("Updating thread statistics...")
 threads_updated = 0
 for thread in threads:
