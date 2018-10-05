@@ -1,3 +1,6 @@
+"""
+Log handler
+"""
 import logging
 
 from logging.handlers import RotatingFileHandler
@@ -16,7 +19,7 @@ class Logger:
         """
         Set up log handler
         """
-        handler = RotatingFileHandler(config.PATH_LOGS, maxBytes=5242880, backupCount=1)
+        handler = RotatingFileHandler(config.PATH_LOGS, maxBytes=5242880, backupCount=0)
         handler.setLevel(logging.WARNING)
         handler.setFormatter(logging.Formatter("%(asctime)-15s | %(message)s", "%d-%m-%Y %H:%M:%S"))
 

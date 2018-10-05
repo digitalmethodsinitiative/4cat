@@ -1,7 +1,10 @@
+"""
+Simple class responsible for capturing user input
+"""
 import threading
 
 
-class KeyPoller:
+class KeyPoller(threading.Thread):
     """
     Interaction poller
 
@@ -16,9 +19,8 @@ class KeyPoller:
         Set up interaction poller
         :param main: Reference to main loop
         """
+        super().__init__()
         self.main = main
-        self.thread = threading.Thread(target=self.run, name="keyboard_poller")
-        self.thread.start()
 
     def run(self):
         """
