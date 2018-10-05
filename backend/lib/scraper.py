@@ -1,8 +1,12 @@
-import requests
+"""
+Basic scraper worker - should be inherited by workers to scrape specific types of content
+"""
 import random
 import time
 import json
 import abc
+
+import requests
 
 from lib.worker import BasicWorker
 from lib.queue import JobClaimedException
@@ -36,7 +40,7 @@ class BasicJSONScraper(BasicWorker, metaclass=abc.ABCMeta):
         is then requested and parsed. If that went well, the parsed data is passed on to the
         processor.
         """
-        job = self.queue.getJob(self.type)
+        job = self.queue.get_job(self.type)
         if not job:
             self.log.debug("Scraper (%s) has no jobs, sleeping for 10 seconds" % self.type)
             time.sleep(10)
@@ -46,7 +50,7 @@ class BasicJSONScraper(BasicWorker, metaclass=abc.ABCMeta):
         self.job = job
 
         try:
-            self.queue.claimJob(job)
+            self.queue.claim_job(job)
         except JobClaimedException:
             # too bad, so sad
             return
@@ -56,7 +60,7 @@ class BasicJSONScraper(BasicWorker, metaclass=abc.ABCMeta):
         try:
             data = requests.get(url, timeout=5)
         except (requests.HTTPError, requests.exceptions.ReadTimeout):
-            self.queue.releaseJob(job, delay=10)  # try again in 10 seconds
+            self.queue.release_job(job, delay=10)  # try again in 10 seconds
             self.log.warning("Could not finish request for %s, releasing job" % url)
             return
 
@@ -69,12 +73,12 @@ class BasicJSONScraper(BasicWorker, metaclass=abc.ABCMeta):
                 self.log.warning(
                     "Could not decode JSON response for %s scrape (remote ID %s, job ID %s) after three attempts, aborting" % (
                         self.type, job["remote_id"], job["id"]))
-                self.queue.finishJob(job)
+                self.queue.finish_job(job)
             else:
                 self.log.info(
                     "Could not decode JSON response for %s scrape (remote ID %s, job ID %s) - retrying later" % (
                         self.type, job["remote_id"], job["id"]))
-                self.queue.releaseJob(job, delay=random.choice(range(5, 35)))  # try again later
+                self.queue.release_job(job, delay=random.choice(range(5, 35)))  # try again later
 
             return
 
@@ -86,7 +90,7 @@ class BasicJSONScraper(BasicWorker, metaclass=abc.ABCMeta):
         """
         After processing, declare job finished
         """
-        self.queue.finishJob(self.job)
+        self.queue.finish_job(self.job)
 
     @abc.abstractmethod
     def process(self, data):

@@ -1,4 +1,6 @@
-import time
+"""
+4Chan board scraper - indexes threads and queues them for scraping
+"""
 
 from lib.scraper import BasicJSONScraper
 from lib.queue import JobAlreadyExistsException
@@ -36,7 +38,8 @@ class BoardScraper(BasicJSONScraper):
 
                 # schedule a job for scraping the thread's posts
                 try:
-                    self.queue.addJob(type="thread", remote_id=thread["no"], details={"board": self.job["remote_id"]})
+                    self.queue.add_job(jobtype="thread", remote_id=thread["no"],
+                                       details={"board": self.job["remote_id"]})
                 except JobAlreadyExistsException:
                     # this might happen if the workers can't keep up with the queue
                     pass

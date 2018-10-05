@@ -1,3 +1,7 @@
+"""
+4CAT Backend init - run this to start the backend!
+"""
+
 from lib.queue import JobQueue
 from lib.database import Database
 from lib.manager import WorkerManager
@@ -16,7 +20,7 @@ print("""
 |                    VP   `Y88P' YP   YP    YP                  |
 |                                                               |
 |               4CAT: Capture and Analysis Toolkit              |
-|                       www.oilab.eu/4cat                       |
+|                         4cat.oilab.eu                         |
 |                                                               |
 +---------------------------------------------------------------+    
 """)
@@ -36,7 +40,7 @@ with open("database.sql", "r") as content_file:
 
 # clean up after ourselves
 db.commit()
-queue.releaseAll()
+queue.release_all()
 
 # make it happen
 WorkerManager(logger=log)

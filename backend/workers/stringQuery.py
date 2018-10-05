@@ -10,7 +10,7 @@ class stringQuery(BasicWorker):
     max_workers = 3
 
     def work(self):
-        job = self.queue.getJob("query")
+        job = self.queue.get_job("query")
         if not job:
             self.log.info("No string queries")
             time.sleep(10)
