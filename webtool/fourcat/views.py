@@ -1,3 +1,10 @@
+import sys
+import os
+sys.path.append(os.getcwd() + '/backend')
+
+from lib.database import Database
+from lib.logger import Logger
+
 import sqlite3
 import csv
 import json
@@ -5,7 +12,6 @@ import time
 import ast
 import html
 import datetime
-import os
 import pandas as pd
 import sys
 import fourcat.similarities as sim
@@ -70,9 +76,6 @@ def load_csv(csv_input):
 		return htmltable
 	else:
 		print('Connecting to database')
-		print(databaselocation)
-		print(os.listdir(os.getcwd()))
-		print(os.getcwd())
 		conn = sqlite3.connect(databaselocation)
 
 		print('Connected to database')
@@ -360,10 +363,12 @@ def w2v(model, word='kek'):
 	sims = sim.getW2vSims('fourcat/static/data/word_embeddings/w2v_model_all-' + model + '.model.bin', querystring=word, longitudinal=False)
 	return sims
 
-
 @app.route('/backendtest', methods=['GET','POST'])
 def backendtest():
 	"""
 	Test the backend functions for substring querying
 	"""
-	print('test')
+	
+	log = Logger()
+	db = Database(logger=log)
+	return('')
