@@ -44,11 +44,13 @@ class stringQuery(BasicWorker):
             self.log.info("Executing string query")
 
             # the relevant column to be queried (post_vector, body_vector, or title_vector)
-            col = job["details"]["col_query"]
+            #col = job["details"]["col_query"]
+            col = 'body_vector'
 
-            if col not in self.allowed_cols:
-                self.log.warning("Column %s is not allowed. Use post_vector, body_vector, or title_vector" % (col))
+            # if col not in self.allowed_cols:
+            #     self.log.warning("Column %s is not allowed. Use post_vector, body_vector, or title_vector" % (col))
 
+            print(job)
             query = job["details"]["str_query"]
 
             # execute the query on the relevant column
