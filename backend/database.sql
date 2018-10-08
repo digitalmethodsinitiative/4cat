@@ -49,6 +49,7 @@ CREATE TABLE IF NOT EXISTS posts (
   timestamp_deleted integer DEFAULT 0,
   subject           text,
   body              text,
+  body_vector       text,
   author            text,
   author_type       text,
   author_type_id    text,
