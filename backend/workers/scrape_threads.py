@@ -116,6 +116,8 @@ class ThreadScraper(BasicJSONScraper):
             }
 
             self.db.insert("posts", post_data, commit=False)
+            self.db.execute("UPDATE posts SET body_vector = to_tsvector(body) WHERE id = %s", (post_id, ))
+
             self.save_links(post, post_id)
             if "filename" in post:
                 self.queue_image(post, thread)
