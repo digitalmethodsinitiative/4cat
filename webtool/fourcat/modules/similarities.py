@@ -12,6 +12,8 @@ import nltk
 import pickle
 import operator
 import json
+from fourcat.createHistogram import createCosineDistHisto
+#import glove_python
 from matplotlib.font_manager import FontProperties
 from nltk.stem.snowball import SnowballStemmer
 from nltk.corpus import stopwords
