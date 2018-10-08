@@ -115,6 +115,7 @@ def process_post(post, db, sequence, threads, board):
         "semantic_url": "",
         "unsorted_data": "{}"
     }, safe=True, commit=False)
+    db.execute("UPDATE posts SET body_vector = to_tsvector(body) WHERE id = %s", (post["num"],))
 
     # add links to other posts
     if post["comment"] and isinstance(post["comment"], str):
