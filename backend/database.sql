@@ -61,7 +61,8 @@ CREATE TABLE IF NOT EXISTS posts (
   image_dimensions  text,
   image_filesize    integer,
   semantic_url      text,
-  unsorted_data     text
+  unsorted_data     text,
+  body_vector       tsvector
 );
 
 CREATE INDEX IF NOT EXISTS posts_timestamp
@@ -73,6 +74,10 @@ CREATE INDEX IF NOT EXISTS posts_thread
   ON posts (
     thread_id
   );
+
+CREATE INDEX IF NOT EXISTS posts_fts
+  ON posts
+  USING gin (body_vector);
 
 -- post replies
 CREATE TABLE IF NOT EXISTS posts_mention (
@@ -89,8 +94,3 @@ CREATE INDEX IF NOT EXISTS mention_mentioned
   ON posts_mention (
     mentioned_id
   );
-
--- TRUNCATE threads;
--- TRUNCATE posts;
--- TRUNCATE jobs;
--- TRUNCATE posts_mention;
