@@ -1,7 +1,8 @@
 import sys
 import os
-sys.path.append(os.getcwd() + '/backend')
-#import lib.queue
+
+sys.path.insert(0, os.path.dirname(__file__) +  '/../../backend')
+import lib.queue
 import backend.config
 import pandas as pd
 import json
@@ -21,18 +22,18 @@ def show_index():
 	"""
 	Test the backend functions for substring querying
 	"""
-
 	log = Logger()
+	query_queue = lib.queue.JobQueue(logger=log)
 	db = Database(logger=log)
 	
-	# Should integrate queue.addJob() when importing gets figured out
-	
-	db.insert("jobs", data={
-		"jobtype": "query",
-		"details": json.dumps({"str_query": "skyrim", "col_query": "body_vector"}),
-		"timestamp": int(time.time()),
-		"remote_id": 0,
-		"claim_after": 0
-		}, safe=True, constraints=("jobtype", "remote_id"))
+	query_queue.add_job("query", details={"str_query": "skyrim", "col_query": "body_vector"})
+
+	# db.insert("jobs", data={
+	# 	"jobtype": "query",
+	# 	"details": json.dumps({"str_query": "skyrim", "col_query": "body_vector"}),
+	# 	"timestamp": int(time.time()),
+	# 	"remote_id": 0,
+	# 	"claim_after": 0
+	# 	}, safe=True, constraints=("jobtype", "remote_id"))
 
 	return('<h1>Testing</h1>')
