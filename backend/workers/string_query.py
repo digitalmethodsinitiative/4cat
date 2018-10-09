@@ -5,6 +5,7 @@ import csv
 from lib.database import Database
 from lib.logger import Logger
 from lib.worker import BasicWorker
+from bs4 import BeautifulSoup
 
 class stringQuery(BasicWorker):
     """
@@ -61,9 +62,8 @@ class stringQuery(BasicWorker):
             result = self.executeQuery(str(col), str(query))
 
             #convert and write to csv
-            result = self.dictToCsv(result, 'test_results')
+            result = self.dictToCsv(result, 'mentions_' + query)
 
-            self.log.info(result)
             if result == 'invalid_column':
                 self.queue.finish_job(job)
             else:
@@ -93,7 +93,7 @@ class stringQuery(BasicWorker):
 
         return string_matches
 
-    def dictToCsv(self, input_di, filename=''):
+    def dictToCsv(self, input_di, filename='', clean_csv=False):
         """
         Takes a dictionary of results, converts it to a csv, and writes it to the data folder.
         The respective csvs will be available to the user.
@@ -107,11 +107,21 @@ class stringQuery(BasicWorker):
             self.log.error('Please insert a filename for the csv')
             return -1
 
-        # write the dictionary to a csv
-        data_dir = config.PATH_DATA + '/' + filename + '.csv'
+        data_dir = config.PATH_DATA +  filename + '.csv'
         fieldnames = ['id', 'timestamp', 'body', 'subject']
+        
+        # write the dictionary to a csv
         with open(data_dir, 'w', encoding='utf-8') as csvfile:
-            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-            writer.writerows(input_di)
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames, lineterminator = '\n')
+            writer.writeheader()
+
+            if clean_csv:
+                for post in input_di:
+                    # Parsing: remove the HTML tags, but keep the <br> as a newline
+                    post['body'] = post['body'].replace('<br>', '\n')
+                    post["body"] = BeautifulSoup(post["body"], 'html.parser').get_text()
+                    writer.writerow(post)
+            else:
+                writer.writerows(input_di)
 
         return data_dir

@@ -46,11 +46,6 @@ else:
 
 themes = ['vaporwave','meme magick','international chans']
 
-#main page for data research
-@app.route('/oldhome')
-def submissions_page():
-	return render_template('fourcat.html')
-
 @app.route('/load/<csv_input>')
 def load_csv(csv_input):
 	"""

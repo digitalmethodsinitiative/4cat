@@ -95,5 +95,3 @@ CREATE INDEX IF NOT EXISTS mention_mentioned
   ON posts_mention (
     mentioned_id
   );
-
-TRUNCATE TABLE jobs;

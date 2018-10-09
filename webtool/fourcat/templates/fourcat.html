@@ -5,7 +5,7 @@
 	<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
 	<link rel="stylesheet" type="text/css" href="{{url_for('static', filename='stylesheet.css')}}">
 	<script type=text/javascript src="{{url_for('static', filename='jquery.js')}}"></script>
-	<script type=text/javascript src="{{url_for('static', filename='js/submits.js')}}"></script>
+	<script type=text/javascript src="{{url_for('static', filename='js/fourcat.js')}}"></script>
 	<meta charset="UTF-8">
 </head>
 <body>
@@ -28,7 +28,7 @@
 							<select id="dataselection">
 
 							</select>
-							<button id="btn_loadcsv" id="btn_loadcsv">Show sample</button>
+							<!-- <button id="btn_loadcsv" id="btn_loadcsv">Show sample</button> -->
 						</div>
 						<div id='filterinputs'>
 
@@ -37,11 +37,11 @@
 								<span>Substring filter:</span>
 								<input id="searchinput" type="text" name="dataselected"  maxlength="200">
 								
-								<select id="select_stringlocation">
+								<!-- <select id="select_stringlocation">
 									<option class="stringselect" value='0'>Comment</option>
 									<option class="stringselect" value='1'>Post title</option>
 								</select>
-							<input type='checkbox' id='check_frequency'></input> Include trends histogram
+							<input type='checkbox' id='check_frequency'></input> Include trends histogram -->
 						</div>
 						<!-- <div class="filterrow">
 							<input type="radio" name="filterradio" class='mainselect' value="textanalysis">
@@ -67,7 +67,7 @@
 						<option class="window_size" value='8'>8</option>
 					</select>
 
-				</div> -->
+				</div>
 				<div class="filterrow" id='filter_allimgs'>
 					<input type="radio" name="filterradio" class='mainselect' value="allimgs">
 					<span>All images chronologically</span>
@@ -81,8 +81,7 @@
 					<input type='checkbox' id='check_time'></input> <span>Filter on time, from</span>
 					<input id="input_mintime" type="date" name="mintimeinput" disabled="disabled"> to
 					<input id="input_maxtime" type="date" name="maxtimeinput" disabled="disabled">
-					<!-- <a target="_blank" href="https://www.epochconverter.com/">Use UNIX timestamp values</a> -->
-				</div>
+				</div> -->
 				<button class="btn_filterbutton" id="btn_go">Go</button>
 			</div>
 		</div>
