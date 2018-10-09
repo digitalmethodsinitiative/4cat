@@ -1,13 +1,13 @@
 import sys
 import os
-sys.path.append(os.getcwd())
+sys.path.append(os.getcwd() + '/backend')
 #import lib.queue
 import backend.config
 import pandas as pd
 import json
 import time
-from backend.lib.database import Database
-from backend.lib.logger import Logger
+from lib.database import Database
+from lib.logger import Logger
 from fourcat import app
 
 """
