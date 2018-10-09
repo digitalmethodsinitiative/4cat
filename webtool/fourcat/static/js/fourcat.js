@@ -37,7 +37,7 @@ $(function() {
 
 	var platformselected = ''
 
-	$('#btn_go').bind('click', function() {
+	/*$('#btn_go').bind('click', function() {
 		btn_filter = $('input[name=filterradio]:checked').val()
 		switch(btn_filter) {
 			case "substring":
@@ -55,10 +55,49 @@ $(function() {
 			default:
 			alert('Select filtering method')
 		} 
+	});*/
+
+	var timeout
+
+	$('#btn_go').bind('click', function(){
+		$('.loader').show()
+
+		search_query = $('#searchinput').val()
+
+		$.ajax({
+			dataType: "text",
+			url: 'string_query/' + search_query,
+			success: function(response) {
+				console.log(response);
+				pollCsv(search_query)
+				timeout = setTimeout(pollCsv(search_query), 2000);
+				$('#submitform').append('<a href="/static/data/filters/mentions_' + search_query + '.csv"<p>' + search_query + '.csv</p></a>')
+				$('.loader').hide()
+			},
+			error: function(error) {
+				console.log('error')
+				console.log(error);
+				$('#results').html('<h3>' +$('#dataselection option:selected').text() + " error</h3>")
+				$('.loader').hide()
+			}
+		});
 	});
+	
+	function pollCsv(str_query){
+		/*
+		Polls server to check whether there's already a csv for a query
+		*/
+		$.post('check_query/' + str_query).done(function(data) {
+			console.log(data)
+			if (data == 'file_exists') {
+				alert('file found!')
+				clearTimeout(timeout)
+			}
+		})
+	}
 
 	//fetching a sample HTML table of the selected csv
-	$('#btn_loadcsv').bind('click', function(){
+	$('#sample_csv').bind('click', function(){
 		$('.loader').show()
 		console.log('load/' + selectedcsv)
 		$.ajax({
