@@ -7,7 +7,7 @@ import pandas as pd
 import json
 import time
 import re
-from flask import Flask, render_template
+from flask import Flask, render_template, url_for
 from lib.database import Database
 from lib.logger import Logger
 from fourcat import app
@@ -49,11 +49,10 @@ def check_query(searchquery):
 	"""
 	AJAX URI to check whether query has been completed.
 	"""
-
-	csv_path = 'static/data/filters/mentions_' + searchquery + '.csv'
-	print(os.path.isfile(csv_path))
+	csv_path = os.path.dirname(__file__) + '/static/data/filters/mentions_' + searchquery + '.csv'
 
 	print(csv_path)
+	
 	if os.path.isfile(csv_path):
 		return 'file_exists'
 	else:
