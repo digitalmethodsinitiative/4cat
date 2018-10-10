@@ -12,11 +12,6 @@ class stringQuery(BasicWorker):
     Process substring queries from the front-end
     Requests are added to the pool as "query" jobs
 
-    The "col_query" field in the job['details'] determines what fields to query
-    body_vector:        only post body
-    subject_vector:     only post subject
-    post_vector:        full post, both body and title
-
     E.g. queue.addJob(type="query", details={"str_query": "skyrim", "col_query": "body_vector"})
     """
 
@@ -31,7 +26,7 @@ class stringQuery(BasicWorker):
         super().__init__(logger)
 
         self.db = Database(logger=self.log)
-        self.allowed_cols = ['post_vector', 'body_vector', 'title_vector']
+        self.allowed_cols = ['body_vector', 'title_vector']
 
     def work(self):
 
@@ -39,8 +34,6 @@ class stringQuery(BasicWorker):
 
         if not job:
             self.log.info("No string queries")
-            # for debugging:
-            # self.queue.add_job(type="query", details={"str_query": "skyrim", "col_query": "body_vector"})
             time.sleep(10)
 
         else:
@@ -56,7 +49,8 @@ class stringQuery(BasicWorker):
             query = job["details"]["str_query"]
 
             if col not in self.allowed_cols:
-                self.log.warning("Column %s is not allowed. Use post_vector, body_vector, or title_vector" % (col))
+                self.log.warning("Column %s is not allowed. Use body_vector and/or title_vector" % (col))
+                return -1
 
             # execute the query on the relevant column
             result = self.executeQuery(str(col), str(query))
@@ -64,18 +58,18 @@ class stringQuery(BasicWorker):
             #convert and write to csv
             result = self.dictToCsv(result, 'mentions_' + query)
 
-            if result == 'invalid_column':
-                self.queue.finish_job(job)
-            else:
-                # done!
-                self.queue.finish_job(job)
-
+            #done!
+            self.queue.finish_job(job)
+            
         looping = False
 
     def executeQuery(self, col_query, str_query):
         """
-        Query the relevant column
-        To do: create csv out of data and store in a 'data' folder (put location in config)
+        Query the relevant column of the chan data
+        
+        :param col_query:   string of the column to query (body_vector, subject_vector)
+        :param str_query:   string to query for
+
         """
         self.log.info('Starting fetching ' + col_query + ' containing \'' + str_query + '\'')
 
@@ -85,22 +79,26 @@ class stringQuery(BasicWorker):
                 string_matches = self.db.fetchall("SELECT id, timestamp, subject, body FROM posts WHERE body_vector @@ to_tsquery(%s);", (str_query,))
             elif col_query == 'subject_vector':
                 string_matches = self.db.fetchall("SELECT id, timestamp, subject, body FROM posts WHERE subject_vector @@ to_tsquery(%s);", (str_query,))
-            else:
-                return 'invalid_column'
+
         except Exception as error:
            return str(error)
         self.log.info('Finished fetching ' + col_query + ' containing \'' + str_query + '\' in ' + str(round((time.time() - start_time), 4)) + ' seconds')
 
         return string_matches
 
-    def dictToCsv(self, input_di, filename='', clean_csv=False):
+    def dictToCsv(self, li_input, filename='', clean_csv=True):
         """
         Takes a dictionary of results, converts it to a csv, and writes it to the data folder.
         The respective csvs will be available to the user.
+
+        :param li_input:    list derived with db.fetchall(), used as input
+        :param filename:    filename for the resulting csv
+        :param clean_csv:   whether to parse the raw HTML data to clean text. If True (default), writing takes 1.5 times longer.
+
         """
-        self.log.info(type(input_di))
+        self.log.info(type(li_input))
         # some error handling
-        if type(input_di) != list:
+        if type(li_input) != list:
             self.log.error('Please use a list object to convert to csv')
             return -1
         if filename == '':
@@ -108,6 +106,8 @@ class stringQuery(BasicWorker):
             return -1
 
         data_dir = config.PATH_DATA +  filename + '.csv'
+
+        # fields to save in the offered csv (tweak later)
         fieldnames = ['id', 'timestamp', 'body', 'subject']
         
         # write the dictionary to a csv
@@ -116,12 +116,13 @@ class stringQuery(BasicWorker):
             writer.writeheader()
 
             if clean_csv:
-                for post in input_di:
-                    # Parsing: remove the HTML tags, but keep the <br> as a newline
+                # Parsing: remove the HTML tags, but keep the <br> as a newline
+                # Takes around 1.5 times longer
+                for post in li_input:
                     post['body'] = post['body'].replace('<br>', '\n')
                     post["body"] = BeautifulSoup(post["body"], 'html.parser').get_text()
                     writer.writerow(post)
             else:
-                writer.writerows(input_di)
+                writer.writerows(li_input)
 
         return data_dir
