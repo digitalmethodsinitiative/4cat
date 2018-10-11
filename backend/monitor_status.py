@@ -10,7 +10,7 @@ import math
 import sys
 import os
 
-sys.path.insert(0, os.path.dirname(__file__) +  '/../..')
+sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)) + '/..')
 import config
 
 from lib.database import Database
@@ -50,7 +50,7 @@ try:
     if recent["jobs"] == 0:
         log.warning("No jobs were found queued.")
 
-    if recent["jobs"] > 500:
+    if recent["jobs"] > config.WARN_JOBS:
         log.warning("%s jobs were found qeueud during check." % (recent["jobs"],))
 
 except Exception as e:

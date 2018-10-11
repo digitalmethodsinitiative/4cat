@@ -19,6 +19,7 @@ PATH_DATA = "data"
 # (which may trigger further alerts depending on logger settings)
 WARN_POSTS = 500
 WARN_THREADS = 50
+WARN_JOBS = 5000  # if *more* than this amount of jobs are queued, warn
 
 # E-mails about critical errors are sent to these addresses
 WARN_EMAILS = ["admin@4cat.biz"]
