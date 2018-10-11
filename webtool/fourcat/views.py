@@ -1,8 +1,8 @@
 import sys
 import os
-sys.path.insert(0, os.path.dirname(__file__) +  '/../../backend')
+sys.path.insert(0, os.path.dirname(__file__) +  '/../..')
 import lib.queue
-import backend.config
+import config
 import pandas as pd
 import json
 import time
