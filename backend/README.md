@@ -41,7 +41,12 @@ The workers can be configured mainly through the following class properties:
   database. Dumps may be in CSV or SQLite format. Run the script without 
   arguments for further explanation:
 
-  `python3 importDump.py`
+  `python3 import_dump.py`
+
+- `monitor_status.py` is a script that checks how many jobs are queued and how
+  many threads and posts were scraped since the last check, and logs a warning
+  if anything suspicious is found. Currently this requires a cronjob to run
+  at regular intervals.
   
 - `database.sql` contains the description of the database used by the backend. 
   Running it should set up your tables and indexes if they have not been added 
