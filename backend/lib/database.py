@@ -184,15 +184,15 @@ class Database:
         except AttributeError:
             return []
 
-    def fetchone(self, query, replacements):
+    def fetchone(self, query, *args):
         """
         Fetch one result row
 
         :param query: Query
-        :param replacements: Replacement values
+        :param args: Replacement values
         :return: The row, as a dictionary, or None if there were no rows
         """
-        self.query(query, replacements)
+        self.query(query, *args)
         try:
             return self.cursor.fetchone()
         except psycopg2.ProgrammingError:
