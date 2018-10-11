@@ -5,6 +5,7 @@ venv
 deploy.sh
 config.py
 
+*.lock
 *.pyc
 *.log
 *.log.*
