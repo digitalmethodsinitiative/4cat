@@ -5,10 +5,14 @@ import psutil
 import sys
 import os
 
+sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)) +  '/..')
+import config
+
 from lib.queue import JobQueue
 from lib.database import Database
 from lib.manager import WorkerManager
 from lib.logger import Logger
+from lib.helpers import get_absolute_folder
 
 print("""
 +---------------------------------------------------------------+
@@ -29,7 +33,7 @@ print("""
 """)
 
 # init - check if a lockfile exists and if so, whether the PID in it is still active
-lockfile = "4cat-backend.lock"
+lockfile = get_absolute_folder(config.PATH_LOCKFILE) + "/4cat-backend.lock"
 if os.path.isfile(lockfile):
     with open(lockfile) as pidfile:
         pid = pidfile.read().strip()
@@ -48,8 +52,8 @@ queue = JobQueue(logger=log)
 
 with open("database.sql", "r") as content_file:
     log.info("Initializing database...")
-    #database_setup = content_file.read()
-    #db.execute(database_setup)
+    database_setup = content_file.read()
+    db.execute(database_setup)
     log.info("Database tables and indexes present.")
 
 # clean up after ourselves
@@ -58,5 +62,4 @@ queue.release_all()
 
 # make it happen
 WorkerManager(logger=log)
-
-print("ok")
+os.unlink(lockfile)
