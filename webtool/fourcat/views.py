@@ -1,6 +1,7 @@
 import sys
 import os
 sys.path.insert(0, os.path.dirname(__file__) +  '/../..')
+sys.path.insert(0, os.path.dirname(__file__) +  '/../../backend')
 import lib.queue
 import config
 import pandas as pd
