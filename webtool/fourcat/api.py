@@ -44,7 +44,7 @@ def api_main():
 
     return jsonify(response)
 
-@app.route('/api/status/')
+@app.route('/api/status.json')
 @api_ratelimit
 def api_status():
     """
