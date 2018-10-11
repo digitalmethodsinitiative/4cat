@@ -28,7 +28,7 @@ class Logger:
 
         handler = RotatingFileHandler(log_path, maxBytes=5242880, backupCount=0)
         handler.setLevel(logging.WARNING)
-        handler.setFormatter(logging.Formatter("%(asctime)-15s | %(message)s", "%d-%m-%Y %H:%M:%S"))
+        handler.setFormatter(logging.Formatter("%(asctime)-15s | %(levelname)s (%(filename)s:%(lineno)d): %(message)s", "%d-%m-%Y %H:%M:%S"))
 
         self.logger.addHandler(handler)
         self.logger.setLevel(logging.WARNING)
