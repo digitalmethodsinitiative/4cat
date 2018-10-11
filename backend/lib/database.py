@@ -206,3 +206,11 @@ class Database:
         This is required for UPDATE etc to stick around.
         """
         self.connection.commit()
+
+    def close(self):
+        """
+        Close connection
+
+        Running queries after this is probably a bad idea!
+        """
+        self.connection.close()
