@@ -13,6 +13,8 @@ from lib.database import Database
 from lib.logger import Logger
 from fourcat import app
 
+import fourcat.api
+
 """
 
 Main views for the 4CAT front-end
