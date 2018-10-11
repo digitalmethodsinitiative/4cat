@@ -49,7 +49,7 @@ CREATE TABLE IF NOT EXISTS posts (
   timestamp_deleted integer DEFAULT 0,
   subject           text,
   body              text,
-  body_vector       text,
+  body_vector       tsvector,
   author            text,
   author_type       text,
   author_type_id    text,
@@ -62,8 +62,7 @@ CREATE TABLE IF NOT EXISTS posts (
   image_dimensions  text,
   image_filesize    integer,
   semantic_url      text,
-  unsorted_data     text,
-  body_vector       tsvector
+  unsorted_data     text
 );
 
 CREATE INDEX IF NOT EXISTS posts_timestamp
