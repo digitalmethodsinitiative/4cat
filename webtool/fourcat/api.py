@@ -18,11 +18,12 @@ limiter = Limiter(
     key_func=get_remote_address
 )
 
+api_ratelimit = limiter.shared_limit("1 per second", scope="api")
 API_SUCCESS = 200
 API_FAIL = 404
 
 @app.route('/api/')
-@limiter.limit("30 per minute")
+@api_ratelimit
 def api_main():
     """
     API Index
@@ -41,7 +42,7 @@ def api_main():
     return jsonify(response)
 
 @app.route('/api/status/')
-@limiter.limit("1 per second")
+@api_ratelimit
 def api_status():
     """
     Get service status
