@@ -2,8 +2,12 @@
 Log handler
 """
 import logging
+import sys
+import os
 
-from logging.handlers import RotatingFileHandler
+from logging.handlers import RotatingFileHandler, SMTPHandler
+
+sys.path.insert(0, os.path.dirname(__file__) +  '/../..')
 import config
 
 
@@ -25,6 +29,18 @@ class Logger:
 
         self.logger.addHandler(handler)
         self.logger.setLevel(logging.WARNING)
+
+    def enable_mailer(self):
+        """
+        Enable the log mailer
+
+        This sends an e-mail to a pre-defined address when a log message of at least
+        level WARNING is logged.
+        """
+        mailer = SMTPHandler("localhost", "backend@4cat.oilab.eu", config.WARN_EMAILS, "4CAT Backend logger")
+        mailer.setLevel(logging.WARNING)
+
+        self.logger.addHandler(mailer)
 
     def log(self, message, level=logging.INFO):
         """

@@ -19,6 +19,9 @@ PATH_DATA = "data"
 WARN_POSTS = 500
 WARN_THREADS = 50
 
+# E-mails about critical errors are sent to these addresses
+WARN_EMAILS = ["admin@4cat.biz"]
+
 # What to scrape?
 BOARDS = ["tg", "v"]
 
