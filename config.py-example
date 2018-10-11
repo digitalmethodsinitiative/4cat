@@ -8,7 +8,8 @@ DB_NAME = "fourcat"
 DB_PASSWORD = "sup3rs3cr3t"
 
 # Path to log file (may be rotated) and folder where images may be saved
-# Paths are relative to the folder this config file is in
+# Relative paths will be relative to the 4cat root folder (i.e. the folder
+# this config file is in)
 PATH_LOGS = "4cat-backend.log"
 PATH_IMAGES = "images"
 PATH_DATA = "data"

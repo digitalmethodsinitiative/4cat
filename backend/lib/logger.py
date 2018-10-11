@@ -5,6 +5,7 @@ import logging
 import sys
 import os
 
+from lib.helpers import get_absolute_folder
 from logging.handlers import RotatingFileHandler, SMTPHandler
 
 sys.path.insert(0, os.path.dirname(__file__) +  '/../..')
@@ -23,12 +24,15 @@ class Logger:
         """
         Set up log handler
         """
-        handler = RotatingFileHandler(config.PATH_LOGS, maxBytes=5242880, backupCount=0)
+        log_path = get_absolute_folder(config.PATH_LOGS) + "/4cat.log"
+
+        handler = RotatingFileHandler(log_path, maxBytes=5242880, backupCount=0)
         handler.setLevel(logging.WARNING)
         handler.setFormatter(logging.Formatter("%(asctime)-15s | %(message)s", "%d-%m-%Y %H:%M:%S"))
 
         self.logger.addHandler(handler)
         self.logger.setLevel(logging.WARNING)
+        self.info("Logging to %s" % log_path)
 
     def enable_mailer(self):
         """

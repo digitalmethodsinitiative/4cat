@@ -2,8 +2,9 @@ import requests
 import time
 import config
 import csv
+import os
 from lib.database import Database
-from lib.logger import Logger
+from lib.helpers import get_absolute_folder
 from lib.worker import BasicWorker
 from bs4 import BeautifulSoup
 
@@ -60,7 +61,7 @@ class stringQuery(BasicWorker):
 
             #done!
             self.queue.finish_job(job)
-            
+
         looping = False
 
     def executeQuery(self, col_query, str_query):
@@ -105,13 +106,13 @@ class stringQuery(BasicWorker):
             self.log.error('Please insert a filename for the csv')
             return -1
 
-        data_dir = config.PATH_DATA +  filename + '.csv'
+        filepath = get_absolute_folder(config.PATH_DATA) + "/" + filename + '.csv'
 
         # fields to save in the offered csv (tweak later)
         fieldnames = ['id', 'timestamp', 'body', 'subject']
-        
+
         # write the dictionary to a csv
-        with open(data_dir, 'w', encoding='utf-8') as csvfile:
+        with open(filepath, 'w', encoding='utf-8') as csvfile:
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames, lineterminator = '\n')
             writer.writeheader()
 
@@ -125,4 +126,4 @@ class stringQuery(BasicWorker):
             else:
                 writer.writerows(li_input)
 
-        return data_dir
+        return filepath
