@@ -3,6 +3,8 @@ import time
 import config
 import csv
 import os
+
+from lib.queue import JobClaimedException
 from lib.database import Database
 from lib.helpers import get_absolute_folder
 from lib.worker import BasicWorker
@@ -42,7 +44,7 @@ class stringQuery(BasicWorker):
             try:
                 self.queue.claim_job(job)
             except JobClaimedException:
-                return JobClaimedException
+                return
 
             self.log.info("Executing string query")
 
@@ -51,7 +53,7 @@ class stringQuery(BasicWorker):
 
             if col not in self.allowed_cols:
                 self.log.warning("Column %s is not allowed. Use body_vector and/or title_vector" % (col))
-                return -1
+                return
 
             # execute the query on the relevant column
             result = self.executeQuery(str(col), str(query))
