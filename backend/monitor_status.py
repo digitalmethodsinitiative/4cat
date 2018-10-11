@@ -20,44 +20,45 @@ concern = False
 monitor_interval = 3600
 
 try:
-    log = Logger()
+	log = Logger()
 except Exception:
-    log = None
-    concern = True
+	log = None
+	concern = True
 
 try:
-    log.enable_mailer()
-    db = Database(logger=log)
-    concern = True
+	log.enable_mailer()
+	db = Database(logger=log)
+	concern = True
 
-    cutoff = int(time.time()) - monitor_interval
-    interval_minutes = math.floor(monitor_interval / 60)
+	cutoff = int(time.time()) - monitor_interval
+	interval_minutes = math.floor(monitor_interval / 60)
 
-    recent = {
-        "posts": db.fetchone("SELECT COUNT(*) AS num FROM posts WHERE timestamp > %s", (cutoff,))["num"],
-        "threads": db.fetchone("SELECT COUNT(*) AS num FROM posts WHERE timestamp > %s", (cutoff,))["num"],
-        "jobs": db.fetchone("SELECT COUNT(*) as num FROM jobs")["num"]
-    }
+	recent = {
+		"posts": db.fetchone("SELECT COUNT(*) AS num FROM posts WHERE timestamp > %s", (cutoff,))["num"],
+		"threads": db.fetchone("SELECT COUNT(*) AS num FROM posts WHERE timestamp > %s", (cutoff,))["num"],
+		"jobs": db.fetchone("SELECT COUNT(*) as num FROM jobs")["num"]
+	}
 
-    if recent["posts"] < config.WARN_POSTS:
-        log.warning("%s posts scraped in the past %s minutes. Is the scraper working?" % (interval_minutes, recent["posts"]))
-        concern = True
+	if recent["posts"] < config.WARN_POSTS:
+		log.warning(
+			"%s posts scraped in the past %s minutes. Is the scraper working?" % (interval_minutes, recent["posts"]))
+		concern = True
 
-    if recent["threads"] < config.WARN_THREADS:
-        log.warning("%s threads scraped in the past %s minutes. Is the scraper working?" % (interval_minutes, recent["threads"]))
-        concern = True
+	if recent["threads"] < config.WARN_THREADS:
+		log.warning("%s threads scraped in the past %s minutes. Is the scraper working?" % (
+		interval_minutes, recent["threads"]))
+		concern = True
 
-    if recent["jobs"] == 0:
-        log.warning("No jobs were found queued.")
+	if recent["jobs"] == 0:
+		log.warning("No jobs were found queued.")
 
-    if recent["jobs"] > config.WARN_JOBS:
-        log.warning("%s jobs were found qeueud during check." % (recent["jobs"],))
+	if recent["jobs"] > config.WARN_JOBS:
+		log.warning("%s jobs were found qeueud during check." % (recent["jobs"],))
 
 except Exception as e:
-    if log:
-        log.critical("Exception raised while running monitoring script: %s" % e)
-    concern = True
-
+	if log:
+		log.critical("Exception raised while running monitoring script: %s" % e)
+	concern = True
 
 # exit with proper exit code
 sys.exit(1) if concern else sys.exit(0)

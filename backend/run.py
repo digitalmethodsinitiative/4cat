@@ -5,7 +5,7 @@ import psutil
 import sys
 import os
 
-sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)) +  '/..')
+sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)) + '/..')
 import config
 
 from lib.queue import JobQueue
@@ -35,14 +35,14 @@ print("""
 # init - check if a lockfile exists and if so, whether the PID in it is still active
 lockfile = get_absolute_folder(config.PATH_LOCKFILE) + "/4cat-backend.lock"
 if os.path.isfile(lockfile):
-    with open(lockfile) as pidfile:
-        pid = pidfile.read().strip()
-        if int(pid) in psutil.pids():
-            print("Error: 4CAT Backend is already running (PID %s). Only one instance may be active at any time." % pid)
-            sys.exit(1)
+	with open(lockfile) as pidfile:
+		pid = pidfile.read().strip()
+		if int(pid) in psutil.pids():
+			print("Error: 4CAT Backend is already running (PID %s). Only one instance may be active at any time." % pid)
+			sys.exit(1)
 
 with open("4cat-backend.lock", "w") as pidfile:
-    pidfile.write(str(os.getpid()))
+	pidfile.write(str(os.getpid()))
 
 # load everything
 looping = True
@@ -51,10 +51,10 @@ db = Database(logger=log)
 queue = JobQueue(logger=log)
 
 with open("database.sql", "r") as content_file:
-    log.info("Initializing database...")
-    database_setup = content_file.read()
-    db.execute(database_setup)
-    log.info("Database tables and indexes present.")
+	log.info("Initializing database...")
+	database_setup = content_file.read()
+	db.execute(database_setup)
+	log.info("Database tables and indexes present.")
 
 # clean up after ourselves
 db.commit()
