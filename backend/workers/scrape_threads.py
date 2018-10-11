@@ -9,6 +9,7 @@ import base64
 import json
 import re
 
+from lib.helpers import get_absolute_folder
 from lib.scraper import BasicJSONScraper
 from lib.queue import JobAlreadyExistsException
 
@@ -156,11 +157,15 @@ class ThreadScraper(BasicJSONScraper):
         :param dict post:  Post data to queue image download for
         :param dict thread:  Thread data of thread within which image was posted
         """
+
+        # generate image path
         md5 = hashlib.md5()
         md5.update(base64.b64decode(post["md5"]))
-        image_path = config.PATH_IMAGES + "/" + md5.hexdigest() + post["ext"]
 
-        if os.path.isdir(config.PATH_IMAGES) and not os.path.isfile(image_path):
+        image_folder = get_absolute_folder(config.PATH_IMAGES)
+        image_path = image_folder + "/" + md5.hexdigest() + post["ext"]
+
+        if os.path.isdir(image_folder) and not os.path.isfile(image_path):
             try:
                 self.queue.add_job("image", remote_id=post["md5"], details={
                     "board": thread["board"],
