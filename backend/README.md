@@ -5,17 +5,11 @@ Runs worker threads in which the magic happens:
 - Scraping 4chan threads and posts
 - Downloading images
 - Scheduling the above
-- Parsing and processing search requests (todo!)
+- Parsing and processing search requests
 
 Run:
 
 `python3 run.py`
-
-Needs:
-
-- `pip3 install requests psycopg2-binary` or `pip3 install -e requirements.txt`
-- A PostgreSQL (>= 9.5) database and user with rights on that database (see 
-  `config.py-example`)
 
 ## What it does
 Runs a number of workers in parallel threads, that query a central job queue 
@@ -41,7 +35,9 @@ The workers can be configured mainly through the following class properties:
   database. Dumps may be in CSV or SQLite format. Run the script without 
   arguments for further explanation:
 
-  `python3 import_dump.py`
+  ```
+  python3 import_dump.py
+  ```
 
 - `monitor_status.py` is a script that checks how many jobs are queued and how
   many threads and posts were scraped since the last check, and logs a warning
@@ -50,5 +46,5 @@ The workers can be configured mainly through the following class properties:
   
 - `database.sql` contains the description of the database used by the backend. 
   Running it should set up your tables and indexes if they have not been added 
-  yet. The SQL is automatically run by `run.py`, so there is no need to create
-  tables before running it for the first time. 
+  yet. The SQL is automatically run by `run.py` upon startup, so there is no 
+  need to create tables before running it for the first time. 
