@@ -1,4 +1,0 @@
-psycopg2_binary==2.7.5
-requests==2.19.1
-beautifulsoup4
-psutil
