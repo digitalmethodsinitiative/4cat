@@ -1,4 +1,0 @@
-html2text
-stop_words
-psutil
-flask-limiter
