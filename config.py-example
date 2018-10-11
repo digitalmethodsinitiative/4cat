@@ -7,12 +7,12 @@ DB_USER = "fourcat"
 DB_NAME = "fourcat"
 DB_PASSWORD = "sup3rs3cr3t"
 
-# Path to log file (may be rotated) and folder where images may be saved
-# Relative paths will be relative to the 4cat root folder (i.e. the folder
-# this config file is in)
-PATH_LOGS = "4cat-backend.log"
-PATH_IMAGES = "images"
-PATH_DATA = "data"
+# Path to folders where logs/images/data may be saved.
+# Paths are relative to the folder this config file is in.
+PATH_LOGS = ""
+PATH_IMAGES = ""  # if left empty or pointing to a non-existent folder, no images will be saved
+PATH_DATA = ""
+PATH_LOCKFILE = "backend"  # the lockfile will be saved in this folder. Probably no need to change!
 
 # The following two options determine when a warning is logged - e.g. if within
 # the last hour less than WARN_POSTS posts are scraped, a warning is logged
