@@ -37,8 +37,8 @@ def string_query(searchquery):
 
 	# make connections to database with backend library
 	log = Logger()
-	query_queue = lib.queue.JobQueue(logger=log)
 	db = Database(logger=log)
+	query_queue = lib.queue.JobQueue(logger=log, database=db)
 	
 	# add job with respective query string
 	query_queue.add_job("query", details={"str_query": searchquery, "col_query": "body_vector"})
