@@ -5,7 +5,6 @@ import csv
 import os
 
 from lib.queue import JobClaimedException
-from lib.database import Database
 from lib.helpers import get_absolute_folder
 from lib.worker import BasicWorker
 from bs4 import BeautifulSoup
@@ -29,7 +28,6 @@ class stringQuery(BasicWorker):
 		"""
 		super().__init__(logger)
 
-		self.db = Database(logger=self.log)
 		self.allowed_cols = ['body_vector', 'title_vector']
 
 	def work(self):

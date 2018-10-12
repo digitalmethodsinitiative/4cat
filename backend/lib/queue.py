@@ -4,8 +4,6 @@ A job queue, to divide work over the workers
 import time
 import json
 
-from lib.database import Database
-
 
 class JobQueue:
 	"""
@@ -18,13 +16,13 @@ class JobQueue:
 	db = None
 	log = None
 
-	def __init__(self, logger):
+	def __init__(self, logger, database):
 		"""
 		Set up database handler
 		"""
 		self.log = logger
 
-		self.db = Database(logger=self.log)
+		self.db = database
 
 	def get_job(self, jobtype, timestamp=-1):
 		"""

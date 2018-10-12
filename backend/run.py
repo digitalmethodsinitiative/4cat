@@ -48,7 +48,7 @@ with open("4cat-backend.lock", "w") as pidfile:
 looping = True
 log = Logger()
 db = Database(logger=log)
-queue = JobQueue(logger=log)
+queue = JobQueue(logger=log, database=db)
 
 with open("database.sql", "r") as content_file:
 	log.info("Initializing database...")

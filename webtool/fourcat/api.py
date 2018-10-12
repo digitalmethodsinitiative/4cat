@@ -12,6 +12,7 @@ from flask_limiter.util import get_remote_address
 import config
 from fourcat import app
 from lib.database import Database
+from lib.queue import JobQueue
 from lib.logger import Logger
 from lib.helpers import get_absolute_folder
 
@@ -54,7 +55,8 @@ def api_status():
 
 	# get job stats
 	db = Database(logger=log)
-	jobs = db.fetchall("SELECT * FROM jobs")
+	queue = JobQueue(logger=log, database=db)
+	jobs = queue.get_all_jobs()
 	jobs_count = len(jobs)
 	jobs_types = set([job["jobtype"] for job in jobs])
 	jobs_sorted = {jobtype: len([job for job in jobs if job["jobtype"] == jobtype]) for jobtype in jobs_types}

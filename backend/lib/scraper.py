@@ -10,7 +10,6 @@ import requests
 
 from lib.worker import BasicWorker
 from lib.queue import JobClaimedException
-from lib.database import Database
 
 
 class BasicJSONScraper(BasicWorker, metaclass=abc.ABCMeta):
@@ -28,8 +27,6 @@ class BasicJSONScraper(BasicWorker, metaclass=abc.ABCMeta):
 		Set up database connection - we need one to store the thread data
 		"""
 		super().__init__(logger)
-
-		self.db = Database(logger=self.log)
 		self.job = {}
 
 	def work(self):

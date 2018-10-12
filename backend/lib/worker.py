@@ -6,6 +6,7 @@ import time
 import abc
 
 from lib.queue import JobQueue
+from lib.database import Database
 
 
 class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
@@ -33,7 +34,9 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
 		super().__init__()
 		self.name = self.type
 		self.log = logger
-		self.queue = JobQueue(logger=self.log)
+
+		self.db = Database(logger=self.log)
+		self.queue = JobQueue(logger=self.log, database=self.db)
 
 	def abort(self):
 		"""
