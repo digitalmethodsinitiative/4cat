@@ -40,8 +40,19 @@ $(function() {
 	$('#btn_go').bind('click', function(){
 		$('.loader').show()
 
+
 		// query string is what's in the search box
 		search_query = $('#searchinput').val()
+		ajax_url = 'string_query/' + search_query
+
+		if($('#check_time').is(':checked')){
+			mindate = $('#input_mintime').val()
+			mindate = (new Date(mindate).getTime() / 100)
+			maxdate = $('#input_maxtime').val()
+			maxdate = (new Date(maxdate).getTime() / 100)
+			console.log(mindate, maxdate)
+			ajax_url = ajax_url + '/' + mindate + '/' + maxdate
+		}
 
 		$.ajax({
 			dataType: "text",
@@ -76,13 +87,14 @@ $(function() {
 				console.log(response)
 				if (response == 'file_exists') {
 					clearInterval(poll_interval)
+					// this doesn't work yet, should update for config data folder
 					$('#submitform').append('<a href="/static/data/filters/mentions_' + search_query + '.csv"<p>' + search_query + '.csv</p></a>')
 					$('.loader').hide()
 					alert('Query for \'' + str_query + '\' complete!')
 				}
 			},
 			error: function(error) {
-				console.log('not complete yet')
+				console.log('Something went wrong when checking for csv exists')
 			}
 		});
 	}

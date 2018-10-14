@@ -49,6 +49,10 @@ class stringQuery(BasicWorker):
 
 			col = job["details"]["col_query"]
 			query = job["details"]["str_query"]
+			
+			if "min_date" in job["details"] and "max_date" in job["details"]:
+				min_date = job["details"]["min_date"]
+				min_date = job["details"]["max_date"]
 
 			if col not in self.allowed_cols:
 				self.log.warning("Column %s is not allowed. Use body_vector and/or title_vector" % (col))
@@ -65,7 +69,7 @@ class stringQuery(BasicWorker):
 
 		looping = False
 
-	def executeQuery(self, col_query, str_query):
+	def executeQuery(self, col_query, str_query, min_date=None, max_date=None):
 		"""
 		Query the relevant column of the chan data
 
@@ -78,8 +82,12 @@ class stringQuery(BasicWorker):
 		start_time = time.time()
 		try:
 			if col_query == 'body_vector':
-				string_matches = self.db.fetchall(
-					"SELECT id, timestamp, subject, body FROM posts WHERE body_vector @@ to_tsquery(%s);", (str_query,))
+				if min_date is not None and max_date is not None:
+					string_matches = self.db.fetchall(
+						"SELECT id, timestamp, subject, body FROM posts WHERE body_vector @@ to_tsquery(%s);", (str_query,))
+				else:
+					string_matches = self.db.fetchall(
+						"SELECT id, timestamp, subject, body FROM posts WHERE body_vector @@ to_tsquery(%s) AND timestamp > %s AND timestamp < %s;", (str_query, min_date, max_date))
 			elif col_query == 'subject_vector':
 				string_matches = self.db.fetchall(
 					"SELECT id, timestamp, subject, body FROM posts WHERE subject_vector @@ to_tsquery(%s);",

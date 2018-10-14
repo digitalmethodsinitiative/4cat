@@ -1,9 +1,0 @@
-fourcat/__init__.py
-fourcat/add_views.py
-fourcat/similarities.py
-fourcat/views.py
-fourcat.egg-info/PKG-INFO
-fourcat.egg-info/SOURCES.txt
-fourcat.egg-info/dependency_links.txt
-fourcat.egg-info/requires.txt
-fourcat.egg-info/top_level.txt

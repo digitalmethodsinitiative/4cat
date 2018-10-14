@@ -27,9 +27,13 @@ def show_index():
 	return render_template('fourcat.html')
 
 @app.route('/string_query/<searchquery>')
-def string_query(searchquery):
+@app.route('/string_query/<searchquery>/<min_timestamp>/<max_timestamp>')
+def string_query(searchquery, min_timestamp='none', max_timestamp='none'):
 	"""
 	AJAX URI for substring querying
+
+	:param	searchquery		str, the string to query for
+	:param	timestamps		str, min and max timestamps to search for, separated by #
 	"""
 
 	# for security
@@ -41,7 +45,7 @@ def string_query(searchquery):
 	query_queue = lib.queue.JobQueue(logger=log, database=db)
 	
 	# add job with respective query string
-	query_queue.add_job("query", details={"str_query": searchquery, "col_query": "body_vector"})
+	query_queue.add_job("query", details={"str_query": searchquery, "col_query": "body_vector", "min_timestamp": min_timestamp, "max_timestamp": max_timestamp})
 
 	return 'success'
 
