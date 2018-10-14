@@ -14,3 +14,4 @@ config.py
 webtool/fourcat/js/jquery-csv-master/
 *.model
 webtool/fourcat/static/data/word_embeddings/
+data/
