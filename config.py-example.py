@@ -25,7 +25,9 @@ WARN_JOBS = 5000  # if *more* than this amount of jobs are queued, warn
 WARN_EMAILS = ["admin@4cat.biz"]
 
 # What to scrape?
-BOARDS = ["tg", "v"]
+SCRAPE_BOARDS = ["tg", "v"]
+SCRAPE_TIMEOUT = 5  # how long to wait for a scrape request to finish?
+SCRAPE_PROXIES = {"http": []}  # Items in this list should be formatted like "http://111.222.33.44:1234"
 
 # Web tool settings
 FLASK_APP = 'fourcat'
