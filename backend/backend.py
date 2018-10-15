@@ -22,9 +22,10 @@ def start():
 	print("Starting 4CAT Backend Daemon.")
 
 	with daemon.DaemonContext(
-			working_directory=os.path.abspath(os.path.dirname(__file__)),
-			umask=0x002,
-			pidfile=pidfile.TimeoutPIDLockFile(lockfile)
+		working_directory=os.path.abspath(os.path.dirname(__file__)),
+		umask=0x002,
+		pidfile=pidfile.TimeoutPIDLockFile(lockfile),
+		detach_process=True
 	) as context:
 		bootstrap.run()
 
