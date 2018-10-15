@@ -21,7 +21,7 @@ class JobScheduler(BasicWorker):
 		normalized_time = self.loop_time - (self.loop_time % 60) + 60
 
 		jobs = self.queue.get_all_jobs()
-		for board in config.BOARDS:
+		for board in config.SCRAPE_BOARDS:
 			scheduled = False
 			for job in jobs:
 				if job["jobtype"] == "board" and job["remote_id"] == board:

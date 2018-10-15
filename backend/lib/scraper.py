@@ -5,12 +5,16 @@ import random
 import time
 import json
 import abc
+import sys
+import os
 
 import requests
 
 from lib.worker import BasicWorker
 from lib.queue import JobClaimedException
 
+sys.path.insert(0, os.path.dirname(__file__) + '/../..')
+import config
 
 class BasicJSONScraper(BasicWorker, metaclass=abc.ABCMeta):
 	"""
@@ -55,7 +59,15 @@ class BasicJSONScraper(BasicWorker, metaclass=abc.ABCMeta):
 		# request URL
 		url = self.get_url()
 		try:
-			data = requests.get(url, timeout=5)
+			# see if any proxies were configured that would work for this URL
+			protocol = url.split(":")[0]
+			if protocol in config.SCRAPE_PROXIES and config.SCRAPE_PROXIES[protocol]:
+				proxies = {protocol: random.choice(config.SCRAPE_PROXIES[protocol])}
+			else:
+				proxies = None
+
+			# do the request!
+			data = requests.get(url, timeout=config.SCRAPE_TIMEOUT, proxies=proxies)
 		except (requests.HTTPError, requests.exceptions.ReadTimeout):
 			self.queue.release_job(job, delay=10)  # try again in 10 seconds
 			self.log.warning("Could not finish request for %s, releasing job" % url)
