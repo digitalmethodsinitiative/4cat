@@ -13,7 +13,7 @@ Run:
 python3 backend.py start
 ```
 
-In the above command, you may replace`start` with `stop`, `restart` or 
+In the above command, you may replace `start` with `stop`, `restart` or 
 `status` to stop/restart the daemon or to see whether it is currently running,
 respectively.
 
@@ -35,22 +35,25 @@ The workers can be configured mainly through the following class properties:
 - `type`: This should be set to the job type this worker is supposed to 
   complete, or a descriptive keyword if the worker does not use jobs.
 
-## Additional tools
-- `import_dump.py` is a script that takes the path of a 4plebs dump as an 
-  argument, and inserts all posts and threads contained therein into the 
-  database. Dumps may be in CSV or SQLite format. Run the script without 
-  arguments for further explanation:
+## Extras and tools
+- `database.sql` contains the description of the database used by the backend. 
+  Running it should set up your tables and indexes if they have not been added 
+  yet. The SQL is automatically run by `run.py` upon startup, so there is no 
+  need to create tables before running it for the first time. 
+  
+In the `extras` folder, you will find the following additional tools:
+
+- `extras/import_dump.py` is a script that takes the path of a 
+  [4plebs dump](https://archive.org/details/4plebs) as an  argument, and 
+  inserts all posts and threads contained therein into the database. Dumps may
+  be in CSV or SQLite format. Run the script without arguments for further 
+  explanation:
 
   ```
   python3 import_dump.py
   ```
 
-- `monitor_status.py` is a script that checks how many jobs are queued and how
+- `extras/monitor_status.py` is a script that checks how many jobs are queued and how
   many threads and posts were scraped since the last check, and logs a warning
   if anything suspicious is found. Currently this requires a cronjob to run
   at regular intervals.
-  
-- `database.sql` contains the description of the database used by the backend. 
-  Running it should set up your tables and indexes if they have not been added 
-  yet. The SQL is automatically run by `run.py` upon startup, so there is no 
-  need to create tables before running it for the first time. 

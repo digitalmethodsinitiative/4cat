@@ -11,24 +11,6 @@ from lib.logger import Logger
 
 
 def run():
-	print("""
-	+---------------------------------------------------------------+
-	|                                                               |
-	|                           welcome to                          |
-	|                                                               |
-	|                  j88D   .o88b.  .d8b.  d888888b               |
-	|                 j8~88  d8P  Y8 d8' `8b `~~88~~'               |
-	|                j8' 88  8P      88ooo88    88                  |
-	|                V88888D 8b      88~~~88    88                  |
-	|                    88  Y8b  d8 88   88    88                  |
-	|                    VP   `Y88P' YP   YP    YP                  |
-	|                                                               |
-	|               4CAT: Capture and Analysis Toolkit              |
-	|                         4cat.oilab.eu                         |
-	|                                                               |
-	+---------------------------------------------------------------+    
-	""")
-
 	# load everything
 	log = Logger()
 	db = Database(logger=log)
@@ -54,5 +36,26 @@ if __name__ == "__main__":
 		print("Running bootstrap.py directly is only supported on Windows.")
 		print("On UNIX-like systems, use 'backend.py start' instead.")
 		sys.exit(1)
+
+	print("""
+	+---------------------------------------------------------------+
+	|                                                               |
+	|                           welcome to                          |
+	|                                                               |
+	|                  j88D   .o88b.  .d8b.  d888888b               |
+	|                 j8~88  d8P  Y8 d8' `8b `~~88~~'               |
+	|                j8' 88  8P      88ooo88    88                  |
+	|                V88888D 8b      88~~~88    88                  |
+	|                    88  Y8b  d8 88   88    88                  |
+	|                    VP   `Y88P' YP   YP    YP                  |
+	|                                                               |
+	|               4CAT: Capture and Analysis Toolkit              |
+	|                         4cat.oilab.eu                         |
+	|                                                               |
+	+---------------------------------------------------------------+
+	| WARNING: Not running as a daemon. Quitting this process will  |
+	|                 shut down the backend as well.                |
+	+---------------------------------------------------------------+
+	""")
 
 	run()
