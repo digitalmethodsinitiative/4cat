@@ -30,7 +30,7 @@ class Logger:
 		self.log_path = get_absolute_folder(config.PATH_LOGS) + "/4cat.log"
 
 		handler = RotatingFileHandler(self.log_path, maxBytes=(25 * 1024 * 1024), backupCount=0)
-		handler.setLevel(logging.WARNING)
+		handler.setLevel(logging.INFO)
 		handler.setFormatter(logging.Formatter("%(asctime)-15s | %(levelname)s (%(filename)s:%(lineno)d): %(message)s",
 											   "%d-%m-%Y %H:%M:%S"))
 
