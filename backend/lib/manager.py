@@ -46,7 +46,7 @@ class WorkerManager:
 		:param frame:  Context within which abort was triggered
 		"""
 		self.looping = False
-		self.log.info("Quitting after next loop.")
+		self.log.warning("Quitting after next loop.")
 
 	def loop(self):
 		"""
@@ -84,7 +84,7 @@ class WorkerManager:
 			time.sleep(5)
 
 		# let all workers end
-		print("Waiting for all workers to finish...")
+		self.log.info("Waiting for all workers to finish...")
 		for worker in self.pool:
 			worker.abort()
 
@@ -113,7 +113,7 @@ class WorkerManager:
 			for member in members:
 				if inspect.isclass(member[1]) and issubclass(member[1], BasicWorker) and not inspect.isabstract(
 						member[1]):
-					print("Adding worker type %s" % member[0])
+					self.log.debug("Adding worker type %s" % member[0])
 					self.worker_prototypes.append(member[1])
 
 		os.chdir("..")
