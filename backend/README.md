@@ -9,7 +9,13 @@ Runs worker threads in which the magic happens:
 
 Run:
 
-`python3 run.py`
+```
+python3 backend.py start
+```
+
+In the above command, you may replace`start` with `stop`, `restart` or 
+`status` to stop/restart the daemon or to see whether it is currently running,
+respectively.
 
 ## What it does
 Runs a number of workers in parallel threads, that query a central job queue 

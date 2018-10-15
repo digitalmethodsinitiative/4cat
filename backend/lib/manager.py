@@ -10,7 +10,6 @@ import time
 import sys
 import os
 
-from lib.keyboard import KeyPoller
 from lib.worker import BasicWorker
 
 
@@ -22,18 +21,15 @@ class WorkerManager:
 	that listens for a keypress (which can be used to end the main loop)
 	"""
 	looping = True
-	key_poller = None
 	pool = []
 	worker_prototypes = []
 	log = None
 
-	def __init__(self, logger):
+	def __init__(self, logger, signal_handler):
 		"""
 		Set up key poller
 		"""
-		self.key_poller = KeyPoller(self)
-		self.key_poller.start()
-
+		self.signal_handler = signal_handler
 		self.log = logger
 
 		self.loop()
@@ -57,7 +53,7 @@ class WorkerManager:
 		while self.looping:
 			self.load_worker_types()
 
-			# start new workers, if neededz
+			# start new workers, if needed
 			for worker_type in self.worker_prototypes:
 				active_workers = len(
 					[worker for worker in self.pool if worker.__class__.__name__ == worker_type.__name__])
@@ -77,6 +73,10 @@ class WorkerManager:
 
 			self.log.debug("Running workers: %i" % len(self.pool))
 
+			# check if we've been killed
+			if self.signal_handler.killed:
+				self.abort()
+
 			# check in five seconds if any workers died and need to be restarted (probably not!)
 			time.sleep(5)
 
@@ -87,8 +87,6 @@ class WorkerManager:
 
 		for worker in self.pool:
 			worker.join()
-
-		print("Done!")
 
 	def load_worker_types(self):
 		"""

@@ -1,6 +1,7 @@
 """
 Log handler
 """
+import traceback
 import logging
 import sys
 import os
@@ -18,22 +19,24 @@ class Logger:
 
 	Sets up a rotating logger that writes to a log file
 	"""
-	logger = logging.getLogger("4cat-backend")
+	logger = None
+	log_path = None
 
 	def __init__(self):
 		"""
 		Set up log handler
 		"""
-		log_path = get_absolute_folder(config.PATH_LOGS) + "/4cat.log"
+		self.logger = logging.getLogger("4cat-backend")
+		self.logger.setLevel(logging.INFO)
+		self.log_path = get_absolute_folder(config.PATH_LOGS) + "/4cat.log"
 
-		handler = RotatingFileHandler(log_path, maxBytes=5242880, backupCount=0)
+		handler = RotatingFileHandler(self.log_path, maxBytes=5242880, backupCount=0)
 		handler.setLevel(logging.WARNING)
 		handler.setFormatter(logging.Formatter("%(asctime)-15s | %(levelname)s (%(filename)s:%(lineno)d): %(message)s",
 											   "%d-%m-%Y %H:%M:%S"))
 
 		self.logger.addHandler(handler)
-		self.logger.setLevel(logging.WARNING)
-		self.info("Logging to %s" % log_path)
+		self.info("Logging to %s" % self.log_path)
 
 	def enable_mailer(self):
 		"""
@@ -46,6 +49,14 @@ class Logger:
 		mailer.setLevel(logging.WARNING)
 
 		self.logger.addHandler(mailer)
+
+	def get_location(self):
+		"""
+		Get location of log file
+
+		:return string:  Absolute path to log location
+		"""
+		return self.log_path
 
 	def log(self, message, level=logging.INFO):
 		"""
