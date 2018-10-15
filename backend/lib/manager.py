@@ -5,6 +5,7 @@ Also known as "employer"
 """
 import importlib
 import inspect
+import signal
 import glob
 import time
 import sys
@@ -25,18 +26,24 @@ class WorkerManager:
 	worker_prototypes = []
 	log = None
 
-	def __init__(self, logger, signal_handler):
+	def __init__(self, logger):
 		"""
 		Set up key poller
 		"""
-		self.signal_handler = signal_handler
+		signal.signal(signal.SIGTERM, self.abort)
 		self.log = logger
 
 		self.loop()
 
-	def abort(self):
+	def abort(self, signum=signal.SIGTERM, frame=None):
 		"""
 		End main loop
+
+		Should be called after a SIGTERM is received - the two signal-related
+		function arguments remain unused.
+
+		:param signum:  Code of signal through which abort was triggered
+		:param frame:  Context within which abort was triggered
 		"""
 		self.looping = False
 		self.log.info("Quitting after next loop.")
@@ -72,10 +79,6 @@ class WorkerManager:
 					self.pool.remove(worker)
 
 			self.log.debug("Running workers: %i" % len(self.pool))
-
-			# check if we've been killed
-			if self.signal_handler.killed:
-				self.abort()
 
 			# check in five seconds if any workers died and need to be restarted (probably not!)
 			time.sleep(5)

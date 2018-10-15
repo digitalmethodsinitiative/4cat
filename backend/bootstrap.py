@@ -9,16 +9,6 @@ from lib.manager import WorkerManager
 from lib.logger import Logger
 
 
-class KillInterceptor:
-	killed = False
-
-	def __init__(self):
-		signal.signal(signal.SIGTERM, self.abort)
-
-	def abort(self, signum, frame):
-		self.killed = True
-
-
 def run():
 	print("""
 	+---------------------------------------------------------------+
@@ -54,5 +44,5 @@ def run():
 	queue.release_all()
 
 	# make it happen
-	WorkerManager(logger=log, signal_handler=KillInterceptor())
+	WorkerManager(logger=log)
 	log.info("4CAT Backend shut down.")
