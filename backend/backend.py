@@ -65,6 +65,13 @@ def stop():
 		return False
 
 
+# check if we can run a daemon
+if os.name not in ("posix", "mac"):
+	print("Using 'backend.py' to run the 4CAT backend is only supported on UNIX-like systems.")
+	print("When using Windows, use 'bootstrap.py' instead.")
+	sys.exit(1)
+
+# display manual if invalid command was given
 manual = """Usage: python(3) backend.py <start|stop|restart|status>
 
 Starts, stops or restarts the 4CAT backend daemon.
