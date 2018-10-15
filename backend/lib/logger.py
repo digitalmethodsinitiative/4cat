@@ -1,7 +1,6 @@
 """
 Log handler
 """
-import traceback
 import logging
 import sys
 import os
@@ -30,7 +29,7 @@ class Logger:
 		self.logger.setLevel(logging.INFO)
 		self.log_path = get_absolute_folder(config.PATH_LOGS) + "/4cat.log"
 
-		handler = RotatingFileHandler(self.log_path, maxBytes=5242880, backupCount=0)
+		handler = RotatingFileHandler(self.log_path, maxBytes=(25 * 1024 * 1024), backupCount=0)
 		handler.setLevel(logging.WARNING)
 		handler.setFormatter(logging.Formatter("%(asctime)-15s | %(levelname)s (%(filename)s:%(lineno)d): %(message)s",
 											   "%d-%m-%Y %H:%M:%S"))
