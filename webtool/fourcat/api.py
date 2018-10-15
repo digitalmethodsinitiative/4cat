@@ -65,7 +65,7 @@ def api_status():
 
 	# determine if backend is live by checking if the process is running
 
-	lockfile = get_absolute_folder(config.PATH_LOCKFILE) + "/4cat-backend.lock"
+	lockfile = get_absolute_folder(config.PATH_LOCKFILE) + "/4cat.pid"
 	if os.path.isfile(lockfile):
 		with open(lockfile) as pidfile:
 			pid = pidfile.read()
