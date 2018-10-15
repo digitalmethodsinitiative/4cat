@@ -1,7 +1,8 @@
 """
 4CAT Backend init - run this to start the backend!
 """
-import signal
+import sys
+import os
 
 from lib.queue import JobQueue
 from lib.database import Database
@@ -46,3 +47,12 @@ def run():
 	# make it happen
 	WorkerManager(logger=log)
 	log.info("4CAT Backend shut down.")
+
+
+if __name__ == "__main__":
+	if os.name != "nt":
+		print("Running bootstrap.py directly is only supported on Windows.")
+		print("On UNIX-like systems, use 'backend.py start' instead.")
+		sys.exit(1)
+
+	run()
