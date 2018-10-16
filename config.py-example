@@ -1,10 +1,13 @@
 """ Scraper/worker configuration """
 
 # Postgres login details
+# DB_NAME_TEST is the name of the database to be used for running tests. Don't store anything valuable in this! It is
+# assumed that the user configured below has full rights over both databases
 DB_HOST = "localhost"
 DB_PORT = 5432
-DB_USER = "fourcat"
 DB_NAME = "fourcat"
+DB_NAME_TEST = "fourcat_test"
+DB_USER = "fourcat"
 DB_PASSWORD = "sup3rs3cr3t"
 
 # Path to folders where logs/images/data may be saved.
