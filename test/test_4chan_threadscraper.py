@@ -15,6 +15,8 @@ from workers.scrape_threads import ThreadScraper
 
 class TestThreadScraper(unittest.TestCase):
 	db = None
+	root = ""
+
 	job = {"details": {"board": "test"}, "remote_id": -1, "jobtype": "thread"}
 
 	@classmethod
@@ -22,9 +24,10 @@ class TestThreadScraper(unittest.TestCase):
 		"""
 		Set up database connection for test database before starting tests
 		"""
+		cls.root = os.path.abspath(os.path.dirname(__file__))
 		cls.log = Logger(output=False)
 		cls.db = Database(logger=cls.log, dbname=config.DB_NAME_TEST)
-		with open("../backend/database.sql") as dbfile:
+		with open(cls.root + "/../backend/database.sql") as dbfile:
 			cls.db.execute(dbfile.read())
 
 	@classmethod
@@ -39,7 +42,7 @@ class TestThreadScraper(unittest.TestCase):
 		"""
 		Reset database after each test
 		"""
-		with open("reset_database.sql") as dbfile:
+		with open(self.root + "/reset_database.sql") as dbfile:
 			self.db.execute(dbfile.read())
 
 	def load_thread(self, filename):
@@ -49,7 +52,7 @@ class TestThreadScraper(unittest.TestCase):
 		:param filename:  JSON file to load
 		:return tuple: (scraper, threaddata)
 		"""
-		with open(filename) as threadfile:
+		with open(self.root + "/4chan_json/" + filename) as threadfile:
 			thread = threadfile.read()
 
 		scraper = ThreadScraper(db=self.db, logger=self.log)
@@ -64,7 +67,7 @@ class TestThreadScraper(unittest.TestCase):
 
 		Expected: six posts are imported
 		"""
-		(scraper, threaddata) = self.load_thread("4chan_json/thread_valid.json")
+		(scraper, threaddata) = self.load_thread("thread_valid.json")
 
 		processed = scraper.process(threaddata, job=self.job)
 		self.assertEqual(processed, 6)
@@ -75,7 +78,7 @@ class TestThreadScraper(unittest.TestCase):
 
 		Expected: processing cannot complete
 		"""
-		(scraper, threaddata) = self.load_thread("4chan_json/thread_invalid_op.json")
+		(scraper, threaddata) = self.load_thread("thread_invalid_op.json")
 
 		processed = scraper.process(threaddata, job=self.job)
 		self.assertFalse(processed)
@@ -87,7 +90,7 @@ class TestThreadScraper(unittest.TestCase):
 
 		Expected: only two posts are imported
 		"""
-		(scraper, threaddata) = self.load_thread("4chan_json/thread_invalid_posts.json")
+		(scraper, threaddata) = self.load_thread("thread_invalid_posts.json")
 
 		processed = scraper.process(threaddata, job=self.job)
 		self.assertEqual(processed, 2)
@@ -98,7 +101,7 @@ class TestThreadScraper(unittest.TestCase):
 
 		Expected: first one imports posts, second doesn't
 		"""
-		(scraper, threaddata) = self.load_thread("4chan_json/thread_valid.json")
+		(scraper, threaddata) = self.load_thread("thread_valid.json")
 
 		processed_first = scraper.process(threaddata, job=self.job)
 		processed_second = scraper.process(threaddata, job=self.job)
@@ -109,20 +112,20 @@ class TestThreadScraper(unittest.TestCase):
 		"""
 		Test importing unknown data fields in post body
 		"""
-		(scraper, threaddata) = self.load_thread("4chan_json/thread_valid_unknownfields.json")
+		(scraper, threaddata) = self.load_thread("thread_valid_unknownfields.json")
 
 		scraper.process(threaddata, job=self.job)
 		post = self.db.fetchone("SELECT * FROM posts")
 
 		fields = json.loads(post["unsorted_data"])
-		self.assertNotEqual(fields, None)
+		self.assertIsNotNone(fields)
 		self.assertEqual(fields, {"unknown1": "value1", "unknown2": "value2"})
 
 	def test_known_fields_post(self):
 		"""
 		Test importing unknown data fields in post body
 		"""
-		(scraper, threaddata) = self.load_thread("4chan_json/thread_valid_onepost.json")
+		(scraper, threaddata) = self.load_thread("thread_valid_onepost.json")
 		threaddata["posts"] = threaddata["posts"][:1]
 
 		scraper.process(threaddata, job=self.job)
@@ -149,13 +152,14 @@ class TestThreadScraper(unittest.TestCase):
 			"unsorted_data": json.dumps({})}
 
 		for field in expected:
-			self.assertEqual(expected[field], post[field])
+			with self.subTest(field=field):
+				self.assertEqual(expected[field], post[field])
 
 	def test_post_flags(self):
 		"""
 		Test correct mapping of 4chan API response data to database records
 		"""
-		(scraper, threaddata) = self.load_thread("4chan_json/thread_valid_onepost.json")
+		(scraper, threaddata) = self.load_thread("thread_valid_onepost.json")
 		postdata = threaddata["posts"][0]
 
 		def change_and_check(scraper, postdata, postfield, field, value, before=None, after=None):
@@ -180,16 +184,18 @@ class TestThreadScraper(unittest.TestCase):
 			self.setUp()
 			scraper.process({"posts": [postdata]}, job=self.job)
 			post = self.db.fetchone("SELECT * FROM posts")
-			self.assertNotEqual(post, None)
-			self.assertEqual(post[field], before)
+			with self.subTest(field=field):
+				self.assertIsNotNone(post)
+				self.assertEqual(post[field], before)
 
 			postdata[postfield] = value
 			self.tearDown()
 			self.setUp()
 			scraper.process({"posts": [postdata]}, job=self.job)
 			post = self.db.fetchone("SELECT * FROM posts")
-			self.assertNotEqual(post, None)
-			self.assertEqual(post[field], after)
+			with self.subTest(field=field):
+				self.assertIsNotNone(post)
+				self.assertEqual(post[field], after)
 
 			return postdata
 
@@ -230,7 +236,7 @@ class TestThreadScraper(unittest.TestCase):
 		"""
 		Test whether thread gets added to database
 		"""
-		(scraper, threaddata) = self.load_thread("4chan_json/thread_valid.json")
+		(scraper, threaddata) = self.load_thread("thread_valid.json")
 		threaddata["posts"] = threaddata["posts"][:1]
 
 		scraper.process(threaddata, job=self.job)
@@ -241,7 +247,7 @@ class TestThreadScraper(unittest.TestCase):
 		"""
 		Test whether basic thread data gets imported correctly
 		"""
-		(scraper, threaddata) = self.load_thread("4chan_json/thread_valid.json")
+		(scraper, threaddata) = self.load_thread("thread_valid.json")
 		scraper.process(threaddata, job=self.job)
 
 		thread = self.db.fetchone("SELECT * FROM threads")
@@ -262,13 +268,14 @@ class TestThreadScraper(unittest.TestCase):
 		}
 
 		for field in expected:
-			self.assertEqual(thread[field], expected[field])
+			with self.subTest(field=field):
+				self.assertEqual(thread[field], expected[field])
 
 	def test_thread_flags(self):
 		"""
 		Test correct assignment of thread flags
 		"""
-		(scraper, threaddata) = self.load_thread("4chan_json/thread_valid.json")
+		(scraper, threaddata) = self.load_thread("thread_valid.json")
 		postdata = threaddata["posts"][0]
 
 		def change_and_check(scraper, threaddata, field, test):
@@ -285,8 +292,9 @@ class TestThreadScraper(unittest.TestCase):
 			self.setUp()
 			scraper.process({"posts": [threaddata]}, job=self.job)
 			thread = self.db.fetchone("SELECT * FROM threads")
-			self.assertNotEqual(thread, None)
-			self.assertEqual(thread[field], test)
+			with self.subTest(field=field):
+				self.assertIsNotNone(thread)
+				self.assertEqual(thread[field], test)
 
 		postdata["bumplimit"] = 1
 		change_and_check(scraper, postdata, "limit_bump", True)
@@ -310,10 +318,10 @@ class TestThreadScraper(unittest.TestCase):
 		"""
 		Test if deleted posts are properly detected if they are missing from a subsequent scrape
 		"""
-		(scraper, threaddata) = self.load_thread("4chan_json/thread_valid.json")
+		(scraper, threaddata) = self.load_thread("thread_valid.json")
 		scraper.process(threaddata, job=self.job)
 
-		(scraper, threaddata) = self.load_thread("4chan_json/thread_valid_deletedpost.json")
+		(scraper, threaddata) = self.load_thread("thread_valid_deletedpost.json")
 		updated = scraper.process(threaddata, job=self.job)
 		self.assertNotIsInstance(updated, bool)
 
@@ -326,10 +334,10 @@ class TestThreadScraper(unittest.TestCase):
 		replies has remained the same
 		:return:
 		"""
-		(scraper, threaddata) = self.load_thread("4chan_json/thread_valid.json")
+		(scraper, threaddata) = self.load_thread("thread_valid.json")
 		scraper.process(threaddata, job=self.job)
 
-		(scraper, threaddata) = self.load_thread("4chan_json/thread_valid_replacedpost.json")
+		(scraper, threaddata) = self.load_thread("thread_valid_replacedpost.json")
 		updated = scraper.process(threaddata, job=self.job)
 		self.assertNotIsInstance(updated, bool)
 
@@ -341,7 +349,7 @@ class TestThreadScraper(unittest.TestCase):
 		"""
 		Test if images are queued when scraped
 		"""
-		(scraper, threaddata) = self.load_thread("4chan_json/thread_valid.json")
+		(scraper, threaddata) = self.load_thread("thread_valid.json")
 		scraper.process(threaddata, job=self.job)
 
 		jobs = self.db.fetchone("SELECT COUNT(*) AS num FROM jobs WHERE jobtype = %s", ("image",))["num"]
@@ -352,7 +360,7 @@ class TestThreadScraper(unittest.TestCase):
 		"""
 		Test if image data is properly saved in job details when queuing for download
 		"""
-		(scraper, threaddata) = self.load_thread("4chan_json/thread_valid_onepost.json")
+		(scraper, threaddata) = self.load_thread("thread_valid_onepost.json")
 		scraper.process(threaddata, job=self.job)
 
 		job = self.db.fetchone("SELECT * FROM jobs WHERE jobtype = %s", ("image",))
@@ -376,7 +384,8 @@ class TestThreadScraper(unittest.TestCase):
 
 		job["details"] = json.loads(job["details"])
 		for field in expected:
-			self.assertEqual(expected[field], job[field])
+			with self.subTest(field=field):
+				self.assertEqual(expected[field], job[field])
 
 
 if __name__ == '__main__':
