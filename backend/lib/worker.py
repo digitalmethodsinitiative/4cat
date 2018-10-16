@@ -27,16 +27,19 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
 	looping = True
 	loop_time = 0
 
-	def __init__(self, logger):
+	def __init__(self, logger, db=None, queue=None):
 		"""
 		Basic init, just make sure our thread name is meaningful
+
+		:param Database db:  Database connection - if not given, a new one will be created
+		:param JobQueue queue: Job Queue - if not given, a new one will be instantiated
 		"""
 		super().__init__()
 		self.name = self.type
 		self.log = logger
 
-		self.db = Database(logger=self.log)
-		self.queue = JobQueue(logger=self.log, database=self.db)
+		self.db = Database(logger=self.log) if not db else db
+		self.queue = JobQueue(logger=self.log, database=self.db) if not queue else queue
 
 	def abort(self):
 		"""

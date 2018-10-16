@@ -32,13 +32,13 @@ class ThreadScraper(BasicJSONScraper):
 					"capcode", "country", "country_name", "sub", "com", "tim", "filename", "ext", "fsize", "md5", "w",
 					"h", "tn_w", "tn_h", "filedeleted", "spoiler", "custom_spoiler", "omitted_posts", "omitted_images",
 					"replies", "images", "bumplimit", "imagelimit", "capcode_replies", "last_modified", "tag",
-					"semantic_url", "since4pass", "unique_ips"]
+					"semantic_url", "since4pass", "unique_ips", "tail_size"]
 
 	# these fields should be present for every single post, and if they're not something weird is going on
 	required_fields = ["no", "resto", "now", "time"]
 	required_fields_op = ["no", "resto", "now", "time", "replies", "images"]
 
-	def process(self, data):
+	def process(self, data, job):
 		"""
 		Process scraped thread data
 
@@ -46,27 +46,29 @@ class ThreadScraper(BasicJSONScraper):
 		for downloading.
 
 		:param dict data: The thread data, as parsed JSON data
+		:return: The amount of posts added, or False if processing could not be completed
 		"""
 		if "posts" not in data or not data["posts"]:
 			self.log.warning(
-				"JSON response for thread %s contained no posts, could not process" % self.job["remote_id"])
-			return
+				"JSON response for thread %s contained no posts, could not process" % job["remote_id"])
+			return False
 
 		# check if OP has all the required data
 		first_post = data["posts"][0]
 		missing = set(self.required_fields_op) - set(first_post.keys())
 		if missing != set():
 			self.log.warning("OP is missing required fields %s, ignoring" % repr(missing))
-			return
+			return False
 
-		thread = self.update_thread(first_post, last_reply=max([post["time"] for post in data["posts"]]),
-									last_post=max([post["no"] for post in data["posts"]]))
+		thread = self.update_thread(first_post,
+									last_reply=max([post["time"] for post in data["posts"] if "time" in post]),
+									last_post=max([post["no"] for post in data["posts"] if "no" in post]), job=job)
 
 		if not thread:
-			return
+			return True
 
 		# create a dict mapped as `post id`: `post data` for easier comparisons with existing data
-		post_dict_scrape = {post["no"]: post for post in data["posts"]}
+		post_dict_scrape = {post["no"]: post for post in data["posts"] if "no" in post}
 		post_dict_db = {post["id"]: post for post in
 						self.db.fetchall("SELECT * FROM posts WHERE thread_id = %s AND timestamp_deleted = 0",
 										 (first_post["no"],))}
@@ -74,7 +76,6 @@ class ThreadScraper(BasicJSONScraper):
 		# mark deleted posts as such
 		deleted = set(post_dict_db.keys()) - set(post_dict_scrape.keys())
 		for post_id in deleted:
-			# print("Post deleted: %s" % repr(post_dict_db[post_id]))
 			self.db.update("posts", where={"id": post_id}, data={"timestamp_deleted": self.loop_time}, commit=False)
 		self.db.commit()
 
@@ -82,53 +83,67 @@ class ThreadScraper(BasicJSONScraper):
 		new = set(post_dict_scrape.keys()) - set(post_dict_db.keys())
 		new_posts = 0
 		for post_id in new:
-			post = post_dict_scrape[post_id]
-
-			# check for data integrity
-			missing = set(self.required_fields) - set(post.keys())
-			if missing != set():
-				self.log.warning("Missing fields %s in scraped post, ignoring" % repr(missing))
-				continue
-
-			# save dimensions as a dumpable dict - no need to make it indexable
-			dimensions = {"w": post["w"], "h": post["h"], "tw": post["tn_w"],
-						  "th": post["tn_h"]} if "w" in post else None
-
-			post_data = {
-				"id": post_id,
-				"thread_id": first_post["no"],
-				"timestamp": post["time"],
-				"subject": post["sub"] if "sub" in post else "",
-				"body": post["com"] if "com" in post else "",
-				"author": post["name"] if "name" in post else "",
-				"author_trip": post["trip"] if "trip" in post else "",
-				"author_type": post["id"] if "id" in post else "",
-				"author_type_id": post["capcode"] if "capcode" in post else "",
-				"country_code": post["country"] if "country" in post else "",
-				"country_name": post["country_name"] if "country_name" in post else "",
-				"image_file": post["filename"] + post["ext"] if "filename" in post else "",
-				"image_4chan": str(post["tim"]) + post["ext"] if "filename" in post else "",
-				"image_md5": post["md5"] if "md5" in post else "",
-				"image_filesize": post["fsize"] if "fsize" in post else 0,
-				"image_dimensions": json.dumps(dimensions),
-				"semantic_url": post["semantic_url"] if "semantic_url" in post else "",
-				"unsorted_data": json.dumps(
-					{field: post[field] for field in post.keys() if field not in self.known_fields})
-			}
-
-			self.db.insert("posts", post_data, commit=False)
-			self.db.execute("UPDATE posts SET body_vector = to_tsvector(body) WHERE id = %s", (post_id,))
-
-			self.save_links(post, post_id)
-			if "filename" in post:
-				self.queue_image(post, thread)
-
-			new_posts += 1
+			added = self.save_post(post_dict_scrape[post_id], thread)
+			if added:
+				new_posts += 1
 
 		# save to database
 		self.log.info("Updating thread %s/%s, new posts: %s, deleted: %s" % (
-			self.job["details"]["board"], first_post["no"], new_posts, len(deleted)))
+			job["details"]["board"], first_post["no"], new_posts, len(deleted)))
 		self.db.commit()
+
+		return new_posts
+
+	def save_post(self, post, thread):
+		"""
+		Add post to database
+
+		:param dict post: Post data to add
+		:param dict thread: Data for thread the post belongs to
+		:return bool:  Whether the post was inserted
+		"""
+		# check for data integrity
+		missing = set(self.required_fields) - set(post.keys())
+		if missing != set():
+			self.log.warning("Missing fields %s in scraped post, ignoring" % repr(missing))
+			return False
+
+		# save dimensions as a dumpable dict - no need to make it indexable
+		if len({"w", "h", "tn_h", "tn_w"} - set(post.keys())) == 0:
+			dimensions = {"w": post["w"], "h": post["h"], "tw": post["tn_w"], "th": post["tn_h"]}
+		else:
+			dimensions = {}
+
+		post_data = {
+			"id": post["no"],
+			"thread_id": thread["id"],
+			"timestamp": post["time"],
+			"subject": post["sub"] if "sub" in post else "",
+			"body": post["com"] if "com" in post else "",
+			"author": post["name"] if "name" in post else "",
+			"author_trip": post["trip"] if "trip" in post else "",
+			"author_type": post["id"] if "id" in post else "",
+			"author_type_id": post["capcode"] if "capcode" in post else "",
+			"country_code": post["country"] if "country" in post else "",
+			"country_name": post["country_name"] if "country_name" in post else "",
+			"image_file": post["filename"] + post["ext"] if "filename" in post else "",
+			"image_4chan": str(post["tim"]) + post["ext"] if "filename" in post else "",
+			"image_md5": post["md5"] if "md5" in post else "",
+			"image_filesize": post["fsize"] if "fsize" in post else 0,
+			"image_dimensions": json.dumps(dimensions),
+			"semantic_url": post["semantic_url"] if "semantic_url" in post else "",
+			"unsorted_data": json.dumps(
+				{field: post[field] for field in post.keys() if field not in self.known_fields})
+		}
+
+		self.db.insert("posts", post_data, commit=False)
+		self.db.execute("UPDATE posts SET body_vector = to_tsvector(body) WHERE id = %s", (post["no"],))
+
+		self.save_links(post, post["no"])
+		if "filename" in post:
+			self.queue_image(post, thread)
+
+		return True
 
 	def save_links(self, post, post_id):
 		"""
@@ -176,7 +191,7 @@ class ThreadScraper(BasicJSONScraper):
 			except JobAlreadyExistsException:
 				pass
 
-	def update_thread(self, first_post, last_reply, last_post):
+	def update_thread(self, first_post, last_reply, last_post, job):
 		"""
 		Update thread info
 
@@ -194,7 +209,7 @@ class ThreadScraper(BasicJSONScraper):
 		thread = self.db.fetchone("SELECT * FROM threads WHERE id = %s", (first_post["no"],))
 		if not thread:
 			self.log.warning("Tried to scrape post before thread %s was scraped" % first_post["no"])
-			return None
+			thread = self.add_thread(first_post, last_reply, last_post, job)
 
 		if thread["num_replies"] == num_replies and thread["timestamp_modified"] == last_reply:
 			# no updates, no need to check posts any further
@@ -218,6 +233,29 @@ class ThreadScraper(BasicJSONScraper):
 
 		self.db.update("threads", where={"id": first_post["no"]}, data=thread_update)
 		return {**thread, **thread_update}
+
+	def add_thread(self, first_post, last_reply, last_post, job):
+		"""
+		Add thread to database
+
+		This should not happen, usually. But if a thread is not in the database yet when it is scraped, add some basic
+		data and let the update method handle the rest of the details.
+
+		:param dict first_post:  Post data for the OP
+		:param int last_reply:  Timestamp of last reply in thread
+		:param int last_post:  ID of last post in thread
+		:return dict:  Thread row that was added
+		"""
+		self.db.insert("threads", {
+			"id": first_post["no"],
+			"board": job["details"]["board"],
+			"timestamp": first_post["time"],
+			"timestamp_scraped": self.loop_time,
+			"timestamp_modified": first_post["time"],
+			"post_last": last_post
+		})
+
+		return self.db.fetchone("SELECT * FROM threads WHERE id = %s", (first_post["no"],))
 
 	def get_url(self):
 		"""

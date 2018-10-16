@@ -26,11 +26,11 @@ class BasicJSONScraper(BasicWorker, metaclass=abc.ABCMeta):
 	"""
 	db = None
 
-	def __init__(self, logger):
+	def __init__(self, db, logger):
 		"""
 		Set up database connection - we need one to store the thread data
 		"""
-		super().__init__(logger)
+		super().__init__(db=db, logger=logger)
 		self.job = {}
 
 	def work(self):
@@ -92,7 +92,7 @@ class BasicJSONScraper(BasicWorker, metaclass=abc.ABCMeta):
 			return
 
 		# finally, pass it on
-		self.process(jsondata)
+		self.process(jsondata, job)
 		self.after_process()
 
 	def after_process(self):
@@ -102,7 +102,7 @@ class BasicJSONScraper(BasicWorker, metaclass=abc.ABCMeta):
 		self.queue.finish_job(self.job)
 
 	@abc.abstractmethod
-	def process(self, data):
+	def process(self, data, job):
 		"""
 		Process scraped data
 
