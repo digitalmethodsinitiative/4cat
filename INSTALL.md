@@ -72,9 +72,9 @@ python3 backend.py start
 
 Other valid arguments are `stop`, `restart` and `status`. Note that 4CAT was
 made to run on a UNIX-like system and the above will not work on Windows. If
-you want to use Windows (this is not recommended except for testing or
-development, and disabled on UNIX-like systems) you can run `bootstrap.py`, 
-which will run the backend directly in the terminal.
+you want to use Windows you can run `bootstrap.py`, which will run the backend 
+directly in the terminal (this is not recommended except for testing or
+development, and disabled on UNIX-like systems).
 
 ### Running the web tool
 Next, start the web tool. Navigate to the `webtool` folder and run the 4CAT
@@ -89,12 +89,12 @@ With the default configuration, you can now navigate to
 `http://localhost:5000` where you'll find the web tool that allows you to query
 the database and create datasets.
 
-##Acquiring data
+## Acquiring data
 4CAT is not very useful with an empty database. To fill it with 4chan data,
 you can either import data from elsewhere or scrape 4chan yourself (or do 
 both).
 
-###Import 4chan data dumps from elsewhere
+### Import 4chan data dumps from elsewhere
 Included in the `backend` folder is `import_dump.py`. You can use this script
 to import dumps from 4plebs (e.g. 
 [these](https://archive.org/details/4plebs-org-data-dump-2018-01)). Run the
@@ -104,7 +104,7 @@ due to the sheer size of the data sets, and because 4CAT needs full text
 indices to search through the data, which take relatively long to generate. A
 faster hard drive helps.
 
-###Scrape 4chan yourself
+### Scrape 4chan yourself
 The 4CAT backend comes with a 4chan API scraper that can capture new posts
 on 4chan as they are posted. You can configure which boards are to be scraped
 in `config.py`. Note that the 4chan API has a rate limit and scraping too many
