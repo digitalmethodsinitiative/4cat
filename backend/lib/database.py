@@ -212,6 +212,12 @@ class Database:
 		"""
 		self.connection.commit()
 
+	def rollback(self):
+		"""
+		Roll back the current transaction
+		"""
+		self.connection.rollback()
+
 	def close(self):
 		"""
 		Close connection
