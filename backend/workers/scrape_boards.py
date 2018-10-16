@@ -17,7 +17,9 @@ class BoardScraper(BasicJSONScraper):
 	pause = 1  # we're not checking this often, but using claim-after to schedule jobs
 	max_workers = 2  # should probably be equivalent to the amount of boards to scrape
 
-	def process(self, data):
+	required_fields = ["no", "last_modified"]
+
+	def process(self, data, job):
 		"""
 		Process scraped board data
 
@@ -30,16 +32,21 @@ class BoardScraper(BasicJSONScraper):
 			for thread in page["threads"]:
 				position += 1
 
+				# check if we have everything we need
+				missing = set(self.required_fields) - set(thread.keys())
+				if missing != set():
+					self.log.warning("Missing fields %s in scraped thread, ignoring" % repr(missing))
+					continue
+
 				thread_data = {
 					"id": thread["no"],
-					"board": self.job["remote_id"],
+					"board": job["remote_id"],
 					"index_positions": ""
 				}
 
 				# schedule a job for scraping the thread's posts
 				try:
-					self.queue.add_job(jobtype="thread", remote_id=thread["no"],
-									   details={"board": self.job["remote_id"]})
+					self.queue.add_job(jobtype="thread", remote_id=thread["no"], details={"board": job["remote_id"]})
 				except JobAlreadyExistsException:
 					# this might happen if the workers can't keep up with the queue
 					pass
