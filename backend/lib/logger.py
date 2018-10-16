@@ -20,13 +20,17 @@ class Logger:
 	"""
 	logger = None
 	log_path = None
+	print_logs = True
 
-	def __init__(self):
+	def __init__(self, output=True):
 		"""
 		Set up log handler
+
+		:param bool output:  Whether to print logs to output
 		"""
 		self.logger = logging.getLogger("4cat-backend")
-		self.logger.setLevel(logging.INFO)
+		self.print_logs = output
+		self.logger.setLevel(logging.DEBUG)
 		self.log_path = get_absolute_folder(config.PATH_LOGS) + "/4cat.log"
 
 		handler = RotatingFileHandler(self.log_path, maxBytes=(25 * 1024 * 1024), backupCount=0)
@@ -64,7 +68,7 @@ class Logger:
 		:param message:  Message to log
 		:param level:  Severity level, should be a logger.* constant
 		"""
-		if level > logging.DEBUG:
+		if self.print_logs and level > logging.DEBUG:
 			print("LOG: %s" % message)
 		self.logger.log(level, message)
 

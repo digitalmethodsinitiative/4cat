@@ -22,12 +22,17 @@ class Database:
 	cursor = None
 	log = None
 
-	def __init__(self, logger):
+	def __init__(self, logger, dbname=None, user=None, password=None, host=None, port=None):
 		"""
 		Set up database connection
 		"""
-		self.connection = psycopg2.connect(dbname=config.DB_NAME, user=config.DB_USER, password=config.DB_PASSWORD,
-										   host=config.DB_HOST, port=config.DB_PORT)
+		dbname = config.DB_NAME if not dbname else dbname
+		user = config.DB_USER if not user else user
+		password = config.DB_PASSWORD if not password else password
+		host = config.DB_HOST if not host else host
+		port = config.DB_PORT if not port else port
+
+		self.connection = psycopg2.connect(dbname=dbname, user=user, password=password, host=host, port=port)
 		self.cursor = self.connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 		self.log = logger
 
