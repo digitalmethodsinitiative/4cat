@@ -28,6 +28,7 @@ WARN_JOBS = 5000  # if *more* than this amount of jobs are queued, warn
 WARN_LEVEL = "WARNING"  # only alerts above this level are passed on: DEBUG/INFO/WARNING/ERROR/CRITICAL
 WARN_SLACK_URL = ""  # slack webhook to post logged warnings to
 WARN_EMAILS = []
+WARN_MAILHOST = "localhost"  # SMTP server to connect to for sending e-mail alerts
 
 # What to scrape?
 SCRAPE_BOARDS = ["tg", "v"]
