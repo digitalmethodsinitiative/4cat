@@ -122,7 +122,7 @@ def process_post(post, db, sequence, threads, board):
 		links = re.findall(link_regex, post["comment"])
 		for linked_post in links:
 			if len(str(linked_post)) <= 15:
-				db.insert("posts_mention", data={"post_id": post["num"], "mentioned_id": linked_post}, commit=False)
+				db.insert("posts_mention", data={"post_id": post["num"], "mentioned_id": linked_post}, safe=True, commit=False)
 
 	if posts_added % 1000 == 0:
 		print("Processed %i posts." % posts_added)
