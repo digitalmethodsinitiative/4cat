@@ -94,3 +94,10 @@ CREATE INDEX IF NOT EXISTS mention_mentioned
   ON posts_mention (
     mentioned_id
   );
+
+-- enforce
+CREATE UNIQUE INDEX IF NOT EXISTS unique_mention
+  ON posts_mention (
+    post_id,
+    mentioned_id
+  );

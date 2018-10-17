@@ -159,7 +159,7 @@ class ThreadScraper(BasicJSONScraper):
 			links = re.findall('<a href="#p([0-9]+)" class="quotelink">', post["com"])
 			for linked_post in links:
 				if len(str(linked_post)) < 15:
-					self.db.insert("posts_mention", {"post_id": post_id, "mentioned_id": linked_post}, commit=False)
+					self.db.insert("posts_mention", {"post_id": post_id, "mentioned_id": linked_post}, safe=True, commit=False)
 
 	def queue_image(self, post, thread):
 		"""
