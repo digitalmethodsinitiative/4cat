@@ -26,7 +26,7 @@ class BasicJSONScraper(BasicWorker, metaclass=abc.ABCMeta):
 	"""
 	db = None
 
-	def __init__(self, db, logger):
+	def __init__(self, db=None, logger=None):
 		"""
 		Set up database connection - we need one to store the thread data
 		"""
