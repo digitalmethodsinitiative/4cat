@@ -4,46 +4,17 @@ import time
 import sys
 import os
 
+from basic_testcase import FourcatTestCase
+
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)) + '/..')
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)) + '/../backend')
 import config
 from lib.helpers import get_absolute_folder
-from lib.logger import Logger
-from lib.database import Database
 from workers.scrape_threads import ThreadScraper
 
 
-class TestThreadScraper(unittest.TestCase):
-	db = None
-	root = ""
-
+class TestThreadScraper(FourcatTestCase):
 	job = {"details": {"board": "test"}, "remote_id": -1, "jobtype": "thread"}
-
-	@classmethod
-	def setUpClass(cls):
-		"""
-		Set up database connection for test database before starting tests
-		"""
-		cls.root = os.path.abspath(os.path.dirname(__file__))
-		cls.log = Logger(output=False)
-		cls.db = Database(logger=cls.log, dbname=config.DB_NAME_TEST)
-		with open(cls.root + "/../backend/database.sql") as dbfile:
-			cls.db.execute(dbfile.read())
-
-	@classmethod
-	def tearDownClass(cls):
-		"""
-		Close database connection after tests are finished
-		"""
-		cls.db.close()
-		del cls.db
-
-	def tearDown(self):
-		"""
-		Reset database after each test
-		"""
-		with open(self.root + "/reset_database.sql") as dbfile:
-			self.db.execute(dbfile.read())
 
 	def load_thread(self, filename):
 		"""

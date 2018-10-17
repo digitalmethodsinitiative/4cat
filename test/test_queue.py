@@ -4,19 +4,14 @@ import time
 import sys
 import os
 
+from basic_testcase import FourcatTestCase
+
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)) + '/..')
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)) + '/../backend')
-import config
-from lib.queue import JobQueue
-from lib.logger import Logger
-from lib.database import Database
+from lib.queue import JobQueue, JobClaimedException
 
 
-class TestJobQueue(unittest.TestCase):
-	db = None
-	log = None
-	root = ""
-
+class TestJobQueue(FourcatTestCase):
 	details = {"key1": "value1", "key2": "value2"}
 	jobid = 1234
 	basic_job = {
@@ -25,39 +20,13 @@ class TestJobQueue(unittest.TestCase):
 		"remote_id": jobid
 	}
 	basic_expected = {
-			"jobtype": "test",
-			"details": json.dumps(details),
-			"remote_id": str(jobid),
-			"claim_after": 0,
-			"claimed": 0,
-			"attempts": 0
-		}
-
-	@classmethod
-	def setUpClass(cls):
-		"""
-		Set up database connection for test database before starting tests
-		"""
-		cls.log = Logger(output=False)
-		cls.db = Database(logger=cls.log, dbname=config.DB_NAME_TEST)
-		cls.root = os.path.abspath(os.path.dirname(__file__))
-		with open(cls.root + "/../backend/database.sql") as dbfile:
-			cls.db.execute(dbfile.read())
-
-	@classmethod
-	def tearDownClass(cls):
-		"""
-		Close database connection after tests are finished
-		"""
-		cls.db.close()
-		del cls.db
-
-	def tearDown(self):
-		"""
-		Reset database after each test
-		"""
-		with open(self.root + "/reset_database.sql") as dbfile:
-			self.db.execute(dbfile.read())
+		"jobtype": "test",
+		"details": json.dumps(details),
+		"remote_id": str(jobid),
+		"claim_after": 0,
+		"claimed": 0,
+		"attempts": 0
+	}
 
 	def test_add_job(self):
 		"""
@@ -132,6 +101,22 @@ class TestJobQueue(unittest.TestCase):
 			self.assertIsNotNone(job)
 
 		self.assertGreater(job["claimed"], int(time.time()) - 2)
+
+	def test_claim_job_claimed(self):
+		"""
+		Test claiming an already claimed job
+
+		Expected: an exception is raised when the job is claimed for the second time
+		"""
+		queue = JobQueue(logger=self.log, database=self.db)
+
+		queue.add_job("test", remote_id=self.jobid)
+		job = queue.get_job("test")
+		self.assertIsNotNone(job)
+
+		queue.claim_job(job)
+		with self.assertRaises(JobClaimedException):
+			queue.claim_job(job)
 
 	def test_release_job(self):
 		"""

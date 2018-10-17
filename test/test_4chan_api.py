@@ -80,5 +80,6 @@ class TestAPIConnection(unittest.TestCase):
 		explanation = ("\n\nThese fields are not currently recognized by 4CAT. If you think they"
 					   "\nare significant, consider filing an issue about them on the 4CAT"
 					   "\nGitHub repository so support for them can be added. 4CAT will still"
-					   "\nwork even if this test (test_thread_single_known) fails!\n\nUnrecognized field(s): %s") % ", ".join(new)
+					   "\nwork even if this test (test_thread_single_known) fails!\n\nUnrecognized field(s): %s") % ", ".join(
+			new)
 		self.assertEqual(new, [], msg=explanation)
