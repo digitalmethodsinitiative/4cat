@@ -315,6 +315,27 @@ class TestThreadScraper(FourcatTestCase):
 		deleted = self.db.fetchone("SELECT COUNT(*) AS num FROM posts WHERE timestamp_deleted > 0")["num"]
 		self.assertEqual(deleted, 1)
 
+	def test_link_posts(self):
+		"""
+		Test detection of links between posts
+
+		Expected: all links are added, but not those with an invalid post ID
+		or those that already exist for the given post.
+		"""
+		(scraper, threaddata) = self.load_thread("thread_valid_links.json")
+		scraper.process(threaddata, job=self.job)
+
+		links = self.db.fetchall("SELECT * FROM posts_mention")
+
+		expected = [
+			{'post_id': 231108796, 'mentioned_id': 231109057},
+			{'post_id': 231108796, 'mentioned_id': 231154556},
+			{'post_id': 231108796, 'mentioned_id': 217403866},
+			{'post_id': 231108796, 'mentioned_id': 6411860372}
+		]
+
+		self.assertCountEqual(links, expected)
+
 	@unittest.skipIf(not os.path.isdir(get_absolute_folder(config.PATH_IMAGES)), "no valid image folder configured")
 	def test_image_queued(self):
 		"""
