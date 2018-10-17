@@ -3,6 +3,8 @@ Log handler
 """
 import requests
 import datetime
+import platform
+import smtplib
 import logging
 import time
 import json
@@ -237,6 +239,7 @@ class Logger:
 			mail += "  _%s_ - logged %i time(s) at %s (first %s, last %s)\n\n" % (
 				log["level"], log["amount"], log["location"], first, last)
 
+		# post compiled report to slack webhook, if configured
 		if config.WARN_SLACK_URL:
 			post = {
 				"text": "%i warnings were logged.\n\nThis report was compiled at %s." % (warnings, datetime.datetime.now().strftime('%d %B %Y %H:%M:%S')),
@@ -245,9 +248,17 @@ class Logger:
 					"text": mail
 				}]
 			}
-			requests.post(config.WARN_SLACK_URL, json.dumps(post))
 
+			try:
+				requests.post(config.WARN_SLACK_URL, json.dumps(post))
+			except requests.RequestException as e:
+				self.warning("Could not send log alerts to Slack webhook (%s)" % e)
+
+		# also send them to the configured admins
 		if config.WARN_EMAILS:
-			for email in config.WARN_EMAILS:
-				# send email somehow!
-				pass
+			mail += "This report was compiled at %s." % datetime.datetime.now().strftime('%d %B %Y %H:%M:%S')
+			with smtplib.SMTP(config.WARN_MAILHOST) as smtp:
+				try:
+					smtp.sendmail("4lab@%s" % platform.uname().node, config.WARN_EMAILS, mail)
+				except smtplib.SMTPException as e:
+					self.error("Could not send log alerts via e-mail (%s)" % e)
