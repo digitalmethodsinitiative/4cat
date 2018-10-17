@@ -83,3 +83,7 @@ class TestAPIConnection(unittest.TestCase):
 					   "\nwork even if this test (test_thread_single_known) fails!\n\nUnrecognized field(s): %s") % ", ".join(
 			new)
 		self.assertEqual(new, [], msg=explanation)
+
+
+if __name__ == '__main__':
+	unittest.main()
