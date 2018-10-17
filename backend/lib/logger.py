@@ -1,9 +1,15 @@
 """
 Log handler
 """
+import requests
+import datetime
 import logging
+import time
+import json
 import sys
+import re
 import os
+from collections import OrderedDict
 
 from lib.helpers import get_absolute_folder
 from logging.handlers import RotatingFileHandler, SMTPHandler
@@ -21,25 +27,41 @@ class Logger:
 	logger = None
 	log_path = None
 	print_logs = True
+	db = None
+	previous_report = 0
+	levels = {
+		"DEBUG": logging.DEBUG,
+		"INFO": logging.INFO,
+		"WARNING": logging.WARNING,
+		"ERROR": logging.ERROR,
+		"CRITICAL": logging.CRITICAL,
+		"FATAL": logging.FATAL
+	}
 
-	def __init__(self, output=True):
+	def __init__(self, output=True, db=None):
 		"""
 		Set up log handler
 
 		:param bool output:  Whether to print logs to output
 		"""
-		self.logger = logging.getLogger("4cat-backend")
 		self.print_logs = output
-		self.logger.setLevel(logging.DEBUG)
 		self.log_path = get_absolute_folder(config.PATH_LOGS) + "/4cat.log"
+		self.previous_report = time.time()
 
+		self.logger = logging.getLogger("4cat-backend")
+		self.logger.setLevel(logging.DEBUG)
+
+		# this handler manages the text log files
 		handler = RotatingFileHandler(self.log_path, maxBytes=(25 * 1024 * 1024), backupCount=0)
 		handler.setLevel(logging.INFO)
-		handler.setFormatter(logging.Formatter("%(asctime)-15s | %(levelname)s (%(filename)s:%(lineno)d): %(message)s",
+		handler.setFormatter(logging.Formatter("%(asctime)-15s | %(levelname)s %(message)s",
 											   "%d-%m-%Y %H:%M:%S"))
 
 		self.logger.addHandler(handler)
 		self.info("Logging to %s" % self.log_path)
+
+		if db:
+			self.db = db
 
 	def enable_mailer(self):
 		"""
@@ -70,7 +92,24 @@ class Logger:
 		"""
 		if self.print_logs and level > logging.DEBUG:
 			print("LOG: %s" % message)
+
+		# because we use a wrapper the context location the logger itself is
+		# useless (it will always point to this function) so we get it
+		# ourselves
+		try:
+			frame = sys._getframe(2)
+			location = frame.f_code.co_filename.split("/").pop() + ":" + str(frame.f_lineno)
+			message = "(" + location + ")" + ": " + message
+		except AttributeError:
+			# the _getframe method may not be available
+			message = ": " + message
+
 		self.logger.log(level, message)
+
+		# every 10 minutes, collect and send warnings etc
+		if self.previous_report < time.time() - 600:
+			self.previous_report = time.time()
+			self.collect_and_send()
 
 	def debug(self, message):
 		"""
@@ -111,3 +150,104 @@ class Logger:
 		:param message: Message to log
 		"""
 		self.log(message, logging.CRITICAL)
+
+	def fatal(self, message):
+		"""
+		Log FATAL level message
+
+		:param message: Message to log
+		"""
+		self.log(message, logging.FATAL)
+
+	def collect_and_send(self):
+		"""
+		Compile a report of recently logged alerts and send it to the admins
+		"""
+		grouped_logs = {}
+		log_regex = re.compile("([0-9: -]+) \| ([A-Z]+) \(([^)]+)\): (.+)")
+		try:
+			min_level = self.levels[config.WARN_LEVEL]
+		except KeyError:
+			min_level = self.levels["WARNING"]
+
+		# this string will be used to recognize when a report was last compiled
+		magic = "Compiling logs into report"
+
+		# process lines from log
+		with open(get_absolute_folder(config.PATH_LOGS) + "/4cat.log") as logfile:
+			logs = logfile.readlines()
+
+		warnings = 0
+		for log in reversed(logs):
+			log = log.strip()
+
+			# filter info from log file
+			bits = re.match(log_regex, log)
+			if not bits:
+				# line does not match log format...
+				continue
+
+			if bits.group(4).strip() == magic:
+				# anything beyond this message has already been compiled/processed earlier
+				break
+
+			key = bits.group(3) + ":" + bits.group(4)
+			timestamp = datetime.datetime.strptime(bits.group(1), '%d-%m-%Y %H:%M:%S').timestamp()
+			level = self.levels[bits.group(2)] if bits.group(2) in self.levels else self.levels["DEBUG"]
+
+			# see if the message is important enough to be in the report
+			if level < min_level:
+				continue
+
+			warnings += 1
+
+			# store logs, grouped by combination of log message and log location
+			if key in grouped_logs:
+				grouped_logs[key]["first"] = min(grouped_logs[key]["first"], timestamp)
+				grouped_logs[key]["last"] = max(grouped_logs[key]["last"], timestamp)
+				grouped_logs[key]["amount"] += 1
+			else:
+				grouped_logs[key] = {
+					"location": bits.group(3),
+					"message": bits.group(4),
+					"level": bits.group(2),
+					"first": timestamp,
+					"last": timestamp,
+					"amount": 1
+				}
+
+		self.info(magic)
+		# see if we have anything to send
+		if not grouped_logs:
+			return
+
+		# order logs, most-logged message first
+		sorted_logs = OrderedDict()
+		sort_keys = {logkey: grouped_logs[logkey]["amount"] for logkey in grouped_logs}
+		for logkey in sorted(sort_keys, key=sort_keys.__getitem__):
+			sorted_logs[logkey] = grouped_logs[logkey]
+
+		# compile a report to send to an unfortunate admin
+		mail = "Hello! The following 4CAT warnings were logged since the last alert:\n\n"
+		for logkey in reversed(sorted_logs):
+			log = sorted_logs[logkey]
+			first = datetime.datetime.fromtimestamp(log["first"]).strftime('%d %B %Y %H:%M:%S')
+			last = datetime.datetime.fromtimestamp(log["last"]).strftime('%d %B %Y %H:%M:%S')
+			mail += "- *%s*\n" % log["message"]
+			mail += "  _%s_ - logged %i time(s) at %s (first %s, last %s)\n\n" % (
+				log["level"], log["amount"], log["location"], first, last)
+
+		if config.WARN_SLACK_URL:
+			post = {
+				"text": "%i warnings were logged.\n\nThis report was compiled at %s." % (warnings, datetime.datetime.now().strftime('%d %B %Y %H:%M:%S')),
+				"attachments": [{
+					"title": "Warnings",
+					"text": mail
+				}]
+			}
+			requests.post(config.WARN_SLACK_URL, json.dumps(post))
+
+		if config.WARN_EMAILS:
+			for email in config.WARN_EMAILS:
+				# send email somehow!
+				pass
