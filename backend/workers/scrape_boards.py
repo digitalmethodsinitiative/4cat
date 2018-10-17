@@ -59,7 +59,7 @@ class BoardScraper(BasicJSONScraper):
 			self.db.insert("threads", thread_data)
 
 		# update timestamps and position
-		position_update = str(self.loop_time) + ":" + str(self.position) + ",", thread_data["id"]
+		position_update = str(self.loop_time) + ":" + str(self.position) + ","
 		self.db.execute("UPDATE threads SET timestamp_scraped = %s, timestamp_modified = %s,"
 						"index_positions = CONCAT(index_positions, %s) WHERE id = %s",
 						(self.loop_time, thread["last_modified"], position_update, thread_data["id"]))
