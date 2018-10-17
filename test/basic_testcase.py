@@ -39,6 +39,8 @@ class FourcatTestCase(unittest.TestCase):
 		"""
 		Close database connection after tests are finished
 		"""
+		with open(cls.root + "/reset_database_tables.sql") as dbfile:
+			cls.db.execute(dbfile.read())
 		cls.db.close()
 		del cls.db
 
@@ -53,5 +55,5 @@ class FourcatTestCase(unittest.TestCase):
 		Reset database after each test
 		"""
 		self.db.rollback()
-		with open(self.root + "/reset_database.sql") as dbfile:
+		with open(self.root + "/reset_database_content.sql") as dbfile:
 			self.db.execute(dbfile.read())
