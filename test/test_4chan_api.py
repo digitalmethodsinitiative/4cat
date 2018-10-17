@@ -13,6 +13,15 @@ class TestAPIConnection(unittest.TestCase):
 	thread = None
 
 	def get_thread(self):
+		"""
+		Get a random thread from the live 4chan API
+
+		The thread is the first one in the threads index for /tg/. Result is
+		cached for later re-use; subsequent calls will return the cached
+		thread.
+
+		:return dict: Thread data, parsed JSON
+		"""
 		if self.thread is None:
 			raw_json = requests.get("http://a.4cdn.org/tg/threads.json")
 			data = json.loads(raw_json.content)
@@ -39,8 +48,8 @@ class TestAPIConnection(unittest.TestCase):
 		self.assertGreater(len(data), 0)
 
 		page = data.pop()
-		self.assertTrue("page" in page)
-		self.assertTrue("threads" in page)
+		self.assertIn("page", page)
+		self.assertIn("threads", page)
 		self.assertGreater(len(page["threads"]), 0)
 
 		thread = page["threads"].pop()
@@ -55,12 +64,12 @@ class TestAPIConnection(unittest.TestCase):
 		Expected: all fields marked as required in the thread scraper are present
 		"""
 		data = self.get_thread()
-		self.assertTrue("posts" in data)
+		self.assertIn("posts", data)
 
 		post = data["posts"].pop()
 		for field in ThreadScraper.required_fields:
 			with self.subTest(field=field):
-				self.assertTrue(field in post)
+				self.assertIn(field, post)
 
 	def test_thread_single_known(self):
 		"""
@@ -69,7 +78,7 @@ class TestAPIConnection(unittest.TestCase):
 		Expected: all fields in the response are marked as "known" in the thread scraper
 		"""
 		data = self.get_thread()
-		self.assertTrue("posts" in data)
+		self.assertIn("posts", data)
 
 		post = data["posts"].pop()
 		new = []
