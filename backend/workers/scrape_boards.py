@@ -18,6 +18,7 @@ class BoardScraper(BasicJSONScraper):
 	max_workers = 2  # should probably be equivalent to the amount of boards to scrape
 
 	required_fields = ["no", "last_modified"]
+	position = 0
 
 	def process(self, data, job):
 		"""
@@ -27,40 +28,41 @@ class BoardScraper(BasicJSONScraper):
 
 		:param dict data: The board data, parsed JSON data
 		"""
-		position = 1
 		for page in data:
 			for thread in page["threads"]:
-				position += 1
+				self.position += 1
+				self.save_thread(thread, job)
 
-				# check if we have everything we need
-				missing = set(self.required_fields) - set(thread.keys())
-				if missing != set():
-					self.log.warning("Missing fields %s in scraped thread, ignoring" % repr(missing))
-					continue
+	def save_thread(self, thread, job):
+		# check if we have everything we need
+		missing = set(self.required_fields) - set(thread.keys())
+		if missing != set():
+			self.log.warning("Missing fields %s in scraped thread, ignoring" % repr(missing))
+			return False
 
-				thread_data = {
-					"id": thread["no"],
-					"board": job["remote_id"],
-					"index_positions": ""
-				}
+		thread_data = {
+			"id": thread["no"],
+			"board": job["remote_id"],
+			"index_positions": ""
+		}
 
-				# schedule a job for scraping the thread's posts
-				try:
-					self.queue.add_job(jobtype="thread", remote_id=thread["no"], details={"board": job["remote_id"]})
-				except JobAlreadyExistsException:
-					# this might happen if the workers can't keep up with the queue
-					pass
+		# schedule a job for scraping the thread's posts
+		try:
+			self.queue.add_job(jobtype="thread", remote_id=thread["no"], details={"board": job["remote_id"]})
+		except JobAlreadyExistsException:
+			# this might happen if the workers can't keep up with the queue
+			pass
 
-				# add database record for thread, if none exists yet
-				thread_row = self.db.fetchone("SELECT * FROM threads WHERE id = %s", (thread_data["id"],))
-				if not thread_row:
-					self.db.insert("threads", thread_data)
+		# add database record for thread, if none exists yet
+		thread_row = self.db.fetchone("SELECT * FROM threads WHERE id = %s", (thread_data["id"],))
+		if not thread_row:
+			self.db.insert("threads", thread_data)
 
-				# update timestamps and position
-				position_update = str(self.loop_time) + ":" + str(position) + ",", thread_data["id"]
-				self.db.execute("UPDATE threads SET timestamp_scraped = %s, timestamp_modified = %s,"
-								"index_positions = CONCAT(index_positions, %s) WHERE id = %s",
-								(self.loop_time, thread["last_modified"], position_update, thread_data["id"]))
+		# update timestamps and position
+		position_update = str(self.loop_time) + ":" + str(self.position) + ",", thread_data["id"]
+		self.db.execute("UPDATE threads SET timestamp_scraped = %s, timestamp_modified = %s,"
+						"index_positions = CONCAT(index_positions, %s) WHERE id = %s",
+						(self.loop_time, thread["last_modified"], position_update, thread_data["id"]))
 
 	def get_url(self):
 		"""
