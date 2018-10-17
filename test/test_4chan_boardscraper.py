@@ -91,6 +91,34 @@ class TestBoardScraper(FourcatTestCase):
 
 		self.assertEqual(threads, 13)
 
+	def test_thread_index_positions(self):
+		"""
+		Test saving thread positions
+
+		Expected: thread positions are saved correctly based on their position
+		in the JSON response with timestamps greater than 0. Invalid thread
+		entries do advance the position index.
+		"""
+		files = ["board_valid.json", "board_valid_shuffled.json", "board_valid.json", "board_invalid_incomplete.json"]
+		for file in files:
+			(scraper, boarddata) = self.load_board(file)
+			scraper.process(boarddata, self.job)
+
+		thread = self.db.fetchone("SELECT * FROM threads ORDER BY id ASC")
+
+		expected = [14, 15, 14, 14]
+		positions = [int(position.split(":")[1]) for position in thread["index_positions"].split(",") if position != ""]
+		times = [int(position.split(":")[0]) for position in thread["index_positions"].split(",") if position != ""]
+
+		self.assertEqual(len(positions), 4)
+
+		with self.subTest(positions=positions):
+			self.assertEqual(positions, expected)
+
+		for time in times:
+			with self.subTest(time=time):
+				self.assertGreater(time, 0)
+
 
 if __name__ == '__main__':
 	unittest.main()
