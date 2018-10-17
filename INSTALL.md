@@ -44,7 +44,8 @@ included test suite to make sure everything has been set up correctly and that
 you can reach the 4chan API:
 
 ```
-python3 -m unittest test/test_*.py
+cd test
+python3 -m unittest test_*.py
 ```
 
 If everything tested successfully, you will see a message similar to the 
@@ -119,10 +120,10 @@ compatibility test regularly** to remain aware of any changes in the API
 response. The test is located at `test/test_4chan_api.py`. If the 4chan API
 response is compatible with 4CAT, the tests within will pass: if not, pay close
 attention to *which* tests fail, and read the failure messages for more info
-on what to do next. You can run this test with the following command:
+on what to do next. Simply run the test as an ordinary python script:
 
 ```
-python3 -m unittest test/test_4chan_api.py
+python3 test_4chan_api.py
 ```
 
 ## Separating the backend and web tool
