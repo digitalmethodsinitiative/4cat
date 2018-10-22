@@ -15,7 +15,7 @@ functionality that can be used to scrape and analyse Twitter data.
 - `webtool`: A Flask app that provides a web front-end to search and analyze
   the stored 4chan archives with.
   
-If you want to run 4CAT yourself, please refer to [`INSTALL.md`](INSTALL.md) for instructions
+If you want to run 4CAT yourself, please refer to [the Wiki](https://github.com/stijn-uva/4cat/wiki/Installing-4CAT) for instructions
 on how to install 4CAT locally.
 
 ## Contributing
