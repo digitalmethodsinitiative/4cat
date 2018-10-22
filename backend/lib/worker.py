@@ -60,9 +60,10 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
 			try:
 				self.work()
 			except Exception as e:
-				location = traceback.extract_tb(e.__traceback__, -1).pop()
-				location = location.filename.split("/").pop() + ":" + str(location.lineno)
-				self.log.error("Worker %s raised exception %s at %s and will abort: %s" % (self.type, e.__class__.__name__, location, e))
+				frames = traceback.extract_tb(e.__traceback__)
+				frames = [frame.filename.split("/").pop() + ":" + str(frame.lineno) for frame in frames]
+				location = "->".join(frames)
+				self.log.error("Worker %s raised exception %s and will abort: %s at %s" % (self.type, e.__class__.__name__, e, location))
 				self.abort()
 
 			time.sleep(self.pause)
