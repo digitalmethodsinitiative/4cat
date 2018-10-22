@@ -259,5 +259,5 @@ class Logger:
 			with smtplib.SMTP(config.WARN_MAILHOST) as smtp:
 				try:
 					smtp.sendmail("4lab@%s" % platform.uname().node, config.WARN_EMAILS, mail)
-				except smtplib.SMTPException as e:
+				except (smtplib.SMTPException, ConnectionRefusedError) as e:
 					self.error("Could not send log alerts via e-mail (%s)" % e)
