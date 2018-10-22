@@ -69,11 +69,14 @@ included `4cat-daemon.py` script:
 python3 4cat-daemon.py start
 ```
 
-Other valid arguments are `stop`, `restart` and `status`. Note that 4CAT was
-made to run on a UNIX-like system and the above will not work on Windows. If
-you want to use Windows you can run `bootstrap.py` in the `backend` folder, 
-which will run the backend directly in the terminal (this is not recommended 
-except for testing or development, and disabled on UNIX-like systems).
+Other valid arguments are `stop`, `restart` and `status`. Note that if you
+change any configuration options, you will need to `restart` the daemon for the
+changes to take effect.
+
+**Note:** The 4CAT was made to run on a UNIX-like system and the above will not 
+work on Windows. Instead, running 4cat-daemon.py on Windows will start the 
+4CAT backend in the terminal window, regardless of the argument given. The 
+backend can then be quit by pressing CTRL+C twice.
 
 ### Running the web tool
 The web tool is a Flask app. It is recommended that you run the web tool as a
