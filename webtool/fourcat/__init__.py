@@ -1,8 +1,13 @@
+import sys
+import os
+sys.path.insert(0, os.path.dirname(__file__) + '/../..')
+
 from flask import Flask
 
 app = Flask(__name__)
 
 import config
+import fourcat.access
 import fourcat.views
 import fourcat.api
 
