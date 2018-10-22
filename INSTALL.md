@@ -44,8 +44,7 @@ included test suite to make sure everything has been set up correctly and that
 you can reach the 4chan API:
 
 ```
-cd test
-python3 -m unittest test_*.py
+python3 -m unittest discover test
 ```
 
 If everything tested successfully, you will see a message similar to the 
@@ -63,27 +62,27 @@ You can now run 4CAT.
 
 ## Running 4CAT
 ### Running the backend
-The backend can be run by navigating to the `backend` folder and using the
-`backend.py` script in there to control the 4CAT backend daemon:
+The backend is run as a daemon that can be started and stopped using the
+included `4cat-daemon.py` script:
 
 ```
-cd backend
-python3 backend.py start
+python3 4cat-daemon.py start
 ```
 
 Other valid arguments are `stop`, `restart` and `status`. Note that 4CAT was
 made to run on a UNIX-like system and the above will not work on Windows. If
-you want to use Windows you can run `bootstrap.py`, which will run the backend 
-directly in the terminal (this is not recommended except for testing or
-development, and disabled on UNIX-like systems).
+you want to use Windows you can run `bootstrap.py` in the `backend` folder, 
+which will run the backend directly in the terminal (this is not recommended 
+except for testing or development, and disabled on UNIX-like systems).
 
 ### Running the web tool
-Next, start the web tool. Navigate to the `webtool` folder and run the 4CAT
-Flask app:
+The web tool is a Flask app. It is recommended that you run the web tool as a
+WSGI module: see the [Flask documentation](http://flask.pocoo.org/docs/1.0/deploying/) 
+for more details. For testing and development, you can run the Flask app 
+locally from the command line:
 
 ```
-cd ../webtool
-FLASK_APP=fourcat flask run
+FLASK_APP=webtool/fourcat flask run
 ```
 
 With the default configuration, you can now navigate to 
@@ -120,10 +119,10 @@ compatibility test regularly** to remain aware of any changes in the API
 response. The test is located at `test/test_4chan_api.py`. If the 4chan API
 response is compatible with 4CAT, the tests within will pass: if not, pay close
 attention to *which* tests fail, and read the failure messages for more info
-on what to do next. Simply run the test as an ordinary python script:
+on what to do next.
 
 ```
-python3 test_4chan_api.py
+python3 -m unittest test/test_4chan_api.py
 ```
 
 ## Separating the backend and web tool

@@ -7,15 +7,11 @@ Runs worker threads in which the magic happens:
 - Scheduling the above
 - Parsing and processing search requests
 
-Run:
+The backend is intended to be run as a daemon process. This is only possible on 
+UNIX-like systems (e.g. Linux or MacOS). See the `4cat-daemon.py` script in the
+parent folder for instructions on how to start and control the daemon
 
-```
-python3 backend.py start
-```
-
-In the above command, you may replace `start` with `stop`, `restart` or 
-`status` to stop/restart the daemon or to see whether it is currently running,
-respectively.
+If you are using Windows, you can run `bootstrap.py` in this folder directly.
 
 ## What it does
 Runs a number of workers in parallel threads, that query a central job queue 
@@ -38,8 +34,8 @@ The workers can be configured mainly through the following class properties:
 ## Extras and tools
 - `database.sql` contains the description of the database used by the backend. 
   Running it should set up your tables and indexes if they have not been added 
-  yet. The SQL is automatically run by `run.py` upon startup, so there is no 
-  need to create tables before running it for the first time. 
+  yet. The SQL is automatically run by upon startup, so there is no need to
+  create tables before running it for the first time. 
   
 In the `extras` folder, you will find the following additional tools:
 
