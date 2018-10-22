@@ -38,7 +38,7 @@ class Logger:
 		"FATAL": logging.FATAL
 	}
 
-	def __init__(self, output=True, db=None):
+	def __init__(self, output=False, db=None):
 		"""
 		Set up log handler
 
