@@ -257,6 +257,15 @@ class ThreadScraper(BasicJSONScraper):
 
 		return self.db.fetchone("SELECT * FROM threads WHERE id = %s", (first_post["no"],))
 
+	def not_found(self):
+		"""
+		If the resource could not be found, that indicates the whole thread has
+		been deleted.
+		"""
+		self.log.info("Thread %s/%s was deleted, marking as such" % (self.job["details"]["board"], self.job["remote_id"]))
+		self.db.update(data={"timestamp_deleted": self.loop_time}, where={"id": self.job["remote_id"]})
+		self.queue.finish_job(self.job)
+
 	def get_url(self):
 		"""
 		Get URL to scrape for the current job

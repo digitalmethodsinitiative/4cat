@@ -40,7 +40,7 @@ class ImageDownloader(BasicWorker):
 		except requests.HTTPError:
 			# something wrong with our internet connection? or blocked by 4chan?
 			# try again in a minute
-			self.queue.release_job(job, delay=60)
+			self.queue.release_job(job, delay=random.choice(range(15,45)))
 			return
 
 		if image.status_code == 404:
