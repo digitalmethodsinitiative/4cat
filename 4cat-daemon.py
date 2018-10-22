@@ -4,11 +4,10 @@ import time
 import sys
 import os
 
-sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)) + '/..')
 import config
-import bootstrap
+import backend.bootstrap as bootstrap
 
-from lib.helpers import get_absolute_folder
+from backend.lib.helpers import get_absolute_folder
 from daemon import pidfile
 
 lockfile = get_absolute_folder(config.PATH_LOCKFILE) + "/4cat.pid"  # pid file location
@@ -19,15 +18,38 @@ def start():
 	Start backend, as a daemon
 	:return bool: True
 	"""
-	print("Starting 4CAT Backend Daemon.")
+	# only one instance may be running at a time
+	if os.path.isfile(lockfile):
+		with open(lockfile) as file:
+			pid = int(file.read().strip())
 
-	with daemon.DaemonContext(
-		working_directory=os.path.abspath(os.path.dirname(__file__)),
-		umask=0x002,
-		pidfile=pidfile.TimeoutPIDLockFile(lockfile),
-		detach_process=True
-	) as context:
-		bootstrap.run()
+		if pid in psutil.pids():
+			print("...error: the 4CAT Backend Daemon is already running.")
+			return False
+
+	# start daemon in a separate process so we can continue doing stuff in this one afterwards
+	new_pid = os.fork()
+	if new_pid == 0:
+		# create new daemon context and run bootstrapper inside it
+		with daemon.DaemonContext(
+				working_directory=os.path.abspath(os.path.dirname(__file__)),
+				umask=0x002,
+				stdout=open("4cat.stdout", "a"),
+				stderr=open("4cat.stderr", "a"),
+				pidfile=pidfile.TimeoutPIDLockFile(lockfile),
+				detach_process=True
+		) as context:
+			bootstrap.run()
+		sys.exit(0)
+	else:
+		# wait a few seconds and see if PIDfile was created and refers to a running process
+		time.sleep(3)
+		with open(lockfile) as file:
+			pid = int(file.read().strip())
+			if pid in psutil.pids():
+				print("...4CAT Backend Daemon started.")
+			else:
+				print("...error while starting 4CAT Backend Daemon.")
 
 	return True
 
@@ -43,25 +65,33 @@ def stop():
 					sent, False if not.
 	"""
 	if os.path.isfile(lockfile):
+		# see if the listed process is actually running right now
 		with open(lockfile) as file:
 			pid = int(file.read().strip())
 
 		if pid not in psutil.pids():
-			print("...error: the 4CAT backend daemon is not currently running.")
+			print("...error: 4CAT Backend Daemon is not running, but a PID file exists. Has it crashed?")
 			return False
 
+		# tell the backend to stop
 		os.system("kill %s" % str(pid))
-		print("Sending SIGTERM to process %i. Waiting for backend to quit..." % pid)
+		print("...sending SIGTERM to process %i. Waiting for backend to quit..." % pid)
+
+		# periodically check if the process has quit
 		starttime = time.time()
 		while pid in psutil.pids():
 			nowtime = time.time()
 			if nowtime - starttime > 60:
+				# give up if it takes too long
 				print("...error: the 4CAT backend daemon did not quit within 60 seconds. Something probably crashed.")
 				return False
 			time.sleep(1)
-		print("4CAT Backend stopped.")
+
+		# backend quit gracefully
+		print("...4CAT Backend stopped.")
 		return True
 	else:
+		# no pid file, so nothing running
 		print("...error: the 4CAT backend daemon is not currently running.")
 		return False
 
@@ -91,18 +121,19 @@ else:
 
 # interpret commands
 if command == "restart":
+	print("Restarting 4CAT Backend Daemon...")
 	# restart daemon, but only if it's already running and could successfully be stopped
 	stopped = stop()
 	if stopped:
+		print("...starting 4CAT Backend Daemon...")
 		start()
 elif command == "start":
 	# start...but only if there currently is no running backend process
-	if pid in psutil.pids():
-		print("Already running.")
-	else:
-		start()
+	print("Starting 4CAT Backend Daemon...")
+	start()
 elif command == "stop":
 	# stop
+	print("Stopping 4CAT Backend Daemon...")
 	stop()
 elif command == "status":
 	# show whether the daemon is currently running

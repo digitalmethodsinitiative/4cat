@@ -12,7 +12,8 @@ from backend.lib.logger import Logger
 
 def run():
 	# load everything
-	log = Logger()
+	print_logs = __name__ == "__main__"
+	log = Logger(output=print_logs)
 	db = Database(logger=log)
 	queue = JobQueue(logger=log, database=db)
 
