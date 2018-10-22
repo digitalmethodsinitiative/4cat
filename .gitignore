@@ -1,17 +1,18 @@
-.idea
-venv
-.git-latest
-.git-checked-out
-deploy.sh
-config.py
-
-*.lock
+# various temporary or downloaded files
 *.pyc
+*.pid
 *.log
-*.log.*
-*.db
 *.csv
-webtool/fourcat/js/jquery-csv-master/
-*.model
-webtool/fourcat/static/data/word_embeddings/
-data/
+*.jpg
+*.png
+*.gif
+*.webm
+*.db
+*.lock
+*.stderr
+*.stdout
+*.git-*
+
+# actual files that are part of 4CAT but should not be included
+config.py
+deploy.sh
