@@ -33,7 +33,7 @@ class stringQuery(BasicWorker):
 		job = self.queue.get_job("query")
 
 		if not job:
-			self.log.info("No string queries")
+			self.log.debug("No string queries, sleeping for 10 seconds")
 			time.sleep(10)
 
 		else:
