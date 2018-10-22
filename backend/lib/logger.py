@@ -228,19 +228,19 @@ class Logger:
 			sorted_logs[logkey] = grouped_logs[logkey]
 
 		# compile a report to send to an unfortunate admin
-		mail = "Hello! The following 4CAT warnings were logged since the last alert:\n\n"
+		mail = ""
 		for logkey in reversed(sorted_logs):
 			log = sorted_logs[logkey]
-			first = datetime.datetime.fromtimestamp(log["first"]).strftime('%d %B %Y %H:%M:%S')
-			last = datetime.datetime.fromtimestamp(log["last"]).strftime('%d %B %Y %H:%M:%S')
+			first = datetime.datetime.fromtimestamp(log["first"]).strftime("%d %b '%y %H:%M:%S")
+			last = datetime.datetime.fromtimestamp(log["last"]).strftime("%d %b '%y %H:%M:%S")
 			mail += "- *%s*\n" % log["message"]
-			mail += "  _%s_ - logged %i time(s) at %s (first %s, last %s)\n\n" % (
+			mail += "  _%s_ - %ix at %s (first %s, last %s)\n\n" % (
 				log["level"], log["amount"], log["location"], first, last)
 
 		# post compiled report to slack webhook, if configured
 		if config.WARN_SLACK_URL:
 			post = {
-				"text": "%i warnings were logged.\n\nThis report was compiled at %s." % (warnings, datetime.datetime.now().strftime('%d %B %Y %H:%M:%S')),
+				"text": "%i warning(s) were logged.\n\nThis report was compiled at %s." % (warnings, datetime.datetime.now().strftime('%d %B %Y %H:%M:%S')),
 				"attachments": [{
 					"title": "Warnings",
 					"text": mail
@@ -254,6 +254,7 @@ class Logger:
 
 		# also send them to the configured admins
 		if config.WARN_EMAILS:
+			mail = "Hello! The following 4CAT warnings were logged since the last alert:\n\n" + mail
 			mail += "This report was compiled at %s." % datetime.datetime.now().strftime('%d %B %Y %H:%M:%S')
 			with smtplib.SMTP(config.WARN_MAILHOST) as smtp:
 				try:
