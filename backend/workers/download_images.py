@@ -1,12 +1,11 @@
 """
 4Chan image downloader
 """
+import requests
 import random
 import time
 
-import requests
-
-from lib.worker import BasicWorker
+from backend.lib.worker import BasicWorker
 
 
 class ImageDownloader(BasicWorker):

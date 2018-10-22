@@ -9,9 +9,9 @@ import base64
 import json
 import re
 
-from lib.helpers import get_absolute_folder
-from lib.scraper import BasicJSONScraper
-from lib.queue import JobAlreadyExistsException
+from backend.lib.helpers import get_absolute_folder
+from backend.lib.scraper import BasicJSONScraper
+from backend.lib.queue import JobAlreadyExistsException
 
 import config
 

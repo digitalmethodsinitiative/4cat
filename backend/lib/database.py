@@ -3,12 +3,9 @@ Database wrapper
 """
 import psycopg2.extras
 import psycopg2
-import sys
-import os
 
 from psycopg2 import sql
 
-sys.path.insert(0, os.path.dirname(__file__) + '/../..')
 import config
 
 

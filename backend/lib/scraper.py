@@ -1,19 +1,15 @@
 """
 Basic scraper worker - should be inherited by workers to scrape specific types of content
 """
+import requests
 import random
 import time
 import json
 import abc
-import sys
-import os
 
-import requests
+from backend.lib.worker import BasicWorker
+from backend.lib.queue import JobClaimedException
 
-from lib.worker import BasicWorker
-from lib.queue import JobClaimedException
-
-sys.path.insert(0, os.path.dirname(__file__) + '/../..')
 import config
 
 class BasicJSONScraper(BasicWorker, metaclass=abc.ABCMeta):
