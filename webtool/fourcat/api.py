@@ -2,19 +2,16 @@ import sys
 import os
 import psutil
 
-sys.path.insert(0, os.path.dirname(__file__) + '/../..')
-sys.path.insert(0, os.path.dirname(__file__) + '/../../backend')
-
 from flask import jsonify
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 
 import config
 from fourcat import app
-from lib.database import Database
-from lib.queue import JobQueue
-from lib.logger import Logger
-from lib.helpers import get_absolute_folder
+from backend.lib.database import Database
+from backend.lib.queue import JobQueue
+from backend.lib.logger import Logger
+from backend.lib.helpers import get_absolute_folder
 
 log = Logger()
 limiter = Limiter(app, key_func=get_remote_address)

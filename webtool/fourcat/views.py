@@ -1,17 +1,11 @@
-import sys
 import os
-sys.path.insert(0, os.path.dirname(__file__) +  '/../..')
-sys.path.insert(0, os.path.dirname(__file__) +  '/../../backend')
-import lib.queue
-import config
-import pandas as pd
-import json
-import time
 import re
 from flask import Flask, render_template, url_for
-from lib.database import Database
-from lib.logger import Logger
 from fourcat import app
+
+from backend.lib.database import Database
+from backend.lib.logger import Logger
+from backend.lib.queue import JobQueue
 
 """
 
@@ -42,7 +36,7 @@ def string_query(searchquery, min_timestamp='none', max_timestamp='none'):
 	# make connections to database with backend library
 	log = Logger()
 	db = Database(logger=log)
-	query_queue = lib.queue.JobQueue(logger=log, database=db)
+	query_queue = JobQueue(logger=log, database=db)
 	
 	# add job with respective query string
 	query_queue.add_job("query", details={"str_query": searchquery, "col_query": "body_vector", "min_timestamp": min_timestamp, "max_timestamp": max_timestamp})

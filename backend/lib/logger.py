@@ -10,13 +10,11 @@ import time
 import json
 import sys
 import re
-import os
 from collections import OrderedDict
 
-from lib.helpers import get_absolute_folder
+from backend.lib.helpers import get_absolute_folder
 from logging.handlers import RotatingFileHandler, SMTPHandler
 
-sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)) + '/../..')
 import config
 
 

@@ -2,8 +2,8 @@
 4Chan board scraper - indexes threads and queues them for scraping
 """
 
-from lib.scraper import BasicJSONScraper
-from lib.queue import JobAlreadyExistsException
+from backend.lib.scraper import BasicJSONScraper
+from backend.lib.queue import JobAlreadyExistsException
 
 
 class BoardScraper(BasicJSONScraper):

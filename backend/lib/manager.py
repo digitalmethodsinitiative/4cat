@@ -11,7 +11,7 @@ import time
 import sys
 import os
 
-from lib.worker import BasicWorker
+from backend.lib.worker import BasicWorker
 
 
 class WorkerManager:
@@ -101,9 +101,9 @@ class WorkerManager:
 		loaded yet are added to an internal list of available worker types.
 		"""
 		# check for worker files
-		os.chdir("workers")
+		os.chdir(os.path.abspath(os.path.dirname(__file__)) + "/../workers")
 		for file in glob.glob("*.py"):
-			module = "workers." + file[:-3]
+			module = "backend.workers." + file[:-3]
 			if module in sys.modules:
 				continue
 
@@ -115,5 +115,3 @@ class WorkerManager:
 						member[1]):
 					self.log.debug("Adding worker type %s" % member[0])
 					self.worker_prototypes.append(member[1])
-
-		os.chdir("..")

@@ -4,10 +4,10 @@
 import sys
 import os
 
-from lib.queue import JobQueue
-from lib.database import Database
-from lib.manager import WorkerManager
-from lib.logger import Logger
+from backend.lib.queue import JobQueue
+from backend.lib.database import Database
+from backend.lib.manager import WorkerManager
+from backend.lib.logger import Logger
 
 
 def run():
@@ -16,7 +16,8 @@ def run():
 	db = Database(logger=log)
 	queue = JobQueue(logger=log, database=db)
 
-	with open("database.sql", "r") as content_file:
+	dbpath = os.path.abspath(os.path.dirname(__file__) + "/database.sql")
+	with open(dbpath, "r") as content_file:
 		log.info("Initializing database...")
 		database_setup = content_file.read()
 		db.execute(database_setup)

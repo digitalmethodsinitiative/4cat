@@ -1,12 +1,10 @@
-import requests
 import time
 import config
 import csv
-import os
 
-from lib.queue import JobClaimedException
-from lib.helpers import get_absolute_folder
-from lib.worker import BasicWorker
+from backend.lib.queue import JobClaimedException
+from backend.lib.helpers import get_absolute_folder
+from backend.lib.worker import BasicWorker
 from bs4 import BeautifulSoup
 
 

@@ -6,8 +6,8 @@ import threading
 import time
 import abc
 
-from lib.queue import JobQueue
-from lib.database import Database
+from backend.lib.queue import JobQueue
+from backend.lib.database import Database
 
 
 class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):

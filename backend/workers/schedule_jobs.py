@@ -3,7 +3,7 @@ Schedules jobs so the other workers have something to do
 """
 import config
 
-from lib.worker import BasicWorker
+from backend.lib.worker import BasicWorker
 
 
 class JobScheduler(BasicWorker):
