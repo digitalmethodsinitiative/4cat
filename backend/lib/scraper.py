@@ -42,6 +42,7 @@ class BasicJSONScraper(BasicWorker, metaclass=abc.ABCMeta):
 			self.log.debug("Scraper (%s) has no jobs, sleeping for 10 seconds" % self.type)
 			time.sleep(10)
 			return
+		print("JOB: " + repr(job["details"]))
 
 		# claim the job - this is needed so multiple workers don't do the same job
 		self.job = job
@@ -64,7 +65,7 @@ class BasicJSONScraper(BasicWorker, metaclass=abc.ABCMeta):
 
 			# do the request!
 			data = requests.get(url, timeout=config.SCRAPE_TIMEOUT, proxies=proxies)
-		except (requests.HTTPError, requests.exceptions.ReadTimeout):
+		except (requests.HTTPError, requests.exceptions.ReadTimeout, ConnectionError):
 			self.queue.release_job(job, delay=10)  # try again in 10 seconds
 			self.log.warning("Could not finish request for %s, releasing job" % url)
 			return
@@ -72,17 +73,17 @@ class BasicJSONScraper(BasicWorker, metaclass=abc.ABCMeta):
 		# parse as JSON
 		try:
 			jsondata = json.loads(data.content)
-		except json.JSONDecodeError:
+		except json.JSONDecodeError as e:
 			if self.job["attempts"] > 2:
 				# todo: determine if this means the thread was deleted
 				self.log.warning(
-					"Could not decode JSON response for %s scrape (remote ID %s, job ID %s) after three attempts, aborting" % (
-						self.type, job["remote_id"], job["id"]))
+					"JSON for %s %s/%s unparseable after %i attempts, aborting" % (
+						self.type, job["details"]["board"], job["remote_id"], job["attempts"]))
 				self.queue.finish_job(job)
 			else:
 				self.log.info(
-					"Could not decode JSON response for %s scrape (remote ID %s, job ID %s) - retrying later" % (
-						self.type, job["remote_id"], job["id"]))
+					"JSON for %s %s/%s unparseable, retrying later (%s)" % (
+						self.type, job["details"]["board"], job["remote_id"], e))
 				self.queue.release_job(job, delay=random.choice(range(5, 35)))  # try again later
 
 			return
