@@ -1,14 +1,9 @@
 import unittest
 import json
 import time
-import sys
-import os
 
 from basic_testcase import FourcatTestCase
-
-sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)) + '/..')
-sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)) + '/../backend')
-from lib.queue import JobQueue, JobClaimedException
+from backend.lib.queue import JobQueue, JobClaimedException
 
 
 class TestJobQueue(FourcatTestCase):

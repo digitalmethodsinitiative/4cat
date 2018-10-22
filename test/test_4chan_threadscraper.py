@@ -1,16 +1,13 @@
 import unittest
 import json
 import time
-import sys
 import os
 
 from basic_testcase import FourcatTestCase
 
-sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)) + '/..')
-sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)) + '/../backend')
 import config
-from lib.helpers import get_absolute_folder
-from workers.scrape_threads import ThreadScraper
+from backend.lib.helpers import get_absolute_folder
+from backend.workers.scrape_threads import ThreadScraper
 
 
 class TestThreadScraper(FourcatTestCase):
