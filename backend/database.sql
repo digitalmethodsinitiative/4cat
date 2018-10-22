@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS threads (
   timestamp          integer DEFAULT 0, -- first known timestamp for this thread
   timestamp_archived integer DEFAULT 0,
   timestamp_scraped  integer, -- last timestamp this thread was scraped
+  timestamp_deleted  integer DEFAULT 0,  -- timestamp this thread was no longer scrapeable
   timestamp_modified integer, -- last timestamp this thread was modified (reported by 4chan)
   post_last          bigint, -- ID of last post in this thread
   num_unique_ips     integer DEFAULT 0,
@@ -101,3 +102,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS unique_mention
     post_id,
     mentioned_id
   );
+
+TRUNCATE TABLE posts;
+TRUNCATE TABLE threads;
+TRUNCATE TABLE jobs;
+TRUNCATE TABLE posts_mention;
