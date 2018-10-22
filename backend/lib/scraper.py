@@ -42,7 +42,6 @@ class BasicJSONScraper(BasicWorker, metaclass=abc.ABCMeta):
 			self.log.debug("Scraper (%s) has no jobs, sleeping for 10 seconds" % self.type)
 			time.sleep(10)
 			return
-		print("JOB: " + repr(job["details"]))
 
 		# claim the job - this is needed so multiple workers don't do the same job
 		self.job = job
@@ -74,16 +73,21 @@ class BasicJSONScraper(BasicWorker, metaclass=abc.ABCMeta):
 		try:
 			jsondata = json.loads(data.content)
 		except json.JSONDecodeError as e:
+			if job["details"] and "board" in job["details"]:
+				id = job["details"]["board"] + "/" + job["remote_id"]
+			else:
+				id = job["remote_id"]
+
 			if self.job["attempts"] > 2:
 				# todo: determine if this means the thread was deleted
 				self.log.warning(
-					"JSON for %s %s/%s unparseable after %i attempts, aborting" % (
-						self.type, job["details"]["board"], job["remote_id"], job["attempts"]))
+					"JSON for %s %s unparseable after %i attempts, aborting" % (
+						self.type, id, job["attempts"]))
 				self.queue.finish_job(job)
 			else:
 				self.log.info(
-					"JSON for %s %s/%s unparseable, retrying later (%s)" % (
-						self.type, job["details"]["board"], job["remote_id"], e))
+					"JSON for %s %s unparseable, retrying later (%s)" % (
+						self.type, id, e))
 				self.queue.release_job(job, delay=random.choice(range(5, 35)))  # try again later
 
 			return
