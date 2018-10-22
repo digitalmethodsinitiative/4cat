@@ -1,12 +1,9 @@
 import unittest
-import sys
 import os
 
-sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)) + '/..')
-sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)) + '/../backend')
 import config
-from lib.logger import Logger
-from lib.database import Database
+from backend.lib.logger import Logger
+from backend.lib.database import Database
 
 
 class FourcatTestCase(unittest.TestCase):

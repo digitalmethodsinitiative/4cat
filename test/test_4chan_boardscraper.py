@@ -1,14 +1,10 @@
 import unittest
 import json
 import time
-import sys
 import re
-import os
 
 from basic_testcase import FourcatTestCase
-
-sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)) + '/../backend')
-from workers.scrape_boards import BoardScraper
+from backend.workers.scrape_boards import BoardScraper
 
 
 class TestBoardScraper(FourcatTestCase):

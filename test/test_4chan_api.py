@@ -1,12 +1,9 @@
 import unittest
 import requests
 import json
-import sys
-import os
 
-sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)) + '/../backend')
-from workers.scrape_threads import ThreadScraper
-from workers.scrape_boards import BoardScraper
+from backend.workers.scrape_threads import ThreadScraper
+from backend.workers.scrape_boards import BoardScraper
 
 
 class TestAPIConnection(unittest.TestCase):
