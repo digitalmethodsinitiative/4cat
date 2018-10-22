@@ -1,6 +1,7 @@
 """
 Worker class that all workers should implement
 """
+import traceback
 import threading
 import time
 import abc
@@ -55,7 +56,15 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
 		"""
 		while self.looping:
 			self.loop_time = int(time.time())
-			self.work()
+
+			try:
+				self.work()
+			except Exception as e:
+				location = traceback.extract_tb(e.__traceback__, -1).pop()
+				location = location.filename.split("/").pop() + ":" + str(location.lineno)
+				self.log.error("Worker %s raised exception %s at %s and will abort: %s" % (self.type, e.__class__.__name__, location, e))
+				self.abort()
+
 			time.sleep(self.pause)
 
 	@abc.abstractmethod
