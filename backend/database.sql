@@ -102,8 +102,3 @@ CREATE UNIQUE INDEX IF NOT EXISTS unique_mention
     post_id,
     mentioned_id
   );
-
-TRUNCATE TABLE posts;
-TRUNCATE TABLE threads;
-TRUNCATE TABLE jobs;
-TRUNCATE TABLE posts_mention;
