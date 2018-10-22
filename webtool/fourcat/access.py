@@ -2,6 +2,7 @@
 Control access to web tool
 """
 import fnmatch
+import socket
 import sys
 import os
 
@@ -20,7 +21,9 @@ def limit_to_hostname():
 	if not config.FlaskConfig.LIMIT_HOSTNAME:
 		return
 
-	hostname = request.host.split(":")[0]
+	socket.setdefaulttimeout(2)
+	hostname = socket.gethostbyaddr(request.remote_addr)[0]
+
 	for hostmask in config.FlaskConfig.LIMIT_HOSTNAME:
 		if fnmatch.filter([hostname], hostmask):
 			return
