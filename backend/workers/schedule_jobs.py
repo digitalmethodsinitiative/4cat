@@ -10,6 +10,7 @@ class JobScheduler(BasicWorker):
 	"""
 	This does no work itself, but schedules jobs for other workers at regular intervals.
 	"""
+	type = "scheduler"
 	pause = 10
 	max_workers = 1
 

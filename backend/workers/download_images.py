@@ -16,6 +16,7 @@ class ImageDownloader(BasicWorker):
 
 	todo: shrink images or keep archive at a manageable size otherwise
 	"""
+	type = "image"
 	pause = 1
 	max_workers = 3
 
