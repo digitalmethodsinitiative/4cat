@@ -102,9 +102,12 @@ def api_thread(board, thread_id):
 	db = Database(logger=log)
 	thread = db.fetchone("SELECT * FROM threads WHERE board = %s AND id = %s", (board, thread_id))
 	if not thread:
+		db.close()
 		abort(404)
 
 	posts = db.fetchall("SELECT * FROM posts WHERE thread_id = %s ORDER BY timestamp ASC", (thread_id,))
+	db.close()
+
 	response = {"posts": []}
 
 	first_post = True
@@ -174,5 +177,39 @@ def api_thread(board, thread_id):
 
 		response["posts"].append(response_post)
 		first_post = False
+
+	return jsonify(response)
+
+
+@app.route('/api/<board>/threads.json')
+@api_ratelimit
+def api_board(board):
+	"""
+	Emulate 4chan API /[board]/threads.json endpoint
+
+	:param str board:  Board to get index for
+	:return:  JSONified thread index
+	"""
+	db = Database(logger=log)
+	threads = db.fetchall("SELECT * FROM threads WHERE board = %s ORDER BY is_sticky DESC, timestamp_modified DESC LIMIT 200", (board,))
+	db.close()
+	if not threads:
+		abort(404)
+
+	response = []
+	page = 1
+	while len(threads) > 0:
+		chunk = threads[:20]
+		threads = threads[20:]
+
+		response.append({
+			"page": page,
+			"threads": [{
+				"no": thread["id"],
+				"last_modified": thread["timestamp_modified"]
+			} for thread in chunk]
+		})
+
+		page += 1
 
 	return jsonify(response)
