@@ -10,6 +10,14 @@ import backend.bootstrap as bootstrap
 from backend.lib.helpers import get_absolute_folder
 from daemon import pidfile
 
+# check if we can run a daemon
+if os.name not in ("posix", "mac"):
+	print("Using 'backend.py' to run the 4CAT backend is only supported on UNIX-like systems.")
+	print("Running backend in terminal instead.")
+	bootstrap.run(print_logs=True)
+	sys.exit(0)
+
+# determine PID file
 lockfile = get_absolute_folder(config.PATH_LOCKFILE) + "/4cat.pid"  # pid file location
 
 
@@ -95,12 +103,6 @@ def stop():
 		print("...error: the 4CAT backend daemon is not currently running.")
 		return False
 
-
-# check if we can run a daemon
-if os.name not in ("posix", "mac"):
-	print("Using 'backend.py' to run the 4CAT backend is only supported on UNIX-like systems.")
-	print("When using Windows, use 'bootstrap.py' instead.")
-	sys.exit(1)
 
 # display manual if invalid command was given
 manual = """Usage: python(3) backend.py <start|stop|restart|status>

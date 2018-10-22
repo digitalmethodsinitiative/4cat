@@ -10,9 +10,30 @@ from backend.lib.manager import WorkerManager
 from backend.lib.logger import Logger
 
 
-def run():
+def run(print_logs=False):
+	if os.name != "nt":
+		print("""
+		+---------------------------------------------------------------+
+		|                                                               |
+		|                           welcome to                          |
+		|                                                               |
+		|                  j88D   .o88b.  .d8b.  d888888b               |
+		|                 j8~88  d8P  Y8 d8' `8b `~~88~~'               |
+		|                j8' 88  8P      88ooo88    88                  |
+		|                V88888D 8b      88~~~88    88                  |
+		|                    88  Y8b  d8 88   88    88                  |
+		|                    VP   `Y88P' YP   YP    YP                  |
+		|                                                               |
+		|               4CAT: Capture and Analysis Toolkit              |
+		|                         4cat.oilab.eu                         |
+		|                                                               |
+		+---------------------------------------------------------------+
+		| WARNING: Not running as a daemon. Quitting this process will  |
+		|                 shut down the backend as well.                |
+		+---------------------------------------------------------------+
+		""")
+
 	# load everything
-	print_logs = __name__ == "__main__"
 	log = Logger(output=print_logs)
 	db = Database(logger=log)
 	queue = JobQueue(logger=log, database=db)
@@ -31,33 +52,3 @@ def run():
 	# make it happen
 	WorkerManager(logger=log)
 	log.info("4CAT Backend shut down.")
-
-
-if __name__ == "__main__":
-	if os.name != "nt":
-		print("Running bootstrap.py directly is only supported on Windows.")
-		print("On UNIX-like systems, use 'backend.py start' instead.")
-		sys.exit(1)
-
-	print("""
-	+---------------------------------------------------------------+
-	|                                                               |
-	|                           welcome to                          |
-	|                                                               |
-	|                  j88D   .o88b.  .d8b.  d888888b               |
-	|                 j8~88  d8P  Y8 d8' `8b `~~88~~'               |
-	|                j8' 88  8P      88ooo88    88                  |
-	|                V88888D 8b      88~~~88    88                  |
-	|                    88  Y8b  d8 88   88    88                  |
-	|                    VP   `Y88P' YP   YP    YP                  |
-	|                                                               |
-	|               4CAT: Capture and Analysis Toolkit              |
-	|                         4cat.oilab.eu                         |
-	|                                                               |
-	+---------------------------------------------------------------+
-	| WARNING: Not running as a daemon. Quitting this process will  |
-	|                 shut down the backend as well.                |
-	+---------------------------------------------------------------+
-	""")
-
-	run()
