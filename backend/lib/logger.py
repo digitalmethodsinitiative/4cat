@@ -240,7 +240,7 @@ class Logger:
 		# post compiled report to slack webhook, if configured
 		if config.WARN_SLACK_URL:
 			post = {
-				"text": "%i warning(s) were logged.\n\nThis report was compiled at %s." % (warnings, datetime.datetime.now().strftime('%d %B %Y %H:%M:%S')),
+				"text": "%i warning(s) were logged from %s.\n\nThis report was compiled at %s." % (warnings, platform.uname().node, datetime.datetime.now().strftime('%d %B %Y %H:%M:%S')),
 				"attachments": [{
 					"title": "Warnings",
 					"text": mail
