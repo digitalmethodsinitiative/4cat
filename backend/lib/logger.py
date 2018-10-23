@@ -107,7 +107,7 @@ class Logger:
 		self.logger.log(level, message)
 
 		# every 10 minutes, collect and send warnings etc
-		if self.previous_report < time.time() - 6:
+		if self.previous_report < time.time() - config.WARN_INTERVAL:
 			self.previous_report = time.time()
 			self.collect_and_send()
 
