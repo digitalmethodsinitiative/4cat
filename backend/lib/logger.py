@@ -107,7 +107,7 @@ class Logger:
 		self.logger.log(level, message)
 
 		# every 10 minutes, collect and send warnings etc
-		if self.previous_report < time.time() - 600:
+		if self.previous_report < time.time() - 6:
 			self.previous_report = time.time()
 			self.collect_and_send()
 
@@ -228,36 +228,59 @@ class Logger:
 			sorted_logs[logkey] = grouped_logs[logkey]
 
 		# compile a report to send to an unfortunate admin
-		mail = ""
-		for logkey in reversed(sorted_logs):
-			log = sorted_logs[logkey]
-			first = datetime.datetime.fromtimestamp(log["first"]).strftime("%d %b '%y %H:%M:%S")
-			last = datetime.datetime.fromtimestamp(log["last"]).strftime("%d %b '%y %H:%M:%S")
-			mail += "- *%s*\n" % log["message"]
-			mail += "  _%s_ - %ix at %s (first %s, last %s)\n\n" % (
-				log["level"], log["amount"], log["location"], first, last)
-
 		# post compiled report to slack webhook, if configured
 		if config.WARN_SLACK_URL:
-			post = {
-				"text": "%i warning(s) were logged from %s.\n\nThis report was compiled at %s." % (warnings, platform.uname().node, datetime.datetime.now().strftime('%d %B %Y %H:%M:%S')),
-				"attachments": [{
-					"title": "Warnings",
-					"text": mail
-				}]
-			}
+			attachments = []
+			for logkey in reversed(sorted_logs):
+				log = sorted_logs[logkey]
+				if log["level"] in ("ERROR", "CRITICAL"):
+					color = "#FF0000"
+				elif log["level"] == "WARNING":
+					color = "#DD7711"
+				else:
+					color = "#3CC619"
+
+				attachments.append({
+					"title": log["message"],
+					"pretext": "%ix at %s" % (log["amount"], log["location"]),
+					"color": color,
+					"fields": [
+						{
+							"title": "First",
+							"value": datetime.datetime.fromtimestamp(log["first"]).strftime("%d %b '%y %H:%M:%S"),
+							"short": True
+						},
+						{
+							"title": "Last",
+							"value": datetime.datetime.fromtimestamp(log["last"]).strftime("%d %b '%y %H:%M:%S"),
+							"short": True
+						}
+					]
+				})
 
 			try:
-				requests.post(config.WARN_SLACK_URL, json.dumps(post))
+				requests.post(config.WARN_SLACK_URL, json.dumps({
+					"text": "%i alerts were logged from %s." % (warnings, platform.uname().node),
+					"attachments": attachments
+				}))
 			except requests.RequestException as e:
 				self.warning("Could not send log alerts to Slack webhook (%s)" % e)
 
 		# also send them to the configured admins
 		if config.WARN_EMAILS:
-			mail = "Hello! The following 4CAT warnings were logged since the last alert:\n\n" + mail
+			mail = "Hello! The following 4CAT warnings were logged since the last alert:\n\n"
+			for logkey in reversed(sorted_logs):
+				log = sorted_logs[logkey]
+				first = datetime.datetime.fromtimestamp(log["first"]).strftime("%d %b '%y %H:%M:%S")
+				last = datetime.datetime.fromtimestamp(log["last"]).strftime("%d %b '%y %H:%M:%S")
+				mail += "- *%s*\n" % log["message"]
+				mail += "  _%s_ - %ix at %s (first %s, last %s)\n\n" % (
+					log["level"], log["amount"], log["location"], first, last)
+
 			mail += "This report was compiled at %s." % datetime.datetime.now().strftime('%d %B %Y %H:%M:%S')
+
 			try:
 				with smtplib.SMTP(config.WARN_MAILHOST) as smtp:
-						smtp.sendmail("4lab@%s" % platform.uname().node, config.WARN_EMAILS, mail)
+					smtp.sendmail("4lab@%s" % platform.uname().node, config.WARN_EMAILS, mail)
 			except (smtplib.SMTPException, ConnectionRefusedError) as e:
 				self.error("Could not send log alerts via e-mail (%s)" % e)
