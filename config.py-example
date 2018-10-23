@@ -39,4 +39,5 @@ SCRAPE_PROXIES = {"http": []}  # Items in this list should be formatted like "ht
 class FlaskConfig:
 	FLASK_APP = "fourcat"
 	SERVER_NAME="localhost:5000"  # name of the server this is hosted/requested on, e.g. 4cat.oilab.nl
-	LIMIT_HOSTNAME=["localhost"]  # set this to an empty list or "*" to allow access from anywhere
+	HOSTNAME_WHITELIST=["localhost"]  # only these may access the web tool; "*" or an empty list matches everything
+	HOSTNAME_WHITELIST_API=["localhost"]  # hostnames matching these are exempt from rate limiting
