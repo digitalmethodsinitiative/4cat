@@ -240,11 +240,14 @@ class Logger:
 				else:
 					color = "#3CC619"
 
-				attachments.append({
+				attachment = {
 					"title": log["message"],
 					"pretext": "%ix at %s" % (log["amount"], log["location"]),
-					"color": color,
-					"fields": [
+					"color": color
+				}
+
+				if log["amount"] > 1:
+					attachment["fields"] = [
 						{
 							"title": "First",
 							"value": datetime.datetime.fromtimestamp(log["first"]).strftime("%d %b '%y %H:%M:%S"),
@@ -256,7 +259,14 @@ class Logger:
 							"short": True
 						}
 					]
-				})
+				else:
+					attachment["fields"] = [{
+						"title": "Date",
+						"value": datetime.datetime.fromtimestamp(log["first"]).strftime("%d %b '%y %H:%M:%S"),
+						"short": False
+					}]
+
+				attachments.append(attachment)
 
 			try:
 				requests.post(config.WARN_SLACK_URL, json.dumps({
