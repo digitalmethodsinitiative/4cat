@@ -3,7 +3,6 @@ import time
 import json
 
 import config
-from backend.lib.database import Database
 from backend.lib.worker import BasicWorker
 
 
@@ -53,8 +52,7 @@ class InternalAPI(BasicWorker):
 					self.manager.log.info("Could not open port %i yet (%s), retrying in 5 seconds" % (self.port, e))
 					time.sleep(5.0)  # wait a few seconds before retrying
 					continue
-				self.manager.log.error(
-					"Port %s is already in use and could not be released! Local API not available." % self.port)
+				self.manager.log.error("Port %s is already in use! Local API not available." % self.port)
 				return
 			except ConnectionRefusedError:
 				self.manager.log.error("OS refused listening at port %i! Local API not available." % self.port)
@@ -191,6 +189,30 @@ class InternalAPI(BasicWorker):
 				response[job["jobtype"]] += 1
 
 			response["total"] = sum([response[jobtype] for jobtype in response])
+
+			return response
+
+		if request == "posts-deleted" or request == "threads-deleted":
+			# return the amount of posts or threads deleted in the past minute, day and hour
+			table = "posts" if request == "posts-deleted" else "threads"
+			now = int(time.time())
+			then = now - 86400
+			items = self.db.fetchall("SELECT * FROM " + table + " WHERE timestamp_deleted > %s", (then,))
+			if items is None:
+				return {"error": "Database unavailable"}
+
+			response = {
+				"1m": 0,
+				"1h": 0,
+				"1d": 0
+			}
+
+			for item in items:
+				response["1d"] += 1
+				if item["timestamp_deleted"] > now - 60:
+					response["1m"] += 1
+				if item["timestamp_deleted"] > now - 3600:
+					response["1h"] += 1
 
 			return response
 
