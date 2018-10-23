@@ -12,7 +12,7 @@ import sys
 import os
 
 from backend.lib.worker import BasicWorker
-
+from backend.lib.api import InternalAPI
 
 class WorkerManager:
 	"""
@@ -28,11 +28,13 @@ class WorkerManager:
 
 	def __init__(self, logger):
 		"""
-		Set up key poller
+		Set up internal API
 		"""
 		signal.signal(signal.SIGTERM, self.abort)
 		self.log = logger
+		self.api = InternalAPI(manager=self)
 
+		self.api.start()
 		self.loop()
 
 	def abort(self, signum=signal.SIGTERM, frame=None):
