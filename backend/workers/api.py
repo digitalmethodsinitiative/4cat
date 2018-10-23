@@ -1,32 +1,23 @@
-import threading
 import socket
 import time
 import json
 
 import config
 from backend.lib.database import Database
+from backend.lib.worker import BasicWorker
 
 
-class InternalAPI(threading.Thread):
+class InternalAPI(BasicWorker):
+	"""
+	Offer a local server that listens on a port for API calls and answers them
+	"""
+	type = "api"
+	pause = 0
+	max_workers = 1
+
 	port = config.API_PORT
-	looping = True
-	manager = None
-	db = None
 
-	def __init__(self, manager, *args, **kwargs):
-		"""
-		Set up database connection
-
-		:param manager:  Worker manager, of which this is a child thread
-		:param args:
-		:param kwargs:
-		"""
-		super().__init__(*args, **kwargs)
-		self.manager = manager
-
-		self.db = Database(logger=manager.log)
-
-	def run(self):
+	def work(self):
 		"""
 		Listen for API requests
 
@@ -36,10 +27,16 @@ class InternalAPI(threading.Thread):
 		:return:
 		"""
 		if self.port == 0:
+			# if configured not to listen, just loop until the backend shuts
+			# down we can't return here immediately, since this is a worker,
+			# and workers that end just get started again
 			self.db.close()
 			self.manager.log.info("Local API not available per configuration")
+			while self.looping:
+				time.sleep(1)
 			return
 
+		# set up the socket
 		server = socket.socket()
 		server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 		server.settimeout(5)  # should be plenty
@@ -82,12 +79,6 @@ class InternalAPI(threading.Thread):
 			client.close()
 
 		self.manager.log.info("Shutting down local API server")
-
-	def abort(self):
-		"""
-		Stop listening - tells the listening thread to unbind socket
-		"""
-		self.looping = False
 
 	def api_response(self, client, address):
 		"""

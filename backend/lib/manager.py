@@ -12,7 +12,6 @@ import sys
 import os
 
 from backend.lib.worker import BasicWorker
-from backend.lib.api import InternalAPI
 
 class WorkerManager:
 	"""
@@ -32,9 +31,7 @@ class WorkerManager:
 		"""
 		signal.signal(signal.SIGTERM, self.abort)
 		self.log = logger
-		self.api = InternalAPI(manager=self)
 
-		self.api.start()
 		self.loop()
 
 	def abort(self, signum=signal.SIGTERM, frame=None):
@@ -48,7 +45,6 @@ class WorkerManager:
 		:param frame:  Context within which abort was triggered
 		"""
 		self.looping = False
-		self.api.abort()
 		self.log.warning("Quitting after next loop.")
 
 	def loop(self):
@@ -72,7 +68,7 @@ class WorkerManager:
 						self.log.info("Starting new worker (%s, %i/%i)" % (
 							worker_type.__name__, active_workers + 1, worker_type.max_workers))
 						active_workers += 1
-						worker = worker_type(logger=self.log)
+						worker = worker_type(logger=self.log, manager=self)
 						worker.start()
 						self.pool.append(worker)
 

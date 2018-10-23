@@ -23,11 +23,11 @@ class BasicJSONScraper(BasicWorker, metaclass=abc.ABCMeta):
 	"""
 	db = None
 
-	def __init__(self, db=None, logger=None):
+	def __init__(self, db=None, logger=None, manager=None):
 		"""
 		Set up database connection - we need one to store the thread data
 		"""
-		super().__init__(db=db, logger=logger)
+		super().__init__(db=db, logger=logger, manager=manager)
 		self.job = {}
 
 	def work(self):
