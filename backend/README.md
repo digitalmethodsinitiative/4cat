@@ -49,7 +49,6 @@ In the `extras` folder, you will find the following additional tools:
   python3 import_dump.py
   ```
 
-- `extras/monitor_status.py` is a script that checks how many jobs are queued and how
-  many threads and posts were scraped since the last check, and logs a warning
-  if anything suspicious is found. Currently this requires a cronjob to run
-  at regular intervals.
+- `extras/munin_plugins` is a collection of python scripts that can be used as
+  a plugin for [Munin](http://munin-monitoring.org), and query the local API to
+  generate stats that are compatible with Munin's graphing.
