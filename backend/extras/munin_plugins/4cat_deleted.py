@@ -17,9 +17,9 @@ def get_api(type):
 if len(sys.argv) > 1 and sys.argv[1] == "config":
 	print("graph_title Deleted threads and posts per hour")
 	print("graph_args -l 0")
-	print("graph_vlabel scraped")
+	print("graph_vlabel deleted")
 	print("graph_category 4cat")
-	print("graph_info The amount of new posts and threads that were found to be deleted over the past hour")
+	print("graph_info The amount of posts and threads that were found to be deleted over the past hour")
 	print("posts.warning 0:1000")
 	print("posts.critical 0:2500")
 	print("threads.warning 0:500")
