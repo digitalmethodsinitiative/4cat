@@ -256,8 +256,8 @@ class Logger:
 		if config.WARN_EMAILS:
 			mail = "Hello! The following 4CAT warnings were logged since the last alert:\n\n" + mail
 			mail += "This report was compiled at %s." % datetime.datetime.now().strftime('%d %B %Y %H:%M:%S')
-			with smtplib.SMTP(config.WARN_MAILHOST) as smtp:
-				try:
-					smtp.sendmail("4lab@%s" % platform.uname().node, config.WARN_EMAILS, mail)
-				except (smtplib.SMTPException, ConnectionRefusedError) as e:
-					self.error("Could not send log alerts via e-mail (%s)" % e)
+			try:
+				with smtplib.SMTP(config.WARN_MAILHOST) as smtp:
+						smtp.sendmail("4lab@%s" % platform.uname().node, config.WARN_EMAILS, mail)
+			except (smtplib.SMTPException, ConnectionRefusedError) as e:
+				self.error("Could not send log alerts via e-mail (%s)" % e)
