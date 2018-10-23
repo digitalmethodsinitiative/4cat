@@ -29,6 +29,7 @@ WARN_JOBS = 5000  # if *more* than this amount of jobs are queued, warn
 API_PORT = 0
 
 # E-mails about critical errors are sent to these addresses
+WARN_INTERVAL = 600  # every so many seconds, compile a report of logged warnings and send it to admins
 WARN_LEVEL = "WARNING"  # only alerts above this level are passed on: DEBUG/INFO/WARNING/ERROR/CRITICAL
 WARN_SLACK_URL = ""  # slack webhook to post logged warnings to
 WARN_EMAILS = []
