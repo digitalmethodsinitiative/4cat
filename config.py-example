@@ -17,13 +17,6 @@ PATH_IMAGES = ""  # if left empty or pointing to a non-existent folder, no image
 PATH_DATA = ""
 PATH_LOCKFILE = "backend"  # the lockfile will be saved in this folder. Probably no need to change!
 
-# The following two options determine when a warning is logged - e.g. if within
-# the last hour less than WARN_POSTS posts are scraped, a warning is logged
-# (which may trigger further alerts depending on logger settings)
-WARN_POSTS = 500
-WARN_THREADS = 50
-WARN_JOBS = 5000  # if *more* than this amount of jobs are queued, warn
-
 # 4CAT has an internal API (available from localhost) that can be used for monitoring and will
 # listen for requests on the following port. "0" disables the API.
 API_PORT = 0
@@ -32,7 +25,7 @@ API_PORT = 0
 WARN_INTERVAL = 600  # every so many seconds, compile a report of logged warnings and send it to admins
 WARN_LEVEL = "WARNING"  # only alerts above this level are passed on: DEBUG/INFO/WARNING/ERROR/CRITICAL
 WARN_SLACK_URL = ""  # slack webhook to post logged warnings to
-WARN_EMAILS = []
+WARN_EMAILS = []  # 4CAT will try to send e-mail reports to these e-mails when warnings are logged
 WARN_MAILHOST = "localhost"  # SMTP server to connect to for sending e-mail alerts
 
 # What to scrape?
