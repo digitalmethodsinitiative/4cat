@@ -25,7 +25,7 @@ API_FAIL = 404
 
 
 @app.route('/api/')
-@limiter.limit("3 per second")
+@api_ratelimit
 def api_main():
 	"""
 	API Index
