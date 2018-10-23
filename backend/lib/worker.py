@@ -25,19 +25,22 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
 
 	queue = None
 	log = None
+	manager = None
 	looping = True
 	loop_time = 0
 
-	def __init__(self, logger, db=None, queue=None):
+	def __init__(self, logger, db=None, queue=None, manager=None):
 		"""
 		Basic init, just make sure our thread name is meaningful
 
 		:param Database db:  Database connection - if not given, a new one will be created
 		:param JobQueue queue: Job Queue - if not given, a new one will be instantiated
+		:param WorkerManager manager:  Worker manager reference
 		"""
 		super().__init__()
 		self.name = self.type
 		self.log = logger
+		self.manager = manager
 
 		self.db = Database(logger=self.log) if not db else db
 		self.queue = JobQueue(logger=self.log, database=self.db) if not queue else queue

@@ -20,11 +20,11 @@ class stringQuery(BasicWorker):
 	pause = 2
 	max_workers = 3
 
-	def __init__(self, logger):
+	def __init__(self, logger, manager):
 		"""
 		Set up database connection - we need one to perform the query
 		"""
-		super().__init__(logger)
+		super().__init__(logger=logger, manager=manager)
 
 		self.allowed_cols = ['body_vector', 'title_vector']
 
