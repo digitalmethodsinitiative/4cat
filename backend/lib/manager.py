@@ -48,6 +48,7 @@ class WorkerManager:
 		:param frame:  Context within which abort was triggered
 		"""
 		self.looping = False
+		self.api.abort()
 		self.log.warning("Quitting after next loop.")
 
 	def loop(self):
