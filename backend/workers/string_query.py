@@ -1,6 +1,8 @@
 import time
 import config
 import csv
+import os
+import pickle as p
 
 from backend.lib.queue import JobClaimedException
 from backend.lib.helpers import get_absolute_folder
@@ -57,30 +59,37 @@ class stringQuery(BasicWorker):
 				return
 
 			# execute the query on the relevant column
-			result = self.executeQuery(str(col), str(query))
+			result = self.execute_query(str(col), str(query))
 
-			# convert and write to csv
-			result = self.dictToCsv(result, 'mentions_' + query)
+			# if query results are not empty, convert and write to csv
+			
+			if len(result) > 0:
+				print('RESULT')
+				result = self.dict_to_csv(result, 'mentions_' + query)
+				self.write_file_status(query, 'finished')
+			else:
+				print('NO RESULT')
+				self.write_file_status(query, 'empty_file')
 
 			# done!
 			self.queue.finish_job(job)
 
 		looping = False
 
-	def executeQuery(self, col_query, str_query, min_date=None, max_date=None):
+	def execute_query(self, col_query, str_query, min_date=None, max_date=None):
 		"""
 		Query the relevant column of the chan data
 
 		:param col_query:   string of the column to query (body_vector, subject_vector)
-		:param str_query:   string to query for
-
+		:param str_query:   string to query
+	
 		"""
 		self.log.info('Starting fetching ' + col_query + ' containing \'' + str_query + '\'')
 
 		start_time = time.time()
 		try:
 			if col_query == 'body_vector':
-				if min_date is not None and max_date is not None:
+				if min_date is None and max_date is None:
 					string_matches = self.db.fetchall(
 						"SELECT id, timestamp, subject, body FROM posts WHERE body_vector @@ to_tsquery(%s);", (str_query,))
 				else:
@@ -93,12 +102,13 @@ class stringQuery(BasicWorker):
 
 		except Exception as error:
 			return str(error)
+
 		self.log.info('Finished fetching ' + col_query + ' containing \'' + str_query + '\' in ' + str(
 			round((time.time() - start_time), 4)) + ' seconds')
 
 		return string_matches
 
-	def dictToCsv(self, li_input, filename='', clean_csv=True):
+	def dict_to_csv(self, li_input, filename='', clean_csv=True):
 		"""
 		Takes a dictionary of results, converts it to a csv, and writes it to the data folder.
 		The respective csvs will be available to the user.
@@ -108,7 +118,7 @@ class stringQuery(BasicWorker):
 		:param clean_csv:   whether to parse the raw HTML data to clean text. If True (default), writing takes 1.5 times longer.
 
 		"""
-		self.log.info(type(li_input))
+		#self.log.info(type(li_input))
 		# some error handling
 		if type(li_input) != list:
 			self.log.error('Please use a list object to convert to csv')
@@ -138,3 +148,22 @@ class stringQuery(BasicWorker):
 				writer.writerows(li_input)
 
 		return filepath
+
+	def write_file_status(self, query, status):
+		"""
+		store the status of a query in a dictionary.
+		statuses can be "finished" or "empty_file"
+
+		"""
+
+		# load the di with file statuses if it exits. Else use an empty dict.
+		path_file_status = get_absolute_folder(config.PATH_DATA + '/queries/di_queries.p')
+		if os.path.isfile(path_file_status):
+			di_file_status = p.load(open(path_file_status, 'rb'))
+		else:
+			di_file_status = {}
+
+		di_file_status[query] = status
+
+		p.dump(di_file_status, open(path_file_status, 'wb'))
+		
