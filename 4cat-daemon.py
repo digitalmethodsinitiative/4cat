@@ -42,8 +42,7 @@ def start():
 		with daemon.DaemonContext(
 				working_directory=os.path.abspath(os.path.dirname(__file__)),
 				umask=0x002,
-				stdout=open("4cat.stdout", "a"),
-				stderr=open("4cat.stderr", "a"),
+				stderr=open("4cat.stderr", "w"),
 				pidfile=pidfile.TimeoutPIDLockFile(lockfile),
 				detach_process=True
 		) as context:
@@ -52,12 +51,20 @@ def start():
 	else:
 		# wait a few seconds and see if PIDfile was created and refers to a running process
 		time.sleep(3)
-		with open(lockfile) as file:
-			pid = int(file.read().strip())
-			if pid in psutil.pids():
-				print("...4CAT Backend Daemon started.")
-			else:
-				print("...error while starting 4CAT Backend Daemon.")
+		if not os.path.isfile(lockfile):
+			print("...error while starting 4CAT Backend Daemon.")
+		else:
+			with open(lockfile) as file:
+				pid = int(file.read().strip())
+				if pid in psutil.pids():
+					print("...4CAT Backend Daemon started.")
+				else:
+					print("...error while starting 4CAT Backend Daemon.")
+
+		if os.path.isfile("4cat.stderr"):
+			print("---------------------------------\nstderr output:")
+			with open("4cat.stderr") as errfile:
+				print(errfile.read())
 
 	return True
 
