@@ -28,12 +28,22 @@ class BoardScraper(BasicJSONScraper):
 
 		:param dict data: The board data, parsed JSON data
 		"""
+		new_threads = 0
 		for page in data:
 			for thread in page["threads"]:
 				self.position += 1
-				self.save_thread(thread, job)
+				new_threads += self.save_thread(thread, job)
+
+		self.log.info("Board scrape yielded %i new threads" % new_threads)
 
 	def save_thread(self, thread, job):
+		"""
+		Save thread
+
+		:param dict thread:  Thread data
+		:param dict job:  Job data
+		:return int:  Number of new threads created (so 0 or 1)
+		"""
 		# check if we have everything we need
 		missing = set(self.required_fields) - set(thread.keys())
 		if missing != set():
@@ -55,7 +65,9 @@ class BoardScraper(BasicJSONScraper):
 
 		# add database record for thread, if none exists yet
 		thread_row = self.db.fetchone("SELECT * FROM threads WHERE id = %s", (thread_data["id"],))
+		new_thread = 0
 		if not thread_row:
+			new_thread += 1
 			self.db.insert("threads", thread_data)
 
 		# update timestamps and position
@@ -63,6 +75,8 @@ class BoardScraper(BasicJSONScraper):
 		self.db.execute("UPDATE threads SET timestamp_scraped = %s, timestamp_modified = %s,"
 						"index_positions = CONCAT(index_positions, %s) WHERE id = %s",
 						(self.loop_time, thread["last_modified"], position_update, thread_data["id"]))
+
+		return new_thread
 
 	def get_url(self):
 		"""
