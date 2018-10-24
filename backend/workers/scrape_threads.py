@@ -89,8 +89,8 @@ class ThreadScraper(BasicJSONScraper):
 				new_posts += 1
 
 		# save to database
-		self.log.info("Updating thread %s/%s, new posts: %s, deleted: %s" % (
-			job["details"]["board"], first_post["no"], new_posts, len(deleted)))
+		self.log.info("Updating %s/%s, new: %s, old: %s, deleted: %s" % (
+			job["details"]["board"], first_post["no"], new_posts, len(post_dict_db), len(deleted)))
 		self.db.commit()
 
 		return new_posts
