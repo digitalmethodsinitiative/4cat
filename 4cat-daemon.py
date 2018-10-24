@@ -62,9 +62,11 @@ def start():
 					print("...error while starting 4CAT Backend Daemon.")
 
 		if os.path.isfile("4cat.stderr"):
-			print("---------------------------------\nstderr output:")
 			with open("4cat.stderr") as errfile:
-				print(errfile.read())
+				stderr = errfile.read()
+				if stderr:
+					print("---------------------------------\nstderr output:")
+					print(stderr)
 
 	return True
 
