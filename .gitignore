@@ -16,3 +16,12 @@
 # actual files that are part of 4CAT but should not be included
 config.py
 deploy.sh
+webtool/venv/
+webtool/fourcat/js/jquery-csv-master/.gitattributes
+webtool/fourcat/js/jquery-csv-master/.gitignore
+webtool/fourcat/js/jquery-csv-master/
+webtool/fourcat/static/data/word_embeddings/w2v_model_all-chan-test.model
+webtool/fourcat/static/data/word_embeddings/w2v_model_all-yt-rightwing-transcripts.model
+webtool/fourcat/static/data/word_embeddings/
+fourcat.egg-info/
+data/
