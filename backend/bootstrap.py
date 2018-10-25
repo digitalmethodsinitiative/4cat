@@ -10,8 +10,8 @@ from backend.lib.manager import WorkerManager
 from backend.lib.logger import Logger
 
 
-def run(print_logs=False):
-	if os.name != "nt":
+def run(as_daemon=True):
+	if not as_daemon:
 		print("""
 		+---------------------------------------------------------------+
 		|                                                               |
@@ -34,7 +34,7 @@ def run(print_logs=False):
 		""")
 
 	# load everything
-	log = Logger(output=print_logs)
+	log = Logger(output=not as_daemon)
 	db = Database(logger=log)
 	queue = JobQueue(logger=log, database=db)
 
