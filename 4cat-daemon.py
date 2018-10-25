@@ -1,4 +1,3 @@
-import daemon
 import psutil
 import time
 import sys
@@ -8,14 +7,18 @@ import config
 import backend.bootstrap as bootstrap
 
 from backend.lib.helpers import get_absolute_folder
-from daemon import pidfile
 
 # check if we can run a daemon
 if os.name not in ("posix", "mac"):
+	# if not, run the backend directly and quit
 	print("Using 'backend.py' to run the 4CAT backend is only supported on UNIX-like systems.")
 	print("Running backend in terminal instead.")
-	bootstrap.run(print_logs=True)
+	bootstrap.run(as_daemon=False)
 	sys.exit(0)
+
+# if so, import necessary modules
+import daemon
+from daemon import pidfile
 
 # determine PID file
 lockfile = get_absolute_folder(config.PATH_LOCKFILE) + "/4cat.pid"  # pid file location
@@ -46,7 +49,7 @@ def start():
 				pidfile=pidfile.TimeoutPIDLockFile(lockfile),
 				detach_process=True
 		) as context:
-			bootstrap.run()
+			bootstrap.run(as_daemon=False)
 		sys.exit(0)
 	else:
 		# wait a few seconds and see if PIDfile was created and refers to a running process

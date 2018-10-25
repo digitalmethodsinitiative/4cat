@@ -1,8 +1,12 @@
 import os
 import re
+import config
+import pickle as p
+
 from flask import Flask, render_template, url_for
 from fourcat import app
 
+from backend.lib.helpers import get_absolute_folder
 from backend.lib.database import Database
 from backend.lib.logger import Logger
 from backend.lib.queue import JobQueue
@@ -48,11 +52,29 @@ def check_query(searchquery):
 	"""
 	AJAX URI to check whether query has been completed.
 	"""
-	csv_path = os.path.dirname(__file__) + '/static/data/filters/mentions_' + searchquery + '.csv'
 
-	print(csv_path)
+	# load dict with metadata and statuses of already processed queries
+	path_file_status = get_absolute_folder(config.PATH_DATA + '/queries/di_queries.p')
+
+	if os.path.isfile(path_file_status):
+		di_queries = p.load(open(path_file_status, 'rb'))
+		print(di_queries)
+		if searchquery in di_queries:
+			file_status = di_queries[searchquery]
+		else:
+			file_status = 'processing'
+	else: 
+		file_status = 'processing'
 	
-	if os.path.isfile(csv_path):
-		return 'file_exists'
+	# check status of query
+	if file_status == 'finished':
+		# returns string with path to the csv
+		csv_path = config.PATH_DATA + '/mentions_' + searchquery + '.csv'
+		return csv_path
+
+	elif file_status == 'empty_file':
+		# if the query has already been executed, but no results were shown, return empty file notification
+		return 'empty_file'
+
 	else:
-		return 'no_file'
+		return 'nofile'
