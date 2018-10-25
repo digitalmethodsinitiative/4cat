@@ -11,6 +11,7 @@ import time
 import sys
 import os
 
+from backend.lib.keyboard import KeyPoller
 from backend.lib.worker import BasicWorker
 
 class WorkerManager:
@@ -25,12 +26,20 @@ class WorkerManager:
 	worker_prototypes = []
 	log = None
 
-	def __init__(self, logger):
+	def __init__(self, logger, as_daemon=True):
 		"""
-		Set up internal API
+		Set up modules and start looping
+
+		:param Logger logger:  Logging handler
+		:param bool as_daemon:  Whether the backend is being run as a daemon
 		"""
 		signal.signal(signal.SIGTERM, self.abort)
 		self.log = logger
+
+		if not as_daemon:
+			# listen for input if running interactively
+			self.key_poller = KeyPoller(manager=self)
+			self.key_poller.start()
 
 		self.loop()
 
