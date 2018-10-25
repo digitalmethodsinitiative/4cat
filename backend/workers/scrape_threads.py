@@ -143,7 +143,7 @@ class ThreadScraper(BasicJSONScraper):
 			self.db.execute("UPDATE posts SET body_vector = to_tsvector(body) WHERE id = %s", (post["no"],))
 		except psycopg2.IntegrityError:
 			self.db.rollback()
-			dupe = self.db.fetchone("SELECT * from post WHERE id = %s" % (post["no"], ))
+			dupe = self.db.fetchone("SELECT * from posts WHERE id = %s" % (post["no"], ))
 			if dupe:
 				self.log.error("Post %s in thread %s/%s (time: %s) scraped twice: first seen in thread %s at %s" % (post["no"], thread["board"], thread["id"], post["time"], dupe["thread_id"], dupe["timestamp"]))
 			else:
