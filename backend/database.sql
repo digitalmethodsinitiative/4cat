@@ -102,3 +102,14 @@ CREATE UNIQUE INDEX IF NOT EXISTS unique_mention
     post_id,
     mentioned_id
   );
+
+-- queries
+CREATE TABLE IF NOT EXISTS queries (
+  id              SERIAL PRIMARY KEY,
+  key             text,
+  query           text,
+  parameters      text,
+  result_file     text DEFAULT '',
+  timestamp       integer,
+  is_finished     boolean DEFAULT FALSE
+)
