@@ -3,6 +3,7 @@ Thread scraper
 
 Parses 4chan API data, saving it to database and queueing downloads
 """
+import psycopg2
 import hashlib
 import os.path
 import base64
@@ -137,8 +138,12 @@ class ThreadScraper(BasicJSONScraper):
 				{field: post[field] for field in post.keys() if field not in self.known_fields})
 		}
 
-		self.db.insert("posts", post_data, commit=False)
-		self.db.execute("UPDATE posts SET body_vector = to_tsvector(body) WHERE id = %s", (post["no"],))
+		try:
+			self.db.insert("posts", post_data, commit=False)
+			self.db.execute("UPDATE posts SET body_vector = to_tsvector(body) WHERE id = %s", (post["no"],))
+		except psycopg2.IntegrityError:
+			self.log.error("Post %s in thread %s/%s scraped twice: coult not save second instance" % (post["no"], thread["board"], thread["id"]))
+			return False
 
 		self.save_links(post, post["no"])
 		if "filename" in post:

@@ -34,7 +34,7 @@ class BoardScraper(BasicJSONScraper):
 				self.position += 1
 				new_threads += self.save_thread(thread, job)
 
-		self.log.info("Board scrape yielded %i new threads" % new_threads)
+		self.log.info("Board scrape for /%s/ yielded %i new threads" % (job["remote_id"], new_threads))
 
 	def save_thread(self, thread, job):
 		"""
