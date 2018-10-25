@@ -53,6 +53,7 @@ class SearchQuery:
 				"is_finished": False
 			}
 			self.db.insert("queries", data=self.data)
+			self.reserve_result_file()
 
 	def get_finished_results_path(self):
 		"""
