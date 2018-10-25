@@ -49,7 +49,7 @@ def start():
 				pidfile=pidfile.TimeoutPIDLockFile(lockfile),
 				detach_process=True
 		) as context:
-			bootstrap.run(as_daemon=False)
+			bootstrap.run(as_daemon=True)
 		sys.exit(0)
 	else:
 		# wait a few seconds and see if PIDfile was created and refers to a running process
