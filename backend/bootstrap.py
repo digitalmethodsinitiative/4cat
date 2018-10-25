@@ -30,7 +30,9 @@ def run(as_daemon=True):
 		print(indent + "|                         4cat.oilab.nl                         |")
 		print(indent + "|                                                               |")
 		print(indent + "+---------------------------------------------------------------+")
-		print(indent + "| WARNING: Not running as a daemon. Quitting this process will  |")
+		print(indent + "|                  press q + enter to shut down                 |")
+		print(indent + "|                                                               |")
+		print(indent + "| WARNING: Not running as a daemon.  Quitting this process will |")
 		print(indent + "|                 shut down the backend as well.                |")
 		print(indent + "+---------------------------------------------------------------+\n\n")
 
