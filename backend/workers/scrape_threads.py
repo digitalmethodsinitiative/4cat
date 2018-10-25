@@ -139,9 +139,10 @@ class ThreadScraper(BasicJSONScraper):
 		}
 
 		try:
-			self.db.insert("posts", post_data, commit=False)
+			self.db.insert("posts", post_data)
 			self.db.execute("UPDATE posts SET body_vector = to_tsvector(body) WHERE id = %s", (post["no"],))
 		except psycopg2.IntegrityError:
+			self.db.rollback()
 			self.log.error("Post %s in thread %s/%s scraped twice: coult not save second instance" % (post["no"], thread["board"], thread["id"]))
 			return False
 
