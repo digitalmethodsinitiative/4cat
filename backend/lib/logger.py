@@ -246,7 +246,8 @@ class Logger:
 
 				attachment = {
 					"title": log["message"],
-					"pretext": "%ix at %s" % (log["amount"], log["location"]),
+					"pretext": "%ix at `%s`" % (log["amount"], log["location"]),
+					"mrkdwn_in": ["text", "pretext"],
 					"color": color
 				}
 
@@ -265,7 +266,7 @@ class Logger:
 					]
 				else:
 					attachment["fields"] = [{
-						"title": "Date",
+						"title": "Logged at",
 						"value": datetime.datetime.fromtimestamp(log["first"]).strftime("%d %b '%y %H:%M:%S"),
 						"short": False
 					}]
@@ -274,7 +275,7 @@ class Logger:
 
 			try:
 				requests.post(config.WARN_SLACK_URL, json.dumps({
-					"text": "%i alerts were logged from %s." % (warnings, platform.uname().node),
+					"text": "%i alerts were logged from `%s`." % (warnings, platform.uname().node),
 					"attachments": attachments
 				}))
 			except requests.RequestException as e:
