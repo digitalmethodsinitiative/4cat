@@ -70,7 +70,6 @@ class TestQuery(FourcatTestCase):
 		"""
 		query = SearchQuery(query="obama", parameters=self.default_parameters, db=self.db)
 
-		self.assertEqual(query.reserve_result_file(), True)
 		self.assertNotEqual("", query.data["result_file"])
 
 		path = query.get_results_path()
@@ -144,7 +143,6 @@ class TestQuery(FourcatTestCase):
 		"""
 		with self.assertRaises(TypeError):
 			SearchQuery(query="", db=self.db)
-
 
 if __name__ == '__main__':
 	unittest.main()

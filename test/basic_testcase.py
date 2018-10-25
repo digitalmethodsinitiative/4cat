@@ -11,15 +11,6 @@ class FourcatTestCase(unittest.TestCase):
 	log = None
 	root = ""
 
-	example_record = {
-		"jobtype": "test",
-		"remote_id": "1234",
-		"details": "",
-		"claimed": 0,
-		"claim_after": 0,
-		"attempts": 0
-	}
-
 	@classmethod
 	def setUpClass(cls):
 		"""
