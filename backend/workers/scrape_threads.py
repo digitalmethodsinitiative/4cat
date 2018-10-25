@@ -25,7 +25,7 @@ class ThreadScraper(BasicJSONScraper):
 	"""
 	type = "thread"
 	max_workers = 2
-	pause = 2
+	pause = 1
 
 	# for new posts, any fields not in here will be saved in the "unsorted_data" column for that post as part of a
 	# JSONified dict
