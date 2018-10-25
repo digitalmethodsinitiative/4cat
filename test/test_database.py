@@ -3,7 +3,7 @@ import unittest
 from basic_testcase import FourcatTestCase
 
 
-class TestJobQueue(FourcatTestCase):
+class TestDatabase(FourcatTestCase):
 	example_record = {
 		"jobtype": "test",
 		"remote_id": "1234",
