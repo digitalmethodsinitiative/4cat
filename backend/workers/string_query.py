@@ -32,8 +32,6 @@ class stringQuery(BasicWorker):
 		"""
 		super().__init__(logger=logger, manager=manager)
 
-		self.allowed_cols = ['body_vector', 'title_vector']
-
 	def work(self):
 
 		job = self.queue.get_job(jobtype="query")
@@ -63,13 +61,10 @@ class stringQuery(BasicWorker):
 
 			self.log.info(resultsfile)
 
+			# check whether timestamp parameters are provided
 			if "min_date" in di_query_parameters and "max_date" in di_query_parameters:
 				min_date = di_query_parameters["min_date"]
 				min_date = di_query_parameters["max_date"]
-
-			if col not in self.allowed_cols:
-				self.log.warning("Column %s is not allowed. Use body_vector and/or title_vector" % (col))
-				return
 
 			# execute the query on the relevant column
 			di_matches = self.execute_query(str(col), str(str_query))
@@ -86,35 +81,73 @@ class stringQuery(BasicWorker):
 
 		looping = False
 
-	def execute_query(self, col_query, str_query, min_date=None, max_date=None):
+	def execute_query(self, body_query, subject_query, full_thread, min_date=None, max_date=None):
 		"""
-		Query the relevant column of the chan data
+		Query the relevant column of the chan data.
+		Converts parameters to SQL statements.
 
-		:param col_query:   string of the column to query (body_vector, subject_vector)
-		:param str_query:   string to query
-	
+		:param	body_query		str,	Query string for post body
+		:param	subject_query	str,	Query string for post subject
+		:param	full_query		bool,	Whether data from the full thread should be returned.
+										Only works when subject is queried.  
+		:param	min_timestamp	str,	Min timestamps to search for
+		:param	max_timestamp	str,	Max timestamps to search for
+		
 		"""
-		self.log.info('Starting fetching ' + col_query + ' containing \'' + str_query + '\'')
 
+		# Set SQL statements depending on parameters provided by user
+		replacements = []
+		sql_post = ''
+		sql_subject = ''
+		sql_min_date = ''
+		sql_max_date = ''
+		sql_log = 'Starting substring query where '
+
+		if body_query:
+			sql_post = " AND body_vector @@ to_tsquery(" + body_query + ")"
+			replacements.append(sql_post)
+			sql_log = sql_log + "'" + body_query + "' is in body, "
+		if subject_query:
+			sql_subject = " AND subject_vector @@ to_tsquery(" + subject_query + ")"
+			replacements.append(sql_subject)
+			sql_log = sql_log + "'" + subject_query + "' is in subject, "
+		if min_date != 0:
+			sql_min_date = " AND timestamp > " + str(min_date)
+			replacements.append(sql_min_date)
+			sql_log = sql_log + "is posted after " + str(min_date) ", "
+		if max_date != 0:
+			sql_max_date = " AND timestamp < " + str(max_date)
+			replacements.append(sql_max_date)
+			sql_log = sql_log + "is posted before " + str(max_date) ", "
+
+		sql_log = sql_log[2:] + '.'
+		self.log.info(sql_log)
+
+		# Some timekeeping
 		start_time = time.time()
-		try:
-			if col_query == 'body_vector':
-				if min_date is None and max_date is None:
-					di_matches = self.db.fetchall(
-						"SELECT id, timestamp, subject, body FROM posts WHERE body_vector @@ to_tsquery(%s);", (str_query,))
-				else:
-					di_matches = self.db.fetchall(
-						"SELECT id, timestamp, subject, body FROM posts WHERE body_vector @@ to_tsquery(%s) AND timestamp > %s AND timestamp < %s;", (str_query, min_date, max_date))
-			elif col_query == 'subject_vector':
-				di_matches = self.db.fetchall(
-					"SELECT id, timestamp, subject, body FROM posts WHERE subject_vector @@ to_tsquery(%s);",
-					(str_query,))
 
-		except Exception as error:
-			return str(error)
+		# Fetch only posts
+		if full_thread == False:
+			try:
+				di_matches = self.db.fetchall("SELECT * FROM posts WHERE true" + sql_post + sql_subject + sql_min_date + sql_max_date, replacements)
+			except Exception as error:
+				return str(error)
 
-		self.log.info('Finished fetching ' + col_query + ' containing \'' + str_query + '\' in ' + str(
-			round((time.time() - start_time), 4)) + ' seconds')
+		# Fetch full thread data
+		elif full_thread and body_query:
+			try:
+				li_thread_ids = self.db.fetchall("SELECT thread_id FROM posts WHERE true" + sql_post + sql_subject + sql_min_date + sql_max_date, replacements)
+			except Exception as error:
+				return str(error)
+			try:
+				di_matches = self.db.fetchall("SELECT * FROM posts WHERE thread_id IN %s", (li_thread_ids))
+			except Exception as error:
+				return str(error)
+		else:
+			self.log.warning("Not enough parameters provided for substring query.")
+			return -1
+
+		self.log.info("Finished query in " + str(round((time.time() - start_time), 4)) + " seconds")
 
 		return di_matches
 
