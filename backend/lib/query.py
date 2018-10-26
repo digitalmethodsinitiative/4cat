@@ -94,6 +94,20 @@ class SearchQuery:
 					   data={"is_finished": True})
 		self.data["is_finished"] = True
 
+	def get_parameters(self):
+		"""
+		Get query parameters
+
+		The query parameters are stored as JSON in the database - parse them
+		and return the resulting object
+
+		:return:  Query parameters as originall stored
+		"""
+		try:
+			return json.loads(self.data["parameters"])
+		except json.JSONDecodeError:
+			return {}
+
 	def reserve_result_file(self, extension="csv"):
 		"""
 		Generate a unique path to the results file for this query
