@@ -27,6 +27,8 @@ $(function() {
 	var platformselected = ''
 	var timeout
 
+	var query_key = null
+
 	$('#btn_go').bind('click', function(){
 		$('.loader').show()
 
@@ -49,13 +51,13 @@ $(function() {
 			url: 'string_query/' + search_query,
 			success: function(response) {
 				console.log(response);
-
-				pollCsv(search_query)
+				query_key = response
+				pollCsv(search_query, query_key)
 
 				// poll every 2000 ms
 				poll_interval = setInterval(function() {
-					pollCsv(search_query);
-				}, 2000);
+					pollCsv(search_query, query_key);
+				}, 4000);
 			},
 			error: function(error) {
 				console.log('error')
@@ -66,13 +68,13 @@ $(function() {
 		});
 	});
 	
-	function pollCsv(str_query){
+	function pollCsv(str_query, query_key){
 		/*
-		Polls server to check whether there's already a csv for a query
+		Polls server to check whether there is already a csv for a query
 		*/
 		$.ajax({
 			dataType: "text",
-			url: 'check_query/' + str_query,
+			url: 'check_query/' + query_key,
 			success: function(response) {
 				console.log(response)
 
@@ -91,7 +93,7 @@ $(function() {
 				// if the query succeeded, notify user
 				else {
 					clearInterval(poll_interval)
-					$('#submitform').append('<a href="http://' + location.hostname + '/fourcat/' + response + '"<p>mentions_' + search_query + '.csv</p></a>')
+					$('#submitform').append('<a href="' + response + '"><p>mentions_' + search_query + '.csv</p></a>')
 					$('.loader').hide()
 					alert('Query for \'' + str_query + '\' complete!')
 				}

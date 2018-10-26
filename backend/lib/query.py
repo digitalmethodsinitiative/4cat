@@ -68,6 +68,8 @@ class SearchQuery:
 		if self.data["is_finished"] and self.data["result_file"] and os.path.isfile(
 				self.folder + "/" + self.data["result_file"]):
 			return self.folder + "/" + self.data["result_file"]
+		# elif self.data["is_finished"] and self.data["empty"]:
+		# 	return 'empty_file'
 		else:
 			return None
 
