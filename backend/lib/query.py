@@ -50,26 +50,28 @@ class SearchQuery:
 				"parameters": json.dumps(parameters),
 				"result_file": "",
 				"timestamp": int(time.time()),
+				"is_empty": False,
 				"is_finished": False
 			}
 			self.db.insert("queries", data=self.data)
 			self.reserve_result_file()
 
-	def get_finished_results_path(self):
+	def check_query_finished(self):
 		"""
-		Get path to results file
+		Checks if query is finished. Returns path to results file is not empty,
+		or 'empty_file' when ther were not matches.
 
 		Only returns a path if the query is finished. In other words, if this
 		method returns a path, a file with the complete results for this query
 		will exist at that location.
 
-		:return: A path to the results file, or `None`
+		:return: A path to the results file, 'empty_file', or `None`
 		"""
 		if self.data["is_finished"] and self.data["result_file"] and os.path.isfile(
 				self.folder + "/" + self.data["result_file"]):
 			return self.folder + "/" + self.data["result_file"]
-		# elif self.data["is_finished"] and self.data["empty"]:
-		# 	return 'empty_file'
+		elif self.data["is_finished"] and self.data["is_empty"]:
+			return 'empty_file'
 		else:
 			return None
 
@@ -153,3 +155,16 @@ class SearchQuery:
 		"""
 		plain_key = repr(parameters) + query
 		return hashlib.md5(plain_key.encode("utf-8")).hexdigest()
+
+	def set_empty(self):
+		"""
+		Update the is_empty field of query in the database to indicate there
+		are no substring matches.
+
+		Should be tweaked to set is_empty to False if query was made sooner
+		than n days ago to prevent false empty results.
+
+		"""
+
+		self.db.update("queries", where={"query": self.data["query"], "key": self.data["key"]},
+								 data={"is_empty": True})
