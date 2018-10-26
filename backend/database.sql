@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS threads (
   timestamp_deleted  integer DEFAULT 0,  -- timestamp this thread was no longer scrapeable
   timestamp_modified integer, -- last timestamp this thread was modified (reported by 4chan)
   subject            text,
-  subject_vector     tsvector
+  subject_vector     tsvector,
   post_last          bigint, -- ID of last post in this thread
   num_unique_ips     integer DEFAULT 0,
   num_replies        integer DEFAULT 0,
