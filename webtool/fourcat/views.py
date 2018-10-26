@@ -56,49 +56,24 @@ def string_query(searchquery, min_timestamp='none', max_timestamp='none'):
 def check_query(query_key):
 	"""
 	AJAX URI to check whether query has been completed.
+
 	"""
 
-	# load dict with metadata and statuses of already processed queries
-	
 	log = Logger()
 	db = Database(logger=log)
 	query = SearchQuery(key=query_key, db=db)
 
-
-	results = query.get_finished_results_path()
+	results = query.check_query_finished()
 
 	if results:
 
-		# relative file path for debugging
 		if app.debug == True:
-			results = 'http://localhost/fourcat/' + config.PATH_DATA + results.split(config.PATH_DATA,1)[1]
-
-		return(results)
-	else:
-		return("nofile")
-
-	if 1 == 2:
-		path_file_status = get_absolute_folder(config.PATH_DATA + '/queries/di_queries.p')
-
-		if os.path.isfile(path_file_status):
-			di_queries = p.load(open(path_file_status, 'rb'))
-			
-			if searchquery in di_queries:
-				file_status = di_queries[searchquery]
-			else:
-				file_status = 'processing'
-		else: 
-			file_status = 'processing'
+			if results == 'empty_file':
+				return(results)
+			# custom path for debugging
+			return('http://localhost/fourcat/data/' + query.data["query"] + '-' + query_key + '.csv')
 		
-		# check status of query
-		if file_status == 'finished':
-			# returns string with path to the csv
-			csv_path = config.PATH_DATA + '/mentions_' + searchquery + '.csv'
-			return csv_path
+		return(results)
 
-		elif file_status == 'empty_file':
-			# if the query has already been executed, but no results were shown, return empty file notification
-			return 'empty_file'
-
-		else:
-			return 'nofile'
+	else:
+		return("no_file")
