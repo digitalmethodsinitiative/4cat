@@ -26,6 +26,8 @@ CREATE TABLE IF NOT EXISTS threads (
   timestamp_scraped  integer, -- last timestamp this thread was scraped
   timestamp_deleted  integer DEFAULT 0,  -- timestamp this thread was no longer scrapeable
   timestamp_modified integer, -- last timestamp this thread was modified (reported by 4chan)
+  subject            text,
+  subject_vector     tsvector
   post_last          bigint, -- ID of last post in this thread
   num_unique_ips     integer DEFAULT 0,
   num_replies        integer DEFAULT 0,
@@ -42,6 +44,10 @@ CREATE INDEX IF NOT EXISTS threads_timestamp
     timestamp
   );
 
+CREATE INDEX IF NOT EXISTS threads_fts
+  ON threads
+  USING gin (subject_vector);
+
 -- posts
 CREATE TABLE IF NOT EXISTS posts (
   id                bigint PRIMARY KEY, -- matches 4chan post ID
@@ -49,6 +55,7 @@ CREATE TABLE IF NOT EXISTS posts (
   timestamp         integer,
   timestamp_deleted integer DEFAULT 0,
   subject           text,
+  subject_vector    tsvector
   body              text,
   body_vector       tsvector,
   author            text,
@@ -79,6 +86,10 @@ CREATE INDEX IF NOT EXISTS posts_thread
 CREATE INDEX IF NOT EXISTS posts_fts
   ON posts
   USING gin (body_vector);
+
+CREATE INDEX IF NOT EXISTS posts_fts
+  ON posts
+  USING gin (subject_vector);
 
 -- post replies
 CREATE TABLE IF NOT EXISTS posts_mention (
