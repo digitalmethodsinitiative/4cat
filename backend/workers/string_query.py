@@ -3,7 +3,6 @@ import config
 import csv
 import os
 import pickle as p
-import ast
 
 from backend.lib.database import Database
 from backend.lib.logger import Logger
@@ -44,7 +43,6 @@ class stringQuery(BasicWorker):
 			time.sleep(10)
 
 		else:
-
 			try:
 				self.queue.claim_job(job)
 			except JobClaimedException:
@@ -52,14 +50,12 @@ class stringQuery(BasicWorker):
 
 			self.log.info("Executing string query")
 			
-			# get query details
 			log = Logger()
 			db = Database(logger=log)
 			query = SearchQuery(key=job["remote_id"], db=db)
 
-			# convert string representation of query parameters to dict
-			di_query_parameters = ast.literal_eval(query.data["parameters"])
-
+			# get query details
+			di_query_parameters = query.get_parameters()
 			col = di_query_parameters["col_query"]
 			str_query = di_query_parameters["str_query"]
 
@@ -78,11 +74,11 @@ class stringQuery(BasicWorker):
 			# execute the query on the relevant column
 			di_matches = self.execute_query(str(col), str(str_query))
 
-			# write to csv
+			# write to csv if there substring matches. Else set query as empty
 			if di_matches:
 				self.dict_to_csv(di_matches, resultsfile)
 			else:
-				query.data["empty"] = True
+				query.set_empty()
 
 			# done!
 			query.finish()

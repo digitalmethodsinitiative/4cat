@@ -79,7 +79,7 @@ $(function() {
 				console.log(response)
 
 				// if the server hasn't processed the query yet, do nothing
-				if (response == 'nofile') {
+				if (response == 'no_file') {
 					// do nothing
 				}
 
