@@ -1,62 +1,49 @@
 //AJAX functions that retrieve user input and send it to the server so Python can do it's magic
 $(function() {
 
-	// hide the loading notification
-	$('.loader').hide()
-
-	$('#dataselection').change(function(){
-		console.log(this)
-		selectedcsv = ($(this).find(":selected").val())
-		console.log(selectedcsv)
-
-	});
-
+	// global variables
 	var loadedcsv = {}
 	var obj_jsonimages = {}
-
-	var column_comment			//columns have different names for different data sheets
-	var column_author
-	var column_createdtime
-	var column_imagelink
-	var column_score
-	var column_threadnumber
-	var column_country
-	var column_subreddit
-	var column_id
-	var column_parent_id
-	var platformselected = ''
 	var timeout
-
 	var query_key = null
 
-	$('#btn_go').bind('click', function(){
+	function start_query(){
+
+		// Show loader
 		$('.loader').show()
 
+		// Set parameters
+		var url_post = $('#body_input').val()
+		var url_subject = $('#subject_input').val()
+		var url_full_thread = $('#check-full-thread').attr('checked')?true:false;
+		var url_min_date = 0
+		var url_max_date = 0
 
-		// query string is what's in the search box
-		search_query = $('#searchinput').val()
-		ajax_url = 'string_query/' + search_query
+		if(url_post == ''){url_post = '-'}
+		if(url_subject == ''){url_subject = '-'}
 
+		// Get time values
 		if($('#check_time').is(':checked')){
-			mindate = $('#input_mintime').val()
-			mindate = (new Date(mindate).getTime() / 100)
-			maxdate = $('#input_maxtime').val()
-			maxdate = (new Date(maxdate).getTime() / 100)
-			console.log(mindate, maxdate)
-			ajax_url = ajax_url + '/' + mindate + '/' + maxdate
+			url_min_date = $('#input_mintime').val()
+			url_max_date = $('#input_maxtime').val()
+			url_min_date = (new Date(url_min_date).getTime() / 100)
+			url_max_date = (new Date(url_max_date).getTime() / 100)
 		}
 
+		ajax_url = 'string_query/' + url_search_query + '/' + url_full_thread + '/' + url_min_date + '/' + url_max_date
+
+		// AJAX the query to the server
 		$.ajax({
 			dataType: "text",
-			url: 'string_query/' + search_query,
+			url: ajax_url,
 			success: function(response) {
 				console.log(response);
 				query_key = response
-				pollCsv(search_query, query_key)
+				poll_csv(query_key)
 
-				// poll every 2000 ms
+				// poll results every 2000 ms after submitting
 				poll_interval = setInterval(function() {
-					pollCsv(search_query, query_key);
+					poll_csv(query_key);
 				}, 4000);
 			},
 			error: function(error) {
@@ -66,11 +53,11 @@ $(function() {
 				$('.loader').hide()
 			}
 		});
-	});
+	}
 	
-	function pollCsv(str_query, query_key){
+	function poll_csv(query_key){
 		/*
-		Polls server to check whether there is already a csv for a query
+		Polls server to check whether there's a result for query
 		*/
 		$.ajax({
 			dataType: "text",
@@ -87,7 +74,7 @@ $(function() {
 				else if (response == 'empty_file') {
 					clearInterval(poll_interval)
 					$('.loader').hide()
-					alert('No results for \'' + str_query + '\'.\nPlease edit search term.')
+					alert('No results for your search input.\nPlease edit search.')
 				}
 
 				// if the query succeeded, notify user
@@ -103,4 +90,19 @@ $(function() {
 			}
 		});
 	}
+
+	// start querying when go button is clicked
+	$('#btn_go').bind('click', function(){
+		start_query()
+	});
+
+	// run query when return is pressed
+	$('input').keyup(function(e){ 
+		var code = e.which;
+		if(code==13)e.preventDefault();
+
+		if(code==32||code==13||code==188||code==186){
+			$("#btn_go").click();
+		}
+	});
 });
