@@ -44,7 +44,7 @@ CREATE INDEX IF NOT EXISTS threads_timestamp
     timestamp
   );
 
-CREATE INDEX IF NOT EXISTS threads_fts
+CREATE INDEX IF NOT EXISTS threads_subject_fts
   ON threads
   USING gin (subject_vector);
 
@@ -87,7 +87,7 @@ CREATE INDEX IF NOT EXISTS posts_fts
   ON posts
   USING gin (body_vector);
 
-CREATE INDEX IF NOT EXISTS posts_fts
+CREATE INDEX IF NOT EXISTS posts_subject_fts
   ON posts
   USING gin (subject_vector);
 
