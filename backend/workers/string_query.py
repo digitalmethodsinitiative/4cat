@@ -26,6 +26,11 @@ class stringQuery(BasicWorker):
 	pause = 2
 	max_workers = 3
 
+	# Columns to return in csv.
+	# Mandatory columns for functioning of tool:
+	# ['thread_id', 'body', 'subject', 'timestamp']
+	li_return_cols = ['thread_id', 'id', 'timestamp', 'body', 'subject']
+
 	def __init__(self, logger, manager):
 		"""
 		Set up database connection - we need one to perform the query
@@ -54,20 +59,17 @@ class stringQuery(BasicWorker):
 
 			# get query details
 			di_query_parameters = query.get_parameters()
-			col = di_query_parameters["col_query"]
-			str_query = di_query_parameters["str_query"]
-
+			body_query = di_query_parameters["body_query"]
+			subject_query = di_query_parameters["subject_query"]
+			full_thread = di_query_parameters["full_thread"]
+			min_date = di_query_parameters["min_date"]
+			max_date = di_query_parameters["max_date"]
 			resultsfile = query.get_results_path() 
 
 			self.log.info(resultsfile)
 
-			# check whether timestamp parameters are provided
-			if "min_date" in di_query_parameters and "max_date" in di_query_parameters:
-				min_date = di_query_parameters["min_date"]
-				min_date = di_query_parameters["max_date"]
-
 			# execute the query on the relevant column
-			di_matches = self.execute_query(str(col), str(str_query))
+			di_matches = self.execute_query(body_query, subject_query, full_thread, min_date, max_date)
 
 			# write to csv if there substring matches. Else set query as empty
 			if di_matches:
@@ -81,7 +83,7 @@ class stringQuery(BasicWorker):
 
 		looping = False
 
-	def execute_query(self, body_query, subject_query, full_thread, min_date=None, max_date=None):
+	def execute_query(self, body_query, subject_query, full_thread, min_date=0, max_date=0):
 		"""
 		Query the relevant column of the chan data.
 		Converts parameters to SQL statements.
@@ -90,57 +92,72 @@ class stringQuery(BasicWorker):
 		:param	subject_query	str,	Query string for post subject
 		:param	full_query		bool,	Whether data from the full thread should be returned.
 										Only works when subject is queried.  
-		:param	min_timestamp	str,	Min timestamps to search for
-		:param	max_timestamp	str,	Max timestamps to search for
+		:param	min_date		str,	Min timestamp to search for
+		:param	max_date		str,	Max timestamp to search for
 		
 		"""
-
+		
 		# Set SQL statements depending on parameters provided by user
 		replacements = []
 		sql_post = ''
 		sql_subject = ''
 		sql_min_date = ''
 		sql_max_date = ''
+		sql_columns = ', '.join(self.li_return_cols)
 		sql_log = 'Starting substring query where '
 
-		if body_query:
-			sql_post = " AND body_vector @@ to_tsquery(" + body_query + ")"
+		# Generate SQL query string
+		if body_query != 'empty':
+			sql_post = " AND body_vector @@ to_tsquery('" + body_query + "')"
 			replacements.append(sql_post)
 			sql_log = sql_log + "'" + body_query + "' is in body, "
-		if subject_query:
-			sql_subject = " AND subject_vector @@ to_tsquery(" + subject_query + ")"
+		if subject_query != 'empty':
+			sql_subject = " AND subject_vector @@ to_tsquery('" + subject_query + "')"
 			replacements.append(sql_subject)
 			sql_log = sql_log + "'" + subject_query + "' is in subject, "
 		if min_date != 0:
 			sql_min_date = " AND timestamp > " + str(min_date)
 			replacements.append(sql_min_date)
-			sql_log = sql_log + "is posted after " + str(min_date) ", "
+			sql_log = sql_log + "is posted after " + str(min_date) + ", "
 		if max_date != 0:
 			sql_max_date = " AND timestamp < " + str(max_date)
 			replacements.append(sql_max_date)
-			sql_log = sql_log + "is posted before " + str(max_date) ", "
+			sql_log = sql_log + "is posted before " + str(max_date) + ", "
 
-		sql_log = sql_log[2:] + '.'
-		self.log.info(sql_log)
 
-		# Some timekeeping
+		# Start some timekeeping
 		start_time = time.time()
 
 		# Fetch only posts
 		if full_thread == False:
+
+			# Log SQL query
+			sql_log = sql_log[:-2] + '.'
+			self.log.info(sql_log)
+			self.log.info("SELECT " + sql_columns + " FROM posts WHERE true" + ' '.join(replacements))
+
 			try:
-				di_matches = self.db.fetchall("SELECT * FROM posts WHERE true" + sql_post + sql_subject + sql_min_date + sql_max_date, replacements)
+				di_matches = self.db.fetchall("SELECT " + sql_columns + " FROM posts WHERE true" + sql_post + sql_subject + sql_min_date + sql_max_date, replacements)
+				return(di_matches)
 			except Exception as error:
 				return str(error)
 
 		# Fetch full thread data
-		elif full_thread and body_query:
+		elif full_thread and subject_query != 'empty':
+
+			# First get the IDs of the matching threads
+			li_thread_ids = []
 			try:
 				li_thread_ids = self.db.fetchall("SELECT thread_id FROM posts WHERE true" + sql_post + sql_subject + sql_min_date + sql_max_date, replacements)
 			except Exception as error:
 				return str(error)
+
+			# Convert matching OP ids to tuple
+			li_thread_ids = tuple([thread["thread_id"] for thread in li_thread_ids])
+
+			# Fetch posts that have matching thread_ids
 			try:
-				di_matches = self.db.fetchall("SELECT * FROM posts WHERE thread_id IN %s", (li_thread_ids))
+				di_matches = self.db.fetchall("SELECT " + sql_columns + " FROM posts WHERE thread_id IN %s ORDER BY thread_id, timestamp", (li_thread_ids,))
 			except Exception as error:
 				return str(error)
 		else:
@@ -163,21 +180,17 @@ class stringQuery(BasicWorker):
 		"""
 		#self.log.info(type(di_input))
 		# some error handling
+
 		if type(di_input) != list:
-			self.log.error('Please use a dict object instead of ' +  str(type(di_input)) + 'to convert to csv')
+			self.log.error('Please use a dict object instead of ' +  str(type(di_input)) + ' to convert to csv')
 			return -1
 		if filepath == '':
 			self.log.error('No file path for results file provided')
 			return -1
 
-		#filepath = get_absolute_folder(config.PATH_DATA) + "/" + filename + '.csv'
-
-		# fields to save in the offered csv (tweak later)
-		fieldnames = ['id', 'timestamp', 'body', 'subject']
-		print('filepath: ',filepath)
 		# write the dictionary to a csv
 		with open(filepath, 'w', encoding='utf-8') as csvfile:
-			writer = csv.DictWriter(csvfile, fieldnames=fieldnames, lineterminator='\n')
+			writer = csv.DictWriter(csvfile, fieldnames=self.li_return_cols, lineterminator='\n')
 			writer.writeheader()
 
 			if clean_csv:
