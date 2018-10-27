@@ -12,25 +12,29 @@ $(function() {
 		// Show loader
 		$('.loader').show()
 
-		// Set parameters
-		var url_post = $('#body_input').val()
+		// Set string parameters
+		var url_body = $('#body_input').val()
 		var url_subject = $('#subject_input').val()
-		var url_full_thread = $('#check-full-thread').attr('checked')?true:false;
+		if(url_body == ''){url_body = 'empty'}
+		if(url_subject == ''){url_subject = 'empty'}
+		
+		// Set full thread search parameter
+		var url_full_thread
+		if($('#check-full-thread').is(':checked')){url_full_thread = 1}
+		else{url_full_thread = 0}
+
+		// Set time parameters
 		var url_min_date = 0
 		var url_max_date = 0
-
-		if(url_post == ''){url_post = '-'}
-		if(url_subject == ''){url_subject = '-'}
-
-		// Get time values
-		if($('#check_time').is(':checked')){
-			url_min_date = $('#input_mintime').val()
-			url_max_date = $('#input_maxtime').val()
-			url_min_date = (new Date(url_min_date).getTime() / 100)
-			url_max_date = (new Date(url_max_date).getTime() / 100)
+		if($('#check-time').is(':checked')){
+			url_min_date = $('#input-min-time').val()
+			url_max_date = $('#input-max-time').val()
+			url_min_date = (new Date(url_min_date).getTime() / 1000)
+			url_max_date = (new Date(url_max_date).getTime() / 1000)
 		}
 
-		ajax_url = 'string_query/' + url_search_query + '/' + url_full_thread + '/' + url_min_date + '/' + url_max_date
+		// Create AJAX url
+		ajax_url = 'string_query/' + url_body + '/' + url_subject + '/' + url_full_thread + '/' + url_min_date + '/' + url_max_date
 
 		// AJAX the query to the server
 		$.ajax({
@@ -80,9 +84,9 @@ $(function() {
 				// if the query succeeded, notify user
 				else {
 					clearInterval(poll_interval)
-					$('#submitform').append('<a href="' + response + '"><p>mentions_' + search_query + '.csv</p></a>')
+					$('#submitform').append('<a href="' + response + '"><p>' + response + '</p></a>')
 					$('.loader').hide()
-					alert('Query for \'' + str_query + '\' complete!')
+					alert('Query for \'' + response + '\' complete!')
 				}
 			},
 			error: function(error) {
@@ -91,12 +95,14 @@ $(function() {
 		});
 	}
 
-	// start querying when go button is clicked
+	/* BUTTON EVENT HANDLERS */
+
+	// Start querying when go button is clicked
 	$('#btn_go').bind('click', function(){
 		start_query()
 	});
 
-	// run query when return is pressed
+	// Run query when return is pressed
 	$('input').keyup(function(e){ 
 		var code = e.which;
 		if(code==13)e.preventDefault();
@@ -104,5 +110,11 @@ $(function() {
 		if(code==32||code==13||code==188||code==186){
 			$("#btn_go").click();
 		}
+	});
+
+	// Enable date selection when 'filter on time' checkbox is checked
+	$('#check-time').on('change', function(){
+		if(this.checked){$('.input-time').attr('disabled', false)}
+		else{$('.input-time').attr('disabled', true)}
 	});
 });

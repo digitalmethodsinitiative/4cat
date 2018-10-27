@@ -49,7 +49,7 @@ CREATE TABLE IF NOT EXISTS posts (
   timestamp         integer,
   timestamp_deleted integer DEFAULT 0,
   subject           text,
-  subject_vector    tsvector
+  subject_vector    tsvector,
   body              text,
   body_vector       tsvector,
   author            text,

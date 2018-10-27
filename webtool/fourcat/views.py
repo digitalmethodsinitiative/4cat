@@ -26,12 +26,12 @@ def show_index():
 	return render_template('fourcat.html')
 
 @app.route('/string_query/<string:body_query>/<string:subject_query>/<int:full_thread>/<int:min_timestamp>/<int:max_timestamp>')
-def string_query(body_query, subject_query, full_thread=0, min_timestamp=None, max_timestamp=None):
+def string_query(body_query, subject_query, full_thread=0, min_timestamp=0, max_timestamp=0):
 	"""
 	AJAX URI for various forms of substring querying
 
-	:param	body_query		str,	Query string for post body
-	:param	subject_query	str,	Query string for post subject
+	:param	body_query		str,	Query string for post body. Can be 'empty'.
+	:param	subject_query	str,	Query string for post subject. Can be 'empty'.
 	:param	full_query		bool,	Whether data from the full thread should be returned.
 									Only works when subject is queried.  
 	:param	min_timestamp	str,	Min timestamps to search for
@@ -41,25 +41,18 @@ def string_query(body_query, subject_query, full_thread=0, min_timestamp=None, m
 
 	# Security
 	body_query = re.escape(body_query)
-
 	# Make connections to database with backend library - safe enough?
 	log = Logger()
 	db = Database(logger=log)
 	queue = JobQueue(log, db)
 
-	# Some minor converting from URL parameters
-	if body_query == '-':
-		body_query = False
-	if subject_query == '-':
-		subject_query = False
-
 	# Queue query
 	query = SearchQuery(query=body_query, parameters={
-		"body_query": body_query,
-		"subject_query": subject_query,
+		"body_query": str(body_query),
+		"subject_query": str(subject_query),
 		"full_thread": bool(full_thread),
-		"min_timestamp": int(min_timestamp),
-		"max_timestamp": int(max_timestamp)
+		"min_date": int(min_timestamp),
+		"max_date": int(max_timestamp)
 		}, db=db)
 	try:
 		queue.add_job(jobtype="query", remote_id=query.key)
@@ -84,10 +77,10 @@ def check_query(query_key):
 
 	if results:
 
+		# custom stuff for debugging
 		if app.debug == True:
 			if results == 'empty_file':
 				return(results)
-			# custom path for debugging
 			return('http://localhost/fourcat/data/' + query.data["query"] + '-' + query_key + '.csv')
 		
 		return(results)

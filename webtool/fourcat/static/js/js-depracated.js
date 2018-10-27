@@ -703,14 +703,12 @@ selectedcsv = ($('#dataselection').find(":selected").val())
 	});
 
 	//when the 'filter on time' checkbox is checked
-	$('#check_time').on('change', function(){
+	$('#check-time').on('change', function(){
 		if(this.checked){
-			$('#input_mintime').attr('disabled', false)
-			$('#input_maxtime').attr('disabled', false)
+			$('.input_time').attr('disabled', false)
 		}
 		else{
-			$('#input_mintime').attr('disabled', true)
-			$('#input_maxtime').attr('disabled', true)
+			$('.input_time').attr('disabled', true)
 		}
 	});
 

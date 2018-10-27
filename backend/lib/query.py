@@ -153,7 +153,7 @@ class SearchQuery:
 		:param parameters:  Query parameters
 		:return str:  Query key
 		"""
-		plain_key = repr(parameters) + query
+		plain_key = repr(parameters) + str(query)
 		return hashlib.md5(plain_key.encode("utf-8")).hexdigest()
 
 	def set_empty(self):
