@@ -141,8 +141,8 @@ class SearchQuery:
 		if self.data["is_finished"]:
 			raise RuntimeError("Cannot reserve results file for a finished query")
 
-		query_bit = self.data["query"].replace(" ", "_").lower()
-		query_bit = re.sub(r"[^a-z0-9]", "", query_bit)
+		query_bit = self.data["query"].replace(" ", "-").lower()
+		query_bit = re.sub(r"[^a-z0-9\-]", "", query_bit)
 		file = query_bit + "-" + self.data["key"]
 
 		path = self.folder + "/" + file + "." + extension.lower()

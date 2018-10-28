@@ -120,11 +120,11 @@ class stringQuery(BasicWorker):
 
 		# Generate SQL query string
 		if body_query != 'empty':
-			sql_post = " AND body_vector @@ to_tsquery('" + body_query + "')"
+			sql_post = " AND body_vector @@ plainto_tsquery('" + body_query + "')"
 			replacements.append(sql_post)
 			sql_log = sql_log + "'" + body_query + "' is in body, "
 		if subject_query != 'empty':
-			sql_subject = " AND subject_vector @@ to_tsquery('" + subject_query + "')"
+			sql_subject = " AND subject_vector @@ plainto_tsquery('" + subject_query + "')"
 			replacements.append(sql_subject)
 			sql_log = sql_log + "'" + subject_query + "' is in subject, "
 		if min_date != 0:
@@ -149,7 +149,6 @@ class stringQuery(BasicWorker):
 
 			try:
 				di_matches = self.db.fetchall("SELECT " + sql_columns + " FROM posts WHERE true" + sql_post + sql_subject + sql_min_date + sql_max_date, replacements)
-				return di_matches
 			except Exception as error:
 				return str(error)
 
@@ -179,7 +178,6 @@ class stringQuery(BasicWorker):
 			return -1
 
 		self.log.info("Finished query in " + str(round((time.time() - start_time), 4)) + " seconds")
-
 		return di_matches
 
 	def get_dense_threads(self, parameters):

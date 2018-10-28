@@ -81,8 +81,9 @@ $(function() {
 		*/
 
 		// Set string parameters
-		var url_body = $('#body-input').val()
-		var url_subject = $('#subject-input').val()
+		var url_body = $('#body-input').val().replace(/ /g, '-');
+		console.log(url_body)
+		var url_subject = $('#subject-input').val().replace(/ /g, '-');
 		if(url_body == ''){url_body = 'empty'}
 		if(url_subject == ''){url_subject = 'empty'}
 		
