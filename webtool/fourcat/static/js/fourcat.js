@@ -12,29 +12,9 @@ $(function() {
 		// Show loader
 		$('.loader').show()
 
-		// Set string parameters
-		var url_body = $('#body_input').val()
-		var url_subject = $('#subject_input').val()
-		if(url_body == ''){url_body = 'empty'}
-		if(url_subject == ''){url_subject = 'empty'}
-		
-		// Set full thread search parameter
-		var url_full_thread
-		if($('#check-full-thread').is(':checked')){url_full_thread = 1}
-		else{url_full_thread = 0}
-
-		// Set time parameters
-		var url_min_date = 0
-		var url_max_date = 0
-		if($('#check-time').is(':checked')){
-			url_min_date = $('#input-min-time').val()
-			url_max_date = $('#input-max-time').val()
-			url_min_date = (new Date(url_min_date).getTime() / 1000)
-			url_max_date = (new Date(url_max_date).getTime() / 1000)
-		}
-
-		// Create AJAX url
-		ajax_url = 'string_query/' + url_body + '/' + url_subject + '/' + url_full_thread + '/' + url_min_date + '/' + url_max_date
+		// Get AJAX url from search options
+		ajax_url = get_ajax_url()
+		console.log(ajax_url)
 
 		// AJAX the query to the server
 		$.ajax({
@@ -95,6 +75,48 @@ $(function() {
 		});
 	}
 
+	function get_ajax_url(){
+		/*
+		Takes the user input and generates an AJAX URL to send to Flask back-end
+		*/
+
+		// Set string parameters
+		var url_body = $('#body-input').val()
+		var url_subject = $('#subject-input').val()
+		if(url_body == ''){url_body = 'empty'}
+		if(url_subject == ''){url_subject = 'empty'}
+		
+		// Set full thread search parameter
+		var url_full_thread
+		if($('#check-full-thread').is(':checked') && url_body !== ''){url_full_thread = 1}
+		else{url_full_thread = 0}
+
+		// Set keyword-dense threads parameters
+		var url_dense_threads = 0
+		var url_dense_percentage = 0
+		var url_dense_thread_length = 0
+		if($('#check-dense-threads').is(':checked') && url_body !== ''){
+			url_dense_threads = 1
+			url_dense_percentage = $('#dense-percentage').val()
+			url_dense_thread_length = $('#dense-thread-length').val()
+		}
+
+		// Set time parameters
+		var url_min_date = 0
+		var url_max_date = 0
+		if($('#check-time').is(':checked')){
+			url_min_date = $('#input-min-time').val()
+			url_max_date = $('#input-max-time').val()
+			url_min_date = (new Date(url_min_date).getTime() / 1000)
+			url_max_date = (new Date(url_max_date).getTime() / 1000)
+		}
+
+		// Create AJAX url
+		ajax_url = 'string_query/' + url_body + '/' + url_subject + '/' + url_full_thread + '/' + url_dense_threads + '/' + url_dense_percentage + '/' + url_dense_thread_length + '/' + url_min_date + '/' + url_max_date
+
+		return ajax_url
+	}
+
 	/* BUTTON EVENT HANDLERS */
 
 	// Start querying when go button is clicked
@@ -106,8 +128,7 @@ $(function() {
 	$('input').keyup(function(e){ 
 		var code = e.which;
 		if(code==13)e.preventDefault();
-
-		if(code==32||code==13||code==188||code==186){
+		if(code==13||code==188||code==186){
 			$("#btn_go").click();
 		}
 	});
@@ -117,4 +138,36 @@ $(function() {
 		if(this.checked){$('.input-time').attr('disabled', false)}
 		else{$('.input-time').attr('disabled', true)}
 	});
+
+	// Change the option and label for keyword-dense threads according to body input
+	$('#body-input').on('input', function(){
+		input_string = $('#body-input').val()
+		if (input_string == ''){
+			$('.density-keyword').html('keyword')
+			$('.input-dense').prop('disabled', true)
+			$('#check-keyword-dense-threads').prop('checked', false)
+		}
+		else{
+			$('.input-dense').prop('disabled', false)
+			if (input_string.length > 7){
+				$('.density-keyword').html(input_string.substr(0,4) + '...')
+			}
+			else{
+				$('.density-keyword').html(input_string)
+			}
+		}
+	});
+
+	// Only enable full thread data option if subject is queried
+	$('#subject-input').on('input', function(){
+		if ($(this).val() == ''){
+			$('#check-full-thread').prop('disabled', true)
+			$('#check-full-thread').prop('checked', false)
+		}
+		else{
+			$('#check-full-thread').prop('disabled', false)
+		}
+	});
+	$('.input-dense').prop('disabled', true)
+	$('#check-full-thread').prop('disabled', true)
 });
