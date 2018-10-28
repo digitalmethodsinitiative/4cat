@@ -65,6 +65,9 @@ class SearchQuery:
 		method returns a path, a file with the complete results for this query
 		will exist at that location.
 
+		If the keyword-dense thread data was queried, it returns a list
+		of data and metadata
+
 		:return: A path to the results file, 'empty_file', or `None`
 		"""
 		if self.data["is_finished"] and self.data["result_file"] and os.path.isfile(
@@ -86,6 +89,18 @@ class SearchQuery:
 		:return str:  A path to the results file
 		"""
 		return self.folder + "/" + self.data["result_file"]
+
+	def get_results_dir(self):
+		"""
+		Get path to results directory
+
+		Always returns a path, that will at some point contain the query
+		results, but may not do so yet. Use this to get the location to write
+		generated results to.
+
+		:return str:  A path to the results directory
+		"""
+		return self.folder
 
 	def finish(self):
 		"""

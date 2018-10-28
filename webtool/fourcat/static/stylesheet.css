@@ -129,9 +129,16 @@ button#submitdata{
 	padding: 5px;
 }
 
-.filter-box > span {
-	min-width:  150px;
+.filter-box > .filter-box-label {
 	display: inline-block;
+	min-width:  210px;
+}
+
+.filter-box > ul {
+	display: inline-block;
+	list-style-type: none;
+	margin: 0px;
+	padding: 0px;
 }
 
 .filterrow button{
@@ -224,6 +231,10 @@ span#imagenavigation{
 
 #input_maxtime, #input_mintime {
 	max-width: 130px;
+}
+
+input.input-number {
+	width: 50px;
 }
 
 input[type="checkbox"].imgsubmit{

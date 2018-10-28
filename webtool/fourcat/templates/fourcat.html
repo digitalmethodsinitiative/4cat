@@ -1,112 +1,136 @@
 <html>
 <head>
 	<title>4CAT</title>
-	<!-- <link href="https://fonts.googleapis.com/css?family=Lekton" rel="stylesheet">
-	<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous"> -->
-	<link rel="stylesheet" type="text/css" href="{{url_for('static', filename='stylesheet.css')}}">
-	<script type=text/javascript src="{{url_for('static', filename='jquery.js')}}"></script>
-	<script type=text/javascript src="{{url_for('static', filename='js/fourcat.js')}}"></script>
-	<meta charset="UTF-8">
-</head>
-<body>
+	<!-- <link href='https://fonts.googleapis.com/css?family=Lekton' rel='stylesheet'>
+		<link rel='stylesheet' href='https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css' integrity='sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm' crossorigin='anonymous'> -->
+		<link rel='stylesheet' type='text/css' href='{{url_for('static', filename='stylesheet.css')}}'>
+		<script type=text/javascript src='{{url_for('static', filename='jquery.js')}}'></script>
+		<script type=text/javascript src='{{url_for('static', filename='js/fourcat.js')}}'></script>
+		<meta charset='UTF-8'>
+	</head>
+	<body>
 
-	<div class="header"><a href="/submissions"><button id='backbutton'>To the forum</button></a><div class="pagetitle"><span>4CAT</span></div></div>
+		<div class='header'><a href='/submissions'><button id='backbutton'>To the forum</button></a><div class='pagetitle'><span>4CAT</span></div></div>
 
-	<div class="container-fluid">
-		<div class="row">
-			<div class="col-lg-9 topdiv">
-				<div id="panel">
-					<div id="filterpanel">
-						<div id='buttonselections'>
-							<span>Currently queries data from /pol/ from November 2013 onwards.</span>
-							<!-- <input name='platformselect' type='radio' class='platformselect' id="radio_selectfb">-->
-						</div>
-						<div id='filterinputs'>
-							<div class="filterrow">
+		<div class='container-fluid'>
+			<div class='row'>
+				<div class='col-lg-9 topdiv'>
+					<div id='panel'>
+						<div id='filterpanel'>
+							<div id='buttonselections'>
+								<span>Currently queries data from /pol/ from November 2013 onwards.</span>
+								<!-- <input name='platformselect' type='radio' class='platformselect' id='radio_selectfb'>-->
+							</div>
+							<div id='filterinputs'>
 								<div class='filter-box'>
-									<span>Board:</span>
+									<div class='filter-box-label'>
+										<span>Board:</span>
+									</div>
 									<select>
 										<option>/pol/</option>
 									</select>
 								</div>
 								<div class='filter-box'>
-									<span>Post body:</span>
-									<input id="body_input" type="text" name="dataselected"  maxlength="200">
+									<div class='filter-box-label'>
+										<span>Post body:</span>
+									</div>
+									<input id='body-input' type='text' name='dataselected' maxlength='200'>
 								</div>
 								<div class='filter-box'>
-									<span>OP subject:</span>
-									<input id="subject_input" type="text" name="dataselected"  maxlength="200">
+									<div class='filter-box-label'>
+										<span>OP subject:</span>
+									</div>
+									<input id='subject-input' type='text' name='dataselected' maxlength='200'>
 									<input type='checkbox' id='check-full-thread'></input>
-									<label for="check-full-thread"> Return full thread data</label>
+									<label for='check-full-thread'> Return full thread data</label>
 								</div>
+								<div class='filter-box'>
+									<div class='filter-box-label'>
+										<input type='checkbox' id='check-dense-threads' class='input-dense'></input> 
+										<label for='check-dense-threads'><span class='density-keyword'>keyword</span>-dense threads:</label>
+									</div>
+									<ul>
+										<li>
+											<input id='dense-percentage' class='input-dense input-number' type='number' value='15' min='15' max='100' name='dataselected'>
+											<label for='dense-percentage'>% of posts containing <span class='density-keyword'>keyword</span> in thread (min 15%)</label>
+										</li>
+										<li>
+											<input id='dense-thread-length' class='input-dense input-number' type='number' value='30' min='30' name='dataselected'>
+											<label for='dense-thread-length'>Total posts in thread (min 30)</label>
+										</li>
+									</ul>
+								</div>
+
 								<!-- Include trends histogram -->
 								<!-- <input type='checkbox' id='check_frequency'></input> --> 
-							</div>
 
-							<div class="filterrow" id='filter_time'>
-								<input type='checkbox' id='check-time'></input> <span>From</span>
-								<input id="input-min-time" class="input-time" type="date" name="mintimeinput" disabled="disabled"> to
-								<input id="input-max-time" class="input-time" type="date" name="maxtimeinput" disabled="disabled">
+								<div class='filter-box' id='filter_time'>
+									<div class='filter-box-label'>
+										<input type='checkbox' id='check-time'></input>
+										<label for='check-time'>Date range</label>
+									</div>
+									<input id='input-min-time' class='input-time' type='date' name='mintimeinput' disabled='disabled'> to
+									<input id='input-max-time' class='input-time' type='date' name='maxtimeinput' disabled='disabled'>
+								</div>
+								<button class='btn_filterbutton' id='btn_go'>Go</button>
 							</div>
-							<button class="btn_filterbutton" id="btn_go">Go</button>
+						</div>
+					</div>
+				</div>
+				<div class='col-lg-3 topdiv'>
+					<div id='submitpanel'>
+						<div id='submitpaneltitle'>
+							<div class='pagetitle'>
+								<span id='submitheader'>RESULTS</span>
+							</div>
+						</div>
+						<div id='submitform'>
+							<p>Full data files will be returned in this panel</p>
+						</div>
+
+					</div>
+				</div>
+			</div>
+		</div>
+		<div class='container-fluid'>
+			<div class='row'>
+				<div class='col-lg-12' id='resultsdiv'>
+					<div id='resultsheader'>
+						<div class='pagetitle'>
+							<span id='resultsheadertext'>DATA PREVIEW</span>
+						</div>
+					</div>
+					<div id='imagenavigationdiv' class='inactive'>
+						<span id='imagenavigation'>
+							<button id='btn_previmg' class='imgbutton'>Previous image</button>
+							<span id='imgnotification'></span>
+							<button id='btn_nextimg' class='imgbutton'>Next image</button>
+						</span>
+					</div>
+					<div id='results'>
+						<div class='loader'>
+							<span>Working... Uncompleted tasks time out and fail after 10 minutes<img src='static/hourglass.gif'></span>
 						</div>
 					</div>
 				</div>
 			</div>
-			<div class="col-lg-3 topdiv">
-				<div id='submitpanel'>
-					<div id="submitpaneltitle">
-						<div class="pagetitle">
-							<span id="submitheader">RESULTS</span>
-						</div>
-					</div>
-					<div id="submitform">
-						<p>Full data files will be returned in this panel</p>
-					</div>
+		</div>
+	</div>
 
-				</div>
+
+	<!--Footer-->
+	<footer class='page-footer'>
+		<!--Copyright-->
+		<div class='footer-copyright'>
+			<div class='container-fluid'>
+				© 2018 Copyright: <a href='http://www.oilab.eu' target='_blank'>Open Intelligence Lab</a>
+
 			</div>
 		</div>
-	</div>
-	<div class="container-fluid">
-		<div class="row">
-			<div class="col-lg-12" id="resultsdiv">
-				<div id="resultsheader">
-					<div class="pagetitle">
-						<span id='resultsheadertext'>DATA PREVIEW</span>
-					</div>
-				</div>
-				<div id="imagenavigationdiv" class='inactive'>
-					<span id='imagenavigation'>
-						<button id="btn_previmg" class="imgbutton">Previous image</button>
-						<span id="imgnotification"></span>
-						<button id="btn_nextimg" class="imgbutton">Next image</button>
-					</span>
-				</div>
-				<div id="results">
-					<div class="loader">
-						<span>Working... Uncompleted tasks time out and fail after 10 minutes<img src='static/hourglass.gif'></span>
-					</div>
-				</div>
-			</div>
-		</div>
-	</div>
-</div>
+		<!--/.Copyright-->
 
-
-<!--Footer-->
-<footer class="page-footer">
-	<!--Copyright-->
-	<div class="footer-copyright">
-		<div class="container-fluid">
-			© 2018 Copyright: <a href="http://www.oilab.eu" target="_blank">Open Intelligence Lab</a>
-
-		</div>
-	</div>
-	<!--/.Copyright-->
-
-</footer>
-<!--/.Footer-->
+	</footer>
+	<!--/.Footer-->
 
 </body>
 </html>
