@@ -43,7 +43,7 @@ def string_query(body_query, subject_query, full_thread=0, dense_threads=0, dens
 	"""
 
 	# Security
-	body_query = re.escape(body_query)
+	#body_query = re.escape(body_query)
 
 	# Make connections to database with backend library - safe enough?
 	log = Logger()
@@ -52,8 +52,8 @@ def string_query(body_query, subject_query, full_thread=0, dense_threads=0, dens
 
 	# Queue query
 	query = SearchQuery(query=body_query, parameters={
-		"body_query": str(body_query),
-		"subject_query": str(subject_query),
+		"body_query": str(body_query).replace("-", " "),
+		"subject_query": str(subject_query).replace("-", " "),
 		"full_thread": bool(full_thread),
 		"dense_threads": bool(dense_threads),
 		"dense_percentage": int(dense_percentage),
