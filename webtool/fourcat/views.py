@@ -32,8 +32,7 @@ def string_query(body_query, subject_query, full_thread=0, dense_threads=0, dens
 
 	:param	body_query					str,	Query string for post body. Can be 'empty'.
 	:param	subject_query				str,	Query string for post subject. Can be 'empty'.
-	:param	full_query					int,	Whether data from the full thread should be returned (0-1).
-												Only works when subject is queried.  
+	:param	exact_match					int,	Whether to perform an exact substring match instead of FTS.
 	:param	dense_threads				int,	Whether to check for keyword-dense threads (0-1).
 	:param	dense_percentage			int,	Minimum percentage of posts in thread containing keyword (>15%).
 	:param	dense_length				int,	Minimum thread length for keyword-dense threads (>30).
@@ -49,7 +48,7 @@ def string_query(body_query, subject_query, full_thread=0, dense_threads=0, dens
 	log = Logger()
 	db = Database(logger=log)
 	queue = JobQueue(log, db)
-
+	print(body_query)
 	# Queue query
 	query = SearchQuery(query=body_query, parameters={
 		"body_query": str(body_query).replace("-", " "),
@@ -88,7 +87,7 @@ def check_query(query_key):
 		if app.debug == True:
 			if results == 'empty_file':
 				return results
-			return 'http://localhost/fourcat/data/' + query.data["query"] + '-' + query_key + '.csv'
+			return 'http://localhost/fourcat/data/' + query.data["query"].replace("\"", "") + '-' + query_key + '.csv'
 		
 		return results
 
