@@ -86,7 +86,7 @@ $(function() {
 
 		if(url_body == ''){url_body = 'empty'}
 		if(url_subject == ''){url_subject = 'empty'}
-		
+
 		// Set full thread search parameter
 		var url_full_thread
 		if($('#check-full-thread').is(':checked') && url_body !== ''){url_full_thread = 1}
@@ -106,12 +106,12 @@ $(function() {
 		var url_min_date = 0
 		var url_max_date = 0
 		if($('#check-time').is(':checked')){
-			url_min_date = $('#input-min-time').val()
-			url_max_date = $('#input-max-time').val()
-			url_min_date = (new Date(url_min_date).getTime() / 1000)
-			url_max_date = (new Date(url_max_date).getTime() / 1000)
+			var min_date = $('#input-min-time').val()
+			var max_date = $('#input-max-time').val()
+			if (isNaN(min_date)){url_min_date = (new Date(min_date).getTime() / 1000)}
+			if (isNaN(max_date)){url_max_date = (new Date(max_date).getTime() / 1000)}
 		}
-
+	
 		// Create AJAX url
 		ajax_url = 'string_query/' + url_body + '/' + url_subject + '/' + url_full_thread + '/' + url_dense_threads + '/' + url_dense_percentage + '/' + url_dense_thread_length + '/' + url_min_date + '/' + url_max_date
 

@@ -5,14 +5,15 @@ import os
 import pickle as p
 import re
 
+from bs4 import BeautifulSoup
+from datetime import datetime
+
 from backend.lib.database import Database
 from backend.lib.logger import Logger
 from backend.lib.query import SearchQuery
 from backend.lib.queue import JobClaimedException
 from backend.lib.helpers import get_absolute_folder
 from backend.lib.worker import BasicWorker
-
-from bs4 import BeautifulSoup
 
 
 class stringQuery(BasicWorker):
@@ -27,9 +28,8 @@ class stringQuery(BasicWorker):
 	max_workers = 3
 
 	# Columns to return in csv.
-	# Mandatory columns:
-	# ['thread_id', 'body', 'subject', 'timestamp']
-	li_return_cols = ['thread_id', 'id', 'timestamp', 'body', 'subject']
+	# Mandatory columns: ['thread_id', 'body', 'subject', 'timestamp']
+	li_return_cols = ['thread_id', 'id', 'timestamp', 'body', 'subject', 'author', 'image_file', 'image_md5', 'country_name']
 
 	def __init__(self, logger, manager):
 		"""
@@ -152,11 +152,11 @@ class stringQuery(BasicWorker):
 			replacements.append(sql_body)
 
 		if min_date != 0:
-			sql_min_date = " AND timestamp > " + str(min_date)
+			sql_min_date = " AND timestamp >= " + str(min_date)
 			replacements.append(sql_min_date)
 			sql_log = sql_log + "is posted after " + str(min_date) + ", "
 		if max_date != 0:
-			sql_max_date = " AND timestamp < " + str(max_date)
+			sql_max_date = " AND timestamp <= " + str(max_date)
 			replacements.append(sql_max_date)
 			sql_log = sql_log + "is posted before " + str(max_date) + ", "
 		sql_log = sql_log[:-2] + '.'
@@ -175,7 +175,6 @@ class stringQuery(BasicWorker):
 				li_matches = self.db.fetchall("SELECT " + sql_columns + " FROM posts WHERE true" + sql_body + sql_subject + sql_min_date + sql_max_date)
 			except Exception as error:
 				return str(error)
-			print(str(li_matches))
 
 		# Fetch full thread data
 		elif dense_threads != False or (full_thread and subject_query != 'empty'):
@@ -210,7 +209,8 @@ class stringQuery(BasicWorker):
 
 	def get_dense_threads(self, parameters):
 		"""
-		Get metadata from keyword-dense threads
+		Get metadata from keyword-dense threads.
+		Returns a list of thread IDs that match the keyboard-density parameters
 
 		"""
 		
@@ -218,25 +218,36 @@ class stringQuery(BasicWorker):
 		body_query = parameters["body_query"]
 		dense_length = parameters["dense_length"]
 		dense_percentage = parameters["dense_percentage"]
+		min_date = parameters["min_date"]
+		max_date = parameters["max_date"]
 
 		# Set body query. Check if there's anything in quotation marks for LIKE operations.
 		pattern = "\"(.*?)\""
 		li_exact_body = re.findall(pattern, body_query)
-		sql_body = " AND body_vector @@ plainto_tsquery('" + body_query + "')"
+		sql_body = " AND posts.body_vector @@ plainto_tsquery('" + body_query + "')"
 		if li_exact_body:
 			for exact_body in li_exact_body:
-				sql_body = sql_body + " AND lower(body) LIKE '%" + exact_body + "%'"
+				sql_body = sql_body + " AND lower(posts.body) LIKE '%" + exact_body + "%'"
 		body_query = body_query.replace("\"", "")
 		
+		# Set timestamp parameters. Currently checks timestamp of all posts with keyword within paramaters.
+		# Should perhaps change to OP timestamp.
+		sql_min_date = ''
+		sql_max_date = ''
+		if min_date != 0:
+			sql_min_date = " AND posts.timestamp >= " + str(min_date)
+		if max_date != 0:
+			sql_max_date = " AND posts.timestamp <= " + str(max_date)
+
 		self.log.info("Getting keyword-dense threads for " + body_query + " with a minimum thread length of " + str(dense_length) + " and a keyword density of " + str(dense_percentage) + ".")
+		#self.log.info()
 
 		matching_threads = self.db.fetchall("""
-			SELECT thread_id, num_replies, keyword_count, keyword_density FROM (
+			SELECT thread_id, num_replies, keyword_count, keyword_density::real FROM (
 				SELECT thread_id, num_replies, keyword_count, ((keyword_count::real / num_replies::real) * 100) AS keyword_density FROM (
 					SELECT posts.thread_id, threads.num_replies, count(*) as keyword_count FROM posts
 					INNER JOIN threads ON posts.thread_id = threads.id
-					WHERE true """ + sql_body + """
-					AND posts.thread_id = threads.id
+					WHERE true """ + sql_body + sql_min_date + sql_max_date + """
 					GROUP BY posts.thread_id, threads.num_replies
 				) AS thread_matches
 			) AS thread_meta
@@ -255,9 +266,9 @@ class stringQuery(BasicWorker):
 		Takes a dictionary of results, converts it to a csv, and writes it to the data folder.
 		The respective csvs will be available to the user.
 
-		:param sql_results:		list with results derived with db.fetchall()
-		:param filepath:    	filepath for the resulting csv
-		:param clean_csv:   	whether to parse the raw HTML data to clean text.
+		:param sql_results:		List with results derived with db.fetchall()
+		:param filepath:    	Filepath for the resulting csv
+		:param clean_csv:   	Whether to parse the raw HTML data to clean text.
 								If True (default), writing takes 1.5 times longer.
 
 		"""
@@ -283,8 +294,15 @@ class stringQuery(BasicWorker):
 				# Parsing: remove the HTML tags, but keep the <br> as a newline
 				# Takes around 1.5 times longer
 				for row in sql_results:
+
+					# Create human dates from timestamp
+					from datetime import datetime
+					row["timestamp"] = datetime.utcfromtimestamp(row["timestamp"]).strftime('%Y-%m-%d %H:%M:%S')
+
+					# Clean body column
 					row["body"] = row["body"].replace("<br>", "\n")
 					row["body"] = BeautifulSoup(row["body"], "html.parser").get_text()
+
 					writer.writerow(row)
 			else:
 				writer.writerows(sql_results)
