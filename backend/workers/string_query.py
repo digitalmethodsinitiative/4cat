@@ -3,6 +3,7 @@ import config
 import csv
 import os
 import pickle as p
+import re
 
 from backend.lib.database import Database
 from backend.lib.logger import Logger
@@ -63,8 +64,9 @@ class stringQuery(BasicWorker):
 			# and set the "dense_threads" parameters as this list
 			if query_parameters["dense_threads"]:
 				matching_threads = self.get_dense_threads(query_parameters)
-				self.dict_to_csv(matching_threads, results_dir + '/metadata_dense_threads_' + query_parameters["body_query"] + ".csv", clean_csv=False)
+
 				if matching_threads:
+					self.psql_results_to_csv(matching_threads, results_dir + '/metadata_dense_threads_' + query_parameters["body_query"].replace("\"", "") + ".csv", clean_csv=False)
 					li_thread_ids = tuple([thread["thread_id"] for thread in matching_threads])
 					query_parameters["dense_threads"] = li_thread_ids
 				else:
@@ -76,11 +78,11 @@ class stringQuery(BasicWorker):
 			
 			# Get posts
 			self.log.info("Executing substring query")
-			di_matches = self.execute_string_query(query_parameters)
+			li_matches = self.execute_string_query(query_parameters)
 			
 			# Write to csv if there substring matches. Else set query as empty.
-			if di_matches:
-				self.dict_to_csv(di_matches, results_file)
+			if li_matches:
+				self.psql_results_to_csv(li_matches, results_file)
 			else:
 				query.set_empty()
 
@@ -109,9 +111,16 @@ class stringQuery(BasicWorker):
 		min_date = query_parameters["min_date"]
 		max_date = query_parameters["max_date"]
 
+		# Check if there's anything in quotation marks for LIKE operations
+		pattern = "\"(.*?)\""
+		li_exact_body = re.findall(pattern, body_query)
+		li_exact_subject = re.findall(pattern, subject_query)
+		body_query = body_query.replace("\"", "")
+		subject_query = subject_query.replace("\"", "")
+
 		# Set SQL statements depending on job parameters
 		replacements = []
-		sql_post = ''
+		sql_body = ''
 		sql_subject = ''
 		sql_min_date = ''
 		sql_max_date = ''
@@ -120,13 +129,28 @@ class stringQuery(BasicWorker):
 
 		# Generate SQL query string
 		if body_query != 'empty':
-			sql_post = " AND body_vector @@ plainto_tsquery('" + body_query + "')"
-			replacements.append(sql_post)
+			# Primary use if FTS search, so set tsvector matching first
+			sql_body = sql_body + " AND body_vector @@ plainto_tsquery('" + body_query + "')"
 			sql_log = sql_log + "'" + body_query + "' is in body, "
+			# If there are exact string matches between "quotation marks", loop through all entries and add to SQL query
+			# Should test later if tsvector matching followed by LIKE is fast enough.
+			if li_exact_body:
+				for exact_body in li_exact_body:
+					sql_body = sql_body + " AND lower(body) LIKE '%" + exact_body + "%'"
+					sql_log = sql_log + "body exactly matches '" + exact_body + "', "
+			replacements.append(sql_body)
+		
 		if subject_query != 'empty':
-			sql_subject = " AND subject_vector @@ plainto_tsquery('" + subject_query + "')"
-			replacements.append(sql_subject)
+			# Primary use if FTS search, so set tsvector matching first
+			sql_subject = sql_subject + " AND subject_vector @@ plainto_tsquery('" + subject_query + "')"
 			sql_log = sql_log + "'" + subject_query + "' is in subject, "
+			# If there are exact string matches between "quotation marks", loop through all entries and add to SQL query
+			if li_exact_subject:
+				for exact_subject in li_exact_subject:
+					sql_subject = sql_subject + " AND lower(subject) LIKE '%" + exact_subject + "%'"
+					sql_log = sql_log + "subject exactly matches '" + exact_subject + "', "
+			replacements.append(sql_body)
+
 		if min_date != 0:
 			sql_min_date = " AND timestamp > " + str(min_date)
 			replacements.append(sql_min_date)
@@ -135,6 +159,7 @@ class stringQuery(BasicWorker):
 			sql_max_date = " AND timestamp < " + str(max_date)
 			replacements.append(sql_max_date)
 			sql_log = sql_log + "is posted before " + str(max_date) + ", "
+		sql_log = sql_log[:-2] + '.'
 
 		# Start some timekeeping
 		start_time = time.time()
@@ -143,17 +168,20 @@ class stringQuery(BasicWorker):
 		if dense_threads is False and full_thread is False:
 
 			# Log SQL query
-			sql_log = sql_log[:-2] + '.'
 			self.log.info(sql_log)
-			self.log.info("SELECT " + sql_columns + " FROM posts WHERE true" + ' '.join(replacements))
+			self.log.info("SELECT " + sql_columns + " FROM posts WHERE true" + sql_body + sql_subject + sql_min_date + sql_max_date)
 
 			try:
-				di_matches = self.db.fetchall("SELECT " + sql_columns + " FROM posts WHERE true" + sql_post + sql_subject + sql_min_date + sql_max_date, replacements)
+				li_matches = self.db.fetchall("SELECT " + sql_columns + " FROM posts WHERE true" + sql_body + sql_subject + sql_min_date + sql_max_date)
 			except Exception as error:
 				return str(error)
+			print(str(li_matches))
 
 		# Fetch full thread data
 		elif dense_threads != False or (full_thread and subject_query != 'empty'):
+			# Log SQL query
+			self.log.info("Getting full thread data, but first: " + sql_log)
+			self.log.info("SELECT " + sql_columns + " FROM posts WHERE true" + sql_body + sql_subject + sql_min_date + sql_max_date)
 
 			# Get the IDs of the matching threads
 			li_thread_ids = []
@@ -161,7 +189,7 @@ class stringQuery(BasicWorker):
 				li_thread_ids = dense_threads
 			else:
 				try:
-					li_thread_ids = self.db.fetchall("SELECT thread_id FROM posts WHERE true" + sql_post + sql_subject + sql_min_date + sql_max_date, replacements)
+					li_thread_ids = self.db.fetchall("SELECT thread_id FROM posts WHERE true" + sql_body + sql_subject + sql_min_date + sql_max_date)
 				except Exception as error:
 					return str(error)
 				# Convert matching OP ids to tuple
@@ -169,7 +197,7 @@ class stringQuery(BasicWorker):
 
 			# Fetch posts within matching thread IDs
 			try:
-				di_matches = self.db.fetchall("SELECT " + sql_columns + " FROM posts WHERE thread_id IN %s ORDER BY thread_id, timestamp", (li_thread_ids,))
+				li_matches = self.db.fetchall("SELECT " + sql_columns + " FROM posts WHERE thread_id IN %s ORDER BY thread_id, timestamp", (li_thread_ids,))
 			except Exception as error:
 				return str(error)
 		
@@ -178,7 +206,7 @@ class stringQuery(BasicWorker):
 			return -1
 
 		self.log.info("Finished query in " + str(round((time.time() - start_time), 4)) + " seconds")
-		return di_matches
+		return li_matches
 
 	def get_dense_threads(self, parameters):
 		"""
@@ -191,6 +219,15 @@ class stringQuery(BasicWorker):
 		dense_length = parameters["dense_length"]
 		dense_percentage = parameters["dense_percentage"]
 
+		# Set body query. Check if there's anything in quotation marks for LIKE operations.
+		pattern = "\"(.*?)\""
+		li_exact_body = re.findall(pattern, body_query)
+		sql_body = " AND body_vector @@ plainto_tsquery('" + body_query + "')"
+		if li_exact_body:
+			for exact_body in li_exact_body:
+				sql_body = sql_body + " AND lower(body) LIKE '%" + exact_body + "%'"
+		body_query = body_query.replace("\"", "")
+		
 		self.log.info("Getting keyword-dense threads for " + body_query + " with a minimum thread length of " + str(dense_length) + " and a keyword density of " + str(dense_percentage) + ".")
 
 		matching_threads = self.db.fetchall("""
@@ -198,23 +235,22 @@ class stringQuery(BasicWorker):
 				SELECT thread_id, num_replies, keyword_count, ((keyword_count::real / num_replies::real) * 100) AS keyword_density FROM (
 					SELECT posts.thread_id, threads.num_replies, count(*) as keyword_count FROM posts
 					INNER JOIN threads ON posts.thread_id = threads.id
-					WHERE posts.body_vector @@ to_tsquery(%s)
+					WHERE true """ + sql_body + """
 					AND posts.thread_id = threads.id
 					GROUP BY posts.thread_id, threads.num_replies
 				) AS thread_matches
 			) AS thread_meta
-			WHERE num_replies >= %s
-			AND keyword_density >= %s
+			WHERE num_replies >= """ + str(dense_length) + """
+			AND keyword_density >= """ + str(dense_percentage) + """
 
-			"""
-			, (body_query, dense_length, dense_percentage,))
+			""")
 
 		# Convert threads to tuple
 		self.log.info("Found " + str(len(matching_threads)) + " " + body_query + "-dense threads.")
 
 		return matching_threads
 
-	def dict_to_csv(self, sql_results, filepath, clean_csv=True):
+	def psql_results_to_csv(self, sql_results, filepath, clean_csv=True):
 		"""
 		Takes a dictionary of results, converts it to a csv, and writes it to the data folder.
 		The respective csvs will be available to the user.
@@ -226,9 +262,10 @@ class stringQuery(BasicWorker):
 
 		"""
 
-		# some error handling
+		# Sme error handling
 		if type(sql_results) != list:
-			self.log.error('Please use a dict object instead of ' +  str(type(sql_results)) + ' to convert to csv')
+			self.log.error('Please use a list instead of ' +  str(type(sql_results)) + ' to convert to csv')
+			self.log.error(sql_results)
 			return -1
 		if filepath == '':
 			self.log.error('No file path for results file provided')
