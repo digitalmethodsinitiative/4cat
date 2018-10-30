@@ -21,7 +21,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS unique_job
 CREATE TABLE IF NOT EXISTS threads (
   id                 bigint PRIMARY KEY, -- matches 4chan thread ID
   board              text,
-  timestamp          integer DEFAULT 0, -- first known timestamp for this thread
+  timestamp          integer DEFAULT 0, -- first known timestamp for this thread, i.e. timestamp of first post
   timestamp_archived integer DEFAULT 0,
   timestamp_scraped  integer, -- last timestamp this thread was scraped
   timestamp_deleted  integer DEFAULT 0,  -- timestamp this thread was no longer scrapeable
