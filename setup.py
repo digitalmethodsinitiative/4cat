@@ -15,7 +15,7 @@ setup(
 
 	packages=['backend', 'webtool'],
 	install_requires=[
-		"requests==2.19.1",
+		"requests==2.20.0",
 		"psycopg2_binary==2.7.5",
 		"html2text==2018.1.9",
 		"numpy==1.15.2",
