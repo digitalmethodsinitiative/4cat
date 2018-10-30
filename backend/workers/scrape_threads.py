@@ -24,7 +24,7 @@ class ThreadScraper(BasicJSONScraper):
 	This scrapes individual threads, and saves the posts into the database.
 	"""
 	type = "thread"
-	max_workers = 2
+	max_workers = 3
 	pause = 1
 
 	# for new posts, any fields not in here will be saved in the "unsorted_data" column for that post as part of a
@@ -230,6 +230,7 @@ class ThreadScraper(BasicJSONScraper):
 
 		# first post has useful metadata for the *thread*
 		thread_update = {
+			"timestamp": first_post["time"],
 			"num_unique_ips": first_post["unique_ips"] if "unique_ips" in first_post else -1,
 			"num_images": first_post["images"],
 			"num_replies": num_replies,
