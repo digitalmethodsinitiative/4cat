@@ -22,13 +22,23 @@ $(function() {
 			url: ajax_url,
 			success: function(response) {
 				console.log(response);
-				query_key = response
-				poll_csv(query_key)
 
-				// poll results every 2000 ms after submitting
-				poll_interval = setInterval(function() {
-					poll_csv(query_key);
-				}, 4000);
+				// If the query is rejected by the server.
+				if (response.substr(0, 14) == 'Invalid query.') {
+					$('.loader').hide()
+					alert(response)
+				}
+
+				// If the query is accepted by the server.
+				else{
+					query_key = response
+					poll_csv(query_key)
+
+					// poll results every 2000 ms after submitting
+					poll_interval = setInterval(function() {
+						poll_csv(query_key);
+					}, 4000);
+				}
 			},
 			error: function(error) {
 				console.log('error')
@@ -78,12 +88,15 @@ $(function() {
 	function get_ajax_url(){
 		/*
 		Takes the user input and generates an AJAX URL to send to Flask back-end
+		Returns an error if not enough parameters are provided.
 		*/
 
-		// Set string parameters
-		var url_body = $('#body-input').val().replace(/ /g, '-');
-		var url_subject = $('#subject-input').val().replace(/ /g, '-');
-
+		// Set string parameters. Replace some potentially harmful characters.
+		// Text in between * characters indicate exact match searches
+		var url_body = $('#body-input').val().replace(/\"/g,"*");
+		var url_subject = $('#subject-input').val().replace(/\"/g,"*");
+		url_body = url_body.replace(/[^\p{L}A-Za-z0-9_*-]+/g,"-");
+		url_subject = url_subject.replace(/[^\p{L}A-Za-z0-9_*-]+/g,"-");
 		if(url_body == ''){url_body = 'empty'}
 		if(url_subject == ''){url_subject = 'empty'}
 

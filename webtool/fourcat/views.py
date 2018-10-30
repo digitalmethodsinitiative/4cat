@@ -12,6 +12,8 @@ from backend.lib.database import Database
 from backend.lib.logger import Logger
 from backend.lib.queue import JobQueue, JobAlreadyExistsException
 
+from stop_words import get_stop_words
+
 """
 
 Main views for the 4CAT front-end
@@ -48,9 +50,9 @@ def string_query(body_query, subject_query, full_thread=0, dense_threads=0, dens
 	log = Logger()
 	db = Database(logger=log)
 	queue = JobQueue(log, db)
-	print(body_query)
-	# Queue query
-	query = SearchQuery(query=body_query, parameters={
+	body_query = body_query.replace("[^\p{L}A-Za-z0-9_*-]","");
+	subject_query = subject_query.replace("[^\p{L}A-Za-z0-9_*-]","");
+	parameters = {
 		"body_query": str(body_query).replace("-", " "),
 		"subject_query": str(subject_query).replace("-", " "),
 		"full_thread": bool(full_thread),
@@ -59,7 +61,18 @@ def string_query(body_query, subject_query, full_thread=0, dense_threads=0, dens
 		"dense_length": int(dense_length),
 		"min_date": int(min_timestamp),
 		"max_date": int(max_timestamp)
-		}, db=db)
+	}
+
+	valid = validateQuery(parameters)
+	print('valid ', valid)
+
+	if valid != True:
+		print(valid)
+		return "Invalid query. " + valid
+
+	# Queue query
+	query = SearchQuery(query=body_query, parameters=parameters, db=db)
+
 	try:
 		queue.add_job(jobtype="query", remote_id=query.key)
 	except JobAlreadyExistsException:
@@ -87,9 +100,62 @@ def check_query(query_key):
 		if app.debug == True:
 			if results == 'empty_file':
 				return results
-			return 'http://localhost/fourcat/data/' + query.data["query"].replace("\"", "") + '-' + query_key + '.csv'
+			return 'http://localhost/fourcat/data/' + query.data["query"].replace("*", "") + '-' + query_key + '.csv'
 		
 		return results
 
 	else:
 		return "no_file"
+
+def validateQuery(parameters):
+	"""
+	Validates the client-side user input
+
+	"""
+
+	if not parameters:
+		print('Please provide valid paramters.')
+		return -1
+
+	stop_words = get_stop_words('en')
+
+	# Body query should be at least three characters long and should not be just a stopword.
+	# 'empty' passes this.
+	if len(parameters["body_query"]) < 3:
+		return("Body query is too short. Use at least three characters.")
+	elif parameters["body_query"] in stop_words:
+		return("Use a body input that is not a stop word.")
+	# Query must contain alphanumeric characters
+	elif not re.search('[a-zA-Z0-9]', parameters["body_query"]):
+		return("Body query must contain alphanumeric characters.")
+
+	# Subject query should be at least three characters long and should not be just a stopword.
+	# 'empty' passes this.
+	if len(parameters["subject_query"]) < 3:
+		return("Subject query is too short. Use at least three characters.")
+	elif parameters["subject_query"] in stop_words:
+		return("Use a subject input that is not a stop word.")
+	# Query must contain alphanumeric characters
+	elif not re.search('[a-zA-Z0-9]', parameters["subject_query"]):
+		return("Subject query must contain alphanumeric characters.")	
+
+	# Keyword-dense thread length should be at least thirty.
+	if parameters["dense_length"] > 0 and parameters["dense_length"] < 30:
+		return("Keyword-dense thread length should be at least thirty.")
+	# Keyword-dense thread density should be at least 15%.
+	elif parameters["dense_percentage"] > 0 and parameters["dense_percentage"] < 15:
+		return("Keyword-dense thread density should be at least 15%.")
+
+	# Check if there are enough parameters provided.
+	# Body and subject queryies may be empty if date ranges are max a week apart.
+	if parameters["body_query"] == 'empty' and parameters["subject_query"] == 'empty':
+		# Check if the date range is less than a week.
+		if parameters["min_date"] != 0 and parameters["max_date"] != 0:
+			time_diff = parameters["max_date"] - parameters["min_date"]
+			print(time_diff)
+			if time_diff >= 604800:
+				return("Filter on a date range shorter than a week.")
+		else:
+			return("Input either a body or subject query, or filter on a date range shorter than a week.")
+	
+	return True

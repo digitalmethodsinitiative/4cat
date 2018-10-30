@@ -119,3 +119,6 @@ CREATE TABLE IF NOT EXISTS queries (
   is_empty        boolean DEFAULT FALSE,
   is_finished     boolean DEFAULT FALSE
 );
+
+TRUNCATE TABLE jobs;
+TRUNCATE TABLE queries;

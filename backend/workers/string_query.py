@@ -112,11 +112,11 @@ class stringQuery(BasicWorker):
 		max_date = query_parameters["max_date"]
 
 		# Check if there's anything in quotation marks for LIKE operations
-		pattern = "\"(.*?)\""
+		pattern = "\*(.*?)\*"
 		li_exact_body = re.findall(pattern, body_query)
 		li_exact_subject = re.findall(pattern, subject_query)
-		body_query = body_query.replace("\"", "")
-		subject_query = subject_query.replace("\"", "")
+		body_query = body_query.replace("*", "")
+		subject_query = subject_query.replace("*", "")
 
 		# Set SQL statements depending on job parameters
 		replacements = []
@@ -133,10 +133,9 @@ class stringQuery(BasicWorker):
 			sql_body = sql_body + " AND body_vector @@ plainto_tsquery('" + body_query + "')"
 			sql_log = sql_log + "'" + body_query + "' is in body, "
 			# If there are exact string matches between "quotation marks", loop through all entries and add to SQL query
-			# Should test later if tsvector matching followed by LIKE is fast enough.
 			if li_exact_body:
 				for exact_body in li_exact_body:
-					sql_body = sql_body + " AND lower(body) LIKE '%" + exact_body + "%'"
+					sql_body = sql_body + " AND lower(body) SIMILAR TO '%" + exact_body + "%'"
 					sql_log = sql_log + "body exactly matches '" + exact_body + "', "
 			replacements.append(sql_body)
 		
@@ -147,7 +146,7 @@ class stringQuery(BasicWorker):
 			# If there are exact string matches between "quotation marks", loop through all entries and add to SQL query
 			if li_exact_subject:
 				for exact_subject in li_exact_subject:
-					sql_subject = sql_subject + " AND lower(subject) LIKE '%" + exact_subject + "%'"
+					sql_subject = sql_subject + " AND lower(subject) SIMILAR TO '%" + exact_subject + "%'"
 					sql_log = sql_log + "subject exactly matches '" + exact_subject + "', "
 			replacements.append(sql_body)
 
@@ -227,7 +226,7 @@ class stringQuery(BasicWorker):
 		sql_body = " AND posts.body_vector @@ plainto_tsquery('" + body_query + "')"
 		if li_exact_body:
 			for exact_body in li_exact_body:
-				sql_body = sql_body + " AND lower(posts.body) LIKE '%" + exact_body + "%'"
+				sql_body = sql_body + " AND postsbIody) LIKE '%" + exact_body + "%'"
 		body_query = body_query.replace("\"", "")
 		
 		# Set timestamp parameters. Currently checks timestamp of all posts with keyword within paramaters.
