@@ -25,25 +25,41 @@ def show_index():
 	"""
 	return render_template('fourcat.html')
 
-@app.route('/string_query/<searchquery>')
-@app.route('/string_query/<searchquery>/<min_timestamp>/<max_timestamp>')
-def string_query(searchquery, min_timestamp='none', max_timestamp='none'):
+@app.route('/string_query/<string:body_query>/<string:subject_query>/<int:full_thread>/<int:dense_threads>/<int:dense_percentage>/<int:dense_length>/<int:min_timestamp>/<int:max_timestamp>')
+def string_query(body_query, subject_query, full_thread=0, dense_threads=0, dense_percentage=15, dense_length=30, min_timestamp=0, max_timestamp=0):
 	"""
-	AJAX URI for substring querying
+	AJAX URI for various forms of substring querying
 
-	:param	searchquery		str, the string to query for
-	:param	timestamps		str, min and max timestamps to search for, separated by #
+	:param	body_query					str,	Query string for post body. Can be 'empty'.
+	:param	subject_query				str,	Query string for post subject. Can be 'empty'.
+	:param	exact_match					int,	Whether to perform an exact substring match instead of FTS.
+	:param	dense_threads				int,	Whether to check for keyword-dense threads (0-1).
+	:param	dense_percentage			int,	Minimum percentage of posts in thread containing keyword (>15%).
+	:param	dense_length				int,	Minimum thread length for keyword-dense threads (>30).
+	:param	min_timestamp				int,	Min date in UTC timestamp
+	:param	max_timestamp				int,	Max date in UTC timestamp
+
 	"""
 
-	# for security
-	searchquery = re.escape(searchquery)
+	# Security
+	#body_query = re.escape(body_query)
 
-	# make connections to database with backend library - safe enough?
+	# Make connections to database with backend library - safe enough?
 	log = Logger()
 	db = Database(logger=log)
 	queue = JobQueue(log, db)
-
-	query = SearchQuery(query=searchquery, parameters={"str_query": searchquery, "col_query": "body_vector", "min_timestamp": min_timestamp, "max_timestamp": max_timestamp}, db=db)
+	print(body_query)
+	# Queue query
+	query = SearchQuery(query=body_query, parameters={
+		"body_query": str(body_query).replace("-", " "),
+		"subject_query": str(subject_query).replace("-", " "),
+		"full_thread": bool(full_thread),
+		"dense_threads": bool(dense_threads),
+		"dense_percentage": int(dense_percentage),
+		"dense_length": int(dense_length),
+		"min_date": int(min_timestamp),
+		"max_date": int(max_timestamp)
+		}, db=db)
 	try:
 		queue.add_job(jobtype="query", remote_id=query.key)
 	except JobAlreadyExistsException:
@@ -67,13 +83,13 @@ def check_query(query_key):
 
 	if results:
 
+		# custom stuff for debugging
 		if app.debug == True:
 			if results == 'empty_file':
-				return(results)
-			# custom path for debugging
-			return('http://localhost/fourcat/data/' + query.data["query"] + '-' + query_key + '.csv')
+				return results
+			return 'http://localhost/fourcat/data/' + query.data["query"].replace("\"", "") + '-' + query_key + '.csv'
 		
-		return(results)
+		return results
 
 	else:
-		return("no_file")
+		return "no_file"
