@@ -3,6 +3,10 @@ import config
 import csv
 import os
 import pickle as p
+import re
+
+from bs4 import BeautifulSoup
+from datetime import datetime
 
 from backend.lib.database import Database
 from backend.lib.logger import Logger
@@ -11,28 +15,27 @@ from backend.lib.queue import JobClaimedException
 from backend.lib.helpers import get_absolute_folder
 from backend.lib.worker import BasicWorker
 
-from bs4 import BeautifulSoup
-
 
 class stringQuery(BasicWorker):
 	"""
 	Process substring queries from the front-end
 	Requests are added to the pool as "query" jobs
 
-	E.g. queue.addJob(type="query", details={"str_query": "skyrim", "col_query": "body_vector"})
 	"""
 
 	type = "query"
 	pause = 2
 	max_workers = 3
 
+	# Columns to return in csv.
+	# Mandatory columns: ['thread_id', 'body', 'subject', 'timestamp']
+	li_return_cols = ['thread_id', 'id', 'timestamp', 'body', 'subject', 'author', 'image_file', 'image_md5', 'country_name']
+
 	def __init__(self, logger, manager):
 		"""
 		Set up database connection - we need one to perform the query
 		"""
 		super().__init__(logger=logger, manager=manager)
-
-		self.allowed_cols = ['body_vector', 'title_vector']
 
 	def work(self):
 
@@ -48,100 +51,240 @@ class stringQuery(BasicWorker):
 			except JobClaimedException:
 				return
 
-			self.log.info("Executing string query")
-			
+			# Setup connections and get parameters
 			log = Logger()
 			db = Database(logger=log)
-			query = SearchQuery(key=job["remote_id"], db=db)
+			key = job["remote_id"]
+			query = SearchQuery(key=key, db=db)
+			query_parameters = query.get_parameters()
+			results_dir = query.get_results_dir()
+			results_file = query.get_results_path() 
 
-			# get query details
-			di_query_parameters = query.get_parameters()
-			col = di_query_parameters["col_query"]
-			str_query = di_query_parameters["str_query"]
+			# If keyword-dense threads are selected, get and write matching threads first,
+			# and set the "dense_threads" parameters as this list
+			if query_parameters["dense_threads"]:
+				matching_threads = self.get_dense_threads(query_parameters)
 
-			resultsfile = query.get_results_path() 
-
-			self.log.info(resultsfile)
-
-			if "min_date" in di_query_parameters and "max_date" in di_query_parameters:
-				min_date = di_query_parameters["min_date"]
-				min_date = di_query_parameters["max_date"]
-
-			if col not in self.allowed_cols:
-				self.log.warning("Column %s is not allowed. Use body_vector and/or title_vector" % (col))
-				return
-
-			# execute the query on the relevant column
-			di_matches = self.execute_query(str(col), str(str_query))
-
-			# write to csv if there substring matches. Else set query as empty
-			if di_matches:
-				self.dict_to_csv(di_matches, resultsfile)
+				if matching_threads:
+					self.psql_results_to_csv(matching_threads, results_dir + '/metadata_dense_threads_' + query_parameters["body_query"].replace("\"", "") + ".csv", clean_csv=False)
+					li_thread_ids = tuple([thread["thread_id"] for thread in matching_threads])
+					query_parameters["dense_threads"] = li_thread_ids
+				else:
+					# No keyword-dense thread results
+					query.set_empty()
+					query.finish()
+					self.queue.finish_job(job)
+					return -1
+			
+			# Get posts
+			self.log.info("Executing substring query")
+			li_matches = self.execute_string_query(query_parameters)
+			
+			# Write to csv if there substring matches. Else set query as empty.
+			if li_matches:
+				self.psql_results_to_csv(li_matches, results_file)
 			else:
 				query.set_empty()
 
-			# done!
+			# Done!
 			query.finish()
 			self.queue.finish_job(job)
 
 		looping = False
 
-	def execute_query(self, col_query, str_query, min_date=None, max_date=None):
+	def execute_string_query(self, query_parameters):
 		"""
-		Query the relevant column of the chan data
+		Query the relevant column of the chan data.
+		Converts parameters to SQL statements.
+		Returns the results in a dictionary.
 
-		:param col_query:   string of the column to query (body_vector, subject_vector)
-		:param str_query:   string to query
-	
+		:param query_parameters		dict, dictionary of query job parameters
+		
 		"""
-		self.log.info('Starting fetching ' + col_query + ' containing \'' + str_query + '\'')
+		
+		body_query = query_parameters["body_query"]
+		subject_query = query_parameters["subject_query"]
+		full_thread = query_parameters["full_thread"]
+		dense_threads = query_parameters["dense_threads"]
+		dense_percentage = query_parameters["dense_percentage"]
+		dense_length = query_parameters["dense_length"]
+		min_date = query_parameters["min_date"]
+		max_date = query_parameters["max_date"]
 
+		# Check if there's anything in quotation marks for LIKE operations
+		pattern = "\"(.*?)\""
+		li_exact_body = re.findall(pattern, body_query)
+		li_exact_subject = re.findall(pattern, subject_query)
+		body_query = body_query.replace("\"", "")
+		subject_query = subject_query.replace("\"", "")
+
+		# Set SQL statements depending on job parameters
+		replacements = []
+		sql_body = ''
+		sql_subject = ''
+		sql_min_date = ''
+		sql_max_date = ''
+		sql_columns = ', '.join(self.li_return_cols)
+		sql_log = 'Starting substring query where '
+
+		# Generate SQL query string
+		if body_query != 'empty':
+			# Primary use if FTS search, so set tsvector matching first
+			sql_body = sql_body + " AND body_vector @@ plainto_tsquery('" + body_query + "')"
+			sql_log = sql_log + "'" + body_query + "' is in body, "
+			# If there are exact string matches between "quotation marks", loop through all entries and add to SQL query
+			# Should test later if tsvector matching followed by LIKE is fast enough.
+			if li_exact_body:
+				for exact_body in li_exact_body:
+					sql_body = sql_body + " AND lower(body) LIKE '%" + exact_body + "%'"
+					sql_log = sql_log + "body exactly matches '" + exact_body + "', "
+			replacements.append(sql_body)
+		
+		if subject_query != 'empty':
+			# Primary use if FTS search, so set tsvector matching first
+			sql_subject = sql_subject + " AND subject_vector @@ plainto_tsquery('" + subject_query + "')"
+			sql_log = sql_log + "'" + subject_query + "' is in subject, "
+			# If there are exact string matches between "quotation marks", loop through all entries and add to SQL query
+			if li_exact_subject:
+				for exact_subject in li_exact_subject:
+					sql_subject = sql_subject + " AND lower(subject) LIKE '%" + exact_subject + "%'"
+					sql_log = sql_log + "subject exactly matches '" + exact_subject + "', "
+			replacements.append(sql_body)
+
+		if min_date != 0:
+			sql_min_date = " AND timestamp >= " + str(min_date)
+			replacements.append(sql_min_date)
+			sql_log = sql_log + "is posted after " + str(min_date) + ", "
+		if max_date != 0:
+			sql_max_date = " AND timestamp <= " + str(max_date)
+			replacements.append(sql_max_date)
+			sql_log = sql_log + "is posted before " + str(max_date) + ", "
+		sql_log = sql_log[:-2] + '.'
+
+		# Start some timekeeping
 		start_time = time.time()
-		try:
-			if col_query == 'body_vector':
-				if min_date is None and max_date is None:
-					di_matches = self.db.fetchall(
-						"SELECT id, timestamp, subject, body FROM posts WHERE body_vector @@ to_tsquery(%s);", (str_query,))
-				else:
-					di_matches = self.db.fetchall(
-						"SELECT id, timestamp, subject, body FROM posts WHERE body_vector @@ to_tsquery(%s) AND timestamp > %s AND timestamp < %s;", (str_query, min_date, max_date))
-			elif col_query == 'subject_vector':
-				di_matches = self.db.fetchall(
-					"SELECT id, timestamp, subject, body FROM posts WHERE subject_vector @@ to_tsquery(%s);",
-					(str_query,))
 
-		except Exception as error:
-			return str(error)
+		# Fetch only posts
+		if dense_threads is False and full_thread is False:
 
-		self.log.info('Finished fetching ' + col_query + ' containing \'' + str_query + '\' in ' + str(
-			round((time.time() - start_time), 4)) + ' seconds')
+			# Log SQL query
+			self.log.info(sql_log)
+			self.log.info("SELECT " + sql_columns + " FROM posts WHERE true" + sql_body + sql_subject + sql_min_date + sql_max_date)
 
-		return di_matches
+			try:
+				li_matches = self.db.fetchall("SELECT " + sql_columns + " FROM posts WHERE true" + sql_body + sql_subject + sql_min_date + sql_max_date)
+			except Exception as error:
+				return str(error)
 
-	def dict_to_csv(self, di_input, filepath, clean_csv=True):
+		# Fetch full thread data
+		elif dense_threads != False or (full_thread and subject_query != 'empty'):
+			# Log SQL query
+			self.log.info("Getting full thread data, but first: " + sql_log)
+			self.log.info("SELECT " + sql_columns + " FROM posts WHERE true" + sql_body + sql_subject + sql_min_date + sql_max_date)
+
+			# Get the IDs of the matching threads
+			li_thread_ids = []
+			if dense_threads != False:
+				li_thread_ids = dense_threads
+			else:
+				try:
+					li_thread_ids = self.db.fetchall("SELECT thread_id FROM posts WHERE true" + sql_body + sql_subject + sql_min_date + sql_max_date)
+				except Exception as error:
+					return str(error)
+				# Convert matching OP ids to tuple
+				li_thread_ids = tuple([thread["thread_id"] for thread in li_thread_ids])
+
+			# Fetch posts within matching thread IDs
+			try:
+				li_matches = self.db.fetchall("SELECT " + sql_columns + " FROM posts WHERE thread_id IN %s ORDER BY thread_id, timestamp", (li_thread_ids,))
+			except Exception as error:
+				return str(error)
+		
+		else:
+			self.log.warning("Not enough parameters provided for substring query.")
+			return -1
+
+		self.log.info("Finished query in " + str(round((time.time() - start_time), 4)) + " seconds")
+		return li_matches
+
+	def get_dense_threads(self, parameters):
+		"""
+		Get metadata from keyword-dense threads.
+		Returns a list of thread IDs that match the keyboard-density parameters
+
+		"""
+		
+		# Get relevant parameter values
+		body_query = parameters["body_query"]
+		dense_length = parameters["dense_length"]
+		dense_percentage = parameters["dense_percentage"]
+		min_date = parameters["min_date"]
+		max_date = parameters["max_date"]
+
+		# Set body query. Check if there's anything in quotation marks for LIKE operations.
+		pattern = "\"(.*?)\""
+		li_exact_body = re.findall(pattern, body_query)
+		sql_body = " AND posts.body_vector @@ plainto_tsquery('" + body_query + "')"
+		if li_exact_body:
+			for exact_body in li_exact_body:
+				sql_body = sql_body + " AND lower(posts.body) LIKE '%" + exact_body + "%'"
+		body_query = body_query.replace("\"", "")
+		
+		# Set timestamp parameters. Currently checks timestamp of all posts with keyword within paramaters.
+		# Should perhaps change to OP timestamp.
+		sql_min_date = ''
+		sql_max_date = ''
+		if min_date != 0:
+			sql_min_date = " AND posts.timestamp >= " + str(min_date)
+		if max_date != 0:
+			sql_max_date = " AND posts.timestamp <= " + str(max_date)
+
+		self.log.info("Getting keyword-dense threads for " + body_query + " with a minimum thread length of " + str(dense_length) + " and a keyword density of " + str(dense_percentage) + ".")
+		#self.log.info()
+
+		matching_threads = self.db.fetchall("""
+			SELECT thread_id, num_replies, keyword_count, keyword_density::real FROM (
+				SELECT thread_id, num_replies, keyword_count, ((keyword_count::real / num_replies::real) * 100) AS keyword_density FROM (
+					SELECT posts.thread_id, threads.num_replies, count(*) as keyword_count FROM posts
+					INNER JOIN threads ON posts.thread_id = threads.id
+					WHERE true """ + sql_body + sql_min_date + sql_max_date + """
+					GROUP BY posts.thread_id, threads.num_replies
+				) AS thread_matches
+			) AS thread_meta
+			WHERE num_replies >= """ + str(dense_length) + """
+			AND keyword_density >= """ + str(dense_percentage) + """
+
+			""")
+
+		# Convert threads to tuple
+		self.log.info("Found " + str(len(matching_threads)) + " " + body_query + "-dense threads.")
+
+		return matching_threads
+
+	def psql_results_to_csv(self, sql_results, filepath, clean_csv=True):
 		"""
 		Takes a dictionary of results, converts it to a csv, and writes it to the data folder.
 		The respective csvs will be available to the user.
 
-		:param di_input:    dict derived with db.fetchall(), used as input
-		:param filename:    filename for the resulting csv
-		:param clean_csv:   whether to parse the raw HTML data to clean text. If True (default), writing takes 1.5 times longer.
+		:param sql_results:		List with results derived with db.fetchall()
+		:param filepath:    	Filepath for the resulting csv
+		:param clean_csv:   	Whether to parse the raw HTML data to clean text.
+								If True (default), writing takes 1.5 times longer.
 
 		"""
-		#self.log.info(type(di_input))
-		# some error handling
-		if type(di_input) != list:
-			self.log.error('Please use a dict object instead of ' +  str(type(di_input)) + 'to convert to csv')
+
+		# Sme error handling
+		if type(sql_results) != list:
+			self.log.error('Please use a list instead of ' +  str(type(sql_results)) + ' to convert to csv')
+			self.log.error(sql_results)
 			return -1
 		if filepath == '':
 			self.log.error('No file path for results file provided')
 			return -1
 
-		#filepath = get_absolute_folder(config.PATH_DATA) + "/" + filename + '.csv'
+		#sql_results = sql_results[0]
+		fieldnames = list(sql_results[0].keys())
 
-		# fields to save in the offered csv (tweak later)
-		fieldnames = ['id', 'timestamp', 'body', 'subject']
-		print('filepath: ',filepath)
 		# write the dictionary to a csv
 		with open(filepath, 'w', encoding='utf-8') as csvfile:
 			writer = csv.DictWriter(csvfile, fieldnames=fieldnames, lineterminator='\n')
@@ -150,11 +293,18 @@ class stringQuery(BasicWorker):
 			if clean_csv:
 				# Parsing: remove the HTML tags, but keep the <br> as a newline
 				# Takes around 1.5 times longer
-				for post in di_input:
-					post['body'] = post['body'].replace('<br>', '\n')
-					post["body"] = BeautifulSoup(post["body"], 'html.parser').get_text()
-					writer.writerow(post)
+				for row in sql_results:
+
+					# Create human dates from timestamp
+					from datetime import datetime
+					row["timestamp"] = datetime.utcfromtimestamp(row["timestamp"]).strftime('%Y-%m-%d %H:%M:%S')
+
+					# Clean body column
+					row["body"] = row["body"].replace("<br>", "\n")
+					row["body"] = BeautifulSoup(row["body"], "html.parser").get_text()
+
+					writer.writerow(row)
 			else:
-				writer.writerows(li_input)
+				writer.writerows(sql_results)
 
 		return filepath
