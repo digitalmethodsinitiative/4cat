@@ -2,14 +2,17 @@ import datetime
 import psutil
 import json
 import os
+import config
+import hashlib
+import base64
+import glob
 
 from collections import OrderedDict
 
-from flask import jsonify, abort
+from flask import jsonify, abort, send_file
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 
-import config
 from fourcat import app
 from backend.lib.database import Database
 from backend.lib.queue import JobQueue
@@ -314,3 +317,37 @@ def get_thread(board, thread, db, limit=0):
 		first_post = False
 
 	return response
+
+@app.route('/api/image/<img_hash>')
+@api_ratelimit
+def get_image(img_hash, limit=0):
+
+	"""
+	Returns an image based on the hexadecimal hash.
+	Request should hex the md5 hashes first (e.g. with hexdigest())
+
+	"""
+	limit = "" if not limit or limit <= 0 else " LIMIT %i" % int(limit)
+	print(img_hash)
+	for file in os.listdir(get_absolute_folder(config.PATH_IMAGES) + '/'):
+		if img_hash in file:
+			image = config.PATH_IMAGES + '/' + file
+			filename = file.split('/')
+			filename = filename[len(filename) - 1]
+			print(filename)
+			filetype = filename.split('.')[1]
+
+			if app.debug == True:
+				print('debugging')
+				file = '../../data/' + filename
+				
+				if filetype == 'webm':
+					return send_file(file, mimetype='video/' + filetype)
+				else:
+					return send_file(file, mimetype='image/' + filetype)
+
+			if filetype == 'webm':
+				return send_file(image, mimetype='video/' + filetype)
+			else:
+				return send_file(image, mimetype='image/' + filetype)
+	abort(404)

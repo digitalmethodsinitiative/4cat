@@ -177,6 +177,7 @@ class stringQuery(BasicWorker):
 
 		# Fetch full thread data
 		elif dense_threads != False or (full_thread and subject_query != 'empty'):
+			
 			# Log SQL query
 			self.log.info("Getting full thread data, but first: " + sql_log)
 			self.log.info("SELECT " + sql_columns + " FROM posts WHERE true" + sql_body + sql_subject + sql_min_date + sql_max_date)
@@ -190,9 +191,14 @@ class stringQuery(BasicWorker):
 					li_thread_ids = self.db.fetchall("SELECT thread_id FROM posts WHERE true" + sql_body + sql_subject + sql_min_date + sql_max_date)
 				except Exception as error:
 					return str(error)
+				
 				# Convert matching OP ids to tuple
 				li_thread_ids = tuple([thread["thread_id"] for thread in li_thread_ids])
 
+				# If there are no threads with the requested string in the title, return the empty list
+				if len(li_thread_ids) == 0:
+					return li_thread_ids
+								
 			# Fetch posts within matching thread IDs
 			try:
 				li_matches = self.db.fetchall("SELECT " + sql_columns + " FROM posts WHERE thread_id IN %s ORDER BY thread_id, timestamp", (li_thread_ids,))
