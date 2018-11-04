@@ -64,7 +64,6 @@ def string_query(body_query, subject_query, full_thread=0, dense_threads=0, dens
 	}
 
 	valid = validateQuery(parameters)
-	print('valid ', valid)
 
 	if valid != True:
 		print(valid)
