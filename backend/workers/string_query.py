@@ -58,7 +58,8 @@ class stringQuery(BasicWorker):
 			query = SearchQuery(key=key, db=db)
 			query_parameters = query.get_parameters()
 			results_dir = query.get_results_dir()
-			results_file = query.get_results_path() 
+			results_file = query.get_results_path()
+			results_file = results_file.replace("*","")
 
 			# If keyword-dense threads are selected, get and write matching threads first,
 			# and set the "dense_threads" parameters as this list
@@ -66,7 +67,7 @@ class stringQuery(BasicWorker):
 				matching_threads = self.get_dense_threads(query_parameters)
 
 				if matching_threads:
-					self.psql_results_to_csv(matching_threads, results_dir + '/metadata_dense_threads_' + query_parameters["body_query"].replace("\"", "") + ".csv", clean_csv=False)
+					self.psql_results_to_csv(matching_threads, results_dir + '/metadata_dense_threads_' + query_parameters["body_query"].replace("*", "") + ".csv", clean_csv=False)
 					li_thread_ids = tuple([thread["thread_id"] for thread in matching_threads])
 					query_parameters["dense_threads"] = li_thread_ids
 				else:
@@ -102,6 +103,7 @@ class stringQuery(BasicWorker):
 		
 		"""
 		
+		board = query_parameters["board"]
 		body_query = query_parameters["body_query"]
 		subject_query = query_parameters["subject_query"]
 		full_thread = query_parameters["full_thread"]
@@ -120,6 +122,7 @@ class stringQuery(BasicWorker):
 
 		# Set SQL statements depending on job parameters
 		replacements = []
+		sql_board = ''
 		sql_body = ''
 		sql_subject = ''
 		sql_min_date = ''
@@ -127,6 +130,16 @@ class stringQuery(BasicWorker):
 		sql_columns = ', '.join(self.li_return_cols)
 		sql_log = 'Starting substring query where '
 
+
+		# Mandatory that thread appears in threads.id for the respective board
+		board_threads = self.db.fetchall("SELECT id FROM threads WHERE board = '" + board + "'")
+		board_threads = list([thread["id"] for thread in board_threads])
+		board_threads = [str(thread) for thread in board_threads]
+		
+		board_threads = ','.join(board_threads)
+		sql_board = ' AND thread_id IN (' + board_threads + ')'
+		sql_log = sql_log + "posts are on " + board + ", "
+		
 		# Generate SQL query string
 		if body_query != 'empty':
 			# Primary use if FTS search, so set tsvector matching first
@@ -168,10 +181,10 @@ class stringQuery(BasicWorker):
 
 			# Log SQL query
 			self.log.info(sql_log)
-			self.log.info("SELECT " + sql_columns + " FROM posts WHERE true" + sql_body + sql_subject + sql_min_date + sql_max_date)
+			self.log.info("SELECT " + sql_columns + " FROM posts WHERE true AND thread_id IN (...)" + sql_body + sql_subject + sql_min_date + sql_max_date)
 
 			try:
-				li_matches = self.db.fetchall("SELECT " + sql_columns + " FROM posts WHERE true" + sql_body + sql_subject + sql_min_date + sql_max_date)
+				li_matches = self.db.fetchall("SELECT " + sql_columns + " FROM posts WHERE true" + sql_board + sql_body + sql_subject + sql_min_date + sql_max_date)
 			except Exception as error:
 				return str(error)
 
@@ -180,7 +193,7 @@ class stringQuery(BasicWorker):
 			
 			# Log SQL query
 			self.log.info("Getting full thread data, but first: " + sql_log)
-			self.log.info("SELECT " + sql_columns + " FROM posts WHERE true" + sql_body + sql_subject + sql_min_date + sql_max_date)
+			self.log.info("SELECT " + sql_columns + " FROM posts WHERE true AND thread_in IN (...)" + sql_body + sql_subject + sql_min_date + sql_max_date)
 
 			# Get the IDs of the matching threads
 			li_thread_ids = []
@@ -188,7 +201,7 @@ class stringQuery(BasicWorker):
 				li_thread_ids = dense_threads
 			else:
 				try:
-					li_thread_ids = self.db.fetchall("SELECT thread_id FROM posts WHERE true" + sql_body + sql_subject + sql_min_date + sql_max_date)
+					li_thread_ids = self.db.fetchall("SELECT thread_id FROM posts WHERE true" + sql_board + sql_body + sql_subject + sql_min_date + sql_max_date)
 				except Exception as error:
 					return str(error)
 				
@@ -218,13 +231,21 @@ class stringQuery(BasicWorker):
 		Returns a list of thread IDs that match the keyboard-density parameters
 
 		"""
-		
+				
 		# Get relevant parameter values
+		board = parameters["board"]
 		body_query = parameters["body_query"]
 		dense_length = parameters["dense_length"]
 		dense_percentage = parameters["dense_percentage"]
 		min_date = parameters["min_date"]
 		max_date = parameters["max_date"]
+
+		# Mandatory that thread appears in threads.id for the respective board
+		board_threads = self.db.fetchall("SELECT id FROM threads WHERE board = '" + board + "'")
+		board_threads = list([thread["id"] for thread in board_threads])
+		board_threads = [str(thread) for thread in board_threads]
+		board_threads = ','.join(board_threads)
+		sql_board = ' AND thread_id IN (' + board_threads + ')'
 
 		# Set body query. Check if there's anything in quotation marks for LIKE operations.
 		pattern = "\"(.*?)\""
@@ -232,7 +253,7 @@ class stringQuery(BasicWorker):
 		sql_body = " AND posts.body_vector @@ plainto_tsquery('" + body_query + "')"
 		if li_exact_body:
 			for exact_body in li_exact_body:
-				sql_body = sql_body + " AND postsbIody) LIKE '%" + exact_body + "%'"
+				sql_body = sql_body + " AND posts.body LIKE '%" + exact_body + "%'"
 		body_query = body_query.replace("\"", "")
 		
 		# Set timestamp parameters. Currently checks timestamp of all posts with keyword within paramaters.
@@ -244,7 +265,7 @@ class stringQuery(BasicWorker):
 		if max_date != 0:
 			sql_max_date = " AND posts.timestamp <= " + str(max_date)
 
-		self.log.info("Getting keyword-dense threads for " + body_query + " with a minimum thread length of " + str(dense_length) + " and a keyword density of " + str(dense_percentage) + ".")
+		self.log.info("Getting keyword-dense threads on " + board + " for " + body_query + " with a minimum thread length of " + str(dense_length) + " and a keyword density of " + str(dense_percentage) + ".")
 		#self.log.info()
 
 		matching_threads = self.db.fetchall("""
@@ -252,7 +273,7 @@ class stringQuery(BasicWorker):
 				SELECT thread_id, num_replies, keyword_count, ((keyword_count::real / num_replies::real) * 100) AS keyword_density FROM (
 					SELECT posts.thread_id, threads.num_replies, count(*) as keyword_count FROM posts
 					INNER JOIN threads ON posts.thread_id = threads.id
-					WHERE true """ + sql_body + sql_min_date + sql_max_date + """
+					WHERE true """ + sql_board + sql_body + sql_min_date + sql_max_date + """
 					GROUP BY posts.thread_id, threads.num_replies
 				) AS thread_matches
 			) AS thread_meta

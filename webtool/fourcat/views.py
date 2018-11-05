@@ -25,13 +25,17 @@ def show_index():
 	"""
 	Index page: main tool frontend
 	"""
-	return render_template('fourcat.html')
 
-@app.route('/string_query/<string:body_query>/<string:subject_query>/<int:full_thread>/<int:dense_threads>/<int:dense_percentage>/<int:dense_length>/<int:min_timestamp>/<int:max_timestamp>')
-def string_query(body_query, subject_query, full_thread=0, dense_threads=0, dense_percentage=15, dense_length=30, min_timestamp=0, max_timestamp=0):
+	boards = config.SCRAPE_BOARDS
+
+	return render_template('fourcat.html', boards=boards)
+
+@app.route('/string_query/<string:board>/<string:body_query>/<string:subject_query>/<int:full_thread>/<int:dense_threads>/<int:dense_percentage>/<int:dense_length>/<int:min_timestamp>/<int:max_timestamp>')
+def string_query(board, body_query, subject_query, full_thread=0, dense_threads=0, dense_percentage=15, dense_length=30, min_timestamp=0, max_timestamp=0):
 	"""
 	AJAX URI for various forms of substring querying
 
+	:param	board						str,	The board to query.
 	:param	body_query					str,	Query string for post body. Can be 'empty'.
 	:param	subject_query				str,	Query string for post subject. Can be 'empty'.
 	:param	exact_match					int,	Whether to perform an exact substring match instead of FTS.
@@ -53,6 +57,7 @@ def string_query(body_query, subject_query, full_thread=0, dense_threads=0, dens
 	body_query = body_query.replace("[^\p{L}A-Za-z0-9_*-]","");
 	subject_query = subject_query.replace("[^\p{L}A-Za-z0-9_*-]","");
 	parameters = {
+		"board": str(board),
 		"body_query": str(body_query).replace("-", " "),
 		"subject_query": str(subject_query).replace("-", " "),
 		"full_thread": bool(full_thread),
@@ -118,32 +123,36 @@ def validateQuery(parameters):
 
 	stop_words = get_stop_words('en')
 
+	# Check if the board is correct
+	if parameters["board"] not in config.SCRAPE_BOARDS:
+		return "Invalid board"
+
 	# Body query should be at least three characters long and should not be just a stopword.
 	# 'empty' passes this.
 	if len(parameters["body_query"]) < 3:
-		return("Body query is too short. Use at least three characters.")
+		return "Body query is too short. Use at least three characters."
 	elif parameters["body_query"] in stop_words:
-		return("Use a body input that is not a stop word.")
+		return "Use a body input that is not a stop word."
 	# Query must contain alphanumeric characters
 	elif not re.search('[a-zA-Z0-9]', parameters["body_query"]):
-		return("Body query must contain alphanumeric characters.")
+		return "Body query must contain alphanumeric characters."
 
 	# Subject query should be at least three characters long and should not be just a stopword.
 	# 'empty' passes this.
 	if len(parameters["subject_query"]) < 3:
-		return("Subject query is too short. Use at least three characters.")
+		return "Subject query is too short. Use at least three characters."
 	elif parameters["subject_query"] in stop_words:
-		return("Use a subject input that is not a stop word.")
+		return "Use a subject input that is not a stop word."
 	# Query must contain alphanumeric characters
 	elif not re.search('[a-zA-Z0-9]', parameters["subject_query"]):
-		return("Subject query must contain alphanumeric characters.")	
+		return "Subject query must contain alphanumeric characters."
 
 	# Keyword-dense thread length should be at least thirty.
 	if parameters["dense_length"] > 0 and parameters["dense_length"] < 30:
-		return("Keyword-dense thread length should be at least thirty.")
+		return "Keyword-dense thread length should be at least thirty."
 	# Keyword-dense thread density should be at least 15%.
 	elif parameters["dense_percentage"] > 0 and parameters["dense_percentage"] < 15:
-		return("Keyword-dense thread density should be at least 15%.")
+		return "Keyword-dense thread density should be at least 15%."
 
 	# Check if there are enough parameters provided.
 	# Body and subject queryies may be empty if date ranges are max a week apart.
@@ -153,8 +162,8 @@ def validateQuery(parameters):
 			time_diff = parameters["max_date"] - parameters["min_date"]
 			print(time_diff)
 			if time_diff >= 604800:
-				return("Filter on a date range shorter than a week.")
+				return "Filter on a date range shorter than a week."
 		else:
-			return("Input either a body or subject query, or filter on a date range shorter than a week.")
+			return "Input either a body or subject query, or filter on a date range shorter than a week."
 	
 	return True
