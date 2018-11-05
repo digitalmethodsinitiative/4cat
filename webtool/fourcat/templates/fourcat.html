@@ -17,7 +17,7 @@
 					<div id='panel'>
 						<div id='filterpanel'>
 							<div id='buttonselections'>
-								<span>Currently queries data from /pol/ from November 2013 onwards.</span>
+								<span>Currently available: {% for board in boards %}<span class='board'> /{{board}}/ </span>{% endfor %}</span>
 								<!-- <input name='platformselect' type='radio' class='platformselect' id='radio_selectfb'>-->
 							</div>
 							<div id='filterinputs'>
@@ -25,8 +25,10 @@
 									<div class='filter-box-label'>
 										<span>Board:</span>
 									</div>
-									<select>
-										<option>/pol/</option>
+									<select id='board-select'>
+										{% for board in boards %}
+										<option> {{board}}</option>
+										{% endfor %}
 									</select>
 								</div>
 								<div class='filter-box'>

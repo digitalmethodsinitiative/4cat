@@ -91,6 +91,9 @@ $(function() {
 		Returns an error if not enough parameters are provided.
 		*/
 
+		// Set board parameter
+		var board = $('#board-select').val()
+
 		// Set string parameters. Replace some potentially harmful characters.
 		// Text in between * characters indicate exact match searches
 		var url_body = $('#body-input').val().replace(/\"/g,"*");
@@ -126,7 +129,7 @@ $(function() {
 		}
 	
 		// Create AJAX url
-		ajax_url = 'string_query/' + url_body + '/' + url_subject + '/' + url_full_thread + '/' + url_dense_threads + '/' + url_dense_percentage + '/' + url_dense_thread_length + '/' + url_min_date + '/' + url_max_date
+		ajax_url = 'string_query/' + board + '/' + url_body + '/' + url_subject + '/' + url_full_thread + '/' + url_dense_threads + '/' + url_dense_percentage + '/' + url_dense_thread_length + '/' + url_min_date + '/' + url_max_date
 
 		return ajax_url
 	}
