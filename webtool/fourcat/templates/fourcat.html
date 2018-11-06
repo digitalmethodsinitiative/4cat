@@ -67,11 +67,13 @@
 
 								<div class='filter-box' id='filter_time'>
 									<div class='filter-box-label'>
-										<input type='checkbox' id='check-time'></input>
-										<label for='check-time'>Date range</label>
+										<input type='checkbox' id='check-time' checked disabled></input>
+										<label for='check-time'>Date range <span class='red'>(mandatory!)</span></label>
 									</div>
-									<input id='input-min-time' class='input-time' type='date' name='mintimeinput' disabled='disabled'> to
-									<input id='input-max-time' class='input-time' type='date' name='maxtimeinput' disabled='disabled'>
+									<!-- <input id='input-min-time' class='input-time' type='date' name='mintimeinput' disabled='disabled'> to
+									<input id='input-max-time' class='input-time' type='date' name='maxtimeinput' disabled='disabled'> -->
+									<input id='input-min-time' class='input-time' type='date' name='mintimeinput'> to
+									<input id='input-max-time' class='input-time' type='date' name='maxtimeinput'> <span class='red'>Currently max a week</span>
 								</div>
 								<button class='btn_filterbutton' id='btn_go'>Go</button>
 							</div>
