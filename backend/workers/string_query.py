@@ -154,13 +154,14 @@ class stringQuery(BasicWorker):
 		
 		if subject_query != 'empty':
 			# Primary use if FTS search, so set tsvector matching first
-			sql_subject = sql_subject + " AND subject_vector @@ plainto_tsquery('" + subject_query + "')"
+			# sql_subject = sql_subject + " AND subject_vector @@ plainto_tsquery('" + subject_query + "')"
+			sql_subject = sql_subject + " AND lower(subject) SIMILAR TO '%" + subject_query + "%'"
 			sql_log = sql_log + "'" + subject_query + "' is in subject, "
 			# If there are exact string matches between "quotation marks", loop through all entries and add to SQL query
-			if li_exact_subject:
-				for exact_subject in li_exact_subject:
-					sql_subject = sql_subject + " AND lower(subject) SIMILAR TO '%" + exact_subject + "%'"
-					sql_log = sql_log + "subject exactly matches '" + exact_subject + "', "
+			# if li_exact_subject:
+			# 	for exact_subject in li_exact_subject:
+			# 		sql_subject = sql_subject + " AND lower(subject) SIMILAR TO '%" + exact_subject + "%'"
+			# 		sql_log = sql_log + "subject exactly matches '" + exact_subject + "', "
 			replacements.append(sql_body)
 
 		if min_date != 0:
@@ -266,8 +267,7 @@ class stringQuery(BasicWorker):
 			sql_max_date = " AND posts.timestamp <= " + str(max_date)
 
 		self.log.info("Getting keyword-dense threads on " + board + " for " + body_query + " with a minimum thread length of " + str(dense_length) + " and a keyword density of " + str(dense_percentage) + ".")
-		#self.log.info()
-
+		
 		matching_threads = self.db.fetchall("""
 			SELECT thread_id, num_replies, keyword_count, keyword_density::real FROM (
 				SELECT thread_id, num_replies, keyword_count, ((keyword_count::real / num_replies::real) * 100) AS keyword_density FROM (
