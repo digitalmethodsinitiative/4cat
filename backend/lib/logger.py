@@ -62,7 +62,7 @@ class Logger:
 		frame = sys._getframe(1)
 		location = frame.f_code.co_filename.split("/").pop() + ":" + str(frame.f_lineno)
 
-		self.info("Logging from %s to %s" % (location, self.log_path))
+		# self.info("Logging from %s to %s" % (location, self.log_path))
 
 		if db:
 			self.db = db
