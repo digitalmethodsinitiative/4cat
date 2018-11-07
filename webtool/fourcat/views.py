@@ -3,7 +3,7 @@ import re
 import config
 import pickle as p
 
-from flask import Flask, render_template, url_for
+from flask import Flask, render_template, url_for, abort
 from fourcat import app
 
 from backend.lib.query import SearchQuery
@@ -85,6 +85,16 @@ def string_query(board, body_query, subject_query, full_thread=0, dense_threads=
 	print("Query queued: %s" % query.key)
 	return query.key
 
+@app.route('/result/<filename>/')
+def get_result(filename):
+	filename = re.sub("[^a-zA-Z0-9]", '', filename)
+	path = get_absolute_folder(config.PATH_DATA) + "/" + filename
+
+	if not os.path.isfile(path):
+		abort(404)
+
+	app.send_static_file(path)
+
 @app.route('/check_query/<query_key>', methods=['GET','POST'])
 def check_query(query_key):
 	"""
@@ -105,6 +115,8 @@ def check_query(query_key):
 			if results == 'empty_file':
 				return results
 			return 'http://localhost/fourcat/data/' + query.data["query"].replace("*", "") + '-' + query_key + '.csv'
+		else:
+			results = results.replace("\\", "/").split("/").pop()
 		
 		return results
 
