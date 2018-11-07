@@ -151,10 +151,10 @@ $(function() {
 	});
 
 	// Enable date selection when 'filter on time' checkbox is checked
-	$('#check-time').on('change', function(){
+	/*$('#check-time').on('change', function(){
 		if(this.checked){$('.input-time').attr('disabled', false)}
 		else{$('.input-time').attr('disabled', true)}
-	});
+	});*/
 
 	// Change the option and label for keyword-dense threads according to body input
 	$('#body-input').on('input', function(){
@@ -187,4 +187,9 @@ $(function() {
 	});
 	$('.input-dense').prop('disabled', true)
 	$('#check-full-thread').prop('disabled', true)
+
+	// On Safari, use the jQuery date picker
+	if ( $('#check-time').prop('type') != 'date' ) {
+		$('#check-time').datepicker();
+	}
 });
