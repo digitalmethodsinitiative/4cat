@@ -137,7 +137,7 @@ class stringQuery(BasicWorker):
 		board_threads = [str(thread) for thread in board_threads]
 		
 		board_threads = ','.join(board_threads)
-		sql_board = ' AND thread_id IN (' + board_threads + ')'
+		#sql_board = ' AND thread_id IN (' + board_threads + ')'
 		sql_log = sql_log + "posts are on " + board + ", "
 		
 		# Generate SQL query string
@@ -246,7 +246,6 @@ class stringQuery(BasicWorker):
 		board_threads = list([thread["id"] for thread in board_threads])
 		board_threads = [str(thread) for thread in board_threads]
 		board_threads = ','.join(board_threads)
-		sql_board = ' AND thread_id IN (' + board_threads + ')'
 
 		# Set body query. Check if there's anything in quotation marks for LIKE operations.
 		pattern = "\"(.*?)\""
@@ -257,6 +256,10 @@ class stringQuery(BasicWorker):
 				sql_body = sql_body + " AND posts.body LIKE '%" + exact_body + "%'"
 		body_query = body_query.replace("\"", "")
 		
+		# Indicate which boards to query
+		sql_board = ''
+		#sql_board = ' AND thread_id IN (' + board_threads + ')'
+
 		# Set timestamp parameters. Currently checks timestamp of all posts with keyword within paramaters.
 		# Should perhaps change to OP timestamp.
 		sql_min_date = ''
