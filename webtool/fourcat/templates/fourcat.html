@@ -17,7 +17,20 @@
 					<div id='panel'>
 						<div id='filterpanel'>
 							<div id='buttonselections'>
-								<span>Currently available: {% for board in boards %}<span class='board'> /{{board}}/ </span>{% endfor %}</span>
+								<span>
+									Currently available:
+									{% for board in boards %}
+										<span class='board-data'>
+											<span class='board'> /{{board}}/ </span>
+											{% if board == 'pol' %}
+												from 28 Nov. 2013 to 18 Mar. 2018 and 7 Nov 2018 onwards.
+											{% endif %}
+											{% if board == 'v' %}
+												from 7 Nov 2018 onwards.
+											{% endif %}
+										</span>
+									{% endfor %}
+								</span>
 								<!-- <input name='platformselect' type='radio' class='platformselect' id='radio_selectfb'>-->
 							</div>
 							<div id='filterinputs'>

@@ -519,6 +519,10 @@ label {
 	cursor:pointer;
 }
 
+.board {
+	color: #485ba6;
+}
+
 .red{
 	color: red;
 }
