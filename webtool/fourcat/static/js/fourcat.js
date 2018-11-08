@@ -74,7 +74,7 @@ $(function() {
 				// if the query succeeded, notify user
 				else {
 					clearInterval(poll_interval)
-					$('#submitform').append('<a href="' + response + '"><p>' + response + '</p></a>')
+					$('#submitform').append('<a href="/result/' + response + '/"><p>' + response + '</p></a>')
 					$('.loader').hide()
 					alert('Query for \'' + response + '\' complete!')
 				}
