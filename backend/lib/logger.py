@@ -44,6 +44,9 @@ class Logger:
 
 		:param bool output:  Whether to print logs to output
 		"""
+		if self.logger:
+			return
+		
 		self.print_logs = output
 		self.log_path = get_absolute_folder(config.PATH_LOGS) + "/4cat.log"
 		self.previous_report = time.time()
@@ -52,17 +55,12 @@ class Logger:
 		self.logger.setLevel(logging.DEBUG)
 
 		# this handler manages the text log files
-		handler = RotatingFileHandler(self.log_path, maxBytes=(25 * 1024 * 1024), backupCount=0)
+		handler = RotatingFileHandler(self.log_path, maxBytes=(25 * 1024 * 1024), backupCount=1)
 		handler.setLevel(logging.INFO)
 		handler.setFormatter(logging.Formatter("%(asctime)-15s | %(levelname)s %(message)s",
 											   "%d-%m-%Y %H:%M:%S"))
 
 		self.logger.addHandler(handler)
-
-		frame = sys._getframe(1)
-		location = frame.f_code.co_filename.split("/").pop() + ":" + str(frame.f_lineno)
-
-		# self.info("Logging from %s to %s" % (location, self.log_path))
 
 		if db:
 			self.db = db
