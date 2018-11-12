@@ -150,6 +150,9 @@ class ThreadScraper(BasicJSONScraper):
 				self.log.error("Post %s in thread %s/%s hit database constraint but no dupe was found?" % (post["no"], thread["board"], thread["id"]))
 
 			return False
+		except ValueError as e:
+			self.db.rollback()
+			self.log.error("ValueError (%s) during scrape of thread %s" % (e, post["no"]))
 
 		self.save_links(post, post["no"])
 		if "filename" in post:
