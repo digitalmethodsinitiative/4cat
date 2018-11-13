@@ -2,8 +2,8 @@
 <head>
 	<title>4CAT</title>
 		<link rel='stylesheet' href='https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css' integrity='sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm' crossorigin='anonymous'>
-		<link rel='stylesheet' type='text/css' href='{{url_for('static', filename='stylesheet.css')}}'>
-		<script type=text/javascript src='{{url_for('static', filename='jquery.js')}}'></script>
+		<link rel='stylesheet' type='text/css' href='{{url_for('static', filename='css/stylesheet.css')}}'>
+		<script type=text/javascript src='{{url_for('static', filename='js/jquery-3.3.1.min.js')}}'></script>
 		<script type=text/javascript src='{{url_for('static', filename='js/fourcat.js')}}'></script>
 		<meta charset='UTF-8'>
 	</head>
@@ -85,8 +85,8 @@
 									</div>
 									<!-- <input id='input-min-time' class='input-time' type='date' name='mintimeinput' disabled='disabled'> to
 									<input id='input-max-time' class='input-time' type='date' name='maxtimeinput' disabled='disabled'> -->
-									<input id='input-min-time' class='input-time' type='date' name='mintimeinput'> to
-									<input id='input-max-time' class='input-time' type='date' name='maxtimeinput'> <span class='red'>Currently max two weeks</span>
+									<input id='input-min-time' class='input-time' type='text' placeholder='dd-mm-yyyy' name='mintimeinput'> to
+									<input id='input-max-time' class='input-time' type='text' placeholder='dd-mm-yyyy' name='maxtimeinput'> <span class='red'>Currently max two weeks</span>
 								</div>
 								<button class='btn_filterbutton' id='btn_go'>Go</button>
 							</div>
@@ -125,7 +125,7 @@
 					</div>
 					<div id='results'>
 						<div class='loader'>
-							<span>Working... Uncompleted tasks time out and fail after 10 minutes<img src='static/hourglass.gif'></span>
+							<span>Working... Uncompleted tasks time out and fail after 10 minutes<img src='static/img/hourglass.gif'></span>
 						</div>
 					</div>
 				</div>

@@ -1,6 +1,6 @@
 @font-face {
 	font-family: 'fixedsys';
-	src: url("fonts/fsex300-webfont.woff")
+	src: url("../fonts/fsex300-webfont.woff")
 }
 
 * {
@@ -275,7 +275,7 @@ input[type="radio"]:checked + label {
 }
 
 #resultsheader{
-	background: url(img/patternblue.jpg);
+	background: url(../img/patternblue.jpg);
 	border-top: 2px solid black;
 	border-bottom: 2px solid black;
 	text-align: center;
@@ -361,7 +361,7 @@ p.imgpost{
 
 #submitpaneltitle{
 	width: 100%;
-	background: url(img/patternblue.jpg);
+	background: url(../img/patternblue.jpg);
 	text-align: center;
 	border-bottom: 2px solid black;
 }
@@ -374,7 +374,7 @@ p.imgpost{
 
 #filterresults{
 	width: 100%;
-	background: url(img/patternblue.jpg);
+	background: url(../img/patternblue.jpg);
 	color: white;
 }
 
@@ -472,7 +472,7 @@ span.activity.needed{
 	border-top: 2px solid black;
 	border-bottom: 2px solid black;
 	width: 100%;
-	background: url(img/patternblue.jpg);
+	background: url(../img/patternblue.jpg);
 	text-align: center;
 	color: white;
 }
@@ -510,7 +510,7 @@ img{
 .page-footer{
 	padding-top: 10px;
 	padding-bottom: 10px;
-	background: url(img/patterngreen.jpg);
+	background: url(../img/patterngreen.jpg);
 	border-top: 2px solid black;
 	text-align: right;
 }
