@@ -140,7 +140,6 @@ class ThreadScraper(BasicJSONScraper):
 
 		try:
 			self.db.insert("posts", post_data)
-			self.db.execute("UPDATE posts SET body_vector = to_tsvector(body) WHERE id = %s", (post["no"],))
 		except psycopg2.IntegrityError:
 			self.db.rollback()
 			dupe = self.db.fetchone("SELECT * from posts WHERE id = %s" % (post["no"], ))

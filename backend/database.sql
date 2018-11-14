@@ -20,6 +20,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS unique_job
 -- threads
 CREATE TABLE IF NOT EXISTS threads (
   id                 bigint PRIMARY KEY, -- matches 4chan thread ID
+  id_seq             SERIAL,  -- sequential ID for easier indexing
   board              text,
   timestamp          integer DEFAULT 0, -- first known timestamp for this thread, i.e. timestamp of first post
   timestamp_archived integer DEFAULT 0,
@@ -42,16 +43,20 @@ CREATE INDEX IF NOT EXISTS threads_timestamp
     timestamp
   );
 
+CREATE INDEX IF NOT EXISTS threads_seq
+  ON threads (
+    id_seq
+  );
+
 -- posts
 CREATE TABLE IF NOT EXISTS posts (
-  id                bigint PRIMARY KEY, -- matches 4chan post ID
+  id                bigint PRIMARY KEY,  -- matches 4chan post ID
+  id_seq            SERIAL,  -- sequential ID for easier indexing
   thread_id         bigint,
   timestamp         integer,
   timestamp_deleted integer DEFAULT 0,
   subject           text,
-  subject_vector    tsvector,
   body              text,
-  body_vector       tsvector,
   author            text,
   author_type       text,
   author_type_id    text,
@@ -77,13 +82,10 @@ CREATE INDEX IF NOT EXISTS posts_thread
     thread_id
   );
 
-CREATE INDEX IF NOT EXISTS posts_fts
-  ON posts
-  USING gin (body_vector);
-
-CREATE INDEX IF NOT EXISTS posts_subject_fts
-  ON posts
-  USING gin (subject_vector);
+CREATE INDEX IF NOT EXISTS posts_seq
+  ON posts (
+    id_seq
+  );
 
 -- post replies
 CREATE TABLE IF NOT EXISTS posts_mention (
