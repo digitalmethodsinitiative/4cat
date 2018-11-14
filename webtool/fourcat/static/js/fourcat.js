@@ -14,39 +14,48 @@ $(function() {
 
 		// Get AJAX url from search options
 		ajax_url = get_ajax_url()
-		console.log(ajax_url)
 
-		// AJAX the query to the server
-		$.ajax({
-			dataType: "text",
-			url: ajax_url,
-			success: function(response) {
-				console.log(response);
+		// Check if parameters are correct
+		if (ajax_url !== false) {
+			console.log(ajax_url)
 
-				// If the query is rejected by the server.
-				if (response.substr(0, 14) == 'Invalid query.') {
+			// AJAX the query to the server
+			$.ajax({
+				dataType: "text",
+				url: ajax_url,
+				success: function(response) {
+					console.log(response);
+
+					// If the query is rejected by the server.
+					if (response.substr(0, 14) == 'Invalid query.') {
+						$('.loader').hide()
+						alert(response)
+					}
+
+					// If the query is accepted by the server.
+					else{
+						query_key = response
+						poll_csv(query_key)
+
+						// poll results every 2000 ms after submitting
+						poll_interval = setInterval(function() {
+							poll_csv(query_key);
+						}, 4000);
+					}
+				},
+				error: function(error) {
+					console.log('error')
+					console.log(error);
+					$('#results').html('<h3>' +$('#dataselection option:selected').text() + " error</h3>")
 					$('.loader').hide()
-					alert(response)
 				}
+			});
+		}
+		// If there's something wrong with the parameters, don't send a request
+		else {
+			$('.loader').hide()
+		}
 
-				// If the query is accepted by the server.
-				else{
-					query_key = response
-					poll_csv(query_key)
-
-					// poll results every 2000 ms after submitting
-					poll_interval = setInterval(function() {
-						poll_csv(query_key);
-					}, 4000);
-				}
-			},
-			error: function(error) {
-				console.log('error')
-				console.log(error);
-				$('#results').html('<h3>' +$('#dataselection option:selected').text() + " error</h3>")
-				$('.loader').hide()
-			}
-		});
 	}
 	
 	function poll_csv(query_key){
@@ -87,9 +96,12 @@ $(function() {
 
 	function get_ajax_url(){
 		/*
-		Takes the user input and generates an AJAX URL to send to Flask back-end
+		Takes the user input and generates an AJAX URL to send to Flask back-end.
+		Parses date input to a unix timestamp and checks whether these are correct.
 		Returns an error if not enough parameters are provided.
 		*/
+
+		var valid = true
 
 		// Set board parameter
 		var board = $('#board-select').val()
@@ -121,17 +133,77 @@ $(function() {
 		// Set time parameters
 		var url_min_date = 0
 		var url_max_date = 0
+
 		if($('#check-time').is(':checked')){
 			var min_date = $('#input-min-time').val()
 			var max_date = $('#input-max-time').val()
-			if (isNaN(min_date)){url_min_date = (new Date(min_date).getTime() / 1000)}
-			if (isNaN(max_date)){url_max_date = (new Date(max_date).getTime() / 1000)}
-		}
-	
-		// Create AJAX url
-		ajax_url = 'string_query/' + board + '/' + url_body + '/' + url_subject + '/' + url_full_thread + '/' + url_dense_threads + '/' + url_dense_percentage + '/' + url_dense_thread_length + '/' + url_min_date + '/' + url_max_date
 
-		return ajax_url
+			// Convert the minimum date string to a unix timestamp
+			if (min_date !== '') {
+				url_min_date = stringToTimestamp(min_date)
+
+				// If the string was incorrectly formatted (could be on Safari), a NaN was returned
+				if (isNaN(url_min_date)) {
+					valid = false
+					alert('Please provide a minimum date in the format dd-mm-yyyy (like 29-11-2017).')
+				}
+			}
+
+			// Convert the maximum date string to a unix timestamp
+			if (max_date !== '' && valid) {
+				url_max_date = stringToTimestamp(max_date)
+				// If the string was incorrectly formatted (could be on Safari), a NaN was returned
+				if (isNaN(url_max_date)) {
+					valid = false
+					alert('Please provide a maximum date in the format dd-mm-yyyy (like 29-11-2017).')
+				}
+			}
+
+			// Input can be ill-formed, like '01-12-90', resulting in negative timestamps
+			if (url_min_date < 0 || url_max_date < 0 && valid) {
+				valid = false
+				alert('Invalid date(s). Check the bar on top with details on date ranges of 4CAT data.')
+			}
+
+			// Make sure the first date is later than or the same as the second
+			if (url_min_date >= url_max_date && url_min_date !== 0 && url_max_date !== 0 && valid) {
+				valid = false
+				alert('The first date is later than or the same as the second.\nPlease provide a correct date range.')
+			}
+		}
+		
+		// Create and return AJAX url only if the parameters are valid
+		if (valid) {
+			ajax_url = 'string_query/' + board + '/' + url_body + '/' + url_subject + '/' + url_full_thread + '/' + url_dense_threads + '/' + url_dense_percentage + '/' + url_dense_thread_length + '/' + url_min_date + '/' + url_max_date
+			return ajax_url
+		}
+		else {
+			return false
+		}
+	}
+
+	function stringToTimestamp(str) {
+		// Converts a text input to a unix timestamp.
+		// Only used in Safari (other browsers use native HTML date picker)
+		var date_regex = /^\d{4}-\d{2}-\d{2}$/
+		if (str.match(date_regex)) {
+			timestamp = (new Date(str).getTime() / 1000)
+		}
+		else {
+			str = str.replace(/\//g,'-')
+			str = str.replace(/\s/g,'-')
+			var date_objects = str.split('-')
+			var year = date_objects[2]
+			var month = date_objects[1]
+			// Support for textual months
+			var testdate = Date.parse(month + "1, 2012");
+			if(!isNaN(testdate)){
+				month = new Date(testdate).getMonth() + 1;
+			}
+			var day = date_objects[0]
+			timestamp = (new Date(year, (month - 1), day).getTime() / 1000)
+		}
+		return timestamp
 	}
 
 	/* BUTTON EVENT HANDLERS */
@@ -185,11 +257,8 @@ $(function() {
 			$('#check-full-thread').prop('disabled', false)
 		}
 	});
+
 	$('.input-dense').prop('disabled', true)
 	$('#check-full-thread').prop('disabled', true)
 
-	// On Safari, use the jQuery date picker
-	if ( $('#check-time').prop('type') != 'date' ) {
-		$('#check-time').datepicker();
-	}
 });
