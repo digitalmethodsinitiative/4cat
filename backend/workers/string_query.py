@@ -216,7 +216,7 @@ class stringQuery(BasicWorker):
 			
 			# Log SQL query
 			self.log.info("Getting full thread data, but first: " + sql_log)
-			self.log.info("SELECT " + sql_columns + " FROM 4cat_posts WHERE true AND " + sql_text + sql_min_date + sql_max_date)
+			self.log.info("SELECT post_id FROM 4cat_posts WHERE true AND " + sql_text + sql_min_date + sql_max_date)
 
 			# Get the IDs of the matching posts
 			li_thread_ids = []
@@ -235,7 +235,7 @@ class stringQuery(BasicWorker):
 				# Convert matching ids to tuple
 				li_ids = tuple([post["post_id"] for post in li_matches])
 
-				# With the post ids, thread ids from the 'regular' `posts` table
+				# With the post ids, thread ids from the 'regular' posts table
 				try:
 					li_thread_ids = self.db.fetchall("SELECT thread_id FROM posts WHERE id in %s ", (li_ids,))
 				except Exception as error:
