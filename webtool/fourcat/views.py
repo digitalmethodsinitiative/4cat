@@ -125,20 +125,28 @@ def validateQuery(parameters):
 
 	stop_words = get_stop_words('en')
 
-
-	# TEMPORARY SOLUTION
-	# Querying can only happen for max a week
+	# TEMPORARY MEASUREMENT
+	# Querying can only happen for max two weeks
 	max_daterange = 1209600						# < CHANGE THIS VARIABLE ACCORDING TO PERFORMANCE
 
 	if parameters["min_date"] == 0 or parameters["max_date"] == 0:
 		return "Temporary hardware limitation:\nUse a date range of max. two weeks."
 
-	# Querying can only happen for max a week
+	# Ensure querying can only happen for max two weeks week (temporary measurement)
 	if parameters["min_date"] != 0 and parameters["max_date"] != 0:
 		if (parameters["max_date"] - parameters["min_date"]) > max_daterange:
 			return "Temporary hardware limitation:\nUse a date range of max. two weeks."
 
-	# Check if the board is correct
+	# Ensure no weird negative timestamps happening
+	if parameters["min_date"] < 0 or parameters["max_date"] < 0:
+		return "Date(s) set too early."
+
+	# Ensure the min date is not later than the max date
+	if parameters["min_date"] != 0 and parameters["max_date"] != 0:
+		if parameters["min_date"] >= parameters["max_date"]:
+			return "The first date is later than or the same as the second."
+
+	# Ensure the board is correct
 	if parameters["board"] not in config.SCRAPE_BOARDS:
 		return "Invalid board"
 
@@ -177,7 +185,7 @@ def validateQuery(parameters):
 			time_diff = parameters["max_date"] - parameters["min_date"]
 			print(time_diff)
 			if time_diff >= 172800:
-				return "With no text querying, filter on a date range shorter of max. two days."
+				return "With no text querying, filter on a date range of max. two days."
 		else:
 			return "Input either a body or subject query, or filter on a date range of max. two days."
 	

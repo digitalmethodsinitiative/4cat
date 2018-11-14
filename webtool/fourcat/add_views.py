@@ -332,21 +332,3 @@ def show_submissions():
 	print(type(jsonfile))
 	inputs = json.dumps(inputs)	
 	return render_template('submitsuccess.html', inputs = inputs)
-
-@app.route('/penelope')
-@app.route('/penelope/<model>/<word>')
-def penelope(model='yt-rightwing-transcripts', word='trump'):
-	# Function that returns the view of the Penelope word2vec/monadology explorer.
-	print('fourcat/static/data/word_embeddings/w2v_model_all-' + model + '.model')
-	sims = sim.getW2vSims('fourcat/static/data/word_embeddings/w2v_model_all-' + model + '.model.bin', querystring=word, longitudinal=False)
-	
-	print('w2v nearest neighbours:')
-	print(sims)
-
-	return render_template('penelope.html', inputs=sims)
-
-@app.route('/w2v/<model>/<word>')
-def w2v(model, word='kek'):
-	# Function that returns the n closest words of a certain word in a word2vec model.
-	sims = sim.getW2vSims('fourcat/static/data/word_embeddings/w2v_model_all-' + model + '.model.bin', querystring=word, longitudinal=False)
-	return sims
