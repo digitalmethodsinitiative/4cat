@@ -9,26 +9,33 @@ source 4cat {
 
     sql_range_step = 1000
 }
-source 4cat_posts : 4cat {
-    sql_query_range = SELECT MIN(id_seq), MAX(id_seq) FROM posts;
-    sql_range_step = 50000000
 
-    sql_query = SELECT id AS post_id, id_seq AS id, body, author, subject, timestamp \
-                  FROM posts \
-                 WHERE id >= $start AND id >= $end
+source 4cat_posts : 4cat {
+    sql_query_range = SELECT MIN(id_seq), MAX(id_seq) FROM posts
+    sql_range_step = 1000000
+
+    sql_query = SELECT p.id_seq AS id, p.id AS post_id, p.thread_id, p.body, p.author, \
+                       p.subject, p.timestamp, t.board \
+                  FROM posts AS p \
+             LEFT JOIN threads AS t \
+                    ON p.thread_id = t.id \
+                 WHERE p.id_seq >= $start AND p.id_seq <= $end
 
     sql_field_string = subject
     sql_field_string = body
-    sql_field_string = author
+    sql_attr_string = board
+    sql_attr_string = author
     sql_attr_bigint = post_id
+    sql_attr_bigint = thread_id
     sql_attr_timestamp = timestamp
 }
 
 source 4cat_threads : 4cat {
-    sql_query = SELECT id AS thread_id, id_seq AS id, board, timestamp, timestamp_modified \
+    sql_query = SELECT id_seq AS id, id AS thread_id, board, timestamp, timestamp_modified \
                   FROM threads
     sql_attr_timestamp = timestamp
     sql_attr_timestamp = timestamp_modified
+    sql_attr_bigint = thread_id
 }
 
 ## /* Indexes */
@@ -37,23 +44,32 @@ index 4cat_index {
     min_infix_len = 3
     charset_table = 0..9, a..z, _, A..Z->a..z, U+00C0->a, U+00C1->a, U+00C2->a, U+00C3->a, U+00C4->a, U+00C5->a, U+00C7->c,$
 }
+
 index 4cat_posts : 4cat_index {
     source = 4cat_posts
-    path = /srv/backend/sphinx/4cat-posts.sphinxindex
+    path = 4cat-posts.sphinxindex
+    min_word_len = 3
+    min_infix_len = 3
+    html_strip = 1
+
+    #stopwords = sphinx/stopwords_en.lst
 }
+
 index 4cat_threads : 4cat_index {
     source = 4cat_threads
-    path = /srv/backend/sphinx/4cat-threads.sphinxindex
+    path = 4cat-threads.sphinxindex
 }
 
 ## /* Daemon configuration */
 searchd {
-    log = /srv/backend/sphinx/searchd.log
-    query_log = /srv/backend/sphinx/searchd-queries.log
-    pid_file = /srv/backend/sphinx/sphinx.pid
+    log = sphinx/searchd.log
+    query_log = sphinx/searchd-queries.log
+    pid_file = sphinx/sphinx.pid
+    binlog_path = sphinx/binlog
     listen = localhost:9213
     listen = localhost:9306:mysql41
 }
+
 indexer {
     mem_limit = 512M
 }
