@@ -4,7 +4,7 @@ import csv
 import os
 import pickle as p
 import re
-import mysql
+import mysql.connector
 
 from bs4 import BeautifulSoup
 from datetime import datetime
