@@ -133,7 +133,7 @@ class stringQuery(BasicWorker):
 
 		# Set SQL statements depending on job parameters
 		replacements = []
-		sql_board = ''
+		sql_board = "board = '" + board + "'"
 		sql_text = ''
 		sql_min_date = ''
 		sql_max_date = ''
@@ -280,6 +280,9 @@ class stringQuery(BasicWorker):
 		min_date = parameters["min_date"]
 		max_date = parameters["max_date"]
 
+		# Indicate which board to query
+		sql_board = "board = '" + board + "'"
+		
 		# Set body query. Check if there's anything in quotation marks for LIKE operations.
 		pattern = "\"(.*?)\""
 		li_exact_body = re.findall(pattern, body_query)
@@ -290,9 +293,6 @@ class stringQuery(BasicWorker):
 		sql_body = sql_body + "')"
 
 		body_query = body_query.replace("\"", "")
-		
-		# Indicate which boards to query
-		sql_board = ''
 
 		# Set timestamp parameters. Currently checks timestamp of all posts with keyword within paramaters.
 		# Should perhaps change to OP timestamp.
@@ -306,7 +306,7 @@ class stringQuery(BasicWorker):
 		# First, get all the posts that match the string query with Sphinx
 		self.log.info("Fetching ids from posts matching " + body_query)
 		try:
-			li_ids = self.sphinx.fetchall("SELECT post_id FROM `4cat_posts` WHERE true" + sql_body + sql_min_date + sql_max_date)
+			li_ids = self.sphinx.fetchall("SELECT post_id FROM `4cat_posts` WHERE " + sql_board + sql_body + sql_min_date + sql_max_date)
 		except Exception as error:
 			return str(error)
 
