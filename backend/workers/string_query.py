@@ -306,12 +306,12 @@ class stringQuery(BasicWorker):
 		# First, get all the posts that match the string query with Sphinx
 		self.log.info("Fetching ids from posts matching " + body_query)
 		try:
-			li_ids = self.sphinx.fetchall("SELECT post_id FROM `4cat_posts` WHERE true" + sql_text + sql_min_date + sql_max_date)
+			li_ids = self.sphinx.fetchall("SELECT post_id FROM `4cat_posts` WHERE true" + sql_body + sql_min_date + sql_max_date)
 		except Exception as error:
 			return str(error)
 
 		# Convert matching ids to tuple
-		li_ids = tuple([post["post_id"] for post in li_matches])
+		li_ids = tuple([post["post_id"] for post in li_ids])
 
 		# With the post ids, get all the thread ids and metadata for the dense threads
 		self.log.info("Getting keyword-dense threads on " + board + " for " + body_query + " with a minimum thread length of " + str(dense_length) + " and a keyword density of " + str(dense_percentage) + ".")		
