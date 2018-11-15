@@ -1,23 +1,22 @@
 """
 Database wrapper
 """
-import psycopg2.extras
-import psycopg2
+import re
+import pymysql.connections as mysqlconnections
+import pymysql
 
 from psycopg2 import sql
 
 import config
 
 
-class Database:
+class MySQLDatabase:
 	"""
-	Simple database handler
-
-	Most importantly, this sets up the database tables if they don't exist yet. Apart
-	from that it offers a few wrapper methods for queries
+	Simple database handler for MySQL connections
 	"""
 	cursor = None
 	log = None
+	identifier_regex = re.compile(r"[^a-zA-Z_0-9]")  # anything matching this will be removed from identifiers
 
 	def __init__(self, logger, dbname=None, user=None, password=None, host=None, port=None):
 		"""
@@ -29,8 +28,8 @@ class Database:
 		host = config.DB_HOST if not host else host
 		port = config.DB_PORT if not port else port
 
-		self.connection = psycopg2.connect(dbname=dbname, user=user, password=password, host=host, port=port)
-		self.cursor = self.connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+		self.connection = mysqlconnections.Connection(database=dbname, user=user, password=password, host=host, port=port)
+		self.cursor = self.connection.cursor(pymysql.cursors.DictCursor)
 		self.log = logger
 
 		if self.log is None:
@@ -82,18 +81,18 @@ class Database:
 			where = {}
 
 		# build query
-		identifiers = [sql.Identifier(column) for column in data.keys()]
-		identifiers.insert(0, sql.Identifier(table))
+		identifiers = [self.escape_identifier(column) for column in data.keys()]
+		identifiers.insert(0, self.escape_identifier(table))
 		replacements = list(data.values())
 
 		query = "UPDATE {} SET " + ", ".join(["{} = %s" for column in data])
 		if where:
 			query += " WHERE " + " AND ".join(["{} = %s" for column in where])
 			for column in where.keys():
-				identifiers.append(sql.Identifier(column))
+				identifiers.append(self.escape_identifier(column))
 				replacements.append(where[column])
 
-		query = sql.SQL(query).format(*identifiers)
+		query = query.format(*identifiers)
 
 		self.log.debug("Executing query: %s" % self.cursor.mogrify(query, replacements))
 		self.cursor.execute(query, replacements)
@@ -117,9 +116,9 @@ class Database:
 		replacements = list(where.values())
 
 		# build query
-		identifiers = [sql.Identifier(column) for column in where.keys()]
-		identifiers.insert(0, sql.Identifier(table))
-		query = sql.SQL("DELETE FROM {} WHERE " + " AND ".join(where_sql)).format(*identifiers)
+		identifiers = [self.escape_identifier(column) for column in where.keys()]
+		identifiers.insert(0, self.escape_identifier(table))
+		query = "DELETE FROM {} WHERE " + " AND ".join(where_sql).format(*identifiers)
 
 		self.log.debug("Executing query: %s" % self.cursor.mogrify(query, replacements))
 		self.cursor.execute(query, replacements)
@@ -146,8 +145,8 @@ class Database:
 			constraints = []
 
 		# escape identifiers
-		identifiers = [sql.Identifier(column) for column in data.keys()]
-		identifiers.insert(0, sql.Identifier(table))
+		identifiers = [self.escape_identifier(column) for column in data.keys()]
+		identifiers.insert(0, self.escape_identifier(table))
 
 		# construct ON NOTHING bit of query
 		if safe:
@@ -155,14 +154,14 @@ class Database:
 			if constraints:
 				safe_bit += "(" + ", ".join(["{}" for each in constraints]) + ")"
 				for column in constraints:
-					identifiers.append(sql.Identifier(column))
+					identifiers.append(self.escape_identifier(column))
 			safe_bit += " DO NOTHING"
 		else:
 			safe_bit = ""
 
 		# prepare parameter replacements
 		protoquery = "INSERT INTO {} (%s) VALUES %%s" % ", ".join(["{}" for column in data.keys()]) + safe_bit
-		query = sql.SQL(protoquery).format(*identifiers)
+		query = protoquery.format(*identifiers)
 		replacements = (tuple(data.values()),)
 
 		self.log.debug("Executing query: %s" % self.cursor.mogrify(query, replacements))
@@ -172,6 +171,15 @@ class Database:
 			self.commit()
 
 		return self.cursor.rowcount
+
+	def escape_identifier(self, identifier):
+		"""
+		Escape a value for use as an identifier (e.g. table name)
+
+		:param string identifier:  Value to be escaped
+		:return string: Escaped value
+		"""
+		return "`" + re.sub(self.identifier_regex, "", identifier) + "`"
 
 	def fetchall(self, query, *args):
 		"""
@@ -197,7 +205,7 @@ class Database:
 		self.query(query, *args)
 		try:
 			return self.cursor.fetchone()
-		except psycopg2.ProgrammingError:
+		except pymysql.ProgrammingError:
 			self.commit()
 			return None
 
