@@ -4,12 +4,12 @@ import csv
 import os
 import pickle as p
 import re
-import mysql
 
 from bs4 import BeautifulSoup
 from datetime import datetime
 
 from backend.lib.database import Database
+from backend.lib.database_mysql import MySQLDatabase
 from backend.lib.logger import Logger
 from backend.lib.query import SearchQuery
 from backend.lib.queue import JobClaimedException
@@ -26,6 +26,7 @@ class stringQuery(BasicWorker):
 	type = "query"
 	pause = 2
 	max_workers = 3
+	sphinx = None
 
 	# Columns to return in csv
 	# Mandatory columns: ['thread_id', 'body', 'subject', 'timestamp']
@@ -39,11 +40,12 @@ class stringQuery(BasicWorker):
 		super().__init__(logger=logger, manager=manager)
 
 		# Connect to the Sphinx database
-		sphinx_db = mysql.connector.connect(
-			host = "localhost",
-			user = config.DB_USER,
-			passwd = config.DB_PASSWORD,
-			port = 9306
+		self.sphinx = MySQLDatabase(
+			host="localhost",
+			user=config.DB_USER,
+			password=config.DB_PASSWORD,
+			port=9306,
+			logger=self.log
 		)
 
 	def work(self):
@@ -111,9 +113,6 @@ class stringQuery(BasicWorker):
 		:param query_parameters		dict, dictionary of query job parameters
 		
 		"""
-		
-		# Connect to the Sphinx database
-		sphinx_cursor =  self.sphinx_db.cursor()
 
 		board = query_parameters["board"]
 		body_query = query_parameters["body_query"]
@@ -181,17 +180,22 @@ class stringQuery(BasicWorker):
 		# Start some timekeeping
 		start_time = time.time()
 
+		where = sql_board + sql_text + sql_min_date + sql_max_date
+		where = where.strip()
+		if where[0:3] == "AND":
+			where = where[3:]
+
 		# Fetch only posts
 		if dense_threads is False and full_thread is False:
 
 			# Log SQL query
 			self.log.info(sql_log)
 			self.log.info('First fetching matching post ids')
-			self.log.info("SELECT post_id FROM 4cat_posts WHERE true AND " + sql_text + sql_min_date + sql_max_date)
+			self.log.info("SELECT post_id FROM `4cat_posts` WHERE " + where)
 
 			# Get the post ids for all posts that match the sphinx query
 			try:
-				li_matches = sphinx_cursor.fetchall("SELECT post_id FROM 4cat_posts WHERE true" + sql_board + sql_text + sql_min_date + sql_max_date)
+				li_matches = self.sphinx.fetchall("SELECT post_id FROM `4cat_posts` WHERE " + where)
 			except Exception as error:
 				return str(error)
 
@@ -216,7 +220,7 @@ class stringQuery(BasicWorker):
 			
 			# Log SQL query
 			self.log.info("Getting full thread data, but first: " + sql_log)
-			self.log.info("SELECT post_id FROM 4cat_posts WHERE true AND " + sql_text + sql_min_date + sql_max_date)
+			self.log.info("SELECT post_id FROM `4cat_posts` WHERE true AND " + sql_text + sql_min_date + sql_max_date)
 
 			# Get the IDs of the matching posts
 			li_thread_ids = []
@@ -228,7 +232,7 @@ class stringQuery(BasicWorker):
 
 				# First, get the post ids (Sphinx table doesn't have thread_ids)
 				try:
-					li_matches = sphinx_cursor.fetchall("SELECT post_id FROM 4cat_posts WHERE true" + sql_text + sql_min_date + sql_max_date)
+					li_matches = self.sphinx.fetchall("SELECT post_id FROM `4cat_posts` WHERE " + where)
 				except Exception as error:
 					return str(error)
 				
@@ -267,9 +271,6 @@ class stringQuery(BasicWorker):
 		Returns a list of thread IDs that match the keyboard-density parameters
 
 		"""
-
-		# Connect to the Sphinx database
-		sphinx_cursor =  self.sphinx_db.cursor()
 				
 		# Get relevant parameter values
 		board = parameters["board"]
@@ -305,7 +306,7 @@ class stringQuery(BasicWorker):
 		# First, get all the posts that match the string query with Sphinx
 		self.log.info("Fetching ids from posts matching " + body_query)
 		try:
-			li_ids = sphinx_cursor.fetchall("SELECT post_id FROM 4cat_posts WHERE true" + sql_text + sql_min_date + sql_max_date)
+			li_ids = self.sphinx.fetchall("SELECT post_id FROM `4cat_posts` WHERE true" + sql_text + sql_min_date + sql_max_date)
 		except Exception as error:
 			return str(error)
 
