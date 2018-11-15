@@ -37,6 +37,6 @@ setup(
 		"psycopg2==2.7.5",
 		"scikit_learn==0.20.0",
 		"python-daemon==1.2",
-		"pickle=18.0"
+		"mysql-connector-python==8.0.11"
 	]
 )
