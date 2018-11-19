@@ -216,32 +216,37 @@ $(function() {
 	// Run query when return is pressed
 	$('input').keyup(function(e){ 
 		var code = e.which;
-		if(code==13)e.preventDefault();
-		if(code==13||code==188||code==186){
+		if (code == 13) e.preventDefault();
+		if (code == 13 || code == 188 || code == 186) {
 			$("#btn_go").click();
 		}
 	});
 
 	// Enable date selection when 'filter on time' checkbox is checked
-	/*$('#check-time').on('change', function(){
-		if(this.checked){$('.input-time').attr('disabled', false)}
-		else{$('.input-time').attr('disabled', true)}
-	});*/
+	$('#check-time').on('change', function(){
+		if (this.checked) {
+			$('.input-time').attr('disabled', false)
+		}
+		else {
+			$('.input-time').attr('disabled', true)
+		}
+	});
 
 	// Change the option and label for keyword-dense threads according to body input
 	$('#body-input').on('input', function(){
 		input_string = $('#body-input').val()
-		if (input_string == ''){
+
+		if (input_string == '') {
 			$('.density-keyword').html('keyword')
 			$('.input-dense').prop('disabled', true)
 			$('#check-keyword-dense-threads').prop('checked', false)
 		}
-		else{
+		else {
 			$('.input-dense').prop('disabled', false)
-			if (input_string.length > 7){
+			if (input_string.length > 7) {
 				$('.density-keyword').html(input_string.substr(0,4) + '...')
 			}
-			else{
+			else {
 				$('.density-keyword').html(input_string)
 			}
 		}
