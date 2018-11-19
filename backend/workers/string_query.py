@@ -304,6 +304,9 @@ class stringQuery(BasicWorker):
 
 		# Convert matching ids to tuple
 		li_ids = tuple([post["post_id"] for post in li_ids])
+
+		if len(li_ids) == 0:
+			return li_ids
 		
 		# With the post ids, get all the thread ids and metadata for the dense threads
 		self.log.info("Getting keyword-dense threads on " + board + " for " + body_query + " with a minimum thread length of " + str(dense_length) + " and a keyword density of " + str(dense_percentage) + ".")		
