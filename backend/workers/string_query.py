@@ -182,11 +182,11 @@ class stringQuery(BasicWorker):
 			# Log SQL query
 			self.log.info(sql_log)
 			self.log.info('First fetching matching post ids')
-			self.log.info("SELECT post_id FROM `4cat_posts` WHERE " + where)
+			self.log.info("SELECT post_id FROM `4cat_posts` WHERE " + where + " LIMIT 1000000")
 
 			# Get the post ids for all posts that match the sphinx query
 			try:
-				li_matches = self.sphinx.fetchall("SELECT post_id FROM `4cat_posts` WHERE " + where)
+				li_matches = self.sphinx.fetchall("SELECT post_id FROM `4cat_posts` WHERE " + where + " LIMIT 1000000")
 			except Exception as error:
 				return str(error)
 
@@ -223,7 +223,7 @@ class stringQuery(BasicWorker):
 
 				# First, get the post ids (Sphinx table doesn't have thread_ids)
 				try:
-					li_matches = self.sphinx.fetchall("SELECT post_id FROM `4cat_posts` WHERE " + where)
+					li_matches = self.sphinx.fetchall("SELECT post_id FROM `4cat_posts` WHERE " + where + " LIMIT 1000000")
 				except Exception as error:
 					return str(error)
 				
@@ -298,7 +298,7 @@ class stringQuery(BasicWorker):
 		self.log.info("Fetching ids from posts matching " + body_query)
 		self.log.info("SELECT post_id FROM `4cat_posts` WHERE " + sql_board + sql_body + sql_min_date + sql_max_date)
 		try:
-			li_ids = self.sphinx.fetchall("SELECT post_id FROM `4cat_posts` WHERE " + sql_board + sql_body + sql_min_date + sql_max_date)
+			li_ids = self.sphinx.fetchall("SELECT post_id FROM `4cat_posts` WHERE " + sql_board + sql_body + sql_min_date + sql_max_date + " LIMIT 1000000")
 		except Exception as error:
 			return str(error)
 
