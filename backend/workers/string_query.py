@@ -76,7 +76,6 @@ class stringQuery(BasicWorker):
 			# and set the "dense_threads" parameters as this list
 			if query_parameters["dense_threads"]:
 				matching_threads = self.get_dense_threads(query_parameters)
-
 				if matching_threads:
 					self.psql_results_to_csv(matching_threads, results_dir + '/metadata_dense_threads_' + query_parameters["body_query"].replace("*", "") + ".csv", clean_csv=False)
 					li_thread_ids = tuple([thread["thread_id"] for thread in matching_threads])
@@ -299,12 +298,13 @@ class stringQuery(BasicWorker):
 		sql_min_date = ''
 		sql_max_date = ''
 		if min_date != 0:
-			sql_min_date = " AND posts.timestamp >= " + str(min_date)
+			sql_min_date = " AND timestamp >= " + str(min_date)
 		if max_date != 0:
-			sql_max_date = " AND posts.timestamp <= " + str(max_date)
+			sql_max_date = " AND timestamp <= " + str(max_date)
 
 		# First, get all the posts that match the string query with Sphinx
 		self.log.info("Fetching ids from posts matching " + body_query)
+		self.log.info("SELECT post_id FROM `4cat_posts` WHERE " + sql_board + sql_body + sql_min_date + sql_max_date)
 		try:
 			li_ids = self.sphinx.fetchall("SELECT post_id FROM `4cat_posts` WHERE " + sql_board + sql_body + sql_min_date + sql_max_date)
 		except Exception as error:
@@ -312,7 +312,7 @@ class stringQuery(BasicWorker):
 
 		# Convert matching ids to tuple
 		li_ids = tuple([post["post_id"] for post in li_ids])
-
+		
 		# With the post ids, get all the thread ids and metadata for the dense threads
 		self.log.info("Getting keyword-dense threads on " + board + " for " + body_query + " with a minimum thread length of " + str(dense_length) + " and a keyword density of " + str(dense_percentage) + ".")		
 		try:
@@ -321,14 +321,14 @@ class stringQuery(BasicWorker):
 					SELECT thread_id, num_replies, keyword_count, ((keyword_count::real / num_replies::real) * 100) AS keyword_density FROM (
 						SELECT posts.thread_id, threads.num_replies, count(*) as keyword_count FROM posts
 						INNER JOIN threads ON posts.thread_id = threads.id
-						WHERE posts.id IN(""" + li_ids + """)
+						WHERE posts.id IN %s
 						GROUP BY posts.thread_id, threads.num_replies
 					) AS thread_matches
 				) AS thread_meta
-				WHERE num_replies >= """ + str(dense_length) + """
-				AND keyword_density >= """ + str(dense_percentage) + """
+				WHERE num_replies >= %s
+				AND keyword_density >= %s
 
-				""")
+				""", (li_ids, dense_length, dense_percentage,))
 		except Exception as error:
 			return str(error)
 
