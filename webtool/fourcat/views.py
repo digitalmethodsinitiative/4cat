@@ -120,22 +120,22 @@ def validateQuery(parameters):
 	"""
 
 	if not parameters:
-		print('Please provide valid paramters.')
+		print('Please provide valid parameters.')
 		return -1
 
 	stop_words = get_stop_words('en')
 
 	# TEMPORARY MEASUREMENT
 	# Querying can only happen for max two weeks
-	max_daterange = 1209600						# < CHANGE THIS VARIABLE ACCORDING TO PERFORMANCE
+	#max_daterange = 1209600
 
-	if parameters["min_date"] == 0 or parameters["max_date"] == 0:
-		return "Temporary hardware limitation:\nUse a date range of max. two weeks."
+	# if parameters["min_date"] == 0 or parameters["max_date"] == 0:
+	# 	return "Temporary hardware limitation:\nUse a date range of max. two weeks."
 
 	# Ensure querying can only happen for max two weeks week (temporary measurement)
-	if parameters["min_date"] != 0 and parameters["max_date"] != 0:
-		if (parameters["max_date"] - parameters["min_date"]) > max_daterange:
-			return "Temporary hardware limitation:\nUse a date range of max. two weeks."
+	# if parameters["min_date"] != 0 and parameters["max_date"] != 0:
+	# 	if (parameters["max_date"] - parameters["min_date"]) > max_daterange:
+	# 		return "Temporary hardware limitation:\nUse a date range of max. two weeks."
 
 	# Ensure no weird negative timestamps happening
 	if parameters["min_date"] < 0 or parameters["max_date"] < 0:
@@ -184,9 +184,9 @@ def validateQuery(parameters):
 		if parameters["min_date"] != 0 and parameters["max_date"] != 0:
 			time_diff = parameters["max_date"] - parameters["min_date"]
 			print(time_diff)
-			if time_diff >= 172800:
-				return "With no text querying, filter on a date range of max. two days."
+			if time_diff >= 2419200:
+				return "With no text querying, filter on a date range of max four weeks."
 		else:
-			return "Input either a body or subject query, or filter on a date range of max. two days."
+			return "Input either a body or subject query, or filter on a date range of max four weeks."
 	
 	return True
