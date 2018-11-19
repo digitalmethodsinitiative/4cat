@@ -1,19 +1,13 @@
 import time
 import config
 import csv
-import os
-import pickle as p
 import re
 
 from bs4 import BeautifulSoup
-from datetime import datetime
 
-from backend.lib.database import Database
 from backend.lib.database_mysql import MySQLDatabase
-from backend.lib.logger import Logger
 from backend.lib.query import SearchQuery
 from backend.lib.queue import JobClaimedException
-from backend.lib.helpers import get_absolute_folder
 from backend.lib.worker import BasicWorker
 
 class stringQuery(BasicWorker):
@@ -63,10 +57,8 @@ class stringQuery(BasicWorker):
 				return
 
 			# Setup connections and get parameters
-			log = Logger()
-			db = Database(logger=log)
 			key = job["remote_id"]
-			query = SearchQuery(key=key, db=db)
+			query = SearchQuery(key=key, db=self.db)
 			query_parameters = query.get_parameters()
 			results_dir = query.get_results_dir()
 			results_file = query.get_results_path()
