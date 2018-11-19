@@ -124,7 +124,7 @@ class stringQuery(BasicWorker):
 
 		# Set SQL statements depending on job parameters
 		replacements = []
-		sql_board = "board = '" + board + "'"
+		sql_board = "board = '[" + board + "]'"
 		sql_text = ''
 		sql_min_date = ''
 		sql_max_date = ''
@@ -272,7 +272,7 @@ class stringQuery(BasicWorker):
 		max_date = parameters["max_date"]
 
 		# Indicate which board to query
-		sql_board = "board = '" + board + "'"
+		sql_board = "board = '[" + board + "]'"
 		
 		# Set body query. Check if there's anything in quotation marks for LIKE operations.
 		pattern = "\"(.*?)\""
