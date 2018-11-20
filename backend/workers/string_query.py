@@ -84,7 +84,7 @@ class stringQuery(BasicWorker):
 			li_matches = self.execute_string_query(query_parameters)
 			
 			# Write to csv if there substring matches. Else set query as empty.
-			if is_empty(li_matches):
+			if len(li_matches) == 0 or type(li_matches) == str:
 				query.set_empty()
 			else:
 				self.psql_results_to_csv(li_matches, results_file)
