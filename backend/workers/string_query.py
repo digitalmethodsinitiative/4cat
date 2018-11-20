@@ -129,9 +129,9 @@ class StringQuery(BasicWorker):
 		sphinx_start = time.time()
 		where = " AND ".join(where)
 		sql = "SELECT thread_id, post_id FROM `4cat_posts` WHERE " + where + " LIMIT 5000000 OPTION max_matches = 5000000"
-		self.log.debug("Running Sphinx query %s " % sql)
+		self.log.info("Running Sphinx query %s " % sql)
 		posts = self.sphinx.fetchall(sql, replacements)
-		self.log.debug("Sphinx query finished in %i seconds, %i results." % (time.time() - sphinx_start, len(posts)))
+		self.log.info("Sphinx query finished in %i seconds, %i results." % (time.time() - sphinx_start, len(posts)))
 		self.sphinx.close()
 
 		if not posts:
@@ -140,7 +140,7 @@ class StringQuery(BasicWorker):
 
 		# query posts database
 		postgres_start = time.time()
-		self.log.debug("Running full posts query")
+		self.log.info("Running full posts query")
 		columns = ", ".join(self.return_cols)
 
 		if not query["full_thread"] and not query["dense_threads"]:
@@ -148,14 +148,14 @@ class StringQuery(BasicWorker):
 			post_ids = tuple([post["post_id"] for post in posts])
 			posts = self.db.fetchall("SELECT " + columns + " FROM posts WHERE id IN %s ORDER BY id ASC",
 									 (post_ids,))
-			self.log.debug("Full posts query finished in %i seconds." % (time.time() - postgres_start))
+			self.log.info("Full posts query finished in %i seconds." % (time.time() - postgres_start))
 
 		else:
 			# all posts for all thread IDs found by Sphinx
 			thread_ids = tuple([post["thread_id"] for post in posts])
 			posts = self.db.fetchall(
 				"SELECT " + columns + " FROM posts WHERE thread_id IN %s ORDER BY thread_id ASC, id ASC", (thread_ids,))
-			self.log.debug("Full posts query finished in %i seconds." % (time.time() - postgres_start))
+			self.log.info("Full posts query finished in %i seconds." % (time.time() - postgres_start))
 
 			if query["dense_threads"] and query["body_query"] != "empty":
 				posts = self.filter_dense(posts, query["body_query"], query["dense_percentage"], query["dense_length"])
@@ -179,14 +179,16 @@ class StringQuery(BasicWorker):
 		:return list:  Filtered list of posts
 		"""
 		# for each thread, save number of posts and number of matching posts
-		self.log.debug("Filtering %s-dense threads from %i posts..." % (keyword, len(posts)))
+		self.log.info("Filtering %s-dense threads from %i posts..." % (keyword, len(posts)))
 		threads = {}
 		for post in posts:
 			if post["thread_id"] not in threads:
 				threads[post["thread_id"]] = {"posts": 0, "match": 0}
 
 			if keyword in post["body"]:
-				threads[post["thread_id"]] += 1
+				threads[post["thread_id"]]["match"] += 1
+
+			threads[post["thread_id"]]["posts"] += 1
 
 		# filter out those threads with the right ratio
 		filtered_threads = []
@@ -195,7 +197,7 @@ class StringQuery(BasicWorker):
 			if float(threads[thread]["match"]) / float(threads[thread]["posts"]) > percentage:
 				filtered_threads.append(thread)
 
-		self.log.debug("Found %i %s-dense threads in results set" % (len(filtered_threads), keyword))
+		self.log.info("Found %i %s-dense threads in results set" % (len(filtered_threads), keyword))
 
 		# filter posts that do not qualify
 		filtered_posts = []
@@ -207,7 +209,7 @@ class StringQuery(BasicWorker):
 				filtered_posts.append(post)
 
 		# return filtered list of posts
-		self.log.debug("Dense thread filtering finished, %i posts left." % len(filtered_posts))
+		self.log.info("Dense thread filtering finished, %i posts left." % len(filtered_posts))
 		return filtered_posts
 
 	def posts_to_csv(self, sql_results, filepath, clean_csv=True):
