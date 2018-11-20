@@ -182,11 +182,11 @@ class stringQuery(BasicWorker):
 			# Log SQL query
 			self.log.info(sql_log)
 			self.log.info('First fetching matching post ids')
-			self.log.info("SELECT post_id FROM `4cat_posts` WHERE " + where + " LIMIT 1000000")
+			self.log.info("SELECT post_id FROM `4cat_posts` WHERE " + where + " LIMIT 5000000")
 
 			# Get the post ids for all posts that match the sphinx query
 			try:
-				li_matches = self.sphinx.fetchall("SELECT post_id FROM `4cat_posts` WHERE " + where + " LIMIT 1000000")
+				li_matches = self.sphinx.fetchall("SELECT post_id FROM `4cat_posts` WHERE " + where + " LIMIT 5000000")
 			except Exception as error:
 				return str(error)
 
