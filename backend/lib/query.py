@@ -113,6 +113,13 @@ class SearchQuery:
 					   data={"is_finished": True})
 		self.data["is_finished"] = True
 
+	def is_finished(self):
+		"""
+		Check if query is finished
+		:return bool:
+		"""
+		return self.data["is_finished"] == True
+
 	def get_parameters(self):
 		"""
 		Get query parameters
