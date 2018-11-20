@@ -5,6 +5,7 @@
 *.csv
 *.jpg
 *.png
+*.gif
 *.webm
 *.db
 *.lock
