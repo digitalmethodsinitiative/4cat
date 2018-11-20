@@ -154,16 +154,16 @@ class StringQuery(BasicWorker):
 			# all posts for all thread IDs found by Sphinx
 			thread_ids = tuple([post["thread_id"] for post in posts])
 
-			# get dense thread ids
-			if query["dense_threads"] and query["body_query"] != "empty":
-				thread_ids = self.filter_dense_sql(thread_ids, query["body_query"], query["dense_percentage"], query["dense_length"])
-
-				# When there are no dense threads
-				if not thread_ids:
-					return []
-
 			posts = self.db.fetchall(
 				"SELECT " + columns + " FROM posts WHERE thread_id IN %s ORDER BY thread_id ASC, id ASC", (thread_ids,))
+
+			# get dense thread ids
+			if query["dense_threads"] and query["body_query"] != "empty":
+				posts = self.filter_dense(posts, query["body_query"], query["dense_percentage"], query["dense_length"])
+
+				# When there are no dense threads
+				if not posts:
+					return []
 
 			self.log.info("Full posts query finished in %i seconds." % (time.time() - postgres_start))
 
