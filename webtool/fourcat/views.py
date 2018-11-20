@@ -171,8 +171,8 @@ def validateQuery(parameters):
 		return "Subject query must contain alphanumeric characters."
 
 	# Keyword-dense thread length should be at least thirty.
-	if parameters["dense_length"] > 0 and parameters["dense_length"] < 30:
-		return "Keyword-dense thread length should be at least thirty."
+	if parameters["dense_length"] > 0 and parameters["dense_length"] < 10:
+		return "Keyword-dense thread length should be at least ten."
 	# Keyword-dense thread density should be at least 15%.
 	elif parameters["dense_percentage"] > 0 and parameters["dense_percentage"] < 15:
 		return "Keyword-dense thread density should be at least 15%."
