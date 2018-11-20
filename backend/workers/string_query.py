@@ -82,7 +82,6 @@ class StringQuery(BasicWorker):
 
 		query.finish()
 		self.queue.finish_job(job)
-		self.sphinx.close()
 
 	def execute_query(self, query):
 		"""
@@ -209,7 +208,7 @@ class StringQuery(BasicWorker):
 				filtered_posts.append(post)
 
 		# return filtered list of posts
-		self.log.info("Dense thread filtering finished, %i posts left." % len(filtered_posts))
+		self.log.info("%s-dense thread filtering finished, %i posts left." % (keyword, len(filtered_posts)))
 		return filtered_posts
 
 	def posts_to_csv(self, sql_results, filepath, clean_csv=True):
