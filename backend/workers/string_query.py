@@ -96,6 +96,7 @@ class StringQuery(BasicWorker):
 		:param dict query:  Query parameters, as part of the SearchQuery object
 		:return list:  Posts, sorted by thread and post ID, in ascending order
 		"""
+
 		# first, build the sphinx query
 		where = []
 		replacements = []
@@ -156,7 +157,7 @@ class StringQuery(BasicWorker):
 			self.log.debug("Full posts query finished in %i seconds." % (time.time() - postgres_start))
 
 			if query["dense_threads"] and query["body_query"] != "empty":
-				posts = self.filter_dense(posts, query["body_query"], query["dense_percentage"], query["dense_length"])
+				posts = self.filter_dense_sql(posts, query["body_query"], query["dense_percentage"], query["dense_length"])
 
 		return posts
 
@@ -200,6 +201,47 @@ class StringQuery(BasicWorker):
 		# return filtered list of posts
 		self.log.debug("Dense thread filtering finished, %i posts left." % len(posts))
 		return posts
+
+	def filter_dense_sql(self, posts, keyword, percentage, length):
+		"""
+		Filter posts for those in "dense threads"
+
+		Dense threads are threads in which a given keyword contains more than
+		a given amount of times. This takes a post array as returned by
+		`execute_query()` and filters it so that only posts in threads in which
+		the keyword appears more than a given threshold's amount of times
+		remain.
+
+		:param list posts:  Posts to filter, result of `execute_query()`
+		:param string keyword:  Keyword that posts will be matched against
+		:param float percentage:  How many posts in the thread need to qualify
+		:param int length:  How long a thread needs to be to qualify
+		:return list:  Filtered list of posts
+		"""
+		# for each thread, save number of posts and number of matching posts
+		self.log.debug("Filtering %s-dense threads from %i posts..." % (keyword, len(posts)))
+		
+		thread_ids = [post["thread_id"] for post in posts]
+
+		try:
+			threads = self.db.fetchall("""
+				SELECT id, num_replies, keyword_count, keyword_density::real FROM (
+					SELECT id, num_replies, keyword_count, ((keyword_count::real / num_replies::real) * 100) AS keyword_density FROM (
+						SELECT id, num_replies, count(*) as keyword_count FROM threads
+						WHERE id IN %s
+						GROUP BY id, num_replies
+					) AS thread_matches
+				) AS thread_meta
+				WHERE num_replies >= %s
+				AND keyword_density >= %s
+
+				""", (thread_ids, length, percentage,))
+		except Exception as error:
+			return str(error)
+
+		# return filtered list of threads
+		self.log.debug("Dense thread filtering finished, %i threads left." % len(threads))
+		return threads
 
 	def posts_to_csv(self, sql_results, filepath, clean_csv=True):
 		"""

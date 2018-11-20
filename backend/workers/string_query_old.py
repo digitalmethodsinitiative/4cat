@@ -10,7 +10,7 @@ from backend.lib.query import SearchQuery
 from backend.lib.queue import JobClaimedException
 from backend.lib.worker import BasicWorker
 
-class stringQuery(BasicWorker):
+class stringQuery():
 	"""
 	Process substring queries from the front-end
 	Requests are added to the pool as "query" jobs
