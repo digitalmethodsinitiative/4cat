@@ -84,10 +84,10 @@ class stringQuery(BasicWorker):
 			li_matches = self.execute_string_query(query_parameters)
 			
 			# Write to csv if there substring matches. Else set query as empty.
-			if li_matches:
-				self.psql_results_to_csv(li_matches, results_file)
-			else:
+			if is_empty(li_matches):
 				query.set_empty()
+			else:
+				self.psql_results_to_csv(li_matches, results_file)
 
 			# Done!
 			query.finish()
@@ -124,7 +124,7 @@ class stringQuery(BasicWorker):
 
 		# Set SQL statements depending on job parameters
 		replacements = []
-		sql_board = "board = '[" + board + "]'"
+		sql_board = "board = '" + board + "'"
 		sql_text = ''
 		sql_min_date = ''
 		sql_max_date = ''
@@ -194,7 +194,7 @@ class stringQuery(BasicWorker):
 			li_ids = tuple([post["post_id"] for post in li_matches])
 
 			# If there are no posts matching the string query, return an empty list
-			if len(li_ids) == 0:
+			if len(li_ids) == 0 or type(li_ids) == str:
 				return li_ids
 
 			# Now fetch the real posts with the ids
@@ -219,9 +219,9 @@ class stringQuery(BasicWorker):
 			# If this function is used for dense threads, skip the thread_id lookup
 			if dense_threads != False:
 				li_thread_ids = dense_threads
-			else:
 
-				# First, get the post ids (Sphinx table doesn't have thread_ids)
+			else:
+				# First, get the post ids from the sphinx database
 				try:
 					li_matches = self.sphinx.fetchall("SELECT post_id FROM `4cat_posts` WHERE " + where + " LIMIT 1000000")
 				except Exception as error:
@@ -272,9 +272,9 @@ class stringQuery(BasicWorker):
 		max_date = parameters["max_date"]
 
 		# Indicate which board to query
-		sql_board = "board = '[" + board + "]'"
+		sql_board = "board = '" + board + "'"
 		
-		# Set body query. Check if there's anything in quotation marks for LIKE operations.
+		# Set body query. Check if there's anything in quotation marks for exact phrase match.
 		pattern = "\"(.*?)\""
 		li_exact_body = re.findall(pattern, body_query)
 		sql_body = " AND MATCH('@body " + body_query
@@ -285,8 +285,7 @@ class stringQuery(BasicWorker):
 
 		body_query = body_query.replace("\"", "")
 
-		# Set timestamp parameters. Currently checks timestamp of all posts with keyword within paramaters.
-		# Should perhaps change to OP timestamp.
+		# Set timestamp parameters.
 		sql_min_date = ''
 		sql_max_date = ''
 		if min_date != 0:
@@ -305,7 +304,7 @@ class stringQuery(BasicWorker):
 		# Convert matching ids to tuple
 		li_ids = tuple([post["post_id"] for post in li_ids])
 
-		if len(li_ids) == 0:
+		if len(li_ids) == 0 or type(li_ids) == str:
 			return li_ids
 		
 		# With the post ids, get all the thread ids and metadata for the dense threads
@@ -346,7 +345,7 @@ class stringQuery(BasicWorker):
 
 		# Error handling
 		if type(sql_results) != list:
-			self.log.error('Please use a list instead of ' +  str(type(sql_results)) + ' to convert to csv')
+			self.log.error('Encountered invalid query results of type ' +  str(type(sql_results)) + ' when trying to write to to csv.')
 			self.log.error(sql_results)
 			return -1
 		if filepath == '':
