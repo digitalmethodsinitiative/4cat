@@ -223,7 +223,7 @@ class stringQuery(BasicWorker):
 			else:
 				# First, get the post ids from the sphinx database
 				try:
-					li_matches = self.sphinx.fetchall("SELECT post_id FROM `4cat_posts` WHERE " + where + " LIMIT 1000000")
+					li_matches = self.sphinx.fetchall("SELECT post_id FROM `4cat_posts` WHERE " + where + " LIMIT 5000000")
 				except Exception as error:
 					return str(error)
 				
@@ -297,7 +297,7 @@ class stringQuery(BasicWorker):
 		self.log.info("Fetching ids from posts matching " + body_query)
 		self.log.info("SELECT post_id FROM `4cat_posts` WHERE " + sql_board + sql_body + sql_min_date + sql_max_date)
 		try:
-			li_ids = self.sphinx.fetchall("SELECT post_id FROM `4cat_posts` WHERE " + sql_board + sql_body + sql_min_date + sql_max_date + " LIMIT 1000000")
+			li_ids = self.sphinx.fetchall("SELECT post_id FROM `4cat_posts` WHERE " + sql_board + sql_body + sql_min_date + sql_max_date + " LIMIT 5000000")
 		except Exception as error:
 			return str(error)
 
