@@ -12,7 +12,6 @@ $(function() {
 	function start_query(){
 
 		// Show loader
-		$('#query_status .status_message .message').html('Query submitted, waiting for results');
 		$('.loader').show()
 
 		// Get AJAX url from search options
@@ -32,11 +31,14 @@ $(function() {
 					// If the query is rejected by the server.
 					if (response.substr(0, 14) == 'Invalid query.') {
 						$('.loader').hide()
-						alert(response)
+						alert(response);
+						$('#query_status .status_message .message').html(error);
+						$('#whole-form').removeAttr('disabled');
 					}
 
 					// If the query is accepted by the server.
 					else{
+						s$('#query_status .status_message .message').html('Query submitted, waiting for results');
 						query_key = response
 						poll_csv(query_key)
 
@@ -47,7 +49,8 @@ $(function() {
 					}
 				},
 				error: function(error) {
-					console.log('error')
+					$('#query_status .status_message .message').html(error);
+					$('#whole-form').removeAttr('disabled');
 					console.log(error);
 					$('#results').html('<h3>' +$('#dataselection option:selected').text() + " error</h3>")
 					$('.loader').hide()
@@ -85,7 +88,9 @@ $(function() {
 					}
 					$('#submitform').append('<a href="/result/' + json.path + '/"><p>' + json.path + '</p></a>')
 					$('.loader').hide();
-					alert('Query for \'' + keyword + '\' complete!')
+					$('#query_status .status_message .dots').html('');
+					$('#whole-form').removeAttr('disabled');
+					alert('Query for \'' + keyword + '\' complete!');
 				} else {
 					let dots = '';
 					for(let i = 0; i < dot_ticker; i+= 1) {
@@ -220,17 +225,10 @@ $(function() {
 	/* BUTTON EVENT HANDLERS */
 
 	// Start querying when go button is clicked
-	$('#btn_go').bind('click', function(){
-		start_query()
-	});
-
-	// Run query when return is pressed
-	$('input').keyup(function(e){ 
-		var code = e.which;
-		if (code == 13) e.preventDefault();
-		if (code == 13 || code == 188 || code == 186) {
-			$("#btn_go").click();
-		}
+	$('#query-form').bind('submit', function(e){
+		e.preventDefault();
+		start_query();
+		$('#whole-form').attr('disabled', 'disabled');
 	});
 
 	// Enable date selection when 'filter on time' checkbox is checked

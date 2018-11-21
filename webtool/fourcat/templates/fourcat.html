@@ -13,81 +13,81 @@
 
 		<div class='container-fluid'>
 			<div class='row'>
-				<div class='col-lg-9 topdiv'>
-					<div id='panel'>
-						<div id='filterpanel'>
-							<div id='buttonselections'>
-								<span>
-									Currently available:
-									{% for board in boards %}
-										<span class='board-data'>
-											<span class='board'> /{{board}}/ </span>
-											{% if board == 'pol' %}
-												from 28 Nov. 2013 to 18 Mar. 2018 and 7 Nov 2018 onwards.
-											{% endif %}
-											{% if board == 'v' %}
-												from 7 Nov 2018 onwards.
-											{% endif %}
-										</span>
-									{% endfor %}
-								<span> Results are limited to 5 million rows.</span>
-								</span>
-							</div>
-							<div id='filterinputs'>
-								<div class='filter-box'>
-									<div class='filter-box-label'>
-										<span>Board:</span>
-									</div>
-									<select id='board-select'>
-										{% for board in boards %}
-										<option> {{board}}</option>
-										{% endfor %}
-									</select>
-								</div>
-								<div class='filter-box'>
-									<div class='filter-box-label'>
-										<span>Post body:</span>
-									</div>
-									<input id='body-input' type='text' name='dataselected' maxlength='200'>
-								</div>
-								<div class='filter-box'>
-									<div class='filter-box-label'>
-										<span>OP subject:</span>
-									</div>
-									<input id='subject-input' type='text' name='dataselected' maxlength='200'>
-									<input type='checkbox' id='check-full-thread'></input>
-									<label for='check-full-thread'> Return full thread data</label>
-								</div>
-								<div class='filter-box'>
-									<div class='filter-box-label'>
-										<input type='checkbox' id='check-dense-threads' class='input-dense'></input> 
-										<label for='check-dense-threads'><span class='density-keyword'>keyword</span>-dense threads:</label>
-									</div>
-									<ul>
-										<li>
-											<input id='dense-percentage' class='input-dense input-number' type='number' value='15' min='10' max='100' name='dataselected'>
-											<label for='dense-percentage'>% of posts containing <span class='density-keyword'>keyword</span> in thread (min 10%)</label>
-										</li>
-										<li>
-											<input id='dense-thread-length' class='input-dense input-number' type='number' value='30' min='10' name='dataselected'>
-											<label for='dense-thread-length'>Total posts in thread (min 10)</label>
-										</li>
-									</ul>
-								</div>
+                <form id="query-form" class='col-lg-9 topdiv'>
+                    <fieldset id="whole-form">
+                        <div id='panel'>
+                            <div id='filterpanel'>
+                                <div id='buttonselections'>
+                                    <span>
+                                        Currently available:
+                                        {% for board in boards %}
+                                            <span class='board-data'>
+                                                <span class='board'> /{{board}}/ </span>
+                                                {% if board == 'pol' %}
+                                                    from 28 Nov. 2013 to 18 Mar. 2018 and 7 Nov 2018 onwards.
+                                                {% endif %}
+                                                {% if board == 'v' %}
+                                                    from 7 Nov 2018 onwards.
+                                                {% endif %}
+                                            </span>
+                                        {% endfor %}
+                                        <span> Results are limited to 5 million rows.</span>
+                                    </span>
+                                </div>
+                                <div id='filterinputs'>
+                                    <div class='filter-box'>
+                                        <div class='filter-box-label'>
+                                            <span>Board:</span>
+                                        </div>
+                                        <select id='board-select'>
+                                            {% for board in boards %}<option> {{board}}</option>{% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class='filter-box'>
+                                        <div class='filter-box-label'>
+                                            <span>Post body:</span>
+                                            </div>
+                                        <input id='body-input' type='text' name='dataselected' maxlength='200'>
+                                    </div>
+                                    <div class='filter-box'>
+                                        <div class='filter-box-label'>
+                                            <span>OP subject:</span>
+                                        </div>
+                                        <input id='subject-input' type='text' name='dataselected' maxlength='200'>
+                                        <input type='checkbox' id='check-full-thread'>
+                                        <label for='check-full-thread'> Return full thread data</label>
+                                    </div>
+                                    <div class='filter-box'>
+                                        <div class='filter-box-label'>
+                                            <input type='checkbox' id='check-dense-threads' class='input-dense'>
+                                            <label for='check-dense-threads'><span class='density-keyword'>keyword</span>-dense threads:</label>
+                                        </div>
+                                        <ul>
+                                            <li>
+                                                <input id='dense-percentage' class='input-dense input-number' type='number' value='15' min='10' max='100' name='dataselected'>
+                                                <label for='dense-percentage'>% of posts containing <span class='density-keyword'>keyword</span> in thread (min 10%)</label>
+                                            </li>
+                                            <li>
+                                                <input id='dense-thread-length' class='input-dense input-number' type='number' value='30' min='10' name='dataselected'>
+                                                <label for='dense-thread-length'>Total posts in thread (min 10)</label>
+                                            </li>
+                                        </ul>
+                                    </div>
 
-								<div class='filter-box' id='filter_time'>
-									<div class='filter-box-label'>
-										<input type='checkbox' id='check-time'></input>
-										<label for='check-time'>Date range</label>
-									</div>
-									<input id='input-min-time' class='input-time' type='date' placeholder='dd-mm-yyyy' name='mintimeinput' disabled='disabled'> to
-									<input id='input-max-time' class='input-time' type='date' placeholder='dd-mm-yyyy' name='maxtimeinput' disabled='disabled'> <span class='red'></span>
-								</div>
-								<button class='btn_filterbutton' id='btn_go'>Go</button>
-							</div>
-						</div>
-					</div>
-				</div>
+                                    <div class='filter-box' id='filter_time'>
+                                        <div class='filter-box-label'>
+                                            <input type='checkbox' id='check-time'>
+                                            <label for='check-time'>Date range</label>
+                                        </div>
+                                        <input id='input-min-time' class='input-time' type='date' placeholder='dd-mm-yyyy' name='mintimeinput' disabled='disabled'> to
+                                        <input id='input-max-time' class='input-time' type='date' placeholder='dd-mm-yyyy' name='maxtimeinput' disabled='disabled'> <span class='red'></span>
+                                    </div>
+                                    <button class='btn_filterbutton' id='btn_go'>Go</button>
+                                </div>
+                            </div>
+                        </div>
+                    </fieldset>
+                </form>
 				<div class='col-lg-3 topdiv'>
 					<div id='submitpanel'>
 						<div id='submitpaneltitle'>
