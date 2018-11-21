@@ -1,13 +1,12 @@
 ## /* Data sources */
 source 4cat {
     type = pgsql
+
     sql_host = localhost
     sql_user = fourcat
     sql_pass = supers3cr3t
     sql_db = fourcat
     sql_port = 5432
-
-    sql_range_step = 1000
 }
 
 source 4cat_posts : 4cat {
@@ -21,8 +20,6 @@ source 4cat_posts : 4cat {
                     ON p.thread_id = t.id \
                  WHERE p.id_seq >= $start AND p.id_seq <= $end
 
-    sql_field_string = subject
-    sql_field_string = body
     sql_attr_string = board
     sql_attr_string = author
     sql_attr_bigint = post_id
