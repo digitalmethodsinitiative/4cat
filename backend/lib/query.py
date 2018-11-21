@@ -49,6 +49,7 @@ class SearchQuery:
 				"query": query,
 				"parameters": json.dumps(parameters),
 				"result_file": "",
+				"status": "",
 				"timestamp": int(time.time()),
 				"is_empty": False,
 				"is_finished": False
@@ -177,6 +178,31 @@ class SearchQuery:
 		"""
 		plain_key = repr(parameters) + str(query)
 		return hashlib.md5(plain_key.encode("utf-8")).hexdigest()
+
+	def get_status(self):
+		"""
+		Get query status
+
+		:return string: Query status
+		"""
+		return self.data["status"]
+
+	def update_status(self, status):
+		"""
+		Update query status
+
+		The status is a string that may be displayed to a user to keep them
+		updated and informed about the progress of a query. No memory is kept
+		of earlier query statuses; the current status is overwritten when
+		updated.
+
+		:param string status:  Query status
+		:return bool:  Status update successful?
+		"""
+		self.data["status"] = status
+		updated = self.db.update("queries", where={"key": self.data["key"]}, data={"status": status})
+
+		return updated > 0
 
 	def set_empty(self):
 		"""
