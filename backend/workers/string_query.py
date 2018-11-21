@@ -201,7 +201,7 @@ class StringQuery(BasicWorker):
 		filtered_threads = []
 		percentage /= 100.0
 		for thread in threads:
-			if float(threads[thread]["match"]) / float(threads[thread]["posts"]) > percentage:
+			if threads[thread]["posts"] > length and float(threads[thread]["match"]) / float(threads[thread]["posts"]) > percentage:
 				filtered_threads.append(thread)
 
 		self.log.info("Found %i %s-dense threads in results set" % (len(filtered_threads), keyword))
