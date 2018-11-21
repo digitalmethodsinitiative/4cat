@@ -91,7 +91,7 @@ $(function() {
 					for(let i = 0; i < dot_ticker; i+= 1) {
 						dots += '.';
 					}
-					status_box.find('.dots').html(dots);
+					$('#query_status .status_message .dots').html(dots);
 
 					dot_ticker += 1;
 					if(dot_ticker > 3) {
