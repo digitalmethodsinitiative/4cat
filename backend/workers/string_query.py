@@ -290,6 +290,7 @@ class StringQuery(BasicWorker):
 
 		# write the dictionary to a csv
 		with open(filepath, 'w', encoding='utf-8') as csvfile:
+			self.query.update_status("Writing posts to result file")
 			writer = csv.DictWriter(csvfile, fieldnames=fieldnames, lineterminator='\n')
 			writer.writeheader()
 
