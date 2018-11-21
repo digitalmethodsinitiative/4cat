@@ -1,3 +1,5 @@
+var dot_ticker = 0;
+
 //AJAX functions that retrieve user input and send it to the server so Python can do it's magic
 $(function() {
 
@@ -10,6 +12,7 @@ $(function() {
 	function start_query(){
 
 		// Show loader
+		$('#query_status .status_message .message').html('Query submitted, waiting for results');
 		$('.loader').show()
 
 		// Get AJAX url from search options
@@ -62,30 +65,38 @@ $(function() {
 		/*
 		Polls server to check whether there's a result for query
 		*/
-		$.ajax({
-			dataType: "text",
+		$.getJSON({
 			url: 'check_query/' + query_key,
-			success: function(response) {
-				console.log(response)
+			success: function(json) {
+				console.log(json);
 
-				// if the server hasn't processed the query yet, do nothing
-				if (response == 'no_file') {
-					// do nothing
+				let status_box = $('#query_status .status_message .message');
+				let current_status = status_box.html();
+
+				if(json.status !== current_status && json.status !== "") {
+					status_box.html(json.status);
 				}
 
-				// if there are no results in the database, notify user
-				else if (response == 'empty_file') {
-					clearInterval(poll_interval)
-					$('.loader').hide()
-					alert('No results for your search input.\nPlease edit search.')
-				}
+				if(json.done) {
+					clearInterval(poll_interval);
+					let keyword = $('#body-input').val();
+					if(keyword === '') {
+						keyword = $('#subject-input').val();
+					}
+					$('#submitform').append('<a href="/result/' + json.path + '/"><p>' + json.path + '</p></a>')
+					$('.loader').hide();
+					alert('Query for \'' + keyword + '\' complete!')
+				} else {
+					let dots = '';
+					for(let i = 0; i < dot_ticker; i+= 1) {
+						dots += '.';
+					}
+					status_box.find('.dots').html(dots);
 
-				// if the query succeeded, notify user
-				else {
-					clearInterval(poll_interval)
-					$('#submitform').append('<a href="/result/' + response + '/"><p>' + response + '</p></a>')
-					$('.loader').hide()
-					alert('Query for \'' + response + '\' complete!')
+					dot_ticker += 1;
+					if(dot_ticker > 3) {
+						dot_ticker = 0;
+					}
 				}
 			},
 			error: function(error) {

@@ -20,7 +20,9 @@ class StringQuery(BasicWorker):
 	type = "query"
 	pause = 2
 	max_workers = 3
+
 	sphinx = None
+	query = None
 
 	# Columns to return in csv
 	# Mandatory columns: ['thread_id', 'body', 'subject', 'timestamp']
@@ -50,13 +52,13 @@ class StringQuery(BasicWorker):
 		# Setup connections and get parameters
 		key = job["remote_id"]
 		try:
-			query = SearchQuery(key=key, db=self.db)
+			self.query = SearchQuery(key=key, db=self.db)
 		except TypeError:
 			self.log.info("Query job %s refers to non-existent query, finishing." % key)
 			self.queue.finish_job(job)
 			return
 
-		if query.is_finished():
+		if self.query.is_finished():
 			self.log.info("Worker started for query %s, but query is already finished" % key)
 			self.queue.finish_job(job)
 			return
@@ -70,17 +72,18 @@ class StringQuery(BasicWorker):
 			logger=self.log
 		)
 
-		query_parameters = query.get_parameters()
-		results_file = query.get_results_path()
+		query_parameters = self.query.get_parameters()
+		results_file = self.query.get_results_path()
 		results_file = results_file.replace("*", "")
 
 		posts = self.execute_query(query_parameters)
 		if not posts:
-			query.set_empty()
+			self.query.set_empty()
+			self.query.update_status("Query finished, but no results were found.")
 		else:
 			self.posts_to_csv(posts, results_file)
 
-		query.finish()
+		self.query.finish()
 		self.queue.finish_job(job)
 
 	def execute_query(self, query):
@@ -126,12 +129,14 @@ class StringQuery(BasicWorker):
 			replacements.append(" ".join(match))
 
 		# query Sphinx
+		self.query.update_status("Searching for matches")
 		sphinx_start = time.time()
 		where = " AND ".join(where)
 		sql = "SELECT thread_id, post_id FROM `4cat_posts` WHERE " + where + " LIMIT 5000000 OPTION max_matches = 5000000"
 		self.log.info("Running Sphinx query %s " % sql)
 		posts = self.sphinx.fetchall(sql, replacements)
 		self.log.info("Sphinx query finished in %i seconds, %i results." % (time.time() - sphinx_start, len(posts)))
+		self.query.update_status("Found %i matches. Collecting post data" % len(posts))
 		self.sphinx.close()
 
 		if not posts:
@@ -148,6 +153,7 @@ class StringQuery(BasicWorker):
 			post_ids = tuple([post["post_id"] for post in posts])
 			posts = self.db.fetchall("SELECT " + columns + " FROM posts WHERE id IN %s ORDER BY id ASC",
 									 (post_ids,))
+			self.query.update_status("Post data collected")
 			self.log.info("Full posts query finished in %i seconds." % (time.time() - postgres_start))
 
 		else:
@@ -159,11 +165,14 @@ class StringQuery(BasicWorker):
 
 			# get dense thread ids
 			if query["dense_threads"] and query["body_query"] != "empty":
+				self.query.update_status("Post data collected. Filtering dense threads")
 				posts = self.filter_dense(posts, query["body_query"], query["dense_percentage"], query["dense_length"])
 
 				# When there are no dense threads
 				if not posts:
 					return []
+			else:
+				self.query.update_status("Post data collected")
 
 			self.log.info("Full posts query finished in %i seconds." % (time.time() - postgres_start))
 
@@ -205,6 +214,7 @@ class StringQuery(BasicWorker):
 				filtered_threads.append(thread)
 
 		self.log.info("Found %i %s-dense threads in results set" % (len(filtered_threads), keyword))
+		self.query.update_status("Found %i dense threads. Collecting final post set")
 
 		# filter posts that do not qualify
 		filtered_posts = []
@@ -217,6 +227,7 @@ class StringQuery(BasicWorker):
 
 		# return filtered list of posts
 		self.log.info("%s-dense thread filtering finished, %i posts left." % (keyword, len(filtered_posts)))
+		self.query.update_status("Dense thread filtering finished, %i posts left. Writing to file" % len(filtered_posts))
 		return filtered_posts
 
 	def filter_dense_sql(self, thread_ids, keyword, percentage, length):
@@ -298,4 +309,5 @@ class StringQuery(BasicWorker):
 			else:
 				writer.writerows(sql_results)
 
+		self.query.update_status("Query finished, results are available.")
 		return filepath
