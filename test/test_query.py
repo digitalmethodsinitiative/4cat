@@ -74,15 +74,13 @@ class TestQuery(FourcatTestCase):
 			self.assertNotEqual("", query.data["result_file"])
 			path = query.get_results_path()
 			self.assertFalse(os.path.isfile(path))
-			self.assertIsNone(query.get_finished_results_path())
 
 		with self.subTest("Result path available after finishing"):
 			touch = open(query.get_results_path(), "w")
 			touch.close()
 			query.finish()
 
-			self.assertIsNotNone(query.get_finished_results_path())
-			self.assertTrue(os.path.isfile(query.get_finished_results_path()))
+			self.assertIsNotNone(query.get_results_path())
 
 		os.unlink(query.get_results_path())
 
