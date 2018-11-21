@@ -8,6 +8,7 @@ import hashlib
 import os.path
 import base64
 import json
+import six
 import re
 
 from backend.lib.helpers import get_absolute_folder
@@ -139,6 +140,12 @@ class ThreadScraper(BasicJSONScraper):
 		}
 
 		try:
+			for field in post_data:
+				if not isinstance(post_data[field], six.string_types):
+					continue
+				# apparently, sometimes \0 appears in posts or something; psycopg2 can't cope with this
+				post_data[field] = post_data[field].replace("\0", "")
+
 			self.db.insert("posts", post_data)
 		except psycopg2.IntegrityError:
 			self.db.rollback()
