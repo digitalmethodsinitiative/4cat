@@ -214,7 +214,7 @@ class StringQuery(BasicWorker):
 				filtered_threads.append(thread)
 
 		self.log.info("Found %i %s-dense threads in results set" % (len(filtered_threads), keyword))
-		self.query.update_status("Found %i dense threads. Collecting final post set")
+		self.query.update_status("Found %i %s-dense threads. Collecting final post set" % (len(filtered_threads), keyword))
 
 		# filter posts that do not qualify
 		filtered_posts = []
