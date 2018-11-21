@@ -86,7 +86,7 @@ $(function() {
 					if(keyword === '') {
 						keyword = $('#subject-input').val();
 					}
-					$('#submitform').append('<a href="/result/' + json.path + '/"><p>' + json.path + '</p></a>')
+					$('#submitform').append('<a href="/result/' + json.path + '"><p>' + json.path + '</p></a>')
 					$('.loader').hide();
 					$('#query_status .status_message .dots').html('');
 					$('#whole-form').removeAttr('disabled');
