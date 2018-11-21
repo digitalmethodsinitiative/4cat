@@ -108,7 +108,7 @@
 				<div class='col-lg-12' id='resultsdiv'>
 					<div id='resultsheader'>
 						<div class='pagetitle'>
-							<span id='resultsheadertext'>DATA PREVIEW</span>
+							<span id='resultsheadertext'>QUERY STATUS</span>
 						</div>
 					</div>
 					<div id='imagenavigationdiv' class='inactive'>
@@ -119,9 +119,14 @@
 						</span>
 					</div>
 					<div id='results'>
-						<div class='loader'>
-							<span>Working... Large queries may take up to ~20 minutes.<img src='static/img/hourglass.gif'></span>
-						</div>
+                        <div id="query_status">
+                            <div class="status_message">
+                                <span class="message">Waiting for input...</span><span class="dots"></span>
+                            </div>
+						    <div class='loader'>
+							    <span>Working... Large queries may take up to ~20 minutes.<img src='static/img/hourglass.gif'></span>
+						    </div>
+                        </div>
 					</div>
 				</div>
 			</div>

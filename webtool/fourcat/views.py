@@ -3,7 +3,7 @@ import re
 import config
 import pickle as p
 
-from flask import Flask, render_template, url_for, abort
+from flask import Flask, render_template, jsonify
 from fourcat import app
 
 from backend.lib.query import SearchQuery
@@ -97,21 +97,23 @@ def check_query(query_key):
 	query = SearchQuery(key=query_key, db=db)
 
 	results = query.check_query_finished()
-
 	if results:
-
-		# custom stuff for debugging
-		if app.debug == True:
-			if results == 'empty_file':
-				return results
-			return 'http://localhost/fourcat/data/' + query.data["query"].replace("*", "") + '-' + query_key + '.csv'
+		if app.debug:
+			path = 'http://localhost/fourcat/data/' + query.data["query"].replace("*", "") + '-' + query_key + '.csv'
 		else:
-			results = results.replace("\\", "/").split("/").pop()
-		
-		return results
-
+			path = results.replace("\\", "/").split("/").pop()
 	else:
-		return "no_file"
+		path = ""
+
+	status = {
+		"status": query.get_status(),
+		"key": query_key,
+		"done": True if results else False,
+		"path": path,
+		"keyword": query.data[""]
+	}
+
+	return jsonify(status)
 
 def validateQuery(parameters):
 	"""
