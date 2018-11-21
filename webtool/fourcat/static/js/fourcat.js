@@ -38,7 +38,7 @@ $(function() {
 
 					// If the query is accepted by the server.
 					else{
-						s$('#query_status .status_message .message').html('Query submitted, waiting for results');
+						$('#query_status .status_message .message').html('Query submitted, waiting for results');
 						query_key = response
 						poll_csv(query_key)
 
