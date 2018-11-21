@@ -109,8 +109,7 @@ def check_query(query_key):
 		"status": query.get_status(),
 		"key": query_key,
 		"done": True if results else False,
-		"path": path,
-		"keyword": query.data[""]
+		"path": path
 	}
 
 	return jsonify(status)
