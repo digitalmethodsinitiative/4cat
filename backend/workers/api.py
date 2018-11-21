@@ -159,7 +159,7 @@ class InternalAPI(BasicWorker):
 			now = int(time.time())
 			then = now - 86400
 			field = "timestamp" if request == "posts" else "timestamp_scraped"
-			items = self.db.fetchall("SELECT * FROM " + request + " WHERE " + field + " > %s", (then,))
+			items = self.db.fetchall("SELECT " + field + " FROM " + request + " WHERE " + field + " > %s", (then,))
 			if items is None:
 				return {"error": "Database unavailable"}
 
