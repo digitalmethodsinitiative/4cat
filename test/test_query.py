@@ -136,6 +136,15 @@ class TestQuery(FourcatTestCase):
 		with self.assertRaises(TypeError):
 			SearchQuery(key="fake-key", db=self.db)
 
+	def test_status(self):
+		query = SearchQuery(query="obama", parameters=self.default_parameters, db=self.db)
+
+		self.assertEqual(query.get_status(), "")
+		query.update_status("test 1")
+		self.assertEqual(query.get_status(), "test 1")
+		query.update_status("test 2")
+		self.assertEqual(query.get_status(), "test 2")
+
 	def test_instantiate_queryparam_fail(self):
 		"""
 		Test instantiating a search query with a lack of parameters
@@ -144,6 +153,7 @@ class TestQuery(FourcatTestCase):
 		"""
 		with self.assertRaises(TypeError):
 			SearchQuery(query="", db=self.db)
+
 
 if __name__ == '__main__':
 	unittest.main()
