@@ -67,7 +67,7 @@ class ThreadScraper(BasicJSONScraper):
 									last_post=max([post["no"] for post in data["posts"] if "no" in post]), job=job)
 
 		if not thread:
-			self.log.info("Thread %s scraped, but no changes found" % first_post["no"])
+			self.log.info("Thread %s/%s scraped, but no changes found" % (job["details"]["board"], first_post["no"]))
 			return True
 
 		# create a dict mapped as `post id`: `post data` for easier comparisons with existing data
