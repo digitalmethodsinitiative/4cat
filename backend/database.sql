@@ -122,3 +122,12 @@ CREATE TABLE IF NOT EXISTS queries (
   is_empty        boolean DEFAULT FALSE,
   is_finished     boolean DEFAULT FALSE
 );
+
+-- users
+CREATE TABLE IF NOT EXISTS users (
+  id              SERIAL PRIMARY KEY
+  name            TEXT,
+  password        TEXT,
+  is_admin        BOOLEAN DEFAULT FALSE,
+  timestamp_seen  INTEGER DEFAULT 0
+)

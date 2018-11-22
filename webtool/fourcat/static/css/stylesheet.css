@@ -56,9 +56,27 @@ p{
 	display: none;
 }
 
-.header{
+h1, h2, .header{
 	text-align: center;
 	background-color: #485ba6;
+}
+
+h1, h2 {
+	font-size: 25px;
+}
+
+h2 {
+	background-image: url(../img/patternblue.jpg);
+}
+
+h1 span, h2 span {
+	background: #000;
+	display: inline-block;
+	color: #FFF;
+	height: 100%;
+	text-transform: uppercase;
+	font-size: inherit;
+	padding: 0.2em 0;
 }
 
 .pagetitle{
@@ -535,4 +553,84 @@ label {
 
 .red{
 	color: red;
+}
+
+
+.middle-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/** LOGIN **/
+.login-page {
+
+}
+
+.login-form {
+	width: 50%;
+	height: 25%;
+	margin-top: 3em;
+}
+
+.login-form h2, .login-form article {
+	border: 2px solid #000;
+}
+
+.login-form h2 {
+	border-bottom: 0;
+	margin-bottom: 0;
+}
+
+.login-form article {
+	border-top: 0;
+	padding: 1em;
+	background: #FFF;
+}
+
+.login-form form {
+	margin-top: 1em;
+}
+
+.login-form .form-element {
+	display: grid;
+	grid-template-columns: 25% 75%;
+	grid-column-gap: 1em;
+	margin: 0 25% 0.5em 25%;
+}
+
+.login-form label {
+	text-align: right;
+}
+
+.login-form .form-footer {
+	text-align: center;
+}
+
+.login-form .form-footer button {
+	padding-left: 2em;
+	padding-right: 2em;
+}
+
+.login-footer {
+	position: absolute;
+	bottom: 0;
+	background: #4eff52 url(../img/patterngreen.jpg);
+	padding: 0.6em 1em;
+	width: 100%;
+	text-align: right;
+	border-top: 2px solid #000;
+}
+
+nav > ul.flat {
+	list-style: none;
+}
+
+nav > ul.flat > li {
+	display: inline-block;
+}
+
+nav > ul.flat > li:not(:last-child)::after {
+	content: '\2022';
+	margin-left: 0.5em;
 }

@@ -30,6 +30,10 @@ def show_index():
 
 	return render_template('fourcat.html', boards=boards)
 
+@app.route('/login')
+def show_login():
+	return render_template("fourcat-login.html", notices=[])
+
 @app.route('/string_query/<string:board>/<string:body_query>/<string:subject_query>/<int:full_thread>/<int:dense_threads>/<int:dense_percentage>/<int:dense_length>/<int:min_timestamp>/<int:max_timestamp>')
 def string_query(board, body_query, subject_query, full_thread=0, dense_threads=0, dense_percentage=15, dense_length=30, min_timestamp=0, max_timestamp=0):
 	"""
