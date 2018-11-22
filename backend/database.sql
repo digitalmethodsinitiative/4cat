@@ -125,9 +125,13 @@ CREATE TABLE IF NOT EXISTS queries (
 
 -- users
 CREATE TABLE IF NOT EXISTS users (
-  id              SERIAL PRIMARY KEY
-  name            TEXT,
+  name            TEXT UNIQUE PRIMARY KEY,
   password        TEXT,
   is_admin        BOOLEAN DEFAULT FALSE,
   timestamp_seen  INTEGER DEFAULT 0
 )
+
+INSERT INTO users
+  (name, password)
+  VALUES ('anonymous', '')
+  ON CONFLICT DO NOTHING;
