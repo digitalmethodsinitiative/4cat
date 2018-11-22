@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<head>
+	<title>4CAT</title>
+    <link rel='stylesheet' href='https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css' integrity='sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm' crossorigin='anonymous'>
+	<link rel='stylesheet' type='text/css' href='{{url_for('static', filename='css/stylesheet.css')}}'>
+	<script type=text/javascript src='{{url_for('static', filename='js/jquery-3.3.1.min.js')}}'></script>
+	<script type=text/javascript src='{{url_for('static', filename='js/fourcat.js')}}'></script>
+	<meta charset='UTF-8'>
+</head>
+<body class="login-page">
+    <h1><span>4CAT: Capture and Analysis Toolkit</span></h1>
+    <div class="middle-wrapper">
+        <div class="login-form">
+            <h2><span>Log in</span></h2>
+            <article>
+                <p>Please log in to access 4CAT. Alternatively, you may connect from the University of Amsterdam
+                through its local network or a VPN; this will log you in automatically.</p>
+                {% for notice in notices %}
+                <p class="form-notice">{{notice}}</p>
+                {%  endfor %}
+                <form action="" method="POST">
+                    <div class="form-element">
+                        <label for="form-username">Name</label>
+                        <input type="text" name="username" id="form-username">
+                    </div>
+                    <div class="form-element">
+                        <label for="form-password">Password</label>
+                        <input type="password" name="password" id="form-password">
+                    </div>
+                    <div class="form-footer">
+                        <button>Log in</button>
+                    </div>
+                </form>
+            </article>
+            <footer class="form-footer">
+                <nav>
+                    <ul class="flat">
+                        <li><a href="/request-account">Request account</a></li>
+                        <li><a href="/forgot-password">Recover password</a></li>
+                    </ul>
+                </nav>
+            </footer>
+        </div>
+    </div>
+
+    <footer class="login-footer">
+        An <a href="https://www.oilab.eu">Open Intelligence Lab</a> production, 2018
+    </footer>
+</body>
