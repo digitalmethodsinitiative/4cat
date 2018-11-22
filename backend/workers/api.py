@@ -216,6 +216,29 @@ class InternalAPI(BasicWorker):
 
 			return response
 
+		if request == "queries":
+			# search queries per time period
+			week = 86400 * 7
+			now = int(time.time())
+
+			items = self.db.fetchall("SELECT * FROM queries WHERE timestamp > %s ORDER BY timestamp ASC", (now - week,))
+
+			response = {
+				"1h": 0,
+				"1d": 0,
+				"1w": 0
+			}
+
+			for item in items:
+				response["1w"] += 1
+				if item["timestamp"] > now - 3600:
+					response["1h"] += 1
+				if item["timestamp"] > now - 86400:
+					response["1d"] += 1
+
+			return response
+
+
 		# no appropriate response
 		return False
 
