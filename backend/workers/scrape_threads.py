@@ -149,7 +149,7 @@ class ThreadScraper(BasicJSONScraper):
 			self.db.insert("posts", post_data)
 		except psycopg2.IntegrityError:
 			self.db.rollback()
-			dupe = self.db.fetchone("SELECT * from posts WHERE id = %s" % (post["no"], ))
+			dupe = self.db.fetchone("SELECT * from posts WHERE id = %s" % (post["no"], ),  commit=False)
 			if dupe:
 				self.log.error("Post %s in thread %s/%s (time: %s) scraped twice: first seen in thread %s at %s" % (post["no"], thread["board"], thread["id"], post["time"], dupe["thread_id"], dupe["timestamp"]))
 			else:

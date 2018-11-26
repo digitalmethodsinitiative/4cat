@@ -173,28 +173,34 @@ class Database:
 
 		return self.cursor.rowcount
 
-	def fetchall(self, query, *args):
+	def fetchall(self, query, *args, commit=True):
 		"""
 		Fetch all rows for a query
 		:param query:  Query
 		:param args: Replacement values
+		:param bool commit: Commit after SELECT
 		:return list: The result rows, as a list
 		"""
 		self.query(query, *args)
+		if commit:
+			self.commit()
 		try:
 			return self.cursor.fetchall()
 		except AttributeError:
 			return []
 
-	def fetchone(self, query, *args):
+	def fetchone(self, query, *args, commit=True):
 		"""
 		Fetch one result row
 
 		:param query: Query
 		:param args: Replacement values
+		:param bool commit: Commit after SELECT
 		:return: The row, as a dictionary, or None if there were no rows
 		"""
 		self.query(query, *args)
+		if commit:
+			self.commit()
 		try:
 			return self.cursor.fetchone()
 		except psycopg2.ProgrammingError:
