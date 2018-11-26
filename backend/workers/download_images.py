@@ -39,7 +39,7 @@ class ImageDownloader(BasicWorker):
 		try:
 			url = "http://i.4cdn.org/%s/%s%s" % (job["details"]["board"], job["details"]["tim"], job["details"]["ext"])
 			image = requests.get(url, timeout=config.SCRAPE_TIMEOUT)
-		except requests.HTTPError as e:
+		except (requests.exceptions.ReadTimeout, requests.HTTPError, ConnectionRefusedError, ConnectionError) as e:
 			# something wrong with our internet connection? or blocked by 4chan?
 			# try again in a minute
 			if job["attempts"] > 2:
