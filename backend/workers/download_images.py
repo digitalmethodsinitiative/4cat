@@ -20,7 +20,7 @@ class ImageDownloader(BasicWorker):
 	"""
 	type = "image"
 	pause = 1
-	max_workers = 3
+	max_workers = 10
 
 	def work(self):
 		"""
