@@ -39,7 +39,7 @@ class JobQueue:
 		"""
 		if timestamp < 0:
 			timestamp = int(time.time())
-		job = self.db.fetchone("SELECT * FROM jobs WHERE jobtype = %s AND claimed = 0 AND claim_after < %s;",
+		job = self.db.fetchone("SELECT * FROM jobs WHERE jobtype = %s AND claimed = 0 AND claim_after < %s ORDER BY timestamp ASC LIMIT 1;",
 							   (jobtype, timestamp))
 
 		return {key: (json.loads(value) if key == "details" else value) for key, value in job.items()} if job else None
@@ -52,7 +52,7 @@ class JobQueue:
 
 		:return list:
 		"""
-		return self.db.fetchall("SELECT * FROM jobs")
+		return self.db.fetchall("SELECT * FROM jobs ORDER BY timestamp ASC")
 
 	def get_job_count(self, jobtype="*"):
 		"""
