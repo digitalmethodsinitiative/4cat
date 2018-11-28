@@ -15,7 +15,7 @@
             <article>
                 <p>Please log in to access 4CAT. Alternatively, you may connect from the University of Amsterdam
                 through its local network or a VPN; this will log you in automatically.</p>
-                {% for notice in notices %}
+                {% for notice in flashes %}
                 <p class="form-notice">{{notice}}</p>
                 {%  endfor %}
                 <form action="" method="POST">
@@ -35,8 +35,9 @@
             <footer class="form-footer">
                 <nav>
                     <ul class="flat">
-                        <li><a href="/request-account">Request account</a></li>
+                        <li><a href="/page/request-account">Request account</a></li>
                         <li><a href="/forgot-password">Recover password</a></li>
+                        <li><a href="/page/data-policy">Data policy</a></li>
                     </ul>
                 </nav>
             </footer>

@@ -612,6 +612,11 @@ label {
 	padding-right: 2em;
 }
 
+.login-form .form-notice {
+    color: #F00;
+    text-align: center;
+}
+
 .login-footer {
 	position: absolute;
 	bottom: 0;
@@ -633,4 +638,21 @@ nav > ul.flat > li {
 nav > ul.flat > li:not(:last-child)::after {
 	content: '\2022';
 	margin-left: 0.5em;
+}
+
+.plain-page article {
+	margin: 0 auto;
+	width: 75%;
+	min-width: 640px;
+	border: 2px solid #000;
+	padding-bottom: 1em;
+	margin-top: 1em;
+}
+
+.plain-page article h2, .plain-page article p {
+	margin-bottom: 0.5em;
+}
+
+.plain-page article p {
+	padding: 0 1em;
 }
