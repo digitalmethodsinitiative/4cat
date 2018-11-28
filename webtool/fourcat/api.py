@@ -57,7 +57,6 @@ def api_status():
 	jobs_types = set([job["jobtype"] for job in jobs])
 	jobs_sorted = {jobtype: len([job for job in jobs if job["jobtype"] == jobtype]) for jobtype in jobs_types}
 	jobs_sorted["total"] = jobs_count
-	db.close()
 
 	# determine if backend is live by checking if the process is running
 
@@ -97,7 +96,6 @@ def api_thread(board, thread_id):
 	"""
 	thread = db.fetchone("SELECT * FROM threads WHERE board = %s AND id = %s", (board, thread_id))
 	response = get_thread(board, thread, db)
-	db.close()
 
 	if not response:
 		abort(404)
@@ -116,7 +114,7 @@ def api_board(board):
 	"""
 	threads = db.fetchall(
 		"SELECT * FROM threads WHERE board = %s ORDER BY is_sticky DESC, timestamp_modified DESC LIMIT 200", (board,))
-	db.close()
+
 	if not threads:
 		abort(404)
 
@@ -154,7 +152,6 @@ def api_board_page(board, page):
 		"SELECT * FROM threads WHERE board = %s ORDER BY is_sticky DESC, timestamp_modified DESC " + limit, (board,))
 
 	if not threads:
-		db.close()
 		abort(404)
 
 	response = {
@@ -162,8 +159,6 @@ def api_board_page(board, page):
 			get_thread(board, thread, db) for thread in threads
 		]
 	}
-
-	db.close()
 
 	return jsonify(response)
 
@@ -181,7 +176,6 @@ def api_board_catalog(board):
 		"SELECT * FROM threads WHERE board = %s ORDER BY is_sticky DESC, timestamp_modified DESC LIMIT 150", (board,))
 
 	if not threads:
-		db.close()
 		abort(404)
 
 	response = []
@@ -204,7 +198,6 @@ def api_board_catalog(board):
 			"threads": page_threads
 		})
 
-	db.close()
 	return jsonify(response)
 
 @app.route('/api/<board>/archive.json')

@@ -1,4 +1,3 @@
-import atexit
 import sys
 import os
 
@@ -21,20 +20,10 @@ import fourcat.views
 import fourcat.api
 
 
-def shutdown():
-	"""
-	This function runs when the app shuts down
-
-	Right now, all it does is properly close the database connection.
-	"""
-	db.close()
-
-
 if config.FlaskConfig.SECRET_KEY == "REPLACE_THIS":
 	raise Exception("You need to set a FLASK_SECRET in config.py before running the webtool.")
 
 app.config.from_object("config.FlaskConfig")
-atexit.register(shutdown)
 login_manager.init_app(app)
 login_manager.login_view = "show_login"
 
