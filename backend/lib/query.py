@@ -103,7 +103,7 @@ class SearchQuery:
 		"""
 		return self.folder
 
-	def finish(self):
+	def finish(self, num_rows=0):
 		"""
 		Declare the query finished
 		"""
@@ -111,8 +111,9 @@ class SearchQuery:
 			raise RuntimeError("Cannot finish a finished query again")
 
 		self.db.update("queries", where={"query": self.data["query"], "key": self.data["key"]},
-					   data={"is_finished": True})
+					   data={"is_finished": True, "num_rows": num_rows})
 		self.data["is_finished"] = True
+		self.data["num_rows"] = num_rows
 
 	def is_finished(self):
 		"""

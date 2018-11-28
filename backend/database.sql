@@ -119,6 +119,7 @@ CREATE TABLE IF NOT EXISTS queries (
   result_file     text DEFAULT '',
   timestamp       integer,
   status          text,
+  num_rows        integer DEFAULT 0,
   is_empty        boolean DEFAULT FALSE,
   is_finished     boolean DEFAULT FALSE
 );
