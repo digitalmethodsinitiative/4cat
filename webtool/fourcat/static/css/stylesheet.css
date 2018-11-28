@@ -617,8 +617,8 @@ label {
     text-align: center;
 }
 
-.login-footer {
-	position: absolute;
+.fixed-footer {
+	position: fixed;
 	bottom: 0;
 	background: #4eff52 url(../img/patterngreen.jpg);
 	padding: 0.6em 1em;
