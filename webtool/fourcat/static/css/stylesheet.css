@@ -79,6 +79,17 @@ h1 span, h2 span {
 	padding: 0.2em 0;
 }
 
+h1 a, h2 a {
+	color: inherit;
+	text-decoration: none;
+	font: inherit;
+}
+
+h1 a:hover, h2 a:hover {
+	text-decoration: none;
+	color: #4eff52;
+}
+
 .pagetitle{
 	background-color: black;
 	display: inline-block;
