@@ -1,0 +1,18 @@
+{% extends "fourcat-layout.html" %}
+
+{% block body_class %}
+    result-list plain-page
+{% endblock %}
+
+{% block body %}
+    <article>
+      <h2><span>Recent results</span></h2>
+      <ol>
+      {% for query in queries %}
+        <li>
+          <a href="/results/{{ query.result_file }}">{{ query.result_file }}</a>
+        </li>
+      {% endfor %}
+      </ol>
+    </article>
+{% endblock %}
