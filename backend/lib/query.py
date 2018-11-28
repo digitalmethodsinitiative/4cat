@@ -16,7 +16,7 @@ class SearchQuery:
 	data = None
 	folder = None
 
-	def __init__(self, query=None, parameters=None, key=None, db=None):
+	def __init__(self, query=None, parameters=None, key=None, db=None, parent=None):
 		"""
 		Create new query object
 
@@ -34,11 +34,14 @@ class SearchQuery:
 			current = self.db.fetchone("SELECT * FROM queries WHERE key = %s", (self.key,))
 			if not current:
 				raise TypeError("SearchQuery() requires a valid query key for its 'key' argument")
+
+			self.query = current["query"]
 		else:
 			if query is None or parameters is None:
 				raise TypeError("SearchQuery() requires either 'key', or 'parameters' and 'query' to be given")
 
 			self.key = self.get_key(query, parameters)
+			self.query = query
 			current = self.db.fetchone("SELECT * FROM queries WHERE key = %s AND query = %s", (self.key, query))
 
 		if current:
@@ -54,6 +57,10 @@ class SearchQuery:
 				"is_empty": False,
 				"is_finished": False
 			}
+
+			if parent:
+				self.data["key_parent"] = parent
+
 			self.db.insert("queries", data=self.data)
 			self.reserve_result_file()
 
@@ -120,7 +127,7 @@ class SearchQuery:
 		Check if query is finished
 		:return bool:
 		"""
-		return self.data["is_finished"] == True
+		return self.data["is_finished"] is True
 
 	def get_parameters(self):
 		"""
