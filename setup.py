@@ -31,6 +31,7 @@ setup(
 		"mpld3==0.3",
 		"APScheduler==3.5.3",
 		"Flask_Limiter==1.0.1",
+		"Flask_Login==0.4.1",
 		"nltk==3.3",
 		"Pillow==5.3.0",
 		"adjustText==0.7.3",
@@ -38,6 +39,7 @@ setup(
 		"psycopg2==2.7.5",
 		"scikit_learn==0.20.0",
 		"python-daemon==1.2"
-		"bcrypt==3.1.4"
+		"bcrypt==3.1.4",
+		"markdown==3.0.1"
 	]
 )
