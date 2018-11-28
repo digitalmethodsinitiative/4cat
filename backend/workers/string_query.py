@@ -159,9 +159,9 @@ class StringQuery(BasicWorker):
 		else:
 			# all posts for all thread IDs found by Sphinx
 			thread_ids = tuple([post["thread_id"] for post in posts])
-
-			posts = self.db.fetchall(
-				"SELECT " + columns + " FROM posts WHERE thread_id IN %s ORDER BY thread_id ASC, id ASC", (thread_ids,))
+			values = ["(%s)" for thread_id in thread_ids]
+			sql = "SELECT " + columns + " FROM posts INNER JOIN ( VALUES " + ", ".join(values) + " ) VALS(included_id) ON (id = included_id) ORDER BY thread_id ASC, id ASC"
+			posts = self.db.fetchall(sql, thread_ids)
 
 			# get dense thread ids
 			if query["dense_threads"] and query["body_query"] != "empty":
