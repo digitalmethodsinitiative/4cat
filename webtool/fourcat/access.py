@@ -44,8 +44,11 @@ def autologin_whitelist():
 		# never check login for static files
 		return
 
-	socket.setdefaulttimeout(2)
-	hostname = socket.gethostbyaddr(request.remote_addr)[0]
+	try:
+		socket.setdefaulttimeout(2)
+		hostname = socket.gethostbyaddr(request.remote_addr)[0]
+	except (socket.herror, socket.timeout):
+		return
 
 	if current_user:
 		if current_user.get_id() == "autologin":
@@ -78,8 +81,11 @@ def exempt_from_limit():
 	if not config.FlaskConfig.HOSTNAME_WHITELIST_API:
 		return False
 
-	socket.setdefaulttimeout(2)
-	hostname = socket.gethostbyaddr(request.remote_addr)[0]
+	try:
+		socket.setdefaulttimeout(2)
+		hostname = socket.gethostbyaddr(request.remote_addr)[0]
+	except (socket.herror, socket.timeout):
+		return False
 
 	for hostmask in config.FlaskConfig.HOSTNAME_WHITELIST_API:
 		if fnmatch.filter([hostname], hostmask):
