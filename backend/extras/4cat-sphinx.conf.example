@@ -1,7 +1,6 @@
 ## /* Data sources */
 source 4cat {
     type = pgsql
-
     sql_host = localhost
     sql_user = fourcat
     sql_pass = supers3cr3t
@@ -11,7 +10,7 @@ source 4cat {
 
 source 4cat_posts : 4cat {
     sql_query_range = SELECT MIN(id_seq), MAX(id_seq) FROM posts
-    sql_range_step = 1000000
+    sql_range_step = 10000000
 
     sql_query = SELECT p.id_seq AS id, p.id AS post_id, p.thread_id, p.body, p.author, \
                        p.subject, p.timestamp, t.board \
@@ -20,6 +19,7 @@ source 4cat_posts : 4cat {
                     ON p.thread_id = t.id \
                  WHERE p.id_seq >= $start AND p.id_seq <= $end
 
+    sql_field_string = subject
     sql_attr_string = board
     sql_attr_string = author
     sql_attr_bigint = post_id
@@ -37,36 +37,42 @@ source 4cat_threads : 4cat {
 
 ## /* Indexes */
 index 4cat_index {
+    type = template
+    morphology = lemmatize_en
     min_word_len = 3
     min_infix_len = 3
     charset_table = 0..9, a..z, _, A..Z->a..z, U+00C0->a, U+00C1->a, U+00C2->a, U+00C3->a, U+00C4->a, U+00C5->a, U+00C7->c,$
 }
 
 index 4cat_posts : 4cat_index {
+    type = plain
     source = 4cat_posts
-    path = 4cat-posts.sphinxindex
+    path = 4cat-posts
     min_word_len = 3
     min_infix_len = 3
+    stopwords = stopwords_en.lst
     html_strip = 1
-
-    #stopwords = sphinx/stopwords_en.lst
 }
 
 index 4cat_threads : 4cat_index {
+    type = plain
     source = 4cat_threads
-    path = 4cat-threads.sphinxindex
+    path = 4cat-threads
 }
 
 ## /* Daemon configuration */
+common {
+    lemmatizer_base = /var/lib/
+}
+
 searchd {
-    log = sphinx/searchd.log
-    query_log = sphinx/searchd-queries.log
-    pid_file = sphinx/sphinx.pid
-    binlog_path = sphinx/binlog
-    listen = localhost:9213
-    listen = localhost:9306:mysql41
+    log = searchd.log
+    query_log = searchd-queries.log
+    pid_file = sphinx.pid
+    listen = 127.0.0.1:9213
+    listen = 127.0.0.1:9306:mysql41
 }
 
 indexer {
-    mem_limit = 512M
+    mem_limit = 786M
 }
