@@ -40,11 +40,11 @@ def show_page(page):
 		abort(404)
 
 	with open(page_path) as file:
-		page = file.read()
-		page_parsed = markdown.markdown(page)
+		page_raw = file.read()
+		page_parsed = markdown.markdown(page_raw)
 		page_parsed = re.sub(r"<h2>(.*)</h2>", r"<h2><span>\1</span></h2>", page_parsed)
 
-	return render_template("fourcat-page.html", body_content=page_parsed, body_class=page_class)
+	return render_template("fourcat-page.html", body_content=page_parsed, body_class=page_class, page_name=page)
 
 
 @app.route('/string_query/<string:board>/<string:body_query>/<string:subject_query>/<int:full_thread>/<int:dense_threads>/<int:dense_percentage>/<int:dense_length>/<int:min_timestamp>/<int:max_timestamp>')
