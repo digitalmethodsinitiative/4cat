@@ -103,12 +103,14 @@ def string_query(board, body_query, subject_query, full_thread=0, dense_threads=
 	return query.key
 
 @app.route('/results/')
+@login_required
 def show_results():
 	queries = db.fetchall("SELECT * FROM queries WHERE is_finished = TRUE ORDER BY timestamp DESC LIMIT 20")
 
 	return render_template("fourcat-results.html", queries=queries)
 
 @app.route('/check_query/<query_key>', methods=['GET','POST'])
+@login_required
 def check_query(query_key):
 	"""
 	AJAX URI to check whether query has been completed.
