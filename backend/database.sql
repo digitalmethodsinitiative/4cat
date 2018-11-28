@@ -129,9 +129,9 @@ CREATE TABLE IF NOT EXISTS users (
   password        TEXT,
   is_admin        BOOLEAN DEFAULT FALSE,
   timestamp_seen  INTEGER DEFAULT 0
-)
+);
 
 INSERT INTO users
   (name, password)
-  VALUES ('anonymous', '')
+  VALUES ('anonymous', ''), ('autologin', '')
   ON CONFLICT DO NOTHING;

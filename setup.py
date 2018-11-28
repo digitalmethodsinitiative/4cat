@@ -38,5 +38,6 @@ setup(
 		"psycopg2==2.7.5",
 		"scikit_learn==0.20.0",
 		"python-daemon==1.2"
+		"bcrypt==3.1.4"
 	]
 )

@@ -1,15 +1,13 @@
 import os
 import re
 import config
-import pickle as p
+import markdown
 
-from flask import Flask, render_template, jsonify
-from fourcat import app
+from flask import Flask, render_template, jsonify, abort
+from flask_login import login_required, current_user
+from fourcat import app, db, log
 
 from backend.lib.query import SearchQuery
-from backend.lib.helpers import get_absolute_folder
-from backend.lib.database import Database
-from backend.lib.logger import Logger
 from backend.lib.queue import JobQueue, JobAlreadyExistsException
 
 from stop_words import get_stop_words
@@ -21,6 +19,7 @@ Main views for the 4CAT front-end
 """
 
 @app.route('/')
+@login_required
 def show_index():
 	"""
 	Index page: main tool frontend
@@ -30,11 +29,26 @@ def show_index():
 
 	return render_template('fourcat.html', boards=boards)
 
-@app.route('/login')
-def show_login():
-	return render_template("fourcat-login.html", notices=[])
+@app.route('/page/<string:page>')
+def show_page(page):
+	page = re.sub(r"[^a-zA-Z0-9-_]*", "", page)
+	page_class = "page-" + page
+	page_folder = os.path.dirname(os.path.abspath(__file__)) + "/pages"
+	page_path = page_folder + "/" + page + ".md"
+
+	if not os.path.exists(page_path):
+		abort(404)
+
+	with open(page_path) as file:
+		page = file.read()
+		page_parsed = markdown.markdown(page)
+		page_parsed = re.sub(r"<h2>(.*)</h2>", r"<h2><span>\1</span></h2>", page_parsed)
+
+	return render_template("fourcat-page.html", body_content=page_parsed, body_class=page_class)
+
 
 @app.route('/string_query/<string:board>/<string:body_query>/<string:subject_query>/<int:full_thread>/<int:dense_threads>/<int:dense_percentage>/<int:dense_length>/<int:min_timestamp>/<int:max_timestamp>')
+@login_required
 def string_query(board, body_query, subject_query, full_thread=0, dense_threads=0, dense_percentage=15, dense_length=30, min_timestamp=0, max_timestamp=0):
 	"""
 	AJAX URI for various forms of substring querying
@@ -55,8 +69,6 @@ def string_query(board, body_query, subject_query, full_thread=0, dense_threads=
 	#body_query = re.escape(body_query)
 
 	# Make connections to database with backend library - safe enough?
-	log = Logger()
-	db = Database(logger=log)
 	queue = JobQueue(log, db)
 	body_query = body_query.replace("[^\p{L}A-Za-z0-9_*-]","");
 	subject_query = subject_query.replace("[^\p{L}A-Za-z0-9_*-]","");
@@ -69,7 +81,8 @@ def string_query(board, body_query, subject_query, full_thread=0, dense_threads=
 		"dense_percentage": int(dense_percentage),
 		"dense_length": int(dense_length),
 		"min_date": int(min_timestamp),
-		"max_date": int(max_timestamp)
+		"max_date": int(max_timestamp),
+		"user": current_user.get_id()
 	}
 
 	valid = validateQuery(parameters)
@@ -95,9 +108,6 @@ def check_query(query_key):
 	AJAX URI to check whether query has been completed.
 
 	"""
-
-	log = Logger()
-	db = Database(logger=log)
 	query = SearchQuery(key=query_key, db=db)
 
 	results = query.check_query_finished()

@@ -3,9 +3,6 @@ import psutil
 import json
 import os
 import config
-import hashlib
-import base64
-import glob
 
 from collections import OrderedDict
 
@@ -13,13 +10,10 @@ from flask import jsonify, abort, send_file
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 
-from fourcat import app
-from backend.lib.database import Database
+from fourcat import app, db, log
 from backend.lib.queue import JobQueue
-from backend.lib.logger import Logger
 from backend.lib.helpers import get_absolute_folder
 
-log = Logger()
 limiter = Limiter(app, key_func=get_remote_address)
 api_ratelimit = limiter.shared_limit("1 per second", scope="api")
 
@@ -57,7 +51,6 @@ def api_status():
 	"""
 
 	# get job stats
-	db = Database(logger=log)
 	queue = JobQueue(logger=log, database=db)
 	jobs = queue.get_all_jobs()
 	jobs_count = len(jobs)
@@ -102,7 +95,6 @@ def api_thread(board, thread_id):
 	:param int thread_id:  Thread ID
 	:return: JSONified thread data
 	"""
-	db = Database(logger=log)
 	thread = db.fetchone("SELECT * FROM threads WHERE board = %s AND id = %s", (board, thread_id))
 	response = get_thread(board, thread, db)
 	db.close()
@@ -122,7 +114,6 @@ def api_board(board):
 	:param str board:  Board to get index for
 	:return:  JSONified thread index
 	"""
-	db = Database(logger=log)
 	threads = db.fetchall(
 		"SELECT * FROM threads WHERE board = %s ORDER BY is_sticky DESC, timestamp_modified DESC LIMIT 200", (board,))
 	db.close()
@@ -158,7 +149,6 @@ def api_board_page(board, page):
 	:param int page:  Page to show
 	:return:  JSONified thread index
 	"""
-	db = Database(logger=log)
 	limit = "LIMIT 15 OFFSET %i" % ((int(page) - 1) * 15)
 	threads = db.fetchall(
 		"SELECT * FROM threads WHERE board = %s ORDER BY is_sticky DESC, timestamp_modified DESC " + limit, (board,))
@@ -187,7 +177,6 @@ def api_board_catalog(board):
 	:param str board:  Board to get index for
 	:return:  JSONified thread index
 	"""
-	db = Database(logger=log)
 	threads = db.fetchall(
 		"SELECT * FROM threads WHERE board = %s ORDER BY is_sticky DESC, timestamp_modified DESC LIMIT 150", (board,))
 
@@ -227,15 +216,12 @@ def get_archive(board):
 	:param board: Board to get list of archived thread IDs for
 	:return:  Simple list of thread IDs, oldest first
 	"""
-	db = Database(logger=log)
-
 	threads = db.fetchall("SELECT id FROM threads WHERE board = %s AND timestamp_archived > 0 ORDER BY timestamp_archived ASC", (board,))
 	return jsonify([thread["id"] for thread in threads])
 
 @app.route('/api/boards.json')
 @api_ratelimit
 def get_boards():
-	db = Database(logger=log)
 	boards = db.fetchall("SELECT DISTINCT board FROM threads")
 	return jsonify({"boards": [{"board": board["board"]} for board in boards]})
 

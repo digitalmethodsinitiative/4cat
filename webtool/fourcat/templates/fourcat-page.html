@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<head>
+	<title>4CAT</title>
+    <link rel='stylesheet' href='https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css' integrity='sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm' crossorigin='anonymous'>
+	<link rel='stylesheet' type='text/css' href='{{url_for('static', filename='css/stylesheet.css')}}'>
+	<script type=text/javascript src='{{url_for('static', filename='js/jquery-3.3.1.min.js')}}'></script>
+	<script type=text/javascript src='{{url_for('static', filename='js/fourcat.js')}}'></script>
+	<meta charset='UTF-8'>
+</head>
+<body class="plain-page {{body_class}}">
+    <h1><span>4CAT: Capture and Analysis Toolkit</span></h1>
+    <article>
+        {{body_content|safe}}
+    </article>
+
+    <footer class="login-footer">
+        {% if current_user.is_authenticated %}
+            Logged in {% if not current_user.is_special() %} as {{ current_user.get_name() }}(<a href="/logout">Log out</a>){% else %} via {{ current_user.get_name() }}{% endif %} -
+        {% endif %}
+        An <a href="https://www.oilab.eu">Open Intelligence Lab</a> production, 2018
+    </footer>
+</body>
