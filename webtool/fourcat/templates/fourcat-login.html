@@ -1,14 +1,10 @@
-<!DOCTYPE html>
-<head>
-	<title>4CAT</title>
-    <link rel='stylesheet' href='https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css' integrity='sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm' crossorigin='anonymous'>
-	<link rel='stylesheet' type='text/css' href='{{url_for('static', filename='css/stylesheet.css')}}'>
-	<script type=text/javascript src='{{url_for('static', filename='js/jquery-3.3.1.min.js')}}'></script>
-	<script type=text/javascript src='{{url_for('static', filename='js/fourcat.js')}}'></script>
-	<meta charset='UTF-8'>
-</head>
-<body class="login-page">
-    <h1><span>4CAT: Capture and Analysis Toolkit</span></h1>
+{% extends "fourcat-layout.html" %}
+
+{% block body_class %}
+    login_page
+{% endblock %}
+
+{% block body %}
     <div class="middle-wrapper">
         <div class="login-form">
             <h2><span>Log in</span></h2>
@@ -43,8 +39,4 @@
             </footer>
         </div>
     </div>
-
-    <footer class="login-footer">
-        An <a href="https://www.oilab.eu">Open Intelligence Lab</a> production, 2018
-    </footer>
-</body>
+{% endblock %}

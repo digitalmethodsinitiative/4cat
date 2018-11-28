@@ -98,6 +98,9 @@ def show_login():
 
 	:return: Redirect to either the URL form, or the index (if logged in)
 	"""
+	if current_user.is_authenticated:
+		return redirect(url_for("show_index"))
+
 	if request.method == 'GET':
 		return render_template('fourcat-login.html', flashes=get_flashed_messages())
 

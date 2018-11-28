@@ -140,7 +140,7 @@
 		<div class='footer-copyright'>
 			<div class='container-fluid'>
             {% if current_user.is_authenticated %}
-                Logged in {% if not current_user.is_special() %} as {{ current_user.get_name() }}(<a href="/logout">Log out</a>){% else %} via {{ current_user.get_name() }}{% endif %} -
+                Logged in {% if not current_user.is_special() %} as {{ current_user.get_name() }} (<a href="/logout">Log out</a>){% else %} via {{ current_user.get_name() }}{% endif %} -
             {% endif %}
 				An <a href="https://www.oilab.eu">Open Intelligence Lab</a> production, 2018
 			</div>
