@@ -114,6 +114,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS unique_mention
 CREATE TABLE IF NOT EXISTS queries (
   id              SERIAL PRIMARY KEY,
   key             text,
+  key_parent      text,
   query           text,
   parameters      text,
   result_file     text DEFAULT '',

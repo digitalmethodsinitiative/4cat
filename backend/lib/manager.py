@@ -66,7 +66,8 @@ class WorkerManager:
 		If aborted, all workers are politely asked to abort too.
 		"""
 		while self.looping:
-			self.load_worker_types()
+			self.load_worker_types("workers")
+			self.load_worker_types("postprocessors")
 
 			# start new workers, if needed
 			for worker_type in self.worker_prototypes:
@@ -99,19 +100,21 @@ class WorkerManager:
 		for worker in self.pool:
 			worker.join()
 
-	def load_worker_types(self):
+	def load_worker_types(self, folder="workers"):
 		"""
 		See what worker types are available
 
-		Looks for python files in the "workers" folder, then looks for classes that
+		Looks for python files in the given folder, then looks for classes that
 		are a subclass of BasicWorker that are available in those files, and not an
 		abstract class themselves. Classes that meet those criteria and have not been
 		loaded yet are added to an internal list of available worker types.
+
+		:param folder:  The folder within the backend root to look in for worker
 		"""
 		# check for worker files
-		os.chdir(os.path.abspath(os.path.dirname(__file__)) + "/../workers")
+		os.chdir(os.path.abspath(os.path.dirname(__file__)) + "/../" + folder)
 		for file in glob.glob("*.py"):
-			module = "backend.workers." + file[:-3]
+			module = "backend." + folder + "." + file[:-3]
 			if module in sys.modules:
 				continue
 
