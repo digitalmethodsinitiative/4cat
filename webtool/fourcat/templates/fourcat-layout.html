@@ -13,7 +13,7 @@
         <p>Welcome.</p>
     {% endblock %}
 
-    <footer class="login-footer">
+    <footer class="fixed-footer">
         {% if current_user.is_authenticated %}
             Logged in {% if not current_user.is_special() %} as {{ current_user.get_name() }} (<a href="/logout">Log out</a>){% else %} via {{ current_user.get_name() }}{% endif %} -
         {% endif %}
