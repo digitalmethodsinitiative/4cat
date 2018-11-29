@@ -1,12 +1,7 @@
 {% extends "fourcat-layout.html" %}
 
-{% block title %}
-    {{ page_name|replace("-", " ")|capitalize }}
-{% endblock %}
-
-{% block body_class %}
-    plain-page {{ body_class }}
-{% endblock %}
+{% block title %}{{ page_name|replace("-", " ")|title }}{% endblock %}
+{% block body_class %}plain-page {{ body_class }}{% endblock %}
 
 {% block body %}
     <article>
