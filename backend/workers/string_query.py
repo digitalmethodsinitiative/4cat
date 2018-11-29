@@ -83,7 +83,8 @@ class StringQuery(BasicWorker):
 		else:
 			self.posts_to_csv(posts, results_file)
 
-		self.query.finish(num_rows=len(posts))
+		num_posts = len(posts) if posts else 0
+		self.query.finish(num_rows=num_posts)
 		self.queue.finish_job(job)
 
 	def execute_query(self, query):
