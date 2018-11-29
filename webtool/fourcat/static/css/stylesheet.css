@@ -667,3 +667,24 @@ nav > ul.flat > li:not(:last-child)::after {
 .plain-page article p {
 	padding: 0 1em;
 }
+
+/** results **/
+.result-list h3 {
+    font-size: inherit;
+}
+.result-list .inline-label {
+    color: #BBB;
+}
+.result-list .property-badge {
+    font-size: 0.6em;
+    display: inline-block;
+    border: 1px solid #000;
+    border-radius: 2px;
+    padding: 0.1em 0.5em;
+    position: relative;
+    top: -1px;
+}
+
+.result-list .second-tier {
+    color: #BBB;
+}

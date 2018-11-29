@@ -1,18 +1,41 @@
 {% extends "fourcat-layout.html" %}
 
-{% block body_class %}
-    result-list plain-page
-{% endblock %}
+{% block title %}Results &amp; previous queries{% endblock %}
+{% block body_class %}result-list plain-page{% endblock %}
 
 {% block body %}
     <article>
       <h2><span>Recent results</span></h2>
-      <ol>
-      {% for query in queries %}
+      <ol class="result-list">
+      {% for query in queries %}{% if query.key_parent == "" %}
         <li>
-          <a href="/result/{{ query.result_file }}">{{ query.result_file }}</a>
+          <h3>
+            <span class="property-badge">/{{ query.parameters.board }}/</span>
+          {% if query.parameters.body_query and query.parameters.body_query != "empty" %}
+              <span class="inline-label">body:</span> <span class="inline-query">{{ query.parameters.body_query }}</span>
+          {% endif %}
+          {% if query.parameters.subject_query and query.parameters.subject_query != "empty" %}
+              <span class="inline-label">subject:</span> <span class="inline-query">{{ query.parameters.subject_query }}</span>
+          {% endif %}
+          {%  if query.parameters.full_thread %}
+              <span class="property-badge second-tier">full thread</span>
+          {% endif %}
+          {%  if query.parameters.dense_threads %}
+              <span class="property-badge second-tier">dense threads</span>
+          {% endif %}
+          </h3>
+        {% if query.is_finished %}
+          <p>
+              {{ query.num_rows }} posts found;
+              <a href="/result/{{ query.result_file }}">{{ query.result_file }}</a>
+          </p>
+        {% elif query.status %}
+          <p>Currently executing query.</p>
+        {% else %}
+          <p>Query is queued.</p>
+        {% endif %}
         </li>
-      {% endfor %}
+      {% endif %}{% endfor %}
       </ol>
     </article>
 {% endblock %}

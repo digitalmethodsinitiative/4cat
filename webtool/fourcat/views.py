@@ -1,5 +1,6 @@
 import os
 import re
+import json
 import config
 import markdown
 
@@ -105,9 +106,21 @@ def string_query(board, body_query, subject_query, full_thread=0, dense_threads=
 @app.route('/results/')
 @login_required
 def show_results():
-	queries = db.fetchall("SELECT * FROM queries WHERE is_finished = TRUE ORDER BY timestamp DESC LIMIT 20")
+	queries = db.fetchall("SELECT * FROM queries WHERE key_parent = '' ORDER BY timestamp DESC LIMIT 20")
+	filtered = []
+	for query in queries:
+		query["parameters"] = json.loads(query["parameters"])
+		filtered.append(query)
 
-	return render_template("fourcat-results.html", queries=queries)
+	return render_template("fourcat-results.html", queries=filtered)
+
+@app.route('/results/<string:key>/')
+def show_result(key):
+	query = db.fetchone("SELECT * FROM queries WHERE key = %s", (key,))
+	if not query:
+		abort(404)
+
+	return render_template("fourcat-result.html", query=query)
 
 @app.route('/check_query/<query_key>', methods=['GET','POST'])
 @login_required
