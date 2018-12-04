@@ -285,7 +285,7 @@ class ThreadScraper(BasicJSONScraper):
 		been deleted.
 		"""
 		self.log.info("Thread %s/%s was deleted, marking as such" % (self.job["details"]["board"], self.job["remote_id"]))
-		self.db.update("threads", data={"timestamp_deleted": self.loop_time}, where={"id": self.job["remote_id"]})
+		self.db.update("threads", data={"timestamp_deleted": self.loop_time}, where={"id": self.job["remote_id"], "timestamp_deleted": 0})
 		self.queue.finish_job(self.job)
 
 	def get_url(self):
