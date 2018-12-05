@@ -26,7 +26,7 @@
           </h3>
         {% if query.is_finished %}
           <p>
-              {{ query.num_rows }} posts found;
+              {{ query.num_rows }} posts;
               <a href="/result/{{ query.result_file }}">{{ query.result_file }}</a>
           </p>
         {% elif query.status %}

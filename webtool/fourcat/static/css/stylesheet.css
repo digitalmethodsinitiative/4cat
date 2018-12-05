@@ -658,6 +658,7 @@ nav > ul.flat > li:not(:last-child)::after {
 	border: 2px solid #000;
 	padding-bottom: 1em;
 	margin-top: 1em;
+	margin-bottom: 5em;
 }
 
 .plain-page article h2, .plain-page article p {
@@ -672,6 +673,17 @@ nav > ul.flat > li:not(:last-child)::after {
 .result-list h3 {
     font-size: inherit;
 }
+
+.result-list {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+.result-list li {
+	padding: 0.5em 0.5em 0.25em 0.5em;
+}
+
 .result-list .inline-label {
     color: #BBB;
 }
@@ -687,4 +699,8 @@ nav > ul.flat > li:not(:last-child)::after {
 
 .result-list .second-tier {
     color: #BBB;
+}
+
+.result-list li:nth-child(even) {
+	background: #d1e2ff;
 }
