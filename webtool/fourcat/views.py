@@ -2,6 +2,7 @@ import os
 import re
 import sys
 import glob
+import time
 import json
 import config
 import inspect
@@ -163,6 +164,7 @@ def queue_postprocessor(key, postprocessor):
 	queue = JobQueue(log, db)
 	queue.add_job(jobtype=postprocessor, remote_id=query.key, details={"type": postprocessor})
 
+	time.sleep(1)  # for quick queries, this immediately displays results, rather than "Queued"
 	return jsonify({"status": "success"})
 
 @app.route('/results/<string:key>/')
