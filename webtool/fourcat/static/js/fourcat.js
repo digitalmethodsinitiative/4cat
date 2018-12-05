@@ -274,5 +274,78 @@ $(function() {
 
 	$('.input-dense').prop('disabled', true)
 	$('#check-full-thread').prop('disabled', true)
+	$('body').on('click', '.result-list .postprocessor-link', function(e) {
+		e.preventDefault();
+		popup_panel.show($(this).attr('href'));
+	})
 
+	$('body').on('click', '.postprocessor-list a', function(e) {
+		e.preventDefault();
+
+		$(this).addClass('loading');
+		$.post($(this).attr('href')).done(function(response) {
+			popup_panel.refresh();
+		}).fail(function(response, code) {
+			if(code === 403) {
+				alert('The post-processor could not be queued because it is in the queue already. Refresh the page to see its status.')
+			} else {
+				alert('The post-processor could not be queued to to a server error. Please try again later, or contact a system administrator if the error persists.');
+			}
+		});
+	})
+
+	$('.result-list > li').each(function() {
+		if(parseInt($(this).attr('data-numrows')) > 0) {
+            $(this).append('<div><a class="button-like postprocessor-link" href="/results/' + $(this).attr('id') + '/postprocessors/">Analysis</a></div>');
+        }
+	})
 });
+
+popup_panel = {
+	panel: false,
+	blur: false,
+	wrap: false,
+	url: '',
+
+	show: function(url, fade=true) {
+		popup_panel.url = url;
+		if(!popup_panel.blur) {
+			popup_panel.blur = $('<div id="popup-blur"></div>');
+			popup_panel.blur.on('click', popup_panel.hide);
+			$('body').append(popup_panel.blur);
+		}
+
+		if(!popup_panel.panel) {
+			popup_panel.panel = $('<div id="popup-panel"><div class="popup-wrap"></div></div>');
+			popup_panel.wrap = popup_panel.panel.find('.popup-wrap');
+			$('body').append(popup_panel.panel);
+		}
+
+		if(fade) {
+            popup_panel.panel.addClass('loading');
+            popup_panel.wrap.html('');
+            popup_panel.panel.removeClass('closed').addClass('open');
+            popup_panel.blur.removeClass('closed').addClass('open');
+        }
+
+		$.get(url).done(function(html) {
+			popup_panel.wrap.animate({opacity:1}, 250);
+			popup_panel.panel.removeClass('loading');
+			popup_panel.wrap.html(html);
+		}).fail(function(html, code) {
+			alert('The page could not be loaded (HTTP error ' + code + ').');
+			popup_panel.hide();
+        });
+	},
+
+	refresh: function() {
+		popup_panel.wrap.animate({opacity:0}, 250, function() {
+			popup_panel.show(popup_panel.url, false);
+		});
+	},
+
+	hide: function() {
+		popup_panel.panel.removeClass('open').addClass('closed');
+		popup_panel.blur.removeClass('open').addClass('closed');
+	}
+};

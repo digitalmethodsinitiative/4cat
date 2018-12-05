@@ -1,15 +1,20 @@
 import os
 import re
+import sys
+import glob
 import json
 import config
+import inspect
 import markdown
+import importlib
 
-from flask import Flask, render_template, jsonify, abort
+from flask import Flask, render_template, jsonify, abort, request
 from flask_login import login_required, current_user
 from fourcat import app, db, log
 
 from backend.lib.query import SearchQuery
 from backend.lib.queue import JobQueue, JobAlreadyExistsException
+from backend.lib.postprocessor import BasicPostProcessor
 
 from stop_words import get_stop_words
 
@@ -18,6 +23,7 @@ from stop_words import get_stop_words
 Main views for the 4CAT front-end
 
 """
+
 
 @app.route('/')
 @login_required
@@ -29,6 +35,7 @@ def show_index():
 	boards = config.SCRAPE_BOARDS
 
 	return render_template('fourcat.html', boards=boards)
+
 
 @app.route('/page/<string:page>')
 def show_page(page):
@@ -48,9 +55,11 @@ def show_page(page):
 	return render_template("fourcat-page.html", body_content=page_parsed, body_class=page_class, page_name=page)
 
 
-@app.route('/string_query/<string:board>/<string:body_query>/<string:subject_query>/<int:full_thread>/<int:dense_threads>/<int:dense_percentage>/<int:dense_length>/<int:min_timestamp>/<int:max_timestamp>')
+@app.route(
+	'/string_query/<string:board>/<string:body_query>/<string:subject_query>/<int:full_thread>/<int:dense_threads>/<int:dense_percentage>/<int:dense_length>/<int:min_timestamp>/<int:max_timestamp>')
 @login_required
-def string_query(board, body_query, subject_query, full_thread=0, dense_threads=0, dense_percentage=15, dense_length=30, min_timestamp=0, max_timestamp=0):
+def string_query(board, body_query, subject_query, full_thread=0, dense_threads=0, dense_percentage=15, dense_length=30,
+				 min_timestamp=0, max_timestamp=0):
 	"""
 	AJAX URI for various forms of substring querying
 
@@ -67,12 +76,12 @@ def string_query(board, body_query, subject_query, full_thread=0, dense_threads=
 	"""
 
 	# Security
-	#body_query = re.escape(body_query)
+	# body_query = re.escape(body_query)
 
 	# Make connections to database with backend library - safe enough?
 	queue = JobQueue(log, db)
-	body_query = body_query.replace("[^\p{L}A-Za-z0-9_*-]","");
-	subject_query = subject_query.replace("[^\p{L}A-Za-z0-9_*-]","");
+	body_query = body_query.replace("[^\p{L}A-Za-z0-9_*-]", "");
+	subject_query = subject_query.replace("[^\p{L}A-Za-z0-9_*-]", "");
 	parameters = {
 		"board": str(board),
 		"body_query": str(body_query).replace("-", " "),
@@ -103,26 +112,107 @@ def string_query(board, body_query, subject_query, full_thread=0, dense_threads=
 	print("Query queued: %s" % query.key)
 	return query.key
 
+
 @app.route('/results/')
 @login_required
 def show_results():
 	queries = db.fetchall("SELECT * FROM queries WHERE key_parent = '' ORDER BY timestamp DESC LIMIT 20")
 	filtered = []
+	postprocessors = load_postprocessors()
+
 	for query in queries:
 		query["parameters"] = json.loads(query["parameters"])
+		query["subqueries"] = []
+
+		subqueries = db.fetchall("SELECT * FROM queries WHERE key_parent = %s ORDER BY timestamp ASC", (query["key"],))
+		for subquery in subqueries:
+			subquery["parameters"] = json.loads(subquery["parameters"])
+			if "type" not in subquery["parameters"] or subquery["parameters"]["type"] not in postprocessors:
+				continue
+			subquery["postprocessor"] = postprocessors[subquery["parameters"]["type"]]
+			query["subqueries"].append(subquery)
+
 		filtered.append(query)
 
 	return render_template("fourcat-results.html", queries=filtered)
 
+@app.route('/results/<string:key>/postprocessors/queue/<string:postprocessor>/', methods=["POST"])
+@login_required
+def queue_postprocessor(key, postprocessor):
+	# cover all bases - can only run postprocessor on "parent" query
+	try:
+		query = SearchQuery(key=key, db=db)
+		if query.data["key_parent"] != "":
+			abort(404)
+	except TypeError:
+		abort(404)
+
+	# load available post-processors
+	postprocessors = load_postprocessors()
+	if postprocessor not in postprocessors:
+		abort(404)
+
+	# ensure we don't run the same post-processor twice
+	subqueries = db.fetchall("SELECT * FROM queries WHERE key_parent = %s", (key,))
+	for subquery in subqueries:
+		details = json.loads(subquery["parameters"])
+		if "type" in details and details["type"] == postprocessor:
+			abort(403)
+
+	# okay, we're good - queue it
+	queue = JobQueue(log, db)
+	queue.add_job(jobtype=postprocessor, remote_id=query.key, details={"type": postprocessor})
+
+	return jsonify({"status": "success"})
+
 @app.route('/results/<string:key>/')
+@app.route('/results/<string:key>/postprocessors/')
+@login_required
 def show_result(key):
 	query = db.fetchone("SELECT * FROM queries WHERE key = %s", (key,))
+	query["parameters"] = json.loads(query["parameters"])
+
 	if not query:
 		abort(404)
 
-	return render_template("fourcat-result.html", query=query)
+	processors = load_postprocessors()
+	unfinished_postprocessors = processors.copy()
+	filtered_subqueries = []
+	subqueries = db.fetchall("SELECT * FROM queries WHERE key_parent = %s", (key,))
 
-@app.route('/check_query/<query_key>', methods=['GET','POST'])
+
+	for subquery in subqueries:
+		details = json.loads(subquery["parameters"])
+		subquery["parameters"] = details
+		subquery["postprocessor"] = processors[details["type"]]
+		filtered_subqueries.append(subquery)
+
+		if details["type"] in unfinished_postprocessors:
+			del unfinished_postprocessors[details["type"]]
+
+
+	queue = JobQueue(log, db)
+	available_postprocessors = unfinished_postprocessors.copy()
+	for type in unfinished_postprocessors:
+		queued = queue.get_all_jobs(type)
+		for job in queued:
+			details = json.loads(job["details"])
+			if job["remote_id"] != key or "type" not in details:
+				continue
+
+			del available_postprocessors[details["type"]]
+			if job["claimed"] == 0:
+				filtered_subqueries.append({
+					"postprocessor": processors[details["type"]],
+					"is_finished": False,
+					"status": ""
+				})
+
+	return render_template("select-postprocessors.html", query=query, postprocessors=available_postprocessors, subqueries=filtered_subqueries)
+
+
+
+@app.route('/check_query/<query_key>')
 @login_required
 def check_query(query_key):
 	"""
@@ -149,6 +239,42 @@ def check_query(query_key):
 
 	return jsonify(status)
 
+
+def load_postprocessors():
+	"""
+	See what post-processors are available
+
+	Looks for python files in the PP folder, then looks for classes that
+	are a subclass of BasicPostProcessor that are available in those files, and not an
+	abstract class themselves. Classes that meet those criteria and have not been
+	loaded yet are added to an internal list of available types.
+	"""
+	pp_folder = os.path.abspath(os.path.dirname(__file__)) + "/../../backend/postprocessors"
+	os.chdir(pp_folder)
+	postprocessors = {}
+
+	# check for worker files
+	for file in glob.glob("*.py"):
+		module = "backend.postprocessors." + file[:-3]
+		if module not in sys.modules:
+			importlib.import_module(module)
+
+		members = inspect.getmembers(sys.modules[module])
+
+		for member in members:
+			if inspect.isclass(member[1]) and issubclass(member[1], BasicPostProcessor) and not inspect.isabstract(
+					member[1]):
+				postprocessors[member[1].type] = {
+					"type": member[1].type,
+					"description": member[1].description,
+					"name": member[1].title,
+					"extension": member[1].extension,
+					"class": member[0]
+				}
+
+	return postprocessors
+
+
 def validateQuery(parameters):
 	"""
 	Validates the client-side user input
@@ -163,7 +289,7 @@ def validateQuery(parameters):
 
 	# TEMPORARY MEASUREMENT
 	# Querying can only happen for max two weeks
-	#max_daterange = 1209600
+	# max_daterange = 1209600
 
 	# if parameters["min_date"] == 0 or parameters["max_date"] == 0:
 	# 	return "Temporary hardware limitation:\nUse a date range of max. two weeks."
@@ -224,5 +350,5 @@ def validateQuery(parameters):
 				return "With no text querying, filter on a date range of max four weeks."
 		else:
 			return "Input either a body or subject query, or filter on a date range of max four weeks."
-	
+
 	return True
