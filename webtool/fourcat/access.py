@@ -108,7 +108,7 @@ def show_login():
 		return redirect(url_for("show_index"))
 
 	if request.method == 'GET':
-		return render_template('fourcat-login.html', flashes=get_flashed_messages())
+		return render_template('login.html', flashes=get_flashed_messages())
 
 	username = request.form['username']
 	password = request.form['password']

@@ -35,7 +35,7 @@ def show_index():
 
 	boards = config.SCRAPE_BOARDS
 
-	return render_template('fourcat.html', boards=boards)
+	return render_template('tool.html', boards=boards)
 
 
 @app.route('/page/<string:page>')
@@ -53,7 +53,7 @@ def show_page(page):
 		page_parsed = markdown.markdown(page_raw)
 		page_parsed = re.sub(r"<h2>(.*)</h2>", r"<h2><span>\1</span></h2>", page_parsed)
 
-	return render_template("fourcat-page.html", body_content=page_parsed, body_class=page_class, page_name=page)
+	return render_template("page.html", body_content=page_parsed, body_class=page_class, page_name=page)
 
 
 @app.route(
@@ -135,7 +135,7 @@ def show_results():
 
 		filtered.append(query)
 
-	return render_template("fourcat-results.html", queries=filtered)
+	return render_template("results.html", queries=filtered)
 
 @app.route('/results/<string:key>/postprocessors/queue/<string:postprocessor>/', methods=["POST"])
 @login_required
@@ -210,7 +210,7 @@ def show_result(key):
 					"status": ""
 				})
 
-	return render_template("select-postprocessors.html", query=query, postprocessors=available_postprocessors, subqueries=filtered_subqueries)
+	return render_template("result.html", query=query, postprocessors=available_postprocessors, subqueries=filtered_subqueries)
 
 
 
@@ -275,7 +275,6 @@ def load_postprocessors():
 				}
 
 	return postprocessors
-
 
 def validateQuery(parameters):
 	"""
