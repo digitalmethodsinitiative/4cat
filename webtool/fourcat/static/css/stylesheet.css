@@ -732,6 +732,10 @@ nav > ul.flat > li:not(:last-child)::after {
     color: #AAA;
 }
 
+.result-list .warning {
+    color: #cc1105;
+}
+
 .result-list > li:nth-child(even), .postprocessor-list > li:nth-child(even) {
 	background: #d1e2ff;
 }

@@ -23,13 +23,18 @@
           {%  if query.parameters.dense_threads %}
               <span class="property-badge second-tier">dense threads</span>
           {% endif %}
+          {%  if query.is_finished and query.num_rows == 0 %}
+              <span class="property-badge second-tier warning">no results</span>
+          {% endif %}
           </h3>
           <div class="result-files">
         {% if query.is_finished %}
+            {% if query.num_rows > 0 %}
             <p class="result-file">
               {{ query.num_rows }} posts;
               <a href="/result/{{ query.result_file }}">{{ query.result_file }}</a>
             </p>
+            {% endif %}
         {% elif query.status %}
             <p>Currently executing query ({{ query.status }}).</p>
         {% else %}
