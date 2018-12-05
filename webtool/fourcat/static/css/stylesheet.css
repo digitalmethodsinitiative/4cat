@@ -674,6 +674,10 @@ nav > ul.flat > li:not(:last-child)::after {
     font-size: inherit;
 }
 
+.result-list article {
+	padding: 0;
+}
+
 .result-list {
 	list-style: none;
 	margin: 0;
