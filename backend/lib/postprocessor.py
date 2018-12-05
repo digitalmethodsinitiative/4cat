@@ -24,6 +24,8 @@ class BasicPostProcessor(BasicWorker, metaclass=abc.ABCMeta):
 	job = None
 	parent = None
 	source_file = None
+	description = "No description available"
+	extension = "csv"
 
 	def __init__(self, db=None, logger=None, manager=None):
 		"""
@@ -63,10 +65,12 @@ class BasicPostProcessor(BasicWorker, metaclass=abc.ABCMeta):
 		params = {
 			"type": self.type
 		}
-		for field in self.job["details"]:
-			params[field] = self.job["details"][field]
 
-		self.query = SearchQuery(query=self.parent.query, parent=self.parent.key, parameters=params, db=self.db)
+		if self.job["details"]:
+			for field in self.job["details"]:
+				params[field] = self.job["details"][field]
+
+		self.query = SearchQuery(query=self.parent.query, parent=self.parent.key, parameters=params, db=self.db, extension=self.extension)
 		self.process()
 		self.after_process()
 
@@ -75,7 +79,8 @@ class BasicPostProcessor(BasicWorker, metaclass=abc.ABCMeta):
 		After processing, declare job finished
 		"""
 		self.query.update_status("Results processed.")
-		self.query.finish()
+		if not self.query.is_finished():
+			self.query.finish()
 		self.queue.finish_job(self.job)
 
 	@abc.abstractmethod

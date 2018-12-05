@@ -8,7 +8,7 @@
       <h2><span>Recent results</span></h2>
       <ol class="result-list">
       {% for query in queries %}{% if query.key_parent == "" %}
-        <li>
+        <li id="{{ query.key }}" class="{% if query.is_finished and query.num_rows > 0 %}has_results{% endif %}" data-numrows="{{ query.num_rows }}">
           <h3>
             <span class="property-badge">/{{ query.parameters.board }}/</span>
           {% if query.parameters.body_query and query.parameters.body_query != "empty" %}
@@ -24,16 +24,25 @@
               <span class="property-badge second-tier">dense threads</span>
           {% endif %}
           </h3>
+          <div class="result-files">
         {% if query.is_finished %}
-          <p>
+            <p class="result-file">
               {{ query.num_rows }} posts;
               <a href="/result/{{ query.result_file }}">{{ query.result_file }}</a>
-          </p>
+            </p>
         {% elif query.status %}
-          <p>Currently executing query.</p>
+            <p>Currently executing query ({{ query.status }}).</p>
         {% else %}
-          <p>Query is queued.</p>
+            <p>Query is queued.</p>
         {% endif %}
+        {% if query.is_finished and query.subqueries|length > 0 %}
+            <ol class="subquery-list">
+            {% for subquery in query.subqueries %}
+                <li id="subquery-{{ subquery.key }}">{{ subquery.postprocessor.name }} ({% if subquery.is_finished %}<a href="/result/{{ subquery.result_file }}">{% if subquery.num_rows > 0 %}{{ subquery.num_rows }} items, {% endif %}{{ subquery.postprocessor.extension }}</a>{% elif subquery.status == "" %}Queued{% else %}Running - {{ subquery.status }}{% endif %})</li>
+            {% endfor %}
+            </ol>
+        {% endif %}
+          </div>
         </li>
       {% endif %}{% endfor %}
       </ol>

@@ -6,7 +6,7 @@ from csv import DictReader, DictWriter
 from backend.lib.postprocessor import BasicPostProcessor
 
 
-class ThreadCounter(BasicPostProcessor):
+class UsernameExtractor(BasicPostProcessor):
 	"""
 	Example post-processor
 
@@ -16,28 +16,28 @@ class ThreadCounter(BasicPostProcessor):
 	contain information needed internally as well as information that is used
 	to describe this post-processor with in a user interface.
 	"""
-	type = "thread-counter"  # job type ID
-	title = "Thread and post counts"  # title displayed in UI
-	description = "See how many threads and, for each thread, how many posts are present in the dataset"  # description displayed in UI
+	type = "extract-usernames"  # job type ID
+	title = "Extracted usernames"  # title displayed in UI
+	description = "Build a list with distinct usernames in the source file, and how many posts were found per username"  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
 	def process(self):
 		"""
 		This takes a 4CAT results file as input, and outputs a new CSV file
-		with one column with unique thread IDs and another one with the number
-		of posts in that thread.
+		with one column with unique usernames and in the other one the amount
+		of posts for that user name
 		"""
-		threads = {}
+		users = {}
 
 		self.query.update_status("Reading source file")
 		with open(self.source_file) as source:
 			csv = DictReader(source)
 			for post in csv:
-				if post["thread_id"] not in threads:
-					threads[post["thread_id"]] = 0
-				threads[post["thread_id"]] += 1
+				if post["author"] not in users:
+					users[post["author"]] = 0
+				users[post["author"]] += 1
 
-		results = [{"thread_id": thread_id, "num_posts": threads[thread_id]} for thread_id in threads]
+		results = [{"username": username, "num_posts": users[username]} for username in users]
 		if not results:
 			return
 

@@ -1,8 +1,10 @@
 import hashlib
+import typing
 import json
 import time
 import re
 import os
+from csv import DictWriter
 
 import config
 from backend.lib.helpers import get_absolute_folder
@@ -16,7 +18,7 @@ class SearchQuery:
 	data = None
 	folder = None
 
-	def __init__(self, query=None, parameters=None, key=None, db=None, parent=None):
+	def __init__(self, query=None, parameters=None, key=None, db=None, parent=None, extension="csv"):
 		"""
 		Create new query object
 
@@ -62,7 +64,7 @@ class SearchQuery:
 				self.data["key_parent"] = parent
 
 			self.db.insert("queries", data=self.data)
-			self.reserve_result_file()
+			self.reserve_result_file(extension)
 
 	def check_query_finished(self):
 		"""
@@ -211,6 +213,33 @@ class SearchQuery:
 		updated = self.db.update("queries", where={"key": self.data["key"]}, data={"status": status})
 
 		return updated > 0
+
+	def write_csv_and_finish(self, data):
+		"""
+		Write data as csv to results file and finish query
+
+		Determines result file path using query's path determination helper
+		methods. After writing results, the query is marked finished.
+
+		:param data: A list or tuple of dictionaries, all with the same keys
+		"""
+		if not (isinstance(data, typing.List) or isinstance(data, typing.Tuple)) or isinstance(data, str):
+			raise TypeError("write_as_csv requires a list or tuple of dictionaries as argument")
+
+		if not data:
+			raise ValueError("write_as_csv requires a dictionary with at least one item")
+
+		if not isinstance(data[0], dict):
+			raise TypeError("write_as_csv requires a list or tuple of dictionaries as argument")
+
+		with open(self.get_results_path(), "w") as results:
+			writer = DictWriter(results, fieldnames=data[0].keys())
+			writer.writeheader()
+
+			for row in data:
+				writer.writerow(row)
+
+		self.finish(len(data))
 
 	def set_empty(self):
 		"""
