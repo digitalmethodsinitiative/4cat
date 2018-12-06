@@ -8,11 +8,13 @@ from flask_login import LoginManager
 
 from backend.lib.database import Database
 from backend.lib.logger import Logger
+from backend.lib.queue import JobQueue
 
 login_manager = LoginManager()
 app = Flask(__name__)
 log = Logger()
 db = Database(logger=log)
+queue = JobQueue(logger=log, database=db)
 
 import config
 import fourcat.access

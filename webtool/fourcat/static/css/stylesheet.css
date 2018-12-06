@@ -66,6 +66,10 @@ p{
 	display: none;
 }
 
+h1 {
+	margin-bottom: 0;
+}
+
 h1, h2, h3.blocktitle, .header{
 	text-align: center;
 	background-color: #485ba6;
@@ -77,6 +81,14 @@ h1, h2, h3.blocktitle {
 
 h2, h3.blocktitle {
 	background-image: url(../img/patternblue.jpg);
+}
+
+h3.section-header {
+	margin-bottom: 0;
+}
+
+h3.section-header + p:not(.glued) {
+	margin-top: 0.5em;
 }
 
 h1 span, h2 span, h3.blocktitle span {
@@ -117,7 +129,7 @@ h1 a:hover, h2 a:hover, h3.blocktitle a:hover {
 }
 
 .col-lg-3.topdiv{
-	background-color: #50ff50;
+	background: #50ff50 url('../img/patterngreen.jpg');
 	border-top: 2px solid black;
 	border-left: 2px solid black;
 	border-right: 2px solid black;
@@ -492,7 +504,7 @@ p.imgpost{
 }
 
 #schedule{
-	background-color: #50ff50;
+	background: #50ff50 url('../img/patterngreen.jpg');
 }
 
 .sidebarcontent{
@@ -559,7 +571,7 @@ img{
 .page-footer{
 	padding-top: 10px;
 	padding-bottom: 10px;
-	background: url(../img/patterngreen.jpg);
+	background: #50ff50 url(../img/patterngreen.jpg);
 	border-top: 2px solid black;
 	text-align: right;
 }
@@ -641,7 +653,7 @@ label {
 .fixed-footer {
 	position: fixed;
 	bottom: 0;
-	background: #4eff52 url(../img/patterngreen.jpg);
+	background: #50ff50 url(../img/patterngreen.jpg);
 	padding: 0.6em 1em;
 	width: 100%;
 	text-align: right;
@@ -666,7 +678,6 @@ nav > ul.flat > li:not(:last-child)::after {
 	width: 75%;
 	min-width: 640px;
 	border: 2px solid #000;
-	padding-bottom: 1em;
 	margin-top: 1em;
 	margin-bottom: 5em;
 }
@@ -715,29 +726,30 @@ nav > ul.flat > li:not(:last-child)::after {
     align-items: center;
 }
 
-.result-list .inline-label {
+.result-list > li:nth-child(even), .postprocessor-list > li:nth-child(even) {
+	background: #d1e2ff;
+}
+
+.result .inline-label {
     color: #AAA;
 }
-.result-list .property-badge {
+
+.result .property-badge {
     font-size: 0.6em;
     display: inline-block;
     border: 1px solid #000;
     border-radius: 2px;
     padding: 0.1em 0.5em;
     position: relative;
-    top: -1px;
+    top: -3px;
 }
 
-.result-list .second-tier {
+.result .second-tier {
     color: #AAA;
 }
 
-.result-list .warning {
+.result .warning {
     color: #cc1105;
-}
-
-.result-list > li:nth-child(even), .postprocessor-list > li:nth-child(even) {
-	background: #d1e2ff;
 }
 
 .subquery-list {
@@ -759,6 +771,12 @@ nav > ul.flat > li:not(:last-child)::after {
     border-bottom: 2px dotted #000;
     vertical-align: top;
     margin-right: 0.5em;
+}
+
+.result-warning {
+	background: #50ff50 url('../img/patterngreen.jpg');
+	text-align: center;
+	margin: 0;
 }
 
 /* popup */
@@ -814,7 +832,7 @@ nav > ul.flat > li:not(:last-child)::after {
 }
 
 /* select postprocessor */
-#popup-panel ol.postprocessor-list {
+ol.postprocessor-list {
     list-style: none;
     margin: 0;
     padding: 0;
@@ -822,6 +840,10 @@ nav > ul.flat > li:not(:last-child)::after {
 
 #popup-panel .subquery-list {
     margin-left: 1.5em;
+}
+
+#popup-panel .postprocessor-list {
+	margin: 0;
 }
 
 .postprocessor-list li {

@@ -86,7 +86,7 @@ $(function() {
 					if(keyword === '') {
 						keyword = $('#subject-input').val();
 					}
-					$('#submitform').append('<a href="/result/' + json.path + '"><p>' + json.path + '</p></a>')
+					$('#submitform').append('<a href="/results/' + json.key + '"><p>' + json.path + '</p></a>')
 					$('.loader').hide();
 					$('#query_status .status_message .dots').html('');
 					$('#whole-form').removeAttr('disabled');
@@ -277,13 +277,13 @@ $(function() {
 	$('body').on('click', '.result-list .postprocessor-link', function(e) {
 		e.preventDefault();
 		popup_panel.show($(this).attr('href'));
-	})
+	});
 
-	$('body').on('click', '.postprocessor-list a', function(e) {
+	$('body').on('click', '#popup-panel .postprocessor-list a', function(e) {
 		e.preventDefault();
 
 		$(this).addClass('loading');
-		$.post($(this).attr('href')).done(function(response) {
+		$.post($(this).attr('href') + "?async=yes").done(function(response) {
 			popup_panel.refresh();
 		}).fail(function(response, code) {
 			if(code === 403) {

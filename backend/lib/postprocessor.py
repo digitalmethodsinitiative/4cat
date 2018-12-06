@@ -70,7 +70,7 @@ class BasicPostProcessor(BasicWorker, metaclass=abc.ABCMeta):
 			for field in self.job["details"]:
 				params[field] = self.job["details"][field]
 
-		self.query = SearchQuery(query=self.parent.query, parent=self.parent.key, parameters=params, db=self.db, extension=self.extension)
+		self.query = SearchQuery(parent=self.parent.key, parameters=params, db=self.db, extension=self.extension)
 		self.process()
 		self.after_process()
 
