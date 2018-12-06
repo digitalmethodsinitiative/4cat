@@ -1,4 +1,5 @@
 <h3 class="blocktitle"><span><a href="/results/{{ query.key }}/">Query{% if query.query != "query" %}: {{ query.query }}{% endif %}</a></span></h3>
+
 <p class="result">
     <span class="property-badge">/{{ query.parameters.board }}/</span>
 {% if query.parameters.body_query and query.parameters.body_query != "empty" %}
@@ -24,6 +25,12 @@
     <span class="property-badge">Until</span>
     <span class="inline-query">{{ query.parameters.max_date|datetime }}</span>
 {% endif %}
+</p>
+{% endif %}
+
+{% if query.status %}
+<p class="result">
+    {{ query.status }}
 </p>
 {% endif %}
 
