@@ -8,6 +8,7 @@ from csv import DictWriter
 
 import config
 from backend.lib.helpers import get_absolute_folder
+from backend.lib.queue import JobQueue
 
 
 class SearchQuery:
@@ -17,15 +18,15 @@ class SearchQuery:
 	db = None
 	data = None
 	folder = None
+	parameters = None
 
-	def __init__(self, query=None, parameters=None, key=None, db=None, parent=None, extension="csv"):
+	def __init__(self, parameters=None, key=None, db=None, parent=None, extension="csv"):
 		"""
 		Create new query object
 
 		If the query is not in the database yet, it is added.
 
-		:param str query:  Search query
-		:param parameters:  Parameters, e.g. date limits, et cetera
+		:param parameters:  Parameters, e.g. string query, date limits, et cetera
 		:param db:  Database connection
 		"""
 		self.db = db
@@ -39,19 +40,20 @@ class SearchQuery:
 
 			self.query = current["query"]
 		else:
-			if query is None or parameters is None:
-				raise TypeError("SearchQuery() requires either 'key', or 'parameters' and 'query' to be given")
+			if parameters is None:
+				raise TypeError("SearchQuery() requires either 'key', or 'parameters' to be given")
 
-			self.key = self.get_key(query, parameters)
-			self.query = query
-			current = self.db.fetchone("SELECT * FROM queries WHERE key = %s AND query = %s", (self.key, query))
+			self.query = self.get_label(parameters)
+			self.key = self.get_key(self.query, parameters)
+			current = self.db.fetchone("SELECT * FROM queries WHERE key = %s AND query = %s", (self.key, self.query))
 
 		if current:
 			self.data = current
+			self.parameters = json.loads(self.data["parameters"])
 		else:
 			self.data = {
 				"key": self.key,
-				"query": query,
+				"query": self.get_label(parameters),
 				"parameters": json.dumps(parameters),
 				"result_file": "",
 				"status": "",
@@ -59,6 +61,7 @@ class SearchQuery:
 				"is_empty": False,
 				"is_finished": False
 			}
+			self.parameters = parameters
 
 			if parent:
 				self.data["key_parent"] = parent
@@ -144,6 +147,17 @@ class SearchQuery:
 			return json.loads(self.data["parameters"])
 		except json.JSONDecodeError:
 			return {}
+
+	def get_label(self, parameters=None):
+		if not parameters:
+			parameters = self.parameters
+
+		if "body_query" in parameters and parameters["body_query"] and parameters["body_query"] != "empty":
+			return parameters["body_query"]
+		elif "subject_query" in parameters and parameters["subject_query"] and parameters["subject_query"] != "empty":
+			return parameters["subject_query"]
+		else:
+			return "query"
 
 	def reserve_result_file(self, extension="csv"):
 		"""
@@ -240,6 +254,23 @@ class SearchQuery:
 				writer.writerow(row)
 
 		self.finish(len(data))
+
+	def get_analyses(self, queue=False):
+		"""
+		Get analyses for this query
+
+		:param queue:  If a JobQueue is passed as this parameter, queued
+		post-processor jobs will also be fetched and included in the result
+		:return dict: Dict with two lists: one `queued` (jobs) and one
+		`running` (queries)
+		"""
+		results = {"queued": [], "running": []}
+
+		results["running"] = self.db.fetchall("SELECT * FROM queries WHERE key_parent = %s", (self.key,))
+		if queue:
+			results["queued"] = queue.get_all_jobs(remote_id=self.key)
+
+		return results
 
 	def set_empty(self):
 		"""

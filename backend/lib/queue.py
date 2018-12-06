@@ -44,16 +44,19 @@ class JobQueue:
 
 		return {key: (json.loads(value) if key == "details" else value) for key, value in job.items()} if job else None
 
-	def get_all_jobs(self, jobtype="*"):
+	def get_all_jobs(self, jobtype="*", remote_id=False):
 		"""
 		Get all jobs
 
 		Returns all jobs, no matter the type or claim-after date
 
 		:param string jobtype:  Type of job, "*" for all types
+		:param string remote_id:  Remote ID, takes precedence over `jobtype`
 		:return list:
 		"""
-		if jobtype == "*":
+		if remote_id:
+			return self.db.fetchall("SELECT * FROM jobs WHERE remote_id = %s ORDER BY timestamp ASC", (remote_id,))
+		elif jobtype == "*":
 			return self.db.fetchall("SELECT * FROM jobs ORDER BY timestamp ASC")
 		else:
 			return self.db.fetchall("SELECT * FROM jobs WHERE jobtype = %s ORDER BY timestamp ASC", (jobtype,))

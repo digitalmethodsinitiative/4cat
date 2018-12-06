@@ -1,59 +1,10 @@
-<h3 class="blocktitle"><span>Query data</span></h3>
-<p>
-    <span class="property-badge">/{{ query.parameters.board }}/</span>
-{% if query.parameters.body_query and query.parameters.body_query != "empty" %}
-    <span class="inline-label">body:</span> <span class="inline-query">{{ query.parameters.body_query }}</span>
-{% endif %}
-{% if query.parameters.subject_query and query.parameters.subject_query != "empty" %}
-    <span class="inline-label">subject:</span> <span class="inline-query">{{ query.parameters.subject_query }}</span>
-{% endif %}
-{%  if query.parameters.full_thread %}
-    <span class="property-badge second-tier">full thread</span>
-{% endif %}
-{%  if query.parameters.dense_threads %}
-    <span class="property-badge second-tier">dense threads</span>
-{% endif %}
-</p>
+{% extends "layout.html" %}
 
-{% if query.is_finished %}
-    <p class="result-file">
-        {{ query.num_rows }} posts;
-        <a href="/result/{{ query.result_file }}">{{ query.result_file }}</a>
-    </p>
-{% elif query.status %}
-    <p>Currently executing query ({{ query.status }}).</p>
-{% else %}
-    <p>Query is queued.</p>
-{% endif %}
+{% block title %}{% if query.query %}Query: {{ query.query }}{% else %}Query results{% endif %}{% endblock %}
+{% block body_class %}plain-page result-page{% endblock %}
 
-{% if subqueries|length > 0 %}
-    <ol class="subquery-list">
-    {% for subquery in subqueries %}
-        {% if subquery.is_finished %}
-            <li><span class="subprocessor-name">{{ subquery.postprocessor.name }}</span>: <a href="/result/{{ subquery.result_file }}">{{ subquery.result_file }}</a> ({{ subquery.num_rows }} items)</li>
-        {% else %}
-        <li><span class="subprocessor-name">{{ subquery.postprocessor.name }}</span>: {% if subquery.status == '' %}Queued{% else %}Running - {{ subquery.status }}{% endif %}</li>
-        {% endif %}
-    {% endfor %}
-    </ol>
-{% endif %}
-
-{% if postprocessors.values()|length == 0 %}
-    <h3 class="blocktitle"><span>Post-processors</span></h3>
-    <p>
-        No further post-processors are available for this query.
-    {% if subqueries|length > 0 %}
-        Results for post-processors that were executed earlier are available in the panel above.
-    {% endif %}
-    </p>
-{% else %}
-    <h3 class="blocktitle"><span>Select post-processor</span></h3>
-<ol class="postprocessor-list">
-{% for processor in postprocessors.values() %}
-    <li>
-        <p><em>{{ processor.name }}</em>: {{ processor.description }}{% if processor.description[-1] != "." %}.{% endif %} Output: {{ processor.extension }} file.</p>
-        <p><a href="/results/{{ query.key }}/postprocessors/queue/{{ processor.type }}/" class="button-like">Queue</a></p>
-    </li>
-{% endfor %}
-</ol>
-{% endif %}
+{% block body %}
+    <article>
+{% include "result-details.html" %}
+    </article>
+{% endblock %}

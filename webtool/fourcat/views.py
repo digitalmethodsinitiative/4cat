@@ -2,16 +2,16 @@ import os
 import re
 import sys
 import glob
-import time
 import json
 import config
 import inspect
+import datetime
 import markdown
 import importlib
 
-from flask import Flask, render_template, jsonify, abort, request
+from flask import render_template, jsonify, abort, request, redirect
 from flask_login import login_required, current_user
-from fourcat import app, db, log
+from fourcat import app, db, log, queue
 
 from backend.lib.query import SearchQuery
 from backend.lib.queue import JobQueue, JobAlreadyExistsException
@@ -24,7 +24,11 @@ from stop_words import get_stop_words
 Main views for the 4CAT front-end
 
 """
-
+@app.template_filter('datetime')
+def _jinja2_filter_datetime(date, fmt=None):
+	date = datetime.datetime.fromtimestamp(date)
+	format = "%d-%M-%Y"
+	return date.strftime(format)
 
 @app.route('/')
 @login_required
@@ -32,14 +36,22 @@ def show_index():
 	"""
 	Index page: main tool frontend
 	"""
-
-	boards = config.SCRAPE_BOARDS
-
-	return render_template('tool.html', boards=boards)
+	return render_template('tool.html', boards=config.SCRAPE_BOARDS)
 
 
 @app.route('/page/<string:page>')
 def show_page(page):
+	"""
+	Display a markdown page within the 4CAT UI
+
+	To make adding static pages easier, they may be saved as markdown files
+	in the pages subdirectory, and then called via this view. The markdown
+	will be parsed to HTML and displayed within the layout template.
+
+	:param page: ID of the page to load, should correspond to a markdown file
+	in the pages/ folder (without the .md extension)
+	:return:  Rendered template
+	"""
 	page = re.sub(r"[^a-zA-Z0-9-_]*", "", page)
 	page_class = "page-" + page
 	page_folder = os.path.dirname(os.path.abspath(__file__)) + "/pages"
@@ -80,7 +92,6 @@ def string_query(board, body_query, subject_query, full_thread=0, dense_threads=
 	# body_query = re.escape(body_query)
 
 	# Make connections to database with backend library - safe enough?
-	queue = JobQueue(log, db)
 	body_query = body_query.replace("[^\p{L}A-Za-z0-9_*-]", "");
 	subject_query = subject_query.replace("[^\p{L}A-Za-z0-9_*-]", "");
 	parameters = {
@@ -99,24 +110,29 @@ def string_query(board, body_query, subject_query, full_thread=0, dense_threads=
 	valid = validateQuery(parameters)
 
 	if valid != True:
-		print(valid)
 		return "Invalid query. " + valid
 
 	# Queue query
-	query = SearchQuery(query=body_query, parameters=parameters, db=db)
+	query = SearchQuery(parameters=parameters, db=db)
 
 	try:
 		queue.add_job(jobtype="query", remote_id=query.key)
 	except JobAlreadyExistsException:
 		pass
 
-	print("Query queued: %s" % query.key)
 	return query.key
 
 
 @app.route('/results/')
 @login_required
 def show_results():
+	"""
+	Show results overview
+
+	For each result, available analyses are also displayed.
+
+	:return:  Rendered template
+	"""
 	queries = db.fetchall("SELECT * FROM queries WHERE key_parent = '' ORDER BY timestamp DESC LIMIT 20")
 	filtered = []
 	postprocessors = load_postprocessors()
@@ -137,9 +153,19 @@ def show_results():
 
 	return render_template("results.html", queries=filtered)
 
-@app.route('/results/<string:key>/postprocessors/queue/<string:postprocessor>/', methods=["POST"])
+
+@app.route('/results/<string:key>/postprocessors/queue/<string:postprocessor>/', methods=["GET", "POST"])
 @login_required
 def queue_postprocessor(key, postprocessor):
+	"""
+	Queue a new post-processor
+
+	:param key:  Key of query to queue the post-processor for
+	:param postprocessor:  ID of the post-processor to queue
+	:return:  Either a redirect, or a JSON status if called asynchronously
+	"""
+	is_async = request.args.get("async", "no") != "no"
+
 	# cover all bases - can only run postprocessor on "parent" query
 	try:
 		query = SearchQuery(key=key, db=db)
@@ -148,73 +174,85 @@ def queue_postprocessor(key, postprocessor):
 	except TypeError:
 		abort(404)
 
-	# load available post-processors
-	postprocessors = load_postprocessors()
-	if postprocessor not in postprocessors:
+	# check if post-processor is available for this query
+	available = get_available_postprocessors(query)
+	if postprocessor not in available:
 		abort(404)
 
-	# ensure we don't run the same post-processor twice
-	subqueries = db.fetchall("SELECT * FROM queries WHERE key_parent = %s", (key,))
-	for subquery in subqueries:
-		details = json.loads(subquery["parameters"])
-		if "type" in details and details["type"] == postprocessor:
-			abort(403)
-
 	# okay, we're good - queue it
-	queue = JobQueue(log, db)
 	queue.add_job(jobtype=postprocessor, remote_id=query.key, details={"type": postprocessor})
 
-	time.sleep(1)  # for quick queries, this immediately displays results, rather than "Queued"
-	return jsonify({"status": "success"})
+	if is_async:
+		return jsonify({"status": "success"})
+	else:
+		return redirect("/results/" + query.key + "/")
+
 
 @app.route('/results/<string:key>/')
 @app.route('/results/<string:key>/postprocessors/')
-@login_required
 def show_result(key):
-	query = db.fetchone("SELECT * FROM queries WHERE key = %s", (key,))
-	query["parameters"] = json.loads(query["parameters"])
+	"""
+	Show result page
 
-	if not query:
+	The page contains query details and a download link, but also shows a list
+	of finished and available post-processors.
+
+	:param key:  Result key
+	:return:  Rendered template
+	"""
+	try:
+		query = SearchQuery(key=key, db=db)
+	except ValueError:
 		abort(404)
 
+	# initialize the data we need
 	processors = load_postprocessors()
 	unfinished_postprocessors = processors.copy()
-	filtered_subqueries = []
-	subqueries = db.fetchall("SELECT * FROM queries WHERE key_parent = %s", (key,))
+	is_postprocessor_running = False
+	analyses = query.get_analyses(queue)
+	filtered_subqueries = analyses["running"].copy()
+	querydata = query.data
+	querydata["parameters"] = json.loads(querydata["parameters"])
 
-
-	for subquery in subqueries:
+	# for each subquery, determine whether it is finished or running
+	# and remove it from the list of available post-processors
+	for subquery in analyses["running"]:
 		details = json.loads(subquery["parameters"])
 		subquery["parameters"] = details
 		subquery["postprocessor"] = processors[details["type"]]
-		filtered_subqueries.append(subquery)
+
+		if not subquery["is_finished"]:
+			is_postprocessor_running = True
 
 		if details["type"] in unfinished_postprocessors:
 			del unfinished_postprocessors[details["type"]]
 
-
-	queue = JobQueue(log, db)
+	# likewise, see if any post-processor jobs were queued (but have not been
+	# started yet) and also remove those from the list of available post-
+	# processors. additionally, add them as a provisional subquery to show in
+	# the UI
 	available_postprocessors = unfinished_postprocessors.copy()
-	for type in unfinished_postprocessors:
-		queued = queue.get_all_jobs(type)
-		for job in queued:
-			details = json.loads(job["details"])
-			if job["remote_id"] != key or "type" not in details:
-				continue
+	for job in analyses["queued"]:
+		if job["jobtype"] in unfinished_postprocessors:
+			del available_postprocessors[job["jobtype"]]
+			is_postprocessor_running = True
 
-			del available_postprocessors[details["type"]]
 			if job["claimed"] == 0:
 				filtered_subqueries.append({
-					"postprocessor": processors[details["type"]],
+					"postprocessor": processors[job["jobtype"]],
 					"is_finished": False,
 					"status": ""
 				})
 
-	return render_template("result.html", query=query, postprocessors=available_postprocessors, subqueries=filtered_subqueries)
+	# we can either show this view as a separate page or as a bunch of html
+	# to be retrieved via XHR
+	standalone = "postprocessors" not in request.url
+	template = "result.html" if standalone else "result-details.html"
+	return render_template(template, query=querydata, postprocessors=available_postprocessors,
+						   subqueries=filtered_subqueries, is_postprocessor_running=is_postprocessor_running)
 
 
-
-@app.route('/check_query/<query_key>')
+@app.route('/check_query/<query_key>/')
 @login_required
 def check_query(query_key):
 	"""
@@ -247,9 +285,9 @@ def load_postprocessors():
 	See what post-processors are available
 
 	Looks for python files in the PP folder, then looks for classes that
-	are a subclass of BasicPostProcessor that are available in those files, and not an
-	abstract class themselves. Classes that meet those criteria and have not been
-	loaded yet are added to an internal list of available types.
+	are a subclass of BasicPostProcessor that are available in those files, and
+	not an abstract class themselves. Classes that meet those criteria are
+	added to a list of available types.
 	"""
 	pp_folder = os.path.abspath(os.path.dirname(__file__)) + "/../../backend/postprocessors"
 	os.chdir(pp_folder)
@@ -276,6 +314,30 @@ def load_postprocessors():
 
 	return postprocessors
 
+
+def get_available_postprocessors(query):
+	"""
+	Get available post-processors for a given query
+
+	:param SearchQuery query:  Query to load available postprocessors for
+	:return dict: Post processors, {id => settings} mapping
+	"""
+	postprocessors = load_postprocessors()
+	available = postprocessors.copy()
+	analyses = query.get_analyses(queue)
+
+	for subquery in analyses["running"]:
+		details = json.loads(subquery["parameters"])
+		if "type" in details and details["type"] in available:
+			del available[details["type"]]
+
+	for job in analyses["queued"]:
+		if job["jobtype"] in available:
+			del available[job["jobtype"]]
+
+	return available
+
+
 def validateQuery(parameters):
 	"""
 	Validates the client-side user input
@@ -283,8 +345,7 @@ def validateQuery(parameters):
 	"""
 
 	if not parameters:
-		print('Please provide valid parameters.')
-		return -1
+		return "Please provide valid parameters."
 
 	stop_words = get_stop_words('en')
 
