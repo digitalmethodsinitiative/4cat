@@ -1,4 +1,4 @@
-<h3 class="blocktitle"><span>Query{% if query.query != "query" %}: {{ query.query }}{% endif %}</span></h3>
+<h3 class="blocktitle"><span><a href="/results/{{ query.key }}/">Query{% if query.query != "query" %}: {{ query.query }}{% endif %}</a></span></h3>
 <p class="result">
     <span class="property-badge">/{{ query.parameters.board }}/</span>
 {% if query.parameters.body_query and query.parameters.body_query != "empty" %}
