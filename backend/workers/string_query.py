@@ -1,7 +1,7 @@
 import time
 import csv
-import os
 
+from pymysql import OperationalError
 from bs4 import BeautifulSoup
 
 import config
@@ -135,7 +135,15 @@ class StringQuery(BasicWorker):
 		where = " AND ".join(where)
 		sql = "SELECT thread_id, post_id FROM `4cat_posts` WHERE " + where + " LIMIT 5000000 OPTION max_matches = 5000000"
 		self.log.info("Running Sphinx query %s " % sql)
-		posts = self.sphinx.fetchall(sql, replacements)
+
+		try:
+			posts = self.sphinx.fetchall(sql, replacements)
+		except OperationalError:
+			self.query.update_status("Your query timed out. This is likely because it matches too many posts. Try again with a narrower date range or a more specific search query.")
+			self.log.info("Sphinx query (body: %s/subject: %s) timed out after %i seconds" % (query["body_query"], query["subject_query"], time.time() - sphinx_start))
+			self.sphinx.close()
+			return None
+
 		self.log.info("Sphinx query finished in %i seconds, %i results." % (time.time() - sphinx_start, len(posts)))
 		self.query.update_status("Found %i matches. Collecting post data" % len(posts))
 		self.sphinx.close()
