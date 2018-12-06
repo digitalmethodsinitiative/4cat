@@ -10,6 +10,7 @@
       {% for query in queries %}{% if query.key_parent == "" %}
         <li id="{{ query.key }}" class="result{% if query.is_finished and query.num_rows > 0 %} has_results{% endif %}" data-numrows="{{ query.num_rows }}">
           <h3>
+            <a href="/results/{{ query.key }}/">#</a>
             <span class="property-badge">/{{ query.parameters.board }}/</span>
           {% if query.parameters.body_query and query.parameters.body_query != "empty" %}
               <span class="inline-label">body:</span> <span class="inline-query">{{ query.parameters.body_query }}</span>
