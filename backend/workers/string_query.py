@@ -79,7 +79,6 @@ class StringQuery(BasicWorker):
 		posts = self.execute_query(query_parameters)
 		if not posts:
 			self.query.set_empty()
-			self.query.update_status("Query finished, but no results were found.")
 		else:
 			self.posts_to_csv(posts, results_file)
 
@@ -150,6 +149,7 @@ class StringQuery(BasicWorker):
 
 		if not posts:
 			# no results
+			self.query.update_status("Query finished, but no results were found.")
 			return None
 
 		# query posts database
