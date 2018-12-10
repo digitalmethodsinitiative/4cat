@@ -1,6 +1,7 @@
 """
 4Chan board scraper - indexes threads and queues them for scraping
 """
+import time
 
 from backend.lib.scraper import BasicJSONScraper
 from backend.lib.queue import JobAlreadyExistsException
@@ -70,7 +71,14 @@ class BoardScraper(BasicJSONScraper):
 			new_thread += 1
 			self.db.insert("threads", thread_data)
 		elif thread_row["timestamp_deleted"] > 0:
-			self.log.warning("Scrape queued for deleted thread %s/%s (deleted at %s)" % (job["remote_id"], thread_data["id"], thread_row["timestamp_deleted"]))
+			log_msg = "Scrape queued for deleted thread %s/%s (deleted at %s)" % (job["remote_id"], thread_data["id"], thread_row["timestamp_deleted"])
+			if int(time.time()) - thread_row["timestamp_deleted"] < (60 * 5):
+				# queued within the past 5 minutes - probably just deleted
+				# after the scrape was queued
+				self.log.info(log_msg)
+			else:
+				# something else is going on here - log a warning
+				self.log.warning(log_msg)
 
 		# update timestamps and position
 		position_update = str(self.loop_time) + ":" + str(self.position) + ","
