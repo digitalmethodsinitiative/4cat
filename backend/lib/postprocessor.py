@@ -71,7 +71,10 @@ class BasicPostProcessor(BasicWorker, metaclass=abc.ABCMeta):
 				params[field] = self.job["details"][field]
 
 		self.query = SearchQuery(parent=self.parent.key, parameters=params, db=self.db, extension=self.extension)
-		self.process()
+
+		if not self.query.is_finished():
+			self.process()
+
 		self.after_process()
 
 	def after_process(self):
