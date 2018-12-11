@@ -27,7 +27,7 @@ Main views for the 4CAT front-end
 @app.template_filter('datetime')
 def _jinja2_filter_datetime(date, fmt=None):
 	date = datetime.datetime.fromtimestamp(date)
-	format = "%d-%M-%Y"
+	format = "%d-%m-%Y"
 	return date.strftime(format)
 
 @app.route('/')
