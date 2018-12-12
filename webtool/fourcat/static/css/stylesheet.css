@@ -3,7 +3,7 @@
 	src: url("../fonts/fsex300-webfont.woff")
 }
 
-* {
+*, code {
 	font-family: 'fixedsys', Courier;
 	font-size: 16px;
 }
@@ -660,6 +660,11 @@ label {
 	border-top: 2px solid #000;
 }
 
+.fixed-footer ul {
+	list-style: none;
+	margin-bottom: 0;
+}
+
 nav > ul.flat {
 	list-style: none;
 }
@@ -688,6 +693,14 @@ nav > ul.flat > li:not(:last-child)::after {
 
 .plain-page article p {
 	padding: 0 1em;
+}
+
+.plain-page h3 {
+	margin-left: 0.5em;
+}
+
+.plain-page code {
+	white-space: pre;
 }
 
 /** results **/

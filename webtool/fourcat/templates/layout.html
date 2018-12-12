@@ -14,9 +14,14 @@
     {% endblock %}
 
     <footer class="fixed-footer">
+    <nav>
+        <ul class="flat">
         {% if current_user.is_authenticated %}
-            Logged in {% if not current_user.is_special() %} as {{ current_user.get_name() }} (<a href="/logout">Log out</a>){% else %} via {{ current_user.get_name() }}{% endif %} -
+            <li>Logged in {% if not current_user.is_special() %} as {{ current_user.get_name() }} (<a href="/logout">Log out</a>){% else %} via {{ current_user.get_name() }}{% endif %}</li>
         {% endif %}
-        An <a href="https://www.oilab.eu">Open Intelligence Lab</a> production, 2018
+          <li><a href="/page/citing">How to cite</a></li>
+          <li><a href="https://www.oilab.eu">Open Intelligence Lab</a>, 2018</li>
+        </ul>
+    </nav>
     </footer>
 </body>
