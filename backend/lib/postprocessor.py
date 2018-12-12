@@ -63,7 +63,8 @@ class BasicPostProcessor(BasicWorker, metaclass=abc.ABCMeta):
 
 		# create new query, for the result of this process
 		params = {
-			"type": self.type
+			"type": self.type,
+			"parent": self.parent.key
 		}
 
 		if self.job["details"]:
