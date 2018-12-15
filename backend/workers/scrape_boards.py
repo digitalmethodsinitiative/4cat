@@ -30,6 +30,10 @@ class BoardScraper(BasicJSONScraper):
 		:param dict data: The board data, parsed JSON data
 		"""
 		new_threads = 0
+		if not data:
+			self.log.error("No thread data from board scrape of /%s/" % job["remote_id"])
+			return False
+
 		for page in data:
 			for thread in page["threads"]:
 				self.position += 1
