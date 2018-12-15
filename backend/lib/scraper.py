@@ -65,7 +65,7 @@ class BasicJSONScraper(BasicWorker, metaclass=abc.ABCMeta):
 
 			# do the request!
 			data = requests.get(url, timeout=config.SCRAPE_TIMEOUT, proxies=proxies)
-		except (requests.HTTPError, requests.ConnectionError, requests.exceptions.ReadTimeout, ConnectionRefusedError) as e:
+		except (requests.exceptions.RequestException, ConnectionRefusedError) as e:
 			if job["attempts"] > 2:
 				self.queue.finish_job(job)
 				self.log.error("Could not finish request for %s (%s), cancelling job" % (url, e))
