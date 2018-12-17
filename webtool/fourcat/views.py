@@ -92,8 +92,6 @@ def string_query(board, body_query, subject_query, full_thread=0, dense_threads=
 	# body_query = re.escape(body_query)
 
 	# Make connections to database with backend library - safe enough?
-	body_query = body_query.replace("[^\p{L}A-Za-z0-9_*-]", "");
-	subject_query = subject_query.replace("[^\p{L}A-Za-z0-9_*-]", "");
 	parameters = {
 		"board": str(board),
 		"body_query": str(body_query).replace("-", " "),
