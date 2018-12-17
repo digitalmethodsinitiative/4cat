@@ -68,42 +68,27 @@ def show_page(page):
 	return render_template("page.html", body_content=page_parsed, body_class=page_class, page_name=page)
 
 
-@app.route(
-	'/string_query/<string:board>/<string:body_query>/<string:subject_query>/<int:full_thread>/<int:dense_threads>/<int:dense_percentage>/<int:dense_length>/<int:min_timestamp>/<int:max_timestamp>')
+@app.route("/queue-query/", methods=["POST"])
 @login_required
-def string_query(board, body_query, subject_query, full_thread=0, dense_threads=0, dense_percentage=15, dense_length=30,
-				 min_timestamp=0, max_timestamp=0):
+def string_query():
 	"""
 	AJAX URI for various forms of substring querying
-
-	:param	board						str,	The board to query.
-	:param	body_query					str,	Query string for post body. Can be 'empty'.
-	:param	subject_query				str,	Query string for post subject. Can be 'empty'.
-	:param	exact_match					int,	Whether to perform an exact substring match instead of FTS.
-	:param	dense_threads				int,	Whether to check for keyword-dense threads (0-1).
-	:param	dense_percentage			int,	Minimum percentage of posts in thread containing keyword (>15%).
-	:param	dense_length				int,	Minimum thread length for keyword-dense threads (>30).
-	:param	min_timestamp				int,	Min date in UTC timestamp
-	:param	max_timestamp				int,	Max date in UTC timestamp
-
 	"""
 
-	# Security
-	# body_query = re.escape(body_query)
-
-	# Make connections to database with backend library - safe enough?
 	parameters = {
-		"board": str(board),
-		"body_query": str(body_query).replace("-", " "),
-		"subject_query": str(subject_query).replace("-", " "),
-		"full_thread": bool(full_thread),
-		"dense_threads": bool(dense_threads),
-		"dense_percentage": int(dense_percentage),
-		"dense_length": int(dense_length),
-		"min_date": int(min_timestamp),
-		"max_date": int(max_timestamp),
+		"board": request.form.get("board", ""),
+		"body_query": request.form.get("body_query", ""),
+		"subject_query": request.form.get("subject_query", ""),
+		"full_thread": (request.form.get("full_threads", "no") != "no"),
+		"dense_threads": (request.form.get("dense_threads", "no") != "no"),
+		"dense_percentage": int(request.form.get("dense_percentage", 0)),
+		"dense_length": int(request.form.get("dense_length", 0)),
+		"min_date": string_to_timestamp(request.form.get("min_date", "")) if request.form.get("use_date", "no") != "no" else 0,
+		"max_date": string_to_timestamp(request.form.get("max_date", "")) if request.form.get("use_date", "no") != "no" else 0,
 		"user": current_user.get_id()
 	}
+
+	print("FORM INPUT: %s" % repr(parameters))
 
 	valid = validateQuery(parameters)
 
@@ -270,9 +255,12 @@ def check_query(query_key):
 
 	status = {
 		"status": query.get_status(),
+		"query": query.data["query"],
+		"rows": query.data["num_rows"],
 		"key": query_key,
 		"done": True if results else False,
-		"path": path
+		"path": path,
+		"empty": query.data["is_empty"]
 	}
 
 	return jsonify(status)
@@ -370,27 +358,7 @@ def validateQuery(parameters):
 
 	# Ensure the board is correct
 	if parameters["board"] not in config.SCRAPE_BOARDS:
-		return "Invalid board"
-
-	# Body query should be at least three characters long and should not be just a stopword.
-	# 'empty' passes this.
-	if len(parameters["body_query"]) < 3:
-		return "Body query is too short. Use at least three characters."
-	elif parameters["body_query"] in stop_words:
-		return "Use a body input that is not a stop word."
-	# Query must contain alphanumeric characters
-	elif not re.search('[a-zA-Z0-9]', parameters["body_query"]):
-		return "Body query must contain alphanumeric characters."
-
-	# Subject query should be at least three characters long and should not be just a stopword.
-	# 'empty' passes this.
-	if len(parameters["subject_query"]) < 3:
-		return "Subject query is too short. Use at least three characters."
-	elif parameters["subject_query"] in stop_words:
-		return "Use a subject input that is not a stop word."
-	# Query must contain alphanumeric characters
-	elif not re.search('[a-zA-Z0-9]', parameters["subject_query"]):
-		return "Subject query must contain alphanumeric characters."
+		return "Invalid board: %s" % parameters["board"]
 
 	# Keyword-dense thread length should be at least thirty.
 	if parameters["dense_length"] > 0 and parameters["dense_length"] < 10:
@@ -401,14 +369,59 @@ def validateQuery(parameters):
 
 	# Check if there are enough parameters provided.
 	# Body and subject queryies may be empty if date ranges are max a week apart.
-	if parameters["body_query"] == 'empty' and parameters["subject_query"] == 'empty':
+	if parameters["body_query"] == "" and parameters["subject_query"] == "":
 		# Check if the date range is less than a week.
 		if parameters["min_date"] != 0 and parameters["max_date"] != 0:
 			time_diff = parameters["max_date"] - parameters["min_date"]
-			print(time_diff)
 			if time_diff >= 2419200:
 				return "With no text querying, filter on a date range of max four weeks."
+			else:
+				return True
 		else:
 			return "Input either a body or subject query, or filter on a date range of max four weeks."
 
+	# Body query should be at least three characters long and should not be just a stopword.
+	if parameters["body_query"] and len(parameters["body_query"]) < 3:
+		return "Body query is too short. Use at least three characters."
+	elif parameters["body_query"] in stop_words:
+		return "Use a body input that is not a stop word."
+	# Query must contain alphanumeric characters
+	elif parameters["body_query"] and not re.search('[a-zA-Z0-9]', parameters["body_query"]):
+		return "Body query must contain alphanumeric characters."
+
+	# Subject query should be at least three characters long and should not be just a stopword.
+	if parameters["subject_query"] and len(parameters["subject_query"]) < 3:
+		return "Subject query is too short. Use at least three characters."
+	elif parameters["subject_query"] in stop_words:
+		return "Use a subject input that is not a stop word."
+	elif parameters["subject_query"] and not re.search('[a-zA-Z0-9]', parameters["subject_query"]):
+		# Query must contain alphanumeric characters
+		return "Subject query must contain alphanumeric characters."
+
 	return True
+
+
+def string_to_timestamp(string):
+	"""
+	Convert dd-mm-yyyy date to unix time
+
+	:param string: Date string to parse
+	:return: The unix time, or 0 if value could not be parsed
+	"""
+	bits = string.split("-")
+	if re.match(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", string):
+		bits = list(reversed(bits))
+
+	if len(bits) != 3:
+		return 0
+
+	try:
+		day = int(bits[0])
+		month = int(bits[1])
+		year = int(bits[2])
+		date = datetime.datetime(year, month, day)
+	except ValueError:
+		return 0
+
+	return int(date.timestamp())
+
