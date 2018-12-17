@@ -14,53 +14,51 @@ $(function() {
 		// Show loader
 		$('.loader').show()
 
-		// Get AJAX url from search options
-		ajax_url = get_ajax_url()
-
-		// Check if parameters are correct
-		if (ajax_url !== false) {
-			console.log(ajax_url)
-
-			// AJAX the query to the server
-			$.ajax({
-				dataType: "text",
-				url: ajax_url,
-				success: function(response) {
-					console.log(response);
-
-					// If the query is rejected by the server.
-					if (response.substr(0, 14) == 'Invalid query.') {
-						$('.loader').hide()
-						alert(response);
-						$('#query_status .status_message .message').html(error);
-						$('#whole-form').removeAttr('disabled');
-					}
-
-					// If the query is accepted by the server.
-					else{
-						$('#query_status .status_message .message').html('Query submitted, waiting for results');
-						query_key = response
-						poll_csv(query_key)
-
-						// poll results every 2000 ms after submitting
-						poll_interval = setInterval(function() {
-							poll_csv(query_key);
-						}, 4000);
-					}
-				},
-				error: function(error) {
-					$('#query_status .status_message .message').html(error);
-					$('#whole-form').removeAttr('disabled');
-					console.log(error);
-					$('#results').html('<h3>' +$('#dataselection option:selected').text() + " error</h3>")
-					$('.loader').hide()
-				}
-			});
-		}
-		// If there's something wrong with the parameters, don't send a request
-		else {
+		//check form input
+		if(!validate_form()) {
 			$('.loader').hide()
+			return;
 		}
+
+		let formdata = $('#query-form').serialize();
+
+        // AJAX the query to the server
+        $.post({
+            dataType: "text",
+            url: "/queue-query/",
+            data: formdata,
+            success: function (response) {
+                console.log(response);
+
+                // If the query is rejected by the server.
+                if (response.substr(0, 14) === 'Invalid query.') {
+                    $('.loader').hide()
+                    alert(response);
+                    $('#query_status .status_message .message').html(response);
+                    $('#whole-form').removeAttr('disabled');
+                }
+
+                // If the query is accepted by the server.
+                else {
+                    $('#query_status .status_message .message').html('Query submitted, waiting for results');
+                    query_key = response
+                    poll_csv(query_key)
+
+                    // poll results every 2000 ms after submitting
+                    poll_interval = setInterval(function () {
+                        poll_csv(query_key);
+                    }, 4000);
+                }
+            },
+            error: function (error) {
+                $('#query_status .status_message .message').html(error);
+                $('#whole-form').removeAttr('disabled');
+                console.log(error);
+                $('#results').html('<h3>' + $('#dataselection option:selected').text() + " error</h3>")
+                $('.loader').hide()
+            }
+        });
+
 
 	}
 	
@@ -86,7 +84,8 @@ $(function() {
 					if(keyword === '') {
 						keyword = $('#subject-input').val();
 					}
-					$('#submitform').append('<a href="/results/' + json.key + '"><p>' + json.path + '</p></a>')
+
+					$('#submitform').append('<a href="/results/' + json.key + '"><p>' + json.query + ' (' + json.rows + ' posts)</p></a>')
 					$('.loader').hide();
 					$('#query_status .status_message .dots').html('');
 					$('#whole-form').removeAttr('disabled');
@@ -110,45 +109,13 @@ $(function() {
 		});
 	}
 
-	function get_ajax_url(){
+	function validate_form(){
 		/*
-		Takes the user input and generates an AJAX URL to send to Flask back-end.
-		Parses date input to a unix timestamp and checks whether these are correct.
-		Returns an error if not enough parameters are provided.
+		Checks validity of input; this is just a preliminary check, further checks are
+		done server-side.
 		*/
 
-		var valid = true
-
-		// Set board parameter
-		var board = $('#board-select').val()
-
-		// Set string parameters. Replace some potentially harmful characters.
-		// Text in between * characters indicate exact match searches
-		var url_body = $('#body-input').val().replace(/\"/g,"*");
-		var url_subject = $('#subject-input').val().replace(/\"/g,"*");
-		url_body = url_body.replace(/[^\p{L}A-Za-z0-9_*-]+/g,"-");
-		url_subject = url_subject.replace(/[^\p{L}A-Za-z0-9_*-]+/g,"-");
-		if(url_body == ''){url_body = 'empty'}
-		if(url_subject == ''){url_subject = 'empty'}
-
-		// Set full thread search parameter
-		var url_full_thread
-		if($('#check-full-thread').is(':checked') && url_body !== ''){url_full_thread = 1}
-		else{url_full_thread = 0}
-
-		// Set keyword-dense threads parameters
-		var url_dense_threads = 0
-		var url_dense_percentage = 0
-		var url_dense_thread_length = 0
-		if($('#check-dense-threads').is(':checked') && url_body !== ''){
-			url_dense_threads = 1
-			url_dense_percentage = $('#dense-percentage').val()
-			url_dense_thread_length = $('#dense-thread-length').val()
-		}
-
-		// Set time parameters
-		var url_min_date = 0
-		var url_max_date = 0
+		var valid = true;
 
 		if($('#check-time').is(':checked')){
 			var min_date = $('#input-min-time').val()
@@ -187,39 +154,8 @@ $(function() {
 				alert('The first date is later than or the same as the second.\nPlease provide a correct date range.')
 			}
 		}
-		
-		// Create and return AJAX url only if the parameters are valid
-		if (valid) {
-			ajax_url = 'string_query/' + board + '/' + url_body + '/' + url_subject + '/' + url_full_thread + '/' + url_dense_threads + '/' + url_dense_percentage + '/' + url_dense_thread_length + '/' + url_min_date + '/' + url_max_date
-			return ajax_url
-		}
-		else {
-			return false
-		}
-	}
 
-	function stringToTimestamp(str) {
-		// Converts a text input to a unix timestamp.
-		// Only used in Safari (other browsers use native HTML date picker)
-		var date_regex = /^\d{4}-\d{2}-\d{2}$/
-		if (str.match(date_regex)) {
-			timestamp = (new Date(str).getTime() / 1000)
-		}
-		else {
-			str = str.replace(/\//g,'-')
-			str = str.replace(/\s/g,'-')
-			var date_objects = str.split('-')
-			var year = date_objects[2]
-			var month = date_objects[1]
-			// Support for textual months
-			var testdate = Date.parse(month + "1, 2012");
-			if(!isNaN(testdate)){
-				month = new Date(testdate).getMonth() + 1;
-			}
-			var day = date_objects[0]
-			timestamp = (new Date(year, (month - 1), day).getTime() / 1000)
-		}
-		return timestamp
+		return valid;
 	}
 
 	/* BUTTON EVENT HANDLERS */
@@ -300,6 +236,46 @@ $(function() {
         }
 	})
 });
+
+function datepicker_normalize() {
+	let name = $(this).attr('name');
+	let actual_name = name.split('_str').shift();
+	let field = $('input[name=' + actual_name + ']');
+
+	//create "normalized" form field if it doesn't exist already
+	if(field.length === 0) {
+		let form = $(this).parents('form')[0];
+		console.log(form);
+		field = $('<input type="hidden" name="' + actual_name + '" value="0">');
+		field.appendTo(form);
+	}
+
+	field.val(stringToTimestamp($(this).val()));
+}
+
+function stringToTimestamp(str) {
+	// Converts a text input to a unix timestamp.
+	// Only used in Safari (other browsers use native HTML date picker)
+	var date_regex = /^\d{4}-\d{2}-\d{2}$/
+	if (str.match(date_regex)) {
+		timestamp = (new Date(str).getTime() / 1000)
+	}
+	else {
+		str = str.replace(/\//g,'-')
+		str = str.replace(/\s/g,'-')
+		var date_objects = str.split('-')
+		var year = date_objects[2]
+		var month = date_objects[1]
+		// Support for textual months
+		var testdate = Date.parse(month + "1, 2012");
+		if(!isNaN(testdate)){
+			month = new Date(testdate).getMonth() + 1;
+		}
+		var day = date_objects[0]
+		timestamp = (new Date(year, (month - 1), day).getTime() / 1000)
+	}
+	return timestamp
+}
 
 popup_panel = {
 	panel: false,

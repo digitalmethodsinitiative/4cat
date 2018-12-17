@@ -117,10 +117,10 @@ class StringQuery(BasicWorker):
 			where.append("board = %s")
 			replacements.append(query["board"])
 
-		if query["body_query"] and query["body_query"] != "empty":
+		if query["body_query"]:
 			match.append("@body " + query["body_query"])
 
-		if query["subject_query"] and query["subject_query"] != "empty":
+		if query["subject_query"]:
 			match.append("@subject " + query["subject_query"])
 
 		# both possible FTS parameters go in one MATCH() operation
@@ -173,7 +173,7 @@ class StringQuery(BasicWorker):
 				"SELECT " + columns + " FROM posts WHERE thread_id IN %s ORDER BY thread_id ASC, id ASC", (thread_ids,))
 
 			# get dense thread ids
-			if query["dense_threads"] and query["body_query"] != "empty":
+			if query["dense_threads"] and query["body_query"]:
 				self.query.update_status("Post data collected. Filtering dense threads")
 				posts = self.filter_dense(posts, query["body_query"], query["dense_percentage"], query["dense_length"])
 
