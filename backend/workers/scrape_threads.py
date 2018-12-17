@@ -70,6 +70,10 @@ class ThreadScraper(BasicJSONScraper):
 			self.log.info("Thread %s/%s scraped, but no changes found" % (job["details"]["board"], first_post["no"]))
 			return True
 
+		if thread["timestamp_deleted"] > 0:
+			self.log.warning("Thread %s/%s seems to have been undeleted, removing deletion timestamp %s" % (job["details"]["board"], first_post["no"], thread["timestamp_deleted"]))
+			self.db.update("threads", where={"id": first_post["no"]}, data={"timestamp_deleted": 0})
+
 		# create a dict mapped as `post id`: `post data` for easier comparisons with existing data
 		post_dict_scrape = {post["no"]: post for post in data["posts"] if "no" in post}
 		post_dict_db = {post["id"]: post for post in
