@@ -701,7 +701,7 @@ nav > ul.flat > li:not(:last-child)::after {
 	padding: 0 1em;
 }
 
-.plain-page .markdown-page article h3 {
+.plain-page.markdown-page article h3 {
 	margin-left: 0.5em;
 }
 
