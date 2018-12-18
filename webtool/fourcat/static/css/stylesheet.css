@@ -715,7 +715,7 @@ nav > ul.flat > li:not(:last-child)::after {
 	padding: 0;
 }
 
-.result-list {
+ol.result-list {
 	list-style: none;
 	margin: 0;
 	padding: 0;
