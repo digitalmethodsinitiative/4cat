@@ -235,6 +235,11 @@ $(function() {
             $(this).append('<div><a class="button-like postprocessor-link" href="/results/' + $(this).attr('id') + '/postprocessors/">Analysis</a></div>');
         }
 	})
+
+	$('.view-controls button').hide();
+	$('.view-controls input, .view-controls select, .view-controls textarea').on('change', function() {
+		$(this).parents('form').trigger('submit');
+	})
 });
 
 function datepicker_normalize() {
