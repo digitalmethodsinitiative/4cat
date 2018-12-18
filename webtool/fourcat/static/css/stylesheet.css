@@ -67,6 +67,10 @@ p{
 }
 
 h1 {
+	margin-bottom: 1em;
+}
+
+.webtool h1 {
 	margin-bottom: 0;
 }
 
@@ -687,7 +691,6 @@ nav > ul.flat > li:not(:last-child)::after {
 	width: 75%;
 	min-width: 640px;
 	border: 2px solid #000;
-	margin-top: 1em;
 }
 
 .plain-page article h2, .plain-page article p {
@@ -901,6 +904,23 @@ ol.postprocessor-list {
 
 .pagination li.page a:hover {
 	background: #50ff50 url('../img/patterngreen.jpg');
+}
+
+/** view controls **/
+.view-controls {
+	margin: 0 auto;
+	width: 75%;
+	min-width: 640px;
+	text-align: right;
+}
+
+.view-controls ul {
+	list-style: none;
+	margin: 0;
+}
+
+.view-controls ul, .view-controls li, .view-controls button {
+	display: inline-block;
 }
 
 /* some helper animations */

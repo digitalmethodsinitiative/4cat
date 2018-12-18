@@ -149,10 +149,19 @@ def show_results(page):
 	"""
 	page_size = 20
 	offset = (page - 1) * page_size
+	all_results = request.args.get("all_results", False)
 
-	num_queries = db.fetchone("SELECT COUNT(*) AS num FROM queries WHERE key_parent = ''")["num"]
-	queries = db.fetchall("SELECT * FROM queries WHERE key_parent = '' ORDER BY timestamp DESC LIMIT %s OFFSET %s",
-						  (page_size, offset))
+	if all_results:
+		num_queries = db.fetchone("SELECT COUNT(*) AS num FROM queries WHERE key_parent = ''")["num"]
+		queries = db.fetchall("SELECT * FROM queries WHERE key_parent = '' ORDER BY timestamp DESC LIMIT %s OFFSET %s",
+							  (page_size, offset))
+	else:
+		num_queries = \
+		db.fetchone("SELECT COUNT(*) AS num FROM queries WHERE key_parent = '' AND parameters::json->>'user' = %s",
+					(current_user.get_id(),))["num"]
+		queries = db.fetchall(
+			"SELECT * FROM queries WHERE key_parent = '' AND parameters::json->>'user' = %s ORDER BY timestamp DESC LIMIT %s OFFSET %s",
+			(current_user.get_id(), page_size, offset))
 
 	if not queries and page != 1:
 		abort(404)
@@ -175,7 +184,7 @@ def show_results(page):
 
 		filtered.append(query)
 
-	return render_template("results.html", queries=filtered, pagination=pagination)
+	return render_template("results.html", queries=filtered, pagination=pagination, all_results=all_results)
 
 
 @app.route('/results/<string:key>/')
