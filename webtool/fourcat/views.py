@@ -1,21 +1,17 @@
 import os
 import re
-import sys
-import glob
 import json
 import config
-import inspect
 import datetime
 import markdown
-import importlib
 
 from flask import render_template, jsonify, abort, request, redirect
 from flask_login import login_required, current_user
-from fourcat import app, db, log, queue
+from fourcat import app, db, queue
+from fourcat.helpers import Pagination, string_to_timestamp, load_postprocessors, get_available_postprocessors
 
 from backend.lib.query import SearchQuery
-from backend.lib.queue import JobQueue, JobAlreadyExistsException
-from backend.lib.postprocessor import BasicPostProcessor
+from backend.lib.queue import JobAlreadyExistsException
 
 from stop_words import get_stop_words
 
@@ -24,11 +20,14 @@ from stop_words import get_stop_words
 Main views for the 4CAT front-end
 
 """
+
+
 @app.template_filter('datetime')
 def _jinja2_filter_datetime(date, fmt=None):
 	date = datetime.datetime.fromtimestamp(date)
 	format = "%d-%m-%Y"
 	return date.strftime(format)
+
 
 @app.route('/')
 @login_required
@@ -83,12 +82,12 @@ def string_query():
 		"dense_threads": (request.form.get("dense_threads", "no") != "no"),
 		"dense_percentage": int(request.form.get("dense_percentage", 0)),
 		"dense_length": int(request.form.get("dense_length", 0)),
-		"min_date": string_to_timestamp(request.form.get("min_date", "")) if request.form.get("use_date", "no") != "no" else 0,
-		"max_date": string_to_timestamp(request.form.get("max_date", "")) if request.form.get("use_date", "no") != "no" else 0,
+		"min_date": string_to_timestamp(request.form.get("min_date", "")) if request.form.get("use_date",
+																							  "no") != "no" else 0,
+		"max_date": string_to_timestamp(request.form.get("max_date", "")) if request.form.get("use_date",
+																							  "no") != "no" else 0,
 		"user": current_user.get_id()
 	}
-
-	print("FORM INPUT: %s" % repr(parameters))
 
 	valid = validateQuery(parameters)
 
@@ -106,9 +105,41 @@ def string_query():
 	return query.key
 
 
-@app.route('/results/')
+@app.route('/check_query/<query_key>/')
 @login_required
-def show_results():
+def check_query(query_key):
+	"""
+	AJAX URI to check whether query has been completed.
+
+	"""
+	query = SearchQuery(key=query_key, db=db)
+
+	results = query.check_query_finished()
+	if results:
+		if app.debug:
+			path = 'http://localhost/fourcat/data/' + query.data["query"].replace("*", "") + '-' + query_key + '.csv'
+		else:
+			path = results.replace("\\", "/").split("/").pop()
+	else:
+		path = ""
+
+	status = {
+		"status": query.get_status(),
+		"query": query.data["query"],
+		"rows": query.data["num_rows"],
+		"key": query_key,
+		"done": True if results else False,
+		"path": path,
+		"empty": query.data["is_empty"]
+	}
+
+	return jsonify(status)
+
+
+@app.route('/results/', defaults={'page': 1})
+@app.route('/results/page/<int:page>/')
+@login_required
+def show_results(page):
 	"""
 	Show results overview
 
@@ -116,7 +147,17 @@ def show_results():
 
 	:return:  Rendered template
 	"""
-	queries = db.fetchall("SELECT * FROM queries WHERE key_parent = '' ORDER BY timestamp DESC LIMIT 20")
+	page_size = 20
+	offset = (page - 1) * page_size
+
+	num_queries = db.fetchone("SELECT COUNT(*) AS num FROM queries WHERE key_parent = ''")["num"]
+	queries = db.fetchall("SELECT * FROM queries WHERE key_parent = '' ORDER BY timestamp DESC LIMIT %s OFFSET %s",
+						  (page_size, offset))
+
+	if not queries and page != 1:
+		abort(404)
+
+	pagination = Pagination(page, page_size, num_queries)
 	filtered = []
 	postprocessors = load_postprocessors()
 
@@ -134,41 +175,7 @@ def show_results():
 
 		filtered.append(query)
 
-	return render_template("results.html", queries=filtered)
-
-
-@app.route('/results/<string:key>/postprocessors/queue/<string:postprocessor>/', methods=["GET", "POST"])
-@login_required
-def queue_postprocessor(key, postprocessor):
-	"""
-	Queue a new post-processor
-
-	:param key:  Key of query to queue the post-processor for
-	:param postprocessor:  ID of the post-processor to queue
-	:return:  Either a redirect, or a JSON status if called asynchronously
-	"""
-	is_async = request.args.get("async", "no") != "no"
-
-	# cover all bases - can only run postprocessor on "parent" query
-	try:
-		query = SearchQuery(key=key, db=db)
-		if query.data["key_parent"] != "":
-			abort(404)
-	except TypeError:
-		abort(404)
-
-	# check if post-processor is available for this query
-	available = get_available_postprocessors(query)
-	if postprocessor not in available:
-		abort(404)
-
-	# okay, we're good - queue it
-	queue.add_job(jobtype=postprocessor, remote_id=query.key, details={"type": postprocessor})
-
-	if is_async:
-		return jsonify({"status": "success"})
-	else:
-		return redirect("/results/" + query.key + "/")
+	return render_template("results.html", queries=filtered, pagination=pagination)
 
 
 @app.route('/results/<string:key>/')
@@ -235,93 +242,38 @@ def show_result(key):
 						   subqueries=filtered_subqueries, is_postprocessor_running=is_postprocessor_running)
 
 
-@app.route('/check_query/<query_key>/')
+@app.route('/results/<string:key>/postprocessors/queue/<string:postprocessor>/', methods=["GET", "POST"])
 @login_required
-def check_query(query_key):
+def queue_postprocessor(key, postprocessor):
 	"""
-	AJAX URI to check whether query has been completed.
+	Queue a new post-processor
 
+	:param key:  Key of query to queue the post-processor for
+	:param postprocessor:  ID of the post-processor to queue
+	:return:  Either a redirect, or a JSON status if called asynchronously
 	"""
-	query = SearchQuery(key=query_key, db=db)
+	is_async = request.args.get("async", "no") != "no"
 
-	results = query.check_query_finished()
-	if results:
-		if app.debug:
-			path = 'http://localhost/fourcat/data/' + query.data["query"].replace("*", "") + '-' + query_key + '.csv'
-		else:
-			path = results.replace("\\", "/").split("/").pop()
+	# cover all bases - can only run postprocessor on "parent" query
+	try:
+		query = SearchQuery(key=key, db=db)
+		if query.data["key_parent"] != "":
+			abort(404)
+	except TypeError:
+		abort(404)
+
+	# check if post-processor is available for this query
+	available = get_available_postprocessors(query)
+	if postprocessor not in available:
+		abort(404)
+
+	# okay, we're good - queue it
+	queue.add_job(jobtype=postprocessor, remote_id=query.key, details={"type": postprocessor})
+
+	if is_async:
+		return jsonify({"status": "success"})
 	else:
-		path = ""
-
-	status = {
-		"status": query.get_status(),
-		"query": query.data["query"],
-		"rows": query.data["num_rows"],
-		"key": query_key,
-		"done": True if results else False,
-		"path": path,
-		"empty": query.data["is_empty"]
-	}
-
-	return jsonify(status)
-
-
-def load_postprocessors():
-	"""
-	See what post-processors are available
-
-	Looks for python files in the PP folder, then looks for classes that
-	are a subclass of BasicPostProcessor that are available in those files, and
-	not an abstract class themselves. Classes that meet those criteria are
-	added to a list of available types.
-	"""
-	pp_folder = os.path.abspath(os.path.dirname(__file__)) + "/../../backend/postprocessors"
-	os.chdir(pp_folder)
-	postprocessors = {}
-
-	# check for worker files
-	for file in glob.glob("*.py"):
-		module = "backend.postprocessors." + file[:-3]
-		if module not in sys.modules:
-			importlib.import_module(module)
-
-		members = inspect.getmembers(sys.modules[module])
-
-		for member in members:
-			if inspect.isclass(member[1]) and issubclass(member[1], BasicPostProcessor) and not inspect.isabstract(
-					member[1]):
-				postprocessors[member[1].type] = {
-					"type": member[1].type,
-					"description": member[1].description,
-					"name": member[1].title,
-					"extension": member[1].extension,
-					"class": member[0]
-				}
-
-	return postprocessors
-
-
-def get_available_postprocessors(query):
-	"""
-	Get available post-processors for a given query
-
-	:param SearchQuery query:  Query to load available postprocessors for
-	:return dict: Post processors, {id => settings} mapping
-	"""
-	postprocessors = load_postprocessors()
-	available = postprocessors.copy()
-	analyses = query.get_analyses(queue)
-
-	for subquery in analyses["running"]:
-		details = json.loads(subquery["parameters"])
-		if "type" in details and details["type"] in available:
-			del available[details["type"]]
-
-	for job in analyses["queued"]:
-		if job["jobtype"] in available:
-			del available[job["jobtype"]]
-
-	return available
+		return redirect("/results/" + query.key + "/")
 
 
 def validateQuery(parameters):
@@ -399,29 +351,3 @@ def validateQuery(parameters):
 		return "Subject query must contain alphanumeric characters."
 
 	return True
-
-
-def string_to_timestamp(string):
-	"""
-	Convert dd-mm-yyyy date to unix time
-
-	:param string: Date string to parse
-	:return: The unix time, or 0 if value could not be parsed
-	"""
-	bits = string.split("-")
-	if re.match(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", string):
-		bits = list(reversed(bits))
-
-	if len(bits) != 3:
-		return 0
-
-	try:
-		day = int(bits[0])
-		month = int(bits[1])
-		year = int(bits[2])
-		date = datetime.datetime(year, month, day)
-	except ValueError:
-		return 0
-
-	return int(date.timestamp())
-

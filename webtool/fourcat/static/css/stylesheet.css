@@ -678,13 +678,16 @@ nav > ul.flat > li:not(:last-child)::after {
 	margin-left: 0.5em;
 }
 
+.plain-page {
+	padding-bottom: 5em;
+}
+
 .plain-page article {
 	margin: 0 auto;
 	width: 75%;
 	min-width: 640px;
 	border: 2px solid #000;
 	margin-top: 1em;
-	margin-bottom: 5em;
 }
 
 .plain-page article h2, .plain-page article p {
@@ -869,6 +872,35 @@ ol.postprocessor-list {
     display: flex;
     justify-content: center;
     align-items: center;
+}
+
+/** pagination **/
+.pagination ol {
+	list-style: none;
+	margin: 0 auto;
+	text-align: center;
+	margin-top: 1em;
+}
+
+.pagination li {
+	display: inline-block;
+}
+
+.pagination li a {
+	display: block;
+}
+
+.pagination li.page a, .pagination li.page .current {
+	border: 2px solid #000;
+	padding: 0.25em;
+	text-align: center;
+	min-width: 2.25em;
+	display: block;
+	text-decoration: none;
+}
+
+.pagination li.page a:hover {
+	background: #50ff50 url('../img/patterngreen.jpg');
 }
 
 /* some helper animations */
