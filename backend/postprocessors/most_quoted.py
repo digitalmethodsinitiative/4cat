@@ -42,7 +42,7 @@ class QuoteRanker(BasicPostProcessor):
 
 					quoted[quotes[0]] += 1
 
-		if not quoted_postsx :
+		if not quoted_posts :
 			return
 
 		most_quoted = sorted(quoted, key=lambda id: quoted[id], reverse=True)
