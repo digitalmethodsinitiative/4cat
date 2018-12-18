@@ -34,10 +34,22 @@ class ThreadCounter(BasicPostProcessor):
 			csv = DictReader(source)
 			for post in csv:
 				if post["thread_id"] not in threads:
-					threads[post["thread_id"]] = 0
-				threads[post["thread_id"]] += 1
+					threads[post["thread_id"]] = {
+						"subject": post["subject"],
+						"count": 0
+					}
 
-		results = [{"thread_id": thread_id, "num_posts": threads[thread_id]} for thread_id in threads]
+					if post["subject"]:
+						threads[post["thread_id"]]["subject"] = post["subject"]
+
+					threads[post["thread_id"]]["count"] += 1
+
+		results = [{
+			"thread_id": thread_id,
+			"subject": threads[thread_id]["subject"],
+			"num_posts": threads[thread_id]["count"]
+		} for thread_id in threads]
+
 		if not results:
 			return
 
