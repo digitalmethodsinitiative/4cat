@@ -37,19 +37,20 @@
           {% endif %}
           </h3>
 
-          {% if query.parameters.min_date > 0 or query.parameters.max_date > 0 %}
-          <p class="result">
-          {% if query.parameters.min_date > 0 %}
-            <span class="property-badge">From</span>
-            <span class="inline-query">{{ query.parameters.min_date|datetime }}</span>
-          {% endif %}{% if query.parameters.max_date > 0 %}
-            <span class="property-badge">Until</span>
-            <span class="inline-query">{{ query.parameters.max_date|datetime }}</span>
-          {% endif %}
-          </p>
-          {% endif %}
-        
           <div class="result-files">
+
+          {% if query.parameters.min_date > 0 or query.parameters.max_date > 0 %}
+            <p class="result">
+          {% if query.parameters.min_date > 0 %}
+              <span class="property-badge">From</span>
+              <span class="inline-query">{{ query.parameters.min_date|datetime }}</span>
+          {% endif %}{% if query.parameters.max_date > 0 %}
+              <span class="property-badge">Until</span>
+              <span class="inline-query">{{ query.parameters.max_date|datetime }}</span>
+          {% endif %}
+            </p>
+          {% endif %}
+
         {% if query.is_finished %}
             {% if query.num_rows > 0 %}
             <p class="result-file">
