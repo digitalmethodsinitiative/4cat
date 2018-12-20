@@ -40,7 +40,7 @@ class SearchQuery:
 
 			self.query = current["query"]
 		elif job is not None:
-			current = self.db.fetchone("SELECT * FROM queries WHERE parameters::json->>job = %s", (job,))
+			current = self.db.fetchone("SELECT * FROM queries WHERE parameters::json->>'job' = %s", (job,))
 			if not current:
 				raise TypeError("SearchQuery() requires a valid job ID for its 'job' argument")
 
