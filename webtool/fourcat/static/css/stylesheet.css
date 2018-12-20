@@ -799,6 +799,15 @@ ol.result-list {
 	margin: 0;
 }
 
+.queue-button-wrap .button-like {
+	opacity: 1;
+	transition: 0.25s;
+}
+
+.queue-button-wrap.hidden .button-like {
+	opacity: 0;
+}
+
 /* popup */
 #popup-blur {
 	position: fixed;
@@ -933,4 +942,11 @@ ol.postprocessor-list {
 @keyframes blur-out {
     from { opacity: 1; }
     to { opacity: 0; }
+}
+
+.flashing { animation: flash 0.5s 3 normal forwards; }
+@keyframes flash {
+	from { background: #FFF; }
+	50% { background: #4eff52; }
+	to { background: #FFF; }
 }

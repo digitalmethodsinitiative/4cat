@@ -66,7 +66,7 @@
         {% if query.is_finished and query.subqueries|length > 0 %}
             <ol class="subquery-list">
             {% for subquery in query.subqueries %}
-                <li id="subquery-{{ subquery.key }}">{{ subquery.postprocessor.name }} ({% if subquery.is_finished %}<a href="/result/{{ subquery.result_file }}">{% if subquery.num_rows > 0 %}{{ subquery.num_rows }} items, {% endif %}{{ subquery.postprocessor.extension }}</a>{% elif subquery.status == "" %}Queued{% else %}Running - {{ subquery.status }}{% endif %})</li>
+                {% include 'result-subquery.html' %}
             {% endfor %}
             </ol>
         {% endif %}
