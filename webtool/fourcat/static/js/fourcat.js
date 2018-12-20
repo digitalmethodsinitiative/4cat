@@ -353,11 +353,15 @@ function update_query_statuses() {
         data: {subqueries: JSON.stringify(keys)},
         success: function(json) {
             json.forEach(subquery => {
-                let li = $('#subquery-' + subquery.key);
+                let selector = '#subquery-' + subquery.key;
+                if($(selector).length === 0) {
+                    selector = '#subquery-job' + subquery.job;
+                }
+                let li = $(selector);
                 let old_status = li.html();
                 li.replaceWith(subquery.html);
 
-                li = $('#subquery-' + subquery.key);
+                li = $(selector);
                 if(li.html() == old_status) {
                     return;
                 }
