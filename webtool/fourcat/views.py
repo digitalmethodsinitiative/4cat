@@ -238,6 +238,7 @@ def show_result(key):
 
 			if job["claimed"] == 0:
 				filtered_subqueries.append({
+					"key": "job%s" % job["id"],
 					"postprocessor": processors[job["jobtype"]],
 					"is_finished": False,
 					"status": ""
@@ -284,6 +285,57 @@ def queue_postprocessor(key, postprocessor):
 	else:
 		return redirect("/results/" + query.key + "/")
 
+@app.route('/check_postprocessors/')
+@login_required
+def check_postprocessor():
+	try:
+		keys = json.loads(request.args.get("subqueries"))
+	except (TypeError, json.decoder.JSONDecodeError):
+		abort(404)
+
+	subqueries = []
+	type = "query"
+
+	for key in keys:
+		try:
+			if key[0:3] == "job":
+				if key.strip() == "job":
+					continue
+				query = queue.get_job_by_id(key[3:])
+				type = "job"
+			else:
+				query = SearchQuery(key=key, db=db)
+				if query.data["key_parent"] == "":
+					continue
+		except (TypeError, ValueError):
+			continue
+
+		processors = load_postprocessors()
+
+		if type == "query":
+			details = json.loads(query.data["parameters"])
+			subquery = query.data
+			subquery["postprocessor"] = processors[details["type"]]
+
+			subqueries.append({
+				"key": query.key,
+				"finished": query.is_finished(),
+				"html": render_template("result-subquery.html", subquery=subquery)
+			})
+		else:
+			subquery = {
+				"key": "job%s" % query["id"],
+				"is_finished": False,
+				"postprocessor": processors[query["jobtype"]],
+				"status": ""
+			}
+			subqueries.append({
+				"key": "job%s" % query["id"],
+				"finished": False,
+				"html": render_template("result-subquery.html", subquery=subquery)
+			})
+
+	return jsonify(subqueries)
 
 def validateQuery(parameters):
 	"""
