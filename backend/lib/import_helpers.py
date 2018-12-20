@@ -1,11 +1,19 @@
 """
 Helper methods and classes for dump importer (see importDump.py)
 """
+import psycopg2
 import json
 import csv
+import sys
 import re
+from psycopg2.extras import execute_values
 
 link_regex = re.compile(">>([0-9]+)")
+post_fields = ("id", "timestamp", "timestamp_deleted", "thread_id", "body", "author",
+			   "author_type_id", "author_trip", "subject", "country_code", "image_file",
+			   "image_4chan", "image_md5", "image_dimensions", "image_filesize",
+			   "semantic_url", "unsorted_data")
+post_fields_sql = ", ".join(post_fields)
 
 
 def parse_value(key, value):
@@ -18,7 +26,7 @@ def parse_value(key, value):
 	if isinstance(value, str):
 		value = value.strip()
 
-	if value == "N" and key not in ["comment", "name", "title"]:
+	if value == "N":
 		return ""
 
 	try:
@@ -29,7 +37,10 @@ def parse_value(key, value):
 
 	return value
 
-
+post_buffer = []
+mentioned_posts = []
+batch_size = 10000
+# problematic ID: 23628818 vs 23974771
 def process_post(post, db, sequence, threads, board):
 	"""
 	Add one post to the database
@@ -41,6 +52,8 @@ def process_post(post, db, sequence, threads, board):
 	:param dict threads: Thread info, {id: data}
 	:return:
 	"""
+	global post_buffer, mentioned_posts
+
 	# skip if needed
 	posts_added = sequence[1] + 1
 	if posts_added <= sequence[0]:
@@ -49,6 +62,10 @@ def process_post(post, db, sequence, threads, board):
 	# sanitize post data
 	post = dict(post)
 	post = {key: parse_value(key, post[key]) for key in post}
+
+	# subnum > 0 is not from 4chan
+	if int(post["subnum"]) > 0:
+		return posts_added
 
 	# see what we need to do with the thread
 	post_thread = post["num"] if post["thread_num"] == 0 else post["thread_num"]
@@ -95,42 +112,48 @@ def process_post(post, db, sequence, threads, board):
 		threads[post_thread] = thread_data
 
 	# add post to database
-	db.insert("posts", data={
-		"id": post["num"],
-		"timestamp": post["timestamp"],
-		"timestamp_deleted": post["deleted"] if int(post["deleted"]) > 1 else 0,
-		"thread_id": post_thread,
-		"body": post["comment"],
-		"author": post["name"],
-		"author_type_id": post["capcode"],
-		"author_trip": post["trip"],
-		"subject": post["title"],
-		"country_code": post["poster_country"],
-		"image_file": post["media_filename"],
-		"image_4chan": post["media_orig"],
-		"image_md5": post["media_hash"],
-		"image_dimensions": json.dumps({"w": post["media_w"], "h": post["media_h"]}) if post[
-																							"media_filename"] != "" else "",
-		"image_filesize": post["media_size"],
-		"semantic_url": "",
-		"unsorted_data": "{}"
-	}, safe=True, commit=False)
-	db.execute("UPDATE posts SET body_vector = to_tsvector(body) WHERE id = %s", (post["num"],))
+	post_buffer.append((
+		post["num"],  # id
+		post["timestamp"],  # timestamp
+		post["deleted"] if int(post["deleted"]) > 1 else 0,  # timestamp_deleted
+		post_thread,  # thread_id
+		post["comment"],  # body
+		post["name"],  # author
+		post["capcode"],  # author_type_id
+		post["trip"],  # author_trip
+		post["title"],  # subject
+		post["poster_country"],  # country_code
+		post["media_filename"],  # image_file
+		post["media_orig"],  # image_4chan
+		post["media_hash"],  # image_md5
+		json.dumps({"w": post["media_w"], "h": post["media_h"]}) if post["media_filename"] != "" else "",  # image_dimensions
+		post["media_size"],  # image_filesize
+		"",  # semantic_url
+		"{}"  # unsorted_data
+	))
 
 	# add links to other posts
 	if post["comment"] and isinstance(post["comment"], str):
 		links = re.findall(link_regex, post["comment"])
 		for linked_post in links:
 			if len(str(linked_post)) <= 15:
-				db.insert("posts_mention", data={"post_id": post["num"], "mentioned_id": linked_post}, safe=True, commit=False)
-
-	if posts_added % 1000 == 0:
-		print("Processed %i posts." % posts_added)
+				mentioned_posts.append((post["num"], linked_post))
 
 	# for speed, we only commit every so many posts
-	if posts_added % 10000 == 0:
-		print("Committing posts %i-%i to database" % (posts_added - 10000, posts_added))
+	if len(post_buffer) % batch_size == 0:
+		print("Committing posts %i-%i to database" % (posts_added - batch_size, posts_added))
+		try:
+			db.execute_many("INSERT INTO posts (" + post_fields_sql + ") VALUES %s", post_buffer)
+		except psycopg2.IntegrityError as e:
+			# print(repr(post_buffer))
+			print(repr(e))
+			print(e)
+			sys.exit(1)
+
+		db.execute_many("INSERT INTO posts_mention (post_id, mentioned_id) VALUES %s ON CONFLICT DO NOTHING", mentioned_posts)
 		db.commit()
+		post_buffer = []
+		mentioned_posts = []
 
 	return posts_added
 
