@@ -298,11 +298,12 @@ def check_postprocessor():
 
 	for key in keys:
 		try:
-			if key[0:3] == "job":
-				if key.strip() == "job":
-					continue
-				query = queue.get_job_by_id(key[3:])
-				type = "job"
+			if key[0:3] == "job" and len(key) > 3:
+				try:
+					query = queue.get_job_by_id(key[3:])
+					type = "job"
+				except ValueError:
+					query = SearchQuery(job=key[3:], db=db)
 			else:
 				query = SearchQuery(key=key, db=db)
 				if query.data["key_parent"] == "":

@@ -20,7 +20,7 @@ class SearchQuery:
 	folder = None
 	parameters = None
 
-	def __init__(self, parameters=None, key=None, db=None, parent=None, extension="csv"):
+	def __init__(self, parameters=None, key=None, job=None, db=None, parent=None, extension="csv"):
 		"""
 		Create new query object
 
@@ -39,6 +39,13 @@ class SearchQuery:
 				raise TypeError("SearchQuery() requires a valid query key for its 'key' argument")
 
 			self.query = current["query"]
+		elif job is not None:
+			current = self.db.fetchone("SELECT * FROM queries WHERE parameters::json->>job = %s", (job,))
+			if not current:
+				raise TypeError("SearchQuery() requires a valid job ID for its 'job' argument")
+
+			self.query = current["query"]
+			self.key = current["key"]
 		else:
 			if parameters is None:
 				raise TypeError("SearchQuery() requires either 'key', or 'parameters' to be given")
