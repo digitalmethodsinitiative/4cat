@@ -44,6 +44,21 @@ class JobQueue:
 
 		return {key: (json.loads(value) if key == "details" else value) for key, value in job.items()} if job else None
 
+	def get_job_by_id(self, id):
+		"""
+		Get job for a given ID
+
+		If no job with the ID exists, raises a ValueError.
+
+		:param id:  Job ID
+		:return dict: Job data
+		"""
+		job = self.db.fetchone("SELECT * FROM jobs WHERE id = %s", (id,))
+		if not job:
+			raise ValueError
+
+		return job
+
 	def get_all_jobs(self, jobtype="*", remote_id=False):
 		"""
 		Get all jobs
