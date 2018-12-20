@@ -303,6 +303,7 @@ def check_postprocessor():
 					query = queue.get_job_by_id(key[3:])
 					type = "job"
 				except ValueError:
+					print("OH")
 					query = SearchQuery(job=key[3:], db=db)
 			else:
 				query = SearchQuery(key=key, db=db)
@@ -320,6 +321,7 @@ def check_postprocessor():
 
 			subqueries.append({
 				"key": query.key,
+				"job": details["job"] if "job" in details else "",
 				"finished": query.is_finished(),
 				"html": render_template("result-subquery.html", subquery=subquery)
 			})
@@ -332,6 +334,7 @@ def check_postprocessor():
 			}
 			subqueries.append({
 				"key": "job%s" % query["id"],
+				"job": query["id"],
 				"finished": False,
 				"html": render_template("result-subquery.html", subquery=subquery)
 			})
