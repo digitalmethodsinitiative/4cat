@@ -187,6 +187,7 @@ button#submitdata{
 .filter-box > .filter-box-label {
 	display: inline-block;
 	min-width:  210px;
+	vertical-align: top;
 }
 
 .filter-box > ul {
