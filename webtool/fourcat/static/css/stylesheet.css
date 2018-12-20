@@ -946,7 +946,7 @@ ol.postprocessor-list {
 
 .flashing { animation: flash 0.5s 3 normal forwards; }
 @keyframes flash {
-	from { background: #FFF; }
+	from { background: rgba(255, 255, 255, 255); }
 	50% { background: #4eff52; }
-	to { background: #FFF; }
+	to { background: rgba(255, 255, 255, 255); }
 }

@@ -354,9 +354,16 @@ function update_query_statuses() {
         success: function(json) {
             json.forEach(subquery => {
                 let li = $('#subquery-' + subquery.key);
+                let old_status = li.html();
                 li.replaceWith(subquery.html);
-                $('#subquery-' + subquery.key).addClass('flashing');
 
+                li = $('#subquery-' + subquery.key);
+                if(li.html() == old_status) {
+                    return;
+                }
+
+
+                li.addClass('flashing');
                 if(!$('body').hasClass('result-page')) {
                     return;
                 }
