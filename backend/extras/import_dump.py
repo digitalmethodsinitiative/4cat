@@ -5,6 +5,7 @@ import sqlite3
 import sys
 import os
 
+sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)) + "/..")
 from csv import DictReader
 from lib.logger import Logger
 from lib.database import Database
@@ -63,6 +64,9 @@ threads = {thread["id"]: thread for thread in
 if ext.lower() == "csv":
 	# import from CSV dump
 	posts_added = 0
+
+	db.execute("TRUNCATE TABLE posts; TRUNCATE TABLE threads; TRUNCATE TABLE posts_mention; ALTER SEQUENCE posts_id_seq_seq RESTART; ALTER SEQUENCE threads_id_seq_seq RESTART;")
+	db.commit()
 
 	with open(sourcefile) as csvdump:
 		reader = DictReader(csvdump, fieldnames=FourPlebs.columns, dialect=FourPlebs)

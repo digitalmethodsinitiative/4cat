@@ -5,6 +5,7 @@ import psycopg2.extras
 import psycopg2
 
 from psycopg2 import sql
+from psycopg2.extras import execute_values
 
 import config
 
@@ -66,6 +67,18 @@ class Database:
 		"""
 		self.cursor.execute(query, replacements)
 		self.commit()
+
+	def execute_many(self, query, replacements=None):
+		"""
+		Execute a query multiple times, each time with different values
+
+		This makes it particularly suitable for INSERT queries, but other types
+		of query using VALUES are possible too.
+
+		:param string query:  Query
+		:param replacements: A list of replacement values
+		"""
+		execute_values(self.cursor, query, replacements)
 
 	def update(self, table, data, where=None, commit=True):
 		"""
