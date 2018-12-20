@@ -361,7 +361,7 @@ function update_query_statuses() {
                 let old_status = li.html();
                 li.replaceWith(subquery.html);
 
-                li = $(selector);
+                li = $('#subquery-' + subquery.key);
                 if(li.html() == old_status) {
                     return;
                 }
