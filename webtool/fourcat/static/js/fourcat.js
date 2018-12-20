@@ -2,6 +2,7 @@ var dot_ticker = 0;
 
 //AJAX functions that retrieve user input and send it to the server so Python can do it's magic
 $(function() {
+    setInterval(update_query_statuses, 4000);
 
 	// global variables
 	var loadedcsv = {}
@@ -58,7 +59,6 @@ $(function() {
                 $('.loader').hide()
             }
         });
-
 
 	}
 	
@@ -330,3 +330,42 @@ popup_panel = {
 		popup_panel.blur.removeClass('open').addClass('closed');
 	}
 };
+
+/**
+ * Fancy live-updating subquery status
+ *
+ * Checks if running subqueries have finished, updates their status, and re-enabled further
+ * analyses if all subqueries have finished
+ */
+function update_query_statuses() {
+    let queued = $('.running.subquery');
+    if(queued.length === 0) {
+        return;
+    }
+
+    let keys = new Array();
+    queued.each(function() {
+        keys.push($(this).attr('id').split('-')[1])
+    });
+
+    $.get({
+        url: "/check_postprocessors/",
+        data: {subqueries: JSON.stringify(keys)},
+        success: function(json) {
+            json.forEach(subquery => {
+                let li = $('#subquery-' + subquery.key);
+                li.replaceWith(subquery.html);
+                $('#subquery-' + subquery.key).addClass('flashing');
+
+                if(!$('body').hasClass('result-page')) {
+                    return;
+                }
+
+                if($('.running.subquery').length == 0) {
+                    $('.result-warning').animate({height: 0}, 250, function() { $(this).remove(); });
+                    $('.queue-button-wrap').removeClass('hidden');
+                }
+            });
+        }
+    })
+}

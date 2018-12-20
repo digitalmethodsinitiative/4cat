@@ -48,11 +48,7 @@
 {% if subqueries|length > 0 %}
     <ol class="subquery-list">
     {% for subquery in subqueries %}
-        {% if subquery.is_finished %}
-            <li><span class="subprocessor-name">{{ subquery.postprocessor.name }}</span>: <a href="/result/{{ subquery.result_file }}">{{ subquery.result_file }}</a> ({{ subquery.num_rows }} items)</li>
-        {% else %}
-        <li><span class="subprocessor-name">{{ subquery.postprocessor.name }}</span>: {% if subquery.status == '' %}Queued{% else %}Running - {{ subquery.status }}{% endif %}</li>
-        {% endif %}
+        {% include 'result-subquery.html' %}
     {% endfor %}
     </ol>
 {% endif %}
@@ -75,7 +71,7 @@
 {% for processor in postprocessors.values() %}
     <li>
         <p><em>{{ processor.name }}</em>: {{ processor.description }}{% if processor.description[-1] != "." %}.{% endif %} Output: {{ processor.extension }} file.</p>
-        <p>{% if not is_postprocessor_running %}<a href="/results/{{ query.key }}/postprocessors/queue/{{ processor.type }}/" class="button-like">Queue</a>{% endif %}</p>
+        <p class="queue-button-wrap {% if is_postprocessor_running %}hidden{% endif %}"><a href="/results/{{ query.key }}/postprocessors/queue/{{ processor.type }}/" class="button-like">Queue</a></p>
     </li>
 {% endfor %}
 </ol>
