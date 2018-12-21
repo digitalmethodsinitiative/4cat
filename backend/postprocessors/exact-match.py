@@ -14,7 +14,7 @@ class ExactMatcher(BasicPostProcessor):
 	"""
 	type = "match-exactly"  # job type ID
 	title = "Exact matches"  # title displayed in UI
-	description = "Filter results so only posts exactly matching the input query are left. Posts are matched against the full query text (search operators are interpreted as plain text, * and \" characters are ignored)"  # description displayed in UI
+	description = "Filter results so only posts containing the exact input query are left. Posts are matched against the full query text (search operators are interpreted as plain text, * and \" characters are ignored)"  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
 	def process(self):
