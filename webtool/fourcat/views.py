@@ -38,7 +38,7 @@ def show_index():
 	return render_template('tool.html', boards=config.SCRAPE_BOARDS)
 
 
-@app.route('/page/<string:page>')
+@app.route('/page/<string:page>/')
 def show_page(page):
 	"""
 	Display a markdown page within the 4CAT UI
