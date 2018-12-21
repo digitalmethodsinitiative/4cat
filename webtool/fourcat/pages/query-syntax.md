@@ -18,7 +18,7 @@ The following syntax is supported:
    or `netherlands`
 
 - `"amsterdam netherlands"` - Match the phrase `amsterdam netherlands`, 
-   occuring exactly like that
+   occurring exactly like that
 
 - `amsterdam -netherlands` - Match posts containing `amsterdam` but 
    not `netherlands`
