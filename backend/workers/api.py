@@ -238,6 +238,12 @@ class InternalAPI(BasicWorker):
 		# no appropriate response
 		return False
 
+	def abort(self):
+		"""
+		Stop main loop
+		"""
+		self.looping = False
+
 
 class InternalAPIException(Exception):
 	# raised if API request could not be parsed
