@@ -9,6 +9,7 @@ import os.path
 import base64
 import json
 import six
+import sys
 import re
 
 from backend.lib.helpers import get_absolute_folder
@@ -29,7 +30,7 @@ class ThreadScraper4chan(BasicJSONScraper):
 	8chan scraper.
 	"""
 	type = "4chan-thread"
-	max_workers = 4
+	max_workers = 1
 
 	# for new posts, any fields not in here will be saved in the "unsorted_data" column for that post as part of a
 	# JSONified dict
@@ -82,9 +83,9 @@ class ThreadScraper4chan(BasicJSONScraper):
 			self.db.update("threads_" + self.prefix, where={"id": thread_db_id}, data={"timestamp_deleted": 0})
 
 		# create a dict mapped as `post id`: `post data` for easier comparisons with existing data
-		post_dict_scrape = {post["no"]: post for post in data["posts"] if "no" in post}
-		post_dict_db = {post["id"]: post for post in
-						self.db.fetchall("SELECT * FROM posts_" + self.prefix + " WHERE thread_id = %s AND timestamp_deleted = 0",
+		post_dict_scrape = {str(post["no"]): post for post in data["posts"] if "no" in post}
+		post_dict_db = {str(post["id"]): post for post in
+						self.db.fetchall("SELECT * FROM posts_" + self.prefix + " WHERE thread_id = %s AND timestamp_deleted = 0 ORDER BY id ASC",
 										 (thread_db_id,))}
 
 		# mark deleted posts as such
@@ -162,8 +163,8 @@ class ThreadScraper4chan(BasicJSONScraper):
 			self.db.rollback()
 			dupe = self.db.fetchone("SELECT * from posts_" + self.prefix + " WHERE id = '%s'" % (str(post["no"]),), commit=False)
 			if dupe:
-				self.log.error("Post %s in thread %s/%s/%s (time: %s) scraped twice: first seen in thread %s at %s" % (
-				post["no"], self.platform, thread["board"], thread["id"], post["time"], dupe["thread_id"], dupe["timestamp"]))
+				self.log.error("Post %s in thread %s/%s/%s (time: %s) scraped twice: first seen as %s in thread %s at %s" % (
+				post["no"], self.platform, thread["board"], thread["id"], post["time"], dupe["id"], dupe["thread_id"], dupe["timestamp"]))
 			else:
 				self.log.error("Post %s in thread %s/%s/%s hit database constraint but no dupe was found?" % (
 				post["no"], self.platform, thread["board"], thread["id"]))
