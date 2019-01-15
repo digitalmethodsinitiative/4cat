@@ -143,11 +143,8 @@ class InternalAPI(BasicWorker):
 		if request == "workers":
 			# return the number of workers, sorted by type
 			workers = {}
-			for worker in self.manager.pool:
-				type = worker.__class__.__name__
-				if type not in workers:
-					workers[type] = 0
-				workers[type] += 1
+			for jobtype in self.manager.worker_pool:
+				workers[jobtype] = len(self.manager.worker_pool[jobtype])
 
 			workers["total"] = sum([workers[workertype] for workertype in workers])
 
