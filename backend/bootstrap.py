@@ -53,5 +53,5 @@ def run(as_daemon=True):
 	queue.release_all()
 
 	# make it happen
-	WorkerManager(logger=log, as_daemon=as_daemon)
+	WorkerManager(logger=log, database=db, queue=queue, as_daemon=as_daemon)
 	log.info("4CAT Backend shut down.")
