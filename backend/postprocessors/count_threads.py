@@ -1,9 +1,9 @@
 """
 Example post-processor worker
 """
-from csv import DictReader, DictWriter
+from csv import DictReader
 
-from backend.lib.postprocessor import BasicPostProcessor
+from backend.abstract.postprocessor import BasicPostProcessor
 
 
 class ThreadCounter(BasicPostProcessor):

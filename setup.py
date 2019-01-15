@@ -7,7 +7,8 @@ setup(
 	name='fourcat',
 	version=1,
 
-	description='4CAT: Capture and Analysis Tool is a comprehensive tool for analysing discourse on 4chan',
+	description=('4CAT: Capture and Analysis Tool is a comprehensive tool for '
+				 'analysing discourse on web forums and imageboards'),
 	long_description=readme,
 	author="Open Intelligence Lab",
 	author_email="4cat@oilab.eu",

@@ -56,7 +56,7 @@ if skip > 0:
 #
 db = Database(logger=Logger())
 threads = {thread["id"]: thread for thread in
-		   db.fetchall("SELECT id, timestamp, timestamp_modified, post_last FROM threads")}
+		   db.fetchall("SELECT id, timestamp, timestamp_modified, post_last FROM 4chan_threads")}
 
 #
 # Start importing posts
@@ -65,7 +65,7 @@ if ext.lower() == "csv":
 	# import from CSV dump
 	posts_added = 0
 
-	db.execute("TRUNCATE TABLE posts; TRUNCATE TABLE threads; TRUNCATE TABLE posts_mention; ALTER SEQUENCE posts_id_seq_seq RESTART; ALTER SEQUENCE threads_id_seq_seq RESTART;")
+	db.execute("TRUNCATE TABLE 4chan_posts; TRUNCATE TABLE 4chan_threads; TRUNCATE TABLE 4chan_posts_mention; ALTER SEQUENCE posts_id_seq_seq RESTART; ALTER SEQUENCE threads_id_seq_seq RESTART;")
 	db.commit()
 
 	with open(sourcefile) as csvdump:
@@ -99,18 +99,18 @@ print("Done!")
 print("Updating thread statistics...")
 threads_updated = 0
 for thread in threads:
-	posts = db.fetchone("SELECT COUNT(*) AS num FROM posts WHERE thread_id = %s", (thread,))["num"]
-	images = db.fetchone("SELECT COUNT(*) AS num FROM posts WHERE image_file != '' AND thread_id = %s", (thread,))[
+	posts = db.fetchone("SELECT COUNT(*) AS num FROM 4chan_posts WHERE thread_id = %s", (thread,))["num"]
+	images = db.fetchone("SELECT COUNT(*) AS num FROM 4chan_posts WHERE image_file != '' AND thread_id = %s", (thread,))[
 		"num"]
 	posts_deleted = \
-		db.fetchone("SELECT COUNT(*) AS num FROM posts WHERE thread_id = %s AND timestamp_deleted > 0", (thread,))[
+		db.fetchone("SELECT COUNT(*) AS num FROM 4chan_posts WHERE thread_id = %s AND timestamp_deleted > 0", (thread,))[
 			"num"]
 
 	update = {"num_replies": posts, "num_images": images}
 
 	# if all posts are deleted, then the thread is deleted - mark thread as such
 	if posts_deleted == posts:
-		last_post = db.fetchone("SELECT MAX(timestamp) as deleted_time FROM posts WHERE thread_id = %s", (thread,))
+		last_post = db.fetchone("SELECT MAX(timestamp) as deleted_time FROM 4chan_posts WHERE thread_id = %s", (thread,))
 		update["timestamp_deleted"] = last_post["deleted_time"]
 
 	db.update("threads", data={"num_replies": posts, "num_images": images}, where={"id": thread}, commit=False)

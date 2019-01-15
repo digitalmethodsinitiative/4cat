@@ -8,7 +8,7 @@ import markdown
 from flask import render_template, jsonify, abort, request, redirect
 from flask_login import login_required, current_user
 from fourcat import app, db, queue
-from fourcat.helpers import Pagination, string_to_timestamp, load_postprocessors, get_available_postprocessors
+from fourcat.helpers import Pagination, string_to_timestamp, load_postprocessors, get_available_postprocessors, get_available_boards
 
 from backend.lib.query import SearchQuery
 from backend.lib.queue import JobAlreadyExistsException
@@ -35,7 +35,9 @@ def show_index():
 	"""
 	Index page: main tool frontend
 	"""
-	return render_template('tool.html', boards=config.SCRAPE_BOARDS)
+	boards = get_available_boards(db)
+
+	return render_template('tool.html', boards=boards)
 
 
 @app.route('/page/<string:page>/')
@@ -93,6 +95,9 @@ def string_query():
 
 	if valid != True:
 		return "Invalid query. " + valid
+
+	parameters["platform"] = parameters["board"].split("-")[0]
+	parameters["board"] = "-".join(parameters["board"].split("-")[1:])
 
 	# Queue query
 	query = SearchQuery(parameters=parameters, db=db)
@@ -303,7 +308,6 @@ def check_postprocessor():
 					query = queue.get_job_by_id(key[3:])
 					type = "job"
 				except ValueError:
-					print("OH")
 					query = SearchQuery(job=key[3:], db=db)
 			else:
 				query = SearchQuery(key=key, db=db)
@@ -374,8 +378,23 @@ def validateQuery(parameters):
 			return "The first date is later than or the same as the second."
 
 	# Ensure the board is correct
-	if parameters["board"] not in config.SCRAPE_BOARDS:
-		return "Invalid board: %s" % parameters["board"]
+	if "board" not in parameters:
+		return "Please provide a board to search"
+
+	boards = get_available_boards(db)
+	board = parameters["board"].split("-")
+	board[1] = "-".join(board[1:])
+
+	if len(board) < 2:
+		return "Invalid board ID: %s" % "-".join(board[0:1])
+
+	board_exists = False
+	for available_board in boards:
+		if available_board["platform"] == board[0] and available_board["board"] == board[1]:
+			board_exists = True
+
+	if not board_exists:
+		return "Invalid board: %s" % "-".join(board[0:1])
 
 	# Keyword-dense thread length should be at least thirty.
 	if parameters["dense_length"] > 0 and parameters["dense_length"] < 10:

@@ -8,12 +8,15 @@ from csv import DictWriter
 
 import config
 from backend.lib.helpers import get_absolute_folder
-from backend.lib.queue import JobQueue
 
 
 class SearchQuery:
 	"""
 	Provide interface to safely register and run search queries
+
+	The actual searching is done in string_query - this class is here to make
+	sure the results end up in the right place and do not conflict with similar
+	other queries.
 	"""
 	db = None
 	data = None

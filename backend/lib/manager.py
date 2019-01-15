@@ -1,39 +1,44 @@
 """
-Manager for a pool of workers
-
-Also known as "employer"
+The heart of the app - manages jobs and workers
 """
 import importlib
 import inspect
 import signal
-import glob
 import time
+import glob
 import sys
 import os
 
+from backend.abstract.worker import BasicWorker
 from backend.lib.keyboard import KeyPoller
-from backend.lib.worker import BasicWorker
+from backend.lib.exceptions import JobClaimedException
+
 
 class WorkerManager:
 	"""
-	Worker Manager
-
-	Simple class that contains the main loop as well as a threaded keyboard poller
-	that listens for a keypress (which can be used to end the main loop)
+	Manages the job queue and worker pool
 	"""
-	looping = True
-	pool = []
-	worker_prototypes = []
+	queue = None
+	db = None
 	log = None
 
-	def __init__(self, logger, as_daemon=True):
-		"""
-		Set up modules and start looping
+	worker_map = {}
+	worker_pool = {}
+	datasources = []
+	pool = []
+	looping = True
 
-		:param Logger logger:  Logging handler
-		:param bool as_daemon:  Whether the backend is being run as a daemon
+	def __init__(self, queue, database, logger, as_daemon=True):
 		"""
-		signal.signal(signal.SIGTERM, self.abort)
+		Initialize manager
+
+		:param queue:  Job queue
+		:param database:  Database handler
+		:param logger:  Logger object
+		:param bool as_daemon:  Whether the manager is being run as a daemon
+		"""
+		self.queue = queue
+		self.db = database
 		self.log = logger
 
 		if not as_daemon:
@@ -41,88 +46,179 @@ class WorkerManager:
 			self.key_poller = KeyPoller(manager=self)
 			self.key_poller.start()
 
+		signal.signal(signal.SIGTERM, self.abort)
+		self.load_workers()
+		self.validate_datasources()
+
+		# queue a job for the api handler so it will be run
+		self.queue.add_job("api", remote_id="localhost")
+
+		# it's time
 		self.loop()
 
-	def abort(self, signum=signal.SIGTERM, frame=None):
+	def delegate(self):
 		"""
-		End main loop
+		Delegate work
 
-		Should be called after a SIGTERM is received - the two signal-related
-		function arguments remain unused.
-
-		:param signum:  Code of signal through which abort was triggered
-		:param frame:  Context within which abort was triggered
+		Checks for open jobs, and then passes those to dedicated workers, if
+		slots are available for those workers.
 		"""
-		self.looping = False
-		self.log.warning("Quitting after next loop.")
+		jobs = self.queue.get_all_jobs()
+
+		num_active = sum([len(self.worker_pool[jobtype]) for jobtype in self.worker_pool])
+		self.log.debug("Running workers: %i" % num_active)
+
+		# clean up workers that have finished processing
+		for jobtype in self.worker_pool:
+			all_workers = self.worker_pool[jobtype]
+			for worker in all_workers:
+				if not worker.is_alive():
+					worker.join()
+					self.worker_pool[jobtype].remove(worker)
+
+			del all_workers
+
+		# check if workers are available for unclaimed jobs
+		for job in jobs:
+			jobtype = job.data["jobtype"]
+			if jobtype in self.worker_map:
+				worker_info = self.worker_map[jobtype]
+				if jobtype not in self.worker_pool:
+					self.worker_pool[jobtype] = []
+
+				# if a job is of a known type, and that job type has open
+				# worker slots, start a new worker to run it
+				if len(self.worker_pool[jobtype]) < worker_info["max"]:
+					try:
+						self.log.debug("Starting new worker for job %s" % jobtype)
+						job.claim()
+						worker = worker_info["class"](logger=self.log, manager=self, job=job)
+						worker.start()
+						self.worker_pool[jobtype].append(worker)
+					except JobClaimedException:
+						# it's fine
+						pass
+
+		time.sleep(1)
 
 	def loop(self):
 		"""
-		Loop the worker manager
+		Main loop
 
-		Every few seconds, this checks if all worker types have enough workers of their type
-		running, and if not new ones are started.
-
-		If aborted, all workers are politely asked to abort too.
+		Constantly delegates work, until no longer looping, after which all
+		workers are asked to stop their work. Once that has happened, the loop
+		properly ends.
 		"""
 		while self.looping:
-			self.load_worker_types("workers")
-			self.load_worker_types("postprocessors")
+			self.delegate()
 
-			# start new workers, if needed
-			for worker_type in self.worker_prototypes:
-				active_workers = len(
-					[worker for worker in self.pool if worker.__class__.__name__ == worker_type.__name__])
-				if active_workers < worker_type.max_workers:
-					for i in range(active_workers, worker_type.max_workers):
-						self.log.info("Starting new worker (%s, %i/%i)" % (
-							worker_type.__name__, active_workers + 1, worker_type.max_workers))
-						active_workers += 1
-						worker = worker_type(logger=self.log, manager=self)
-						worker.start()
-						self.pool.append(worker)
+		self.log.info("Telling all workers to stop doing whatever they're doing...")
+		for jobtype in self.worker_pool:
+			for worker in self.worker_pool[jobtype]:
+				worker.abort()
 
-			# remove references to finished workers
-			for worker in self.pool:
-				if not worker.is_alive():
-					self.pool.remove(worker)
-
-			self.log.debug("Running workers: %i" % len(self.pool))
-
-			# check in five seconds if any workers died and need to be restarted (probably not!)
-			time.sleep(5)
-
-		# let all workers end
+		# wait for all workers to finish
 		self.log.info("Waiting for all workers to finish...")
-		for worker in self.pool:
-			worker.abort()
+		for jobtype in self.worker_pool:
+			for worker in self.worker_pool[jobtype]:
+				worker.join()
 
-		for worker in self.pool:
-			worker.join()
+		time.sleep(3)
 
-	def load_worker_types(self, folder="workers"):
+		# abort
+		self.log.info("Bye!")
+
+	def load_workers(self):
 		"""
-		See what worker types are available
+		Looks for files containing worker definitions and import those as
+		modules
 
-		Looks for python files in the given folder, then looks for classes that
-		are a subclass of BasicWorker that are available in those files, and not an
-		abstract class themselves. Classes that meet those criteria and have not been
-		loaded yet are added to an internal list of available worker types.
-
-		:param folder:  The folder within the backend root to look in for worker
+		Futhermore calls the init method of any datasources found (if they
+		have such a method)
 		"""
-		# check for worker files
-		os.chdir(os.path.abspath(os.path.dirname(__file__)) + "/../" + folder)
-		for file in glob.glob("*.py"):
-			module = "backend." + folder + "." + file[:-3]
-			if module in sys.modules:
-				continue
+		self.log.debug("Loading workers...")
+		base = os.path.abspath(os.path.dirname(__file__) + "../../..")
 
-			importlib.import_module(module)
-			members = inspect.getmembers(sys.modules[module])
+		# folders with generic workers
+		folders = ["backend/postprocessors", "backend/workers"]
 
-			for member in members:
-				if inspect.isclass(member[1]) and issubclass(member[1], BasicWorker) and not inspect.isabstract(
-						member[1]):
+		# add folders with datasource-specific workers
+		os.chdir(base + "/datasources")
+		datasources = [file[:-1] for file in glob.glob("**/**/")]
+		for datasource in datasources:
+			folders.append("datasources/%s" % datasource)
+
+		# load any workers found in those folders
+		for folder in folders:
+			os.chdir(base + "/" + folder)
+			files = glob.glob("./*.py")
+			for file in files:
+				if file[2:4] == "__":
+					# we're not interested in __init__.py etc
+					continue
+
+				# initialize data source if it's the first time encountering it
+				if "datasources" in folder:
+					datasource = folder.split("datasources/")[1].split("/")[0]
+					if datasource not in self.datasources:
+						self.log.info("(Startup) Registered data source %s" % datasource)
+						self.datasources.append(datasource)
+						datamodule = "datasources." + folder.replace(base, "")[12:].split("/")[0]
+
+						importlib.import_module(datamodule)
+
+						# initialize datasource
+						if hasattr(sys.modules[datamodule], "init_datasource") and hasattr(sys.modules[datamodule], "PLATFORM"):
+							self.log.debug("Initializing datasource %s" % datasource)
+							sys.modules[datamodule].init_datasource(logger=self.log, database=self.db, queue=self.queue, name=sys.modules[datamodule].PLATFORM)
+						else:
+							self.log.error("Datasource %s is lacking init_datasource or PLATFORM in __init__.py" % datasource)
+
+					module = folder.replace(base, "").replace("/", ".") + "." + file[2:-3]
+					if module in sys.modules:
+						# we've been here
+						continue
+
+				else:
+					# load relevant files in folder
+					module = folder.replace("/", ".") + "." + file[2:-3]
+					if module in sys.modules:
+						# already loaded
+						continue
+
+				# now check if the file is actually a worker or just a random python file we
+				# accidentally loaded (in which case it will be garbage collected)
+				importlib.import_module(module)
+				members = inspect.getmembers(sys.modules[module])
+				for member in members:
+					if not inspect.isclass(member[1]) or not issubclass(member[1], BasicWorker) or inspect.isabstract(
+							member[1]):
+						# is not a valid worker definition
+						continue
+
+					# save to worker map
+					worker = {
+						"max": member[1].max_workers,
+						"name": member[0],
+						"jobtype": member[1].type,
+						"class": member[1]
+					}
 					self.log.debug("Adding worker type %s" % member[0])
-					self.worker_prototypes.append(member[1])
+					self.worker_map[member[1].type] = worker
+
+	def validate_datasources(self):
+		for datasource in self.datasources:
+			if datasource + "-search" not in self.worker_map:
+				self.log.error("No search worker defined for datasource %s. Search queries will not be executed." % datasource)
+
+			if datasource + "-thread" not in self.worker_map:
+				self.log.warning("No thread scraper defined for datasource %s." % datasource)
+
+			if datasource + "-board" not in self.worker_map:
+				self.log.warning("No board scraper defined for datasource %s." % datasource)
+
+	def abort(self):
+		"""
+		Stop looping the delegator and prepare for shutdown
+		"""
+		self.looping = False

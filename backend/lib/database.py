@@ -14,8 +14,9 @@ class Database:
 	"""
 	Simple database handler
 
-	Most importantly, this sets up the database tables if they don't exist yet. Apart
-	from that it offers a few wrapper methods for queries
+	Offers a number of abstraction methods that limit how much SQL one is
+	required to write. Also makes the database connection mostly multithreading
+	proof by instantiating a new cursor for each query (and closing it afterwards)
 	"""
 	cursor = None
 	log = None
@@ -45,30 +46,38 @@ class Database:
 		"""
 		self.commit()
 
-	def query(self, query, replacements=None):
+	def query(self, query, replacements=None, cursor=None):
 		"""
 		Execute a query
 
 		:param string query: Query
 		:param args: Replacement values
+		:param cursor: Cursor to use. Default - use common cursor
 		:return None:
 		"""
+		if not cursor:
+			cursor = self.cursor
+
 		self.log.debug("Executing query %s" % self.cursor.mogrify(query, replacements))
 
-		return self.cursor.execute(query, replacements)
+		return cursor.execute(query, replacements)
 
-	def execute(self, query, replacements=None):
+	def execute(self, query, replacements=None, cursor=None):
 		"""
 		Execute a query, and commit afterwards
 
 		This is required for UPDATE/INSERT/DELETE/etc to stick
 		:param string query:  Query
 		:param replacements: Replacement values
+		:param cursor: Cursor to use. Default - use common cursor
 		"""
-		self.cursor.execute(query, replacements)
+		if not cursor:
+			cursor = self.cursor
+
+		cursor.execute(query, replacements)
 		self.commit()
 
-	def execute_many(self, query, replacements=None):
+	def execute_many(self, query, replacements=None, cursor=None):
 		"""
 		Execute a query multiple times, each time with different values
 
@@ -77,8 +86,12 @@ class Database:
 
 		:param string query:  Query
 		:param replacements: A list of replacement values
+		:param cursor: Cursor to use. Default - use common cursor
 		"""
-		execute_values(self.cursor, query, replacements)
+		if not cursor:
+			cursor = self.cursor
+
+		execute_values(cursor, query, replacements)
 
 	def update(self, table, data, where=None, commit=True):
 		"""
@@ -108,13 +121,15 @@ class Database:
 
 		query = sql.SQL(query).format(*identifiers)
 
-		self.log.debug("Executing query: %s" % self.cursor.mogrify(query, replacements))
-		self.cursor.execute(query, replacements)
+		cursor = self.get_cursor()
+		self.log.debug("Executing query: %s" % cursor.mogrify(query, replacements))
+		cursor.execute(query, replacements)
 
 		if commit:
 			self.commit()
 
-		return self.cursor.rowcount
+		result = cursor.rowcount
+		return result
 
 	def delete(self, table, where, commit=True):
 		"""
@@ -134,13 +149,17 @@ class Database:
 		identifiers.insert(0, sql.Identifier(table))
 		query = sql.SQL("DELETE FROM {} WHERE " + " AND ".join(where_sql)).format(*identifiers)
 
-		self.log.debug("Executing query: %s" % self.cursor.mogrify(query, replacements))
-		self.cursor.execute(query, replacements)
+		cursor = self.get_cursor()
+		self.log.debug("Executing query: %s" % cursor.mogrify(query, replacements))
+		cursor.execute(query, replacements)
 
 		if commit:
 			self.commit()
 
-		return self.cursor.rowcount
+		result = cursor.rowcount
+		cursor.close()
+
+		return result
 
 	def insert(self, table, data, commit=True, safe=False, constraints=None):
 		"""
@@ -178,13 +197,16 @@ class Database:
 		query = sql.SQL(protoquery).format(*identifiers)
 		replacements = (tuple(data.values()),)
 
-		self.log.debug("Executing query: %s" % self.cursor.mogrify(query, replacements))
-		self.cursor.execute(query, replacements)
+		cursor = self.get_cursor()
+		self.log.debug("Executing query: %s" % cursor.mogrify(query, replacements))
+		cursor.execute(query, replacements)
 
 		if commit:
 			self.commit()
 
-		return self.cursor.rowcount
+		result = cursor.rowcount
+		cursor.close()
+		return result
 
 	def fetchall(self, query, *args, commit=True):
 		"""
@@ -194,13 +216,17 @@ class Database:
 		:param bool commit: Commit after SELECT
 		:return list: The result rows, as a list
 		"""
-		self.query(query, *args)
+		cursor = self.get_cursor()
+		self.query(query, cursor=cursor, *args)
 		if commit:
 			self.commit()
 		try:
-			return self.cursor.fetchall()
+			result = cursor.fetchall()
 		except AttributeError:
-			return []
+			result = []
+
+		cursor.close()
+		return result
 
 	def fetchone(self, query, *args, commit=True):
 		"""
@@ -211,14 +237,18 @@ class Database:
 		:param bool commit: Commit after SELECT
 		:return: The row, as a dictionary, or None if there were no rows
 		"""
-		self.query(query, *args)
+		cursor = self.get_cursor()
+		self.query(query, cursor=cursor, *args)
 		if commit:
 			self.commit()
 		try:
-			return self.cursor.fetchone()
+			result = cursor.fetchone()
 		except psycopg2.ProgrammingError:
 			self.commit()
-			return None
+			result = None
+
+		cursor.close()
+		return result
 
 	def commit(self):
 		"""
@@ -241,3 +271,11 @@ class Database:
 		Running queries after this is probably a bad idea!
 		"""
 		self.connection.close()
+
+	def get_cursor(self):
+		"""
+		Get a new cursor
+
+		:return: Cursor
+		"""
+		return self.connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)

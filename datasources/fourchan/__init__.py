@@ -1,0 +1,13 @@
+import config
+
+from backend.lib.helpers import init_datasource
+
+# Internal identifier for this platform
+#
+# This name is to be used whenever referring to the platform or a property of
+# it. For example, 4CAT will expect the search worker to look for jobs of the
+# type "4chan-search" if the PLATFORM is "4chan".
+#
+# Likewise, this is the identifier used in the config file to configure what
+# boards are available for this platform (through the SCRAPE_BOARDS setting).
+PLATFORM = "4chan"

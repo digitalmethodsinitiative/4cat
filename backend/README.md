@@ -2,7 +2,7 @@
 
 Runs worker threads in which the magic happens:
 
-- Scraping 4chan threads and posts
+- Scraping image board threads and posts
 - Downloading images
 - Scheduling the above
 - Parsing and processing search requests

@@ -6,6 +6,7 @@ import datetime
 import inspect
 import json
 import glob
+import time
 import sys
 import os
 import re
@@ -13,7 +14,8 @@ import re
 from math import ceil
 from fourcat import queue
 
-from backend.lib.postprocessor import BasicPostProcessor
+from abstract.postprocessor import BasicPostProcessor
+import config
 
 class Pagination(object):
 	"""
@@ -158,3 +160,32 @@ def get_available_postprocessors(query):
 			del available[job["jobtype"]]
 
 	return available
+
+
+def get_available_boards(db):
+	"""
+	Get boards available for querying
+
+	This retrieves the boards available for search. Since the database queries
+	that retrieve this info are relatively intensive, the result is cached as
+	a JSON file with a lifetime of one day.
+
+	:param db:  Databse handler
+	:return dict: Available boards, {platform: [boards]}
+	"""
+	# cache board queries since they're intensive
+	boards = []
+
+	boardfile = os.path.abspath(os.path.dirname(__file__)) + "/static/boards.json"
+	if os.path.exists(boardfile) and time.time() - os.path.getmtime(boardfile) < 86400:
+		with open(boardfile) as file:
+			boards = json.loads(file.read())
+	else:
+		for platform in config.SCRAPE_BOARDS:
+			platform_boards = db.fetchall("SELECT DISTINCT board FROM threads_" + platform)
+			for board in platform_boards:
+				boards.append({"board": board["board"], "platform": platform})
+		with open(boardfile, "w+") as file:
+			file.write(json.dumps(boards))
+
+	return boards

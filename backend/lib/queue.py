@@ -4,6 +4,9 @@ A job queue, to divide work over the workers
 import time
 import json
 
+from backend.lib.job import Job
+import psycopg2
+
 
 class JobQueue:
 	"""
@@ -39,42 +42,58 @@ class JobQueue:
 		"""
 		if timestamp < 0:
 			timestamp = int(time.time())
-		job = self.db.fetchone("SELECT * FROM jobs WHERE jobtype = %s AND claimed = 0 AND claim_after < %s ORDER BY timestamp ASC LIMIT 1;",
-							   (jobtype, timestamp))
 
-		return {key: (json.loads(value) if key == "details" else value) for key, value in job.items()} if job else None
+		job = self.db.fetchone((
+			"SELECT * FROM jobs"
+			"        WHERE jobtype = %s"
+			"          AND timestamp_claimed = 0"
+			"          AND timestamp_after < %s"
+			"          AND (interval = 0 OR timestamp_lastclaimed + interval < %s)"
+			"    ORDER BY timestamp ASC"
+			"       LIMIT 1;"),
+			(jobtype, timestamp, timestamp))
 
-	def get_job_by_id(self, id):
-		"""
-		Get job for a given ID
-
-		If no job with the ID exists, raises a ValueError.
-
-		:param id:  Job ID
-		:return dict: Job data
-		"""
-		job = self.db.fetchone("SELECT * FROM jobs WHERE id = %s", (id,))
-		if not job:
-			raise ValueError
-
-		return job
+		return job.get_by_data(job) if job else None
 
 	def get_all_jobs(self, jobtype="*", remote_id=False):
 		"""
-		Get all jobs
-
-		Returns all jobs, no matter the type or claim-after date
+		Get all unclaimed (and claimable) jobs
 
 		:param string jobtype:  Type of job, "*" for all types
 		:param string remote_id:  Remote ID, takes precedence over `jobtype`
 		:return list:
 		"""
+		replacements = []
 		if remote_id:
-			return self.db.fetchall("SELECT * FROM jobs WHERE remote_id = %s ORDER BY timestamp ASC", (remote_id,))
-		elif jobtype == "*":
-			return self.db.fetchall("SELECT * FROM jobs ORDER BY timestamp ASC")
+			filter = "WHERE remote_id = %s"
+			replacements = [remote_id]
+		elif jobtype != "*":
+			filter = "WHERE jobtype = %s"
+			replacements = [jobtype]
 		else:
-			return self.db.fetchall("SELECT * FROM jobs WHERE jobtype = %s ORDER BY timestamp ASC", (jobtype,))
+			filter = "WHERE jobtype != ''"
+
+		now = int(time.time())
+		replacements.append(now)
+		replacements.append(now)
+
+		query = "SELECT * FROM jobs %s" % filter
+		query += ("        AND timestamp_claimed = 0"
+			"              AND timestamp_after < %s"
+			"              AND (interval = 0 OR timestamp_lastclaimed + interval < %s)"
+			"         ORDER BY timestamp ASC")
+
+		try:
+			jobs = self.db.fetchall(query, replacements)
+		except psycopg2.ProgrammingError:
+			# there seems to be a bug with psycopg2 where it sometimes raises
+			# this for empty query results even though it shouldn't. this
+			# doesn't seem to indicate an actual problem so we catch the
+			# exception and return an empty list
+			# https://github.com/psycopg/psycopg2/issues/346
+			jobs = []
+
+		return [Job.get_by_data(job, self.db) for job in jobs if job]
 
 	def get_job_count(self, jobtype="*"):
 		"""
@@ -90,7 +109,7 @@ class JobQueue:
 
 		return int(count["count"])
 
-	def add_job(self, jobtype, details=None, remote_id=0, claim_after=0):
+	def add_job(self, jobtype, details=None, remote_id=0, claim_after=0, interval=0):
 		"""
 		Add a new job to the queue
 
@@ -106,34 +125,9 @@ class JobQueue:
 			"details": json.dumps(details),
 			"timestamp": int(time.time()),
 			"remote_id": remote_id,
-			"claim_after": claim_after
+			"timestamp_after": claim_after,
+			"interval": interval
 		}, safe=True, constraints=("jobtype", "remote_id"))
-
-	def finish_job(self, job):
-		"""
-		Finish a job
-
-		This deletes the job from the queue and the database.
-
-		:param job:  Job to finish
-		"""
-		self.db.delete("jobs", where={"id": job["id"]})
-
-	def release_job(self, job, delay=0, claim_after=0):
-		"""
-		Release a job
-
-		The job is no longer marked as claimed, and can be claimed by a worker again.
-
-		:param job:  Job to release
-		:param int delay:  Amount of seconds after which job may be reclaimed
-		:param int claim_after:  UNIX timestamp after which job may be reclaimed. If
-								`delay` is set, it overrides this parameter.
-		"""
-		if delay > 0:
-			claim_after = int(time.time()) + delay
-
-		self.db.update("jobs", where={"id": job["id"]}, data={"claimed": 0, "claim_after": claim_after})
 
 	def release_all(self):
 		"""
@@ -141,40 +135,4 @@ class JobQueue:
 
 		All claimed jobs are released. This is useful to run when the backend is restarted.
 		"""
-		self.db.execute("UPDATE jobs SET claimed = 0")
-
-	def claim_job(self, job):
-		"""
-		Claim a job
-
-		Marks a job as 'claimed', which means no other workers may claim the job, and it will not
-		be returned when the queue is asked for a new job to do.
-
-		:param job: Job to claim
-		"""
-		updated_rows = self.db.update("jobs", where={"id": job["id"], "claimed": 0},
-									  data={"claimed": int(time.time()), "attempts": job["attempts"] + 1})
-
-		if updated_rows == 0:
-			raise JobClaimedException("Job is already claimed")
-
-
-class QueueException(Exception):
-	"""
-	General Queue Exception - only children are to be used
-	"""
-	pass
-
-
-class JobClaimedException(QueueException):
-	"""
-	Raise if job is claimed, but is already marked as such
-	"""
-	pass
-
-
-class JobAlreadyExistsException(QueueException):
-	"""
-	Raise if a job is created, but a job with the same type/remote_id combination already exists
-	"""
-	pass
+		self.db.execute("UPDATE jobs SET timestamp_claimed = 0")

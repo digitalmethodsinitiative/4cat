@@ -4,8 +4,8 @@ Basic post-processor worker - should be inherited by workers to post-process res
 import time
 import abc
 
-from backend.lib.worker import BasicWorker
-from backend.lib.queue import JobClaimedException
+from backend.abstract.worker import BasicWorker
+from backend.lib.exceptions import JobClaimedException
 from backend.lib.query import SearchQuery
 
 

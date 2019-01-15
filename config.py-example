@@ -1,43 +1,59 @@
-""" Scraper/worker configuration """
+""" 4CAT configuration """
+
+# Platform configuration
+PLATFORMS = {
+	"4chan": {  # should correspond to PLATFORM in the data source's __init__.py
+		"interval": 60,  # scrape interval for boards
+		"boards": ["pol", "v"]  # boards to scrape (and generally make available)
+	},
+}
 
 # Postgres login details
-# DB_NAME_TEST is the name of the database to be used for running tests. Don't store anything valuable in this! It is
-# assumed that the user configured below has full rights over both databases
 DB_HOST = "localhost"
 DB_PORT = 5432
+DB_USER = "fourcat"
 DB_NAME = "fourcat"
 DB_NAME_TEST = "fourcat_test"
-DB_USER = "fourcat"
-DB_PASSWORD = "sup3rs3cr3t"
+DB_PASSWORD = "supers3cr3t"
 
 # Path to folders where logs/images/data may be saved.
 # Paths are relative to the folder this config file is in.
-PATH_LOGS = ""
-PATH_IMAGES = ""  # if left empty or pointing to a non-existent folder, no images will be saved
-PATH_DATA = ""
+PATH_LOGS = ""  # store logs here - empty means the 4CAT root folder
+PATH_IMAGES = "images"  # if left empty or pointing to a non-existent folder, no images will be saved
+PATH_DATA = ""  # search results will be stored here as CSV files
 PATH_LOCKFILE = "backend"  # the lockfile will be saved in this folder. Probably no need to change!
 
-# 4CAT has an internal API (available from localhost) that can be used for monitoring and will
+# Path to sphinx data folder. This is used by the script that generates the sphinx configuration file
+# for you.
+SPHINX_PATH = "/opt/sphinx/data"
+
+# The following two options determine when a warning is logged - e.g. if within
+# the last hour less than WARN_POSTS posts are scraped, a warning is logged
+# (which may trigger further alerts depending on logger settings)
+WARN_POSTS = 500
+WARN_THREADS = 50
+WARN_JOBS = 500  # if *more* than this amount of jobs are queued, warn
+
+# 4CAT has an API (available from localhost) that can be used for monitoring and will
 # listen for requests on the following port. "0" disables the API.
-API_PORT = 0
+API_PORT = 4445
 
 # E-mails about critical errors are sent to these addresses
 WARN_INTERVAL = 600  # every so many seconds, compile a report of logged warnings and send it to admins
-WARN_LEVEL = "WARNING"  # only alerts above this level are passed on: DEBUG/INFO/WARNING/ERROR/CRITICAL
-WARN_SLACK_URL = ""  # slack webhook to post logged warnings to
-WARN_EMAILS = []  # 4CAT will try to send e-mail reports to these e-mails when warnings are logged
+WARN_LEVEL = "WARNING"  # only alerts above this level are mailed: DEBUG/INFO/WARNING/ERROR/CRITICAL
+WARN_SLACK_URL = ""
+WARN_EMAILS = []
 WARN_MAILHOST = "localhost"  # SMTP server to connect to for sending e-mail alerts
 
-# What to scrape?
-SCRAPE_BOARDS = ["tg", "v"]
+# Scrape settings
 SCRAPE_TIMEOUT = 5  # how long to wait for a scrape request to finish?
 SCRAPE_PROXIES = {"http": []}  # Items in this list should be formatted like "http://111.222.33.44:1234"
 
 # Web tool settings
 class FlaskConfig:
-	FLASK_APP = "fourcat"
-	SECRET_KEY = "REPLACE_THIS"  # login secret. replace this before running
-	SERVER_NAME="localhost:5000"  # name of the server this is hosted/requested on, e.g. 4cat.oilab.nl
+	FLASK_APP = 'webtool/fourcat'
+	SECRET_KEY = "REPLACE_THIS"
+	SERVER_NAME='4cat.local:5000'
 	HOSTNAME_WHITELIST=["localhost"]  # only these may access the web tool; "*" or an empty list matches everything
 	HOSTNAME_WHITELIST_API=["localhost"]  # hostnames matching these are exempt from rate limiting
-	HOSTNAME_WHITELIST_NAME="Whitelisted host"  # Users are told they're logged in as this "user" when accessing via a whitelisted host
+	HOSTNAME_WHITELIST_NAME="Automatic login"

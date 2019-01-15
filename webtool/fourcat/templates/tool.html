@@ -12,18 +12,6 @@
                             <div id='filterpanel'>
                                 <div id='buttonselections'>
                                     <span>
-                                        Currently available:
-                                        {% for board in boards %}
-                                            <span class='board-data'>
-                                                <span class='board'> /{{board}}/ </span>
-                                                {% if board == 'pol' %}
-                                                    from 28 Nov. 2013 to 18 Mar. 2018 and 7 Nov 2018 onwards.
-                                                {% endif %}
-                                                {% if board == 'v' %}
-                                                    from 7 Nov 2018 onwards.
-                                                {% endif %}
-                                            </span>
-                                        {% endfor %}
                                         <span> Results are limited to 5 million rows. You can use <a href="/page/query-syntax/">advanced query syntax</a>.</span>
                                     </span>
                                 </div>
@@ -33,7 +21,9 @@
                                             <span>Board:</span>
                                         </div>
                                         <select name="board" id='board-select'>
-                                            {% for board in boards %}<option> {{board}}</option>{% endfor %}
+                                            {% for board in boards %}
+                                                <option value="{{board.platform}}-{{board.board}}">({{board.platform}}) {{board.board}}</option>
+                                            {% endfor %}
                                         </select>
                                     </div>
                                     <div class='filter-box'>
