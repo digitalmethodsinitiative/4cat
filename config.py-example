@@ -5,7 +5,7 @@ PLATFORMS = {
 	"4chan": {  # should correspond to PLATFORM in the data source's __init__.py
 		"interval": 60,  # scrape interval for boards
 		"boards": ["pol", "v"]  # boards to scrape (and generally make available)
-	},
+	}
 }
 
 # Postgres login details
@@ -23,20 +23,13 @@ PATH_IMAGES = "images"  # if left empty or pointing to a non-existent folder, no
 PATH_DATA = ""  # search results will be stored here as CSV files
 PATH_LOCKFILE = "backend"  # the lockfile will be saved in this folder. Probably no need to change!
 
-# Path to sphinx data folder. This is used by the script that generates the sphinx configuration file
-# for you.
+# Path to sphinx data folder. This is used by the script that generates the
+# sphinx configuration file for you.
 SPHINX_PATH = "/opt/sphinx/data"
 
-# The following two options determine when a warning is logged - e.g. if within
-# the last hour less than WARN_POSTS posts are scraped, a warning is logged
-# (which may trigger further alerts depending on logger settings)
-WARN_POSTS = 500
-WARN_THREADS = 50
-WARN_JOBS = 500  # if *more* than this amount of jobs are queued, warn
-
-# 4CAT has an API (available from localhost) that can be used for monitoring and will
-# listen for requests on the following port. "0" disables the API.
-API_PORT = 4445
+# 4CAT has an API (available from localhost) that can be used for monitoring
+# and will listen for requests on the following port. "0" disables the API.
+API_PORT = 4444
 
 # E-mails about critical errors are sent to these addresses
 WARN_INTERVAL = 600  # every so many seconds, compile a report of logged warnings and send it to admins
