@@ -10,12 +10,14 @@ also encompass other types of websites such as blogs (where each blog post is a
 thread) or even Facebook pages (which also contain posts with comments).
 
 By default, 4CAT has data source definitions for 4chan and 8chan, but it is
-flexible in this regard and you can add additional data sources with relatively
-little trouble as long as you keep the data structure 4CAT expects in mind.
+flexible in this regard and you can 
+[add additional data sources](https://github.com/stijn-uva/4cat/wiki/Data-sources) 
+with relatively little trouble as long as you keep the data structure 4CAT 
+expects in mind.
 
 It was created by [OILab](https://oilab.eu) and the 
-[Digital Methods Initiative](https://www.digitalmethods.net), both based at the 
-University of Amsterdam. The tool was inspired by the 
+[Digital Methods Initiative](https://www.digitalmethods.net) at the University
+of Amsterdam. The tool was inspired by the 
 [TCAT](https://wiki.digitalmethods.net/Dmi/ToolDmiTcat), a tool with comparable
 functionality that can be used to scrape and analyse Twitter data.
 
@@ -39,7 +41,7 @@ may be analysed from various epistemological perspectives.
   downloads and stores the relevant data and performs searches and analyses as 
   queued by the front-end.
 - `webtool`: A Flask app that provides a web front-end to search and analyze
-  the stored 4chan archives with.
+  the stored data with.
 - `datasources`: Data source definitions. This is a set of configuration 
   options, database definitions and python scripts to process this data with.
   If you want to set up your own data sources, refer to the
