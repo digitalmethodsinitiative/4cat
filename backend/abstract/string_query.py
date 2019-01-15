@@ -107,7 +107,7 @@ class StringQuery(BasicWorker, metaclass=abc.ABCMeta):
 			where.append("timestamp <= %s")
 			replacements.append(query["max_date"])
 
-		if query["board"]:
+		if query["board"] and query["board"] != "*":
 			where.append("board = %s")
 			replacements.append(query["board"])
 
@@ -254,12 +254,11 @@ class StringQuery(BasicWorker, metaclass=abc.ABCMeta):
 		# for each thread, save number of posts and number of matching posts
 		self.log.debug("Filtering %s-dense threads from %i threads..." % (keyword, len(thread_ids)))
 
-		# @todo account for table prefixes
 		try:
 			threads = self.db.fetchall("""
 				SELECT id as thread_id, num_replies, keyword_count, keyword_density::real FROM (
 					SELECT id, num_replies, keyword_count, ((keyword_count::real / num_replies::real) * 100) AS keyword_density FROM (
-						SELECT id, num_replies, count(*) as keyword_count FROM threads
+						SELECT id, num_replies, count(*) as keyword_count FROM threads_%s
 						WHERE id IN %s
 						GROUP BY id, num_replies
 					) AS thread_matches
@@ -267,7 +266,7 @@ class StringQuery(BasicWorker, metaclass=abc.ABCMeta):
 				WHERE num_replies >= %s
 				AND keyword_density >= %s
 
-				""", (thread_ids, length, percentage,))
+				""", (self.prefix, thread_ids, length, percentage,))
 		except Exception as error:
 			return str(error)
 
@@ -288,7 +287,6 @@ class StringQuery(BasicWorker, metaclass=abc.ABCMeta):
 								If True (default), writing takes 1.5 times longer.
 
 		"""
-
 		if not filepath:
 			raise Exception("No result file for query")
 
