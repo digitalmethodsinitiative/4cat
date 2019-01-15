@@ -8,16 +8,16 @@ import markdown
 from flask import render_template, jsonify, abort, request, redirect
 from flask_login import login_required, current_user
 from fourcat import app, db, queue
-from fourcat.helpers import Pagination, string_to_timestamp, load_postprocessors, get_available_postprocessors, get_available_boards
+from fourcat.helpers import Pagination, string_to_timestamp, load_postprocessors, get_available_postprocessors
 
 from backend.lib.query import SearchQuery
-from backend.lib.queue import JobAlreadyExistsException
+from backend.lib.exceptions import JobAlreadyExistsException
 
 from stop_words import get_stop_words
 
 """
 
-Main views for the 4CAT front-end
+Main vn views for the 4CAT front-end
 
 """
 
@@ -30,14 +30,24 @@ def _jinja2_filter_datetime(date, fmt=None):
 
 
 @app.route('/')
+@app.route('/tool/')
 @login_required
 def show_index():
 	"""
 	Index page: main tool frontend
 	"""
-	boards = get_available_boards(db)
+	return render_template('tool.html', boards=config.PLATFORMS)
 
-	return render_template('tool.html', boards=boards)
+
+@app.route('/get-boards/<string:platform>/')
+@login_required
+def getboards(platform):
+	if platform not in config.PLATFORMS or "boards" not in config.PLATFORMS[platform]:
+		result = False
+	else:
+		result = config.PLATFORMS[platform]["boards"]
+
+	return jsonify(result)
 
 
 @app.route('/page/<string:page>/')
@@ -78,6 +88,7 @@ def string_query():
 
 	parameters = {
 		"board": request.form.get("board", ""),
+		"platform": request.form.get("platform", ""),
 		"body_query": request.form.get("body_query", ""),
 		"subject_query": request.form.get("subject_query", ""),
 		"full_thread": (request.form.get("full_threads", "no") != "no"),
@@ -96,14 +107,11 @@ def string_query():
 	if valid != True:
 		return "Invalid query. " + valid
 
-	parameters["platform"] = parameters["board"].split("-")[0]
-	parameters["board"] = "-".join(parameters["board"].split("-")[1:])
-
 	# Queue query
 	query = SearchQuery(parameters=parameters, db=db)
 
 	try:
-		queue.add_job(jobtype="query", remote_id=query.key)
+		queue.add_job(jobtype="%s-search" % parameters["platform"], remote_id=query.key)
 	except JobAlreadyExistsException:
 		pass
 
@@ -378,23 +386,14 @@ def validateQuery(parameters):
 			return "The first date is later than or the same as the second."
 
 	# Ensure the board is correct
-	if "board" not in parameters:
+	if "platform" not in parameters or "board" not in parameters:
 		return "Please provide a board to search"
 
-	boards = get_available_boards(db)
-	board = parameters["board"].split("-")
-	board[1] = "-".join(board[1:])
+	if parameters["platform"] not in config.PLATFORMS:
+		return "Please choose a valid platform to search"
 
-	if len(board) < 2:
-		return "Invalid board ID: %s" % "-".join(board[0:1])
-
-	board_exists = False
-	for available_board in boards:
-		if available_board["platform"] == board[0] and available_board["board"] == board[1]:
-			board_exists = True
-
-	if not board_exists:
-		return "Invalid board: %s" % "-".join(board[0:1])
+	if parameters["board"] not in config.PLATFORMS[parameters["platform"]]["boards"]:
+		return "Please choose a valid board for querying"
 
 	# Keyword-dense thread length should be at least thirty.
 	if parameters["dense_length"] > 0 and parameters["dense_length"] < 10:

@@ -18,13 +18,19 @@
                                 <div id='filterinputs'>
                                     <div class='filter-box'>
                                         <div class='filter-box-label'>
-                                            <span>Board:</span>
+                                            <span>Platform:</span>
                                         </div>
-                                        <select name="board" id='board-select'>
-                                            {% for board in boards %}
-                                                <option value="{{board.platform}}-{{board.board}}">({{board.platform}}) {{board.board}}</option>
+                                        <select name="platform" id='platform-select'>
+                                            {% for platform in boards %}
+                                                <option value="{{ platform }}">{{ platform }}</option>
                                             {% endfor %}
                                         </select>
+                                    </div>
+                                    <div class='filter-box'>
+                                        <div class='filter-box-label'>
+                                            <span>Board:</span>
+                                        </div>
+                                        <input id="board-select" name="board" value="pol" placeholder="pol">
                                     </div>
                                     <div class='filter-box'>
                                         <div class='filter-box-label'>

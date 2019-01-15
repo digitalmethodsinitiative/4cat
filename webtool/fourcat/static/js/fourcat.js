@@ -240,6 +240,9 @@ $(function() {
 	$('.view-controls input, .view-controls select, .view-controls textarea').on('change', function() {
 		$(this).parents('form').trigger('submit');
 	})
+
+	$('#platform-select').on('change', update_boards);
+	$('#platform-select').trigger('change');
 });
 
 function datepicker_normalize() {
@@ -379,4 +382,32 @@ function update_query_statuses() {
             });
         }
     })
+}
+
+function update_boards() {
+	var platform = $('#platform-select option:selected').text();
+	$('#whole-form').attr('disabled', true);
+	$.get({
+        url: '/get-boards/' + platform + '/',
+        success: function (json) {
+        	var select;
+        	if(!json) {
+        		alert('No boards available for platform ' + platform);
+        		select = $('<span id="board-select"></span>');
+			} else {
+                select = $('<select id="board-select" name="board">');
+                json.forEach(function (board) {
+                    $('<option value="' + board + '">' + board + '</option>').appendTo(select);
+                });
+            }
+            $('#board-select').replaceWith(select);
+			$('#whole-form').removeAttr('disabled');
+        },
+		error: function(err) {
+        	alert('No boards available for platform ' + platform + ' (' + err + ')');
+        	var select = $('<span id="board-select"></span>');
+            $('#board-select').replaceWith(select);
+            $('#whole-form').removeAttr('disabled');
+		}
+    });
 }
