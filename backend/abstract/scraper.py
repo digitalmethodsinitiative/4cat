@@ -11,7 +11,7 @@ from backend.abstract.worker import BasicWorker
 import config
 
 
-class BasicJSONScraper(BasicWorker, metaclass=abc.ABCMeta):
+class BasicHTTPScraper(BasicWorker, metaclass=abc.ABCMeta):
 	"""
 	Abstract JSON scraper class
 
@@ -68,23 +68,19 @@ class BasicJSONScraper(BasicWorker, metaclass=abc.ABCMeta):
 			# because it may indicate that the resource has been deleted
 			self.not_found()
 		else:
-			# parse as JSON
-			try:
-				jsondata = json.loads(data.content)
-			except json.JSONDecodeError as e:
+			data = self.parse(data.content)
+			if data is None:
 				if self.job.data["attempts"] > 2:
-					self.log.warning(
-						"JSON for %s %s unparsable after %i attempts, aborting" % (self.type, id, self.job.data["attempts"]))
-					self.job.finish()
-				else:
-					self.log.info(
-						"JSON for %s %s unparsable, retrying later (%s)" % (self.type, id, e))
+					self.log.info("Data for %s %s could not be parsed, retrying later" % (self.type, id))
 					self.job.release(delay=random.choice(range(15, 45)))  # try again later
-
+				else:
+					self.log.warning("Data for %s %s could not be parsed after %i attempts, aborting" % (
+					self.type, id, self.job.data["attempts"]))
+					self.job.finish()
 				return
 
 			# finally, pass it on
-			self.process(jsondata)
+			self.process(data)
 			self.after_process()
 
 	def after_process(self):
@@ -99,6 +95,17 @@ class BasicJSONScraper(BasicWorker, metaclass=abc.ABCMeta):
 		a 404 response. This does not necessarily indicate failure.
 		"""
 		self.job.finish()
+
+	def parse(self, data):
+		"""
+		Parse incoming data
+
+		Can be overridden to, e.g., parse JSON data
+
+		:param data:  Body of HTTP request
+		:return:  Parsed data
+		"""
+		return data
 
 	@abc.abstractmethod
 	def process(self, data):
@@ -117,3 +124,21 @@ class BasicJSONScraper(BasicWorker, metaclass=abc.ABCMeta):
 		:return string:  URL to scrape
 		"""
 		pass
+
+
+class BasicJSONScraper(BasicHTTPScraper, metaclass=abc.ABCMeta):
+	"""
+	Scraper for JSON-based data
+	"""
+
+	def parse(self, data):
+		"""
+		Parse data as JSON
+
+		:param str data:  Incoming JSON-encoded data
+		:return:  Decoded JSON object
+		"""
+		try:
+			return json.loads(data)
+		except json.JSONDecodeError:
+			return None
