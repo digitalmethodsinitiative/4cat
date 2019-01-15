@@ -9,5 +9,5 @@ from backend.lib.helpers import init_datasource
 # type "4chan-search" if the PLATFORM is "4chan".
 #
 # Likewise, this is the identifier used in the config file to configure what
-# boards are available for this platform (through the SCRAPE_BOARDS setting).
+# boards are available for this platform (through the PLATFORMS setting).
 PLATFORM = "4chan"
