@@ -144,7 +144,7 @@ class WorkerManager:
 
 		# add folders with datasource-specific workers
 		os.chdir(base + "/datasources")
-		datasources = [file[:-1] for file in glob.glob("**/**/")]
+		datasources = [file[:-1] for file in glob.glob("**/**/")] + [file[:-1] for file in glob.glob("**/")]
 		for datasource in datasources:
 			folders.append("datasources/%s" % datasource)
 
@@ -191,9 +191,13 @@ class WorkerManager:
 				importlib.import_module(module)
 				members = inspect.getmembers(sys.modules[module])
 				for member in members:
-					if not inspect.isclass(member[1]) or not issubclass(member[1], BasicWorker) or inspect.isabstract(
+					if member[0][0:2] == "__" or not inspect.isclass(member[1]) or not issubclass(member[1], BasicWorker) or inspect.isabstract(
 							member[1]):
 						# is not a valid worker definition
+						continue
+
+					if member[1].type in self.worker_map:
+						# already mapped
 						continue
 
 					# save to worker map
@@ -203,7 +207,7 @@ class WorkerManager:
 						"jobtype": member[1].type,
 						"class": member[1]
 					}
-					self.log.debug("Adding worker type %s" % member[0])
+					self.log.info("Adding worker type %s" % member[0])
 					self.worker_map[member[1].type] = worker
 
 	def validate_datasources(self):
