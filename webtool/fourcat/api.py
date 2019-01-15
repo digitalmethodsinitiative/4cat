@@ -54,8 +54,8 @@ def api_status():
 	queue = JobQueue(logger=log, database=db)
 	jobs = queue.get_all_jobs()
 	jobs_count = len(jobs)
-	jobs_types = set([job["jobtype"] for job in jobs])
-	jobs_sorted = {jobtype: len([job for job in jobs if job["jobtype"] == jobtype]) for jobtype in jobs_types}
+	jobs_types = set([job.data["jobtype"] for job in jobs])
+	jobs_sorted = {jobtype: len([job for job in jobs if job.data["jobtype"] == jobtype]) for jobtype in jobs_types}
 	jobs_sorted["total"] = jobs_count
 
 	# determine if backend is live by checking if the process is running
