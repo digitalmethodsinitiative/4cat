@@ -80,7 +80,7 @@ for conf in confs:
 			continue
 
 		definition = source[1]
-		index = """\nindex %s : 4cat_index {\n	source = %s\n	path = %s\n}""" % (index_name, name, config.SPHINX_PATH + "/" + index_name)
+		index = """\nindex %s : 4cat_index {\n	type = plain\n	source = %s\n	path = %s\n}""" % (index_name, name, config.SPHINX_PATH + "/" + index_name)
 		indexes.append(index)
 
 # write results to file
