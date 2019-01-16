@@ -5,7 +5,7 @@ import re
 
 from csv import DictReader
 
-from backend.lib.postprocessor import BasicPostProcessor
+from backend.abstract.postprocessor import BasicPostProcessor
 
 
 class QuoteNetworkGrapher(BasicPostProcessor):

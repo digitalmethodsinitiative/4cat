@@ -1,7 +1,7 @@
 <h3 class="blocktitle"><span><a href="/results/{{ query.key }}/">Query{% if query.query != "query" %}: {{ query.query }}{% endif %}</a></span></h3>
 
 <p class="result">
-    <span class="property-badge">/{{ query.parameters.board }}/</span>
+    <span class="property-badge">{{ query.parameters.platform if "platform" in query.parameters else "4chan" }}/{{ query.parameters.board }}/</span>
 {% if query.parameters.body_query and query.parameters.body_query != "empty" %}
     <span class="inline-label">body:</span> <span class="inline-query">{{ query.parameters.body_query }}</span>
 {% endif %}

@@ -24,12 +24,13 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
 	max_workers = 1  # max amount of workers of this type
 
 	queue = None
+	job = None
 	log = None
 	manager = None
 	looping = True
 	loop_time = 0
 
-	def __init__(self, logger, db=None, queue=None, manager=None):
+	def __init__(self, logger, job, db=None, queue=None, manager=None):
 		"""
 		Basic init, just make sure our thread name is meaningful
 
@@ -41,15 +42,10 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
 		self.name = self.type
 		self.log = logger
 		self.manager = manager
+		self.job = job
 
 		self.db = Database(logger=self.log) if not db else db
 		self.queue = JobQueue(logger=self.log, database=self.db) if not queue else queue
-
-	def abort(self):
-		"""
-		Stop the work loop, and end the thread.
-		"""
-		self.looping = False
 
 	def run(self):
 		"""
@@ -57,19 +53,22 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
 
 		This simply calls the work method continually, with a pause in-between calls.
 		"""
-		while self.looping:
-			self.loop_time = int(time.time())
+		try:
+			self.work()
+		except Exception as e:
+			frames = traceback.extract_tb(e.__traceback__)
+			frames = [frame.filename.split("/").pop() + ":" + str(frame.lineno) for frame in frames]
+			location = "->".join(frames)
+			self.log.error("Worker %s raised exception %s and will abort: %s at %s" % (self.type, e.__class__.__name__, e, location))
+			self.abort()
 
-			try:
-				self.work()
-			except Exception as e:
-				frames = traceback.extract_tb(e.__traceback__)
-				frames = [frame.filename.split("/").pop() + ":" + str(frame.lineno) for frame in frames]
-				location = "->".join(frames)
-				self.log.error("Worker %s raised exception %s and will abort: %s at %s" % (self.type, e.__class__.__name__, e, location))
-				self.abort()
+	def abort(self):
+		"""
+		Called when the application shuts down
 
-			time.sleep(self.pause)
+		Can be used to stop loops, for looping workers.
+		"""
+		pass
 
 	@abc.abstractmethod
 	def work(self):

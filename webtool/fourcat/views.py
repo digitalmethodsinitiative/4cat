@@ -11,13 +11,13 @@ from fourcat import app, db, queue
 from fourcat.helpers import Pagination, string_to_timestamp, load_postprocessors, get_available_postprocessors
 
 from backend.lib.query import SearchQuery
-from backend.lib.queue import JobAlreadyExistsException
+from backend.lib.exceptions import JobAlreadyExistsException
 
 from stop_words import get_stop_words
 
 """
 
-Main views for the 4CAT front-end
+Main vn views for the 4CAT front-end
 
 """
 
@@ -30,12 +30,24 @@ def _jinja2_filter_datetime(date, fmt=None):
 
 
 @app.route('/')
+@app.route('/tool/')
 @login_required
 def show_index():
 	"""
 	Index page: main tool frontend
 	"""
-	return render_template('tool.html', boards=config.SCRAPE_BOARDS)
+	return render_template('tool.html', boards=config.PLATFORMS)
+
+
+@app.route('/get-boards/<string:platform>/')
+@login_required
+def getboards(platform):
+	if platform not in config.PLATFORMS or "boards" not in config.PLATFORMS[platform]:
+		result = False
+	else:
+		result = config.PLATFORMS[platform]["boards"]
+
+	return jsonify(result)
 
 
 @app.route('/page/<string:page>/')
@@ -76,6 +88,7 @@ def string_query():
 
 	parameters = {
 		"board": request.form.get("board", ""),
+		"platform": request.form.get("platform", ""),
 		"body_query": request.form.get("body_query", ""),
 		"subject_query": request.form.get("subject_query", ""),
 		"full_thread": (request.form.get("full_threads", "no") != "no"),
@@ -98,7 +111,7 @@ def string_query():
 	query = SearchQuery(parameters=parameters, db=db)
 
 	try:
-		queue.add_job(jobtype="query", remote_id=query.key)
+		queue.add_job(jobtype="%s-search" % parameters["platform"], remote_id=query.key)
 	except JobAlreadyExistsException:
 		pass
 
@@ -303,7 +316,6 @@ def check_postprocessor():
 					query = queue.get_job_by_id(key[3:])
 					type = "job"
 				except ValueError:
-					print("OH")
 					query = SearchQuery(job=key[3:], db=db)
 			else:
 				query = SearchQuery(key=key, db=db)
@@ -374,8 +386,14 @@ def validateQuery(parameters):
 			return "The first date is later than or the same as the second."
 
 	# Ensure the board is correct
-	if parameters["board"] not in config.SCRAPE_BOARDS:
-		return "Invalid board: %s" % parameters["board"]
+	if "platform" not in parameters or "board" not in parameters:
+		return "Please provide a board to search"
+
+	if parameters["platform"] not in config.PLATFORMS:
+		return "Please choose a valid platform to search"
+
+	if parameters["board"] not in config.PLATFORMS[parameters["platform"]]["boards"]:
+		return "Please choose a valid board for querying"
 
 	# Keyword-dense thread length should be at least thirty.
 	if parameters["dense_length"] > 0 and parameters["dense_length"] < 10:

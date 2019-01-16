@@ -52,11 +52,11 @@ class Logger:
 		self.previous_report = time.time()
 
 		self.logger = logging.getLogger("4cat-backend")
-		self.logger.setLevel(logging.DEBUG)
+		self.logger.setLevel(logging.INFO)
 
 		# this handler manages the text log files
 		handler = RotatingFileHandler(self.log_path, maxBytes=(25 * 1024 * 1024), backupCount=1)
-		handler.setLevel(logging.INFO)
+		handler.setLevel(logging.DEBUG)
 		handler.setFormatter(logging.Formatter("%(asctime)-15s | %(levelname)s %(message)s",
 											   "%d-%m-%Y %H:%M:%S"))
 

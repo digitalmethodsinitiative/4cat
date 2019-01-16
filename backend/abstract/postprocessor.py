@@ -1,11 +1,9 @@
 """
 Basic post-processor worker - should be inherited by workers to post-process results
 """
-import time
 import abc
 
-from backend.lib.worker import BasicWorker
-from backend.lib.queue import JobClaimedException
+from backend.abstract.worker import BasicWorker
 from backend.lib.query import SearchQuery
 
 
@@ -32,7 +30,6 @@ class BasicPostProcessor(BasicWorker, metaclass=abc.ABCMeta):
 		Set up database connection - we need one to store the thread data
 		"""
 		super().__init__(db=db, logger=logger, manager=manager)
-		self.job = {}
 
 	def work(self):
 		"""
@@ -42,35 +39,20 @@ class BasicPostProcessor(BasicWorker, metaclass=abc.ABCMeta):
 		is then requested and parsed. If that went well, the parsed data is passed on to the
 		processor.
 		"""
-		job = self.queue.get_job(self.type)
-		if not job:
-			self.log.debug("Post-processor (%s) has no jobs, sleeping for 10 seconds" % self.type)
-			time.sleep(10)
-			return
-
-		# claim the job - this is needed so multiple workers don't do the same job
-		self.job = job
-
-		try:
-			self.queue.claim_job(job)
-		except JobClaimedException:
-			# too bad, so sad
-			return
-
-		self.log.info("Running post-processor %s on query %s" % (self.type, job["remote_id"]))
-		self.parent = SearchQuery(key=job["remote_id"], db=self.db)
+		self.log.info("Running post-processor %s on query %s" % (self.type, self.job.data["remote_id"]))
+		self.parent = SearchQuery(key=self.job.data["remote_id"], db=self.db)
 		self.source_file = self.parent.get_results_path()
 
 		# create new query, for the result of this process
 		params = {
 			"type": self.type,
 			"parent": self.parent.key,
-			"job": job["id"]
+			"job": self.job.data["id"]
 		}
 
 		if self.job["details"]:
-			for field in self.job["details"]:
-				params[field] = self.job["details"][field]
+			for field in self.job.details:
+				params[field] = self.job.details[field]
 
 		self.query = SearchQuery(parent=self.parent.key, parameters=params, db=self.db, extension=self.extension)
 
@@ -86,7 +68,7 @@ class BasicPostProcessor(BasicWorker, metaclass=abc.ABCMeta):
 		self.query.update_status("Results processed.")
 		if not self.query.is_finished():
 			self.query.finish()
-		self.queue.finish_job(self.job)
+		self.job.finish()
 
 	@abc.abstractmethod
 	def process(self):

@@ -12,29 +12,25 @@
                             <div id='filterpanel'>
                                 <div id='buttonselections'>
                                     <span>
-                                        Currently available:
-                                        {% for board in boards %}
-                                            <span class='board-data'>
-                                                <span class='board'> /{{board}}/ </span>
-                                                {% if board == 'pol' %}
-                                                    from 28 Nov. 2013 to 18 Mar. 2018 and 7 Nov 2018 onwards.
-                                                {% endif %}
-                                                {% if board == 'v' %}
-                                                    from 7 Nov 2018 onwards.
-                                                {% endif %}
-                                            </span>
-                                        {% endfor %}
                                         <span> Results are limited to 5 million rows. You can use <a href="/page/query-syntax/">advanced query syntax</a>.</span>
                                     </span>
                                 </div>
                                 <div id='filterinputs'>
                                     <div class='filter-box'>
                                         <div class='filter-box-label'>
+                                            <span>Platform:</span>
+                                        </div>
+                                        <select name="platform" id='platform-select'>
+                                            {% for platform in boards %}
+                                                <option value="{{ platform }}">{{ platform }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class='filter-box'>
+                                        <div class='filter-box-label'>
                                             <span>Board:</span>
                                         </div>
-                                        <select name="board" id='board-select'>
-                                            {% for board in boards %}<option> {{board}}</option>{% endfor %}
-                                        </select>
+                                        <input id="board-select" name="board" value="pol" placeholder="pol">
                                     </div>
                                     <div class='filter-box'>
                                         <div class='filter-box-label'>
