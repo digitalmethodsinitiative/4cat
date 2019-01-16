@@ -3,17 +3,15 @@ Basic scraper worker - should be inherited by workers to scrape specific types o
 """
 import requests
 import random
-import time
 import json
 import abc
 
-from backend.lib.worker import BasicWorker
-from backend.lib.queue import JobClaimedException
+from backend.abstract.worker import BasicWorker
 
 import config
 
 
-class BasicJSONScraper(BasicWorker, metaclass=abc.ABCMeta):
+class BasicHTTPScraper(BasicWorker, metaclass=abc.ABCMeta):
 	"""
 	Abstract JSON scraper class
 
@@ -23,12 +21,12 @@ class BasicJSONScraper(BasicWorker, metaclass=abc.ABCMeta):
 	"""
 	db = None
 
-	def __init__(self, db=None, logger=None, manager=None):
+	def __init__(self, job, db=None, logger=None, manager=None):
 		"""
 		Set up database connection - we need one to store the thread data
 		"""
-		super().__init__(db=db, logger=logger, manager=manager)
-		self.job = {}
+		super().__init__(db=db, logger=logger, manager=manager, job=job)
+		self.prefix = self.type.split("-")[0]
 
 	def work(self):
 		"""
@@ -38,20 +36,6 @@ class BasicJSONScraper(BasicWorker, metaclass=abc.ABCMeta):
 		is then requested and parsed. If that went well, the parsed data is passed on to the
 		processor.
 		"""
-		job = self.queue.get_job(self.type)
-		if not job:
-			self.log.debug("Scraper (%s) has no jobs, sleeping for 10 seconds" % self.type)
-			time.sleep(10)
-			return
-
-		# claim the job - this is needed so multiple workers don't do the same job
-		self.job = job
-
-		try:
-			self.queue.claim_job(job)
-		except JobClaimedException:
-			# too bad, so sad
-			return
 
 		# request URL
 		url = self.get_url()
@@ -66,58 +50,65 @@ class BasicJSONScraper(BasicWorker, metaclass=abc.ABCMeta):
 			# do the request!
 			data = requests.get(url, timeout=config.SCRAPE_TIMEOUT, proxies=proxies)
 		except (requests.exceptions.RequestException, ConnectionRefusedError) as e:
-			if job["attempts"] > 2:
-				self.queue.finish_job(job)
+			if self.job.data["attempts"] > 2:
+				self.job.finish()
 				self.log.error("Could not finish request for %s (%s), cancelling job" % (url, e))
 			else:
-				self.queue.release_job(job, delay=10)  # try again in 10 seconds
+				self.job.release(delay=10)
 				self.log.info("Could not finish request for %s (%s), releasing job" % (url, e))
 			return
 
-		if job["details"] and "board" in job["details"]:
-			id = job["details"]["board"] + "/" + job["remote_id"]
+		if "board" in self.job.details:
+			id = self.job.details["board"] + "/" + self.job.data["remote_id"]
 		else:
-			id = job["remote_id"]
+			id = self.job.data["remote_id"]
 
 		if data.status_code == 404:
 			# this should be handled differently from an actually erroneous response
 			# because it may indicate that the resource has been deleted
 			self.not_found()
 		else:
-			# parse as JSON
-			try:
-				jsondata = json.loads(data.content)
-			except json.JSONDecodeError as e:
-				if self.job["attempts"] > 2:
-					self.log.warning(
-						"JSON for %s %s unparsable after %i attempts, aborting" % (self.type, id, job["attempts"]))
-					self.queue.finish_job(job)
+			data = self.parse(data.content)
+			if data is None:
+				if self.job.data["attempts"] > 2:
+					self.log.info("Data for %s %s could not be parsed, retrying later" % (self.type, id))
+					self.job.release(delay=random.choice(range(15, 45)))  # try again later
 				else:
-					self.log.info(
-						"JSON for %s %s unparsable, retrying later (%s)" % (self.type, id, e))
-					self.queue.release_job(job, delay=random.choice(range(15, 45)))  # try again later
-
+					self.log.warning("Data for %s %s could not be parsed after %i attempts, aborting" % (
+					self.type, id, self.job.data["attempts"]))
+					self.job.finish()
 				return
 
 			# finally, pass it on
-			self.process(jsondata, job)
+			self.process(data)
 			self.after_process()
 
 	def after_process(self):
 		"""
 		After processing, declare job finished
 		"""
-		self.queue.finish_job(self.job)
+		self.job.finish()
 
 	def not_found(self):
 		"""
 		Called if the job could not be completed because the request returned
 		a 404 response. This does not necessarily indicate failure.
 		"""
-		self.queue.finish_job(self.job)
+		self.job.finish()
+
+	def parse(self, data):
+		"""
+		Parse incoming data
+
+		Can be overridden to, e.g., parse JSON data
+
+		:param data:  Body of HTTP request
+		:return:  Parsed data
+		"""
+		return data
 
 	@abc.abstractmethod
-	def process(self, data, job):
+	def process(self, data):
 		"""
 		Process scraped data
 
@@ -133,3 +124,21 @@ class BasicJSONScraper(BasicWorker, metaclass=abc.ABCMeta):
 		:return string:  URL to scrape
 		"""
 		pass
+
+
+class BasicJSONScraper(BasicHTTPScraper, metaclass=abc.ABCMeta):
+	"""
+	Scraper for JSON-based data
+	"""
+
+	def parse(self, data):
+		"""
+		Parse data as JSON
+
+		:param str data:  Incoming JSON-encoded data
+		:return:  Decoded JSON object
+		"""
+		try:
+			return json.loads(data)
+		except json.JSONDecodeError:
+			return None

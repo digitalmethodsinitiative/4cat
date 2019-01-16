@@ -13,7 +13,7 @@ import re
 from math import ceil
 from fourcat import queue
 
-from backend.lib.postprocessor import BasicPostProcessor
+from backend.abstract.postprocessor import BasicPostProcessor
 
 class Pagination(object):
 	"""

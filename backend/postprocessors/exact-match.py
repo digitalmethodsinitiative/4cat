@@ -1,9 +1,9 @@
 """
 Exact match filter
 """
-from csv import DictReader, DictWriter
+from csv import DictReader
 
-from backend.lib.postprocessor import BasicPostProcessor
+from backend.abstract.postprocessor import BasicPostProcessor
 from backend.lib.query import SearchQuery
 
 class ExactMatcher(BasicPostProcessor):

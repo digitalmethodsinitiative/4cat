@@ -4,9 +4,9 @@ Extract most-used images from corpus
 import hashlib
 import base64
 
-from csv import DictReader, DictWriter
+from csv import DictReader
 
-from backend.lib.postprocessor import BasicPostProcessor
+from backend.abstract.postprocessor import BasicPostProcessor
 
 
 class TopImageCounter(BasicPostProcessor):

@@ -93,7 +93,7 @@ def process_post(post, db, sequence, threads, board):
 
 		# only update database if something actually changed
 		if updates != {}:
-			db.update("threads", where={"id": thread["id"]}, data=updates, commit=False)
+			db.update("4chan_threads", where={"id": thread["id"]}, data=updates, commit=False)
 			threads[post_thread] = {**thread, **updates}
 
 	else:
@@ -108,7 +108,7 @@ def process_post(post, db, sequence, threads, board):
 			"index_positions": ""
 		}
 
-		db.insert("threads", data=thread_data, commit=False)
+		db.insert("4chan_threads", data=thread_data, commit=False)
 		threads[post_thread] = thread_data
 
 	# add post to database
@@ -143,14 +143,14 @@ def process_post(post, db, sequence, threads, board):
 	if len(post_buffer) % batch_size == 0:
 		print("Committing posts %i-%i to database" % (posts_added - batch_size, posts_added))
 		try:
-			db.execute_many("INSERT INTO posts (" + post_fields_sql + ") VALUES %s", post_buffer)
+			db.execute_many("INSERT INTO 4chan_posts (" + post_fields_sql + ") VALUES %s", post_buffer)
 		except psycopg2.IntegrityError as e:
 			# print(repr(post_buffer))
 			print(repr(e))
 			print(e)
 			sys.exit(1)
 
-		db.execute_many("INSERT INTO posts_mention (post_id, mentioned_id) VALUES %s ON CONFLICT DO NOTHING", mentioned_posts)
+		db.execute_many("INSERT INTO 4chan_posts_mention (post_id, mentioned_id) VALUES %s ON CONFLICT DO NOTHING", mentioned_posts)
 		db.commit()
 		post_buffer = []
 		mentioned_posts = []

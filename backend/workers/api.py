@@ -3,7 +3,7 @@ import time
 import json
 
 import config
-from backend.lib.worker import BasicWorker
+from backend.abstract.worker import BasicWorker
 
 
 class InternalAPI(BasicWorker):
@@ -11,7 +11,6 @@ class InternalAPI(BasicWorker):
 	Offer a local server that listens on a port for API calls and answers them
 	"""
 	type = "api"
-	pause = 0
 	max_workers = 1
 
 	port = config.API_PORT
@@ -49,8 +48,8 @@ class InternalAPI(BasicWorker):
 				break
 			except OSError as e:
 				if has_time and self.looping:
-					self.manager.log.info("Could not open port %i yet (%s), retrying in 5 seconds" % (self.port, e))
-					time.sleep(5.0)  # wait a few seconds before retrying
+					self.manager.log.info("Could not open port %i yet (%s), retrying in 10 seconds" % (self.port, e))
+					time.sleep(10.0)  # wait a few seconds before retrying
 					continue
 				self.manager.log.error("Port %s is already in use! Local API not available." % self.port)
 				return
@@ -144,11 +143,8 @@ class InternalAPI(BasicWorker):
 		if request == "workers":
 			# return the number of workers, sorted by type
 			workers = {}
-			for worker in self.manager.pool:
-				type = worker.__class__.__name__
-				if type not in workers:
-					workers[type] = 0
-				workers[type] += 1
+			for jobtype in self.manager.worker_pool:
+				workers[jobtype] = len(self.manager.worker_pool[jobtype])
 
 			workers["total"] = sum([workers[workertype] for workertype in workers])
 
@@ -241,6 +237,12 @@ class InternalAPI(BasicWorker):
 
 		# no appropriate response
 		return False
+
+	def abort(self):
+		"""
+		Stop main loop
+		"""
+		self.looping = False
 
 
 class InternalAPIException(Exception):

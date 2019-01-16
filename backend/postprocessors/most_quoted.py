@@ -5,7 +5,7 @@ import re
 
 from csv import DictReader, DictWriter
 
-from backend.lib.postprocessor import BasicPostProcessor
+from backend.abstract.postprocessor import BasicPostProcessor
 
 
 class QuoteRanker(BasicPostProcessor):

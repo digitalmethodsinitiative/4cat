@@ -16,6 +16,7 @@
 # actual files that are part of 4CAT but should not be included
 config.py
 deploy.sh
+backend/extras/sphinx.conf
 webtool/venv/
 webtool/fourcat/js/jquery-csv-master/.gitattributes
 webtool/fourcat/js/jquery-csv-master/.gitignore
@@ -26,3 +27,4 @@ webtool/fourcat/static/data/word_embeddings/
 fourcat.egg-info/
 data/
 4cat.log.1
+webtool/fourcat/static/boards.json
