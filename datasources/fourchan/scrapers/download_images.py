@@ -30,7 +30,7 @@ class ImageDownloader(BasicWorker):
 		:return:
 		"""
 		try:
-			url = "http://i.4cdn.org/%s/%s%s" % (self.job.details["board"], self.job.details["details"]["tim"], self.job.details["ext"])
+			url = "http://i.4cdn.org/%s/%s%s" % (self.job.details["board"], self.job.details["tim"], self.job.details["ext"])
 			image = requests.get(url, timeout=config.SCRAPE_TIMEOUT * 3)
 		except (requests.exceptions.RequestException, ConnectionRefusedError) as e:
 			# something wrong with our internet connection? or blocked by 4chan?
