@@ -30,7 +30,7 @@ class ThreadScraper4chan(BasicJSONScraper):
 	8chan scraper.
 	"""
 	type = "4chan-thread"
-	max_workers = 1
+	max_workers = 4
 
 	# for new posts, any fields not in here will be saved in the "unsorted_data" column for that post as part of a
 	# JSONified dict
