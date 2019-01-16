@@ -11,7 +11,7 @@ from backend.lib.helpers import get_absolute_folder
 # check if we can run a daemon
 if os.name not in ("posix", "mac"):
 	# if not, run the backend directly and quit
-	print("Using 'backend.py' to run the 4CAT backend is only supported on UNIX-like systems.")
+	print("Using '%s' to run the 4CAT backend is only supported on UNIX-like systems." % __file__)
 	print("Running backend in terminal instead.")
 	bootstrap.run(as_daemon=False)
 	sys.exit(0)
