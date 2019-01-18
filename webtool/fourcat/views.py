@@ -11,7 +11,8 @@ from fourcat import app, db, queue
 from fourcat.helpers import Pagination, string_to_timestamp, load_postprocessors, get_available_postprocessors
 
 from backend.lib.query import SearchQuery
-from backend.lib.exceptions import JobAlreadyExistsException
+from backend.lib.job import Job
+from backend.lib.exceptions import JobAlreadyExistsException, JobNotFoundException
 
 from stop_words import get_stop_words
 
@@ -245,14 +246,14 @@ def show_result(key):
 	# the UI
 	available_postprocessors = unfinished_postprocessors.copy()
 	for job in analyses["queued"]:
-		if job["jobtype"] in unfinished_postprocessors:
-			del available_postprocessors[job["jobtype"]]
+		if job.data["jobtype"] in unfinished_postprocessors:
+			del available_postprocessors[job.data["jobtype"]]
 			is_postprocessor_running = True
 
-			if job["claimed"] == 0:
+			if job.data["timestamp_claimed"] == 0:
 				filtered_subqueries.append({
-					"key": "job%s" % job["id"],
-					"postprocessor": processors[job["jobtype"]],
+					"key": "job%s" % job.data["id"],
+					"postprocessor": processors[job.data["jobtype"]],
 					"is_finished": False,
 					"status": ""
 				})
@@ -307,21 +308,22 @@ def check_postprocessor():
 		abort(404)
 
 	subqueries = []
-	type = "query"
 
 	for key in keys:
+		type = "query"
 		try:
 			if key[0:3] == "job" and len(key) > 3:
 				try:
-					query = queue.get_job_by_id(key[3:])
+					query = Job.get_by_ID(key[3:], database=db)
 					type = "job"
-				except ValueError:
+				except (ValueError, JobNotFoundException):
 					query = SearchQuery(job=key[3:], db=db)
 			else:
 				query = SearchQuery(key=key, db=db)
 				if query.data["key_parent"] == "":
 					continue
-		except (TypeError, ValueError):
+		except (TypeError, ValueError) as e:
+			print(e)
 			continue
 
 		processors = load_postprocessors()
@@ -339,14 +341,14 @@ def check_postprocessor():
 			})
 		else:
 			subquery = {
-				"key": "job%s" % query["id"],
+				"key": "job%s" % query.data["id"],
 				"is_finished": False,
-				"postprocessor": processors[query["jobtype"]],
+				"postprocessor": processors[query.data["jobtype"]],
 				"status": ""
 			}
 			subqueries.append({
-				"key": "job%s" % query["id"],
-				"job": query["id"],
+				"key": "job%s" % query.data["id"],
+				"job": query.data["id"],
 				"finished": False,
 				"html": render_template("result-subquery.html", subquery=subquery)
 			})

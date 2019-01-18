@@ -25,11 +25,11 @@ class BasicPostProcessor(BasicWorker, metaclass=abc.ABCMeta):
 	description = "No description available"
 	extension = "csv"
 
-	def __init__(self, db=None, logger=None, manager=None):
+	def __init__(self, db=None, logger=None, manager=None, job=job):
 		"""
 		Set up database connection - we need one to store the thread data
 		"""
-		super().__init__(db=db, logger=logger, manager=manager)
+		super().__init__(db=db, logger=logger, manager=manager, job=job)
 
 	def work(self):
 		"""
@@ -50,7 +50,7 @@ class BasicPostProcessor(BasicWorker, metaclass=abc.ABCMeta):
 			"job": self.job.data["id"]
 		}
 
-		if self.job["details"]:
+		if self.job.details:
 			for field in self.job.details:
 				params[field] = self.job.details[field]
 

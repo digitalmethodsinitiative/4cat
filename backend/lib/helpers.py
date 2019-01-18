@@ -7,7 +7,7 @@ import os
 
 import config
 
-def get_absolute_folder(folder):
+def get_absolute_folder(folder=""):
 	"""
 	Get absolute path to a folder
 
