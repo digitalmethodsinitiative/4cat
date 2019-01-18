@@ -228,8 +228,9 @@ class WorkerManager:
 			if datasource + "-board" not in self.worker_map:
 				self.log.warning("No board scraper defined for datasource %s." % datasource)
 
-	def abort(self):
+	def abort(self, signal, stack):
 		"""
 		Stop looping the delegator and prepare for shutdown
 		"""
+		self.log.info("Received SIGTERM")
 		self.looping = False
