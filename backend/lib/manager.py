@@ -24,7 +24,7 @@ class WorkerManager:
 
 	worker_map = {}
 	worker_pool = {}
-	datasources = []
+	datasources = {}
 	pool = []
 	looping = True
 
@@ -45,13 +45,17 @@ class WorkerManager:
 			# listen for input if running interactively
 			self.key_poller = KeyPoller(manager=self)
 			self.key_poller.start()
+		else:
+			signal.signal(signal.SIGTERM, self.abort)
 
-		signal.signal(signal.SIGTERM, self.abort)
 		self.load_workers()
 		self.validate_datasources()
 
 		# queue a job for the api handler so it will be run
 		self.queue.add_job("api", remote_id="localhost")
+
+		# queue corpus stats generator for a daily run
+		self.queue.add_job("corpus-stats", remote_id="localhost", interval=86400)
 
 		# it's time
 		self.loop()
@@ -162,17 +166,20 @@ class WorkerManager:
 					datasource = folder.split("datasources/")[1].split("/")[0]
 					if datasource not in self.datasources:
 						self.log.info("(Startup) Registered data source %s" % datasource)
-						self.datasources.append(datasource)
 						datamodule = "datasources." + folder.replace(base, "")[12:].split("/")[0]
 
 						importlib.import_module(datamodule)
 
 						# initialize datasource
+						datasource_id = datasource
 						if hasattr(sys.modules[datamodule], "init_datasource") and hasattr(sys.modules[datamodule], "PLATFORM"):
 							self.log.debug("Initializing datasource %s" % datasource)
+							datasource_id = sys.modules[datamodule].PLATFORM
 							sys.modules[datamodule].init_datasource(logger=self.log, database=self.db, queue=self.queue, name=sys.modules[datamodule].PLATFORM)
 						else:
 							self.log.error("Datasource %s is lacking init_datasource or PLATFORM in __init__.py" % datasource)
+
+						self.datasources[datasource_id] = datasource
 
 					module = folder.replace(base, "").replace("/", ".") + "." + file[2:-3]
 					if module in sys.modules:
