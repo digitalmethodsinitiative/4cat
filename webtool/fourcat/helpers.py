@@ -154,7 +154,7 @@ def get_available_postprocessors(query):
 			del available[details["type"]]
 
 	for job in analyses["queued"]:
-		if job["jobtype"] in available:
-			del available[job["jobtype"]]
+		if job.data["jobtype"] in available:
+			del available[job.data["jobtype"]]
 
 	return available
