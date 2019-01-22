@@ -5,7 +5,7 @@ it as follows:
 
 ### MLA
 
-Peeters, Stijn and Sal Hagen. "4CAT: Capture and Analysis Toolkit" *Computer software. Vers.* 0.5 (2015).
+Peeters, Stijn and Sal Hagen. "4CAT: Capture and Analysis Toolkit" *Computer software. Vers.* 0.5 (2018).
 
 ### BibTeX
 
