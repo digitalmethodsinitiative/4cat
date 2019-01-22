@@ -1,125 +1,246 @@
 """
-Imports 4plebs database dumps
+Import 4chan data from 4plebs data dumps
 """
-import sqlite3
+import argparse
+import psycopg2
+import json
+import time
 import sys
+import csv
+import re
 import os
 
-sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)) + "/..")
-from csv import DictReader
-from lib.logger import Logger
-from lib.database import Database
-from lib.import_helpers import FourPlebs, process_post
+sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)) + "/../..")
+from backend.lib.database import Database
+from backend.lib.logger import Logger
 
-#
-# Interpret and validate command line arguments
-#
-skip = 0
-for i in range(0, len(sys.argv)):
-	if sys.argv[i][:7] == "--skip=":
-		skip = int(sys.argv[i][7:])
-		del sys.argv[i]
-		break
 
-# show manual if needed
-if len(sys.argv) < 2 or not os.path.isfile(sys.argv[1]):
-	print("Please provide a file to import.")
-	print()
-	print("Usage: python3 importDump.py [--skip=n] <sourcefile> [boardname]")
-	print("Where sourcefile is either:")
-	print("- a path to a 4plebs CSV dump")
-	print("- a path to an SQLite database with a 'posts' table with columns matching the")
-	print("  columns in the 4plebs dumps")
-	print("And boardname is the name of the board contained within. If boardname is")
-	print("omitted, the first word in the file name is used as the board name (e.g. pol for")
-	print("pol.dump.csv)")
-	print()
-	print("Arguments:")
-	print("--skip=n    : skip first n posts")
-	print()
+class FourPlebs(csv.Dialect):
+	"""
+	CSV Dialect as used in 4plebs database dumps - to be used with Python CSV functions
+	"""
+	delimiter = ","
+	doublequote = False
+	escapechar = "\\"
+	lineterminator = "\n"
+	quotechar = '"'
+	quoting = csv.QUOTE_ALL
+	skipinitialspace = False
+	strict = True
+
+	columns = ["num", "subnum", "thread_num", "op", "timestamp", "timestamp_expired", "preview_orig", "preview_w",
+			   "preview_h", "media_filename", "media_w", "media_h", "media_size", "media_hash", "media_orig", "spoiler",
+			   "deleted", "capcode", "email", "name", "trip", "title", "comment", "sticky", "locked", "poster_hash",
+			   "poster_country", "exif"]
+
+
+def sanitize(post):
+	"""
+	Sanitize post data
+
+	:param dict post:  Post data, from a DictReader
+	:return dict:  Post data, but cleaned and sanitized
+	"""
+	if isinstance(post, dict):
+		return {key: sanitize(post[key]) for key in post}
+	else:
+		if isinstance(post, str):
+			post = post.strip()
+			post = post.replace("\\\\", "\\")
+
+		if post == "N":
+			post = ""
+
+		return post
+
+
+def commit(posts, mentions, post_fields, db, platform, fast=False):
+	if fast:
+		post_fields_sql = ", ".join(post_fields)
+		try:
+			db.execute_many("INSERT INTO posts_" + platform + " (" + post_fields_sql + ") VALUES %s", posts)
+			db.commit()
+		except psycopg2.IntegrityError as e:
+			print(repr(e))
+			print(e)
+			sys.exit(1)
+
+		db.execute_many(
+			"INSERT INTO posts_mention_" + platform + " (post_id, mentioned_id) VALUES %s ON CONFLICT DO NOTHING",
+			mentions)
+	else:
+		db.execute("START TRANSACTION")
+		for post in posts:
+			db.insert("posts_" + platform, data={post_fields[i]: post[i] for i in range(0, len(post))}, safe=True, commit=False)
+		db.commit()
+
+		db.execute("START TRANSACTION")
+		for mention in mentions:
+			db.insert("posts_mention_" + platform, data={"post_id": mention[0], "mentioned_id": mention[1]}, safe=True, commit=False)
+		db.commit()
+
+
+# set up
+platform = "temp"
+link_regex = re.compile(">>([0-9]+)")
+post_fields = ("id", "timestamp", "timestamp_deleted", "thread_id", "body", "author",
+			   "author_type_id", "author_trip", "subject", "country_code", "image_file",
+			   "image_4chan", "image_md5", "image_dimensions", "image_filesize",
+			   "semantic_url", "unsorted_data")
+
+# parse parameters
+cli = argparse.ArgumentParser()
+cli.add_argument("-i", "--input", required=True, help="CSV file to read from - should be a 4plebs data dump")
+cli.add_argument("-b", "--board", required=True, help="What board the posts belong to, e.g. 'pol'")
+cli.add_argument("-a", "--batch", type=int, default=1000000,
+				 help="Size of post batches; every so many posts, they are saved to the database")
+cli.add_argument("-s", "--skip", type=int, default=0, help="How many posts to skip")
+cli.add_argument("-e", "--end", type=int, default=sys.maxsize,
+				 help="At which post to stop processing. Starts counting at 0 (so not affected by --skip)")
+cli.add_argument("-f", "--fast", default=False, type=bool,
+				 help="Use batch queries instead of inserting posts individually. This is far faster than 'slow' mode, "
+					  "but will crash if trying to insert a duplicate post, so it should only be used on an empty "
+					  "database or when you're sure datasets don't overlap.")
+args = cli.parse_args()
+
+if not os.path.exists(args.input):
+	print("File not found: %s" % args.input)
 	sys.exit(1)
 
-sourcefile = sys.argv[1]
-board = sourcefile.split("/").pop().split(".")[0] if len(sys.argv) < 3 else sys.argv[2]
-ext = sourcefile.split(".").pop()
-if ext.lower() not in ["csv", "db"]:
-	print("Source file should be a CSV file or SQlite3 database")
-	sys.exit(1)
-
-print("Importing from: %s" % sourcefile)
-print("Board to be imported: %s" % board)
-if skip > 0:
-	print("Skipping first %i posts." % skip)
-
-#
-# Init database - we need the thread data to know whether to insert a new thread for a post
-#
 db = Database(logger=Logger())
-threads = {thread["id"]: thread for thread in
-		   db.fetchall("SELECT id, timestamp, timestamp_modified, post_last FROM 4chan_threads")}
 
-#
-# Start importing posts
-#
-if ext.lower() == "csv":
-	# import from CSV dump
-	posts_added = 0
+print("Opening %s." % args.input)
+if args.skip > 0:
+	print("Skipping %i posts." % args.skip)
 
-	db.execute("TRUNCATE TABLE 4chan_posts; TRUNCATE TABLE 4chan_threads; TRUNCATE TABLE 4chan_posts_mention; ALTER SEQUENCE posts_id_seq_seq RESTART; ALTER SEQUENCE threads_id_seq_seq RESTART;")
-	db.commit()
+if args.fast:
+	print("Fast mode enabled.")
 
-	with open(sourcefile) as csvdump:
-		reader = DictReader(csvdump, fieldnames=FourPlebs.columns, dialect=FourPlebs)
-		for post in reader:
-			post["board"] = board
-			posts_added = process_post(post, db=db, sequence=(skip, posts_added), threads=threads, board=board)
-else:
-	# import from SQLite3 database
-	sqlite = sqlite3.connect(sourcefile)
-	sqlite.row_factory = sqlite3.Row
-	cursor = sqlite.cursor()
+with open(args.input) as inputfile:
+	postscsv = csv.DictReader(inputfile, fieldnames=FourPlebs.columns, dialect=FourPlebs)
 
-	# find table name
-	table = cursor.execute("SELECT * FROM sqlite_master WHERE type = 'table'").fetchone()[1]
+	postbuffer = []
+	threads = {}
+	mentioned_posts = []
+	posts = 0
+	skipped = 0
 
-	posts_added = skip
-	posts = cursor.execute("SELECT * FROM " + table + " LIMIT -1 OFFSET " + str(skip))
-	post = posts.fetchone()
-	while post:
-		posts_added = process_post(post, db=db, sequence=(0, posts_added), threads=threads, board=board)
-		post = posts.fetchone()
+	for csvpost in postscsv:
+		posts += 1
 
-print("Done! Committing final transaction...")
-db.commit()
-print("Done!")
+		if posts < args.skip:
+			continue
 
-#
-# Update thread stats that we can derive ourselves
-#
-print("Updating thread statistics...")
-threads_updated = 0
-for thread in threads:
-	posts = db.fetchone("SELECT COUNT(*) AS num FROM 4chan_posts WHERE thread_id = %s", (thread,))["num"]
-	images = db.fetchone("SELECT COUNT(*) AS num FROM 4chan_posts WHERE image_file != '' AND thread_id = %s", (thread,))[
-		"num"]
-	posts_deleted = \
-		db.fetchone("SELECT COUNT(*) AS num FROM 4chan_posts WHERE thread_id = %s AND timestamp_deleted > 0", (thread,))[
-			"num"]
+		if posts >= args.end:
+			break
 
-	update = {"num_replies": posts, "num_images": images}
+		print("\rPost %s" % posts, end="")
+		if int(csvpost["subnum"]) > 0:
+			# skip ghost posts
+			continue
 
-	# if all posts are deleted, then the thread is deleted - mark thread as such
-	if posts_deleted == posts:
-		last_post = db.fetchone("SELECT MAX(timestamp) as deleted_time FROM 4chan_posts WHERE thread_id = %s", (thread,))
-		update["timestamp_deleted"] = last_post["deleted_time"]
+		post = sanitize(csvpost)
+		if post["thread_num"] not in threads:
+			threads[post["thread_num"]] = {
+				"timestamp": int(time.time()),
+				"timestamp_modified": 0,
+				"timestamp_archived": 0,
+				"is_sticky": 0,
+				"is_closed": 0,
+				"post_last": 0
+			}
 
-	db.update("threads", data={"num_replies": posts, "num_images": images}, where={"id": thread}, commit=False)
+		try:
+			threads[post["thread_num"]]["post_last"] = max(threads[post["thread_num"]]["post_last"], int(post["num"]))
+			threads[post["thread_num"]]["is_sticky"] = max(threads[post["thread_num"]]["is_sticky"],
+														   int(post["sticky"]))
+			threads[post["thread_num"]]["is_closed"] = max(threads[post["thread_num"]]["is_closed"],
+														   1 if post["locked"] != "0" else 0)
+			threads[post["thread_num"]]["timestamp_modified"] = max(threads[post["thread_num"]]["timestamp_modified"],
+																	int(post["timestamp"]))
+			threads[post["thread_num"]]["timestamp_archived"] = max(threads[post["thread_num"]]["timestamp_archived"],
+																	int(post["timestamp_expired"]))
+			threads[post["thread_num"]]["timestamp"] = max(threads[post["thread_num"]]["timestamp"],
+														   int(post["timestamp"]))
+		except ValueError:
+			print(post)
+			sys.exit(1)
 
-	threads_updated += 1
-	if threads_updated % 1000 == 0:
-		print("Updated threads %i-%i of %i" % (threads_updated - 1000, threads_updated, len(threads)))
+		post_id = int(post["num"])
+		postdata = (
+			post["num"],  # id
+			post["timestamp"],  # timestamp
+			post["deleted"] if int(post["deleted"]) > 1 else 0,  # timestamp_deleted
+			post["thread_num"],  # thread_id
+			post["comment"],  # body
+			post["name"],  # author
+			post["capcode"],  # author_type_id
+			post["trip"],  # author_trip
+			post["title"],  # subject
+			post["poster_country"],  # country_code
+			post["media_filename"],  # image_file
+			post["media_orig"],  # image_4chan
+			post["media_hash"],  # image_md5
+			json.dumps({"w": post["media_w"], "h": post["media_h"]}) if post["media_filename"] != "" else "",
+			# image_dimensions
+			post["media_size"],  # image_filesize
+			"",  # semantic_url
+			"{}"  # unsorted_data
+		)
+		postbuffer.append(postdata)
+		# add links to other posts
+		if post["comment"] and isinstance(post["comment"], str):
+			links = re.findall(link_regex, post["comment"])
+			for linked_post in links:
+				if len(str(linked_post)) <= 15:
+					mentioned_posts.append((post["num"], linked_post))
 
-# finalize last bits
-print("Committing changes...")
-db.commit()
-print("Done!")
+		# for speed, we only commit every so many posts
+		if len(postbuffer) % args.batch == 0:
+			print("\nCommitting posts %i-%i to database." % (posts - args.batch, posts))
+			commit(postbuffer, mentioned_posts, post_fields, db, platform, fast=args.fast)
+			postbuffer = []
+			mentioned_posts = []
+
+# commit remainder
+print("\nSkipped %i post IDs that were already known." % skipped)
+print("Committing final posts.")
+commit(postbuffer, mentioned_posts, post_fields, db, platform, fast=args.fast)
+
+# update threads
+print("Updating threads.")
+for thread_id in threads:
+	thread = threads[thread_id]
+
+	thread["id"] = thread_id
+	thread["board"] = args.board
+	thread["timestamp_scraped"] = -1
+	thread["num_unique_ips"] = -1
+	thread["num_replies"] = 0
+	thread["num_images"] = 0
+
+	thread["is_sticky"] = True if thread["is_sticky"] == 1 else False
+	thread["is_closed"] = True if thread["is_closed"] == 1 else False
+	exists = db.fetchone("SELECT * FROM threads_" + platform + " WHERE id = %s", (thread_id,))
+
+	if not exists:
+		db.insert("threads_" + platform, thread)
+
+	else:
+		if thread["timestamp"] < exists["timestamp"]:
+			thread["is_sticky"] = exists["is_sticky"]
+			thread["is_closed"] = exists["is_closed"]
+		thread["post_last"] = max(thread["post_last"], exists["post_last"])
+		thread["timestamp_modified"] = max(thread["timestamp_modified"], exists["timestamp_modified"])
+		thread["timestamp_modified"] = max(thread["timestamp_archived"], exists["timestamp_archived"])
+		thread["timestamp"] = min(thread["timestamp"], exists["timestamp"])
+
+		db.update("threads_" + platform, data=thread, where={"id": thread_id})
+
+print("Updating thread statistics.")
+db.execute(
+	"UPDATE threads_" + platform + " AS t SET num_replies = ( SELECT COUNT(*) FROM posts_" + platform + " AS p WHERE p.thread_id = t.id) WHERE t.id IN %s",
+	(tuple(threads.keys()),))
+db.execute(
+	"UPDATE threads_" + platform + " AS t SET num_images = ( SELECT COUNT(*) FROM posts_" + platform + " AS p WHERE p.thread_id = t.id AND image_file != '') WHERE t.id IN %s",
+	(tuple(threads.keys()),))
