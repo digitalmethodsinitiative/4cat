@@ -84,9 +84,9 @@ def api_status():
 	return jsonify(response)
 
 
-@app.route('/api/<board>/thread/<thread_id>.json')
+@app.route('/api/<platform>/<board>/thread/<thread_id>.json')
 @api_ratelimit
-def api_thread(board, thread_id):
+def api_thread(platform, board, thread_id):
 	"""
 	Emulate 4chan thread.json API endpoint
 
@@ -94,8 +94,11 @@ def api_thread(board, thread_id):
 	:param int thread_id:  Thread ID
 	:return: JSONified thread data
 	"""
-	thread = db.fetchone("SELECT * FROM threads WHERE board = %s AND id = %s", (board, thread_id))
-	response = get_thread(board, thread, db)
+	if platform not in config.PLATFORMS:
+		return jsonify({"error": "Invalid platform"})
+
+	thread = db.fetchone("SELECT * FROM threads_" + platform + " WHERE board = %s AND id = %s", (board, thread_id))
+	response = get_thread(platform, board, thread, db)
 
 	if not response:
 		abort(404)
@@ -103,17 +106,20 @@ def api_thread(board, thread_id):
 		return jsonify(response)
 
 
-@app.route('/api/<board>/threads.json')
+@app.route('/api/<platform>/<board>/threads.json')
 @api_ratelimit
-def api_board(board):
+def api_board(platform, board):
 	"""
 	Emulate 4chan API /[board]/threads.json endpoint
 
 	:param str board:  Board to get index for
 	:return:  JSONified thread index
 	"""
+	if platform not in config.PLATFORMS:
+		return jsonify({"error": "Invalid platform"})
+
 	threads = db.fetchall(
-		"SELECT * FROM threads WHERE board = %s ORDER BY is_sticky DESC, timestamp_modified DESC LIMIT 200", (board,))
+		"SELECT * FROM threads_" + platform + " WHERE board = %s ORDER BY is_sticky DESC, timestamp_modified DESC LIMIT 200", (board,))
 
 	if not threads:
 		abort(404)
@@ -137,9 +143,9 @@ def api_board(board):
 	return jsonify(response)
 
 
-@app.route('/api/<board>/<page>.json')
+@app.route('/api/<platform>/<board>/<page>.json')
 @api_ratelimit
-def api_board_page(board, page):
+def api_board_page(platform, board, page):
 	"""
 	Emulate 4chan API /[board]/[page].json endpoint
 
@@ -147,33 +153,39 @@ def api_board_page(board, page):
 	:param int page:  Page to show
 	:return:  JSONified thread index
 	"""
+	if platform not in config.PLATFORMS:
+		return jsonify({"error": "Invalid platform"})
+
 	limit = "LIMIT 15 OFFSET %i" % ((int(page) - 1) * 15)
 	threads = db.fetchall(
-		"SELECT * FROM threads WHERE board = %s ORDER BY is_sticky DESC, timestamp_modified DESC " + limit, (board,))
+		"SELECT * FROM threads_" + platform + " WHERE board = %s ORDER BY is_sticky DESC, timestamp_modified DESC " + limit, (board,))
 
 	if not threads:
 		abort(404)
 
 	response = {
 		"threads": [
-			get_thread(board, thread, db) for thread in threads
+			get_thread(platform, board, thread, db) for thread in threads
 		]
 	}
 
 	return jsonify(response)
 
 
-@app.route('/api/<board>/catalog.json')
+@app.route('/api/<platform>/<board>/catalog.json')
 @api_ratelimit
-def api_board_catalog(board):
+def api_board_catalog(platform, board):
 	"""
 	Emulate 4chan API /[board]/catalog.json endpoint
 
 	:param str board:  Board to get index for
 	:return:  JSONified thread index
 	"""
+	if platform not in config.PLATFORMS:
+		return jsonify({"error": "Invalid platform"})
+
 	threads = db.fetchall(
-		"SELECT * FROM threads WHERE board = %s ORDER BY is_sticky DESC, timestamp_modified DESC LIMIT 150", (board,))
+		"SELECT * FROM threads_" + platform + " WHERE board = %s ORDER BY is_sticky DESC, timestamp_modified DESC LIMIT 150", (board,))
 
 	if not threads:
 		abort(404)
@@ -186,7 +198,7 @@ def api_board_catalog(board):
 		page_threads = []
 
 		for thread in threads:
-			thread = get_thread(board, thread, db, limit=6)["posts"]
+			thread = get_thread(platform, board, thread, db, limit=6)["posts"]
 			first_post = thread[0]
 			if len(thread) > 1:
 				first_post["last_replies"] = thread[1:6]
@@ -200,28 +212,34 @@ def api_board_catalog(board):
 
 	return jsonify(response)
 
-@app.route('/api/<board>/archive.json')
+@app.route('/api/<platform>/<board>/archive.json')
 @api_ratelimit
-def get_archive(board):
+def get_archive(platform, board):
 	"""
 	Emulate 4chan API /[board]/archive.json endpoint
 
 	:param board: Board to get list of archived thread IDs for
 	:return:  Simple list of thread IDs, oldest first
 	"""
-	threads = db.fetchall("SELECT id FROM threads WHERE board = %s AND timestamp_archived > 0 ORDER BY timestamp_archived ASC", (board,))
+	if platform not in config.PLATFORMS:
+		return jsonify({"error": "Invalid platform"})
+
+	threads = db.fetchall("SELECT id FROM threads_" + platform + " WHERE board = %s AND timestamp_archived > 0 ORDER BY timestamp_archived ASC", (board,))
 	return jsonify([thread["id"] for thread in threads])
 
-@app.route('/api/boards.json')
+@app.route('/api/<platform>/boards.json')
 @api_ratelimit
-def get_boards():
-	boards = db.fetchall("SELECT DISTINCT board FROM threads")
+def get_boards(platform):
+	if platform not in config.PLATFORMS:
+		return jsonify({"error": "Invalid platform"})
+
+	boards = db.fetchall("SELECT DISTINCT board FROM threads_" + platform)
 	return jsonify({"boards": [{"board": board["board"]} for board in boards]})
 
 
-def get_thread(board, thread, db, limit=0):
+def get_thread(platform, board, thread, db, limit=0):
 	limit = "" if not limit or limit <= 0 else " LIMIT %i" % int(limit)
-	posts = db.fetchall("SELECT * FROM posts WHERE thread_id = %s ORDER BY timestamp ASC" + limit, (thread["id"],))
+	posts = db.fetchall("SELECT * FROM posts_" + platform + " WHERE thread_id = %s ORDER BY timestamp ASC" + limit, (thread["id"],))
 	if not posts:
 		return False
 
