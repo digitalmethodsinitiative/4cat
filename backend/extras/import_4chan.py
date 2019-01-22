@@ -81,7 +81,6 @@ def commit(posts, mentions, post_fields, db, platform, fast=False):
 
 
 # set up
-platform = "temp"
 link_regex = re.compile(">>([0-9]+)")
 post_fields = ("id", "timestamp", "timestamp_deleted", "thread_id", "body", "author",
 			   "author_type_id", "author_trip", "subject", "country_code", "image_file",
@@ -97,6 +96,7 @@ cli.add_argument("-a", "--batch", type=int, default=1000000,
 cli.add_argument("-s", "--skip", type=int, default=0, help="How many posts to skip")
 cli.add_argument("-e", "--end", type=int, default=sys.maxsize,
 				 help="At which post to stop processing. Starts counting at 0 (so not affected by --skip)")
+cli.add_argument("-p", "--platform", type=str, default="4chan", help="Platform ID")
 cli.add_argument("-f", "--fast", default=False, type=bool,
 				 help="Use batch queries instead of inserting posts individually. This is far faster than 'slow' mode, "
 					  "but will crash if trying to insert a duplicate post, so it should only be used on an empty "
@@ -198,14 +198,14 @@ with open(args.input) as inputfile:
 		# for speed, we only commit every so many posts
 		if len(postbuffer) % args.batch == 0:
 			print("\nCommitting posts %i-%i to database." % (posts - args.batch, posts))
-			commit(postbuffer, mentioned_posts, post_fields, db, platform, fast=args.fast)
+			commit(postbuffer, mentioned_posts, post_fields, db, args.platform, fast=args.fast)
 			postbuffer = []
 			mentioned_posts = []
 
 # commit remainder
 print("\nSkipped %i post IDs that were already known." % skipped)
 print("Committing final posts.")
-commit(postbuffer, mentioned_posts, post_fields, db, platform, fast=args.fast)
+commit(postbuffer, mentioned_posts, post_fields, db, args.platform, fast=args.fast)
 
 # update threads
 print("Updating threads.")
@@ -221,10 +221,10 @@ for thread_id in threads:
 
 	thread["is_sticky"] = True if thread["is_sticky"] == 1 else False
 	thread["is_closed"] = True if thread["is_closed"] == 1 else False
-	exists = db.fetchone("SELECT * FROM threads_" + platform + " WHERE id = %s", (thread_id,))
+	exists = db.fetchone("SELECT * FROM threads_" + args.platform + " WHERE id = %s", (thread_id,))
 
 	if not exists:
-		db.insert("threads_" + platform, thread)
+		db.insert("threads_" + args.platform, thread)
 
 	else:
 		if thread["timestamp"] < exists["timestamp"]:
@@ -235,12 +235,12 @@ for thread_id in threads:
 		thread["timestamp_modified"] = max(thread["timestamp_archived"], exists["timestamp_archived"])
 		thread["timestamp"] = min(thread["timestamp"], exists["timestamp"])
 
-		db.update("threads_" + platform, data=thread, where={"id": thread_id})
+		db.update("threads_" + args.platform, data=thread, where={"id": thread_id})
 
 print("Updating thread statistics.")
 db.execute(
-	"UPDATE threads_" + platform + " AS t SET num_replies = ( SELECT COUNT(*) FROM posts_" + platform + " AS p WHERE p.thread_id = t.id) WHERE t.id IN %s",
+	"UPDATE threads_" + args.platform + " AS t SET num_replies = ( SELECT COUNT(*) FROM posts_" + args.platform + " AS p WHERE p.thread_id = t.id) WHERE t.id IN %s",
 	(tuple(threads.keys()),))
 db.execute(
-	"UPDATE threads_" + platform + " AS t SET num_images = ( SELECT COUNT(*) FROM posts_" + platform + " AS p WHERE p.thread_id = t.id AND image_file != '') WHERE t.id IN %s",
+	"UPDATE threads_" + args.platform + " AS t SET num_images = ( SELECT COUNT(*) FROM posts_" + args.platform + " AS p WHERE p.thread_id = t.id AND image_file != '') WHERE t.id IN %s",
 	(tuple(threads.keys()),))
