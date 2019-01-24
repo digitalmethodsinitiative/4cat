@@ -75,6 +75,12 @@ class HistogramRenderer(BasicPostProcessor):
 		for m in range(last_month + 1, 13):
 			del months[last_year][m]
 
+		# sort dates
+		months_sorted = {year: months[year] for year in sorted(months.keys())}
+		for year in months_sorted:
+			months_sorted[year] = {month: months_sorted[year][month] for month in sorted(months_sorted[year].keys())}
+		months = months_sorted
+
 		# create histogram
 		self.query.update_status("Drawing histogram")
 
