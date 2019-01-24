@@ -95,7 +95,7 @@ def api_thread(platform, board, thread_id):
 	:return: JSONified thread data
 	"""
 	if platform not in config.PLATFORMS:
-		return jsonify({"error": "Invalid platform", "endpoint": request.url_rule.string})
+		return jsonify({"error": "Invalid platform", "endpoint": request.url_rule.rule})
 
 	thread = db.fetchone("SELECT * FROM threads_" + platform + " WHERE board = %s AND id = %s", (board, thread_id))
 	response = get_thread(platform, board, thread, db)
@@ -116,7 +116,7 @@ def api_board(platform, board):
 	:return:  JSONified thread index
 	"""
 	if platform not in config.PLATFORMS:
-		return jsonify({"error": "Invalid platform", "endpoint": request.url_rule.string})
+		return jsonify({"error": "Invalid platform", "endpoint": request.url_rule.rule})
 
 	threads = db.fetchall(
 		"SELECT * FROM threads_" + platform + " WHERE board = %s ORDER BY is_sticky DESC, timestamp_modified DESC LIMIT 200", (board,))
@@ -154,10 +154,10 @@ def api_board_page(platform, board, page):
 	:return:  JSONified thread index
 	"""
 	if platform not in config.PLATFORMS:
-		return jsonify({"error": "Invalid platform", "endpoint": request.url_rule.string})
+		return jsonify({"error": "Invalid platform", "endpoint": request.url_rule.rule})
 
 	if not isinstance(page, int):
-		return jsonify({"error": "Invalid page number", "endpoint": request.url_rule.string})
+		return jsonify({"error": "Invalid page number", "endpoint": request.url_rule.rule})
 
 	limit = "LIMIT 15 OFFSET %i" % ((int(page) - 1) * 15)
 	threads = db.fetchall(
@@ -185,7 +185,7 @@ def api_board_catalog(platform, board):
 	:return:  JSONified thread index
 	"""
 	if platform not in config.PLATFORMS:
-		return jsonify({"error": "Invalid platform", "endpoint": request.url_rule.string})
+		return jsonify({"error": "Invalid platform", "endpoint": request.url_rule.rule})
 
 	threads = db.fetchall(
 		"SELECT * FROM threads_" + platform + " WHERE board = %s ORDER BY is_sticky DESC, timestamp_modified DESC LIMIT 150", (board,))
@@ -229,7 +229,7 @@ def get_archive(platform, board):
 	:return:  Simple list of thread IDs, oldest first
 	"""
 	if platform not in config.PLATFORMS:
-		return jsonify({"error": "Invalid platform", "endpoint": request.url_rule.string})
+		return jsonify({"error": "Invalid platform", "endpoint": request.url_rule.rule})
 
 	threads = db.fetchall("SELECT id FROM threads_" + platform + " WHERE board = %s AND timestamp_archived > 0 ORDER BY timestamp_archived ASC", (board,))
 	return jsonify([thread["id"] for thread in threads])
@@ -238,7 +238,7 @@ def get_archive(platform, board):
 @api_ratelimit
 def get_boards(platform):
 	if platform not in config.PLATFORMS:
-		return jsonify({"error": "Invalid platform", "endpoint": request.url_rule.string})
+		return jsonify({"error": "Invalid platform", "endpoint": request.url_rule.rule})
 
 	boards = db.fetchall("SELECT DISTINCT board FROM threads_" + platform)
 	return jsonify({"boards": [{"board": board["board"]} for board in boards]})
