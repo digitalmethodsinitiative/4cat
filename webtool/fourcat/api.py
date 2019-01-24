@@ -156,7 +156,9 @@ def api_board_page(platform, board, page):
 	if platform not in config.PLATFORMS:
 		return jsonify({"error": "Invalid platform", "endpoint": request.url_rule.rule})
 
-	if not isinstance(page, int):
+	try:
+		page = int(page)
+	except ValueError:
 		return jsonify({"error": "Invalid page number", "endpoint": request.url_rule.rule})
 
 	limit = "LIMIT 15 OFFSET %i" % ((int(page) - 1) * 15)
