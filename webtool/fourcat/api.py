@@ -292,10 +292,12 @@ def get_thread(platform, board, thread, db, limit=0):
 			response_post["fsize"] = post["image_filesize"]
 
 			dimensions = json.loads(post["image_dimensions"])
-			response_post["w"] = dimensions["w"]
-			response_post["h"] = dimensions["h"]
-			response_post["tn_w"] = dimensions["tw"]
-			response_post["tn_h"] = dimensions["th"]
+			if "w" in dimensions and "h" in dimensions:
+				response_post["w"] = dimensions["w"]
+				response_post["h"] = dimensions["h"]
+			if "tw" in dimensions and "th" in dimensions:
+				response_post["tn_w"] = dimensions["tw"]
+				response_post["tn_h"] = dimensions["th"]
 
 		# for the rest, just add it if not empty
 		if post["subject"]:
