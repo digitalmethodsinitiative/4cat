@@ -1,0 +1,50 @@
+{% extends "layout.html" %}
+
+{% block body_class %}plain-page frontpage {{ body_class }}{% endblock %}
+
+{% block body %}
+    <article>
+        <section>
+            <div>
+                <h2><span>What is 4CAT?</span></h2>
+                <p>4CAT is a software suite for capture and analysis of thread-based platforms, created and run by
+                    <a href="https://oilab.eu">OILab</a> at the University of Amsterdam as part of the ERC-funded
+                    <a href="https://www.odycceus.eu">ODYCCEUS</a> project.</p>
+                <p>It is currently under development. At this time, you can use it to <a href="/tool/">query</a> select boards of 4chan and
+                    8chan.</p>
+            </div>
+
+            <div>
+                <h2><span>Updates</span></h2>
+                <ol>
+                    <li><time>29 Jan 2019</time> We upgraded our server hardware and rebuilt indexes; the full corpus
+                    of posts is now once again available.</li>
+                    <li><time>18 Jan 2019</time> Added 8chan as a data source. The boards <code>pol</code>,
+                        <code>leftypol</code>, <code>v</code> and <code>brit</code> will be scraped.</li>
+                    <li><time>11 Jan 2019</time> Added the <code>lgbt</code> board to the 4chan scraper.</li>
+                </ol>
+            </div>
+        </section>
+
+        <aside>
+            <div>
+                <h2><span>Available platforms</span></h2>
+                <p>The following platforms and boards are currently available for analysis:</p>
+                <ul>
+                    {% for platform in boards %}
+                        {% if "boards" in boards[platform] and boards[platform]["boards"] %}
+                            <li>
+                                {{ platform }}
+                                <ul>
+                                {% for board in boards[platform]["boards"] %}
+                                    <li>{{ board }}</li>
+                                {% endfor %}
+                                </ul>
+                            </li>
+                        {% endif %}
+                    {% endfor %}
+                </ul>
+            </div>
+        </aside>
+    </article>
+{% endblock %}

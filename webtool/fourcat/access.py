@@ -3,15 +3,16 @@ Control access to web tool
 """
 import fnmatch
 import socket
+import time
 import sys
 import os
 
 sys.path.insert(0, os.path.dirname(__file__) + '/../..')
 import config
 
-from flask import request, abort, render_template, redirect, url_for, flash, get_flashed_messages
+from flask import request, abort, render_template, redirect, url_for, flash, get_flashed_messages, jsonify
 from flask_login import login_user, login_required, logout_user, current_user
-from fourcat import app, login_manager
+from fourcat import app, login_manager, openapi, db
 from fourcat.api import limiter
 from fourcat.user import User
 
@@ -28,6 +29,25 @@ def load_user(user_name):
 	user = User.get_by_name(user_name)
 	user.authenticate()
 	return user
+
+
+@login_manager.request_loader
+def load_user_from_request(request):
+	"""
+	Load user object via access token
+
+	:param request:  Flask request
+	:return:  User object, or None if no valid access token was given
+	"""
+	user = db.fetchone("SELECT name AS user FROM tokens WHERE token = ? AND (expires = 0 OR expires > ?)",
+					   (request.args.get("access-token"), int(time.time())))
+	if not user:
+		return None
+	else:
+		db.execute("UPDATE tokens SET calls = calls + 1 WHERE name = ?", (user["user"],))
+		user = User.get_by_name(user["user"])
+		user.authenticate()
+		return user
 
 
 @app.before_request
@@ -134,3 +154,34 @@ def logout():
 	logout_user()
 	flash("You have been logged out of 4CAT.")
 	return redirect(url_for("show_login"))
+
+
+@app.route("/request-token/")
+@login_required
+@openapi.endpoint
+def request_token():
+	"""
+	Request an access token
+
+	Requires that the user is currently logged in to 4CAT.
+
+	:return: An object with one item `token`
+	"""
+	token = db.fetchone("SELECT * FROM tokens WHERE name = ? AND (expires = 0 OR expires > ?)",
+						(current_user.get_id(), int(time.time())))
+
+	if token:
+		token = token["token"]
+	else:
+		token = "hello"
+
+		# delete any expired tokens
+		db.delete("tokens", where={"name": current_user.get_id()})
+
+		# save new token
+		db.insert("tokens", data={
+			"name": current_user.get_id(),
+			"token": token
+		})
+
+	return jsonify({"token": token})

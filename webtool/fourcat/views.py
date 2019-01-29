@@ -5,9 +5,9 @@ import config
 import datetime
 import markdown
 
-from flask import render_template, jsonify, abort, request, redirect
+from flask import render_template, jsonify, abort, request, redirect, send_from_directory
 from flask_login import login_required, current_user
-from fourcat import app, db, queue
+from fourcat import app, db, queue, openapi, limiter
 from fourcat.helpers import Pagination, string_to_timestamp, load_postprocessors, get_available_postprocessors
 
 from backend.lib.query import SearchQuery
@@ -15,12 +15,6 @@ from backend.lib.job import Job
 from backend.lib.exceptions import JobAlreadyExistsException, JobNotFoundException
 
 from stop_words import get_stop_words
-
-"""
-
-Main vn views for the 4CAT front-end
-
-"""
 
 
 @app.template_filter('datetime')
@@ -31,11 +25,20 @@ def _jinja2_filter_datetime(date, fmt=None):
 
 
 @app.route('/')
+def show_frontpage():
+	"""
+	Index page: news and introduction
+
+	:return:
+	"""
+	return render_template("frontpage.html", boards=config.PLATFORMS)
+
+
 @app.route('/tool/')
 @login_required
 def show_index():
 	"""
-	Index page: main tool frontend
+	Main tool frontend
 	"""
 	return render_template('tool.html', boards=config.PLATFORMS)
 
@@ -82,9 +85,32 @@ def show_page(page):
 
 @app.route("/queue-query/", methods=["POST"])
 @login_required
+@limiter.limit("2 per minute")
+@openapi.endpoint
 def string_query():
 	"""
-	AJAX URI for various forms of substring querying
+	Queue a 4CAT Query
+
+	Requires authentication by logging in or providing a valid access token.
+
+	:request-param str board:  Board ID to query
+	:request-param str platform:  Platform ID to query
+	:request-param str body_query:  String to match in the post body
+	:request-param str subject_query:  String to match in the post subject
+	:request-param str ?full_threads:  Whether to return full thread data: if
+	                                   set, return full thread data.
+    :request-param int dense_percentage:  Lower threshold for dense threads
+    :request-param int dense_length: Minimum length for dense threads matching
+    :request-param str ?use_data:  Match within given time period: if set,
+                                   match within period.
+    :request-param int min_date:  Timestamp marking the beginning of the match
+                                  period
+    :request-param int max_date:  Timestamp marking the end of the match period
+    :request-param str ?access_token:  Access token; only required if not
+                                       logged in currently.
+
+	:return str:  The query key, which may be used to later retrieve query
+	              status and results.
 	"""
 
 	parameters = {
@@ -121,12 +147,22 @@ def string_query():
 
 @app.route('/check_query/<query_key>/')
 @login_required
+@openapi.endpoint
 def check_query(query_key):
 	"""
-	AJAX URI to check whether query has been completed.
+	Check query status
 
+	Requires authentication by logging in or providing a valid access token.
+
+	:param str query_key:  ID of the query for which to return the status
+	:return: Query status, containing the `status`, `query`, number of `rows`,
+	         the query `key`, whether the query is `done`, the `path` of the
+	         result file and whether the query result is `empty`.
 	"""
-	query = SearchQuery(key=query_key, db=db)
+	try:
+		query = SearchQuery(key=query_key, db=db)
+	except TypeError:
+		abort(404)
 
 	results = query.check_query_finished()
 	if results:
@@ -150,6 +186,29 @@ def check_query(query_key):
 	return jsonify(status)
 
 
+@app.route('/result/<string:query_key>/')
+@login_required
+@openapi.endpoint
+def get_result(query_key):
+	"""
+	Get query result
+
+	:param str query_key:  ID of the query for which to return the result
+	:return:  Result file
+	:rmime: text/csv
+	"""
+	try:
+		query = SearchQuery(key=query_key, db=db)
+	except TypeError:
+		abort(404)
+
+	results = query.check_query_finished()
+	if not results:
+		abort(404)
+
+	return send_from_directory(config.PATH_DATA, results.replace("\\", "/").split("/").pop())
+
+
 @app.route('/results/', defaults={'page': 1})
 @app.route('/results/page/<int:page>/')
 @login_required
@@ -171,8 +230,8 @@ def show_results(page):
 							  (page_size, offset))
 	else:
 		num_queries = \
-		db.fetchone("SELECT COUNT(*) AS num FROM queries WHERE key_parent = '' AND parameters::json->>'user' = %s",
-					(current_user.get_id(),))["num"]
+			db.fetchone("SELECT COUNT(*) AS num FROM queries WHERE key_parent = '' AND parameters::json->>'user' = %s",
+						(current_user.get_id(),))["num"]
 		queries = db.fetchall(
 			"SELECT * FROM queries WHERE key_parent = '' AND parameters::json->>'user' = %s ORDER BY timestamp DESC LIMIT %s OFFSET %s",
 			(current_user.get_id(), page_size, offset))
@@ -299,6 +358,7 @@ def queue_postprocessor(key, postprocessor):
 	else:
 		return redirect("/results/" + query.key + "/")
 
+
 @app.route('/check_postprocessors/')
 @login_required
 def check_postprocessor():
@@ -354,6 +414,7 @@ def check_postprocessor():
 			})
 
 	return jsonify(subqueries)
+
 
 def validateQuery(parameters):
 	"""
