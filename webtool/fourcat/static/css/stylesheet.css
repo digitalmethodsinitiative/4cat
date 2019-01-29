@@ -798,6 +798,15 @@ nav > ul.flat > li:not(:last-child)::after {
 	margin-left: 0.5em;
 }
 
+.platform-list {
+	margin-right: 1em;
+}
+
+.platform-list ul {
+	padding-left: 1em;
+	list-style-type: disc;
+}
+
 /** results **/
 .result-list h3 {
     font-size: inherit;
