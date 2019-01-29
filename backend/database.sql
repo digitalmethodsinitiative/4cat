@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS jobs (
   details                text,
   timestamp              integer,
   timestamp_after        integer DEFAULT 0,
-  timestamp_lastclaimed  integer DEFAULT 0
+  timestamp_lastclaimed  integer DEFAULT 0,
   timestamp_claimed      integer DEFAULT 0,
   status                 text,
   attempts               integer DEFAULT 0
@@ -47,3 +47,11 @@ INSERT INTO users
   (name, password)
   VALUES ('anonymous', ''), ('autologin', '')
   ON CONFLICT DO NOTHING;
+
+-- access tokens
+CREATE TABLE IF NOT EXISTS access_tokens (
+  name TEXT UNIQUE PRIMARY KEY,
+  token TEXT,
+  calls INTEGER DEFAULT 0,
+  expires INTEGER DEFAULT 0
+)

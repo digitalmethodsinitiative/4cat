@@ -67,10 +67,6 @@ p{
 }
 
 h1 {
-	margin-bottom: 1em;
-}
-
-.webtool h1 {
 	margin-bottom: 0;
 }
 
@@ -134,7 +130,6 @@ h1 a:hover, h2 a:hover, h3.blocktitle a:hover {
 
 .col-lg-3.topdiv{
 	background: #50ff50 url('../img/patterngreen.jpg');
-	border-top: 2px solid black;
 	border-left: 2px solid black;
 	border-right: 2px solid black;
 }
@@ -208,7 +203,6 @@ select{
 #buttonselections{
 	background-color: #f8ed74;
 	padding: 10px;
-	border-top: 2px solid black;
 	border-bottom: 2px solid black;
 }
 
@@ -600,6 +594,44 @@ label {
   align-items: center;
 }
 
+/** main nav **/
+.main-nav {
+	background: #50ff50 url(../img/patterngreen.jpg);
+	margin-bottom: 2em;
+	border-top: 2px solid #000;
+	border-bottom: 2px solid #000;
+	color: #000;
+}
+
+.webtool .main-nav {
+	margin-bottom: 0;
+}
+
+.main-nav ul {
+	list-style: none;
+	padding: 0;
+	text-align: center;
+	margin: 0.25em 0;
+}
+
+.main-nav li {
+	display: inline-block;
+}
+
+.main-nav li:not(:last-child):after {
+	content: '\02022';
+	margin-left: 0.5em;
+}
+
+.main-nav li a {
+	color: inherit;
+	text-decoration: none;
+}
+
+.main-nav li a:hover {
+	text-decoration: underline;
+}
+
 /** LOGIN **/
 .login-page {
 
@@ -688,17 +720,17 @@ nav > ul.flat > li:not(:last-child)::after {
 }
 
 .plain-page article {
+	border: 2px solid #000;
+	min-width: 640px;
 	margin: 0 auto;
 	width: 75%;
-	min-width: 640px;
-	border: 2px solid #000;
 }
 
-.plain-page article h2, .plain-page article p {
+.plain-page article h2, .plain-page article p, .frontpage .row p {
 	margin-bottom: 0.5em;
 }
 
-.plain-page article p {
+.plain-page article p, .frontpage .row p {
 	padding: 0 1em;
 }
 
@@ -708,6 +740,51 @@ nav > ul.flat > li:not(:last-child)::after {
 
 .plain-page code {
 	white-space: pre;
+}
+
+/** frontpage **/
+.frontpage article {
+	display: grid;
+	grid-template-columns: 66% 33%;
+	grid-column-gap: 1em;
+	max-width: 75%;
+	margin: 0 auto;
+	border: 0;
+}
+
+.frontpage article div:not(:first-child) h2 {
+	margin-bottom: 0;
+}
+
+.frontpage section, .frontpage aside {
+	border: 2px solid #000;
+}
+
+.frontpage section {
+	width: 100%;
+}
+
+.frontpage time {
+	font-weight: bold;
+}
+
+.frontpage ol {
+	list-style: none;
+	padding: 0;
+	margin: 0;
+}
+
+.frontpage ol li {
+	padding: 1em;
+}
+
+.frontpage ol li:nth-child(even) {
+	background: #d1e2ff;
+}
+
+.frontpage time:after {
+	content: '\02022';
+	margin-left: 0.5em;
 }
 
 /** results **/

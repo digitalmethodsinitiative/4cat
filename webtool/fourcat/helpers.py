@@ -15,6 +15,7 @@ from fourcat import queue
 
 from backend.abstract.postprocessor import BasicPostProcessor
 
+
 class Pagination(object):
 	"""
 	Provide pagination
