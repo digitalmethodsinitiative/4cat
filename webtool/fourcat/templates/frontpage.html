@@ -30,7 +30,19 @@
             <div>
                 <h2><span>Available platforms</span></h2>
                 <p>The following platforms and boards are currently available for analysis:</p>
-                <ul>
+                <ul class="platform-list">
+            {% if stats %}
+                {% for platform in stats %}{% if platform != "overall" %}
+                    <li>
+                        {{ platform }} ({{ stats[platform]["overall"]["posts"]|numberify }} posts)
+                        <ul>
+                            {% for board in stats[platform]["boards"] %}
+                                <li><code>{{ board }}</code>: {{ stats[platform]["boards"][board]["posts"]|numberify }} posts (since {{ stats[platform]["boards"][board]["first"]|datetime('%-d %b %Y') }})</li>
+                            {% endfor %}
+                        </ul>
+                    </li>
+                {% endif %}{% endfor %}
+            {% else %}
                     {% for platform in boards %}
                         {% if "boards" in boards[platform] and boards[platform]["boards"] %}
                             <li>
@@ -43,6 +55,7 @@
                             </li>
                         {% endif %}
                     {% endfor %}
+            {% endif %}
                 </ul>
             </div>
         </aside>

@@ -13,6 +13,7 @@ from fourcat.helpers import Pagination, string_to_timestamp, load_postprocessors
 from backend.lib.query import SearchQuery
 from backend.lib.job import Job
 from backend.lib.exceptions import JobAlreadyExistsException, JobNotFoundException
+from backend.lib.helpers import get_absolute_folder
 
 from stop_words import get_stop_words
 
@@ -20,8 +21,22 @@ from stop_words import get_stop_words
 @app.template_filter('datetime')
 def _jinja2_filter_datetime(date, fmt=None):
 	date = datetime.datetime.fromtimestamp(date)
-	format = "%d-%m-%Y"
+	format = "%d-%m-%Y" if not fmt else fmt
 	return date.strftime(format)
+
+@app.template_filter('numberify')
+def _jinja2_filter_numberify(number):
+	try:
+		number = int(number)
+	except TypeError:
+		return number
+
+	if number > 1000000:
+		return str(int(number / 1000000)) + "m"
+	elif number > 1000:
+		return str(int(number / 1000)) + "k"
+
+	return str(number)
 
 
 @app.route('/')
@@ -31,7 +46,20 @@ def show_frontpage():
 
 	:return:
 	"""
-	return render_template("frontpage.html", boards=config.PLATFORMS)
+
+	# load corpus stats that are generated daily, if available
+	stats_path = get_absolute_folder(os.path.dirname(__file__)) + "/../../stats.json"
+	if os.path.exists(stats_path):
+		with open(stats_path) as stats_file:
+			stats = stats_file.read()
+		try:
+			stats = json.loads(stats)
+		except json.JSONDecodeError:
+			stats = None
+	else:
+		stats = None
+
+	return render_template("frontpage.html", stats=stats, boards=config.PLATFORMS)
 
 
 @app.route('/tool/')
