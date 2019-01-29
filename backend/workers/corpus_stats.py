@@ -16,7 +16,14 @@ class CorpusStats(BasicWorker):
 	max_workers = 1
 
 	def work(self):
-		stats = {}
+		stats = {
+			"overall": {
+				"threads": 0,
+				"posts": 0,
+				"first": int(time.time()),
+				"last": 0
+			}
+		}
 
 		for platform in config.PLATFORMS:
 			stats[platform] = {
@@ -30,22 +37,37 @@ class CorpusStats(BasicWorker):
 			}
 
 			for board in config.PLATFORMS[platform]["boards"]:
-				thread_ids = [thread["id"] for thread in self.db.fetchall("SELECT id FROM threads_" + platform + " WHERE board = %s", (board,))]
-				minmax = self.db.fetchone(
-					"SELECT MIN(timestamp) AS first, MAX(timestamp) AS last FROM posts_" + platform + " WHERE thread_id IN %s",
-					(thread_ids,))
 				stats[platform]["boards"][board] = {
-					"threads": len(thread_ids),
-					"posts": self.db.fetchone("SELECT COUNT(*) AS num FROM posts_" + platform + " WHERE thread_id IN %s", (thread_ids,))["num"],
-					"first": minmax["first"],
-					"last": minmax["last"],
+					"threads": int(
+						self.db.fetchone("SELECT COUNT(*) AS num FROM threads_" + platform + " WHERE board = %s",
+										 (board,))["num"]),
+					"posts": int(self.db.fetchone(
+						"SELECT SUM(num_replies) AS num FROM threads_" + platform + " WHERE board = %s", (board,))[
+									 "num"]),
+					"first":
+						int(self.db.fetchone(
+							"SELECT MIN(timestamp) AS num FROM threads_" + platform + " WHERE board = %s AND timestamp > 0",
+							(board,))["num"]),
+					"last": int(self.db.fetchone(
+						"SELECT MAX(timestamp_modified) AS num FROM threads_" + platform + " WHERE board = %s",
+						(board,))["num"]),
 				}
 
-				stats[platform]["overall"]["first"] = min(stats[platform]["overall"]["first"], stats[platform][board]["first"])
-				stats[platform]["overall"]["last"] = max(stats[platform]["overall"]["last"], stats[platform][board]["last"])
-				stats[platform]["overall"]["posts"] += stats[platform]["overall"]["posts"]
-				stats[platform]["overall"]["threads"] += stats[platform]["overall"]["threads"]
+				stats[platform]["overall"]["first"] = min(stats[platform]["overall"]["first"],
+														  stats[platform]["boards"][board]["first"])
+				stats[platform]["overall"]["last"] = max(stats[platform]["overall"]["last"],
+														 stats[platform]["boards"][board]["last"])
+				stats[platform]["overall"]["posts"] += stats[platform]["boards"][board]["posts"]
+				stats[platform]["overall"]["threads"] += stats[platform]["boards"][board]["threads"]
 
-		outputfile = "stats.json"  #get_absolute_folder(os.path.dirname(__file__)) + "/../../stats.json"
+				stats["overall"]["first"] = min(stats["overall"]["first"], stats[platform]["boards"][board]["first"])
+				stats["overall"]["last"] = max(stats["overall"]["last"], stats[platform]["boards"][board]["last"])
+				stats["overall"]["posts"] += stats[platform]["boards"][board]["posts"]
+				stats["overall"]["threads"] += stats[platform]["boards"][board]["threads"]
+
+
+		outputfile = get_absolute_folder(os.path.dirname(__file__)) + "/../../stats.json"
 		with open(outputfile, "w") as statsfile:
 			statsfile.write(json.dumps(stats))
+
+		self.log.info("Corpus stats updated.")
