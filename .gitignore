@@ -28,3 +28,4 @@ fourcat.egg-info/
 data/
 4cat.log.1
 webtool/fourcat/static/boards.json
+stats.json
