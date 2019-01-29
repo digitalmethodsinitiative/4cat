@@ -721,7 +721,7 @@ nav > ul.flat > li:not(:last-child)::after {
 
 .plain-page article {
 	border: 2px solid #000;
-	min-width: 640px;
+	min-width: 350px;
 	margin: 0 auto;
 	width: 75%;
 }
@@ -750,6 +750,17 @@ nav > ul.flat > li:not(:last-child)::after {
 	max-width: 75%;
 	margin: 0 auto;
 	border: 0;
+}
+
+@media only screen and (max-width: 690px) {
+	.frontpage article {
+		display: block;
+		min-width: 350px;
+	}
+
+	.frontpage article section {
+		margin-bottom: 1em;
+	}
 }
 
 .frontpage article div:not(:first-child) h2 {
