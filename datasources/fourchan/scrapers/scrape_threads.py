@@ -2,6 +2,24 @@
 Thread scraper
 
 Parses 4chan API data, saving it to database and queueing downloads
+
+Flow:
+
+(crawler)
+-> process():
+   -> register_thread(): check if thread exists
+      if not, create preliminary record
+      -> add_thread()
+      if so,
+        if no change in timestamp or number of posts, DONE (halt processing)
+        if changes, continue
+   -> create separate sets of new posts and deleted posts
+   -> mark deleted posts as deleted
+   -> add new posts to database
+      -> save_post(): save post data to database
+         -> save_links(): extract references to other posts and save to database
+         -> queue_image(): if an image was attached, queue a job to scrape it
+   -> update_thread(): update thread data
 """
 import psycopg2
 import hashlib
@@ -61,22 +79,25 @@ class ThreadScraper4chan(BasicJSONScraper):
 				"JSON response for thread %s/%s contained no posts, could not process" % (self.platform, self.job.data["remote_id"]))
 			return False
 
-		# check if OP has all the required data
+		# determine OP id (8chan sequential threads are an exception here)
 		first_post = data["posts"][0]
+		thread_db_id = str(first_post["id"] if "id" in first_post and self.type != "4chan-thread" else first_post["no"])
+
+		# check if OP has all the required data
 		missing = set(self.required_fields_op) - set(first_post.keys())
 		if missing != set():
 			self.log.warning("OP is missing required fields %s, ignoring" % repr(missing))
 			return False
 
-		thread = self.update_thread(first_post,
-									last_reply=max([post["time"] for post in data["posts"] if "time" in post]),
-									last_post=max([post["no"] for post in data["posts"] if "no" in post]))
+		# check if thread exists and has new data
+		last_reply = max([post["time"] for post in data["posts"] if "time" in post])
+		last_post = max([post["no"] for post in data["posts"] if "no" in post])
+		thread = self.register_thread(first_post, last_reply, last_post, num_replies=len(data["posts"]))
 
 		if not thread:
 			self.log.info("Thread %s/%s scraped, but no changes found" % (self.job.details["board"], first_post["no"]))
 			return True
 
-		thread_db_id = str(first_post["id"] if "id" in first_post and self.type != "4chan-thread" else first_post["no"])
 		if thread["timestamp_deleted"] > 0:
 			self.log.warning("Thread %s/%s/%s seems to have been undeleted, removing deletion timestamp %s" % (
 			self.platform, self.job.details["board"], first_post["no"], thread["timestamp_deleted"]))
@@ -102,11 +123,15 @@ class ThreadScraper4chan(BasicJSONScraper):
 			if added:
 				new_posts += 1
 
+		# update thread data
+		self.update_thread(thread, first_post, last_reply, last_post, thread["num_replies"] + new_posts)
+
 		# save to database
 		self.log.info("Updating %s/%s/%s, new: %s, old: %s, deleted: %s" % (
 			self.platform, self.job.details["board"], first_post["no"], new_posts, len(post_dict_db), len(deleted)))
 		self.db.commit()
 
+		# return the amount of new posts
 		return new_posts
 
 	def save_post(self, post, thread):
@@ -133,20 +158,20 @@ class ThreadScraper4chan(BasicJSONScraper):
 			"id": post["no"],
 			"thread_id": thread["id"],
 			"timestamp": post["time"],
-			"subject": post["sub"] if "sub" in post else "",
-			"body": post["com"] if "com" in post else "",
-			"author": post["name"] if "name" in post else "",
-			"author_trip": post["trip"] if "trip" in post else "",
+			"subject": post.get("sub", ""),
+			"body": post.get("com", ""),
+			"author": post.get("name", ""),
+			"author_trip": post.get("trip", ""),
 			"author_type": post["id"] if "id" in post and self.type == "4chan-thread" else "",
-			"author_type_id": post["capcode"] if "capcode" in post else "",
-			"country_code": post["country"] if "country" in post else "",
-			"country_name": post["country_name"] if "country_name" in post else "",
+			"author_type_id": post.get("capcode", ""),
+			"country_code": post.get("country", ""),
+			"country_name": post.get("country_name", ""),
 			"image_file": post["filename"] + post["ext"] if "filename" in post else "",
 			"image_4chan": str(post["tim"]) + post["ext"] if "filename" in post else "",
-			"image_md5": post["md5"] if "md5" in post else "",
-			"image_filesize": post["fsize"] if "fsize" in post else 0,
+			"image_md5": post.get("md5", ""),
+			"image_filesize": post.get("fsize", 0),
 			"image_dimensions": json.dumps(dimensions),
-			"semantic_url": post["semantic_url"] if "semantic_url" in post else "",
+			"semantic_url": post.get("semantic_url", ""),
 			"unsorted_data": json.dumps(
 				{field: post[field] for field in post.keys() if field not in self.known_fields})
 		}
@@ -161,7 +186,7 @@ class ThreadScraper4chan(BasicJSONScraper):
 			self.db.insert("posts_" + self.prefix, post_data)
 		except psycopg2.IntegrityError:
 			self.db.rollback()
-			dupe = self.db.fetchone("SELECT * from posts_" + self.prefix + " WHERE id = '%s'" % (str(post["no"]),), commit=False)
+			dupe = self.db.fetchone("SELECT * from posts_" + self.prefix + " WHERE id = %s" % (str(post["no"]),), commit=False)
 			if dupe:
 				self.log.error("Post %s in thread %s/%s/%s (time: %s) scraped twice: first seen as %s in thread %s at %s" % (
 				post["no"], self.platform, thread["board"], thread["id"], post["time"], dupe["id"], dupe["thread_id"], dupe["timestamp"]))
@@ -227,37 +252,52 @@ class ThreadScraper4chan(BasicJSONScraper):
 			except JobAlreadyExistsException:
 				pass
 
-	def update_thread(self, first_post, last_reply, last_post):
+	def register_thread(self, first_post, last_reply, last_post, num_replies):
 		"""
-		Update thread info
+		Check if thread exists
 
-		Processes post data for the OP to see if the thread for that OP needs
-		updating.
+		Acquires thread data from the database and determines whether there is
+		any new data that belongs to this thread.
 
 		:param dict first_post:  Post data for the OP
 		:param int last_reply:  Timestamp of last reply in thread
 		:param int last_post:  ID of last post in thread
+		:param int num_replies:  Number of posts in thread (including OP)
 		:return: Thread data (dict), updated, or `None` if no further work is needed
 		"""
 		# we need the following to check whether the thread has changed since the last scrape
 		# 8chan doesn't always include this, in which case "-1" is as good a placeholder as any
-		num_replies = first_post["replies"] + 1 if "replies" in first_post else -1
-
 		# account for 8chan-style cyclical ID
 		thread_db_id = str(first_post["id"] if "id" in first_post and self.type != "4chan-thread" else first_post["no"])
-
 		thread = self.db.fetchone("SELECT * FROM threads_" + self.prefix + " WHERE id = %s", (thread_db_id,))
+
 		if not thread:
-			# self.log.warning("Tried to scrape post before thread %s was scraped" % first_post["no"])
+			# This very rarely happens, but sometimes the thread is not yet in the database, somehow
+			# In this case, a thread with the bare minimum of metadata is created - more extensive
+			# data will be added in update_thread later.
 			thread = self.add_thread(first_post, last_reply, last_post)
+			return thread
 
 		if thread["num_replies"] == num_replies and num_replies != -1 and thread["timestamp_modified"] == last_reply:
 			# no updates, no need to check posts any further
 			self.log.debug("No new messages in thread %s" % first_post["no"])
 			return None
+		else:
+			return thread
+
+	def update_thread(self, thread, first_post, last_reply, last_post, num_replies):
+		"""
+		Update thread info
+
+		:param dict first_post:  Post data for the OP
+		:param int last_reply:  Timestamp of last reply in thread
+		:param int last_post:  ID of last post in thread
+		:param int num_replies:  Number of posts in thread (including OP)
+		:return: Thread data (dict), updated, or `None` if no further work is needed
+		"""
+		thread_db_id = str(first_post["id"] if "id" in first_post and self.type != "4chan-thread" else first_post["no"])
 
 		# first post has useful metadata for the *thread*
-
 		# 8chan uses "bumplocked" but otherwise it's the same
 		bumplimit = ("bumplimit" in first_post and first_post["bumplimit"] == 1) or (
 					"bumplocked" in first_post and first_post["bumplocked"] == 1)
@@ -285,8 +325,9 @@ class ThreadScraper4chan(BasicJSONScraper):
 		"""
 		Add thread to database
 
-		This should not happen, usually. But if a thread is not in the database yet when it is scraped, add some basic
-		data and let the update method handle the rest of the details.
+		This should not happen, usually. But if a thread is not in the database
+		yet when it is scraped, add some basic data and let the update method
+		handle the rest of the details.
 
 		:param dict first_post:  Post data for the OP
 		:param int last_reply:  Timestamp of last reply in thread
