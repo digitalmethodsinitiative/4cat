@@ -46,10 +46,10 @@ class CorpusStats(BasicWorker):
 									 "num"]),
 					"first":
 						int(self.db.fetchone(
-							"SELECT MIN(timestamp) AS num FROM threads_" + platform + " WHERE board = %s AND timestamp > 0",
+							"SELECT MIN(timestamp) AS num FROM threads_" + platform + " WHERE board = %s AND is_sticky = FALSE AND timestamp > 0",
 							(board,))["num"]),
 					"last": int(self.db.fetchone(
-						"SELECT MAX(timestamp_modified) AS num FROM threads_" + platform + " WHERE board = %s",
+						"SELECT MAX(timestamp_modified) AS num FROM threads_" + platform + " WHERE board = %s AND is_sticky = FALSE",
 						(board,))["num"]),
 				}
 
