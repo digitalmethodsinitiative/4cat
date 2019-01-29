@@ -39,12 +39,12 @@ def load_user_from_request(request):
 	:param request:  Flask request
 	:return:  User object, or None if no valid access token was given
 	"""
-	user = db.fetchone("SELECT name AS user FROM tokens WHERE token = ? AND (expires = 0 OR expires > ?)",
+	user = db.fetchone("SELECT name AS user FROM access_tokens WHERE token = %s AND (expires = 0 OR expires > %s)",
 					   (request.args.get("access-token"), int(time.time())))
 	if not user:
 		return None
 	else:
-		db.execute("UPDATE tokens SET calls = calls + 1 WHERE name = ?", (user["user"],))
+		db.execute("UPDATE access_tokens SET calls = calls + 1 WHERE name = %s", (user["user"],))
 		user = User.get_by_name(user["user"])
 		user.authenticate()
 		return user
@@ -167,7 +167,7 @@ def request_token():
 
 	:return: An object with one item `token`
 	"""
-	token = db.fetchone("SELECT * FROM tokens WHERE name = ? AND (expires = 0 OR expires > ?)",
+	token = db.fetchone("SELECT * FROM access_tokens WHERE `name` = %s AND (expires = 0 OR expires > %s)",
 						(current_user.get_id(), int(time.time())))
 
 	if token:
