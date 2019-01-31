@@ -47,7 +47,7 @@ regex_source = re.compile(r"source ([^ ]+) : 4cat {([^}]+)}")
 
 # go through all data sources found
 for conf in confs:
-	datasource = conf.split("/")[0]
+	datasource = re.split(r"[\/\\]", conf)[0]
 	module = "datasources." + datasource
 
 	# check if data source can be imported
