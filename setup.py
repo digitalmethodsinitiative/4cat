@@ -18,7 +18,7 @@ setup(
 	install_requires=[
 		"requests==2.20.0",
 		"psycopg2_binary==2.7.5",
-		"pymysql=0.9.2",
+		"pymysql==0.9.2",
 		"html2text==2018.1.9",
 		"numpy==1.15.2",
 		"scipy==1.1.0",
@@ -39,7 +39,7 @@ setup(
 		"beautifulsoup4==4.6.3",
 		"psycopg2==2.7.5",
 		"scikit_learn==0.20.0",
-		"python-daemon==1.2"
+		"python-daemon==1.2",
 		"bcrypt==3.1.4",
 		"markdown==3.0.1"
 	]

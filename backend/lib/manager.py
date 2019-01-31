@@ -8,6 +8,7 @@ import time
 import glob
 import sys
 import os
+import re
 
 from backend.abstract.worker import BasicWorker
 from backend.lib.keyboard import KeyPoller
@@ -163,10 +164,12 @@ class WorkerManager:
 
 				# initialize data source if it's the first time encountering it
 				if "datasources" in folder:
-					datasource = folder.split("datasources/")[1].split("/")[0]
+					datasource = folder.split("datasources/")[1]
+					datasource = re.split(r"[\\\/]", datasource)[0]
 					if datasource not in self.datasources:
 						self.log.info("(Startup) Registered data source %s" % datasource)
-						datamodule = "datasources." + folder.replace(base, "")[12:].split("/")[0]
+						datamodule = "datasources." + folder.replace(base, "")[12:]
+						datamodule = re.split(r"[\\\/]", datamodule)[0]
 
 						importlib.import_module(datamodule)
 
@@ -181,14 +184,14 @@ class WorkerManager:
 
 						self.datasources[datasource_id] = datasource
 
-					module = folder.replace(base, "").replace("/", ".") + "." + file[2:-3]
+					module = folder.replace(base, "").replace("\\", ".").replace("/", ".") + "." + file[2:-3]
 					if module in sys.modules:
 						# we've been here
 						continue
 
 				else:
 					# load relevant files in folder
-					module = folder.replace("/", ".") + "." + file[2:-3]
+					module = folder.replace("\\", ".").replace("/", ".") + "." + file[2:-3]
 					if module in sys.modules:
 						# already loaded
 						continue
