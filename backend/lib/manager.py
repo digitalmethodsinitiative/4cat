@@ -126,6 +126,7 @@ class WorkerManager:
 		self.log.info("Waiting for all workers to finish...")
 		for jobtype in self.worker_pool:
 			for worker in self.worker_pool[jobtype]:
+				self.log.info("Waiting for worker %s..." % jobtype)
 				worker.join()
 
 		time.sleep(3)
@@ -221,6 +222,12 @@ class WorkerManager:
 					self.worker_map[member[1].type] = worker
 
 	def validate_datasources(self):
+		"""
+		Validate data sources
+
+		Logs warnings if not all information is precent for the configured data
+		sources.
+		"""
 		for datasource in self.datasources:
 			if datasource + "-search" not in self.worker_map:
 				self.log.error("No search worker defined for datasource %s. Search queries will not be executed." % datasource)
@@ -231,7 +238,7 @@ class WorkerManager:
 			if datasource + "-board" not in self.worker_map:
 				self.log.warning("No board scraper defined for datasource %s." % datasource)
 
-	def abort(self, signal, stack):
+	def abort(self, signal=None, stack=None):
 		"""
 		Stop looping the delegator and prepare for shutdown
 		"""
