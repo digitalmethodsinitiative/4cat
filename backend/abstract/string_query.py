@@ -4,6 +4,7 @@ import abc
 
 from pymysql import OperationalError
 from bs4 import BeautifulSoup
+from collections import Counter
 
 import config
 from backend.lib.database_mysql import MySQLDatabase
@@ -163,18 +164,19 @@ class StringQuery(BasicWorker, metaclass=abc.ABCMeta):
 			# all posts for all thread IDs found by Sphinx
 			thread_ids = tuple([post["thread_id"] for post in posts])
 
-			posts = self.fetch_threads(thread_ids)
-
-			# get dense thread ids
+			# if indicated, get dense thread ids
 			if query["dense_threads"] and query["body_query"]:
 				self.query.update_status("Post data collected. Filtering dense threads")
-				posts = self.filter_dense(posts, query["body_query"], query["dense_percentage"], query["dense_length"])
+				#posts = self.filter_dense(posts, query["body_query"], query["dense_percentage"], query["dense_length"])
+				thread_ids = self.filter_dense_sql(thread_ids, query["body_query"], query["dense_percentage"], query["dense_length"])
 
 				# When there are no dense threads
-				if not posts:
+				if not thread_ids:
 					return []
-			else:
-				self.query.update_status("Post data collected")
+
+			posts = self.fetch_threads(thread_ids)
+			
+			self.query.update_status("Post data collected")
 
 			self.log.info("Full posts query finished in %i seconds." % (time.time() - postgres_start))
 
@@ -252,28 +254,38 @@ class StringQuery(BasicWorker, metaclass=abc.ABCMeta):
 		:return list:  Filtered list of posts
 		"""
 		# for each thread, save number of posts and number of matching posts
-		self.log.debug("Filtering %s-dense threads from %i threads..." % (keyword, len(thread_ids)))
+		self.log.info("Filtering %s-dense threads from %i threads..." % (keyword, len(thread_ids)))
 
-		try:
-			threads = self.db.fetchall("""
-				SELECT id as thread_id, num_replies, keyword_count, keyword_density::real FROM (
-					SELECT id, num_replies, keyword_count, ((keyword_count::real / num_replies::real) * 100) AS keyword_density FROM (
-						SELECT id, num_replies, count(*) as keyword_count FROM threads_%s
-						WHERE id IN %s
-						GROUP BY id, num_replies
-					) AS thread_matches
-				) AS thread_meta
-				WHERE num_replies >= %s
-				AND keyword_density >= %s
+		keyword_posts = Counter(thread_ids)
 
-				""", (self.prefix, thread_ids, length, percentage,))
-		except Exception as error:
-			return str(error)
+		# if statements becuase you can't use a variable as a table header...
+		if self.prefix == "4chan":
+			total_posts = self.db.fetchall("""SELECT id, num_replies FROM threads_4chan
+												WHERE id IN %s
+												GROUP BY id
+			""", (thread_ids,))
+		elif self.prefix == '8chan'
+			total_posts = self.db.fetchall("""SELECT id, num_replies FROM threads_8chan
+												WHERE id IN %s
+												GROUP BY id
+			""", (thread_ids,))
 
-		self.log.debug("Dense thread filtering finished, %i threads left." % len(threads))
+		# check wether the total posts / posts with keywords is longer than the given percentage,
+		# and if the length is above the given threshold
+		qualified_threads = []
+		for total_post in total_posts:
+			# check if the length meets the threshold
+			if total_post["num_replies"] >= length:
+				# check if the keyword density meets the threshold
+				thread_density = float(keyword_posts[total_post["id"]] / total_post["num_replies"] * 100)
+				if thread_density >= float(percentage):
+					qualified_threads.append(total_post["id"])
 
-		filtered_threads = tuple([thread['thread_id'] for thread in threads])
+		else:
+			raise Exception("Invalid prefix %s" % (self.prefix))
 
+		self.log.info("Dense thread filtering finished, %i threads left." % len(qualified_threads))
+		filtered_threads = tuple([thread for thread in qualified_threads])
 		return filtered_threads
 
 	def posts_to_csv(self, sql_results, filepath, clean_csv=True):
