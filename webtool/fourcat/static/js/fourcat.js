@@ -67,7 +67,7 @@ $(function() {
 		Polls server to check whether there's a result for query
 		*/
 		$.getJSON({
-			url: 'check_query/' + query_key,
+			url: '/check_query/' + query_key,
 			success: function(json) {
 				console.log(json);
 
@@ -197,19 +197,7 @@ $(function() {
 		}
 	});
 
-	// Only enable full thread data option if subject is queried
-	$('#subject-input').on('input', function(){
-		if ($(this).val() == ''){
-			$('#check-full-thread').prop('disabled', true)
-			$('#check-full-thread').prop('checked', false)
-		}
-		else{
-			$('#check-full-thread').prop('disabled', false)
-		}
-	});
-
 	$('.input-dense').prop('disabled', true)
-	$('#check-full-thread').prop('disabled', true)
 	$('body').on('click', '.result-list .postprocessor-link', function(e) {
 		e.preventDefault();
 		popup_panel.show($(this).attr('href'));
