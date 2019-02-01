@@ -7,12 +7,7 @@
 	font-family: 'fixedsys', Courier;
 	font-size: 16px;
 }
-.fullpost p, .fullpost ul, .fullpost ul li, .fullpost ul a, .fullpost ul li a {
-	font-size: 20px;}
-.container.fluid {
-  margin: 0 auto;
-  width: 100%;
-}
+
 
 body{
 	margin: 0;
@@ -903,6 +898,32 @@ ol.result-list {
 
 .queue-button-wrap.hidden .button-like {
 	opacity: 0;
+}
+
+.result-preview ol {
+    list-style: none;
+    padding: 0;
+}
+
+.result-preview li {
+    background: #d1e2ff;
+    padding: 0.5em;
+    margin: 0.5em;
+}
+
+.result-preview .byline {
+    border-bottom: 2px solid #000;
+}
+
+.result-preview .author {
+    background: #000;
+    display: inline-block;
+    color: #FFF;
+    padding: 0 0.5em;
+}
+
+.result-preview .body .quote {
+    color: #ff5750;
 }
 
 /* popup */

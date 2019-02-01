@@ -1,5 +1,6 @@
 import os
 import re
+import csv
 import json
 import config
 import datetime
@@ -37,6 +38,10 @@ def _jinja2_filter_numberify(number):
 		return str(int(number / 1000)) + "k"
 
 	return str(number)
+
+@app.template_filter('markdown')
+def _jinja2_filter_markdown(text):
+	return markdown.markdown(text)
 
 
 @app.route('/')
@@ -120,6 +125,8 @@ def string_query():
 	Queue a 4CAT Query
 
 	Requires authentication by logging in or providing a valid access token.
+
+	:param str platform: Platform ID to query
 
 	:request-param str board:  Board ID to query
 	:request-param str platform:  Platform ID to query
@@ -345,11 +352,27 @@ def show_result(key):
 					"status": ""
 				})
 
+	# show preview
+	if query.is_finished() and querydata["num_rows"] > 0:
+		preview = []
+		with open(query.get_results_path()) as resultfile:
+			posts = csv.DictReader(resultfile)
+			i = 0
+			for post in posts:
+				i += 1
+				post["body"] = post["body"].replace(">", "&gt;")
+				post["body"] = re.sub(r"&gt;&gt;([0-9]+)", "<span class=\"quote\">&gt;&gt;\\1</span>", post["body"])
+				preview.append(post)
+				if i > 25:
+					break
+	else:
+		preview = None
+
 	# we can either show this view as a separate page or as a bunch of html
 	# to be retrieved via XHR
 	standalone = "postprocessors" not in request.url
 	template = "result.html" if standalone else "result-details.html"
-	return render_template(template, query=querydata, postprocessors=available_postprocessors,
+	return render_template(template, preview=preview, query=querydata, postprocessors=available_postprocessors,
 						   subqueries=filtered_subqueries, is_postprocessor_running=is_postprocessor_running)
 
 

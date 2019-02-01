@@ -173,7 +173,7 @@ class OpenAPICollector:
 			if rule_func not in self.endpoints:
 				continue
 
-			pointspec = self.endpoints[endpoint]
+			pointspec = self.endpoints[rule_func]
 
 			# find parameters in endpoint path
 			vars = {}
