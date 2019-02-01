@@ -1,0 +1,21 @@
+{% if query.num_rows > 0 %}
+<section class="result-preview">
+    <h3 class="blocktitle section-header"><span>Preview</span></h3>
+    {% if query.num_rows > 25 %}
+    <p class="glued result-warning">Preview is limited to 25 items - download the results to see all {{ query.num_rows }} posts</p>
+    {% endif %}
+    <ol>
+    {% for post in preview %}
+        <li>
+            <p class="byline"><span class="author">{{ post.id }}/{{ post.author }}</span> at <time>{{ post.timestamp }}</time> in <span class="thread">{{ post.thread_id }}</span></p>
+            <div class="body">
+                {{ post.body|markdown|safe }}
+            </div>
+        </li>
+    {% endfor %}
+    </ol>
+    {% if query.num_rows > 25 %}
+    <p class="glued result-warning">Preview is limited to 25 items - download the results to see all {{ query.num_rows }} posts</p>
+    {% endif %}
+</section>
+{% endif %}

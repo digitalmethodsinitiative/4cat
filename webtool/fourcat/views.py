@@ -9,7 +9,7 @@ import markdown
 from flask import render_template, jsonify, abort, request, redirect, send_from_directory
 from flask_login import login_required, current_user
 from fourcat import app, db, queue, openapi, limiter
-from fourcat.helpers import Pagination, string_to_timestamp, load_postprocessors, get_available_postprocessors
+from fourcat.helpers import Pagination, string_to_timestamp, load_postprocessors, get_available_postprocessors, get_preview
 
 from backend.lib.query import SearchQuery
 from backend.lib.job import Job
@@ -205,8 +205,13 @@ def check_query(query_key):
 			path = 'http://localhost/fourcat/data/' + query.data["query"].replace("*", "") + '-' + query_key + '.csv'
 		else:
 			path = results.replace("\\", "/").split("/").pop()
+
+		querydata = query.data
+		querydata["parameters"] = json.loads(querydata["parameters"])
+		preview = render_template("posts-preview.html", query=querydata, preview=get_preview(query))
 	else:
 		path = ""
+		preview = ""
 
 	status = {
 		"status": query.get_status(),
@@ -214,6 +219,7 @@ def check_query(query_key):
 		"rows": query.data["num_rows"],
 		"key": query_key,
 		"done": True if results else False,
+		"preview": preview,
 		"path": path,
 		"empty": query.data["is_empty"]
 	}
@@ -354,17 +360,7 @@ def show_result(key):
 
 	# show preview
 	if query.is_finished() and querydata["num_rows"] > 0:
-		preview = []
-		with open(query.get_results_path()) as resultfile:
-			posts = csv.DictReader(resultfile)
-			i = 0
-			for post in posts:
-				i += 1
-				post["body"] = post["body"].replace(">", "&gt;")
-				post["body"] = re.sub(r"&gt;&gt;([0-9]+)", "<span class=\"quote\">&gt;&gt;\\1</span>", post["body"])
-				preview.append(post)
-				if i > 25:
-					break
+		preview = get_preview(query)
 	else:
 		preview = None
 
