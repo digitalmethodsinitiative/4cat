@@ -9,6 +9,7 @@ import glob
 import sys
 import os
 import re
+import csv
 
 from math import ceil
 from fourcat import queue
@@ -159,3 +160,23 @@ def get_available_postprocessors(query):
 			del available[job.data["jobtype"]]
 
 	return available
+
+def get_preview(query):
+	"""
+	Generate a data preview of 25 rows of a results csv
+	
+	:param query 
+	:return list: 
+	"""
+	preview = []
+	with open(query.get_results_path(), encoding="utf-8") as resultfile:
+		posts = csv.DictReader(resultfile)
+		i = 0
+		for post in posts:
+			i += 1
+			post["body"] = post["body"].replace(">", "&gt;")
+			post["body"] = re.sub(r"&gt;&gt;([0-9]+)", "<span class=\"quote\">&gt;&gt;\\1</span>", post["body"])
+			preview.append(post)
+			if i > 25:
+				break
+	return preview

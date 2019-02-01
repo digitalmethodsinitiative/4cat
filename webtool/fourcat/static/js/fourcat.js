@@ -74,6 +74,7 @@ $(function() {
 				let status_box = $('#query_status .status_message .message');
 				let current_status = status_box.html();
 
+				// 
 				if(json.status !== current_status && json.status !== "") {
 					status_box.html(json.status);
 				}
@@ -89,6 +90,7 @@ $(function() {
 					$('.loader').hide();
 					$('#query_status .status_message .dots').html('');
 					$('#whole-form').removeAttr('disabled');
+					$('#post-preview').html(json.preview);
 					alert('Query for \'' + keyword + '\' complete!');
 				} else {
 					let dots = '';
