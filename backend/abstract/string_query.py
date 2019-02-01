@@ -264,7 +264,7 @@ class StringQuery(BasicWorker, metaclass=abc.ABCMeta):
 												WHERE id IN %s
 												GROUP BY id
 			""", (thread_ids,))
-		elif self.prefix == '8chan'
+		elif self.prefix == '8chan':
 			total_posts = self.db.fetchall("""SELECT id, num_replies FROM threads_8chan
 												WHERE id IN %s
 												GROUP BY id
