@@ -186,6 +186,7 @@ class SearchQuery:
 		query_bit = self.data["query"].replace(" ", "-").lower()
 		query_bit = re.sub(r"[^a-z0-9\-]", "", query_bit)
 		file = query_bit + "-" + self.data["key"]
+		file = re.sub(r"[-]+", "-", file)
 
 		path = self.folder + "/" + file + "." + extension.lower()
 		index = 1
