@@ -1,10 +1,12 @@
 """
 Basic scraper worker - should be inherited by workers to scrape specific types of content
 """
+import collections
 import requests
 import random
 import json
 import abc
+import os
 
 from backend.abstract.worker import BasicWorker
 
@@ -30,38 +32,53 @@ class BasicHTTPScraper(BasicWorker, metaclass=abc.ABCMeta):
 
 	def work(self):
 		"""
-		Scrape a URL
+		Scrape something
 
-		This acquires a job - if none are found, the loop pauses for a while. The job's URL
-		is then requested and parsed. If that went well, the parsed data is passed on to the
-		processor.
+		This requests data according to the job's parameter - either from a
+		local file or from a URL. The job is then either finished or released
+		depending on whether that was successful, and the data is processed
+		further if available.
 		"""
-
-		# request URL
-		url = self.get_url()
-		try:
-			# see if any proxies were configured that would work for this URL
-			protocol = url.split(":")[0]
-			if protocol in config.SCRAPE_PROXIES and config.SCRAPE_PROXIES[protocol]:
-				proxies = {protocol: random.choice(config.SCRAPE_PROXIES[protocol])}
-			else:
-				proxies = None
-
-			# do the request!
-			data = requests.get(url, timeout=config.SCRAPE_TIMEOUT, proxies=proxies)
-		except (requests.exceptions.RequestException, ConnectionRefusedError) as e:
-			if self.job.data["attempts"] > 2:
+		if "file" in self.job.details:
+			# if the file is available locally, use that file
+			if not os.path.exists(self.job.details["file"]):
 				self.job.finish()
-				self.log.error("Could not finish request for %s (%s), cancelling job" % (url, e))
-			else:
-				self.job.release(delay=10)
-				self.log.info("Could not finish request for %s (%s), releasing job" % (url, e))
-			return
+				self.log.error("Scraper was told to use source file %s, but file does not exist, cancelling job." % self.job.details["file"])
+				return
 
-		if "board" in self.job.details:
-			id = self.job.details["board"] + "/" + self.job.data["remote_id"]
+			with open(self.job.details["file"]) as source:
+				datafields = {
+					"status_code": 200,
+					"content": source.read()
+				}
+
+				data = collections.namedtuple("object", datafields.keys())(*datafields.values())
 		else:
-			id = self.job.data["remote_id"]
+			# if not, see what URL we need to request data from
+			url = self.get_url()
+			try:
+				# see if any proxies were configured that would work for this URL
+				protocol = url.split(":")[0]
+				if protocol in config.SCRAPE_PROXIES and config.SCRAPE_PROXIES[protocol]:
+					proxies = {protocol: random.choice(config.SCRAPE_PROXIES[protocol])}
+				else:
+					proxies = None
+
+				# do the request!
+				data = requests.get(url, timeout=config.SCRAPE_TIMEOUT, proxies=proxies)
+			except (requests.exceptions.RequestException, ConnectionRefusedError) as e:
+				if self.job.data["attempts"] > 2:
+					self.job.finish()
+					self.log.error("Could not finish request for %s (%s), cancelling job" % (url, e))
+				else:
+					self.job.release(delay=10)
+					self.log.info("Could not finish request for %s (%s), releasing job" % (url, e))
+				return
+
+			if "board" in self.job.details:
+				id = self.job.details["board"] + "/" + self.job.data["remote_id"]
+			else:
+				id = self.job.data["remote_id"]
 
 		if data.status_code == 404:
 			# this should be handled differently from an actually erroneous response
