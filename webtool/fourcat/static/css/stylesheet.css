@@ -925,6 +925,10 @@ ol.result-list {
     color: #ff5750;
 }
 
+.result-preview .body .greentext {
+	color: #3eb439;
+}
+
 /* popup */
 #popup-blur {
 	position: fixed;
