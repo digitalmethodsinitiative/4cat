@@ -72,8 +72,6 @@ h1, h2, h3.blocktitle, .header{
 
 h1, h2, h3.blocktitle {
 	font-size: 25px;
-	border-top: 2px solid black;
-	border-bottom: 2px solid black;
 }
 
 h2, h3.blocktitle {
@@ -260,13 +258,12 @@ span#imagenavigation{
 
 #results{
 	max-width: 100%;
-	min-height: 50px;
+	min-height: 150px;
 }
 
 #results img{
 	margin: 0 auto;
 	display: block;
-	max-width: 500px;
 	max-width: 100%;
 	max-height: 600px;
 	margin-top: 15px;
