@@ -176,6 +176,7 @@ def get_preview(query):
 			i += 1
 			post["body"] = post["body"].replace(">", "&gt;")
 			post["body"] = re.sub(r"&gt;&gt;([0-9]+)", "<span class=\"quote\">&gt;&gt;\\1</span>", post["body"])
+			post["body"] = re.sub(r"^&gt;([^\n]+)", "<span class=\"greentext\">&gt;\\1</span>", post["body"], flags=re.MULTILINE)
 			preview.append(post)
 			if i > 25:
 				break
