@@ -318,6 +318,10 @@ def show_result(key):
 	except ValueError:
 		abort(404)
 
+	# subqueries are not available via a separate page
+	if query.data["key_parent"]:
+		abort(404)
+
 	# initialize the data we need
 	processors = load_postprocessors()
 	unfinished_postprocessors = processors.copy()
