@@ -303,6 +303,7 @@ class StringQuery(BasicWorker, metaclass=abc.ABCMeta):
 			raise Exception("No result file for query")
 
 		fieldnames = list(sql_results[0].keys())
+		fieldnames.append("unix_timestamp")
 
 		# write the dictionary to a csv
 		with open(filepath, 'w', encoding='utf-8') as csvfile:
