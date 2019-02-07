@@ -17,7 +17,7 @@ class UsernameExtractor(BasicPostProcessor):
 	to describe this post-processor with in a user interface.
 	"""
 	type = "extract-usernames"  # job type ID
-	title = "Extracted usernames"  # title displayed in UI
+	title = "Top usernames"  # title displayed in UI
 	description = "Build a list with distinct usernames in the source file, and how many posts were found per username"  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
@@ -38,6 +38,8 @@ class UsernameExtractor(BasicPostProcessor):
 				users[post["author"]] += 1
 
 		results = [{"username": username, "num_posts": users[username]} for username in users]
+		results = sorted(results, key=lambda x: x["num_posts"], reverse=True)
+
 		if not results:
 			return
 

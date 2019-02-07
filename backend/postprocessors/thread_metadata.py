@@ -1,5 +1,5 @@
 """
-Example post-processor worker
+Thread data
 """
 from csv import DictReader
 
@@ -17,8 +17,8 @@ class ThreadCounter(BasicPostProcessor):
 	to describe this post-processor with in a user interface.
 	"""
 	type = "thread-counter"  # job type ID
-	title = "Thread and post counts"  # title displayed in UI
-	description = "See how many threads and, for each thread, how many posts are present in the dataset"  # description displayed in UI
+	title = "Thread metadata"  # title displayed in UI
+	description = "Create an overview of the threads present in the dataset, containing thread IDs, subjects and post counts."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
 	def process(self):

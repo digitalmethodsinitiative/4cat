@@ -37,7 +37,7 @@ class HistogramRenderer(BasicPostProcessor):
 		with open(self.source_file) as source:
 			posts = csv.DictReader(source)
 			for post in posts:
-				date = datetime.datetime.fromisoformat(post["timestamp"])
+				date = post.get("unix_timestamp", datetime.datetime.fromisoformat(post["timestamp"]))
 				timestamp = date.timestamp()
 
 				first_post = min(timestamp, first_post)
@@ -144,7 +144,7 @@ class HistogramRenderer(BasicPostProcessor):
 					draw.pieslice([x, bar_y - arc_size, x + arc_size, bar_y], start=180, end=270, fill="black")
 					draw.pieslice([x + bar_width - arc_size, bar_y - arc_size, x + bar_width, bar_y], start=-90, end=0,
 							  fill="black")
-					
+
 				draw.rectangle([(x + arc_adjust, bar_y - arc_size), (x + bar_width - arc_adjust, bar_y)], fill="black")
 
 				x += item_width
