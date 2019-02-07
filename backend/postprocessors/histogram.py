@@ -124,7 +124,11 @@ class HistogramRenderer(BasicPostProcessor):
 		bar_width = item_width * 0.9
 		x = x_margin_left + (item_width / 2) - (bar_width / 2)
 
-		arc_size = int(item_width / 5)
+		if bar_width >= 8:
+			arc_size = max(4, int(item_width / 5))
+		else:
+			arc_size = 0
+
 		arc_adjust = arc_size / 2
 
 		for year in months:
@@ -136,9 +140,11 @@ class HistogramRenderer(BasicPostProcessor):
 				draw.rectangle([(x, bar_y - arc_adjust), (x + bar_width, height - y_margin)], "black")
 
 				# rounded corners
-				draw.pieslice([x, bar_y - arc_size, x + arc_size, bar_y], start=180, end=270, fill="black")
-				draw.pieslice([x + bar_width - arc_size, bar_y - arc_size, x + bar_width, bar_y], start=-90, end=0,
+				if arc_size > 0:
+					draw.pieslice([x, bar_y - arc_size, x + arc_size, bar_y], start=180, end=270, fill="black")
+					draw.pieslice([x + bar_width - arc_size, bar_y - arc_size, x + bar_width, bar_y], start=-90, end=0,
 							  fill="black")
+					
 				draw.rectangle([(x + arc_adjust, bar_y - arc_size), (x + bar_width - arc_adjust, bar_y)], fill="black")
 
 				x += item_width
