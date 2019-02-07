@@ -37,8 +37,7 @@ class HistogramRenderer(BasicPostProcessor):
 		with open(self.source_file) as source:
 			posts = csv.DictReader(source)
 			for post in posts:
-				date = post.get("unix_timestamp", datetime.datetime.fromisoformat(post["timestamp"]))
-				timestamp = date.timestamp()
+				timestamp = int(post.get("unix_timestamp", datetime.datetime.fromisoformat(post["timestamp"]).timestamp()))
 
 				first_post = min(timestamp, first_post)
 				last_post = max(timestamp, last_post)
