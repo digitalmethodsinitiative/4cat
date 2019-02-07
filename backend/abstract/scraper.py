@@ -41,6 +41,7 @@ class BasicHTTPScraper(BasicWorker, metaclass=abc.ABCMeta):
 		"""
 		if "file" in self.job.details:
 			# if the file is available locally, use that file
+			id = self.job.details["file"]
 			if not os.path.exists(self.job.details["file"]):
 				self.job.finish()
 				self.log.error("Scraper was told to use source file %s, but file does not exist, cancelling job." % self.job.details["file"])
