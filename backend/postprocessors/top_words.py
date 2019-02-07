@@ -27,7 +27,7 @@ class PostTokeniser(BasicPostProcessor):
 		of posts for that user name
 		"""
 		tokens = {}
-		delete_regex = re.compile(r"[^a-zA-Z0-9]")
+		delete_regex = re.compile(r"[^a-zA-Z0-9 ]")
 		stopwords = get_stop_words("en")
 
 		self.query.update_status("Reading source file")
@@ -44,7 +44,7 @@ class PostTokeniser(BasicPostProcessor):
 						tokens[token] = 0
 					tokens[token] += 1
 
-		results = [{"word": token, "num_posts": tokens[token]} for token in tokens]
+		results = [{"word": token, "num_posts": tokens[token]} for token in tokens if tokens[token] > 1]
 		results = sorted(results, key=lambda x: x["num_posts"], reverse=True)
 
 		if not results:
