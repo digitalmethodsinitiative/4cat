@@ -34,7 +34,7 @@ class StringQuery(BasicWorker, metaclass=abc.ABCMeta):
 	# Columns to return in csv
 	# Mandatory columns: ['thread_id', 'body', 'subject', 'timestamp']
 	return_cols = ['thread_id', 'id', 'timestamp', 'body', 'subject', 'author', 'image_file', 'image_md5',
-				   'country_name']
+				   'country_code']
 
 	def work(self):
 		"""
@@ -316,6 +316,7 @@ class StringQuery(BasicWorker, metaclass=abc.ABCMeta):
 				for row in sql_results:
 					# Create human dates from timestamp
 					from datetime import datetime
+					row["unix_timestamp"] = row["timestamp"]
 					row["timestamp"] = datetime.utcfromtimestamp(row["timestamp"]).strftime('%Y-%m-%d %H:%M:%S')
 
 					# Clean body column
