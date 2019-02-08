@@ -269,6 +269,8 @@ class StringQuery(BasicWorker, metaclass=abc.ABCMeta):
 												WHERE id IN %s
 												GROUP BY id
 			""", (thread_ids,))
+		else:
+			raise Exception("Invalid prefix %s" % (self.prefix))
 
 		# check wether the total posts / posts with keywords is longer than the given percentage,
 		# and if the length is above the given threshold
@@ -281,8 +283,6 @@ class StringQuery(BasicWorker, metaclass=abc.ABCMeta):
 				if thread_density >= float(percentage):
 					qualified_threads.append(total_post["id"])
 
-		else:
-			raise Exception("Invalid prefix %s" % (self.prefix))
 
 		self.log.info("Dense thread filtering finished, %i threads left." % len(qualified_threads))
 		filtered_threads = tuple([thread for thread in qualified_threads])
