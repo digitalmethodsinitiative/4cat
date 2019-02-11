@@ -6,9 +6,11 @@ import config
 
 from collections import OrderedDict
 
-from flask import jsonify, abort, send_file, request
+from flask import jsonify, abort, send_file, request, render_template
 
 from fourcat import app, db, log, openapi, limiter
+from fourcat.helpers import format_post
+
 from backend.lib.queue import JobQueue
 from backend.lib.helpers import get_absolute_folder
 
@@ -102,6 +104,8 @@ def api_thread(platform, board, thread_id):
 	:param str platform:  Platform ID
 	:param str board:  Board name
 	:param int thread_id:  Thread ID
+
+	:request-param str format:  Data format. Can be `json` (default) or `html`.
 	:return: Thread data, as a list of `posts`.
 	"""
 	if platform not in config.PLATFORMS:
@@ -112,6 +116,16 @@ def api_thread(platform, board, thread_id):
 
 	if not response:
 		abort(404)
+	elif request.args.get("format", "json") == "html":
+		def format(post):
+			post["com"] = format_post(post["com"]).replace("\n", "<br>")
+			return post
+		response["posts"] = [format(post) for post in response["posts"]]
+		metadata = {
+			"subject": "".join([post.get("sub", "") for post in response["posts"]]),
+			"id": response["posts"][0]["no"]
+		}
+		return render_template("thread.html", platform=platform, board=board, posts=response["posts"], thread=thread, metadata=metadata)
 	else:
 		return jsonify(response)
 

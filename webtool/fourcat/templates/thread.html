@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<head>
+    <title>{% if metadata.subject %}{{ metadata.subject }}{% else %}(no subject){% endif %} &bull; {{ platform }}/{{ board }}/{{ metadata.id }} &bull; 4CAT</title>
+    <style>
+        body {
+            font-family: monospace;
+        }
+        body > header {
+            min-width: 640px;
+            max-width: 960px;
+            margin: 0 auto;
+            font-size: 1.5em;
+            padding: 0.5em;
+            box-sizing: border-box;
+        }
+        body > header h1 {
+            font-size: 1.5em;
+        }
+        .thread {
+            list-style: none;
+        }
+        .thread li {
+            background: #d1e2ff;
+            padding: 1em;
+            min-width: 640px;
+            max-width: 960px;
+            margin: 0 auto;
+            margin-bottom: 1em;
+        }
+        .thread header {
+            border-bottom: 1px solid #000;
+            display: inline;
+        }
+        .thread article {
+            margin-top: 0.5em;
+        }
+        .thread header .author {
+            font-weight: bold;
+        }
+        .thread header span {
+            display: inline-block;
+        }
+        .thread header span:not(:last-child)::after {
+            content: '\2022';
+            margin-left: 0.5em;
+        }
+        footer {
+            text-align: center;
+        }
+        .thread li.op {
+            border: 2px solid #000;
+            background: #485ba6;
+            color: #FFF;
+        }
+        .thread li.op header {
+            border-color: #FFF;
+        }
+        .quote {
+            color: #ff5750;
+        }
+        .greentext {
+            color: #3eb439;
+        }
+        .highlight {
+            outline: 2px solid #ff5750;
+        }
+        li a {
+            color: inherit;
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+<header>
+    <h1>{% if metadata.subject %}{{ metadata.subject }}{% else %}(no subject){% endif %}</h1>
+    <span class="path">{{ platform }}/{{ board }}/{{ metadata.id }}</span>
+</header>
+
+<ol class="thread">
+    {% for post in posts %}
+        <li id="post-{{ post.no }}"{% if post.resto == 0 %} class="op"{% endif %}>
+            <header>
+                <span class="author">{{ post.name }}{% if post.trip %}/{{ post.trip }}{% endif %}</span>
+                <span class="datetime">{{ post.time|datetime('%d-%m-%Y %H:%M') }}</span>
+                <span class="post_id">{{ post.no }}</span>
+            </header>
+            {% if post.image_md5 %}
+                <a href="https://archive.4plebs.org/_/search/image/{{ post.image_md5 }}" rel="external">
+                    <div class="has_image">(Has image)</div>
+                </a>
+            {% endif %}
+            <article>
+                {{ post.com|safe }}
+            </article>
+        </li>
+    {% endfor %}
+</ol>
+
+<footer>
+    <p>Rendered by <a href="https://4cat.oilab.nl">4CAT</a></p>
+</footer>
+
+<script>
+    document.querySelectorAll('.quote a').forEach(link => link.addEventListener('mouseover', function(e) {
+        let post = 'post-' + this.getAttribute('href').split('-').pop();
+        document.querySelector('#' + post).classList.add('highlight');
+    }));
+    document.querySelectorAll('.quote a').forEach(link => link.addEventListener('mouseout', function(e) {
+        document.querySelectorAll('.thread li').forEach(link => link.classList.remove('highlight'));
+    }));
+</script>
+</body>
