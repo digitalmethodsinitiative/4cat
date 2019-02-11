@@ -265,6 +265,7 @@ class StringQuery(BasicWorker, metaclass=abc.ABCMeta):
 												GROUP BY id
 			""", (thread_ids,))
 		elif self.prefix == '8chan':
+			thread_ids = tuple([str(thread_id) for thread_id in thread_ids])
 			total_posts = self.db.fetchall("""SELECT id, num_replies FROM threads_8chan
 												WHERE id IN %s
 												GROUP BY id
