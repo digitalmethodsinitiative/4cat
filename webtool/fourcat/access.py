@@ -1,6 +1,7 @@
 """
 Control access to web tool
 """
+import hashlib
 import fnmatch
 import socket
 import time
@@ -167,21 +168,23 @@ def request_token():
 
 	:return: An object with one item `token`
 	"""
-	token = db.fetchone("SELECT * FROM access_tokens WHERE `name` = %s AND (expires = 0 OR expires > %s)",
+	token = db.fetchone("SELECT * FROM access_tokens WHERE name = %s AND (expires = 0 OR expires > %s)",
 						(current_user.get_id(), int(time.time())))
 
 	if token:
 		token = token["token"]
 	else:
-		token = "hello"
+		token = current_user.get_id() + str(time.time())
+		token = hashlib.sha256(token.encode("utf8")).hexdigest()
 
 		# delete any expired tokens
-		db.delete("tokens", where={"name": current_user.get_id()})
+		db.delete("access_tokens", where={"name": current_user.get_id()})
 
 		# save new token
-		db.insert("tokens", data={
+		db.insert("access_tokens", data={
 			"name": current_user.get_id(),
-			"token": token
+			"token": token,
+			"expires": int(time.time()) + (365 * 86400)
 		})
 
 	return jsonify({"token": token})
