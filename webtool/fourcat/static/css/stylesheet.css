@@ -921,7 +921,7 @@ ol.result-list {
     padding: 0 0.5em;
 }
 
-.result-preview .body a.quote {
+.result-preview .body a.quote, .result-preview .body .quote a {
     color: #ff5750;
 }
 
