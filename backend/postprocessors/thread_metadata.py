@@ -44,15 +44,15 @@ class ThreadCounter(BasicPostProcessor):
 						"count": 0,
 					}
 
-					if post["subject"]:
-						threads[post["thread_id"]]["subject"] = post["subject"]
+				if post["subject"]:
+					threads[post["thread_id"]]["subject"] = post["subject"]
 
-					if post["image_md5"]:
-						threads[post["thread_id"]]["images"] += 1
+				if post["image_md5"]:
+					threads[post["thread_id"]]["images"] += 1
 
-					timestamp = int(post.get("unix_timestamp", datetime.datetime.fromisoformat(post["timestamp"]).timestamp))
-					threads[post["thread_id"]]["first_post"] = min(timestamp, threads[post["thread_id"]]["first_post"])
-					threads[post["thread_id"]]["count"] += 1
+				timestamp = int(post.get("unix_timestamp", datetime.datetime.fromisoformat(post["timestamp"]).timestamp))
+				threads[post["thread_id"]]["first_post"] = min(timestamp, threads[post["thread_id"]]["first_post"])
+				threads[post["thread_id"]]["count"] += 1
 
 		results = [{
 			"thread_id": thread_id,
