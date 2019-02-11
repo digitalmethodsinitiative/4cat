@@ -174,10 +174,14 @@ def get_preview(query):
 		i = 0
 		for post in posts:
 			i += 1
-			post["body"] = post["body"].replace(">", "&gt;")
-			post["body"] = re.sub(r"&gt;&gt;([0-9]+)", "<span class=\"quote\">&gt;&gt;\\1</span>", post["body"])
-			post["body"] = re.sub(r"^&gt;([^\n]+)", "<span class=\"greentext\">&gt;\\1</span>", post["body"], flags=re.MULTILINE)
+			post["body"] = format_post(post["body"])
 			preview.append(post)
 			if i > 25:
 				break
 	return preview
+
+def format_post(post):
+	post = post.replace(">", "&gt;")
+	post = re.sub(r"&gt;&gt;([0-9]+)", "<span class=\"quote\"><a href=\"#post-\\1\">&gt;&gt;\\1</a></span>", post)
+	post = re.sub(r"^&gt;([^\n]+)", "<span class=\"greentext\">&gt;\\1</span>", post, flags=re.MULTILINE)
+	return post
