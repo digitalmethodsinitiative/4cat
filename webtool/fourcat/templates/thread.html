@@ -61,12 +61,27 @@
         .greentext {
             color: #3eb439;
         }
-        .highlight {
+        .highlight, :target {
             outline: 2px solid #ff5750;
         }
         li a {
             color: inherit;
             text-decoration: none;
+        }
+        a.has_image {
+            background: #FFF;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: #000;
+            width: 5em;
+            height: 5em;
+            float: left;
+            text-align: center;
+            margin-right: 1em;
+        }
+        .clear {
+            clear: both;
         }
     </style>
 </head>
@@ -84,14 +99,17 @@
                 <span class="datetime">{{ post.time|datetime('%d-%m-%Y %H:%M') }}</span>
                 <span class="post_id">{{ post.no }}</span>
             </header>
-            {% if post.image_md5 %}
-                <a href="https://archive.4plebs.org/_/search/image/{{ post.image_md5 }}" rel="external">
-                    <div class="has_image">(Has image)</div>
+            {% if post.md5 %}
+                <a href="https://archive.4plebs.org/_/search/image/{{ post.md5 }}" rel="external" class="has_image">
+                    <span>(image)</span>
                 </a>
             {% endif %}
             <article>
                 {{ post.com|safe }}
             </article>
+            {% if post.md5 %}
+                <div class="clear"></div>
+            {% endif %}
         </li>
     {% endfor %}
 </ol>
