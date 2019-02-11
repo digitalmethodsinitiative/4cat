@@ -1,6 +1,9 @@
 """
 Thread data
 """
+import datetime
+import time
+
 from csv import DictReader
 
 from backend.abstract.postprocessor import BasicPostProcessor
@@ -36,18 +39,27 @@ class ThreadCounter(BasicPostProcessor):
 				if post["thread_id"] not in threads:
 					threads[post["thread_id"]] = {
 						"subject": post["subject"],
-						"count": 0
+						"first_post": int(time.time()),
+						"images": 0,
+						"count": 0,
 					}
 
 					if post["subject"]:
 						threads[post["thread_id"]]["subject"] = post["subject"]
 
+					if post["image_md5"]:
+						threads[post["thread_id"]]["images"] += 1
+
+					timestamp = int(post.get("unix_timestamp", datetime.datetime.fromisoformat(post["timestamp"]).timestamp))
+					threads[post["thread_id"]]["first_post"] = min(timestamp, threads[post["thread_id"]]["first_post"])
 					threads[post["thread_id"]]["count"] += 1
 
 		results = [{
 			"thread_id": thread_id,
+			"timestamp": datetime.datetime.utcfromtimestamp(threads["thread_id"]["timestamp"]).strftime('%Y-%m-%d %H:%M:%S'),
 			"subject": threads[thread_id]["subject"],
-			"num_posts": threads[thread_id]["count"]
+			"num_posts": threads[thread_id]["count"],
+			"num_images": threads[thread_id]["images"]
 		} for thread_id in threads]
 
 		if not results:
