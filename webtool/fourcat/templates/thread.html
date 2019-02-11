@@ -103,7 +103,7 @@
                 <span class="post_id">{{ post.no }}</span>
             </header>
             {% if post.md5 %}
-                <a href="https://archive.4plebs.org/_/search/image/{{ post.md5 }}" rel="external" class="has_image">
+                <a href="https://archive.4plebs.org/_/search/image/{{ post.md5.replace("/", "_") }}" rel="external" class="has_image">
                     <span>(image)</span>
                 </a>
             {% endif %}
