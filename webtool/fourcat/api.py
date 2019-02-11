@@ -118,7 +118,7 @@ def api_thread(platform, board, thread_id):
 		abort(404)
 	elif request.args.get("format", "json") == "html":
 		def format(post):
-			post["com"] = format_post(post["com"]).replace("\n", "<br>")
+			post["com"] = format_post(post.get("com", "")).replace("\n", "<br>")
 			return post
 		response["posts"] = [format(post) for post in response["posts"]]
 		metadata = {
