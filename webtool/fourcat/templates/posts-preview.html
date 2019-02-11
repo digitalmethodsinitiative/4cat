@@ -6,7 +6,7 @@
     {% endif %}
     <ol>
     {% for post in preview %}
-        <li>
+        <li id="post-{{ post.id }}">
             <p class="byline"><span class="author">{{ post.id }}/{{ post.author }}</span> at <time>{{ post.timestamp }}</time> in <a class="thread" href="/api/{{ query.parameters.platform }}/{{ query.parameters.board }}/thread/{{ post.thread_id }}.json?format=html">{{ post.thread_id }}</a></span></p>
             <div class="body">
                 <p>{{ post.body|replace("\n", "<br>\n")|safe }}</p>
