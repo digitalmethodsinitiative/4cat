@@ -8,6 +8,8 @@ from csv import DictReader
 
 from backend.abstract.postprocessor import BasicPostProcessor
 
+import config
+
 
 class ThreadCounter(BasicPostProcessor):
 	"""
@@ -50,16 +52,20 @@ class ThreadCounter(BasicPostProcessor):
 				if post["image_md5"]:
 					threads[post["thread_id"]]["images"] += 1
 
-				timestamp = int(post.get("unix_timestamp", datetime.datetime.fromisoformat(post["timestamp"]).timestamp))
+				timestamp = int(
+					post.get("unix_timestamp", datetime.datetime.fromisoformat(post["timestamp"]).timestamp))
 				threads[post["thread_id"]]["first_post"] = min(timestamp, threads[post["thread_id"]]["first_post"])
 				threads[post["thread_id"]]["count"] += 1
 
 		results = [{
 			"thread_id": thread_id,
-			"timestamp": datetime.datetime.utcfromtimestamp(threads[thread_id]["first_post"]).strftime('%Y-%m-%d %H:%M:%S'),
+			"timestamp": datetime.datetime.utcfromtimestamp(threads[thread_id]["first_post"]).strftime(
+				'%Y-%m-%d %H:%M:%S'),
 			"subject": threads[thread_id]["subject"],
 			"num_posts": threads[thread_id]["count"],
-			"num_images": threads[thread_id]["images"]
+			"num_images": threads[thread_id]["images"],
+			"preview_url": "http://" + config.FlaskConfig.SERVER_NAME + "/api/4chan/pol/thread/" + str(
+				thread_id) + ".json?format=html"
 		} for thread_id in threads]
 
 		if not results:
