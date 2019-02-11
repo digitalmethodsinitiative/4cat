@@ -216,7 +216,7 @@ class OpenAPICollector:
 						"type": vars[var]
 					} for var in vars] + [{
 						"name": request_var["name"],
-						"in": "request",
+						"in": "query",
 						"required": request_var["required"],
 						"description": request_var["description"],
 						"type": request_var["type"]
