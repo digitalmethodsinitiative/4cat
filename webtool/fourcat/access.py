@@ -176,15 +176,16 @@ def request_token():
 	else:
 		token = current_user.get_id() + str(time.time())
 		token = hashlib.sha256(token.encode("utf8")).hexdigest()
+		token = {
+			"name": current_user.get_id(),
+			"token": token,
+			"expires": int(time.time()) + (365 * 86400)
+		}
 
 		# delete any expired tokens
 		db.delete("access_tokens", where={"name": current_user.get_id()})
 
 		# save new token
-		db.insert("access_tokens", data={
-			"name": current_user.get_id(),
-			"token": token,
-			"expires": int(time.time()) + (365 * 86400)
-		})
+		db.insert("access_tokens", token)
 
-	return jsonify({"token": token})
+	return jsonify(token)
