@@ -24,6 +24,7 @@ class DomainExtractor(BasicPostProcessor):
 		the domain was mentioned
 		"""
 		link_regex = re.compile(r"https?://[^\s]+")
+		www_regex = re.compile("^www\.")
 		links = {}
 
 		self.query.update_status("Reading source file")
@@ -33,7 +34,7 @@ class DomainExtractor(BasicPostProcessor):
 				post_links = link_regex.findall(post["body"])
 				if post_links:
 					for link in post_links:
-						link = link.split("/")[2]
+						link = www_regex.sub("", link.split("/")[2])
 						if link not in links:
 							links[link] = 0
 						links[link] += 1
