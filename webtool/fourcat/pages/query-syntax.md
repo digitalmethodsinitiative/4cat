@@ -15,7 +15,7 @@ The following syntax is supported:
   `netherlands`
 
 - `amsterdam | netherlands` - Match posts containing either `amsterdam` 
-   or `netherlands`
+   or `netherlands` (or both)
 
 - `"amsterdam netherlands"` - Match the phrase `amsterdam netherlands`, 
    occurring exactly like that
@@ -32,6 +32,9 @@ The following syntax is supported:
 
 - `amsterd*m` - Match posts containing `amsterdam` or
   [`amsterdoom`](https://www.mobygames.com/game/amsterdoom/)
+
+- `netherlands (amsterdam | rotterdam)` - Match posts containing `netherlands`
+  and either `amsterdam` or `rotterdam` (or both)
 
 Note that for punctuation and non-alphanumeric characters, it is often 
 necessary to wrap them in `"quotation marks"`; if not, they will be ignored
