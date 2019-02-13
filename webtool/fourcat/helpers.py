@@ -133,7 +133,8 @@ def load_postprocessors():
 					"description": member[1].description,
 					"name": member[1].title,
 					"extension": member[1].extension,
-					"class": member[0]
+					"class": member[0],
+					"options": member[1].options if hasattr(member[1], "options") else {}
 				}
 
 	return postprocessors
@@ -152,11 +153,12 @@ def get_available_postprocessors(query):
 
 	for subquery in analyses["running"]:
 		details = json.loads(subquery["parameters"])
-		if "type" in details and details["type"] in available:
+		if "type" in details and details["type"] in available and not available[details["type"]].get("options", {}):
 			del available[details["type"]]
 
 	for job in analyses["queued"]:
-		if job.data["jobtype"] in available:
+		if job.data["jobtype"] in available and not available[job.data["jobtype"]].get("options", {}):
+			print(job.data["jobtype"])
 			del available[job.data["jobtype"]]
 
 	return available

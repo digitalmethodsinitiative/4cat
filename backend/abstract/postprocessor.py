@@ -24,6 +24,7 @@ class BasicPostProcessor(BasicWorker, metaclass=abc.ABCMeta):
 	source_file = None
 	description = "No description available"
 	extension = "csv"
+	options = {}
 
 	def __init__(self, db=None, logger=None, manager=None, job=job):
 		"""
@@ -46,14 +47,15 @@ class BasicPostProcessor(BasicWorker, metaclass=abc.ABCMeta):
 		# create new query, for the result of this process
 		params = {
 			"type": self.type,
-			"parent": self.parent.key,
-			"job": self.job.data["id"]
+			"job": self.job.data["id"],
+			"options": self.job.data.get("options", {})
 		}
 
 		if self.job.details:
 			for field in self.job.details:
 				params[field] = self.job.details[field]
 
+		self.options = params["options"]
 		self.query = SearchQuery(parent=self.parent.key, parameters=params, db=self.db, extension=self.extension)
 
 		if not self.query.is_finished():

@@ -1,37 +1,44 @@
-<h3 class="blocktitle"><span><a href="/results/{{ query.key }}/">Query{% if query.query != "query" %}: {{ query.query }}{% endif %}</a></span></h3>
+<h3 class="blocktitle"><span><a href="/results/{{ query.key }}/">Query{% if query.query != "query" %}:
+    {{ query.query }}{% endif %}</a></span></h3>
+{% if messages %}
+    {% for message in messages %}
+            <p class="result-warning glued">{{ message }}</p>
+    {% endfor %}
+{% endif %}
 
 <p class="result">
     <span class="property-badge">{{ query.parameters.platform if "platform" in query.parameters else "4chan" }}/{{ query.parameters.board }}/</span>
-{% if query.parameters.body_query and query.parameters.body_query != "empty" %}
-    <span class="inline-label">body:</span> <span class="inline-query">{{ query.parameters.body_query }}</span>
-{% endif %}
-{% if query.parameters.subject_query and query.parameters.subject_query != "empty" %}
-    <span class="inline-label">subject:</span> <span class="inline-query">{{ query.parameters.subject_query }}</span>
-{% endif %}
-{%  if query.parameters.full_thread %}
-    <span class="property-badge second-tier">full thread</span>
-{% endif %}
-{%  if query.parameters.dense_threads %}
-    <span class="property-badge second-tier">dense threads ({{ query.parameters.dense_percentage }}%/&gt; {{ query.parameters.dense_length }})</span>
-{% endif %}
+    {% if query.parameters.body_query and query.parameters.body_query != "empty" %}
+        <span class="inline-label">body:</span> <span class="inline-query">{{ query.parameters.body_query }}</span>
+    {% endif %}
+    {% if query.parameters.subject_query and query.parameters.subject_query != "empty" %}
+        <span class="inline-label">subject:</span>
+        <span class="inline-query">{{ query.parameters.subject_query }}</span>
+    {% endif %}
+    {% if query.parameters.full_thread %}
+        <span class="property-badge second-tier">full thread</span>
+    {% endif %}
+    {% if query.parameters.dense_threads %}
+        <span class="property-badge second-tier">dense threads ({{ query.parameters.dense_percentage }}%/&gt; {{ query.parameters.dense_length }})</span>
+    {% endif %}
 </p>
 
 {% if query.parameters.min_date > 0 or query.parameters.max_date > 0 %}
-<p class="result">
-{% if query.parameters.min_date > 0 %}
-    <span class="property-badge">From</span>
-    <span class="inline-query">{{ query.parameters.min_date|datetime }}</span>
-{% endif %}{% if query.parameters.max_date > 0 %}
-    <span class="property-badge">Until</span>
-    <span class="inline-query">{{ query.parameters.max_date|datetime }}</span>
-{% endif %}
-</p>
+    <p class="result">
+        {% if query.parameters.min_date > 0 %}
+            <span class="property-badge">From</span>
+            <span class="inline-query">{{ query.parameters.min_date|datetime }}</span>
+        {% endif %}{% if query.parameters.max_date > 0 %}
+        <span class="property-badge">Until</span>
+        <span class="inline-query">{{ query.parameters.max_date|datetime }}</span>
+    {% endif %}
+    </p>
 {% endif %}
 
 {% if query.status %}
-<p class="result">
-    {{ query.status }}
-</p>
+    <p class="result">
+        {{ query.status }}
+    </p>
 {% endif %}
 
 {% if query.is_finished %}
@@ -47,35 +54,47 @@
 
 {% if subqueries|length > 0 %}
     <ol class="subquery-list">
-    {% for subquery in subqueries %}
-        {% include 'result-subquery.html' %}
-    {% endfor %}
+        {% for subquery in subqueries %}
+            {% include 'result-subquery.html' %}
+        {% endfor %}
     </ol>
 {% endif %}
 
 {% if current_user.is_authenticated %}
-{% if query.num_rows == 0 or postprocessors.values()|length == 0 %}
-    <h3 class="blocktitle section-header"><span>Analyses</span></h3>
-    <p>
-        No further analytical post-processors are available for this query.
-    {% if subqueries|length > 0 %}
-        Results for analyses that were run earlier are available in the panel above.
+    {% if query.num_rows == 0 or postprocessors.values()|length == 0 %}
+        <h3 class="blocktitle section-header"><span>Analyses</span></h3>
+        <p>
+            No further analytical post-processors are available for this query.
+            {% if subqueries|length > 0 %}
+                Results for analyses that were run earlier are available in the panel above.
+            {% endif %}
+        </p>
+    {% else %}
+        <h3 class="blocktitle section-header"><span>Select analysis</span></h3>
+        {% if is_postprocessor_running %}
+            <p class="result-warning glued">Further analyses may be queued once all analyses currently queued for this
+                result have been completed.</p>
+        {% endif %}
+        <ol class="postprocessor-list">
+            {% for processor in postprocessors.values() %}
+                <li>
+                    <form action="/results/{{ query.key }}/postprocessors/queue/{{ processor.type }}/" method="POST">
+                        <p><em>{{ processor.name }}</em>:
+                            {{ processor.description }}{% if processor.description[-1] != "." %}.{% endif %}
+                            Output: {{ processor.extension }} file.</p>
+                        <p class="queue-button-wrap {% if is_postprocessor_running %}hidden{% endif %}"><button>Queue</button></p>
+                        {% if processor.options %}
+                            <fieldset class="postprocessor-options">
+                                {% for option in processor.options %}
+                                    {% include "postprocessor-option.html" %}
+                                {% endfor %}
+                            </fieldset>
+                        {% endif %}
+                    </form>
+                </li>
+            {% endfor %}
+        </ol>
     {% endif %}
-    </p>
-{% else %}
-    <h3 class="blocktitle section-header"><span>Select analysis</span></h3>
-{% if is_postprocessor_running %}
-    <p class="result-warning glued">Further analyses may be queued once all analyses currently queued for this result have been completed.</p>
-{% endif %}
-<ol class="postprocessor-list">
-{% for processor in postprocessors.values() %}
-    <li>
-        <p><em>{{ processor.name }}</em>: {{ processor.description }}{% if processor.description[-1] != "." %}.{% endif %} Output: {{ processor.extension }} file.</p>
-        <p class="queue-button-wrap {% if is_postprocessor_running %}hidden{% endif %}"><a href="/results/{{ query.key }}/postprocessors/queue/{{ processor.type }}/" class="button-like">Queue</a></p>
-    </li>
-{% endfor %}
-</ol>
-{% endif %}
 {% endif %}
 
 {% include "posts-preview.html" %}
