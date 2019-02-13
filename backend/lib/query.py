@@ -54,7 +54,7 @@ class SearchQuery:
 				raise TypeError("SearchQuery() requires either 'key', or 'parameters' to be given")
 
 			self.query = self.get_label(parameters)
-			self.key = self.get_key(self.query, parameters)
+			self.key = self.get_key(self.query, parameters, parent)
 			current = self.db.fetchone("SELECT * FROM queries WHERE key = %s AND query = %s", (self.key, self.query))
 
 		if current:
@@ -200,7 +200,7 @@ class SearchQuery:
 		self.data["result_file"] = file
 		return updated > 0
 
-	def get_key(self, query, parameters):
+	def get_key(self, query, parameters, parent=""):
 		"""
 		Generate a unique key for this query that can be used to identify it
 
@@ -211,7 +211,7 @@ class SearchQuery:
 		:param parameters:  Query parameters
 		:return str:  Query key
 		"""
-		plain_key = repr(parameters) + str(query)
+		plain_key = repr(parameters) + str(query) + parent
 		return hashlib.md5(plain_key.encode("utf-8")).hexdigest()
 
 	def get_status(self):
