@@ -895,8 +895,10 @@ ol.result-list {
 	transition: 0.25s;
 }
 
-.queue-button-wrap.hidden .button-like, .queue-button-wrap button {
+.queue-button-wrap.hidden .button-like, .queue-button-wrap.hidden button {
 	opacity: 0;
+	height: 0;
+	overflow: hidden;
 }
 
 .result-preview ol {
