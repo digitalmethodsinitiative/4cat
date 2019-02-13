@@ -119,15 +119,19 @@ class JobQueue:
 		:param jobtype:  Job type
 		:param details:  Job details - may be empty, will be stored as JSON
 		:param remote_id:  Remote ID of object to work on. For example, a post or thread ID
+
+		:return bool:  Whether anything was inserted into the database - if
+		               not, the job already existed (but will still be
+		               executed)
 		"""
-		self.db.insert("jobs", data={
+		return self.db.insert("jobs", data={
 			"jobtype": jobtype,
 			"details": json.dumps(details),
 			"timestamp": int(time.time()),
 			"remote_id": remote_id,
 			"timestamp_after": claim_after,
 			"interval": interval
-		}, safe=True, constraints=("jobtype", "remote_id"))
+		}, safe=True, constraints=("jobtype", "remote_id")) > 0
 
 	def release_all(self):
 		"""
