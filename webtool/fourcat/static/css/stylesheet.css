@@ -18,7 +18,7 @@ button, .button-like {
 	border: 2px solid black;
 	background-color: white;
 	text-align: center;
-	padding: 3px;
+	padding: 0 0.5em;
 	cursor: pointer;
 }
 
@@ -845,7 +845,7 @@ ol.result-list {
     color: #AAA;
 }
 
-.result .property-badge {
+.property-badge {
     font-size: 0.6em;
     display: inline-block;
     border: 1px solid #000;
@@ -895,7 +895,7 @@ ol.result-list {
 	transition: 0.25s;
 }
 
-.queue-button-wrap.hidden .button-like {
+.queue-button-wrap.hidden .button-like, .queue-button-wrap button {
 	opacity: 0;
 }
 
@@ -972,7 +972,7 @@ ol.result-list {
 	animation: blur-out 0.25s normal forwards;
 }
 
-#popup-panel p, #popup-panel ol {
+#popup-panel p:not(.glued), #popup-panel ol {
     margin: 0 1em;
 }
 
@@ -996,10 +996,16 @@ ol.postprocessor-list {
 	margin: 0;
 }
 
-.postprocessor-list li {
+.postprocessor-list li form {
     display: grid;
     grid-template-columns: auto 5em;
     padding: 0.5em;
+}
+
+.postprocessor-list li fieldset {
+	padding: 0 1em 0 1em;
+	transition: 0.25s;
+	overflow: hidden;
 }
 
 .postprocessor-list li p:nth-child(2) {
