@@ -1,1 +1,8 @@
-<li id="subquery-{{ subquery.key }}" class="subquery{% if not subquery.is_finished %} running{% endif %}">{{ subquery.postprocessor.name }} ({% if subquery.is_finished %}<a href="/result/{{ subquery.result_file }}">{% if subquery.num_rows > 0 %}{{ subquery.num_rows }} items, {% endif %}{{ subquery.postprocessor.extension }}</a>{% elif subquery.status == "" %}Queued{% else %}Running - {{ subquery.status }}{% endif %})</li>
+<li id="subquery-{{ subquery.key }}"
+    class="subquery{% if not subquery.is_finished %} running{% endif %}">{{ subquery.postprocessor.name or "(Deprecated analysis) " + subquery.parameters.type }} ({% if subquery.is_finished %}<a href="/result/{{ subquery.result_file }}">{% if subquery.num_rows > 0 %}{{ subquery.num_rows }} items, {% endif %}{{ subquery.postprocessor.extension or subquery.result_file.split(".")[-1] }}</a>{% elif subquery.status == "" %}Queued{% else %}Running - {{ subquery.status }}{% endif %})
+{% if "parameters" in subquery and "options" in subquery.parameters %}
+    {% for option in subquery.parameters.options %}
+        <span class="property-badge">{% if "options" in subquery.postprocessor and subquery.postprocessor.options[option].type == "toggle" %}{% if subquery.parameters.options[option] %}{{ option }}{% endif %}{% else %}{{ option }}={{ subquery.parameters.options[option] }}{% endif %}</span>
+    {% endfor %}
+{% endif %}
+</li>

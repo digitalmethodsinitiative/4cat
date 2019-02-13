@@ -6,7 +6,7 @@ import config
 import datetime
 import markdown
 
-from flask import render_template, jsonify, abort, request, redirect, send_from_directory
+from flask import render_template, jsonify, abort, request, redirect, send_from_directory, flash, get_flashed_messages
 from flask_login import login_required, current_user
 from fourcat import app, db, queue, openapi, limiter
 from fourcat.helpers import Pagination, string_to_timestamp, load_postprocessors, get_available_postprocessors, get_preview
@@ -14,7 +14,7 @@ from fourcat.helpers import Pagination, string_to_timestamp, load_postprocessors
 from backend.lib.query import SearchQuery
 from backend.lib.job import Job
 from backend.lib.exceptions import JobAlreadyExistsException, JobNotFoundException
-from backend.lib.helpers import get_absolute_folder
+from backend.lib.helpers import get_absolute_folder, UserInput
 
 from stop_words import get_stop_words
 
@@ -336,12 +336,16 @@ def show_result(key):
 	for subquery in analyses["running"]:
 		details = json.loads(subquery["parameters"])
 		subquery["parameters"] = details
-		subquery["postprocessor"] = processors[details["type"]]
+
+		if details["type"] not in processors:
+			subquery["postprocessor"] = {}
+		else:
+			subquery["postprocessor"] = processors[details["type"]]
 
 		if not subquery["is_finished"]:
 			is_postprocessor_running = True
 
-		if details["type"] in unfinished_postprocessors:
+		if details["type"] in unfinished_postprocessors and not unfinished_postprocessors[details["type"]].get("options", None):
 			del unfinished_postprocessors[details["type"]]
 
 	# likewise, see if any post-processor jobs were queued (but have not been
@@ -351,7 +355,8 @@ def show_result(key):
 	available_postprocessors = unfinished_postprocessors.copy()
 	for job in analyses["queued"]:
 		if job.data["jobtype"] in unfinished_postprocessors:
-			del available_postprocessors[job.data["jobtype"]]
+			if not unfinished_postprocessors[job.data["jobtype"]].get("options", {}):
+				del available_postprocessors[job.data["jobtype"]]
 			is_postprocessor_running = True
 
 			if job.data["timestamp_claimed"] == 0:
@@ -359,6 +364,7 @@ def show_result(key):
 					"key": "job%s" % job.data["id"],
 					"postprocessor": processors[job.data["jobtype"]],
 					"is_finished": False,
+					"parameters": {"options": job.details.get("options", {})},
 					"status": ""
 				})
 
@@ -373,7 +379,7 @@ def show_result(key):
 	standalone = "postprocessors" not in request.url
 	template = "result.html" if standalone else "result-details.html"
 	return render_template(template, preview=preview, query=querydata, postprocessors=available_postprocessors,
-						   subqueries=filtered_subqueries, is_postprocessor_running=is_postprocessor_running)
+						   subqueries=filtered_subqueries, is_postprocessor_running=is_postprocessor_running, messages=get_flashed_messages())
 
 
 @app.route('/results/<string:key>/postprocessors/queue/<string:postprocessor>/', methods=["GET", "POST"])
@@ -401,8 +407,19 @@ def queue_postprocessor(key, postprocessor):
 	if postprocessor not in available:
 		abort(404)
 
+	# process further options
+	details = {"type": postprocessor, "options": {}}
+	for option in available[postprocessor]["options"]:
+		settings = available[postprocessor]["options"][option]
+		if settings["type"] == UserInput.OPTION_TOGGLE:
+			details["options"][option] = request.values.get("option-" + option, None) is not None
+		else:
+			details["options"][option] = request.values.get("option-" + option, settings.get("default", None))
+
 	# okay, we're good - queue it
-	queue.add_job(jobtype=postprocessor, remote_id=query.key, details={"type": postprocessor})
+	added = queue.add_job(jobtype=postprocessor, remote_id=query.key, details=details)
+	if not added:
+		flash("Another analysis of this type (%s) is already queued. Wait until it completes to queue another." % available[postprocessor]["name"])
 
 	if is_async:
 		return jsonify({"status": "success"})
@@ -443,6 +460,7 @@ def check_postprocessor():
 			details = json.loads(query.data["parameters"])
 			subquery = query.data
 			subquery["postprocessor"] = processors[details["type"]]
+			subquery["parameters"] = details
 
 			subqueries.append({
 				"key": query.key,
@@ -455,6 +473,7 @@ def check_postprocessor():
 				"key": "job%s" % query.data["id"],
 				"is_finished": False,
 				"postprocessor": processors[query.data["jobtype"]],
+				"parameters": {"options": query.details.get("options", {})},
 				"status": ""
 			}
 			subqueries.append({
