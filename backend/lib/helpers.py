@@ -7,6 +7,7 @@ import os
 
 import config
 
+
 def get_absolute_folder(folder=""):
 	"""
 	Get absolute path to a folder
@@ -43,3 +44,7 @@ def init_datasource(database, logger, queue, name):
 
 	for board in config.PLATFORMS[name]["boards"]:
 		queue.add_job(name + "-board", remote_id=board, interval=60)
+
+
+class UserInput:
+	OPTION_TOGGLE = "toggle"
