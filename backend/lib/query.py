@@ -211,7 +211,8 @@ class SearchQuery:
 		:param parameters:  Query parameters
 		:return str:  Query key
 		"""
-		plain_key = repr(parameters) + str(query) + parent
+		
+		plain_key = repr(parameters) + str(query) + str(parent)
 		return hashlib.md5(plain_key.encode("utf-8")).hexdigest()
 
 	def get_status(self):

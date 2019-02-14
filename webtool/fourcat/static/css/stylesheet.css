@@ -171,8 +171,8 @@ button#submitdata {
 }
 
 .filter-container {
-	padding-top: 10px;
-	padding-bottom: 10px;
+	padding-top: 5px;
+	padding-bottom: 5px;
 	border-bottom: 1px dotted rgba(0,0,0,.1);
 }
 
@@ -184,6 +184,11 @@ button#submitdata {
 	display: inline-block;
 	min-width:  210px;
 	vertical-align: top;
+
+}
+
+.filter-box > .filter-box-label > label{
+	margin-bottom: 0px;
 }
 
 .filter-box > ul {
@@ -363,6 +368,10 @@ input[type="radio"]:checked + label {
 .btn_filterbutton {
 	width: 100px;
 	margin-top: 0px;
+}
+
+#btn_go {
+	margin-top: 10px;
 }
 
 #btn_clear {
