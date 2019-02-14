@@ -16,64 +16,74 @@
                                     </span>
                                 </div>
                                 <div id='filterinputs'>
-                                    <div class='filter-box'>
-                                        <div class='filter-box-label'>
-                                            <span>Platform:</span>
-                                        </div>
-                                        <select name="platform" id='platform-select'>
-                                            {% for platform in boards %}
-                                                <option value="{{ platform }}">{{ platform }}</option>
-                                            {% endfor %}
-                                        </select>
-                                    </div>
-                                    <div class='filter-box'>
-                                        <div class='filter-box-label'>
-                                            <span>Board:</span>
-                                        </div>
-                                        <input id="board-select" name="board" value="pol" placeholder="pol">
-                                    </div>
-                                    <div class='filter-box'>
-                                        <div class='filter-box-label'>
-                                            <span>Post body:</span>
+                                    <div class='filter-container'>
+                                        <div class='filter-box'>
+                                            <div class='filter-box-label'>
+                                                <span>Platform:</span>
                                             </div>
-                                        <input name="body_query" id='body-input' type='text' maxlength='200'>
-                                    </div>
-                                    <div class='filter-box'>
-                                        <div class='filter-box-label'>
-                                            <span>OP subject:</span>
+                                            <select name="platform" id='platform-select'>
+                                                {% for platform in boards %}
+                                                    <option value="{{ platform }}">{{ platform }}</option>
+                                                {% endfor %}
+                                            </select>
                                         </div>
-                                        <input name="subject_query" id='subject-input' type='text' maxlength='200'>
-                                    </div>
-                                    <div class='filter-box'>
-                                        <div class='filter-box-label'>
-                                            <label for='check-full-thread'> Return full threads</label>
+                                        <div class='filter-box'>
+                                            <div class='filter-box-label'>
+                                                <span>Board:</span>
+                                            </div>
+                                            <input id="board-select" name="board" value="pol" placeholder="pol">
                                         </div>
-                                        <input name="full_threads" type='checkbox' id='check-full-thread'> (warning: slow!)
                                     </div>
-                                    <div class='filter-box'>
-                                        <div class='filter-box-label'>
-                                            <input name="dense_threads" type='checkbox' id='check-dense-threads' class='input-dense'>
-                                            <label for='check-dense-threads'><span class='density-keyword'>keyword</span>-dense threads:</label>
+                                    <div class='filter-container'>
+                                        <div class='filter-box'>
+                                            <div class='filter-box-label'>
+                                                <span>Post body:</span>
+                                                </div>
+                                            <input name="body_query" id='body-input' type='text' maxlength='200'>
                                         </div>
-                                        <ul>
-                                            <li>
-                                                <input name="dense_percentage" id='dense-percentage' class='input-dense input-number' type='number' value='15' min='10' max='100'>
-                                                <label for='dense-percentage'>% of posts containing <span class='density-keyword'>keyword</span> in thread (min 10%)</label>
-                                            </li>
-                                            <li>
-                                                <input name="dense_length" id='dense-thread-length' class='input-dense input-number' type='number' value='30' min='10'>
-                                                <label for='dense-thread-length'>Total posts in thread (min 10)</label>
-                                            </li>
-                                        </ul>
                                     </div>
-
-                                    <div class='filter-box' id='filter_time'>
-                                        <div class='filter-box-label'>
-                                            <input name="use_date" type='checkbox' id='check-time'>
-                                            <label for='check-time'>Date range</label>
+                                    <div class='filter-container'>
+                                        <div class='filter-box'>
+                                            <div class='filter-box-label'>
+                                                <span>OP subject:</span>
+                                            </div>
+                                            <input name="subject_query" id='subject-input' type='text' maxlength='200'>
                                         </div>
-                                        <input name="min_date" id='input-min-time' class='input-time' type='date' placeholder='dd-mm-yyyy' disabled='disabled'> to
-                                        <input name="max_date" id='input-max-time' class='input-time' type='date' placeholder='dd-mm-yyyy' disabled='disabled'> <span class='red'></span>
+                                        <div class='filter-box'>
+                                            <div class='filter-box-label'>
+                                                <label for='check-full-thread'> Return full threads</label>
+                                            </div>
+                                            <input name="full_threads" type='checkbox' id='check-full-thread'> (warning: slow!)
+                                        </div>
+                                    </div>
+                                    <div class='filter-container'>
+                                        <div class='filter-box'>
+                                            <div class='filter-box-label'>
+                                                <input name="dense_threads" type='checkbox' id='check-dense-threads' class='input-dense'>
+                                                <label for='check-dense-threads'><span class='density-keyword'>keyword</span>-dense threads:</label>
+                                            </div>
+                                            <ul>
+                                                <li>
+                                                    <input name="dense_percentage" id='dense-percentage' class='input-dense input-number' type='number' value='15' min='10' max='100'>
+                                                    <label for='dense-percentage'>% of posts containing <span class='density-keyword'>keyword</span> in thread (min 10%)</label>
+                                                </li>
+                                                <li>
+                                                    <input name="dense_length" id='dense-thread-length' class='input-dense input-number' type='number' value='30' min='10'>
+                                                    <label for='dense-thread-length'>Total posts in thread (min 10)</label>
+                                                </li>
+                                            </ul>
+                                            
+                                        </div>
+                                    </div>
+                                    <div class='filter-container'>
+                                        <div class='filter-box' id='filter_time'>
+                                            <div class='filter-box-label'>
+                                                <input name="use_date" type='checkbox' id='check-time'>
+                                                <label for='check-time'>Date range</label>
+                                            </div>
+                                            <input name="min_date" id='input-min-time' class='input-time' type='date' placeholder='dd-mm-yyyy' disabled='disabled'> to
+                                            <input name="max_date" id='input-max-time' class='input-time' type='date' placeholder='dd-mm-yyyy' disabled='disabled'> <span class='red'></span>
+                                        </div>
                                     </div>
                                     <button class='btn_filterbutton' id='btn_go'>Go</button>
                                 </div>

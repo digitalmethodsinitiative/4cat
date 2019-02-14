@@ -9,7 +9,7 @@
 }
 
 
-body{
+body {
 	margin: 0;
 }
 
@@ -32,32 +32,32 @@ button, .button-like {
     color: #000;
 }
 
-input, textarea{
+input, textarea {
 	border: 2px solid black;
 	padding: 3px;
 }
 
-select{
+select {
 	border: 2px solid black;
 	padding: 3px;
 	font-family: 'fixedsys','Lekton', Courier;
 	background-color: #f8ed74;;
 }
 
-option.selectoption{
+option.selectoption {
 	font-family: 'fixedsys','Lekton', Courier;
 }
 
-select#dataselection{
+select#dataselection {
 	width: 500px;
 	display: none;
 }
 
-p{
+p {
 	margin: 0;
 }
 
-.invisible{
+.invisible {
 	display: none;
 }
 
@@ -65,7 +65,7 @@ h1 {
 	margin-bottom: 0;
 }
 
-h1, h2, h3.blocktitle, .header{
+h1, h2, h3.blocktitle, .header {
 	text-align: center;
 	background-color: #485ba6;
 }
@@ -107,33 +107,33 @@ h1 a:hover, h2 a:hover, h3.blocktitle a:hover {
 	color: #4eff52;
 }
 
-.pagetitle{
+.pagetitle {
 	background-color: black;
 	display: inline-block;
 }
 
-.header span{
+.header span {
 	font-size: 25px;
 	color: white;
 	height: 100%
 }
 
-.col-lg-9.topdiv,.col-lg-3.topdiv{
+.col-lg-9.topdiv,.col-lg-3.topdiv {
 	padding-left: 0px;
 	padding-right: 0px;
 }
 
-.col-lg-3.topdiv{
+.col-lg-3.topdiv {
 	background: #50ff50 url('../img/patterngreen.jpg');
 	border-left: 2px solid black;
 	border-right: 2px solid black;
 }
 
-button{
+button {
 	margin:2px;
 }
 
-button:active{
+button:active {
 	background-color: black;
 	color:white;
 }
@@ -145,12 +145,12 @@ button::-moz-focus-inner {
 :focus {
 	outline:none !important;
 }
-button.inactive{
+button.inactive {
 	background-color: red;
 	display: none;
 }
 
-button#submitdata{
+button#submitdata {
 	width: 100%;
 	margin: 0 auto;
 	margin-top: 10px;
@@ -158,16 +158,22 @@ button#submitdata{
 	display: block;
 }
 
-#filterinputs{
+#filterinputs {
 	padding: 10px;
 }
 
 
-.filterrow{
+.filterrow {
 	position: relative;
 	margin-top:5px;
 	margin-bottom: 5px;
 	min-height: 35px;
+}
+
+.filter-container {
+	padding-top: 10px;
+	padding-bottom: 10px;
+	border-bottom: 1px dotted rgba(0,0,0,.1);
 }
 
 .filter-box {
@@ -187,34 +193,34 @@ button#submitdata{
 	padding: 0px;
 }
 
-.filterrow button{
+.filterrow button {
 	float: right;
 }
 
-select{
+select {
 	max-width: 100%;
 }
 
-#buttonselections{
+#buttonselections {
 	background-color: #f8ed74;
 	padding: 10px;
 	border-bottom: 2px solid black;
 }
 
-#submitform{
+#submitform {
 	padding: 10px;
 }
 
-#submitform > div.submitdiv{
+#submitform > div.submitdiv {
 	display: inline-block;
 	margin-top: 8px;
 }
 
-.submitdiv > select{
+.submitdiv > select {
 	max-width: 100px;
 }
 
-#submitform > input, #submitform> textarea{
+#submitform > input, #submitform> textarea {
 	width: 330px;
 }
 
@@ -233,16 +239,16 @@ select{
 	display: none;
 }
 
-.loader img{
+.loader img {
 	width: 33px;
 }
 
-textarea#notes{
+textarea#notes {
 	height: 50px;
 	width: 250px;
 }
 
-table, th, td{
+table, th, td {
 	text-align: left;
 	border-collapse: collapse;
 	border: 1px solid black;
@@ -251,17 +257,17 @@ table, th, td{
 	margin-bottom: 2px;
 }
 
-span#imagenavigation{
+span#imagenavigation {
 	text-align: center;
 	display: inherit;
 }
 
-#results{
+#results {
 	max-width: 100%;
 	min-height: 150px;
 }
 
-#results img{
+#results img {
 	margin: 0 auto;
 	display: block;
 	max-width: 100%;
@@ -269,17 +275,17 @@ span#imagenavigation{
 	margin-top: 15px;
 }
 
-.imagecheckinput{
+.imagecheckinput {
 	position: absolute;
 	right: 0;
 	top: 0;
 }
 
-.imagecheckinput label{
+.imagecheckinput label {
 	font-size: 22px;
 }
 
-#searchinput{
+#searchinput {
 	width: 175px;
 }
 
@@ -291,7 +297,7 @@ input.input-number {
 	width: 50px;
 }
 
-input[type="checkbox"].imgsubmit{
+input[type="checkbox"].imgsubmit {
 	border: 2px solid black;
 	width: 20px;
 }
@@ -305,7 +311,7 @@ input[type="radio"] + label {
     margin-right: 13px;
 }
 
-input[type="radio"].mainselect{
+input[type="radio"].mainselect {
 	display: inline;
 }
 
@@ -323,12 +329,12 @@ input[type="radio"]:checked + label {
     color: white;
 }
 
-#resultsdiv{
+#resultsdiv {
 	padding-left: 0px;
 	padding-right: 0px;
 }
 
-#resultsheader{
+#resultsheader {
 	background: url(../img/patternblue.jpg);
 	border-top: 2px solid black;
 	border-bottom: 2px solid black;
@@ -336,42 +342,42 @@ input[type="radio"]:checked + label {
 	position: relative;
 }
 
-#imagenavigationdiv{
+#imagenavigationdiv {
 	position: relative;
 	background-color: #f8ed74;
 	border-bottom: 2px solid black;
 }
 
-#imagenavigationdiv.inactive{
+#imagenavigationdiv.inactive {
 	display: none;
 	border: 0px;
 }
 
 
-#resultsheadertext{
+#resultsheadertext {
 	color: white;
 	font-size: 25px;
 	height: 100%;
 }
 
-.btn_filterbutton{
+.btn_filterbutton {
 	width: 100px;
 	margin-top: 0px;
 }
 
-#btn_clear{
+#btn_clear {
 	position: absolute;
 	right: 2px;
 	background-color: #485ba6;
 	color:white;
 }
 
-#btn_clear:active{
+#btn_clear:active {
 	background-color: black;
 	color: white;
 }
 
-p.imgpost{
+p.imgpost {
 	max-width: 600px;
 	margin: 0 auto;
 	font-size: 22px;
@@ -379,7 +385,7 @@ p.imgpost{
 
 
 /* BIG SCREEN */
-.notificationheader{
+.notificationheader {
 	background-color: #f8ed74;
 	text-align: center;
 	padding: 10px;
@@ -387,7 +393,7 @@ p.imgpost{
 	border-bottom: 2px solid black;
 }
 
-.notificationheader h1{
+.notificationheader h1 {
 	font-size: 33px;
 	color: black;
 	padding-top: 0px;
@@ -396,43 +402,43 @@ p.imgpost{
 	margin-bottom: 0px;
 }
 
-.notificationheader span.url{
+.notificationheader span.url {
 	font-size: 33px;
 	background-color: black;
 	color: white;
 }
 
-.col-lg-9.submitscreen{
+.col-lg-9.submitscreen {
 	max-height: 85vh;
 	overflow-y: scroll;
 }
 
-#submitform{
+#submitform {
 	height: 100%;
 	max-height: 295px;
 	overflow-y: scroll;
 }
 
-#submitpaneltitle{
+#submitpaneltitle {
 	width: 100%;
 	background: url(../img/patternblue.jpg);
 	text-align: center;
 	border-bottom: 2px solid black;
 }
 
-#submitheader{
+#submitheader {
 	color: white;
 	font-size: 25px;
 	height: 100%;
 }
 
-#filterresults{
+#filterresults {
 	width: 100%;
 	background: url(../img/patternblue.jpg);
 	color: white;
 }
 
-.submission{
+.submission {
 	border-top: 2px solid black;
 	width: 100%;
 	font-size: 30px;
@@ -440,39 +446,39 @@ p.imgpost{
 }
 
 
-.submission.sticky{
+.submission.sticky {
 	border: 2px solid green;
 }
 
-.fullpost{
+.fullpost {
 	padding: 15px;
 	overflow-x:scroll;
 }
 
-.fullpost > img{
+.fullpost > img {
 	max-width: 400px;
 	max-height: 500px;
 	border: 5px solid black;
 }
 
-.div_notes p{
+.div_notes p {
 	font-size: 20px;
 	margin-bottom: 10px;
 }
 
-.span_posttitle{
+.span_posttitle {
 	font-size: 35px;
 }
 
 
-.span_theme{
+.span_theme {
 	position:absolute;
 	top: 24px;
 	right: 15px;
 	color:purple;
 }
 
-.span_meme{
+.span_meme {
 	position:absolute;
 	right:15px;
 	top: 6px;
@@ -480,49 +486,49 @@ p.imgpost{
 }
 
 
-.col-lg-9.submitscreen,.col-lg-3.submitscreen{
+.col-lg-9.submitscreen,.col-lg-3.submitscreen {
 	padding-left: 0px;
 	padding-right: 0px;
 }
 
-.col-lg-3.submitscreen span{
+.col-lg-3.submitscreen span {
 	font-size: 25px;
 	background-color: black;
 	text-align: center;
 	margin: 0 auto;
 }
 
-#rules{
+#rules {
 	background-color: #ff5750;
 }
 
-#schedule{
+#schedule {
 	background: #50ff50 url('../img/patterngreen.jpg');
 }
 
-.sidebarcontent{
+.sidebarcontent {
 	padding: 10px;
 	color: black;
 }
 
-.btn_expand{
+.btn_expand {
 	font-size: 30px;
 	cursor: pointer;
 	margin-left: 5px;
 	padding: 10px;
 }
-#backbutton{
+#backbutton {
 	display: none;
 	position: absolute;
 	left: 0;
 }
 
-span.activity.needed{
+span.activity.needed {
 	font-size: 17px;
 	background-color: transparent;
 }
 
-.sidebartitle{
+.sidebartitle {
 	border-top: 2px solid black;
 	border-bottom: 2px solid black;
 	width: 100%;
@@ -531,21 +537,21 @@ span.activity.needed{
 	color: white;
 }
 
-#schedule > p{
+#schedule > p {
 	color: black;
 }
 
-#schedule > p > span > a{
+#schedule > p > span > a {
 	color: #ff5750;;
 }
 
-.presentationimg{
+.presentationimg {
 	max-width: 100% !important;
 	border: 5px solid black;
 	margin-bottom: 5px;
 }
 
-#notifications{
+#notifications {
 	position: absolute;
 	right:10px;
 	top:5px;
@@ -553,15 +559,15 @@ span.activity.needed{
 
 }
 
-input, textarea{
+input, textarea {
 	max-width: 100%;
 }
 
-img{
+img {
 	cursor: pointer;
 }
 
-.page-footer{
+.page-footer {
 	padding-top: 10px;
 	padding-bottom: 10px;
 	background: #50ff50 url(../img/patterngreen.jpg);
@@ -577,7 +583,7 @@ label {
 	color: #485ba6;
 }
 
-.red{
+.red {
 	color: red;
 }
 
