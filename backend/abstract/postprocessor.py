@@ -23,6 +23,7 @@ class BasicPostProcessor(BasicWorker, metaclass=abc.ABCMeta):
 	parent = None
 	source_file = None
 	description = "No description available"
+	category = "Other"
 	extension = "csv"
 	options = {}
 

@@ -130,6 +130,7 @@ def load_postprocessors():
 					member[1]):
 				postprocessors[member[1].type] = {
 					"type": member[1].type,
+					"category": member[1].category,
 					"description": member[1].description,
 					"name": member[1].title,
 					"extension": member[1].extension,

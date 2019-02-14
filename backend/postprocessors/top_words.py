@@ -16,6 +16,8 @@ class PostTokeniser(BasicPostProcessor):
 	Count how often each country code occurs in the result set
 	"""
 	type = "count-words"  # job type ID
+
+	category = "Text analysis" # category
 	title = "Top (popular) words"  # title displayed in UI
 	description = "Generate a list of most-used words used in the results, and how often they are used. Stop words are ignored."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI

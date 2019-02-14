@@ -17,6 +17,7 @@ class UsernameExtractor(BasicPostProcessor):
 	to describe this post-processor with in a user interface.
 	"""
 	type = "extract-usernames"  # job type ID
+	category = "Post metrics" # category
 	title = "Top usernames"  # title displayed in UI
 	description = "Build a list with distinct usernames in the source file, and how many posts were found per username"  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI

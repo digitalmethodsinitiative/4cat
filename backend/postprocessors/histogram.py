@@ -16,6 +16,7 @@ class HistogramRenderer(BasicPostProcessor):
 	Generate activity histogram
 	"""
 	type = "monthly-histogram"  # job type ID
+	category = "Visual" # category
 	title = "Histogram (monthly)"  # title displayed in UI
 	description = "Generates a histogram (bar graph) that aggregates the number of posts per month to provide an impression of over-time activity in the data set"  # description displayed in UI
 	extension = "png"  # extension of result file, used internally and in UI

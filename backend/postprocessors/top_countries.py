@@ -13,6 +13,7 @@ class CountryCounter(BasicPostProcessor):
 	Count how often each country code occurs in the result set
 	"""
 	type = "count-countries"  # job type ID
+	category = "Post metrics" # category
 	title = "Top countries"  # title displayed in UI
 	description = "Generate a list of country codes present in the result set and sort it by how often the country is present."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
