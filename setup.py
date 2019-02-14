@@ -36,11 +36,11 @@ setup(
 		"nltk==3.3",
 		"Pillow==5.3.0",
 		"adjustText==0.7.3",
-		"beautifulsoup4==4.6.3",
 		"psycopg2==2.7.5",
 		"scikit_learn==0.20.0",
 		"python-daemon==1.2",
 		"bcrypt==3.1.4",
 		"markdown==3.0.1"
+
 	]
 )
