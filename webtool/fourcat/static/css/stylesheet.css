@@ -86,6 +86,14 @@ h3.section-header + p:not(.glued) {
 	margin-top: 0.5em;
 }
 
+h4.section-subheader {
+	text-transform: uppercase;
+	font-size: 16px;
+	background-color: #000;
+	color: #fff;
+	padding-left: 25px;
+}
+
 h1 span, h2 span, h3.blocktitle span {
 	background: #000;
 	display: inline-block;
@@ -183,7 +191,6 @@ button#submitdata {
 .filter-box > .filter-box-label {
 	display: inline-block;
 	min-width:  210px;
-	vertical-align: top;
 
 }
 
@@ -999,6 +1006,12 @@ ol.result-list {
 }
 
 /* select postprocessor */
+ol.postprocessor-category {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
 ol.postprocessor-list {
     list-style: none;
     margin: 0;
