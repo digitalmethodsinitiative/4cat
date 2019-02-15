@@ -50,12 +50,8 @@ class Tokenise(BasicPostProcessor):
 		This takes a 4CAT results file as input, and outputs a plain text file
 		containing all post bodies as one continuous string, sanitized.
 		"""
-		delete_regex = re.compile(r"[^a-zA-Z)(.,\n -]")
-
-		posts = 0
 		self.query.update_status("Processing posts")
 
-		collapse_whitespace = re.compile(r"\s+")
 		link_regex = re.compile(r"https?://[^\s]+")
 		token_regex = re.compile(r"[a-zA-Z\-\)\(]{3,50}")
 
@@ -117,8 +113,7 @@ class Tokenise(BasicPostProcessor):
 					subunits[output] = set()
 
 				# clean up text and get tokens from it
-				body = collapse_whitespace.sub(" ", post["body"])
-				body = link_regex.sub(" ", body)
+				body = link_regex.sub("", post["body"])
 				tokens = token_regex.findall(body)
 
 				# stem, lemmatise and save tokens that are not stopwords
