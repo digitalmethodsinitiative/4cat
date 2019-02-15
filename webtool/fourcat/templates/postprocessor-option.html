@@ -1,5 +1,12 @@
 <label>
     {% if processor.options[option].type == "toggle" %}
         <input type="checkbox" name="option-{{ option }}"{% if processor.options[option].default %} checked="checked"{% endif %}> {{ processor.options[option].help }}
+    {% elif processor.options[option].type == "choice" %}
+        {{ processor.options[option].help }}:
+        <select name="option-{{ option }}">
+        {% for choice in processor.options[option].options %}
+            <option value="{{ choice }}"{% if choice == processor.options[option].default %} selected="selected"{% endif %}>{{ processor.options[option].options[choice] }}</option>
+        {% endfor %}
+        </select>
     {% endif %}
 </label>
