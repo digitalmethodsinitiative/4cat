@@ -73,9 +73,8 @@ class StringQuery(BasicWorker, metaclass=abc.ABCMeta):
 		results_file = results_file.replace("*", "")
 
 		posts = self.execute_query(query_parameters)
-		if not posts:
-			self.query.set_empty()
-		else:
+
+		if posts:
 			self.posts_to_csv(posts, results_file)
 
 		num_posts = len(posts) if posts else 0
