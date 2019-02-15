@@ -80,6 +80,7 @@ def load_postprocessors():
 					"name": member[1].title,
 					"extension": member[1].extension,
 					"class": member[0],
+					"category": member[1].category if hasattr(member[1], "category") else "other",
 					"accepts": member[1].accepts if hasattr(member[1], "accepts") else [],
 					"options": member[1].options if hasattr(member[1], "options") else {}
 				}
