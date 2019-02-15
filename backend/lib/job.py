@@ -63,6 +63,27 @@ class Job:
 		"""
 		return Job(data, database)
 
+	def get_by_remote_ID(remote_id, database, jobtype="*"):
+		"""
+		Instantiate job object by combination of remote ID and job type
+
+		This combination is guaranteed to be unique.
+
+		:param database: Database handler
+		:param str jobtype: Job type
+		:param int remote_id: Job remote ID
+		:return Job: Job object
+		"""
+		if jobtype != "*":
+			data = database.fetchone("SELECT * FROM jobs WHERE jobtype = %s AND remote_id = %s", (jobtype, remote_id))
+		else:
+			data = database.fetchone("SELECT * FROM jobs WHERE remote_id = %s", (remote_id))
+
+		if not data:
+			raise JobNotFoundException
+
+		return Job.get_by_data(data, database=database)
+
 	def claim(self):
 		"""
 		Claim a job

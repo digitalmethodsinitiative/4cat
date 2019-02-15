@@ -104,42 +104,6 @@ def string_to_timestamp(string):
 	return int(date.timestamp())
 
 
-def load_postprocessors():
-	"""
-	See what post-processors are available
-
-	Looks for python files in the PP folder, then looks for classes that
-	are a subclass of BasicPostProcessor that are available in those files, and
-	not an abstract class themselves. Classes that meet those criteria are
-	added to a list of available types.
-	"""
-	pp_folder = os.path.abspath(os.path.dirname(__file__)) + "/../../backend/postprocessors"
-	os.chdir(pp_folder)
-	postprocessors = {}
-
-	# check for worker files
-	for file in glob.glob("*.py"):
-		module = "backend.postprocessors." + file[:-3]
-		if module not in sys.modules:
-			importlib.import_module(module)
-
-		members = inspect.getmembers(sys.modules[module])
-
-		for member in members:
-			if inspect.isclass(member[1]) and issubclass(member[1], BasicPostProcessor) and not inspect.isabstract(
-					member[1]):
-				postprocessors[member[1].type] = {
-					"type": member[1].type,
-					"description": member[1].description,
-					"name": member[1].title,
-					"extension": member[1].extension,
-					"class": member[0],
-					"options": member[1].options if hasattr(member[1], "options") else {}
-				}
-
-	return postprocessors
-
-
 def get_available_postprocessors(query):
 	"""
 	Get available post-processors for a given query
@@ -147,21 +111,18 @@ def get_available_postprocessors(query):
 	:param SearchQuery query:  Query to load available postprocessors for
 	:return dict: Post processors, {id => settings} mapping
 	"""
-	postprocessors = load_postprocessors()
+	postprocessors = query.get_compatible_postprocessors()
 	available = postprocessors.copy()
-	analyses = query.get_analyses(queue)
+	analyses = query.get_analyses()
 
-	for subquery in analyses["running"]:
-		details = json.loads(subquery["parameters"])
-		if "type" in details and details["type"] in available and not available[details["type"]].get("options", {}):
-			del available[details["type"]]
-
-	for job in analyses["queued"]:
-		if job.data["jobtype"] in available and not available[job.data["jobtype"]].get("options", {}):
-			print(job.data["jobtype"])
-			del available[job.data["jobtype"]]
+	for category in analyses:
+		for subquery in analyses[category]:
+			details = json.loads(subquery["parameters"])
+			if "type" in details and details["type"] in available and not available[details["type"]].get("options", {}):
+				del available[details["type"]]
 
 	return available
+
 
 def get_preview(query):
 	"""
@@ -182,7 +143,16 @@ def get_preview(query):
 				break
 	return preview
 
+
 def format_post(post):
+	"""
+	Format a plain-text 4chan post for HTML display
+
+	Converts >>references into links and adds a class to greentext.s
+
+	:param str post:  Post body
+	:return str:  Formatted post body
+	"""
 	post = post.replace(">", "&gt;")
 	post = re.sub(r"&gt;&gt;([0-9]+)", "<span class=\"quote\"><a href=\"#post-\\1\">&gt;&gt;\\1</a></span>", post)
 	post = re.sub(r"^&gt;([^\n]+)", "<span class=\"greentext\">&gt;\\1</span>", post, flags=re.MULTILINE)

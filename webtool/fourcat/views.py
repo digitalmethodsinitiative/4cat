@@ -1,6 +1,5 @@
 import os
 import re
-import csv
 import json
 import config
 import datetime
@@ -9,12 +8,11 @@ import markdown
 from flask import render_template, jsonify, abort, request, redirect, send_from_directory, flash, get_flashed_messages
 from flask_login import login_required, current_user
 from fourcat import app, db, queue, openapi, limiter
-from fourcat.helpers import Pagination, string_to_timestamp, load_postprocessors, get_available_postprocessors, get_preview
+from fourcat.helpers import Pagination, string_to_timestamp, get_available_postprocessors, get_preview
 
 from backend.lib.query import SearchQuery
-from backend.lib.job import Job
 from backend.lib.exceptions import JobAlreadyExistsException, JobNotFoundException
-from backend.lib.helpers import get_absolute_folder, UserInput
+from backend.lib.helpers import get_absolute_folder, UserInput, load_postprocessors
 
 from stop_words import get_stop_words
 
@@ -221,7 +219,7 @@ def check_query(query_key):
 		"done": True if results else False,
 		"preview": preview,
 		"path": path,
-		"empty": query.data["is_empty"]
+		"empty": (query.data["num_rows"] == 0)
 	}
 
 	return jsonify(status)
@@ -291,9 +289,9 @@ def show_results(page):
 		subqueries = db.fetchall("SELECT * FROM queries WHERE key_parent = %s ORDER BY timestamp ASC", (query["key"],))
 		for subquery in subqueries:
 			subquery["parameters"] = json.loads(subquery["parameters"])
-			if "type" not in subquery["parameters"] or subquery["parameters"]["type"] not in postprocessors:
+			if subquery.data["type"] not in postprocessors:
 				continue
-			subquery["postprocessor"] = postprocessors[subquery["parameters"]["type"]]
+			subquery["postprocessor"] = postprocessors[subquery.data["type"]]
 			query["subqueries"].append(subquery)
 
 		filtered.append(query)
@@ -323,50 +321,39 @@ def show_result(key):
 		abort(404)
 
 	# initialize the data we need
-	processors = load_postprocessors()
-	unfinished_postprocessors = processors.copy()
-	is_postprocessor_running = False
-	analyses = query.get_analyses(queue)
-	filtered_subqueries = analyses["running"].copy()
 	querydata = query.data
 	querydata["parameters"] = json.loads(querydata["parameters"])
 
+	# load list of post-processors compatible with this query result
+	processors = query.get_compatible_postprocessors()
+	unfinished_postprocessors = processors.copy()
+	is_postprocessor_running = False
+
+	# determine whether any post-processors have already been run/queued
+	analyses = query.get_analyses()
+	filtered_subqueries = analyses["running"] + analyses["queued"]
+
 	# for each subquery, determine whether it is finished or running
 	# and remove it from the list of available post-processors
-	for subquery in analyses["running"]:
-		details = json.loads(subquery["parameters"])
-		subquery["parameters"] = details
+	for category in analyses:
+		for subquery in analyses[category]:
+			type = subquery["type"]
+			details = json.loads(subquery["parameters"])
+			subquery["parameters"] = details
 
-		if details["type"] not in processors:
-			subquery["postprocessor"] = {}
-		else:
-			subquery["postprocessor"] = processors[details["type"]]
+			if type not in processors:
+				# this could happen for postprocessors that were run earlier but no longer exist as class
+				subquery["postprocessor"] = {}
+			else:
+				subquery["postprocessor"] = processors[type]
 
-		if not subquery["is_finished"]:
-			is_postprocessor_running = True
+			if not subquery["is_finished"]:
+				is_postprocessor_running = True
 
-		if details["type"] in unfinished_postprocessors and not unfinished_postprocessors[details["type"]].get("options", None):
-			del unfinished_postprocessors[details["type"]]
+			if type in unfinished_postprocessors and not unfinished_postprocessors[type].get("options", None):
+				del unfinished_postprocessors[type]
 
-	# likewise, see if any post-processor jobs were queued (but have not been
-	# started yet) and also remove those from the list of available post-
-	# processors. additionally, add them as a provisional subquery to show in
-	# the UI
 	available_postprocessors = unfinished_postprocessors.copy()
-	for job in analyses["queued"]:
-		if job.data["jobtype"] in unfinished_postprocessors:
-			if not unfinished_postprocessors[job.data["jobtype"]].get("options", {}):
-				del available_postprocessors[job.data["jobtype"]]
-			is_postprocessor_running = True
-
-			if job.data["timestamp_claimed"] == 0:
-				filtered_subqueries.append({
-					"key": "job%s" % job.data["id"],
-					"postprocessor": processors[job.data["jobtype"]],
-					"is_finished": False,
-					"parameters": {"options": job.details.get("options", {})},
-					"status": ""
-				})
 
 	# show preview
 	if query.is_finished() and querydata["num_rows"] > 0:
@@ -407,19 +394,23 @@ def queue_postprocessor(key, postprocessor):
 	if postprocessor not in available:
 		abort(404)
 
-	# process further options
-	details = {"type": postprocessor, "options": {}}
+	# create a query now
+	options = {}
 	for option in available[postprocessor]["options"]:
 		settings = available[postprocessor]["options"][option]
 		if settings["type"] == UserInput.OPTION_TOGGLE:
-			details["options"][option] = request.values.get("option-" + option, None) is not None
+			options[option] = request.values.get("option-" + option, None) is not None
 		else:
-			details["options"][option] = request.values.get("option-" + option, settings.get("default", None))
+			options[option] = request.values.get("option-" + option, settings.get("default", None))
 
-	# okay, we're good - queue it
-	added = queue.add_job(jobtype=postprocessor, remote_id=query.key, details=details)
-	if not added:
-		flash("Another analysis of this type (%s) is already queued. Wait until it completes to queue another." % available[postprocessor]["name"])
+	analysis = SearchQuery(parent=query.key, parameters=options, db=db, extension=available[postprocessor]["extension"], type=postprocessor)
+	if analysis.is_new:
+		# analysis has not been run or queued before - queue a job to run it
+		job = queue.add_job(jobtype=postprocessor, remote_id=analysis.key)
+		analysis.link_job(job)
+		analysis.update_status("Queued")
+	else:
+		flash("This analysis (%s) is currently queued or has already been run. Check its status below." % available[postprocessor]["name"])
 
 	if is_async:
 		return jsonify({"status": "success"})
@@ -436,52 +427,25 @@ def check_postprocessor():
 		abort(404)
 
 	subqueries = []
+	processors = load_postprocessors()
 
 	for key in keys:
-		type = "query"
 		try:
-			if key[0:3] == "job" and len(key) > 3:
-				try:
-					query = Job.get_by_ID(key[3:], database=db)
-					type = "job"
-				except (ValueError, JobNotFoundException):
-					query = SearchQuery(job=key[3:], db=db)
-			else:
-				query = SearchQuery(key=key, db=db)
-				if query.data["key_parent"] == "":
-					continue
-		except (TypeError, ValueError) as e:
-			print(e)
+			query = SearchQuery(key=key, db=db)
+		except TypeError:
 			continue
 
-		processors = load_postprocessors()
+		details = json.loads(query.data["parameters"])
+		subquery = query.data
+		subquery["postprocessor"] = processors[query.data["type"]]
+		subquery["parameters"] = details
 
-		if type == "query":
-			details = json.loads(query.data["parameters"])
-			subquery = query.data
-			subquery["postprocessor"] = processors[details["type"]]
-			subquery["parameters"] = details
-
-			subqueries.append({
-				"key": query.key,
-				"job": details["job"] if "job" in details else "",
-				"finished": query.is_finished(),
-				"html": render_template("result-subquery.html", subquery=subquery)
-			})
-		else:
-			subquery = {
-				"key": "job%s" % query.data["id"],
-				"is_finished": False,
-				"postprocessor": processors[query.data["jobtype"]],
-				"parameters": {"options": query.details.get("options", {})},
-				"status": ""
-			}
-			subqueries.append({
-				"key": "job%s" % query.data["id"],
-				"job": query.data["id"],
-				"finished": False,
-				"html": render_template("result-subquery.html", subquery=subquery)
-			})
+		subqueries.append({
+			"key": query.key,
+			"job": details["job"] if "job" in details else "",
+			"finished": query.is_finished(),
+			"html": render_template("result-subquery.html", subquery=subquery)
+		})
 
 	return jsonify(subqueries)
 

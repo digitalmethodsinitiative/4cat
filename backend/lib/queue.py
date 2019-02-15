@@ -79,9 +79,9 @@ class JobQueue:
 
 		query = "SELECT * FROM jobs %s" % filter
 		query += ("        AND timestamp_claimed = 0"
-			"              AND timestamp_after < %s"
-			"              AND (interval = 0 OR timestamp_lastclaimed + interval < %s)"
-			"         ORDER BY timestamp ASC")
+				  "              AND timestamp_after < %s"
+				  "              AND (interval = 0 OR timestamp_lastclaimed + interval < %s)"
+				  "         ORDER BY timestamp ASC")
 
 		try:
 			jobs = self.db.fetchall(query, replacements)
@@ -120,18 +120,22 @@ class JobQueue:
 		:param details:  Job details - may be empty, will be stored as JSON
 		:param remote_id:  Remote ID of object to work on. For example, a post or thread ID
 
-		:return bool:  Whether anything was inserted into the database - if
-		               not, the job already existed (but will still be
-		               executed)
+		:return Job: A job that matches the input type and remote ID. This may
+		             be a newly added job or an existing that matched the same
+		             combination (which is required to be unique, so no new job
+		             with those parameters could be queued, and the old one is
+		             just as valid).
 		"""
-		return self.db.insert("jobs", data={
+		self.db.insert("jobs", data={
 			"jobtype": jobtype,
 			"details": json.dumps(details),
 			"timestamp": int(time.time()),
 			"remote_id": remote_id,
 			"timestamp_after": claim_after,
 			"interval": interval
-		}, safe=True, constraints=("jobtype", "remote_id")) > 0
+		}, safe=True, constraints=("jobtype", "remote_id"))
+
+		return Job.get_by_remote_ID(database=self.db, remote_id=str(remote_id), jobtype=jobtype)
 
 	def release_all(self):
 		"""

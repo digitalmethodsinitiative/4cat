@@ -41,22 +41,13 @@ class BasicPostProcessor(BasicWorker, metaclass=abc.ABCMeta):
 		processor.
 		"""
 		self.log.info("Running post-processor %s on query %s" % (self.type, self.job.data["remote_id"]))
-		self.parent = SearchQuery(key=self.job.data["remote_id"], db=self.db)
+
+		self.query = SearchQuery(key=self.job.data["remote_id"], db=self.db)
+		self.options = self.query.parameters
+		self.query.update_status("Processing data")
+
+		self.parent = SearchQuery(key=self.query.data["key_parent"], db=self.db)
 		self.source_file = self.parent.get_results_path()
-
-		# create new query, for the result of this process
-		params = {
-			"type": self.type,
-			"job": self.job.data["id"],
-			"options": self.job.data.get("options", {})
-		}
-
-		if self.job.details:
-			for field in self.job.details:
-				params[field] = self.job.details[field]
-
-		self.options = params["options"]
-		self.query = SearchQuery(parent=self.parent.key, parameters=params, db=self.db, extension=self.extension)
 
 		if not self.query.is_finished():
 			self.process()
@@ -67,7 +58,7 @@ class BasicPostProcessor(BasicWorker, metaclass=abc.ABCMeta):
 		"""
 		After processing, declare job finished
 		"""
-		self.query.update_status("Results processed.")
+		self.query.update_status("Results processed")
 		if not self.query.is_finished():
 			self.query.finish()
 		self.job.finish()

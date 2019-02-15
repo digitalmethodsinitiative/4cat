@@ -1,7 +1,9 @@
 """
 Miscellaneous helper functions for the 4CAT backend
 """
+import importlib
 import inspect
+import glob
 import sys
 import os
 
@@ -43,8 +45,48 @@ def init_datasource(database, logger, queue, name):
 		return
 
 	for board in config.PLATFORMS[name]["boards"]:
-		queue.add_job(name + "-board", remote_id=board, interval=60)
+		# queue.add_job(name + "-board", remote_id=board, interval=60)
+		pass
+
+
+def load_postprocessors():
+	"""
+	See what post-processors are available
+
+	Looks for python files in the PP folder, then looks for classes that
+	are a subclass of BasicPostProcessor that are available in those files, and
+	not an abstract class themselves. Classes that meet those criteria are
+	added to a list of available types.
+	"""
+	pp_folder = os.path.abspath(os.path.dirname(__file__)) + "/../../backend/postprocessors"
+	os.chdir(pp_folder)
+	postprocessors = {}
+
+	# check for worker files
+	for file in glob.glob("*.py"):
+		module = "backend.postprocessors." + file[:-3]
+		if module not in sys.modules:
+			importlib.import_module(module)
+
+		members = inspect.getmembers(sys.modules[module])
+
+		for member in members:
+			if inspect.isclass(member[1]) and "BasicPostProcessor" in [parent.__name__ for parent in
+																	   member[1].__bases__] and not inspect.isabstract(
+					member[1]):
+				postprocessors[member[1].type] = {
+					"type": member[1].type,
+					"description": member[1].description,
+					"name": member[1].title,
+					"extension": member[1].extension,
+					"class": member[0],
+					"accepts": member[1].accepts if hasattr(member[1], "accepts") else [],
+					"options": member[1].options if hasattr(member[1], "options") else {}
+				}
+
+	return postprocessors
 
 
 class UserInput:
 	OPTION_TOGGLE = "toggle"
+	OPTION_CHOICE = "choice"
