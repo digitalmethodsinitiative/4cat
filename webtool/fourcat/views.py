@@ -399,8 +399,11 @@ def queue_postprocessor(key, postprocessor):
 	options = {}
 	for option in available[postprocessor]["options"]:
 		settings = available[postprocessor]["options"][option]
+		choice = request.values.get("option-" + option, None)
 		if settings["type"] == UserInput.OPTION_TOGGLE:
-			options[option] = request.values.get("option-" + option, None) is not None
+			options[option] = choice is not None
+		elif settings["type"] == UserInput.OPTION_CHOICE:
+			options[option] = choice if choice in settings["options"] else settings["default"]
 		else:
 			options[option] = request.values.get("option-" + option, settings.get("default", None))
 

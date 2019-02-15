@@ -1038,6 +1038,10 @@ ol.postprocessor-list {
 	overflow: hidden;
 }
 
+.postprocessor-list li fieldset label {
+	display: block;
+}
+
 .postprocessor-list li p:nth-child(2) {
     display: flex;
     justify-content: center;
