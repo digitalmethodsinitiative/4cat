@@ -288,6 +288,7 @@ def show_results(page):
 
 		subqueries = db.fetchall("SELECT * FROM queries WHERE key_parent = %s ORDER BY timestamp ASC", (query["key"],))
 		for subquery in subqueries:
+			subquery["parameters"] = json.loads(subquery["parameters"])
 			if subquery["type"] not in postprocessors:
 				continue
 			subquery["postprocessor"] = postprocessors[subquery["type"]]
