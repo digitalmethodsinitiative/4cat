@@ -1,4 +1,4 @@
-"""
+, encoding='utf-8'"""
 Split results by thread
 """
 import zipfile
@@ -45,7 +45,7 @@ class ThreadSplitter(BasicPostProcessor):
 		# read and write
 		threadfiles = []
 		self.query.update_status("Creating thread files")
-		with open(self.source_file) as source:
+		with open(self.source_file, encoding='utf-8') as source:
 			csv = DictReader(source)
 			for post in csv:
 				thread = post["thread_id"]

@@ -33,7 +33,7 @@ class PostTokeniser(BasicPostProcessor):
 		stopwords = get_stop_words("en")
 
 		self.query.update_status("Reading source file")
-		with open(self.source_file) as source:
+		with open(self.source_file, encoding='utf-8') as source:
 			csv = DictReader(source)
 			for post in csv:
 				body = re.sub("\s+", " ", delete_regex.sub("", post["body"])).lower()
