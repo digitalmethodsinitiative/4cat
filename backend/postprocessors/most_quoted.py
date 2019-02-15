@@ -13,6 +13,7 @@ class QuoteRanker(BasicPostProcessor):
 	Rank posts by most-quoted
 	"""
 	type = "quote-ranker"  # job type ID
+	category = "Post metrics" # category
 	title = "Sort by most quoted"  # title displayed in UI
 	description = "Sort posts by how often they were quoted by other posts in the data set. Post IDs may be correlated and triangulated with the full results set."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI

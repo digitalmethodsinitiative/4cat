@@ -326,6 +326,7 @@ def show_result(key):
 
 	# load list of post-processors compatible with this query result
 	processors = query.get_compatible_postprocessors()
+	processor_categories = set([value['category'] for value in processors.values()])
 	unfinished_postprocessors = processors.copy()
 	is_postprocessor_running = False
 
@@ -365,7 +366,7 @@ def show_result(key):
 	# to be retrieved via XHR
 	standalone = "postprocessors" not in request.url
 	template = "result.html" if standalone else "result-details.html"
-	return render_template(template, preview=preview, query=querydata, postprocessors=available_postprocessors,
+	return render_template(template, preview=preview, query=querydata, postprocessors=available_postprocessors, processor_categories=processor_categories,
 						   subqueries=filtered_subqueries, is_postprocessor_running=is_postprocessor_running, messages=get_flashed_messages())
 
 
