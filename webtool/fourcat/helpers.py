@@ -154,7 +154,7 @@ def get_available_postprocessors(query):
 
 	for category in analyses:
 		for subquery in analyses[category]:
-			type = subquery.data["type"]
+			type = subquery["type"]
 			if type in available and not available[type].get("options", {}):
 				del available[type]
 
