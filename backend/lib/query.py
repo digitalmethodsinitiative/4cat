@@ -1,3 +1,4 @@
+import collections
 import hashlib
 import typing
 import json
@@ -7,7 +8,8 @@ import os
 from csv import DictWriter
 
 import config
-from backend.lib.helpers import get_absolute_folder
+from backend.lib.job import Job
+from backend.lib.helpers import load_postprocessors, get_absolute_folder
 
 
 class SearchQuery:
@@ -21,9 +23,10 @@ class SearchQuery:
 	db = None
 	data = None
 	folder = None
-	parameters = None
+	parameters = {}
+	is_new = True
 
-	def __init__(self, parameters=None, key=None, job=None, db=None, parent=None, extension="csv"):
+	def __init__(self, parameters={}, key=None, job=None, db=None, parent=None, extension="csv", type="search"):
 		"""
 		Create new query object
 
@@ -53,22 +56,23 @@ class SearchQuery:
 			if parameters is None:
 				raise TypeError("SearchQuery() requires either 'key', or 'parameters' to be given")
 
-			self.query = self.get_label(parameters)
+			self.query = self.get_label(parameters, default=type)
 			self.key = self.get_key(self.query, parameters, parent)
 			current = self.db.fetchone("SELECT * FROM queries WHERE key = %s AND query = %s", (self.key, self.query))
 
 		if current:
 			self.data = current
 			self.parameters = json.loads(self.data["parameters"])
+			self.is_new = False
 		else:
 			self.data = {
 				"key": self.key,
-				"query": self.get_label(parameters),
+				"query": self.get_label(parameters, default=type),
 				"parameters": json.dumps(parameters),
 				"result_file": "",
 				"status": "",
+				"type": type,
 				"timestamp": int(time.time()),
-				"is_empty": False,
 				"is_finished": False
 			}
 			self.parameters = parameters
@@ -96,8 +100,6 @@ class SearchQuery:
 		if self.data["is_finished"] and self.data["result_file"] and os.path.isfile(
 				self.folder + "/" + self.data["result_file"]):
 			return self.folder + "/" + self.data["result_file"]
-		elif self.data["is_finished"] and self.data["is_empty"]:
-			return 'empty_file'
 		else:
 			return None
 
@@ -158,7 +160,7 @@ class SearchQuery:
 		except json.JSONDecodeError:
 			return {}
 
-	def get_label(self, parameters=None):
+	def get_label(self, parameters=None, default="Query"):
 		if not parameters:
 			parameters = self.parameters
 
@@ -167,7 +169,7 @@ class SearchQuery:
 		elif "subject_query" in parameters and parameters["subject_query"] and parameters["subject_query"] != "empty":
 			return parameters["subject_query"]
 		else:
-			return "query"
+			return default
 
 	def reserve_result_file(self, extension="csv"):
 		"""
@@ -209,9 +211,20 @@ class SearchQuery:
 
 		:param str query:  Query string
 		:param parameters:  Query parameters
+		:param parent: Parent query's key (if applicable)
+
 		:return str:  Query key
 		"""
-		plain_key = repr(parameters) + str(query) + parent
+		# we're going to use the hash of the parameters to uniquely identify
+		# the query, so make sure it's always in the same order, or we might
+		# end up creating multiple keys for the same query if python
+		# decides to return the dict in a different order
+		param_key = collections.OrderedDict()
+		for key in sorted(parameters):
+			param_key[key] = parameters[key]
+
+		parent_key = str(parent) if parent else ""
+		plain_key = repr(param_key) + str(query) + parent_key
 		return hashlib.md5(plain_key.encode("utf-8")).hexdigest()
 
 	def get_status(self):
@@ -268,32 +281,56 @@ class SearchQuery:
 		self.update_status("Finished")
 		self.finish(len(data))
 
-	def get_analyses(self, queue=False):
+	def get_analyses(self):
 		"""
 		Get analyses for this query
 
-		:param queue:  If a JobQueue is passed as this parameter, queued
-		post-processor jobs will also be fetched and included in the result
 		:return dict: Dict with two lists: one `queued` (jobs) and one
 		`running` (queries)
 		"""
 		results = {"queued": [], "running": []}
 
-		results["running"] = self.db.fetchall("SELECT * FROM queries WHERE key_parent = %s", (self.key,))
-		if queue:
-			results["queued"] = queue.get_all_jobs(remote_id=self.key)
+		analyses = self.db.fetchall("SELECT * FROM queries WHERE key_parent = %s", (self.key,))
+		for analysis in analyses:
+			if analysis["status"] == "Queued":
+				results["queued"].append(analysis)
+			else:
+				results["running"].append(analysis)
 
 		return results
 
-	def set_empty(self):
+	def get_compatible_postprocessors(self):
 		"""
-		Update the is_empty field of query in the database to indicate there
-		are no substring matches.
+		Get list of post-processors available for this query
 
-		Should be tweaked to set is_empty to False if query was made sooner
-		than n days ago to prevent false empty results.
+		Checks whether this query type is one that is listed as being accepted
+		by the post-processor, for each known type: if the post-processor does
+		not specify accepted types (via the `accepts` attribute of the class),
+		it is assumed it accepts everything, and it is hence included in the
+		response.
 
+		:return dict:  Compatible post-processors, `name => properties` mapping
 		"""
+		postprocessors = load_postprocessors()
 
-		self.db.update("queries", where={"query": self.data["query"], "key": self.data["key"]},
-								 data={"is_empty": True})
+		available = {}
+		for postprocessor in postprocessors.values():
+			if not postprocessor["accepts"] or self.data["type"] in postprocessor["accepts"]:
+				available[postprocessor["type"]] = postprocessor
+
+		return available
+
+	def link_job(self, job):
+		"""
+		Link this query to a job ID
+
+		Updates the query data to include a reference to the job that will be
+		executing (or has already executed) this job.
+
+		:param Job job:  The job that will run this query
+		"""
+		if type(job) != Job:
+			raise TypeError("link_job requires a Job object as its argument")
+
+
+		self.db.update("queries", where={"key": self.key}, data={"job": job.data["id"]})

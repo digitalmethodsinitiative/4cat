@@ -25,14 +25,15 @@ CREATE UNIQUE INDEX IF NOT EXISTS unique_job
 CREATE TABLE IF NOT EXISTS queries (
   id              SERIAL PRIMARY KEY,
   key             text,
+  type            text DEFAULT 'search',
   key_parent      text,
   query           text,
+  job             integer DEFAULT 0,
   parameters      text,
   result_file     text DEFAULT '',
   timestamp       integer,
   status          text,
   num_rows        integer DEFAULT 0,
-  is_empty        boolean DEFAULT FALSE,
   is_finished     boolean DEFAULT FALSE
 );
 
@@ -55,4 +56,4 @@ CREATE TABLE IF NOT EXISTS access_tokens (
   token TEXT,
   calls INTEGER DEFAULT 0,
   expires INTEGER DEFAULT 0
-)
+);
