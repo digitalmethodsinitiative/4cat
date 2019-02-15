@@ -154,9 +154,9 @@ def get_available_postprocessors(query):
 
 	for category in analyses:
 		for subquery in analyses[category]:
-			details = json.loads(subquery["parameters"])
-			if "type" in details and details["type"] in available and not available[details["type"]].get("options", {}):
-				del available[details["type"]]
+			type = subquery["type"]
+			if type in available and not available[type].get("options", {}):
+				del available[type]
 
 	return available
 
