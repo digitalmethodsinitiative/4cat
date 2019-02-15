@@ -86,7 +86,7 @@ class SearchQuery:
 	def check_query_finished(self):
 		"""
 		Checks if query is finished. Returns path to results file is not empty,
-		or 'empty_file' when ther were not matches.
+		or 'empty_file' when there were not matches.
 
 		Only returns a path if the query is finished. In other words, if this
 		method returns a path, a file with the complete results for this query
@@ -97,9 +97,10 @@ class SearchQuery:
 
 		:return: A path to the results file, 'empty_file', or `None`
 		"""
-		if self.data["is_finished"] and self.data["result_file"] and os.path.isfile(
-				self.folder + "/" + self.data["result_file"]):
+		if self.data["is_finished"] and self.data["num_rows"] > 0:
 			return self.folder + "/" + self.data["result_file"]
+		elif self.data["is_finished"] and self.data["num_rows"] == 0:
+			return 'empty'
 		else:
 			return None
 

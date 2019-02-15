@@ -162,7 +162,7 @@ def string_query():
 		"user": current_user.get_id()
 	}
 
-	valid = validateQuery(parameters)
+	valid = validate_query(parameters)
 
 	if valid != True:
 		return "Invalid query. " + valid
@@ -198,7 +198,12 @@ def check_query(query_key):
 		abort(404)
 
 	results = query.check_query_finished()
-	if results:
+	if results == 'empty':
+		querydata = query.data
+		querydata["parameters"] = json.loads(querydata["parameters"])
+		path = False
+		preview = ""
+	elif results:
 		if app.debug:
 			path = 'http://localhost/fourcat/data/' + query.data["query"].replace("*", "") + '-' + query_key + '.csv'
 		else:
@@ -385,7 +390,7 @@ def queue_postprocessor(key, postprocessor):
 	# cover all bases - can only run postprocessor on "parent" query
 	try:
 		query = SearchQuery(key=key, db=db)
-		if query.data["key_parent"] != "":
+		if query.data["key_parent"]:	
 			abort(404)
 	except TypeError:
 		abort(404)
@@ -451,7 +456,7 @@ def check_postprocessor():
 	return jsonify(subqueries)
 
 
-def validateQuery(parameters):
+def validate_query(parameters):
 	"""
 	Validates the client-side user input
 
