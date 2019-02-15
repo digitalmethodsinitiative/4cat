@@ -1,9 +1,10 @@
 import time
 import csv
 import abc
+import re
+import html2text
 
 from pymysql import OperationalError
-from bs4 import BeautifulSoup
 from collections import Counter
 
 import config
@@ -312,6 +313,8 @@ class StringQuery(BasicWorker, metaclass=abc.ABCMeta):
 			writer = csv.DictWriter(csvfile, fieldnames=fieldnames, lineterminator='\n')
 			writer.writeheader()
 
+			html_parser = html2text.HTML2Text()
+
 			if clean_csv:
 				# Parsing: remove the HTML tags, but keep the <br> as a newline
 				# Takes around 1.5 times longer
@@ -321,9 +324,8 @@ class StringQuery(BasicWorker, metaclass=abc.ABCMeta):
 					row["unix_timestamp"] = row["timestamp"]
 					row["timestamp"] = datetime.utcfromtimestamp(row["timestamp"]).strftime('%Y-%m-%d %H:%M:%S')
 
-					# Clean body column
-					row["body"] = row["body"].replace("<br>", "\n")
-					row["body"] = BeautifulSoup(row["body"], "html.parser").get_text()
+					# Parse html to text
+					row["body"] = html_parser.handle(row["body"])
 
 					writer.writerow(row)
 			else:

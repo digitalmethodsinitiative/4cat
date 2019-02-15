@@ -14,6 +14,7 @@ class URLExtractor(BasicPostProcessor):
 	Rank URLs by most mentioned
 	"""
 	type = "url-extractor"  # job type ID
+	category = "Post metrics" # category
 	title = "Top URLs"  # title displayed in UI
 	description = "Extract URLs mentioned in the posts and sort them by most-mentioned. Note that archive and URL shortener links are not expanded."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI

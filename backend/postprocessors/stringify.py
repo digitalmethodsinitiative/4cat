@@ -12,6 +12,7 @@ class Stringify(BasicPostProcessor):
 	Merge post body into one long string
 	"""
 	type = "stringify-posts"  # job type ID
+	category = "Text analysis" # category
 	title = "Collapse into string"  # title displayed in UI
 	description = "Collapses all posts in the results into one plain text string. The result can be used for word clouds, word trees, et cetera."  # description displayed in UI
 	extension = "txt"  # extension of result file, used internally and in UI
