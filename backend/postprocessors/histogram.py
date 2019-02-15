@@ -35,7 +35,7 @@ class HistogramRenderer(BasicPostProcessor):
 		max_posts = 0
 
 		# collect post numbers per month
-		with open(self.source_file) as source:
+		with open(self.source_file, encoding='utf-8') as source:
 			posts = csv.DictReader(source)
 			for post in posts:
 				timestamp = int(post.get("unix_timestamp", datetime.datetime.fromisoformat(post["timestamp"]).timestamp()))

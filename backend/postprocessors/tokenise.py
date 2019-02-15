@@ -81,7 +81,7 @@ class Tokenise(BasicPostProcessor):
 
 		# process posts
 		self.query.update_status("Processing posts")
-		with open(self.source_file) as source:
+		with open(self.source_file, encoding='utf-8') as source:
 			csv = DictReader(source)
 			for post in csv:
 				# determine what output unit this post belongs to
