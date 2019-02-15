@@ -1,6 +1,7 @@
 """
 Miscellaneous helper functions for the 4CAT backend
 """
+import collections
 import importlib
 import inspect
 import glob
@@ -85,7 +86,11 @@ def load_postprocessors():
 					"options": member[1].options if hasattr(member[1], "options") else {}
 				}
 
-	return postprocessors
+	sorted_postprocessors = collections.OrderedDict()
+	for key in sorted(postprocessors, key=lambda postprocessor: postprocessors[postprocessor]["category"] + postprocessors[postprocessor]["name"]):
+		sorted_postprocessors[key] = postprocessors[key]
+
+	return sorted_postprocessors
 
 
 class UserInput:
