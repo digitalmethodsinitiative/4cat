@@ -71,7 +71,7 @@ class Job:
 
 		:param database: Database handler
 		:param str jobtype: Job type
-		:param int remote_id: Job remote ID
+		:param str remote_id: Job remote ID
 		:return Job: Job object
 		"""
 		if jobtype != "*":

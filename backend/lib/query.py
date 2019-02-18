@@ -8,7 +8,7 @@ import os
 from csv import DictWriter
 
 import config
-from backend.lib.job import Job
+from backend.lib.job import Job, JobNotFoundException
 from backend.lib.helpers import load_postprocessors, get_absolute_folder
 
 
@@ -328,10 +328,21 @@ class SearchQuery:
 		Updates the query data to include a reference to the job that will be
 		executing (or has already executed) this job.
 
+		Note that if no job can be found for this query, this method silently
+		fails.
+
 		:param Job job:  The job that will run this query
+
+		:todo: If the job column ever gets used, make sure it always contains
+		       a valid value, rather than silently failing this method.
 		"""
 		if type(job) != Job:
 			raise TypeError("link_job requires a Job object as its argument")
 
+		if "id" not in job.data:
+			try:
+				job = job.get_by_remote_ID(self.key, jobtype=self.data["type"], database=self.db)
+			except JobNotFoundException:
+				return
 
 		self.db.update("queries", where={"key": self.key}, data={"job": job.data["id"]})
