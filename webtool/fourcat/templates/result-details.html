@@ -49,7 +49,6 @@
         {{ query.num_rows }} posts;
         {% if query.num_rows > 0 %}
             <a href="/result/{{ query.result_file }}">{{ query.result_file }}</a>
-            }
         {% endif %}
     </p>
 {% elif query.status %}
