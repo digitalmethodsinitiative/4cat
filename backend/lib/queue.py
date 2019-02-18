@@ -126,16 +126,21 @@ class JobQueue:
 		             with those parameters could be queued, and the old one is
 		             just as valid).
 		"""
-		self.db.insert("jobs", data={
+		data =  data={
 			"jobtype": jobtype,
 			"details": json.dumps(details),
 			"timestamp": int(time.time()),
+			"timestamp_claimed": 0,
+			"timestamp_lastclaimed": 0,
 			"remote_id": remote_id,
 			"timestamp_after": claim_after,
-			"interval": interval
-		}, safe=True, constraints=("jobtype", "remote_id"))
+			"interval": interval,
+			"attempts": 0
+		}
 
-		return Job.get_by_remote_ID(database=self.db, remote_id=str(remote_id), jobtype=jobtype)
+		self.db.insert("jobs", data, safe=True, constraints=("jobtype", "remote_id"))
+
+		return Job.get_by_data(data, database=self.db)
 
 	def release_all(self):
 		"""
