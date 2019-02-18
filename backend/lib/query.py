@@ -341,7 +341,7 @@ class SearchQuery:
 
 		if "id" not in job.data:
 			try:
-				job = job.get_by_remote_ID(self.key, jobtype=self.data["type"], database=self.db)
+				job = Job.get_by_remote_ID(self.key, self.db, jobtype=self.data["type"])
 			except JobNotFoundException:
 				return
 
