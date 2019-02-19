@@ -1,6 +1,6 @@
 {% extends "layout.html" %}
 
-{% block title %}{{ page_name|replace("-", " ")|title }}{% endblock %}
+{% block title %}{% if page_name %}{{ page_name|replace("-", " ")|title }}{% else %}Notice{% endif %}{% endblock %}
 {% block body_class %}plain-page markdown-page {{ body_class }}{% endblock %}
 
 {% block body %}
