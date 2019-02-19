@@ -1,6 +1,6 @@
 {% extends "layout.html" %}
 
-{% block title %}{{ page_name|replace("-", " ")|title }}{% endblock %}
+{% block title %}Request account{% endblock %}
 {% block body_class %}plain-page markdown-page {{ body_class }}{% endblock %}
 
 {% block body %}
@@ -24,7 +24,7 @@
                 <input type="text" name="email" id="request-email" value="{{ form.email }}">
             </div>
             <div class="form-element{% if "university" in incomplete %} missing{% endif %}">
-                <label for="request-uni">Insitutional affiliation</label>
+                <label for="request-uni">Institutional affiliation</label>
                 <input type="text" name="university" id="request-uni" value="{{ form.university }}">
             </div>
             <div class="form-element{% if "source" in incomplete %} missing{% endif %}">
