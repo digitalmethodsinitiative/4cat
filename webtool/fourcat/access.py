@@ -213,8 +213,8 @@ def request_access():
 		else:
 			try:
 				with smtplib.SMTP("localhost") as smtp:
-					smtp.sendmail("site@4cat.oilab.nl", config.ADMIN_EMAILS, json.dumps(request.form))
-				return redirect("/pages/request-after/")
+					smtp.sendmail("4cat@oilab.nl", config.ADMIN_EMAILS, json.dumps(request.form))
+				return render_template("error.html", title="Thank you", message="Your request has been submitted; we'll try to answer it as soon as possible.")
 			except (smtplib.SMTPException, ConnectionRefusedError):
 				return render_template("error.html", title="Error", message="The form could not be submitted; the e-mail server is unreachable.")
 
