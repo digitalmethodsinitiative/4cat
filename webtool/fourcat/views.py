@@ -389,8 +389,6 @@ def queue_postprocessor(key, postprocessor):
 	# cover all bases - can only run postprocessor on "parent" query
 	try:
 		query = SearchQuery(key=key, db=db)
-		if query.data["key_parent"]:	
-			abort(404)
 	except TypeError:
 		abort(404)
 
