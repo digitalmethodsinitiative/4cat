@@ -337,27 +337,26 @@ def show_result(key):
 
 	# determine whether any post-processors have already been run/queued
 	analyses = query.get_analyses()
-	filtered_subqueries = analyses["running"] + analyses["queued"]
+	filtered_subqueries = []
 
 	# for each subquery, determine whether it is finished or running
 	# and remove it from the list of available post-processors
-	for category in analyses:
-		for subquery in analyses[category]:
-			type = subquery["type"]
-			details = json.loads(subquery["parameters"])
-			subquery["parameters"] = details
+	for subquery in analyses:
+		type = subquery.type
 
-			if type not in processors:
-				# this could happen for postprocessors that were run earlier but no longer exist as class
-				subquery["postprocessor"] = {}
-			else:
-				subquery["postprocessor"] = processors[type]
+		if type not in processors:
+			# this could happen for postprocessors that were run earlier but no longer exist as class
+			subquery.postprocessor = {}
+		else:
+			subquery.postprocessor = processors[type]
 
-			if not subquery["is_finished"]:
-				is_postprocessor_running = True
+		if not subquery.is_finished():
+			is_postprocessor_running = True
 
-			if type in unfinished_postprocessors and not unfinished_postprocessors[type].get("options", None):
+		if type in unfinished_postprocessors and not unfinished_postprocessors[type].get("options", None):
 				del unfinished_postprocessors[type]
+
+		filtered_subqueries.append(subquery)
 
 	available_postprocessors = unfinished_postprocessors.copy()
 
