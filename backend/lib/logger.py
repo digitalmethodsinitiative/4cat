@@ -293,7 +293,7 @@ class Logger:
 			mail += "This report was compiled at %s." % datetime.datetime.now().strftime('%d %B %Y %H:%M:%S')
 
 			try:
-				with smtplib.SMTP(config.WARN_MAILHOST) as smtp:
-					smtp.sendmail("4lab@%s" % platform.uname().node, config.WARN_EMAILS, mail)
+				with smtplib.SMTP(config.MAILHOST) as smtp:
+					smtp.sendmail("4cat@%s" % platform.uname().node, config.WARN_EMAILS, mail)
 			except (smtplib.SMTPException, ConnectionRefusedError) as e:
 				self.error("Could not send log alerts via e-mail (%s)" % e)
