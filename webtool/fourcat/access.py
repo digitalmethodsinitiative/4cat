@@ -2,9 +2,11 @@
 Control access to web tool
 """
 import hashlib
+import smtplib
 import fnmatch
 import socket
 import time
+import json
 import sys
 import os
 
@@ -189,3 +191,31 @@ def request_token():
 		db.insert("access_tokens", token)
 
 	return jsonify(token)
+
+@app.route("/request-access/", methods=["GET", "POST"])
+def request_access():
+	if not config.ADMIN_EMAILS:
+		return render_template("error.html", message="No administrator e-mail is configured; the request form cannot be displayed.")
+
+	if not config.MAILHOST:
+		return render_template("error.html", message="No e-mail server configured; the request form cannot be displayed.")
+
+	incomplete = []
+
+	if request.method == "POST":
+		required = ("name", "email", "university", "intent", "source")
+		for field in required:
+			if not request.form.get(field, "").strip():
+				incomplete.append(field)
+
+		if incomplete:
+			flash("Please fill in all fields before submitting.")
+		else:
+			try:
+				with smtplib.SMTP("localhost") as smtp:
+					smtp.sendmail("site@4cat.oilab.nl", config.ADMIN_EMAILS, json.dumps(request.form))
+				return redirect("/pages/request-after/")
+			except (smtplib.SMTPException, ConnectionRefusedError):
+				return render_template("error.html", title="Error", message="The form could not be submitted; the e-mail server is unreachable.")
+
+	return render_template("request-account.html", incomplete=incomplete, flashes=get_flashed_messages(), form=request.form)
