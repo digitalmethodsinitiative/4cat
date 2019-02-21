@@ -30,7 +30,7 @@ class TopImageCounter(BasicPostProcessor):
 		images = {}
 
 		self.query.update_status("Reading source file")
-		with open(self.source_file) as source:
+		with open(self.source_file, encoding="utf-8") as source:
 			csv = DictReader(source)
 			for post in csv:
 				if not post["image_file"]:

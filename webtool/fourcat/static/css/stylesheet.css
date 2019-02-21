@@ -930,6 +930,7 @@ ol.result-list {
 	background: #50ff50 url('../img/patterngreen.jpg');
 	text-align: center;
 	margin: 0;
+	margin-bottom: 0px;
 }
 
 .queue-button-wrap .button-like {
