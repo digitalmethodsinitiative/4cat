@@ -579,10 +579,6 @@ input, textarea {
 	max-width: 100%;
 }
 
-img {
-	cursor: pointer;
-}
-
 .page-footer {
 	padding-top: 10px;
 	padding-bottom: 10px;

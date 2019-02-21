@@ -1,10 +1,14 @@
 """
-Collapse post bodies into one long string
+Get regular and 'debate' thread metadata
 """
+from datetime import datetime
+import time
 
 from csv import DictReader
 
 from backend.abstract.postprocessor import BasicPostProcessor
+
+import config
 
 
 class DebateMetrics(BasicPostProcessor):
@@ -46,7 +50,7 @@ class DebateMetrics(BasicPostProcessor):
 						"first_post": int(time.time()),
 						"images": 0,
 						"count": 0,
-						"op_length": len(post["comment"])
+						"op_length": len(post["body"])
 					}
 
 				if post["subject"]:
@@ -56,13 +60,13 @@ class DebateMetrics(BasicPostProcessor):
 					threads[post["thread_id"]]["images"] += 1
 
 				timestamp = int(
-					post.get("unix_timestamp", datetime.datetime.fromisoformat(post["timestamp"]).timestamp))
+					post.get("unix_timestamp", datetime.date.fromisoformat(post["timestamp"]).timestamp))
 				threads[post["thread_id"]]["first_post"] = min(timestamp, threads[post["thread_id"]]["first_post"])
 				threads[post["thread_id"]]["count"] += 1
 
 		results = [{
 			"thread_id": thread_id,
-			"timestamp": datetime.datetime.utcfromtimestamp(threads[thread_id]["first_post"]).strftime(
+			"timestamp": datetime.date.utcfromtimestamp(threads[thread_id]["first_post"]).strftime(
 				'%Y-%m-%d %H:%M:%S'),
 			"subject": threads[thread_id]["subject"],
 			"num_posts": threads[thread_id]["count"],

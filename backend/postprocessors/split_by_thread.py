@@ -1,8 +1,9 @@
-, encoding='utf-8'"""
+"""
 Split results by thread
 """
 import zipfile
 import os
+import time
 
 from csv import DictReader, DictWriter
 
