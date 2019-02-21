@@ -1,6 +1,5 @@
 <li id="subquery-{{ subquery.key }}"
     class="subquery{% if not subquery.is_finished %} running{% endif %}">{{ subquery.postprocessor.name or "(Deprecated analysis) " + subquery.type }} ({% if subquery.is_finished %}<a href="/result/{{ subquery.result_file }}">{% if subquery.num_rows > 0 %}{{ subquery.num_rows }} items, {% endif %}{{ subquery.postprocessor.extension or subquery.result_file.split(".")[-1] }}</a>{% elif subquery.status == "" %}Queued{% else %}Running - {{ subquery.status }}{% endif %})
-{% if "parameters" in subquery %}
     {% for option in subquery.parameters %}
         {% if "options" in subquery.postprocessor and option in subquery.postprocessor.options %}
         {% if subquery.postprocessor.options[option].type == "toggle" %}
@@ -9,5 +8,4 @@
             <span class="property-badge">{{ option }}={{ subquery.parameters[option] }}</span>{% endif %}
         {% endif %}
     {% endfor %}
-{% endif %}
 </li>

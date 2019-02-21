@@ -1,0 +1,11 @@
+{% extends "layout.html" %}
+
+{% block title %}{% if page_name %}{{ page_name|replace("-", " ")|title }}{% else %}Notice{% endif %}{% endblock %}
+{% block body_class %}plain-page markdown-page {{ body_class }}{% endblock %}
+
+{% block body %}
+    <article>
+        <h2><span>{% if title %}{{ title }}{% else %}Notice{% endif %}</span></h2>
+        <p>{{ message }}</p>
+    </article>
+{% endblock %}

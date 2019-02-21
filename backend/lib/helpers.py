@@ -46,8 +46,7 @@ def init_datasource(database, logger, queue, name):
 		return
 
 	for board in config.PLATFORMS[name]["boards"]:
-		# queue.add_job(name + "-board", remote_id=board, interval=60)
-		pass
+		queue.add_job(name + "-board", remote_id=board, interval=60)
 
 
 def load_postprocessors():

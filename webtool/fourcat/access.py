@@ -1,12 +1,18 @@
 """
 Control access to web tool
 """
+import html2text
 import hashlib
+import smtplib
 import fnmatch
 import socket
 import time
+import json
 import sys
 import os
+
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 
 sys.path.insert(0, os.path.dirname(__file__) + '/../..')
 import config
@@ -189,3 +195,46 @@ def request_token():
 		db.insert("access_tokens", token)
 
 	return jsonify(token)
+
+@app.route("/request-access/", methods=["GET", "POST"])
+def request_access():
+	if not config.ADMIN_EMAILS:
+		return render_template("error.html", message="No administrator e-mail is configured; the request form cannot be displayed.")
+
+	if not config.MAILHOST:
+		return render_template("error.html", message="No e-mail server configured; the request form cannot be displayed.")
+
+	incomplete = []
+
+	if request.method == "POST":
+		required = ("name", "email", "university", "intent", "source")
+		for field in required:
+			if not request.form.get(field, "").strip():
+				incomplete.append(field)
+
+		if incomplete:
+			flash("Please fill in all fields before submitting.")
+		else:
+			html_parser = html2text.HTML2Text()
+
+			sender = "4cat@oilab.nl"
+			message = MIMEMultipart("alternative")
+			message["Subject"] = "Account request"
+			message["From"] = sender
+			message["To"] = config.ADMIN_EMAILS[0]
+
+			mail = "<p>Hello! Some requests a 4CAT Account:</p>\n"
+			for field in required:
+				mail += "<p><b>" + field + "</b>: " + request.form.get(field, "") + " </p>\n"
+
+			message.attach(MIMEText(html_parser.handle(mail), "plain"))
+			message.attach(MIMEText(mail, "html"))
+
+			try:
+				with smtplib.SMTP("localhost") as smtp:
+					smtp.sendmail("4cat@oilab.nl", config.ADMIN_EMAILS, message.as_string())
+				return render_template("error.html", title="Thank you", message="Your request has been submitted; we'll try to answer it as soon as possible.")
+			except (smtplib.SMTPException, ConnectionRefusedError):
+				return render_template("error.html", title="Error", message="The form could not be submitted; the e-mail server is unreachable.")
+
+	return render_template("request-account.html", incomplete=incomplete, flashes=get_flashed_messages(), form=request.form)
