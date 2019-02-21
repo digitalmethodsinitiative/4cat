@@ -47,7 +47,7 @@
 {% if query.is_finished %}
     {% if query.num_rows > 0 %}
         <p class="result-file">
-            {{ query.num_rows }} posts;
+            {{ query.num_rows }} posts
             <a href="/result/{{ query.result_file }}">{{ query.result_file }}</a>
         </p>
     {% endif %}

@@ -8,7 +8,7 @@ import os
 from csv import DictWriter
 
 import config
-from backend.lib.job import Job
+from backend.lib.job import Job, JobNotFoundException
 from backend.lib.helpers import load_postprocessors, get_absolute_folder
 
 
@@ -26,7 +26,7 @@ class SearchQuery:
 	parameters = {}
 	is_new = True
 
-	def __init__(self, parameters={}, key=None, job=None, db=None, parent=None, extension="csv", type="search"):
+	def __init__(self, parameters={}, key=None, job=None, data=None, db=None, parent=None, extension="csv", type="search"):
 		"""
 		Create new query object
 
@@ -49,6 +49,13 @@ class SearchQuery:
 			current = self.db.fetchone("SELECT * FROM queries WHERE parameters::json->>'job' = %s", (job,))
 			if not current:
 				raise TypeError("SearchQuery() requires a valid job ID for its 'job' argument")
+
+			self.query = current["query"]
+			self.key = current["key"]
+		elif data is not None:
+			current = data
+			if "query" not in data or "key" not in data or "parameters" not in data or "key_parent" not in data:
+				raise ValueError("SearchQuery() requires a complete query record for its 'data' argument")
 
 			self.query = current["query"]
 			self.key = current["key"]
@@ -289,14 +296,17 @@ class SearchQuery:
 		:return dict: Dict with two lists: one `queued` (jobs) and one
 		`running` (queries)
 		"""
-		results = {"queued": [], "running": []}
+		results = []
+		analyses_records = self.db.fetchall("SELECT * FROM queries WHERE key_parent = %s", (self.key,))
+		analyses = [SearchQuery(data=analysis, db=self.db) for analysis in analyses_records]
 
-		analyses = self.db.fetchall("SELECT * FROM queries WHERE key_parent = %s", (self.key,))
 		for analysis in analyses:
-			if analysis["status"] == "Queued":
-				results["queued"].append(analysis)
-			else:
-				results["running"].append(analysis)
+			postprocessors = analysis.get_compatible_postprocessors()
+
+			analysis.data["_subqueries"] = analysis.get_analyses()
+			analysis.data["_postprocessors"] = {key: value for key, value in postprocessors.items() if key not in [analysis.data["type"] for analysis in analyses]}
+
+			results.append(analysis)
 
 		return results
 
@@ -307,8 +317,7 @@ class SearchQuery:
 		Checks whether this query type is one that is listed as being accepted
 		by the post-processor, for each known type: if the post-processor does
 		not specify accepted types (via the `accepts` attribute of the class),
-		it is assumed it accepts everything, and it is hence included in the
-		response.
+		it is assumed it accepts 'search' queries as an input.
 
 		:return dict:  Compatible post-processors, `name => properties` mapping
 		"""
@@ -316,7 +325,7 @@ class SearchQuery:
 
 		available = {}
 		for postprocessor in postprocessors.values():
-			if not postprocessor["accepts"] or self.data["type"] in postprocessor["accepts"]:
+			if (self.data["type"] == "search" and not postprocessor["accepts"]) or self.data["type"] in postprocessor["accepts"]:
 				available[postprocessor["type"]] = postprocessor
 
 		return available
@@ -328,10 +337,28 @@ class SearchQuery:
 		Updates the query data to include a reference to the job that will be
 		executing (or has already executed) this job.
 
+		Note that if no job can be found for this query, this method silently
+		fails.
+
 		:param Job job:  The job that will run this query
+
+		:todo: If the job column ever gets used, make sure it always contains
+		       a valid value, rather than silently failing this method.
 		"""
 		if type(job) != Job:
 			raise TypeError("link_job requires a Job object as its argument")
 
+		if "id" not in job.data:
+			try:
+				job = Job.get_by_remote_ID(self.key, self.db, jobtype=self.data["type"])
+			except JobNotFoundException:
+				return
 
 		self.db.update("queries", where={"key": self.key}, data={"job": job.data["id"]})
+
+
+	def __getattr__(self, attr):
+		if attr in self.data:
+			return self.data[attr]
+		else:
+			raise KeyError("SearchQuery instance has no attribute %s" % attr)

@@ -81,8 +81,47 @@ $(function () {
 
     $('#platform-select').on('change', update_boards);
     $('#platform-select').trigger('change');
+
+    $(document).on('mousemove', '.tooltip-trigger', show_tooltip);
+    $(document).on('mouseout', '.tooltip-trigger', hide_tooltip);
+    $(document).on('click', '.tooltip-trigger', toggle_tooltip);
 });
 
+function show_tooltip(e, parent = false) {
+    if (e) {
+        e.preventDefault();
+    }
+    if (!parent) {
+        parent = this;
+    }
+    tooltip = $('#' + $(parent).attr('aria-controls'));
+    if ($(tooltip).is(':hidden')) {
+        position = $(parent).position();
+        parent_width = parseFloat($(parent).css('width').replace('px', ''));
+        $(tooltip).show();
+        width = parseFloat($(tooltip).css('width').replace('px', ''));
+        height = parseFloat($(tooltip).css('height').replace('px', ''));
+        $(tooltip).css('top', (position.top - height - 5) + 'px');
+        $(tooltip).css('left', (position.left + (parent_width / 2) - (width / 2)) + 'px');
+    }
+}
+
+function toggle_tooltip(e) {
+    tooltip = $('#' + $(this).attr('aria-controls'));
+    if ($(tooltip).is(':hidden')) {
+        show_tooltip(e, this);
+    } else {
+        hide_tooltip(e, this);
+    }
+}
+
+function hide_tooltip(e, parent = false) {
+    if (!parent) {
+        parent = this;
+    }
+    tooltip = $('#' + $(parent).attr('aria-controls'));
+    $(tooltip).hide();
+}
 
 function start_query() {
 
@@ -235,19 +274,19 @@ function validate_form() {
 }
 
 function collapse_postprocessor_options() {
-    $('.postprocessor-list li').each(function() {
+    $('.postprocessor-list li').each(function () {
         if ($(this).hasClass('collapsed') || $(this).hasClass('expanded')) {
             return;
         }
         fieldset = $(this).find('fieldset');
-        if(fieldset.length == 0) {
+        if (fieldset.length == 0) {
             return;
         }
         $(this).attr('data-options-height', fieldset.height());
         fieldset.css('height', '0');
         $(this).addClass('collapsed');
         $(this).find('button').text('Options').on('click', function (e) {
-            if($(this).text() == 'Options') {
+            if ($(this).text() == 'Options') {
                 e.preventDefault();
                 $(this).text('Queue');
                 li = $(this).parents('li');

@@ -28,7 +28,7 @@ button, .button-like {
     padding: 0 0.5em;
 }
 
-.button-like:hover {
+.button-like:hover, .button-like:focus {
     color: #000;
 }
 
@@ -110,7 +110,7 @@ h1 a, h2 a, h3.blocktitle a {
 	font: inherit;
 }
 
-h1 a:hover, h2 a:hover, h3.blocktitle a:hover {
+h1 a:hover, h2 a:hover, h3.blocktitle a:hover, h1 a:focus, h2 a:focus, h3.blocktitle a:focus {
 	text-decoration: none;
 	color: #4eff52;
 }
@@ -640,7 +640,7 @@ label {
 	text-decoration: none;
 }
 
-.main-nav li a:hover {
+.main-nav li a:hover, .main-nav li a:focus {
 	text-decoration: underline;
 }
 
@@ -674,27 +674,51 @@ label {
 	margin-top: 1em;
 }
 
-.login-form .form-element {
+form .form-element {
 	display: grid;
 	grid-template-columns: 25% 75%;
 	grid-column-gap: 1em;
 	margin: 0 25% 0.5em 25%;
 }
 
-.login-form label {
+form.wide .form-element {
+	display: block;
+}
+
+form.wide .form-element > *:not(button) {
+	display: block;
+}
+
+form .form-element label {
 	text-align: right;
 }
 
-.login-form .form-footer {
+form.wide .form-element label {
+	text-align: left;
+}
+
+form.wide .form-element input, form.wide .form-element select, form.wide .form-element textarea {
+	width: 100%;
+}
+
+.form-element.missing label {
+	color: #F00;
+}
+
+.form-element.missing input, .form-element.missing select, .form-element.missing textarea {
+	border-color: #F00;
+}
+
+form .form-footer {
 	text-align: center;
 }
 
-.login-form .form-footer button {
+form .form-footer button {
 	padding-left: 2em;
 	padding-right: 2em;
 }
 
-.login-form .form-notice {
+form .form-notice {
     color: #F00;
     text-align: center;
 }
@@ -1069,7 +1093,7 @@ ol.postprocessor-list {
 	text-decoration: none;
 }
 
-.pagination li.page a:hover {
+.pagination li.page a:hover, .pagination li.page a:focus {
 	background: #50ff50 url('../img/patterngreen.jpg');
 }
 
@@ -1106,4 +1130,16 @@ ol.postprocessor-list {
 	from { background: rgba(255, 255, 255, 255); }
 	50% { background: #4eff52; }
 	to { background: rgba(255, 255, 255, 255); }
+}
+
+/* tooltips */
+*[role=tooltip] {
+	display: none;
+	background: #000;
+	color: #FFF;
+	padding: 0.5em;
+	box-sizing: border-box;
+	position: absolute;
+	max-width: 25em;
+	border: 2px solid #FFF;
 }

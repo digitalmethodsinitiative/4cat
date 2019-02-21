@@ -55,7 +55,7 @@ class Logger:
 		self.logger.setLevel(logging.INFO)
 
 		# this handler manages the text log files
-		handler = RotatingFileHandler(self.log_path, maxBytes=(25 * 1024 * 1024), backupCount=1)
+		handler = RotatingFileHandler(self.log_path, maxBytes=(50 * 1024 * 1024))
 		handler.setLevel(logging.DEBUG)
 		handler.setFormatter(logging.Formatter("%(asctime)-15s | %(levelname)s %(message)s",
 											   "%d-%m-%Y %H:%M:%S"))
@@ -293,7 +293,7 @@ class Logger:
 			mail += "This report was compiled at %s." % datetime.datetime.now().strftime('%d %B %Y %H:%M:%S')
 
 			try:
-				with smtplib.SMTP(config.WARN_MAILHOST) as smtp:
-					smtp.sendmail("4lab@%s" % platform.uname().node, config.WARN_EMAILS, mail)
+				with smtplib.SMTP(config.MAILHOST) as smtp:
+					smtp.sendmail("4cat@%s" % platform.uname().node, config.WARN_EMAILS, mail)
 			except (smtplib.SMTPException, ConnectionRefusedError) as e:
 				self.error("Could not send log alerts via e-mail (%s)" % e)
