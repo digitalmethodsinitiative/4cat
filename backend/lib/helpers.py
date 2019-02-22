@@ -20,13 +20,14 @@ def get_absolute_folder(folder=""):
 
 	:return string:  Absolute folder path (no trailing slash)
 	"""
-	if len(folder) == 0 or (folder[0] != "/" and folder[0] != "\\"):
+
+	if len(folder) == 0 or (folder[0] != "/" or folder[0] != "\\"):
 		path = os.path.dirname(os.path.dirname(os.path.dirname(__file__))) + "/"  # 4cat root folder
 		path += folder
 	else:
 		path = folder
 
-	path = path[:-1] if len(path) > 0 and (path[-1] == "/" and path[-1] != "\\") else path
+	path = path[:-1] if len(path) > 0 and (path[-1] == "/" or path[-1] == "\\") else path
 
 	return path
 
