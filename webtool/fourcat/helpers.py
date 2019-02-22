@@ -152,11 +152,10 @@ def get_available_postprocessors(query):
 	available = postprocessors.copy()
 	analyses = query.get_analyses()
 
-	for category in analyses:
-		for subquery in analyses[category]:
-			type = subquery["type"]
-			if type in available and not available[type].get("options", {}):
-				del available[type]
+	for subquery in analyses:
+		type = subquery.type
+		if type in available and not available[type].get("options", {}):
+			del available[type]
 
 	return available
 

@@ -23,6 +23,7 @@ def _jinja2_filter_datetime(date, fmt=None):
 	format = "%d-%m-%Y" if not fmt else fmt
 	return date.strftime(format)
 
+
 @app.template_filter('numberify')
 def _jinja2_filter_numberify(number):
 	try:
@@ -36,6 +37,7 @@ def _jinja2_filter_numberify(number):
 		return str(int(number / 1000)) + "k"
 
 	return str(number)
+
 
 @app.template_filter('markdown')
 def _jinja2_filter_markdown(text):
@@ -322,46 +324,15 @@ def show_result(key):
 		abort(404)
 
 	# subqueries are not available via a separate page
-	if query.data["key_parent"]:
+	if query.key_parent:
 		abort(404)
-
-	# initialize the data we need
-	querydata = query.data
-	querydata["parameters"] = json.loads(querydata["parameters"])
 
 	# load list of post-processors compatible with this query result
 	processors = query.get_compatible_postprocessors()
-	processor_categories = set([value['category'] for value in processors.values()])
-	unfinished_postprocessors = processors.copy()
 	is_postprocessor_running = False
 
-	# determine whether any post-processors have already been run/queued
-	analyses = query.get_analyses()
-	filtered_subqueries = []
-
-	# for each subquery, determine whether it is finished or running
-	# and remove it from the list of available post-processors
-	for subquery in analyses:
-		type = subquery.type
-
-		if type not in processors:
-			# this could happen for postprocessors that were run earlier but no longer exist as class
-			subquery.postprocessor = {}
-		else:
-			subquery.postprocessor = processors[type]
-
-		if not subquery.is_finished():
-			is_postprocessor_running = True
-
-		if type in unfinished_postprocessors and not unfinished_postprocessors[type].get("options", None):
-				del unfinished_postprocessors[type]
-
-		filtered_subqueries.append(subquery)
-
-	available_postprocessors = unfinished_postprocessors.copy()
-
 	# show preview
-	if query.is_finished() and querydata["num_rows"] > 0:
+	if query.is_finished() and query.num_rows > 0:
 		preview = get_preview(query)
 	else:
 		preview = None
@@ -369,9 +340,9 @@ def show_result(key):
 	# we can either show this view as a separate page or as a bunch of html
 	# to be retrieved via XHR
 	standalone = "postprocessors" not in request.url
-	template = "result.html" if standalone else "result-details.html"
-	return render_template(template, preview=preview, query=querydata, postprocessors=available_postprocessors, processor_categories=processor_categories,
-						   subqueries=filtered_subqueries, is_postprocessor_running=is_postprocessor_running, messages=get_flashed_messages())
+	template = "result.html" if standalone else "result-details-extended.html"
+	return render_template(template, preview=preview, query=query, postprocessors=load_postprocessors(),
+						   is_postprocessor_running=is_postprocessor_running, messages=get_flashed_messages())
 
 
 @app.route('/results/<string:key>/postprocessors/queue/<string:postprocessor>/', methods=["GET", "POST"])
@@ -393,35 +364,38 @@ def queue_postprocessor(key, postprocessor):
 		abort(404)
 
 	# check if post-processor is available for this query
-	available = get_available_postprocessors(query)
-	if postprocessor not in available:
+	if postprocessor not in query.postprocessors:
 		abort(404)
 
 	# create a query now
 	options = {}
-	for option in available[postprocessor]["options"]:
-		settings = available[postprocessor]["options"][option]
+	for option in query.postprocessors[postprocessor]["options"]:
+		settings = query.postprocessors[postprocessor]["options"][option]
 		choice = request.values.get("option-" + option, None)
-		if settings["type"] == UserInput.OPTION_TOGGLE:
-			options[option] = choice is not None
-		elif settings["type"] == UserInput.OPTION_CHOICE:
-			options[option] = choice if choice in settings["options"] else settings["default"]
-		else:
-			options[option] = request.values.get("option-" + option, settings.get("default", None))
+		options[option] = UserInput.parse(settings, choice)
 
-	analysis = SearchQuery(parent=query.key, parameters=options, db=db, extension=available[postprocessor]["extension"], type=postprocessor)
+	analysis = SearchQuery(parent=query.key, parameters=options, db=db,
+						   extension=query.postprocessors[postprocessor]["extension"], type=postprocessor)
 	if analysis.is_new:
 		# analysis has not been run or queued before - queue a job to run it
 		job = queue.add_job(jobtype=postprocessor, remote_id=analysis.key)
 		analysis.link_job(job)
 		analysis.update_status("Queued")
 	else:
-		flash("This analysis (%s) is currently queued or has already been run. Check its status below." % available[postprocessor]["name"])
+		flash("This analysis (%s) is currently queued or has already been run with these parameters." %
+			  query.postprocessors[postprocessor]["name"])
 
 	if is_async:
-		return jsonify({"status": "success"})
+		return jsonify({
+			"status": "success",
+			"container": query.key + "-sub",
+			"key": analysis.key,
+			"html": render_template("result-subquery-extended.html", subquery=analysis,
+									postprocessors=load_postprocessors()) if analysis.is_new else "",
+			"messages": get_flashed_messages()
+		})
 	else:
-		return redirect("/results/" + query.key + "/")
+		return redirect("/results/" + analysis.top_key() + "/")
 
 
 @app.route('/check_postprocessors/')
@@ -433,7 +407,6 @@ def check_postprocessor():
 		abort(404)
 
 	subqueries = []
-	processors = load_postprocessors()
 
 	for key in keys:
 		try:
@@ -441,16 +414,11 @@ def check_postprocessor():
 		except TypeError:
 			continue
 
-		details = json.loads(query.data["parameters"])
-		subquery = query.data
-		subquery["postprocessor"] = processors[query.data["type"]]
-		subquery["parameters"] = details
-
 		subqueries.append({
 			"key": query.key,
-			"job": details["job"] if "job" in details else "",
+			"job": query.job,
 			"finished": query.is_finished(),
-			"html": render_template("result-subquery.html", subquery=subquery)
+			"html": render_template("result-subquery-extended.html", subquery=query, postprocessors=load_postprocessors())
 		})
 
 	return jsonify(subqueries)
