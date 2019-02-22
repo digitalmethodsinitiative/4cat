@@ -279,7 +279,7 @@ class SearchQuery:
 			raise TypeError("write_as_csv requires a list or tuple of dictionaries as argument")
 
 		self.update_status("Writing results file")
-		with open(self.get_results_path(), "w") as results:
+		with open(self.get_results_path(), "w", encoding="utf-8") as results:
 			writer = DictWriter(results, fieldnames=data[0].keys())
 			writer.writeheader()
 

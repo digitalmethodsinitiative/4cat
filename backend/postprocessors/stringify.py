@@ -27,7 +27,7 @@ class Stringify(BasicPostProcessor):
 		posts = 0
 		self.query.update_status("Processing posts")
 		with open(self.query.get_results_path(), "w") as results:
-			with open(self.source_file, encoding='utf-8') as source:
+			with open(self.source_file, encoding="utf-8") as source:
 				csv = DictReader(source)
 				for post in csv:
 					posts += 1

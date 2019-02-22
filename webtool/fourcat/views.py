@@ -230,28 +230,23 @@ def check_query(query_key):
 	return jsonify(status)
 
 
-@app.route('/result/<string:query_key>/')
+@app.route('/result/<string:query_file>/')
 @login_required
 @openapi.endpoint
-def get_result(query_key):
+def get_result(query_file):
 	"""
-	Get query result
+	Get query result file
 
-	:param str query_key:  ID of the query for which to return the result
+	:param str query_file:  name of the result file
 	:return:  Result file
 	:rmime: text/csv
 	"""
-	try:
-		query = SearchQuery(key=query_key, db=db)
-	except TypeError:
-		abort(404)
 
-	results = query.check_query_finished()
-	if not results:
-		abort(404)
-
-	return send_from_directory(config.PATH_DATA, results.replace("\\", "/").split("/").pop())
-
+	# Return localhost URL when debugging locally
+	if app.debug:
+		return redirect("http://localhost/fourcat/data/" + query_file)
+	
+	return send_from_directory(query.get_results_path().replace("\\", "/"), query.get_results_path().replace("\\", "/").split("/").pop())
 
 @app.route('/results/', defaults={'page': 1})
 @app.route('/results/page/<int:page>/')

@@ -395,12 +395,12 @@ function update_query_statuses() {
      * Checks if running subqueries have finished, updates their status, and re-enabled further
      * analyses if all subqueries have finished
      */
-    let queued = $('.subquery.running');
-    console.log('checking postprocessor statuses')
+    let queued = $('.subquery');
+    
     if (queued.length === 0) {
         return;
     }
-    console.log('checking postprocessor statuses')
+    
     let keys = new Array();
     queued.each(function () {
         keys.push($(this).attr('id').split('-')[1])

@@ -50,7 +50,7 @@ class QuoteRanker(BasicPostProcessor):
 		fieldnames.append("num_quoted")
 
 		self.query.update_status("Writing results file")
-		with open(self.query.get_results_path(), "w") as results:
+		with open(self.query.get_results_path(), "w", encoding="utf-8") as results:
 			writer = DictWriter(results, fieldnames=fieldnames)
 			writer.writeheader()
 

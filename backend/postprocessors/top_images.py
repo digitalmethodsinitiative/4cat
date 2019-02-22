@@ -52,7 +52,6 @@ class TopImageCounter(BasicPostProcessor):
 
 		top_images = {id: images[id] for id in sorted(images, key=lambda id: images[id]["count"], reverse=True)}
 
-
 		results=[{
 			"md5_hash": images[id]["md5"],
 			"filename": images[id]["filename"],

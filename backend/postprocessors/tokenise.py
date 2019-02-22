@@ -6,6 +6,7 @@ import zipfile
 import pickle
 import re
 import os
+import shutil
 
 from csv import DictReader
 from stop_words import get_stop_words
@@ -71,17 +72,16 @@ class Tokenise(BasicPostProcessor):
 			index += 1
 
 		os.mkdir(dirname)
-		os.chdir(dirname)
 
 		# this needs to go outside the loop because we need to call it one last
 		# time after the post loop has finished
 		def save_subunit(subunit):
-			with open(subunit + ".pb", "wb") as outputfile:
+			with open(dirname + '/' + subunit + ".pb", "wb") as outputfile:
 				pickle.dump(subunits[subunit], outputfile)
 
 		# process posts
 		self.query.update_status("Processing posts")
-		with open(self.source_file, encoding='utf-8') as source:
+		with open(self.source_file, encoding="utf-8") as source:
 			csv = DictReader(source)
 			for post in csv:
 				# determine what output unit this post belongs to
@@ -129,7 +129,6 @@ class Tokenise(BasicPostProcessor):
 
 					subunits[output].add(token)
 
-
 		# save the last subunit we worked on too
 		save_subunit(current_subunit)
 
@@ -137,10 +136,11 @@ class Tokenise(BasicPostProcessor):
 		self.query.update_status("Compressing results into archive")
 		with zipfile.ZipFile(self.query.get_results_path(), "w") as zip:
 			for subunit in subunits:
-				zip.write(subunit + ".pb")
-				os.unlink(subunit + ".pb")
+				zip.write(dirname + '/'+ subunit + ".pb")
+				os.unlink(dirname + '/'+ subunit + ".pb")
 
-		os.rmdir(dirname)
+		# delete temporary files and folder
+		shutil.rmtree(dirname)
 
 		# done!
 		self.query.update_status("Finished")
