@@ -87,7 +87,7 @@ def load_postprocessors():
 				}
 
 	sorted_postprocessors = collections.OrderedDict()
-	for key in sorted(postprocessors, key=lambda postprocessor: postprocessors[postprocessor]["category"] + postprocessors[postprocessor]["name"]):
+	for key in sorted(postprocessors, key=lambda postprocessor: postprocessors[postprocessor]["category"] + postprocessors[postprocessor]["name"].lower()):
 		sorted_postprocessors[key] = postprocessors[key]
 
 	return sorted_postprocessors
@@ -96,3 +96,28 @@ def load_postprocessors():
 class UserInput:
 	OPTION_TOGGLE = "toggle"
 	OPTION_CHOICE = "choice"
+	OPTION_TEXT = "string"
+
+	def parse(settings, choice):
+		type = settings.get("type", "")
+		if type == UserInput.OPTION_TOGGLE:
+			return choice is not None
+		elif type == UserInput.OPTION_CHOICE:
+			return choice if choice in settings.get("options", []) else settings.get("default", "")
+		elif type == UserInput.OPTION_TEXT:
+			print("Input: %s" % choice)
+			if "max" in settings:
+				try:
+					choice = min(settings["max"], int(choice))
+				except TypeError as e:
+					choice = settings.get("default")
+
+			if "min" in settings:
+				try:
+					choice = max(settings["min"], int(choice))
+				except TypeError as e:
+					choice = settings.get("default")
+
+			return choice or settings.get("default")
+		else:
+			return choice

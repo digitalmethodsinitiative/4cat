@@ -92,6 +92,7 @@ h4.section-subheader {
 	background-color: #000;
 	color: #fff;
 	padding-left: 25px;
+	margin-bottom: 0;
 }
 
 h1 span, h2 span, h3.blocktitle span {
@@ -757,6 +758,9 @@ nav > ul.flat > li:not(:last-child)::after {
 
 .plain-page article {
 	border: 2px solid #000;
+}
+
+.plain-page article, .result-tree {
 	min-width: 350px;
 	margin: 0 auto;
 	width: 75%;
@@ -859,7 +863,7 @@ ol.result-list {
 }
 
 .result-list > li {
-	padding: 0.5em 0.5em 0.25em 0.5em;
+	padding: 0.5em 0.5em 0.5em 0.5em;
 }
 
 .result-list li p.result-file {
@@ -895,6 +899,7 @@ ol.result-list {
     padding: 0.1em 0.5em;
     position: relative;
     top: -3px;
+	vertical-align: baseline;
 }
 
 .result .second-tier {
@@ -905,32 +910,15 @@ ol.result-list {
     color: #cc1105;
 }
 
-.subquery-list {
-    list-style: none;
-    padding: 0;
-    margin-left: 1.5em;
-}
-
-.subquery-list li {
-    padding: 0;
-}
-
-.subquery-list li::before {
-    content: '';
-    display: inline-block;
-    width: 0.85em;
-    height: 0.85em;
-    border-left: 2px dotted #000;
-    border-bottom: 2px dotted #000;
-    vertical-align: top;
-    margin-right: 0.5em;
-}
-
 .result-warning {
 	background: #50ff50 url('../img/patterngreen.jpg');
 	text-align: center;
 	margin: 0;
 	margin-bottom: 0px;
+}
+
+.plain-page article p.queue-button-wrap {
+	margin-bottom: 0;
 }
 
 .queue-button-wrap .button-like {
@@ -1047,6 +1035,10 @@ ol.postprocessor-list {
 	margin: 0;
 }
 
+.postprocessor-list li {
+	padding: 0.25em;
+}
+
 .postprocessor-list li form {
     display: grid;
     grid-template-columns: auto 5em;
@@ -1054,9 +1046,15 @@ ol.postprocessor-list {
 }
 
 .postprocessor-list li fieldset {
-	padding: 0 1em 0 1em;
+	padding: 0 1em;
 	transition: 0.25s;
 	overflow: hidden;
+	display: block;
+	box-sizing: border-box;
+}
+
+.postprocessor-list li.expanded fieldset {
+	padding-top: 0.5em;
 }
 
 .postprocessor-list li fieldset label {
@@ -1126,15 +1124,15 @@ ol.postprocessor-list {
     to { opacity: 0; }
 }
 
-.flashing { animation: flash 0.5s 3 normal forwards; }
+.flashing, .flashing .query-core, .flashing .query-core p, .flashing .query-core .property-badge { animation: flash 0.5s 3 normal forwards; }
 @keyframes flash {
-	from { background: rgba(255, 255, 255, 255); }
-	50% { background: #4eff52; }
-	to { background: rgba(255, 255, 255, 255); }
+	from { border-color: #000; color: #4eff52; }
+	50% { border-color: #4eff52; color: #4eff52; }
+	to { border-color: #000; color: #000; }
 }
 
 /* tooltips */
-*[role=tooltip] {
+*[role=tooltip], .plain-page article p[role=tooltip] {
 	display: none;
 	background: #000;
 	color: #FFF;
@@ -1143,4 +1141,189 @@ ol.postprocessor-list {
 	position: absolute;
 	max-width: 25em;
 	border: 2px solid #FFF;
+}
+
+/* generic classes to apply 'block' appearance (rounded corners and border) */
+.card {
+	border: 2px solid #000;
+	margin-bottom: 0.5em;
+	border-radius: 8px;
+}
+
+.card.query {
+	margin: 1em 2em 0 2em;
+}
+
+.card.query h3 {
+	border-top-left-radius: 0.25em;
+	border-top-right-radius: 0.25em;
+}
+
+.card.query p {
+	padding: 0.5em 1em;
+}
+
+/* query block wrapper */
+.subquery {
+	transition: 0.25s;
+}
+
+.subquery-list {
+	padding: 0;
+	list-style: none;
+}
+
+
+.subquery .subquery-list {
+	padding: 0;
+	margin-bottom: 0.5em;
+}
+
+.subquery.focus {
+	margin: 0 auto;
+	max-width: 500px;
+	position: relative;
+	margin-top: 2em;
+}
+
+.subquery.focus::before {
+	content: ' ';
+	border-left: 2px dotted #000;
+	height: 0.9em;
+	position: absolute;
+	left: 50%;
+	top: -1.5em;
+	margin-left: -1px;
+}
+
+.subquery[aria-expanded=false], .postprocessor-wrap[aria-expanded=false] {
+	height: 0;
+	overflow: hidden;
+}
+
+.result-tree > div > .subquery-list {
+	margin: 0.5em 3em 2em 3em;
+}
+
+/* query description in query block */
+li:not(.focus) > .query-core {
+	position: relative;
+	display: inline-block;
+	width: 90%;
+	padding: 0.25em 0.5em;
+}
+
+.focus > .query-core {
+	padding: 2em 0.5em 1em 0.5em;
+	background: transparent;
+}
+
+.plain-page article .query-core p {
+	padding-left: 0;
+}
+
+.query-core button:not(.active) {
+	border-left: 0;
+	border-top-left-radius: 0;
+	border-bottom-left-radius: 0;
+    border-left: 2px solid #000;
+	margin-left: -2px;
+	display: block;
+	z-index: 0;
+}
+
+.query-core button.active {
+	position:  absolute;
+	top: 0;
+	right: 0;
+	left: 0;
+	border: 0;
+	border-radius: 0;
+	border-bottom: 2px solid #000;
+	background: transparent;
+	width: 100%;
+	margin: 0;
+}
+
+.query-core button.active:hover {
+	background: #000;
+	color: #FFF;
+}
+
+.query-core {
+	font-size: 0;
+}
+
+.query-core > * {
+	font-size: 16px;
+}
+
+li:not(.focus) > .query-core > p {
+	border: 2px solid #000;
+	background: #FFF;
+	border-radius: 0.5em;
+	border-right: 0;
+	display: inline-block;
+	padding: 0 0.5em;
+	border-right: 2px solid #000;
+	z-index: 1;
+	float: left;
+	margin-top: 2px;
+}
+
+li:not(.focus):not(.running) > .query-core > p {
+	border-top-right-radius: 0;
+	border-bottom-right-radius: 0;
+}
+
+/* post-processor and subquery controls */
+li > .sub-controls {
+	height: auto;
+}
+
+li:not(.focus) > .sub-controls {
+	height: 0;
+	overflow: hidden;
+}
+
+.result-page .subquery:not(.focus):not([aria-expanded=false]) {
+	height: 2.5em;
+}
+
+.subquery-list > li:not(.focus)::before {
+	content: '';
+	border-left: 2px dotted #000;
+	border-bottom: 2px dotted #000;
+	width: 0.85em;
+	height: 0.85em;
+	display: inline-block;
+	vertical-align: top;
+	margin-left: 1em;
+}
+
+body.result-list .subquery-list > li:not(.focus)::before {
+	margin-left: 2em;
+	margin-right: 0.5em;
+}
+
+.subquery .postprocessor-wrap .postprocessor-list {
+	list-style: none;
+	padding: 0;
+}
+
+.postprocessor-wrap {
+	margin-top: 1em;
+}
+
+li.focus > .query-core > p {
+	margin: 2em 0.5em 0.5em 0.5em;
+}
+
+.postprocessor-wrap li:last-child {
+    border-bottom-left-radius: 0.5em;
+    border-bottom-right-radius: 0.5em;
+}
+
+.subquery-list .postprocessor-options input.numeric {
+	width: 5em;
 }

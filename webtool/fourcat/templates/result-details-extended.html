@@ -1,10 +1,13 @@
-<h3 class="blocktitle"><span><a href="/results/{{ query.key }}/">Query{% if query.query != "query" %}:
-    {{ query.query }}{% endif %}</a></span></h3>
+<section class="result-tree">
 {% if messages %}
     {% for message in messages %}
         <p class="result-warning glued">{{ message }}</p>
     {% endfor %}
 {% endif %}
+
+<div class="card query">
+    <h3 class="blocktitle"><span><a href="/results/{{ query.key }}/">Query{% if query.query != "query" %}:
+    {{ query.query }}{% endif %}</a></span></h3>
 
 <p class="result">
     <span class="property-badge">{{ query.parameters.platform if "platform" in query.parameters else "4chan" }}/{{ query.parameters.board }}/</span>
@@ -24,10 +27,8 @@
     {%  if query.is_finished and query.num_rows == 0 %}
         <span class="property-badge second-tier warning">no results</span>
     {% endif %}
-</p>
 
 {% if query.parameters.min_date > 0 or query.parameters.max_date > 0 %}
-    <p class="result">
         {% if query.parameters.min_date > 0 %}
             <span class="property-badge">From</span>
             <span class="inline-query">{{ query.parameters.min_date|datetime }}</span>
@@ -35,38 +36,26 @@
         <span class="property-badge">Until</span>
         <span class="inline-query">{{ query.parameters.max_date|datetime }}</span>
     {% endif %}
-    </p>
 {% endif %}
+    </p>
 
-{% if query.status %}
     <p class="result">
-        {{ query.status }}
+        {% if query.status %}{{ query.status }}{% else %}Query is queued.{% endif %} {% if query.is_finished %}({{ query.num_rows }} posts{% if query.num_rows > 0 %}; <a href="/result/{{ query.result_file }}">{{ query.result_file }}</a>{% endif %}){% endif %}
     </p>
-{% endif %}
+</div>
 
-{% if query.is_finished %}
-    {% if query.num_rows > 0 %}
-        <p class="result-file">
-            {{ query.num_rows }} posts
-            <a href="/result/{{ query.result_file }}">{{ query.result_file }}</a>
-        </p>
-    {% endif %}
-{% elif query.status %}
-    <p>Currently executing query ({{ query.status }}).</p>
-{% else %}
-    <p>Query is queued.</p>
-{% endif %}
-
-{% if subqueries|length > 0 %}
+    <div id="{{ query.key }}-sub">
     <ol class="subquery-list">
-        {% for subquery in subqueries %}
-            {% include 'result-subquery.html' %}
+        {% for subquery in query.subqueries %}
+            {% include 'result-subquery-extended.html' %}
         {% endfor %}
     </ol>
-{% endif %}
+    </div>
+</section>
 
+<article>
 {% if current_user.is_authenticated %}
-    {% if query.num_rows == 0 or postprocessors.values()|length == 0 %}
+    {% if query.num_rows == 0 or query.postprocessors|length == 0 %}
         <h3 class="blocktitle section-header"><span>Analyses</span></h3>
         <p>
             No further analytical post-processors are available for this query.
@@ -81,34 +70,23 @@
                 result have been completed.</p>
         {% endif %}
 
+        <p>Start your analysis of the retrieved data by choosing one of the post-processors below.
+        Note that some may take a while to complete, so carefully consider which one you want to run
+        before queueing it.</p>
+        <p><a href="#">Documentation</a> about the various modes of analysis and what to take into
+        account when using 4CAT data is available as well.</p>
+
 
         {% set cat = namespace(egory='') %}
-        {% for processor in postprocessors.values() %}
+        {% for processor in query.postprocessors.values() %}
             {% if processor.category != cat.egory %}
                 {% if cat.egory != '' %}</ol>{% endif %}
                 {% set cat.egory = processor.category %}
                 <h4 class="blocktitle section-subheader"><span>{{ processor.category }}</span></h4>
                 <ol class="postprocessor-list">
             {% endif %}
-            <li>
-                <form action="/results/{{ query.key }}/postprocessors/queue/{{ processor.type }}/" method="POST">
-                    <p><em>{{ processor.name }}</em>:
-                        {{ processor.description }}{% if processor.description[-1] != "." %}.{% endif %}
-                        Output: {{ processor.extension }} file.</p>
-                    <p class="queue-button-wrap {% if is_postprocessor_running %}hidden{% endif %}">
-                        <button>Queue</button>
-                    </p>
-                    {% if processor.options %}
-                        <fieldset class="postprocessor-options">
-                            {% for option in processor.options %}
-                                {% include "postprocessor-option.html" %}
-                            {% endfor %}
-                        </fieldset>
-                    {% endif %}
-                </form>
-            </li>
+            {% include "postprocessor-details.html" %}
         {% endfor %}
     {% endif %}
 {% endif %}
-
-{% include "posts-preview.html" %}
+</article>
