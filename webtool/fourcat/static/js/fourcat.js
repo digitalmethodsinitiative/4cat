@@ -314,8 +314,9 @@ function datepicker_normalize() {
 }
 
 function stringToTimestamp(str) {
-    // Converts a text input to a unix timestamp.
-    // Only used in Safari (other browsers use native HTML date picker)
+    /* Converts a text input to a unix timestamp.
+     Only used in Safari (other browsers use native HTML date picker) */
+
     var date_regex = /^\d{4}-\d{2}-\d{2}$/
     if (str.match(date_regex)) {
         timestamp = (new Date(str).getTime() / 1000)
@@ -387,18 +388,19 @@ popup_panel = {
     }
 };
 
-/**
- * Fancy live-updating subquery status
- *
- * Checks if running subqueries have finished, updates their status, and re-enabled further
- * analyses if all subqueries have finished
- */
 function update_query_statuses() {
-    let queued = $('.running.subquery');
+    /**
+     * Fancy live-updating subquery status
+     *
+     * Checks if running subqueries have finished, updates their status, and re-enabled further
+     * analyses if all subqueries have finished
+     */
+    let queued = $('.subquery.running');
+    console.log('checking postprocessor statuses')
     if (queued.length === 0) {
         return;
     }
-
+    console.log('checking postprocessor statuses')
     let keys = new Array();
     queued.each(function () {
         keys.push($(this).attr('id').split('-')[1])
@@ -422,12 +424,12 @@ function update_query_statuses() {
                     return;
                 }
 
-
                 li.addClass('flashing');
                 if (!$('body').hasClass('result-page')) {
                     return;
                 }
 
+                console.log('checking postprocessors finished')
                 if ($('.running.subquery').length == 0) {
                     $('.result-warning').animate({height: 0}, 250, function () {
                         $(this).remove();

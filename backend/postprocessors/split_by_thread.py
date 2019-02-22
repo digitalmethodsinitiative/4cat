@@ -4,6 +4,7 @@ Split results by thread
 import zipfile
 import os
 import time
+import shutil
 
 from csv import DictReader, DictWriter
 
@@ -40,23 +41,24 @@ class ThreadSplitter(BasicPostProcessor):
 			dirname = dirname_base + "-" + str(index)
 			index += 1
 
+		# create temporary folder
 		os.mkdir(dirname)
-		os.chdir(dirname)
 
 		# read and write
 		threadfiles = []
 		self.query.update_status("Creating thread files")
-		with open(self.source_file, encoding='utf-8') as source:
+		with open(self.source_file, encoding="utf-8") as source:
 			csv = DictReader(source)
 			for post in csv:
 				thread = post["thread_id"]
-				new = not os.path.exists(thread + ".csv")
+				new = not os.path.exists(dirname + '/' +thread + ".csv")
 
-				with open(thread + ".csv", "a") as output:
+				with open(dirname + '/' + thread + ".csv", "a", encoding="utf-8") as output:
 					outputcsv = DictWriter(output, fieldnames=post.keys())
+
 					if new:
 						outputcsv.writeheader()
-						threadfiles.append(output.name)
+						threadfiles.append(dirname + '/' + thread + ".csv")
 
 					outputcsv.writerow(post)
 
@@ -66,7 +68,8 @@ class ThreadSplitter(BasicPostProcessor):
 				zip.write(threadfile)
 				os.unlink(threadfile)
 
-		os.rmdir(dirname)
+		# remove temporary folder
+		shutil.rmtree(dirname)
 
 		self.query.update_status("Finished")
 		self.query.finish(len(threadfiles))

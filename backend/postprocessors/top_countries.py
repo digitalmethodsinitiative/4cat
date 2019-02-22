@@ -27,7 +27,7 @@ class CountryCounter(BasicPostProcessor):
 		countries = {}
 
 		self.query.update_status("Reading source file")
-		with open(self.source_file) as source:
+		with open(self.source_file, encoding="utf-8") as source:
 			csv = DictReader(source)
 			for post in csv:
 				country = post["country_code"] if "country_code" in post else ""
