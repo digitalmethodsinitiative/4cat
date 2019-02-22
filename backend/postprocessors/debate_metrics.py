@@ -40,7 +40,7 @@ class DebateMetrics(BasicPostProcessor):
 		reply_lengths = []
 
 		self.query.update_status("Reading source file")
-		with open(self.source_file, encoding='utf-8') as source:
+		with open(self.source_file, encoding="utf-8") as source:
 			csv = DictReader(source)
 			for post in csv:
 				if post["thread_id"] not in threads:
@@ -72,7 +72,6 @@ class DebateMetrics(BasicPostProcessor):
 			"num_images": threads[thread_id]["images"],
 			"preview_url": "http://" + config.FlaskConfig.SERVER_NAME + "/api/4chan/pol/thread/" + str(
 				thread_id) + ".json?format=html",
-			"op_length": op_length,
 			"op_replies": threads[thread_id]["op_length"]
 			# TO DO
 			# "reply_amount": ,

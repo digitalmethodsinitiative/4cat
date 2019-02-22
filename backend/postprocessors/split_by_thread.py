@@ -50,15 +50,15 @@ class ThreadSplitter(BasicPostProcessor):
 		with open(self.source_file, encoding="utf-8") as source:
 			csv = DictReader(source)
 			for post in csv:
-				thread = post["thread_id"]
-				new = not os.path.exists(dirname + '/' +thread + ".csv")
+				thread = dirname + '/' + post["thread_id"] + ".csv"
+				new = not os.path.exists(thread)
 
-				with open(dirname + '/' + thread + ".csv", "a", encoding="utf-8") as output:
+				with open(thread, "a", encoding="utf-8") as output:
 					outputcsv = DictWriter(output, fieldnames=post.keys())
 
 					if new:
 						outputcsv.writeheader()
-						threadfiles.append(dirname + '/' + thread + ".csv")
+						threadfiles.append(thread)
 
 					outputcsv.writerow(post)
 

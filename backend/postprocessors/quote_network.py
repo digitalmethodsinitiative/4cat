@@ -46,7 +46,7 @@ class QuoteNetworkGrapher(BasicPostProcessor):
 					edges.append([post["id"], quotes[0]])
 
 		self.query.update_status("Writing results file")
-		with open(self.query.get_results_path(), "w") as results:
+		with open(self.query.get_results_path(), "w", encoding="utf-8") as results:
 			results.write("nodedef>name VARCHAR,label VARCHAR\n")
 			for node in nodes:
 				results.write("post-" + node + ',"' + node + '"\n')
