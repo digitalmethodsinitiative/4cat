@@ -1,0 +1,17 @@
+            <li>
+                <form action="/results/{{ query.key }}/postprocessors/queue/{{ processor.type }}/" method="POST">
+                    <div><em>{{ processor.name }}</em>{% if inline %} <button class="tooltip-trigger" aria-controls="tooltip-postprocessor-{{ item.id }}-{{ processor.type }}" aria-label="Post-processor details">?</button> <p role="tooltip" id="tooltip-postprocessor-{{ item.id }}-{{ processor.type }}">{% else %}:{% endif %}
+                        {{ processor.description }}{% if processor.description[-1] != "." %}.{% endif %}
+                        Output: {{ processor.extension }} file.{% if inline %}</p>{% endif %}</div>
+                    <p class="queue-button-wrap {% if is_postprocessor_running %}hidden{% endif %}">
+                        <button class="control-postprocessor">Queue</button>
+                    </p>
+                    {% if processor.options %}
+                        <fieldset class="postprocessor-options">
+                            {% for option in processor.options %}
+                                {% include "postprocessor-option.html" %}
+                            {% endfor %}
+                        </fieldset>
+                    {% endif %}
+                </form>
+            </li>

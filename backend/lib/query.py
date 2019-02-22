@@ -26,6 +26,9 @@ class SearchQuery:
 	parameters = {}
 	is_new = True
 
+	subqueries = []
+	postprocessors = {}
+
 	def __init__(self, parameters={}, key=None, job=None, data=None, db=None, parent=None, extension="csv", type="search"):
 		"""
 		Create new query object
@@ -80,7 +83,8 @@ class SearchQuery:
 				"status": "",
 				"type": type,
 				"timestamp": int(time.time()),
-				"is_finished": False
+				"is_finished": False,
+				"num_rows": 0
 			}
 			self.parameters = parameters
 
@@ -89,6 +93,12 @@ class SearchQuery:
 
 			self.db.insert("queries", data=self.data)
 			self.reserve_result_file(extension)
+
+		# retrieve analyses and post-processors that may be run for this query
+		analyses = self.db.fetchall("SELECT * FROM queries WHERE key_parent = %s ORDER BY timestamp ASC", (self.key,))
+		self.subqueries = [SearchQuery(data=analysis, db=self.db) for analysis in analyses]
+		self.postprocessors = self.get_available_postprocessors()
+
 
 	def check_query_finished(self):
 		"""
@@ -289,30 +299,35 @@ class SearchQuery:
 		self.update_status("Finished")
 		self.finish(len(data))
 
-	def get_analyses(self):
+	def top_key(self):
 		"""
-		Get analyses for this query
+		Get key of root query
 
-		:return dict: Dict with two lists: one `queued` (jobs) and one
-		`running` (queries)
+		Traverses the tree of queries this one is part of until it finds one
+		with no parent query, then returns that query's key.
+
+		Not to be confused with top kek.
+
+		:return str: Parent key.
 		"""
-		results = []
-		analyses_records = self.db.fetchall("SELECT * FROM queries WHERE key_parent = %s", (self.key,))
-		analyses = [SearchQuery(data=analysis, db=self.db) for analysis in analyses_records]
+		key = self.key_parent
+		if not key:
+			return self.key
 
-		for analysis in analyses:
-			postprocessors = analysis.get_compatible_postprocessors()
+		while True:
+			try:
+				parent = SearchQuery(key=key, db=self.db)
+			except TypeError:
+				return key
 
-			analysis.data["_subqueries"] = analysis.get_analyses()
-			analysis.data["_postprocessors"] = {key: value for key, value in postprocessors.items() if key not in [analysis.data["type"] for analysis in analyses]}
-
-			results.append(analysis)
-
-		return results
+			if parent.key_parent:
+				key = parent.key_parent
+			else:
+				return key
 
 	def get_compatible_postprocessors(self):
 		"""
-		Get list of post-processors available for this query
+		Get list of post-processors compatible with this query
 
 		Checks whether this query type is one that is listed as being accepted
 		by the post-processor, for each known type: if the post-processor does
@@ -323,12 +338,34 @@ class SearchQuery:
 		"""
 		postprocessors = load_postprocessors()
 
-		available = {}
+		available = collections.OrderedDict()
 		for postprocessor in postprocessors.values():
 			if (self.data["type"] == "search" and not postprocessor["accepts"]) or self.data["type"] in postprocessor["accepts"]:
 				available[postprocessor["type"]] = postprocessor
 
 		return available
+
+	def get_available_postprocessors(self):
+		"""
+		Get list of post-processors that may be run for this query
+
+		Returns all compatible postprocessors except for those that are already
+		queued or finished and have no options. Postprocessors that have been
+		run but have options are included so they may be run again with a
+		different configuration
+
+		:return dict:  Available post-processors, `name => properties` mapping
+		"""
+		postprocessors = self.get_compatible_postprocessors()
+
+		for analysis in self.subqueries:
+			if analysis.type not in postprocessors:
+				continue
+
+			if not postprocessors[analysis.type]["options"]:
+				del postprocessors[analysis.type]
+
+		return postprocessors
 
 	def link_job(self, job):
 		"""
@@ -358,7 +395,14 @@ class SearchQuery:
 
 
 	def __getattr__(self, attr):
+		"""
+		Getter so we don't have to use .data all the time
+
+		:param attr:  Data key to get
+		:return:  Value
+		"""
 		if attr in self.data:
 			return self.data[attr]
 		else:
+			print(self.data)
 			raise KeyError("SearchQuery instance has no attribute %s" % attr)

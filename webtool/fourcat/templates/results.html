@@ -35,12 +35,6 @@
           {%  if query.is_finished and query.num_rows == 0 %}
               <span class="property-badge second-tier warning">no results</span>
           {% endif %}
-          </h3>
-
-          <div class="result-files">
-
-          {% if query.parameters.min_date > 0 or query.parameters.max_date > 0 %}
-            <p class="result">
           {% if query.parameters.min_date > 0 %}
               <span class="property-badge">From</span>
               <span class="inline-query">{{ query.parameters.min_date|datetime }}</span>
@@ -48,15 +42,14 @@
               <span class="property-badge">Until</span>
               <span class="inline-query">{{ query.parameters.max_date|datetime }}</span>
           {% endif %}
-            </p>
-          {% endif %}
+          </h3>
 
+          <div class="result-files">
         {% if query.is_finished %}
             <p class="result-file">
               {{ query.num_rows }} posts;
               {% if query.num_rows > 0 %}
                 <a href="/result/{{ query.result_file }}">{{ query.result_file }}</a>
-              }
               {% endif %}
             </p>
         {% elif query.status %}
@@ -66,12 +59,14 @@
         {% endif %}
         {% if query.is_finished and query.subqueries|length > 0 %}
             <ol class="subquery-list">
-            {% for subquery in query.subqueries %}
-                {% include 'result-subquery.html' %}
-            {% endfor %}
+                <li>{{ query.subqueries|length }} analysis result{% if query.subqueries|length != 1 %}s{% endif %} available</li>
             </ol>
         {% endif %}
+
           </div>
+          {% if query.num_rows > 0 %}
+              <div><a class="button-like postprocessor-link" href="/results/{{ query.key }}/">Analysis</a></div>
+              {% endif %}
         </li>
       {% endif %}{% endfor %}
       </ol>
