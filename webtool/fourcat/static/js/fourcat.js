@@ -117,18 +117,18 @@ postprocessor = {
             block.attr('aria-expanded', null);
             block.removeClass('card').removeClass('focus');
             $(this).text($(this).attr('data-original'));
-            block.find('> .postprocessor-wrap').attr('aria-expanded', 'true');
+            block.find('> .details-only').attr('aria-expanded', 'true');
 
             if (parent_block) {
                 parent_block.addClass('card').find('> .query-core').removeClass('card');
-                parent_block.find('> .sub-controls .postprocessor-wrap').attr('aria-expanded', 'true');
+                parent_block.find('> .sub-controls > .details-only').attr('aria-expanded', 'true');
             }
         } else {
             //open this level and collapse siblings
             siblings.attr('aria-expanded', 'false');
             block.attr('aria-expanded', 'true');
             block.addClass('card').addClass('focus');
-            block.find('> .postprocessor-wrap').attr('aria-expanded', 'false');
+            block.find('> .details-only').attr('aria-expanded', 'true');
 
             if (siblings.length === 0) {
                 $(this).attr('data-original', $(this).text()).text('Close');
@@ -139,7 +139,7 @@ postprocessor = {
 
             if (parent_block) {
                 parent_block.removeClass('card').find('> .query-core').addClass('card');
-                parent_block.find('> .sub-controls .postprocessor-wrap').attr('aria-expanded', 'false');
+                parent_block.find('> .sub-controls > .details-only').attr('aria-expanded', 'false');
             }
         }
     },

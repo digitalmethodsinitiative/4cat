@@ -21,7 +21,7 @@
     {% if not item.is_finished() %}
     </div>
     {% else %}
-        </p><button class="expand-postprocessors" aria-controls="{{ item.key }}-sub">
+    </p><button class="expand-postprocessors" aria-controls="{{ item.key }}-sub">
             {% if can_postprocess %}{{ item.postprocessors|length }} further analys{% if item.postprocessors|length == 1 %}i{% else %}e{% endif %}s{% endif %}
             {% if can_postprocess and item.subqueries %}and{% endif %}
             {% if item.subqueries %}{{ item.subqueries|length }} further result{% if item.subqueries|length != 1 %}s{% endif %}{% endif %}
@@ -30,13 +30,16 @@
     </div>
     {% if item.is_finished() %}
     <div class="sub-controls" id="{{ item.key }}-sub">
-            <ul class="subquery-list" aria-expanded="false">
-                {% for subquery in item.subqueries %}
-                    {% include "result-subquery-extended.html" %}
-                {% endfor %}
-            </ul>
+        <ul class="subquery-list" aria-expanded="false">
+            {% for subquery in item.subqueries %}
+                {% include "result-subquery-extended.html" %}
+            {% endfor %}
+        </ul>
+        <p class="details-only">
+            <a class="permalink" href="/results/{{ query.key }}/#nav={{ subquery.get_breadcrumbs() }}">Permanent link to this analysis result (with context)</a>
+        </p>
         {% if can_postprocess %}
-            <div class="postprocessor-wrap" aria-expanded="true">
+        <div class="postprocessor-wrap details-only" aria-expanded="true">
             <h4 class="section-subheader">Available analyses</h4>
             <ul class="postprocessor-list">
                 {% for processor in item.postprocessors.values() %}
@@ -46,7 +49,7 @@
                     {% set inline = false %}
                 {% endfor %}
             </ul>
-            </div>
+        </div>
         {% endif %}
     </div>
     {% endif %}
