@@ -28,6 +28,7 @@ class SearchQuery:
 
 	subqueries = []
 	postprocessors = {}
+	genealogy = []
 
 	def __init__(self, parameters={}, key=None, job=None, data=None, db=None, parent=None, extension="csv", type="search"):
 		"""
@@ -310,20 +311,54 @@ class SearchQuery:
 
 		:return str: Parent key.
 		"""
-		key = self.key_parent
-		if not key:
-			return self.key
+		genealogy = self.get_genealogy()
+		return genealogy[0].key
+
+	def get_genealogy(self):
+		"""
+		Get genealogy of this query
+
+		Creates a list of SearchQuery objects, with the first one being the
+		'top' query, and each subsequent one being a sub-query of the previous
+		one, ending with the current query.
+
+		:return list:  Query genealogy, oldest query first
+		"""
+		if self.genealogy or not self.key_parent:
+			return self.genealogy
+
+		key_parent = self.key_parent
+		genealogy = []
 
 		while True:
 			try:
-				parent = SearchQuery(key=key, db=self.db)
+				parent = SearchQuery(key=key_parent, db=self.db)
 			except TypeError:
-				return key
+				break
 
+			genealogy.append(parent)
 			if parent.key_parent:
-				key = parent.key_parent
+				key_parent = parent.key_parent
 			else:
-				return key
+				break
+
+		genealogy.append(self)
+		self.genealogy = genealogy
+		return self.genealogy
+
+	def get_breadcrumbs(self):
+		"""
+		Get breadcrumbs navlink for use in permalinks
+
+		Returns a string representing this query's genealogy that may be used
+		to uniquely identify it.
+
+		:return str: Nav link
+		"""
+		genealogy = self.get_genealogy()
+
+		return ",".join([query.key for query in genealogy])
+
 
 	def get_compatible_postprocessors(self):
 		"""

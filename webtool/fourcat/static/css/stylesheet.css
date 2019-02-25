@@ -13,6 +13,26 @@ body {
 	margin: 0;
 }
 
+.permalink::before {
+	content: '\02192';
+	border-left: 1px solid #007bff;
+	border-bottom: 1px solid #007bff;
+	font-size: 0.5em;
+	display: inline-block;
+	margin-right: 0.75em;
+	width: 1em;
+	height: 1em;
+	line-height: 0.95em;
+	font-weight: bold;
+	vertical-align: top;
+	margin-top: 1.15em;
+}
+
+.permalink:hover::before {
+	border-left: 1px solid #0056b3;
+	border-bottom: 1px solid #0056b3;
+}
+
 button, .button-like {
 	border-radius: 10px;
 	border: 2px solid black;
@@ -559,7 +579,7 @@ span.activity.needed {
 }
 
 #schedule > p > span > a {
-	color: #ff5750;;
+	color: #ff5750;
 }
 
 .presentationimg {
@@ -1196,9 +1216,10 @@ ol.postprocessor-list {
 	margin-left: -1px;
 }
 
-.subquery[aria-expanded=false], .postprocessor-wrap[aria-expanded=false] {
+.subquery[aria-expanded=false], .details-only[aria-expanded=false] {
 	height: 0;
 	overflow: hidden;
+	display: none;
 }
 
 .result-tree > div > .subquery-list {
@@ -1311,8 +1332,13 @@ body.result-list .subquery-list > li:not(.focus)::before {
 	padding: 0;
 }
 
+.sub-controls p.details-only {
+	padding: 0 0.5em 0.5em 0.5em;
+	text-align: center;
+}
+
 .postprocessor-wrap {
-	margin-top: 1em;
+	margin-top: 0.5em;
 }
 
 li.focus > .query-core > p {
