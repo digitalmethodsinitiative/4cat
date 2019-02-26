@@ -246,7 +246,7 @@ def get_result(query_file):
 
 	# Return localhost URL when debugging locally
 	if app.debug:
-		return redirect("http://localhost/fourcat/data/" + query_file)
+		return redirect("http://localhost/fourcat/" + config.PATH_DATA + "/" + query_file)
 	
 	return send_from_directory(query.get_results_path().replace("\\", "/"), query.get_results_path().replace("\\", "/").split("/").pop())
 

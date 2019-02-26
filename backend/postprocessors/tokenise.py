@@ -38,7 +38,7 @@ class Tokenise(BasicPostProcessor):
 			"default": False,
 			"help": "Lemmatise tokens"
 		},
-		"resolution": {
+		"timeframe": {
 			"type": UserInput.OPTION_CHOICE,
 			"default": "all",
 			"options": {"all": "Overall", "year": "Year", "month": "Month", "day": "Day"},
