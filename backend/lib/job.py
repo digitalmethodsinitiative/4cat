@@ -29,9 +29,6 @@ class Job:
 		self.data = data
 		self.db = database
 
-		if "timestamp_claimed" not in self.data:
-			print(self.data)
-
 		try:
 			self.is_finished = "is_finished" in self.data and self.data["is_finished"]
 			self.is_claimed = self.data["timestamp_claimed"] and self.data["timestamp_claimed"] > 0
@@ -77,7 +74,7 @@ class Job:
 		if jobtype != "*":
 			data = database.fetchone("SELECT * FROM jobs WHERE jobtype = %s AND remote_id = %s", (jobtype, remote_id))
 		else:
-			data = database.fetchone("SELECT * FROM jobs WHERE remote_id = %s", (remote_id))
+			data = database.fetchone("SELECT * FROM jobs WHERE remote_id = %s", (remote_id,))
 
 		if not data:
 			raise JobNotFoundException

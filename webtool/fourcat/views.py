@@ -1,3 +1,6 @@
+"""
+4CAT Web Tool views - pages to be viewed by the user
+"""
 import os
 import re
 import json
@@ -7,14 +10,11 @@ import markdown
 
 from flask import render_template, jsonify, abort, request, redirect, send_from_directory, flash, get_flashed_messages
 from flask_login import login_required, current_user
-from fourcat import app, db, queue, openapi, limiter
-from fourcat.helpers import Pagination, string_to_timestamp, get_available_postprocessors, get_preview
+from fourcat import app, db, queue, openapi
+from fourcat.lib.helpers import Pagination, get_preview
 
 from backend.lib.query import SearchQuery
-from backend.lib.exceptions import JobAlreadyExistsException, JobNotFoundException
 from backend.lib.helpers import get_absolute_folder, UserInput, load_postprocessors
-
-from stop_words import get_stop_words
 
 
 @app.template_filter('datetime')
@@ -43,6 +43,17 @@ def _jinja2_filter_numberify(number):
 def _jinja2_filter_markdown(text):
 	return markdown.markdown(text)
 
+@app.route("/access-tokens/")
+@login_required
+def show_access_tokens():
+	user = current_user.get_id()
+
+	if user == "autologin":
+		abort(403)
+
+	tokens = db.fetchall("SELECT * FROM access_tokens WHERE name = %s", (user,))
+
+	return render_template("access-tokens.html", tokens=tokens)
 
 @app.route('/')
 def show_frontpage():
@@ -114,122 +125,6 @@ def show_page(page):
 		page_parsed = re.sub(r"<h2>(.*)</h2>", r"<h2><span>\1</span></h2>", page_parsed)
 
 	return render_template("page.html", body_content=page_parsed, body_class=page_class, page_name=page)
-
-
-@app.route("/queue-query/", methods=["POST"])
-@login_required
-@limiter.limit("2 per minute")
-@openapi.endpoint
-def string_query():
-	"""
-	Queue a 4CAT Query
-
-	Requires authentication by logging in or providing a valid access token.
-
-	:param str platform: Platform ID to query
-
-	:request-param str board:  Board ID to query
-	:request-param str platform:  Platform ID to query
-	:request-param str body_query:  String to match in the post body
-	:request-param str subject_query:  String to match in the post subject
-	:request-param str ?full_threads:  Whether to return full thread data: if
-	                                   set, return full thread data.
-    :request-param int dense_percentage:  Lower threshold for dense threads
-    :request-param int dense_length: Minimum length for dense threads matching
-    :request-param str ?use_data:  Match within given time period: if set,
-                                   match within period.
-    :request-param int min_date:  Timestamp marking the beginning of the match
-                                  period
-    :request-param int max_date:  Timestamp marking the end of the match period
-    :request-param str ?access_token:  Access token; only required if not
-                                       logged in currently.
-
-	:return str:  The query key, which may be used to later retrieve query
-	              status and results.
-	"""
-
-	parameters = {
-		"board": request.form.get("board", ""),
-		"platform": request.form.get("platform", ""),
-		"body_query": request.form.get("body_query", ""),
-		"subject_query": request.form.get("subject_query", ""),
-		"full_thread": (request.form.get("full_threads", "no") != "no"),
-		"dense_threads": (request.form.get("dense_threads", "no") != "no"),
-		"dense_percentage": int(request.form.get("dense_percentage", 0)),
-		"dense_length": int(request.form.get("dense_length", 0)),
-		"min_date": string_to_timestamp(request.form.get("min_date", "")) if request.form.get("use_date",
-																							  "no") != "no" else 0,
-		"max_date": string_to_timestamp(request.form.get("max_date", "")) if request.form.get("use_date",
-																							  "no") != "no" else 0,
-		"user": current_user.get_id()
-	}
-
-	valid = validate_query(parameters)
-
-	if valid != True:
-		return "Invalid query. " + valid
-
-	# Queue query
-	query = SearchQuery(parameters=parameters, db=db)
-
-	try:
-		queue.add_job(jobtype="%s-search" % parameters["platform"], remote_id=query.key)
-	except JobAlreadyExistsException:
-		pass
-
-	return query.key
-
-
-@app.route('/check_query/<query_key>/')
-@login_required
-@openapi.endpoint
-def check_query(query_key):
-	"""
-	Check query status
-
-	Requires authentication by logging in or providing a valid access token.
-
-	:param str query_key:  ID of the query for which to return the status
-	:return: Query status, containing the `status`, `query`, number of `rows`,
-	         the query `key`, whether the query is `done`, the `path` of the
-	         result file and whether the query result is `empty`.
-	"""
-	try:
-		query = SearchQuery(key=query_key, db=db)
-	except TypeError:
-		abort(404)
-
-	results = query.check_query_finished()
-	if results == 'empty':
-		querydata = query.data
-		querydata["parameters"] = json.loads(querydata["parameters"])
-		path = False
-		preview = ""
-	elif results:
-		if app.debug:
-			path = 'http://localhost/fourcat/data/' + query.data["query"].replace("*", "") + '-' + query_key + '.csv'
-		else:
-			path = results.replace("\\", "/").split("/").pop()
-
-		querydata = query.data
-		querydata["parameters"] = json.loads(querydata["parameters"])
-		preview = render_template("posts-preview.html", query=querydata, preview=get_preview(query))
-	else:
-		path = ""
-		preview = ""
-
-	status = {
-		"status": query.get_status(),
-		"query": query.data["query"],
-		"rows": query.data["num_rows"],
-		"key": query_key,
-		"done": True if results else False,
-		"preview": preview,
-		"path": path,
-		"empty": (query.data["num_rows"] == 0)
-	}
-
-	return jsonify(status)
 
 
 @app.route('/result/<string:query_file>/')
@@ -315,7 +210,7 @@ def show_result(key):
 	"""
 	try:
 		query = SearchQuery(key=key, db=db)
-	except ValueError:
+	except TypeError:
 		abort(404)
 
 	# subqueries are not available via a separate page
@@ -339,28 +234,34 @@ def show_result(key):
 	return render_template(template, preview=preview, query=query, postprocessors=load_postprocessors(),
 						   is_postprocessor_running=is_postprocessor_running, messages=get_flashed_messages())
 
-
 @app.route('/results/<string:key>/postprocessors/queue/<string:postprocessor>/', methods=["GET", "POST"])
 @login_required
-def queue_postprocessor(key, postprocessor):
+def queue_postprocessor(key, postprocessor, is_async=False):
 	"""
 	Queue a new post-processor
 
-	:param key:  Key of query to queue the post-processor for
-	:param postprocessor:  ID of the post-processor to queue
+	:param str key:  Key of query to queue the post-processor for
+	:param str postprocessor:  ID of the post-processor to queue
 	:return:  Either a redirect, or a JSON status if called asynchronously
 	"""
-	is_async = request.args.get("async", "no") != "no"
+	if not is_async:
+		is_async = request.args.get("async", "no") != "no"
 
 	# cover all bases - can only run postprocessor on "parent" query
 	try:
 		query = SearchQuery(key=key, db=db)
 	except TypeError:
-		abort(404)
+		if is_async:
+			return jsonify({"error": "Not a valid query key."})
+		else:
+			abort(404)
 
 	# check if post-processor is available for this query
 	if postprocessor not in query.postprocessors:
-		abort(404)
+		if is_async:
+			return jsonify({"error": "Not a valid post-processor ID"})
+		else:
+			abort(404)
 
 	# create a query now
 	options = {}
@@ -391,112 +292,3 @@ def queue_postprocessor(key, postprocessor):
 		})
 	else:
 		return redirect("/results/" + analysis.top_key() + "/")
-
-
-@app.route('/check_postprocessors/')
-@login_required
-def check_postprocessor():
-	try:
-		keys = json.loads(request.args.get("subqueries"))
-	except (TypeError, json.decoder.JSONDecodeError):
-		abort(404)
-
-	subqueries = []
-
-	for key in keys:
-		try:
-			query = SearchQuery(key=key, db=db)
-		except TypeError:
-			continue
-
-		subqueries.append({
-			"key": query.key,
-			"job": query.job,
-			"finished": query.is_finished(),
-			"html": render_template("result-subquery-extended.html", subquery=query, postprocessors=load_postprocessors())
-		})
-
-	return jsonify(subqueries)
-
-
-def validate_query(parameters):
-	"""
-	Validates the client-side user input
-
-	"""
-
-	if not parameters:
-		return "Please provide valid parameters."
-
-	stop_words = get_stop_words('en')
-
-	# TEMPORARY MEASUREMENT
-	# Querying can only happen for max two weeks
-	# max_daterange = 1209600
-
-	# if parameters["min_date"] == 0 or parameters["max_date"] == 0:
-	# 	return "Temporary hardware limitation:\nUse a date range of max. two weeks."
-
-	# Ensure querying can only happen for max two weeks week (temporary measurement)
-	# if parameters["min_date"] != 0 and parameters["max_date"] != 0:
-	# 	if (parameters["max_date"] - parameters["min_date"]) > max_daterange:
-	# 		return "Temporary hardware limitation:\nUse a date range of max. two weeks."
-
-	# Ensure no weird negative timestamps happening
-	if parameters["min_date"] < 0 or parameters["max_date"] < 0:
-		return "Date(s) set too early."
-
-	# Ensure the min date is not later than the max date
-	if parameters["min_date"] != 0 and parameters["max_date"] != 0:
-		if parameters["min_date"] >= parameters["max_date"]:
-			return "The first date is later than or the same as the second."
-
-	# Ensure the board is correct
-	if "platform" not in parameters or "board" not in parameters:
-		return "Please provide a board to search"
-
-	if parameters["platform"] not in config.PLATFORMS:
-		return "Please choose a valid platform to search"
-
-	if parameters["board"] not in config.PLATFORMS[parameters["platform"]]["boards"]:
-		return "Please choose a valid board for querying"
-
-	# Keyword-dense thread length should be at least thirty.
-	if parameters["dense_length"] > 0 and parameters["dense_length"] < 10:
-		return "Keyword-dense thread length should be at least ten."
-	# Keyword-dense thread density should be at least 15%.
-	elif parameters["dense_percentage"] > 0 and parameters["dense_percentage"] < 10:
-		return "Keyword-dense thread density should be at least 10%."
-
-	# Check if there are enough parameters provided.
-	# Body and subject queryies may be empty if date ranges are max a week apart.
-	if parameters["body_query"] == "" and parameters["subject_query"] == "":
-		# Check if the date range is less than a week.
-		if parameters["min_date"] != 0 and parameters["max_date"] != 0:
-			time_diff = parameters["max_date"] - parameters["min_date"]
-			if time_diff >= 2419200:
-				return "With no text querying, filter on a date range of max four weeks."
-			else:
-				return True
-		else:
-			return "Input either a body or subject query, or filter on a date range of max four weeks."
-
-	# Body query should be at least three characters long and should not be just a stopword.
-	if parameters["body_query"] and len(parameters["body_query"]) < 3:
-		return "Body query is too short. Use at least three characters."
-	elif parameters["body_query"] in stop_words:
-		return "Use a body input that is not a stop word."
-	# Query must contain alphanumeric characters
-	elif parameters["body_query"] and not re.search('[a-zA-Z0-9]', parameters["body_query"]):
-		return "Body query must contain alphanumeric characters."
-
-	# Subject query should be at least three characters long and should not be just a stopword.
-	if parameters["subject_query"] and len(parameters["subject_query"]) < 3:
-		return "Subject query is too short. Use at least three characters."
-	elif parameters["subject_query"] in stop_words:
-		return "Use a subject input that is not a stop word."
-	elif parameters["subject_query"] and not re.search('[a-zA-Z0-9]', parameters["subject_query"]):
-		# Query must contain alphanumeric characters
-		return "Subject query must contain alphanumeric characters."
-
-	return True

@@ -157,7 +157,10 @@ class OpenAPICollector:
 			"swagger": "2.0",
 			"info": {
 				"title": "4CAT: Capture and Analysis Toolkit RESTful API",
-				"version": "v1"
+				"version": "1.0.0",
+				"contact": {
+					"email": "4cat@oilab.eu"
+				}
 			},
 			"paths": {
 			}

@@ -1,13 +1,11 @@
 """
-Control access to web tool
+Control access to web tool - views and functions used in handling user access
 """
 import html2text
-import hashlib
 import smtplib
 import fnmatch
 import socket
 import time
-import json
 import sys
 import os
 
@@ -17,11 +15,11 @@ from email.mime.text import MIMEText
 sys.path.insert(0, os.path.dirname(__file__) + '/../..')
 import config
 
-from flask import request, abort, render_template, redirect, url_for, flash, get_flashed_messages, jsonify
+from flask import request, abort, render_template, redirect, url_for, flash, get_flashed_messages
 from flask_login import login_user, login_required, logout_user, current_user
-from fourcat import app, login_manager, openapi, db
-from fourcat.api import limiter
-from fourcat.user import User
+from fourcat import app, login_manager, db
+from fourcat.api_tool import limiter
+from fourcat.lib.user import User
 
 
 @login_manager.user_loader
@@ -34,7 +32,8 @@ def load_user(user_name):
 	:return:  User object
 	"""
 	user = User.get_by_name(user_name)
-	user.authenticate()
+	if user:
+		user.authenticate()
 	return user
 
 
@@ -43,11 +42,22 @@ def load_user_from_request(request):
 	"""
 	Load user object via access token
 
+	Access token may be supplied via a GET parameter or the Authorization
+	HTTP header.
+
 	:param request:  Flask request
 	:return:  User object, or None if no valid access token was given
 	"""
+	token = request.args.get("access-token")
+
+	if not token:
+		token = request.headers.get("Authorization")
+
+	if not token:
+		return None
+
 	user = db.fetchone("SELECT name AS user FROM access_tokens WHERE token = %s AND (expires = 0 OR expires > %s)",
-					   (request.args.get("access-token"), int(time.time())))
+					   (token, int(time.time())))
 	if not user:
 		return None
 	else:
@@ -163,46 +173,22 @@ def logout():
 	return redirect(url_for("show_login"))
 
 
-@app.route("/request-token/")
-@login_required
-@openapi.endpoint
-def request_token():
-	"""
-	Request an access token
-
-	Requires that the user is currently logged in to 4CAT.
-
-	:return: An object with one item `token`
-	"""
-	token = db.fetchone("SELECT * FROM access_tokens WHERE name = %s AND (expires = 0 OR expires > %s)",
-						(current_user.get_id(), int(time.time())))
-
-	if token:
-		token = token["token"]
-	else:
-		token = current_user.get_id() + str(time.time())
-		token = hashlib.sha256(token.encode("utf8")).hexdigest()
-		token = {
-			"name": current_user.get_id(),
-			"token": token,
-			"expires": int(time.time()) + (365 * 86400)
-		}
-
-		# delete any expired tokens
-		db.delete("access_tokens", where={"name": current_user.get_id()})
-
-		# save new token
-		db.insert("access_tokens", token)
-
-	return jsonify(token)
-
 @app.route("/request-access/", methods=["GET", "POST"])
 def request_access():
+	"""
+	Request a 4CAT Account
+
+	Displays a web form for people to fill in their details which can then be
+	sent to the 4CAT admin via e-mail so they can create an account (if
+	approved)
+	"""
 	if not config.ADMIN_EMAILS:
-		return render_template("error.html", message="No administrator e-mail is configured; the request form cannot be displayed.")
+		return render_template("error.html",
+							   message="No administrator e-mail is configured; the request form cannot be displayed.")
 
 	if not config.MAILHOST:
-		return render_template("error.html", message="No e-mail server configured; the request form cannot be displayed.")
+		return render_template("error.html",
+							   message="No e-mail server configured; the request form cannot be displayed.")
 
 	incomplete = []
 
@@ -233,8 +219,11 @@ def request_access():
 			try:
 				with smtplib.SMTP("localhost") as smtp:
 					smtp.sendmail("4cat@oilab.nl", config.ADMIN_EMAILS, message.as_string())
-				return render_template("error.html", title="Thank you", message="Your request has been submitted; we'll try to answer it as soon as possible.")
+				return render_template("error.html", title="Thank you",
+									   message="Your request has been submitted; we'll try to answer it as soon as possible.")
 			except (smtplib.SMTPException, ConnectionRefusedError):
-				return render_template("error.html", title="Error", message="The form could not be submitted; the e-mail server is unreachable.")
+				return render_template("error.html", title="Error",
+									   message="The form could not be submitted; the e-mail server is unreachable.")
 
-	return render_template("request-account.html", incomplete=incomplete, flashes=get_flashed_messages(), form=request.form)
+	return render_template("request-account.html", incomplete=incomplete, flashes=get_flashed_messages(),
+						   form=request.form)
