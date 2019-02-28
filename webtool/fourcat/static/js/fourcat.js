@@ -60,6 +60,7 @@ function init() {
     // subsubsubquery interface bits
     $(document).on('click', '.expand-postprocessors', postprocessor.toggle);
     $(document).on('click', '.control-postprocessor', postprocessor.queue);
+    $(document).on('click', '.postprocessor-tree button', toggleButton);
 
     //allow opening given analysis path via anchor links
     navpath = window.location.hash.substr(1);
@@ -562,6 +563,19 @@ popup_panel = {
         popup_panel.blur.removeClass('open').addClass('closed');
     }
 };
+
+/** General-purpose toggle buttons **/
+function toggleButton(e) {
+    e.preventDefault();
+
+    target = $('#' + $(this).attr('aria-controls'));
+    is_open = target.attr('aria-expanded') !== 'false';
+    if (is_open) {
+        target.attr('aria-expanded', false);
+    } else {
+        target.attr('aria-expanded', true);
+    }
+}
 
 /**
  * Convert input string to Unix timestamp
