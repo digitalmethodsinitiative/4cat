@@ -64,6 +64,7 @@
             {% endif %}
         </p>
     {% else %}
+        {% set part = "main" %}
         <h3 class="blocktitle section-header"><span>Select analysis</span></h3>
         {% if is_postprocessor_running %}
             <p class="result-warning glued">Further analyses may be queued once all analyses currently queued for this

@@ -218,7 +218,6 @@ def show_result(key):
 		abort(404)
 
 	# load list of post-processors compatible with this query result
-	processors = query.get_compatible_postprocessors()
 	is_postprocessor_running = False
 
 	# show preview

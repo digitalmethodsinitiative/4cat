@@ -1,0 +1,10 @@
+<li>
+    <span class="postprocessor">{{ postprocessors[postprocessor].name }}</span>
+    {% if postprocessors[postprocessor].further %}
+        <ul>
+        {% for postprocessor in postprocessors[postprocessor].further %}
+            {% include "postprocessor-tree.html" %}
+        {% endfor %}
+        </ul>
+    {% endif %}
+</li>
