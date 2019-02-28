@@ -55,7 +55,7 @@ class ImageWallGenerator(BasicPostProcessor):
 		images = {}
 
 		self.query.update_status("Reading source file")
-		parent = SearchQuery(key=self.query.top_key(), db=self.db)
+		parent = self.query.get_genealogy()[0]
 		external = "fireden" if parent.parameters["board"] == "v" else "4plebs"
 		rate_limit = 1 if external == "fireden" else 16
 
