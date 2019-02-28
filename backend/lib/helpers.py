@@ -43,7 +43,7 @@ def init_datasource(database, logger, queue, name):
 	:param name:
 	:return:
 	"""
-	if name not in config.PLATFORMS or "boards" not in config.PLATFORMS[name]:
+	if True or name not in config.PLATFORMS or "boards" not in config.PLATFORMS[name]:
 		return
 
 	for board in config.PLATFORMS[name]["boards"]:
@@ -80,7 +80,6 @@ def load_postprocessors():
 					"description": member[1].description,
 					"name": member[1].title,
 					"extension": member[1].extension,
-					"class": member[0],
 					"category": member[1].category if hasattr(member[1], "category") else "other",
 					"accepts": member[1].accepts if hasattr(member[1], "accepts") else [],
 					"options": member[1].options if hasattr(member[1], "options") else {}
@@ -89,6 +88,13 @@ def load_postprocessors():
 	sorted_postprocessors = collections.OrderedDict()
 	for key in sorted(postprocessors, key=lambda postprocessor: postprocessors[postprocessor]["category"] + postprocessors[postprocessor]["name"].lower()):
 		sorted_postprocessors[key] = postprocessors[key]
+
+	backup = sorted_postprocessors.copy()
+	for type in sorted_postprocessors:
+		sorted_postprocessors[type]["further"] = []
+		for possible_child in backup:
+			if type in backup[possible_child]["accepts"]:
+				sorted_postprocessors[type]["further"].append(possible_child)
 
 	return sorted_postprocessors
 
