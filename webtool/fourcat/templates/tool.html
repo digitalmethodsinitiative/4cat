@@ -6,7 +6,7 @@
 {% block body %}
 		<div class='container-fluid'>
 			<div class='row'>
-                <form id="query-form" class='col-lg-9 topdiv'>
+                <form id="query-form" action="/api/queue-query/" method="POST" class='col-lg-9 topdiv'>
                     <fieldset id="whole-form">
                         <div id='panel'>
                             <div id='filterpanel'>
@@ -53,7 +53,7 @@
                                             <div class='filter-box-label'>
                                                 <label for='check-full-thread'> Return full threads</label>
                                             </div>
-                                            <input name="full_threads" type='checkbox' id='check-full-thread'> (warning: slow!)
+                                            <input name="full_thread" type='checkbox' id='check-full-thread'> (warning: slow!)
                                         </div>
                                     </div>
                                     <div class='filter-container'>

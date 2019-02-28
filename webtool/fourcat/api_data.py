@@ -1,5 +1,8 @@
+"""
+4CAT Data API - endpoints to get post and thread data from
+"""
+
 import datetime
-import psutil
 import json
 import os
 import config
@@ -9,90 +12,10 @@ from collections import OrderedDict
 from flask import jsonify, abort, send_file, request, render_template
 
 from fourcat import app, db, log, openapi, limiter
-from fourcat.helpers import format_post
-
-from backend.lib.queue import JobQueue
+from fourcat.lib.helpers import format_post
 from backend.lib.helpers import get_absolute_folder
 
 api_ratelimit = limiter.shared_limit("1 per second", scope="api")
-
-API_SUCCESS = 200
-API_FAIL = 404
-
-
-@app.route('/api/')
-@api_ratelimit
-def api_main():
-	"""
-	API Index
-
-	No data here - just a reference to the documentation
-
-	:return: Flask JSON response
-	"""
-	response = {
-		"code": API_SUCCESS,
-		"items": [
-			"Refer to https://4cat.oilab.nl/api.md for API documentation."
-		]
-	}
-
-	return jsonify(response)
-
-
-@app.route('/api/openapi.json')
-@api_ratelimit
-@openapi.endpoint
-def openapi_specification():
-	"""
-	Show OpenAPI specification of 4CAT API
-
-	:return: OpenAPI-formatted API specification
-	"""
-	return jsonify(openapi.generate())
-
-
-@app.route('/api/status.json')
-@api_ratelimit
-def api_status():
-	"""
-	Get service status
-
-	:return: Flask JSON response
-	"""
-
-	# get job stats
-	queue = JobQueue(logger=log, database=db)
-	jobs = queue.get_all_jobs()
-	jobs_count = len(jobs)
-	jobs_types = set([job.data["jobtype"] for job in jobs])
-	jobs_sorted = {jobtype: len([job for job in jobs if job.data["jobtype"] == jobtype]) for jobtype in jobs_types}
-	jobs_sorted["total"] = jobs_count
-
-	# determine if backend is live by checking if the process is running
-	lockfile = get_absolute_folder(config.PATH_LOCKFILE) + "/4cat.pid"
-	if os.path.isfile(lockfile):
-		with open(lockfile) as pidfile:
-			pid = pidfile.read()
-			backend_live = int(pid) in psutil.pids()
-	else:
-		backend_live = False
-
-	response = {
-		"code": API_SUCCESS,
-		"items": {
-			"backend": {
-				"live": backend_live,
-				"queued": jobs_sorted
-			},
-			"frontend": {
-				"live": True  # duh
-			}
-		}
-	}
-
-	return jsonify(response)
-
 
 @app.route('/api/<platform>/<board>/thread/<int:thread_id>.json')
 @api_ratelimit

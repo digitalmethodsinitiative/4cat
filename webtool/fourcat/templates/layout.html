@@ -29,6 +29,9 @@
 			<li><a href="/results/">Past results</a></li>
 			<li><a href="/">About</a></li>
 			<li><a href="/page/faq/">FAQ</a></li>
+            {% if current_user.is_authenticated and not current_user.is_special() %}
+                <li><a href="/access-tokens">API Access</a></li>
+            {% endif %}
 		</ul>
 	</nav>
 	{% block body %}

@@ -36,6 +36,9 @@
             {% endfor %}
         </ul>
         <p class="details-only">
+            {{ postprocessors[item.type].description }}
+        </p>
+        <p class="details-only">
             <a class="permalink" href="/results/{{ query.key }}/#nav={{ subquery.get_breadcrumbs() }}" target="_blank">Permanent link to this analysis result (with context)</a>
         </p>
         {% if can_postprocess %}

@@ -46,7 +46,7 @@ class SearchQuery:
 			self.key = key
 			current = self.db.fetchone("SELECT * FROM queries WHERE key = %s", (self.key,))
 			if not current:
-				raise TypeError("SearchQuery() requires a valid query key for its 'key' argument")
+				raise TypeError("SearchQuery() requires a valid query key for its 'key' argument, \"%s\" given" % key)
 
 			self.query = current["query"]
 		elif job is not None:
@@ -342,6 +342,7 @@ class SearchQuery:
 			else:
 				break
 
+		genealogy.reverse()
 		genealogy.append(self)
 		self.genealogy = genealogy
 		return self.genealogy

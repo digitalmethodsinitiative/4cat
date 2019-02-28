@@ -217,12 +217,13 @@ query = {
             return;
         }
 
-        let formdata = $('#query-form').serialize();
+        let form = $('#query-form');
+        let formdata = form.serialize();
 
         // AJAX the query to the server
         $.post({
             dataType: "text",
-            url: "/queue-query/",
+            url: form.attr('action'),
             data: formdata,
             success: function (response) {
                 console.log(response);
@@ -267,7 +268,8 @@ query = {
         Polls server to check whether there's a result for query
         */
         $.getJSON({
-            url: '/check_query/' + query_key,
+            url: '/api/check-query/',
+            data: {key: query_key},
             success: function (json) {
                 console.log(json);
 
@@ -330,7 +332,7 @@ query = {
         });
 
         $.get({
-            url: "/check_postprocessors/",
+            url: "/api/check-postprocessors/",
             data: {subqueries: JSON.stringify(keys)},
             success: function (json) {
                 json.forEach(subquery => {

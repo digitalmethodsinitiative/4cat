@@ -64,6 +64,8 @@ class User:
 			self.is_active = True
 
 		self.name = self.data["name"]
+		if authenticated:
+			print("Authenticating %s" % data["name"])
 		self.is_authenticated = authenticated
 
 	def authenticate(self):

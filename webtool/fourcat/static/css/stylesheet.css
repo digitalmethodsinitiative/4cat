@@ -695,6 +695,24 @@ label {
 	margin-top: 1em;
 }
 
+.token-list {
+	margin: 1em auto;
+	font-size: inherit;
+}
+
+.token-list td, .token-list th {
+	font-size: inherit;
+	padding: 0 0.5em;
+	border-width: 2px;
+}
+
+.token-list th {
+	text-align: center;
+	background: #f8ed74;
+	font-weight: normal;
+	padding: 0 1em;
+}
+
 form .form-element {
 	display: grid;
 	grid-template-columns: 25% 75%;
