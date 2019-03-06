@@ -114,10 +114,10 @@ class StringQuery(BasicWorker, metaclass=abc.ABCMeta):
 
 		# escape / since it's a special character for Sphinx
 		if query["body_query"]:
-			match.append("@body " + query["body_query"].replace("/", "\/"))
+			match.append("@body " + query["body_query"].replace("/", "\/").replace("(", "\(",).replace("*", "\*"))
 
 		if query["subject_query"]:
-			match.append("@subject " + query["subject_query"].replace("/", "\/"))
+			match.append("@subject " + query["subject_query"].replace("/", "\/").replace("(", "\(",).replace("*", "\*"))
 
 		# both possible FTS parameters go in one MATCH() operation
 		if match:
