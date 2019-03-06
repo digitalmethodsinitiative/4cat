@@ -17,9 +17,9 @@ import config
 
 from flask import request, abort, render_template, redirect, url_for, flash, get_flashed_messages
 from flask_login import login_user, login_required, logout_user, current_user
-from fourcat import app, login_manager, db
-from fourcat.api_tool import limiter
-from fourcat.lib.user import User
+from webtool import app, login_manager, db
+from webtool.api_tool import limiter
+from webtool.lib.user import User
 
 
 @login_manager.user_loader

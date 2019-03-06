@@ -1,7 +1,0 @@
-!!4CAT Requirements!!
-
-<MOSCOW>
-#Must
-
-- Penelope integration
-	- What data could be served? Just serving a list of strings as data input?

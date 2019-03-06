@@ -11,8 +11,8 @@ from collections import OrderedDict
 
 from flask import jsonify, abort, send_file, request, render_template
 
-from fourcat import app, db, log, openapi, limiter
-from fourcat.lib.helpers import format_post
+from webtool import app, db, log, openapi, limiter
+from webtool.lib.helpers import format_post
 from backend.lib.helpers import get_absolute_folder
 
 api_ratelimit = limiter.shared_limit("1 per second", scope="api")

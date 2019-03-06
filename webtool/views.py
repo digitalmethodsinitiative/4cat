@@ -10,8 +10,8 @@ import markdown
 
 from flask import render_template, jsonify, abort, request, redirect, send_from_directory, flash, get_flashed_messages
 from flask_login import login_required, current_user
-from fourcat import app, db, queue, openapi
-from fourcat.lib.helpers import Pagination, get_preview
+from webtool import app, db, queue, openapi
+from webtool.lib.helpers import Pagination, get_preview
 
 from backend.lib.query import SearchQuery
 from backend.lib.helpers import get_absolute_folder, UserInput, load_postprocessors
@@ -56,6 +56,7 @@ def show_access_tokens():
 	return render_template("access-tokens.html", tokens=tokens)
 
 @app.route('/')
+@login_required
 def show_frontpage():
 	"""
 	Index page: news and introduction
@@ -64,7 +65,7 @@ def show_frontpage():
 	"""
 
 	# load corpus stats that are generated daily, if available
-	stats_path = get_absolute_folder(os.path.dirname(__file__)) + "/../../stats.json"
+	stats_path = get_absolute_folder(os.path.dirname(__file__)) + "/../stats.json"
 	if os.path.exists(stats_path):
 		with open(stats_path) as stats_file:
 			stats = stats_file.read()
@@ -198,6 +199,7 @@ def show_results(page):
 
 @app.route('/results/<string:key>/')
 @app.route('/results/<string:key>/postprocessors/')
+@login_required
 def show_result(key):
 	"""
 	Show result page

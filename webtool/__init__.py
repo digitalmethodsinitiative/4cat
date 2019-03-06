@@ -1,8 +1,3 @@
-import sys
-import os
-
-sys.path.insert(0, os.path.dirname(__file__) + '/../..')
-
 from flask import Flask
 from flask_login import LoginManager
 from flask_limiter import Limiter
@@ -23,7 +18,7 @@ queue = JobQueue(logger=log, database=db)
 
 
 # initialize openapi endpoint collector for later speficiation generation
-from fourcat.lib.openapi_collector import OpenAPICollector
+from webtool.lib.openapi_collector import OpenAPICollector
 openapi = OpenAPICollector(app)
 
 # initialize rate limiter
@@ -39,10 +34,10 @@ login_manager.init_app(app)
 login_manager.login_view = "show_login"
 
 # import all views
-import fourcat.access
-import fourcat.views
-import fourcat.api_tool
-import fourcat.api_data
+import webtool.access
+import webtool.views
+import webtool.api_tool
+import webtool.api_data
 
 # run it
 if __name__ == "__main__":

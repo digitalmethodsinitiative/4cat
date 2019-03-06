@@ -11,10 +11,11 @@ import re
 import csv
 
 from math import ceil
+from stop_words import get_stop_words
 
 from backend.abstract.postprocessor import BasicPostProcessor
 
-from stop_words import get_stop_words
+import config
 
 
 class Pagination(object):
