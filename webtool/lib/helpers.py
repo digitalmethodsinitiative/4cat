@@ -265,18 +265,12 @@ def validate_query(parameters):
 		return "Body query is too short. Use at least three characters."
 	elif parameters["body_query"] in stop_words:
 		return "Use a body input that is not a stop word."
-	# Query must contain alphanumeric characters
-	elif parameters["body_query"] and not re.search('[a-zA-Z0-9]', parameters["body_query"]):
-		return "Body query must contain alphanumeric characters."
 
 	# Subject query should be at least three characters long and should not be just a stopword.
 	if parameters["subject_query"] and len(parameters["subject_query"]) < 3:
 		return "Subject query is too short. Use at least three characters."
 	elif parameters["subject_query"] in stop_words:
 		return "Use a subject input that is not a stop word."
-	elif parameters["subject_query"] and not re.search('[a-zA-Z0-9]', parameters["subject_query"]):
-		# Query must contain alphanumeric characters
-		return "Subject query must contain alphanumeric characters."
 
 	return True
 
