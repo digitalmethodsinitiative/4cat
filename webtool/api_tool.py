@@ -12,9 +12,9 @@ import os
 from flask import jsonify, abort, request, render_template, redirect, url_for
 from flask_login import login_required, current_user
 
-from fourcat import app, db, log, openapi, limiter, queue
-from fourcat.views import queue_postprocessor
-from fourcat.lib.helpers import string_to_timestamp, get_preview, validate_query
+from webtool import app, db, log, openapi, limiter, queue
+from webtool.views import queue_postprocessor
+from webtool.lib.helpers import string_to_timestamp, get_preview, validate_query
 
 from backend.lib.queue import JobQueue
 from backend.lib.query import SearchQuery

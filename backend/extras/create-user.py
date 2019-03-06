@@ -7,7 +7,7 @@ sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)) + '/..')
 
 from backend.lib.database import Database
 from backend.lib.logger import Logger
-from fourcat.lib.user import User
+from webtool.lib.user import User
 
 log = Logger()
 db = Database(logger=log)

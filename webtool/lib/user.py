@@ -3,7 +3,7 @@ User class
 """
 import bcrypt
 
-from fourcat import db, app, config
+from webtool import db, app, config
 
 
 class User:
