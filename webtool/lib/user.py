@@ -3,7 +3,7 @@ User class
 """
 import bcrypt
 
-from fourcat import db, app, config
+from webtool import db, app, config
 
 
 class User:
@@ -64,6 +64,8 @@ class User:
 			self.is_active = True
 
 		self.name = self.data["name"]
+		if authenticated:
+			print("Authenticating %s" % data["name"])
 		self.is_authenticated = authenticated
 
 	def authenticate(self):

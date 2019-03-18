@@ -13,6 +13,26 @@ body {
 	margin: 0;
 }
 
+.permalink::before {
+	content: '\02192';
+	border-left: 1px solid #007bff;
+	border-bottom: 1px solid #007bff;
+	font-size: 0.5em;
+	display: inline-block;
+	margin-right: 0.75em;
+	width: 1em;
+	height: 1em;
+	line-height: 0.95em;
+	font-weight: bold;
+	vertical-align: top;
+	margin-top: 1.15em;
+}
+
+.permalink:hover::before {
+	border-left: 1px solid #0056b3;
+	border-bottom: 1px solid #0056b3;
+}
+
 button, .button-like {
 	border-radius: 10px;
 	border: 2px solid black;
@@ -157,6 +177,23 @@ button::-moz-focus-inner {
 button.inactive {
 	background-color: red;
 	display: none;
+}
+
+button.link-like {
+	border: 0;
+	padding: 0;
+	margin: 0;
+	color: #007bff;
+}
+
+button.link-like:hover {
+	color: #0056b3;
+	text-decoration: underline;
+}
+
+button.link-like:active {
+	background-color: transparent;
+	color: #0056b3;
 }
 
 button#submitdata {
@@ -559,7 +596,7 @@ span.activity.needed {
 }
 
 #schedule > p > span > a {
-	color: #ff5750;;
+	color: #ff5750;
 }
 
 .presentationimg {
@@ -673,6 +710,24 @@ label {
 
 .login-form form {
 	margin-top: 1em;
+}
+
+.token-list {
+	margin: 1em auto;
+	font-size: inherit;
+}
+
+.token-list td, .token-list th {
+	font-size: inherit;
+	padding: 0 0.5em;
+	border-width: 2px;
+}
+
+.token-list th {
+	text-align: center;
+	background: #f8ed74;
+	font-weight: normal;
+	padding: 0 1em;
 }
 
 form .form-element {
@@ -1067,6 +1122,47 @@ ol.postprocessor-list {
     align-items: center;
 }
 
+.postprocessor-tree {
+	font-style: italic;
+}
+
+.postprocessor-tree ul {
+	display: inline-block;
+	vertical-align: top;
+	margin: 0 0 0.5em 1.5em;
+	list-style: none;
+	padding: 0;
+	border: 2px solid #FFF;
+	border-width: 0 0 0 2px;
+	border-left-color: #000;
+	border-top-left-radius: 0.5em;
+	border-bottom-left-radius: 0.5em;
+	position: relative;
+	box-sizing: border-box;
+	transition: 0.25s;
+}
+
+.postprocessor-tree ul[aria-expanded=false] {
+	height: 0;
+	opacity: 0;
+	overflow: hidden;
+}
+
+.postprocessor-tree ul[aria-expanded=true] {
+	height: auto;
+	opacity: 1;
+}
+
+.postprocessor-tree li {
+	padding: 0 0 0 0.5em;
+}
+.postprocessor-tree ul::before {
+	content: '\02192';
+	position: absolute;
+	top: 0.1em;
+	left: -1.5em;
+}
+
 /** pagination **/
 .pagination ol {
 	list-style: none;
@@ -1196,9 +1292,10 @@ ol.postprocessor-list {
 	margin-left: -1px;
 }
 
-.subquery[aria-expanded=false], .postprocessor-wrap[aria-expanded=false] {
+.subquery[aria-expanded=false], .details-only[aria-expanded=false] {
 	height: 0;
 	overflow: hidden;
+	display: none;
 }
 
 .result-tree > div > .subquery-list {
@@ -1311,8 +1408,13 @@ body.result-list .subquery-list > li:not(.focus)::before {
 	padding: 0;
 }
 
+.sub-controls p.details-only {
+	padding: 0 0.5em 0.5em 0.5em;
+	text-align: center;
+}
+
 .postprocessor-wrap {
-	margin-top: 1em;
+	margin-top: 0.5em;
 }
 
 li.focus > .query-core > p {
