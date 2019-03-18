@@ -60,6 +60,7 @@ function init() {
     // subsubsubquery interface bits
     $(document).on('click', '.expand-postprocessors', postprocessor.toggle);
     $(document).on('click', '.control-postprocessor', postprocessor.queue);
+    $(document).on('click', '.postprocessor-tree button', toggleButton);
 
     //allow opening given analysis path via anchor links
     navpath = window.location.hash.substr(1);
@@ -117,18 +118,18 @@ postprocessor = {
             block.attr('aria-expanded', null);
             block.removeClass('card').removeClass('focus');
             $(this).text($(this).attr('data-original'));
-            block.find('> .postprocessor-wrap').attr('aria-expanded', 'true');
+            block.find('> .details-only').attr('aria-expanded', 'true');
 
             if (parent_block) {
                 parent_block.addClass('card').find('> .query-core').removeClass('card');
-                parent_block.find('> .sub-controls .postprocessor-wrap').attr('aria-expanded', 'true');
+                parent_block.find('> .sub-controls > .details-only').attr('aria-expanded', 'true');
             }
         } else {
             //open this level and collapse siblings
             siblings.attr('aria-expanded', 'false');
             block.attr('aria-expanded', 'true');
             block.addClass('card').addClass('focus');
-            block.find('> .postprocessor-wrap').attr('aria-expanded', 'false');
+            block.find('> .details-only').attr('aria-expanded', 'true');
 
             if (siblings.length === 0) {
                 $(this).attr('data-original', $(this).text()).text('Close');
@@ -139,7 +140,7 @@ postprocessor = {
 
             if (parent_block) {
                 parent_block.removeClass('card').find('> .query-core').addClass('card');
-                parent_block.find('> .sub-controls .postprocessor-wrap').attr('aria-expanded', 'false');
+                parent_block.find('> .sub-controls > .details-only').attr('aria-expanded', 'false');
             }
         }
     },
@@ -217,12 +218,13 @@ query = {
             return;
         }
 
-        let formdata = $('#query-form').serialize();
+        let form = $('#query-form');
+        let formdata = form.serialize();
 
         // AJAX the query to the server
         $.post({
             dataType: "text",
-            url: "/queue-query/",
+            url: form.attr('action'),
             data: formdata,
             success: function (response) {
                 console.log(response);
@@ -267,7 +269,8 @@ query = {
         Polls server to check whether there's a result for query
         */
         $.getJSON({
-            url: '/check_query/' + query_key,
+            url: '/api/check-query/',
+            data: {key: query_key},
             success: function (json) {
                 console.log(json);
 
@@ -330,7 +333,7 @@ query = {
         });
 
         $.get({
-            url: "/check_postprocessors/",
+            url: "/api/check-postprocessors/",
             data: {subqueries: JSON.stringify(keys)},
             success: function (json) {
                 json.forEach(subquery => {
@@ -560,6 +563,19 @@ popup_panel = {
         popup_panel.blur.removeClass('open').addClass('closed');
     }
 };
+
+/** General-purpose toggle buttons **/
+function toggleButton(e) {
+    e.preventDefault();
+
+    target = $('#' + $(this).attr('aria-controls'));
+    is_open = target.attr('aria-expanded') !== 'false';
+    if (is_open) {
+        target.attr('aria-expanded', false);
+    } else {
+        target.attr('aria-expanded', true);
+    }
+}
 
 /**
  * Convert input string to Unix timestamp

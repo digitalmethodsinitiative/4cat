@@ -59,7 +59,7 @@
         {% endif %}
         {% if query.is_finished and query.subqueries|length > 0 %}
             <ol class="subquery-list">
-                <li>{{ query.subqueries|length }} analysis result{% if query.subqueries|length != 1 %}s{% endif %} available</li>
+                <li><a href="/results/{{ query.key }}/">{{ query.subqueries|length }} analysis result{% if query.subqueries|length != 1 %}s{% endif %} available</a></li>
             </ol>
         {% endif %}
 

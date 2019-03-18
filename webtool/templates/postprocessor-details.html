@@ -6,6 +6,16 @@
                     <p class="queue-button-wrap {% if is_postprocessor_running %}hidden{% endif %}">
                         <button class="control-postprocessor">Queue</button>
                     </p>
+                    {% if processor.further and part == "main" %}
+                        <div class="postprocessor-tree">
+                            <button class="link-like" aria-controls="postprocessor-tree-{{ query.key }}">Show further analysis options.</button>
+                            <ul id="postprocessor-tree-{{ query.key }}" aria-expanded="false">
+                                {% for postprocessor in processor.further %}
+                                    {% include "postprocessor-tree.html" %}
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    {% endif %}
                     {% if processor.options %}
                         <fieldset class="postprocessor-options">
                             {% for option in processor.options %}

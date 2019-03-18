@@ -4,7 +4,6 @@ General helper functions for Flask templating and 4CAT views
 import importlib
 import datetime
 import inspect
-import json
 import glob
 import sys
 import os
@@ -12,9 +11,11 @@ import re
 import csv
 
 from math import ceil
-from fourcat import queue
+from stop_words import get_stop_words
 
 from backend.abstract.postprocessor import BasicPostProcessor
+
+import config
 
 
 class Pagination(object):
@@ -193,3 +194,83 @@ def format_post(post):
 	post = re.sub(r"&gt;&gt;([0-9]+)", "<span class=\"quote\"><a href=\"#post-\\1\">&gt;&gt;\\1</a></span>", post)
 	post = re.sub(r"^&gt;([^\n]+)", "<span class=\"greentext\">&gt;\\1</span>", post, flags=re.MULTILINE)
 	return post
+
+
+def validate_query(parameters):
+	"""
+	Validate client-side input
+
+	:param parameters:  Parameters to validate
+	:return:
+	"""
+
+	if not parameters:
+		return "Please provide valid parameters."
+
+	stop_words = get_stop_words('en')
+
+	# TEMPORARY MEASUREMENT
+	# Querying can only happen for max two weeks
+	# max_daterange = 1209600
+
+	# if parameters["min_date"] == 0 or parameters["max_date"] == 0:
+	# 	return "Temporary hardware limitation:\nUse a date range of max. two weeks."
+
+	# Ensure querying can only happen for max two weeks week (temporary measurement)
+	# if parameters["min_date"] != 0 and parameters["max_date"] != 0:
+	# 	if (parameters["max_date"] - parameters["min_date"]) > max_daterange:
+	# 		return "Temporary hardware limitation:\nUse a date range of max. two weeks."
+
+	# Ensure no weird negative timestamps happening
+	if parameters["min_date"] < 0 or parameters["max_date"] < 0:
+		return "Date(s) set too early."
+
+	# Ensure the min date is not later than the max date
+	if parameters["min_date"] != 0 and parameters["max_date"] != 0:
+		if parameters["min_date"] >= parameters["max_date"]:
+			return "The first date is later than or the same as the second."
+
+	# Ensure the board is correct
+	if "platform" not in parameters or "board" not in parameters:
+		return "Please provide a board to search"
+
+	if parameters["platform"] not in config.PLATFORMS:
+		return "Please choose a valid platform to search"
+
+	if parameters["board"] not in config.PLATFORMS[parameters["platform"]]["boards"]:
+		return "Please choose a valid board for querying"
+
+	# Keyword-dense thread length should be at least thirty.
+	if parameters["dense_length"] > 0 and parameters["dense_length"] < 10:
+		return "Keyword-dense thread length should be at least ten."
+	# Keyword-dense thread density should be at least 15%.
+	elif parameters["dense_percentage"] > 0 and parameters["dense_percentage"] < 10:
+		return "Keyword-dense thread density should be at least 10%."
+
+	# Check if there are enough parameters provided.
+	# Body and subject queryies may be empty if date ranges are max a week apart.
+	if parameters["body_query"] == "" and parameters["subject_query"] == "":
+		# Check if the date range is less than a week.
+		if parameters["min_date"] != 0 and parameters["max_date"] != 0:
+			time_diff = parameters["max_date"] - parameters["min_date"]
+			if time_diff >= 2419200:
+				return "With no text querying, filter on a date range of max four weeks."
+			else:
+				return True
+		else:
+			return "Input either a body or subject query, or filter on a date range of max four weeks."
+
+	# Body query should be at least three characters long and should not be just a stopword.
+	if parameters["body_query"] and len(parameters["body_query"]) < 3:
+		return "Body query is too short. Use at least three characters."
+	elif parameters["body_query"] in stop_words:
+		return "Use a body input that is not a stop word."
+
+	# Subject query should be at least three characters long and should not be just a stopword.
+	if parameters["subject_query"] and len(parameters["subject_query"]) < 3:
+		return "Subject query is too short. Use at least three characters."
+	elif parameters["subject_query"] in stop_words:
+		return "Use a subject input that is not a stop word."
+
+	return True
+
