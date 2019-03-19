@@ -7,9 +7,55 @@ import inspect
 import glob
 import sys
 import os
+import csv
+import html2text
+import datetime
 
 import config
 
+def posts_to_csv(self, sql_results, filepath, clean_csv=True):
+	"""
+	Takes a dictionary of results, converts it to a csv, and writes it to the data folder.
+	The respective csvs will be available to the user.
+
+	:param sql_results:		List with results derived with db.fetchall()
+	:param filepath:    	Filepath for the resulting csv
+	:param clean_csv:   	Whether to parse the raw HTML data to clean text.
+							If True (default), writing takes 1.5 times longer.
+
+	"""
+	if not filepath:
+		raise Exception("No result file for query")
+
+	fieldnames = list(sql_results[0].keys())
+	fieldnames.append("unix_timestamp")
+
+	# write the dictionary to a csv
+	with open(filepath, 'w', encoding='utf-8') as csvfile:
+		self.query.update_status("Writing posts to result file")
+		writer = csv.DictWriter(csvfile, fieldnames=fieldnames, lineterminator='\n')
+		writer.writeheader()
+
+		html_parser = html2text.HTML2Text()
+
+		if clean_csv:
+			# Parsing: remove the HTML tags, but keep the <br> as a newline
+			# Takes around 1.5 times longer
+			for row in sql_results:
+				# Create human dates from timestamp
+				from datetime import datetime
+				row["unix_timestamp"] = row["timestamp"]
+				row["timestamp"] = datetime.utcfromtimestamp(row["timestamp"]).strftime('%Y-%m-%d %H:%M:%S')
+
+				# Parse html to text
+				row["body"] = html_parser.handle(row["body"])
+
+				writer.writerow(row)
+		else:
+			writer.writerows(sql_results)
+
+	self.query.update_status("Query finished, results are available.")
+	return filepath
 
 def get_absolute_folder(folder=""):
 	"""

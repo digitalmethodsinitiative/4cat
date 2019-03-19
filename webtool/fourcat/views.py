@@ -136,6 +136,9 @@ def string_query():
 	                                   set, return full thread data.
     :request-param int dense_percentage:  Lower threshold for dense threads
     :request-param int dense_length: Minimum length for dense threads matching
+    :request-param str ?random_sample:  Whether to return a random sample: if
+	                                   set, return random posts.
+    :request-param int random_amount:  The amount of random posts to return.
     :request-param str ?use_data:  Match within given time period: if set,
                                    match within period.
     :request-param int min_date:  Timestamp marking the beginning of the match
@@ -147,7 +150,7 @@ def string_query():
 	:return str:  The query key, which may be used to later retrieve query
 	              status and results.
 	"""
-
+	print(request.form)
 	parameters = {
 		"board": request.form.get("board", ""),
 		"platform": request.form.get("platform", ""),
@@ -157,6 +160,9 @@ def string_query():
 		"dense_threads": (request.form.get("dense_threads", "no") != "no"),
 		"dense_percentage": int(request.form.get("dense_percentage", 0)),
 		"dense_length": int(request.form.get("dense_length", 0)),
+		#"random_sample": (request.form.get("random_sample", "no") != "no"),
+		"random_amount": int(request.form.get("random_amount", 0)) if request.form.get("random_sample",
+																							  "no") != "no" else 0,
 		"min_date": string_to_timestamp(request.form.get("min_date", "")) if request.form.get("use_date",
 																							  "no") != "no" else 0,
 		"max_date": string_to_timestamp(request.form.get("max_date", "")) if request.form.get("use_date",
@@ -300,7 +306,6 @@ def show_results(page):
 
 	return render_template("results.html", queries=filtered, pagination=pagination, all_results=all_results)
 
-
 @app.route('/results/<string:key>/')
 @app.route('/results/<string:key>/postprocessors/')
 def show_result(key):
@@ -417,86 +422,3 @@ def check_postprocessor():
 		})
 
 	return jsonify(subqueries)
-
-
-def validate_query(parameters):
-	"""
-	Validates the client-side user input
-
-	"""
-
-	if not parameters:
-		return "Please provide valid parameters."
-
-	stop_words = get_stop_words('en')
-
-	# TEMPORARY MEASUREMENT
-	# Querying can only happen for max two weeks
-	# max_daterange = 1209600
-
-	# if parameters["min_date"] == 0 or parameters["max_date"] == 0:
-	# 	return "Temporary hardware limitation:\nUse a date range of max. two weeks."
-
-	# Ensure querying can only happen for max two weeks week (temporary measurement)
-	# if parameters["min_date"] != 0 and parameters["max_date"] != 0:
-	# 	if (parameters["max_date"] - parameters["min_date"]) > max_daterange:
-	# 		return "Temporary hardware limitation:\nUse a date range of max. two weeks."
-
-	# Ensure no weird negative timestamps happening
-	if parameters["min_date"] < 0 or parameters["max_date"] < 0:
-		return "Date(s) set too early."
-
-	# Ensure the min date is not later than the max date
-	if parameters["min_date"] != 0 and parameters["max_date"] != 0:
-		if parameters["min_date"] >= parameters["max_date"]:
-			return "The first date is later than or the same as the second."
-
-	# Ensure the board is correct
-	if "platform" not in parameters or "board" not in parameters:
-		return "Please provide a board to search"
-
-	if parameters["platform"] not in config.PLATFORMS:
-		return "Please choose a valid platform to search"
-
-	if parameters["board"] not in config.PLATFORMS[parameters["platform"]]["boards"]:
-		return "Please choose a valid board for querying"
-
-	# Keyword-dense thread length should be at least thirty.
-	if parameters["dense_length"] > 0 and parameters["dense_length"] < 10:
-		return "Keyword-dense thread length should be at least ten."
-	# Keyword-dense thread density should be at least 15%.
-	elif parameters["dense_percentage"] > 0 and parameters["dense_percentage"] < 10:
-		return "Keyword-dense thread density should be at least 10%."
-
-	# Check if there are enough parameters provided.
-	# Body and subject queryies may be empty if date ranges are max a week apart.
-	if parameters["body_query"] == "" and parameters["subject_query"] == "":
-		# Check if the date range is less than a week.
-		if parameters["min_date"] != 0 and parameters["max_date"] != 0:
-			time_diff = parameters["max_date"] - parameters["min_date"]
-			if time_diff >= 2419200:
-				return "With no text querying, filter on a date range of max four weeks."
-			else:
-				return True
-		else:
-			return "Input either a body or subject query, or filter on a date range of max four weeks."
-
-	# Body query should be at least three characters long and should not be just a stopword.
-	if parameters["body_query"] and len(parameters["body_query"]) < 3:
-		return "Body query is too short. Use at least three characters."
-	elif parameters["body_query"] in stop_words:
-		return "Use a body input that is not a stop word."
-	# Query must contain alphanumeric characters
-	elif parameters["body_query"] and not re.search('[a-zA-Z0-9]', parameters["body_query"]):
-		return "Body query must contain alphanumeric characters."
-
-	# Subject query should be at least three characters long and should not be just a stopword.
-	if parameters["subject_query"] and len(parameters["subject_query"]) < 3:
-		return "Subject query is too short. Use at least three characters."
-	elif parameters["subject_query"] in stop_words:
-		return "Use a subject input that is not a stop word."
-	elif parameters["subject_query"] and not re.search('[a-zA-Z0-9]', parameters["subject_query"]):
-		# Query must contain alphanumeric characters
-		return "Subject query must contain alphanumeric characters."
-
-	return True

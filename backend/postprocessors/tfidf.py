@@ -4,7 +4,6 @@ import pandas as pd
 import pickle as p
 import numpy as np
 import itertools
-from helpers import getPolitiekTokens, getKrantTokens, getStem
 from sklearn.feature_extraction.text import TfidfVectorizer
 """
 Create a csv with tf-idf terms
@@ -54,13 +53,13 @@ class tfidf(BasicPostProcessor):
 		},
 		"min_df": {
 			"type": UserInput.OPTION_TEXT,
-			"default": 1
+			"default": 1,
 			"min": 1,
 			"max": 10000
 		},
 		"max_df": {
 			"type": UserInput.OPTION_TEXT,
-			"default": 999
+			"default": 999,
 			"min": 1,
 			"max": 10000
 		}

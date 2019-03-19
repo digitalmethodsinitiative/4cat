@@ -203,7 +203,8 @@ def validate_query(parameters):
 	:param parameters:  Parameters to validate
 	:return:
 	"""
-
+	
+	print(parameters)
 	if not parameters:
 		return "Please provide valid parameters."
 

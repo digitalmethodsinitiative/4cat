@@ -16,75 +16,111 @@
                                     </span>
                                 </div>
                                 <div id='filterinputs'>
+
+                                    <!-- PLATFORM FILTERBOX -->
                                     <div class='filter-container'>
                                         <div class='filter-box'>
-                                            <div class='filter-box-label'>
+                                            <div class='filter-label'>
                                                 <span>Platform:</span>
                                             </div>
-                                            <select name="platform" id='platform-select'>
-                                                {% for platform in boards %}
-                                                    <option value="{{ platform }}">{{ platform }}</option>
-                                                {% endfor %}
-                                            </select>
+                                            <div class='filter-parameters'>
+                                                <select name="platform" id='platform-select'>
+                                                    {% for platform in boards %}
+                                                        <option value="{{ platform }}">{{ platform }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                            </div>
                                         </div>
                                         <div class='filter-box'>
-                                            <div class='filter-box-label'>
+                                            <div class='filter-label'>
                                                 <span>Board:</span>
                                             </div>
-                                            <input id="board-select" name="board" value="pol" placeholder="pol">
+                                            <div class='filter-parameters'>
+                                                <input id="board-select" name="board" value="pol" placeholder="pol">
+                                            </div>
                                         </div>
                                     </div>
+
+                                    <!-- POST BODY FILTERBOX -->
                                     <div class='filter-container'>
                                         <div class='filter-box'>
-                                            <div class='filter-box-label'>
+                                            <div class='filter-label'>
                                                 <span>Post body:</span>
                                                 </div>
-                                            <input name="body_query" id='body-input' type='text' maxlength='200'>
+                                            <div class='filter-parameters'>
+                                                <input name="body_query" id='body-input' type='text' maxlength='200'>
+                                            </div>
                                         </div>
                                     </div>
+
+                                    <!-- OP SUBJECT FILTERBOX -->
                                     <div class='filter-container'>
                                         <div class='filter-box'>
-                                            <div class='filter-box-label'>
+                                            <div class='filter-label'>
                                                 <span>OP subject:</span>
                                             </div>
-                                            <input name="subject_query" id='subject-input' type='text' maxlength='200'>
+                                            <div class='filter-parameters'>
+                                                <input name="subject_query" id='subject-input' type='text' maxlength='200'>
+                                            </div>
                                         </div>
                                         <div class='filter-box'>
-                                            <div class='filter-box-label'>
-                                                <label for='check-full-thread'> Return full threads</label>
+                                            <div class='filter-label'>
+                                                <label for='check-full-thread'>Return full threads:</label>
                                             </div>
-                                            <input name="full_thread" type='checkbox' id='check-full-thread'> (warning: slow!)
+                                            <div class='filter-parameters'>
+                                                <input name="full_thread" type='checkbox' id='check-full-thread'> (warning: slow!)
+                                            </div>
                                         </div>
                                     </div>
+
+                                    <!-- DENSE THREADS FILTERBOX -->
                                     <div class='filter-container'>
                                         <div class='filter-box'>
-                                            <div class='filter-box-label'>
+                                            <div class='filter-label'>
                                                 <input name="dense_threads" type='checkbox' id='check-dense-threads' class='input-dense' disabled>
                                                 <label for='check-dense-threads'><span class='density-keyword'>keyword</span>-dense threads:</label>
                                             </div>
-                                            <ul>
-                                                <li>
-                                                    <input name="dense_percentage" id='dense-percentage' class='input-dense input-number' type='number' value='15' min='10' max='100'>
-                                                    <label for='dense-percentage'>% of posts containing <span class='density-keyword'>keyword</span> in thread (min 10%)</label>
-                                                </li>
-                                                <li>
-                                                    <input name="dense_length" id='dense-thread-length' class='input-dense input-number' type='number' value='30' min='10'>
-                                                    <label for='dense-thread-length'>Total posts in thread (min 10)</label>
-                                                </li>
-                                            </ul>
-                                            
+                                            <div class='filter-parameters'>
+                                                <ul>
+                                                    <li>
+                                                        <label for='dense-percentage'><span class='density-keyword'>keyword</span> must appear in at least <input name="dense_percentage" id='dense-percentage' class='input-dense input-number' type='number' value='15' min='10' max='100'> % of posts,</label>
+                                                    </li>
+                                                    <li>
+                                                         <label for='dense-length'>min. thread length is <input name="dense_length" id='dense-length' class='input-dense input-number' type='number' value='30' min='10'> posts</label>
+                                                    </li>
+                                                </ul>
+                                            </div>
                                         </div>
                                     </div>
+
+                                    <!-- RANDOM SAMPLE FILTERBOX -->
+                                    <div class='filter-container'>
+                                        <div class='filter-box'>
+                                            <div class='filter-label'>
+                                                <input name='random_sample' type='checkbox' id='check-random-sample' class='random-sample'>
+                                                <label for='check-random-sample'> Random post sample:</label>
+                                            </div>
+                                            <div class='filter-parameters'>
+                                                <input name='random_amount' id='random-sample-amount' class='input-number' type='number' value='5000' min='1' max='5000000' disabled>
+                                                <label for='random-sample-amount'> posts (works with date range)</label>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- DATE RANGE FILTERBOX -->
                                     <div class='filter-container'>
                                         <div class='filter-box' id='filter_time'>
-                                            <div class='filter-box-label'>
-                                                <input name="use_date" type='checkbox' id='check-time'>
-                                                <label for='check-time'>Date range</label>
+                                            <div class='filter-label'>
+                                                <input name='use_date' type='checkbox' id='check-time'>
+                                                <label for='check-time'>Date range:</label>
                                             </div>
-                                            <input name="min_date" id='input-min-time' class='input-time' type='date' placeholder='dd-mm-yyyy' disabled='disabled'> to
-                                            <input name="max_date" id='input-max-time' class='input-time' type='date' placeholder='dd-mm-yyyy' disabled='disabled'> <span class='red'></span>
+                                            <div class='filter-parameters'>
+                                                <input name='min_date' id='input-min-time' class='input-time' type='date' placeholder='dd-mm-yyyy' disabled='disabled'> to
+                                                <input name='max_date' id='input-max-time' class='input-time' type='date' placeholder='dd-mm-yyyy' disabled='disabled'> <span class='red'></span>
+                                            </div>
                                         </div>
                                     </div>
+
                                     
                                     <button class='btn_filterbutton' id='btn_go'>Go</button>
                                     

@@ -219,24 +219,28 @@ button#submitdata {
 .filter-container {
 	padding-top: 5px;
 	padding-bottom: 5px;
-	border-bottom: 1px dotted rgba(0,0,0,.1);
+	border-bottom: 1px dotted rgba(0,0,0,.4);
 }
 
 .filter-box {
+	position: relative;
 	padding: 5px;
 }
 
-.filter-box > .filter-box-label {
+.filter-box > .filter-label {
 	display: inline-block;
 	min-width:  210px;
-
+	position: absolute;
+	top: 50%;
+	transform: translateY(-50%);
 }
 
-.filter-box > .filter-box-label > label{
-	margin-bottom: 0px;
+.filter-box > .filter-parameters {
+	display: inline-block;
+	margin-left: 210px;
 }
 
-.filter-box > ul {
+.filter-parameters > ul {
 	display: inline-block;
 	list-style-type: none;
 	margin: 0px;
@@ -347,6 +351,10 @@ input.input-number {
 	width: 50px;
 }
 
+input.input-number#random-sample-amount {
+	width: 100px;
+}
+
 input[type="checkbox"].imgsubmit {
 	border: 2px solid black;
 	width: 20px;
@@ -364,15 +372,6 @@ input[type="radio"] + label {
 input[type="radio"].mainselect {
 	display: inline;
 }
-
-/*input[type="radio"] + label span {
-    display:inline-block;
-    width:19px;
-    height:19px;
-    border-radius: 20px;
-    background-color: white;
-    border: 2px solid black;
-}*/
 
 input[type="radio"]:checked + label {
     background-color: black;
