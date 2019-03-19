@@ -4,7 +4,7 @@ Basic post-processor worker - should be inherited by workers to post-process res
 import abc
 
 from backend.abstract.worker import BasicWorker
-from backend.lib.query import SearchQuery
+from backend.lib.query import DataSet
 
 
 class BasicPostProcessor(BasicWorker, metaclass=abc.ABCMeta):
@@ -43,11 +43,11 @@ class BasicPostProcessor(BasicWorker, metaclass=abc.ABCMeta):
 		"""
 		self.log.info("Running post-processor %s on query %s" % (self.type, self.job.data["remote_id"]))
 
-		self.query = SearchQuery(key=self.job.data["remote_id"], db=self.db)
+		self.query = DataSet(key=self.job.data["remote_id"], db=self.db)
 		self.options = self.query.parameters
 		self.query.update_status("Processing data")
 
-		self.parent = SearchQuery(key=self.query.data["key_parent"], db=self.db)
+		self.parent = DataSet(key=self.query.data["key_parent"], db=self.db)
 		self.source_file = self.parent.get_results_path()
 
 		if not self.query.is_finished():

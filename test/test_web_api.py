@@ -4,7 +4,7 @@ import json
 import time
 
 from test.basic_testcase import FourcatTestCase
-from backend.lib.query import SearchQuery
+from backend.lib.query import DataSet
 
 import config
 
@@ -112,7 +112,7 @@ class TestQuery(FourcatTestCase):
 		}
 
 		key = self.post_api("queue-query", data=querydata, is_json=False).decode("utf-8")
-		query = SearchQuery(key=key, db=self.db)
+		query = DataSet(key=key, db=self.db)
 
 		# check if the query was added to the database correctly
 		del querydata["use_date"]

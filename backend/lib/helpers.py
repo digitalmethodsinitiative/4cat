@@ -13,7 +13,7 @@ import datetime
 
 import config
 
-def posts_to_csv(self, sql_results, filepath, clean_csv=True):
+def posts_to_csv(sql_results, filepath, clean_csv=True):
 	"""
 	Takes a dictionary of results, converts it to a csv, and writes it to the data folder.
 	The respective csvs will be available to the user.
@@ -32,7 +32,6 @@ def posts_to_csv(self, sql_results, filepath, clean_csv=True):
 
 	# write the dictionary to a csv
 	with open(filepath, 'w', encoding='utf-8') as csvfile:
-		self.query.update_status("Writing posts to result file")
 		writer = csv.DictWriter(csvfile, fieldnames=fieldnames, lineterminator='\n')
 		writer.writeheader()
 
@@ -54,7 +53,6 @@ def posts_to_csv(self, sql_results, filepath, clean_csv=True):
 		else:
 			writer.writerows(sql_results)
 
-	self.query.update_status("Query finished, results are available.")
 	return filepath
 
 def get_absolute_folder(folder=""):

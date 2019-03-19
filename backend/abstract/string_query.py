@@ -8,7 +8,7 @@ from collections import Counter
 
 import config
 from backend.lib.database_mysql import MySQLDatabase
-from backend.lib.query import SearchQuery
+from backend.lib.query import DataSet
 from backend.abstract.worker import BasicWorker
 from backend.lib.helpers import posts_to_csv
 
@@ -47,7 +47,7 @@ class StringQuery(BasicWorker, metaclass=abc.ABCMeta):
 		# Setup connections and get parameters
 		key = self.job.data["remote_id"]
 		try:
-			self.query = SearchQuery(key=key, db=self.db)
+			self.query = DataSet(key=key, db=self.db)
 		except TypeError:
 			self.log.info("Query job %s refers to non-existent query, finishing." % key)
 			self.job.finish()
@@ -71,10 +71,17 @@ class StringQuery(BasicWorker, metaclass=abc.ABCMeta):
 		results_file = self.query.get_results_path()
 		results_file = results_file.replace("*", "")
 
-		posts = self.execute_string_query(query_parameters)
+		# Execute the relevant query (string-based or random)
+		if query_parameters["random_amount"]:
+			posts = self.execute_random_query(query_parameters)
+		else:
+			posts = self.execute_string_query(query_parameters)
 
+		# Write posts to csv and update the DataBase status to finished
 		if posts:
-			self.posts_to_csv(posts, results_file)
+			self.query.update_status("Writing posts to result file")
+			posts_to_csv(posts, results_file)
+			self.query.update_status("Query finished, results are available.")
 
 		num_posts = len(posts) if posts else 0
 		self.query.finish(num_rows=num_posts)
@@ -90,7 +97,7 @@ class StringQuery(BasicWorker, metaclass=abc.ABCMeta):
 		the PostgreSQL is queried to return all posts for the found IDs, as
 		well as (optionally) all other posts in the threads those posts were in.
 
-		:param dict query:  Query parameters, as part of the SearchQuery object
+		:param dict query:  Query parameters, as part of the DataSet object
 		:return list:  Posts, sorted by thread and post ID, in ascending order
 		"""
 
@@ -167,7 +174,7 @@ class StringQuery(BasicWorker, metaclass=abc.ABCMeta):
 			if query["dense_threads"] and query["body_query"]:
 				self.query.update_status("Post data collected. Filtering dense threads")
 				#posts = self.filter_dense(posts, query["body_query"], query["dense_percentage"], query["dense_length"])
-				thread_ids = self.filter_dense_sql(thread_ids, query["body_query"], query["dense_percentage"], query["dense_length"])
+				thread_ids = self.filter_dense(thread_ids, query["body_query"], query["dense_percentage"], query["dense_length"])
 
 				# When there are no dense threads
 				if not thread_ids:
@@ -181,62 +188,53 @@ class StringQuery(BasicWorker, metaclass=abc.ABCMeta):
 
 		return posts
 
-	def filter_dense(self, posts, keyword, percentage, length):
+
+	def execute_random_query(self, query):
 		"""
-		Filter posts for those in "dense threads"
+		Execute a query; get post data for given parameters
 
-		Dense threads are threads in which a given keyword contains more than
-		a given amount of times. This takes a post array as returned by
-		`execute_string_query()` and filters it so that only posts in threads in which
-		the keyword appears more than a given threshold's amount of times
-		remain.
+		This handles general search - anything that does not involve dense
+		threads (those are handled by get_dense_threads()). First, Sphinx is
+		queries with the search parameters to get the relevant post IDs; then
+		the PostgreSQL is queried to return all posts for the found IDs, as
+		well as (optionally) all other posts in the threads those posts were in.
 
-		:param list posts:  Posts to filter, result of `execute_string_query()`
-		:param string keyword:  Keyword that posts will be matched against
-		:param float percentage:  How many posts in the thread need to qualify
-		:param int length:  How long a thread needs to be to qualify
-		:return list:  Filtered list of posts
+		:param dict query:  Query parameters, as part of the DataSet object
+		:return list:  Posts, sorted by thread and post ID, in ascending order
 		"""
-		# for each thread, save number of posts and number of matching posts
-		self.log.info("Filtering %s-dense threads from %i posts..." % (keyword, len(posts)))
-		threads = {}
-		for post in posts:
-			if post["thread_id"] not in threads:
-				threads[post["thread_id"]] = {"posts": 0, "match": 0}
 
-			if keyword in post["body"]:
-				threads[post["thread_id"]]["match"] += 1
+		# Build random id query
+		where = []
+		replacements = []
 
-			threads[post["thread_id"]]["posts"] += 1
+		# Amount of random posts to get
+		random_amount = query["random_amount"]
 
-		# filter out those threads with the right ratio
-		filtered_threads = []
-		percentage /= 100.0
-		for thread in threads:
-			if threads[thread]["posts"] > length and float(threads[thread]["match"]) / float(
-					threads[thread]["posts"]) > percentage:
-				filtered_threads.append(thread)
+		# Set dates
+		if query["max_date"] == 0:
+			max_date = 1000000000
+		else:
+			max_date = query["max_date"]
+		min_date = query["min_date"]
+		# Get random post ids
+		# Use `if`s since you can't use a variable for tables
+		if self.prefix == "4chan":
+			post_ids = self.db.fetchall("""SELECT id FROM posts_4chan ORDER BY random() LIMIT %s;
+			""", (random_amount,))
+		elif self.prefix == '8chan':
+			post_ids = self.db.fetchall("""SELECT id FROM posts_8chan ORDER BY random() LIMIT %s;
+			""", (random_amount,))
+		else:
+			raise Exception("Invalid prefix %s" % (self.prefix))
 
-		self.log.info("Found %i %s-dense threads in results set" % (len(filtered_threads), keyword))
-		self.query.update_status(
-			"Found %i %s-dense threads. Collecting final post set" % (len(filtered_threads), keyword))
+		# Fetch the posts
+		post_ids =  tuple([post["id"] for post in post_ids])
+		posts = self.fetch_posts(post_ids)
+		self.query.update_status("Post data collected")
 
-		# filter posts that do not qualify
-		filtered_posts = []
-		while posts:
-			post = posts[0]
-			del posts[0]
+		return posts
 
-			if post["thread_id"] in filtered_threads:
-				filtered_posts.append(post)
-
-		# return filtered list of posts
-		self.log.info("%s-dense thread filtering finished, %i posts left." % (keyword, len(filtered_posts)))
-		self.query.update_status(
-			"Dense thread filtering finished, %i posts left. Writing to file" % len(filtered_posts))
-		return filtered_posts
-
-	def filter_dense_sql(self, thread_ids, keyword, percentage, length):
+	def filter_dense(self, thread_ids, keyword, percentage, length):
 		"""
 		Filter posts for those in "dense threads"
 

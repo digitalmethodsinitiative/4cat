@@ -3,12 +3,12 @@ import json
 import os
 
 from test.basic_testcase import FourcatTestCase
-from backend.lib.query import SearchQuery
+from backend.lib.query import DataSet
 
 
 class TestQuery(FourcatTestCase):
 	"""
-	Test the SearchQuery class
+	Test the DataSet class
 	"""
 	default_parameters = {"before": 1540477901, "after": 0}
 	default_key = "291391f1636c710e00f9a136e54d770a"
@@ -19,7 +19,7 @@ class TestQuery(FourcatTestCase):
 
 		Expected: the key is the expected MD5 Hash
 		"""
-		query = SearchQuery(query="obama", parameters=self.default_parameters, db=self.db)
+		query = DataSet(query="obama", parameters=self.default_parameters, db=self.db)
 		self.assertEqual(query.key, self.default_key)
 
 	def test_create_query(self):
@@ -28,7 +28,7 @@ class TestQuery(FourcatTestCase):
 
 		Expected: data is properly inserted into database
 		"""
-		SearchQuery(query="obama", parameters=self.default_parameters, db=self.db)
+		DataSet(query="obama", parameters=self.default_parameters, db=self.db)
 
 		result = self.db.fetchone("SELECT * FROM queries")
 		self.assertIsNotNone(result)
@@ -50,7 +50,7 @@ class TestQuery(FourcatTestCase):
 
 		Expected: hash changes
 		"""
-		query = SearchQuery(query="trump", parameters=self.default_parameters, db=self.db)
+		query = DataSet(query="trump", parameters=self.default_parameters, db=self.db)
 		self.assertNotEqual(query.key, self.default_key)
 
 	def test_key_not_match_parameters(self):
@@ -59,7 +59,7 @@ class TestQuery(FourcatTestCase):
 
 		Expected: hash changes
 		"""
-		query = SearchQuery(query="trump", parameters={"president": True}, db=self.db)
+		query = DataSet(query="trump", parameters={"president": True}, db=self.db)
 		self.assertNotEqual(query.key, self.default_key)
 
 	def test_reserve_file(self):
@@ -68,7 +68,7 @@ class TestQuery(FourcatTestCase):
 
 		Expected:
 		"""
-		query = SearchQuery(query="obama", parameters=self.default_parameters, db=self.db)
+		query = DataSet(query="obama", parameters=self.default_parameters, db=self.db)
 
 		with self.subTest("Result path is reserved"):
 			self.assertNotEqual("", query.data["result_file"])
@@ -90,7 +90,7 @@ class TestQuery(FourcatTestCase):
 
 		Expected: RuntimeErrors are raised
 		"""
-		query = SearchQuery(query="obama", parameters=self.default_parameters, db=self.db)
+		query = DataSet(query="obama", parameters=self.default_parameters, db=self.db)
 		query.finish()
 
 		with self.subTest("Reserving a finished query's result file"):
@@ -103,24 +103,24 @@ class TestQuery(FourcatTestCase):
 
 	def test_instantiate_key(self):
 		"""
-		Test instantiating a SearchQuery by key
+		Test instantiating a DataSet by key
 
 		Expected: the same record is used in both cases
 		"""
-		query = SearchQuery(query="obama", parameters=self.default_parameters, db=self.db)
-		other_query = SearchQuery(key=self.default_key, db=self.db)
+		query = DataSet(query="obama", parameters=self.default_parameters, db=self.db)
+		other_query = DataSet(key=self.default_key, db=self.db)
 
 		self.assertEqual(other_query.data["query"], "obama")
 		self.assertEqual(query.key, other_query.key)
 
 	def test_instantiate_queryparam(self):
 		"""
-		Test instantiating a SearchQuery by query/param combination
+		Test instantiating a DataSet by query/param combination
 
 		Expected: the same record is used in both cases
 		"""
-		query = SearchQuery(query="obama", parameters=self.default_parameters, db=self.db)
-		other_query = SearchQuery(query="obama", parameters=self.default_parameters, db=self.db)
+		query = DataSet(query="obama", parameters=self.default_parameters, db=self.db)
+		other_query = DataSet(query="obama", parameters=self.default_parameters, db=self.db)
 
 		self.assertEqual(query.key, other_query.key)
 
@@ -134,10 +134,10 @@ class TestQuery(FourcatTestCase):
 		Expected: a TypeError is raised
 		"""
 		with self.assertRaises(TypeError):
-			SearchQuery(key="fake-key", db=self.db)
+			DataSet(key="fake-key", db=self.db)
 
 	def test_status(self):
-		query = SearchQuery(query="obama", parameters=self.default_parameters, db=self.db)
+		query = DataSet(query="obama", parameters=self.default_parameters, db=self.db)
 
 		self.assertEqual(query.get_status(), "")
 		query.update_status("test 1")
@@ -152,7 +152,7 @@ class TestQuery(FourcatTestCase):
 		Expected: a TypeError is raised
 		"""
 		with self.assertRaises(TypeError):
-			SearchQuery(query="", db=self.db)
+			DataSet(query="", db=self.db)
 
 
 if __name__ == '__main__':

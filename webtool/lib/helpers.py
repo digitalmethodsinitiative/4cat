@@ -146,7 +146,7 @@ def get_available_postprocessors(query):
 	"""
 	Get available post-processors for a given query
 
-	:param SearchQuery query:  Query to load available postprocessors for
+	:param DataSet query:  Query to load available postprocessors for
 	:return dict: Post processors, {id => settings} mapping
 	"""
 	postprocessors = query.get_compatible_postprocessors()
@@ -203,8 +203,7 @@ def validate_query(parameters):
 	:param parameters:  Parameters to validate
 	:return:
 	"""
-	
-	print(parameters)
+
 	if not parameters:
 		return "Please provide valid parameters."
 
@@ -250,7 +249,7 @@ def validate_query(parameters):
 
 	# Check if there are enough parameters provided.
 	# Body and subject queryies may be empty if date ranges are max a week apart.
-	if parameters["body_query"] == "" and parameters["subject_query"] == "":
+	if parameters["body_query"] == "" and parameters["subject_query"] == "" and parameters["random_amount"] == False:
 		# Check if the date range is less than a week.
 		if parameters["min_date"] != 0 and parameters["max_date"] != 0:
 			time_diff = parameters["max_date"] - parameters["min_date"]

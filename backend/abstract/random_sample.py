@@ -9,7 +9,7 @@ from collections import Counter
 import config
 
 from backend.lib.database_mysql import MySQLDatabase
-from backend.lib.query import SearchQuery
+from backend.lib.query import DataSet
 from backend.abstract.worker import BasicWorker
 from backend.lib.helpers import posts_to_csv
 
@@ -45,7 +45,7 @@ class RandomQuery(BasicWorker, metaclass=abc.ABCMeta):
 		# Setup connections and get parameters
 		key = self.job.data["remote_id"]
 		try:
-			self.query = SearchQuery(key=key, db=self.db)
+			self.query = DataSet(key=key, db=self.db)
 		except TypeError:
 			self.log.info("Query job %s refers to non-existent query, finishing." % key)
 			self.job.finish()
@@ -79,7 +79,7 @@ class RandomQuery(BasicWorker, metaclass=abc.ABCMeta):
 		the PostgreSQL is queried to return all posts for the found IDs, as
 		well as (optionally) all other posts in the threads those posts were in.
 
-		:param dict query:  Query parameters, as part of the SearchQuery object
+		:param dict query:  Query parameters, as part of the DataSet object
 		:return list:  Posts, sorted by thread and post ID, in ascending order
 		"""
 
