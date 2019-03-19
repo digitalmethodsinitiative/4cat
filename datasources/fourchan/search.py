@@ -1,12 +1,12 @@
 """
-4Chan Search via Sphinx
+4chan Search via Sphinx
 """
 from backend.abstract.string_query import StringQuery
 
 
 class Search4Chan(StringQuery):
 	"""
-	Search 4Chan corpus
+	Search 4chan corpus
 
 	Defines methods that are used to query the 4chan data indexed and saved.
 	"""

@@ -31,22 +31,35 @@ function init() {
         if (input_string === '') {
             $('.density-keyword').html('keyword');
             $('.input-dense').prop('disabled', true);
-            $('#check-keyword-dense-threads').prop('checked', false)
+            $('#check-dense-threads').prop('checked', false)
         } else {
             $('.input-dense').prop('disabled', false);
-            if (input_string.length > 7) {
-                $('.density-keyword').html(input_string.substr(0, 4) + '...')
+            if (input_string.length > 8) {
+                $('.density-keyword').html(input_string.substr(0, 5) + '...')
             } else {
-                $('.density-keyword').html(input_string)
+                $('.density-keyword').html('"' + input_string + '"')
             }
         }
     });
 
-    //platform select boxes trigger an update of the boards available for the chosen platform
+    // Disable all options if random sample is checked (except dates & boards)
+    $('#check-random-sample').on('change', function () {
+        $('#random-sample-amount').attr('disabled', !this.checked);
+        $('#body-input').attr('disabled', this.checked);
+        $('#subject-input').attr('disabled', this.checked);
+        $('#check-full-thread').attr('disabled', this.checked).prop('checked', false);
+        $('#check-dense-threads').attr('disabled', this.checked).prop('checked', false);
+        $('#dense-percentage').attr('disabled', this.checked).prop('checked', false);
+        $('#dense-length').attr('disabled', this.checked).prop('checked', false);
+        $('#check-full-thread').attr('disabled', this.checked).prop('checked', false);
+    });
+    $('#check-random-sample').trigger('change');
+
+    // Platform select boxes trigger an update of the boards available for the chosen platform
     $('#platform-select').on('change', query.update_boards);
     $('#platform-select').trigger('change');
 
-    //controls to change which results show up in overview
+    // Controls to change which results show up in overview
     $('.view-controls button').hide();
     $('.view-controls input, .view-controls select, .view-controls textarea').on('change', function () {
         $(this).parents('form').trigger('submit');
@@ -220,6 +233,7 @@ query = {
 
         let form = $('#query-form');
         let formdata = form.serialize();
+        console.log(formdata)
 
         // AJAX the query to the server
         $.post({
@@ -227,7 +241,7 @@ query = {
             url: form.attr('action'),
             data: formdata,
             success: function (response) {
-                console.log(response);
+                //console.log(response);
 
                 // If the query is rejected by the server.
                 if (response.substr(0, 14) === 'Invalid query.') {
@@ -388,7 +402,7 @@ query = {
 
                 // If the string was incorrectly formatted (could be on Safari), a NaN was returned
                 if (isNaN(url_min_date)) {
-                    valid = false;
+                    valid = false
                     alert('Please provide a minimum date in the format dd-mm-yyyy (like 29-11-2017).');
                 }
             }
@@ -398,24 +412,25 @@ query = {
                 url_max_date = stringToTimestamp(max_date);
                 // If the string was incorrectly formatted (could be on Safari), a NaN was returned
                 if (isNaN(url_max_date)) {
-                    valid = false;
+                    valid = false
                     alert('Please provide a maximum date in the format dd-mm-yyyy (like 29-11-2017).');
                 }
             }
 
             // Input can be ill-formed, like '01-12-90', resulting in negative timestamps
             if (url_min_date < 0 || url_max_date < 0 && valid) {
-                valid = false;
+                valid = false
                 alert('Invalid date(s). Check the bar on top with details on date ranges of 4CAT data.');
             }
 
             // Make sure the first date is later than or the same as the second
             if (url_min_date >= url_max_date && url_min_date !== 0 && url_max_date !== 0 && valid) {
-                valid = false;
+                valid = false
                 alert('The first date is later than or the same as the second.\nPlease provide a correct date range.');
             }
         }
 
+        // Return true if everyting is passed
         return valid;
     },
 
