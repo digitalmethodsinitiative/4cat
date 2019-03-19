@@ -233,7 +233,6 @@ query = {
 
         let form = $('#query-form');
         let formdata = form.serialize();
-        console.log(formdata)
 
         // AJAX the query to the server
         $.post({

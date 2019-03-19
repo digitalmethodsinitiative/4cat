@@ -1,5 +1,6 @@
 import collections
 import hashlib
+import random
 import typing
 import json
 import time
@@ -12,7 +13,7 @@ from backend.lib.job import Job, JobNotFoundException
 from backend.lib.helpers import load_postprocessors, get_absolute_folder
 
 
-class SearchQuery:
+class DataSet:
 	"""
 	Provide interface to safely register and run search queries
 
@@ -46,26 +47,26 @@ class SearchQuery:
 			self.key = key
 			current = self.db.fetchone("SELECT * FROM queries WHERE key = %s", (self.key,))
 			if not current:
-				raise TypeError("SearchQuery() requires a valid query key for its 'key' argument, \"%s\" given" % key)
+				raise TypeError("DataSet() requires a valid query key for its 'key' argument, \"%s\" given" % key)
 
 			self.query = current["query"]
 		elif job is not None:
 			current = self.db.fetchone("SELECT * FROM queries WHERE parameters::json->>'job' = %s", (job,))
 			if not current:
-				raise TypeError("SearchQuery() requires a valid job ID for its 'job' argument")
+				raise TypeError("DataSet() requires a valid job ID for its 'job' argument")
 
 			self.query = current["query"]
 			self.key = current["key"]
 		elif data is not None:
 			current = data
 			if "query" not in data or "key" not in data or "parameters" not in data or "key_parent" not in data:
-				raise ValueError("SearchQuery() requires a complete query record for its 'data' argument")
+				raise ValueError("DataSet() requires a complete query record for its 'data' argument")
 
 			self.query = current["query"]
 			self.key = current["key"]
 		else:
 			if parameters is None:
-				raise TypeError("SearchQuery() requires either 'key', or 'parameters' to be given")
+				raise TypeError("DataSet() requires either 'key', or 'parameters' to be given")
 
 			self.query = self.get_label(parameters, default=type)
 			self.key = self.get_key(self.query, parameters, parent)
@@ -97,7 +98,7 @@ class SearchQuery:
 
 		# retrieve analyses and post-processors that may be run for this query
 		analyses = self.db.fetchall("SELECT * FROM queries WHERE key_parent = %s ORDER BY timestamp ASC", (self.key,))
-		self.subqueries = [SearchQuery(data=analysis, db=self.db) for analysis in analyses]
+		self.subqueries = [DataSet(data=analysis, db=self.db) for analysis in analyses]
 		self.postprocessors = self.get_available_postprocessors()
 
 
@@ -238,13 +239,21 @@ class SearchQuery:
 		# the query, so make sure it's always in the same order, or we might
 		# end up creating multiple keys for the same query if python
 		# decides to return the dict in a different order
-		param_key = collections.OrderedDict()
-		for key in sorted(parameters):
-			param_key[key] = parameters[key]
 
-		parent_key = str(parent) if parent else ""
-		plain_key = repr(param_key) + str(query) + parent_key
-		return hashlib.md5(plain_key.encode("utf-8")).hexdigest()
+		# Return a unique key if random posts are queried
+		if parameters["random_amount"]:
+			random_int = str(random.randint(1,10000000))
+			return hashlib.md5(random_int.encode("utf-8")).hexdigest()
+
+		# Return a hash based on parameters for other queries
+		else:
+			param_key = collections.OrderedDict()
+			for key in sorted(parameters):
+				param_key[key] = parameters[key]
+
+			parent_key = str(parent) if parent else ""
+			plain_key = repr(param_key) + str(query) + parent_key
+			return hashlib.md5(plain_key.encode("utf-8")).hexdigest()
 
 	def get_status(self):
 		"""
@@ -318,7 +327,7 @@ class SearchQuery:
 		"""
 		Get genealogy of this query
 
-		Creates a list of SearchQuery objects, with the first one being the
+		Creates a list of DataSet objects, with the first one being the
 		'top' query, and each subsequent one being a sub-query of the previous
 		one, ending with the current query.
 
@@ -332,7 +341,7 @@ class SearchQuery:
 
 		while True:
 			try:
-				parent = SearchQuery(key=key_parent, db=self.db)
+				parent = DataSet(key=key_parent, db=self.db)
 			except TypeError:
 				break
 
@@ -441,4 +450,4 @@ class SearchQuery:
 			return self.data[attr]
 		else:
 			print(self.data)
-			raise KeyError("SearchQuery instance has no attribute %s" % attr)
+			raise KeyError("DataSet instance has no attribute %s" % attr)

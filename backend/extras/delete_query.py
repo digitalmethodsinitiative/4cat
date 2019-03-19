@@ -10,7 +10,7 @@ from backend.lib.database import Database
 from backend.lib.logger import Logger
 from backend.lib.queue import JobQueue
 from backend.lib.job import Job, JobNotFoundException
-from backend.lib.query import SearchQuery
+from backend.lib.query import DataSet
 
 import config
 
@@ -31,20 +31,19 @@ database = Database(logger=logger)
 
 # Initialize query
 try:
-	parent = SearchQuery(key=args.key, db=database)
+	parent = DataSet(key=args.key, db=database)
 except TypeError:
 	print("No query found with that key.")
 	sys.exit(1)
 
 # Find subqueries/analyses/postprocessors
 keys = [row["key"] for row in database.fetchall("SELECT key FROM queries WHERE key_parent = %s", (parent.key,))]
-print(keys)
 keys.append(parent.key)
 
 # Delete all of them
 for key in keys:
 	try:
-		query = SearchQuery(key=key, db=database)
+		query = DataSet(key=key, db=database)
 	except TypeError as e:
 		print("Could not initialize query %s (%s), skipping." % (key, e))
 		continue

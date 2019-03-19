@@ -10,7 +10,7 @@ from flask_login import login_required, current_user
 from fourcat import app, db, queue, openapi, limiter
 from fourcat.helpers import Pagination, string_to_timestamp, get_available_postprocessors, get_preview
 
-from backend.lib.query import SearchQuery
+from backend.lib.query import DataSet
 from backend.lib.exceptions import JobAlreadyExistsException, JobNotFoundException
 from backend.lib.helpers import get_absolute_folder, UserInput, load_postprocessors
 
@@ -176,7 +176,7 @@ def string_query():
 		return "Invalid query. " + valid
 
 	# Queue query
-	query = SearchQuery(parameters=parameters, db=db)
+	query = DataSet(parameters=parameters, db=db)
 
 	try:
 		queue.add_job(jobtype="%s-search" % parameters["platform"], remote_id=query.key)
@@ -201,7 +201,7 @@ def check_query(query_key):
 	         result file and whether the query result is `empty`.
 	"""
 	try:
-		query = SearchQuery(key=query_key, db=db)
+		query = DataSet(key=query_key, db=db)
 	except TypeError:
 		abort(404)
 
@@ -319,7 +319,7 @@ def show_result(key):
 	:return:  Rendered template
 	"""
 	try:
-		query = SearchQuery(key=key, db=db)
+		query = DataSet(key=key, db=db)
 	except ValueError:
 		abort(404)
 
@@ -359,7 +359,7 @@ def queue_postprocessor(key, postprocessor):
 
 	# cover all bases - can only run postprocessor on "parent" query
 	try:
-		query = SearchQuery(key=key, db=db)
+		query = DataSet(key=key, db=db)
 	except TypeError:
 		abort(404)
 
@@ -374,7 +374,7 @@ def queue_postprocessor(key, postprocessor):
 		choice = request.values.get("option-" + option, None)
 		options[option] = UserInput.parse(settings, choice)
 
-	analysis = SearchQuery(parent=query.key, parameters=options, db=db,
+	analysis = DataSet(parent=query.key, parameters=options, db=db,
 						   extension=query.postprocessors[postprocessor]["extension"], type=postprocessor)
 	if analysis.is_new:
 		# analysis has not been run or queued before - queue a job to run it
@@ -410,7 +410,7 @@ def check_postprocessor():
 
 	for key in keys:
 		try:
-			query = SearchQuery(key=key, db=db)
+			query = DataSet(key=key, db=db)
 		except TypeError:
 			continue
 

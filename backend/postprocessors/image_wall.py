@@ -19,7 +19,7 @@ from io import StringIO
 
 import config
 from backend.lib.helpers import UserInput, get_absolute_folder
-from backend.lib.query import SearchQuery
+from backend.lib.query import DataSet
 from backend.abstract.postprocessor import BasicPostProcessor
 
 

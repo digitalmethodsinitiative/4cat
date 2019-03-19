@@ -17,7 +17,7 @@ from webtool.views import queue_postprocessor
 from webtool.lib.helpers import string_to_timestamp, get_preview, validate_query
 
 from backend.lib.queue import JobQueue
-from backend.lib.query import SearchQuery
+from backend.lib.query import DataSet
 from backend.lib.helpers import get_absolute_folder, load_postprocessors
 
 api_ratelimit = limiter.shared_limit("1 per second", scope="api")
@@ -84,7 +84,7 @@ def api_status():
 @login_required
 @limiter.limit("5 per minute")
 @openapi.endpoint
-def string_query():
+def queue_query():
 	"""
 	Queue a 4CAT Query
 
@@ -125,7 +125,7 @@ def string_query():
 		"dense_percentage": int(request.form.get("dense_percentage", 0)),
 		"dense_length": int(request.form.get("dense_length", 0)),
 		"random_amount": int(request.form.get("random_amount", 0)) if request.form.get("random_sample",
-																							  "no") != "no" else 0,
+																							  "no") != "no" else False,
 		"min_date": string_to_timestamp(request.form.get("min_date", "")) if request.form.get("use_date",
 																							  "no") != "no" else 0,
 		"max_date": string_to_timestamp(request.form.get("max_date", "")) if request.form.get("use_date",
@@ -135,15 +135,15 @@ def string_query():
 
 	valid = validate_query(parameters)
 
-	if valid != True:
-		return "Invalid query. " + valid
+	if not valid:
+		return "Invalid query."
 
 	# Queue query
-	query = SearchQuery(parameters=parameters, db=db)
+	query = DataSet(parameters=parameters, db=db)
+
 	queue.add_job(jobtype="%s-search" % parameters["platform"], remote_id=query.key)
 
 	return query.key
-
 
 @app.route('/api/check-query/')
 @login_required
@@ -161,7 +161,7 @@ def check_query():
 	"""
 	query_key = request.args.get("key")
 	try:
-		query = SearchQuery(key=query_key, db=db)
+		query = DataSet(key=query_key, db=db)
 	except TypeError:
 		return jsonify({"error": "Not a valid query key."})
 
@@ -245,7 +245,7 @@ def available_postprocessors():
 	         and a list of `options`, if applicable.
 	"""
 	try:
-		query = SearchQuery(key=request.args.get("key"), db=db)
+		query = DataSet(key=request.args.get("key"), db=db)
 	except TypeError:
 		return jsonify({"error": "Not a valid query key."})
 
@@ -275,7 +275,7 @@ def check_postprocessor():
 
 	for key in keys:
 		try:
-			query = SearchQuery(key=key, db=db)
+			query = DataSet(key=key, db=db)
 		except TypeError:
 			continue
 

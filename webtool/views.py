@@ -13,7 +13,7 @@ from flask_login import login_required, current_user
 from webtool import app, db, queue, openapi
 from webtool.lib.helpers import Pagination, get_preview
 
-from backend.lib.query import SearchQuery
+from backend.lib.query import DataSet
 from backend.lib.helpers import get_absolute_folder, UserInput, load_postprocessors
 
 
@@ -211,7 +211,7 @@ def show_result(key):
 	:return:  Rendered template
 	"""
 	try:
-		query = SearchQuery(key=key, db=db)
+		query = DataSet(key=key, db=db)
 	except TypeError:
 		abort(404)
 
@@ -250,7 +250,7 @@ def queue_postprocessor(key, postprocessor, is_async=False):
 
 	# cover all bases - can only run postprocessor on "parent" query
 	try:
-		query = SearchQuery(key=key, db=db)
+		query = DataSet(key=key, db=db)
 	except TypeError:
 		if is_async:
 			return jsonify({"error": "Not a valid query key."})
@@ -271,7 +271,7 @@ def queue_postprocessor(key, postprocessor, is_async=False):
 		choice = request.values.get("option-" + option, None)
 		options[option] = UserInput.parse(settings, choice)
 
-	analysis = SearchQuery(parent=query.key, parameters=options, db=db,
+	analysis = DataSet(parent=query.key, parameters=options, db=db,
 						   extension=query.postprocessors[postprocessor]["extension"], type=postprocessor)
 	if analysis.is_new:
 		# analysis has not been run or queued before - queue a job to run it
