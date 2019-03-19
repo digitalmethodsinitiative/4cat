@@ -21,6 +21,8 @@ Usage:
 import inspect
 import re
 
+import config
+
 
 class OpenAPICollector:
 	"""
@@ -155,11 +157,15 @@ class OpenAPICollector:
 		"""
 		spec = {
 			"swagger": "2.0",
+			"host": config.FlaskConfig.SERVER_NAME,
 			"info": {
 				"title": "4CAT: Capture and Analysis Toolkit RESTful API",
+				"description": "This API allows interfacing with the 4CAT Capture and Analysis Toolkit, offering "
+							   "endpoints through which one may query our 4chan and 8chan corpora via keyword-based "
+							   "search, and run further analysis on the results.",
 				"version": "1.0.0",
 				"contact": {
-					"email": "4cat@oilab.eu"
+					"email": config.ADMIN_EMAILS[0] if config.ADMIN_EMAILS else ""
 				}
 			},
 			"paths": {
