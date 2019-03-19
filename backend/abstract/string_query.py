@@ -210,22 +210,12 @@ class StringQuery(BasicWorker, metaclass=abc.ABCMeta):
 		# Amount of random posts to get
 		random_amount = query["random_amount"]
 
-		# Set dates
-		if query["max_date"] == 0:
-			max_date = 1000000000
-		else:
-			max_date = query["max_date"]
-		min_date = query["min_date"]
 		# Get random post ids
-		# Use `if`s since you can't use a variable for tables
-		if self.prefix == "4chan":
-			post_ids = self.db.fetchall("""SELECT id FROM posts_4chan ORDER BY random() LIMIT %s;
-			""", (random_amount,))
-		elif self.prefix == '8chan':
-			post_ids = self.db.fetchall("""SELECT id FROM posts_8chan ORDER BY random() LIMIT %s;
-			""", (random_amount,))
+		# `if max_date > 0` prevents postgres issues with big ints
+		if query["max_date"] > 0:
+			post_ids = self.db.fetchall("SELECT id FROM posts_" + self.prefix + " WHERE timestamp >= %s AND timestamp <= %s ORDER BY random() LIMIT %s;", (query["min_date"], query["max_date"], random_amount,))
 		else:
-			raise Exception("Invalid prefix %s" % (self.prefix))
+			post_ids = self.db.fetchall("SELECT id FROM posts_" + self.prefix + " WHERE timestamp >= %s ORDER BY random() LIMIT %s;", (query["min_date"], random_amount,))
 
 		# Fetch the posts
 		post_ids =  tuple([post["id"] for post in post_ids])
