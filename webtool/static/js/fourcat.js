@@ -290,7 +290,6 @@ query = {
                 let status_box = $('#query_status .status_message .message');
                 let current_status = status_box.html();
 
-                //
                 if (json.status !== current_status && json.status !== "") {
                     status_box.html(json.status);
                 }
@@ -299,10 +298,18 @@ query = {
                     clearInterval(poll_interval);
                     let keyword = $('#body-input').val();
                     if (keyword === '') {
-                        keyword = $('#subject-input').val();
+                        if ($('#subject-input').val().length > 0){
+                            keyword = $('#subject-input').val();
+                        }
+                        else if ($('#check-random-sample').is(':checked')) {
+                            keyword = 'random-' + $('#random-sample-amount').val();
+                        }
+                        else {
+                            keyword = '';
+                        }
                     }
 
-                    $('#submitform').append('<a href="/results/' + json.key + '"><p>' + json.query + ' (' + json.rows + ' posts)</p></a>');
+                    $('#submitform').append('<a href="/results/' + json.key + '"><p>' + keyword + ' (' + json.rows + ' posts)</p></a>');
                     $('.loader').hide();
                     $('#query_status .status_message .dots').html('');
                     $('#whole-form').removeAttr('disabled');
