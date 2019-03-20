@@ -13,6 +13,12 @@
 *.stdout
 *.git-*
 
+# do not ignore interface images
+!webtool/static/*.png
+!webtool/static/*.gif
+!webtool/static/*.jpg
+!webtool/static/*.ico
+
 # actual files that are part of 4CAT but should not be included
 config.py
 deploy.sh
