@@ -228,7 +228,7 @@ class DataSet:
 		self.data["result_file"] = file
 		return updated > 0
 
-	def get_key(self, query, parameters=None, parent=""):
+	def get_key(self, query, parameters, parent=""):
 		"""
 		Generate a unique key for this query that can be used to identify it
 
@@ -247,8 +247,7 @@ class DataSet:
 		# decides to return the dict in a different order
 
 		# Return a unique key if random posts are queried
-		print(parameters)
-		if parameters and parameters["random_amount"]:
+		if "random_amount" in parameters:
 			random_int = str(random.randint(1,10000000))
 			return hashlib.md5(random_int.encode("utf-8")).hexdigest()
 
