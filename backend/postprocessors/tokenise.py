@@ -85,15 +85,14 @@ class Tokenise(BasicPostProcessor):
 			csv = DictReader(source)
 			for post in csv:
 				# determine what output unit this post belongs to
-				if self.options["resolution"] == "all":
-					output = "overall"
+				if self.options["timeframe"] == "all":
+						output = "overall"
 				else:
-					timestamp = int(
-						post.get("unix_timestamp", datetime.datetime.fromisoformat(post["timestamp"]).timestamp()))
+					timestamp = int(datetime.datetime.strptime(post["timestamp"], "%Y-%m-%d %H:%M:%S").timestamp())
 					date = datetime.datetime.fromtimestamp(timestamp)
-					if self.options["resolution"] == "year":
+					if self.options["timeframe"] == "year":
 						output = str(date.year)
-					elif self.options["resolution"] == "month":
+					elif self.options["timeframe"] == "month":
 						output = str(date.year) + "-" + str(date.month)
 					else:
 						output = str(date.year)
