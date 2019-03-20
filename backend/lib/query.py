@@ -207,7 +207,7 @@ class DataSet:
 			raise RuntimeError("Cannot reserve results file for a finished query")
 
 		# Use 'random' for random post queries
-		if parameters and parameters["random_amount"] > 0:
+		if "random_amount" in parameters and parameters["random_amount"] > 0:
 			file = 'random-' + str(parameters["random_amount"]) + '-' + self.data["key"]
 		# Use the querystring for string queries
 		else:
