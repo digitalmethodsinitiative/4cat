@@ -191,7 +191,7 @@ class DataSet:
 		else:
 			return default
 
-	def reserve_result_file(self, parameters, extension="csv"):
+	def reserve_result_file(self, parameters=None, extension="csv"):
 		"""
 		Generate a unique path to the results file for this query
 
@@ -207,7 +207,7 @@ class DataSet:
 			raise RuntimeError("Cannot reserve results file for a finished query")
 
 		# Use 'random' for random post queries
-		if parameters["random_amount"] > 0:
+		if parameters and parameters["random_amount"] > 0:
 			file = 'random-' + str(parameters["random_amount"]) + '-' + self.data["key"]
 		# Use the querystring for string queries
 		else:
@@ -228,7 +228,7 @@ class DataSet:
 		self.data["result_file"] = file
 		return updated > 0
 
-	def get_key(self, query, parameters, parent=""):
+	def get_key(self, query, parameters=None, parent=""):
 		"""
 		Generate a unique key for this query that can be used to identify it
 
@@ -247,7 +247,8 @@ class DataSet:
 		# decides to return the dict in a different order
 
 		# Return a unique key if random posts are queried
-		if parameters["random_amount"]:
+		print(parameters)
+		if parameters and parameters["random_amount"]:
 			random_int = str(random.randint(1,10000000))
 			return hashlib.md5(random_int.encode("utf-8")).hexdigest()
 
