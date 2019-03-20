@@ -1,18 +1,13 @@
 <!DOCTYPE html>
 <head>
 	<title>{% block title %}4CAT: Capture and Analysis Toolkit{% endblock %} &bull; 4CAT</title>
-	<link rel='stylesheet' href='{{url_for('static', filename='css/bootstrap.min.css')}}'>
-	<link rel='stylesheet' type='text/css' href='{{url_for('static', filename='css/stylesheet.css')}}'>
-	<script type=text/javascript src='{{url_for('static', filename='js/jquery-3.3.1.min.js')}}'></script>
-	<script type=text/javascript src='{{url_for('static', filename='js/fourcat.js')}}'></script>
+	<link rel="stylesheet" href="{{url_for('static', filename='css/bootstrap.min.css')}}">
+	<link rel="stylesheet" type="text/css" href="{{url_for('static', filename='css/stylesheet.css')}}">
+	<script type="text/javascript" src="{{url_for('static', filename='js/jquery-3.3.1.min.js')}}"></script>
+	<script type="text/javascript" src="{{url_for('static', filename='js/fourcat.js')}}"></script>
 
 	<!-- favicons -->
-	<link rel="apple-touch-icon" sizes="180x180" href="{{url_for("static", filename="img/favicon/apple-touch-icon.png")}}">
-	<link rel="icon" type="image/png" sizes="32x32" href="{{url_for("static", filename="img/favicon/favicon-32x32.png")}}">
-	<link rel="icon" type="image/png" sizes="16x16" href="{{url_for("static", filename="img/favicon/favicon-16x16.png")}}">
-	<link rel="manifest" href="{{url_for("static", filename="img/favicon/site.webmanifest")}}">
-	<link rel="mask-icon" href="{{url_for("static", filename="img/favicon/safari-pinned-tab.svg")}}" color="#485ba6">
-	<link rel="shortcut icon" href="{{url_for("static", filename="img/favicon/favicon.ico")}}">
+	<link rel="shortcut icon" href="{{url_for('static', filename='img/favicon/favicon.ico')}}">
 	<meta name="msapplication-TileColor" content="#485ba6">
 	<meta name="msapplication-config" content="static/img/favicon/browserconfig.xml">
 	<meta name="theme-color" content="#ffffff">
