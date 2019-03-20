@@ -32,3 +32,9 @@ stats.json
 startup/
 build/
 dist/
+
+# do not ignore interface images
+!webtool/static/img/*.png
+!webtool/static/img/*.gif
+!webtool/static/img/*.jpg
+!webtool/static/img/favicon/*.ico
