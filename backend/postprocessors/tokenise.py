@@ -103,14 +103,13 @@ class Tokenise(BasicPostProcessor):
 				if current_subunit and current_subunit != output:
 					save_subunit(current_subunit)
 					self.query.update_status("Processing posts (" + output + ")")
-					subunits[current_subunit] = set()
+					subunits[current_subunit] = list()  # free up memory
 
 				current_subunit = output
 
-				# deduplication comes for free (well, no extra code) with
-				# sets
+				# create a new list if we're starting a new subunit
 				if output not in subunits:
-					subunits[output] = set()
+					subunits[output] = list()
 
 				# clean up text and get tokens from it
 				body = link_regex.sub("", post["body"])
@@ -127,7 +126,7 @@ class Tokenise(BasicPostProcessor):
 					if self.parameters["lemmatise"]:
 						token = lemmatizer.lemmatize(token)
 
-					subunits[output].add(token)
+					subunits[output].append(token)
 
 		# save the last subunit we worked on too
 		save_subunit(current_subunit)
@@ -136,8 +135,8 @@ class Tokenise(BasicPostProcessor):
 		self.query.update_status("Compressing results into archive")
 		with zipfile.ZipFile(self.query.get_results_path(), "w") as zip:
 			for subunit in subunits:
-				zip.write(dirname + '/'+ subunit + ".pb")
-				os.unlink(dirname + '/'+ subunit + ".pb")
+				zip.write(dirname + "/" + subunit + ".pb")
+				os.unlink(dirname + "/" + subunit + ".pb")
 
 		# delete temporary files and folder
 		shutil.rmtree(dirname)
