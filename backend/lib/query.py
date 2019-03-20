@@ -94,7 +94,7 @@ class DataSet:
 				self.data["key_parent"] = parent
 
 			self.db.insert("queries", data=self.data)
-			self.reserve_result_file(extension)
+			self.reserve_result_file(parameters, extension)
 
 		# retrieve analyses and post-processors that may be run for this query
 		analyses = self.db.fetchall("SELECT * FROM queries WHERE key_parent = %s ORDER BY timestamp ASC", (self.key,))
@@ -191,7 +191,7 @@ class DataSet:
 		else:
 			return default
 
-	def reserve_result_file(self, extension="csv"):
+	def reserve_result_file(self, parameters, extension="csv"):
 		"""
 		Generate a unique path to the results file for this query
 
@@ -200,15 +200,21 @@ class DataSet:
 		expect (i.e. the results file for this particular query).
 
 		:param str extension: File extension, "csv" by default
+		:param parameters:  Query parameters
 		:return bool:  Whether the file path was successfully reserved
 		"""
 		if self.data["is_finished"]:
 			raise RuntimeError("Cannot reserve results file for a finished query")
 
-		query_bit = self.data["query"].replace(" ", "-").lower()
-		query_bit = re.sub(r"[^a-z0-9\-]", "", query_bit)
-		file = query_bit + "-" + self.data["key"]
-		file = re.sub(r"[-]+", "-", file)
+		# Use 'random' for random post queries
+		if parameters["random_amount"] > 0:
+			file = 'random-' + str(parameters["random_amount"]) + '-' + self.data["key"]
+		# Use the querystring for string queries
+		else:
+			query_bit = self.data["query"].replace(" ", "-").lower()
+			query_bit = re.sub(r"[^a-z0-9\-]", "", query_bit)
+			file = query_bit + "-" + self.data["key"]
+			file = re.sub(r"[-]+", "-", file)
 
 		path = self.folder + "/" + file + "." + extension.lower()
 		index = 1

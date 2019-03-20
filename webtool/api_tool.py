@@ -172,11 +172,11 @@ def check_query():
 		path = False
 		preview = ""
 	elif results:
+		# Return absolute folder when using localhost for debugging
 		if app.debug:
-			path = 'http://localhost/fourcat/data/' + query.data["query"].replace("*", "") + '-' + query_key + '.csv'
+			path = 'http://localhost/fourcat/data/' + query.data["result_file"] + '.csv'
 		else:
 			path = results.replace("\\", "/").split("/").pop()
-
 		querydata = query.data
 		querydata["parameters"] = json.loads(querydata["parameters"])
 		preview = render_template("posts-preview.html", query=querydata, preview=get_preview(query))
