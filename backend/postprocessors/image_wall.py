@@ -62,7 +62,7 @@ class ImageWallGenerator(BasicPostProcessor):
 		urls = []
 
 		try:
-			amount = max(0, min(200, int(self.options.get("amount", 0))))
+			amount = max(0, min(200, int(self.parameters.get("amount", 0))))
 		except ValueError:
 			amount = 100
 
