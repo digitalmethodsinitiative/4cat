@@ -92,7 +92,7 @@ class Logger:
 		:param message:  Message to log
 		:param level:  Severity level, should be a logger.* constant
 		"""
-		if self.print_logs and level > logging.DEBUG:
+		if self.print_logs and level >= logging.DEBUG:
 			print("LOG: %s" % message)
 
 		# because we use a wrapper the context location the logger itself is
