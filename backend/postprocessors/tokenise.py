@@ -48,8 +48,8 @@ class Tokenise(BasicPostProcessor):
 
 	def process(self):
 		"""
-		This takes a 4CAT results file as input, and outputs a plain text file
-		containing all post bodies as one continuous string, sanitized.
+		This takes a 4CAT results file as input, and outputs a number of files containing
+		tokenised posts, grouped per time unit as specified in the parameters.
 		"""
 		self.query.update_status("Processing posts")
 
@@ -81,18 +81,19 @@ class Tokenise(BasicPostProcessor):
 
 		# process posts
 		self.query.update_status("Processing posts")
+		timeframe = self.parameters["timeframe"]
 		with open(self.source_file, encoding="utf-8") as source:
 			csv = DictReader(source)
 			for post in csv:
 				# determine what output unit this post belongs to
-				if self.options["timeframe"] == "all":
+				if timeframe == "all":
 						output = "overall"
 				else:
 					timestamp = int(datetime.datetime.strptime(post["timestamp"], "%Y-%m-%d %H:%M:%S").timestamp())
 					date = datetime.datetime.fromtimestamp(timestamp)
-					if self.options["timeframe"] == "year":
+					if timeframe == "year":
 						output = str(date.year)
-					elif self.options["timeframe"] == "month":
+					elif timeframe == "month":
 						output = str(date.year) + "-" + str(date.month)
 					else:
 						output = str(date.year)
@@ -120,10 +121,10 @@ class Tokenise(BasicPostProcessor):
 					if token in stopwords:
 						continue
 
-					if self.options["stem"]:
+					if self.parameters["stem"]:
 						token = stemmer.stem(token)
 
-					if self.options["lemmatise"]:
+					if self.parameters["lemmatise"]:
 						token = lemmatizer.lemmatize(token)
 
 					subunits[output].add(token)

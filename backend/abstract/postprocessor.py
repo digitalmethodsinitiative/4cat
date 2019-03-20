@@ -26,6 +26,7 @@ class BasicPostProcessor(BasicWorker, metaclass=abc.ABCMeta):
 	category = "Other"
 	extension = "csv"
 	options = {}
+	parameters = {}
 
 	def __init__(self, db=None, logger=None, manager=None, job=job):
 		"""
@@ -44,7 +45,7 @@ class BasicPostProcessor(BasicWorker, metaclass=abc.ABCMeta):
 		self.log.info("Running post-processor %s on query %s" % (self.type, self.job.data["remote_id"]))
 
 		self.query = DataSet(key=self.job.data["remote_id"], db=self.db)
-		self.options = self.query.parameters
+		self.parameters = self.query.parameters
 		self.query.update_status("Processing data")
 
 		self.parent = DataSet(key=self.query.data["key_parent"], db=self.db)
