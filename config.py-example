@@ -44,6 +44,7 @@ MAILHOST = "localhost"  # SMTP server to connect to for sending e-mail alerts
 # Scrape settings
 SCRAPE_TIMEOUT = 5  # how long to wait for a scrape request to finish?
 SCRAPE_PROXIES = {"http": []}  # Items in this list should be formatted like "http://111.222.33.44:1234"
+IMAGE_INTERVAL = 3600
 
 # Web tool settings
 class FlaskConfig:
