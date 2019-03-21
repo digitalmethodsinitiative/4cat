@@ -3,9 +3,9 @@
 """
 
 import datetime
+import config
 import json
 import os
-import config
 
 from collections import OrderedDict
 
@@ -13,7 +13,7 @@ from flask import jsonify, abort, send_file, request, render_template
 
 from webtool import app, db, log, openapi, limiter
 from webtool.lib.helpers import format_post
-from backend.lib.helpers import get_absolute_folder
+from backend.lib.helpers import get_absolute_folder, strip_tags
 
 api_ratelimit = limiter.shared_limit("1 per second", scope="api")
 
@@ -36,6 +36,12 @@ def api_thread(platform, board, thread_id):
 
 	thread = db.fetchone("SELECT * FROM threads_" + platform + " WHERE board = %s AND id = %s", (board, thread_id))
 	response = get_thread(platform, board, thread, db)
+
+	def strip_html(post):
+		post["com"] = strip_tags(post.get("com", ""))
+		return post
+
+	response["posts"] = [strip_html(post) for post in response["posts"]]
 
 	if not response:
 		abort(404)
