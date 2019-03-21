@@ -1,6 +1,7 @@
 import argparse
 import psycopg2
 import sys
+import re
 import os
 
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)) + '/..')
@@ -19,6 +20,10 @@ cli.add_argument("-p", "--password", required=True, help="Password")
 args = cli.parse_args()
 
 if __name__ == "__main__":
+	if not re.match(r"[^@]+\@.*?\.[a-zA-Z]+", args.username):
+		print("Please provide an e-mail address as username.")
+		sys.exit(1)
+
 	try:
 		db.insert("users", data={"name": args.username})
 		user = User.get_by_name(args.username)
