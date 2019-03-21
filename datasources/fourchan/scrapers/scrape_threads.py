@@ -200,7 +200,8 @@ class ThreadScraper4chan(BasicJSONScraper):
 			self.log.error("ValueError (%s) during scrape of thread %s" % (e, post["no"]))
 
 		self.save_links(post, post["no"])
-		if "filename" in post:
+		# Download images (exclude .webm files)
+		if "filename" in post and post["ext"] != ".webm":
 			self.queue_image(post, thread)
 
 		return True
@@ -243,11 +244,11 @@ class ThreadScraper4chan(BasicJSONScraper):
 
 		if os.path.isdir(image_folder) and not os.path.isfile(image_path):
 			try:
-				self.queue.add_job("4chan-image", remote_id=post["md5"], details={
+				self.queue.add_job("4chan-image", remote_id=post["md5"], claim_after=config.IMG_INTERVAL, details={
 					"board": thread["board"],
 					"ext": post["ext"],
 					"tim": post["tim"],
-					"destination": image_path
+					"destination": image_path,
 				})
 			except JobAlreadyExistsException:
 				pass
