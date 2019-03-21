@@ -39,37 +39,30 @@ class tfidf(BasicPostProcessor):
 	type = "tfidf"  # job type ID
 	category = "Text analysis"  # category
 	title = "Tf-idf"  # title displayed in UI
-	description = "Get the tf-idf values of tokenised text."  # description displayed in UI
-	extension = "png"  # extension of result file, used internally and in UI
+	description = "Get the tf-idf values of tokenised text. Tf-idf (term frequency - inverse document frequency) is a popular technique to score which words are common locally but rare globally."  # description displayed in UI
+	extension = "csv"  # extension of result file, used internally and in UI
 	accepts = ["tokenise-posts"]  # query types this post-processor accepts as input
 
 	options = {
-		
+		"timeframe": {
+			"type": UserInput.OPTION_CHOICE,
+			"default": "months",
+			"options": {"years": "years", "months": "months", "weeks": "weeks", "days": "days"},
+			"help": "What timeframe to use to separate and compare documents."
+		},
 		"n_size": {
 			"type": UserInput.OPTION_CHOICE,
 			"default": "1 word",
-			"options": {"1 word": "1 word", "2 words": "2 words"},
-			"help": "Amount of words to return (tf-idf onegrams or bigrams)"
-		},
-		"min_df": {
-			"type": UserInput.OPTION_TEXT,
-			"default": 1,
-			"min": 1,
-			"max": 10000
-		},
-		"max_df": {
-			"type": UserInput.OPTION_TEXT,
-			"default": 999,
-			"min": 1,
-			"max": 10000
+			"options": {"1_word": "1 word", "2_words": "2 words", "3_words": "3 words"},
+			"help": "Amount of words to compare (tf-idf unigrams, bigrams, or trigrams)."
 		}
 	}
 
-	def process(self, tokens, li_filenames, filename, min_df=0, max_df=0, top_n=25, ngram_range=1, domain=''):
+	def process(self, tokens, li_filenames, filename, min_df=0, max_df=0, top_n=25, ngram_range=1):
 		'''
 		Creates a csv with the top n highest scoring tf-idf words.
 
-		:param input,		list of tokens. Should be unpickled first
+		:param tokens,		list of tokens. Should be unpickled first
 		:param filename,	the name of the output folder, based on the input
 		:param max_df,		filter out words that appear in more than length of token list - max_df
 		:param min_df,		filter out words that appear in less than min_df

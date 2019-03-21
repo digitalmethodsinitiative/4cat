@@ -589,12 +589,14 @@ popup_panel = {
 function toggleButton(e) {
     e.preventDefault();
 
-    target = $('#' + $(this).attr('aria-controls'));
-    is_open = target.attr('aria-expanded') !== 'false';
+    target = '#' + $(this).attr('aria-controls');
+    console.log(target)
+    
+    is_open = $(target).attr('aria-expanded') !== 'false';
     if (is_open) {
-        target.attr('aria-expanded', false);
+        $(target).attr('aria-expanded', false);
     } else {
-        target.attr('aria-expanded', true);
+        $(target).attr('aria-expanded', true);
     }
 }
 
