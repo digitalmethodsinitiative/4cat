@@ -1,5 +1,11 @@
 <li>
-    <span class="postprocessor">{{ postprocessors[postprocessor].name }}</span>
+    <span class="postprocessor">
+    	<em>{{ postprocessors[postprocessor].name }}</em>
+    	<button class="tooltip-trigger" aria-controls="tooltip-postprocessor-{{ postprocessors[postprocessor].id }}-{{ postprocessors[postprocessor].type }}" aria-label="Post-processor details">?</button>
+    	<p role="tooltip" id="tooltip-postprocessor-{{ postprocessors[postprocessor].id }}-{{ postprocessors[postprocessor].type }}">
+                {{ postprocessors[postprocessor].description }}{% if postprocessors[postprocessor].description[-1] != "." %}.{% endif %}
+                Output: {{ postprocessors[postprocessor].extension }} file.</p>
+    </span>
     {% if postprocessors[postprocessor].further %}
         <ul>
         {% for postprocessor in postprocessors[postprocessor].further %}

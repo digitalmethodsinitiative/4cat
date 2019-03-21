@@ -1095,7 +1095,7 @@ ol.postprocessor-list {
 
 .postprocessor-list li form {
     display: grid;
-    grid-template-columns: auto 5em;
+    grid-template-columns: auto 10em;
     padding: 0.5em;
 }
 
@@ -1126,16 +1126,9 @@ ol.postprocessor-list {
 }
 
 .postprocessor-tree ul {
-	display: inline-block;
 	vertical-align: top;
-	margin: 0 0 0.5em 1.5em;
 	list-style: none;
 	padding: 0;
-	border: 2px solid #FFF;
-	border-width: 0 0 0 2px;
-	border-left-color: #000;
-	border-top-left-radius: 0.5em;
-	border-bottom-left-radius: 0.5em;
 	position: relative;
 	box-sizing: border-box;
 	transition: 0.25s;
@@ -1150,16 +1143,20 @@ ol.postprocessor-list {
 .postprocessor-tree ul[aria-expanded=true] {
 	height: auto;
 	opacity: 1;
+	font-style: normal;
 }
 
 .postprocessor-tree li {
 	padding: 0 0 0 0.5em;
 }
-.postprocessor-tree ul::before {
-	content: '\02192';
-	position: absolute;
-	top: 0.1em;
-	left: -1.5em;
+.postprocessor-tree li::before {
+	display: inline-block;
+	content: '';
+	border-left: 2px dotted #000;
+	border-bottom: 2px dotted #000;
+	width: 0.85em;
+	height: 0.85em;
+	vertical-align: top;
 }
 
 /** pagination **/
