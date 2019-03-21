@@ -72,7 +72,7 @@ class StringQuery(BasicWorker, metaclass=abc.ABCMeta):
 		results_file = results_file.replace("*", "")
 
 		# Execute the relevant query (string-based or random)
-		if query_parameters["random_amount"]:
+		if "random_amount" in query_parameters and query_parameters["random_amount"]:
 			posts = self.execute_random_query(query_parameters)
 		else:
 			posts = self.execute_string_query(query_parameters)

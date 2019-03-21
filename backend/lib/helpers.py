@@ -8,10 +8,11 @@ import glob
 import sys
 import os
 import csv
-import html2text
-import datetime
+
+from html.parser import HTMLParser
 
 import config
+
 
 def posts_to_csv(sql_results, filepath, clean_csv=True):
 	"""
@@ -35,8 +36,6 @@ def posts_to_csv(sql_results, filepath, clean_csv=True):
 		writer = csv.DictWriter(csvfile, fieldnames=fieldnames, lineterminator='\n')
 		writer.writeheader()
 
-		html_parser = html2text.HTML2Text()
-
 		if clean_csv:
 			# Parsing: remove the HTML tags, but keep the <br> as a newline
 			# Takes around 1.5 times longer
@@ -47,13 +46,14 @@ def posts_to_csv(sql_results, filepath, clean_csv=True):
 				row["timestamp"] = datetime.utcfromtimestamp(row["timestamp"]).strftime('%Y-%m-%d %H:%M:%S')
 
 				# Parse html to text
-				row["body"] = html_parser.handle(row["body"])
+				row["body"] = strip_tags(row["body"])
 
 				writer.writerow(row)
 		else:
 			writer.writerows(sql_results)
 
 	return filepath
+
 
 def get_absolute_folder(folder=""):
 	"""
@@ -118,7 +118,7 @@ def load_postprocessors():
 		for member in members:
 			if inspect.isclass(member[1]) and "BasicPostProcessor" in [parent.__name__ for parent in
 																	   member[1].__bases__] and not inspect.isabstract(
-					member[1]):
+				member[1]):
 				postprocessors[member[1].type] = {
 					"type": member[1].type,
 					"description": member[1].description,
@@ -130,7 +130,8 @@ def load_postprocessors():
 				}
 
 	sorted_postprocessors = collections.OrderedDict()
-	for key in sorted(postprocessors, key=lambda postprocessor: postprocessors[postprocessor]["category"] + postprocessors[postprocessor]["name"].lower()):
+	for key in sorted(postprocessors, key=lambda postprocessor: postprocessors[postprocessor]["category"] +
+																postprocessors[postprocessor]["name"].lower()):
 		sorted_postprocessors[key] = postprocessors[key]
 
 	backup = sorted_postprocessors.copy()
@@ -141,6 +142,30 @@ def load_postprocessors():
 				sorted_postprocessors[type]["further"].append(possible_child)
 
 	return sorted_postprocessors
+
+
+class HTMLStripper(HTMLParser):
+	def __init__(self):
+		super().__init__()
+		self.reset()
+		self.strict = False
+		self.convert_charrefs = True
+		self.fed = []
+
+	def handle_data(self, data):
+		self.fed.append(data)
+
+	def get_data(self):
+		return ''.join(self.fed)
+
+
+def strip_tags(html, convert_newlines=True):
+	if convert_newlines:
+		html = html.replace("<br>", "\n")
+
+	stripper = HTMLStripper()
+	stripper.feed(html)
+	return stripper.get_data()
 
 
 class UserInput:
