@@ -48,7 +48,7 @@ class tfidf(BasicPostProcessor):
 			"type": UserInput.OPTION_CHOICE,
 			"default": "months",
 			"options": {"years": "years", "months": "months", "weeks": "weeks", "days": "days"},
-			"help": "What timeframe to use to separate and compare documents."
+			"help": "Timeframe:"
 		},
 		"n_size": {
 			"type": UserInput.OPTION_CHOICE,

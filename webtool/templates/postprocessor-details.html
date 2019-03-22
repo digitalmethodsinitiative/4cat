@@ -1,19 +1,20 @@
             <li>
                 <form action="/results/{{ query.key }}/postprocessors/queue/{{ processor.type }}/" method="POST">
-                    <div><em>{{ processor.name }}</em>
+                    <div class="postprocessor-description">
+                        <em>{{ processor.name }}</em>
                         {% if inline %}
-                        <button class="tooltip-trigger" aria-controls="tooltip-postprocessor-{{ item.id }}-{{ processor.type }}" aria-label="Post-processor details">?</button> 
+                        <button class="tooltip-trigger" aria-controls="tooltip-postprocessor-{{ item.id }}-{{ processor.type }}" aria-label="Post-processor details">?</button>
                         <p role="tooltip" id="tooltip-postprocessor-{{ item.id }}-{{ processor.type }}">
-                            {% else %}:
+                        {% else %}:
                         {% endif %}
                         {{ processor.description }}
                         {% if processor.description[-1] != "." %}.{% endif %}
                         Output: {{ processor.extension }} file.{% if inline %}
                         </p>{% endif %}
                     </div>
-                    <p class="queue-button-wrap {% if is_postprocessor_running %}hidden{% endif %}">
+                    <div class="queue-button-wrap {% if is_postprocessor_running %}hidden{% endif %}">
                         <button class="control-postprocessor">Queue</button>
-                    </p>
+                    </div>
                     {% if processor.further and part == "main" %}
                         <div class="postprocessor-tree">
                             <!-- <button class="link-like" aria-controls="postprocessor-tree-{{ processor.type }}">Show further analysis options.</button> -->
