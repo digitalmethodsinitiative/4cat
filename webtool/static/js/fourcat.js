@@ -52,8 +52,25 @@ function init() {
         $('#dense-percentage').attr('disabled', this.checked).prop('checked', false);
         $('#dense-length').attr('disabled', this.checked).prop('checked', false);
         $('#check-full-thread').attr('disabled', this.checked).prop('checked', false);
+        $('#check-country-flag').attr('disabled', this.checked).prop('checked', false);
+        $('#country_flag').attr('disabled', this.checked).prop('checked', false);
     });
     $('#check-random-sample').trigger('change');
+
+    // Disable all options if country flag is checked (except dates & boards)
+    $('#check-country-flag').on('change', function () {
+        $('#country_flag').attr('disabled', !this.checked);
+        $('#body-input').attr('disabled', this.checked);
+        $('#subject-input').attr('disabled', this.checked);
+        $('#check-full-thread').attr('disabled', this.checked).prop('checked', false);
+        $('#check-dense-threads').attr('disabled', this.checked).prop('checked', false);
+        $('#dense-percentage').attr('disabled', this.checked).prop('checked', false);
+        $('#dense-length').attr('disabled', this.checked).prop('checked', false);
+        $('#check-random-sample').attr('disabled', this.checked).prop('checked', false);
+        $('#random-sample-amount').attr('disabled', this.checked).prop('checked', false);
+        $('#check-full-thread').attr('disabled', this.checked).prop('checked', false);
+    });
+    $('#check-country-flag').trigger('change')
 
     // Platform select boxes trigger an update of the boards available for the chosen platform
     $('#platform-select').on('change', query.update_boards);
@@ -233,6 +250,8 @@ query = {
 
         let form = $('#query-form');
         let formdata = form.serialize();
+
+        console.log(formdata)
 
         // AJAX the query to the server
         $.post({

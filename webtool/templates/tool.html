@@ -107,6 +107,22 @@
                                         </div>
                                     </div>
 
+                                    <!-- COUNTRY FILTERBOX -->
+                                    <div class='filter-container'>
+                                        <div class='filter-box'>
+                                            <div class='filter-label'>
+                                                <input name='country_check' type='checkbox' id='check-country-flag' class='country_flag'>
+                                                <label for='check-country-flag'> Country flag:</label>
+                                            </div>
+                                            <div class='filter-parameters'>
+                                                <select name='country_flag' id='country_flag' class='dropdown' disabled>
+                                                    {% include "country-flags.html" %}
+                                                </select>
+                                                <label for='country_flag'> country</label>
+                                            </div>
+                                        </div>
+                                    </div>
+
                                     <!-- DATE RANGE FILTERBOX -->
                                     <div class='filter-container'>
                                         <div class='filter-box' id='filter_time'>
@@ -120,7 +136,6 @@
                                             </div>
                                         </div>
                                     </div>
-
                                     
                                     <button class='btn_filterbutton' id='btn_go'>Go</button>
                                     
