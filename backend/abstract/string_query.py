@@ -34,7 +34,7 @@ class StringQuery(BasicWorker, metaclass=abc.ABCMeta):
 	# Columns to return in csv
 	# Mandatory columns: ['thread_id', 'body', 'subject', 'timestamp']
 	return_cols = ['thread_id', 'id', 'timestamp', 'body', 'subject', 'author', 'image_file', 'image_md5',
-				   'country_code']
+				   'country_name']
 
 	def work(self):
 		"""
@@ -71,9 +71,11 @@ class StringQuery(BasicWorker, metaclass=abc.ABCMeta):
 		results_file = self.query.get_results_path()
 		results_file = results_file.replace("*", "")
 
-		# Execute the relevant query (string-based or random)
+		# Execute the relevant query (string-based, random, countryflag-based)
 		if "random_amount" in query_parameters and query_parameters["random_amount"]:
 			posts = self.execute_random_query(query_parameters)
+		elif "country_flag" != "all":
+			posts = self.execute_country_query(query_parameters)
 		else:
 			posts = self.execute_string_query(query_parameters)
 
@@ -226,13 +228,13 @@ class StringQuery(BasicWorker, metaclass=abc.ABCMeta):
 
 	def filter_dense(self, thread_ids, keyword, percentage, length):
 		"""
-		Filter posts for those in "dense threads"
-
+		Filter posts for dense threads.
 		Dense threads are threads in which a given keyword contains more than
-		a given amount of times. This takes a post array as returned by
-		`execute_string_query()` and filters it so that only posts in threads in which
-		the keyword appears more than a given threshold's amount of times
-		remain.
+        a given amount of times. This takes a post array as returned by
+        `execute_string_query()` and filters it so that only posts in threads in which
+        the keyword appears more than a given threshold's amount of times
+        remain.
+
 
 		:param list thread_ids:  Threads to filter, result of `execute_string_query()`
 		:param string keyword:  Keyword that posts will be matched against
@@ -275,6 +277,31 @@ class StringQuery(BasicWorker, metaclass=abc.ABCMeta):
 		self.log.info("Dense thread filtering finished, %i threads left." % len(qualified_threads))
 		filtered_threads = tuple([thread for thread in qualified_threads])
 		return filtered_threads
+
+	def execute_country_query(self, query):
+		"""
+		Get posts with a country flag
+
+		:param str country: Country to filter on
+		:return list: filtered list of post ids
+		"""
+
+		print(query)
+		print(query["country_flag"])
+		country_flag = query["country_flag"].replace("_"," ")
+
+		# `if max_date > 0` prevents postgres issues with big ints
+		if query["max_date"] > 0:
+			post_ids = self.db.fetchall("SELECT id FROM posts_" + self.prefix + " WHERE timestamp >= %s AND timestamp <= %s AND lower(country_name) = %s;", (query["min_date"], query["max_date"], country_flag,))
+		else:
+			post_ids = self.db.fetchall("SELECT id FROM posts_" + self.prefix + " WHERE timestamp >= %s AND lower(country_name) = %s;", (query["min_date"], country_flag,))
+
+		# Fetch the posts
+		post_ids =  tuple([post["id"] for post in post_ids])
+		posts = self.fetch_posts(post_ids)
+		self.query.update_status("Post data collected")
+
+		return posts
 
 	@abc.abstractmethod
 	def fetch_posts(self, post_ids):
