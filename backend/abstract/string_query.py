@@ -175,7 +175,6 @@ class StringQuery(BasicWorker, metaclass=abc.ABCMeta):
 			# if indicated, get dense thread ids
 			if query["dense_threads"] and query["body_query"]:
 				self.query.update_status("Post data collected. Filtering dense threads")
-				#posts = self.filter_dense(posts, query["body_query"], query["dense_percentage"], query["dense_length"])
 				thread_ids = self.filter_dense(thread_ids, query["body_query"], query["dense_percentage"], query["dense_length"])
 
 				# When there are no dense threads
@@ -226,58 +225,6 @@ class StringQuery(BasicWorker, metaclass=abc.ABCMeta):
 
 		return posts
 
-	def filter_dense(self, thread_ids, keyword, percentage, length):
-		"""
-		Filter posts for dense threads.
-		Dense threads are threads in which a given keyword contains more than
-        a given amount of times. This takes a post array as returned by
-        `execute_string_query()` and filters it so that only posts in threads in which
-        the keyword appears more than a given threshold's amount of times
-        remain.
-
-
-		:param list thread_ids:  Threads to filter, result of `execute_string_query()`
-		:param string keyword:  Keyword that posts will be matched against
-		:param float percentage:  How many posts in the thread need to qualify
-		:param int length:  How long a thread needs to be to qualify
-		:return list:  Filtered list of posts
-		"""
-		# for each thread, save number of posts and number of matching posts
-		self.log.info("Filtering %s-dense threads from %i threads..." % (keyword, len(thread_ids)))
-
-		keyword_posts = Counter(thread_ids)
-
-		# if statements becuase you can't use a variable as a table header...
-		if self.prefix == "4chan":
-			total_posts = self.db.fetchall("""SELECT id, num_replies FROM threads_4chan
-												WHERE id IN %s
-												GROUP BY id
-			""", (thread_ids,))
-		elif self.prefix == '8chan':
-			thread_ids = tuple([str(thread_id) for thread_id in thread_ids])
-			total_posts = self.db.fetchall("""SELECT id, num_replies FROM threads_8chan
-												WHERE id IN %s
-												GROUP BY id
-			""", (thread_ids,))
-		else:
-			raise Exception("Invalid prefix %s" % (self.prefix))
-
-		# check wether the total posts / posts with keywords is longer than the given percentage,
-		# and if the length is above the given threshold
-		qualified_threads = []
-		for total_post in total_posts:
-			# check if the length meets the threshold
-			if total_post["num_replies"] >= length:
-				# check if the keyword density meets the threshold
-				thread_density = float(keyword_posts[total_post["id"]] / total_post["num_replies"] * 100)
-				if thread_density >= float(percentage):
-					qualified_threads.append(total_post["id"])
-
-
-		self.log.info("Dense thread filtering finished, %i threads left." % len(qualified_threads))
-		filtered_threads = tuple([thread for thread in qualified_threads])
-		return filtered_threads
-
 	def execute_country_query(self, query):
 		"""
 		Get posts with a country flag
@@ -286,22 +233,107 @@ class StringQuery(BasicWorker, metaclass=abc.ABCMeta):
 		:return list: filtered list of post ids
 		"""
 
-		print(query)
-		print(query["country_flag"])
-		country_flag = query["country_flag"].replace("_"," ")
-
 		# `if max_date > 0` prevents postgres issues with big ints
 		if query["max_date"] > 0:
-			post_ids = self.db.fetchall("SELECT id FROM posts_" + self.prefix + " WHERE timestamp >= %s AND timestamp <= %s AND lower(country_name) = %s;", (query["min_date"], query["max_date"], country_flag,))
+			posts = self.db.fetchall("SELECT thread_id, id FROM posts_" + self.prefix + " WHERE timestamp >= %s AND timestamp <= %s AND lower(country_name) = %s;", (query["min_date"], query["max_date"], country_flag,))
 		else:
-			post_ids = self.db.fetchall("SELECT id FROM posts_" + self.prefix + " WHERE timestamp >= %s AND lower(country_name) = %s;", (query["min_date"], country_flag,))
+			posts = self.db.fetchall("SELECT thread_id, id FROM posts_" + self.prefix + " WHERE timestamp >= %s AND lower(country_name) = %s;", (query["min_date"], country_flag,))
 
-		# Fetch the posts
-		post_ids =  tuple([post["id"] for post in post_ids])
-		posts = self.fetch_posts(post_ids)
+		if query["dense_percentage"]:
+			# Fetch all the posts
+			post_ids =  tuple([post["id"] for post in post_ids])
+			posts = self.fetch_posts(post_ids)
+			self.query.update_status("Post data collected")
+		else:
+			# Get the full threads with country density
+			self.query.update_status("Post data collected. Filtering dense threads")
+			thread_ids = tuple([post["thread_id"] for post in posts])
+			thread_ids = self.filter_dense_country(thread_ids, country_flag, query["dense_country"])
+			# When there are no dense threads
+			if not thread_ids:
+				return []
+
+			posts = self.fetch_threads(thread_ids)
+			
 		self.query.update_status("Post data collected")
 
 		return posts
+
+	def filter_dense(self, thread_ids, keyword, percentage, length):
+		"""
+		Filter posts for dense threads.
+		Dense threads are threads that contain a keyword more than
+		a given amount of times. This takes a post array as returned by
+		`execute_string_query()` and filters it so that only posts in threads in which
+		the keyword appears more than a given threshold's amount of times
+		remain.
+
+		:param list thread_ids:  Threads to filter, result of `execute_string_query()`
+		:param string keyword:  Keyword that posts will be matched against
+		:param float percentage:  How many posts in the thread need to qualify
+		:param int length:  How long a thread needs to be to qualify
+		:return list:  Filtered list of posts
+		"""
+
+		# for each thread, save number of posts and number of matching posts
+		self.log.info("Filtering %s-dense threads from %i threads..." % (keyword, len(thread_ids)))
+
+		keyword_posts = Counter(thread_ids)
+
+		thread_ids = tuple([str(thread_id) for thread_id in thread_ids])
+		total_posts = self.db.fetchall("SELECT id, num_replies FROM threads_" + self.prefix + " WHERE id IN %s GROUP BY id", (thread_ids,))
+
+		# Check wether the total posts / posts with keywords is longer than the given percentage,
+		# and if the length is above the given threshold
+		qualified_threads = []
+		for total_post in total_posts:
+			# Check if the length meets the threshold
+			if total_post["num_replies"] >= length:
+				# Check if the keyword density meets the threshold
+				thread_density = float(keyword_posts[total_post["id"]] / total_post["num_replies"] * 100)
+				if thread_density >= float(percentage):
+					qualified_threads.append(total_post["id"])
+
+		self.log.info("Dense thread filtering finished, %i threads left." % len(qualified_threads))
+		filtered_threads = tuple([thread for thread in qualified_threads])
+		return filtered_threads
+
+	def filter_dense_country(self, thread_ids, country, percentage):
+		"""
+		Filter posts for dense country threads.
+		Dense country threads are threads that contain a country flag more than
+        a given amount of times. This takes a post array as returned by
+        `execute_string_query()` and filters it so that only posts in threads in which
+        the country flag appears more than a given threshold's amount of times
+        remain.
+
+		:param list thread_ids:  Threads to filter, result of `execute_country_query()`
+		:param string country: Country that posts will be matched against
+		:param float percentage:  How many posts in the thread need to qualify
+		:return list:  Filtered list of posts
+		"""
+
+		# for each thread, save number of posts and number of matching posts
+		self.log.info("Filtering %s-dense threads from %i threads..." % (country, len(thread_ids)))
+
+		country_posts = Counter(thread_ids)
+
+		thread_ids = tuple([str(thread_id) for thread_id in thread_ids])
+		total_posts = self.db.fetchall("SELECT id, num_replies FROM threads_" + self.prefix + " WHERE id IN %s GROUP BY id", (thread_ids,))
+
+		# Check wether the total posts / posts with country flag is longer than the given percentage,
+		# and if the length is above the given threshold
+		qualified_threads = []
+		for total_post in total_posts:
+			# Check if the keyword density meets the threshold
+			thread_density = float(country_posts[total_post["id"]] / total_post["num_replies"] * 100)
+			if thread_density >= float(percentage):
+				qualified_threads.append(total_post["id"])
+
+		# Return thread IDs
+		self.log.info("Dense thread filtering finished, %i threads left." % len(qualified_threads))
+		filtered_threads = tuple([thread for thread in qualified_threads])
+		return filtered_threads
 
 	@abc.abstractmethod
 	def fetch_posts(self, post_ids):

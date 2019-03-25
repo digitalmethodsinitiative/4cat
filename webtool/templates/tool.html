@@ -119,6 +119,12 @@
                                                     {% include "country-flags.html" %}
                                                 </select>
                                                 <label for='country_flag'> country</label>
+                                                <ul>
+                                                    <li>
+                                                        <input name='check_dense_country' type='checkbox' id='check-dense-country'>
+                                                        <label for='dense-percentage'><span class='density-keyword'>Get full threads where country flag appears in at least</span> <input name="dense_country_percentage" id='dense-country-percentage' class='input-dense input-number' type='number' value='50' min='35' max='100'> % of posts</label>
+                                                    </li>
+                                                </ul>
                                             </div>
                                         </div>
                                     </div>
