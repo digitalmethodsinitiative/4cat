@@ -233,23 +233,28 @@ class StringQuery(BasicWorker, metaclass=abc.ABCMeta):
 		:return list: filtered list of post ids
 		"""
 
+		country_flag = query["country_flag"].replace("_", " ").lower()
+
 		# `if max_date > 0` prevents postgres issues with big ints
 		if query["max_date"] > 0:
 			posts = self.db.fetchall("SELECT thread_id, id FROM posts_" + self.prefix + " WHERE timestamp >= %s AND timestamp <= %s AND lower(country_name) = %s;", (query["min_date"], query["max_date"], country_flag,))
 		else:
 			posts = self.db.fetchall("SELECT thread_id, id FROM posts_" + self.prefix + " WHERE timestamp >= %s AND lower(country_name) = %s;", (query["min_date"], country_flag,))
 
-		if query["dense_percentage"]:
-			# Fetch all the posts
-			post_ids =  tuple([post["id"] for post in post_ids])
+		# Fetch all the posts
+		if query["dense_country_percentage"] == False:
+			post_ids =  tuple([post["id"] for post in posts])
+			# Return empty list if there's no matches
+			if not post_ids:
+				return []
 			posts = self.fetch_posts(post_ids)
 			self.query.update_status("Post data collected")
+		# Get the full threads with country density
 		else:
-			# Get the full threads with country density
 			self.query.update_status("Post data collected. Filtering dense threads")
 			thread_ids = tuple([post["thread_id"] for post in posts])
-			thread_ids = self.filter_dense_country(thread_ids, country_flag, query["dense_country"])
-			# When there are no dense threads
+			thread_ids = self.filter_dense_country(thread_ids, country_flag, query["dense_country_percentage"])
+			# Return empty list if there's no matches
 			if not thread_ids:
 				return []
 
@@ -313,7 +318,7 @@ class StringQuery(BasicWorker, metaclass=abc.ABCMeta):
 		:return list:  Filtered list of posts
 		"""
 
-		# for each thread, save number of posts and number of matching posts
+		# For each thread, save number of posts and number of matching posts
 		self.log.info("Filtering %s-dense threads from %i threads..." % (country, len(thread_ids)))
 
 		country_posts = Counter(thread_ids)
