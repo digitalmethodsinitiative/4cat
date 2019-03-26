@@ -125,7 +125,7 @@ def queue_query():
 		"dense_percentage": int(request.form.get("dense_percentage", 0)),
 		"dense_length": int(request.form.get("dense_length", 0)),
 		"country_flag": request.form.get("country_flag", ""),
-		"dense_country": int(request.form.get("dense_country_percentage", 0)) if request.form.get("check_dense_country",
+		"dense_country_percentage": int(request.form.get("dense_country_percentage", 0)) if request.form.get("check_dense_country",
 																							  "no") != "no" else False,
 		"random_amount": int(request.form.get("random_amount", 0)) if request.form.get("random_sample",
 																							  "no") != "no" else False,
