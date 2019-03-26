@@ -74,7 +74,7 @@ class StringQuery(BasicWorker, metaclass=abc.ABCMeta):
 		# Execute the relevant query (string-based, random, countryflag-based)
 		if "random_amount" in query_parameters and query_parameters["random_amount"]:
 			posts = self.execute_random_query(query_parameters)
-		elif "country_flag" != "all":
+		if "country_flag" in query_parameters and query_parameters["country_flag"] != "all":
 			posts = self.execute_country_query(query_parameters)
 		else:
 			posts = self.execute_string_query(query_parameters)
