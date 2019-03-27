@@ -71,6 +71,8 @@ class StringQuery(BasicWorker, metaclass=abc.ABCMeta):
 		results_file = self.query.get_results_path()
 		results_file = results_file.replace("*", "")
 
+		self.log.info(str(query_parameters))
+
 		# Execute the relevant query (string-based, random, countryflag-based)
 		if "random_amount" in query_parameters and query_parameters["random_amount"]:
 			posts = self.execute_random_query(query_parameters)
@@ -84,6 +86,8 @@ class StringQuery(BasicWorker, metaclass=abc.ABCMeta):
 			self.query.update_status("Writing posts to result file")
 			posts_to_csv(posts, results_file)
 			self.query.update_status("Query finished, results are available.")
+		else:
+			self.query.update_status("Query finished, no results found.")
 
 		num_posts = len(posts) if posts else 0
 		self.query.finish(num_rows=num_posts)
@@ -235,13 +239,18 @@ class StringQuery(BasicWorker, metaclass=abc.ABCMeta):
 		:return list: filtered list of post ids
 		"""
 
-		country_flag = query["country_flag"].replace("_", " ").lower()
+		country_flag = query["country_flag"]
 
 		# `if max_date > 0` prevents postgres issues with big ints
 		if query["max_date"] > 0:
-			posts = self.db.fetchall("SELECT thread_id, id FROM posts_" + self.prefix + " WHERE timestamp >= %s AND timestamp <= %s AND lower(country_code) = %s;", (query["min_date"], query["max_date"], country_flag,))
+
+			sql = "SELECT thread_id, id FROM posts_" + self.prefix + " WHERE timestamp >= %s AND timestamp <= %s AND country_code = %s;" % (query["min_date"], query["max_date"], country_flag)
+			print(sql)
+			posts = self.db.fetchall("SELECT thread_id, id FROM posts_" + self.prefix + " WHERE timestamp >= %s AND timestamp <= %s AND country_code = %s;", (query["min_date"], query["max_date"], country_flag,))
 		else:
-			posts = self.db.fetchall("SELECT thread_id, id FROM posts_" + self.prefix + " WHERE timestamp >= %s AND lower(country_code) = %s;", (query["min_date"], country_flag,))
+			sql = "SELECT thread_id, id FROM posts_" + self.prefix + " WHERE timestamp >= %s AND country_code = %s;" % (query["min_date"], country_flag)
+			print(sql)
+			posts = self.db.fetchall("SELECT thread_id, id FROM posts_" + self.prefix + " WHERE timestamp >= %s AND country_code = %s;", (query["min_date"], country_flag,))
 
 		# Fetch all the posts
 		if query["dense_country_percentage"] == False:
@@ -336,7 +345,7 @@ class StringQuery(BasicWorker, metaclass=abc.ABCMeta):
 			thread_density = float(country_posts[total_post["id"]] / total_post["num_replies"] * 100)
 			if thread_density >= float(percentage):
 				qualified_threads.append(total_post["id"])
-		
+
 		# Return thread IDs
 		self.log.info("Dense thread filtering finished, %i threads left." % len(qualified_threads))
 		filtered_threads = tuple([thread for thread in qualified_threads])
