@@ -74,7 +74,7 @@ class StringQuery(BasicWorker, metaclass=abc.ABCMeta):
 		# Execute the relevant query (string-based, random, countryflag-based)
 		if "random_amount" in query_parameters and query_parameters["random_amount"]:
 			posts = self.execute_random_query(query_parameters)
-		if "country_flag" in query_parameters and query_parameters["country_flag"] != "all":
+		elif "country_flag" in query_parameters and query_parameters["country_flag"] != "all":
 			posts = self.execute_country_query(query_parameters)
 		else:
 			posts = self.execute_string_query(query_parameters)
@@ -203,6 +203,8 @@ class StringQuery(BasicWorker, metaclass=abc.ABCMeta):
 		:param dict query:  Query parameters, as part of the DataSet object
 		:return list:  Posts, sorted by thread and post ID, in ascending order
 		"""
+
+		self.query.update_status("Fetching random posts")
 
 		# Build random id query
 		where = []
