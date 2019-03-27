@@ -34,7 +34,7 @@ class StringQuery(BasicWorker, metaclass=abc.ABCMeta):
 	# Columns to return in csv
 	# Mandatory columns: ['thread_id', 'body', 'subject', 'timestamp']
 	return_cols = ['thread_id', 'id', 'timestamp', 'body', 'subject', 'author', 'image_file', 'image_md5',
-				   'country_name']
+				   'country_code', 'country_name']
 
 	def work(self):
 		"""
