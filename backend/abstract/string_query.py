@@ -239,9 +239,9 @@ class StringQuery(BasicWorker, metaclass=abc.ABCMeta):
 
 		# `if max_date > 0` prevents postgres issues with big ints
 		if query["max_date"] > 0:
-			posts = self.db.fetchall("SELECT thread_id, id FROM posts_" + self.prefix + " WHERE timestamp >= %s AND timestamp <= %s AND lower(country_name) = %s;", (query["min_date"], query["max_date"], country_flag,))
+			posts = self.db.fetchall("SELECT thread_id, id FROM posts_" + self.prefix + " WHERE timestamp >= %s AND timestamp <= %s AND lower(country_code) = %s;", (query["min_date"], query["max_date"], country_flag,))
 		else:
-			posts = self.db.fetchall("SELECT thread_id, id FROM posts_" + self.prefix + " WHERE timestamp >= %s AND lower(country_name) = %s;", (query["min_date"], country_flag,))
+			posts = self.db.fetchall("SELECT thread_id, id FROM posts_" + self.prefix + " WHERE timestamp >= %s AND lower(country_code) = %s;", (query["min_date"], country_flag,))
 
 		# Fetch all the posts
 		if query["dense_country_percentage"] == False:
@@ -336,7 +336,7 @@ class StringQuery(BasicWorker, metaclass=abc.ABCMeta):
 			thread_density = float(country_posts[total_post["id"]] / total_post["num_replies"] * 100)
 			if thread_density >= float(percentage):
 				qualified_threads.append(total_post["id"])
-
+		
 		# Return thread IDs
 		self.log.info("Dense thread filtering finished, %i threads left." % len(qualified_threads))
 		filtered_threads = tuple([thread for thread in qualified_threads])
