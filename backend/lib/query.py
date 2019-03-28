@@ -188,6 +188,8 @@ class DataSet:
 			return parameters["body_query"]
 		elif "subject_query" in parameters and parameters["subject_query"] and parameters["subject_query"] != "empty":
 			return parameters["subject_query"]
+		elif "country_flag" in parameters and parameters["country_flag"] and parameters["country_flag"] != "all":
+			return "Flag: %s" % parameters["country_flag"]
 		else:
 			return default
 
