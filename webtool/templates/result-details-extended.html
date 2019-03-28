@@ -31,6 +31,9 @@
     {% if query.parameters.dense_threads %}
         <span class="property-badge second-tier">dense threads ({{ query.parameters.dense_percentage }}%/&gt; {{ query.parameters.dense_length }})</span>
     {% endif %}
+    {% if query.parameters.dense_country_percentage %}
+        <span class="property-badge second-tier">country-dense threads ({{ query.parameters.dense_country_percentage }}%)</span>
+    {% endif %}
     {%  if query.is_finished and query.num_rows == 0 %}
         <span class="property-badge second-tier warning">no results</span>
     {% endif %}
