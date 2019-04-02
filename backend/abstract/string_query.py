@@ -242,6 +242,11 @@ class StringQuery(BasicWorker, metaclass=abc.ABCMeta):
 		country_flag = query["country_flag"]
 
 		# `if max_date > 0` prevents postgres issues with big ints
+<<<<<<< HEAD
+=======
+
+		self.query.update_status("Querying database for country-specific posts")
+>>>>>>> 59318888449bb42d08d633c2efe82145ddd91b86
 		if query["max_date"] > 0:
 			posts = self.db.fetchall("SELECT thread_id, id FROM posts_" + self.prefix + " WHERE timestamp >= %s AND timestamp <= %s AND country_code = %s;", (query["min_date"], query["max_date"], country_flag,))
 		else:
@@ -252,6 +257,7 @@ class StringQuery(BasicWorker, metaclass=abc.ABCMeta):
 			return []
 
 		# Fetch all the posts
+		self.query.update_status("Found %s posts. Collecting post data..." % len(posts))
 		if query["dense_country_percentage"] == False:
 			post_ids =  tuple([post["id"] for post in posts])
 			posts = self.fetch_posts(post_ids)

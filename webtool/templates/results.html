@@ -26,11 +26,21 @@
           {% if query.parameters.subject_query and query.parameters.subject_query != "empty" %}
               <span class="inline-label">subject:</span> <span class="inline-query">{{ query.parameters.subject_query }}</span>
           {% endif %}
-          {%  if query.parameters.full_thread %}
+          {% if query.parameters.country_flag %}
+              <span class="inline-label">country:</span>
+              <span class="inline-query">{{ query.parameters.country_flag }}</span>
+          {% endif %}
+          {% if query.parameters.full_thread %}
               <span class="property-badge second-tier">full thread</span>
+          {% endif %}
+          {% if query.parameters.random_amount and query.parameters.random_amount > 0 %}
+              <span class="property-badge second-tier">random sample={{ query.parameters.random_amount }}</span>
           {% endif %}
           {%  if query.parameters.dense_threads %}
               <span class="property-badge second-tier">dense threads ({{ query.parameters.dense_percentage }}%)</span>
+          {% endif %}
+          {% if query.parameters.dense_country_percentage %}
+              <span class="property-badge second-tier">country-dense threads ({{ query.parameters.dense_country_percentage }}%)</span>
           {% endif %}
           {%  if query.is_finished and query.num_rows == 0 %}
               <span class="property-badge second-tier warning">no results</span>
