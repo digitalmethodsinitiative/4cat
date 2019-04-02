@@ -126,7 +126,7 @@ def queue_query():
 		"dense_length": int(request.form.get("dense_length", 0)),
 		"country_flag": request.form.get("country_flag", "all"),
 		"dense_country_percentage": int(request.form.get("dense_country_percentage", 0)) if request.form.get("check_dense_country",
-																							  "no") != "no" else False,
+																							  "no") != "no" else 0,
 		"random_amount": int(request.form.get("random_amount", 0)) if request.form.get("random_sample",
 																							  "no") != "no" else False,
 		"min_date": string_to_timestamp(request.form.get("min_date", "")) if request.form.get("use_date",
@@ -138,8 +138,8 @@ def queue_query():
 
 	valid = validate_query(parameters)
 
-	if not valid:
-		return "Invalid query."
+	if valid != True:
+		return "Invalid query. " + valid
 
 	# Queue query
 	query = DataSet(parameters=parameters, db=db)
