@@ -209,6 +209,9 @@ class DataSet:
 		# Use 'random' for random post queries
 		if "random_amount" in parameters and parameters["random_amount"] > 0:
 			file = 'random-' + str(parameters["random_amount"]) + '-' + self.data["key"]
+		# Use country code for country flag queries
+		elif "country_flag" in parameters and parameters["country_flag"] != 'all':
+			file = 'countryflag-' + str(parameters["country_flag"]) + '-' + self.data["key"]
 		# Use the querystring for string queries
 		else:
 			query_bit = self.data["query"].replace(" ", "-").lower()

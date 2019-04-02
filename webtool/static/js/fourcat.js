@@ -16,7 +16,6 @@ function init() {
     $('#query-form').bind('submit', function (e) {
         e.preventDefault();
         query.start();
-        $('#whole-form').attr('disabled', 'disabled');
     });
 
     // Enable date selection when 'filter on time' checkbox is checked
@@ -27,7 +26,6 @@ function init() {
     // Change the option and label for keyword-dense threads according to body input
     $('#body-input').on('input', function () {
         input_string = $('#body-input').val();
-
         if (input_string === '') {
             $('.density-keyword').html('keyword');
             $('.input-dense').prop('disabled', true);
@@ -48,12 +46,14 @@ function init() {
         $('#body-input').attr('disabled', this.checked);
         $('#subject-input').attr('disabled', this.checked);
         $('#check-full-thread').attr('disabled', this.checked).prop('checked', false);
-        $('#check-dense-threads').attr('disabled', this.checked).prop('checked', false);
-        $('#dense-percentage').attr('disabled', this.checked).prop('checked', false);
-        $('#dense-length').attr('disabled', this.checked).prop('checked', false);
         $('#check-full-thread').attr('disabled', this.checked).prop('checked', false);
         $('#check-country-flag').attr('disabled', this.checked).prop('checked', false);
         $('#country_flag').attr('disabled', this.checked).prop('checked', false);
+        if ($('#body-input').val().length > 0) {
+            $('#check-dense-threads').attr('disabled', this.checked).prop('checked', false);
+            $('#dense-percentage').attr('disabled', this.checked).prop('checked', false);
+            $('#dense-length').attr('disabled', this.checked).prop('checked', false);
+        }
     });
     $('#check-random-sample').trigger('change');
 
@@ -63,18 +63,25 @@ function init() {
         $('#body-input').attr('disabled', this.checked);
         $('#subject-input').attr('disabled', this.checked);
         $('#check-full-thread').attr('disabled', this.checked).prop('checked', false);
-        $('#check-dense-threads').attr('disabled', this.checked).prop('checked', false);
-        $('#dense-percentage').attr('disabled', this.checked).prop('checked', false);
-        $('#dense-length').attr('disabled', this.checked).prop('checked', false);
         $('#check-random-sample').attr('disabled', this.checked).prop('checked', false);
         $('#random-sample-amount').attr('disabled', this.checked).prop('checked', false);
         $('#check-full-thread').attr('disabled', this.checked).prop('checked', false);
+        if ($('#body-input').val().length > 0) {
+            $('#check-dense-threads').attr('disabled', this.checked).prop('checked', false);
+            $('#dense-percentage').attr('disabled', this.checked).prop('checked', false);
+            $('#dense-length').attr('disabled', this.checked).prop('checked', false);
+        }
     });
     $('#check-country-flag').trigger('change')
 
     // Platform select boxes trigger an update of the boards available for the chosen platform
     $('#platform-select').on('change', query.update_boards);
+    $('#platform-select').on('change', query.update_filters);
     $('#platform-select').trigger('change');
+
+    // Board and platform select boxes determine what filter options are available (e.g. country flag posts for /pol/)
+    $('.filter-parameters#board-filter').on('change', '#board-select', query.update_filters);
+
 
     // Controls to change which results show up in overview
     $('.view-controls button').hide();
@@ -105,6 +112,15 @@ function init() {
             $('#subquery-' + breadcrumb + ' > .query-core > button').trigger('click');
         }, 25);
     }
+
+    // Notify that dense threads can only be selected if a body string is provided
+    $('#dense-threads-filterlabel').on('click', function(){
+        if ($('#body-input').val().length == 0) {
+            alert('Please provide a keyword in the post body field.');
+            $('#body-input').focus();
+            $('#body-input').select;
+        }
+    });
 }
 
 /**
@@ -238,20 +254,22 @@ query = {
      */
     start: function () {
 
+        //check form input
+        if (!query.validate()) {
+            return;
+        }
+
         // Show loader
         let loader = $('.loader');
         loader.show();
 
-        //check form input
-        if (!query.validate()) {
-            loader.hide();
-            return;
-        }
-
         let form = $('#query-form');
         let formdata = form.serialize();
-
+        
         console.log(formdata)
+        
+        // Disable form
+        $('#whole-form').attr('disabled', 'disabled');
 
         // AJAX the query to the server
         $.post({
@@ -259,7 +277,8 @@ query = {
             url: form.attr('action'),
             data: formdata,
             success: function (response) {
-                //console.log(response);
+
+                /*console.log(response);*/
 
                 // If the query is rejected by the server.
                 if (response.substr(0, 14) === 'Invalid query.') {
@@ -322,6 +341,9 @@ query = {
                         }
                         else if ($('#check-random-sample').is(':checked')) {
                             keyword = 'random-' + $('#random-sample-amount').val();
+                        }
+                        else if ($('#check-country-flag').is(':checked')) {
+                            keyword = 'countryflag-' + $('#country_flag').val();
                         }
                         else {
                             keyword = '';
@@ -427,7 +449,7 @@ query = {
 
                 // If the string was incorrectly formatted (could be on Safari), a NaN was returned
                 if (isNaN(url_min_date)) {
-                    valid = false
+                    valid = false;
                     alert('Please provide a minimum date in the format dd-mm-yyyy (like 29-11-2017).');
                 }
             }
@@ -437,21 +459,50 @@ query = {
                 url_max_date = stringToTimestamp(max_date);
                 // If the string was incorrectly formatted (could be on Safari), a NaN was returned
                 if (isNaN(url_max_date)) {
-                    valid = false
+                    valid = false;
                     alert('Please provide a maximum date in the format dd-mm-yyyy (like 29-11-2017).');
                 }
             }
 
             // Input can be ill-formed, like '01-12-90', resulting in negative timestamps
             if (url_min_date < 0 || url_max_date < 0 && valid) {
-                valid = false
+                valid = false;
                 alert('Invalid date(s). Check the bar on top with details on date ranges of 4CAT data.');
             }
 
             // Make sure the first date is later than or the same as the second
             if (url_min_date >= url_max_date && url_min_date !== 0 && url_max_date !== 0 && valid) {
-                valid = false
+                valid = false;
                 alert('The first date is later than or the same as the second.\nPlease provide a correct date range.');
+            }
+        }
+
+        // Country flag check
+        if ($('#check-country-flag').is(':checked') && valid) {
+            
+            let common_countries = ['US', 'GB', 'CA', 'AU'];
+            let country = $('#country_flag').val()
+
+            // Don't allow querying without date ranges for the common countries
+            if (common_countries.includes(country)){
+                if ($('#check-time').is(':checked')) {
+
+                    let min_date = stringToTimestamp($('#input-min-time').val());
+                    let max_date = stringToTimestamp($('#input-max-time').val());
+                    
+                    // Max three monhts for the common country flags
+                    if (max_date - min_date > 7889231) {
+                        valid = false;
+                        alert('Select a date range of max. three months and try again. The date selected is more than three months. The most common country flags on 4chan/pol/ (US, UK, Canada, Australia) have a date restriction.');
+                    }
+                }
+                else {
+                    valid = false;
+                    $('#check-time').prop('checked', true);
+                    $('#check-time').trigger('change');
+                    $('#input-min-time').focus().select();
+                    alert('The most common country flags on 4chan/pol/ (US, Canada, Australia) have a date restriction. Select a date range of max. three months and try again.');
+                }
             }
         }
 
@@ -489,8 +540,41 @@ query = {
                 $('#whole-form').removeAttr('disabled');
             }
         });
+    },
+
+
+    /**
+     * Update query filters according to the platform and board selected
+     */
+    update_filters: function () {
+        let platform = $('#platform-select').val()
+        let board = $('#board-select').val()
+
+        // Array of pol-specific filters. Should correspond to HTML filter container IDs.
+        let pol_specific = ['country-flag']
+
+        // Simple if statement for now - update when new boards and filters are added
+        if (platform == '4chan') {
+            if (board == 'pol') {
+                for (var filter in pol_specific) {
+                    $('#filter-container-' + pol_specific[filter]).show()
+                }
+            }
+            else {
+                for (var filter in pol_specific) {
+                    $('#check-' + pol_specific[filter]).prop('checked', false);
+                    $('#filter-container-' + pol_specific[filter]).hide()
+                }
+            }
+        }
+        else {
+            $('#filter-container-' + pol_specific[filter]).hide()
+            $('#check-' + pol_specific[filter]).prop('checked', false);
+        }
+        reset_form()
     }
 };
+
 
 /**
  * Tooltip management
@@ -603,6 +687,19 @@ popup_panel = {
         popup_panel.blur.removeClass('open').addClass('closed');
     }
 };
+
+/**
+ * Resets the form with correct checks and disablings
+ */
+function reset_form() {
+    $('#body-input').val('').text('').attr('disabled', false).trigger('input');
+    $('#subject-input').val('').text('').attr('disabled', false);
+    $('#check-keyword-dense').prop('checked', false).attr('disabled', true);
+    $('#dense-percentage').attr('disabled', true);
+    $('#dense-length').attr('disabled', true);
+    $('#check-random-sample').prop('checked', false).attr('disabled', false);
+    $('#check-country-flag').prop('checked', false).attr('disabled', false);
+}
 
 /** General-purpose toggle buttons **/
 function toggleButton(e) {

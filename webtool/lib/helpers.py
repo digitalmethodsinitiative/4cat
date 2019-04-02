@@ -208,20 +208,9 @@ def validate_query(parameters):
 		return "Please provide valid parameters."
 
 	stop_words = get_stop_words('en')
+	common_countries = ["US", "GB", "CA", "AU"]
 
-	# TEMPORARY MEASUREMENT
-	# Querying can only happen for max two weeks
-	# max_daterange = 1209600
-
-	# if parameters["min_date"] == 0 or parameters["max_date"] == 0:
-	# 	return "Temporary hardware limitation:\nUse a date range of max. two weeks."
-
-	# Ensure querying can only happen for max two weeks week (temporary measurement)
-	# if parameters["min_date"] != 0 and parameters["max_date"] != 0:
-	# 	if (parameters["max_date"] - parameters["min_date"]) > max_daterange:
-	# 		return "Temporary hardware limitation:\nUse a date range of max. two weeks."
-
-	# Ensure no weird negative timestamps happening
+	# Catch weird negative timestamps
 	if parameters["min_date"] < 0 or parameters["max_date"] < 0:
 		return "Date(s) set too early."
 
@@ -248,17 +237,22 @@ def validate_query(parameters):
 		return "Keyword-dense thread density should be at least 10%."
 
 	# Check if there are enough parameters provided.
-	# Body and subject queryies may be empty if date ranges are max a week apart.
+	# Body and subject queries may be empty if date ranges are max a week apart.
 	if parameters["body_query"] == "" and parameters["subject_query"] == "" and parameters["random_amount"] == False:
-		# Check if the date range is less than a week.
-		if parameters["min_date"] != 0 and parameters["max_date"] != 0:
+		# Queries for common country flags should have a date range of max. three months
+		if parameters["country_flag"] != 'all':
+			if parameters["country_flag"] in common_countries:
+				if parameters["min_date"] != 0 and parameters["max_date"] != 0:
+					time_diff = parameters["max_date"] - parameters["min_date"]
+					if time_diff >= 7889231:
+						return "Without any filters, you can only get data for a date range of max four weeks with common countries (US, Canada, UK, Australia)."
+		# For 'empty' queries, check if the date range is less than a week.
+		elif parameters["min_date"] != 0 and parameters["max_date"] != 0:
 			time_diff = parameters["max_date"] - parameters["min_date"]
 			if time_diff >= 2419200:
-				return "With no text querying, filter on a date range of max four weeks."
-			else:
-				return True
+				return "Without any filters, you can only get data for a date range of max four weeks."
 		else:
-			return "Input either a body or subject query, or filter on a date range of max four weeks."
+			return "Without any filters, you can only get data for a date range of max four weeks."
 
 	# Body query should be at least three characters long and should not be just a stopword.
 	if parameters["body_query"] and len(parameters["body_query"]) < 3:
@@ -272,5 +266,8 @@ def validate_query(parameters):
 	elif parameters["subject_query"] in stop_words:
 		return "Use a subject input that is not a stop word."
 
-	return True
+	# Country-dense threads should be over 35%.
+	if parameters["dense_country_percentage"] > 0 and parameters["dense_country_percentage"] < 35:
+		return "Country-dense percentage should be at least 35%."
 
+	return True
