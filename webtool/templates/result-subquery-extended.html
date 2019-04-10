@@ -2,16 +2,16 @@
 {% set can_postprocess = (current_user.is_authenticated and item.postprocessors) %}
 <li id="subquery-{{ subquery.key }}" class="subquery{% if not subquery.is_finished() %} running{% endif %}" data-status="{{ subquery.status }}">
     <div class="query-core">
-        <p>{{ postprocessors[subquery.type].name or "(Deprecated analysis) " + subquery.type }}
+        <p>{{ postprocessors[subquery.type].name if subquery.type in postprocessors else "(Deprecated analysis) " + subquery.type }}
 
             {% if subquery.is_finished() %}
-                (<a href="/result/{{ subquery.result_file }}">{{ subquery.num_rows }} item{% if subquery.num_rows != 1 %}s{% endif %}, {{ postprocessors[subquery.type].extension }}</a>)
+                (<a href="/result/{{ subquery.result_file }}">{{ subquery.num_rows }} item{% if subquery.num_rows != 1 %}s{% endif %}, {{ postprocessors[subquery.type].extension if subquery.type in postprocessors else "download" }}</a>)
             {% else %}
                 ({{ subquery.status }})
             {% endif %}
 
         {% for option in subquery.parameters %}
-            {% if "options" in postprocessors[subquery.type] and option in postprocessors[subquery.type].options %}
+            {% if subquery.type in postprocessors and "options" in postprocessors[subquery.type] and option in postprocessors[subquery.type].options %}
                 {% if postprocessors[subquery.type].options[option].type == "toggle" %}
         {% if subquery.parameters[option] %}<span class="property-badge">{{ option }}</span>{% endif %}
                 {% else %}
