@@ -86,7 +86,7 @@ class StringQuery(BasicWorker, metaclass=abc.ABCMeta):
 			self.query.update_status("Writing posts to result file")
 			posts_to_csv(posts, results_file)
 			self.query.update_status("Query finished, results are available.")
-		else:
+		elif posts is not None:
 			self.query.update_status("Query finished, no results found.")
 
 		num_posts = len(posts) if posts else 0
@@ -143,6 +143,8 @@ class StringQuery(BasicWorker, metaclass=abc.ABCMeta):
 
 		try:
 			posts = self.fetch_sphinx(where, replacements)
+			self.log.info("Sphinx query finished in %i seconds, %i results." % (time.time() - sphinx_start, len(posts)))
+			self.query.update_status("Found %i matches. Collecting post data" % len(posts))
 		except OperationalError:
 			self.query.update_status(
 				"Your query timed out. This is likely because it matches too many posts. Try again with a narrower date range or a more specific search query.")
@@ -151,8 +153,6 @@ class StringQuery(BasicWorker, metaclass=abc.ABCMeta):
 			self.sphinx.close()
 			return None
 
-		self.log.info("Sphinx query finished in %i seconds, %i results." % (time.time() - sphinx_start, len(posts)))
-		self.query.update_status("Found %i matches. Collecting post data" % len(posts))
 		self.sphinx.close()
 
 		if not posts:
