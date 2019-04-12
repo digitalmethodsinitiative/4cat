@@ -50,6 +50,10 @@
     </p>
 
     <p class="result">
+        Queued on {{ query.timestamp|datetime(fmt="%Y-%m-%d %H:%m") }}.
+    </p>
+
+    <p class="result">
         {% if query.status %}{{ query.status }}{% else %}Query is queued.{% endif %} {% if query.is_finished %}({{ query.num_rows }} posts{% if query.num_rows > 0 %}; <a href="/result/{{ query.result_file }}">{{ query.result_file }}</a>{% endif %}){% endif %}
     </p>
 </div>
