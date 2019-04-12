@@ -119,6 +119,9 @@ class JobQueue:
 		:param jobtype:  Job type
 		:param details:  Job details - may be empty, will be stored as JSON
 		:param remote_id:  Remote ID of object to work on. For example, a post or thread ID
+		:param claim_after:  Absolute timestamp after which job may be claimed
+		:param interval:  If this is not zero, the job is made a repeating job,
+		                  which will be repeated at most every `interval` seconds.
 
 		:return Job: A job that matches the input type and remote ID. This may
 		             be a newly added job or an existing that matched the same
