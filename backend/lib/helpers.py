@@ -46,7 +46,8 @@ def posts_to_csv(sql_results, filepath, clean_csv=True):
 				row["timestamp"] = datetime.utcfromtimestamp(row["timestamp"]).strftime('%Y-%m-%d %H:%M:%S')
 
 				# Parse html to text
-				row["body"] = strip_tags(row["body"])
+				if row["body"]:
+					row["body"] = strip_tags(row["body"])
 
 				writer.writerow(row)
 		else:
@@ -160,6 +161,16 @@ class HTMLStripper(HTMLParser):
 
 
 def strip_tags(html, convert_newlines=True):
+	"""
+	Strip HTML from a string
+
+	:param html: HTML to strip
+	:param convert_newlines: Convert <br> tags to \n before stripping
+	:return: Stripped HTML
+	"""
+	if not html:
+		return ""
+
 	if convert_newlines:
 		html = html.replace("<br>", "\n")
 
