@@ -190,6 +190,9 @@ def request_access():
 		return render_template("error.html",
 							   message="No e-mail server configured; the request form cannot be displayed.")
 
+	if current_user.is_authenticated:
+		return render_template("error.html", message="You are already logged in and cannot request another account.")
+
 	incomplete = []
 
 	if request.method == "POST":
