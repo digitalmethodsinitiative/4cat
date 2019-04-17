@@ -43,6 +43,11 @@ def _jinja2_filter_numberify(number):
 def _jinja2_filter_markdown(text):
 	return markdown.markdown(text)
 
+@app.route("/robots.txt")
+def robots():
+	with open(os.path.dirname(os.path.abspath(__file__)) + "/static/robots.txt") as robotstxt:
+		return robotstxt.read()
+
 @app.route("/access-tokens/")
 @login_required
 def show_access_tokens():
