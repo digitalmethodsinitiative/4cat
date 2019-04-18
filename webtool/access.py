@@ -145,7 +145,7 @@ def show_login():
 		return redirect(url_for("show_index"))
 
 	if request.method == 'GET':
-		return render_template('login.html', flashes=get_flashed_messages())
+		return render_template('account/login.html', flashes=get_flashed_messages())
 
 	username = request.form['username']
 	password = request.form['password']
@@ -228,5 +228,105 @@ def request_access():
 				return render_template("error.html", title="Error",
 									   message="The form could not be submitted; the e-mail server is unreachable.")
 
-	return render_template("request-account.html", incomplete=incomplete, flashes=get_flashed_messages(),
+	return render_template("account/request.html", incomplete=incomplete, flashes=get_flashed_messages(),
+						   form=request.form)
+
+
+@app.route("/reset-password/", methods=["GET", "POST"])
+def reset_password():
+	"""
+	Reset a password
+
+	This page requires a valid reset token to be supplied as a GET parameter.
+	If that is satisfied then the user may choose a new password which they can
+	then use to log in.
+	"""
+	if current_user.is_authenticated:
+		# this makes no sense if you're already logged in
+		return render_template("error.html", message="You are already logged in and cannot request another account.")
+
+	token = request.args.get("token", None) or request.form.get("token", None)
+	if token is None:
+		# we need *a* token
+		return render_template("error.html", message="You need a valid reset token to set a password.")
+
+	resetting_user = User.get_by_token(token)
+	if not resetting_user or resetting_user.is_special():
+		# this doesn't mean the token is unknown, but it could be older than 3 days
+		return render_template("error.html",
+							   message="You need a valid reset token to set a password. Your token may have expired: in this case, you have to request a new one.")
+
+	# check form
+	incomplete = []
+	if request.method == "POST":
+		# check password validity
+		password = request.form.get("password", None)
+		if password is None or len(password) < 8:
+			incomplete.append("password")
+			flash("Please provide a password of at least 8 characters.")
+
+		# reset password if okay and redirect to login
+		if not incomplete:
+			resetting_user.set_password(password)
+			resetting_user.clear_token()
+			flash("Your password has been set. You can now log in to 4CAT.")
+			return redirect(url_for("show_login"))
+
+	# show form
+	return render_template("account/reset-password.html", username=resetting_user.get_name(), incomplete=incomplete,
+						   flashes=get_flashed_messages(), token=token,
+						   form=request.form)
+
+
+@app.route("/request-password/", methods=["GET", "POST"])
+@limiter.limit("6 per minute")
+def request_password():
+	"""
+	Request a password reset
+
+	A user that is not logged in can use this page to request that a password
+	reset link will be sent to them. Only one link can be requested per 3 days.
+
+	This view is rate-limited to prevent brute forcing a list of e-mails.
+	:return:
+	"""
+	if current_user.is_authenticated:
+		# using this while logged in makes no sense
+		return render_template("error.html", message="You are already logged in and cannot request a password reset.")
+
+	# check form submission
+	incomplete = []
+	if request.method == "POST":
+		# we need *a* username
+		username = request.form.get("username", None)
+		if username is None:
+			incomplete.append(username)
+			flash("Please provide a username.")
+
+		# is it also a valid username? that is not a 'special' user (like autologin)?
+		resetting_user = User.get_by_name(username)
+		if resetting_user is None or resetting_user.is_special():
+			incomplete.append("username")
+			flash("That user is not known here. Note that your username is typically your e-mail address.")
+
+		elif resetting_user.get_token() and resetting_user.data["timestamp_token"] > 0 and resetting_user.data[
+			"timestamp_token"] > time.time() - (3 * 86400):
+			# and have they not already requested a reset?
+			incomplete.append("")
+			flash(
+				"You have recently requested a password reset and an e-mail has been sent to you containing a reset link. It could take a while to arrive; also, don't forget to check your spam folder.")
+		else:
+			# okay, send an e-mail
+			try:
+				resetting_user.email_token()
+				return render_template("error.html", title="Success",
+									   message="An e-mail has been sent to you containing instructions on how to reset your password.")
+			except RuntimeError:
+				# no e-mail could be sent - clear the token so the user can try again later
+				resetting_user.clear_token()
+				incomplete.append(username)
+				flash("The username was recognised but no reset e-mail could be sent. Please try again later.")
+
+	# show page
+	return render_template("account/request-password.html", incomplete=incomplete, flashes=get_flashed_messages(),
 						   form=request.form)

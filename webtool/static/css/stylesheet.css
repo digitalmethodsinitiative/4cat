@@ -769,7 +769,7 @@ form.wide .form-element input, form.wide .form-element select, form.wide .form-e
 	border-color: #F00;
 }
 
-form .form-footer {
+form .form-footer, .form-footer ul {
 	text-align: center;
 }
 
@@ -944,6 +944,10 @@ ol.result-list {
 
 .result-list > li:nth-child(even), .postprocessor-list > li:nth-child(even) {
 	/*background: #d1e2ff;*/
+}
+
+.query.card .datestamp {
+	text-align: center;
 }
 
 .result .inline-label {
