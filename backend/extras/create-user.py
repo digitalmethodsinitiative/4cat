@@ -38,7 +38,7 @@ if user is None:
 	sys.exit(1)
 
 try:
-	user.email_token()
+	user.email_token(new=True)
 	print("An e-mail containing a link through which the registration can be completed has been sent to %s." % args.username)
 except RuntimeError as e:
 	print("""
