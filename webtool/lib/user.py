@@ -62,7 +62,9 @@ class User:
 
 		:return:  User object, or `None` for invalid token
 		"""
-		user = db.fetchone("SELECT * FROM users WHERE register_token = %s AND (timestamp_token = 0 OR timestamp_token > %s)", (token, int(time.time()) - (3 * 86400)))
+		user = db.fetchone(
+			"SELECT * FROM users WHERE register_token = %s AND (timestamp_token = 0 OR timestamp_token > %s)",
+			(token, int(time.time()) - (3 * 86400)))
 		if not user:
 			return None
 		else:
@@ -148,7 +150,7 @@ class User:
 		"""
 		return self.get_id() in ("autologin", "anonymous")
 
-	def email_token(self):
+	def email_token(self, new=False):
 		"""
 		Send user an e-mail with a password reset link
 
@@ -175,7 +177,8 @@ class User:
 		register_token = hashlib.sha256()
 		register_token.update(os.urandom(128))
 		register_token = register_token.hexdigest()
-		db.update("users", data={"register_token": register_token, "timestamp_token": int(time.time())}, where={"name": username})
+		db.update("users", data={"register_token": register_token, "timestamp_token": int(time.time())},
+				  where={"name": username})
 
 		# prepare welcome e-mail
 		sender = "4cat@oilab.nl"
@@ -187,13 +190,24 @@ class User:
 		# the actual e-mail...
 		url_base = config.FlaskConfig.SERVER_NAME
 		url = "https://%s/reset-password/?token=%s" % (url_base, register_token)
-		mail = """
-		<p>Hello %s,</p>
-		<p>A 4CAT account has been created for you. You can now log in to 4CAT at <a href="http://%s">%s</a>.</p>
-		<p>Note that before you log in, you will need to set a password. You can do so via the following link:</p>
-		<p><a href="%s">%s</a></p> 
-		<p>Please complete your registration within 72 hours as the link above will become invalid after this time.</p>
-		""" % (username, url_base, url_base, url, url)
+
+		# we use slightly different e-mails depending on whether this is the first time setting a password
+		if new:
+			mail = """
+			<p>Hello %s,</p>
+			<p>A 4CAT account has been created for you. You can now log in to 4CAT at <a href="http://%s">%s</a>.</p>
+			<p>Note that before you log in, you will need to set a password. You can do so via the following link:</p>
+			<p><a href="%s">%s</a></p> 
+			<p>Please complete your registration within 72 hours as the link above will become invalid after this time.</p>
+			""" % (username, url_base, url_base, url, url)
+		else:
+			mail = """
+			<p>Hello %s,</p>
+			<p>Someone has requested a password reset for your 4CAT account. If that someone is you, great! If not, feel free to ignore this e-mail.</p>
+			<p>You can change your password via the following link:</p>
+			<p><a href="%s">%s</a></p> 
+			<p>Please do this within 72 hours as the link above will become invalid after this time.</p>
+			""" % (username, url, url)
 
 		# provide a plain-text alternative as well
 		html_parser = html2text.HTML2Text()

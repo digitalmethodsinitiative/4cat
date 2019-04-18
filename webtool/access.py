@@ -131,7 +131,7 @@ def exempt_from_limit():
 	return False
 
 
-@app.route('/login', methods=['GET', 'POST'])
+@app.route('/login/', methods=['GET', 'POST'])
 def show_login():
 	"""
 	Handle logging in
@@ -318,7 +318,7 @@ def request_password():
 		else:
 			# okay, send an e-mail
 			try:
-				resetting_user.email_token()
+				resetting_user.email_token(new=False)
 				return render_template("error.html", title="Success",
 									   message="An e-mail has been sent to you containing instructions on how to reset your password.")
 			except RuntimeError:
