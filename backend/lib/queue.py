@@ -53,7 +53,7 @@ class JobQueue:
 			"       LIMIT 1;"),
 			(jobtype, timestamp, timestamp))
 
-		return job.get_by_data(job) if job else None
+		return Job.get_by_data(job, database=self.db) if job else None
 
 	def get_all_jobs(self, jobtype="*", remote_id=False):
 		"""
