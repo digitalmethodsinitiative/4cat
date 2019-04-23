@@ -1,9 +1,7 @@
 import time
-import csv
 import abc
-import re
 
-from pymysql import OperationalError
+from pymysql import OperationalError, ProgrammingError
 from collections import Counter
 
 import config
@@ -150,6 +148,11 @@ class StringQuery(BasicWorker, metaclass=abc.ABCMeta):
 				"Your query timed out. This is likely because it matches too many posts. Try again with a narrower date range or a more specific search query.")
 			self.log.info("Sphinx query (body: %s/subject: %s) timed out after %i seconds" % (
 			query["body_query"], query["subject_query"], time.time() - sphinx_start))
+			self.sphinx.close()
+			return None
+		except ProgrammingError as e:
+			self.query.update_status("Error during query. 4CAT admins have been notified; try again later.")
+			self.log.error("Sphinx crash during query %s: %s" % (self.query.key, e))
 			self.sphinx.close()
 			return None
 
