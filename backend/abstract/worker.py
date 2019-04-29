@@ -43,6 +43,7 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
 		self.log = logger
 		self.manager = manager
 		self.job = job
+		self.loop_time = int(time.time())
 
 		self.db = Database(logger=self.log) if not db else db
 		self.queue = JobQueue(logger=self.log, database=self.db) if not queue else queue

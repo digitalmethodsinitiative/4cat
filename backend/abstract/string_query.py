@@ -1,9 +1,7 @@
 import time
-import csv
 import abc
-import re
 
-from pymysql import OperationalError
+from pymysql import OperationalError, ProgrammingError
 from collections import Counter
 
 import config
@@ -86,7 +84,7 @@ class StringQuery(BasicWorker, metaclass=abc.ABCMeta):
 			self.query.update_status("Writing posts to result file")
 			posts_to_csv(posts, results_file)
 			self.query.update_status("Query finished, results are available.")
-		else:
+		elif posts is not None:
 			self.query.update_status("Query finished, no results found.")
 
 		num_posts = len(posts) if posts else 0
@@ -126,10 +124,10 @@ class StringQuery(BasicWorker, metaclass=abc.ABCMeta):
 
 		# escape / since it's a special character for Sphinx
 		if query["body_query"]:
-			match.append("@body " + query["body_query"].replace("/", "\/").replace("(", "\(",).replace("*", "\*"))
+			match.append("@body " + query["body_query"].replace("/", "\/").replace("(", "\(",))
 
 		if query["subject_query"]:
-			match.append("@subject " + query["subject_query"].replace("/", "\/").replace("(", "\(",).replace("*", "\*"))
+			match.append("@subject " + query["subject_query"].replace("/", "\/").replace("(", "\(",))
 
 		# both possible FTS parameters go in one MATCH() operation
 		if match:
@@ -143,6 +141,8 @@ class StringQuery(BasicWorker, metaclass=abc.ABCMeta):
 
 		try:
 			posts = self.fetch_sphinx(where, replacements)
+			self.log.info("Sphinx query finished in %i seconds, %i results." % (time.time() - sphinx_start, len(posts)))
+			self.query.update_status("Found %i matches. Collecting post data" % len(posts))
 		except OperationalError:
 			self.query.update_status(
 				"Your query timed out. This is likely because it matches too many posts. Try again with a narrower date range or a more specific search query.")
@@ -150,9 +150,12 @@ class StringQuery(BasicWorker, metaclass=abc.ABCMeta):
 			query["body_query"], query["subject_query"], time.time() - sphinx_start))
 			self.sphinx.close()
 			return None
+		except ProgrammingError as e:
+			self.query.update_status("Error during query. 4CAT admins have been notified; try again later.")
+			self.log.error("Sphinx crash during query %s: %s" % (self.query.key, e))
+			self.sphinx.close()
+			return None
 
-		self.log.info("Sphinx query finished in %i seconds, %i results." % (time.time() - sphinx_start, len(posts)))
-		self.query.update_status("Found %i matches. Collecting post data" % len(posts))
 		self.sphinx.close()
 
 		if not posts:
@@ -242,9 +245,7 @@ class StringQuery(BasicWorker, metaclass=abc.ABCMeta):
 		country_flag = query["country_flag"]
 
 		# `if max_date > 0` prevents postgres issues with big ints
-
 		self.query.update_status("Querying database for country-specific posts")
-		
 		if query["max_date"] > 0:
 			posts = self.db.fetchall("SELECT thread_id, id FROM posts_" + self.prefix + " WHERE timestamp >= %s AND timestamp <= %s AND country_code = %s;", (query["min_date"], query["max_date"], country_flag,))
 		else:

@@ -35,7 +35,7 @@ class QuoteNetworkGrapher(BasicPostProcessor):
 		with open(self.source_file, encoding='utf-8') as source:
 			csv = DictReader(source)
 			for post in csv:
-				quotes = re.findall(link, post["body"])
+				quotes = link.findall(post["body"])
 				if quotes:
 					if post["id"] not in nodes:
 						nodes.append(post["id"])

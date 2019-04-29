@@ -26,6 +26,7 @@ import hashlib
 import os.path
 import base64
 import json
+import time
 import six
 import sys
 import re
@@ -243,8 +244,10 @@ class ThreadScraper4chan(BasicJSONScraper):
 		image_path = image_folder + "/" + md5.hexdigest() + post["ext"]
 
 		if os.path.isdir(image_folder) and not os.path.isfile(image_path):
+			claimtime = int(time.time()) + config.IMAGE_INTERVAL
+
 			try:
-				self.queue.add_job("4chan-image", remote_id=post["md5"], claim_after=config.IMAGE_INTERVAL, details={
+				self.queue.add_job("4chan-image", remote_id=post["md5"], claim_after=claimtime, details={
 					"board": thread["board"],
 					"ext": post["ext"],
 					"tim": post["tim"],
