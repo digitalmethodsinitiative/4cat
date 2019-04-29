@@ -18,7 +18,7 @@ class FourcatTestCase(unittest.TestCase):
 		"""
 		cls.root = os.path.abspath(os.path.dirname(__file__))
 		cls.log = Logger(output=False)
-		cls.db = Database(logger=cls.log, dbname=config.DB_NAME_TEST)
+		cls.db = Database(logger=cls.log, dbname=config.DB_NAME_TEST, appname="test-suite")
 		with open(cls.root + "/../backend/database.sql") as dbfile:
 			cls.db.execute(dbfile.read())
 

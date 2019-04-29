@@ -45,7 +45,7 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
 		self.job = job
 		self.loop_time = int(time.time())
 
-		self.db = Database(logger=self.log) if not db else db
+		self.db = Database(logger=self.log, appname=self.type) if not db else db
 		self.queue = JobQueue(logger=self.log, database=self.db) if not queue else queue
 
 	def run(self):

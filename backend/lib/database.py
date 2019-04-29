@@ -21,9 +21,17 @@ class Database:
 	cursor = None
 	log = None
 
-	def __init__(self, logger, dbname=None, user=None, password=None, host=None, port=None):
+	def __init__(self, logger, dbname=None, user=None, password=None, host=None, port=None, appname=None):
 		"""
 		Set up database connection
+
+		:param logger:  Logger instance
+		:param dbname:  Database name
+		:param user:  Database username
+		:param password:  Database password
+		:param host:  Database server address
+		:param port:  Database port
+		:param appname:  App name, mostly useful to trace connections in pg_stat_activity
 		"""
 		dbname = config.DB_NAME if not dbname else dbname
 		user = config.DB_USER if not user else user
@@ -31,7 +39,9 @@ class Database:
 		host = config.DB_HOST if not host else host
 		port = config.DB_PORT if not port else port
 
-		self.connection = psycopg2.connect(dbname=dbname, user=user, password=password, host=host, port=port, application_name="4CAT")
+		appname = "4CAT" if not appname else "4CAT-%s" % appname
+
+		self.connection = psycopg2.connect(dbname=dbname, user=user, password=password, host=host, port=port, application_name=appname)
 		self.cursor = self.connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 		self.log = logger
 

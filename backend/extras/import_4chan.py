@@ -107,7 +107,7 @@ if not os.path.exists(args.input):
 	print("File not found: %s" % args.input)
 	sys.exit(1)
 
-db = Database(logger=Logger())
+db = Database(logger=Logger(), appname="4chan-import")
 
 print("Opening %s." % args.input)
 if args.skip > 0:

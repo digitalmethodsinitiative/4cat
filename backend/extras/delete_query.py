@@ -27,7 +27,7 @@ if not args.quiet:
 		sys.exit(0)
 
 logger = Logger()
-database = Database(logger=logger)
+database = Database(logger=logger, appname="delete-query")
 
 # Initialize query
 try:
