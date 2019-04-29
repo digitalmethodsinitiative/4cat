@@ -6,7 +6,7 @@ import requests
 from backend.abstract.postprocessor import BasicPostProcessor
 
 
-class SemanticFrameExtractor(BasicPostProcessor):
+class SemanticFrameExtractor(): #BasicPostProcessor):
 	"""
 	Extract Semantic Frames
 

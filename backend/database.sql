@@ -39,10 +39,12 @@ CREATE TABLE IF NOT EXISTS queries (
 
 -- users
 CREATE TABLE IF NOT EXISTS users (
-  name            TEXT UNIQUE PRIMARY KEY,
-  password        TEXT,
-  is_admin        BOOLEAN DEFAULT FALSE,
-  timestamp_seen  INTEGER DEFAULT 0
+  name               TEXT UNIQUE PRIMARY KEY,
+  password           TEXT,
+  is_admin           BOOLEAN DEFAULT FALSE,
+  register_token     TEXT DEFAULT '',
+  timestamp_token    INTEGER DEFAULT 0,
+  timestamp_seen     INTEGER DEFAULT 0
 );
 
 INSERT INTO users

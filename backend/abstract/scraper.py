@@ -88,7 +88,7 @@ class BasicHTTPScraper(BasicWorker, metaclass=abc.ABCMeta):
 		else:
 			data = self.parse(data.content)
 			if data is None:
-				if self.job.data["attempts"] > 2:
+				if self.job.data["attempts"] < 2:
 					self.log.info("Data for %s %s could not be parsed, retrying later" % (self.type, id))
 					self.job.release(delay=random.choice(range(15, 45)))  # try again later
 				else:
