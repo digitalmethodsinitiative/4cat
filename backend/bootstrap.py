@@ -38,7 +38,7 @@ def run(as_daemon=True):
 
 	# load everything
 	log = Logger(output=not as_daemon)
-	db = Database(logger=log)
+	db = Database(logger=log, appname="main")
 	queue = JobQueue(logger=log, database=db)
 
 	#dbpath = os.path.abspath(os.path.dirname(__file__) + "/database.sql")
