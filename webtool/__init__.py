@@ -13,7 +13,7 @@ database_name = config.DB_NAME_TEST if hasattr(config.FlaskConfig, "DEBUG") and 
 login_manager = LoginManager()
 app = Flask(__name__)
 log = Logger()
-db = Database(logger=log, dbname=database_name)
+db = Database(logger=log, dbname=database_name, appname="frontend")
 queue = JobQueue(logger=log, database=db)
 
 
