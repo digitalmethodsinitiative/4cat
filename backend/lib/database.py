@@ -31,7 +31,7 @@ class Database:
 		host = config.DB_HOST if not host else host
 		port = config.DB_PORT if not port else port
 
-		self.connection = psycopg2.connect(dbname=dbname, user=user, password=password, host=host, port=port)
+		self.connection = psycopg2.connect(dbname=dbname, user=user, password=password, host=host, port=port, application_name="4CAT")
 		self.cursor = self.connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 		self.log = logger
 
