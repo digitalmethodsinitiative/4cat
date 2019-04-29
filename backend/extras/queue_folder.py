@@ -25,7 +25,7 @@ jsons = glob.glob(input + "/*.json")
 
 print("Initialising queue...")
 logger = Logger()
-queue = JobQueue(logger=logger, database=Database(logger=logger))
+queue = JobQueue(logger=logger, database=Database(logger=logger), appname="queue-folder")
 
 print("Adding files to queue...")
 deadline = int(time.time()) + 1

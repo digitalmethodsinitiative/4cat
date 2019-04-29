@@ -12,7 +12,7 @@ from backend.lib.logger import Logger
 from webtool.lib.user import User
 
 log = Logger()
-db = Database(logger=log)
+db = Database(logger=log, appname="create-user")
 
 cli = argparse.ArgumentParser()
 cli.add_argument("-u", "--username", required=True, help="Name of user (must be unique)")

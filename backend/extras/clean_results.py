@@ -12,7 +12,7 @@ from backend.lib.query import DataSet
 import config
 
 logger = Logger()
-database = Database(logger=logger)
+database = Database(logger=logger, appname="result-cleaner")
 
 os.chdir(config.PATH_DATA)
 files = glob.glob("*.*")
