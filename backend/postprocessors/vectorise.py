@@ -68,7 +68,7 @@ class Vectorise(BasicPostProcessor):
 				vectors_list = [[token, vectors[token]] for token in vectors]
 
 				# sort
-				vectors_list = sorted(vectors_list, key=lambda item: item[1])
+				vectors_list = sorted(vectors_list, key=lambda item: item[1], reverse=True)
 
 				# dump the resulting file via pickle
 				vector_path = dirname + "/" + vector_set_name
