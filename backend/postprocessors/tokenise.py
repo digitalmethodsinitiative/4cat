@@ -37,12 +37,12 @@ class Tokenise(BasicPostProcessor):
 		"stem": {
 			"type": UserInput.OPTION_TOGGLE,
 			"default": False,
-			"help": "Stem tokens"
+			"help": "Stem tokens (English only)"
 		},
 		"lemmatise": {
 			"type": UserInput.OPTION_TOGGLE,
 			"default": False,
-			"help": "Lemmatise tokens"
+			"help": "Lemmatise tokens (English only)"
 		},
 		"timeframe": {
 			"type": UserInput.OPTION_CHOICE,
@@ -53,13 +53,22 @@ class Tokenise(BasicPostProcessor):
 		"stopwords": {
 			"type": UserInput.OPTION_CHOICE,
 			"default": "terrier",
-			"options": {"nltk": "NLTK (the NLTK package's list)", "terrier": "Terrier (most expansive)", "snowball": "Snowball (the Snowball Stemmer's list)", "none": "None"},
+			"options": {
+				"nltk": "NLTK (the NLTK package's list)",
+				"terrier": "Terrier (most expansive)",
+				"snowball": "Snowball (the Snowball Stemmer's list)",
+				"iso": "English stopwords (stopwords-iso)",
+				"dutch": "Dutch stopwords (stopwords-iso)",
+				"none": "None"},
 			"help": "Stopword filter"
 		},
 		"filter": {
 			"type": UserInput.OPTION_CHOICE,
 			"default": "none",
-			"options": {"none": "None (do not exclude words)", "infochimps": "Exclude normal English (InfoChimps/dwyl word list)"},
+			"options": {
+				"none": "None (do not exclude words)",
+				"infochimps": "Exclude normal English (InfoChimps/dwyl word list)",
+				"dutch": "Exclude Dutch words (unknown origin)"},
 			"help": "Exclude words"
 		}
 	}
@@ -85,6 +94,9 @@ class Tokenise(BasicPostProcessor):
 			elif self.parameters["stopwords"] == "snowball":
 				with open(config.PATH_ROOT + "/backend/assets/stopwords-snowball.pb", "rb") as input:
 					stopwords = pickle.load(input)
+			elif self.parameters["stopwords"] == "dutch":
+				with open(config.PATH_ROOT + "/backend/assets/stopwords-dutch.pb", "rb") as input:
+					stopwords = pickle.load(input)
 			else:
 				stopwords = []
 		except FileNotFoundError:
@@ -95,6 +107,9 @@ class Tokenise(BasicPostProcessor):
 		try:
 			if self.parameters["filter"] == "infochimps":
 				with open(config.PATH_ROOT + "/backend/assets/wordlist-infochimps.pb", "rb") as input:
+					word_filter = pickle.load(input)
+			elif self.parameters["filter"] == "dutch":
+				with open(config.PATH_ROOT + "/backend/assets/wordlist-dutch.pb", "rb") as input:
 					word_filter = pickle.load(input)
 			else:
 				word_filter = []
