@@ -13,7 +13,7 @@ class Vectorise(BasicPostProcessor):
 	"""
 	Creates word vectors from tokens
 	"""
-	type = "vectorise-posts"  # job type ID
+	type = "vectorise-tokens"  # job type ID
 	category = "Text analysis"  # category
 	title = "Vectorise tokens"  # title displayed in UI
 	description = "Creates word vectors for a token set. Token lists are transformed into word => frequency counts."  # description displayed in UI
