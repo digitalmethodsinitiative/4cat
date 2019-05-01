@@ -1,4 +1,5 @@
 """ 4CAT configuration """
+import os
 
 # Platform configuration
 PLATFORMS = {
@@ -18,6 +19,7 @@ DB_PASSWORD = "supers3cr3t"
 
 # Path to folders where logs/images/data may be saved.
 # Paths are relative to the folder this config file is in.
+PATH_ROOT = os.path.abspath(os.path.dirname(__file__))  # better don't change this
 PATH_LOGS = ""  # store logs here - empty means the 4CAT root folder
 PATH_IMAGES = "images"  # if left empty or pointing to a non-existent folder, no images will be saved
 PATH_DATA = ""  # search results will be stored here as CSV files
