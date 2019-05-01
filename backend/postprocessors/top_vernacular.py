@@ -16,7 +16,7 @@ class VectorRanker(BasicPostProcessor):
 	"""
 	type = "vector-ranker"  # job type ID
 	category = "Post metrics" # category
-	title = "Top vernacular"  # title displayed in UI
+	title = "Top vectors"  # title displayed in UI
 	description = "Ranks most used tokens per token set. Reveals most-used words and/or most-used vernacular per time period. Limited to 100 most-used tokens."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
@@ -65,18 +65,16 @@ class VectorRanker(BasicPostProcessor):
 				results[0].append(vector_set_name.split(".")[0])
 				results[0].append("")
 
-				row = 0
-				for vector in vectors:
-					row += 1
-
-					if row > 101:
-						break
-
+				for row in range(1, 102):
 					if len(results) < (row + 1):
 						results.append([])
 
-					results[row].append(vector[0])
-					results[row].append(vector[1])
+					if row >= len(vectors):
+						results[row].append("")
+						results[row].append("")
+					else:
+						results[row].append(vectors[row][0])
+						results[row].append(vectors[row][1])
 
 		# delete temporary files and folder
 		shutil.rmtree(dirname)
