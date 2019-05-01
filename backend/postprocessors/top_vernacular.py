@@ -7,6 +7,7 @@ import shutil
 import csv
 import os
 
+from backend.lib.helpers import UserInput
 from backend.abstract.postprocessor import BasicPostProcessor
 
 
@@ -21,6 +22,14 @@ class VectorRanker(BasicPostProcessor):
 	extension = "csv"  # extension of result file, used internally and in UI
 
 	accepts = ["vectorise-tokens"]
+
+	options = {
+		"amount": {
+			"type": UserInput.OPTION_TOGGLE,
+			"default": False,
+			"help": "Include number of occurrences"
+		}
+	}
 
 	def process(self):
 		"""
@@ -63,7 +72,8 @@ class VectorRanker(BasicPostProcessor):
 					results.append([])
 
 				results[0].append(vector_set_name.split(".")[0])
-				results[0].append("")
+				if self.parameters["amount"]:
+					results[0].append("")
 
 				for row in range(1, 102):
 					if len(results) < (row + 1):
@@ -71,10 +81,12 @@ class VectorRanker(BasicPostProcessor):
 
 					if row >= len(vectors):
 						results[row].append("")
-						results[row].append("")
+						if self.parameters["amount"]:
+							results[row].append("")
 					else:
 						results[row].append(vectors[row][0])
-						results[row].append(vectors[row][1])
+						if self.parameters["amount"]:
+							results[row].append(vectors[row][1])
 
 		# delete temporary files and folder
 		shutil.rmtree(dirname)
