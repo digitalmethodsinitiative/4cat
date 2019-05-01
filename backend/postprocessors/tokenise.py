@@ -29,6 +29,11 @@ class Tokenise(BasicPostProcessor):
 	extension = "zip"  # extension of result file, used internally and in UI
 
 	options = {
+		"echobrackets": {
+			"type": UserInput.OPTION_TOGGLE,
+			"default": False,
+			"help": "Allow (parentheses) in tokens"
+		},
 		"stem": {
 			"type": UserInput.OPTION_TOGGLE,
 			"default": False,
@@ -50,6 +55,12 @@ class Tokenise(BasicPostProcessor):
 			"default": "terrier",
 			"options": {"nltk": "NLTK (the NLTK package's list)", "terrier": "Terrier (most expansive)", "snowball": "Snowball (the Snowball Stemmer's list)", "none": "None"},
 			"help": "Stopword filter"
+		},
+		"filter": {
+			"type": UserInput.OPTION_CHOICE,
+			"default": "none",
+			"options": {"none": "None (do not exclude words)", "infochimps": "Exclude normal English (InfoChimps/dwyl word list)"},
+			"help": "Exclude words"
 		}
 	}
 
@@ -61,7 +72,8 @@ class Tokenise(BasicPostProcessor):
 		self.query.update_status("Processing posts")
 
 		link_regex = re.compile(r"https?://[^\s]+")
-		token_regex = re.compile(r"[a-zA-Z\-\)\(]{3,50}")
+		token_regex = re.compile(r"[a-zA-Z\-]{3,50}")
+		token_regex_echobrackets = re.compile(r"[a-zA-Z\-\)\(]{3,50}")
 
 		# load stopwords - we have a few options here
 		try:
@@ -78,6 +90,17 @@ class Tokenise(BasicPostProcessor):
 		except FileNotFoundError:
 			self.log.error("Could not load stopwords file for stopwords option %s in query %s" % (self.parameters["stopwords"], self.query.key))
 			stopwords = []
+
+		# load filter if needed
+		try:
+			if self.parameters["filter"] == "infochimps":
+				with open(config.PATH_ROOT + "/backend/assets/wordlist-infochimps.pb", "rb") as input:
+					word_filter = pickle.load(input)
+			else:
+				word_filter = []
+		except FileNotFoundError:
+			self.log.error("Could not load word list for exclusion filter %s in query %s" % (self.parameters["filter"], self.query.key))
+			word_filter = []
 
 		stemmer = SnowballStemmer("english")
 		lemmatizer = WordNetLemmatizer()
@@ -100,6 +123,10 @@ class Tokenise(BasicPostProcessor):
 		def save_subunit(subunit):
 			with open(dirname + '/' + subunit + ".pb", "wb") as outputfile:
 				pickle.dump(subunits[subunit], outputfile)
+
+		# determine what regex to use for tokens
+		if self.query.parameters["echobrackets"]:
+			token_regex = token_regex_echobrackets
 
 		# process posts
 		self.query.update_status("Processing posts")
@@ -143,6 +170,9 @@ class Tokenise(BasicPostProcessor):
 						continue
 
 					token = token.lower()
+
+					if word_filter and token in word_filter:
+						continue
 
 					if self.parameters["stem"]:
 						token = stemmer.stem(token)

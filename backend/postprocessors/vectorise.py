@@ -64,12 +64,18 @@ class Vectorise(BasicPostProcessor):
 						vectors[token] = 0
 					vectors[token] += 1
 
+				# convert to vector list
+				vectors_list = [[token, vectors[token]] for token in vectors]
+
+				# sort
+				vectors_list = sorted(vectors_list, key=lambda item: item[1])
+
 				# dump the resulting file via pickle
 				vector_path = dirname + "/" + vector_set_name
 				vector_paths.append(vector_path)
 
 				with open(vector_path, "wb") as output:
-					pickle.dump(vectors, output)
+					pickle.dump(vectors_list, output)
 
 		# create zip of archive and delete temporary files and folder
 		self.query.update_status("Compressing results into archive")
