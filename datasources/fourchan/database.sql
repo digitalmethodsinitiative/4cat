@@ -69,6 +69,8 @@ CREATE INDEX IF NOT EXISTS posts_seq
     id_seq
   );
 
+CREATE TABLE posts_4chan_new () INHERITS (posts_4chan);
+
 -- post replies
 CREATE TABLE IF NOT EXISTS posts_mention_4chan (
   post_id      bigint,

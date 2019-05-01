@@ -28,7 +28,6 @@ import base64
 import json
 import time
 import six
-import sys
 import re
 
 from backend.lib.helpers import get_absolute_folder
@@ -184,7 +183,7 @@ class ThreadScraper4chan(BasicJSONScraper):
 				# apparently, sometimes \0 appears in posts or something; psycopg2 can't cope with this
 				post_data[field] = post_data[field].replace("\0", "")
 
-			self.db.insert("posts_" + self.prefix, post_data)
+			self.db.insert("posts_" + self.prefix + "_new", post_data)
 		except psycopg2.IntegrityError:
 			self.db.rollback()
 			dupe = self.db.fetchone("SELECT * from posts_" + self.prefix + " WHERE id = %s" % (str(post["no"]),), commit=False)
