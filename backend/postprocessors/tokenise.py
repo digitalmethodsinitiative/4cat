@@ -16,6 +16,7 @@ from nltk.stem.wordnet import WordNetLemmatizer
 from backend.lib.helpers import UserInput
 from backend.abstract.postprocessor import BasicPostProcessor
 
+import config
 
 class Tokenise(BasicPostProcessor):
 	"""
@@ -43,6 +44,12 @@ class Tokenise(BasicPostProcessor):
 			"default": "all",
 			"options": {"all": "Overall", "year": "Year", "month": "Month", "day": "Day"},
 			"help": "Produce files per"
+		},
+		"stopwords": {
+			"type": UserInput.OPTION_CHOICE,
+			"default": "terrier",
+			"options": {"nltk": "NLTK (the NLTK package's list)", "terrier": "Terrier (most expansive)", "snowball": "Snowball (the Snowball Stemmer's list)", "none": "None"},
+			"help": "Stopword filter"
 		}
 	}
 
@@ -56,7 +63,22 @@ class Tokenise(BasicPostProcessor):
 		link_regex = re.compile(r"https?://[^\s]+")
 		token_regex = re.compile(r"[a-zA-Z\-\)\(]{3,50}")
 
-		stopwords = get_stop_words("en")
+		# load stopwords - we have a few options here
+		try:
+			if self.parameters["stopwords"] == "nltk":
+				stopwords = get_stop_words("en")
+			elif self.parameters["stopwords"] == "terrier":
+				with open(config.PATH_ROOT + "/backend/assets/stopwords-terrier.pb", "rb") as input:
+					stopwords = pickle.load(input)
+			elif self.parameters["stopwords"] == "snowball":
+				with open(config.PATH_ROOT + "/backend/assets/stopwords-snowball.pb", "rb") as input:
+					stopwords = pickle.load(input)
+			else:
+				stopwords = []
+		except FileNotFoundError:
+			self.log.error("Could not load stopwords file for stopwords option %s in query %s" % (self.parameters["stopwords"], self.query.key))
+			stopwords = []
+
 		stemmer = SnowballStemmer("english")
 		lemmatizer = WordNetLemmatizer()
 
@@ -96,7 +118,7 @@ class Tokenise(BasicPostProcessor):
 					elif timeframe == "month":
 						output = str(date.year) + "-" + str(date.month)
 					else:
-						output = str(date.year)
+						output = str(date.year) + "-" + str(date.month) + "-" + str(date.day)
 
 				# write each subunit to disk as it is done, to avoid
 				# unnecessary RAM hogging
@@ -120,6 +142,8 @@ class Tokenise(BasicPostProcessor):
 					if token in stopwords:
 						continue
 
+					token = token.lower()
+
 					if self.parameters["stem"]:
 						token = stemmer.stem(token)
 
@@ -135,7 +159,7 @@ class Tokenise(BasicPostProcessor):
 		self.query.update_status("Compressing results into archive")
 		with zipfile.ZipFile(self.query.get_results_path(), "w") as zip:
 			for subunit in subunits:
-				zip.write(dirname + "/" + subunit + ".pb")
+				zip.write(dirname + "/" + subunit + ".pb", subunit + ".pb")
 				os.unlink(dirname + "/" + subunit + ".pb")
 
 		# delete temporary files and folder
