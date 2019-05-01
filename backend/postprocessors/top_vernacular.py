@@ -73,7 +73,7 @@ class VectorRanker(BasicPostProcessor):
 
 				results[0].append(vector_set_name.split(".")[0])
 				if self.parameters["amount"]:
-					results[0].append("")
+					results[0].append("occurrences")
 
 				for row in range(1, 102):
 					if len(results) < (row + 1):
