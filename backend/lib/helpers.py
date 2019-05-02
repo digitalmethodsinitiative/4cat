@@ -192,16 +192,13 @@ def get_software_version():
 	versionpath = config.PATH_ROOT + "/" + config.PATH_VERSION
 
 	if not os.path.exists(versionpath) or not os.path.isfile(versionpath):
-		print("Version file unavailable")
 		return ""
 
 	try:
 		with open(versionpath, "r") as versionfile:
 			version = versionfile.readline().split(" ")[0]
-			print("Found: %s" % version)
 			return version
 	except OSError:
-		print("An error!")
 		return ""
 
 

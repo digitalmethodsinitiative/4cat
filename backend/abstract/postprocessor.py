@@ -5,6 +5,7 @@ import abc
 
 from backend.abstract.worker import BasicWorker
 from backend.lib.query import DataSet
+from backend.lib.helpers import get_software_version
 
 
 class BasicPostProcessor(BasicWorker, metaclass=abc.ABCMeta):
@@ -47,6 +48,7 @@ class BasicPostProcessor(BasicWorker, metaclass=abc.ABCMeta):
 		self.query = DataSet(key=self.job.data["remote_id"], db=self.db)
 		self.parameters = self.query.parameters
 		self.query.update_status("Processing data")
+		self.query.update_version(get_software_version())
 
 		self.parent = DataSet(key=self.query.data["key_parent"], db=self.db)
 		self.source_file = self.parent.get_results_path()

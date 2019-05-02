@@ -23,18 +23,19 @@ CREATE UNIQUE INDEX IF NOT EXISTS unique_job
 
 -- queries
 CREATE TABLE IF NOT EXISTS queries (
-  id              SERIAL PRIMARY KEY,
-  key             text,
-  type            text DEFAULT 'search',
-  key_parent      text,
-  query           text,
-  job             integer DEFAULT 0,
-  parameters      text,
-  result_file     text DEFAULT '',
-  timestamp       integer,
-  status          text,
-  num_rows        integer DEFAULT 0,
-  is_finished     boolean DEFAULT FALSE
+  id               SERIAL PRIMARY KEY,
+  key              text,
+  type             text DEFAULT 'search',
+  key_parent       text,
+  query            text,
+  job              integer DEFAULT 0,
+  parameters       text,
+  result_file      text DEFAULT '',
+  timestamp        integer,
+  status           text,
+  num_rows         integer DEFAULT 0,
+  is_finished      boolean DEFAULT FALSE,
+  software_version text
 );
 
 -- users
