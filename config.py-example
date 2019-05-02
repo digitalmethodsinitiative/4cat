@@ -29,6 +29,14 @@ PATH_LOCKFILE = "backend"  # the lockfile will be saved in this folder. Probably
 # sphinx configuration file for you.
 SPHINX_PATH = "/opt/sphinx/data"
 
+# The following two options should be set to ensure that every analysis step can
+# be traced to a specific version of 4CAT. This allows for reproducible
+# research. You can however leave them empty with no ill effect. The version ID
+# should be a commit hash, which will be combined with the Github URL to offer
+# links to the exact version of 4CAT code that produced an analysis result
+PATH_VERSION = ""  # file containing a version ID (everything after the first whitespace found is ignored)
+GITHUB_URL = ""  # URL to the github repository for this 4CAT instance
+
 # 4CAT has an API (available from localhost) that can be used for monitoring
 # and will listen for requests on the following port. "0" disables the API.
 API_PORT = 4444

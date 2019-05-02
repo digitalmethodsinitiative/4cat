@@ -122,6 +122,7 @@ def load_postprocessors():
 				member[1]):
 				postprocessors[member[1].type] = {
 					"type": member[1].type,
+					"file": file,
 					"description": member[1].description,
 					"name": member[1].title,
 					"extension": member[1].extension,
@@ -177,6 +178,31 @@ def strip_tags(html, convert_newlines=True):
 	stripper = HTMLStripper()
 	stripper.feed(html)
 	return stripper.get_data()
+
+
+def get_software_version():
+	"""
+	Get current 4CAT version
+
+	Reads a given version file and returns the first string found in there
+	(up until the first space). On failure, return an empty string.
+
+	:return str:  4CAT version
+	"""
+	versionpath = config.PATH_ROOT + "/" + config.PATH_VERSION
+
+	if not os.path.exists(versionpath) or not os.path.isfile(versionpath):
+		print("Version file unavailable")
+		return ""
+
+	try:
+		with open(versionpath, "r") as versionfile:
+			version = versionfile.readline().split(" ")[0]
+			print("Found: %s" % version)
+			return version
+	except OSError:
+		print("An error!")
+		return ""
 
 
 class UserInput:
