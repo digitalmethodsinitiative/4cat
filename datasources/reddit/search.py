@@ -158,7 +158,7 @@ class SearchReddit(StringQuery):
 						"thread_id": thread["id"],
 						"id": thread["id"],
 						"timestamp": thread["created_utc"],
-						"body": thread.get("selftext", ""),
+						"body": thread.get("selftext", "").strip(),
 						"subject": thread["title"],
 						"author": thread["author"],
 						"image_file": thread["url"] if image_match.search(thread["url"]) else "",
@@ -166,7 +166,7 @@ class SearchReddit(StringQuery):
 						"country_code": "",
 						"country_name": "",
 						"parent": "",
-						"score": thread["score"]
+						"score": thread.get("score", 0)
 					})
 
 					# this is the only way to go to the next page right now...
@@ -270,7 +270,7 @@ class SearchReddit(StringQuery):
 						"thread_id": post["link_id"].split("_")[1],
 						"id": post["id"],
 						"timestamp": post["created_utc"],
-						"body": post["body"],
+						"body": post["body"].strip(),
 						"subject": "",
 						"author": post["author"],
 						"image_file": "",
