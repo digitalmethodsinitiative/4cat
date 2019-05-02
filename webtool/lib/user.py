@@ -150,6 +150,14 @@ class User:
 		"""
 		return self.get_id() in ("autologin", "anonymous")
 
+	def is_admin(self):
+		"""
+		Check if user is an administrator
+
+		:return bool:
+		"""
+		return self.data["is_admin"]
+
 	def email_token(self, new=False):
 		"""
 		Send user an e-mail with a password reset link

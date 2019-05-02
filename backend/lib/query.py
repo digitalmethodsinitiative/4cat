@@ -291,6 +291,32 @@ class DataSet:
 
 		return updated > 0
 
+	def update_version(self, version):
+		"""
+		Update software version used for this query
+
+		This can be used to verify the code that was used to run this query.
+
+		:param string version:  Version identifier
+		:return bool:  Update successul?
+		"""
+		self.data["software_version"] = version
+		updated = self.db.update("queries", where={"key": self.data["key"]}, data={"software_version": version})
+
+		return updated > 0
+
+	def get_version_url(self, file):
+		"""
+		Get a versioned github URL for the version this query was performed with
+
+		:param file:  File to link within the repository
+		:return:  URL, or an empty string
+		"""
+		if not self.data["software_version"] or not config.GITHUB_URL:
+			return ""
+
+		return config.GITHUB_URL + "/blob/" + self.data["software_version"] + "/" + file
+
 	def write_csv_and_finish(self, data):
 		"""
 		Write data as csv to results file and finish query
