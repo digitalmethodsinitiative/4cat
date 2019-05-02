@@ -124,11 +124,13 @@ def queue_query():
 		"dense_threads": (request.form.get("dense_threads", "no") != "no"),
 		"dense_percentage": int(request.form.get("dense_percentage", 0)),
 		"dense_length": int(request.form.get("dense_length", 0)),
-		"country_flag": request.form.get("country_flag", "all"),
-		"dense_country_percentage": int(request.form.get("dense_country_percentage", 0)) if request.form.get("check_dense_country",
-																							  "no") != "no" else 0,
+		"country_flag": request.form.get("country_flag", "all") if request.form.get("country_check",
+																					"no") != "no" else "all",
+		"dense_country_percentage": int(request.form.get("dense_country_percentage", 0)) if request.form.get(
+			"check_dense_country",
+			"no") != "no" else 0,
 		"random_amount": int(request.form.get("random_amount", 0)) if request.form.get("random_sample",
-																							  "no") != "no" else False,
+																					   "no") != "no" else False,
 		"min_date": string_to_timestamp(request.form.get("min_date", "")) if request.form.get("use_date",
 																							  "no") != "no" else 0,
 		"max_date": string_to_timestamp(request.form.get("max_date", "")) if request.form.get("use_date",
@@ -147,6 +149,7 @@ def queue_query():
 	queue.add_job(jobtype="%s-search" % parameters["platform"], remote_id=query.key)
 
 	return query.key
+
 
 @app.route('/api/check-query/')
 @login_required
