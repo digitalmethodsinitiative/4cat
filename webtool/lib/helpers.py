@@ -208,7 +208,7 @@ def validate_query(parameters):
 		return "Please provide valid parameters."
 
 	stop_words = get_stop_words('en')
-	common_countries = ["US", "GB", "CA", "AU"]
+	common_countries = ["US", "GB", "CA", "AU", "europe"]
 
 	# Catch weird negative timestamps
 	if parameters["min_date"] < 0 or parameters["max_date"] < 0:

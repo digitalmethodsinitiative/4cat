@@ -246,10 +246,18 @@ class StringQuery(BasicWorker, metaclass=abc.ABCMeta):
 
 		# `if max_date > 0` prevents postgres issues with big ints
 		self.query.update_status("Querying database for country-specific posts")
-		if query["max_date"] > 0:
-			posts = self.db.fetchall("SELECT thread_id, id FROM posts_" + self.prefix + " WHERE timestamp >= %s AND timestamp <= %s AND country_code = %s;", (query["min_date"], query["max_date"], country_flag,))
+
+		if country_flag == "europe":
+			operator = "IN"
+			country_flag = ("GB", "DE", "NL", "RU", "FI", "FR", "RO", "PL", "SE", "NO", "ES", "IE", "IT", "SI", "RS", "DK", "HR", "GR", "BG", "BE", "AT", "HU", "CH", "PT", "LT", "CZ", "EE", "UY", "LV", "SK", "MK", "UA", "IS", "BA", "CY", "GE", "LU", "ME", "AL", "MD", "IM", "EU", "BY", "MC", "AX", "KZ", "AM", "GG", "JE", "MT", "FO", "AZ", "LI", "AD")
+
 		else:
-			posts = self.db.fetchall("SELECT thread_id, id FROM posts_" + self.prefix + " WHERE timestamp >= %s AND country_code = %s;", (query["min_date"], country_flag,))
+			operator = "="
+
+		if query["max_date"] > 0:
+			posts = self.db.fetchall("SELECT thread_id, id FROM posts_" + self.prefix + " WHERE timestamp >= %s AND timestamp <= %s AND country_code " + operator + " %s;", (query["min_date"], query["max_date"], country_flag,))
+		else:
+			posts = self.db.fetchall("SELECT thread_id, id FROM posts_" + self.prefix + " WHERE timestamp >= %s AND country_code " + operator + " %s;", (query["min_date"], country_flag,))
 
 		# Return empty list if there's no matches
 		if not posts:
