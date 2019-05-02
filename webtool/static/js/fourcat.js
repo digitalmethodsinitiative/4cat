@@ -581,7 +581,9 @@ query = {
         } else {
             $('#control-dense-threads').show().find('input, select, textarea').prop('disabled', false);
             $('#control-random-sample').show().find('input, select, textarea').prop('disabled', false);
-            $('#filter-container-country-flag').show().find('input, select, textarea').prop('disabled', false);
+            if(board == 'pol') {
+                $('#filter-container-country-flag').show().find('input, select, textarea').prop('disabled', false);
+            }
         }
 
         reset_form()
