@@ -226,7 +226,7 @@ def validate_query(parameters):
 	if parameters["platform"] not in config.PLATFORMS:
 		return "Please choose a valid platform to search"
 
-	if parameters["board"] not in config.PLATFORMS[parameters["platform"]]["boards"]:
+	if parameters["board"] not in config.PLATFORMS[parameters["platform"]]["boards"] and config.PLATFORMS[parameters["platform"]]["boards"] != ["*"]:
 		return "Please choose a valid board for querying"
 
 	# Keyword-dense thread length should be at least thirty.

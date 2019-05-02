@@ -524,6 +524,8 @@ query = {
                 if (!json) {
                     alert('No boards available for platform ' + platform);
                     select = $('<span id="board-select">(No boards available)</span>');
+                } else if(json.length == 1 && json[0] == '*') {
+                    select = $('<input name="board" id="board-select">');
                 } else {
                     select = $('<select id="board-select" name="board">');
                     json.forEach(function (board) {
