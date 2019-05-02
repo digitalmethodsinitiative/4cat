@@ -26,6 +26,9 @@ class CorpusStats(BasicWorker):
 		}
 
 		for platform in config.PLATFORMS:
+			if "interval" not in config.PLATFORMS:
+				continue
+
 			stats[platform] = {
 				"boards": {},
 				"overall": {

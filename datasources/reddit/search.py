@@ -19,6 +19,7 @@ class SearchReddit(StringQuery):
 
 	type = "reddit-search"
 	max_workers = 1
+	max_retries = 3
 
 	query = None
 
@@ -82,6 +83,9 @@ class SearchReddit(StringQuery):
 		:return list:  Posts, sorted by thread and post ID, in ascending order
 		"""
 
+		# we need this to check thread URLs (but maybe don't filter?)
+		image_match = re.compile(r"\.(jpg|jpeg|png|gif|webm|mp4)$", flags=re.IGNORECASE)
+
 		# first, build the sphinx query
 		post_parameters = {
 			"sort": "asc",
@@ -108,77 +112,82 @@ class SearchReddit(StringQuery):
 		# set up query
 		total_posts = 0
 		return_posts = []
+		max_retries = 3
 
-		# searching by subject is a little complicated in Reddit but we do it
-		# by first searching for threads, then storing the comment IDs for that
-		# thread, and next querying all comment IDs found this way.
+		# first, search for threads - this is a separate endpoint from comments
+		submission_parameters = post_parameters.copy()
+		submission_parameters["selftext"] = submission_parameters["q"]
+
 		if query["subject_query"]:
+			submission_parameters["title"] = query["subject_query"]
+
+		# this is where we store our progress
+		thread_ids = []
+		total_threads = 0
+		seen_threads = set()
+
+		# loop through results bit by bit
+		while True:
+			retries = 0
+
+			response = self.call_pushshift_api("https://api.pushshift.io/reddit/submission/search", params=submission_parameters)
+			if response is None:
+				return response
+
+
+			# if this fails, too much is wrong to continue
+			if response.status_code != 200:
+				self.query.update_status(
+					"HTTP Status code %i while receiving thread data from Pushshift API. Not all posts are saved." % (
+						response.status_code))
+				return None
+
+			threads = response.json()["data"]
+
+			if len(threads) == 0:
+				# we're done here, no more results will be coming
+				break
+
+			# store comment IDs for a thread, and also add the OP to the
+			# return list. This means all OPs will come before all comments
+			# but we can sort later if that turns out to be a problem
+			for thread in threads:
+				if thread["id"] not in seen_threads:
+					seen_threads.add(thread["id"])
+					return_posts.append({
+						"thread_id": thread["id"],
+						"id": thread["id"],
+						"timestamp": thread["created_utc"],
+						"body": thread.get("selftext", ""),
+						"subject": thread["title"],
+						"author": thread["author"],
+						"image_file": thread["url"] if image_match.search(thread["url"]) else "",
+						"image_md5": "",
+						"country_code": "",
+						"country_name": "",
+						"parent": "",
+						"score": thread["score"]
+					})
+
+					# this is the only way to go to the next page right now...
+					submission_parameters["after"] = thread["created_utc"]
+					total_threads += 1
+
+			# update status
+			self.query.update_status("Retrieved %i threads via Pushshift API." % total_threads)
+
+		# if we want full thread data, we need the comment IDs for all threads
+		chunked_index = 0
+		if query["full_thread"]:
 			chunked_search = True
-			chunked_index = 0
-
-			# we need this to check submission URLs (maybe don't filter?)
-			image_match = re.compile(r"\.(jpg|jpeg|png|gif|webm|mp4)$", flags=re.IGNORECASE)
-
-			submission_parameters = post_parameters.copy()
-			submission_parameters["selftext"] = submission_parameters["q"]
-
-			if query["subject_query"]:
-				submission_parameters["title"] = query["subject_query"]
-
-			# this is where we store our progress
-			thread_ids = []
-			total_threads = 0
-			seen_threads = set()
-
-			while True:
-				response = requests.get("https://api.pushshift.io/reddit/submission/search", params=post_parameters)
-
-				# if this fails, too much is wrong to continue
-				if response.status_code != 200:
-					self.query.update_status(
-						"HTTP Status code %i while receiving thread data from Pushshift API. Not all posts are saved." % (
-							response.status_code))
-					return None
-
-				threads = response.json()["data"]
-
-				# this is not the end of the world, but warrants a warning
-				if len(threads) == 0:
-					break
-
-				# store comment IDs for a thread, and also add the OP to the
-				# return list. This means all OPs will come before all comments
-				# but we can sort later if that turns out to be a problem
-				for thread in threads:
-					if thread["id"] not in seen_threads:
-						seen_threads.add(thread["id"])
-						return_posts.append({
-							"thread_id": thread["id"],
-							"id": thread["id"],
-							"timestamp": thread["created_utc"],
-							"body": thread.get("selftext", ""),
-							"subject": thread["title"],
-							"author": thread["author"],
-							"image_file": thread["url"] if image_match.search(thread["url"]) else "",
-							"image_md5": "",
-							"country_code": "",
-							"country_name": "",
-							"parent": "",
-							"score": thread["score"]
-						})
-						post_parameters["after"] = thread["created_utc"]
-						total_threads += 1
-
-				# update status
-				self.query.update_status("Retrieved %i threads via Pushshift API." % total_threads)
-
-			# okay, we have thread IDs, now find out what comments we need
-			# we use 500-ID chunks here since the comment search returns
-			# 500 results at most
 			chunks = []
 			chunk = []
-			for thread_id in thread_ids:
-				response = requests.get("https://api.pushshift.io/reddit/submission/comment_ids/%s" % thread_id)
+
+			threads_checked = 0
+			for thread_id in seen_threads:
+				response = self.call_pushshift_api("https://api.pushshift.io/reddit/submission/comment_ids/%s" % thread_id)
+				if response is None:
+					return response
 
 				# we can continue if this is the case but some posts will be missing
 				if response.status_code != 200:
@@ -188,30 +197,55 @@ class SearchReddit(StringQuery):
 					continue
 
 				# divide the results in 500-ID chunks
-				comment_ids = response.content["data"]
+				comment_ids = response.json()["data"]
 				for comment_id in comment_ids:
 					if len(chunk) == 500:
 						chunks.append(chunk)
 						chunk = []
 
 					chunk.append(comment_id)
-				chunks.append(chunk)
+
+				threads_checked += 1
+				self.query.update_status("Fetched post IDs for %i of %i threads via Pushshift API..." % (threads_checked, len(seen_threads)))
+
+			# full thread search overrides other search params
+			chunks.append(chunk)
+			post_parameters["q"] = ""
+			post_parameters["after"] = ""
+			post_parameters["before"] = ""
 
 		else:
 			# non-chunked search, if we're not searching by thread
 			chunked_search = False
 			chunks = []
-			chunked_index = 0
 
 		# okay, search the pushshift API for posts
+		# we have two modes here: by keyword, or by ID. ID is set above where
+		# ID chunks are defined: these chunks are used here if available
 		seen_posts = set()
-		while True:
+
+		# do we need to query posts at all? not if there's a subject query and
+		# we're not looking for full threads
+		do_posts_search = not query["subject_query"] or chunked_search
+
+		while do_posts_search:
 			# chunked search: search within the given IDs only
 			if chunked_search:
+				if len(chunks) <= chunked_index:
+					# we're out of chunks - done fetching data
+					break
+
 				post_parameters["ids"] = ",".join(chunks[chunked_index])
 				chunked_index += 1
 
-			response = requests.get("https://api.pushshift.io/reddit/comment/search", params=post_parameters)
+			response = self.call_pushshift_api("https://api.pushshift.io/reddit/comment/search", params=post_parameters)
+			if response is None:
+				return response
+
+			if retries >= max_retries:
+				self.log.error("Error during pushshift fetch of query %s" % self.query.key)
+				self.query.update_status("Error while searching for posts on Pushshift")
+				return None
 
 			# this is bad - return what we have so far, but also warn
 			if response.status_code != 200:
@@ -220,10 +254,12 @@ class SearchReddit(StringQuery):
 						response.status_code))
 				break
 
-			# if we're not searching by chunks, we know exactly how much to
-			# expect, so check if that's all good
+			# no more posts
 			posts = response.json()["data"]
 			if len(posts) == 0 and not chunked_search:
+				# this could happen in some edge cases if we're searching by
+				# chunk (if no IDs in the chunk match the other parameters)
+				# so only break if that's not the case
 				break
 
 			# store post data
@@ -244,12 +280,14 @@ class SearchReddit(StringQuery):
 						"parent": post["parent_id"],
 						"score": post["score"]
 					})
+
 					if not chunked_search:
+						# this is the only way to go to the next page right now...
 						post_parameters["after"] = post["created_utc"]
+
 					total_posts += 1
 
-			# update: if we're searching by chunk, we don't know how much to
-			# expect, but otherwise we do
+			# update our progress
 			self.query.update_status("Found %i posts via Pushshift API..." % total_posts)
 
 		# and done!
@@ -321,10 +359,52 @@ class SearchReddit(StringQuery):
 		return None
 
 	def fetch_posts(self, post_ids):
+		"""
+		Unused but mandated by abstract class.
+
+		:param post_ids:
+		:return:
+		"""
 		pass
 
 	def fetch_threads(self, thread_ids):
+		"""
+		Unused but mandated by abstract class.
+
+		:param thread_ids:
+		:return:
+		"""
 		pass
 
 	def fetch_sphinx(self, where, replacements):
+		"""
+		Unused but mandated by abstract class.
+
+		:param where:
+		:param replacements:
+		:return:
+		"""
 		pass
+
+	def call_pushshift_api(self, *args, **kwargs):
+		"""
+		Call pushshift API and don't crash (immediately) if it fails
+
+		:param args:
+		:param kwargs:
+		:return: Response, or `None`
+		"""
+		retries = 0
+		while retries < self.max_retries:
+			try:
+				response = requests.get(*args, **kwargs)
+				break
+			except requests.RequestException:
+				retries += 1
+
+		if retries >= self.max_retries:
+			self.log.error("Error during pushshift fetch of query %s" % self.query.key)
+			self.query.update_status("Error while searching for posts on Pushshift")
+			return None
+
+		return response
