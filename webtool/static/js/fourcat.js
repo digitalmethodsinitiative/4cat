@@ -571,6 +571,19 @@ query = {
             $('#filter-container-' + pol_specific[filter]).hide()
             $('#check-' + pol_specific[filter]).prop('checked', false);
         }
+
+        if (platform == 'reddit') {
+            $('#control-full-threads').hide().find('input, select, textarea').prop('disabled', true);
+            $('#control-dense-threads').hide().find('input, select, textarea').prop('disabled', true);
+            $('#control-random-sample').hide().find('input, select, textarea').prop('disabled', true);
+            $('#filter-container-country-flag').hide().find('input, select, textarea').prop('disabled', true);
+        } else {
+            $('#control-full-threads').show().find('input, select, textarea').prop('disabled', false);
+            $('#control-dense-threads').show().find('input, select, textarea').prop('disabled', false);
+            $('#control-random-sample').show().find('input, select, textarea').prop('disabled', false);
+            $('#filter-container-country-flag').show().find('input, select, textarea').prop('disabled', false);
+        }
+
         reset_form()
     }
 };
