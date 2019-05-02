@@ -1162,7 +1162,7 @@ ol.postprocessor-list {
 }
 
 .postprocessor-tree li {
-	padding: 0 0 0 0.5em;
+	padding: 0 0 0 1em;
 	border: 0;
 }
 .postprocessor-tree li::before {
@@ -1173,6 +1173,7 @@ ol.postprocessor-list {
 	width: 0.85em;
 	height: 0.85em;
 	vertical-align: top;
+	margin-top: 0.25em;
 }
 
 /** pagination **/
