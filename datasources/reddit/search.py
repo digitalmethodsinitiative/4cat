@@ -58,9 +58,9 @@ class SearchReddit(StringQuery):
 
 		# Write posts to csv and update the DataBase status to finished
 		if posts:
-			self.query.update_status("Writing posts to result file")
+			# self.query.update_status("Writing posts to result file")
 			posts_to_csv(posts, results_file)
-			self.query.update_status("Query finished, results are available.")
+		# self.query.update_status("Query finished, results are available.")
 		elif posts is not None:
 			self.query.update_status("Query finished, no results found.")
 
@@ -128,7 +128,6 @@ class SearchReddit(StringQuery):
 			# this is where we store our progress
 			thread_ids = []
 			total_threads = 0
-			expected_threads = 0
 			seen_threads = set()
 
 			while True:
@@ -142,13 +141,9 @@ class SearchReddit(StringQuery):
 					return None
 
 				threads = response.json()["data"]
-				expected_threads = response.json()["metadata"]["total_results"]
 
 				# this is not the end of the world, but warrants a warning
 				if len(threads) == 0:
-					self.log.warning(
-						"Received fewer threads than expected from Pushshift API for query %s. Expected %i, received %i." % (
-							self.query.key, expected_threads, total_posts))
 					break
 
 				# store comment IDs for a thread, and also add the OP to the
@@ -175,12 +170,7 @@ class SearchReddit(StringQuery):
 						total_threads += 1
 
 				# update status
-				if total_posts >= expected_threads:
-					self.query.update_status("Found %i threads via Pushshift API." % total_threads)
-					break
-				else:
-					self.query.update_status(
-						"Retrieved %i of %i threads via Pushshift API." % (total_threads, expected_threads))
+				self.query.update_status("Retrieved %i threads via Pushshift API." % total_threads)
 
 			# okay, we have thread IDs, now find out what comments we need
 			# we use 500-ID chunks here since the comment search returns
@@ -213,7 +203,6 @@ class SearchReddit(StringQuery):
 			chunks = []
 			chunked_index = 0
 
-
 		# okay, search the pushshift API for posts
 		seen_posts = set()
 		while True:
@@ -234,11 +223,7 @@ class SearchReddit(StringQuery):
 			# if we're not searching by chunks, we know exactly how much to
 			# expect, so check if that's all good
 			posts = response.json()["data"]
-			total_expected = response.json()["metadata"]["total_results"]
 			if len(posts) == 0 and not chunked_search:
-				self.log.warning(
-					"Received fewer posts than expected from Pushshift API for query %s. Expected %i, received %i." % (
-						self.query.key, total_expected, total_posts))
 				break
 
 			# store post data
@@ -265,14 +250,7 @@ class SearchReddit(StringQuery):
 
 			# update: if we're searching by chunk, we don't know how much to
 			# expect, but otherwise we do
-			if chunked_search:
-				self.query.update_status("Found %i posts via Pushshift API..." % total_posts)
-			elif total_posts >= total_expected:
-				self.query.update_status("Found %i posts via Pushshift API." % total_posts)
-				break
-			else:
-				self.query.update_status(
-					"Retrieved %i of %i posts via Pushshift API." % (total_posts, total_expected))
+			self.query.update_status("Found %i posts via Pushshift API..." % total_posts)
 
 		# and done!
 		return return_posts
