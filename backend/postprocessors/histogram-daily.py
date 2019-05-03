@@ -48,8 +48,9 @@ class DailyHistogramRenderer(BasicPostProcessor):
 				month = str(date.month) + "-" + str(date.day)
 				if year not in months:
 					months[year] = {}
-					for i in range(1, 13):
-						months[year][i] = 0
+
+				if month not in months[year]:
+					months[year] = 0
 
 				months[year][month] += 1
 				max_posts = max(months[year][month], max_posts)
