@@ -38,7 +38,6 @@ def parse_value(key, value):
 	return value
 
 post_buffer = []
-mentioned_posts = []
 batch_size = 10000
 # problematic ID: 23628818 vs 23974771
 def process_post(post, db, sequence, threads, board):
@@ -52,7 +51,7 @@ def process_post(post, db, sequence, threads, board):
 	:param dict threads: Thread info, {id: data}
 	:return:
 	"""
-	global post_buffer, mentioned_posts
+	global post_buffer
 
 	# skip if needed
 	posts_added = sequence[1] + 1
@@ -132,13 +131,6 @@ def process_post(post, db, sequence, threads, board):
 		"{}"  # unsorted_data
 	))
 
-	# add links to other posts
-	if post["comment"] and isinstance(post["comment"], str):
-		links = re.findall(link_regex, post["comment"])
-		for linked_post in links:
-			if len(str(linked_post)) <= 15:
-				mentioned_posts.append((post["num"], linked_post))
-
 	# for speed, we only commit every so many posts
 	if len(post_buffer) % batch_size == 0:
 		print("Committing posts %i-%i to database" % (posts_added - batch_size, posts_added))
@@ -149,11 +141,8 @@ def process_post(post, db, sequence, threads, board):
 			print(repr(e))
 			print(e)
 			sys.exit(1)
-
-		db.execute_many("INSERT INTO 4chan_posts_mention (post_id, mentioned_id) VALUES %s ON CONFLICT DO NOTHING", mentioned_posts)
 		db.commit()
 		post_buffer = []
-		mentioned_posts = []
 
 	return posts_added
 

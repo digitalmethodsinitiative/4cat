@@ -69,27 +69,4 @@ CREATE INDEX IF NOT EXISTS posts_seq
     id_seq
   );
 
-CREATE TABLE posts_4chan_new () INHERITS (posts_4chan);
-
--- post replies
-CREATE TABLE IF NOT EXISTS posts_mention_4chan (
-  post_id      bigint,
-  mentioned_id bigint
-);
-
-CREATE INDEX IF NOT EXISTS mention_post
-  ON posts_mention_4chan (
-    post_id
-  );
-
-CREATE INDEX IF NOT EXISTS mention_mentioned
-  ON posts_mention_4chan (
-    mentioned_id
-  );
-
--- enforce
-CREATE UNIQUE INDEX IF NOT EXISTS unique_mention
-  ON posts_mention_4chan (
-    post_id,
-    mentioned_id
-  );
+CREATE TABLE posts_4chan_old () INHERITS (posts_4chan);

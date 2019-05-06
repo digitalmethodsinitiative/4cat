@@ -54,7 +54,7 @@ def sanitize(post):
 		return post
 
 
-def commit(posts, mentions, post_fields, db, platform, fast=False):
+def commit(posts, post_fields, db, platform, fast=False):
 	if fast:
 		post_fields_sql = ", ".join(post_fields)
 		try:
@@ -65,18 +65,10 @@ def commit(posts, mentions, post_fields, db, platform, fast=False):
 			print(e)
 			sys.exit(1)
 
-		db.execute_many(
-			"INSERT INTO posts_mention_" + platform + " (post_id, mentioned_id) VALUES %s ON CONFLICT DO NOTHING",
-			mentions)
 	else:
 		db.execute("START TRANSACTION")
 		for post in posts:
 			db.insert("posts_" + platform, data={post_fields[i]: post[i] for i in range(0, len(post))}, safe=True, commit=False)
-		db.commit()
-
-		db.execute("START TRANSACTION")
-		for mention in mentions:
-			db.insert("posts_mention_" + platform, data={"post_id": mention[0], "mentioned_id": mention[1]}, safe=True, commit=False)
 		db.commit()
 
 
@@ -121,7 +113,6 @@ with open(args.input) as inputfile:
 
 	postbuffer = []
 	threads = {}
-	mentioned_posts = []
 	posts = 0
 	skipped = 0
 
@@ -188,24 +179,17 @@ with open(args.input) as inputfile:
 			"{}"  # unsorted_data
 		)
 		postbuffer.append(postdata)
-		# add links to other posts
-		if post["comment"] and isinstance(post["comment"], str):
-			links = re.findall(link_regex, post["comment"])
-			for linked_post in links:
-				if len(str(linked_post)) <= 15:
-					mentioned_posts.append((post["num"], linked_post))
 
 		# for speed, we only commit every so many posts
 		if len(postbuffer) % args.batch == 0:
 			print("\nCommitting posts %i-%i to database." % (posts - args.batch, posts))
-			commit(postbuffer, mentioned_posts, post_fields, db, args.platform, fast=args.fast)
+			commit(postbuffer, post_fields, db, args.platform, fast=args.fast)
 			postbuffer = []
-			mentioned_posts = []
 
 # commit remainder
 print("\nSkipped %i post IDs that were already known." % skipped)
 print("Committing final posts.")
-commit(postbuffer, mentioned_posts, post_fields, db, args.platform, fast=args.fast)
+commit(postbuffer, post_fields, db, args.platform, fast=args.fast)
 
 # update threads
 print("Updating threads.")
