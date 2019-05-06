@@ -17,7 +17,6 @@ Flow:
    -> mark deleted posts as deleted
    -> add new posts to database
       -> save_post(): save post data to database
-         -> save_links(): extract references to other posts and save to database
          -> queue_image(): if an image was attached, queue a job to scrape it
    -> update_thread(): update thread data
 """
@@ -183,7 +182,7 @@ class ThreadScraper4chan(BasicJSONScraper):
 				# apparently, sometimes \0 appears in posts or something; psycopg2 can't cope with this
 				post_data[field] = post_data[field].replace("\0", "")
 
-			self.db.insert("posts_" + self.prefix + "_new", post_data)
+			self.db.insert("posts_" + self.prefix, post_data)
 		except psycopg2.IntegrityError:
 			self.db.rollback()
 			dupe = self.db.fetchone("SELECT * from posts_" + self.prefix + " WHERE id = %s" % (str(post["no"]),), commit=False)
@@ -199,29 +198,11 @@ class ThreadScraper4chan(BasicJSONScraper):
 			self.db.rollback()
 			self.log.error("ValueError (%s) during scrape of thread %s" % (e, post["no"]))
 
-		self.save_links(post, post["no"])
 		# Download images (exclude .webm files)
 		if "filename" in post and post["ext"] != ".webm":
 			self.queue_image(post, thread)
 
 		return True
-
-	def save_links(self, post, post_id):
-		"""
-		Save links to other posts in the given post
-
-		Links are wrapped in a link with the "quotelink" class; the link is
-		saved as a simple Post ID => Linked ID mapping.
-
-		:param dict post:  Post data
-		:param int post_id:  ID of the given post
-		"""
-		if "com" in post:
-			links = re.findall('<a href="#p([0-9]+)" class="quotelink">', post["com"])
-			for linked_post in links:
-				if len(str(linked_post)) < 15:
-					self.db.insert("posts_mention_" + self.prefix, {"post_id": post_id, "mentioned_id": linked_post}, safe=True,
-								   commit=False)
 
 	def queue_image(self, post, thread):
 		"""
