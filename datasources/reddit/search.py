@@ -59,9 +59,9 @@ class SearchReddit(StringQuery):
 
 		# Write posts to csv and update the DataBase status to finished
 		if posts:
-			# self.query.update_status("Writing posts to result file")
+			self.query.update_status("Writing posts to result file")
 			posts_to_csv(posts, results_file)
-		# self.query.update_status("Query finished, results are available.")
+			self.query.update_status("Query finished, results are available.")
 		elif posts is not None:
 			self.query.update_status("Query finished, no results found.")
 
