@@ -128,10 +128,10 @@ class StringQuery(BasicWorker, metaclass=abc.ABCMeta):
 
 		# escape / since it's a special character for Sphinx
 		if query["body_query"]:
-			match.append("@body " + query["body_query"].replace("/", "\/").replace("(", "\(",))
+			match.append("@body " + query["body_query"].replace("/", "\/").replace("(", "\(", ))
 
 		if query["subject_query"]:
-			match.append("@subject " + query["subject_query"].replace("/", "\/").replace("(", "\(",))
+			match.append("@subject " + query["subject_query"].replace("/", "\/").replace("(", "\(", ))
 
 		# both possible FTS parameters go in one MATCH() operation
 		if match:
@@ -151,7 +151,7 @@ class StringQuery(BasicWorker, metaclass=abc.ABCMeta):
 			self.query.update_status(
 				"Your query timed out. This is likely because it matches too many posts. Try again with a narrower date range or a more specific search query.")
 			self.log.info("Sphinx query (body: %s/subject: %s) timed out after %i seconds" % (
-			query["body_query"], query["subject_query"], time.time() - sphinx_start))
+				query["body_query"], query["subject_query"], time.time() - sphinx_start))
 			self.sphinx.close()
 			return None
 		except ProgrammingError as e:
@@ -186,20 +186,20 @@ class StringQuery(BasicWorker, metaclass=abc.ABCMeta):
 			# if indicated, get dense thread ids
 			if query["dense_threads"] and query["body_query"]:
 				self.query.update_status("Post data collected. Filtering dense threads")
-				thread_ids = self.filter_dense(thread_ids, query["body_query"], query["dense_percentage"], query["dense_length"])
+				thread_ids = self.filter_dense(thread_ids, query["body_query"], query["dense_percentage"],
+											   query["dense_length"])
 
 				# When there are no dense threads
 				if not thread_ids:
 					return []
 
 			posts = self.fetch_threads(thread_ids)
-			
+
 			self.query.update_status("Post data collected")
 
 			self.log.info("Full posts query finished in %i seconds." % (time.time() - postgres_start))
 
 		return posts
-
 
 	def execute_random_query(self, query):
 		"""
@@ -227,12 +227,16 @@ class StringQuery(BasicWorker, metaclass=abc.ABCMeta):
 		# Get random post ids
 		# `if max_date > 0` prevents postgres issues with big ints
 		if query["max_date"] > 0:
-			post_ids = self.db.fetchall("SELECT id FROM posts_" + self.prefix + " WHERE timestamp >= %s AND timestamp <= %s ORDER BY random() LIMIT %s;", (query["min_date"], query["max_date"], random_amount,))
+			post_ids = self.db.fetchall(
+				"SELECT id FROM posts_" + self.prefix + " WHERE timestamp >= %s AND timestamp <= %s ORDER BY random() LIMIT %s;",
+				(query["min_date"], query["max_date"], random_amount,))
 		else:
-			post_ids = self.db.fetchall("SELECT id FROM posts_" + self.prefix + " WHERE timestamp >= %s ORDER BY random() LIMIT %s;", (query["min_date"], random_amount,))
+			post_ids = self.db.fetchall(
+				"SELECT id FROM posts_" + self.prefix + " WHERE timestamp >= %s ORDER BY random() LIMIT %s;",
+				(query["min_date"], random_amount,))
 
 		# Fetch the posts
-		post_ids =  tuple([post["id"] for post in post_ids])
+		post_ids = tuple([post["id"] for post in post_ids])
 		posts = self.fetch_posts(post_ids)
 		self.query.update_status("Post data collected")
 
@@ -252,40 +256,55 @@ class StringQuery(BasicWorker, metaclass=abc.ABCMeta):
 		self.query.update_status("Querying database for country-specific posts")
 
 		if country_flag == "europe":
+			# country codes that can be selected in the web tool that are in
+			# Europe (as defined by geographic location, using the Caucasus
+			# mountains as a border)
 			operator = "IN"
-			country_flag = ("GB", "DE", "NL", "RU", "FI", "FR", "RO", "PL", "SE", "NO", "ES", "IE", "IT", "SI", "RS", "DK", "HR", "GR", "BG", "BE", "AT", "HU", "CH", "PT", "LT", "CZ", "EE", "UY", "LV", "SK", "MK", "UA", "IS", "BA", "CY", "GE", "LU", "ME", "AL", "MD", "IM", "EU", "BY", "MC", "AX", "KZ", "AM", "GG", "JE", "MT", "FO", "AZ", "LI", "AD")
+			country_flag = (
+			"GB", "DE", "NL", "RU", "FI", "FR", "RO", "PL", "SE", "NO", "ES", "IE", "IT", "SI", "RS", "DK", "HR", "GR",
+			"BG", "BE", "AT", "HU", "CH", "PT", "LT", "CZ", "EE", "UY", "LV", "SK", "MK", "UA", "IS", "BA", "CY", "GE",
+			"LU", "ME", "AL", "MD", "IM", "EU", "BY", "MC", "AX", "KZ", "AM", "GG", "JE", "MT", "FO", "AZ", "LI", "AD")
 
 		else:
 			operator = "="
 
-		if query["max_date"] > 0:
-			posts = self.db.fetchall("SELECT thread_id, id FROM posts_" + self.prefix + " WHERE timestamp >= %s AND timestamp <= %s AND country_code " + operator + " %s;", (query["min_date"], query["max_date"], country_flag,))
+		# if we just need the posts, we only need one query: else, first query
+		# thread and post IDs and use those to filter the exact posts we need
+		# which is done later after we check if we've actually found any posts
+		# to begin with
+		if query["dense_country_percentage"]:
+			columns = ", ".join(self.return_cols)
 		else:
-			posts = self.db.fetchall("SELECT thread_id, id FROM posts_" + self.prefix + " WHERE timestamp >= %s AND country_code " + operator + " %s;", (query["min_date"], country_flag,))
+			columns = "thread_id, id"
+
+		# initial queries
+		if query["max_date"] > 0:
+			posts = self.db.fetchall(
+				"SELECT " + columns + " FROM posts_" + self.prefix + " WHERE timestamp >= %s AND timestamp <= %s AND country_code " + operator + " %s;",
+				(query["min_date"], query["max_date"], country_flag,))
+		else:
+			posts = self.db.fetchall(
+				"SELECT " + columns + " FROM posts_" + self.prefix + " WHERE timestamp >= %s AND country_code " + operator + " %s;",
+				(query["min_date"], country_flag,))
 
 		# Return empty list if there's no matches
 		if not posts:
 			return []
 
 		# Fetch all the posts
-		self.query.update_status("Found %s posts. Collecting post data..." % len(posts))
-		if query["dense_country_percentage"] == False:
-			post_ids =  tuple([post["id"] for post in posts])
-			posts = self.fetch_posts(post_ids)
-			self.query.update_status("Post data collected")
-		# Get the full threads with country density
-		else:
+		if query["dense_country_percentage"]:
+			# Get the full threads with country density
 			self.query.update_status("Post data collected. Filtering dense threads")
-			thread_ids = tuple([post["thread_id"] for post in posts])
+			thread_ids = [post["thread_id"] for post in posts]
 			thread_ids = self.filter_dense_country(thread_ids, country_flag, query["dense_country_percentage"])
 			# Return empty list if there's no matches
 			if not thread_ids:
 				return []
 
 			posts = self.fetch_threads(thread_ids)
-			
-		self.query.update_status("Post data collected")
 
+		# done
+		self.query.update_status("Post data collected. %i country-specific posts found." % len(posts))
 		return posts
 
 	def filter_dense(self, thread_ids, keyword, percentage, length):
@@ -310,7 +329,8 @@ class StringQuery(BasicWorker, metaclass=abc.ABCMeta):
 		keyword_posts = Counter(thread_ids)
 
 		thread_ids = tuple([str(thread_id) for thread_id in thread_ids])
-		total_posts = self.db.fetchall("SELECT id, num_replies FROM threads_" + self.prefix + " WHERE id IN %s GROUP BY id", (thread_ids,))
+		total_posts = self.db.fetchall(
+			"SELECT id, num_replies FROM threads_" + self.prefix + " WHERE id IN %s GROUP BY id", (thread_ids,))
 
 		# Check wether the total posts / posts with keywords is longer than the given percentage,
 		# and if the length is above the given threshold
@@ -348,7 +368,8 @@ class StringQuery(BasicWorker, metaclass=abc.ABCMeta):
 		country_posts = Counter(thread_ids)
 
 		thread_ids = tuple([str(thread_id) for thread_id in thread_ids])
-		total_posts = self.db.fetchall("SELECT id, num_replies FROM threads_" + self.prefix + " WHERE id IN %s GROUP BY id", (thread_ids,))
+		total_posts = self.db.fetchall(
+			"SELECT id, num_replies FROM threads_" + self.prefix + " WHERE id IN %s GROUP BY id", (thread_ids,))
 
 		# Check wether the total posts / posts with country flag is longer than the given percentage,
 		# and if the length is above the given threshold
