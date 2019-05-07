@@ -8,7 +8,8 @@ import config
 from backend.lib.database_mysql import MySQLDatabase
 from backend.lib.query import DataSet
 from backend.abstract.worker import BasicWorker
-from backend.lib.helpers import posts_to_csv
+from backend.lib.helpers import posts_to_csv, get_software_version
+
 
 class StringQuery(BasicWorker, metaclass=abc.ABCMeta):
 	"""
@@ -55,6 +56,9 @@ class StringQuery(BasicWorker, metaclass=abc.ABCMeta):
 			self.log.info("Worker started for query %s, but query is already finished" % key)
 			self.job.finish()
 			return
+
+
+		self.query.update_version(get_software_version())
 
 		# connect to Sphinx backend
 		self.sphinx = MySQLDatabase(
