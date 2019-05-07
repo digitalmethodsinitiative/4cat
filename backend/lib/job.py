@@ -172,8 +172,8 @@ class Job:
 		try:
 			status = json.loads(self.data["status"])
 			return status
-		except json.JSONDecodeError:
-			return [self.data["status"]]
+		except (TypeError, json.JSONDecodeError):
+			return [str(self.data.get("status", ""))]
 
 	def current_status(self):
 		"""
