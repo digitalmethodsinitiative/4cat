@@ -38,3 +38,7 @@ dist/
 !webtool/static/img/*.gif
 !webtool/static/img/*.jpg
 !webtool/static/img/favicon/*.ico
+
+# data files
+results
+snapshots

@@ -51,6 +51,10 @@ def _jinja2_filter_httpquery(data):
 def _jinja2_filter_markdown(text):
 	return markdown.markdown(text)
 
+@app.template_filter('json')
+def _jinja2_filter_json(data):
+	return json.dumps(data)
+
 @app.route("/robots.txt")
 def robots():
 	with open(os.path.dirname(os.path.abspath(__file__)) + "/static/robots.txt") as robotstxt:
@@ -98,45 +102,66 @@ def show_overview():
 	# plain text or from a csv
 	def open_and_read(file):
 		with open(file) as handle:
-			return handle.read()
+			return "\n".join(handle.readlines()).strip()
 
 	def csv_to_list(file):
 		with open(file) as handle:
 			reader = csv.reader(handle)
-			reader.__next__()
+			try:
+				# skip header
+				reader.__next__()
+			except StopIteration:
+				return []
 			data = []
 			for row in reader:
 				data.append(row)
 
 		return data
 
-	# overall activity
-	activity_files = sorted(glob.glob(config.PATH_SNAPSHOTDATA + "/*-activity.txt"))
-	activity_data = [open_and_read(file).strip() for file in activity_files]
-
-	# top 15 countries
-	country_files = sorted(glob.glob(config.PATH_SNAPSHOTDATA + "/*-countries.csv"))
-	country_data = [csv_to_list(file) for file in country_files]
-
-	# most popular non-standard words
-	neologism_files = sorted(glob.glob(config.PATH_SNAPSHOTDATA + "/*-top-neologisms.csv"))
-	neologism_data = [csv_to_list(file) for file in neologism_files]
-
-	# prepare for output
-	graphs = {
+	graph_types = {
 		"activity": {
-			"type": "1-line",
-			"data": activity_data,
+			"type": "plain",
+			"title": "Overall posting activity",
+			"chart_type": "line",
 		},
 		"countries": {
-			"type": "stacked-bar",
-			"data": country_data
+			"type": "two-column",
+			"title": "Most prevalent countries",
+			"chart_type": "stacked-bar"
 		},
 		"neologisms": {
-			"type": "alluvial",
-			"data": neologism_data
+			"type": "two-column",
+			"title": "Most-used non-standard words",
+			"chart_type": "alluvial"
 		}
 	}
+
+	graphs = {}
+	for type in graph_types:
+		data_type = graph_types[type]["type"]
+		extension = "csv" if data_type == "two-column" else "txt"
+		files = sorted(glob.glob(config.PATH_SNAPSHOTDATA + "/*-" + type + "." + extension))
+		boards = set(sorted(["-".join(file.split("-")[1:-1]) for file in files]))
+
+		data = {}
+		times = {}
+		for board in boards:
+			if data_type == "two-column":
+				data[board] = [csv_to_list(file) for file in files if board in file]
+			else:
+				data[board] = [[["posts", int(open_and_read(file).strip())]] for file in files if board in file]
+
+			times[board] = [int(file.split("/")[-1].split("-")[0]) for file in files if board in file]
+
+		if not data:
+			continue
+
+		graphs[type] = {
+			"title": graph_types[type]["title"],
+			"data": data,
+			"times": times,
+			"type": graph_types[type]["chart_type"]
+		}
 
 	return render_template("overview.html", graphs=graphs)
 
@@ -221,18 +246,26 @@ def show_results(page):
 	page_size = 20
 	offset = (page - 1) * page_size
 	all_results = request.args.get("all_results", False)
+	query_filter = request.args.get("filter", "")
 
-	if all_results:
-		num_queries = db.fetchone("SELECT COUNT(*) AS num FROM queries WHERE key_parent = ''")["num"]
-		queries = db.fetchall("SELECT * FROM queries WHERE key_parent = '' ORDER BY timestamp DESC LIMIT %s OFFSET %s",
-							  (page_size, offset))
-	else:
-		num_queries = \
-			db.fetchone("SELECT COUNT(*) AS num FROM queries WHERE key_parent = '' AND parameters::json->>'user' = %s",
-						(current_user.get_id(),))["num"]
-		queries = db.fetchall(
-			"SELECT * FROM queries WHERE key_parent = '' AND parameters::json->>'user' = %s ORDER BY timestamp DESC LIMIT %s OFFSET %s",
-			(current_user.get_id(), page_size, offset))
+	where = ["key_parent = ''"]
+	replacements = []
+
+	if not all_results:
+		where.append("parameters::json->>'user' = %s")
+		replacements.append(current_user.get_id())
+
+	if query_filter:
+		where.append("query LIKE %s")
+		replacements.append("%" + query_filter + "%")
+
+	where = " AND ".join(where)
+
+	num_queries = db.fetchone("SELECT COUNT(*) AS num FROM queries WHERE " + where, tuple(replacements))["num"]
+
+	replacements.append(page_size)
+	replacements.append(offset)
+	queries = db.fetchall("SELECT * FROM queries WHERE " + where + " ORDER BY timestamp DESC LIMIT %s OFFSET %s", tuple(replacements))
 
 	if not queries and page != 1:
 		abort(404)
@@ -255,7 +288,7 @@ def show_results(page):
 
 		filtered.append(query)
 
-	return render_template("results.html", queries=filtered, pagination=pagination, all_results=all_results)
+	return render_template("results.html", filter={"filter": query_filter, "all_results": all_results}, queries=filtered, pagination=pagination)
 
 
 @app.route('/results/<string:key>/')
