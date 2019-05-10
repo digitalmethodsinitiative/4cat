@@ -1397,7 +1397,7 @@ li:not(.focus) > .sub-controls {
 }
 
 .result-page .subquery:not(.focus):not([aria-expanded=false]) {
-	height: 2.5em;
+	/*height: 2.5em;*/
 }
 
 .subquery-list > li:not(.focus)::before {

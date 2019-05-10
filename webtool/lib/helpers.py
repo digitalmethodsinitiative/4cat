@@ -12,7 +12,7 @@ import csv
 
 from math import ceil
 from stop_words import get_stop_words
-
+from flask_login import current_user
 from backend.abstract.postprocessor import BasicPostProcessor
 
 import config
@@ -210,6 +210,12 @@ def validate_query(parameters):
 	stop_words = get_stop_words('en')
 	common_countries = ["US", "GB", "CA", "AU", "europe"]
 
+	# Admins can use larger timespans without further queries
+	if current_user.is_admin():
+		time_threshold = 7889231 # 3 months
+	else:
+		time_threshold = 2419200 # four weeks
+
 	# Catch weird negative timestamps
 	if parameters["min_date"] < 0 or parameters["max_date"] < 0:
 		return "Date(s) set too early."
@@ -217,7 +223,7 @@ def validate_query(parameters):
 	# Ensure the min date is not later than the max date
 	if parameters["min_date"] != 0 and parameters["max_date"] != 0:
 		if parameters["min_date"] >= parameters["max_date"]:
-			return "The first date is later than or the same as the second."
+			return "The first date is later than the second."
 
 	# Ensure the board is correct
 	if "platform" not in parameters or "board" not in parameters:
@@ -249,8 +255,8 @@ def validate_query(parameters):
 		# For 'empty' queries, check if the date range is less than a week.
 		elif parameters["min_date"] != 0 and parameters["max_date"] != 0:
 			time_diff = parameters["max_date"] - parameters["min_date"]
-			if time_diff >= 2419200:
-				return "Without any filters, you can only get data for a date range of max four weeks."
+			if time_diff >= time_threshold:
+					return "Without any filters, you can only get data for a date range of max four weeks."
 		else:
 			return "Without any filters, you can only get data for a date range of max four weeks."
 
