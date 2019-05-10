@@ -8,6 +8,7 @@
     <form action="" method="GET">
     <ul>
         <li><label><input type="checkbox" id="all-results" name="all_results"{% if all_results %} checked="checked"{% endif %} #}> Show all results, not just my own</label></li>
+        <li><input aria-label="Query filter" placeholder="Filter queries..." name="filter" value="{{ filter }}"></li>
     </ul>
     <button>Update</button>
     </form>
@@ -85,12 +86,12 @@
     <nav class="pagination">
       <ol>
       {% if pagination.has_prev %}
-        <li><a href="/results/page/{{ pagination.page - 1 }}/{% if all_results %}?all_results=yes{% endif %}">&laquo; Previous</a></li>
+        <li><a href="/results/page/{{ pagination.page - 1 }}/?{{ filter|http_query }}">&laquo; Previous</a></li>
       {% endif %}
       {%- for page in pagination.iter_pages() %}
         {% if page %}
           {% if page != pagination.page %}
-            <li class="page"><a href="/results/page/{{ page }}/{% if all_results %}?all_results=yes{% endif %}">{{ page }}</a></li>
+            <li class="page"><a href="/results/page/{{ page }}/?{{ filter|http_query }}">{{ page }}</a></li>
           {% else %}
             <li class="page"><strong class="current">{{ page }}</strong></li>
           {% endif %}
@@ -99,7 +100,7 @@
         {% endif %}
       {%- endfor %}
       {% if pagination.has_next %}
-        <li><a href="/results/page/{{ pagination.page + 1 }}/{% if all_results %}?all_results=yes{% endif %}">Next &raquo;</a></li>
+        <li><a href="/results/page/{{ pagination.page + 1 }}/?{{ filter|http_query }}">Next &raquo;</a></li>
       {% endif %}
       </ol>
       </nav>

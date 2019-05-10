@@ -70,9 +70,9 @@ var graphs = {
                     chart: {type: 'column'},
                     title: {text: undefined},
                     xAxis: {categories: times},
-                    yAxis: {min: 0, title: {text: 'Prominence'}},
+                    yAxis: {min: 0, title: {text: 'Activity'}},
                     legend: {reversed: true},
-                    plotOptions: {series: {stacking: 'percent'}},
+                    plotOptions: {series: {stacking: 'normal'}},
                     series: array_series
                 })
             } else {
