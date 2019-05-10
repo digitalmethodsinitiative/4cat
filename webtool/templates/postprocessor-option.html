@@ -2,7 +2,7 @@
     {% if processor.options[option].type == "toggle" %}
         <input type="checkbox" name="option-{{ option }}"{% if processor.options[option].default %} checked="checked"{% endif %}> {{ processor.options[option].help }}
     {% elif processor.options[option].type == "string" %}
-        {{ processor.options[option].help }}: <input{% if processor.options[option].min or processor.options[option].max %} class="numeric"{% endif %}name="option-{{ option }}" value="{{ processor.options[option].default }}">
+        {{ processor.options[option].help }}: <input{% if processor.options[option].min or processor.options[option].max %} class="numeric"{% endif %} name="option-{{ option }}" value="{{ processor.options[option].default }}">
     {% elif processor.options[option].type == "choice" %}
         {{ processor.options[option].help }}:
         <select name="option-{{ option }}">

@@ -493,7 +493,7 @@ query = {
                     // Max three monhts for the common country flags
                     if (max_date - min_date > 7889231) {
                         valid = false;
-                        alert('Select a date range of max. three months and try again. The date selected is more than three months. The most common country flags on 4chan/pol/ (US, UK, Canada, Australia) have a date restriction.');
+                        alert('The date selected is more than three months. Select a date range of max. three months and try again. Only the most common country flags on 4chan/pol/ (US, UK, Canada, Australia) have a date restriction.');
                     }
                 }
                 else {
