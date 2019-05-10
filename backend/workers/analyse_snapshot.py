@@ -14,12 +14,15 @@ class SnapshotAnalyser(BasicWorker):
 	max_workers = 1
 
 	def work(self):
+		# make sure the search query exists, because it is the starting point
+		# for all further analysis
 		try:
 			query = DataSet(key=self.job.data["remote_id"], db=self.db)
 		except ValueError:
 			self.job.finish()
 			return
 
+		# if the search is not finished yet, check again in 5 seconds
 		if not query.is_finished():
 			self.job.release(delay=5)
 			return
@@ -35,7 +38,7 @@ class SnapshotAnalyser(BasicWorker):
 						"parameters": {
 							"amount": True,
 							"top": 15,
-							"copy_to": config.PATH_SNAPSHOTDATA + "%s-top-neologisms.csv" % file_prefix
+							"copy_to": config.PATH_SNAPSHOTDATA + "%s-neologisms.csv" % file_prefix
 						}
 					}
 				}
@@ -56,4 +59,5 @@ class SnapshotAnalyser(BasicWorker):
 		}, type="count-countries", db=self.db, parent=query.key)
 		self.queue.add_job("count-countries", remote_id=analysis.key)
 
+		# queueing is done, job finished
 		self.job.finish()

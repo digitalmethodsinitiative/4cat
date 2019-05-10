@@ -1442,3 +1442,10 @@ li.focus > .query-core > p {
 .subquery-list .postprocessor-options input.numeric {
 	width: 5em;
 }
+
+/** overview graphs **/
+.graph-select {
+	margin: 0 1em;
+	text-align: right;
+	display: block;
+}
