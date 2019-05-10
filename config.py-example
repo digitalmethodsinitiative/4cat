@@ -24,6 +24,7 @@ PATH_LOGS = ""  # store logs here - empty means the 4CAT root folder
 PATH_IMAGES = "images"  # if left empty or pointing to a non-existent folder, no images will be saved
 PATH_DATA = ""  # search results will be stored here as CSV files
 PATH_LOCKFILE = "backend"  # the lockfile will be saved in this folder. Probably no need to change!
+PATH_SNAPSHOTDATA = ""  # stats for daily snapshots will be stored here
 
 # Path to sphinx data folder. This is used by the script that generates the
 # sphinx configuration file for you.

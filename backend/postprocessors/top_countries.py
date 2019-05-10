@@ -4,7 +4,7 @@ Determine which country code is the most prevalent in the data
 from csv import DictReader
 
 from backend.abstract.postprocessor import BasicPostProcessor
-
+from backend.lib.helpers import UserInput
 
 class CountryCounter(BasicPostProcessor):
 	"""
@@ -18,6 +18,14 @@ class CountryCounter(BasicPostProcessor):
 	description = "Generate a list of country codes present in the result set and sort it by how often the country is present."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
+	options = {
+		"top": {
+			"type": UserInput.OPTION_TEXT,
+			"default": 500,
+			"help": "Number of top countries to include"
+		}
+	}
+
 	def process(self):
 		"""
 		This takes a 4CAT results file as input, and outputs a new CSV file
@@ -25,6 +33,7 @@ class CountryCounter(BasicPostProcessor):
 		of posts for that user name
 		"""
 		countries = {}
+
 
 		self.query.update_status("Reading source file")
 		with open(self.source_file, encoding="utf-8") as source:
@@ -37,6 +46,14 @@ class CountryCounter(BasicPostProcessor):
 
 		results = [{"country": country, "num_posts": countries[country]} for country in countries]
 		results = sorted(results, key=lambda x: x["num_posts"], reverse=True)
+
+		# truncate results as needed
+		try:
+			cutoff = int(self.parameters.get("top", 1000))
+		except TypeError:
+			cutoff = 1000
+
+		results = results[0:cutoff]
 
 		if not results:
 			return

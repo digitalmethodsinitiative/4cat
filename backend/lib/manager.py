@@ -10,6 +10,8 @@ import sys
 import os
 import re
 
+import config
+
 from backend.abstract.worker import BasicWorker
 from backend.lib.keyboard import KeyPoller
 from backend.lib.exceptions import JobClaimedException
@@ -55,8 +57,10 @@ class WorkerManager:
 		# queue a job for the api handler so it will be run
 		self.queue.add_job("api", remote_id="localhost")
 
-		# queue corpus stats generator for a daily run
+		# queue corpus stats and snapshot generators for a daily run
 		self.queue.add_job("corpus-stats", remote_id="localhost", interval=86400)
+		if config.PATH_SNAPSHOTDATA and os.path.exists(config.PATH_SNAPSHOTDATA):
+			self.queue.add_job("schedule-snapshot", remote_id="localhost", interval=60)
 
 		# it's time
 		self.loop()

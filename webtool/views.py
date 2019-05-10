@@ -3,10 +3,14 @@
 """
 import os
 import re
+import csv
 import json
+import glob
 import config
 import datetime
 import markdown
+
+from urllib.parse import urlencode
 
 from flask import render_template, jsonify, abort, request, redirect, send_from_directory, flash, get_flashed_messages
 from flask_login import login_required, current_user
@@ -37,6 +41,10 @@ def _jinja2_filter_numberify(number):
 		return str(int(number / 1000)) + "k"
 
 	return str(number)
+
+@app.template_filter("http_query")
+def _jinja2_filter_httpquery(data):
+	return urlencode(data)
 
 
 @app.template_filter('markdown')
@@ -83,6 +91,54 @@ def show_frontpage():
 
 	return render_template("frontpage.html", stats=stats, boards=config.PLATFORMS)
 
+@app.route("/overview/")
+@login_required
+def show_overview():
+	# some quick helper functions to read the snapshot data with, either as
+	# plain text or from a csv
+	def open_and_read(file):
+		with open(file) as handle:
+			return handle.read()
+
+	def csv_to_list(file):
+		with open(file) as handle:
+			reader = csv.reader(handle)
+			reader.__next__()
+			data = []
+			for row in reader:
+				data.append(row)
+
+		return data
+
+	# overall activity
+	activity_files = sorted(glob.glob(config.PATH_SNAPSHOTDATA + "/*-activity.txt"))
+	activity_data = [open_and_read(file).strip() for file in activity_files]
+
+	# top 15 countries
+	country_files = sorted(glob.glob(config.PATH_SNAPSHOTDATA + "/*-countries.csv"))
+	country_data = [csv_to_list(file) for file in country_files]
+
+	# most popular non-standard words
+	neologism_files = sorted(glob.glob(config.PATH_SNAPSHOTDATA + "/*-top-neologisms.csv"))
+	neologism_data = [csv_to_list(file) for file in neologism_files]
+
+	# prepare for output
+	graphs = {
+		"activity": {
+			"type": "1-line",
+			"data": activity_data,
+		},
+		"countries": {
+			"type": "stacked-bar",
+			"data": country_data
+		},
+		"neologisms": {
+			"type": "alluvial",
+			"data": neologism_data
+		}
+	}
+
+	return render_template("overview.html", graphs=graphs)
 
 @app.route('/tool/')
 @login_required
