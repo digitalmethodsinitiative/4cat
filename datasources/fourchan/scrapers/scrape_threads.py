@@ -187,8 +187,9 @@ class ThreadScraper4chan(BasicJSONScraper):
 			self.db.rollback()
 			dupe = self.db.fetchone("SELECT * from posts_" + self.prefix + " WHERE id = %s" % (str(post["no"]),), commit=False)
 			if dupe:
-				self.log.error("Post %s in thread %s/%s/%s (time: %s) scraped twice: first seen as %s in thread %s at %s" % (
-				post["no"], self.platform, thread["board"], thread["id"], post["time"], dupe["id"], dupe["thread_id"], dupe["timestamp"]))
+				pass
+				#self.log.error("Post %s in thread %s/%s/%s (time: %s) scraped twice: first seen as %s in thread %s at %s" % (
+				# post["no"], self.platform, thread["board"], thread["id"], post["time"], dupe["id"], dupe["thread_id"], dupe["timestamp"]))
 			else:
 				self.log.error("Post %s in thread %s/%s/%s hit database constraint but no dupe was found?" % (
 				post["no"], self.platform, thread["board"], thread["id"]))
