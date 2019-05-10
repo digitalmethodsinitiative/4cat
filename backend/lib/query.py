@@ -159,6 +159,29 @@ class DataSet:
 		self.data["is_finished"] = True
 		self.data["num_rows"] = num_rows
 
+	def delete(self):
+		"""
+		Delete the query, and all its subqueries
+
+		Deletes both database records and result files. Note that manipulating
+		a query object after it has been deleted is undefined behaviour.
+		"""
+		# first, recursively delete sub-queries
+		sub_queries = self.db.fetchall("SELECT * FROM queries WHERE key_parent = %s", (self.key,))
+		for sub_query in sub_queries:
+			sub_query = DataSet(key=sub_query["key"], db=self.db)
+			sub_query.delete()
+
+		# delete from database
+		self.db.execute("DELETE FROM queries WHERE key = %s", (self.key,))
+
+		# delete from drive
+		try:
+			os.unlink(self.get_results_path())
+		except FileNotFoundError:
+			# already deleted, apparently
+			pass
+
 	def is_finished(self):
 		"""
 		Check if query is finished
