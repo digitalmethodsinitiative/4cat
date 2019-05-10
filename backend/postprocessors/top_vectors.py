@@ -103,7 +103,7 @@ class VectorRanker(BasicPostProcessor):
 
 		# truncate results as needed
 		try:
-			cutoff = self.parameters.get("cutoff", 100)
+			cutoff = self.parameters.get("top", 100)
 		except TypeError:
 			cutoff = 10
 
