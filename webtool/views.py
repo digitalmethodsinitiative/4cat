@@ -121,14 +121,9 @@ def show_overview():
 	# graph configuration here
 	# todo: move this to an external file or the database
 	graph_types = {
-		"activity": {
-			"type": "plain",
-			"title": "Overall posting activity",
-			"chart_type": "line",
-		},
 		"countries": {
 			"type": "two-column",
-			"title": "Most prevalent countries",
+			"title": "Overall activity",
 			"chart_type": "stacked-bar"
 		},
 		"neologisms": {
@@ -153,7 +148,13 @@ def show_overview():
 		# calculate per-board data
 		for board in boards:
 			if data_type == "two-column":
-				data[board] = [csv_to_list(file) for file in files if board in file]
+				items = [csv_to_list(file) for file in files if board in file]
+
+				# potentially this is a list of empty lists, which means we're not interested
+				if not [item for item in items if item]:
+					continue
+
+				data[board] = items
 			else:
 				data[board] = [[["posts", int(open_and_read(file).strip())]] for file in files if board in file]
 
