@@ -43,7 +43,12 @@ class SnapshotScheduler(BasicWorker):
 					"max_date": epoch,
 					"country_flag": "all",
 					"full_thread": False,
-					"user": "daily-snapshot"
+					"dense_threads": False,
+					"user": "daily-snapshot",
+					"dense_percentage": 0,
+					"dense_country_percentage": 0,
+					"random_amount": False,
+					"dense_length": 0
 				}, type=type, db=self.db)
 
 				# run the search and queue further analysis for once the
