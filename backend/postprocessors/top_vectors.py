@@ -24,10 +24,20 @@ class VectorRanker(BasicPostProcessor):
 	accepts = ["vectorise-tokens"]
 
 	options = {
+		"exclude-top": {
+			"type": UserInput.OPTION_TEXT,
+			"default": 0,
+			"help": "Exclude top x items"
+		},
 		"amount": {
 			"type": UserInput.OPTION_TOGGLE,
 			"default": False,
 			"help": "Include number of occurrences"
+		},
+		"top": {
+			"type": UserInput.OPTION_TEXT,
+			"default": 100,
+			"help": "Cut-off for top list"
 		}
 	}
 
@@ -90,6 +100,14 @@ class VectorRanker(BasicPostProcessor):
 
 		# delete temporary files and folder
 		shutil.rmtree(dirname)
+
+		# truncate results as needed
+		try:
+			cutoff = self.parameters.get("cutoff", 100)
+		except TypeError:
+			cutoff = 10
+
+		results = results[0:cutoff]
 
 		# done!
 		self.query.update_status("Writing results file")
