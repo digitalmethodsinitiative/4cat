@@ -1,11 +1,13 @@
 """
 Basic post-processor worker - should be inherited by workers to post-process results
 """
+import shutil
 import abc
+import os
 
 from backend.abstract.worker import BasicWorker
 from backend.lib.query import DataSet
-from backend.lib.helpers import get_software_version
+from backend.lib.helpers import get_software_version, load_postprocessors
 
 
 class BasicPostProcessor(BasicWorker, metaclass=abc.ABCMeta):
@@ -53,7 +55,9 @@ class BasicPostProcessor(BasicWorker, metaclass=abc.ABCMeta):
 		self.parent = DataSet(key=self.query.data["key_parent"], db=self.db)
 		self.source_file = self.parent.get_results_path()
 
-		if not self.query.is_finished():
+		if not os.path.exists(self.source_file):
+			self.query.update_status("Finished, no input data found.")
+		elif not self.query.is_finished():
 			self.process()
 
 		self.after_process()
@@ -65,6 +69,30 @@ class BasicPostProcessor(BasicWorker, metaclass=abc.ABCMeta):
 		self.query.update_status("Results processed")
 		if not self.query.is_finished():
 			self.query.finish()
+
+		# see if we have anything else lined up to run next
+		if "next" in self.parameters:
+			next_parameters = self.parameters["next"].get("parameters", {})
+			next_type = self.parameters["next"].get("type", "")
+			available_postprocessors = self.query.get_available_postprocessors()
+
+			# run it only if the post-processor is actually available for this query
+			if next_type in available_postprocessors:
+				next_analysis = DataSet(parameters=next_parameters, type=next_type, db=self.db, parent=self.query.key)
+				self.queue.add_job(next_type, remote_id=next_analysis.key)
+
+		# see if we need to register the result somewhere
+		if "copy_to" in self.parameters:
+			# copy the results to an arbitray place that was passed
+			if os.path.exists(self.query.get_results_path()):
+				# but only if we actually have something to copy
+				shutil.copyfile(self.query.get_results_path(), self.parameters["copy_to"])
+			else:
+				# if copy_to was passed, that means it's important that this
+				# file exists somewhere, so we create it as an empty file
+				with open(self.parameters["copy_to"], "w") as empty_file:
+					empty_file.write("")
+
 		self.job.finish()
 
 	@abc.abstractmethod

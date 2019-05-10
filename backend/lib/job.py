@@ -107,14 +107,17 @@ class Job:
 
 		self.is_claimed = True
 
-	def finish(self):
+	def finish(self, delete=False):
 		"""
 		Finish job
 
 		This deletes it from the database, or in the case of recurring jobs,
 		resets the claim flags.
+
+		:param bool cancel: Whether to force deleting the job even if it is a
+							job with an interval.
 		"""
-		if self.data["interval"] == 0:
+		if self.data["interval"] == 0 or delete:
 			self.db.delete("jobs", where={"jobtype": self.data["jobtype"], "remote_id": self.data["remote_id"]})
 		else:
 			self.db.update("jobs", data={"timestamp_claimed": 0}, where={"jobtype": self.data["jobtype"], "remote_id": self.data["remote_id"]})

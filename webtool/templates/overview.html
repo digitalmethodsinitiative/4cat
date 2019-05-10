@@ -1,0 +1,6 @@
+<h2>Overview</h2>
+
+{% for graph in graphs %}
+    <h3>{{ graph }}</h3>
+    <pre>{{ graphs[graph]|pprint }}</pre>
+{% endfor %}

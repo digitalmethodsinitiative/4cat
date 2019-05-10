@@ -40,33 +40,22 @@ class CorpusStats(BasicWorker):
 			}
 
 			for board in config.PLATFORMS[platform]["boards"]:
-				stats[platform]["boards"][board] = {
-					"threads": int(
-						self.db.fetchone("SELECT COUNT(*) AS num FROM threads_" + platform + " WHERE board = %s",
-										 (board,))["num"]),
-					"posts": int(self.db.fetchone(
-						"SELECT SUM(num_replies) AS num FROM threads_" + platform + " WHERE board = %s", (board,))[
-									 "num"]),
-					"first":
-						int(self.db.fetchone(
-							"SELECT MIN(timestamp) AS num FROM threads_" + platform + " WHERE board = %s AND is_sticky = FALSE AND timestamp > 0",
-							(board,))["num"]),
+				# PostgreSQL COUNT(*) is pretty slow so we cheat and use live
+				# tuples instead, which should be more or less accurate as long
+				# as the autovacuum workers are doing their job
+				stats[platform] = {
+					"threads": int(self.db.fetchone("SELECT n_live_tup AS num FROM pg_stat_user_tables WHERE relname = %s", ("threads_" + platform, ))["num"]),
+					"posts": int(self.db.fetchone("SELECT n_live_tup AS num FROM pg_stat_user_tables WHERE relname = %s", ("posts_" + platform,))["num"]),
+					"first": int(self.db.fetchone(
+							"SELECT MIN(timestamp) AS num FROM threads_" + platform + " WHERE is_sticky = FALSE AND timestamp > 0")["num"]),
 					"last": int(self.db.fetchone(
-						"SELECT MAX(timestamp_modified) AS num FROM threads_" + platform + " WHERE board = %s AND is_sticky = FALSE",
-						(board,))["num"]),
+							"SELECT MAX(timestamp_modified) AS num FROM threads_" + platform + " WHERE is_sticky = FALSE AND timestamp > 0")["num"]),
 				}
 
-				stats[platform]["overall"]["first"] = min(stats[platform]["overall"]["first"],
-														  stats[platform]["boards"][board]["first"])
-				stats[platform]["overall"]["last"] = max(stats[platform]["overall"]["last"],
-														 stats[platform]["boards"][board]["last"])
-				stats[platform]["overall"]["posts"] += stats[platform]["boards"][board]["posts"]
-				stats[platform]["overall"]["threads"] += stats[platform]["boards"][board]["threads"]
-
-				stats["overall"]["first"] = min(stats["overall"]["first"], stats[platform]["boards"][board]["first"])
-				stats["overall"]["last"] = max(stats["overall"]["last"], stats[platform]["boards"][board]["last"])
-				stats["overall"]["posts"] += stats[platform]["boards"][board]["posts"]
-				stats["overall"]["threads"] += stats[platform]["boards"][board]["threads"]
+				stats["overall"]["first"] = min(stats["overall"]["first"], stats[platform]["first"])
+				stats["overall"]["last"] = max(stats["overall"]["last"], stats[platform]["last"])
+				stats["overall"]["posts"] += stats[platform]["posts"]
+				stats["overall"]["threads"] += stats[platform]["threads"]
 
 
 		outputfile = get_absolute_folder(os.path.dirname(__file__)) + "/../../stats.json"
