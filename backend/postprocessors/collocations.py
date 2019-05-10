@@ -67,7 +67,6 @@ class getCollocations(BasicPostProcessor):
 		"""
 
 		dirname = self.query.get_results_path().replace(".", "")
-		print(dirname)
 
 		self.query.update_status("Processing token sets")
 		vector_paths = []
@@ -86,10 +85,6 @@ class getCollocations(BasicPostProcessor):
 			forbidden_words = self.parameters["forbidden_words"].replace(" ", "").lower().split(',')
 		else:
 			forbidden_words = False
-
-		print(window_size, type(window_size))
-		print(query_string, type(query_string))
-		print(forbidden_words, type(forbidden_words))
 
 		# Go through all archived token sets and generate collocations for each
 		with zipfile.ZipFile(self.source_file, "r") as token_archive:
