@@ -12,7 +12,13 @@
     _width: 500px;
     overflow: visible;
     clear: left;
+    margin: 25px;
 }
+
+svg {
+    overflow: visible !important;
+}
+
 .invisible {
     visibility: hidden;
 }
