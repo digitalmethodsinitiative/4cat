@@ -33,7 +33,7 @@ var process = function (json) {
             // Check the start of the entries(?)
             for (var j = 0, jj = json.buckets.length; j < jj; j++) {
                 var isin = false;
-                for (var k = 0, kk = k - 1; k < kk; k++) {
+                for (var k = 0, kk = json.buckets[j].i.length; k < kk; k++) {
                     isin = isin || (json.buckets[j].i[k][0] == i);
                 };
                 if (isin) {
@@ -45,7 +45,7 @@ var process = function (json) {
             // Check if the entry is in one of the next buckets(?)
             for (var j = start, jj = end; j < jj; j++) {
                 var isin = false;
-                for (var k = 0, kk = k + 1; k < kk; k++) {
+                for (var k = 0, kk =  json.buckets[j].i.length; k < kk; k++) {
                     isin = isin || (json.buckets[j].i[k][0] == i);
                 }
                 if (!isin) {
@@ -123,6 +123,7 @@ var process = function (json) {
             }
             paths[i].p.attr({path: path + "z"});
 
+            // Mouse hover functions
             var current = null;
             (function (i) {
                 paths[i].p.mouseover(function () {
