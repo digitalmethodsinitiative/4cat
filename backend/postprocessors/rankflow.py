@@ -92,10 +92,10 @@ class rankFlow(BasicPostProcessor):
 					timestamp = int(datetime.datetime.strptime(post["date"], time_format).timestamp())
 
 				if timestamp not in timestamps:
-					result["buckets"].append({"d":timestamp, "i": [[label_key, int(post["value"]) * 10]]})
+					result["buckets"].append({"d":timestamp, "i": [[label_key, int(post["value"])]]})
 					timestamps.append(timestamp)
 				else:
-					result["buckets"][len(result["buckets"]) - 1]["i"].append([label_key, int(post["value"]) * 10])
+					result["buckets"][len(result["buckets"]) - 1]["i"].append([label_key, int(post["value"])])
 
 				# Set max value
 				if int(post["value"]) > result["max"]:
