@@ -1,4 +1,15 @@
-var process = function (json) {
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Rankflow</title>
+<script type="text/javascript" src="https://4cat.oilab.nl/static/js/jquery-3.3.1.min.js" charset="utf-8"></script>
+<script type="text/javascript" src='**raphael**' charset="utf-8"></script>
+</head>
+<body>
+
+<script type="text/javascript">
+
+	var process = function (json) {
     var x = 0,
         r = Raphael("chart", 2350, 550),
         labels = {},
@@ -11,8 +22,9 @@ var process = function (json) {
         lgnd2 = $("#legend2")[0],
         usrnm2 = $("#username2")[0],
         plchldr = $("#placeholder")[0];
+
     function finishes() {
-        for (var i in json.authors) {
+        for (var i in json.labels) {
             var start, end;
             for (var j = json.buckets.length - 1; j >= 0; j--) {
                 var isin = false;
@@ -45,6 +57,7 @@ var process = function (json) {
             }
         }
     }
+
     function block() {
         var p, h;
         finishes();
@@ -101,7 +114,7 @@ var process = function (json) {
                     labels[i].show();
                     pathes[i].p.toFront();
                     labels[i].toFront();
-                    usrnm2.innerHTML = json.authors[i].n + " <em>";
+                    usrnm2.innerHTML = json.labels[i].n + " <em>";
                     lgnd2.style.backgroundColor = pathes[i].p.attr("fill");
                     nmhldr2.className = "";
                     plchldr.className = "hidden";
@@ -115,6 +128,21 @@ var process = function (json) {
         block();
     }
 };
+
+// Initialise the graph
 $(function () {
+    var json = JSON.parse('**json**')
     process(json);
 });
+
+</script>
+
+<div id="name2" class="hidden">
+    <div id="legend2">&nbsp;</div>
+    <div id="username2">legend</div>
+</div>
+<div id="placeholder">mouse over the graph for more details</div>
+<div id="chart"></div>
+
+</body>
+</html>

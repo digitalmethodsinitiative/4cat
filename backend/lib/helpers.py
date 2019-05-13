@@ -135,14 +135,13 @@ def load_postprocessors():
 	for key in sorted(postprocessors, key=lambda postprocessor: postprocessors[postprocessor]["category"] +
 																postprocessors[postprocessor]["name"].lower()):
 		sorted_postprocessors[key] = postprocessors[key]
-
+	
 	backup = sorted_postprocessors.copy()
 	for type in sorted_postprocessors:
 		sorted_postprocessors[type]["further"] = []
 		for possible_child in backup:
 			if type in backup[possible_child]["accepts"]:
 				sorted_postprocessors[type]["further"].append(possible_child)
-
 	return sorted_postprocessors
 
 
@@ -201,6 +200,25 @@ def get_software_version():
 	except OSError:
 		return ""
 
+def get_js_lib_url(file):
+	"""
+	Returns the full URL of a library file on the 4CAT server.
+	Useful when debugging as it works with localhost
+	
+	:param file str: The library file to return URL from (e.g. `raphael.js`)
+
+	:return str: The absolute URL
+	"""
+
+	if not file.endswith(".js"):
+		file = file + ".js"
+
+	if config.FlaskConfig.SERVER_NAME == "localhost:5000":
+		url = "http://localhost/fourcat/webtool/static/js/" + file
+	else:
+		url = get_absolute_folder("") + "static/js/" + file
+
+	return url
 
 class UserInput:
 	OPTION_TOGGLE = "toggle"
