@@ -60,7 +60,7 @@ class WorkerManager:
 		# queue corpus stats and snapshot generators for a daily run
 		self.queue.add_job("corpus-stats", remote_id="localhost", interval=86400)
 		if config.PATH_SNAPSHOTDATA and os.path.exists(config.PATH_SNAPSHOTDATA):
-			self.queue.add_job("schedule-snapshot", remote_id="localhost", interval=60)
+			self.queue.add_job("schedule-snapshot", remote_id="localhost", interval=86400)
 
 		# it's time
 		self.loop()

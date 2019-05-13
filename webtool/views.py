@@ -118,15 +118,12 @@ def show_overview():
 
 		return data
 
+	# graph configuration here
+	# todo: move this to an external file or the database
 	graph_types = {
-		"activity": {
-			"type": "plain",
-			"title": "Overall posting activity",
-			"chart_type": "line",
-		},
 		"countries": {
 			"type": "two-column",
-			"title": "Most prevalent countries",
+			"title": "Overall activity",
 			"chart_type": "stacked-bar"
 		},
 		"neologisms": {
@@ -136,26 +133,45 @@ def show_overview():
 		}
 	}
 
+	# define graphs: each graph type can have multiple independent graphs,
+	# one for each board that is tracked
 	graphs = {}
 	for type in graph_types:
 		data_type = graph_types[type]["type"]
 		extension = "csv" if data_type == "two-column" else "txt"
 		files = sorted(glob.glob(config.PATH_SNAPSHOTDATA + "/*-" + type + "." + extension))
-		boards = set(sorted(["-".join(file.split("-")[1:-1]) for file in files]))
+		boards = set(sorted(["-".join(file.split("/")[-1].split("-")[1:-1]) for file in files]))
 
 		data = {}
 		times = {}
+
+		# calculate per-board data
 		for board in boards:
 			if data_type == "two-column":
-				data[board] = [csv_to_list(file) for file in files if board in file]
+				items = [csv_to_list(file) for file in files if board in file]
+
+				# potentially this is a list of empty lists, which means we're not interested
+				if not [item for item in items if item]:
+					continue
+
+				data[board] = items
 			else:
 				data[board] = [[["posts", int(open_and_read(file).strip())]] for file in files if board in file]
+
+			# only show last two weeks
+			data[board] = data[board][0:14]
+
+			# no data? don't include this, no graph will be available
+			if not data[board]:
+				del data[board]
+				continue
 
 			times[board] = [int(file.split("/")[-1].split("-")[0]) for file in files if board in file]
 
 		if not data:
 			continue
 
+		# this is the data that will be passed to the template
 		graphs[type] = {
 			"title": graph_types[type]["title"],
 			"data": data,

@@ -38,8 +38,8 @@ var graphs = {
             let max_val = 0;
 
             times = times.map(function (timestamp) {
-                let date = new Date(timestamp * 1000);
-                return (date.getDay() + 1) + ' ' + months[date.getMonth()];
+                let date = new Date((timestamp + 3600) * 1000);
+                return (date.getDate() + 1) + ' ' + months[date.getMonth()];
             });
 
             for (let time in all_data) {
@@ -70,9 +70,9 @@ var graphs = {
                     chart: {type: 'column'},
                     title: {text: undefined},
                     xAxis: {categories: times},
-                    yAxis: {min: 0, title: {text: 'Prominence'}},
+                    yAxis: {min: 0, title: {text: 'Activity'}},
                     legend: {reversed: true},
-                    plotOptions: {series: {stacking: 'percent'}},
+                    plotOptions: {series: {stacking: 'normal'}},
                     series: array_series
                 })
             } else {
