@@ -139,8 +139,8 @@ def show_overview():
 	for type in graph_types:
 		data_type = graph_types[type]["type"]
 		extension = "csv" if data_type == "two-column" else "txt"
-		files = sorted(glob.glob(config.PATH_SNAPSHOTDATA + "/*-" + type + "." + extension))
-		boards = set(sorted(["-".join(file.split("/")[-1].split("-")[1:-1]) for file in files]))
+		files = sorted(set(glob.glob(config.PATH_SNAPSHOTDATA + "/*-" + type + "." + extension)))
+		boards = sorted(set(["-".join(file.split("/")[-1].split("-")[1:-1]) for file in files]))
 
 		data = {}
 		times = {}
