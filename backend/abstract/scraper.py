@@ -66,7 +66,7 @@ class BasicHTTPScraper(BasicWorker, metaclass=abc.ABCMeta):
 					proxies = None
 
 				# do the request!
-				data = requests.get(url, timeout=config.SCRAPE_TIMEOUT, proxies=proxies)
+				data = requests.get(url, timeout=config.SCRAPE_TIMEOUT, proxies=proxies, headers={"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_4) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/12.1 Safari/605.1.15"})
 			except (requests.exceptions.RequestException, ConnectionRefusedError) as e:
 				if self.job.data["attempts"] > 2:
 					self.job.finish()
