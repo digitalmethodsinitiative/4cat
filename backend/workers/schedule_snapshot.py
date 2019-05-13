@@ -30,7 +30,13 @@ class SnapshotScheduler(BasicWorker):
 				# usually we just want the past 24 hours, but this can be
 				# changed through job parameters if needed, for example
 				# if data for a specific day needs to be recalculated
-				epoch = self.loop_time if not self.job.details or "epoch" not in self.job.details else self.job.details["epoch"]
+				if not self.job.details or "epoch" not in self.job.details:
+					# make epoch closest timestamp that is the original
+					# timestamp plus a multiple of the interval while still
+					# being less than or equal to the claim time
+					epoch = self.loop_time - ((self.loop_time - self.job.data["timestamp"]) % self.job.data["interval"])
+				else:
+					epoch = self.job.details["epoch"]
 
 				# create a new search query that simply returns all posts
 				# between the given timestamps
