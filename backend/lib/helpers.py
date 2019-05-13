@@ -200,23 +200,26 @@ def get_software_version():
 	except OSError:
 		return ""
 
-def get_js_lib_url(file):
+def get_lib_url(file):
 	"""
 	Returns the full URL of a library file on the 4CAT server.
 	Useful when debugging as it works with localhost
 	
 	:param file str: The library file to return URL from (e.g. `raphael.js`)
-
-	:return str: The absolute URL
+	:return str: The absolute URL to return
 	"""
 
-	if not file.endswith(".js"):
-		file = file + ".js"
+	if file.endswith(".js"):
+		ext = "js/"
+	elif file.endswith(".css"):
+		ext = "css/"
+	else:
+		return "Provide a filename with a valid extention (`.js` or `.css`)"
 
 	if config.FlaskConfig.SERVER_NAME == "localhost:5000":
-		url = "http://localhost/fourcat/webtool/static/js/" + file
+		url = "http://localhost/fourcat/webtool/static/" + ext + file
 	else:
-		url = get_absolute_folder("") + "static/js/" + file
+		url = get_absolute_folder("") + "static/" + ext + file
 
 	return url
 

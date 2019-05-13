@@ -5,7 +5,7 @@ import config
 
 from csv import DictReader, DictWriter
 
-from backend.lib.helpers import get_absolute_folder, get_js_lib_url
+from backend.lib.helpers import get_absolute_folder, get_lib_url
 from backend.abstract.postprocessor import BasicPostProcessor
 
 class rankFlow(BasicPostProcessor):
@@ -33,12 +33,13 @@ class rankFlow(BasicPostProcessor):
 		if not data:
 			return
 
-		# Get the path for the library
-		raphael_url = get_js_lib_url("raphael.js")
+		# Get library files
+		raphael_js = get_lib_url("raphael.js")
+		raphael_css = get_lib_url("rankflow.css")
 
 		# Generate a html file based on the retreived json data
 		with open("../assets/rankflow.html") as template:
-			output = template.read().replace("**json**", json.dumps(data)).replace("**raphael**", raphael_url)
+			output = template.read().replace("**json**", json.dumps(data)).replace("**raphael.js**", raphael_js).replace("**rankflow.css**", raphael_css)
 
 		# Write HTML file
 		output_file = open(self.query.get_results_path(), "w", encoding="utf-8")
@@ -78,7 +79,14 @@ class rankFlow(BasicPostProcessor):
 					label_key = labels.index(post["collocation"])
 
 				# Make a bucket when a new timestamp appears
-				timestamp = int(datetime.datetime.strptime(post["date"], "%Y-%m").timestamp())
+				if len(post["date"]) == 4: # years
+					time_format = "%Y"
+				elif len(post["date"]) == 7: # months
+					time_format = "%Y-%m"
+				elif len(post["date"]) == 10: # months
+					time_format = "%Y-%m-%d"
+
+				timestamp = int(datetime.datetime.strptime(post["date"], time_format).timestamp())
 				if timestamp not in timestamps:
 					result["buckets"].append({"d":timestamp, "i": [[label_key, int(post["value"]) * 10]]})
 					timestamps.append(timestamp)

@@ -1,3 +1,12 @@
+@font-face {
+    font-family: 'fixedsys';
+    src: url("../fonts/fsex300-webfont.woff")
+}
+
+* {
+    font-family: 'fixedsys', 'Courier';
+}
+
 #chart {
     width: 100%;
     _width: 500px;
