@@ -1,54 +1,92 @@
-import csv
 import datetime
+import json
+
+import config
+
 from csv import DictReader, DictWriter
 
+from backend.lib.helpers import get_absolute_folder, get_js_lib_url
+from backend.abstract.postprocessor import BasicPostProcessor
 
-def generate_json(file):
+class rankFlow(BasicPostProcessor):
 	"""
-	Generates a JSON structure usable for Raphael.js to make a RankFlow
-	
+	Creates a visualisation showing the 'flow' of elements
+	over time (rankFlow). Based on the Raphael.js impact visualisation
+
 	"""
 
-	result = {"max": 0, "buckets":[],
-        "authors": {}
-        }
+	type = "rankflow"  # job type ID
+	category = "Visual"  # category
+	title = "RankFlow"  # title displayed in UI
+	description = "Create a flow-graph of elements over time."  # description displayed in UI
+	extension = "html"  # extension of result file, used internally and in UI
 
-	with open(file , encoding="utf-8") as source:
-		csv = DictReader(source)
+	accepts = ["collocations"]  # query types this post-processor accepts as input
 
-		# names = set([post["collocation"] for post in csv])
-		# for i, name in enumerate(names):
-		# 	result["authors"][str(i)] = {"name": name}
-		# csv = DictReader(source)
+	def process(self):
 
-		authors = []
-		timestamps = []
+		# Get json data to use in a graph
+		self.query.update_status("Generating graph data")
+		data = self.generate_json(self.source_file)
+		
+		# Return empty when there's no results
+		if not data:
+			return
 
-		for post in csv:
-			print(post)
+		# Get the path for the library
+		raphael_url = get_js_lib_url("raphael.js")
 
-			# Set author names
-			if post["collocation"] not in authors:
-				authors.append(post["collocation"])
-				author_key = str(len(result["authors"]))
-				result["authors"][author_key] = {}
-				result["authors"][author_key]["n"] = post["collocation"]
-			else:
-				author_key = authors.index(post["collocation"])
+		# Generate a html file based on the retreived json data
+		with open("../assets/rankflow.html") as template:
+			output = template.read().replace("**json**", json.dumps(data)).replace("**raphael**", raphael_url)
 
-			timestamp = int(datetime.datetime.strptime(post["date"], "%Y-%m").timestamp())
-			print(timestamp)
-			if timestamp not in timestamps:
-				result["buckets"].append({"d":timestamp, "i": [[author_key, int(post["value"]) * 10]]})
-				timestamps.append(timestamp)
-				print(timestamps)
-			else:
-				result["buckets"][len(result["buckets"]) - 1]["i"].append([author_key, int(post["value"]) * 10])
+		# Write HTML file
+		output_file = open(self.query.get_results_path(), "w", encoding="utf-8")
+		output_file.write(output)
+		output_file.close()
 
-			# Set max value
-			if int(post["value"]) > result["max"]:
-				result["max"] = int(post["value"])
+		# Finish
+		self.query.update_status("Finished")
+		self.query.finish(len(output))
 
-	print(result)
-if __name__ == '__main__':
-	generate_json('collocations.csv')
+	def generate_json(self, source_file):
+		"""
+		Generates a JSON structure usable for Raphael.js to make a RankFlow
+
+		"""
+
+		result = {"max": 0, "buckets":[], "labels": {}
+			}
+
+		
+		# Open and loop through the source file
+		with open(source_file, encoding="utf-8") as source:
+			csv = DictReader(source)
+
+			labels = []
+			timestamps = []
+
+			for post in csv:
+
+				# Set label names (e.g. collocation text)
+				if post["collocation"] not in labels:
+					labels.append(post["collocation"])
+					label_key = str(len(result["labels"]))
+					result["labels"][label_key] = {}
+					result["labels"][label_key]["n"] = post["collocation"]
+				else:
+					label_key = labels.index(post["collocation"])
+
+				# Make a bucket when a new timestamp appears
+				timestamp = int(datetime.datetime.strptime(post["date"], "%Y-%m").timestamp())
+				if timestamp not in timestamps:
+					result["buckets"].append({"d":timestamp, "i": [[label_key, int(post["value"]) * 10]]})
+					timestamps.append(timestamp)
+				else:
+					result["buckets"][len(result["buckets"]) - 1]["i"].append([label_key, int(post["value"]) * 10])
+
+				# Set max value
+				if int(post["value"]) > result["max"]:
+					result["max"] = int(post["value"])
+
+		return result

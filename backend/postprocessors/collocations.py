@@ -44,8 +44,8 @@ class getCollocations(BasicPostProcessor):
 		},
 		"query_string": {
 			"type": UserInput.OPTION_TEXT,
-			"default": " ",
-			"help": "Match string - Optional word that must be in the collocation sets. Leaving this empty will generate collocations from the overall corpus"
+			"default": "",
+			"help": "Match string - Optional word that must be in the collocation sets. Separate with , to include multiple match words"
 		},
 		"max_output": {
 			"type": UserInput.OPTION_TEXT,
@@ -77,8 +77,11 @@ class getCollocations(BasicPostProcessor):
 		# Validate and process some user inputs
 		n_size = int(self.parameters["n_size"])
 		window_size = int(self.parameters["window_size"])
-		query_string = [self.parameters["query_string"].replace(" ","").lower()]
-		if len(query_string) < 1:
+
+		query_string = self.parameters["query_string"].replace(" ", "")
+		if query_string != "":
+			query_string = query_string.lower().split(',')
+		else:
 			query_string = False
 		max_output = int(self.parameters["max_output"])
 		if self.parameters["forbidden_words"] != "":
@@ -103,11 +106,11 @@ class getCollocations(BasicPostProcessor):
 
 				# Get the date
 				date_string = tokens_name.split('.')[0]
-
+				
 				# Get the collocations. Returns a tuple.
 				self.query.update_status("Generating collocations for " + date_string)
 				collocations = self.get_collocations(tokens, window_size, n_size, query_string=query_string, max_output=max_output, forbidden_words=forbidden_words)
-				
+
 				# Loop through the results and store them in the results list
 				for tpl in collocations:
 					result = {}
@@ -136,10 +139,7 @@ class getCollocations(BasicPostProcessor):
 		:return: list of tuples with collocations 
 		
 		"""
-		
-		# Filter tokens on whether they contain the query string
-		#tokens = [token for token in tokens if query_string in token]
-		
+
 		# Two-word collocations (~ bigrams)
 		if n_size == 2:
 			finder = BigramCollocationFinder.from_words(tokens, window_size=window_size)
@@ -148,15 +148,14 @@ class getCollocations(BasicPostProcessor):
 			if query_string != False:
 				word_filter = lambda w1, w2: not any(string in (w1, w2) for string in query_string)
 				finder.apply_ngram_filter(word_filter)
+				# Filter out two times the occurance of the same query string
+				duplicate_filter = lambda w1, w2: (w1 in query_string and w2 in query_string)
+				finder.apply_ngram_filter(duplicate_filter)
 			
 			# Filter out forbidden words
 			if forbidden_words != False:
 				forbidden_words_filter = lambda w1, w2: any(string in (w1, w2) for string in forbidden_words)
 				finder.apply_ngram_filter(forbidden_words_filter)
-
-			# Filter out two times the occurance of the same query string
-			duplicate_filter = lambda w1, w2: (w1 in query_string and w2 in query_string)
-			finder.apply_ngram_filter(duplicate_filter)
 
 			#finder.apply_freq_filter(min_frequency)
 
