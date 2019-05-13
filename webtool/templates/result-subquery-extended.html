@@ -27,6 +27,15 @@
             {% if item.subqueries %}{{ item.subqueries|length }} further result{% if item.subqueries|length != 1 %}s{% endif %}{% endif %}
             {% if not can_postprocess and not item.subqueries %}details{% endif %}
         </button>
+        {% if postprocessors[subquery.type].extension == "html" or postprocessors[subquery.type].extension == "png" or postprocessors[subquery.type].extension == "jpg" or postprocessors[subquery.type].extension == "gif" %}
+            <div class="query-result">
+            {% if postprocessors[subquery.type].extension == "html" %}
+                <iframe class="query-result-iframe" src="/result/{{ subquery.result_file }}"></iframe>
+            {% elif postprocessors[subquery.type].extension == "png" or postprocessors[subquery.type].extension == "jpg" or postprocessors[subquery.type].extension == "gif" %}
+                <img src="/result/{{ subquery.result_file }}"></img>
+            {% endif %}
+            </div>
+        {% endif %}
     </div>
     {% if item.is_finished() %}
     <div class="sub-controls" id="{{ item.key }}-sub">

@@ -1091,6 +1091,19 @@ ol.postprocessor-list {
     padding: 0;
 }
 
+.query-result {
+	width: 100%;
+}
+
+.query-result > img {
+	width: 100%;
+}
+
+iframe.query-result-iframe {
+	width: 100%;
+	height: 700px;
+}
+
 #popup-panel .subquery-list {
     margin-left: 1.5em;
 }
@@ -1290,7 +1303,7 @@ ol.postprocessor-list {
 
 .subquery.focus {
 	margin: 0 auto;
-	max-width: 500px;
+	max-width: 725px;
 	position: relative;
 	margin-top: 2em;
 }
