@@ -38,8 +38,8 @@ var graphs = {
             let max_val = 0;
 
             times = times.map(function (timestamp) {
-                let date = new Date(timestamp * 1000);
-                return (date.getDay() + 1) + ' ' + months[date.getMonth()];
+                let date = new Date((timestamp + 3600) * 1000);
+                return (date.getDate() + 1) + ' ' + months[date.getMonth()];
             });
 
             for (let time in all_data) {
