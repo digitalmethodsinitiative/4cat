@@ -23,4 +23,4 @@ for file in files:
 		query = DataSet(key=key, db=database)
 	except TypeError:
 		print("Not linked to a query: %s" % file)
-		os.unlink(file)
+		os.unlink(config.PATH_DATA + "/" + file)

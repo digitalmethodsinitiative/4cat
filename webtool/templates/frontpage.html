@@ -39,11 +39,9 @@
             {% if stats %}
                 {% for platform in stats %}{% if platform != "overall" %}
                     <li>
-                        {{ platform }} ({{ stats[platform]["overall"]["posts"]|numberify }} posts)
+                        {{ platform }} ({{ stats[platform]["posts"]|numberify }} posts)
                         <ul>
-                            {% for board in stats[platform]["boards"] %}
-                                <li><code>{{ board }}</code>: {{ stats[platform]["boards"][board]["posts"]|numberify }} posts (since {{ stats[platform]["boards"][board]["first"]|datetime('%-d %b %Y') }})</li>
-                            {% endfor %}
+                            <li>since {{ stats[platform]["first"]|datetime('%-d %b %Y') }}</li>
                         </ul>
                     </li>
                 {% endif %}{% endfor %}

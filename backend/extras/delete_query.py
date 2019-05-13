@@ -36,36 +36,6 @@ except TypeError:
 	print("No query found with that key.")
 	sys.exit(1)
 
-# Find subqueries/analyses/postprocessors
-keys = [row["key"] for row in database.fetchall("SELECT key FROM queries WHERE key_parent = %s", (parent.key,))]
-keys.append(parent.key)
 
-# Delete all of them
-for key in keys:
-	try:
-		query = DataSet(key=key, db=database)
-	except TypeError as e:
-		print("Could not initialize query %s (%s), skipping." % (key, e))
-		continue
-
-	# If a job is queued for the query, delete it too
-	if "job" in query.parameters:
-		try:
-			job = Job.get_by_ID(query.parameters["job"], database)
-			print("Finishing job %s..." % job.data["id"])
-			job.finish()
-		except JobNotFoundException:
-			pass
-
-	# If there is a result file already, delete it
-	path = query.get_results_path()
-	if os.path.isfile(path):
-		print("Deleting %s..." % path)
-		os.unlink(path)
-
-	# Finally, delete it from the database
-	print("Deleting query %s from database..." % query.key)
-	database.delete("queries", where={"key": query.key})
-
-print(
-	"Done. Note that running jobs for the queries above are not stopped; you will have to wait for them to finish on their own.")
+parent.delete()
+print("Done. Note that running jobs for the queries above are not stopped; you will have to wait for them to finish on their own.")
