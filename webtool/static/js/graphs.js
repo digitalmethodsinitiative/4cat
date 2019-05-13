@@ -95,7 +95,7 @@ var graphs = {
         });
 
         $('.graph-nav').each(function () {
-            $(this).find('option:eq(1)').prop('selected', true);
+            $(this).find('option:eq(0)').prop('selected', true);
             $(this).trigger('change');
         });
     }
