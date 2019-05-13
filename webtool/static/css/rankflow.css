@@ -10,7 +10,7 @@
 #chart {
     width: 100%;
     _width: 500px;
-    overflow: auto;
+    overflow: visible;
     clear: left;
 }
 .invisible {
