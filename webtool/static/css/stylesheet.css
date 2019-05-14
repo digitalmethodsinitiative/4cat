@@ -81,7 +81,7 @@ p {
 	display: none;
 }
 
-.zebra {
+.zebra, .result-list li:nth-child(odd) {
 	background: #f0f4ff;
 }
 
@@ -946,10 +946,6 @@ ol.result-list {
     align-items: center;
 }
 
-.result-list > li:nth-child(even), .postprocessor-list > li:nth-child(even) {
-	background: #d6ffff;
-}
-
 .query.card .datestamp {
 	text-align: center;
 }
@@ -1099,18 +1095,11 @@ ol.postprocessor-list {
 	width: 100%;
 }
 
-.query-result > img {
+.query-result img {
 	display: block;
-	margin: 0 auto;
+	margin: 0.5em auto;
 	width: 100%;
-	max-width: 500px;
-	padding: 10px;
-}
-
-iframe.query-result-iframe {
-	width: 100%;
-	height: 700px;
-	border: none;
+	max-width: 90%;
 }
 
 #popup-panel .subquery-list {
@@ -1427,6 +1416,20 @@ li:not(.focus):not(.running) > .query-core > p {
 	border-bottom-right-radius: 0;
 }
 
+/** preview **/
+iframe.query-result-iframe {
+	width: 90%;
+	margin: 0 auto;
+	border: 0;
+	height: 700px;
+	display: block;
+	border: 1px dashed #000;
+}
+
+iframe.query-result-iframe.csvfile {
+	height: 200px;
+}
+
 /* post-processor and subquery controls */
 li > .sub-controls {
 	height: auto;
@@ -1467,6 +1470,11 @@ body.result-list .subquery-list > li:not(.focus)::before {
 	text-align: center;
 }
 
+.details-only img {
+	max-width: 75%;
+	margin: 0.5em auto;
+}
+
 .postprocessor-wrap {
 	margin-top: 0.5em;
 }
@@ -1484,7 +1492,7 @@ li.focus > .query-core > p {
 .postprocessor-list .expanded .postprocessor-options {
 	border-top: 2px solid #000;
 	margin-top: 0.5em;
-	padding: 0.5em 0;
+	padding: 0.5em;
 }
 
 .subquery-list .postprocessor-options input.numeric {
@@ -1508,4 +1516,35 @@ li.focus > .query-core > p {
 	margin: 0 1em;
 	text-align: right;
 	display: block;
+}
+
+/** CSV preview **/
+.csv-preview .warning {
+	text-align: center;
+	background: #000;
+	color: #FFF;
+	font-weight: bold;
+	position: fixed;
+	width: 100%;
+	top: 0;
+}
+
+.csv-preview table {
+	margin-top: 1em;
+}
+
+.csv-preview table, .csv-preview td {
+	border: 0;
+}
+
+.csv-preview td {
+	font-size: 0.8em;
+}
+
+.csv-preview table tr:nth-child(even) td {
+	background: #f0f4ff;
+}
+
+.csv-preview td:not(:last-child) {
+	border-right: 1px solid #808080;
 }

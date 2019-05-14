@@ -7,8 +7,8 @@
     <nav class="view-controls">
     <form action="" method="GET">
     <ul>
-        <li><label><input type="checkbox" id="all-results" name="all_results"{% if all_results %} checked="checked"{% endif %} #}> Show all results, not just my own</label></li>
-        <li><input aria-label="Query filter" placeholder="Filter queries..." name="filter" value="{{ filter }}"></li>
+        <li><label><input type="checkbox" id="all-results" name="all_results"{% if filter.all_results %} checked="checked"{% endif %} #}> Show all results, not just my own</label></li>
+        <li><input aria-label="Query filter" placeholder="Filter queries..." name="filter" value="{{ filter.filter }}"></li>
     </ul>
     <button>Update</button>
     </form>
