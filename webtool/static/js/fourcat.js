@@ -143,6 +143,7 @@ function init() {
 
     //collapse post-processor options
     postprocessor.collapse_options();
+    postprocessor.resize_blocks();
 }
 
 /**
@@ -211,6 +212,8 @@ postprocessor = {
                 parent_block.find('> .sub-controls > .details-only').attr('aria-expanded', 'false');
             }
         }
+
+        postprocessor.resize_blocks();
     },
 
     /**
@@ -273,6 +276,28 @@ postprocessor = {
             }
             index += 1;
         })
+    },
+
+    resize_blocks: function() {
+        $('.query-core').each(function() {
+           let description = $(this).find('> p');
+           let button = $(this).find('> button');
+
+           let max_width = $(this).width();
+           let description_width = description.width();
+           let description_height = description.height();
+           let button_width = button.width();
+           let button_height = button.height();
+
+           $(this).removeClass('fullwidth-description').removeClass('fullwidth-button');
+           if(description_width + button_width > max_width || button_height > description_height) {
+               if(description_width > button_width || button_height > description_height) {
+                   $(this).addClass('fullwidth-description');
+               } else {
+                   $(this).addClass('fullwidth-button');
+               }
+           }
+        });
     }
 };
 

@@ -33,7 +33,7 @@ setup(
 		"APScheduler==3.5.3",
 		"Flask_Limiter==1.0.1",
 		"Flask_Login==0.4.1",
-		"nltk==3.3",
+		"nltk==3.4.1",
 		"Pillow==5.3.0",
 		"adjustText==0.7.3",
 		"psycopg2==2.7.5",

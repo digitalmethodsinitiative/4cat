@@ -28,14 +28,12 @@ def _jinja2_filter_numberify(number):
 
 @app.template_filter("http_query")
 def _jinja2_filter_httpquery(data):
-	query = []
-	for key in data:
-		try:
-			query[urlencode(str(key))] = urlencode(data[str(key)])
-		except TypeError:
-			pass # cannot be HTML-encoded anyway
+	data = {key: data[key] for key in data if data[key]}
 
-	return "&amp;".join([key + "=" + query[key] for key in query])
+	try:
+		return urlencode(data)
+	except TypeError:
+		return ""
 
 
 @app.template_filter('markdown')
