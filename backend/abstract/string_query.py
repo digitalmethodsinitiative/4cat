@@ -1,5 +1,6 @@
 import time
 import abc
+import re
 
 from pymysql import OperationalError, ProgrammingError
 from collections import Counter
@@ -128,10 +129,10 @@ class StringQuery(BasicWorker, metaclass=abc.ABCMeta):
 
 		# escape / since it's a special character for Sphinx
 		if query["body_query"]:
-			match.append("@body " + query["body_query"].replace("/", "\/").replace("(", "\(", ))
+			match.append("@body " + self.escape_for_sphinx(query["body_query"]))
 
 		if query["subject_query"]:
-			match.append("@subject " + query["subject_query"].replace("/", "\/").replace("(", "\(", ))
+			match.append("@subject " + self.escape_for_sphinx(query["subject_query"]))
 
 		# both possible FTS parameters go in one MATCH() operation
 		if match:
@@ -384,6 +385,19 @@ class StringQuery(BasicWorker, metaclass=abc.ABCMeta):
 		self.log.info("Dense thread filtering finished, %i threads left." % len(qualified_threads))
 		filtered_threads = tuple([thread for thread in qualified_threads])
 		return filtered_threads
+
+	def escape_for_sphinx(self, string):
+		"""
+		SphinxQL has a couple of special characters that should be escaped if
+		they are part of a query, but no native function is available to
+		provide this functionality. This method does.
+
+		Thanks: https://stackoverflow.com/a/6288301
+
+		:param str string:  String to escape
+		:return str: Escaped string
+		"""
+		return re.sub(r"([=\(\)|\-!@~\"&/\\\^\$\=])", r"\\\1", string)
 
 	@abc.abstractmethod
 	def fetch_posts(self, post_ids):
