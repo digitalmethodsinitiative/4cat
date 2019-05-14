@@ -109,6 +109,11 @@ def show_overview():
 
 		# calculate per-board data
 		for board in boards:
+			# if we match by just the board, "europe" will match both "europe"
+			# and "european", but if we sandwich it between dashes it will
+			# always match the correct files only
+			board_match = "-" + board + "-"
+
 			if data_type == "two-column":
 				items = [csv_to_list(file) for file in files if board in file]
 
@@ -118,7 +123,7 @@ def show_overview():
 
 				data[board] = items
 			else:
-				data[board] = [[["posts", int(open_and_read(file).strip())]] for file in files if board in file]
+				data[board] = [[["posts", int(open_and_read(file).strip())]] for file in files if board_match in file]
 
 			# only show last two weeks
 			data[board] = data[board][0:14]
@@ -128,7 +133,7 @@ def show_overview():
 				del data[board]
 				continue
 
-			times[board] = [int(file.split("/")[-1].split("-")[0]) for file in files if board in file]
+			times[board] = [int(file.split("/")[-1].split("-")[0]) for file in files if board_match in file]
 
 		if not data:
 			continue
