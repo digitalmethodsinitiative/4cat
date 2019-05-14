@@ -30,6 +30,16 @@
     </div>
     {% if item.is_finished() %}
     <div class="sub-controls" id="{{ item.key }}-sub">
+
+        <ul class="subquery-list" aria-expanded="false">
+            {% for subquery in item.subqueries %}
+                {% include "result-subquery-extended.html" %}
+            {% endfor %}
+        </ul>
+        <p class="details-only">
+            {{ postprocessors[item.type].description if item.type in postprocessors else "This post-processor has been deprecated but you can still download the result." }}
+        </p>
+    
         {% if postprocessors[subquery.type].extension in ("jpg", "jpeg", "png", "csv", "html") %}
             <div class="query-result">
             {% if postprocessors[subquery.type].extension == "html" %}
@@ -41,15 +51,6 @@
             {% endif %}
             </div>
         {% endif %}
-
-        <ul class="subquery-list" aria-expanded="false">
-            {% for subquery in item.subqueries %}
-                {% include "result-subquery-extended.html" %}
-            {% endfor %}
-        </ul>
-        <p class="details-only">
-            {{ postprocessors[item.type].description if item.type in postprocessors else "This post-processor has been deprecated but you can still download the result." }}
-        </p>
         <p class="details-only">
             <a class="permalink" href="/results/{{ query.key }}/#nav={{ subquery.get_breadcrumbs() }}" target="_blank">Permanent link to this analysis result (with context)</a>
         </p>
