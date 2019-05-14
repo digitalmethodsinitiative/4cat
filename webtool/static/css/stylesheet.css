@@ -81,6 +81,10 @@ p {
 	display: none;
 }
 
+.zebra {
+	background: #f0f4ff;
+}
+
 h1 {
 	margin-bottom: 0;
 }
@@ -1179,10 +1183,10 @@ iframe.query-result-iframe {
 }
 
 .postprocessor-tree li {
-	padding: 0 0 0 1em;
+	padding: 0;
 	border: 0;
 }
-.postprocessor-tree li::before {
+.postprocessor-tree > ul > li::before {
 	display: inline-block;
 	content: '';
 	border-left: 2px dotted #000;
@@ -1191,6 +1195,19 @@ iframe.query-result-iframe {
 	height: 0.85em;
 	vertical-align: top;
 	margin-top: 0.25em;
+	margin-left: 1em;
+}
+
+.postprocessor-tree > ul > li > ul, .postprocessor-tree > ul > li > span {
+	display: inline-block;
+}
+
+.postprocessor-tree ul > li > span::before {
+	content: '->';
+}
+
+.postprocessor-tree > ul > li > span::before {
+	content: none;
 }
 
 /** pagination **/
@@ -1267,6 +1284,12 @@ iframe.query-result-iframe {
 	position: absolute;
 	max-width: 25em;
 	border: 2px solid #FFF;
+}
+
+button.tooltip-trigger {
+	font-size: 0.8em;
+	position: relative;
+	top: -0.1em;
 }
 
 /* generic classes to apply 'block' appearance (rounded corners and border) */
@@ -1456,8 +1479,27 @@ li.focus > .query-core > p {
     border-bottom-right-radius: 0.5em;
 }
 
+
+.postprocessor-list .expanded .postprocessor-options {
+	border-top: 2px solid #000;
+	margin-top: 0.5em;
+	padding: 0.5em 0;
+}
+
 .subquery-list .postprocessor-options input.numeric {
 	width: 5em;
+}
+
+.postprocessor-options h4 {
+	font-size: 1em;
+	font-weight: bold;
+	text-align: center;
+}
+
+.multichoice-wrapper {
+	border-left: 2px solid #363636;
+	margin-left: 0.25em;
+	padding-left: 0.5em;
 }
 
 /** overview graphs **/

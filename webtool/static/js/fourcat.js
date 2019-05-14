@@ -263,6 +263,14 @@ postprocessor = {
             fieldset.css('height', '0');
             $(this).addClass('collapsed');
             $(this).find('button.control-postprocessor').text('Options');
+        });
+
+        let index = 0;
+        $('article > .postprocessor-list > li').each(function() {
+            if(index % 2 === 0) {
+                $(this).addClass('zebra');
+            }
+            index += 1;
         })
     }
 };
