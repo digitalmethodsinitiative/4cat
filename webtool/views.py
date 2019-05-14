@@ -91,7 +91,12 @@ def show_overview():
 		"neologisms": {
 			"type": "two-column",
 			"title": "Most-used non-standard words",
-			"chart_type": "alluvial"
+			"chart_type": "multi-line"
+		},
+		"bigrams": {
+			"type": "two-column",
+			"title": "Most-occurring bigrams",
+			"chart_type": "multi-line"
 		}
 	}
 

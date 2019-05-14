@@ -475,6 +475,8 @@ query = {
                         });
                         $('.queue-button-wrap').removeClass('hidden');
                     }
+
+                    postprocessor.resize_blocks();
                 });
             }
         });

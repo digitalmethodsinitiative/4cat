@@ -30,25 +30,43 @@ class SnapshotAnalyser(BasicWorker):
 		# queue top non-standard words
 		file_prefix = "/%i-%s-%s" % (query.parameters["max_date"], query.parameters["platform"], query.parameters["board"])
 		analysis = DataSet(parameters={
-			"next": {
+			"next": [{
 				"type": "vectorise-tokens",
 				"parameters": {
-					"next": {
+					"next": [{
 						"type": "vector-ranker",
 						"parameters": {
 							"amount": True,
 							"top": 15,
 							"copy_to": config.PATH_SNAPSHOTDATA + "%s-neologisms.csv" % file_prefix
 						}
-					}
+					}]
 				}
-			},
+			}],
 			"echobrackets": False,
 			"stem": False,
 			"lemmatise": False,
 			"timeframe": "all",
-			"stopwords": "terrier",
-			"filter": "infochimps"
+			"filter": ["wordlist-cracklib-english", "stopwords-iso-english"]
+		}, type="tokenise-posts", db=self.db, parent=query.key)
+		self.queue.add_job("tokenise-posts", remote_id=analysis.key)
+
+		# queue top bigrams
+		analysis = DataSet(parameters={
+			"next": [{
+				"type": "collocations",
+				"parameters": {
+					"n_size": 2,
+					"window_size": 3,
+					"max_output": 15,
+					"copy_to": config.PATH_SNAPSHOTDATA + "%s-bigrams.csv" % file_prefix
+				}
+			}],
+			"echobrackets": False,
+			"stem": "english",
+			"lemmatise": False,
+			"timeframe": "all",
+			"filter": ["stopwords-iso-all"]
 		}, type="tokenise-posts", db=self.db, parent=query.key)
 		self.queue.add_job("tokenise-posts", remote_id=analysis.key)
 
