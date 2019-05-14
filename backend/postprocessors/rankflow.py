@@ -21,7 +21,7 @@ class rankFlow(BasicPostProcessor):
 	description = "Create a flow-graph of elements over time."  # description displayed in UI
 	extension = "html"  # extension of result file, used internally and in UI
 
-	accepts = ["collocations"]  # query types this post-processor accepts as input
+	accepts = ["collocations", "tfidf"]  # query types this post-processor accepts as input
 
 	def process(self):
 
@@ -70,14 +70,14 @@ class rankFlow(BasicPostProcessor):
 
 			for post in csv:
 
-				# Set label names (e.g. collocation text)
-				if post["collocation"] not in labels:
-					labels.append(post["collocation"])
+				# Set label names
+				if post["text"] not in labels:
+					labels.append(post["text"])
 					label_key = str(len(result["labels"]))
 					result["labels"][label_key] = {}
-					result["labels"][label_key]["n"] = post["collocation"]
+					result["labels"][label_key]["n"] = post["text"]
 				else:
-					label_key = labels.index(post["collocation"])
+					label_key = labels.index(post["text"])
 
 				# Make a bucket when a new timestamp appears
 				if post["date"] == "overall":
@@ -91,14 +91,21 @@ class rankFlow(BasicPostProcessor):
 						time_format = "%Y-%m-%d"
 					timestamp = int(datetime.datetime.strptime(post["date"], time_format).timestamp())
 
+				# Multiply floats so they can be converted to ints (necessary for tf-idf scores)
+				value = float(post["value"])
+				if value % 1 != 0:
+					value = value * 100
+				value = int(value)
+
+				# Add values to results dict
 				if timestamp not in timestamps:
-					result["buckets"].append({"d":timestamp, "i": [[label_key, int(post["value"])]]})
+					result["buckets"].append({"d":timestamp, "i": [[label_key, value]]})
 					timestamps.append(timestamp)
 				else:
-					result["buckets"][len(result["buckets"]) - 1]["i"].append([label_key, int(post["value"])])
+					result["buckets"][len(result["buckets"]) - 1]["i"].append([label_key, value])
 
 				# Set max value
-				if int(post["value"]) > result["max"]:
-					result["max"] = int(post["value"])
+				if value > result["max"]:
+					result["max"] = value
 
 		return result

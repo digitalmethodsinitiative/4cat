@@ -113,7 +113,7 @@ class getCollocations(BasicPostProcessor):
 				# Loop through the results and store them in the results list
 				for tpl in collocations:
 					result = {}
-					result['collocation'] = ' '.join(tpl[0])
+					result['text'] = ' '.join(tpl[0])
 					result['value'] = tpl[1]
 					result['date'] = date_string
 					results.append(result)

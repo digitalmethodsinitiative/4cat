@@ -42,14 +42,14 @@ class tfIdf(BasicPostProcessor):
 			"default": 0,
 			"min": 1,
 			"max": 10000,
-			"help": "The maximum amount of days/months/years a term may appear in. Useful for fetching rare terms that are not constantly prevalent throughout dataset."
+			"help": "The minimum amount of days/months/years a term should appear in. Useful for filtering out very sporadic terms."
 		},
 		"max_df": {
 			"type": UserInput.OPTION_TEXT,
 			"default": 0,
 			"min": 1,
 			"max": 10000,
-			"help": "The minimum amount of days/months/years a term should appear in. Useful for filtering out very sporadic terms."
+			"help": "The maximum amount of days/months/years a term may appear in. Useful for fetching rare terms that are not constantly prevalent throughout dataset."
 		},
 		"max_output": {
 			"type": UserInput.OPTION_TEXT,
@@ -107,7 +107,6 @@ class tfIdf(BasicPostProcessor):
 		# Get the collocations. Returns a tuple.
 		self.query.update_status("Generating tf-idf for token set")
 		results = self.get_tfidf(tokens, dates, ngram_range=n_size, min_df=min_df, max_df=max_df, top_n=max_output)
-		print(results)
 
 		# Generate csv and finish
 		self.query.update_status("Writing to csv and finishing")
@@ -158,8 +157,8 @@ class tfIdf(BasicPostProcessor):
 			df_tim = (df_matrix.sort_values(by=[document], ascending=False))[:top_n]
 			for i in range(top_n):
 				result = {}
-				result['terms'] = df_tim.index.values[i]
-				result['values'] = df_tim[document].values[i].tolist()
-				result['dates'] = document
+				result['text'] = df_tim.index.values[i]
+				result['value'] = df_tim[document].values[i].tolist()
+				result['date'] = document
 				results.append(result)
 		return results
