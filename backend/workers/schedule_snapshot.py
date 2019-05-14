@@ -1,3 +1,4 @@
+import math
 import os
 
 import config
@@ -20,7 +21,9 @@ class SnapshotScheduler(BasicWorker):
 			return
 
 		for platform in config.PLATFORMS:
-			if "boards" not in config.PLATFORMS[platform] or config.PLATFORMS[platform]["boards"] == "*":
+			if not config.PLATFORMS[platform].get("snapshots", False)\
+					or not config.PLATFORMS[platform].get("boards", False) \
+					or config.PLATFORMS[platform]["boards"] == ["*"]:
 				# we need specific boards to queue the snapshot for
 				continue
 
@@ -34,7 +37,13 @@ class SnapshotScheduler(BasicWorker):
 					# make epoch closest timestamp that is the original
 					# timestamp plus a multiple of the interval while still
 					# being less than or equal to the claim time
-					epoch = self.loop_time - ((self.loop_time - self.job.data["timestamp"]) % self.job.data["interval"])
+
+					# this ensures the snapshots will always have exactly a
+					# 24-hour gap between them
+					repeats = math.floor(
+						(self.job.data["timestamp_lastclaimed"] - self.job.data["timestamp"]) / self.job.data[
+							"interval"])
+					epoch = self.job.data["timestamp"] + (repeats * self.job.data["interval"])
 				else:
 					epoch = self.job.details["epoch"]
 
