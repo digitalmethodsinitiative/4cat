@@ -3,25 +3,22 @@ Calculate word collocations from tokens
 """
 import zipfile
 import pickle
-import shutil
 import os
-import itertools
 
 import operator
-from collections import OrderedDict, Counter
 from nltk.collocations import *
 
 from backend.lib.helpers import UserInput
 from backend.abstract.postprocessor import BasicPostProcessor
 
-class getCollocations(BasicPostProcessor):
+class GetCollocations(BasicPostProcessor):
 	"""
 	Generates word collocations from input tokens
 	"""
 	type = "collocations"  # job type ID
 	category = "Text analysis"  # category
 	title = "Word collocations"  # title displayed in UI
-	description = "Extracts word collocations from as set of tokens."  # description displayed in UI
+	description = "Extracts word collocations from a set of tokens."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
 	accepts = ["tokenise-posts"]  # query types this post-processor accepts as input

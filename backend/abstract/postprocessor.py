@@ -71,9 +71,9 @@ class BasicPostProcessor(BasicWorker, metaclass=abc.ABCMeta):
 			self.query.finish()
 
 		# see if we have anything else lined up to run next
-		if "next" in self.parameters:
-			next_parameters = self.parameters["next"].get("parameters", {})
-			next_type = self.parameters["next"].get("type", "")
+		for next in self.parameters.get("next", []):
+			next_parameters = next.get("parameters", {})
+			next_type = next.get("type", "")
 			available_postprocessors = self.query.get_available_postprocessors()
 
 			# run it only if the post-processor is actually available for this query
