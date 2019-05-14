@@ -7,10 +7,7 @@ import csv
 import json
 import glob
 import config
-import datetime
 import markdown
-
-from urllib.parse import urlencode
 
 from flask import render_template, jsonify, abort, request, redirect, send_from_directory, flash, get_flashed_messages
 from flask_login import login_required, current_user
@@ -19,41 +16,6 @@ from webtool.lib.helpers import Pagination, get_preview
 
 from backend.lib.query import DataSet
 from backend.lib.helpers import get_absolute_folder, UserInput, load_postprocessors
-
-
-@app.template_filter('datetime')
-def _jinja2_filter_datetime(date, fmt=None):
-	date = datetime.datetime.fromtimestamp(date)
-	format = "%d-%m-%Y" if not fmt else fmt
-	return date.strftime(format)
-
-
-@app.template_filter('numberify')
-def _jinja2_filter_numberify(number):
-	try:
-		number = int(number)
-	except TypeError:
-		return number
-
-	if number > 1000000:
-		return str(int(number / 1000000)) + "m"
-	elif number > 1000:
-		return str(int(number / 1000)) + "k"
-
-	return str(number)
-
-@app.template_filter("http_query")
-def _jinja2_filter_httpquery(data):
-	return urlencode(data)
-
-
-@app.template_filter('markdown')
-def _jinja2_filter_markdown(text):
-	return markdown.markdown(text)
-
-@app.template_filter('json')
-def _jinja2_filter_json(data):
-	return json.dumps(data)
 
 @app.route("/robots.txt")
 def robots():
@@ -245,8 +207,6 @@ def get_result(query_file):
 	# Return localhost URL when debugging locally
 	if app.debug:
 		return redirect("http://localhost/fourcat/data/" + query_file)
-	
-	return send_from_directory(query.get_results_path().replace("\\", "/"), query.get_results_path().replace("\\", "/").split("/").pop())
 
 @app.route('/results/', defaults={'page': 1})
 @app.route('/results/page/<int:page>/')
@@ -344,6 +304,38 @@ def show_result(key):
 	template = "result.html" if standalone else "result-details-extended.html"
 	return render_template(template, preview=preview, query=query, postprocessors=load_postprocessors(),
 						   is_postprocessor_running=is_postprocessor_running, messages=get_flashed_messages())
+
+@app.route("/preview-csv/<string:key>/")
+@login_required
+def preview_csv(key):
+	"""
+	Preview a CSV file
+
+	Simply passes the first 25 rows of a query's csv result file to the
+	template renderer.
+
+	:param str key:  Query key
+	:return:  HTML preview
+	"""
+	try:
+		query = DataSet(key=key, db=db)
+	except TypeError:
+		abort(404)
+
+	try:
+		with open(query.get_results_path()) as csvfile:
+			rows = []
+			reader = csv.reader(csvfile)
+			while len(rows) < 25:
+				try:
+					row = next(reader)
+					rows.append(row)
+				except StopIteration:
+					break
+	except FileNotFoundError:
+		abort(404)
+
+	return render_template("result-csv-preview.html", rows=rows, filename=query.get_results_path().split("/")[-1])
 
 @app.route('/results/<string:key>/postprocessors/queue/<string:postprocessor>/', methods=["GET", "POST"])
 @login_required

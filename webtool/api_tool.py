@@ -203,6 +203,37 @@ def check_query():
 
 	return jsonify(status)
 
+@app.route("/api/delete-query/", methods=["DELETE", "POST"])
+@api_ratelimit
+@login_required
+@openapi.endpoint
+def delete_query():
+	"""
+	Delete a query
+
+	Only available to administrators. Deletes a query, as well as any
+	subqueries linked to it, from 4CAT. Calling this on a query that is
+	currently being executed is undefined behaviour.
+
+	:request-param str query_key:  ID of the query for which to return the status
+    :request-param str ?access_token:  Access token; only required if not
+                                       logged in currently.
+
+	:return: A dictionary with either an `error` or a successful `status`.
+	"""
+	if not current_user.is_admin():
+		return jsonify({"error": "Not allowed"})
+
+	query_key = request.form.get("key")
+	try:
+		query = DataSet(key=query_key, db=db)
+	except TypeError:
+		return jsonify({"error": "Not a valid query key."})
+
+	query.delete()
+	return jsonify({"status": "success"})
+
+
 
 @app.route("/api/queue-postprocessor/", methods=["POST"])
 @api_ratelimit
