@@ -135,7 +135,7 @@ def load_postprocessors():
 	for key in sorted(postprocessors, key=lambda postprocessor: postprocessors[postprocessor]["category"] +
 																postprocessors[postprocessor]["name"].lower()):
 		sorted_postprocessors[key] = postprocessors[key]
-	
+
 	backup = sorted_postprocessors.copy()
 	for type in sorted_postprocessors:
 		sorted_postprocessors[type]["further"] = []
@@ -200,12 +200,13 @@ def get_software_version():
 	except OSError:
 		return ""
 
+
 def get_lib_url(file):
 	"""
 	Returns the full URL of a library file on the 4CAT server.
 	Useful when debugging as it works with localhost
 	
-	:param file str: The library file to return URL from (e.g. `raphael.js`)
+	:param str file: The library file to return URL from (e.g. `raphael.js`)
 	:return str: The absolute URL to return
 	"""
 
@@ -223,19 +224,50 @@ def get_lib_url(file):
 
 	return url
 
+
 class UserInput:
-	OPTION_TOGGLE = "toggle"
-	OPTION_CHOICE = "choice"
-	OPTION_TEXT = "string"
+	"""
+	Class for handling user input
+
+	Particularly for post-processors, it is important that user input is within
+	parameters set by the post-processor, or post-processor behaviour may be
+	undefined. This class offers a set of pre-defined form elements that can
+	easily be parsed.
+	"""
+	OPTION_TOGGLE = "toggle"  # boolean toggle (checkbox)
+	OPTION_CHOICE = "choice"  # one choice out of a list (select)
+	OPTION_TEXT = "string"  # simple string or integer (input text)
+	OPTION_MULTI = "multi"  # multiple values out of a list (select multiple)
 
 	def parse(settings, choice):
+		"""
+		Filter user input
+
+		Makes sure user input for post-processors is valid and within the
+		parameters specified by the post-processor
+
+		:param obj settings:  Settings, including defaults and valid options
+		:param choice:  The chosen option, to be parsed
+		:return:  Validated and parsed input
+		"""
 		type = settings.get("type", "")
 		if type == UserInput.OPTION_TOGGLE:
+			# simple boolean toggle
 			return choice is not None
+		elif type == UserInput.OPTION_MULTI:
+			# any number of values out of a list of possible values
+			# comma-separated during input, returned as a list of valid options
+			chosen = choice.split(",")
+			return [item for item in chosen if item in settings.get("options", [])]
 		elif type == UserInput.OPTION_CHOICE:
+			# select box
+			# one out of multiple options
+			# return option if valid, or default
 			return choice if choice in settings.get("options", []) else settings.get("default", "")
 		elif type == UserInput.OPTION_TEXT:
-			print("Input: %s" % choice)
+			# text string
+			# optionally clamp it as an integer; return default if not a valid
+			# integer
 			if "max" in settings:
 				try:
 					choice = min(settings["max"], int(choice))
@@ -250,4 +282,5 @@ class UserInput:
 
 			return choice or settings.get("default")
 		else:
+			# no filtering
 			return choice
