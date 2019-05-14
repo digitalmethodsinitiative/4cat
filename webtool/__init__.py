@@ -16,8 +16,7 @@ log = Logger()
 db = Database(logger=log, dbname=database_name, appname="frontend")
 queue = JobQueue(logger=log, database=db)
 
-
-# initialize openapi endpoint collector for later speficiation generation
+# initialize openapi endpoint collector for later specification generation
 from webtool.lib.openapi_collector import OpenAPICollector
 openapi = OpenAPICollector(app)
 
@@ -38,6 +37,9 @@ import webtool.access
 import webtool.views
 import webtool.api_tool
 import webtool.api_data
+
+# import custom jinja2 template filters
+import webtool.lib.template_filters
 
 # run it
 if __name__ == "__main__":
