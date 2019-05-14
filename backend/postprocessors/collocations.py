@@ -40,24 +40,24 @@ class getCollocations(BasicPostProcessor):
 			"type": UserInput.OPTION_CHOICE,
 			"default": "3",
 			"options": {"3": "3", "4": "4", "5": "5", "6": "6"},
-			"help": "Window size - The range of words taken into account when calculating collocations"
+			"help": "Window size"
 		},
 		"query_string": {
 			"type": UserInput.OPTION_TEXT,
 			"default": "",
-			"help": "Match string - Optional word that must be in the collocation sets. Separate with , to include multiple match words"
+			"help": "Required words (comma-separated)"
+		},
+		"forbidden_words": {
+			"type": UserInput.OPTION_TEXT,
+			"default": "",
+			"help": "Words to exclude (comma-separated)"
 		},
 		"max_output": {
 			"type": UserInput.OPTION_TEXT,
 			"default": "25",
 			"min": 1,
 			"max": 100,
-			"help": "Output number - The amount of collocations to return per timeframe"
-		},
-		"forbidden_words": {
-			"type": UserInput.OPTION_TEXT,
-			"default": "",
-			"help": "Exclude words - Type words separated by commas that you want to exclude if they appear in a collocation set"
+			"help": "Number of results"
 		}
 	}
 
