@@ -289,7 +289,7 @@ postprocessor = {
            let button_height = button.height();
 
            $(this).removeClass('fullwidth-description').removeClass('fullwidth-button');
-           if(description_width + button_width > max_width) {
+           if(description_width + button_width > max_width || button_height > description_height) {
                if(description_width > button_width || button_height > description_height) {
                    $(this).addClass('fullwidth-description');
                } else {
