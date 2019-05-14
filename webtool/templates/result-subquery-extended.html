@@ -30,14 +30,14 @@
     </div>
     {% if item.is_finished() %}
     <div class="sub-controls" id="{{ item.key }}-sub">
-        {% if postprocessors[subquery.type].extension == "html" or postprocessors[subquery.type].extension == "png" or postprocessors[subquery.type].extension == "jpg" or postprocessors[subquery.type].extension == "gif" %}
+        {% if postprocessors[subquery.type].extension in ("jpg", "jpeg", "png", "csv", "html") %}
             <div class="query-result">
             {% if postprocessors[subquery.type].extension == "html" %}
                 <iframe class="query-result-iframe" src="/result/{{ subquery.result_file }}"></iframe>
             {% elif postprocessors[subquery.type].extension in ("png", "jpg", "jpeg", "gif") %}
                 <a href="/result/{{ subquery.result_file }}"><img class="details-only" src="/result/{{ subquery.result_file }}"></a>
             {% elif postprocessors[subquery.type].extension == "csv" %}
-                <iframe class="query-result-iframe" class="/preview-csv/{{ subquery.key }}/"></iframe>
+                <iframe class="query-result-iframe csvfile" src="/preview-csv/{{ subquery.key }}/"></iframe>
             {% endif %}
             </div>
         {% endif %}
