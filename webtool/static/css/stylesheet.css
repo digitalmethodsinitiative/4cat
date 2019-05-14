@@ -81,7 +81,7 @@ p {
 	display: none;
 }
 
-.zebra, .result-list > li:nth-child(odd) {
+.zebra, .result-list > li:nth-child(even), .postprocessor-wrap .postprocessor-list > li:nth-child(even) {
 	background: #f0f4ff;
 }
 
@@ -1370,6 +1370,35 @@ li:not(.focus) > .query-core {
 	margin-left: -2px;
 	display: block;
 	z-index: 0;
+}
+
+li:not(.focus):not(.running) > .query-core.fullwidth-description > p, li:not(.focus) > .query-core.fullwidth-description > p {
+	border-bottom-left-radius: 0;
+	border-top-right-radius: 0.5em;
+	border-bottom-right-radius: 0.5em;
+}
+
+li:not(.focus) > .query-core.fullwidth-description > button:not(.active) {
+	border-top-left-radius: 0;
+	border-top-right-radius: 0;
+	border-bottom-left-radius: 8px;
+	border-top: 0;
+	clear: left;
+	margin-left: 0;
+}
+
+li:not(.focus):not(.running) > .query-core.fullwidth-button > p, li:not(.focus) > .query-core.fullwidth-button > p {
+	border-bottom-left-radius: 0;
+	border-bottom-right-radius: 0;
+	border-bottom: 0;
+}
+
+li:not(.focus) > .query-core.fullwidth-description > button:not(.active) {
+	clear: left;
+	border-top-left-radius: 0;
+	border-top-right-radius: 0;
+	border-bottom-left-radius: 8px;
+	margin-left: 0;
 }
 
 .query-core button.active {
