@@ -30,7 +30,10 @@ def _jinja2_filter_numberify(number):
 def _jinja2_filter_httpquery(data):
 	query = []
 	for key in data:
-		query[urlencode(key)] = urlencode(data[key])
+		try:
+			query[urlencode(str(key))] = urlencode(data[str(key)])
+		except TypeError:
+			pass # cannot be HTML-encoded anyway
 
 	return "&amp;".join([key + "=" + query[key] for key in query])
 
