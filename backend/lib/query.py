@@ -275,7 +275,7 @@ class DataSet:
 		# decides to return the dict in a different order
 
 		# Return a unique key if random posts are queried
-		if "random_amount" in parameters:
+		if parameters.get("random_amount", None):
 			random_int = str(random.randint(1,10000000))
 			return hashlib.md5(random_int.encode("utf-8")).hexdigest()
 

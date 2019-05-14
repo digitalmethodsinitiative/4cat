@@ -5,7 +5,8 @@ import os
 PLATFORMS = {
 	"4chan": {  # should correspond to PLATFORM in the data source's __init__.py
 		"interval": 60,  # scrape interval for boards
-		"boards": ["pol", "v"]  # boards to scrape (and generally make available)
+		"boards": ["pol", "v"],  # boards to scrape (and generally make available)
+		"snapshots": True  # calculate daily snapshots for on the statistics page
 	}
 }
 

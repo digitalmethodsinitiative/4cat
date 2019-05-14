@@ -10,7 +10,6 @@ $(init);
 
 function init() {
     setInterval(query.update_status, 4000);
-    postprocessor.collapse_options();
 
     // Start querying when go button is clicked
     $('#query-form').bind('submit', function (e) {
@@ -121,6 +120,29 @@ function init() {
             $('#body-input').select;
         }
     });
+
+    //more user-friendly select multiple
+    $('.multichoice-wrapper').each(function() {
+        let wrapper = $(this);
+        let select = $(this).find('select');
+        let name = select.attr('name')
+        let input = $('<input type="hidden" name="' + name + '">');
+        wrapper.append(input);
+        select.find('option').each(function() {
+            checkbox_choice = $('<label><input type="checkbox" name="' + name + ':' + $(this).attr('value') + '"> ' + $(this).text() + '</label>');
+            checkbox_choice.find('input').on('change', function() {
+               let checked = wrapper.find('input:checked').map(function() {
+                  return $(this).attr('name').split(':')[1];
+               }).get();
+               input.val(checked.join(','));
+            });
+            wrapper.append(checkbox_choice);
+        });
+        select.remove();
+    });
+
+    //collapse post-processor options
+    postprocessor.collapse_options();
 }
 
 /**
