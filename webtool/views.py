@@ -7,10 +7,7 @@ import csv
 import json
 import glob
 import config
-import datetime
 import markdown
-
-from urllib.parse import urlencode
 
 from flask import render_template, jsonify, abort, request, redirect, send_from_directory, flash, get_flashed_messages
 from flask_login import login_required, current_user
@@ -19,41 +16,6 @@ from webtool.lib.helpers import Pagination, get_preview
 
 from backend.lib.query import DataSet
 from backend.lib.helpers import get_absolute_folder, UserInput, load_postprocessors
-
-
-@app.template_filter('datetime')
-def _jinja2_filter_datetime(date, fmt=None):
-	date = datetime.datetime.fromtimestamp(date)
-	format = "%d-%m-%Y" if not fmt else fmt
-	return date.strftime(format)
-
-
-@app.template_filter('numberify')
-def _jinja2_filter_numberify(number):
-	try:
-		number = int(number)
-	except TypeError:
-		return number
-
-	if number > 1000000:
-		return str(int(number / 1000000)) + "m"
-	elif number > 1000:
-		return str(int(number / 1000)) + "k"
-
-	return str(number)
-
-@app.template_filter("http_query")
-def _jinja2_filter_httpquery(data):
-	return urlencode(data)
-
-
-@app.template_filter('markdown')
-def _jinja2_filter_markdown(text):
-	return markdown.markdown(text)
-
-@app.template_filter('json')
-def _jinja2_filter_json(data):
-	return json.dumps(data)
 
 @app.route("/robots.txt")
 def robots():
@@ -245,8 +207,6 @@ def get_result(query_file):
 	# Return localhost URL when debugging locally
 	if app.debug:
 		return redirect("http://localhost/fourcat/data/" + query_file)
-	
-	return send_from_directory(query.get_results_path().replace("\\", "/"), query.get_results_path().replace("\\", "/").split("/").pop())
 
 @app.route('/results/', defaults={'page': 1})
 @app.route('/results/page/<int:page>/')
