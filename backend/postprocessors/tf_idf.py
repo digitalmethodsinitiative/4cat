@@ -42,14 +42,14 @@ class tfIdf(BasicPostProcessor):
 			"default": 1,
 			"min": 1,
 			"max": 10000,
-			"help": "The minimum amount of days/months/years a term should appear in. Useful for filtering out very sporadic terms."
+			"help": "Ignore terms that appear in less than this amount of token sets. Useful for filtering out very sporadic terms"
 		},
 		"max_df": {
 			"type": UserInput.OPTION_TEXT,
 			"default": "",
 			"min": 1,
 			"max": 10000,
-			"help": "The maximum amount of days/months/years a term may appear in. Useful for fetching rare terms that are not constantly prevalent throughout dataset. Leave emtpy if terms may appear in all sets."
+			"help": "Ignore terms that appear in more than this amount of token sets. Useful for getting rarer terms not consistent troughout the dataset. Leave empty if terms may appear in all sets"
 		},
 		"max_output": {
 			"type": UserInput.OPTION_TEXT,
@@ -105,8 +105,6 @@ class tfIdf(BasicPostProcessor):
 			min_df = len(tokens) - 1
 		if max_df == 0 or max_df == "" or max_df > len(tokens):
 			max_df = len(tokens)
-		else:
-			max_df = len(tokens) - max_df
 
 		# Get the collocations. Returns a tuple.
 		self.query.update_status("Generating tf-idf for token set")

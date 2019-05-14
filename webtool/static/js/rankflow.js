@@ -125,12 +125,14 @@ var process = function (json) {
             var current = null;
             (function (i) {
                 paths[i].p.mouseover(function () {
-                    current = i;
-                    labels[i].show();
                     paths[i].p.toFront();
                     labels[i].toFront();
                     username2.innerHTML = json.labels[i].n + " <em>";
                     legend2.style.backgroundColor = paths[i].p.attr("fill");
+                    for (path in paths) {
+                        paths[path].p.attr("stroke", paths[path].p.attr("fill"))
+                    }
+                    paths[i].p.attr("stroke", "red").attr("stroke-width", "1");
                     nameholder2.className = "";
                     placeholder.className = "hidden";
                 });
