@@ -47,7 +47,7 @@ class SnapshotAnalyser(BasicWorker):
 			"stem": False,
 			"lemmatise": False,
 			"timeframe": "all",
-			"filter": ["wordlist-cracklib-english", "stopwords-iso-english"]
+			"filter": ["wordlist-cracklib-english", "wordlist-unknown-dutch", "stopwords-iso-all"]
 		}, type="tokenise-posts", db=self.db, parent=query.key)
 		self.queue.add_job("tokenise-posts", remote_id=analysis.key)
 
