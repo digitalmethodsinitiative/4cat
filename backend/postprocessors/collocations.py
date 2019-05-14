@@ -66,13 +66,6 @@ class getCollocations(BasicPostProcessor):
 		Unzips token sets, vectorises them and zips them again.
 		"""
 
-		dirname = self.query.get_results_path().replace(".", "")
-
-		self.query.update_status("Processing token sets")
-		vector_paths = []
-
-		# Dictionary to save queries from
-		results = []
 
 		# Validate and process user inputs
 		n_size = int(self.parameters["n_size"])
@@ -87,6 +80,13 @@ class getCollocations(BasicPostProcessor):
 			forbidden_words = self.parameters["forbidden_words"].replace(" ", "").lower().split(',')
 		else:
 			forbidden_words = False
+
+		# Get token sets
+		self.query.update_status("Processing token sets")
+		dirname = self.query.get_results_path().replace(".", "")
+
+		# Dictionary to save queries from
+		results = []
 
 		# Go through all archived token sets and generate collocations for each
 		with zipfile.ZipFile(self.source_file, "r") as token_archive:
