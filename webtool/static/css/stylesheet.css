@@ -947,7 +947,7 @@ ol.result-list {
 }
 
 .result-list > li:nth-child(even), .postprocessor-list > li:nth-child(even) {
-	/*background: #d1e2ff;*/
+	background: #d6ffff;
 }
 
 .query.card .datestamp {

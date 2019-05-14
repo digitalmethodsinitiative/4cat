@@ -66,28 +66,27 @@ class getCollocations(BasicPostProcessor):
 		Unzips token sets, vectorises them and zips them again.
 		"""
 
-		dirname = self.query.get_results_path().replace(".", "")
 
-		self.query.update_status("Processing token sets")
-		vector_paths = []
-
-		# Dictionary to save queries from
-		results = []
-
-		# Validate and process some user inputs
+		# Validate and process user inputs
 		n_size = int(self.parameters["n_size"])
 		window_size = int(self.parameters["window_size"])
-
 		query_string = self.parameters["query_string"].replace(" ", "")
+		max_output = int(self.parameters["max_output"])
 		if query_string != "":
 			query_string = query_string.lower().split(',')
 		else:
 			query_string = False
-		max_output = int(self.parameters["max_output"])
 		if self.parameters["forbidden_words"] != "":
 			forbidden_words = self.parameters["forbidden_words"].replace(" ", "").lower().split(',')
 		else:
 			forbidden_words = False
+
+		# Get token sets
+		self.query.update_status("Processing token sets")
+		dirname = self.query.get_results_path().replace(".", "")
+
+		# Dictionary to save queries from
+		results = []
 
 		# Go through all archived token sets and generate collocations for each
 		with zipfile.ZipFile(self.source_file, "r") as token_archive:
@@ -122,7 +121,7 @@ class getCollocations(BasicPostProcessor):
 		if not results:
 			return
 
-		# Generate csv
+		# Generate csv and finish
 		self.query.update_status("Writing to csv and finishing")				
 		self.query.write_csv_and_finish(results)
 
