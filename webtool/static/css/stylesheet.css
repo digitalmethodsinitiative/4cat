@@ -1459,6 +1459,10 @@ iframe.query-result-iframe.csvfile {
 	height: 200px;
 }
 
+.subquery.focus:not(.card) > .sub-controls > .query-result > .query-result-iframe {
+	display: none;
+}
+
 /* post-processor and subquery controls */
 li > .sub-controls {
 	height: auto;
