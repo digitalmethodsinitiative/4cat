@@ -68,11 +68,9 @@ var process = function (json) {
                 }
                 p.f.push([x, h, flows[i][1]]);
 
-                // Change block_height to increase block size 
-                block_height = 10
-                height = Math.max(Math.round(Math.log(flows[i][1]) * block_height), 1)
-                console.log(height)
-                p.b.unshift([x, h += height]);
+                // Block_height is relative
+                block_height =  (flows[i][1] / json.max) * 100
+                p.b.unshift([x, h += block_height]);
                 h += 2;
             }
             // Set dates
@@ -138,7 +136,6 @@ var process = function (json) {
                 });
             })(i);
         }
-        console.log(labels)
     }
 
     function getRandomColour(min, max){
