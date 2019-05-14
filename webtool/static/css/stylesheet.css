@@ -946,10 +946,6 @@ ol.result-list {
     align-items: center;
 }
 
-.result-list > li:nth-child(even), .postprocessor-list > li:nth-child(even) {
-	background: #d6ffff;
-}
-
 .query.card .datestamp {
 	text-align: center;
 }
