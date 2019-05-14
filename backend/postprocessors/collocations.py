@@ -54,12 +54,14 @@ class getCollocations(BasicPostProcessor):
 		},
 		"max_output": {
 			"type": UserInput.OPTION_TEXT,
-			"default": "25",
+			"default": 10,
 			"min": 1,
 			"max": 100,
 			"help": "Number of results"
 		}
 	}
+
+	
 
 	def process(self):
 		"""

@@ -57,9 +57,7 @@ class rankFlow(BasicPostProcessor):
 
 		"""
 
-		result = {"max": 0, "buckets":[], "labels": {}
-			}
-
+		result = {"max": 0, "buckets":[], "labels": {}}
 		
 		# Open and loop through the source file
 		with open(source_file, encoding="utf-8") as source:
@@ -91,7 +89,7 @@ class rankFlow(BasicPostProcessor):
 						time_format = "%Y-%m-%d"
 					timestamp = int(datetime.datetime.strptime(post["date"], time_format).timestamp())
 
-				# Multiply floats so they can be converted to ints (necessary for tf-idf scores)
+				# Multiply small floats so they can be converted to ints (necessary for tf-idf scores)
 				value = float(post["value"])
 				if value % 1 != 0:
 					value = value * 100
