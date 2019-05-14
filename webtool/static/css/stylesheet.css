@@ -81,7 +81,7 @@ p {
 	display: none;
 }
 
-.zebra, .result-list li:nth-child(odd) {
+.zebra, .result-list > li:nth-child(odd) {
 	background: #f0f4ff;
 }
 
