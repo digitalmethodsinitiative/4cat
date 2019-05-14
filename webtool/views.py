@@ -115,7 +115,7 @@ def show_overview():
 			board_match = "-" + board + "-"
 
 			if data_type == "two-column":
-				items = [csv_to_list(file) for file in files if board in file]
+				items = [csv_to_list(file) for file in files if board_match in file]
 
 				# potentially this is a list of empty lists, which means we're not interested
 				if not [item for item in items if item]:
