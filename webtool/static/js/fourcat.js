@@ -231,6 +231,7 @@ postprocessor = {
             li.removeClass('collapsed').addClass('expanded');
             li.find('fieldset').css('height', li.attr('data-options-height') + 'px');
         } else {
+            $('html,body').scrollTop(200);
             let form = $(this).parents('form');
             $.ajax(form.attr('action') + '?async', {
                 'method': form.attr('method'),

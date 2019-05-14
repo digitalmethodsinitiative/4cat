@@ -220,7 +220,7 @@ def get_lib_url(file):
 	if config.FlaskConfig.SERVER_NAME == "localhost:5000":
 		url = "http://localhost/fourcat/webtool/static/" + ext + file
 	else:
-		url = get_absolute_folder("") + "static/" + ext + file
+		url = "https://" + config.FlaskConfig.SERVER_NAME + "/static/" + ext + file
 
 	return url
 

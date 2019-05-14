@@ -68,11 +68,9 @@ var process = function (json) {
                 }
                 p.f.push([x, h, flows[i][1]]);
 
-                // Change block_height to increase block size 
-                block_height = 10
-                height = Math.max(Math.round(Math.log(flows[i][1]) * block_height), 1)
-                console.log(height)
-                p.b.unshift([x, h += height]);
+                // Block_height is relative
+                block_height =  (flows[i][1] / json.max) * 100
+                p.b.unshift([x, h += block_height]);
                 h += 2;
             }
             // Set dates
@@ -127,18 +125,19 @@ var process = function (json) {
             var current = null;
             (function (i) {
                 paths[i].p.mouseover(function () {
-                    current = i;
-                    labels[i].show();
                     paths[i].p.toFront();
                     labels[i].toFront();
                     username2.innerHTML = json.labels[i].n + " <em>";
                     legend2.style.backgroundColor = paths[i].p.attr("fill");
+                    for (path in paths) {
+                        paths[path].p.attr("stroke", paths[path].p.attr("fill"))
+                    }
+                    paths[i].p.attr("stroke", "red").attr("stroke-width", "1");
                     nameholder2.className = "";
                     placeholder.className = "hidden";
                 });
             })(i);
         }
-        console.log(labels)
     }
 
     function getRandomColour(min, max){

@@ -39,21 +39,21 @@ class tfIdf(BasicPostProcessor):
 		},
 		"min_df": {
 			"type": UserInput.OPTION_TEXT,
-			"default": 0,
+			"default": 1,
 			"min": 1,
 			"max": 10000,
-			"help": "The minimum amount of days/months/years a term should appear in. Useful for filtering out very sporadic terms."
+			"help": "Ignore terms that appear in less than this amount of token sets. Useful for filtering out very sporadic terms"
 		},
 		"max_df": {
 			"type": UserInput.OPTION_TEXT,
-			"default": 0,
+			"default": "",
 			"min": 1,
 			"max": 10000,
-			"help": "The maximum amount of days/months/years a term may appear in. Useful for fetching rare terms that are not constantly prevalent throughout dataset."
+			"help": "Ignore terms that appear in more than this amount of token sets. Useful for getting rarer terms not consistent troughout the dataset. Leave empty if terms may appear in all sets"
 		},
 		"max_output": {
 			"type": UserInput.OPTION_TEXT,
-			"default": "25",
+			"default": 10,
 			"min": 1,
 			"max": 100,
 			"help": "Output number - The amount of words to return per timeframe"
@@ -68,7 +68,9 @@ class tfIdf(BasicPostProcessor):
 		# Validate and process user inputs - parse to int
 		n_size = (int(self.parameters["n_size"]),int(self.parameters["n_size"]))
 		min_df = int(self.parameters["min_df"])
-		max_df = int(self.parameters["max_df"])
+		max_df = self.parameters["min_df"]
+		if max_df != "":
+			max_df = int(self.parameters["max_df"])
 		max_output = int(self.parameters["max_output"])
 
 		# Get token sets
@@ -97,12 +99,12 @@ class tfIdf(BasicPostProcessor):
 				os.unlink(temp_path)
 
 		# Make sure `min_df` and `max_df` are valid
-		if min_df > len(tokens):
-			min_df = len(tokens)
-		if max_df == 0 or max_df > len(tokens):
+		if min_df == 0:
+			min_df = 1
+		elif min_df > len(tokens):
+			min_df = len(tokens) - 1
+		if max_df == 0 or max_df == "" or max_df > len(tokens):
 			max_df = len(tokens)
-		else:
-			max_df = len(tokens) - max_df
 
 		# Get the collocations. Returns a tuple.
 		self.query.update_status("Generating tf-idf for token set")
