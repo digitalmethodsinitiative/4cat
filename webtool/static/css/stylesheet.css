@@ -1095,12 +1095,11 @@ ol.postprocessor-list {
 	width: 100%;
 }
 
-.query-result > img {
+.query-result img {
 	display: block;
-	margin: 0 auto;
+	margin: 0.5em auto;
 	width: 100%;
-	max-width: 500px;
-	padding: 10px;
+	max-width: 90%;
 }
 
 #popup-panel .subquery-list {
