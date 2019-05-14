@@ -1110,6 +1110,7 @@ ol.postprocessor-list {
 iframe.query-result-iframe {
 	width: 100%;
 	height: 700px;
+	border: none;
 }
 
 #popup-panel .subquery-list {
