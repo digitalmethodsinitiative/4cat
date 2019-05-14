@@ -305,6 +305,38 @@ def show_result(key):
 	return render_template(template, preview=preview, query=query, postprocessors=load_postprocessors(),
 						   is_postprocessor_running=is_postprocessor_running, messages=get_flashed_messages())
 
+@app.route("/preview-csv/<string:key>/")
+@login_required
+def preview_csv(key):
+	"""
+	Preview a CSV file
+
+	Simply passes the first 25 rows of a query's csv result file to the
+	template renderer.
+
+	:param str key:  Query key
+	:return:  HTML preview
+	"""
+	try:
+		query = DataSet(key=key, db=db)
+	except TypeError:
+		abort(404)
+
+	try:
+		with open(query.get_results_path()) as csvfile:
+			rows = []
+			reader = csv.reader(csvfile)
+			while len(rows) < 25:
+				try:
+					row = next(reader)
+					rows.append(row)
+				except StopIteration:
+					break
+	except FileNotFoundError:
+		abort(404)
+
+	return render_template("result-csv-preview.html", rows=rows, filename=query.get_results_path().split("/")[-1])
+
 @app.route('/results/<string:key>/postprocessors/queue/<string:postprocessor>/', methods=["GET", "POST"])
 @login_required
 def queue_postprocessor(key, postprocessor, is_async=False):
