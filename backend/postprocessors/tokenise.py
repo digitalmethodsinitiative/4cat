@@ -50,6 +50,11 @@ class Tokenise(BasicPostProcessor):
 			"default": False,
 			"help": "Lemmatise tokens (English only)"
 		},
+		"exclude_duplicates": {
+			"type": UserInput.OPTION_TOGGLE,
+			"default": False,
+			"help": "Exclude duplicate words"
+		},
 		"filter": {
 			"type": UserInput.OPTION_MULTI,
 			"default": [],
@@ -155,13 +160,16 @@ class Tokenise(BasicPostProcessor):
 				body = link_regex.sub("", post["body"])
 				tokens = token_regex.findall(body)
 
+				# Only keep unique terms if indicated
+				if self.parameters["exclude_duplicates"]:
+					tokens = set(tokens)
+
 				# stem, lemmatise and save tokens that are not stopwords
 				for token in tokens:
 					token = token.lower()
 
 					if token in word_filter:
 						continue
-
 					if self.parameters["stem"]:
 						token = stemmer.stem(token)
 
