@@ -24,20 +24,15 @@ class VectorRanker(BasicPostProcessor):
 	accepts = ["vectorise-tokens"]
 
 	options = {
-		"exclude-top": {
+		"top": {
 			"type": UserInput.OPTION_TEXT,
-			"default": 0,
-			"help": "Exclude top x items"
+			"default": 100,
+			"help": "Cut-off for top list"
 		},
 		"amount": {
 			"type": UserInput.OPTION_TOGGLE,
 			"default": False,
 			"help": "Include number of occurrences"
-		},
-		"top": {
-			"type": UserInput.OPTION_TEXT,
-			"default": 100,
-			"help": "Cut-off for top list"
 		}
 	}
 
@@ -103,7 +98,7 @@ class VectorRanker(BasicPostProcessor):
 
 		# truncate results as needed
 		try:
-			cutoff = self.parameters.get("top", 100)
+			cutoff = int(self.parameters.get("top", 100))
 		except TypeError:
 			cutoff = 10
 

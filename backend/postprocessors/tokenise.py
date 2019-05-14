@@ -9,7 +9,6 @@ import os
 import shutil
 
 from csv import DictReader
-from stop_words import get_stop_words
 from nltk.stem.snowball import SnowballStemmer
 from nltk.stem.wordnet import WordNetLemmatizer
 
@@ -29,47 +28,41 @@ class Tokenise(BasicPostProcessor):
 	extension = "zip"  # extension of result file, used internally and in UI
 
 	options = {
-		"echobrackets": {
-			"type": UserInput.OPTION_TOGGLE,
-			"default": False,
-			"help": "Allow (parentheses) in tokens"
-		},
-		"stem": {
-			"type": UserInput.OPTION_TOGGLE,
-			"default": False,
-			"help": "Stem tokens (English only)"
-		},
-		"lemmatise": {
-			"type": UserInput.OPTION_TOGGLE,
-			"default": False,
-			"help": "Lemmatise tokens (English only)"
-		},
 		"timeframe": {
 			"type": UserInput.OPTION_CHOICE,
 			"default": "all",
 			"options": {"all": "Overall", "year": "Year", "month": "Month", "day": "Day"},
 			"help": "Produce files per"
 		},
-		"stopwords": {
-			"type": UserInput.OPTION_CHOICE,
-			"default": "terrier",
-			"options": {
-				"nltk": "NLTK (the NLTK package's list)",
-				"terrier": "Terrier (most expansive)",
-				"snowball": "Snowball (the Snowball Stemmer's list)",
-				"iso": "English stopwords (stopwords-iso)",
-				"dutch": "Dutch stopwords (stopwords-iso)",
-				"none": "None"},
-			"help": "Stopword filter"
-		},
-		"filter": {
+		"stem": {
 			"type": UserInput.OPTION_CHOICE,
 			"default": "none",
+			"options": {"none": "No stemming", **{language: language[0].upper() + language[1:] for language in SnowballStemmer.languages}},
+			"help": "Stem tokens (with SnowballStemmer)"
+		},
+		"echobrackets": {
+			"type": UserInput.OPTION_TOGGLE,
+			"default": False,
+			"help": "Allow (parentheses) in tokens"
+		},
+		"lemmatise": {
+			"type": UserInput.OPTION_TOGGLE,
+			"default": False,
+			"help": "Lemmatise tokens (English only)"
+		},
+		"filter": {
+			"type": UserInput.OPTION_MULTI,
+			"default": [],
 			"options": {
-				"none": "None (do not exclude words)",
-				"infochimps": "Exclude normal English (InfoChimps/dwyl word list)",
-				"dutch": "Exclude Dutch words (unknown origin)"},
-			"help": "Exclude words"
+				"stopwords-terrier-english": "English stopwords (terrier, recommended)",
+				"stopwords-iso-english": "English stopwords (stopwords-iso)",
+				"stopwords-iso-dutch": "Dutch stopwords (stopwords-iso)",
+				"stopwords-iso-all": "Multi-language stopwords (stopwords-iso)",
+				"wordlist-cracklib-english": "English word list (cracklib, recommended)",
+				"wordlist-infochimps-english": "English word list (infochimps)",
+				"wordlist-unknown-dutch": "Dutch word list (unknown)"
+			},
+			"help": "Word lists to exclude (i.e. not tokenise)"
 		}
 	}
 
@@ -84,42 +77,20 @@ class Tokenise(BasicPostProcessor):
 		token_regex = re.compile(r"[a-zA-Z\-]{3,50}")
 		token_regex_echobrackets = re.compile(r"[a-zA-Z\-\)\(]{3,50}")
 
-		# load stopwords - we have a few options here
-		try:
-			if self.parameters["stopwords"] == "nltk":
-				stopwords = get_stop_words("en")
-			elif self.parameters["stopwords"] == "terrier":
-				with open(config.PATH_ROOT + "/backend/assets/stopwords-terrier.pb", "rb") as input:
-					stopwords = pickle.load(input)
-			elif self.parameters["stopwords"] == "snowball":
-				with open(config.PATH_ROOT + "/backend/assets/stopwords-snowball.pb", "rb") as input:
-					stopwords = pickle.load(input)
-			elif self.parameters["stopwords"] == "dutch":
-				with open(config.PATH_ROOT + "/backend/assets/stopwords-dutch.pb", "rb") as input:
-					stopwords = pickle.load(input)
-			else:
-				stopwords = []
-		except FileNotFoundError:
-			self.log.error("Could not load stopwords file for stopwords option %s in query %s" % (self.parameters["stopwords"], self.query.key))
-			stopwords = []
+		# load word filters - words to exclude from tokenisation
+		word_filter = set()
+		for wordlist in self.parameters["filter"]:
+			with open(config.PATH_ROOT + "/backend/assets/%s.pb" % wordlist, "rb") as input:
+				word_filter = set.union(word_filter, pickle.load(input))
 
-		# load filter if needed
-		try:
-			if self.parameters["filter"] == "infochimps":
-				with open(config.PATH_ROOT + "/backend/assets/wordlist-infochimps.pb", "rb") as input:
-					word_filter = pickle.load(input)
-			elif self.parameters["filter"] == "dutch":
-				with open(config.PATH_ROOT + "/backend/assets/wordlist-dutch.pb", "rb") as input:
-					word_filter = pickle.load(input)
-			else:
-				word_filter = []
-		except FileNotFoundError:
-			self.log.error("Could not load word list for exclusion filter %s in query %s" % (self.parameters["filter"], self.query.key))
-			word_filter = []
+		# initialise pre-processors if needed
+		if self.parameters["stem"]:
+			stemmer = SnowballStemmer("english")
 
-		stemmer = SnowballStemmer("english")
-		lemmatizer = WordNetLemmatizer()
+		if self.parameters["lemmatise"]:
+			lemmatizer = WordNetLemmatizer()
 
+		# this is how we'll keep track of the subsets of tokens
 		subunits = {}
 		current_subunit = ""
 
@@ -136,6 +107,11 @@ class Tokenise(BasicPostProcessor):
 		# this needs to go outside the loop because we need to call it one last
 		# time after the post loop has finished
 		def save_subunit(subunit):
+			"""
+			Save token set to disk
+
+			:param str subunit:  Subset ID
+			"""
 			with open(dirname + '/' + subunit + ".pb", "wb") as outputfile:
 				pickle.dump(subunits[subunit], outputfile)
 
@@ -181,12 +157,9 @@ class Tokenise(BasicPostProcessor):
 
 				# stem, lemmatise and save tokens that are not stopwords
 				for token in tokens:
-					if token in stopwords:
-						continue
-
 					token = token.lower()
 
-					if word_filter and token in word_filter:
+					if token in word_filter:
 						continue
 
 					if self.parameters["stem"]:

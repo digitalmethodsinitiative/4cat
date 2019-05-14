@@ -9,7 +9,7 @@
                         {% endif %}
                         {{ processor.description }}
                         {% if processor.description[-1] != "." %}.{% endif %}
-                        Output: {{ processor.extension }} file.{% if inline %}
+                        Output: {{ processor.extension }} file.{% if processor.further and part == "main" %} Further analyses available.{% endif %}{% if inline %}
                         </p>{% endif %}
                     </div>
                     <div class="queue-button-wrap {% if is_postprocessor_running %}hidden{% endif %}">
@@ -17,8 +17,6 @@
                     </div>
                     {% if processor.further and part == "main" %}
                         <div class="postprocessor-tree">
-                            <!-- <button class="link-like" aria-controls="postprocessor-tree-{{ processor.type }}">Show further analysis options.</button> -->
-                            <span>Subsequent analyses available:</span>
                             <ul id="postprocessor-tree-{{ processor.type }}" aria-expanded="true">
                                 {% for postprocessor in processor.further %}
                                     {% include "postprocessor-tree.html" %}
@@ -28,6 +26,7 @@
                     {% endif %}
                     {% if processor.options %}
                         <fieldset class="postprocessor-options">
+                            <h4>Options</h4>
                             {% for option in processor.options %}
                                 {% include "postprocessor-option.html" %}
                             {% endfor %}
