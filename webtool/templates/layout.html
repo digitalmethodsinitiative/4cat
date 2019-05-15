@@ -3,6 +3,9 @@
 	<title>{% block title %}4CAT: Capture and Analysis Toolkit{% endblock %} &bull; 4CAT</title>
 	<link rel="stylesheet" href="{{url_for('static', filename='css/bootstrap.min.css')}}">
 	<link rel="stylesheet" type="text/css" href="{{url_for('static', filename='css/stylesheet.css')}}">
+{% if "default"|config_override("STYLE") == "corporate" %}
+	<link rel="stylesheet" type="text/css" href="{{url_for('static', filename='css/penelope.css')}}">
+{% endif %}
 	<script type="text/javascript" src="{{url_for('static', filename='js/jquery-3.3.1.min.js')}}"></script>
 	<script type="text/javascript" src="{{url_for('static', filename='js/fourcat.js')}}"></script>
 

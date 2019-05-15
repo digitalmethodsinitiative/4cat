@@ -1,114 +1,68 @@
-body{
-	margin: 0px;
-	background-color: white;	/*background-color: #ffe;*/
+*, code, select, input, textarea {
+	font-family: 'Trebuchet MS';
+	color: #0f0f16;
 }
 
-* {
-	font-family: 'Arial', sans-serif;
-	color: black;
+select, input, textarea {
+	background: #EFEFEF;
 }
 
-#maindiv{
-	width: 700px;
-	max-width: 100%;
-	margin: 0 auto;
-	padding-left: 10px;
-	padding-right: 10px;
+a {
+	color: #ce1b28;
 }
 
-svg{
-	max-width: 100%;
+a:hover {
+	color: #ff2231;
 }
 
-line {
-	stroke: #c7c7c7;
+.permalink::before {
+	border-color: #ce1b28;
 }
 
-text {
-	stroke: maroon;
-	stroke-width: 1px;
-	cursor: pointer;
-	text-anchor: 'middle';
-	fill: maroon;
-	font-family: 'Arial', sans-serif;
-	font-size: 14;
+.permalink:hover::before {
+	border-color: #ff2231;
 }
 
-text.chan-node, .chan-indicator {
-	color:  #789922;
-	stroke: #789922;
-	fill: #789922;
-}
-
-text.chan-node:hover{
-	stroke: #789922;
-	fill: #789922;
-}
-
-text.chan-node.clicked{
-	stroke: #cc1105;
-	fill: #cc1105;
-}
-
-text.yt-node, .yt-indicator{
-	color:  red;
-	stroke: red;
-	fill: red;
-	font-family: 'Roboto', 'Arial', sans-serif;
-}
-
-text.yt-node.clicked{
-	stroke: #cc1105;
-	font-family: 'Roboto', 'Arial', sans-serif;
-	fill: red;
-}
-
-.node circle{
-	stroke: #fff;
-	stroke-width: 3px;
-	fill: #555;
-}
-
-#controlpanel{
-	background-color: #f0e0d6;
-	border: 1px solid #d9bfb7;
-	padding: 10px;
-}
-
-
-h1{
+h1, h2, h3.blocktitle, #submitpaneltitle, #resultsheader {
+	background: #ce1b28;
 	font-weight: bold;
 }
 
-p{
-	font-size: 12px;
+h1 span, h2 span, h3 span, h3.blocktitle span, #submitpaneltitle div, #resultsheader div {
+	background: transparent;
+	text-transform: none;
+	padding: 0.5em 0;
 }
 
-#alertbox{
-	max-width: 98%; 
+h1 a:hover, h2 a:hover, h3.blocktitle a:hover {
+	color: #EFEFEF;
 }
 
-p#alerts{
-	display: inline;
-	font-weight: bold;
-	color: #cc1105;
+.main-nav {
+	background: #21202e;
 }
 
-#pagetitle{
-	margin-top: 20px;
-	height: 38px;
+.main-nav li a, .main-nav li:not(:last-child):after {
+	color: #FFF;
 }
 
-#pagetitle img{
-	max-height: 60%;
-	display: inline;
+.fixed-footer {
+	background: #21202e;
+	color: #FFF;
 }
 
-#pagetitle h1{
-	display: inline;
-	padding-left: 10px;
+.fixed-footer,.fixed-footer a {
+	color: #FFF;
 }
 
-.red{
-	color: red;
+nav > ul.flat > li {
+	color: #FFF;
+}
+
+.zebra, .result-list > li:nth-child(even), .postprocessor-wrap .postprocessor-list > li:nth-child(even), .frontpage ol li:nth-child(even) {
+	background: #EEE;
+}
+
+.col-lg-3.topdiv, #buttonselections {
+	background: #EEE;
 }

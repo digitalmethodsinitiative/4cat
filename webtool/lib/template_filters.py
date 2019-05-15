@@ -5,6 +5,8 @@ import json
 from urllib.parse import urlencode
 from webtool import app
 
+import config
+
 @app.template_filter('datetime')
 def _jinja2_filter_datetime(date, fmt=None):
 	date = datetime.datetime.fromtimestamp(date)
@@ -43,3 +45,10 @@ def _jinja2_filter_markdown(text):
 @app.template_filter('json')
 def _jinja2_filter_json(data):
 	return json.dumps(data)
+
+@app.template_filter('config_override')
+def _jinja2_filter_conf(data, property=""):
+	try:
+		return getattr(config.FlaskConfig, property)
+	except AttributeError:
+		return data
