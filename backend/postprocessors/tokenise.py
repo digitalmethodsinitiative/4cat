@@ -10,7 +10,7 @@ import shutil
 
 from csv import DictReader
 from nltk.stem.snowball import SnowballStemmer
-from nltk.stem.wordnet import WordNetLemmatizer
+from nltk.stem import WordNetLemmatizer
 
 from backend.lib.helpers import UserInput
 from backend.abstract.postprocessor import BasicPostProcessor

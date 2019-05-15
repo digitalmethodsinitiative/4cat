@@ -68,7 +68,7 @@ var process = function (json) {
                 }
                 p.f.push([x, h, flows[i][1]]);
 
-                // Block_height is relative
+                // Block_height is relative to the max amount
                 block_height =  (flows[i][1] / json.max) * 100
                 p.b.unshift([x, h += block_height]);
                 h += 2;
