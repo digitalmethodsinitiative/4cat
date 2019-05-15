@@ -40,6 +40,7 @@ h1 a:hover, h2 a:hover, h3.blocktitle a:hover {
 
 .main-nav {
 	background: #21202e;
+	box-shadow: 0 5px 10px #888;
 }
 
 .main-nav li a, .main-nav li:not(:last-child):after {
@@ -49,6 +50,10 @@ h1 a:hover, h2 a:hover, h3.blocktitle a:hover {
 .fixed-footer {
 	background: #21202e;
 	color: #FFF;
+	background-image: url('/static/img/LogoOdycceus.svg');
+	background-repeat: no-repeat;
+	background-position: -1.75em 0.35em;
+	background-size: 12.5%;
 }
 
 .fixed-footer,.fixed-footer a {
@@ -65,4 +70,8 @@ nav > ul.flat > li {
 
 .col-lg-3.topdiv, #buttonselections {
 	background: #EEE;
+}
+
+.postprocessor-tree > ul > li::before {
+	height: 0.55em;
 }
