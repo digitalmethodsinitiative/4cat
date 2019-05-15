@@ -1,27 +1,49 @@
 var graphs = {
     init: function () {
-        Highcharts.setOptions({
-            colors: [
-                '#FF0000',
-                '#00FF00',
-                '#FFFF00',
-                '#0000FF',
-                '#FF00FF',
-                '#00FFFF',
-                '#000000',
-                '#800000',
-                '#008000',
-                '#000080',
-                '#800080',
-                '#008080',
-                '#808000',
-                '#A6CAF0',
-                '#A0A0A4',
-                '#808080',
-                '#C0C0C0',
-                '#C0DCC0',
-            ]
-        });
+        if($('body').hasClass('style-corporate')) {
+            Highcharts.setOptions({
+               colors: [
+                   "#c52731",
+                   "#98dd5c",
+                   "#39208d",
+                   "#05f1ac",
+                   "#b31585",
+                   "#2a8504",
+                   "#8256cb",
+                   "#8f8e00",
+                   "#004a92",
+                   "#da8217",
+                   "#c2a6ff",
+                   "#004700",
+                   "#ff7ba9",
+                   "#f9ce85",
+                   "#ff7d5b"
+               ]
+            });
+        } else {
+            Highcharts.setOptions({
+                colors: [
+                    '#FF0000',
+                    '#00FF00',
+                    '#FFFF00',
+                    '#0000FF',
+                    '#FF00FF',
+                    '#00FFFF',
+                    '#000000',
+                    '#800000',
+                    '#008000',
+                    '#000080',
+                    '#800080',
+                    '#008080',
+                    '#808000',
+                    '#A6CAF0',
+                    '#A0A0A4',
+                    '#808080',
+                    '#C0C0C0',
+                    '#C0DCC0',
+                ]
+            });
+        }
 
         let months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -80,7 +102,7 @@ var graphs = {
                 if (graph_container.hasClass('alluvial')) {
                     height = '75%';
                 } else {
-                    height = '33%';
+                    height = '50%';
                 }
 
                 Highcharts.chart(graph_id, {
