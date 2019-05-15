@@ -67,15 +67,28 @@ class GetCollocations(BasicPostProcessor):
 
 
 		# Validate and process user inputs
-		n_size = int(self.parameters["n_size"])
-		window_size = int(self.parameters["window_size"])
-		query_string = self.parameters["query_string"].replace(" ", "")
-		max_output = int(self.parameters["max_output"])
+		try:
+			n_size = int(self.parameters.get("n_size", 2))
+		except TypeError:
+			n_size = 2
+
+		try:
+			window_size = int(self.parameters.get("window_size", 3))
+		except TypeError:
+			window_size = 3
+
+		try:
+			max_output = int(self.parameters.get("max_output", 10))
+		except TypeError:
+			max_output = 10
+
+		query_string = self.parameters.get("query_string", "").replace(" ", "")
+		
 		if query_string != "":
 			query_string = query_string.lower().split(',')
 		else:
 			query_string = False
-		if self.parameters["forbidden_words"] != "":
+		if self.parameters.get("forbidden_words", None):
 			forbidden_words = self.parameters["forbidden_words"].replace(" ", "").lower().split(',')
 		else:
 			forbidden_words = False
