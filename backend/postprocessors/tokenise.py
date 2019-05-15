@@ -161,7 +161,7 @@ class Tokenise(BasicPostProcessor):
 				tokens = token_regex.findall(body)
 
 				# Only keep unique terms if indicated
-				if self.parameters["exclude_duplicates"]:
+				if self.parameters.get("exclude_duplicates", False):
 					tokens = set(tokens)
 
 				# stem, lemmatise and save tokens that are not stopwords
