@@ -83,9 +83,9 @@ class rankFlow(BasicPostProcessor):
 				else:
 					if len(post["date"]) == 4: # years
 						time_format = "%Y"
-					elif len(post["date"]) == 7: # months
+					elif 6 <= len(post["date"]) <= 7: # months (2018-1 or 2018-01)
 						time_format = "%Y-%m"
-					elif len(post["date"]) == 10: # days
+					elif 8 <= len(post["date"]) <= 10: # days (2018-1-1, 2018-01-1, 2018-1-01 or 2018-01-01)
 						time_format = "%Y-%m-%d"
 					timestamp = int(datetime.datetime.strptime(post["date"], time_format).timestamp())
 

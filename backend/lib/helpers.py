@@ -271,13 +271,13 @@ class UserInput:
 			if "max" in settings:
 				try:
 					choice = min(settings["max"], int(choice))
-				except TypeError as e:
+				except (ValueError, TypeError) as e:
 					choice = settings.get("default")
 
 			if "min" in settings:
 				try:
 					choice = max(settings["min"], int(choice))
-				except TypeError as e:
+				except (ValueError, TypeError) as e:
 					choice = settings.get("default")
 
 			return choice or settings.get("default")

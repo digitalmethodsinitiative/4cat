@@ -1,16 +1,13 @@
 var process = function (json) {
     var x = 0,
-        r = Raphael("chart", 2350, 550),
+        r = Raphael("chart", json.buckets.length * 110, 700),
         labels = {},
         textattr = {"font": '11px', stroke: "none", fill: "#000"},
-        paths = {},
-        nameholder = $("#name")[0],
-        nameholder2 = $("#name2")[0],
-        legend = $("#legend")[0],
-        username = $("#username")[0],
-        legend2 = $("#legend2")[0],
-        username2 = $("#username2")[0],
-        placeholder = $("#placeholder")[0];
+        paths = {}
+
+
+    // Set viewbox of graphic
+    r.setViewBox(-30,-30, json.buckets.length * 110, 700, true)
 
     function finishes() {
         for (var i in json.labels) {
@@ -69,7 +66,11 @@ var process = function (json) {
                 p.f.push([x, h, flows[i][1]]);
 
                 // Block_height is relative to the max amount
-                block_height =  (flows[i][1] / json.max) * 100
+                min_block_height = 10
+                block_height =  ((flows[i][1] / json.max) * 100)
+                if (block_height < min_block_height && block_height != 0){
+                    block_height = min_block_height    // Minimum block height
+                }
                 p.b.unshift([x, h += block_height]);
                 h += 2;
             }
@@ -96,7 +97,7 @@ var process = function (json) {
             var th = Math.round(paths[i].f[0][1] + (paths[i].b[paths[i].b.length - 1][1] - paths[i].f[0][1]) / 2 + 3);
 
             // Change `block_label` to change the text on the blocks
-            if (th < 15) {block_label = json.labels[i].n + '\n' + paths[i].f[0][2]}
+            if (th < 20) {block_label = json.labels[i].n + '\n' + paths[i].f[0][2]}
             else {block_label = json.labels[i].n + ' ' + paths[i].f[0][2]}
 
             labels[i].push(r.text(paths[i].f[0][0] + 25, th, block_label).attr(textattr));
@@ -127,14 +128,10 @@ var process = function (json) {
                 paths[i].p.mouseover(function () {
                     paths[i].p.toFront();
                     labels[i].toFront();
-                    username2.innerHTML = json.labels[i].n + " <em>";
-                    legend2.style.backgroundColor = paths[i].p.attr("fill");
                     for (path in paths) {
                         paths[path].p.attr("stroke", paths[path].p.attr("fill"))
                     }
                     paths[i].p.attr("stroke", "red").attr("stroke-width", "1");
-                    nameholder2.className = "";
-                    placeholder.className = "hidden";
                 });
             })(i);
         }
