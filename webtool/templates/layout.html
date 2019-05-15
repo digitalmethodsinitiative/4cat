@@ -19,7 +19,7 @@
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 </head>
-<body class="{% block body_class%}{% endblock %}">
+<body class="{% block body_class%}{% endblock %} style-{{ "default"|config_override("STYLE") }}">
 	<h1><span><a href="/">{% block site_header %}4CAT: Capture and Analysis Toolkit{% endblock %}</a></span></h1>
 	<nav class="main-nav">
 		<ul>
