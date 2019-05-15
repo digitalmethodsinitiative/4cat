@@ -7,6 +7,11 @@ PLATFORMS = {
 		"interval": 60,  # scrape interval for boards
 		"boards": ["pol", "v"],  # boards to scrape (and generally make available)
 		"snapshots": True  # calculate daily snapshots for on the statistics page
+	},
+	"reddit" = {
+		"interval": 60,
+		"boards": ["europe", "politics"],
+		"snapshots": True
 	}
 }
 

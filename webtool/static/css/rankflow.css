@@ -3,61 +3,32 @@
     src: url("../fonts/fsex300-webfont.woff")
 }
 
+html, body {
+    width: 100%;
+    height: 100%;
+}
+
 * {
     font-family: 'fixedsys', 'Courier';
 }
 
 #chart {
+    height: 100%;
     width: 100%;
-    _width: 500px;
     overflow: visible;
     clear: left;
     margin: 25px;
+    margin-top: 40px;
 }
 
 svg {
-    overflow: visible !important;
+    overflow: scroll !important;
 }
 
 .invisible {
     visibility: hidden;
 }
+
 .hidden {
     display: none;
-}
-#legend,
-#legend2 {
-    -moz-border-radius: 2px;
-    -webkit-border-radius: 2px;
-    width: 1em;
-    height: 1em;
-    border: solid 1px #000;
-    margin-right: .3em;
-    line-height: 1;
-}
-#name, 
-#name2 {
-    float: left;
-    clear: left;
-}
-#name div,
-#name2 div {
-    float: left;
-}
-#placeholder {
-    clear: left;
-    color: #999;
-}
-em {
-    color: #666;
-    font-style: normal;
-}
-form {
-    margin: 0;
-    padding: 0;
-}
-fieldset {
-    margin: 0;
-    padding: 0;
-    border: none;
 }
