@@ -17,7 +17,7 @@ class StringQuery(BasicWorker, metaclass=abc.ABCMeta):
 	Process substring queries from the front-end
 
 	Requests are added to the pool as "query" jobs. This class is to be
-	extended by platform-specific search classes, which will define the
+	extended by data source-specific search classes, which will define the
 	abstract methods at the end of this class to tailor the search engine
 	to their database layouts.
 	"""

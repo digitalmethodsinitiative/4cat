@@ -31,7 +31,8 @@ class DataSet:
 	postprocessors = {}
 	genealogy = []
 
-	def __init__(self, parameters={}, key=None, job=None, data=None, db=None, parent=None, extension="csv", type="search"):
+	def __init__(self, parameters={}, key=None, job=None, data=None, db=None, parent=None, extension="csv",
+				 type="search"):
 		"""
 		Create new query object
 
@@ -100,7 +101,6 @@ class DataSet:
 		analyses = self.db.fetchall("SELECT * FROM queries WHERE key_parent = %s ORDER BY timestamp ASC", (self.key,))
 		self.subqueries = [DataSet(data=analysis, db=self.db) for analysis in analyses]
 		self.postprocessors = self.get_available_postprocessors()
-
 
 	def check_query_finished(self):
 		"""
@@ -269,18 +269,17 @@ class DataSet:
 
 		:return str:  Query key
 		"""
-		# we're going to use the hash of the parameters to uniquely identify
-		# the query, so make sure it's always in the same order, or we might
-		# end up creating multiple keys for the same query if python
-		# decides to return the dict in a different order
-
 		# Return a unique key if random posts are queried
 		if parameters.get("random_amount", None):
-			random_int = str(random.randint(1,10000000))
+			random_int = str(random.randint(1, 10000000))
 			return hashlib.md5(random_int.encode("utf-8")).hexdigest()
 
 		# Return a hash based on parameters for other queries
 		else:
+			# we're going to use the hash of the parameters to uniquely identify
+			# the query, so make sure it's always in the same order, or we might
+			# end up creating multiple keys for the same query if python
+			# decides to return the dict in a different order
 			param_key = collections.OrderedDict()
 			for key in sorted(parameters):
 				param_key[key] = parameters[key]
@@ -429,7 +428,6 @@ class DataSet:
 
 		return ",".join([query.key for query in genealogy])
 
-
 	def get_compatible_postprocessors(self):
 		"""
 		Get list of post-processors compatible with this query
@@ -445,7 +443,9 @@ class DataSet:
 
 		available = collections.OrderedDict()
 		for postprocessor in postprocessors.values():
-			if (self.data["type"] == "search" and not postprocessor["accepts"]) or self.data["type"] in postprocessor["accepts"]:
+			if (self.data["type"] == "search" and not postprocessor["accepts"] and (
+					not postprocessor["datasources"] or self.parameters.get("datasource") in postprocessor["datasources"])) or \
+					self.data["type"] in postprocessor["accepts"]:
 				available[postprocessor["type"]] = postprocessor
 
 		return available
@@ -497,7 +497,6 @@ class DataSet:
 				return
 
 		self.db.update("queries", where={"key": self.key}, data={"job": job.data["id"]})
-
 
 	def __getattr__(self, attr):
 		"""

@@ -12,7 +12,7 @@ class Search4Chan(StringQuery):
 	"""
 	type = "4chan-search"  # job ID
 	sphinx_index = "4chan"  # prefix for sphinx indexes for this data source. Should usually match sphinx.conf
-	prefix = "4chan"  # table identifier for this platform; see below for usage
+	prefix = "4chan"  # table identifier for this datasource; see below for usage
 
 	def fetch_posts(self, post_ids):
 		"""
@@ -45,6 +45,6 @@ class Search4Chan(StringQuery):
 		:param list replacements:  Values to use for parameters in the WHERE clause that should be parsed
 		:return list:  List of matching posts; each post as a dictionary with `thread_id` and `post_id` as keys
 		"""
-		sql = "SELECT thread_id, post_id FROM `" + self.prefix + "_posts` WHERE " + where + " LIMIT 5000000 OPTION ranker = none, boolean_simplify = 1, sort_method = kbuffer, max_matches = 5000000, cutoff = 5000000"
+		sql = "SELECT thread_id, post_id FROM `4cat_posts` WHERE " + where + " LIMIT 5000000 OPTION ranker = none, boolean_simplify = 1, sort_method = kbuffer, max_matches = 5000000, cutoff = 5000000"
 		self.log.info("Running Sphinx query %s " % sql)
 		return self.sphinx.fetchall(sql, replacements)

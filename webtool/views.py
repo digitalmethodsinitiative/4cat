@@ -55,7 +55,7 @@ def show_frontpage():
 	else:
 		stats = None
 
-	return render_template("frontpage.html", stats=stats, boards=config.PLATFORMS)
+	return render_template("frontpage.html", stats=stats, boards=config.DATASOURCES)
 
 @app.route("/overview/")
 @login_required
@@ -159,16 +159,16 @@ def show_index():
 	"""
 	Main tool frontend
 	"""
-	return render_template('tool.html', boards=config.PLATFORMS)
+	return render_template('tool.html', boards=config.DATASOURCES)
 
 
-@app.route('/get-boards/<string:platform>/')
+@app.route('/get-boards/<string:datasource>/')
 @login_required
-def getboards(platform):
-	if platform not in config.PLATFORMS or "boards" not in config.PLATFORMS[platform]:
+def getboards(datasource):
+	if datasource not in config.DATASOURCES or "boards" not in config.DATASOURCES[datasource]:
 		result = False
 	else:
-		result = config.PLATFORMS[platform]["boards"]
+		result = config.DATASOURCES[datasource]["boards"]
 
 	return jsonify(result)
 

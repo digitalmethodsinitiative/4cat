@@ -10,7 +10,7 @@
     {{ query.query }}{% endif %}</a></span></h3>
 
 <p class="result">
-    <span class="property-badge">{{ query.parameters.platform if "platform" in query.parameters else "4chan" }}/{{ query.parameters.board }}/</span>
+    <span class="property-badge">{{ query.parameters.datasource if "datasource" in query.parameters else "4chan" }}/{{ query.parameters.board }}/</span>
     {% if query.parameters.body_query and query.parameters.body_query != "empty" %}
         <span class="inline-label">body:</span> <span class="inline-query">{{ query.parameters.body_query }}</span>
     {% endif %}
@@ -52,6 +52,12 @@
     <p class="result">
         Queued on {{ query.timestamp|datetime(fmt="%Y-%m-%d %H:%m") }}.
     </p>
+
+    <!--{% if query.num_rows > 0 and query.is_finished %}
+    <div class="query-result">
+        <iframe class="query-result-iframe csvfile" src="/preview-csv/{{ query.key }}/"></iframe>
+    </div>
+    {% endif %}-->
 
     <p class="result">
         {% if query.status %}{{ query.status }}{% else %}Query is queued.{% endif %} {% if query.is_finished %}({{ query.num_rows }} posts{% if query.num_rows > 0 %}; <a href="/result/{{ query.result_file }}">{{ query.result_file }}</a>{% endif %}){% endif %}

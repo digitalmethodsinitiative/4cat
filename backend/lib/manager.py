@@ -180,12 +180,12 @@ class WorkerManager:
 
 						# initialize datasource
 						datasource_id = datasource
-						if hasattr(sys.modules[datamodule], "init_datasource") and hasattr(sys.modules[datamodule], "PLATFORM"):
+						if hasattr(sys.modules[datamodule], "init_datasource") and hasattr(sys.modules[datamodule], "DATASOURCE"):
 							self.log.debug("Initializing datasource %s" % datasource)
-							datasource_id = sys.modules[datamodule].PLATFORM
-							sys.modules[datamodule].init_datasource(logger=self.log, database=self.db, queue=self.queue, name=sys.modules[datamodule].PLATFORM)
+							datasource_id = sys.modules[datamodule].DATASOURCE
+							sys.modules[datamodule].init_datasource(logger=self.log, database=self.db, queue=self.queue, name=sys.modules[datamodule].DATASOURCE)
 						else:
-							self.log.error("Datasource %s is lacking init_datasource or PLATFORM in __init__.py" % datasource)
+							self.log.error("Datasource %s is lacking init_datasource or DATASOURCE in __init__.py" % datasource)
 
 						self.datasources[datasource_id] = datasource
 

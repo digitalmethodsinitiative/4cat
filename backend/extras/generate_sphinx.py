@@ -47,21 +47,21 @@ regex_source = re.compile(r"source ([^ ]+) : 4cat {([^}]+)}")
 
 # go through all data sources found
 for conf in confs:
-	datasource = re.split(r"[\/\\]", conf)[0]
-	module = "datasources." + datasource
+	datasource_id = re.split(r"[\/\\]", conf)[0]
+	module = "datasources." + datasource_id
 
 	# check if data source can be imported
 	try:
 		importlib.import_module(module)
 	except ImportError:
-		print("Error loading settings for data source %s. Skipping." % datasource)
+		print("Error loading settings for data source %s. Skipping." % datasource_id)
 		continue
 
-	# check if imported data source has the required attribute (i.e. the platform identifier)
+	# check if imported data source has the required attribute (i.e. the data source identifier)
 	try:
-		platform = sys.modules[module].PLATFORM
+		datasource = sys.modules[module].DATASOURCE
 	except AttributeError:
-		print("Data source %s has no platform identifier set. Skipping." % datasource)
+		print("Data source %s has no datasource identifier set. Skipping." % datasource_id)
 		continue
 
 	with open(conf) as conffile:
@@ -73,7 +73,7 @@ for conf in confs:
 	for source in defined_sources:
 		sources.append("source %s : 4cat {%s}" % source)
 		name = source[0]
-		index_name = platform + "_posts" if "posts" in name else platform + "_threads" if "threads" in name else False
+		index_name = datasource + "_posts" if "posts" in name else datasource + "_threads" if "threads" in name else False
 		if not index_name:
 			# we only know how to deal with post and thread sources
 			print("Unrecognized data source %s. Skipping." % name)

@@ -20,15 +20,15 @@ class SnapshotScheduler(BasicWorker):
 			self.job.finish(delete=True)
 			return
 
-		for platform in config.PLATFORMS:
-			if not config.PLATFORMS[platform].get("snapshots", False)\
-					or not config.PLATFORMS[platform].get("boards", False) \
-					or config.PLATFORMS[platform]["boards"] == ["*"]:
+		for datasource in config.DATASOURCES:
+			if not config.DATASOURCES[datasource].get("snapshots", False)\
+					or not config.DATASOURCES[datasource].get("boards", False) \
+					or config.DATASOURCES[datasource]["boards"] == ["*"]:
 				# we need specific boards to queue the snapshot for
 				continue
 
-			for board in config.PLATFORMS[platform]["boards"]:
-				type = "%s-search" % platform
+			for board in config.DATASOURCES[datasource]["boards"]:
+				type = "%s-search" % datasource
 
 				# usually we just want the past 24 hours, but this can be
 				# changed through job parameters if needed, for example
@@ -50,7 +50,7 @@ class SnapshotScheduler(BasicWorker):
 				# create a new search query that simply returns all posts
 				# between the given timestamps
 				query = DataSet(parameters={
-					"platform": platform,
+					"datasource": datasource,
 					"board": board,
 					"body_query": "",
 					"subject_query": "",

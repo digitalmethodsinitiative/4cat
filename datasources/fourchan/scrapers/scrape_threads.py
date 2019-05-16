@@ -71,11 +71,11 @@ class ThreadScraper4chan(BasicJSONScraper):
 		:param dict data: The thread data, as parsed JSON data
 		:return: The amount of posts added, or False if processing could not be completed
 		"""
-		self.platform = self.type.split("-")[0]
+		self.datasource = self.type.split("-")[0]
 
 		if "posts" not in data or not data["posts"]:
 			self.log.warning(
-				"JSON response for thread %s/%s contained no posts, could not process" % (self.platform, self.job.data["remote_id"]))
+				"JSON response for thread %s/%s contained no posts, could not process" % (self.datasource, self.job.data["remote_id"]))
 			return False
 
 		# determine OP id (8chan sequential threads are an exception here)
@@ -99,7 +99,7 @@ class ThreadScraper4chan(BasicJSONScraper):
 
 		if thread["timestamp_deleted"] > 0:
 			self.log.warning("Thread %s/%s/%s seems to have been undeleted, removing deletion timestamp %s" % (
-			self.platform, self.job.details["board"], first_post["no"], thread["timestamp_deleted"]))
+			self.datasource, self.job.details["board"], first_post["no"], thread["timestamp_deleted"]))
 			self.db.update("threads_" + self.prefix, where={"id": thread_db_id}, data={"timestamp_deleted": 0})
 
 		# create a dict mapped as `post id`: `post data` for easier comparisons with existing data
@@ -127,7 +127,7 @@ class ThreadScraper4chan(BasicJSONScraper):
 
 		# save to database
 		self.log.info("Updating %s/%s/%s, new: %s, old: %s, deleted: %s" % (
-			self.platform, self.job.details["board"], first_post["no"], new_posts, len(post_dict_db), len(deleted)))
+			self.datasource, self.job.details["board"], first_post["no"], new_posts, len(post_dict_db), len(deleted)))
 		self.db.commit()
 
 		# return the amount of new posts
@@ -189,10 +189,10 @@ class ThreadScraper4chan(BasicJSONScraper):
 			if dupe:
 				pass
 				#self.log.error("Post %s in thread %s/%s/%s (time: %s) scraped twice: first seen as %s in thread %s at %s" % (
-				# post["no"], self.platform, thread["board"], thread["id"], post["time"], dupe["id"], dupe["thread_id"], dupe["timestamp"]))
+				# post["no"], self.datasource, thread["board"], thread["id"], post["time"], dupe["id"], dupe["thread_id"], dupe["timestamp"]))
 			else:
 				self.log.error("Post %s in thread %s/%s/%s hit database constraint but no dupe was found?" % (
-				post["no"], self.platform, thread["board"], thread["id"]))
+				post["no"], self.datasource, thread["board"], thread["id"]))
 
 			return False
 		except ValueError as e:
@@ -339,10 +339,10 @@ class ThreadScraper4chan(BasicJSONScraper):
 		If the resource could not be found, that indicates the whole thread has
 		been deleted.
 		"""
-		self.platform = self.type.split("-")[0]
+		self.datasource = self.type.split("-")[0]
 		thread_db_id = self.job.data["remote_id"].split("/").pop()
 		self.log.info(
-			"Thread %s/%s/%s was deleted, marking as such" % (self.platform, self.job.details["board"], self.job.data["remote_id"]))
+			"Thread %s/%s/%s was deleted, marking as such" % (self.datasource, self.job.details["board"], self.job.data["remote_id"]))
 		self.db.update("threads_" + self.prefix, data={"timestamp_deleted": self.loop_time},
 					   where={"id": thread_db_id, "timestamp_deleted": 0})
 		self.job.finish()
