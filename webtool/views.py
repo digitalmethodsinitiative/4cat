@@ -138,7 +138,7 @@ def show_overview():
 				del data[board]
 				continue
 
-			times[board] = [int(file.split("/")[-1].split("-")[0]) for file in files if board_match in file]
+			times[board] = [int(file.split("/")[-1].split("-")[0]) for file in files if board_match in file][-14:]
 
 		if not data:
 			continue
