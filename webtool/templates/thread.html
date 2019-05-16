@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <head>
-    <title>{% if metadata.subject %}{{ metadata.subject }}{% else %}(no subject){% endif %} &bull; {{ platform }}/{{ board }}/{{ metadata.id }} &bull; 4CAT</title>
+    <title>{% if metadata.subject %}{{ metadata.subject }}{% else %}(no subject){% endif %} &bull; {{ datasource }}/{{ board }}/{{ metadata.id }} &bull; 4CAT</title>
     <style>
         body {
             font-family: monospace;
@@ -91,7 +91,7 @@
 <body>
 <header>
     <h1>{% if metadata.subject %}{{ metadata.subject }}{% else %}(no subject){% endif %}</h1>
-    <span class="path">{{ platform }}/{{ board }}/{{ metadata.id }}</span>
+    <span class="path">{{ datasource }}/{{ board }}/{{ metadata.id }}</span>
 </header>
 
 <ol class="thread">

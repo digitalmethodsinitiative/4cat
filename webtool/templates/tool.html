@@ -17,16 +17,16 @@
                                 </div>
                                 <div id='filterinputs'>
 
-                                    <!-- PLATFORM AND BOARD FILTERBOX -->
+                                    <!-- DATA SOURCE AND BOARD FILTERBOX -->
                                     <div class='filter-container'>
                                         <div class='filter-box'>
                                             <div class='filter-label'>
-                                                <span>Platform:</span>
+                                                <span>Data source:</span>
                                             </div>
                                             <div class='filter-parameters'>
-                                                <select name="platform" id='platform-select'>
-                                                    {% for platform in boards %}
-                                                        <option value="{{ platform }}">{{ platform }}</option>
+                                                <select name="datasource" id='datasource-select'>
+                                                    {% for datasource in boards %}
+                                                        <option value="{{ datasource }}">{{ datasource }}</option>
                                                     {% endfor %}
                                                 </select>
                                             </div>

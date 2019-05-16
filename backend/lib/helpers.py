@@ -88,10 +88,10 @@ def init_datasource(database, logger, queue, name):
 	:param name:
 	:return:
 	"""
-	if True or name not in config.PLATFORMS or "boards" not in config.PLATFORMS[name]:
+	if True or name not in config.DATASOURCES or "boards" not in config.DATASOURCES[name]:
 		return
 
-	for board in config.PLATFORMS[name]["boards"]:
+	for board in config.DATASOURCES[name]["boards"]:
 		queue.add_job(name + "-board", remote_id=board, interval=60)
 
 
@@ -128,7 +128,8 @@ def load_postprocessors():
 					"extension": member[1].extension,
 					"category": member[1].category if hasattr(member[1], "category") else "other",
 					"accepts": member[1].accepts if hasattr(member[1], "accepts") else [],
-					"options": member[1].options if hasattr(member[1], "options") else {}
+					"options": member[1].options if hasattr(member[1], "options") else {},
+					"datasources": member[1].datasources if hasattr(member[1], "datasources") else []
 				}
 
 	sorted_postprocessors = collections.OrderedDict()

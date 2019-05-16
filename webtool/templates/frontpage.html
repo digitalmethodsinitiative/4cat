@@ -18,7 +18,7 @@
             <div>
                 <h2><span>Updates</span></h2>
                 <ol>
-                    <li><time>2 May 2019</time> Reddit is now available as a platform for data capture. This data is
+                    <li><time>2 May 2019</time> Reddit is now available as a data source capture and analysis. This data is
                         sourced from the <a href="https://pushshift.io">Pushshift</a> API.</li>
                     <li><time>6 Feb 2019</time> Result pages now include a preview of the posts found, so you can get a
                         quick impression of what your query returned.</li>
@@ -33,25 +33,25 @@
 
         <aside>
             <div>
-                <h2><span>Available platforms</span></h2>
-                <p>The following platforms and boards are currently available for analysis:</p>
-                <ul class="platform-list">
+                <h2><span>Available data sources</span></h2>
+                <p>The following data sources and boards are currently available for analysis:</p>
+                <ul class="datasource-list">
             {% if stats %}
-                {% for platform in stats %}{% if platform != "overall" %}
+                {% for datasource in stats %}{% if datasource != "overall" %}
                     <li>
-                        {{ platform }} ({{ stats[platform]["posts"]|numberify }} posts)
+                        {{ datasource }} ({{ stats[datasource]["posts"]|numberify }} posts)
                         <ul>
-                            <li>since {{ stats[platform]["first"]|datetime('%-d %b %Y') }}</li>
+                            <li>since {{ stats[datasource]["first"]|datetime('%-d %b %Y') }}</li>
                         </ul>
                     </li>
                 {% endif %}{% endfor %}
             {% else %}
-                    {% for platform in boards %}
-                        {% if "boards" in boards[platform] and boards[platform]["boards"] %}
+                    {% for datasource in boards %}
+                        {% if "boards" in boards[datasource] and boards[datasource]["boards"] %}
                             <li>
-                                {{ platform }}
+                                {{ datasource }}
                                 <ul>
-                                {% for board in boards[platform]["boards"] %}
+                                {% for board in boards[datasource]["boards"] %}
                                     <li>{{ board }}</li>
                                 {% endfor %}
                                 </ul>

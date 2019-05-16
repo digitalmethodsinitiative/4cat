@@ -226,13 +226,13 @@ def validate_query(parameters):
 			return "The first date is later than the second."
 
 	# Ensure the board is correct
-	if "platform" not in parameters or "board" not in parameters:
+	if "datasource" not in parameters or "board" not in parameters:
 		return "Please provide a board to search"
 
-	if parameters["platform"] not in config.PLATFORMS:
-		return "Please choose a valid platform to search"
+	if parameters["datasource"] not in config.DATASOURCES:
+		return "Please choose a valid datasource to search"
 
-	if parameters["board"] not in config.PLATFORMS[parameters["platform"]]["boards"] and config.PLATFORMS[parameters["platform"]]["boards"] != ["*"]:
+	if parameters["board"] not in config.DATASOURCES[parameters["datasource"]]["boards"] and config.DATASOURCES[parameters["datasource"]]["boards"] != ["*"]:
 		return "Please choose a valid board for querying"
 
 	# Keyword-dense thread length should be at least thirty.

@@ -32,6 +32,6 @@ class Stringify(BasicPostProcessor):
 				for post in csv:
 					posts += 1
 
-			results.write(posts)
+			results.write(str(posts))
 
 		self.query.finish(1)

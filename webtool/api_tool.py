@@ -7,10 +7,12 @@ import psutil
 import config
 import json
 import time
+import csv
 import os
 
-from flask import jsonify, abort, request, render_template, redirect, url_for
+from flask import jsonify, abort, request, render_template, redirect
 from flask_login import login_required, current_user
+from werkzeug.utils import secure_filename
 
 from webtool import app, db, log, openapi, limiter, queue
 from webtool.views import queue_postprocessor
@@ -90,10 +92,8 @@ def queue_query():
 
 	Requires authentication by logging in or providing a valid access token.
 
-	:param str platform: Platform ID to query
-
 	:request-param str board:  Board ID to query
-	:request-param str platform:  Platform ID to query
+	:request-param str datasource:  Data source ID to query
 	:request-param str body_query:  String to match in the post body
 	:request-param str subject_query:  String to match in the post subject
 	:request-param str ?full_thread:  Whether to return full thread data: if
@@ -117,7 +117,7 @@ def queue_query():
 
 	parameters = {
 		"board": request.form.get("board", ""),
-		"platform": request.form.get("platform", ""),
+		"datasource": request.form.get("datasource", ""),
 		"body_query": request.form.get("body_query", ""),
 		"subject_query": request.form.get("subject_query", ""),
 		"full_thread": (request.form.get("full_thread", "no") != "no"),
@@ -146,7 +146,7 @@ def queue_query():
 	# Queue query
 	query = DataSet(parameters=parameters, db=db)
 
-	queue.add_job(jobtype="%s-search" % parameters["platform"], remote_id=query.key)
+	queue.add_job(jobtype="%s-search" % parameters["datasource"], remote_id=query.key)
 
 	return query.key
 
@@ -262,7 +262,28 @@ def queue_postprocessor_api():
 	        a `url` at which the result may be downloaded when finished, and a
 	        list of `messages` describing any warnings generated while queuing.
 	"""
-	key = request.form.get("key", "")
+	if request.files and "input_file" in request.files:
+		input_file = request.files["input_file"]
+		if not input_file:
+			return jsonify({"error": "No file input provided"})
+
+		if input_file.filename[-4:] != ".csv":
+			return jsonify({"error": "File input is not a csv file"})
+
+		test_csv_file = csv.DictReader(input_file.stream)
+		if "body" not in test_csv_file.fieldnames:
+			return jsonify({"error": "File must contain a 'body' column"})
+
+		
+
+
+		filename = secure_filename(input_file.filename)
+		input_file.save(config.PATH_DATA + "/")
+
+
+	else:
+		key = request.form.get("key", "")
+
 	return queue_postprocessor(key, request.form.get("postprocessor", ""), is_async=True)
 
 

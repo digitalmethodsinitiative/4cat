@@ -12,7 +12,7 @@ class BoardScraper8chan(BoardScraper4chan):
 	work with the 8chan API instead
 	"""
 	type = "8chan-board"
-	platform = "8chan"
+	datasource = "8chan"
 	max_workers = 4
 
 	def get_url(self):

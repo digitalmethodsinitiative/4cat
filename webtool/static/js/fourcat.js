@@ -73,12 +73,12 @@ function init() {
     });
     $('#check-country-flag').trigger('change')
 
-    // Platform select boxes trigger an update of the boards available for the chosen platform
-    $('#platform-select').on('change', query.update_boards);
-    $('#platform-select').on('change', query.update_filters);
-    $('#platform-select').trigger('change');
+    // Data source select boxes trigger an update of the boards available for the chosen data source
+    $('#datasource-select').on('change', query.update_boards);
+    $('#datasource-select').on('change', query.update_filters);
+    $('#datasource-select').trigger('change');
 
-    // Board and platform select boxes determine what filter options are available (e.g. country flag posts for /pol/)
+    // Board and data source select boxes determine what filter options are available (e.g. country flag posts for /pol/)
     $('.filter-parameters#board-filter').on('change', '#board-select', query.update_filters);
 
 
@@ -570,17 +570,17 @@ query = {
 
 
     /**
-     * Update board select list for chosen platform
+     * Update board select list for chosen datasource
      */
     update_boards: function () {
-        let platform = $('#platform-select option:selected').text();
+        let datasource = $('#datasource-select option:selected').text();
         $('#whole-form').attr('disabled', true);
         $.get({
-            url: '/get-boards/' + platform + '/',
+            url: '/get-boards/' + datasource + '/',
             success: function (json) {
                 let select;
                 if (!json) {
-                    alert('No boards available for platform ' + platform);
+                    alert('No boards available for datasource ' + datasource);
                     select = $('<span id="board-select">(No boards available)</span>');
                 } else if(json.length == 1 && json[0] == '*') {
                     select = $('<input name="board" id="board-select">');
@@ -594,7 +594,7 @@ query = {
                 $('#whole-form').removeAttr('disabled');
             },
             error: function (err) {
-                alert('No boards available for platform ' + platform + ' (' + err + ')');
+                alert('No boards available for datasource ' + datasource + ' (' + err + ')');
                 let select = $('<span id="board-select">(No boards available)</span>');
                 $('#board-select').replaceWith(select);
                 $('#whole-form').removeAttr('disabled');
@@ -604,17 +604,17 @@ query = {
 
 
     /**
-     * Update query filters according to the platform and board selected
+     * Update query filters according to the datasource and board selected
      */
     update_filters: function () {
-        let platform = $('#platform-select').val()
+        let datasource = $('#datasource-select').val()
         let board = $('#board-select').val()
 
         // Array of pol-specific filters. Should correspond to HTML filter container IDs.
         let pol_specific = ['country-flag']
 
         // Simple if statement for now - update when new boards and filters are added
-        if (platform == '4chan') {
+        if (datasource == '4chan') {
             if (board == 'pol') {
                 for (var filter in pol_specific) {
                     $('#filter-container-' + pol_specific[filter]).show()
@@ -632,7 +632,7 @@ query = {
             $('#check-' + pol_specific[filter]).prop('checked', false);
         }
 
-        if (platform == 'reddit') {
+        if (datasource == 'reddit') {
             $('#control-dense-threads').hide().find('input, select, textarea').prop('disabled', true);
             $('#control-random-sample').hide().find('input, select, textarea').prop('disabled', true);
             $('#filter-container-country-flag').hide().find('input, select, textarea').prop('disabled', true);

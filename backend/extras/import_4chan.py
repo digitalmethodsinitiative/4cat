@@ -54,11 +54,11 @@ def sanitize(post):
 		return post
 
 
-def commit(posts, post_fields, db, platform, fast=False):
+def commit(posts, post_fields, db, datasource, fast=False):
 	if fast:
 		post_fields_sql = ", ".join(post_fields)
 		try:
-			db.execute_many("INSERT INTO posts_" + platform + " (" + post_fields_sql + ") VALUES %s", posts)
+			db.execute_many("INSERT INTO posts_" + datasource + " (" + post_fields_sql + ") VALUES %s", posts)
 			db.commit()
 		except psycopg2.IntegrityError as e:
 			print(repr(e))
@@ -68,7 +68,7 @@ def commit(posts, post_fields, db, platform, fast=False):
 	else:
 		db.execute("START TRANSACTION")
 		for post in posts:
-			db.insert("posts_" + platform, data={post_fields[i]: post[i] for i in range(0, len(post))}, safe=True, commit=False)
+			db.insert("posts_" + datasource, data={post_fields[i]: post[i] for i in range(0, len(post))}, safe=True, commit=False)
 		db.commit()
 
 
@@ -88,7 +88,7 @@ cli.add_argument("-a", "--batch", type=int, default=1000000,
 cli.add_argument("-s", "--skip", type=int, default=0, help="How many posts to skip")
 cli.add_argument("-e", "--end", type=int, default=sys.maxsize,
 				 help="At which post to stop processing. Starts counting at 0 (so not affected by --skip)")
-cli.add_argument("-p", "--platform", type=str, default="4chan", help="Platform ID")
+cli.add_argument("-d", "--datasource", type=str, default="4chan", help="Data source ID")
 cli.add_argument("-f", "--fast", default=False, type=bool,
 				 help="Use batch queries instead of inserting posts individually. This is far faster than 'slow' mode, "
 					  "but will crash if trying to insert a duplicate post, so it should only be used on an empty "
@@ -183,13 +183,13 @@ with open(args.input) as inputfile:
 		# for speed, we only commit every so many posts
 		if len(postbuffer) % args.batch == 0:
 			print("\nCommitting posts %i-%i to database." % (posts - args.batch, posts))
-			commit(postbuffer, post_fields, db, args.platform, fast=args.fast)
+			commit(postbuffer, post_fields, db, args.datasource, fast=args.fast)
 			postbuffer = []
 
 # commit remainder
 print("\nSkipped %i post IDs that were already known." % skipped)
 print("Committing final posts.")
-commit(postbuffer, post_fields, db, args.platform, fast=args.fast)
+commit(postbuffer, post_fields, db, args.datasource, fast=args.fast)
 
 # update threads
 print("Updating threads.")
@@ -205,10 +205,10 @@ for thread_id in threads:
 
 	thread["is_sticky"] = True if thread["is_sticky"] == 1 else False
 	thread["is_closed"] = True if thread["is_closed"] == 1 else False
-	exists = db.fetchone("SELECT * FROM threads_" + args.platform + " WHERE id = %s", (thread_id,))
+	exists = db.fetchone("SELECT * FROM threads_" + args.datasource + " WHERE id = %s", (thread_id,))
 
 	if not exists:
-		db.insert("threads_" + args.platform, thread)
+		db.insert("threads_" + args.datasource, thread)
 
 	else:
 		if thread["timestamp"] < exists["timestamp"]:
@@ -219,12 +219,12 @@ for thread_id in threads:
 		thread["timestamp_modified"] = max(thread["timestamp_archived"], exists["timestamp_archived"])
 		thread["timestamp"] = min(thread["timestamp"], exists["timestamp"])
 
-		db.update("threads_" + args.platform, data=thread, where={"id": thread_id})
+		db.update("threads_" + args.datasource, data=thread, where={"id": thread_id})
 
 print("Updating thread statistics.")
 db.execute(
-	"UPDATE threads_" + args.platform + " AS t SET num_replies = ( SELECT COUNT(*) FROM posts_" + args.platform + " AS p WHERE p.thread_id = t.id) WHERE t.id IN %s",
+	"UPDATE threads_" + args.datasource + " AS t SET num_replies = ( SELECT COUNT(*) FROM posts_" + args.datasource + " AS p WHERE p.thread_id = t.id) WHERE t.id IN %s",
 	(tuple(threads.keys()),))
 db.execute(
-	"UPDATE threads_" + args.platform + " AS t SET num_images = ( SELECT COUNT(*) FROM posts_" + args.platform + " AS p WHERE p.thread_id = t.id AND image_file != '') WHERE t.id IN %s",
+	"UPDATE threads_" + args.datasource + " AS t SET num_images = ( SELECT COUNT(*) FROM posts_" + args.datasource + " AS p WHERE p.thread_id = t.id AND image_file != '') WHERE t.id IN %s",
 	(tuple(threads.keys()),))

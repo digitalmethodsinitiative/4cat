@@ -28,7 +28,7 @@ class SnapshotAnalyser(BasicWorker):
 			return
 
 		# queue top non-standard words
-		file_prefix = "/%i-%s-%s" % (query.parameters["max_date"], query.parameters["platform"], query.parameters["board"])
+		file_prefix = "/%i-%s-%s" % (query.parameters["max_date"], query.parameters["datasource"], query.parameters["board"])
 		analysis = DataSet(parameters={
 			"next": [{
 				"type": "vectorise-tokens",
