@@ -131,7 +131,7 @@ def show_overview():
 				data[board] = [[["posts", int(open_and_read(file).strip())]] for file in files if board_match in file]
 
 			# only show last two weeks
-			data[board] = data[board][0:14]
+			data[board] = data[board][-14:]
 
 			# no data? don't include this, no graph will be available
 			if not data[board]:
