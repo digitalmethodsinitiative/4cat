@@ -1,6 +1,6 @@
 *, code, select, input, textarea {
 	font-family: 'Trebuchet MS';
-	color: #0f0f16;
+	
 }
 
 select, input, textarea {
@@ -32,6 +32,10 @@ h1 span, h2 span, h3 span, h3.blocktitle span, #submitpaneltitle div, #resultshe
 	background: transparent;
 	text-transform: none;
 	padding: 0.5em 0;
+}
+
+h4.section-subheader {
+    color: #FFF;
 }
 
 h1 a:hover, h2 a:hover, h3.blocktitle a:hover {
@@ -74,4 +78,8 @@ nav > ul.flat > li {
 
 .postprocessor-tree > ul > li::before {
 	height: 0.55em;
+}
+
+.result-warning {
+	background: #eee;
 }

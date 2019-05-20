@@ -33,8 +33,12 @@ def api_thread(datasource, board, thread_id):
 	"""
 	if datasource not in config.DATASOURCES:
 		return jsonify({"error": "Invalid data source", "endpoint": request.url_rule.rule})
-
+	print(datasource, board, thread_id)
 	thread = db.fetchone("SELECT * FROM threads_" + datasource + " WHERE board = %s AND id = %s", (board, thread_id))
+
+	if thread == None:
+		return "Thread is not anymore available on the server."
+
 	response = get_thread(datasource, board, thread, db)
 
 	def strip_html(post):
@@ -321,17 +325,15 @@ def get_image(img_hash, limit=0):
 
 	"""
 	limit = "" if not limit or limit <= 0 else " LIMIT %i" % int(limit)
-	print(img_hash)
+	
 	for file in os.listdir(get_absolute_folder(config.PATH_IMAGES) + '/'):
 		if img_hash in file:
 			image = config.PATH_IMAGES + '/' + file
 			filename = file.split('/')
 			filename = filename[len(filename) - 1]
-			print(filename)
 			filetype = filename.split('.')[1]
 
 			if app.debug == True:
-				print('debugging')
 				file = '../../data/' + filename
 
 				if filetype == 'webm':

@@ -27,7 +27,7 @@ class DebateMetrics(BasicPostProcessor):
 	type = "debate_metrics"  # job type ID
 	category = "Thread metrics" # category
 	title = "Debate metrics"  # title displayed in UI
-	description = "Collapses all posts in the results into one plain text string. The result can be used for word clouds, word trees, et cetera."  # description displayed in UI
+	description = "Returns a csv with meta-metrics per thread."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
 	def process(self):
@@ -38,13 +38,15 @@ class DebateMetrics(BasicPostProcessor):
 
 		threads = {}
 		reply_lengths = []
+		
+		datasource = self.parent.parameters["datasource"]
+		board = self.parent.parameters["board"]
 
 		self.query.update_status("Reading source file")
 		with open(self.source_file, encoding="utf-8") as source:
 			csv = DictReader(source)
 			for post in csv:
 				if post["thread_id"] not in threads:
-					print(post)
 					threads[post["thread_id"]] = {
 						"subject": post["subject"],
 						"first_post": int(time.time()),
@@ -70,10 +72,9 @@ class DebateMetrics(BasicPostProcessor):
 			"subject": threads[thread_id]["subject"],
 			"num_posts": threads[thread_id]["count"],
 			"num_images": threads[thread_id]["images"],
-			"preview_url": "http://" + config.FlaskConfig.SERVER_NAME + "/api/4chan/pol/thread/" + str(
+			"preview_url": "http://" + config.FlaskConfig.SERVER_NAME + "/api/" + datasource + "/" + board + "/thread/" + str(
 				thread_id) + ".json?format=html",
 			"op_replies": threads[thread_id]["op_length"]
-			# TO DO
 			# "reply_amount": ,
 			# "active_users": ,
 			# "reply_length": ,
