@@ -9,7 +9,11 @@ var poll_interval;
 $(init);
 
 function init() {
+    // Check status of query
     setInterval(query.update_status, 4000);
+
+    // Check queue length
+    setInterval(function () {query.check_queue();}, 4000);
 
     // Start querying when go button is clicked
     $('#query-form').bind('submit', function (e) {
@@ -319,6 +323,8 @@ query = {
         let loader = $('.loader');
         loader.show();
 
+        query.check_queue();
+
         let form = $('#query-form');
         let formdata = form.serialize();
         
@@ -364,7 +370,6 @@ query = {
                 $('.loader').hide()
             }
         });
-
     },
 
     /**
@@ -380,6 +385,8 @@ query = {
             data: {key: query_key},
             success: function (json) {
                 console.log(json);
+
+                query.check_queue();
 
                 let status_box = $('#query_status .status_message .message');
                 let current_status = status_box.html();
@@ -478,6 +485,37 @@ query = {
 
                     postprocessor.resize_blocks();
                 });
+            }
+        });
+    },
+
+    check_queue: function () {
+        /*
+        Polls server to check how many search queries are still in the queue
+        */
+        $.getJSON({
+            url: '/api/check_queue/',
+            success: function (json) {
+
+                let queue_box = $('#query_status .queue_message > span#queue_string');
+                let circle = $('#query_status .queue_message > span#circle');
+                if (json.count == 0) {
+                    queue_box.html('Search queue is empty');
+                    $(circle).removeClass('full');
+                }
+                else if (json.count == 1) {
+                    queue_box.html('Processing 1 query.');
+                    circle.className = 'full';
+                    $(circle).addClass('full');
+                    console.log('queued')
+                }
+                else {
+                    queue_box.html('Processing ' + json.count + ' queries.');
+                    $(circle).addClass('full');
+                }
+            },
+            error: function () {
+                console.log('Something went wrong when checking query queue');
             }
         });
     },

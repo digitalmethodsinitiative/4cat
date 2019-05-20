@@ -292,10 +292,22 @@ select {
 	text-align: center;
 }
 
-#query_status .status_message {
+#query_status .status_message .queue_message {
 	border-bottom: 1px solid #000;
 	width: 50%;
 	margin: 0 auto;
+}
+
+#query_status .queue_message > span#circle {
+	height: 10px;
+	width: 10px;
+	border-radius: 50%;
+	display: inline-block;
+	background-color: green;
+}
+
+#query_status .queue_message > span#circle.full {
+	background-color: red;
 }
 
 .loader {

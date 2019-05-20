@@ -234,6 +234,20 @@ def delete_query():
 	return jsonify({"status": "success"})
 
 
+@app.route("/api/check_queue/")
+@api_ratelimit
+@login_required
+@openapi.endpoint
+def check_queue():
+	"""
+	Get the amount of queries still in the queue.
+
+	:return: An int with the amount of unprocessed queries.
+	"""
+	unfinished_queries = db.fetchone("SELECT count(*)count FROM queries WHERE type='search' AND is_finished=false")
+
+	return jsonify(unfinished_queries)
+
 
 @app.route("/api/queue-postprocessor/", methods=["POST"])
 @api_ratelimit
@@ -274,12 +288,8 @@ def queue_postprocessor_api():
 		if "body" not in test_csv_file.fieldnames:
 			return jsonify({"error": "File must contain a 'body' column"})
 
-		
-
-
 		filename = secure_filename(input_file.filename)
 		input_file.save(config.PATH_DATA + "/")
-
 
 	else:
 		key = request.form.get("key", "")
