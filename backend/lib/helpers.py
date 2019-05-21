@@ -6,8 +6,9 @@ import importlib
 import inspect
 import glob
 import sys
-import os
 import csv
+import os
+import re
 
 from html.parser import HTMLParser
 
@@ -166,14 +167,18 @@ def strip_tags(html, convert_newlines=True):
 	Strip HTML from a string
 
 	:param html: HTML to strip
-	:param convert_newlines: Convert <br> tags to \n before stripping
+	:param convert_newlines: Convert <br> and </p> tags to \n before stripping
 	:return: Stripped HTML
 	"""
 	if not html:
 		return ""
 
+	deduplicate_newlines = re.compile(r"\n+")
+
 	if convert_newlines:
-		html = html.replace("<br>", "\n")
+		html = html.replace("<br>", "\n").replace("</p>", "</p>\n")
+		html = deduplicate_newlines.sub("\n", html)
+
 
 	stripper = HTMLStripper()
 	stripper.feed(html)
