@@ -26,7 +26,7 @@ class CorpusStats(BasicWorker):
 		}
 
 		for datasource in config.DATASOURCES:
-			if "interval" not in config.DATASOURCES:
+			if "interval" not in config.DATASOURCES[datasource]:
 				continue
 
 			stats[datasource] = {
