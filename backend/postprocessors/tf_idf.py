@@ -4,18 +4,14 @@ Create a csv with tf-idf ranked terms
 import os
 import pickle
 import zipfile
-import shutil
 import numpy as np
 import pandas as pd
 
-from backend.lib.helpers import UserInput
+from backend.lib.helpers import UserInput, convert_to_int
 from backend.abstract.postprocessor import BasicPostProcessor
 
-from collections import OrderedDict
-from csv import DictReader
 from sklearn.feature_extraction.text import TfidfVectorizer
 
-import config
 
 class tfIdf(BasicPostProcessor):
 	"""
@@ -37,14 +33,14 @@ class tfIdf(BasicPostProcessor):
 			"options": {"1": 1, "2": 2},
 			"help": "Amount of words to return (tf-idf unigrams or bigrams)"
 		},
-		"min_df": {
+		"min_occurrences": {
 			"type": UserInput.OPTION_TEXT,
 			"default": 1,
 			"min": 1,
 			"max": 10000,
 			"help": "Ignore terms that appear in less than this amount of token sets. Useful for filtering out very sporadic terms"
 		},
-		"max_df": {
+		"max_occurrences": {
 			"type": UserInput.OPTION_TEXT,
 			"default": "",
 			"min": 1,
@@ -59,19 +55,18 @@ class tfIdf(BasicPostProcessor):
 			"help": "Output number - The amount of words to return per timeframe"
 		}
 	}
-	
+
 	def process(self):
 		"""
 		Unzips and appends tokens to fetch and write a tf-idf matrix
 		"""
 
 		# Validate and process user inputs - parse to int
-		n_size = (int(self.parameters["n_size"]),int(self.parameters["n_size"]))
-		min_df = int(self.parameters["min_df"])
-		max_df = self.parameters["min_df"]
-		if max_df != "":
-			max_df = int(self.parameters["max_df"])
-		max_output = int(self.parameters["max_output"])
+		n_size = convert_to_int(self.parameters.get("n_size", 1), 1)
+		n_size = (n_size, n_size)
+		min_occurrences = convert_to_int(self.parameters.get("min_occurrences", 1), 1)
+		max_occurrences = convert_to_int(self.parameters.get("min_occurrences", -1), -1)
+		max_output = convert_to_int(self.parameters.get("max_output", 10), 10)
 
 		# Get token sets
 		self.query.update_status("Processing token sets")
@@ -86,7 +81,6 @@ class tfIdf(BasicPostProcessor):
 
 			# Loop through the tokens (can also be a single set)
 			for tokens_name in token_sets:
-				
 				# Get the date
 				date_string = tokens_name.split('.')[0]
 				dates.append(date_string)
@@ -98,43 +92,43 @@ class tfIdf(BasicPostProcessor):
 					tokens.append(pickle.load(binary_tokens))
 				os.unlink(temp_path)
 
-		# Make sure `min_df` and `max_df` are valid
-		if min_df == 0:
-			min_df = 1
-		elif min_df > len(tokens):
-			min_df = len(tokens) - 1
-		if max_df == 0 or max_df == "" or max_df > len(tokens):
-			max_df = len(tokens)
+		# Make sure `min_occurrences` and `max_occurrences` are valid
+		if min_occurrences > len(tokens):
+			min_occurrences = len(tokens) - 1
+		if max_occurrences <= 0 or max_occurrences > len(tokens):
+			max_occurrences = len(tokens)
 
 		# Get the collocations. Returns a tuple.
 		self.query.update_status("Generating tf-idf for token set")
-		results = self.get_tfidf(tokens, dates, ngram_range=n_size, min_df=min_df, max_df=max_df, top_n=max_output)
+		results = self.get_tfidf(tokens, dates, ngram_range=n_size, min_occurrences=min_occurrences,
+								 max_occurrences=max_occurrences, top_n=max_output)
 
 		# Generate csv and finish
 		self.query.update_status("Writing to csv and finishing")
 		self.query.write_csv_and_finish(results)
 
-	def get_tfidf(self, tokens, dates, ngram_range=1, min_df=0, max_df=0, top_n=25):
-		'''
+	def get_tfidf(self, tokens, dates, ngram_range=(1,1), min_occurrences=0, max_occurrences=0, top_n=25):
+		"""
 		Creates a csv with the top n highest scoring tf-idf words.
 
 		:param tokens list,			list of tokens. Should be unpickled first
 		:param dates list,		list of column names  
-		:param max_df int,			filter out words that appear in more than length of token list - max_df
-		:param min_df int,			filter out words that appear in less than min_df
+		:param max_occurrences int,			filter out words that appear in more than length of token list - max_occurrences
+		:param min_occurrences int,			filter out words that appear in less than min_occurrences
 		:param ngram_range tuple,	the amount of words to extract
 
 		:returns ...
-		'''
+		"""
 
 		# Vectorise
 		self.query.update_status('Vectorizing')
-		tfidf_vectorizer = TfidfVectorizer(min_df=min_df, max_df=max_df, ngram_range=ngram_range, analyzer='word', token_pattern=None, tokenizer=lambda i:i, lowercase=False)
+		tfidf_vectorizer = TfidfVectorizer(min_df=min_occurrences, max_df=max_occurrences, ngram_range=ngram_range,
+										   analyzer='word', token_pattern=None, tokenizer=lambda i: i, lowercase=False)
 		tfidf_matrix = tfidf_vectorizer.fit_transform(tokens)
-		
+
 		feature_array = np.array(tfidf_vectorizer.get_feature_names())
 		tfidf_sorting = np.argsort(tfidf_matrix.toarray()).flatten()[::-1]
-		
+
 		# Print and store top n highest scoring tf-idf scores
 		top_words = feature_array[tfidf_sorting][:top_n]
 		weights = np.asarray(tfidf_matrix.mean(axis=0)).ravel().tolist()
@@ -146,7 +140,7 @@ class tfIdf(BasicPostProcessor):
 
 		# Turn the dataframe 90 degrees
 		df_matrix = df_matrix.transpose()
-		
+
 		# Do some editing of the dataframe
 		df_matrix.columns = dates
 		cols = df_matrix.columns.tolist()
