@@ -37,17 +37,21 @@
                 <p>The following data sources and boards are currently available for analysis:</p>
                 <ul class="datasource-list">
             {% if stats %}
-                {% for datasource in stats %}{% if datasource != "overall" %}
+                {% for datasource in datasources %}{% if datasource != "overall" %}
                     <li>
-                        {{ datasource }} ({{ stats[datasource]["posts"]|numberify }} posts)
+                        {{ datasource|capitalize }}{% if datasource in stats %} ({{ stats[datasource]["posts"]|numberify }} posts since {{ stats[datasource]["first"]|datetime('%-d %b %Y') }}){% endif %}
+                        {% if "boards" in datasources[datasource] and datasources[datasource]["boards"] != "*" and datasources[datasource]["boards"] != ["*"] %}
                         <ul>
-                            <li>since {{ stats[datasource]["first"]|datetime('%-d %b %Y') }}</li>
+                        {% for board in datasources[datasource]["boards"]|sort %}
+                            <li>{{ board }}</li>
+                        {% endfor %}
                         </ul>
+                        {% endif %}
                     </li>
                 {% endif %}{% endfor %}
             {% else %}
-                    {% for datasource in boards %}
-                        {% if "boards" in boards[datasource] and boards[datasource]["boards"] %}
+                    {% for datasource in datasources %}
+                        {% if "boards" in datasources[datasource] and datasources[datasource]["boards"] %}
                             <li>
                                 {{ datasource }}
                                 <ul>

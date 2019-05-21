@@ -55,7 +55,7 @@ def show_frontpage():
 	else:
 		stats = None
 
-	return render_template("frontpage.html", stats=stats, boards=config.DATASOURCES)
+	return render_template("frontpage.html", stats=stats, datasources=config.DATASOURCES)
 
 @app.route("/overview/")
 @login_required
