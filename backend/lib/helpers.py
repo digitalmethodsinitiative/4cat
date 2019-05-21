@@ -179,7 +179,6 @@ def strip_tags(html, convert_newlines=True):
 		html = html.replace("<br>", "\n").replace("</p>", "</p>\n")
 		html = deduplicate_newlines.sub("\n", html)
 
-
 	stripper = HTMLStripper()
 	stripper.feed(html)
 	return stripper.get_data()
@@ -229,6 +228,22 @@ def get_lib_url(file):
 		url = "https://" + config.FlaskConfig.SERVER_NAME + "/static/" + ext + file
 
 	return url
+
+
+def convert_to_int(value, default=0):
+	"""
+	Convert a value to an integer, with a fallback
+
+	The fallback is used if a TypeError is thrown during converstion to int.
+
+	:param value:  Value to convert
+	:param int default:  Default value, if conversion not possible
+	:return int:  Converted value
+	"""
+	try:
+		return int(value)
+	except TypeError:
+		return default
 
 
 class UserInput:
