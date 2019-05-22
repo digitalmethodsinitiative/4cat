@@ -36,9 +36,9 @@ function init() {
         } else {
             $('.input-dense').prop('disabled', false);
             if (input_string.length > 8) {
-                $('.density-keyword').html(input_string.substr(0, 5) + '...')
+                $('.density-keyword').html(input_string.substr(0, 5) + '...');
             } else {
-                $('.density-keyword').html('"' + input_string + '"')
+                $('.density-keyword').html('"' + input_string + '"');
             }
         }
     });
@@ -75,7 +75,7 @@ function init() {
             $('#dense-length').attr('disabled', this.checked).prop('checked', false);
         }
     });
-    $('#check-country-flag').trigger('change')
+    $('#check-country-flag').trigger('change');
 
     // Data source select boxes trigger an update of the boards available for the chosen data source
     $('#datasource-select').on('change', query.update_boards);
@@ -84,7 +84,6 @@ function init() {
 
     // Board and data source select boxes determine what filter options are available (e.g. country flag posts for /pol/)
     $('.filter-parameters#board-filter').on('change', '#board-select', query.update_filters);
-
 
     // Controls to change which results show up in overview
     $('.view-controls button').hide();
@@ -129,7 +128,7 @@ function init() {
     $('.multichoice-wrapper').each(function() {
         let wrapper = $(this);
         let select = $(this).find('select');
-        let name = select.attr('name')
+        let name = select.attr('name');
         let input = $('<input type="hidden" name="' + name + '">');
         wrapper.append(input);
         select.find('option').each(function() {
@@ -252,7 +251,7 @@ postprocessor = {
                     }
                 },
                 'error': function (response) {
-                    alert('The analysis could not be queued: ' + response.responseText)
+                    alert('The analysis could not be queued: ' + response.responseText);
                 }
             });
         }
@@ -328,7 +327,7 @@ query = {
         let form = $('#query-form');
         let formdata = form.serialize();
         
-        console.log(formdata)
+        console.log(formdata);
         
         // Disable form
         $('#whole-form').attr('disabled', 'disabled');
@@ -367,7 +366,7 @@ query = {
                 $('#whole-form').removeAttr('disabled');
                 console.log(error);
                 $('#results').html('<h3>' + $('#dataselection option:selected').text() + " error</h3>");
-                $('.loader').hide()
+                $('.loader').hide();
             }
         });
     },
@@ -433,7 +432,7 @@ query = {
                 }
             },
             error: function () {
-                console.log('Something went wrong when checking query status')
+                console.log('Something went wrong when checking query status');
             }
         });
     },
@@ -453,7 +452,7 @@ query = {
 
         let keys = [];
         queued.each(function () {
-            keys.push($(this).attr('id').split('-')[1])
+            keys.push($(this).attr('id').split('-')[1]);
         });
 
         $.get({
@@ -497,6 +496,7 @@ query = {
             url: '/api/check_queue/',
             success: function (json) {
 
+                // Update the query status box with the queue status
                 let queue_box = $('#query_status .queue_message > span#queue_string');
                 let circle = $('#query_status .queue_message > span#circle');
                 if (json.count == 0) {
@@ -507,7 +507,6 @@ query = {
                     queue_box.html('Processing 1 query.');
                     circle.className = 'full';
                     $(circle).addClass('full');
-                    console.log('queued')
                 }
                 else {
                     queue_box.html('Processing ' + json.count + ' queries.');
@@ -577,7 +576,7 @@ query = {
         if ($('#check-country-flag').is(':checked') && valid) {
             
             let common_countries = ['US', 'GB', 'CA', 'AU'];
-            let country = $('#country_flag').val()
+            let country = $('#country_flag').val();
 
             // Don't allow querying without date ranges for the common countries
             if (common_countries.includes(country)){
@@ -605,7 +604,6 @@ query = {
         // Return true if everyting is passed
         return valid;
     },
-
 
     /**
      * Update board select list for chosen datasource
@@ -645,11 +643,11 @@ query = {
      * Update query filters according to the datasource and board selected
      */
     update_filters: function () {
-        let datasource = $('#datasource-select').val()
-        let board = $('#board-select').val()
+        let datasource = $('#datasource-select').val();
+        let board = $('#board-select').val();
 
         // Array of pol-specific filters. Should correspond to HTML filter container IDs.
-        let pol_specific = ['country-flag']
+        let pol_specific = ['country-flag'];
 
         // Simple if statement for now - update when new boards and filters are added
         if (datasource == '4chan') {
@@ -666,15 +664,17 @@ query = {
             }
         }
         else {
-            $('#filter-container-' + pol_specific[filter]).hide()
+            $('#filter-container-' + pol_specific[filter]).hide();
             $('#check-' + pol_specific[filter]).prop('checked', false);
         }
 
         if (datasource == 'reddit') {
+            //$('#control-url').show();
             $('#control-dense-threads').hide().find('input, select, textarea').prop('disabled', true);
             $('#control-random-sample').hide().find('input, select, textarea').prop('disabled', true);
             $('#filter-container-country-flag').hide().find('input, select, textarea').prop('disabled', true);
         } else {
+            //$('#control-url').hide();
             $('#control-dense-threads').show().find('input, select, textarea').prop('disabled', false);
             $('#control-random-sample').show().find('input, select, textarea').prop('disabled', false);
             if(board == 'pol') {
@@ -682,7 +682,7 @@ query = {
             }
         }
 
-        reset_form()
+        reset_form();
     }
 };
 
@@ -817,7 +817,7 @@ function toggleButton(e) {
     e.preventDefault();
 
     target = '#' + $(this).attr('aria-controls');
-    console.log(target)
+    console.log(target);
     
     is_open = $(target).attr('aria-expanded') !== 'false';
     if (is_open) {

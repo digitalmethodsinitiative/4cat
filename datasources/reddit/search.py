@@ -134,7 +134,6 @@ class SearchReddit(StringQuery):
 			if response is None:
 				return response
 
-
 			# if this fails, too much is wrong to continue
 			if response.status_code != 200:
 				self.query.update_status(
@@ -158,10 +157,13 @@ class SearchReddit(StringQuery):
 						"thread_id": thread["id"],
 						"id": thread["id"],
 						"timestamp": thread["created_utc"],
+						"subreddit": thread["subreddit"],
 						"body": thread.get("selftext", "").strip().replace("\r", ""),
 						"subject": thread["title"],
 						"author": thread["author"],
 						"image_file": thread["url"] if image_match.search(thread["url"]) else "",
+						"domain": thread["domain"],
+						"url": thread["url"],
 						"image_md5": "",
 						"country_code": "",
 						"country_name": "",
