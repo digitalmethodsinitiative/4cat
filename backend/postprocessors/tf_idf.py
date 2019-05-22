@@ -119,12 +119,12 @@ class tfIdf(BasicPostProcessor):
 		Creates a csv with the top n highest scoring tf-idf words.
 
 		:param tokens list,			list of tokens. Should be unpickled first
-		:param dates list,		list of column names  
+		:param dates list,			list of column names  
 		:param max_df int,			filter out words that appear in more than length of token list - max_df
 		:param min_df int,			filter out words that appear in less than min_df
 		:param ngram_range tuple,	the amount of words to extract
 
-		:returns ...
+		:returns list,				...
 		'''
 
 		# Vectorise
