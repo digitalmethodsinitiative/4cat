@@ -31,7 +31,7 @@ body {
 	color: #37373c;
 }
 
-section, article, aside {
+section, article, aside, #filterinput, #results {
 	background: #FFF;
 }
 
