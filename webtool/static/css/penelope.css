@@ -31,7 +31,7 @@ body {
 	color: #37373c;
 }
 
-section, article, aside, #filterinput, #results {
+section, article, aside, #filterpanel, #results {
 	background: #FFF;
 }
 
