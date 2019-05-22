@@ -11,7 +11,7 @@ from backend.abstract.postprocessor import BasicPostProcessor
 import config
 
 
-class ThreadCounter(BasicPostProcessor):
+class ThreadMetadata(BasicPostProcessor):
 	"""
 	Example post-processor
 
@@ -21,7 +21,7 @@ class ThreadCounter(BasicPostProcessor):
 	contain information needed internally as well as information that is used
 	to describe this post-processor with in a user interface.
 	"""
-	type = "thread-counter"  # job type ID
+	type = "thread-metadata"  # job type ID
 	category = "Thread metrics" # category
 	title = "Thread metadata"  # title displayed in UI
 	description = "Create an overview of the threads present in the dataset, containing thread IDs, subjects and post counts."  # description displayed in UI
@@ -43,6 +43,10 @@ class ThreadCounter(BasicPostProcessor):
 					threads[post["thread_id"]] = {
 						"subject": post["subject"],
 						"first_post": int(time.time()),
+						"image_md5": "",
+						"country_code": "",
+						"author": "",
+						"last_post": 0,
 						"images": 0,
 						"count": 0,
 					}
@@ -53,17 +57,27 @@ class ThreadCounter(BasicPostProcessor):
 				if post["image_md5"]:
 					threads[post["thread_id"]]["images"] += 1
 
+				if post["id"] == post["thread_id"]:
+					threads[post["thread_id"]]["author"] = post["author"]
+					threads[post["thread_id"]]["country_code"] = post["country_code"]
+					threads[post["thread_id"]]["image_md5"] = post["image_md5"]
+
 				timestamp = int(datetime.datetime.strptime(post["timestamp"], "%Y-%m-%d %H:%M:%S").timestamp())
-				#print(timestamp)
+
 				threads[post["thread_id"]]["first_post"] = min(timestamp, threads[post["thread_id"]]["first_post"])
+				threads[post["thread_id"]]["last_post"] = max(timestamp, threads[post["thread_id"]]["last_post"])
 				threads[post["thread_id"]]["count"] += 1
 
 		results = [{
 			"thread_id": thread_id,
 			"timestamp": datetime.datetime.fromtimestamp(threads[thread_id]["first_post"]).strftime('%Y-%m-%d %H:%M:%S'),
+			"timestamp_lastpost": datetime.datetime.fromtimestamp(threads[thread_id]["last_post"]).strftime('%Y-%m-%d %H:%M:%S'),
 			"subject": threads[thread_id]["subject"],
+			"author": threads[thread_id]["author"],
+			"country_code": threads[thread_id]["country_code"],
 			"num_posts": threads[thread_id]["count"],
 			"num_images": threads[thread_id]["images"],
+			"image_md5": threads[thread_id]["image_md5"],
 			"preview_url": "http://" + config.FlaskConfig.SERVER_NAME + "/api/4chan/pol/thread/" + str(
 				thread_id) + ".json?format=html"
 		} for thread_id in threads]
