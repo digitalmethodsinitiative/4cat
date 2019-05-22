@@ -55,7 +55,7 @@ def show_frontpage():
 	else:
 		stats = None
 
-	return render_template("frontpage.html", stats=stats, boards=config.DATASOURCES)
+	return render_template("frontpage.html", stats=stats, datasources=config.DATASOURCES)
 
 @app.route("/overview/")
 @login_required
@@ -106,6 +106,10 @@ def show_overview():
 	for type in graph_types:
 		data_type = graph_types[type]["type"]
 		extension = "csv" if data_type == "two-column" else "txt"
+
+		# files are stored as timestamp-datasource-board-graphtype.csv
+		# so we can extract the board names here, as well as sort by filename,
+		# which we need because the graph is over-time
 		files = sorted(set(glob.glob(config.PATH_SNAPSHOTDATA + "/*-" + type + "." + extension)))
 		boards = sorted(set(["-".join(file.split("/")[-1].split("-")[1:-1]) for file in files]))
 
@@ -118,27 +122,22 @@ def show_overview():
 			# and "european", but if we sandwich it between dashes it will
 			# always match the correct files only
 			board_match = "-" + board + "-"
+			board_files = [file for file in files if board_match in file]
 
 			if data_type == "two-column":
-				items = [csv_to_list(file) for file in files if board_match in file]
-
-				# potentially this is a list of empty lists, which means we're not interested
-				if not [item for item in items if item]:
-					continue
-
-				data[board] = items
+				data[board] = [csv_to_list(file) for file in board_files]
 			else:
-				data[board] = [[["posts", int(open_and_read(file).strip())]] for file in files if board_match in file]
+				data[board] = [[["posts", int(open_and_read(file).strip())]] for file in board_files]
 
 			# only show last two weeks
 			data[board] = data[board][-14:]
 
 			# no data? don't include this, no graph will be available
-			if not data[board]:
+			if not data[board] or not any([any(item) for item in data[board]]):
 				del data[board]
 				continue
 
-			times[board] = [int(file.split("/")[-1].split("-")[0]) for file in files if board_match in file][-14:]
+			times[board] = [int(file.split("/")[-1].split("-")[0]) for file in board_files][-14:]
 
 		if not data:
 			continue

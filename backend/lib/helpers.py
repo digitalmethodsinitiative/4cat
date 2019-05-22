@@ -6,8 +6,9 @@ import importlib
 import inspect
 import glob
 import sys
-import os
 import csv
+import os
+import re
 
 from html.parser import HTMLParser
 
@@ -166,14 +167,17 @@ def strip_tags(html, convert_newlines=True):
 	Strip HTML from a string
 
 	:param html: HTML to strip
-	:param convert_newlines: Convert <br> tags to \n before stripping
+	:param convert_newlines: Convert <br> and </p> tags to \n before stripping
 	:return: Stripped HTML
 	"""
 	if not html:
 		return ""
 
+	deduplicate_newlines = re.compile(r"\n+")
+
 	if convert_newlines:
-		html = html.replace("<br>", "\n")
+		html = html.replace("<br>", "\n").replace("</p>", "</p>\n")
+		html = deduplicate_newlines.sub("\n", html)
 
 	stripper = HTMLStripper()
 	stripper.feed(html)
@@ -224,6 +228,22 @@ def get_lib_url(file):
 		url = "https://" + config.FlaskConfig.SERVER_NAME + "/static/" + ext + file
 
 	return url
+
+
+def convert_to_int(value, default=0):
+	"""
+	Convert a value to an integer, with a fallback
+
+	The fallback is used if a TypeError is thrown during converstion to int.
+
+	:param value:  Value to convert
+	:param int default:  Default value, if conversion not possible
+	:return int:  Converted value
+	"""
+	try:
+		return int(value)
+	except TypeError:
+		return default
 
 
 class UserInput:
