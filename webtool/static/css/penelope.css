@@ -1,10 +1,51 @@
+@font-face {
+	font-family: 'Open Sans';
+	src: url("../fonts/OpenSans-Regular.ttf")
+}
+
+@font-face {
+	font-family: 'Open Sans';
+	font-weight: bold;
+	src: url("../fonts/OpenSans-Bold.ttf")
+}
+
+@font-face {
+	font-family: 'Open Sans';
+	font-style: italic;
+	src: url("../fonts/OpenSans-Italic.ttf")
+}
+
+@font-face {
+	font-family: 'Open Sans';
+	font-weight: bold;
+	font-style: italic;
+	src: url("../fonts/OpenSans-BoldItalic.ttf")
+}
+
 *, code, select, input, textarea {
-	font-family: 'Trebuchet MS';
-	
+	font-family: 'Open Sans', 'Trebuchet MS', sans-serif;
+}
+
+body {
+	background: #F5F5F5;
+	color: #37373c;
+}
+
+section, article, aside, #filterpanel, #results {
+	background: #FFF;
+}
+
+.frontpage aside, .plain-page article, .frontpage section, .pagination li.page a, .pagination li.page .current, input, select, textarea, .login-form h2, .login-form article {
+	border: 1px solid #E9E9E9;
+}
+
+.frontpage > article, section.result-tree {
+	background: transparent;
+	border: 0;
 }
 
 select, input, textarea {
-	background: #EFEFEF;
+	background: #E9E9E9;
 }
 
 a {
@@ -13,6 +54,10 @@ a {
 
 a:hover {
 	color: #ff2231;
+}
+
+code {
+	color: #19b0a3;
 }
 
 .permalink::before {
@@ -24,8 +69,16 @@ a:hover {
 }
 
 h1, h2, h3.blocktitle, #submitpaneltitle, #resultsheader {
-	background: #ce1b28;
+	background: #21202E;
 	font-weight: bold;
+}
+
+h1 {
+	background: #ce1b28;
+}
+
+h2, h3.blocktitle, #submitpaneltitle, #resultsheader, .login-form h2 {
+	border-left: 0.5em solid #ce1b28;
 }
 
 h1 span, h2 span, h3 span, h3.blocktitle span, #submitpaneltitle div, #resultsheader div {
@@ -39,7 +92,7 @@ h4.section-subheader {
 }
 
 h1 a:hover, h2 a:hover, h3.blocktitle a:hover {
-	color: #EFEFEF;
+	color: #E9E9E9;
 }
 
 .main-nav {
@@ -49,6 +102,14 @@ h1 a:hover, h2 a:hover, h3.blocktitle a:hover {
 
 .main-nav li a, .main-nav li:not(:last-child):after {
 	color: #FFF;
+}
+
+.login-form h2 {
+	border-bottom: 0;
+}
+
+.login-form article {
+	border-top: 0;
 }
 
 .fixed-footer {

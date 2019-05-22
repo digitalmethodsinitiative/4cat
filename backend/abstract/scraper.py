@@ -72,7 +72,7 @@ class BasicHTTPScraper(BasicWorker, metaclass=abc.ABCMeta):
 					self.job.finish()
 					self.log.error("Could not finish request for %s (%s), cancelling job" % (url, e))
 				else:
-					self.job.release(delay=10)
+					self.job.release(delay=random.randint(45,60))
 					self.log.info("Could not finish request for %s (%s), releasing job" % (url, e))
 				return
 
