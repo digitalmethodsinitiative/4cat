@@ -43,9 +43,11 @@ def posts_to_csv(sql_results, filepath, clean_csv=True):
 			for row in sql_results:
 				# Create human dates from timestamp
 				from datetime import datetime
-				row["unix_timestamp"] = row["timestamp"]
-				row["timestamp"] = datetime.utcfromtimestamp(row["timestamp"]).strftime('%Y-%m-%d %H:%M:%S')
-
+				if "timestamp" in row:
+					row["unix_timestamp"] = row["timestamp"]
+					row["timestamp"] = datetime.utcfromtimestamp(row["timestamp"]).strftime('%Y-%m-%d %H:%M:%S')
+				else:
+					row["timestamp"] = "undefined"
 				# Parse html to text
 				if row["body"]:
 					row["body"] = strip_tags(row["body"])
