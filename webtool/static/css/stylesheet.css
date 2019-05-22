@@ -290,6 +290,7 @@ select {
 
 #query_status {
 	text-align: center;
+	padding-top: 0.5em;
 }
 
 #query_status .status_message .queue_message {
