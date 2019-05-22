@@ -274,9 +274,9 @@ class StringQuery(BasicWorker, metaclass=abc.ABCMeta):
 		# which is done later after we check if we've actually found any posts
 		# to begin with
 		if query["dense_country_percentage"]:
-			columns = ", ".join(self.return_cols)
-		else:
 			columns = "thread_id, id"
+		else:
+			columns = ", ".join(self.return_cols)
 
 		# initial queries
 		if query["max_date"] > 0:
