@@ -1,6 +1,7 @@
+import shutil
 import time
 import abc
-import re
+import os
 
 from pymysql import OperationalError, ProgrammingError, Error
 from collections import Counter
@@ -106,6 +107,18 @@ class StringQuery(BasicWorker, metaclass=abc.ABCMeta):
 					next_analysis = DataSet(parameters=next_parameters, type=next_type, db=self.db,
 											parent=self.query.key, extension=available_postprocessors[next_type]["extension"])
 					self.queue.add_job(next_type, remote_id=next_analysis.key)
+
+		# see if we need to register the result somewhere
+		if query_parameters.get("copy_to", None):
+			# copy the results to an arbitrary place that was passed
+			if os.path.exists(self.query.get_results_path()):
+				# but only if we actually have something to copy
+				shutil.copyfile(self.query.get_results_path(), query_parameters.get("copy_to"))
+			else:
+				# if copy_to was passed, that means it's important that this
+				# file exists somewhere, so we create it as an empty file
+				with open(query_parameters.get("copy_to"), "w") as empty_file:
+					empty_file.write("")
 
 		try:
 			self.sphinx.close()
