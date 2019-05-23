@@ -1,8 +1,9 @@
+import shutil
 import time
 import abc
-import re
+import os
 
-from pymysql import OperationalError, ProgrammingError
+from pymysql import OperationalError, ProgrammingError, Error
 from collections import Counter
 
 import config
@@ -93,6 +94,38 @@ class StringQuery(BasicWorker, metaclass=abc.ABCMeta):
 			self.query.update_status("Query finished, no results found.")
 
 		num_posts = len(posts) if posts else 0
+
+		# queue predefined post-processors
+		if num_posts > 0 and query_parameters.get("next", []):
+			for next in query_parameters.get("next"):
+				next_parameters = next.get("parameters", {})
+				next_type = next.get("type", "")
+				available_postprocessors = self.query.get_available_postprocessors()
+
+				# run it only if the post-processor is actually available for this query
+				if next_type in available_postprocessors:
+					next_analysis = DataSet(parameters=next_parameters, type=next_type, db=self.db,
+											parent=self.query.key, extension=available_postprocessors[next_type]["extension"])
+					self.queue.add_job(next_type, remote_id=next_analysis.key)
+
+		# see if we need to register the result somewhere
+		if query_parameters.get("copy_to", None):
+			# copy the results to an arbitrary place that was passed
+			if os.path.exists(self.query.get_results_path()):
+				# but only if we actually have something to copy
+				shutil.copyfile(self.query.get_results_path(), query_parameters.get("copy_to"))
+			else:
+				# if copy_to was passed, that means it's important that this
+				# file exists somewhere, so we create it as an empty file
+				with open(query_parameters.get("copy_to"), "w") as empty_file:
+					empty_file.write("")
+
+		try:
+			self.sphinx.close()
+		except Error:
+			# already closed earlier
+			pass
+
 		self.query.finish(num_rows=num_posts)
 		self.job.finish()
 

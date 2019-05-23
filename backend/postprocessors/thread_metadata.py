@@ -45,6 +45,7 @@ class ThreadMetadata(BasicPostProcessor):
 						"first_post": int(time.time()),
 						"image_md5": "",
 						"country_code": "",
+						"op_body": "",
 						"author": "",
 						"last_post": 0,
 						"images": 0,
@@ -61,6 +62,7 @@ class ThreadMetadata(BasicPostProcessor):
 					threads[post["thread_id"]]["author"] = post["author"]
 					threads[post["thread_id"]]["country_code"] = post["country_code"]
 					threads[post["thread_id"]]["image_md5"] = post["image_md5"]
+					threads[post["thread_id"]]["op_body"] = post["body"]
 
 				timestamp = int(datetime.datetime.strptime(post["timestamp"], "%Y-%m-%d %H:%M:%S").timestamp())
 
@@ -74,6 +76,7 @@ class ThreadMetadata(BasicPostProcessor):
 			"timestamp_lastpost": datetime.datetime.fromtimestamp(threads[thread_id]["last_post"]).strftime('%Y-%m-%d %H:%M:%S'),
 			"subject": threads[thread_id]["subject"],
 			"author": threads[thread_id]["author"],
+			"op_body": threads[thread_id]["op_body"],
 			"country_code": threads[thread_id]["country_code"],
 			"num_posts": threads[thread_id]["count"],
 			"num_images": threads[thread_id]["images"],

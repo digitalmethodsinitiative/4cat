@@ -23,52 +23,6 @@ class SearchReddit(StringQuery):
 
 	query = None
 
-	def work(self):
-		"""
-		Run 4CAT search query
-
-		Gets query details, passes them on to the object's search method, and
-		writes the results to a CSV file. If that all went well, the query and
-		job are marked as finished.
-		"""
-		# Setup connections and get parameters
-		key = self.job.data["remote_id"]
-		try:
-			self.query = DataSet(key=key, db=self.db)
-		except TypeError:
-			self.log.info("Query job %s refers to non-existent query, finishing." % key)
-			self.job.finish()
-			return
-
-		if self.query.is_finished():
-			self.log.info("Worker started for query %s, but query is already finished" % key)
-			self.job.finish()
-			return
-
-		query_parameters = self.query.get_parameters()
-		results_file = self.query.get_results_path()
-		results_file = results_file.replace("*", "")
-
-		# Execute the relevant query (string-based, random, countryflag-based)
-		if "random_amount" in query_parameters and query_parameters["random_amount"]:
-			posts = self.execute_random_query(query_parameters)
-		elif "country_flag" in query_parameters and query_parameters["country_flag"] != "all":
-			posts = self.execute_country_query(query_parameters)
-		else:
-			posts = self.execute_string_query(query_parameters)
-
-		# Write posts to csv and update the DataBase status to finished
-		if posts:
-			self.query.update_status("Writing posts to result file")
-			posts_to_csv(posts, results_file)
-			self.query.update_status("Query finished, results are available.")
-		elif posts is not None:
-			self.query.update_status("Query finished, no results found.")
-
-		num_posts = len(posts) if posts else 0
-		self.query.finish(num_rows=num_posts)
-		self.job.finish()
-
 	def execute_string_query(self, query):
 		"""
 		Execute a query; get post data for given parameters
@@ -122,7 +76,7 @@ class SearchReddit(StringQuery):
 			submission_parameters["title"] = query["subject_query"]
 
 		# Check whether only OPs linking to certain URLs should be retreived
-		if query["url"]:
+		if query.get("url", None):
 			urls = []
 			domains = []
 
@@ -263,7 +217,7 @@ class SearchReddit(StringQuery):
 		# or if there's a subject query and we're not looking for full threads
 		
 
-		do_posts_search = (not query["url"] and not query["subject_query"]) or chunked_search
+		do_posts_search = (not query.get("url", None) and not query.get("subject_query", None)) or chunked_search
 		while do_posts_search:
 			# chunked search: search within the given IDs only
 			if chunked_search:
