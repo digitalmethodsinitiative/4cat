@@ -204,6 +204,7 @@ def check_query():
 
 	return jsonify(status)
 
+
 @app.route("/api/delete-query/", methods=["DELETE", "POST"])
 @api_ratelimit
 @login_required
@@ -246,7 +247,7 @@ def check_queue():
 	:return: An JSON object with one item `count` containing the number of
 	queued or active search queries.
 	"""
-	unfinished_queries = db.fetchone("SELECT COUNT(*) AS count FROM jobs WHERE type LIKE '%-search'")
+	unfinished_queries = db.fetchone("SELECT COUNT(*) AS count FROM jobs WHERE jobtype LIKE '%-search'")
 
 	return jsonify(unfinished_queries)
 
