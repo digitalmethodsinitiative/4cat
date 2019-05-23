@@ -22,12 +22,11 @@ class SnapshotScheduler(BasicWorker):
 
 		for datasource in config.DATASOURCES:
 			if not config.DATASOURCES[datasource].get("snapshots", False)\
-					or not config.DATASOURCES[datasource].get("boards", False) \
-					or config.DATASOURCES[datasource]["boards"] == ["*"]:
+					or not config.DATASOURCES[datasource].get("boards_snapshot", False):
 				# we need specific boards to queue the snapshot for
 				continue
 
-			for board in config.DATASOURCES[datasource]["boards"]:
+			for board in config.DATASOURCES[datasource]["boards_snapshot"]:
 				type = "%s-search" % datasource
 
 				# usually we just want the past 24 hours, but this can be
