@@ -10,6 +10,7 @@ $(init);
 
 function init() {
     // Check status of query
+    query.update_status();
     setInterval(query.update_status, 4000);
 
     // Check queue length
@@ -493,7 +494,7 @@ query = {
         Polls server to check how many search queries are still in the queue
         */
         $.getJSON({
-            url: '/api/check_queue/',
+            url: '/api/check-queue/',
             success: function (json) {
 
                 // Update the query status box with the queue status
