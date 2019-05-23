@@ -48,6 +48,11 @@ class BasicPostProcessor(BasicWorker, metaclass=abc.ABCMeta):
 		self.log.info("Running post-processor %s on query %s" % (self.type, self.job.data["remote_id"]))
 
 		self.query = DataSet(key=self.job.data["remote_id"], db=self.db)
+		if not self.query.is_finished():
+			# not finished yet - retry after a while
+			self.job.release(delay=30)
+			return
+
 		self.parameters = self.query.parameters
 		self.query.update_status("Processing data")
 		self.query.update_version(get_software_version())
