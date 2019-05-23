@@ -104,7 +104,7 @@ class StringQuery(BasicWorker, metaclass=abc.ABCMeta):
 				# run it only if the post-processor is actually available for this query
 				if next_type in available_postprocessors:
 					next_analysis = DataSet(parameters=next_parameters, type=next_type, db=self.db,
-											parent=self.query.key)
+											parent=self.query.key, extension=available_postprocessors[next_type]["extension"])
 					self.queue.add_job(next_type, remote_id=next_analysis.key)
 
 		try:

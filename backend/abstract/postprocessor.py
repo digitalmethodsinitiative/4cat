@@ -45,13 +45,14 @@ class BasicPostProcessor(BasicWorker, metaclass=abc.ABCMeta):
 		is then requested and parsed. If that went well, the parsed data is passed on to the
 		processor.
 		"""
-		self.log.info("Running post-processor %s on query %s" % (self.type, self.job.data["remote_id"]))
-
 		self.query = DataSet(key=self.job.data["remote_id"], db=self.db)
-		if not self.query.is_finished():
+		self.parent = DataSet(key=self.query.data["key_parent"], db=self.db)
+		if not self.parent.is_finished():
 			# not finished yet - retry after a while
 			self.job.release(delay=30)
 			return
+
+		self.log.info("Running post-processor %s on query %s" % (self.type, self.job.data["remote_id"]))
 
 		self.parameters = self.query.parameters
 		self.query.update_status("Processing data")
@@ -83,7 +84,7 @@ class BasicPostProcessor(BasicWorker, metaclass=abc.ABCMeta):
 
 			# run it only if the post-processor is actually available for this query
 			if next_type in available_postprocessors:
-				next_analysis = DataSet(parameters=next_parameters, type=next_type, db=self.db, parent=self.query.key)
+				next_analysis = DataSet(parameters=next_parameters, type=next_type, db=self.db, parent=self.query.key, extension=available_postprocessors[next_type]["extension"])
 				self.queue.add_job(next_type, remote_id=next_analysis.key)
 
 		# see if we need to register the result somewhere
