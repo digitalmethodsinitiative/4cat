@@ -6,12 +6,12 @@ DATASOURCES = {
 	"4chan": {  # should correspond to DATASOURCE in the data source's __init__.py
 		"interval": 60,  # scrape interval for boards
 		"boards": ["pol", "v"],  # boards to scrape (and generally make available)
-		"snapshots": True  # calculate daily snapshots for on the statistics page
+		"boards_snapshots": []
 	},
 	"reddit": {
 		"interval": 60,
 		"boards": ["europe", "politics"],
-		"snapshots": True
+		"boards_snapshots": []
 	}
 }
 
