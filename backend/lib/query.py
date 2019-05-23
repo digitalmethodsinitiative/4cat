@@ -244,6 +244,9 @@ class DataSet:
 			file = query_bit + "-" + self.data["key"]
 			file = re.sub(r"[-]+", "-", file)
 
+		# Crop filename
+		file = file[:250]
+
 		path = self.folder + "/" + file + "." + extension.lower()
 		index = 1
 		while os.path.isfile(path):
