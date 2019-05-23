@@ -669,12 +669,12 @@ query = {
         }
 
         if (datasource == 'reddit') {
-            //$('#control-url').show();
+            $('#control-url').show().prop('disabled', false);
             $('#control-dense-threads').hide().find('input, select, textarea').prop('disabled', true);
             $('#control-random-sample').hide().find('input, select, textarea').prop('disabled', true);
             $('#filter-container-country-flag').hide().find('input, select, textarea').prop('disabled', true);
         } else {
-            //$('#control-url').hide();
+            $('#control-url').hide().prop('disabled', true);
             $('#control-dense-threads').show().find('input, select, textarea').prop('disabled', false);
             $('#control-random-sample').show().find('input, select, textarea').prop('disabled', false);
             if(board == 'pol') {

@@ -121,6 +121,39 @@ class SearchReddit(StringQuery):
 		if query["subject_query"]:
 			submission_parameters["title"] = query["subject_query"]
 
+		# Check whether only OPs linking to certain URLs should be retreived
+		if query["url"]:
+			urls = []
+			domains = []
+
+			if "," in query["url"]:
+				urls_input = query["url"].split(",")
+			elif "|" in query["url"]:
+				urls_input = query["url"].split("|")
+			else:
+				urls_input = [query["url"]]
+
+			# Input strings
+			for url in urls_input:
+
+				# Some cleaning
+				url = url.strip()
+
+				url_clean = url.replace("http://","")
+				url_clean = url.replace("https://","")
+				url_clean = url.replace("www.","")
+
+				# Store urls or domains separately; different fields in Pushshift API
+				if "/" in url_clean:
+					urls.append(url)
+				else:
+					domains.append(url_clean)
+			if urls:
+				# Multiple full URLs is supposedly not supported by Pushshift
+				submission_parameters["url"] = "\'" + (",".join(urls)) + "\'"
+			if domains:
+				submission_parameters["domain"] = ",".join(domains)
+
 		# this is where we store our progress
 		thread_ids = []
 		total_threads = 0
@@ -226,10 +259,11 @@ class SearchReddit(StringQuery):
 		# ID chunks are defined: these chunks are used here if available
 		seen_posts = set()
 
-		# do we need to query posts at all? not if there's a subject query and
-		# we're not looking for full threads
-		do_posts_search = not query["subject_query"] or chunked_search
+		# do we need to query posts at all? not if there's a URL search
+		# or if there's a subject query and we're not looking for full threads
+		
 
+		do_posts_search = (not query["url"] and not query["subject_query"]) or chunked_search
 		while do_posts_search:
 			# chunked search: search within the given IDs only
 			if chunked_search:

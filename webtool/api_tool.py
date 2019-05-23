@@ -121,6 +121,7 @@ def queue_query():
 		"body_query": request.form.get("body_query", ""),
 		"subject_query": request.form.get("subject_query", ""),
 		"full_thread": (request.form.get("full_thread", "no") != "no"),
+		"url": (request.form.get("url_query", "")),
 		"dense_threads": (request.form.get("dense_threads", "no") != "no"),
 		"dense_percentage": int(request.form.get("dense_percentage", 0)),
 		"dense_length": int(request.form.get("dense_length", 0)),
@@ -137,6 +138,8 @@ def queue_query():
 																							  "no") != "no" else 0,
 		"user": current_user.get_id()
 	}
+
+	print(parameters)
 
 	valid = validate_query(parameters)
 
