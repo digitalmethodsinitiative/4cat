@@ -136,7 +136,7 @@ class HistogramRenderer(BasicPostProcessor):
 			for month in months[year]:
 				posts = months[year][month]
 				bar_height = ((posts / max_neat) * item_height) - arc_adjust
-				self.query.update_status("%i-%i: %i (%f%%)" % (year, month, posts, bar_height))
+				self.query.update_status("%i-%i: %i posts" % (year, month, posts))
 				bar_y = y_margin_top + item_height - (bar_height) + arc_adjust
 				draw.rectangle([(x, bar_y - arc_adjust), (x + bar_width, height - y_margin)], "black")
 
