@@ -55,7 +55,7 @@
                             <li>
                                 {{ datasource }}
                                 <ul>
-                                {% for board in boards[datasource]["boards"] %}
+                                {% for board in datasources[datasource]["boards"] %}
                                     <li>{{ board }}</li>
                                 {% endfor %}
                                 </ul>

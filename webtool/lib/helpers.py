@@ -244,7 +244,7 @@ def validate_query(parameters):
 
 	# Check if there are enough parameters provided.
 	# Body and subject queries may be empty if date ranges are max a week apart.
-	if parameters["body_query"] == "" and parameters["subject_query"] == "" and parameters["random_amount"] == False:
+	if parameters["body_query"] == "" and parameters["subject_query"] == "" and parameters["random_amount"] == False and parameters["url"] == "":
 		# Queries for common country flags should have a date range of max. three months
 		if parameters["country_flag"] != 'all':
 			if parameters["country_flag"] in common_countries:
