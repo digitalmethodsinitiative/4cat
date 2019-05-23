@@ -79,7 +79,7 @@ class StringQuery(BasicWorker, metaclass=abc.ABCMeta):
 		# Execute the relevant query (string-based, random, countryflag-based)
 		if "random_amount" in query_parameters and query_parameters["random_amount"]:
 			posts = self.execute_random_query(query_parameters)
-		elif "country_flag" in query_parameters and query_parameters["country_flag"] != "all":
+		elif "country_flag" in query_parameters and query_parameters["country_flag"] != "all" and not query_parameters["body_query"]:
 			posts = self.execute_country_query(query_parameters)
 		else:
 			posts = self.execute_string_query(query_parameters)
@@ -176,7 +176,19 @@ class StringQuery(BasicWorker, metaclass=abc.ABCMeta):
 		if not query["full_thread"] and not query["dense_threads"]:
 			# just the exact post IDs we found via Sphinx
 			post_ids = tuple([post["post_id"] for post in posts])
+
+			# If the string posts should be filtered on a country
+			if "country_flag" in query:
+				if query["country_flag"] != "all":
+					post_ids = self.filter_on_country(query, post_ids)
+
+					# no results after country filtering
+					if not post_ids:
+						self.query.update_status("Query finished, but no results were found.")
+						return None
+
 			posts = self.fetch_posts(post_ids)
+
 			self.query.update_status("Post data collected")
 			self.log.info("Full posts query finished in %i seconds." % (time.time() - postgres_start))
 
@@ -243,9 +255,42 @@ class StringQuery(BasicWorker, metaclass=abc.ABCMeta):
 
 		return posts
 
+	def filter_on_country(self, query, post_ids):
+		"""
+		Filters retreived posts on whether they contain a country flag.
+
+		:param dict query:  Query parameters, as part of the DataSet object
+		:param list post_ids: List of post IDs to filter on
+		:return tuple: filtered list of post ids
+		"""
+
+		country_flag = query["country_flag"]
+		self.query.update_status("Filtering on country-specific posts")
+
+		if country_flag == "europe":
+			# country codes that can be selected in the web tool that are in
+			# Europe (as defined by geographic location, using the Caucasus
+			# mountains as a border)
+			operator = "IN"
+			country_flag = (
+			"GB", "DE", "NL", "RU", "FI", "FR", "RO", "PL", "SE", "NO", "ES", "IE", "IT", "SI", "RS", "DK", "HR", "GR",
+			"BG", "BE", "AT", "HU", "CH", "PT", "LT", "CZ", "EE", "UY", "LV", "SK", "MK", "UA", "IS", "BA", "CY", "GE",
+			"LU", "ME", "AL", "MD", "IM", "EU", "BY", "MC", "AX", "KZ", "AM", "GG", "JE", "MT", "FO", "AZ", "LI", "AD")
+		else:
+			operator = "="
+
+		posts = self.db.fetchall(
+				"SELECT id FROM posts_" + self.prefix + " WHERE id IN %s AND country_code " + operator + " %s;",
+				(post_ids, country_flag,))
+
+		post_ids = tuple([post["id"] for post in posts])
+		
+		return post_ids
+		
+
 	def execute_country_query(self, query):
 		"""
-		Get posts with a country flag
+		Get posts based on their country flag
 
 		:param str country: Country to filter on
 		:return list: filtered list of post ids

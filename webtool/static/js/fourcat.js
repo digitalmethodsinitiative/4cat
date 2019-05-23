@@ -63,7 +63,7 @@ function init() {
     // Disable all options if country flag is checked (except dates & boards)
     $('#check-country-flag').on('change', function () {
         $('#country_flag').attr('disabled', !this.checked);
-        $('#body-input').attr('disabled', this.checked);
+        //$('#body-input').attr('disabled', this.checked);
         $('#subject-input').attr('disabled', this.checked);
         $('#check-full-thread').attr('disabled', this.checked).prop('checked', false);
         $('#check-random-sample').attr('disabled', this.checked).prop('checked', false);
@@ -573,7 +573,7 @@ query = {
         }
 
         // Country flag check
-        if ($('#check-country-flag').is(':checked') && valid) {
+        if ($('#check-country-flag').is(':checked') && ($('#body-input').val()).length < 2 && valid) {
             
             let common_countries = ['US', 'GB', 'CA', 'AU'];
             let country = $('#country_flag').val();
@@ -585,7 +585,7 @@ query = {
                     let min_date = stringToTimestamp($('#input-min-time').val());
                     let max_date = stringToTimestamp($('#input-max-time').val());
                     
-                    // Max three monhts for the common country flags
+                    // Max three monhts for the common country flags without any body parameters
                     if (max_date - min_date > 7889231) {
                         valid = false;
                         alert('The date selected is more than three months. Select a date range of max. three months and try again. Only the most common country flags on 4chan/pol/ (US, UK, Canada, Australia) have a date restriction.');
@@ -596,7 +596,7 @@ query = {
                     $('#check-time').prop('checked', true);
                     $('#check-time').trigger('change');
                     $('#input-min-time').focus().select();
-                    alert('The most common country flags on 4chan/pol/ (US, Canada, Australia) have a date restriction. Select a date range of max. three months and try again.');
+                    alert('The most common country flags on 4chan/pol/ (US, Canada, Australia) have a date restriction when you want to retreive all of their posts. Select a date range of max. three months and try again.');
                 }
             }
         }
