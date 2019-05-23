@@ -241,11 +241,9 @@ class DataSet:
 		else:
 			query_bit = self.data["query"].replace(" ", "-").lower()
 			query_bit = re.sub(r"[^a-z0-9\-]", "", query_bit)
+			query_bit = query_bit[:200] # Crop
 			file = query_bit + "-" + self.data["key"]
 			file = re.sub(r"[-]+", "-", file)
-
-		# Crop filename
-		file = file[:250]
 
 		path = self.folder + "/" + file + "." + extension.lower()
 		index = 1
