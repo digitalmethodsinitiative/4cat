@@ -74,6 +74,8 @@ class ThreadMetadata(BasicPostProcessor):
 			"thread_id": thread_id,
 			"timestamp": datetime.datetime.fromtimestamp(threads[thread_id]["first_post"]).strftime('%Y-%m-%d %H:%M:%S'),
 			"timestamp_lastpost": datetime.datetime.fromtimestamp(threads[thread_id]["last_post"]).strftime('%Y-%m-%d %H:%M:%S'),
+			"timestamp_unix": threads[thread_id]["first_post"],
+			"timestamp_lastpost_unix": threads[thread_id]["last_post"],
 			"subject": threads[thread_id]["subject"],
 			"author": threads[thread_id]["author"],
 			"op_body": threads[thread_id]["op_body"],
