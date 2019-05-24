@@ -45,8 +45,24 @@ class BasicPostProcessor(BasicWorker, metaclass=abc.ABCMeta):
 		is then requested and parsed. If that went well, the parsed data is passed on to the
 		processor.
 		"""
-		self.query = DataSet(key=self.job.data["remote_id"], db=self.db)
-		self.parent = DataSet(key=self.query.data["key_parent"], db=self.db)
+		try:
+			self.query = DataSet(key=self.job.data["remote_id"], db=self.db)
+		except TypeError:
+			# query has been deleted in the meantime. finish without error,
+			# as deleting it will have been a conscious choice by a user
+			self.job.finish()
+			return
+
+		try:
+			self.parent = DataSet(key=self.query.data["key_parent"], db=self.db)
+		except TypeError:
+			# we need to know what the parent query was to properly handle the
+			# analysis
+			self.log.warning("Post-processor %s queued for orphan query %s: cannot run, cancelling job" % (self.type, self.query.key))
+			self.job.finish()
+			return
+
+
 		if not self.parent.is_finished():
 			# not finished yet - retry after a while
 			self.job.release(delay=30)
