@@ -40,7 +40,7 @@
             {{ postprocessors[item.type].description if item.type in postprocessors else "This post-processor has been deprecated but you can still download the result." }}
         </p>
     
-        {% if postprocessors[subquery.type].extension in ("jpg", "jpeg", "png", "csv", "html") %}
+        {% if subquery.type in postprocessors and postprocessors[subquery.type].extension in ("jpg", "jpeg", "png", "csv", "html") %}
             <div class="query-result">
             {% if postprocessors[subquery.type].extension == "html" %}
                 <iframe class="query-result-iframe" src="/result/{{ subquery.result_file }}"></iframe>
@@ -54,7 +54,7 @@
         <p class="details-only">
             <a class="permalink" href="/results/{{ query.key }}/#nav={{ subquery.get_breadcrumbs() }}" target="_blank">Permanent link to this analysis result (with context)</a>
         </p>
-        {% if current_user.is_admin() and item.get_version_url("backend/postprocessors/" + postprocessors[item.type].file) %}
+        {% if item.type in postprocessors and current_user.is_admin() and item.get_version_url("backend/postprocessors/" + postprocessors[item.type].file) %}
         <p class="details-only">
             <a class="permalink" href="{{ item.get_version_url("backend/postprocessors/" + postprocessors[item.type].file) }}" target="_blank">Review the code that generated this result</a>
         </p>
