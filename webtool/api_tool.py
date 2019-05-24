@@ -139,8 +139,6 @@ def queue_query():
 		"user": current_user.get_id()
 	}
 
-	print(parameters)
-
 	valid = validate_query(parameters)
 
 	if valid != True:
@@ -206,6 +204,7 @@ def check_query():
 
 	return jsonify(status)
 
+
 @app.route("/api/delete-query/", methods=["DELETE", "POST"])
 @api_ratelimit
 @login_required
@@ -237,7 +236,7 @@ def delete_query():
 	return jsonify({"status": "success"})
 
 
-@app.route("/api/check_queue/")
+@app.route("/api/check-queue/")
 @api_ratelimit
 @login_required
 @openapi.endpoint
@@ -245,9 +244,10 @@ def check_queue():
 	"""
 	Get the amount of queries still in the queue.
 
-	:return: An int with the amount of unprocessed queries.
+	:return: An JSON object with one item `count` containing the number of
+	queued or active search queries.
 	"""
-	unfinished_queries = db.fetchone("SELECT count(*)count FROM queries WHERE type='search' AND is_finished=false")
+	unfinished_queries = db.fetchone("SELECT COUNT(*) AS count FROM jobs WHERE jobtype LIKE '%-search'")
 
 	return jsonify(unfinished_queries)
 
