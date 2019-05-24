@@ -13,6 +13,7 @@ function init() {
     setInterval(query.update_status, 4000);
 
     // Check queue length
+    query.check_queue();
     setInterval(function () {query.check_queue();}, 4000);
 
     // Start querying when go button is clicked

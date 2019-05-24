@@ -232,7 +232,7 @@ def validate_query(parameters):
 	if parameters["datasource"] not in config.DATASOURCES:
 		return "Please choose a valid datasource to search"
 
-	if parameters["board"] not in config.DATASOURCES[parameters["datasource"]]["boards"] and config.DATASOURCES[parameters["datasource"]]["boards"] != ["*"]:
+	if parameters["datasource"] not 'reddit' and (parameters["board"] not in config.DATASOURCES[parameters["datasource"]]["boards"] and config.DATASOURCES[parameters["datasource"]]["boards"] != ["*"]):
 		return "Please choose a valid board for querying"
 
 	# Keyword-dense thread length should be at least thirty.

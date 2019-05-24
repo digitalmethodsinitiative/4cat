@@ -144,3 +144,7 @@ nav > ul.flat > li {
 .result-warning {
 	background: #eee;
 }
+
+.pagination li.page a:hover, .pagination li.page a:focus {
+    background: #21202e;
+}
