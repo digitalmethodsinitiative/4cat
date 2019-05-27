@@ -33,8 +33,8 @@ class CountryCounter(BasicPostProcessor):
 		with one column with unique usernames and in the other one the amount
 		of posts for that user name
 		"""
-		countries = {}
 
+		countries = {}
 
 		self.query.update_status("Reading source file")
 		with open(self.source_file, encoding="utf-8") as source:

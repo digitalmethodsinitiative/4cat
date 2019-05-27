@@ -46,8 +46,10 @@ class URLExtractor(BasicPostProcessor):
 				post_links = link_regex.findall(post["body"])
 				if post_links:
 					for link in post_links:
+						# Extract domain name if user indicated so
 						if self.parameters.get("hostnames", False):
 							link = www_regex.sub("", link.split("/")[2])
+						# Else just use the full URL
 						if link not in links:
 							links[link] = 0
 						links[link] += 1
