@@ -11,22 +11,20 @@ from backend.abstract.postprocessor import BasicPostProcessor
 import config
 
 
-class ThreadMetadata(BasicPostProcessor):
+class YouTubeMetadata(BasicPostProcessor):
 	"""
-	Example post-processor
+	
+	Extracts data from YouTube URLs
+	Every row is one link, with the metadata and `amount`
+	of times shared.
 
-	This is a very simple example post-processor.
-
-	The four configuration options should be set for all post-processors. They
-	contain information needed internally as well as information that is used
-	to describe this post-processor with in a user interface.
 	"""
-	type = "thread-metadata"  # job type ID
-	category = "Thread metrics" # category
-	title = "Thread metadata"  # title displayed in UI
-	description = "Create an overview of the threads present in the dataset, containing thread IDs, subjects and post counts."  # description displayed in UI
+
+	type = "youtube-metadata"  # job type ID
+	category = "Post metrics" # category
+	title = "YouTube metadata"  # title displayed in UI
+	description = "Extract information from the YouTube links shared in your dataset."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
-	datasources = ["4chan","8chan"]
 
 	def process(self):
 		"""

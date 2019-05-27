@@ -29,6 +29,8 @@ class DebateMetrics(BasicPostProcessor):
 	title = "Debate metrics"  # title displayed in UI
 	description = "Returns a csv with meta-metrics per thread."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
+	datasources = ["4chan","8chan"]
+
 
 	def process(self):
 		"""

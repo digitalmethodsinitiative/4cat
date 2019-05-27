@@ -24,6 +24,7 @@ class ThreadSplitter(BasicPostProcessor):
 	title = "Split by thread"  # title displayed in UI
 	description = "Split the result over separate csv files per thread. The threads can then be downloaded as an archive containing the separate CSV files."  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
+	datasources = ["4chan","8chan","reddit"]
 
 	def process(self):
 		"""

@@ -17,6 +17,7 @@ class CountryCounter(BasicPostProcessor):
 	title = "Top countries"  # title displayed in UI
 	description = "Generate a list of country codes present in the result set and sort it by how often the country is present."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
+	datasources = ["4chan"]
 
 	options = {
 		"top": {
