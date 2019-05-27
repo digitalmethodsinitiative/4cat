@@ -35,6 +35,7 @@ class ImageWallGenerator(BasicPostProcessor):
 	description = "Download top images and create an image wall. The amount of images used can be configured; the more images, the longer it takes to create the image wall. May take a while to complete as images are sourced externally."  # description displayed in UI
 	extension = "png"  # extension of result file, used internally and in UI
 	accepts = ["top-images"]  # query types this post-processor accepts as input
+	datasources = ["4chan"]
 
 	options = {
 		"amount": {

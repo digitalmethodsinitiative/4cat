@@ -17,6 +17,8 @@ class QuoteRanker(BasicPostProcessor):
 	title = "Sort by most quoted"  # title displayed in UI
 	description = "Sort posts by how often they were quoted by other posts in the data set. Post IDs may be correlated and triangulated with the full results set."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
+	datasources = ["4chan","8chan"]
+
 
 	def process(self):
 		"""

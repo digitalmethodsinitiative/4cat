@@ -20,6 +20,7 @@ class TopImageCounter(BasicPostProcessor):
 	title = "Top images"  # title displayed in UI
 	description = "Collect all images used in the data set, and sort by most used. Contains URLs through which the images may potentially be downloaded."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
+	datasources = ["4chan"]
 
 	def process(self):
 		"""
