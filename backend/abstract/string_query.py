@@ -475,7 +475,7 @@ class StringQuery(BasicWorker, metaclass=abc.ABCMeta):
 		:param str string:  String to escape
 		:return str: Escaped string
 		"""
-		return string  # re.sub(r"([=\(\)|\-!@~\"&/\\\^\$\=])", r"\\\1", string)
+		return string.replace("/", "\\/")
 
 	@abc.abstractmethod
 	def fetch_posts(self, post_ids):
