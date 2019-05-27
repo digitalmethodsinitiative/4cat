@@ -332,7 +332,7 @@ def preview_csv(key):
 		abort(404)
 
 	try:
-		with open(query.get_results_path()) as csvfile:
+		with open(query.get_results_path(), encoding="utf-8") as csvfile:
 			rows = []
 			reader = csv.reader(csvfile)
 			while len(rows) < 25:

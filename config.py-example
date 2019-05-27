@@ -63,6 +63,10 @@ SCRAPE_TIMEOUT = 5  # how long to wait for a scrape request to finish?
 SCRAPE_PROXIES = {"http": []}  # Items in this list should be formatted like "http://111.222.33.44:1234"
 IMAGE_INTERVAL = 3600
 
+# YouTube variables to use for postprocessors
+YOUTUBE_API_SERVICE_NAME = "youtube"
+YOUTUBE_API_VERSION = "v3"
+YOUTUBE_DEVELOPER_KEY = ""
 
 # Web tool settings
 class FlaskConfig:

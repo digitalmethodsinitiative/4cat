@@ -41,6 +41,7 @@ setup(
 		"python-daemon==1.2",
 		"bcrypt==3.1.4",
 		"markdown==3.0.1",
-		"cssselect==1.0.3"
+		"cssselect==1.0.3",
+		"youtube_dl==2019.1.2"
 	]
 )
