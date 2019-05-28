@@ -212,7 +212,7 @@ def validate_query(parameters):
 
 	# Admins can use larger timespans without further queries
 	if current_user.is_admin():
-		time_threshold = 7889231 # 3 months
+		time_threshold = 100000000000 #7889231 = 3 months
 	else:
 		time_threshold = 2419200 # four weeks
 
