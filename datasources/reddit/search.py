@@ -213,11 +213,11 @@ class SearchReddit(StringQuery):
 		# ID chunks are defined: these chunks are used here if available
 		seen_posts = set()
 
-		# do we need to query posts at all? not if there's a URL search
-		# or if there's a subject query and we're not looking for full threads
-		
+		# do we need to query posts at all?
+		# Yes if explicitly stated with the 'full thread' checkmark
+		# or if post bodies need to be searched.
+		do_posts_search = chunked_search or query["body_query"]
 
-		do_posts_search = (not query.get("url", None) and not query.get("subject_query", None)) or chunked_search
 		while do_posts_search:
 			# chunked search: search within the given IDs only
 			if chunked_search:
