@@ -1,21 +1,11 @@
 from setuptools import setup
+import os
 
 with open("README.md", 'r') as readmefile:
 	readme = readmefile.read()
 
-setup(
-	name='fourcat',
-	version=1,
-
-	description=('4CAT: Capture and Analysis Tool is a comprehensive tool for '
-				 'analysing discourse on web forums and imageboards'),
-	long_description=readme,
-	author="Open Intelligence Lab",
-	author_email="4cat@oilab.eu",
-	url="https://4cat.oilab.nl",
-
-	packages=['backend', 'webtool'],
-	install_requires=[
+# Universal libraries
+libraries = [
 		"requests==2.20.0",
 		"psycopg2_binary==2.7.5",
 		"pymysql==0.9.2",
@@ -38,11 +28,30 @@ setup(
 		"adjustText==0.7.3",
 		"psycopg2==2.7.5",
 		"scikit_learn==0.20.0",
-		"python-daemon==2.2.0",
 		"bcrypt==3.1.4",
 		"markdown==3.0.1",
 		"cssselect==1.0.3",
 		"youtube_dl==2019.1.2",
 		"google-api-python-client==1.7.7"
 	]
+
+# Some libraries don't run on Windows
+unix_libraries = [
+		"python-daemon==2.2.0"
+]
+
+if os.name != "nt":
+	libraries = libraries + unix_libraries
+
+setup(
+	name='fourcat',
+	version=1,
+	description=('4CAT: Capture and Analysis Tool is a comprehensive tool for '
+				 'analysing discourse on web forums and imageboards'),
+	long_description=readme,
+	author="Open Intelligence Lab",
+	author_email="4cat@oilab.eu",
+	url="https://4cat.oilab.nl",
+	packages=['backend', 'webtool'],
+	install_requires=libraries
 )
