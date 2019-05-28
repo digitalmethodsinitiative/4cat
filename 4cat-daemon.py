@@ -1,4 +1,3 @@
-import psutil
 import time
 import sys
 import os
@@ -17,6 +16,7 @@ if os.name not in ("posix", "mac"):
 	sys.exit(0)
 else:
 	# if so, import necessary modules
+	import psutil
 	import daemon
 	from daemon import pidfile
 
