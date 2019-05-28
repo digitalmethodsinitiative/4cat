@@ -15,10 +15,10 @@ if os.name not in ("posix", "mac"):
 	print("Running backend in terminal instead.")
 	bootstrap.run(as_daemon=False)
 	sys.exit(0)
-
-# if so, import necessary modules
-import daemon
-from daemon import pidfile
+else:
+	# if so, import necessary modules
+	import daemon
+	from daemon import pidfile
 
 # determine PID file
 lockfile = get_absolute_folder(config.PATH_LOCKFILE) + "/4cat.pid"  # pid file location
