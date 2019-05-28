@@ -38,7 +38,7 @@ setup(
 		"adjustText==0.7.3",
 		"psycopg2==2.7.5",
 		"scikit_learn==0.20.0",
-		"python-daemon==1.2",
+		"python-daemon==2.2.0",
 		"bcrypt==3.1.4",
 		"markdown==3.0.1",
 		"cssselect==1.0.3",
