@@ -388,6 +388,7 @@ class SearchReddit(StringQuery):
 		while retries < self.max_retries:
 			try:
 				response = requests.get(*args, **kwargs)
+				#print(response.get_url())
 				break
 			except requests.RequestException:
 				retries += 1
