@@ -28,7 +28,7 @@ class YouTubeMetadata(BasicPostProcessor):
 
 	type = "youtube-metadata"  # job type ID
 	category = "Post metrics" # category
-	title = "YouTube metadata"  # title displayed in UI
+	title = "YouTube URL metadata"  # title displayed in UI
 	description = "Extract information from YouTube links to videos and channels"  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 	datasources = ["4chan", "8chan", "reddit"]
@@ -65,23 +65,39 @@ class YouTubeMetadata(BasicPostProcessor):
 			csv = DictReader(source)
 
 			self.query.update_status("Extracting YouTube links")
-			urls = []
 
-			# Reddit posts have a dedicated URL column.
-			# Start with these and then append URLs from the OP text and commments.
-			if datasource == "reddit":
-				urls = [post["url"] for post in csv if "youtu.be" in post["domain"] or "youtube.com" in post["domain"]]
+			# Use a dict with post IDs as keys
+			# and a list of YouTube URLs referenced as value
+			urls = {}
 
-			# Extract YT urls from the post bodies	
 			link_regex = re.compile(r"https?://[^\s]+")
 			www_regex = re.compile(r"^www\.")
+
 			for post in csv:
-				post_links = link_regex.findall(post["body"])
-				if post_links:
-					for link in post_links:
-						# Only keep YouTube links. These two should be all options.
-						if "youtu.be" in link or "youtube.com" in link:
-							urls.append(link)
+				# Reddit posts have a dedicated URL column.
+				# Start with these and then append URLs from the OP text and commments.
+				post_urls = []
+
+				if datasource == "reddit":
+					if "youtu.be" in post.get("domain") or "youtube.com" in post.get("domain"):
+						post_urls.append(post["url"])
+				
+				# Extract more YouTube urls from the post body		
+				if "youtu" in post["body"]: # If statement to speed things up
+					post_links = link_regex.findall(post["body"])
+					if post_links:
+						for link in post_links:
+							# Only keep YouTube links. These two should be all options.
+							if "youtu.be" in link or "youtube.com" in link:
+								post_urls.append(link)
+
+				# Store the URLs as values with the post ID as a key
+				if post_urls:
+					for post_url in post_urls:
+						if post_url in urls:
+							urls[post_url].append(post["id"])
+						else:
+							urls[post_url] = [post["id"]]
 
 		# Return if there's no YouTube URLs
 		if not urls:
@@ -103,13 +119,18 @@ def get_youtube_metadata(self, urls):
 	Gets metadata from various YouTube URLs.
 	Currently only supports channels and videos.
 
-	:param list url, a list to urls referencing a channel or video
+	:param list or dict url, a list to urls referencing a channel or video
+			or a dictionary with the urls as keys and post IDs as avlues
 	:returns dict, containing metadata on the YouTube URL
 
 	"""
 
 	if isinstance(urls, str):
 		urls = [urls]
+
+	if isinstance(urls, dict):
+		di_urls = urls
+		urls = list(urls.keys())
 
 	# Parse video and channel IDs from URLs and add back together
 	video_ids = parse_video_ids(urls)
@@ -127,7 +148,7 @@ def get_youtube_metadata(self, urls):
 		cutoff = min(sorted([len(value) for value in all_ids.values()])[:cutoff])
 	
 	# Create a new dict with the amount of references, filtered on user thresholds
-	top_ids ={}
+	top_ids = {}
 	for youtube_id, urls in all_ids.items():
 		count = len(urls)
 		if count >= min_mentions and count >= cutoff:
@@ -149,31 +170,39 @@ def get_youtube_metadata(self, urls):
 
 	# Loop through all IDs and get metadata per instance
 	for youtube_id, count in top_ids.items():
-	
-		metadata = None
+
+		metadata = {}
 
 		if youtube_id in unique_video_ids:
-			metadata = get_video_metadata(youtube_id)
-			if metadata:
-				metadata["type"] = "video"
+			metadata["type"] = "video"
+			new_metadata = get_video_metadata(youtube_id)
 		elif youtube_id in unique_channel_ids:
-			metadata = get_channel_metadata(youtube_id)
-			if metadata:
-				metadata["type"] = "channel"
+			metadata["type"] = channel
+			new_metadata = get_channel_metadata(youtube_id)
 		
-		# If data collection failed, create an almost empty dict
-		if not metadata:
-			metadata = {}
-			metadata["type"] = "unknown/deleted"
-
-		# Store the amount of times the channel/video is linked
-		metadata["count"] = count
+		# Make a column to indicate which pages could not be retrieved successfully
+		# These are likely deleted or unparseable URLs
+		if new_metadata:
+			metadata["deleted_or_failed"] = False
+		else:
+			metadata["deleted_or_failed"] = True
 
 		# Store the URL(s) used to reference the channel or video
+		# Also store who referenced this channel/video in the original dataset.
+		# This will be useful for cross-referencing.
 		urls_referenced = list(set(all_ids[youtube_id]))
-		if len(urls_referenced) == 1:
-			urls_referenced = urls_referenced[0] # Make string if there's only one entry
-		metadata["url"] = urls_referenced
+		referenced_by = []
+		for url_referenced in urls_referenced:
+			referenced_by += list(set(di_urls[url_referenced]))
+		metadata["referenced_urls"] = ','.join(urls_referenced)
+		metadata["referenced_by"] = ','.join(referenced_by)
+
+		# Store the amount of times the channel/video is linked
+		metadata["count"] = len(referenced_by)
+
+		# Add the new metadata after the metrics (looks nice in csv!)
+		if new_metadata:
+			metadata = {**metadata, **new_metadata}
 
 		# Store the metadata in a longer list
 		all_metadata.append(metadata)
@@ -208,6 +237,7 @@ def parse_channel_ids(urls):
 
 	"""
 
+	# Parse string to list so the loop works
 	if isinstance(urls, str):
 		urls = [urls]
 
@@ -226,9 +256,9 @@ def parse_channel_ids(urls):
 				# key in the dictionary
 				if channel_id:
 					if channel_id not in ids:
+						# Make it a list if there only one string entry yet
 						ids[channel_id] = [url]
 					else:
-						# Make it a list if there only one string entry yet
 						ids[channel_id].append(url)
 			except Exception as error:
 				channel_id = False
@@ -244,6 +274,7 @@ def parse_video_ids(urls):
 
 	"""
 
+	# Parse string to list so the loop works
 	if isinstance(urls, str):
 		urls = [urls]
 
@@ -286,8 +317,6 @@ def get_channel_metadata(channel_id):
 	:returns dict, containing YouTube's response metadata
 
 	"""
-
-	metadata = {}
 
 	# Use YouTubeDL and the YouTube API to request channel data
 	youtube = build(config.YOUTUBE_API_SERVICE_NAME, config.YOUTUBE_API_VERSION,
@@ -333,8 +362,6 @@ def get_video_metadata(video_id):
 	:return dict, containing YouTube's response metadata
 
 	"""
-
-	metadata = {}
 	
 	# Use YouTubeDL and the YouTube API to request video data
 	youtube = build(config.YOUTUBE_API_SERVICE_NAME, config.YOUTUBE_API_VERSION,

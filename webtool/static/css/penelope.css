@@ -148,3 +148,10 @@ nav > ul.flat > li {
 .pagination li.page a:hover, .pagination li.page a:focus {
     background: #21202e;
 }
+
+.flashing, .flashing .query-core, .flashing .query-core p, .flashing .query-core .property-badge { animation: flash 0.5s 3 normal forwards; }
+@keyframes flash {
+	from { border-color: #000; color: #ed4327; }
+	50% { border-color: #ed4327; color: #ed4327; }
+	to { border-color: #000; color: #000; }
+}
