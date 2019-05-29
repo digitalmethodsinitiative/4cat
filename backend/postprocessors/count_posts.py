@@ -47,6 +47,8 @@ class CountPosts(BasicPostProcessor):
 
 				csv = DictReader(source)
 				
+				counter = 0
+
 				for post in csv:
 
 					# Add a count for the respective timeframe
@@ -66,6 +68,11 @@ class CountPosts(BasicPostProcessor):
 						posts[date] = 1
 					else:
 						posts[date] += 1
+
+					counter += 1
+
+					if counter % 10 == 0:
+						self.query.update_status("Counted through " + str(counter) + " posts.")
 
 			# Write to csv
 			csv_writer = writer(results)
