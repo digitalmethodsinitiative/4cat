@@ -33,6 +33,9 @@ class YouTubeMetadata(BasicPostProcessor):
 	extension = "csv"  # extension of result file, used internally and in UI
 	datasources = ["4chan", "8chan", "reddit"]
 
+	max_retries = 3
+	sleep_time = 10
+
 	options = {
 		"top": {
 			"type": UserInput.OPTION_TEXT,
@@ -172,19 +175,23 @@ def get_youtube_metadata(self, urls):
 	for youtube_id, count in top_ids.items():
 
 		metadata = {}
+		new_metadata = None
 
 		if youtube_id in unique_video_ids:
 			metadata["type"] = "video"
-			new_metadata = get_video_metadata(youtube_id)
-		elif youtube_id in unique_channel_ids:
-			metadata["type"] = channel
-			new_metadata = get_channel_metadata(youtube_id)
+			try:
+				new_metadata = get_video_metadata(self, youtube_id)
+			except Exception as e:
+				metadata["error_code"] = str(e)
 		
-		# Make a column to indicate which pages could not be retrieved successfully
-		# These are likely deleted or unparseable URLs
-		if new_metadata:
-			metadata["deleted_or_failed"] = False
-		else:
+		elif youtube_id in unique_channel_ids:
+			metadata["type"] = "channel"
+			try:
+				new_metadata = get_channel_metadata(self, youtube_id)
+			except Exception as e:
+				metadata["error_code"] = str(e)
+
+		if not new_metadata:
 			metadata["deleted_or_failed"] = True
 
 		# Store the URL(s) used to reference the channel or video
@@ -309,7 +316,7 @@ def parse_video_ids(urls):
 					ids[video_id].append(url)
 	return ids
 
-def get_channel_metadata(channel_id):
+def get_channel_metadata(self, channel_id):
 	"""
 	Use the YouTube API to fetch metadata from a channel.
 
@@ -321,17 +328,27 @@ def get_channel_metadata(channel_id):
 	# Use YouTubeDL and the YouTube API to request channel data
 	youtube = build(config.YOUTUBE_API_SERVICE_NAME, config.YOUTUBE_API_VERSION,
 					developerKey=config.YOUTUBE_DEVELOPER_KEY)
-	while True:
+	retries = 0
+	api_error = ""
+	while retries < self.max_retries:
 		try:
 			response = youtube.channels().list(
 			part = "snippet,contentDetails,topicDetails,statistics,brandingSettings",
 			id = channel_id
 			).execute()
 			break
-		except HttpError as e:
-			time.sleep(10)
-			pass
 
+		except Exception as error:
+			self.query.update_status("Encountered exception " + str(e) + ".\nSleeping for " + str(self.sleep_time))
+			retries += 1
+			api_error = error
+			time.sleep(self.sleep_time) # Wait a bit before trying again
+
+	# Raise error if the requests failed
+	if retries >= self.max_retries:
+		self.log.error("Error during youtube_dl of query %s" % self.query.key)
+		self.query.update_status("Error while getting YouTube data")
+		raise api_error
 
 	# Get and return results
 	if response["items"]:
@@ -355,7 +372,7 @@ def get_channel_metadata(channel_id):
 
 	return result
 
-def get_video_metadata(video_id):
+def get_video_metadata(self, video_id):
 	"""
 	Use the YouTube API to fetch metadata from a video.
 	:param str channel_id, a valild YouTube video ID
@@ -367,16 +384,27 @@ def get_video_metadata(video_id):
 	youtube = build(config.YOUTUBE_API_SERVICE_NAME, config.YOUTUBE_API_VERSION,
 										developerKey=config.YOUTUBE_DEVELOPER_KEY)
 
-	while True:
+	retries = 0
+	api_error = ""
+	while retries < self.max_retries:
 		try:
 			response = youtube.videos().list(
-					part = 'snippet,contentDetails,statistics',
-					id = video_id
-					).execute()
+				part = 'snippet,contentDetails,statistics',
+				id = video_id
+				).execute()
 			break
-		except HttpError as e:
-			time.sleep(10)
-			pass
+
+		except Exception as error:
+			self.query.update_status("Encountered exception " + str(e) + ".\nSleeping for " + str(self.sleep_time))
+			retries += 1
+			api_error = error
+			time.sleep(self.sleep_time) # Wait a bit before trying again
+
+	# Raise error if the requests failed
+	if retries >= self.max_retries:
+		self.log.error("Error during youtube_dl of query %s" % self.query.key)
+		self.query.update_status("Error while getting YouTube data")
+		raise api_error
 
 	# Check if a valid reponse is provided by the API
 	if response["items"]:
