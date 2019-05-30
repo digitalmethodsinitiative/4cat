@@ -4,7 +4,7 @@ Thread data
 import datetime
 import time
 import re
-import urllib.parse
+import urllib
 import youtube_dl
 
 from apiclient.discovery import build
@@ -34,7 +34,7 @@ class YouTubeMetadata(BasicPostProcessor):
 	datasources = ["4chan", "8chan", "reddit"]
 
 	max_retries = 3
-	sleep_time = 10
+	sleep_time = 20
 
 	options = {
 		"top": {
@@ -338,7 +338,7 @@ def get_channel_metadata(self, channel_id):
 			).execute()
 			break
 
-		except Exception as error:
+		except urllib.error.HTTPError as error:
 			self.query.update_status("Encountered exception " + str(e) + ".\nSleeping for " + str(self.sleep_time))
 			retries += 1
 			api_error = error
@@ -394,7 +394,7 @@ def get_video_metadata(self, video_id):
 				).execute()
 			break
 
-		except Exception as error:
+		except urllib.error.HTTPError as error:
 			self.query.update_status("Encountered exception " + str(e) + ".\nSleeping for " + str(self.sleep_time))
 			retries += 1
 			api_error = error
