@@ -73,9 +73,11 @@ class SnapshotAnalyser(BasicWorker):
 		# queue top countries
 		analysis = DataSet(parameters={
 			"top": 15,
+			"attribute": "country_code",
+			"timeframe": "all",
 			"copy_to": config.PATH_SNAPSHOTDATA + "%s-countries.csv" % file_prefix
-		}, type="count-countries", db=self.db, parent=query.key)
-		self.queue.add_job("count-countries", remote_id=analysis.key)
+		}, type="attribute-frequencies", db=self.db, parent=query.key)
+		self.queue.add_job("attribute-frequencies", remote_id=analysis.key)
 
 		# queueing is done, job finished
 		self.job.finish()
