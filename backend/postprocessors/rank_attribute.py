@@ -2,9 +2,12 @@
 Generate ranking per post attribute
 """
 import collections
+import itertools
 import datetime
 import re
 
+from collections import OrderedDict
+from itertools import islice
 from csv import DictReader
 
 from backend.abstract.postprocessor import BasicPostProcessor
@@ -13,10 +16,10 @@ from backend.lib.helpers import UserInput, convert_to_int
 
 class AttributeRanker(BasicPostProcessor):
 	"""
-	Count occurence of values for a given post attribute for a given time
+	Count occurrence of values for a given post attribute for a given time
 	frame
 
-	For example, this may be used to count the most-used usernames per year;
+	For example, this may be used to count the most-used author names per year;
 	most-occurring country codes per month; overall top host names, etc
 	"""
 	type = "attribute-frequencies"  # job type ID
@@ -71,7 +74,7 @@ class AttributeRanker(BasicPostProcessor):
 
 		# we need to be able to order the values later, chronologically, so use
 		# and OrderedDict; all frequencies go into this variable
-		items = collections.OrderedDict()
+		items = OrderedDict()
 
 		self.query.update_status("Reading source file")
 		with open(self.source_file, encoding='utf-8') as source:
@@ -92,7 +95,7 @@ class AttributeRanker(BasicPostProcessor):
 
 				# again, we need to be able to sort, so OrderedDict it is
 				if time_unit not in items:
-					items[time_unit] = collections.OrderedDict()
+					items[time_unit] = OrderedDict()
 
 				# get values from post
 				if attribute in ("url", "hostname"):
@@ -118,14 +121,16 @@ class AttributeRanker(BasicPostProcessor):
 
 		# sort by time and frequency
 		self.query.update_status("Sorting items")
-		sorted_items = collections.OrderedDict((key, items[key]) for key in sorted(items.keys()))
+		sorted_items = OrderedDict((key, items[key]) for key in sorted(items.keys()))
 		for time_unit in sorted_items:
 			if cutoff > 0:
-				sorted_items[time_unit] = sorted_items[time_unit][:cutoff]
+				# OrderedDict's API sucks and really needs some extra
+				# convenience methods
+				sorted_items[time_unit] = OrderedDict(islice(sorted_items[time_unit].items(), cutoff))
 
-			sorted_unit = collections.OrderedDict((item, sorted_items[time_unit][item]) for item in
-												  sorted(sorted_items[time_unit], reverse=True,
-														 key=lambda key: sorted_items[time_unit][key]))
+			sorted_unit = OrderedDict((item, sorted_items[time_unit][item]) for item in
+									  sorted(sorted_items[time_unit], reverse=True,
+											 key=lambda key: sorted_items[time_unit][key]))
 			sorted_items[time_unit].clear()
 			sorted_items[time_unit].update(sorted_unit)
 
