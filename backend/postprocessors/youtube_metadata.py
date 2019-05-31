@@ -142,39 +142,62 @@ def get_youtube_metadata(self, urls):
 	unique_channel_ids = set(channel_ids.keys())
 	all_ids = dict(video_ids, **channel_ids)
 
-	# Slice the amount of URLs depending on the user inputs
-	cutoff = int(self.parameters.get("top"))
 	min_mentions = int(self.parameters.get("min"))
 
-	# Determine the lowest number in the top n entries, and use it as a cutoff
-	if cutoff != 0:
-		cutoff = min(sorted([len(value) for value in all_ids.values()])[:cutoff])
-	
-	# Create a new dict with the amount of references, filtered on user thresholds
-	top_ids = {}
+	# Make a list of dicts with meta info about the YouTube URLs,
+	# including the post ids, urls, and times referenced.
+	urls_metadata = []
 	for youtube_id, urls in all_ids.items():
-		count = len(urls)
-		if count >= min_mentions and count >= cutoff:
-			top_ids[youtube_id] = count
+		# Store the unique URLs used to reference the video/channel.
+		# This can for instance include timestamps (e.g. '&t=19s'),
+		# which might be interesting at a later point.
+		url_metadata = {}
+		url_metadata["youtube_id"] = youtube_id
+		url_metadata["urls_referenced"] = list(urls)
 
-	# Sort by most frequently posted pages
-	top_ids = OrderedDict(sorted(top_ids.items(), key=itemgetter(1)))
+		referenced_by = []
+		for url in urls:
+			# Make the 'referenced by' a set to prevent
+			# spammers posting the same link in one post
+			# to overrepresent
+			referenced_by += list(set(di_urls[url]))
+		url_metadata["referenced_urls"] = urls
+		url_metadata["referenced_by"] = referenced_by
+
+		# Store the amount of times the channel/video is linked
+		url_metadata["count"] = len(referenced_by)
+
+		# only use the data if it meets the user threshold
+		if url_metadata["count"] >= min_mentions:
+			urls_metadata.append(url_metadata)
+
+	# Sort the dict by frequency
+	urls_metadata = sorted(urls_metadata, key=lambda i: i['count'], reverse=True)
+
+	#Slice the amount of URLs depending on the user inputs
+	top = int(self.parameters.get("top"))
+	if top != 0:
+		urls_metadata = urls_metadata[:top]
 
 	# Return if there's nothing left after the cutoff
-	if not top_ids:
+	if not urls_metadata:
 		return
 
-	# Store all data in here
+	# Store all youtube_dl data in here
 	all_metadata = []
 
 	counter = 0
 
-	self.query.update_status("Extracting metadata from " + str(len(top_ids)) + " YouTube URLs")
+	self.query.update_status("Extracting metadata from " + str(len(urls_metadata)) + " YouTube URLs")
 
 	# Loop through all IDs and get metadata per instance
-	for youtube_id, count in top_ids.items():
+	for youtube_item in urls_metadata:
 
-		metadata = {}
+		youtube_id = youtube_item["youtube_id"]
+
+		# Dict that will become the csv row.
+		# Store some default values so it's placed in the first columns
+		metadata = {"type": "unknown", "deleted_or_failed": False, "count": 0}
 		new_metadata = None
 
 		if youtube_id in unique_video_ids:
@@ -194,39 +217,31 @@ def get_youtube_metadata(self, urls):
 		if not new_metadata:
 			metadata["deleted_or_failed"] = True
 
-		# Store the URL(s) used to reference the channel or video
-		# Also store who referenced this channel/video in the original dataset.
-		# This will be useful for cross-referencing.
-		urls_referenced = list(set(all_ids[youtube_id]))
-		referenced_by = []
-		for url_referenced in urls_referenced:
-			referenced_by += list(set(di_urls[url_referenced]))
-		metadata["referenced_urls"] = ','.join(urls_referenced)
-		metadata["referenced_by"] = ','.join(referenced_by)
-
-		# Store the amount of times the channel/video is linked
-		metadata["count"] = len(referenced_by)
+		# Store data from original post file for cross-referencing
+		metadata["referenced_urls"] = ','.join(youtube_item["urls_referenced"])
+		metadata["referenced_by"] = ','.join(youtube_item["referenced_by"])
+		metadata["count"] = youtube_item["count"]
 
 		# Add the new metadata after the metrics (looks nice in csv!)
 		if new_metadata:
 			metadata = {**metadata, **new_metadata}
 
-		# Store the metadata in a longer list
+		# Store the metadata the overall list
 		all_metadata.append(metadata)
 
 		counter += 1
 
 		# Update status once in a while
 		if counter % 10 == 0:
-			self.query.update_status("Extracted metadata " + str(counter) + "/" + str(len(top_ids)))
+			self.query.update_status("Extracted metadata " + str(counter) + "/" + str(len(urls_metadata)))
 
+	# To write to csv, all dictionary items must have all the possible keys
 	# Get all the possible keys
 	all_keys = []
 	for entry in all_metadata:
 		for key in entry.keys():
 			if key not in all_keys:
 				all_keys.append(key)
-
 	# Make sure all possible items are in every dict entry.
 	for entry in all_metadata:
 		for contain_key in all_keys:
