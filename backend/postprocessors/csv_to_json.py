@@ -40,7 +40,11 @@ class ConvertCSVToJSON(BasicPostProcessor):
 				output.write("[")
 				for post in csv:
 					posts += 1
-					output.write(json.dumps(post) + ",")
+
+					if posts > 1:
+						output.write(",")
+
+					output.write(json.dumps(post))
 				output.write("]")
 
 		self.query.update_status("Finished.")
