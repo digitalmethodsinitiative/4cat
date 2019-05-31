@@ -20,7 +20,7 @@ class ThreadSplitter(BasicPostProcessor):
 	containing only the posts in that thread.
 	"""
 	type = "split-threads"  # job type ID
-	category = "Splitting" # category
+	category = "Conversion" # category
 	title = "Split by thread"  # title displayed in UI
 	description = "Split the result over separate csv files per thread. The threads can then be downloaded as an archive containing the separate CSV files."  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
