@@ -183,7 +183,6 @@ def get_youtube_metadata(self, urls):
 		top = int(self.parameters.get("top"))
 	except ValueError:
 		top = 0
-	
 	if top != 0:
 		if top < len(urls_metadata):
 			urls_metadata = urls_metadata[:top]
@@ -222,7 +221,7 @@ def get_youtube_metadata(self, urls):
 		
 		# Get the YouTube API dict for the relevant video/channel
 		api_data = api_results.get(youtube_id)
-		
+
 		if not api_data:
 			metadata["deleted_or_failed"] = True
 
@@ -231,7 +230,7 @@ def get_youtube_metadata(self, urls):
 		metadata["referenced_by"] = ','.join(youtube_item["referenced_by"])
 		metadata["count"] = youtube_item["count"]
 
-		# Add the new metadata after the metrics (looks nice in csv!)
+		# Add api data if the request for the item was succesfull
 		if api_data:
 			metadata = {**metadata, **api_data}
 
@@ -310,64 +309,57 @@ def request_youtube_api(self, ids, object_type="video"):
 				api_error = error
 				time.sleep(self.sleep_time) # Wait a bit before trying again
 
-		# Raise error if the requests failed
+		# Do nothing with the results if the requests failed -
+		# be in the final results file
 		if retries >= self.max_retries:
 			self.log.error("Error during YouTube API request of query %s" % self.query.key)
 			self.query.update_status("Error while getting YouTube data")
 
-			# Add `None`s for the amount of IDs
-			results.append(None * len(ids_string.split(",")))
+		else:
+			# Get and return results for each video
+			for metadata in response["items"]:
+				result = {}
 
-		# Check if a valid reponse is provided by the API
-		if not response["items"]:
-			return
+				# This will become the key
+				result_id = metadata["id"]
 
-		# Get and return results for each video
-		for metadata in response["items"]:
-			result = {}
+				if object_type == "video":
 
-			# This will become the key
-			result_id = metadata["id"]
-			
+					# Results as dict entries
+					result["type"] = "video"
 
-			if object_type == "video":
+					result["upload_time"] = metadata["snippet"].get("publishedAt")
+					result["channel_id"] = metadata["snippet"].get("channelId")
+					result["channel_title"] = metadata["snippet"].get("channelTitle")
+					result["video_id"] = metadata["snippet"].get("videoId")
+					result["video_title"] = metadata["snippet"].get("title")
+					result["video_duration"] = metadata.get("contentDetails").get("duration")
+					result["video_view_count"] = metadata["statistics"].get("viewCount")
+					result["video_comment_count"] = metadata["statistics"].get("commentCount")
+					result["video_likes_count"] = metadata["statistics"].get("likeCount")
+					result["video_dislikes_count"] = metadata["statistics"].get("dislikeCount")
+					result["video_topic_ids"] = metadata.get("topicDetails")
+					result["video_category_id"] = metadata["snippet"].get("categoryId")
+					result["video_tags"] = metadata["snippet"].get("tags")
 
+				elif object_type == "channel":
 
-				# Results as dict entries
-				result["type"] = "video"
+					# Results as dict entries
+					result["type"] = "channel"
+					result["channel_id"] = metadata["snippet"].get("channelId")
+					result["channel_title"] = metadata["snippet"].get("title")
+					result["channel_description"] = metadata["snippet"].get("description")
+					result["channel_default_language"] = metadata["snippet"].get("defaultLanguage")
+					result["channel_country"] = metadata["snippet"].get("country")
+					result["channel_viewcount"] = metadata["statistics"].get("viewCount")
+					result["channel_commentcount"] = metadata["statistics"].get("commentCount")
+					result["channel_subscribercount"] = metadata["statistics"].get("subscriberCount")
+					result["channel_videocount"] = metadata["statistics"].get("videoCount")
+					result["channel_topic_ids"] = metadata["topicDetails"].get("topicIds")
+					result["channel_topic_categories"] = metadata["topicDetails"].get("topicCategories")
+					result["channel_branding_keywords"] = metadata["brandingSettings"]["channel"].get("keywords")
 
-				result["upload_time"] = metadata["snippet"].get("publishedAt")
-				result["channel_id"] = metadata["snippet"].get("channelId")
-				result["channel_title"] = metadata["snippet"].get("channelTitle")
-				result["video_id"] = metadata["snippet"].get("videoId")
-				result["video_title"] = metadata["snippet"].get("title")
-				result["video_duration"] = metadata.get("contentDetails").get("duration")
-				result["video_view_count"] = metadata["statistics"].get("viewCount")
-				result["video_comment_count"] = metadata["statistics"].get("commentCount")
-				result["video_likes_count"] = metadata["statistics"].get("likeCount")
-				result["video_dislikes_count"] = metadata["statistics"].get("dislikeCount")
-				result["video_topic_ids"] = metadata.get("topicDetails")
-				result["video_category_id"] = metadata["snippet"].get("categoryId")
-				result["video_tags"] = metadata["snippet"].get("tags")
-
-			elif object_type == "channel":
-
-				# Results as dict entries
-				result["type"] = "channel"
-				result["channel_id"] = metadata["snippet"].get("channelId")
-				result["channel_title"] = metadata["snippet"].get("title")
-				result["channel_description"] = metadata["snippet"].get("description")
-				result["channel_default_language"] = metadata["snippet"].get("defaultLanguage")
-				result["channel_country"] = metadata["snippet"].get("country")
-				result["channel_viewcount"] = metadata["statistics"].get("viewCount")
-				result["channel_commentcount"] = metadata["statistics"].get("commentCount")
-				result["channel_subscribercount"] = metadata["statistics"].get("subscriberCount")
-				result["channel_videocount"] = metadata["statistics"].get("videoCount")
-				result["channel_topic_ids"] = metadata["topicDetails"].get("topicIds")
-				result["channel_topic_categories"] = metadata["topicDetails"].get("topicCategories")
-				result["channel_branding_keywords"] = metadata["brandingSettings"]["channel"].get("keywords")
-
-			results[result_id] = result
+				results[result_id] = result
 
 		# Update status per response item
 		self.query.update_status("Got metadata from " + str(i * 50) + "/" + str(len(ids)) + " YouTube URLs")
