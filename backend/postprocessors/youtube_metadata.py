@@ -39,12 +39,12 @@ class YouTubeMetadata(BasicPostProcessor):
 	options = {
 		"top": {
 			"type": UserInput.OPTION_TEXT,
-			"default": 25,
+			"default": 0,
 			"help": "Top n most-frequently referenced pages (0 = all)"
 		},
 		"min": {
 			"type": UserInput.OPTION_TEXT,
-			"default": 5,
+			"default": 0,
 			"help": "Times a page must be referenced (0 = all)"
 		}
 	}
@@ -61,6 +61,10 @@ class YouTubeMetadata(BasicPostProcessor):
 
 		datasource = self.parent.parameters.get("datasource")
 
+		# Use a dict with post IDs as keys
+		# and a list of YouTube URLs referenced as value
+		urls = {}
+
 		self.query.update_status("Reading source file")
 		with open(self.source_file, encoding="utf-8") as source:
 
@@ -68,10 +72,6 @@ class YouTubeMetadata(BasicPostProcessor):
 			csv = DictReader(source)
 
 			self.query.update_status("Extracting YouTube links")
-
-			# Use a dict with post IDs as keys
-			# and a list of YouTube URLs referenced as value
-			urls = {}
 
 			link_regex = re.compile(r"https?://[^\s]+")
 			www_regex = re.compile(r"^www\.")
@@ -105,6 +105,7 @@ class YouTubeMetadata(BasicPostProcessor):
 		# Return if there's no YouTube URLs
 		if not urls:
 			self.query.update_status("Finished")
+			self.query.finish(0)
 			return
 
 		# Get metadata.
@@ -112,6 +113,7 @@ class YouTubeMetadata(BasicPostProcessor):
 
 		if not results:
 			self.query.update_status("Finished")
+			self.query.finish(0)
 			return
 
 		self.query.update_status("Writing results to csv.")
@@ -142,7 +144,10 @@ def get_youtube_metadata(self, urls):
 	unique_channel_ids = list(set(channel_ids.keys()))
 	all_ids = dict(video_ids, **channel_ids)
 
-	min_mentions = int(self.parameters.get("min"))
+	try:
+		min_mentions = int(self.parameters.get("min"))
+	except ValueError:
+		min_mentions = 0
 
 	# Make a list of dicts with meta info about the YouTube URLs,
 	# including the post ids, urls, and times referenced.
@@ -173,13 +178,16 @@ def get_youtube_metadata(self, urls):
 
 	# Sort the dict by frequency
 	urls_metadata = sorted(urls_metadata, key=lambda i: i['count'], reverse=True)
-
 	# Slice the amount of URLs depending on the user inputs
-	top = int(self.parameters.get("top"))
-	if top and top != 0:
+	try:
+		top = int(self.parameters.get("top"))
+	except ValueError:
+		top = 0
+	
+	if top != 0:
 		if top < len(urls_metadata):
 			urls_metadata = urls_metadata[:top]
-
+	
 	# These IDs we'll actually fetch
 	videos_to_fetch = []
 	channels_to_fetch = []
@@ -250,6 +258,7 @@ def get_youtube_metadata(self, urls):
 				entry[contain_key] = None
 
 	return all_metadata
+
 
 
 def request_youtube_api(self, ids, object_type="video"):
