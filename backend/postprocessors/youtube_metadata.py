@@ -355,9 +355,9 @@ def request_youtube_api(self, ids, object_type="video"):
 					result["channel_commentcount"] = metadata["statistics"].get("commentCount")
 					result["channel_subscribercount"] = metadata["statistics"].get("subscriberCount")
 					result["channel_videocount"] = metadata["statistics"].get("videoCount")
-					result["channel_topic_ids"] = metadata["topicDetails"].get("topicIds")
-					result["channel_topic_categories"] = metadata["topicDetails"].get("topicCategories")
-					result["channel_branding_keywords"] = metadata["brandingSettings"]["channel"].get("keywords")
+					result["channel_topic_ids"] = metadata.get("topicDetails").get("topicIds")
+					result["channel_topic_categories"] = metadata.get("topicDetails").get("topicCategories")
+					result["channel_branding_keywords"] = metadata.get("brandingSettings").get("channel").get("keywords")
 
 				results[result_id] = result
 
