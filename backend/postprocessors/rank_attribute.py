@@ -1,8 +1,6 @@
 """
 Generate ranking per post attribute
 """
-import collections
-import itertools
 import datetime
 import re
 
@@ -123,16 +121,16 @@ class AttributeRanker(BasicPostProcessor):
 		self.query.update_status("Sorting items")
 		sorted_items = OrderedDict((key, items[key]) for key in sorted(items.keys()))
 		for time_unit in sorted_items:
-			if cutoff > 0:
-				# OrderedDict's API sucks and really needs some extra
-				# convenience methods
-				sorted_items[time_unit] = OrderedDict(islice(sorted_items[time_unit].items(), cutoff))
-
 			sorted_unit = OrderedDict((item, sorted_items[time_unit][item]) for item in
 									  sorted(sorted_items[time_unit], reverse=True,
 											 key=lambda key: sorted_items[time_unit][key]))
 			sorted_items[time_unit].clear()
 			sorted_items[time_unit].update(sorted_unit)
+
+			if cutoff > 0:
+				# OrderedDict's API sucks and really needs some extra
+				# convenience methods
+				sorted_items[time_unit] = OrderedDict(islice(sorted_items[time_unit].items(), cutoff))
 
 		# convert to flat list
 		rows = []

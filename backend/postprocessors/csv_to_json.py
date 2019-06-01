@@ -21,7 +21,7 @@ class ConvertCSVToJSON(BasicPostProcessor):
 	# all post-processors with CSV output
 	accepts = ["search", "collocations", "debate_metrics", "quote-ranker", "tfidf", "thread-metadata",
 			   "count-countries", "top-images", "url-extractor", "extract-usernames", "vector-ranker",
-			   "count-words", "youtube-metadata", "rank-attribute", "count-posts"]
+			   "count-words", "youtube-metadata", "attribute-frequencies", "count-posts"]
 
 	def process(self):
 		"""
@@ -40,7 +40,11 @@ class ConvertCSVToJSON(BasicPostProcessor):
 				output.write("[")
 				for post in csv:
 					posts += 1
-					output.write(json.dumps(post) + ",")
+
+					if posts > 1:
+						output.write(",")
+
+					output.write(json.dumps(post))
 				output.write("]")
 
 		self.query.update_status("Finished.")
