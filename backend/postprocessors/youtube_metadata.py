@@ -138,8 +138,8 @@ def get_youtube_metadata(self, urls):
 	# Parse video and channel IDs from URLs and add back together
 	video_ids = parse_video_ids(urls)
 	channel_ids = parse_channel_ids(urls)
-	unique_video_ids = set(video_ids.keys())
-	unique_channel_ids = set(channel_ids.keys())
+	unique_video_ids = list(set(video_ids.keys()))
+	unique_channel_ids = list(set(channel_ids.keys()))
 	all_ids = dict(video_ids, **channel_ids)
 
 	min_mentions = int(self.parameters.get("min"))
@@ -152,7 +152,7 @@ def get_youtube_metadata(self, urls):
 		# This can for instance include timestamps (e.g. '&t=19s'),
 		# which might be interesting at a later point.
 		url_metadata = {}
-		url_metadata["youtube_id"] = youtube_id
+		url_metadata["id"] = youtube_id
 		url_metadata["urls_referenced"] = list(urls)
 
 		referenced_by = []
@@ -174,47 +174,48 @@ def get_youtube_metadata(self, urls):
 	# Sort the dict by frequency
 	urls_metadata = sorted(urls_metadata, key=lambda i: i['count'], reverse=True)
 
-	#Slice the amount of URLs depending on the user inputs
+	# Slice the amount of URLs depending on the user inputs
 	top = int(self.parameters.get("top"))
-	if top != 0:
-		urls_metadata = urls_metadata[:top]
+	if top and top != 0:
+		if top < len(urls_metadata):
+			urls_metadata = urls_metadata[:top]
 
+	# These IDs we'll actually fetch
+	videos_to_fetch = []
+	channels_to_fetch = []
+	for url_metadata in urls_metadata:
+		if url_metadata["id"] in unique_video_ids:
+			videos_to_fetch.append(url_metadata["id"])
+		if url_metadata["id"] in unique_channel_ids:
+			channels_to_fetch.append(url_metadata["id"])
+	
 	# Return if there's nothing left after the cutoff
 	if not urls_metadata:
 		return
 
-	# Store all youtube_dl data in here
+	# Store all YouTube API data in here
 	all_metadata = []
 
 	counter = 0
 
-	self.query.update_status("Extracting metadata from " + str(len(urls_metadata)) + " YouTube URLs")
+	# Get YouTube API data for all videos and channels
+	video_data = request_youtube_api(self, videos_to_fetch, object_type="video")
+	channel_data = request_youtube_api(self, channels_to_fetch, object_type="channel")
+	api_results = {**video_data, **channel_data}
 
-	# Loop through all IDs and get metadata per instance
+	# Loop through retreived videos and channels
 	for youtube_item in urls_metadata:
 
-		youtube_id = youtube_item["youtube_id"]
+		youtube_id = youtube_item["id"]
 
 		# Dict that will become the csv row.
 		# Store some default values so it's placed in the first columns
-		metadata = {"type": "unknown", "deleted_or_failed": False, "count": 0}
-		new_metadata = None
-
-		if youtube_id in unique_video_ids:
-			metadata["type"] = "video"
-			try:
-				new_metadata = get_video_metadata(self, youtube_id)
-			except Exception as e:
-				metadata["error_code"] = str(e)
+		metadata = {"id": youtube_id, "deleted_or_failed": False, "count": 0}
 		
-		elif youtube_id in unique_channel_ids:
-			metadata["type"] = "channel"
-			try:
-				new_metadata = get_channel_metadata(self, youtube_id)
-			except Exception as e:
-				metadata["error_code"] = str(e)
-
-		if not new_metadata:
+		# Get the YouTube API dict for the relevant video/channel
+		api_data = api_results.get(youtube_id)
+		
+		if not api_data:
 			metadata["deleted_or_failed"] = True
 
 		# Store data from original post file for cross-referencing
@@ -223,8 +224,8 @@ def get_youtube_metadata(self, urls):
 		metadata["count"] = youtube_item["count"]
 
 		# Add the new metadata after the metrics (looks nice in csv!)
-		if new_metadata:
-			metadata = {**metadata, **new_metadata}
+		if api_data:
+			metadata = {**metadata, **api_data}
 
 		# Store the metadata the overall list
 		all_metadata.append(metadata)
@@ -249,6 +250,120 @@ def get_youtube_metadata(self, urls):
 				entry[contain_key] = None
 
 	return all_metadata
+
+
+def request_youtube_api(self, ids, object_type="video"):
+	"""
+	Use the YouTube API to fetch metadata from videos or channels.
+	:param video_ids str, a list of valid YouTube IDs
+	:param type str, the type of object to query. Currently only `video` or `channel`. 
+	:return list, containing dicts with YouTube's response metadata.
+	Max 50 results per try.
+
+	"""
+	
+	ids_list = get_yt_compatible_ids(ids)
+
+	if object_type != "video" and object_type != "channel":
+		return "No valid YouTube object type (currently only 'channel' and 'video' are supported)"
+
+	# List of dicts for all video data
+	results = {}
+
+	for i, ids_string in enumerate(ids_list):
+
+		retries = 0
+		api_error = ""
+
+		# Use YouTubeDL and the YouTube API to request video data
+		youtube = build(config.YOUTUBE_API_SERVICE_NAME, config.YOUTUBE_API_VERSION,
+											developerKey=config.YOUTUBE_DEVELOPER_KEY)
+		
+		while retries < self.max_retries:
+			try:
+				if object_type == "video":
+					response = youtube.videos().list(
+						part = 'snippet,contentDetails,statistics',
+						id = ids_string,
+						maxResults = 50
+						).execute()
+				elif object_type == "channel":
+					response = youtube.channels().list(
+						part = "snippet,topicDetails,statistics,brandingSettings",
+						id = ids_string,
+						maxResults = 50
+					).execute()
+				break
+
+			except urllib.error.HTTPError as error:
+				self.query.update_status("Encountered exception " + str(e) + ".\nSleeping for " + str(self.sleep_time))
+				retries += 1
+				api_error = error
+				time.sleep(self.sleep_time) # Wait a bit before trying again
+
+		# Raise error if the requests failed
+		if retries >= self.max_retries:
+			self.log.error("Error during YouTube API request of query %s" % self.query.key)
+			self.query.update_status("Error while getting YouTube data")
+
+			# Add `None`s for the amount of IDs
+			results.append(None * len(ids_string.split(",")))
+
+		# Check if a valid reponse is provided by the API
+		if not response["items"]:
+			return
+
+		# Get and return results for each video
+		for metadata in response["items"]:
+			result = {}
+
+			# This will become the key
+			result_id = metadata["id"]
+			
+
+			if object_type == "video":
+
+
+				# Results as dict entries
+				result["type"] = "video"
+
+				result["upload_time"] = metadata["snippet"].get("publishedAt")
+				result["channel_id"] = metadata["snippet"].get("channelId")
+				result["channel_title"] = metadata["snippet"].get("channelTitle")
+				result["video_id"] = metadata["snippet"].get("videoId")
+				result["video_title"] = metadata["snippet"].get("title")
+				result["video_duration"] = metadata.get("contentDetails").get("duration")
+				result["video_view_count"] = metadata["statistics"].get("viewCount")
+				result["video_comment_count"] = metadata["statistics"].get("commentCount")
+				result["video_likes_count"] = metadata["statistics"].get("likeCount")
+				result["video_dislikes_count"] = metadata["statistics"].get("dislikeCount")
+				result["video_topic_ids"] = metadata.get("topicDetails")
+				result["video_category_id"] = metadata["snippet"].get("categoryId")
+				result["video_tags"] = metadata["snippet"].get("tags")
+
+			elif object_type == "channel":
+
+				# Results as dict entries
+				result["type"] = "channel"
+				result["channel_id"] = metadata["snippet"].get("channelId")
+				result["channel_title"] = metadata["snippet"].get("title")
+				result["channel_description"] = metadata["snippet"].get("description")
+				result["channel_default_language"] = metadata["snippet"].get("defaultLanguage")
+				result["channel_country"] = metadata["snippet"].get("country")
+				result["channel_viewcount"] = metadata["statistics"].get("viewCount")
+				result["channel_commentcount"] = metadata["statistics"].get("commentCount")
+				result["channel_subscribercount"] = metadata["statistics"].get("subscriberCount")
+				result["channel_videocount"] = metadata["statistics"].get("videoCount")
+				result["channel_topic_ids"] = metadata["topicDetails"].get("topicIds")
+				result["channel_topic_categories"] = metadata["topicDetails"].get("topicCategories")
+				result["channel_branding_keywords"] = metadata["brandingSettings"]["channel"].get("keywords")
+
+			results[result_id] = result
+
+		# Update status per response item
+		self.query.update_status("Got metadata from " + str(i * 50) + "/" + str(len(ids)) + " YouTube URLs")
+
+	return results
 
 def parse_channel_ids(urls):
 	"""
@@ -277,6 +392,7 @@ def parse_channel_ids(urls):
 				# If so, we're appending the URL to that existing
 				# key in the dictionary
 				if channel_id:
+					channel_id = channel_id.strip().replace(",","")
 					if channel_id not in ids:
 						# Make it a list if there only one string entry yet
 						ids[channel_id] = [url]
@@ -325,122 +441,42 @@ def parse_video_ids(urls):
 			# If so, we're appending the URL to that existing
 			# key in the dictionary
 			if video_id:
+				video_id = video_id.strip().replace(",","")
 				if video_id not in ids:
 					ids[video_id] = [url]
 				else:
 					ids[video_id].append(url)
+
 	return ids
 
-def get_channel_metadata(self, channel_id):
+def get_yt_compatible_ids(yt_ids):
 	"""
-	Use the YouTube API to fetch metadata from a channel.
+	:param yt_ids list, a list of strings
+	:returns list, a ist of joined strings in pairs of 50
 
-	:param str channel_id, a valild YouTube channel ID
-	:returns dict, containing YouTube's response metadata
-
+	Takes a list of IDs and returns list of joined strings
+	in pairs of fifty. This should be done for the YouTube API
+	that requires a comma-separated string and can only return
+	max fifty results.
 	"""
 
-	# Use YouTubeDL and the YouTube API to request channel data
-	youtube = build(config.YOUTUBE_API_SERVICE_NAME, config.YOUTUBE_API_VERSION,
-					developerKey=config.YOUTUBE_DEVELOPER_KEY)
-	retries = 0
-	api_error = ""
-	while retries < self.max_retries:
-		try:
-			response = youtube.channels().list(
-			part = "snippet,contentDetails,topicDetails,statistics,brandingSettings",
-			id = channel_id
-			).execute()
-			break
+	# If there's only one item, return a single list item 
+	if isinstance(yt_ids, str):
+		return [yt_ids]
 
-		except urllib.error.HTTPError as error:
-			self.query.update_status("Encountered exception " + str(e) + ".\nSleeping for " + str(self.sleep_time))
-			retries += 1
-			api_error = error
-			time.sleep(self.sleep_time) # Wait a bit before trying again
+	ids = []
+	last_i = 0
+	for i, yt_id in enumerate(yt_ids):
 
-	# Raise error if the requests failed
-	if retries >= self.max_retries:
-		self.log.error("Error during youtube_dl of query %s" % self.query.key)
-		self.query.update_status("Error while getting YouTube data")
-		raise api_error
+		# Add a joined string per fifty videos
+		if i % 50 == 0 and i != 0:
+			ids_string = ",".join(yt_ids[last_i:i])
+			ids.append(ids_string)
+			last_i = i
 
-	# Get and return results
-	if response["items"]:
-		metadata = response["items"][0]
-	else:
-		return
+		# If the end of the list is reached, add the last data
+		elif i == (len(yt_ids) - 1):
+			ids_string = ",".join(yt_ids[last_i:i])
+			ids.append(ids_string)
 
-	result = {}
-	result["channel_id"] = metadata["id"]
-	result["channel_title"] = metadata["snippet"].get("title")
-	result["channel_description"] = metadata["snippet"].get("description")
-	result["channel_default_language"] = metadata["snippet"].get("defaultLanguage")
-	result["channel_country"] = metadata["snippet"].get("country")
-	result["channel_viewcount"] = metadata["statistics"].get("viewCount")
-	result["channel_commentcount"] = metadata["statistics"].get("commentCount")
-	result["channel_subscribercount"] = metadata["statistics"].get("subscriberCount")
-	result["channel_videocount"] = metadata["statistics"].get("videoCount")
-	result["channel_topic_ids"] = metadata["topicDetails"].get("topicIds")
-	result["channel_topic_categories"] = metadata["topicDetails"].get("topicCategories")
-	result["channel_branding_keywords"] = metadata["brandingSettings"]["channel"].get("keywords")
-
-	return result
-
-def get_video_metadata(self, video_id):
-	"""
-	Use the YouTube API to fetch metadata from a video.
-	:param str channel_id, a valild YouTube video ID
-	:return dict, containing YouTube's response metadata
-
-	"""
-	
-	# Use YouTubeDL and the YouTube API to request video data
-	youtube = build(config.YOUTUBE_API_SERVICE_NAME, config.YOUTUBE_API_VERSION,
-										developerKey=config.YOUTUBE_DEVELOPER_KEY)
-
-	retries = 0
-	api_error = ""
-	while retries < self.max_retries:
-		try:
-			response = youtube.videos().list(
-				part = 'snippet,contentDetails,statistics',
-				id = video_id
-				).execute()
-			break
-
-		except urllib.error.HTTPError as error:
-			self.query.update_status("Encountered exception " + str(e) + ".\nSleeping for " + str(self.sleep_time))
-			retries += 1
-			api_error = error
-			time.sleep(self.sleep_time) # Wait a bit before trying again
-
-	# Raise error if the requests failed
-	if retries >= self.max_retries:
-		self.log.error("Error during youtube_dl of query %s" % self.query.key)
-		self.query.update_status("Error while getting YouTube data")
-		raise api_error
-
-	# Check if a valid reponse is provided by the API
-	if response["items"]:
-		metadata = response["items"][0]
-	else:
-		return
-	
-	# Get and return results
-	result = {}
-	result["video_id"] = metadata["id"]
-	result["upload_time"] = metadata["snippet"].get("publishedAt")
-	result["channel_id"] = metadata["snippet"].get("channelId")
-	result["channel_title"] = metadata["snippet"].get("channelTitle")
-	result["video_title"] = metadata["snippet"].get("title")
-	result["video_duration"] = metadata.get("contentDetails").get("duration")
-	result["video_view_count"] = metadata["statistics"].get("viewCount")
-	result["video_comment_count"] = metadata["statistics"].get("commentCount")
-	result["video_likes_count"] = metadata["statistics"].get("likeCount")
-	result["video_dislikes_count"] = metadata["statistics"].get("dislikeCount")
-	result["video_topic_ids"] = metadata.get("topicDetails")
-	result["video_category_id"] = metadata["snippet"].get("categoryId")
-	result["video_tags"] = metadata["snippet"].get("tags")
-
-	return result
+	return ids
