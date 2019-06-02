@@ -303,11 +303,12 @@ def request_youtube_api(self, ids, object_type="video"):
 					).execute()
 				break
 
-			except urllib.error.HTTPError as error:
+			except Exception as error:
 				self.query.update_status("Encountered exception " + str(e) + ".\nSleeping for " + str(self.sleep_time))
 				retries += 1
 				api_error = error
 				time.sleep(self.sleep_time) # Wait a bit before trying again
+				pass
 
 		# Do nothing with the results if the requests failed -
 		# be in the final results file
@@ -355,8 +356,10 @@ def request_youtube_api(self, ids, object_type="video"):
 					result["channel_commentcount"] = metadata["statistics"].get("commentCount")
 					result["channel_subscribercount"] = metadata["statistics"].get("subscriberCount")
 					result["channel_videocount"] = metadata["statistics"].get("videoCount")
-					result["channel_topic_ids"] = metadata.get("topicDetails").get("topicIds")
-					result["channel_topic_categories"] = metadata.get("topicDetails").get("topicCategories")
+					# This one sometimes fails for some reason
+					if "topicDetails" in metadata:
+						result["channel_topic_ids"] = metadata["topicDetails"].get("topicIds")
+						result["channel_topic_categories"] = metadata["topicDetails"].get("topicCategories")
 					result["channel_branding_keywords"] = metadata.get("brandingSettings").get("channel").get("keywords")
 
 				results[result_id] = result
