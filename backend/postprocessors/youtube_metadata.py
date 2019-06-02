@@ -304,7 +304,7 @@ def request_youtube_api(self, ids, object_type="video"):
 				break
 
 			except Exception as error:
-				self.query.update_status("Encountered exception " + str(e) + ".\nSleeping for " + str(self.sleep_time))
+				self.query.update_status("Encountered exception " + str(error) + ".\nSleeping for " + str(self.sleep_time))
 				retries += 1
 				api_error = error
 				time.sleep(self.sleep_time) # Wait a bit before trying again
