@@ -34,7 +34,7 @@
     {% if query.parameters.dense_country_percentage %}
         <span class="property-badge second-tier">country-dense threads ({{ query.parameters.dense_country_percentage }}%)</span>
     {% endif %}
-    {%  if query.is_finished and query.num_rows == 0 %}
+    {%  if query.is_finished() and query.num_rows == 0 %}
         <span class="property-badge second-tier warning">no results</span>
     {% endif %}
 
@@ -53,14 +53,14 @@
         Queued on {{ query.timestamp|datetime(fmt="%Y-%m-%d %H:%m") }}.
     </p>
 
-    <!--{% if query.num_rows > 0 and query.is_finished %}
+    <!--{% if query.num_rows > 0 and query.is_finished() %}
     <div class="query-result">
         <iframe class="query-result-iframe csvfile" src="/preview-csv/{{ query.key }}/"></iframe>
     </div>
     {% endif %}-->
 
     <p class="result">
-        {% if query.status %}{{ query.status }}{% else %}Query is queued.{% endif %} {% if query.is_finished %}({{ query.num_rows }} posts{% if query.num_rows > 0 %}; <a href="/result/{{ query.result_file }}">{{ query.result_file }}</a>{% endif %}){% endif %}
+        {% if query.status %}{{ query.status }}{% else %}Query is queued.{% endif %} {% if query.is_finished() %}({{ query.num_rows }} posts{% if query.num_rows > 0 %}; <a href="/result/{{ query.result_file }}">{{ query.result_file }}</a>{% endif %}){% endif %}
     </p>
 </div>
 
