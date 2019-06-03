@@ -239,10 +239,10 @@ class StringQuery(BasicWorker, metaclass=abc.ABCMeta):
 				if not thread_ids:
 					return []
 
-			if len(posts) > 100000:
+			if len(posts) > 25000:
 				self.log.info("Aborting full-thread query - too many OPs found")
 				self.query.update_status(
-					"Your query returned more than 100000 posts to fetch full thread data for - this is too much data to handle. Consider splitting your query into smaller periods of time or using a more precise query.")
+					"Your query returned more than 25000 posts to fetch full thread data for - this is too much data to handle. Consider whether you really need full thread data, and if so, consider splitting your query into smaller periods of time or using a more precise query.")
 				self.job.finish()
 				return None
 
