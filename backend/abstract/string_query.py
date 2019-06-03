@@ -242,7 +242,7 @@ class StringQuery(BasicWorker, metaclass=abc.ABCMeta):
 			if len(posts) > 25000:
 				self.log.info("Aborting full-thread query - too many OPs found")
 				self.query.update_status(
-					"Your query returned more than 25000 posts to fetch full thread data for - this is too much data to handle. Consider whether you really need full thread data, and if so, consider splitting your query into smaller periods of time or using a more precise query.")
+					"Your query returned %i posts to fetch full thread data for - 4CAT cannot handle fetching full thread data for more than 25000 threads. Consider whether you really need full thread data, and if so, consider splitting your query into smaller periods of time or using a more precise query." % len(posts))
 				self.job.finish()
 				return None
 
