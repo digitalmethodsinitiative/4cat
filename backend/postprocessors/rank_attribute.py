@@ -70,6 +70,9 @@ class AttributeRanker(BasicPostProcessor):
 		attribute = self.parameters.get("attribute", self.options["attribute"]["default"])
 		cutoff = convert_to_int(self.parameters.get("top", self.options["top"]["default"]))
 
+		# This is needed to check for URLs in the "domain" and "url" columns for Reddit submissions
+		datasource = self.parent.parameters.get("datasource")
+
 		# we need to be able to order the values later, chronologically, so use
 		# and OrderedDict; all frequencies go into this variable
 		items = OrderedDict()
@@ -97,15 +100,25 @@ class AttributeRanker(BasicPostProcessor):
 
 				# get values from post
 				if attribute in ("url", "hostname"):
-					# URLs need some processing because there may be multiple per post
-					post_links = link_regex.findall(post["body"])
-					if not post_links:
-						values = []
 
-					if attribute == "hostname":
-						values = [www_regex.sub("", link.split("/")[2]) for link in post_links]
+					# Reddit post submissions have designated URL columns
+					if datasource == "reddit" and post.get("domain"):
+						if attribute == "hostname":
+							values = [post["domain"]]
+						else:
+							values = [post["url"]]
+
+					# 4chan and Reddit posts need extracting
 					else:
-						values = list(post_links)
+						# URLs need some processing because there may be multiple per post
+						post_links = link_regex.findall(post["body"])
+						if not post_links:
+							values = []
+
+						if attribute == "hostname":
+							values = [www_regex.sub("", link.split("/")[2]) for link in post_links]
+						else:
+							values = list(post_links)
 				else:
 					# simply copy the CSV column
 					values = [post[attribute]]

@@ -287,11 +287,7 @@ class SearchReddit(StringQuery):
 		"""
 		Execute a query; get post data for given parameters
 
-		This handles general search - anything that does not involve dense
-		threads (those are handled by get_dense_threads()). First, Sphinx is
-		queries with the search parameters to get the relevant post IDs; then
-		the PostgreSQL is queried to return all posts for the found IDs, as
-		well as (optionally) all other posts in the threads those posts were in.
+		This handles random search.
 
 		:param dict query:  Query parameters, as part of the DataSet object
 		:return list:  Posts, sorted by thread and post ID, in ascending order
