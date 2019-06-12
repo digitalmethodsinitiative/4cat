@@ -100,25 +100,18 @@ class AttributeRanker(BasicPostProcessor):
 
 				# get values from post
 				if attribute in ("url", "hostname"):
+					# URLs need some processing because there may be multiple per post
+					post_links = link_regex.findall(post["body"])
 
-					# Reddit post submissions have designated URL columns
-					if datasource == "reddit" and post.get("domain"):
-						if attribute == "hostname":
-							values = [post["domain"]]
-						else:
-							values = [post["url"]]
+					if "url" in post:
+						# some datasources may provide a specific URL per post
+						# as a separate attribute
+						post_links.append(post["url"])
 
-					# 4chan and Reddit posts need extracting
+					if attribute == "hostname":
+						values = [www_regex.sub("", link.split("/")[2]) for link in post_links]
 					else:
-						# URLs need some processing because there may be multiple per post
-						post_links = link_regex.findall(post["body"])
-						if not post_links:
-							values = []
-
-						if attribute == "hostname":
-							values = [www_regex.sub("", link.split("/")[2]) for link in post_links]
-						else:
-							values = list(post_links)
+						values = post_links
 				else:
 					# simply copy the CSV column
 					values = [post[attribute]]
