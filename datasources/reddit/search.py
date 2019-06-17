@@ -263,6 +263,8 @@ class SearchReddit(StringQuery):
 						"body": post["body"].strip().replace("\r", ""),
 						"subject": "",
 						"author": post["author"],
+						"domain": "",
+						"url": "",
 						"image_file": "",
 						"image_md5": "",
 						"country_code": "",
