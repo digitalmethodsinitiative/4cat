@@ -271,22 +271,20 @@ class StringQuery(BasicWorker, metaclass=abc.ABCMeta):
 		self.query.update_status("Fetching random posts")
 
 		# Build random id query
-		where = []
-		replacements = []
-
 		# Amount of random posts to get
 		random_amount = query["random_amount"]
 
 		# Get random post ids
 		# `if max_date > 0` prevents postgres issues with big ints
+		# INNER JOIN with threads table to lookup the board of the post
 		if query["max_date"] > 0:
 			post_ids = self.db.fetchall(
-				"SELECT id FROM posts_" + self.prefix + " WHERE timestamp >= %s AND timestamp <= %s ORDER BY random() LIMIT %s;",
-				(query["min_date"], query["max_date"], random_amount,))
+				"SELECT posts_" + self.prefix + ".id FROM posts_" + self.prefix + " INNER JOIN threads_" + self.prefix + " ON threads_" + self.prefix + ".id = posts_" + self.prefix + ".thread_id WHERE board = %s AND posts_" + self.prefix + ".timestamp >= %s AND posts_" + self.prefix + ".timestamp <= %s ORDER BY random() LIMIT %s;",
+				(query["board"], query["min_date"], query["max_date"], random_amount,))
 		else:
 			post_ids = self.db.fetchall(
-				"SELECT id FROM posts_" + self.prefix + " WHERE timestamp >= %s ORDER BY random() LIMIT %s;",
-				(query["min_date"], random_amount,))
+				"SELECT posts_" + self.prefix + ".id FROM posts_" + self.prefix + " INNER JOIN threads_" + self.prefix + " ON threads_" + self.prefix + ".id = posts_" + self.prefix + ".thread_id WHERE board = %s AND posts_" + self.prefix + ".timestamp >= %s ORDER BY random() LIMIT %s;",
+				(query["board"], query["min_date"], random_amount,))
 
 		# Fetch the posts
 		post_ids = tuple([post["id"] for post in post_ids])
