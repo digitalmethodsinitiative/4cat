@@ -14,9 +14,11 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
 	"""
 	Abstract Worker class
 
-	This starts a separate thread in which a worker method is continually called until
-	the worker is told to stop working. The work method can do whatever the worker needs
-	to do - that part is to be implemented by a child class.
+	This runs as a separate thread in which a worker method is executed. The
+	work method can do whatever the worker needs to do - that part is to be
+	implemented by a child class. This class provides scaffolding that makes
+	sure crashes are caught properly and the relevant data is available to the
+	worker code.
 	"""
 	type = "misc"  # this should match the job type as saved in the database
 	jobdata = {}

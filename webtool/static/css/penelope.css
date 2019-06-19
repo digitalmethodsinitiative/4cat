@@ -22,21 +22,33 @@
 	src: url("../fonts/OpenSans-BoldItalic.ttf")
 }
 
+:root {
+    --penelope-red: #CE1B28;
+    --penelope-highlight: #FF2231;
+    --penelope-alternate: #19B0A3;
+    --penelope-gray: #E9E9E9;
+    --penelope-gray-alternate: #EEE;
+    --penelope-white: #F5F5F5;
+    --penelope-black: #21202E;
+    --white: #FFF;
+    --text: #37373C;
+}
+
 *, code, select, input, textarea {
 	font-family: 'Open Sans', 'Trebuchet MS', sans-serif;
 }
 
 body {
-	background: #F5F5F5;
-	color: #37373c;
+	background: var(--penelope-white);
+	color: var(--text);
 }
 
 section, article, aside, #filterpanel, #results {
-	background: #FFF;
+	background: var(--white);
 }
 
 .frontpage aside, .plain-page article, .frontpage section, .pagination li.page a, .pagination li.page .current, input, select, textarea, .login-form h2, .login-form article {
-	border: 1px solid #E9E9E9;
+	border: 1px solid var(--penelope-gray);
 }
 
 .frontpage > article, section.result-tree {
@@ -45,40 +57,40 @@ section, article, aside, #filterpanel, #results {
 }
 
 select, input, textarea {
-	background: #E9E9E9;
+	background: var(--penelope-gray);
 }
 
 a {
-	color: #ce1b28;
+	color: var(--penelope-red);
 }
 
 a:hover {
-	color: #ff2231;
+	color: var(--penelope-highlight);
 }
 
 code {
-	color: #19b0a3;
+	color: var(--penelope-alternate);
 }
 
 .permalink::before {
-	border-color: #ce1b28;
+	border-color: var(--penelope-red);
 }
 
 .permalink:hover::before {
-	border-color: #ff2231;
+	border-color: var(--penelope-highlight);
 }
 
 h1, h2, h3.blocktitle, #submitpaneltitle, #resultsheader {
-	background: #21202E;
+	background: var(--penelope-black);
 	font-weight: bold;
 }
 
 h1 {
-	background: #ce1b28;
+	background: var(--penelope-red);
 }
 
 h2, h3.blocktitle, #submitpaneltitle, #resultsheader, .login-form h2 {
-	border-left: 0.5em solid #ce1b28;
+	border-left: 0.5em solid var(--penelope-red);
 }
 
 h1 span, h2 span, h3 span, h3.blocktitle span, #submitpaneltitle div, #resultsheader div {
@@ -88,15 +100,15 @@ h1 span, h2 span, h3 span, h3.blocktitle span, #submitpaneltitle div, #resultshe
 }
 
 h4.section-subheader {
-    color: #FFF;
+    color: var(--white);
 }
 
 h1 a:hover, h2 a:hover, h3.blocktitle a:hover {
-	color: #E9E9E9;
+	color: var(--penelope-gray);
 }
 
 .main-nav {
-	background: #21202e;
+	background: var(--penelope-black);
 	box-shadow: 0 5px 10px #888;
 }
 
@@ -113,8 +125,8 @@ h1 a:hover, h2 a:hover, h3.blocktitle a:hover {
 }
 
 .fixed-footer {
-	background: #21202e;
-	color: #FFF;
+	background: var(--penelope-black);
+	color: var(--white);
 	background-image: url('/static/img/LogoOdycceus.svg');
 	background-repeat: no-repeat;
 	background-position: -1.75em 0.35em;
@@ -122,36 +134,36 @@ h1 a:hover, h2 a:hover, h3.blocktitle a:hover {
 }
 
 .fixed-footer,.fixed-footer a {
-	color: #FFF;
+	color: var(--white);
 }
 
 nav > ul.flat > li {
-	color: #FFF;
+	color: var(--white);
 }
 
-.zebra, .result-list > li:nth-child(even), .postprocessor-wrap .postprocessor-list > li:nth-child(even), .frontpage ol li:nth-child(even) {
-	background: #EEE;
+.zebra, .result-list > li:nth-child(even), .processor-wrap .processor-list > li:nth-child(even), .frontpage ol li:nth-child(even) {
+	background: var(--penelope-gray-alternate);
 }
 
 .col-lg-3.topdiv, #buttonselections {
-	background: #EEE;
+	background: var(--penelope-gray-alternate);
 }
 
-.postprocessor-tree > ul > li::before {
+.processor-tree > ul > li::before {
 	height: 0.55em;
 }
 
 .result-warning {
-	background: #eee;
+	background: var(--penelope-gray-alternate);
 }
 
 .pagination li.page a:hover, .pagination li.page a:focus {
-    background: #21202e;
+    background: var(--penelope-black);
 }
 
 .flashing, .flashing .query-core, .flashing .query-core p, .flashing .query-core .property-badge { animation: flash 0.5s 3 normal forwards; }
 @keyframes flash {
-	from { border-color: #000; color: #ed4327; }
-	50% { border-color: #ed4327; color: #ed4327; }
-	to { border-color: #000; color: #000; }
+	from { border-color: var(--penelope-black); color: var(--penelope-red); }
+	50% { border-color: var(--penelope-red); color: var(--penelope-red); }
+	to { border-color: var(--penelope-black); color: var(--penelope-black); }
 }

@@ -22,14 +22,13 @@ Flow:
 """
 import psycopg2
 import hashlib
-import os.path
 import base64
 import json
 import time
 import six
-import re
 
-from backend.lib.helpers import get_absolute_folder
+from pathlib import Path
+
 from backend.abstract.scraper import BasicJSONScraper
 from backend.lib.exceptions import JobAlreadyExistsException
 
@@ -221,10 +220,10 @@ class ThreadScraper4chan(BasicJSONScraper):
 		md5 = hashlib.md5()
 		md5.update(base64.b64decode(post["md5"]))
 
-		image_folder = get_absolute_folder(config.PATH_IMAGES)
-		image_path = image_folder + "/" + md5.hexdigest() + post["ext"]
+		image_folder = Path(config.PATH_IMAGES)
+		image_path = image_folder.joinpath(md5.hexdigest() + post["ext"])
 
-		if os.path.isdir(image_folder) and not os.path.isfile(image_path):
+		if image_folder.is_dir() and not image_path.is_file():
 			claimtime = int(time.time()) + config.IMAGE_INTERVAL
 
 			try:
@@ -232,7 +231,7 @@ class ThreadScraper4chan(BasicJSONScraper):
 					"board": thread["board"],
 					"ext": post["ext"],
 					"tim": post["tim"],
-					"destination": image_path,
+					"destination": str(image_path),
 				})
 			except JobAlreadyExistsException:
 				pass

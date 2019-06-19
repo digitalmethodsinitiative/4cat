@@ -3,7 +3,7 @@ import time
 import config
 
 from backend.abstract.worker import BasicWorker
-from backend.lib.query import DataSet
+from backend.lib.dataset import DataSet
 
 
 class SnapshotAnalyser(BasicWorker):

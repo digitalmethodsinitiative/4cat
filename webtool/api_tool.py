@@ -1,5 +1,5 @@
 """
-4CAT Tool API - To be used to queue and check queries
+4CAT Tool API - To be used to queue and check datasets
 """
 
 import hashlib
@@ -10,17 +10,20 @@ import time
 import csv
 import os
 
+from pathlib import Path
+
+import backend
+
 from flask import jsonify, abort, request, render_template, redirect
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 
 from webtool import app, db, log, openapi, limiter, queue
-from webtool.views import queue_postprocessor
+from webtool.views import queue_processor
 from webtool.lib.helpers import string_to_timestamp, get_preview, validate_query
 
 from backend.lib.queue import JobQueue
-from backend.lib.query import DataSet
-from backend.lib.helpers import get_absolute_folder, load_postprocessors
+from backend.lib.dataset import DataSet
 
 api_ratelimit = limiter.shared_limit("1 per second", scope="api")
 
@@ -58,9 +61,9 @@ def api_status():
 	jobs_sorted["total"] = jobs_count
 
 	# determine if backend is live by checking if the process is running
-	lockfile = get_absolute_folder(config.PATH_LOCKFILE) + "/4cat.pid"
+	lockfile = Path(config.PATH_ROOT, config.PATH_LOCKFILE, "4cat.pid")
 	if os.path.isfile(lockfile):
-		with open(lockfile) as pidfile:
+		with lockfile.open() as pidfile:
 			pid = pidfile.read()
 			backend_live = int(pid) in psutil.pids()
 	else:
@@ -86,9 +89,9 @@ def api_status():
 @login_required
 @limiter.limit("5 per minute")
 @openapi.endpoint
-def queue_query():
+def queue_dataset():
 	"""
-	Queue a 4CAT Query
+	Queue a 4CAT search query for processing into a dataset
 
 	Requires authentication by logging in or providing a valid access token.
 
@@ -111,7 +114,7 @@ def queue_query():
     :request-param str ?access_token:  Access token; only required if not
                                        logged in currently.
 
-	:return str:  The query key, which may be used to later retrieve query
+	:return str:  The dataset key, which may be used to later retrieve dataset
 	              status and results.
 	"""
 
@@ -144,62 +147,59 @@ def queue_query():
 	if valid != True:
 		return "Invalid query. " + valid
 
-	# Queue query
-	query = DataSet(parameters=parameters, db=db)
+	# Queue dataset
+	dataset = DataSet(parameters=parameters, db=db)
 
-	queue.add_job(jobtype="%s-search" % parameters["datasource"], remote_id=query.key)
+	queue.add_job(jobtype="%s-search" % parameters["datasource"], remote_id=dataset.key)
 
-	return query.key
+	return dataset.key
 
 
 @app.route('/api/check-query/')
 @login_required
 @openapi.endpoint
-def check_query():
+def check_dataset():
 	"""
-	Check query status
+	Check dataset status
 
 	Requires authentication by logging in or providing a valid access token.
 
-	:request-param str query_key:  ID of the query for which to return the status
-	:return: Query status, containing the `status`, `query`, number of `rows`,
-	         the query `key`, whether the query is `done`, the `path` of the
-	         result file and whether the query result is `empty`.
+	:request-param str query_key:  ID of the dataset for which to return the status
+	:return: Dataset status, containing the `status`, `query`, number of `rows`,
+	         the dataset `key`, whether the dataset is `done`, the `path` of the
+	         result file and whether the dataset is `empty`.
 	"""
-	query_key = request.args.get("key")
+	dataset_key = request.args.get("key")
 	try:
-		query = DataSet(key=query_key, db=db)
+		dataset = DataSet(key=dataset_key, db=db)
 	except TypeError:
-		return jsonify({"error": "Not a valid query key."})
+		return jsonify({"error": "Not a valid dataset key."})
 
-	results = query.check_query_finished()
+	results = dataset.check_dataset_finished()
 	if results == 'empty':
-		querydata = query.data
-		querydata["parameters"] = json.loads(querydata["parameters"])
+		dataset_data = dataset.data
+		dataset_data["parameters"] = json.loads(dataset_data["parameters"])
 		path = False
 		preview = ""
 	elif results:
 		# Return absolute folder when using localhost for debugging
-		if app.debug:
-			path = 'http://localhost/fourcat/data/' + query.data["result_file"] + '.csv'
-		else:
-			path = results.replace("\\", "/").split("/").pop()
-		querydata = query.data
-		querydata["parameters"] = json.loads(querydata["parameters"])
-		preview = render_template("posts-preview.html", query=querydata, preview=get_preview(query))
+		path = results.name
+		dataset_data = dataset.data
+		dataset_data["parameters"] = json.loads(dataset_data["parameters"])
+		preview = render_template("posts-preview.html", query=dataset_data, preview=get_preview(dataset))
 	else:
 		path = ""
 		preview = ""
 
 	status = {
-		"status": query.get_status(),
-		"query": query.data["query"],
-		"rows": query.data["num_rows"],
-		"key": query_key,
+		"status": dataset.get_status(),
+		"query": dataset.data["query"],
+		"rows": dataset.data["num_rows"],
+		"key": dataset_key,
 		"done": True if results else False,
 		"preview": preview,
 		"path": path,
-		"empty": (query.data["num_rows"] == 0)
+		"empty": (dataset.data["num_rows"] == 0)
 	}
 
 	return jsonify(status)
@@ -209,15 +209,15 @@ def check_query():
 @api_ratelimit
 @login_required
 @openapi.endpoint
-def delete_query():
+def delete_dataset():
 	"""
-	Delete a query
+	Delete a dataset
 
-	Only available to administrators. Deletes a query, as well as any
-	subqueries linked to it, from 4CAT. Calling this on a query that is
+	Only available to administrators. Deletes a dataset, as well as any
+	children linked to it, from 4CAT. Calling this on a dataset that is
 	currently being executed is undefined behaviour.
 
-	:request-param str query_key:  ID of the query for which to return the status
+	:request-param str query_key:  ID of the dataset for which to return the status
     :request-param str ?access_token:  Access token; only required if not
                                        logged in currently.
 
@@ -226,13 +226,13 @@ def delete_query():
 	if not current_user.is_admin():
 		return jsonify({"error": "Not allowed"})
 
-	query_key = request.form.get("key")
+	dataset_key = request.form.get("key")
 	try:
-		query = DataSet(key=query_key, db=db)
+		dataset = DataSet(key=dataset_key, db=db)
 	except TypeError:
-		return jsonify({"error": "Not a valid query key."})
+		return jsonify({"error": "Not a valid dataset key."})
 
-	query.delete()
+	dataset.delete()
 	return jsonify({"status": "success"})
 
 
@@ -242,39 +242,39 @@ def delete_query():
 @openapi.endpoint
 def check_queue():
 	"""
-	Get the amount of queries still in the queue.
+	Get the amount of datasets yet to finish processing
 
 	:return: An JSON object with one item `count` containing the number of
-	queued or active search queries.
+	queued or active datasets.
 	"""
-	unfinished_queries = db.fetchone("SELECT COUNT(*) AS count FROM jobs WHERE jobtype LIKE '%-search'")
+	unfinished_datasets = db.fetchone("SELECT COUNT(*) AS count FROM jobs WHERE jobtype LIKE '%-search'")
 
-	return jsonify(unfinished_queries)
+	return jsonify(unfinished_datasets)
 
 
-@app.route("/api/queue-postprocessor/", methods=["POST"])
+@app.route("/api/queue-processor/", methods=["POST"])
 @api_ratelimit
 @login_required
 @openapi.endpoint
-def queue_postprocessor_api():
+def queue_processor_api():
 	"""
-	Queue a new post-processor
+	Queue a new processor
 
-	Queues the post-processor for a given query; with the returned query key,
-	the post-processor status can then be checked periodically to download the
+	Queues the processor for a given dataset; with the returned query key,
+	the processor status can then be checked periodically to download the
 	result when available.
 
 	Note that apart from the required parameters, further parameters may be
 	provided based on the configuration options available for the chosen
-	post-processor. Available options may be found via the
-	`/get-available-postprocessors/` endpoint.
+	processor. Available options may be found via the
+	`/get-available-processors/` endpoint.
 
-	:request-param str key:  Key of query to queue post-processor for
-	:request-param str postprocessor:  ID of post-processor to queue
+	:request-param str key:  Key of dataset to queue processor for
+	:request-param str processor:  ID of processor to queue
     :request-param str ?access_token:  Access token; only required if not
                                        logged in currently.
 
-	:return: A list of query data, with each query an item with a `key`,
+	:return: A list of dataset properties, with each dataset an item with a `key`,
 	        whether it had `finished`, a `html` snippet containing details,
 	        a `url` at which the result may be downloaded when finished, and a
 	        list of `messages` describing any warnings generated while queuing.
@@ -297,42 +297,42 @@ def queue_postprocessor_api():
 	else:
 		key = request.form.get("key", "")
 
-	return queue_postprocessor(key, request.form.get("postprocessor", ""), is_async=True)
+	return queue_processor(key, request.form.get("processor", ""), is_async=True)
 
 
-@app.route("/api/get-available-postprocessors/")
+@app.route("/api/get-available-processors/")
 @login_required
 @api_ratelimit
 @openapi.endpoint
-def available_postprocessors():
+def available_processors():
 	"""
-	Get post-processors available for a query
+	Get processors available for a dataset
 
-	:request-param string key:  Query key to get post-processors for
+	:request-param string key:  Dataset key to get processors for
 	:return: An object containing the `error` if the request failed, or a list
-	         of post-processors, each with a `name`, a `type` ID, a
+	         of processors, each with a `name`, a `type` ID, a
 	         `description` of what it does, the `extension` of the file it
-	         produces, a `category` name, what types of queries it `accepts`,
+	         produces, a `category` name, what types of datasets it `accepts`,
 	         and a list of `options`, if applicable.
 	"""
 	try:
-		query = DataSet(key=request.args.get("key"), db=db)
+		dataset = DataSet(key=request.args.get("key"), db=db)
 	except TypeError:
-		return jsonify({"error": "Not a valid query key."})
+		return jsonify({"error": "Not a valid dataset key."})
 
-	return jsonify(query.get_available_postprocessors())
+	return jsonify(dataset.get_available_processors())
 
 
-@app.route('/api/check-postprocessors/')
+@app.route('/api/check-processors/')
 @login_required
 @openapi.endpoint
-def check_postprocessor():
+def check_processor():
 	"""
-	Check post-processor status
+	Check processor status
 
-	:request-param str subqueries:  A JSON-encoded list of query keys to get
+	:request-param str subqueries:  A JSON-encoded list of dataset keys to get
 	                                the status of
-	:return: A list of query data, with each query an item with a `key`,
+	:return: A list of dataset data, with each dataset an item with a `key`,
 	        whether it had `finished`, a `html` snippet containing details, and
 	        a `url` at which the result may be downloaded when finished.
 	         `finished`, `html` and `result_path`.
@@ -340,25 +340,25 @@ def check_postprocessor():
 	try:
 		keys = json.loads(request.args.get("subqueries"))
 	except (TypeError, json.decoder.JSONDecodeError):
-		return jsonify({"error": "Unexpected format for subquery key list.f"})
+		return jsonify({"error": "Unexpected format for child dataset key list."})
 
-	subqueries = []
+	children = []
 
 	for key in keys:
 		try:
-			query = DataSet(key=key, db=db)
+			dataset = DataSet(key=key, db=db)
 		except TypeError:
 			continue
 
-		subqueries.append({
-			"key": query.key,
-			"finished": query.is_finished(),
-			"html": render_template("result-subquery-extended.html", subquery=query, query=query.get_genealogy()[0],
-									postprocessors=load_postprocessors()),
-			"url": "/result/" + query.data["result_file"]
+		children.append({
+			"key": dataset.key,
+			"finished": dataset.is_finished(),
+			"html": render_template("result-child.html", child=dataset, dataset=dataset.get_genealogy()[-2], query=dataset.get_genealogy()[0],
+									processors=backend.all_modules.processors),
+			"url": "/result/" + dataset.data["result_file"]
 		})
 
-	return jsonify(subqueries)
+	return jsonify(children)
 
 
 @app.route("/api/request-token/")

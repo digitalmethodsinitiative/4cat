@@ -13,7 +13,7 @@ import csv
 from math import ceil
 from stop_words import get_stop_words
 from flask_login import current_user
-from backend.abstract.postprocessor import BasicPostProcessor
+from backend.abstract.processor import BasicProcessor
 
 import config
 
@@ -127,7 +127,7 @@ def load_postprocessors():
 		members = inspect.getmembers(sys.modules[module])
 
 		for member in members:
-			if inspect.isclass(member[1]) and issubclass(member[1], BasicPostProcessor) and not inspect.isabstract(
+			if inspect.isclass(member[1]) and issubclass(member[1], BasicProcessor) and not inspect.isabstract(
 					member[1]):
 				postprocessors[member[1].type] = {
 					"type": member[1].type,
@@ -149,7 +149,7 @@ def get_available_postprocessors(query):
 	:param DataSet query:  Query to load available postprocessors for
 	:return dict: Post processors, {id => settings} mapping
 	"""
-	postprocessors = query.get_compatible_postprocessors()
+	postprocessors = query.get_compatible_processors()
 	available = postprocessors.copy()
 	analyses = query.get_analyses()
 
@@ -169,7 +169,7 @@ def get_preview(query):
 	:return list: 
 	"""
 	preview = []
-	with open(query.get_results_path(), encoding="utf-8") as resultfile:
+	with query.get_results_path().open(encoding="utf-8") as resultfile:
 		posts = csv.DictReader(resultfile)
 		i = 0
 		for post in posts:

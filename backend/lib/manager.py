@@ -1,18 +1,14 @@
 """
 The heart of the app - manages jobs and workers
 """
-import importlib
-import inspect
 import signal
 import time
-import glob
-import sys
-import os
-import re
+
+from pathlib import Path
 
 import config
+import backend
 
-from backend.abstract.worker import BasicWorker
 from backend.lib.keyboard import KeyPoller
 from backend.lib.exceptions import JobClaimedException
 
@@ -25,9 +21,7 @@ class WorkerManager:
 	db = None
 	log = None
 
-	worker_map = {}
 	worker_pool = {}
-	datasources = {}
 	pool = []
 	looping = True
 
@@ -51,7 +45,6 @@ class WorkerManager:
 		else:
 			signal.signal(signal.SIGTERM, self.abort)
 
-		self.load_workers()
 		self.validate_datasources()
 
 		# queue a job for the api handler so it will be run
@@ -59,7 +52,7 @@ class WorkerManager:
 
 		# queue corpus stats and snapshot generators for a daily run
 		self.queue.add_job("corpus-stats", remote_id="localhost", interval=86400)
-		if config.PATH_SNAPSHOTDATA and os.path.exists(config.PATH_SNAPSHOTDATA):
+		if config.PATH_SNAPSHOTDATA and Path(config.PATH_SNAPSHOTDATA).exists():
 			self.queue.add_job("schedule-snapshot", remote_id="localhost", interval=86400)
 
 		# it's time
@@ -90,8 +83,9 @@ class WorkerManager:
 		# check if workers are available for unclaimed jobs
 		for job in jobs:
 			jobtype = job.data["jobtype"]
-			if jobtype in self.worker_map:
-				worker_info = self.worker_map[jobtype]
+
+			if jobtype in backend.all_modules.workers:
+				worker_info = backend.all_modules.workers[jobtype]
 				if jobtype not in self.worker_pool:
 					self.worker_pool[jobtype] = []
 
@@ -138,93 +132,6 @@ class WorkerManager:
 		# abort
 		self.log.info("Bye!")
 
-	def load_workers(self):
-		"""
-		Looks for files containing worker definitions and import those as
-		modules
-
-		Futhermore calls the init method of any datasources found (if they
-		have such a method)
-		"""
-		self.log.debug("Loading workers...")
-		base = os.path.abspath(os.path.dirname(__file__) + "../../..")
-
-		# folders with generic workers
-		folders = ["backend/postprocessors", "backend/workers"]
-
-		# add folders with datasource-specific workers
-		os.chdir(base + "/datasources")
-		datasources = [file[:-1] for file in glob.glob("**/**/")] + [file[:-1] for file in glob.glob("**/")]
-		for datasource in datasources:
-			folders.append("datasources/%s" % datasource)
-
-		# load any workers found in those folders
-		for folder in folders:
-			os.chdir(base + "/" + folder)
-			files = glob.glob("./*.py")
-			for file in files:
-				if file[2:4] == "__":
-					# we're not interested in __init__.py etc
-					continue
-
-				# initialize data source if it's the first time encountering it
-				if "datasources" in folder:
-					datasource = folder.split("datasources/")[1]
-					datasource = re.split(r"[\\\/]", datasource)[0]
-					if datasource not in self.datasources:
-						self.log.info("(Startup) Registered data source %s" % datasource)
-						datamodule = "datasources." + folder.replace(base, "")[12:]
-						datamodule = re.split(r"[\\\/]", datamodule)[0]
-
-						importlib.import_module(datamodule)
-
-						# initialize datasource
-						datasource_id = datasource
-						if hasattr(sys.modules[datamodule], "init_datasource") and hasattr(sys.modules[datamodule], "DATASOURCE"):
-							self.log.debug("Initializing datasource %s" % datasource)
-							datasource_id = sys.modules[datamodule].DATASOURCE
-							sys.modules[datamodule].init_datasource(logger=self.log, database=self.db, queue=self.queue, name=sys.modules[datamodule].DATASOURCE)
-						else:
-							self.log.error("Datasource %s is lacking init_datasource or DATASOURCE in __init__.py" % datasource)
-
-						self.datasources[datasource_id] = datasource
-
-					module = folder.replace(base, "").replace("\\", ".").replace("/", ".") + "." + file[2:-3]
-					if module in sys.modules:
-						# we've been here
-						continue
-
-				else:
-					# load relevant files in folder
-					module = folder.replace("\\", ".").replace("/", ".") + "." + file[2:-3]
-					if module in sys.modules:
-						# already loaded
-						continue
-
-				# now check if the file is actually a worker or just a random python file we
-				# accidentally loaded (in which case it will be garbage collected)
-				importlib.import_module(module)
-				members = inspect.getmembers(sys.modules[module])
-				for member in members:
-					if member[0][0:2] == "__" or not inspect.isclass(member[1]) or not issubclass(member[1], BasicWorker) or inspect.isabstract(
-							member[1]):
-						# is not a valid worker definition
-						continue
-
-					if member[1].type in self.worker_map:
-						# already mapped
-						continue
-
-					# save to worker map
-					worker = {
-						"max": member[1].max_workers,
-						"name": member[0],
-						"jobtype": member[1].type,
-						"class": member[1]
-					}
-					self.log.info("Adding worker type %s" % member[0])
-					self.worker_map[member[1].type] = worker
-
 	def validate_datasources(self):
 		"""
 		Validate data sources
@@ -232,14 +139,14 @@ class WorkerManager:
 		Logs warnings if not all information is precent for the configured data
 		sources.
 		"""
-		for datasource in self.datasources:
-			if datasource + "-search" not in self.worker_map:
+		for datasource in backend.all_modules.datasources:
+			if datasource + "-search" not in backend.all_modules.workers:
 				self.log.error("No search worker defined for datasource %s. Search queries will not be executed." % datasource)
 
-			if datasource + "-thread" not in self.worker_map:
+			if datasource + "-thread" not in backend.all_modules.workers:
 				self.log.warning("No thread scraper defined for datasource %s." % datasource)
 
-			if datasource + "-board" not in self.worker_map:
+			if datasource + "-board" not in backend.all_modules.workers:
 				self.log.warning("No board scraper defined for datasource %s." % datasource)
 
 	def abort(self, signal=None, stack=None):

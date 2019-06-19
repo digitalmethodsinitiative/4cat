@@ -98,10 +98,10 @@ function init() {
     $(document).on('mouseout', '.tooltip-trigger', tooltip.hide);
     $(document).on('click', '.tooltip-trigger', tooltip.toggle);
 
-    // subsubsubquery interface bits
-    $(document).on('click', '.expand-postprocessors', postprocessor.toggle);
-    $(document).on('click', '.control-postprocessor', postprocessor.queue);
-    $(document).on('click', '.postprocessor-tree button', toggleButton);
+    // child of child of child etc interface bits
+    $(document).on('click', '.expand-processors', processor.toggle);
+    $(document).on('click', '.control-processor', processor.queue);
+    $(document).on('click', '.processor-tree button', toggleButton);
 
     //allow opening given analysis path via anchor links
     navpath = window.location.hash.substr(1);
@@ -113,7 +113,7 @@ function init() {
                 return;
             }
             let breadcrumb = analyses.shift();
-            $('#subquery-' + breadcrumb + ' > .query-core > button').trigger('click');
+            $('#child-' + breadcrumb + ' > .query-core > button').trigger('click');
         }, 25);
     }
 
@@ -147,16 +147,16 @@ function init() {
     });
 
     //collapse post-processor options
-    postprocessor.collapse_options();
-    postprocessor.resize_blocks();
+    processor.collapse_options();
+    processor.resize_blocks();
 }
 
 /**
  * Post-processor handling
  */
-postprocessor = {
+processor = {
     /**
-     * Toggle options for a postprocessor
+     * Toggle options for a processor
      *
      * A bit more involved than it should be, but this way it looks nicer because
      * of the animation...
@@ -173,17 +173,17 @@ postprocessor = {
         e.preventDefault();
 
         let block = $(this).parent().parent();
-        let parent_block = $(block.parents('.subquery')[0]);
+        let parent_block = $(block.parents('.child')[0]);
         let siblings = block.siblings();
 
         if (mode === 'off') {
             //trigger closing of lower levels
-            let open_children = block.find('.subquery.focus');
+            let open_children = block.find('.child.focus');
             if (open_children.length > 0) {
-                $(open_children[0]).find('> .query-core > .expand-postprocessors').trigger('click');
+                $(open_children[0]).find('> .query-core > .expand-processors').trigger('click');
             }
 
-            block.find('.sub-controls .expand-postprocessors.active').each(function () {
+            block.find('.sub-controls .expand-processors.active').each(function () {
                 $(this).trigger('click');
             });
 
@@ -218,7 +218,7 @@ postprocessor = {
             }
         }
 
-        postprocessor.resize_blocks();
+        processor.resize_blocks();
     },
 
     /**
@@ -248,7 +248,7 @@ postprocessor = {
 
                     if (response.html.length > 0) {
                         let new_element = $(response.html);
-                        let parent_list = $('#' + response.container + ' > .subquery-list');
+                        let parent_list = $('#' + response.container + ' > .child-list');
                         new_element.appendTo($(parent_list));
                     }
                 },
@@ -260,7 +260,7 @@ postprocessor = {
     },
 
     collapse_options: function () {
-        $('.postprocessor-list li').each(function () {
+        $('.processor-list li').each(function () {
             if ($(this).hasClass('collapsed') || $(this).hasClass('expanded')) {
                 return;
             }
@@ -271,11 +271,11 @@ postprocessor = {
             $(this).attr('data-options-height', fieldset.height());
             fieldset.css('height', '0');
             $(this).addClass('collapsed');
-            $(this).find('button.control-postprocessor').text('Options');
+            $(this).find('button.control-processor').text('Options');
         });
 
         let index = 0;
-        $('article > .postprocessor-list > li').each(function() {
+        $('article > .processor-list > li').each(function() {
             if(index % 2 === 0) {
                 $(this).addClass('zebra');
             }
@@ -441,13 +441,13 @@ query = {
 
 
     /**
-     * Fancy live-updating subquery status
+     * Fancy live-updating child dataset status
      *
      * Checks if running subqueries have finished, updates their status, and re-enabled further
      * analyses if all subqueries have finished
      */
     update_status: function () {
-        let queued = $('.running.subquery');
+        let queued = $('.running.child');
         if (queued.length === 0) {
             return;
         }
@@ -458,12 +458,12 @@ query = {
         });
 
         $.get({
-            url: "/api/check-postprocessors/",
+            url: "/api/check-processors/",
             data: {subqueries: JSON.stringify(keys)},
             success: function (json) {
-                json.forEach(subquery => {
-                    let target = $('#subquery-' + subquery.key);
-                    let update = $(subquery.html);
+                json.forEach(child => {
+                    let target = $('#child-' + child.key);
+                    let update = $(child.html);
                     update.attr('aria-expanded', target.attr('aria-expanded'));
 
                     if (target.attr('data-status') === update.attr('data-status')) {
@@ -471,20 +471,20 @@ query = {
                     }
 
                     target.replaceWith(update);
-                    $('#subquery-' + subquery.key).addClass('flashing');
+                    $('#child-' + child.key).addClass('flashing');
 
                     if (!$('body').hasClass('result-page')) {
                         return;
                     }
 
-                    if ($('.running.subquery').length == 0) {
+                    if ($('.running.child').length == 0) {
                         $('.result-warning').animate({height: 0}, 250, function () {
                             $(this).remove();
                         });
                         $('.queue-button-wrap').removeClass('hidden');
                     }
 
-                    postprocessor.resize_blocks();
+                    processor.resize_blocks();
                 });
             }
         });
@@ -786,7 +786,7 @@ popup_panel = {
             popup_panel.hide();
         });
 
-        postprocessor.collapse_options();
+        processor.collapse_options();
     },
 
     refresh: function () {

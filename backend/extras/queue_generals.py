@@ -10,7 +10,7 @@ sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)) + "/../..")
 from backend.lib.database import Database
 from backend.lib.logger import Logger
 from backend.lib.queue import JobQueue
-from backend.lib.query import DataSet
+from backend.lib.dataset import DataSet
 
 import config
 
@@ -42,7 +42,7 @@ with open("generals.csv") as input:
 				"next": [{
 					"type": "thread-metadata",
 					"parameters": {
-						"copy_to": "/Users/stijn/PycharmProjects/4cat/results/generals/%s.csv" % row["label"]
+						"copy_to": "/Users/stijn/PycharmProjects/4cat/results/generals/%s.csv" % row["label"].replace("/", "")
 					}
 				}]
 			}, db=database)

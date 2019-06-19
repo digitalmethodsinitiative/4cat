@@ -8,12 +8,13 @@ import json
 import os
 
 from collections import OrderedDict
+from pathlib import Path
 
 from flask import jsonify, abort, send_file, request, render_template
 
 from webtool import app, db, log, openapi, limiter
 from webtool.lib.helpers import format_post
-from backend.lib.helpers import get_absolute_folder, strip_tags
+from backend.lib.helpers import strip_tags
 
 api_ratelimit = limiter.shared_limit("1 per second", scope="api")
 
@@ -33,7 +34,7 @@ def api_thread(datasource, board, thread_id):
 	"""
 	if datasource not in config.DATASOURCES:
 		return jsonify({"error": "Invalid data source", "endpoint": request.url_rule.rule})
-	print(datasource, board, thread_id)
+
 	thread = db.fetchone("SELECT * FROM threads_" + datasource + " WHERE board = %s AND id = %s", (board, thread_id))
 
 	if thread == None:
@@ -326,23 +327,18 @@ def get_image(img_hash, limit=0):
 	"""
 	limit = "" if not limit or limit <= 0 else " LIMIT %i" % int(limit)
 	
-	for file in os.listdir(get_absolute_folder(config.PATH_IMAGES) + '/'):
-		if img_hash in file:
-			image = config.PATH_IMAGES + '/' + file
-			filename = file.split('/')
-			filename = filename[len(filename) - 1]
-			filetype = filename.split('.')[1]
-
+	for file in Path(config.PATH_ROOT, config.PATH_IMAGES).glob("*"):
+		if img_hash in file.name:
 			if app.debug == True:
-				file = '../../data/' + filename
+				file = '../../data/' + file.name
 
-				if filetype == 'webm':
-					return send_file(file, mimetype='video/' + filetype)
+				if file.suffix == 'webm':
+					return send_file(file, mimetype='video/' + file.suffix)
 				else:
-					return send_file(file, mimetype='image/' + filetype)
+					return send_file(file, mimetype='image/' + file.suffix)
 
-			if filetype == 'webm':
-				return send_file(image, mimetype='video/' + filetype)
+			if file.suffix == 'webm':
+				return send_file(str(file), mimetype='video/' + file.suffix)
 			else:
-				return send_file(image, mimetype='image/' + filetype)
+				return send_file(str(file), mimetype='image/' + file.suffix)
 	abort(404)
