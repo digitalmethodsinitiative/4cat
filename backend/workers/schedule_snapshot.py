@@ -1,10 +1,11 @@
 import math
-import os
+
+from pathlib import Path
 
 import config
 
 from backend.abstract.worker import BasicWorker
-from backend.lib.query import DataSet
+from backend.lib.dataset import DataSet
 
 
 class SnapshotScheduler(BasicWorker):
@@ -15,7 +16,7 @@ class SnapshotScheduler(BasicWorker):
 	max_workers = 1
 
 	def work(self):
-		if not config.PATH_SNAPSHOTDATA or not os.path.exists(config.PATH_SNAPSHOTDATA):
+		if not config.PATH_SNAPSHOTDATA or not Path(config.PATH_SNAPSHOTDATA).exists():
 			# a valid path to a place to store the snapshot data is needed
 			self.job.finish(delete=True)
 			return
