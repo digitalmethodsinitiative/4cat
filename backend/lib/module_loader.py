@@ -123,10 +123,12 @@ class ModuleCollector:
 
 					self.workers[metadata["id"]] = metadata
 
-		self.processors = {id: self.processors[id] for id in
-						   sorted(self.processors, key=lambda item: self.processors[item]["name"])
-		self.processors = {id: self.processors[id] for id in
-						   sorted(self.processors, key=lambda item: self.processors[item]["category"])
+		sorted_processors = {id: self.processors[id] for id in
+						   sorted(self.processors, key=lambda item: self.processors[item]["name"])}
+		categorised_processors = {id: sorted_processors[id] for id in
+						   sorted(sorted_processors, key=lambda item: sorted_processors[item]["category"])}
+
+		self.processors = sorted_processors
 
 	def load_datasources(self):
 		"""
