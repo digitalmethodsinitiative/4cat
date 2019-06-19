@@ -53,7 +53,8 @@ class ModuleCollector:
 		`BasicProcessor` or `BasicWorker` and are not abstract.
 		"""
 		# look for workers and processors in pre-defined folders and datasources
-		paths = [Path(config.PATH_ROOT, "backend", "processors"), Path(config.PATH_ROOT, "backend", "workers"), *[self.datasources[datasource]["path"] for datasource in self.datasources]]
+		paths = [Path(config.PATH_ROOT, "backend", "processors"), Path(config.PATH_ROOT, "backend", "workers"),
+				 *[self.datasources[datasource]["path"] for datasource in self.datasources]]
 
 		for folder in paths:
 			# loop through folders, and files in those folders, recursively
@@ -121,6 +122,11 @@ class ModuleCollector:
 						self.processors[metadata["id"]] = metadata
 
 					self.workers[metadata["id"]] = metadata
+
+		self.processors = {id: self.processors[id] for id in
+						   sorted(self.processors, key=lambda item: self.processors[item]["name"])
+		self.processors = {id: self.processors[id] for id in
+						   sorted(self.processors, key=lambda item: self.processors[item]["category"])
 
 	def load_datasources(self):
 		"""
