@@ -64,7 +64,7 @@ class SnapshotScheduler(BasicWorker):
 					"dense_country_percentage": 0,
 					"random_amount": False,
 					"dense_length": 0
-				}, type=type, db=self.db)
+				}, type="search", db=self.db)
 
 				# run the search and queue further analysis for once the
 				# search is done
