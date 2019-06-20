@@ -56,9 +56,9 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 			try:
 				self.parent = DataSet(key=self.dataset.data["key_parent"], db=self.db)
 			except TypeError:
-				# we need to know what the parent query was to properly handle the
+				# we need to know what the parent dataset was to properly handle the
 				# analysis
-				self.log.warning("Post-processor %s queued for orphan query %s: cannot run, cancelling job" % (self.type, self.dataset.key))
+				self.log.warning("Processor %s queued for orphan query %s: cannot run, cancelling job" % (self.type, self.dataset.key))
 				self.job.finish()
 				return
 
