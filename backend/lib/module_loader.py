@@ -128,7 +128,7 @@ class ModuleCollector:
 		categorised_processors = {id: sorted_processors[id] for id in
 						   sorted(sorted_processors, key=lambda item: sorted_processors[item]["category"])}
 
-		self.processors = sorted_processors
+		self.processors = categorised_processors
 
 	def load_datasources(self):
 		"""
