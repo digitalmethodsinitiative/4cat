@@ -241,7 +241,7 @@ def get_youtube_metadata(self, urls):
 
 		# Update status once in a while
 		if counter % 10 == 0:
-			self.query.update_status("Extracted metadata " + str(counter) + "/" + str(len(urls_metadata)))
+			self.dataset.update_status("Extracted metadata " + str(counter) + "/" + str(len(urls_metadata)))
 
 	# To write to csv, all dictionary items must have all the possible keys
 	# Get all the possible keys
@@ -304,7 +304,7 @@ def request_youtube_api(self, ids, object_type="video"):
 				break
 
 			except Exception as error:
-				self.query.update_status("Encountered exception " + str(error) + ".\nSleeping for " + str(self.sleep_time))
+				self.dataset.update_status("Encountered exception " + str(error) + ".\nSleeping for " + str(self.sleep_time))
 				retries += 1
 				api_error = error
 				time.sleep(self.sleep_time) # Wait a bit before trying again
@@ -313,8 +313,8 @@ def request_youtube_api(self, ids, object_type="video"):
 		# Do nothing with the results if the requests failed -
 		# be in the final results file
 		if retries >= self.max_retries:
-			self.log.error("Error during YouTube API request of query %s" % self.query.key)
-			self.query.update_status("Error while getting YouTube data")
+			self.log.error("Error during YouTube API request of query %s" % self.dataset.key)
+			self.dataset.update_status("Error while getting YouTube data")
 
 		else:
 			# Get and return results for each video
@@ -365,7 +365,7 @@ def request_youtube_api(self, ids, object_type="video"):
 				results[result_id] = result
 
 		# Update status per response item
-		self.query.update_status("Got metadata from " + str(i * 50) + "/" + str(len(ids)) + " YouTube URLs")
+		self.dataset.update_status("Got metadata from " + str(i * 50) + "/" + str(len(ids)) + " YouTube URLs")
 
 	return results
 
