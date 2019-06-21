@@ -190,7 +190,7 @@ class HistogramRenderer(BasicProcessor):
 			draw.text((header_x, header_y), header, font=headerfont, fill="white")
 
 			# x labels
-			labelfont = ImageFont.truetype(fontfile, int(x_margin_left / 5))
+			labelfont = ImageFont.truetype(str(fontfile), int(x_margin_left / 5))
 			origin = x_margin_left - (tick_width * 2)
 			step = y_height / 10
 			for i in range(0, 11):
@@ -201,7 +201,7 @@ class HistogramRenderer(BasicProcessor):
 				draw.text((label_x, label_y), label, font=labelfont, fill="black")
 
 			# y labels
-			labelfont = ImageFont.truetype(fontfile, int(x_margin_left / 6))
+			labelfont = ImageFont.truetype(str(fontfile), int(x_margin_left / 6))
 			month_labels = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
 			label_width = labelfont.getsize("2018")[0]
 			label_x = x_margin_left + (item_width / 2) - (label_width / 2)
@@ -216,7 +216,7 @@ class HistogramRenderer(BasicProcessor):
 					label_x += item_width
 
 			# 4cat logo
-			footerfont = ImageFont.truetype(fontfile, int(height / 75))
+			footerfont = ImageFont.truetype(str(fontfile), int(height / 75))
 			footer = "made with 4CAT - 4cat.oilab.nl"
 			footersize = footerfont.getsize(footer)
 			footer_x = width - footersize[0] * 1.1
