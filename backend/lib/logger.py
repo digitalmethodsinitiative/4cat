@@ -10,9 +10,10 @@ import time
 import json
 import sys
 import re
-from collections import OrderedDict
 
-from backend.lib.helpers import get_absolute_folder
+from collections import OrderedDict
+from pathlib import Path
+
 from logging.handlers import RotatingFileHandler, SMTPHandler
 
 import config
@@ -48,7 +49,7 @@ class Logger:
 			return
 		
 		self.print_logs = output
-		self.log_path = get_absolute_folder(config.PATH_LOGS) + "/4cat.log"
+		self.log_path = Path(config.PATH_ROOT, config.PATH_LOGS, "4cat.log")
 		self.previous_report = time.time()
 
 		self.logger = logging.getLogger("4cat-backend")
@@ -76,14 +77,6 @@ class Logger:
 		mailer.setLevel(logging.WARNING)
 
 		self.logger.addHandler(mailer)
-
-	def get_location(self):
-		"""
-		Get location of log file
-
-		:return string:  Absolute path to log location
-		"""
-		return self.log_path
 
 	def log(self, message, level=logging.INFO):
 		"""
@@ -176,7 +169,7 @@ class Logger:
 		magic = "Compiling logs into report"
 
 		# process lines from log
-		with open(get_absolute_folder(config.PATH_LOGS) + "/4cat.log") as logfile:
+		with open(self.log_path) as logfile:
 			logs = logfile.readlines()
 
 		warnings = 0

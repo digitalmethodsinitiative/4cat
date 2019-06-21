@@ -2,8 +2,9 @@ import unittest
 import json
 import time
 
-from basic_testcase import FourcatTestCase
-from backend.lib.queue import JobQueue, JobClaimedException
+from test.basic_testcase import FourcatTestCase
+from backend.lib.queue import JobQueue
+from backend.lib.exceptions import JobClaimedException
 
 
 class TestJobQueue(FourcatTestCase):
@@ -18,8 +19,8 @@ class TestJobQueue(FourcatTestCase):
 		"jobtype": "test",
 		"details": json.dumps(details),
 		"remote_id": str(jobid),
-		"claim_after": 0,
-		"claimed": 0,
+		"timestamp_after": 0,
+		"timestamp_claimed": 0,
 		"attempts": 0
 	}
 
@@ -36,8 +37,8 @@ class TestJobQueue(FourcatTestCase):
 			"jobtype": "test",
 			"details": json.dumps(self.details),
 			"remote_id": str(self.jobid),
-			"claim_after": 0,
-			"claimed": 0,
+			"timestamp_after": 0,
+			"timestamp_claimed": 0,
 			"attempts": 0
 		}
 
@@ -85,7 +86,7 @@ class TestJobQueue(FourcatTestCase):
 		with self.subTest():
 			self.assertIsNotNone(job)
 
-		queue.claim_job(job)
+		job.claim()
 
 		job = queue.get_job("test")
 		with self.subTest():
@@ -95,7 +96,7 @@ class TestJobQueue(FourcatTestCase):
 		with self.subTest():
 			self.assertIsNotNone(job)
 
-		self.assertGreater(job["claimed"], int(time.time()) - 2)
+		self.assertGreater(job["timestamp_claimed"], int(time.time()) - 2)
 
 	def test_claim_job_claimed(self):
 		"""
@@ -109,9 +110,9 @@ class TestJobQueue(FourcatTestCase):
 		job = queue.get_job("test")
 		self.assertIsNotNone(job)
 
-		queue.claim_job(job)
+		job.claim()
 		with self.assertRaises(JobClaimedException):
-			queue.claim_job(job)
+			job.claim()
 
 	def test_release_job(self):
 		"""
@@ -125,13 +126,13 @@ class TestJobQueue(FourcatTestCase):
 		job = queue.get_job("test")
 		with self.subTest():
 			self.assertIsNotNone(job)
-			queue.claim_job(job)
-			queue.release_job(job)
+			job.claim()
+			job.release()
 
 			job = self.db.fetchone("SELECT * FROM jobs")
 
 			with self.subTest():
-				self.assertEqual(job["claimed"], 0)
+				self.assertEqual(job["timestamp_claimed"], 0)
 
 			with self.subTest():
 				self.assertEqual(job["attempts"], 1)
@@ -149,7 +150,7 @@ class TestJobQueue(FourcatTestCase):
 
 		self.assertIsNotNone(job)
 
-		queue.finish_job(job)
+		job.finish()
 		job = self.db.fetchone("SELECT * FROM jobs")
 
 		self.assertIsNone(job)
@@ -174,7 +175,7 @@ class TestJobQueue(FourcatTestCase):
 		"""
 		Test getting all jobs while some are claimed
 
-		Expected: all jobs are returned, regardless of claim status
+		Expected: only unclaimed jobs are returned
 		"""
 		queue = JobQueue(logger=self.log, database=self.db)
 
@@ -184,9 +185,9 @@ class TestJobQueue(FourcatTestCase):
 		job = queue.get_job("test")
 
 		self.assertIsNotNone(job)
-		queue.claim_job(job)
+		job.claim()
 		jobs = queue.get_all_jobs()
-		self.assertEqual(len(jobs), 2)
+		self.assertEqual(len(jobs), 1)
 
 	def test_get_job_count(self):
 		"""
@@ -222,13 +223,13 @@ class TestJobQueue(FourcatTestCase):
 			job = queue.get_job("test")
 			with self.subTest():
 				self.assertIsNotNone(job)
-				queue.claim_job(job)
+				job.claim()
 
-		unclaimed_jobs = self.db.fetchone("SELECT COUNT(*) AS num FROM jobs WHERE claimed = 0")["num"]
+		unclaimed_jobs = self.db.fetchone("SELECT COUNT(*) AS num FROM jobs WHERE timestamp_claimed = 0")["num"]
 		self.assertEqual(unclaimed_jobs, expected - claimable)
 
 		queue.release_all()
-		unclaimed_jobs = self.db.fetchone("SELECT COUNT(*) AS num FROM jobs WHERE claimed = 0")["num"]
+		unclaimed_jobs = self.db.fetchone("SELECT COUNT(*) AS num FROM jobs WHERE timestamp_claimed = 0")["num"]
 		self.assertEqual(unclaimed_jobs, expected)
 
 	def test_release_with_delay(self):
@@ -243,7 +244,7 @@ class TestJobQueue(FourcatTestCase):
 		job = queue.get_job("test")
 		self.assertIsNotNone(job)
 
-		queue.release_job(job, delay=2)
+		job.release(delay=2)
 
 		all_jobs = queue.get_job_count()
 		self.assertEqual(all_jobs, 1)
@@ -268,7 +269,7 @@ class TestJobQueue(FourcatTestCase):
 		self.assertIsNotNone(job)
 
 		deadline = int(time.time()) + 2
-		queue.release_job(job, claim_after=deadline)
+		job.release(claim_after=deadline)
 
 		all_jobs = queue.get_job_count()
 		self.assertEqual(all_jobs, 1)

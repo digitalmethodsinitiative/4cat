@@ -9,13 +9,17 @@ import glob
 import config
 import markdown
 
+from pathlib import Path
+
+import backend
+
 from flask import render_template, jsonify, abort, request, redirect, send_from_directory, flash, get_flashed_messages
 from flask_login import login_required, current_user
 from webtool import app, db, queue, openapi
 from webtool.lib.helpers import Pagination, get_preview
 
-from backend.lib.query import DataSet
-from backend.lib.helpers import get_absolute_folder, UserInput, load_postprocessors
+from backend.lib.dataset import DataSet
+from backend.lib.helpers import UserInput
 
 @app.route("/robots.txt")
 def robots():
@@ -44,9 +48,9 @@ def show_frontpage():
 	"""
 
 	# load corpus stats that are generated daily, if available
-	stats_path = get_absolute_folder(os.path.dirname(__file__)) + "/../stats.json"
-	if os.path.exists(stats_path):
-		with open(stats_path) as stats_file:
+	stats_path = Path(config.PATH_ROOT, "stats.json")
+	if stats_path.exists():
+		with stats_path.open() as stats_file:
 			stats = stats_file.read()
 		try:
 			stats = json.loads(stats)
@@ -206,7 +210,7 @@ def show_page(page):
 @openapi.endpoint
 def get_result(query_file):
 	"""
-	Get query result file
+	Get dataset result file
 
 	:param str query_file:  name of the result file
 	:return:  Result file
@@ -246,73 +250,73 @@ def show_results(page):
 
 	where = " AND ".join(where)
 
-	num_queries = db.fetchone("SELECT COUNT(*) AS num FROM queries WHERE " + where, tuple(replacements))["num"]
+	num_datasets = db.fetchone("SELECT COUNT(*) AS num FROM queries WHERE " + where, tuple(replacements))["num"]
 
 	replacements.append(page_size)
 	replacements.append(offset)
-	queries = db.fetchall("SELECT * FROM queries WHERE " + where + " ORDER BY timestamp DESC LIMIT %s OFFSET %s", tuple(replacements))
+	datasets = db.fetchall("SELECT * FROM queries WHERE " + where + " ORDER BY timestamp DESC LIMIT %s OFFSET %s", tuple(replacements))
 
-	if not queries and page != 1:
+	if not datasets and page != 1:
 		abort(404)
 
-	pagination = Pagination(page, page_size, num_queries)
+	pagination = Pagination(page, page_size, num_datasets)
 	filtered = []
-	postprocessors = load_postprocessors()
+	processors = backend.all_modules.processors
 
-	for query in queries:
-		query["parameters"] = json.loads(query["parameters"])
-		query["subqueries"] = []
+	for dataset in datasets:
+		dataset["parameters"] = json.loads(dataset["parameters"])
+		dataset["children"] = []
 
-		subqueries = db.fetchall("SELECT * FROM queries WHERE key_parent = %s ORDER BY timestamp ASC", (query["key"],))
-		for subquery in subqueries:
-			subquery["parameters"] = json.loads(subquery["parameters"])
-			if subquery["type"] not in postprocessors:
+		children = db.fetchall("SELECT * FROM queries WHERE key_parent = %s ORDER BY timestamp ASC", (dataset["key"],))
+		for child in children:
+			child["parameters"] = json.loads(child["parameters"])
+			if child["type"] not in processors:
 				continue
-			subquery["postprocessor"] = postprocessors[subquery["type"]]
-			query["subqueries"].append(subquery)
+			child["processor"] = processors[child["type"]]
+			dataset["children"].append(child)
 
-		filtered.append(query)
+		filtered.append(dataset)
 
 	return render_template("results.html", filter={"filter": query_filter, "all_results": all_results}, queries=filtered, pagination=pagination)
 
 
 @app.route('/results/<string:key>/')
-@app.route('/results/<string:key>/postprocessors/')
+@app.route('/results/<string:key>/processors/')
 @login_required
 def show_result(key):
 	"""
 	Show result page
 
-	The page contains query details and a download link, but also shows a list
-	of finished and available post-processors.
+	The page contains dataset details and a download link, but also shows a list
+	of finished and available processors.
 
 	:param key:  Result key
 	:return:  Rendered template
 	"""
 	try:
-		query = DataSet(key=key, db=db)
+		dataset = DataSet(key=key, db=db)
 	except TypeError:
 		abort(404)
 
-	# subqueries are not available via a separate page
-	if query.key_parent:
+	# child datasets are not available via a separate page
+	if dataset.key_parent:
 		abort(404)
 
-	# load list of post-processors compatible with this query result
-	is_postprocessor_running = False
+	# load list of processors compatible with this dataset
+	is_processor_running = False
 
 	# show preview
-	if query.is_finished() and query.num_rows > 0:
-		preview = get_preview(query)
+	if dataset.is_finished() and dataset.num_rows > 0:
+		preview = get_preview(dataset)
 	else:
 		preview = None
 
 	# we can either show this view as a separate page or as a bunch of html
 	# to be retrieved via XHR
-	standalone = "postprocessors" not in request.url
-	template = "result.html" if standalone else "result-details-extended.html"
-	return render_template(template, preview=preview, query=query, postprocessors=load_postprocessors(),
-						   is_postprocessor_running=is_postprocessor_running, messages=get_flashed_messages())
+	standalone = "processors" not in request.url
+	template = "result.html" if standalone else "result-details.html"
+	return render_template(template, preview=preview, dataset=dataset, processors=backend.all_modules.processors,
+						   is_processor_running=is_processor_running, messages=get_flashed_messages())
 
 @app.route("/preview-csv/<string:key>/")
 @login_required
@@ -320,19 +324,19 @@ def preview_csv(key):
 	"""
 	Preview a CSV file
 
-	Simply passes the first 25 rows of a query's csv result file to the
+	Simply passes the first 25 rows of a dataset's csv result file to the
 	template renderer.
 
-	:param str key:  Query key
+	:param str key:  Dataset key
 	:return:  HTML preview
 	"""
 	try:
-		query = DataSet(key=key, db=db)
+		dataset = DataSet(key=key, db=db)
 	except TypeError:
 		abort(404)
 
 	try:
-		with open(query.get_results_path(), encoding="utf-8") as csvfile:
+		with dataset.get_results_path().open(encoding="utf-8") as csvfile:
 			rows = []
 			reader = csv.reader(csvfile)
 			while len(rows) < 25:
@@ -344,62 +348,62 @@ def preview_csv(key):
 	except FileNotFoundError:
 		abort(404)
 
-	return render_template("result-csv-preview.html", rows=rows, filename=query.get_results_path().split("/")[-1])
+	return render_template("result-csv-preview.html", rows=rows, filename=dataset.get_results_path().name)
 
-@app.route('/results/<string:key>/postprocessors/queue/<string:postprocessor>/', methods=["GET", "POST"])
+@app.route('/results/<string:key>/processors/queue/<string:processor>/', methods=["GET", "POST"])
 @login_required
-def queue_postprocessor(key, postprocessor, is_async=False):
+def queue_processor(key, processor, is_async=False):
 	"""
-	Queue a new post-processor
+	Queue a new processor
 
-	:param str key:  Key of query to queue the post-processor for
-	:param str postprocessor:  ID of the post-processor to queue
+	:param str key:  Key of dataset to queue the processor for
+	:param str processor:  ID of the processor to queue
 	:return:  Either a redirect, or a JSON status if called asynchronously
 	"""
 	if not is_async:
 		is_async = request.args.get("async", "no") != "no"
 
-	# cover all bases - can only run postprocessor on "parent" query
+	# cover all bases - can only run processor on "parent" dataset
 	try:
-		query = DataSet(key=key, db=db)
+		dataset = DataSet(key=key, db=db)
 	except TypeError:
 		if is_async:
-			return jsonify({"error": "Not a valid query key."})
+			return jsonify({"error": "Not a valid dataset key."})
 		else:
 			abort(404)
 
-	# check if post-processor is available for this query
-	if postprocessor not in query.postprocessors:
+	# check if processor is available for this dataset
+	if processor not in dataset.processors:
 		if is_async:
-			return jsonify({"error": "Not a valid post-processor ID"})
+			return jsonify({"error": "This processor is not available for this dataset or has already been run."})
 		else:
 			abort(404)
 
-	# create a query now
+	# create a dataset now
 	options = {}
-	for option in query.postprocessors[postprocessor]["options"]:
-		settings = query.postprocessors[postprocessor]["options"][option]
+	for option in dataset.processors[processor]["options"]:
+		settings = dataset.processors[processor]["options"][option]
 		choice = request.values.get("option-" + option, None)
 		options[option] = UserInput.parse(settings, choice)
 
-	analysis = DataSet(parent=query.key, parameters=options, db=db,
-						   extension=query.postprocessors[postprocessor]["extension"], type=postprocessor)
+	analysis = DataSet(parent=dataset.key, parameters=options, db=db,
+					   extension=dataset.processors[processor]["extension"], type=processor)
 	if analysis.is_new:
 		# analysis has not been run or queued before - queue a job to run it
-		job = queue.add_job(jobtype=postprocessor, remote_id=analysis.key)
+		job = queue.add_job(jobtype=processor, remote_id=analysis.key)
 		analysis.link_job(job)
 		analysis.update_status("Queued")
 	else:
 		flash("This analysis (%s) is currently queued or has already been run with these parameters." %
-			  query.postprocessors[postprocessor]["name"])
+			  dataset.processors[processor]["name"])
 
 	if is_async:
 		return jsonify({
 			"status": "success",
-			"container": query.key + "-sub",
+			"container": dataset.key + "-sub",
 			"key": analysis.key,
-			"html": render_template("result-subquery-extended.html", subquery=analysis,
-									postprocessors=load_postprocessors()) if analysis.is_new else "",
+			"html": render_template("result-child.html", child=analysis, dataset=dataset,
+									processors=backend.all_modules.processors) if analysis.is_new else "",
 			"messages": get_flashed_messages()
 		})
 	else:

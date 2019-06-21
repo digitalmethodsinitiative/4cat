@@ -1,0 +1,16 @@
+<li>
+    <span class="processor">
+    	<em>{{ processors[processor].name }}</em>
+    	<button class="tooltip-trigger" aria-controls="tooltip-processor-{{ processors[processor].id }}-{{ processors[processor].id }}" aria-label="Post-processor details">?</button>
+    	<p role="tooltip" id="tooltip-processor-{{ processors[processor].id }}-{{ processors[processor].id }}">
+                {{ processors[processor].description }}{% if processors[processor].description[-1] != "." %}.{% endif %}
+                Output: {{ processors[processor].extension }} file. </p>
+    </span>
+    {% if processors[processor].further %}
+        <ul>
+        {% for processor in processors[processor].further %}
+            {% include "processor-tree.html" %}
+        {% endfor %}
+        </ul>
+    {% endif %}
+</li>

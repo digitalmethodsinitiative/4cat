@@ -3,11 +3,12 @@ import json
 import time
 import os
 
-from basic_testcase import FourcatTestCase
+from pathlib import Path
 
 import config
-from backend.lib.helpers import get_absolute_folder
-from backend.workers.scrape_threads import ThreadScraper
+
+from test.basic_testcase import FourcatTestCase
+from datasources.fourchan.scrapers.scrape_threads import ThreadScraper4chan
 
 
 class TestThreadScraper(FourcatTestCase):
@@ -23,7 +24,7 @@ class TestThreadScraper(FourcatTestCase):
 		with open(self.root + "/4chan_json/" + filename) as threadfile:
 			thread = threadfile.read()
 
-		scraper = ThreadScraper(db=self.db, logger=self.log)
+		scraper = ThreadScraper4chan(db=self.db, logger=self.log)
 		scraper.loop_time = int(time.time())
 		threaddata = json.loads(thread)
 
@@ -333,7 +334,7 @@ class TestThreadScraper(FourcatTestCase):
 
 		self.assertCountEqual(links, expected)
 
-	@unittest.skipIf(not os.path.isdir(get_absolute_folder(config.PATH_IMAGES)), "no valid image folder configured")
+	@unittest.skipIf(not os.path.isdir(Path(config.PATH_ROOT, config.PATH_IMAGES)), "no valid image folder configured")
 	def test_image_queued(self):
 		"""
 		Test if images are queued when scraped
@@ -344,7 +345,7 @@ class TestThreadScraper(FourcatTestCase):
 		jobs = self.db.fetchone("SELECT COUNT(*) AS num FROM jobs WHERE jobtype = %s", ("image",))["num"]
 		self.assertEqual(jobs, 6)
 
-	@unittest.skipIf(not os.path.isdir(get_absolute_folder(config.PATH_IMAGES)), "no valid image folder configured")
+	@unittest.skipIf(not os.path.isdir(Path(config.PATH_ROOT, config.PATH_IMAGES)), "no valid image folder configured")
 	def test_image_queue_data(self):
 		"""
 		Test if image data is properly saved in job details when queuing for download
@@ -355,7 +356,7 @@ class TestThreadScraper(FourcatTestCase):
 		job = self.db.fetchone("SELECT * FROM jobs WHERE jobtype = %s", ("image",))
 		self.assertNotEqual(job, None)
 
-		path = get_absolute_folder(config.PATH_IMAGES) + "/" + "3af66a356ef3faf5e847e1523b59786c.jpg"
+		path = Path(config.PATH_ROOT, config.PATH_IMAGES, "3af66a356ef3faf5e847e1523b59786c.jpg")
 		expected = {
 			"jobtype": "image",
 			"remote_id": "szdeY2WkImwGp\/MR3LHICg==",

@@ -1,11 +1,10 @@
-import socket
 import time
 import json
-import os
+
+from pathlib import Path
 
 import config
 from backend.abstract.worker import BasicWorker
-from backend.lib.helpers import get_absolute_folder
 
 
 class CorpusStats(BasicWorker):
@@ -57,9 +56,8 @@ class CorpusStats(BasicWorker):
 				stats["overall"]["posts"] += stats[datasource]["posts"]
 				stats["overall"]["threads"] += stats[datasource]["threads"]
 
-
-		outputfile = get_absolute_folder(os.path.dirname(__file__)) + "/../../stats.json"
-		with open(outputfile, "w") as statsfile:
+		outputfile = Path(config.PATH_ROOT, "stats.json")
+		with outputfile.open("w") as statsfile:
 			statsfile.write(json.dumps(stats))
 
 		self.log.info("Corpus stats updated.")

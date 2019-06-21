@@ -1,15 +1,6 @@
-import time
-import csv
 import abc
-import re
 
-from pymysql import OperationalError
-from collections import Counter
-
-import config
-
-from backend.lib.database_mysql import MySQLDatabase
-from backend.lib.query import DataSet
+from backend.lib.dataset import DataSet
 from backend.abstract.worker import BasicWorker
 from backend.lib.helpers import posts_to_csv
 
@@ -58,12 +49,11 @@ class RandomQuery(BasicWorker, metaclass=abc.ABCMeta):
 
 		query_parameters = self.query.get_parameters()
 		results_file = self.query.get_results_path()
-		results_file = results_file.replace("*", "")
 
 		posts = self.execute_random_query(query_parameters)
 
 		if posts:
-			self.posts_to_csv(posts, results_file)
+			posts_to_csv(posts, results_file)
 
 		num_posts = len(posts) if posts else 0
 		self.query.finish(num_rows=num_posts)

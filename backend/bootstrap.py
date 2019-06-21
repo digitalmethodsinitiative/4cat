@@ -2,7 +2,6 @@
 4CAT Backend init - run this to start the backend!
 """
 import shutil
-import os
 
 from backend.lib.queue import JobQueue
 from backend.lib.database import Database
