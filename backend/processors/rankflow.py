@@ -42,7 +42,7 @@ class rankFlow(BasicProcessor):
 			server_url = "http://" + config.FlaskConfig.SERVER_NAME
 
 		# Generate a html file based on the retreived json data
-		with open("../assets/rankflow.html") as template:
+		with open(config.PATH_ROOT + "/backend/assets/rankflow.html") as template:
 			output = template.read().replace("**json**", json.dumps(data)).replace("**server**", server_url)
 
 		# Write HTML file
