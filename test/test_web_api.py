@@ -4,7 +4,7 @@ import json
 import time
 
 from test.basic_testcase import FourcatTestCase
-from backend.lib.query import DataSet
+from backend.lib.dataset import DataSet
 
 import config
 

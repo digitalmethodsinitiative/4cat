@@ -1,0 +1,113 @@
+<section class="result-tree">
+{% if messages %}
+    {% for message in messages %}
+        <p class="result-warning glued">{{ message }}</p>
+    {% endfor %}
+{% endif %}
+
+<div class="card query">
+    <h3 class="blocktitle"><span><a href="/results/{{ dataset.key }}/">Query{% if dataset.query != "query" %}:
+    {{ dataset.query }}{% endif %}</a></span></h3>
+
+<p class="result">
+    <span class="property-badge">{{ dataset.parameters.datasource if "datasource" in dataset.parameters else "4chan" }}/{{ dataset.parameters.board }}/</span>
+    {% if dataset.parameters.body_query and dataset.parameters.body_query != "empty" %}
+        <span class="inline-label">body:</span> <span class="inline-query">{{ dataset.parameters.body_query }}</span>
+    {% endif %}
+    {% if dataset.parameters.subject_query and dataset.parameters.subject_query != "empty" %}
+        <span class="inline-label">subject:</span>
+        <span class="inline-query">{{ dataset.parameters.subject_query }}</span>
+    {% endif %}
+    {% if dataset.parameters.country_flag %}
+        <span class="inline-label">country:</span>
+        <span class="inline-query">{{ dataset.parameters.country_flag }}</span>
+    {% endif %}
+    {% if dataset.parameters.full_thread %}
+        <span class="property-badge second-tier">full thread</span>
+    {% endif %}
+    {% if dataset.parameters.random_amount and dataset.parameters.random_amount > 0 %}
+        <span class="property-badge second-tier">random sample={{ dataset.parameters.random_amount }}</span>
+    {% endif %}
+    {% if dataset.parameters.dense_threads %}
+        <span class="property-badge second-tier">dense threads ({{ dataset.parameters.dense_percentage }}%/&gt; {{ dataset.parameters.dense_length }})</span>
+    {% endif %}
+    {% if dataset.parameters.dense_country_percentage %}
+        <span class="property-badge second-tier">country-dense threads ({{ dataset.parameters.dense_country_percentage }}%)</span>
+    {% endif %}
+    {%  if dataset.is_finished() and dataset.num_rows == 0 %}
+        <span class="property-badge second-tier warning">no results</span>
+    {% endif %}
+
+{% if dataset.parameters.min_date > 0 or dataset.parameters.max_date > 0 %}
+        {% if dataset.parameters.min_date > 0 %}
+            <span class="property-badge">From</span>
+            <span class="inline-query">{{ dataset.parameters.min_date|datetime }}</span>
+        {% endif %}{% if dataset.parameters.max_date > 0 %}
+        <span class="property-badge">Until</span>
+        <span class="inline-query">{{ dataset.parameters.max_date|datetime }}</span>
+    {% endif %}
+{% endif %}
+    </p>
+
+    <p class="result">
+        Queued on {{ dataset.timestamp|datetime(fmt="%Y-%m-%d %H:%M") }}.
+    </p>
+
+    <!--{% if dataset.num_rows > 0 and dataset.is_finished() %}
+    <div class="query-result">
+        <iframe class="query-result-iframe csvfile" src="/preview-csv/{{ dataset.key }}/"></iframe>
+    </div>
+    {% endif %}-->
+
+    <p class="result">
+        {% if dataset.status %}{{ dataset.status }}{% else %}Query is queued.{% endif %} {% if dataset.is_finished() %}({{ dataset.num_rows }} posts{% if dataset.num_rows > 0 %}; <a href="/result/{{ dataset.result_file }}">{{ dataset.result_file }}</a>{% endif %}){% endif %}
+    </p>
+</div>
+
+    <div id="{{ dataset.key }}-sub">
+    <ol class="child-list">
+        {% for child in dataset.children %}
+            {% include 'result-child.html' %}
+        {% endfor %}
+    </ol>
+    </div>
+</section>
+
+<article>
+{% if current_user.is_authenticated %}
+    {% if dataset.num_rows == 0 or dataset.processors|length == 0 %}
+        <h3 class="blocktitle section-header"><span>Analyses</span></h3>
+        <p>
+            No further analytical post-processors are available for this dataset.
+            {% if subqueries|length > 0 %}
+                Results for analyses that were run earlier are available in the panel above.
+            {% endif %}
+        </p>
+    {% else %}
+        {% set part = "main" %}
+        <h3 class="blocktitle section-header"><span>Select analysis</span></h3>
+        {% if is_processor_running %}
+            <p class="result-warning glued">Further analyses may be queued once all analyses currently queued for this
+                result have been completed.</p>
+        {% endif %}
+
+        <p>Start your analysis of the retrieved data by choosing one of the post-processors below.
+        Note that some may take a while to complete, so carefully consider which one you want to run
+        before queueing it.</p>
+        <p><a href="#">Documentation</a> about the various modes of analysis and what to take into
+        account when using 4CAT data is available as well.</p>
+
+
+        {% set cat = namespace(egory='') %}
+        {% for processor in dataset.processors.values() %}
+            {% if processor.category != cat.egory %}
+                {% if cat.egory != '' %}</ol>{% endif %}
+                {% set cat.egory = processor.category %}
+                <h4 class="blocktitle section-subheader"><span>{{ processor.category }}</span></h4>
+                <ol class="processor-list">
+            {% endif %}
+            {% include "processor-details.html" %}
+        {% endfor %}
+    {% endif %}
+{% endif %}
+</article>

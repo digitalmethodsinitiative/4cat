@@ -1,8 +1,8 @@
 {% extends "layout.html" %}
 
-{% block title %}{% if query.query %}Query: {{ query.query }}{% else %}Query results{% endif %}{% endblock %}
+{% block title %}{% if dataset.query %}Query: {{ dataset.query }}{% else %}Query results{% endif %}{% endblock %}
 {% block body_class %}plain-page result-page{% endblock %}
 
 {% block body %}
-{% include "result-details-extended.html" %}
+{% include "result-details.html" %}
 {% endblock %}

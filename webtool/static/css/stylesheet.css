@@ -81,7 +81,7 @@ p {
 	display: none;
 }
 
-.zebra, .result-list > li:nth-child(even), .postprocessor-wrap .postprocessor-list > li:nth-child(even) {
+.zebra, .result-list > li:nth-child(even), .processor-wrap .processor-list > li:nth-child(even) {
 	background: #f0f4ff;
 }
 
@@ -371,6 +371,10 @@ span#imagenavigation {
 
 input.input-number {
 	width: 50px;
+}
+
+input.input-time {
+	width: 7.5em;
 }
 
 input.input-number#random-sample-amount {
@@ -1093,14 +1097,14 @@ ol.result-list {
     margin-bottom: 0;
 }
 
-/* select postprocessor */
-ol.postprocessor-category {
+/* select processor */
+ol.processor-category {
     list-style: none;
     margin: 0;
     padding: 0;
 }
 
-ol.postprocessor-list {
+ol.processor-list {
     list-style: none;
     margin: 0;
     padding: 0;
@@ -1117,30 +1121,30 @@ ol.postprocessor-list {
 	max-width: 90%;
 }
 
-#popup-panel .subquery-list {
+#popup-panel .child-list {
     margin-left: 1.5em;
 }
 
-#popup-panel .postprocessor-list {
+#popup-panel .processor-list {
 	margin: 0;
 }
 
-.postprocessor-list li {
+.processor-list li {
 	padding: 0.25em;
 	border-bottom: 1px dotted rgba(0,0,0,.4);
 }
 
-.postprocessor-list li form {
+.processor-list li form {
 	position: relative;
     padding: 0.5em;
 }
 
-.postprocessor-list li form .postprocessor-description{
+.processor-list li form .processor-description{
     width: 84%;
     display: inline-block;
 }
 
-.postprocessor-list li fieldset {
+.processor-list li fieldset {
 	padding: 0 1em;
 	transition: 0.25s;
 	overflow: hidden;
@@ -1148,25 +1152,25 @@ ol.postprocessor-list {
 	box-sizing: border-box;
 }
 
-.postprocessor-list li.expanded fieldset {
+.processor-list li.expanded fieldset {
 	padding-top: 0.5em;
 }
 
-.postprocessor-list li fieldset label {
+.processor-list li fieldset label {
 	display: block;
 }
 
-.postprocessor-list li div:nth-child(2) {
+.processor-list li div:nth-child(2) {
 	position: absolute;
 	top: 5px;
 	right: 5px;
 }
 
-.postprocessor-tree {
+.processor-tree {
 	font-style: italic;
 }
 
-.postprocessor-tree ul {
+.processor-tree ul {
 	vertical-align: top;
 	list-style: none;
 	padding: 0;
@@ -1175,23 +1179,23 @@ ol.postprocessor-list {
 	transition: 0.25s;
 }
 
-.postprocessor-tree ul[aria-expanded=false] {
+.processor-tree ul[aria-expanded=false] {
 	height: 0;
 	opacity: 0;
 	overflow: hidden;
 }
 
-.postprocessor-tree ul[aria-expanded=true] {
+.processor-tree ul[aria-expanded=true] {
 	height: auto;
 	opacity: 1;
 	font-style: normal;
 }
 
-.postprocessor-tree li {
+.processor-tree li {
 	padding: 0;
 	border: 0;
 }
-.postprocessor-tree > ul > li::before {
+.processor-tree > ul > li::before {
 	display: inline-block;
 	content: '';
 	border-left: 2px dotted #000;
@@ -1203,15 +1207,15 @@ ol.postprocessor-list {
 	margin-left: 1em;
 }
 
-.postprocessor-tree > ul > li > ul, .postprocessor-tree > ul > li > span {
+.processor-tree > ul > li > ul, .processor-tree > ul > li > span {
 	display: inline-block;
 }
 
-.postprocessor-tree ul > li > span::before {
+.processor-tree ul > li > span::before {
 	content: '->';
 }
 
-.postprocessor-tree > ul > li > span::before {
+.processor-tree > ul > li > span::before {
 	content: none;
 }
 
@@ -1318,29 +1322,29 @@ button.tooltip-trigger {
 }
 
 /* query block wrapper */
-.subquery {
+.child {
 	transition: 0.25s;
 }
 
-.subquery-list {
+.child-list {
 	padding: 0;
 	list-style: none;
 }
 
 
-.subquery .subquery-list {
+.child .child-list {
 	padding: 0;
 	margin-bottom: 0.5em;
 }
 
-.subquery.focus {
+.child.focus {
 	margin: 0 auto;
 	max-width: 725px;
 	position: relative;
 	margin-top: 2em;
 }
 
-.subquery.focus::before {
+.child.focus::before {
 	content: ' ';
 	border-left: 2px dotted #000;
 	height: 0.9em;
@@ -1350,13 +1354,13 @@ button.tooltip-trigger {
 	margin-left: -1px;
 }
 
-.subquery[aria-expanded=false], .details-only[aria-expanded=false] {
+.child[aria-expanded=false], .details-only[aria-expanded=false] {
 	height: 0;
 	overflow: hidden;
 	display: none;
 }
 
-.result-tree > div > .subquery-list {
+.result-tree > div > .child-list {
 	margin: 0.5em 3em 2em 3em;
 }
 
@@ -1475,11 +1479,11 @@ iframe.query-result-iframe.csvfile {
 	height: 200px;
 }
 
-.subquery.focus:not(.card) > .sub-controls > .query-result > .query-result-iframe {
+.child.focus:not(.card) > .sub-controls > .query-result > .query-result-iframe {
 	display: none;
 }
 
-/* post-processor and subquery controls */
+/* post-processor and child controls */
 li > .sub-controls {
 	height: auto;
 }
@@ -1489,15 +1493,15 @@ li:not(.focus) > .sub-controls {
 	overflow: hidden;
 }
 
-.result-page .subquery:not(.focus):not([aria-expanded=false]) {
+.result-page .child:not(.focus):not([aria-expanded=false]) {
 	/*height: 2.5em;*/
 }
 
-.subquery-list > li:not(.focus) {
+.child-list > li:not(.focus) {
 	margin-top: 0.5em;
 }
 
-.subquery-list > li:not(.focus)::before {
+.child-list > li:not(.focus)::before {
 	content: '';
 	border-left: 2px dotted #000;
 	border-bottom: 2px dotted #000;
@@ -1508,12 +1512,12 @@ li:not(.focus) > .sub-controls {
 	margin-left: 1em;
 }
 
-body.result-list .subquery-list > li:not(.focus)::before {
+body.result-list .child-list > li:not(.focus)::before {
 	margin-left: 2em;
 	margin-right: 0.5em;
 }
 
-.subquery .postprocessor-wrap .postprocessor-list {
+.child .processor-wrap .processor-list {
 	list-style: none;
 	padding: 0;
 }
@@ -1528,7 +1532,7 @@ body.result-list .subquery-list > li:not(.focus)::before {
 	margin: 0.5em auto;
 }
 
-.postprocessor-wrap {
+.processor-wrap {
 	margin-top: 0.5em;
 }
 
@@ -1536,23 +1540,23 @@ li.focus > .query-core > p {
 	margin: 2em 0.5em 0.5em 0.5em;
 }
 
-.postprocessor-wrap li:last-child {
+.processor-wrap li:last-child {
     border-bottom-left-radius: 0.5em;
     border-bottom-right-radius: 0.5em;
 }
 
 
-.postprocessor-list .expanded .postprocessor-options {
+.processor-list .expanded .processor-options {
 	border-top: 2px solid #000;
 	margin-top: 0.5em;
 	padding: 0.5em;
 }
 
-.subquery-list .postprocessor-options input.numeric {
+.child-list .processor-options input.numeric {
 	width: 5em;
 }
 
-.postprocessor-options h4 {
+.processor-options h4 {
 	font-size: 1em;
 	font-weight: bold;
 	text-align: center;

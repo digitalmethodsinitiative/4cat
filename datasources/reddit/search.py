@@ -2,7 +2,7 @@ import requests
 import abc
 import re
 
-from backend.lib.query import DataSet
+from backend.lib.dataset import DataSet
 from backend.lib.helpers import posts_to_csv
 from backend.abstract.string_query import StringQuery
 

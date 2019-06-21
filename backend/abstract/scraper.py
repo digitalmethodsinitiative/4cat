@@ -6,8 +6,8 @@ import requests
 import random
 import json
 import abc
-import os
 
+from pathlib import Path
 from backend.abstract.worker import BasicWorker
 
 import config
@@ -42,12 +42,13 @@ class BasicHTTPScraper(BasicWorker, metaclass=abc.ABCMeta):
 		if "file" in self.job.details:
 			# if the file is available locally, use that file
 			id = self.job.details["file"]
-			if not os.path.exists(self.job.details["file"]):
+			local_path = Path(self.job.details["file"])
+			if not local_path.exists():
 				self.job.finish()
 				self.log.error("Scraper was told to use source file %s, but file does not exist, cancelling job." % self.job.details["file"])
 				return
 
-			with open(self.job.details["file"]) as source:
+			with local_path.open() as source:
 				datafields = {
 					"status_code": 200,
 					"content": source.read()

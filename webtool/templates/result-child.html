@@ -1,0 +1,78 @@
+{% set item = child %}
+{% set can_process = (current_user.is_authenticated and item.processors) %}
+<li id="child-{{ child.key }}" class="child{% if not child.is_finished() %} running{% endif %}" data-status="{{ child.status }}">
+    <div class="query-core">
+        <p>{{ processors[child.type].name if child.type in processors else "(Deprecated analysis) " + child.type }}
+
+            {% if child.is_finished() %}
+                (<a href="/result/{{ child.result_file }}">{{ child.num_rows }} item{% if child.num_rows != 1 %}s{% endif %}, {{ processors[child.type].extension if child.type in processors else "download" }}</a>)
+            {% else %}
+                ({{ child.status }})
+            {% endif %}
+
+        {% for option in child.parameters %}
+            {% if child.type in processors and "options" in processors[child.type] and option in processors[child.type].options %}
+                {% if processors[child.type].options[option].type == "toggle" %}
+        {% if child.parameters[option] %}<span class="property-badge">{{ option }}</span>{% endif %}
+                {% else %}
+        <span class="property-badge">{{ option }}={{ child.parameters[option] }}</span>{% endif %}
+            {% endif %}
+        {% endfor %}
+    {% if not item.is_finished() %}
+    </div>
+    {% else %}
+    </p><button class="expand-processors" aria-controls="{{ item.key }}-sub">
+            {% if can_process %}{{ item.processors|length }} further analys{% if item.processors|length == 1 %}i{% else %}e{% endif %}s{% endif %}
+            {% if can_process and item.children %}and{% endif %}
+            {% if item.children %}{{ item.children|length }} further result{% if item.children|length != 1 %}s{% endif %}{% endif %}
+            {% if not can_process and not item.children %}details{% endif %}
+        </button>
+    </div>
+    {% if item.is_finished() %}
+    <div class="sub-controls" id="{{ item.key }}-sub">
+
+        <ul class="child-list" aria-expanded="false">
+            {% for child in item.children %}
+                {% include "result-child.html" %}
+            {% endfor %}
+        </ul>
+        <p class="details-only">
+            {{ processors[item.type].description if item.type in processors else "This post-processor has been deprecated but you can still download the result." }}
+        </p>
+    
+        {% if child.type in processors and processors[child.type].extension in ("jpg", "jpeg", "png", "csv", "html") %}
+            <div class="query-result">
+            {% if processors[child.type].extension == "html" %}
+                <iframe class="query-result-iframe" src="/result/{{ child.result_file }}"></iframe>
+            {% elif processors[child.type].extension in ("png", "jpg", "jpeg", "gif") %}
+                <a href="/result/{{ child.result_file }}"><img class="details-only" src="/result/{{ child.result_file }}"></a>
+            {% elif processors[child.type].extension == "csv" %}
+                <iframe class="query-result-iframe csvfile" src="/preview-csv/{{ child.key }}/"></iframe>
+            {% endif %}
+            </div>
+        {% endif %}
+        <p class="details-only">
+            <a class="permalink" href="/results/{{ dataset.key }}/#nav={{ child.get_breadcrumbs() }}" target="_blank">Permanent link to this analysis result (with context)</a>
+        </p>
+        {% if item.type in processors and current_user.is_admin() and item.get_version_url("backend/processors/" + processors[item.type].file) %}
+        <p class="details-only">
+            <a class="permalink" href="{{ item.get_version_url("backend/processors/" + processors[item.type].file) }}" target="_blank">Review the code that generated this result</a>
+        </p>
+        {% endif %}
+        {% if can_process %}
+        <div class="processor-wrap details-only" aria-expanded="true">
+            <h4 class="section-subheader">Available analyses</h4>
+            <ul class="processor-list">
+                {% for processor in item.processors.values() %}
+                    {% set dataset = item %}
+                    {% set inline = true %}
+                    {% include "processor-details.html" %}
+                    {% set inline = false %}
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+    {% endif %}
+</li>

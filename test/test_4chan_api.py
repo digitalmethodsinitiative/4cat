@@ -2,8 +2,8 @@ import unittest
 import requests
 import json
 
-from backend.workers.scrape_threads import ThreadScraper
-from backend.workers.scrape_boards import BoardScraper
+from datasources.fourchan.scrapers.scrape_threads import ThreadScraper4chan
+from datasources.fourchan.scrapers.scrape_boards import BoardScraper4chan
 
 
 class TestAPIConnection(unittest.TestCase):
@@ -50,7 +50,7 @@ class TestAPIConnection(unittest.TestCase):
 		self.assertGreater(len(page["threads"]), 0)
 
 		thread = page["threads"].pop()
-		for field in BoardScraper.required_fields:
+		for field in BoardScraper4chan.required_fields:
 			with self.subTest(field=field):
 				self.assertTrue(field in thread)
 
@@ -64,7 +64,7 @@ class TestAPIConnection(unittest.TestCase):
 		self.assertIn("posts", data)
 
 		post = data["posts"].pop()
-		for field in ThreadScraper.required_fields:
+		for field in ThreadScraper4chan.required_fields:
 			with self.subTest(field=field):
 				self.assertIn(field, post)
 
@@ -80,7 +80,7 @@ class TestAPIConnection(unittest.TestCase):
 		post = data["posts"].pop()
 		new = []
 		for field in post:
-			if field not in ThreadScraper.known_fields:
+			if field not in ThreadScraper4chan.known_fields:
 				new.append(field)
 
 		explanation = ("\n\nThese fields are not currently recognized by 4CAT. If you think they"

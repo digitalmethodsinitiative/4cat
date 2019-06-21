@@ -1,6 +1,6 @@
 import unittest
 
-from basic_testcase import FourcatTestCase
+from test.basic_testcase import FourcatTestCase
 
 
 class TestDatabase(FourcatTestCase):
@@ -8,8 +8,8 @@ class TestDatabase(FourcatTestCase):
 		"jobtype": "test",
 		"remote_id": "1234",
 		"details": "",
-		"claimed": 0,
-		"claim_after": 0,
+		"timestamp_claimed": 0,
+		"timestamp_after": 0,
 		"attempts": 0
 	}
 

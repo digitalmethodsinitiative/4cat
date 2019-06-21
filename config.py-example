@@ -63,7 +63,7 @@ SCRAPE_TIMEOUT = 5  # how long to wait for a scrape request to finish?
 SCRAPE_PROXIES = {"http": []}  # Items in this list should be formatted like "http://111.222.33.44:1234"
 IMAGE_INTERVAL = 3600
 
-# YouTube variables to use for postprocessors
+# YouTube variables to use for processors
 YOUTUBE_API_SERVICE_NAME = "youtube"
 YOUTUBE_API_VERSION = "v3"
 YOUTUBE_DEVELOPER_KEY = ""
@@ -73,6 +73,7 @@ class FlaskConfig:
 	FLASK_APP = 'webtool/fourcat'
 	SECRET_KEY = "REPLACE_THIS"
 	SERVER_NAME = '4cat.local:5000'
+	SERVER_HTTPS = False  # set to true to make 4CAT use "https" in absolute URLs
 	HOSTNAME_WHITELIST = ["localhost"]  # only these may access the web tool; "*" or an empty list matches everything
 	HOSTNAME_WHITELIST_API = ["localhost"]  # hostnames matching these are exempt from rate limiting
 	HOSTNAME_WHITELIST_NAME = "Automatic login"

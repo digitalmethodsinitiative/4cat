@@ -2,16 +2,22 @@ import time
 import sys
 import os
 
+from pathlib import Path
+
 import config
 import backend.bootstrap as bootstrap
 
-from backend.lib.helpers import get_absolute_folder
-
 # check if we can run a daemon
-if os.name not in ("posix", "mac"):
+if os.name not in ("posix"):
 	# if not, run the backend directly and quit
 	print("Using '%s' to run the 4CAT backend is only supported on UNIX-like systems." % __file__)
 	print("Running backend in terminal instead.")
+	bootstrap.run(as_daemon=False)
+	sys.exit(0)
+
+
+if sys.argv[-2].lower() in ("-i", "--interactive"):
+	print("Running backend in interactive mode.")
 	bootstrap.run(as_daemon=False)
 	sys.exit(0)
 else:
@@ -21,7 +27,7 @@ else:
 	from daemon import pidfile
 
 # determine PID file
-lockfile = get_absolute_folder(config.PATH_LOCKFILE) + "/4cat.pid"  # pid file location
+lockfile = Path(config.PATH_ROOT, config.PATH_LOCKFILE, "4cat.pid") # pid file location
 
 
 def start():
@@ -30,8 +36,8 @@ def start():
 	:return bool: True
 	"""
 	# only one instance may be running at a time
-	if os.path.isfile(lockfile):
-		with open(lockfile) as file:
+	if lockfile.is_file():
+		with lockfile.open() as file:
 			pid = int(file.read().strip())
 
 		if pid in psutil.pids():
@@ -46,7 +52,7 @@ def start():
 				working_directory=os.path.abspath(os.path.dirname(__file__)),
 				umask=0x002,
 				stderr=open("4cat.stderr", "w"),
-				pidfile=pidfile.TimeoutPIDLockFile(lockfile),
+				pidfile=pidfile.TimeoutPIDLockFile(str(lockfile)),
 				detach_process=True
 		) as context:
 			bootstrap.run(as_daemon=True)
@@ -54,17 +60,17 @@ def start():
 	else:
 		# wait a few seconds and see if PIDfile was created and refers to a running process
 		time.sleep(3)
-		if not os.path.isfile(lockfile):
+		if not lockfile.is_file():
 			print("...error while starting 4CAT Backend Daemon.")
 		else:
-			with open(lockfile) as file:
+			with lockfile.open() as file:
 				pid = int(file.read().strip())
 				if pid in psutil.pids():
 					print("...4CAT Backend Daemon started.")
 				else:
 					print("...error while starting 4CAT Backend Daemon.")
 
-		if os.path.isfile("4cat.stderr"):
+		if Path("4cat.stderr").is_file():
 			with open("4cat.stderr") as errfile:
 				stderr = errfile.read()
 				if stderr:
@@ -84,9 +90,9 @@ def stop():
 	:return bool:   True if the backend was running (and a shut down signal was
 					sent, False if not.
 	"""
-	if os.path.isfile(lockfile):
+	if lockfile.is_file():
 		# see if the listed process is actually running right now
-		with open(lockfile) as file:
+		with lockfile.open() as file:
 			pid = int(file.read().strip())
 
 		if pid not in psutil.pids():
@@ -126,9 +132,9 @@ if len(sys.argv) < 2 or sys.argv[1].lower() not in ("start", "stop", "restart", 
 	sys.exit(1)
 
 # determine command given and get the current PID (if any)
-command = sys.argv[1].lower()
-if os.path.isfile(lockfile):
-	with open(lockfile) as file:
+command = sys.argv[-1].lower()
+if lockfile.is_file():
+	with lockfile.open() as file:
 		pid = int(file.read().strip())
 else:
 	pid = None
