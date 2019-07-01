@@ -3,7 +3,6 @@
 *.pid
 *.log
 *.csv
-*.jpg
 *.png
 *.gif
 *.webm
