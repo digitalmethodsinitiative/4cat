@@ -7,17 +7,17 @@ from csv import DictReader
 
 from backend.abstract.processor import BasicProcessor
 
-class rankFlow(BasicProcessor):
+class flowChart(BasicProcessor):
 	"""
 	Creates a visualisation showing the 'flow' of elements
-	over time (rankFlow). Based on the Raphael.js impact visualisation
+	over time (flowChart). Based on the Raphael.js impact visualisation
 
 	"""
 
-	type = "rankflow"  # job type ID
+	type = "flochart"  # job type ID
 	category = "Visual"  # category
-	title = "RankFlow"  # title displayed in UI
-	description = "Create a flow-graph of elements over time."  # description displayed in UI
+	title = "Flow chart"  # title displayed in UI
+	description = "Create a flow chart of elements over time."  # description displayed in UI
 	extension = "html"  # extension of result file, used internally and in UI
 
 	accepts = ["collocations", "tfidf"]  # query types this post-processor accepts as input
@@ -42,7 +42,7 @@ class rankFlow(BasicProcessor):
 			server_url = "http://" + config.FlaskConfig.SERVER_NAME
 
 		# Generate a html file based on the retreived json data
-		with open(config.PATH_ROOT + "/backend/assets/rankflow.html") as template:
+		with open(config.PATH_ROOT + "/backend/assets/flowchart.html") as template:
 			output = template.read().replace("**json**", json.dumps(data)).replace("**server**", server_url)
 
 		# Write HTML file
@@ -55,7 +55,7 @@ class rankFlow(BasicProcessor):
 
 	def generate_json(self, source_file):
 		"""
-		Generates a JSON structure usable for Raphael.js to make a RankFlow
+		Generates a JSON structure usable for Raphael.js to make a flow chart
 
 		"""
 

@@ -212,3 +212,36 @@ class UserInput:
 		else:
 			# no filtering
 			return choice
+
+
+def get_yt_compatible_ids(yt_ids):
+	"""
+	:param yt_ids list, a list of strings
+	:returns list, a ist of joined strings in pairs of 50
+
+	Takes a list of IDs and returns list of joined strings
+	in pairs of fifty. This should be done for the YouTube API
+	that requires a comma-separated string and can only return
+	max fifty results.
+	"""
+
+	# If there's only one item, return a single list item 
+	if isinstance(yt_ids, str):
+		return [yt_ids]
+
+	ids = []
+	last_i = 0
+	for i, yt_id in enumerate(yt_ids):
+
+		# Add a joined string per fifty videos
+		if i % 50 == 0 and i != 0:
+			ids_string = ",".join(yt_ids[last_i:i])
+			ids.append(ids_string)
+			last_i = i
+
+		# If the end of the list is reached, add the last data
+		elif i == (len(yt_ids) - 1):
+			ids_string = ",".join(yt_ids[last_i:i])
+			ids.append(ids_string)
+
+	return ids

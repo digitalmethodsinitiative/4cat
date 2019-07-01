@@ -1,5 +1,5 @@
 """
-Thread data
+Get YouTube metadata from video links posted
 """
 import datetime
 import time
@@ -13,7 +13,7 @@ from operator import itemgetter
 from csv import DictReader
 
 from backend.abstract.processor import BasicProcessor
-from backend.lib.helpers import UserInput
+from backend.lib.helpers import UserInput, get_yt_compatible_ids
 
 import config
 
@@ -109,7 +109,7 @@ class YouTubeMetadata(BasicProcessor):
 			return
 
 		# Get metadata.
-		results = get_youtube_metadata(self, urls)
+		results = self.get_youtube_metadata(urls)
 
 		if not results:
 			self.dataset.update_status("Finished")
@@ -119,146 +119,228 @@ class YouTubeMetadata(BasicProcessor):
 		self.dataset.update_status("Writing results to csv.")
 		self.dataset.write_csv_and_finish(results)
 
-def get_youtube_metadata(self, urls):
-	"""
-	Gets metadata from various YouTube URLs.
-	Currently only supports channels and videos.
+	def get_youtube_metadata(self, urls):
+		"""
+		Gets metadata from various YouTube URLs.
+		Currently only supports channels and videos.
 
-	:param list or dict url, a list to urls referencing a channel or video
-			or a dictionary with the urls as keys and post IDs as avlues
-	:returns dict, containing metadata on the YouTube URL
+		:param list or dict url, a list to urls referencing a channel or video
+				or a dictionary with the urls as keys and post IDs as avlues
+		:returns dict, containing metadata on the YouTube URL
 
-	"""
+		"""
 
-	if isinstance(urls, str):
-		urls = [urls]
+		if isinstance(urls, str):
+			urls = [urls]
 
-	if isinstance(urls, dict):
-		di_urls = urls
-		urls = list(urls.keys())
+		if isinstance(urls, dict):
+			di_urls = urls
+			urls = list(urls.keys())
 
-	# Parse video and channel IDs from URLs and add back together
-	video_ids = parse_video_ids(urls)
-	channel_ids = parse_channel_ids(urls)
-	unique_video_ids = list(set(video_ids.keys()))
-	unique_channel_ids = list(set(channel_ids.keys()))
-	all_ids = dict(video_ids, **channel_ids)
+		# Parse video and channel IDs from URLs and add back together
+		video_ids = self.parse_video_ids(urls)
+		channel_ids = self.parse_channel_ids(urls)
+		unique_video_ids = list(set(video_ids.keys()))
+		unique_channel_ids = list(set(channel_ids.keys()))
+		all_ids = dict(video_ids, **channel_ids)
 
-	try:
-		min_mentions = int(self.parameters.get("min"))
-	except ValueError:
-		min_mentions = 0
+		try:
+			min_mentions = int(self.parameters.get("min"))
+		except ValueError:
+			min_mentions = 0
 
-	# Make a list of dicts with meta info about the YouTube URLs,
-	# including the post ids, urls, and times referenced.
-	urls_metadata = []
-	for youtube_id, urls in all_ids.items():
-		# Store the unique URLs used to reference the video/channel.
-		# This can for instance include timestamps (e.g. '&t=19s'),
-		# which might be interesting at a later point.
-		url_metadata = {}
-		url_metadata["id"] = youtube_id
-		url_metadata["urls_referenced"] = list(urls)
+		# Make a list of dicts with meta info about the YouTube URLs,
+		# including the post ids, urls, and times referenced.
+		urls_metadata = []
+		for youtube_id, urls in all_ids.items():
+			# Store the unique URLs used to reference the video/channel.
+			# This can for instance include timestamps (e.g. '&t=19s'),
+			# which might be interesting at a later point.
+			url_metadata = {}
+			url_metadata["id"] = youtube_id
+			url_metadata["urls_referenced"] = list(urls)
 
-		referenced_by = []
-		for url in urls:
-			# Make the 'referenced by' a set to prevent
-			# spammers posting the same link in one post
-			# to overrepresent
-			referenced_by += list(set(di_urls[url]))
-		url_metadata["referenced_urls"] = urls
-		url_metadata["referenced_by"] = referenced_by
+			referenced_by = []
+			for url in urls:
+				# Make the 'referenced by' a set to prevent
+				# spammers posting the same link in one post
+				# to overrepresent
+				referenced_by += list(set(di_urls[url]))
+			url_metadata["referenced_urls"] = urls
+			url_metadata["referenced_by"] = referenced_by
 
-		# Store the amount of times the channel/video is linked
-		url_metadata["count"] = len(referenced_by)
+			# Store the amount of times the channel/video is linked
+			url_metadata["count"] = len(referenced_by)
 
-		# only use the data if it meets the user threshold
-		if url_metadata["count"] >= min_mentions:
-			urls_metadata.append(url_metadata)
+			# only use the data if it meets the user threshold
+			if url_metadata["count"] >= min_mentions:
+				urls_metadata.append(url_metadata)
 
-	# Sort the dict by frequency
-	urls_metadata = sorted(urls_metadata, key=lambda i: i['count'], reverse=True)
-	# Slice the amount of URLs depending on the user inputs
-	try:
-		top = int(self.parameters.get("top"))
-	except ValueError:
-		top = 0
-	if top != 0:
-		if top < len(urls_metadata):
-			urls_metadata = urls_metadata[:top]
-	
-	# These IDs we'll actually fetch
-	videos_to_fetch = []
-	channels_to_fetch = []
-	for url_metadata in urls_metadata:
-		if url_metadata["id"] in unique_video_ids:
-			videos_to_fetch.append(url_metadata["id"])
-		if url_metadata["id"] in unique_channel_ids:
-			channels_to_fetch.append(url_metadata["id"])
-	
-	# Return if there's nothing left after the cutoff
-	if not urls_metadata:
-		return
-
-	# Store all YouTube API data in here
-	all_metadata = []
-
-	counter = 0
-
-	# Get YouTube API data for all videos and channels
-	video_data = request_youtube_api(self, videos_to_fetch, object_type="video")
-	channel_data = request_youtube_api(self, channels_to_fetch, object_type="channel")
-	api_results = {**video_data, **channel_data}
-
-	# Loop through retreived videos and channels
-	for youtube_item in urls_metadata:
-
-		youtube_id = youtube_item["id"]
-
-		# Dict that will become the csv row.
-		# Store some default values so it's placed in the first columns
-		metadata = {"id": youtube_id, "deleted_or_failed": False, "count": 0}
+		# Sort the dict by frequency
+		urls_metadata = sorted(urls_metadata, key=lambda i: i['count'], reverse=True)
+		# Slice the amount of URLs depending on the user inputs
+		try:
+			top = int(self.parameters.get("top"))
+		except ValueError:
+			top = 0
+		if top != 0:
+			if top < len(urls_metadata):
+				urls_metadata = urls_metadata[:top]
 		
-		# Get the YouTube API dict for the relevant video/channel
-		api_data = api_results.get(youtube_id)
+		# These IDs we'll actually fetch
+		videos_to_fetch = []
+		channels_to_fetch = []
+		for url_metadata in urls_metadata:
+			if url_metadata["id"] in unique_video_ids:
+				videos_to_fetch.append(url_metadata["id"])
+			if url_metadata["id"] in unique_channel_ids:
+				channels_to_fetch.append(url_metadata["id"])
+		
+		# Return if there's nothing left after the cutoff
+		if not urls_metadata:
+			return
 
-		if not api_data:
-			metadata["deleted_or_failed"] = True
+		# Store all YouTube API data in here
+		all_metadata = []
 
-		# Store data from original post file for cross-referencing
-		metadata["referenced_urls"] = ','.join(youtube_item["urls_referenced"])
-		metadata["referenced_by"] = ','.join(youtube_item["referenced_by"])
-		metadata["count"] = youtube_item["count"]
+		counter = 0
 
-		# Add api data if the request for the item was succesfull
-		if api_data:
-			metadata = {**metadata, **api_data}
+		# Get YouTube API data for all videos and channels
+		video_data = request_youtube_api(self, videos_to_fetch, object_type="video")
+		channel_data = request_youtube_api(self, channels_to_fetch, object_type="channel")
+		api_results = {**video_data, **channel_data}
 
-		# Store the metadata the overall list
-		all_metadata.append(metadata)
+		# Loop through retreived videos and channels
+		for youtube_item in urls_metadata:
 
-		counter += 1
+			youtube_id = youtube_item["id"]
 
-		# Update status once in a while
-		if counter % 10 == 0:
-			self.dataset.update_status("Extracted metadata " + str(counter) + "/" + str(len(urls_metadata)))
+			# Dict that will become the csv row.
+			# Store some default values so it's placed in the first columns
+			metadata = {"id": youtube_id, "deleted_or_failed": False, "count": 0}
+			
+			# Get the YouTube API dict for the relevant video/channel
+			api_data = api_results.get(youtube_id)
 
-	# To write to csv, all dictionary items must have all the possible keys
-	# Get all the possible keys
-	all_keys = []
-	for entry in all_metadata:
-		for key in entry.keys():
-			if key not in all_keys:
-				all_keys.append(key)
-	# Make sure all possible items are in every dict entry.
-	for entry in all_metadata:
-		for contain_key in all_keys:
-			if contain_key not in entry.keys():
-				entry[contain_key] = None
+			if not api_data:
+				metadata["deleted_or_failed"] = True
 
-	return all_metadata
+			# Store data from original post file for cross-referencing
+			metadata["referenced_urls"] = ','.join(youtube_item["urls_referenced"])
+			metadata["referenced_by"] = ','.join(youtube_item["referenced_by"])
+			metadata["count"] = youtube_item["count"]
 
+			# Add api data if the request for the item was succesfull
+			if api_data:
+				metadata = {**metadata, **api_data}
 
+			# Store the metadata the overall list
+			all_metadata.append(metadata)
+
+			counter += 1
+
+			# Update status once in a while
+			if counter % 10 == 0:
+				self.dataset.update_status("Extracted metadata " + str(counter) + "/" + str(len(urls_metadata)))
+
+		# To write to csv, all dictionary items must have all the possible keys
+		# Get all the possible keys
+		all_keys = []
+		for entry in all_metadata:
+			for key in entry.keys():
+				if key not in all_keys:
+					all_keys.append(key)
+		# Make sure all possible items are in every dict entry.
+		for entry in all_metadata:
+			for contain_key in all_keys:
+				if contain_key not in entry.keys():
+					entry[contain_key] = None
+
+		return all_metadata
+
+	def parse_channel_ids(self, urls):
+		"""
+		Parses the channel ID from URLs pointing to a YouTube channel.
+
+		:param str, url: string of a URL pointing to a YouTube channel.
+		:returns dict ids: dict with validly parsed IDs as keys and URLs as values.
+
+		"""
+
+		# Parse string to list so the loop works
+		if isinstance(urls, str):
+			urls = [urls]
+
+		ids = {}
+
+		for url in urls:
+			channel_id = False
+
+			if "channel" in url and "watch?" not in url:
+				# Get channel ID
+				try:
+					url_splitted = url.split("channel")
+					channel_id = url_splitted[1].split("/")[1]
+					# Check if we already encountered the ID.
+					# If so, we're appending the URL to that existing
+					# key in the dictionary
+					if channel_id:
+						channel_id = channel_id.strip().replace(",","")
+						if channel_id not in ids:
+							# Make it a list if there only one string entry yet
+							ids[channel_id] = [url]
+						else:
+							ids[channel_id].append(url)
+				except Exception as error:
+					channel_id = False
+
+		return ids
+
+	def parse_video_ids(self, urls):
+		"""
+		Gets the video ID from URLs pointing to a YouTube video.
+		
+		:param str url: string of a URL pointing to a YouTube video.
+		:returns dict ids: dict with validly parsed IDs as keys and URLs as values.
+
+		"""
+
+		# Parse string to list so the loop works
+		if isinstance(urls, str):
+			urls = [urls]
+
+		ids = {}
+
+		for url in urls:
+			video_id = False
+
+			if "youtu" in url:
+				query = urllib.parse.urlparse(url)
+
+				# youtu.be URLs always reference videos
+				if query.hostname == "youtu.be":
+					video_id = query.path[1:]
+				elif query.hostname in ("www.youtube.com", "youtube.com", "m.youtube.com"):
+					if query.path == "/watch":
+						parsed_url = urllib.parse.parse_qs(query.query)
+						if "v" in parsed_url:
+							video_id = parsed_url["v"][0]
+					elif query.path[:7] == "/embed/":
+						video_id = query.path.split("/")[2]
+					elif query.path[:3] == "/v/":
+						video_id = query.path.split("/")[2]
+				
+				# Check if we already encountered the ID.
+				# If so, we're appending the URL to that existing
+				# key in the dictionary
+				if video_id:
+					video_id = video_id.strip().replace(",","")
+					if video_id not in ids:
+						ids[video_id] = [url]
+					else:
+						ids[video_id].append(url)
+
+		return ids
 
 def request_youtube_api(self, ids, object_type="video"):
 	"""
@@ -368,119 +450,3 @@ def request_youtube_api(self, ids, object_type="video"):
 		self.dataset.update_status("Got metadata from " + str(i * 50) + "/" + str(len(ids)) + " YouTube URLs")
 
 	return results
-
-def parse_channel_ids(urls):
-	"""
-	Parses the channel ID from URLs pointing to a YouTube channel.
-
-	:param str, url: string of a URL pointing to a YouTube channel.
-	:returns dict ids: dict with validly parsed IDs as keys and URLs as values.
-
-	"""
-
-	# Parse string to list so the loop works
-	if isinstance(urls, str):
-		urls = [urls]
-
-	ids = {}
-
-	for url in urls:
-		channel_id = False
-
-		if "channel" in url and "watch?" not in url:
-			# Get channel ID
-			try:
-				url_splitted = url.split("channel")
-				channel_id = url_splitted[1].split("/")[1]
-				# Check if we already encountered the ID.
-				# If so, we're appending the URL to that existing
-				# key in the dictionary
-				if channel_id:
-					channel_id = channel_id.strip().replace(",","")
-					if channel_id not in ids:
-						# Make it a list if there only one string entry yet
-						ids[channel_id] = [url]
-					else:
-						ids[channel_id].append(url)
-			except Exception as error:
-				channel_id = False
-
-	return ids
-
-def parse_video_ids(urls):
-	"""
-	Gets the video ID from URLs pointing to a YouTube video.
-	
-	:param str url: string of a URL pointing to a YouTube video.
-	:returns dict ids: dict with validly parsed IDs as keys and URLs as values.
-
-	"""
-
-	# Parse string to list so the loop works
-	if isinstance(urls, str):
-		urls = [urls]
-
-	ids = {}
-
-	for url in urls:
-		video_id = False
-
-		if "youtu" in url:
-			query = urllib.parse.urlparse(url)
-
-			# youtu.be URLs always reference videos
-			if query.hostname == "youtu.be":
-				video_id = query.path[1:]
-			elif query.hostname in ("www.youtube.com", "youtube.com", "m.youtube.com"):
-				if query.path == "/watch":
-					parsed_url = urllib.parse.parse_qs(query.query)
-					if "v" in parsed_url:
-						video_id = parsed_url["v"][0]
-				elif query.path[:7] == "/embed/":
-					video_id = query.path.split("/")[2]
-				elif query.path[:3] == "/v/":
-					video_id = query.path.split("/")[2]
-			
-			# Check if we already encountered the ID.
-			# If so, we're appending the URL to that existing
-			# key in the dictionary
-			if video_id:
-				video_id = video_id.strip().replace(",","")
-				if video_id not in ids:
-					ids[video_id] = [url]
-				else:
-					ids[video_id].append(url)
-
-	return ids
-
-def get_yt_compatible_ids(yt_ids):
-	"""
-	:param yt_ids list, a list of strings
-	:returns list, a ist of joined strings in pairs of 50
-
-	Takes a list of IDs and returns list of joined strings
-	in pairs of fifty. This should be done for the YouTube API
-	that requires a comma-separated string and can only return
-	max fifty results.
-	"""
-
-	# If there's only one item, return a single list item 
-	if isinstance(yt_ids, str):
-		return [yt_ids]
-
-	ids = []
-	last_i = 0
-	for i, yt_id in enumerate(yt_ids):
-
-		# Add a joined string per fifty videos
-		if i % 50 == 0 and i != 0:
-			ids_string = ",".join(yt_ids[last_i:i])
-			ids.append(ids_string)
-			last_i = i
-
-		# If the end of the list is reached, add the last data
-		elif i == (len(yt_ids) - 1):
-			ids_string = ",".join(yt_ids[last_i:i])
-			ids.append(ids_string)
-
-	return ids
