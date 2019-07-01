@@ -35,14 +35,6 @@ class YouTubeThumbnails(BasicProcessor):
 	description = "Download YouTube video thumbnails."  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
 	
-	options = {
-		"max_output": {
-			"type": UserInput.OPTION_TEXT,
-			"default": 0,
-			"help": "Only get n thumbnails (0 = all)"
-		}
-	}
-
 	max_retries = 3
 	sleep_time = 10
 	accepts = ["youtube-metadata"]
@@ -55,8 +47,6 @@ class YouTubeThumbnails(BasicProcessor):
 
 		self.dataset.update_status("Reading source file")
 
-		max_output = convert_to_int(self.parameters.get("max_output", 0), 0)
-
 		with open(self.source_file, encoding="utf-8") as source:
 
 			# Read source file
@@ -68,13 +58,12 @@ class YouTubeThumbnails(BasicProcessor):
 			
 			# Get the thumbnails
 			self.dataset.update_status("Downloading thumbnails")
-			self.download_thumbnails(video_ids, max_output)
+			self.download_thumbnails(video_ids)
 
-	def download_thumbnails(self, video_ids, max_output = 0):
+	def download_thumbnails(self, video_ids):
 		"""
 		Download video thumbnails
 		:param video_ids list, list of YouTube video IDs
-		:param max_output int, the amount of thumbnails to save
 		"""
 
 		# prepare staging area
@@ -84,8 +73,7 @@ class YouTubeThumbnails(BasicProcessor):
 		# Use YouTubeDL and the YouTube API to request video data
 		youtube = build(config.YOUTUBE_API_SERVICE_NAME, config.YOUTUBE_API_VERSION,
 											developerKey=config.YOUTUBE_DEVELOPER_KEY)
-		if max_output != 0:
-			video_ids = video_ids[:max_output]
+		
 		ids_list = get_yt_compatible_ids(video_ids)
 		retries = 0
 		for i, ids_string in enumerate(ids_list):
