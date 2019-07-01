@@ -194,6 +194,9 @@ class SearchReddit(BasicProcessor):
 			# return list. This means all OPs will come before all comments
 			# but we can sort later if that turns out to be a problem
 			for thread in threads:
+				if thread.get("promoted", False):
+					continue
+
 				if thread["id"] not in seen_threads:
 					seen_threads.add(thread["id"])
 					return_posts.append({
@@ -312,6 +315,9 @@ class SearchReddit(BasicProcessor):
 
 			# store post data
 			for post in posts:
+				if post.get("promoted", False):
+					continue
+					
 				if post["id"] not in seen_posts:
 					seen_posts.add(post["id"])
 					return_posts.append({

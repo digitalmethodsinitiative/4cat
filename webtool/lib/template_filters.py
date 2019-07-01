@@ -7,6 +7,7 @@ from webtool import app
 
 import config
 
+
 @app.template_filter('datetime')
 def _jinja2_filter_datetime(date, fmt=None):
 	date = datetime.datetime.fromtimestamp(date)
@@ -28,6 +29,7 @@ def _jinja2_filter_numberify(number):
 
 	return str(number)
 
+
 @app.template_filter("http_query")
 def _jinja2_filter_httpquery(data):
 	data = {key: data[key] for key in data if data[key]}
@@ -42,9 +44,11 @@ def _jinja2_filter_httpquery(data):
 def _jinja2_filter_markdown(text):
 	return markdown.markdown(text)
 
+
 @app.template_filter('json')
 def _jinja2_filter_json(data):
 	return json.dumps(data)
+
 
 @app.template_filter('config_override')
 def _jinja2_filter_conf(data, property=""):
@@ -52,3 +56,8 @@ def _jinja2_filter_conf(data, property=""):
 		return getattr(config.FlaskConfig, property)
 	except AttributeError:
 		return data
+
+
+@app.context_processor
+def inject_now():
+	return {'__datenow': datetime.datetime.utcnow()}
