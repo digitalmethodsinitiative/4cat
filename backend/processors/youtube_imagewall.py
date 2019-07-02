@@ -1,22 +1,15 @@
 """
 Get YouTube metadata from video links posted
 """
-import datetime
-import time
-import re
-import urllib.request
-import youtube_dl
+import zipfile
+import shutil
 import pandas as pd
 import math
-import os
-import zipfile
 
 import config
 
 from pathlib import Path
-from apiclient.discovery import build
 from collections import Counter
-from csv import DictReader
 from PIL import Image, ImageFile, ImageOps, ImageDraw, ImageFont
 
 from backend.abstract.processor import BasicProcessor
@@ -149,6 +142,10 @@ class YouTubeImageWall(BasicProcessor):
 		# Save just the IDs for reference
 		image_ids = [image[:-4] for image in zipped_images]
 
+		# prepare staging area
+		results_path = self.dataset.get_temporary_path()
+		results_path.mkdir()
+
 		# Loop through images and copy them onto the wall
 		for file in files:
 			counter += 1
@@ -157,15 +154,20 @@ class YouTubeImageWall(BasicProcessor):
 
 			# Get the thumbnail if it exists
 			# Else use a 'no video' template
+			delete_after_use = False
 			if file in image_ids:
 				with zipfile.ZipFile(str(self.source_file), "r") as image_archive:
-					with image_archive.open(file + '.jpg') as extracted_image:
-						image = Image.open(extracted_image)
+					temp_path = results_path.joinpath(file + ".jpg")
+					image_archive.extract(file + ".jpg", results_path)
+					delete_after_use = True
 			else:
-				image = Image.open(config.PATH_ROOT + "/backend/assets/no-video.jpg")
+				temp_path = Path(config.PATH_ROOT, "backend/assets/no-video.jpg")
 
 			# Resize the image
+			image = Image.open(temp_path)
 			image = ImageOps.fit(image, (tile_width, tile_height), method=Image.BILINEAR)
+			if delete_after_use:
+				temp_path.unlink()
 
 			# Turn image coloured if we want a category grid
 			if category_overlay:
@@ -191,6 +193,9 @@ class YouTubeImageWall(BasicProcessor):
 			x = index % tiles_x
 			y = math.floor(index / tiles_x)
 			wall.paste(image, (x * tile_width, y * tile_height))
+
+		# delete temporary files and folder
+		shutil.rmtree(results_path)
 
 		# Make a legend with categories
 		if category_overlay:
