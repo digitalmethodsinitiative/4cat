@@ -115,7 +115,8 @@ class ModuleCollector:
 							"category": component[1].category if hasattr(component[1], "category") else "other",
 							"accepts": component[1].accepts if hasattr(component[1], "accepts") else [],
 							"options": component[1].options if hasattr(component[1], "options") else {},
-							"datasources": component[1].datasources if hasattr(component[1], "datasources") else []
+							"datasources": component[1].datasources if hasattr(component[1], "datasources") else [],
+							"further": []
 						}}
 
 						# maintain a separate cache of processors
@@ -127,6 +128,16 @@ class ModuleCollector:
 						   sorted(self.processors, key=lambda item: self.processors[item]["name"])}
 		categorised_processors = {id: sorted_processors[id] for id in
 						   sorted(sorted_processors, key=lambda item: sorted_processors[item]["category"])}
+
+		# determine what processors are available as a follow-up for each
+		# processor. This can only be done here because we need to know all
+		# possible processors before we can inspect mutual compatibilities
+		backup = categorised_processors.copy()
+		for type in categorised_processors:
+			categorised_processors[type]["further"] = []
+			for possible_child in backup:
+				if type in backup[possible_child]["accepts"]:
+					categorised_processors[type]["further"].append(possible_child)
 
 		self.processors = categorised_processors
 
