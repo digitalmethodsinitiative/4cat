@@ -320,34 +320,7 @@ def get_thread(datasource, board, thread, db, limit=0):
 	return response
 
 
-@app.route('/api/image/<img_hash>')
-@api_ratelimit
-def get_image(img_hash, limit=0):
-	"""
-	Returns an image based on the hexadecimal hash.
-	Request should hex the md5 hashes first (e.g. with hexdigest())
-
-	"""
-	limit = "" if not limit or limit <= 0 else " LIMIT %i" % int(limit)
-
-	for file in Path(config.PATH_ROOT, config.PATH_IMAGES).glob("*"):
-		if img_hash in file.name:
-			if app.debug == True:
-				file = '../../data/' + file.name
-
-				if file.suffix == 'webm':
-					return send_file(file, mimetype='video/' + file.suffix)
-				else:
-					return send_file(file, mimetype='image/' + file.suffix)
-
-			if file.suffix == 'webm':
-				return send_file(str(file), mimetype='video/' + file.suffix)
-			else:
-				return send_file(str(file), mimetype='image/' + file.suffix)
-	abort(404)
-
-
-@app.route('/api/imagefile/<img_file>')
+@app.route('/api/image/<img_file>')
 @api_ratelimit
 def get_image_file(img_file, limit=0):
 	"""
