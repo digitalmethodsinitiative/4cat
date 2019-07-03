@@ -5,7 +5,7 @@
 import datetime
 import config
 import json
-import os
+import re
 
 from collections import OrderedDict
 from pathlib import Path
@@ -17,6 +17,7 @@ from webtool.lib.helpers import format_post
 from backend.lib.helpers import strip_tags
 
 api_ratelimit = limiter.shared_limit("1 per second", scope="api")
+
 
 @app.route('/api/<datasource>/<board>/thread/<int:thread_id>.json')
 @api_ratelimit
@@ -54,12 +55,14 @@ def api_thread(datasource, board, thread_id):
 		def format(post):
 			post["com"] = format_post(post.get("com", "")).replace("\n", "<br>")
 			return post
+
 		response["posts"] = [format(post) for post in response["posts"]]
 		metadata = {
 			"subject": "".join([post.get("sub", "") for post in response["posts"]]),
 			"id": response["posts"][0]["no"]
 		}
-		return render_template("thread.html", datasource=datasource, board=board, posts=response["posts"], thread=thread, metadata=metadata)
+		return render_template("thread.html", datasource=datasource, board=board, posts=response["posts"],
+							   thread=thread, metadata=metadata)
 	else:
 		return jsonify(response)
 
@@ -326,7 +329,7 @@ def get_image(img_hash, limit=0):
 
 	"""
 	limit = "" if not limit or limit <= 0 else " LIMIT %i" % int(limit)
-	
+
 	for file in Path(config.PATH_ROOT, config.PATH_IMAGES).glob("*"):
 		if img_hash in file.name:
 			if app.debug == True:
@@ -342,3 +345,21 @@ def get_image(img_hash, limit=0):
 			else:
 				return send_file(str(file), mimetype='image/' + file.suffix)
 	abort(404)
+
+
+@app.route('/api/imagefile/<img_file>')
+@api_ratelimit
+def get_image_file(img_file, limit=0):
+	"""
+	Returns an image based on filename
+	Request should hex the md5 hashes first (e.g. with hexdigest())
+
+	"""
+	if not re.match(r"([a-zA-Z0-9]+)\.([a-z]+)", img_file):
+		abort(404)
+
+	image_path = Path(config.PATH_ROOT, config.PATH_IMAGES, img_file)
+	if not image_path.exists():
+		abort(404)
+
+	return send_file(str(image_path))
