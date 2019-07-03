@@ -319,7 +319,6 @@ class SearchReddit(BasicProcessor):
 
 				if post["id"] not in seen_posts:
 					seen_posts.add(post["id"])
-					print(post)
 					return_posts.append({
 						"thread_id": post["link_id"].split("_")[1],
 						"id": post["id"],
@@ -364,7 +363,6 @@ class SearchReddit(BasicProcessor):
 		while retries < self.max_retries:
 			try:
 				response = requests.get(*args, **kwargs)
-				# print(response.get_url())
 				break
 			except requests.RequestException as e:
 				self.log.info("Error %s while querying Pushshift API - retrying..." % e)
