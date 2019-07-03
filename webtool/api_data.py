@@ -322,7 +322,6 @@ def get_thread(datasource, board, thread, db, limit=0):
 
 @app.route('/api/image/<img_file>')
 @app.route('/api/imagefile/<img_file>')
-@api_ratelimit
 def get_image_file(img_file, limit=0):
 	"""
 	Returns an image based on filename
