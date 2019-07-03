@@ -76,7 +76,7 @@ class ImageWallGenerator(BasicProcessor):
 				if extension not in ("jpg", "jpeg", "png", "gif"):
 					continue
 
-				local_file = post["url_4cat"].split("/")[-1] + "." + extension
+				local_file = post["url_4cat"].split("/")[-1]
 				local_path = Path(config.PATH_IMAGES, local_file)
 				if local_path.exists():
 					urls.append(local_path)
