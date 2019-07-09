@@ -104,7 +104,7 @@ class ImageDownloader(BasicProcessor):
 				continue
 
 			# hash needs to be hexified if it's a 4chan hash
-			if path[-2:] == "==":
+			if path.stem[-2:] == "==":
 				md5 = hashlib.md5()
 				md5.update(base64.b64decode(path))
 				hash = md5.hexdigest()
