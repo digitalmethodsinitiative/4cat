@@ -324,6 +324,7 @@ class SearchReddit(BasicProcessor):
 						"thread_id": post["link_id"].split("_")[1],
 						"id": post["id"],
 						"timestamp": post["created_utc"],
+						"subreddit": post["subreddit"],
 						"body": post["body"].strip().replace("\r", ""),
 						"subject": "",
 						"author": post["author"],

@@ -234,5 +234,5 @@ class YouTubeImageWall(BasicProcessor):
 
 		# Finish up
 		self.dataset.update_status("Saving result")
-		wall.save(str(self.dataset.get_results_path()), dpi=(300, 300))
+		wall.save(str(self.dataset.get_results_path()), dpi=(150, 150))
 		self.dataset.finish(1)
