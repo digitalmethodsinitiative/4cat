@@ -157,6 +157,7 @@ class DataSet:
 		index = 1
 		while results_path.exists():
 			results_path = results_dir_base.joinpath(results_dir + "-" + str(index))
+			index += 1
 
 		# create temporary folder
 		return results_path
