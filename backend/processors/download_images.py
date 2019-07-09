@@ -1,11 +1,11 @@
 """
-Create an image wall of the most-used images
+Download images linked in dataset
 """
 import requests
 import hashlib
-import random
+import zipfile
+import shutil
 import base64
-import math
 import time
 import re
 
@@ -22,27 +22,26 @@ from backend.lib.helpers import UserInput
 from backend.abstract.processor import BasicProcessor
 
 
-class ImageWallGenerator(BasicProcessor):
+class ImageDownloader(BasicProcessor):
 	"""
-	Image wall generator
+	Image downloader
 
-	Create an image wall from the top images in the dataset
+	Downloads top images and saves as zip archive
 	"""
-	type = "image-wall"  # job type ID
+	type = "image-downloader"  # job type ID
 	category = "Visual"  # category
-	title = "Image wall"  # title displayed in UI
-	description = "Download top images and create an image wall. The amount of images used can be configured; the more images, the longer it takes to create the image wall. May take a while to complete as images are sourced externally."  # description displayed in UI
-	extension = "png"  # extension of result file, used internally and in UI
+	title = "Download images"  # title displayed in UI
+	description = "Download top images and compress as a zip file. May take a while to complete as images are sourced externally."  # description displayed in UI
+	extension = "zip"  # extension of result file, used internally and in UI
 	accepts = ["top-images"]  # query types this post-processor accepts as input
-	datasources = ["4chan"]
 
 	options = {
 		"amount": {
 			"type": UserInput.OPTION_TEXT,
-			"help": "No. of images (max 200)",
-			"default": 112,
+			"help": "No. of images (max 1000)",
+			"default": 100,
 			"min": 0,
-			"max": 200
+			"max": 1000
 		}
 	}
 
@@ -62,9 +61,11 @@ class ImageWallGenerator(BasicProcessor):
 		urls = []
 
 		try:
-			amount = max(0, min(200, int(self.parameters.get("amount", 0))))
+			amount = max(0, min(1000, int(self.parameters.get("amount", 0))))
 		except ValueError:
 			amount = 100
+
+		extensions = {}
 
 		with open(self.source_file) as source:
 			csv = DictReader(source)
@@ -79,21 +80,16 @@ class ImageWallGenerator(BasicProcessor):
 				local_file = post["url_4cat"].split("/")[-1]
 				local_path = Path(config.PATH_IMAGES, local_file)
 				if local_path.exists():
-					urls.append(local_path)
+					url = local_path
 				else:
-					urls.append(post["url_" + external])
+					url = post["url_" + external]
 
-		# randomize it
-		random.shuffle(urls)
+				urls.append(url)
+				extensions[url] = extension
 
-		# calculate image wall dimensions
-		tiles_x = int(math.sqrt(len(urls))) + int(math.sqrt(len(urls)) / 3) + 1
-		tiles_y = int(math.sqrt(len(urls))) - int(math.sqrt(len(urls)) / 3) + 1
-
-		# initialize our canvas
-		ImageFile.LOAD_TRUNCATED_IMAGES = True
-		tile_size = 100  # size of each tile, in pixels (they'll all be square)
-		wall = Image.new('RGB', (tiles_x * tile_size, tiles_y * tile_size))
+		# prepare staging area
+		results_path = self.dataset.get_temporary_path()
+		results_path.mkdir()
 		counter = 0
 
 		# loop through images and copy them onto the wall
@@ -107,17 +103,28 @@ class ImageWallGenerator(BasicProcessor):
 			except (requests.RequestException, IndexError, FileNotFoundError):
 				continue
 
-			picture = ImageOps.fit(picture, (tile_size, tile_size), method=Image.BILINEAR)
+			# hash needs to be hexified if it's a 4chan hash
+			if path[-2:] == "==":
+				md5 = hashlib.md5()
+				md5.update(base64.b64decode(path))
+				hash = md5.hexdigest()
+			else:
+				# if we're using an already-saved image the hash is good as it is
+				hash = path
 
-			# put image on wall
-			index = counter - 1
-			x = index % tiles_x
-			y = math.floor(index / tiles_x)
-			wall.paste(picture, (x * tile_size, y * tile_size))
+			# determine file name
+			imagepath = str(results_path.joinpath(hash)) + "." + extensions[path]
+			picture.save(imagepath)
 
 		# finish up
-		self.dataset.update_status("Saving result")
-		wall.save(str(self.dataset.get_results_path()))
+		self.dataset.update_status("Compressing images")
+
+		with zipfile.ZipFile(self.dataset.get_results_path(), "w") as zip:
+			for imagefile in results_path.glob("*"):
+				zip.write(imagefile, imagefile.name)
+
+		# delete temporary files and folder
+		shutil.rmtree(results_path)
 
 		self.dataset.update_status("Finished")
 		self.dataset.finish(len(urls))

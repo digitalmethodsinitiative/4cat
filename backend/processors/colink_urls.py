@@ -50,9 +50,9 @@ class URLCoLinker(BasicProcessor):
 		months = {}
 
 		# we use these to extract URLs and host names if needed
-		link_regex = re.compile(r"https?://[^\s]+")
+		link_regex = re.compile(r"https?://[^\s)]+")
 		www_regex = re.compile(r"^www\.")
-		trailing_dot = re.compile(r"[.,]$")
+		trailing_dot = re.compile(r"[.,)]$")
 
 		self.dataset.update_status("Reading source file")
 
@@ -128,12 +128,12 @@ class URLCoLinker(BasicProcessor):
 		with self.dataset.get_results_path().open("w", encoding="utf-8") as results:
 			results.write("nodedef>name VARCHAR\n")
 			for url in urls:
-				results.write(url + "\n")
+				results.write("'" + url + "'\n")
 
 			results.write("edgedef>node1 VARCHAR, node2 VARCHAR, weight INTEGER\n")
 			for pair in colink:
 				results.write(
-					pair.split(" ")[0].replace(",", "\\,") + "," + pair.split(" ")[1].replace(",", "\\,") + "," + str(
+					"'" + pair.split(" ")[0] +"','" + pair.split(" ")[1] + "'," + str(
 						colink[pair]) + "\n")
 
 		self.dataset.finish(len(colink))

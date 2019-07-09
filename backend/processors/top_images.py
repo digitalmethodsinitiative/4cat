@@ -57,7 +57,7 @@ class TopImageCounter(BasicProcessor):
 			"md5_hash": images[id]["md5"],
 			"filename": images[id]["filename"],
 			"num_posts": images[id]["count"],
-			"url_4cat": "http://4cat.oilab.nl/api/image/" + images[id]["md5"],
+			"url_4cat": "http://4cat.oilab.nl/api/image/" + images[id]["md5"] + "." + images[id]["filename"].split(".")[-1],
 			"url_4plebs": "https://archive.4plebs.org/_/search/image/" + images[id]["hash"].replace("/", "_"),
 			"url_fireden": "https://boards.fireden.net/_/search/image/" + images[id]["hash"].replace("/", "_")
 		} for id in top_images]
