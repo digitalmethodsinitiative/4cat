@@ -27,9 +27,13 @@
           {% if dataset.parameters.subject_query and dataset.parameters.subject_query != "empty" %}
               <span class="inline-label">subject:</span> <span class="inline-query">{{ dataset.parameters.subject_query }}</span>
           {% endif %}
-          {% if dataset.parameters.country_flag %}
+          {% if dataset.parameters.country_flag and dataset.parameters.country_flag != "all" %}
               <span class="inline-label">country:</span>
               <span class="inline-query">{{ dataset.parameters.country_flag }}</span>
+          {% endif %}
+          {% if dataset.parameters.url %}
+              <span class="inline-label">URL:</span>
+              <span class="inline-query">{{ dataset.parameters.url }}</span>
           {% endif %}
           {% if dataset.parameters.full_thread %}
               <span class="property-badge second-tier">full thread</span>

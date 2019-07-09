@@ -38,7 +38,8 @@ class AttributeRanker(BasicProcessor):
 				"image_file": "Image (filename)",
 				"country_code": "Country code",
 				"url": "URLs (in post body)",
-				"hostname": "Host names (in post body)"
+				"hostname": "Host names (in post body)",
+				"subreddit": "Subreddit (only for Reddit datasets)"
 			},
 			"help": "Attribute to aggregate"
 		},
@@ -114,7 +115,7 @@ class AttributeRanker(BasicProcessor):
 						values = post_links
 				else:
 					# simply copy the CSV column
-					values = [post[attribute]]
+					values = [post.get(attribute, "")]
 
 				# keep track of occurrences of found items per relevant time period
 				for value in values:

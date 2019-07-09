@@ -34,7 +34,6 @@ class SearchReddit(BasicProcessor):
 		writes the results to a CSV file. If that all went well, the query and
 		job are marked as finished.
 		"""
-
 		query_parameters = self.dataset.get_parameters()
 		results_file = self.dataset.get_results_path()
 
@@ -203,7 +202,6 @@ class SearchReddit(BasicProcessor):
 						"thread_id": thread["id"],
 						"id": thread["id"],
 						"timestamp": thread["created_utc"],
-						"subreddit": thread["subreddit"],
 						"body": thread.get("selftext", "").strip().replace("\r", ""),
 						"subject": thread["title"],
 						"author": thread["author"],
@@ -213,6 +211,7 @@ class SearchReddit(BasicProcessor):
 						"image_md5": "",
 						"country_code": "",
 						"country_name": "",
+						"subreddit": thread["subreddit"],
 						"parent": "",
 						"score": thread.get("score", 0)
 					})
@@ -317,7 +316,7 @@ class SearchReddit(BasicProcessor):
 			for post in posts:
 				if post.get("promoted", False):
 					continue
-					
+
 				if post["id"] not in seen_posts:
 					seen_posts.add(post["id"])
 					return_posts.append({
@@ -334,8 +333,11 @@ class SearchReddit(BasicProcessor):
 						"image_md5": "",
 						"country_code": "",
 						"country_name": "",
+						"subreddit": post["subreddit"],
 						"parent": post["parent_id"],
-						"score": post["score"]
+						# this is missing sometimes, but upon manual inspection
+						# the post always has 1 point
+						"score": post.get("score", 1)
 					})
 
 					if not chunked_search:
@@ -362,9 +364,9 @@ class SearchReddit(BasicProcessor):
 		while retries < self.max_retries:
 			try:
 				response = requests.get(*args, **kwargs)
-				# print(response.get_url())
 				break
-			except requests.RequestException:
+			except requests.RequestException as e:
+				self.log.info("Error %s while querying Pushshift API - retrying..." % e)
 				retries += 1
 
 		if retries >= self.max_retries:
