@@ -2,6 +2,7 @@
 Download images linked in dataset
 """
 import requests
+import binascii
 import hashlib
 import zipfile
 import shutil
@@ -108,7 +109,7 @@ class ImageDownloader(BasicProcessor):
 				md5 = hashlib.md5()
 				try:
 					md5.update(base64.b64decode(path))
-				except md5.Error:
+				except binascii.Error:
 					self.log.warning("Invalid base64 hash %s, skipping" % path)
 					continue
 
