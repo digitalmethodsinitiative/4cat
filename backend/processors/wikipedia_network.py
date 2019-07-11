@@ -78,7 +78,11 @@ class WikipediaCatgegoryNetwork(BasicProcessor):
 
 				# fetch wikipedia source
 				url = "https://en.wikipedia.org/w/index.php?title=" + link + "&action=edit"
-				page = requests.get(url)
+				try:
+					page = requests.get(url)
+				except requests.RequestException:
+					errors += 1
+					continue
 
 				if page.status_code != 200:
 					errors += 1
