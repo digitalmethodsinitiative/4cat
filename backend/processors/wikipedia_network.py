@@ -74,6 +74,7 @@ class WikipediaCatgegoryNetwork(BasicProcessor):
 				page_categories[link] = set()
 				self.dataset.update_status(
 					"Fetching categories from Wikipedia API (page %i of %i)" % (counter, len(links)))
+				counter += 1
 
 				# fetch wikipedia source
 				url = "https://en.wikipedia.org/w/index.php?title=" + link + "&action=edit"
