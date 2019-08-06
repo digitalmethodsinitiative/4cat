@@ -1,0 +1,17 @@
+
+# Get post counts per month
+sudo su - postgres
+psql --dbname=fourcat
+COPY ( SELECT to_char(to_timestamp(posts_4chan.timestamp), 'YYYY-MM') AS month_string, count(*) AS count FROM posts_4chan INNER JOIN threads_4chan ON threads_4chan.id = posts_4chan.thread_id WHERE threads_4chan.board = 'pol' GROUP BY month_string ) TO '/mnt/bigstorage/psql_files/count_per_month.csv' WITH HEADER CSV DELIMITER ',';
+
+
+# Get post counts per month (only OP)
+sudo su - postgres
+psql --dbname=fourcat
+COPY ( SELECT to_char(to_timestamp(posts_4chan.timestamp), 'YYYY-MM') AS month_string, count(*) AS count FROM posts_4chan INNER JOIN threads_4chan ON threads_4chan.id = posts_4chan.id WHERE threads_4chan.board = 'pol' GROUP BY month_string ) TO '/mnt/bigstorage/psql_files/count_per_month_op_only.csv' WITH HEADER CSV DELIMITER ',';
+
+# Make psql dump
+sudo su - postgres
+cd /
+usr/pgsql-9.5/bin/pg_dump -t posts_4chan_new --format=tar fourcat > mnt/bigstorage/8ch_dump.sql
+
