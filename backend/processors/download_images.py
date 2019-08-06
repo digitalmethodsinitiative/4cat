@@ -2,6 +2,7 @@
 Download images linked in dataset
 """
 import requests
+import binascii
 import hashlib
 import zipfile
 import shutil
@@ -104,13 +105,18 @@ class ImageDownloader(BasicProcessor):
 				continue
 
 			# hash needs to be hexified if it's a 4chan hash
-			if path[-2:] == "==":
+			if not isinstance(path, Path) and path[-2:] == "==":
 				md5 = hashlib.md5()
-				md5.update(base64.b64decode(path))
+				try:
+					md5.update(base64.b64decode(path))
+				except binascii.Error:
+					self.log.warning("Invalid base64 hash %s, skipping" % path)
+					continue
+
 				hash = md5.hexdigest()
 			else:
 				# if we're using an already-saved image the hash is good as it is
-				hash = path
+				hash = path.stem
 
 			# determine file name
 			imagepath = str(results_path.joinpath(hash)) + "." + extensions[path]
@@ -151,7 +157,7 @@ class ImageDownloader(BasicProcessor):
 
 		# get link to image from external HTML search results
 		# detect rate limiting and wait until we're good to go again
-		page = requests.get(path)
+		page = requests.get(path, headers={"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/12.1.1 Safari/605.1.15"})
 		rate_limited = rate_regex.search(page.content.decode("utf-8"))
 
 		while rate_limited:
@@ -167,6 +173,12 @@ class ImageDownloader(BasicProcessor):
 
 		# download image itself
 		image = requests.get(image_url, stream=True)
+
+		# if not available, the thumbnail may be
+		if image.status_code != 200:
+			thumbnail_url = ".".join(image_url.split(".")[:-1]) + "s." + image_url.split(".")[-1]
+			image = requests.get(thumbnail_url, stream=True)
+
 		if image.status_code != 200:
 			raise FileNotFoundError
 
