@@ -13,6 +13,7 @@ import csv
 from math import ceil
 from stop_words import get_stop_words
 from flask_login import current_user
+from flask import jsonify
 from backend.abstract.processor import BasicProcessor
 
 import config
@@ -78,6 +79,19 @@ class Pagination(object):
 					yield None
 				yield num
 				last = num
+
+
+def error(code=200, **kwargs):
+	"""
+	Custom HTTP response
+
+	:param code:  HTTP status code
+	:param kwargs:  Any items to include in the response
+	:return:  JSON object to be used as Flask response
+	"""
+	response = jsonify(kwargs)
+	response.status_code = code
+	return response
 
 
 def string_to_timestamp(string):

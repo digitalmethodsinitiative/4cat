@@ -107,12 +107,16 @@ class OpenAPICollector:
 			mime = re.search(r":rmime:([^:]+)", metadata)
 			mime = mime[1].strip() if mime else "application/json"
 
+			# determine error codes
+			error_codes = {str(var[0]): {"description": re.sub("[\s]+", " ", var[1].strip())} for var in re.findall(r":return-error ([0-9]+): ([^:]+)", metadata)}
+
 		else:
 			# if there is no docstring (shame!) assume defaults
 			docstring = ""
 			vars = request_vars = {}
 			title = description = ""
 			mime = "application/json"
+			error_codes = {}
 
 		# Use return description as endpoint data summary
 		result = re.search(r":(return|returns)[^:]*:([^:]+)", docstring)
@@ -129,6 +133,7 @@ class OpenAPICollector:
 			"description": collapse_whitespace.sub(" ", description),
 			"mime": mime,
 			"return": result,
+			"return-error": error_codes,
 			"vars": vars,
 			"request-vars": request_vars
 		}
@@ -214,7 +219,11 @@ class OpenAPICollector:
 					"responses": {
 						"200": {
 							"description": pointspec["return"]
-						}
+						},
+						"429": {
+							"description": "If your request has been rate-limited."
+						},
+						**pointspec["return-error"]
 					},
 					# combine path parameters and any request parameters found in docstring
 					"parameters": [{
