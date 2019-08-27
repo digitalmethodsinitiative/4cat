@@ -60,7 +60,7 @@ def get_standalone_processors():
 
 @app.route("/api/process/<processor>/", methods=["POST"])
 @api_ratelimit
-#@login_required
+@login_required
 @openapi.endpoint
 def process_standalone(processor):
 	"""
