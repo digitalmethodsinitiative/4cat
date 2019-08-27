@@ -167,3 +167,36 @@ nav > ul.flat > li {
 	50% { border-color: var(--penelope-red); color: var(--penelope-red); }
 	to { border-color: var(--penelope-black); color: var(--penelope-black); }
 }
+
+#datasource-form fieldset {
+	border-top: 1px dotted var(--penelope-black);
+}
+
+#query-form .form-element {
+	padding: 1em 0 0 0;
+	display: grid;
+	grid-template-columns: 25% 75%;
+	width: 100%;
+	margin: 0;
+}
+
+#query-form .form-element:last-child {
+	padding: 1em 0 1em 0;
+}
+
+#query-form .submit-container {
+	text-align: center;
+	padding: 2em;
+}
+
+#query-status.active {
+	animation: scroll-background 2s linear infinite;
+	background:
+		repeating-linear-gradient(
+		90deg,
+  		#E9E9E9,
+  		#E9E9E9 25px,
+  		#FFF 25px,
+  		#FFF 350px
+	) 0 0;
+}

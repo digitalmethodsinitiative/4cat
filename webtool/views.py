@@ -156,13 +156,13 @@ def show_overview():
 
 	return render_template("overview.html", graphs=graphs)
 
-@app.route('/tool/')
+@app.route('/create-dataset/')
 @login_required
 def show_index():
 	"""
 	Main tool frontend
 	"""
-	return render_template('tool.html', boards=config.DATASOURCES)
+	return render_template('create-dataset.html', boards=config.DATASOURCES)
 
 
 @app.route('/get-boards/<string:datasource>/')

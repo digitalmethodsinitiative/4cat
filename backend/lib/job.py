@@ -5,7 +5,6 @@ Class that represents a job in the job queue
 import time
 import json
 import math
-
 from backend.lib.exceptions import JobClaimedException, JobNotFoundException
 
 
@@ -96,8 +95,8 @@ class Job:
 			claim_time = math.floor(int(time.time()) / self.data["interval"]) * self.data["interval"]
 
 		updated = self.db.update("jobs", data={"timestamp_claimed": claim_time, "timestamp_lastclaimed": claim_time},
-								 where={"jobtype": self.data["jobtype"], "remote_id": self.data["remote_id"], "timestamp_claimed": 0})
-
+								 where={"jobtype": self.data["jobtype"], "remote_id": self.data["remote_id"],
+										"timestamp_claimed": 0})
 
 		if updated == 0:
 			raise JobClaimedException
@@ -120,7 +119,8 @@ class Job:
 		if self.data["interval"] == 0 or delete:
 			self.db.delete("jobs", where={"jobtype": self.data["jobtype"], "remote_id": self.data["remote_id"]})
 		else:
-			self.db.update("jobs", data={"timestamp_claimed": 0}, where={"jobtype": self.data["jobtype"], "remote_id": self.data["remote_id"]})
+			self.db.update("jobs", data={"timestamp_claimed": 0},
+						   where={"jobtype": self.data["jobtype"], "remote_id": self.data["remote_id"]})
 
 		self.is_finished = True
 
@@ -138,7 +138,8 @@ class Job:
 		elif claim_after > 0:
 			update["timestamp_after"] = claim_after
 
-		self.db.update("jobs", data=update, where={"jobtype": self.data["jobtype"], "remote_id": self.data["remote_id"]})
+		self.db.update("jobs", data=update,
+					   where={"jobtype": self.data["jobtype"], "remote_id": self.data["remote_id"]})
 		self.is_claimed = False
 
 	def update_status(self, status):
@@ -150,7 +151,8 @@ class Job:
 		:param status:  New status
 		"""
 		self.data["status"] = status
-		self.db.update("jobs", data={"status": status}, where={"jobtype": self.data["jobtype"], "remote_id": self.data["remote_id"]})
+		self.db.update("jobs", data={"status": status},
+					   where={"jobtype": self.data["jobtype"], "remote_id": self.data["remote_id"]})
 
 	def add_status(self, status):
 		"""

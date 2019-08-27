@@ -22,7 +22,9 @@ def _jinja2_filter_numberify(number):
 	except TypeError:
 		return number
 
-	if number > 1000000:
+	if number > 1000000000:
+		return "{0:.1f}".format(number / 1000000000) + "b"
+	elif number > 1000000:
 		return str(int(number / 1000000)) + "m"
 	elif number > 1000:
 		return str(int(number / 1000)) + "k"

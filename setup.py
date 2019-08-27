@@ -15,7 +15,7 @@ libraries = [
 		"stop_words==2018.7.23",
 		"setuptools==40.0.0",
 		"psutil==5.4.7",
-		"Flask==1.0.2",
+		"Flask==1.1.0",
 		"pandas==0.23.4",
 		"gensim==3.6.0",
 		"matplotlib==3.0.0",

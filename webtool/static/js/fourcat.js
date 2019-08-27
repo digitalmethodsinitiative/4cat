@@ -23,69 +23,9 @@ function init() {
         query.start();
     });
 
-    // Enable date selection when 'filter on time' checkbox is checked
-    $('#check-time').on('change', function () {
-        $('.input-time').attr('disabled', !this.checked);
-    });
-
-    // Change the option and label for keyword-dense threads according to body input
-    $('#body-input').on('input', function () {
-        input_string = $('#body-input').val();
-        if (input_string === '') {
-            $('.density-keyword').html('keyword');
-            $('.input-dense').prop('disabled', true);
-            $('#check-dense-threads').prop('checked', false)
-        } else {
-            $('.input-dense').prop('disabled', false);
-            if (input_string.length > 8) {
-                $('.density-keyword').html(input_string.substr(0, 5) + '...');
-            } else {
-                $('.density-keyword').html('"' + input_string + '"');
-            }
-        }
-    });
-
-    // Disable all options if random sample is checked (except dates & boards)
-    $('#check-random-sample').on('change', function () {
-        $('#random-sample-amount').attr('disabled', !this.checked);
-        $('#body-input').attr('disabled', this.checked);
-        $('#subject-input').attr('disabled', this.checked);
-        $('#check-full-thread').attr('disabled', this.checked).prop('checked', false);
-        $('#check-full-thread').attr('disabled', this.checked).prop('checked', false);
-        $('#check-country-flag').attr('disabled', this.checked).prop('checked', false);
-        $('#country_flag').attr('disabled', this.checked).prop('checked', false);
-        if ($('#body-input').val().length > 0) {
-            $('#check-dense-threads').attr('disabled', this.checked).prop('checked', false);
-            $('#dense-percentage').attr('disabled', this.checked).prop('checked', false);
-            $('#dense-length').attr('disabled', this.checked).prop('checked', false);
-        }
-    });
-    $('#check-random-sample').trigger('change');
-
-    // Disable all options if country flag is checked (except dates & boards)
-    $('#check-country-flag').on('change', function () {
-        $('#country_flag').attr('disabled', !this.checked);
-        //$('#body-input').attr('disabled', this.checked);
-        $('#subject-input').attr('disabled', this.checked);
-        $('#check-full-thread').attr('disabled', this.checked).prop('checked', false);
-        $('#check-random-sample').attr('disabled', this.checked).prop('checked', false);
-        $('#random-sample-amount').attr('disabled', this.checked).prop('checked', false);
-        $('#check-full-thread').attr('disabled', this.checked).prop('checked', false);
-        if ($('#body-input').val().length > 0) {
-            $('#check-dense-threads').attr('disabled', this.checked).prop('checked', false);
-            $('#dense-percentage').attr('disabled', this.checked).prop('checked', false);
-            $('#dense-length').attr('disabled', this.checked).prop('checked', false);
-        }
-    });
-    $('#check-country-flag').trigger('change');
-
     // Data source select boxes trigger an update of the boards available for the chosen data source
-    $('#datasource-select').on('change', query.update_boards);
-    $('#datasource-select').on('change', query.update_filters);
+    $('#datasource-select').on('change', query.update_form);
     $('#datasource-select').trigger('change');
-
-    // Board and data source select boxes determine what filter options are available (e.g. country flag posts for /pol/)
-    $('.filter-parameters#board-filter').on('change', '#board-select', query.update_filters);
 
     // Controls to change which results show up in overview
     $('.view-controls button').hide();
@@ -311,6 +251,22 @@ processor = {
  */
 query = {
     /**
+     * Enable query form, so settings may be changed
+     */
+    enable_form: function() {
+        $('#query-form fieldset').prop('disabled', false);
+        $('#query-status').removeClass('active');
+    },
+
+    /**
+     * Disable query form, while query is active
+     */
+    disable_form: function() {
+        $('#query-form fieldset').prop('disabled', true);
+        $('#query-status').addClass('active');
+    },
+
+    /**
      * Tool window: start a query, submit it to the backend
      */
     start: function () {
@@ -321,39 +277,36 @@ query = {
         }
 
         // Show loader
-        let loader = $('.loader');
-        loader.show();
-
         query.check_queue();
 
         let form = $('#query-form');
-        let formdata = form.serialize();
+        let formdata = new FormData(form[0]);
         
         console.log(formdata);
         
         // Disable form
-        $('#whole-form').attr('disabled', 'disabled');
+        query.disable_form();
 
         // AJAX the query to the server
         $.post({
             dataType: "text",
             url: form.attr('action'),
             data: formdata,
-            success: function (response) {
+            cache: false,
+            contentType: false,
+            processData: false,
 
-                /*console.log(response);*/
+            success: function (response) {
 
                 // If the query is rejected by the server.
                 if (response.substr(0, 14) === 'Invalid query.') {
-                    $('.loader').hide();
                     alert(response);
-                    $('#query_status .status_message .message').html(response);
-                    $('#whole-form').removeAttr('disabled');
+                    query.enable_form();
                 }
 
                 // If the query is accepted by the server.
                 else {
-                    $('#query_status .status_message .message').html('Query submitted, waiting for results');
+                    $('#query-status .message').html('Query submitted, waiting for results');
                     query_key = response;
                     query.check(query_key);
 
@@ -364,11 +317,8 @@ query = {
                 }
             },
             error: function (error) {
-                $('#query_status .status_message .message').html(error);
-                $('#whole-form').removeAttr('disabled');
-                console.log(error);
-                $('#results').html('<h3>' + $('#dataselection option:selected').text() + " error</h3>");
-                $('.loader').hide();
+                query.enable_form();
+                $('#query-status .message').html(error);
             }
         });
     },
@@ -385,11 +335,9 @@ query = {
             url: '/api/check-query/',
             data: {key: query_key},
             success: function (json) {
-                console.log(json);
-
                 query.check_queue();
 
-                let status_box = $('#query_status .status_message .message');
+                let status_box = $('#query-status .message');
                 let current_status = status_box.html();
 
                 if (json.status !== current_status && json.status !== "") {
@@ -398,34 +346,18 @@ query = {
 
                 if (json.done) {
                     clearInterval(poll_interval);
-                    let keyword = $('#body-input').val();
-                    if (keyword === '') {
-                        if ($('#subject-input').val().length > 0){
-                            keyword = $('#subject-input').val();
-                        }
-                        else if ($('#check-random-sample').is(':checked')) {
-                            keyword = 'random-' + $('#random-sample-amount').val();
-                        }
-                        else if ($('#check-country-flag').is(':checked')) {
-                            keyword = 'countryflag-' + $('#country_flag').val();
-                        }
-                        else {
-                            keyword = '';
-                        }
-                    }
+                    let keyword = json.label;
 
-                    $('#submitform').append('<a href="/results/' + json.key + '"><p>' + keyword + ' (' + json.rows + ' posts)</p></a>');
-                    $('.loader').hide();
-                    $('#query_status .status_message .dots').html('');
-                    $('#whole-form').removeAttr('disabled');
-                    $('#post-preview').html(json.preview);
+                    $('#query-results').append('<li><a href="/results/' + json.key + '">' + keyword + ' (' + json.rows + ' items)</a></li>');
+                    $('#query-status .status_message .dots').html('');
+                    query.enable_form();
                     alert('Query for \'' + keyword + '\' complete!');
                 } else {
                     let dots = '';
                     for (let i = 0; i < dot_ticker; i += 1) {
                         dots += '.';
                     }
-                    $('#query_status .status_message .dots').html(dots);
+                    $('#query-status .dots').html(dots);
 
                     dot_ticker += 1;
                     if (dot_ticker > 3) {
@@ -434,7 +366,7 @@ query = {
                 }
             },
             error: function () {
-                console.log('Something went wrong when checking query status');
+                console.log('Something went wrong while checking query status');
             }
         });
     },
@@ -499,8 +431,8 @@ query = {
             success: function (json) {
 
                 // Update the query status box with the queue status
-                let queue_box = $('#query_status .queue_message > span#queue_string');
-                let circle = $('#query_status .queue_message > span#circle');
+                let queue_box = $('#query-status .queue_message > span#queue_string');
+                let circle = $('#query-status .queue_message > span#circle');
                 if (json.count == 0) {
                     queue_box.html('Search queue is empty');
                     $(circle).removeClass('full');
@@ -610,81 +542,22 @@ query = {
     /**
      * Update board select list for chosen datasource
      */
-    update_boards: function () {
-        let datasource = $('#datasource-select option:selected').text();
-        $('#whole-form').attr('disabled', true);
+    update_form: function() {
+        datasource = $('#datasource-select').val();
         $.get({
-            url: '/get-boards/' + datasource + '/',
-            success: function (json) {
-                let select;
-                if (!json) {
-                    alert('No boards available for datasource ' + datasource);
-                    select = $('<span id="board-select">(No boards available)</span>');
-                } else if(json.length == 1 && json[0] == '*') {
-                    select = $('<input name="board" id="board-select">');
-                } else {
-                    select = $('<select id="board-select" name="board">');
-                    json.forEach(function (board) {
-                        $('<option value="' + board + '">' + board + '</option>').appendTo(select);
-                    });
+            'url': '/api/datasource-form/' + datasource + '/',
+            'success': function(data) {
+                $('#query-form-script').remove();
+                $('#datasource-form').html(data.html);
+                if(data.has_javascript) {
+                    $('<script id="query-form-script">').attr('src', '/api/datasource-script/' + data.datasource + '/').appendTo('body');
                 }
-                $('#board-select').replaceWith(select);
-                $('#whole-form').removeAttr('disabled');
             },
-            error: function (err) {
-                alert('No boards available for datasource ' + datasource + ' (' + err + ')');
-                let select = $('<span id="board-select">(No boards available)</span>');
-                $('#board-select').replaceWith(select);
-                $('#whole-form').removeAttr('disabled');
+            'error': function() {
+                $('#datasource-select').parents('form').trigger('reset');
+                alert('Invalid datasource selected.');
             }
         });
-    },
-
-
-    /**
-     * Update query filters according to the datasource and board selected
-     */
-    update_filters: function () {
-        let datasource = $('#datasource-select').val();
-        let board = $('#board-select').val();
-
-        // Array of pol-specific filters. Should correspond to HTML filter container IDs.
-        let pol_specific = ['country-flag'];
-
-        // Simple if statement for now - update when new boards and filters are added
-        if (datasource == '4chan') {
-            if (board == 'pol') {
-                for (var filter in pol_specific) {
-                    $('#filter-container-' + pol_specific[filter]).show()
-                }
-            }
-            else {
-                for (var filter in pol_specific) {
-                    $('#check-' + pol_specific[filter]).prop('checked', false);
-                    $('#filter-container-' + pol_specific[filter]).hide()
-                }
-            }
-        }
-        else {
-            $('#filter-container-' + pol_specific[filter]).hide();
-            $('#check-' + pol_specific[filter]).prop('checked', false);
-        }
-
-        if (datasource == 'reddit') {
-            $('#control-url').show().prop('disabled', false);
-            $('#control-dense-threads').hide().find('input, select, textarea').prop('disabled', true);
-            $('#control-random-sample').hide().find('input, select, textarea').prop('disabled', true);
-            $('#filter-container-country-flag').hide().find('input, select, textarea').prop('disabled', true);
-        } else {
-            $('#control-url').hide().prop('disabled', true);
-            $('#control-dense-threads').show().find('input, select, textarea').prop('disabled', false);
-            $('#control-random-sample').show().find('input, select, textarea').prop('disabled', false);
-            if(board == 'pol') {
-                $('#filter-container-country-flag').show().find('input, select, textarea').prop('disabled', false);
-            }
-        }
-
-        reset_form();
     }
 };
 

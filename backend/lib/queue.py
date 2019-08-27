@@ -152,3 +152,23 @@ class JobQueue:
 		All claimed jobs are released. This is useful to run when the backend is restarted.
 		"""
 		self.db.execute("UPDATE jobs SET timestamp_claimed = 0")
+
+
+
+	def get_place_in_queue(self, job):
+		"""
+		What is the place of this job in the queue?
+
+		:param Job job:  Job to get place in queue for
+
+		:return int: Place in queue. 0 means the job is currently being
+		processed; 1+ means the job is queued, with 1 corresponding to the
+		front of the queue.
+		"""
+		if job.data["timestamp_claimed"] > 0:
+			return 0
+
+		all_queued = self.get_all_jobs(jobtype=job.data["jobtype"])
+		our_timestamp = job.data["timestamp"]
+		return len(
+			[queued_job for queued_job in all_queued if queued_job.data["timestamp"] < our_timestamp or queued_job.data["timestamp_claimed"] > 0])

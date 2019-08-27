@@ -7,51 +7,9 @@
 
 <div class="card query">
     <h3 class="blocktitle"><span><a href="/results/{{ dataset.key }}/">Query{% if dataset.query != "query" %}:
-    {{ dataset.query }}{% endif %}</a></span></h3>
+    {{ dataset.get_label() }}{% endif %}</a></span></h3>
 
-<p class="result">
-    <span class="property-badge">{{ dataset.parameters.datasource if "datasource" in dataset.parameters else "4chan" }}/{{ dataset.parameters.board }}/</span>
-    {% if dataset.parameters.body_query and dataset.parameters.body_query != "empty" %}
-        <span class="inline-label">body:</span> <span class="inline-query">{{ dataset.parameters.body_query }}</span>
-    {% endif %}
-    {% if dataset.parameters.subject_query and dataset.parameters.subject_query != "empty" %}
-        <span class="inline-label">subject:</span>
-        <span class="inline-query">{{ dataset.parameters.subject_query }}</span>
-    {% endif %}
-    {% if dataset.parameters.country_flag and dataset.parameters.country_flag != "all" %}
-        <span class="inline-label">country:</span>
-        <span class="inline-query">{{ dataset.parameters.country_flag }}</span>
-    {% endif %}
-    {% if dataset.parameters.url %}
-        <span class="inline-label">URL:</span>
-        <span class="inline-query">{{ dataset.parameters.url }}</span>
-    {% endif %}
-    {% if dataset.parameters.full_thread %}
-        <span class="property-badge second-tier">full thread</span>
-    {% endif %}
-    {% if dataset.parameters.random_amount and dataset.parameters.random_amount > 0 %}
-        <span class="property-badge second-tier">random sample={{ dataset.parameters.random_amount }}</span>
-    {% endif %}
-    {% if dataset.parameters.dense_threads %}
-        <span class="property-badge second-tier">dense threads ({{ dataset.parameters.dense_percentage }}%/&gt; {{ dataset.parameters.dense_length }})</span>
-    {% endif %}
-    {% if dataset.parameters.dense_country_percentage %}
-        <span class="property-badge second-tier">country-dense threads ({{ dataset.parameters.dense_country_percentage }}%)</span>
-    {% endif %}
-    {%  if dataset.is_finished() and dataset.num_rows == 0 %}
-        <span class="property-badge second-tier warning">no results</span>
-    {% endif %}
-
-{% if dataset.parameters.min_date > 0 or dataset.parameters.max_date > 0 %}
-        {% if dataset.parameters.min_date > 0 %}
-            <span class="property-badge">From</span>
-            <span class="inline-query">{{ dataset.parameters.min_date|datetime }}</span>
-        {% endif %}{% if dataset.parameters.max_date > 0 %}
-        <span class="property-badge">Until</span>
-        <span class="inline-query">{{ dataset.parameters.max_date|datetime }}</span>
-    {% endif %}
-{% endif %}
-    </p>
+    {% include 'result-metadata.html' %}
 
     <p class="result">
         Queued on {{ dataset.timestamp|datetime(fmt="%Y-%m-%d %H:%M") }}.

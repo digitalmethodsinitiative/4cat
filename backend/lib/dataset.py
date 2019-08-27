@@ -236,10 +236,18 @@ class DataSet:
 
 		if "body_query" in parameters and parameters["body_query"] and parameters["body_query"] != "empty":
 			return parameters["body_query"]
+		elif "body_match" in parameters and parameters["body_match"] and parameters["body_match"] != "empty":
+			return parameters["body_match"]
 		elif "subject_query" in parameters and parameters["subject_query"] and parameters["subject_query"] != "empty":
 			return parameters["subject_query"]
+		elif "subject_match" in parameters and parameters["subject_match"] and parameters["subject_match"] != "empty":
+			return parameters["subject_match"]
 		elif "country_flag" in parameters and parameters["country_flag"] and parameters["country_flag"] != "all":
 			return "Flag: %s" % parameters["country_flag"]
+		elif "country_code" in parameters and parameters["country_code"] and parameters["country_code"] != "all":
+			return "Country: %s" % parameters["country_code"]
+		elif "filename" in parameters and parameters["filename"]:
+			return parameters["filename"]
 		else:
 			return default
 

@@ -1,0 +1,52 @@
+{% extends "layout.html" %}
+
+{% block title %}Create query{% endblock %}
+{% block body_class %}plain-page frontpage {% endblock %}
+
+{% block body %}
+    <article>
+        <section>
+            <div>
+                <h2><span>Create new dataset</span></h2>
+                <p>Results are limited to 5 million rows. You can use <a href="/page/query-syntax/">advanced query
+                    syntax</a>. Note that large queries can take up to 30 minutes to complete.</p>
+            </div>
+
+            <form id="query-form" action="/api/queue-query/" method="POST">
+                <fieldset class="form-element">
+                    <label for="datasource-select">Data source:</label>
+                    <div>
+                        <select name="datasource" id="datasource-select">
+                            {% for datasource in boards %}
+                                <option value="{{ datasource }}">{{ datasource|capitalize }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </fieldset>
+
+                <fieldset id="datasource-form">
+                    Loading query form for chosen datasource...
+                </fieldset>
+
+                <fieldset class="submit-container">
+                    <div>
+                        <button>Create dataset</button>
+                    </div>
+                </fieldset>
+            </form>
+        </section>
+
+        <aside>
+            <div>
+                <h2 id="query-status-header"><span>Dataset status</span></h2>
+                <p id="query-status">
+                    <span class="message">Waiting for input...</span><span class="dots"></span>
+                </p>
+
+                <h2><span>Results</span></h2>
+                <ol id="query-results">
+                </ol>
+            </div>
+        </aside>
+    </article>
+{% endblock %}

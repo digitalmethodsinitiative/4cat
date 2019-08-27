@@ -28,3 +28,6 @@ class JobNotFoundException(QueueException):
 	Raise if trying to instantiate a job with an ID that is not valid
 	"""
 	pass
+
+class QueryParametersException(FourcatException):
+	pass
