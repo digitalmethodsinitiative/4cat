@@ -108,7 +108,7 @@ class ImageDownloader(BasicProcessor):
 			if not isinstance(path, Path) and path[-2:] == "==":
 				md5 = hashlib.md5()
 				try:
-					md5.update(base64.b64decode(path))
+					md5.update(base64.b64decode(path.split("/")[-1].split(".")[0]))
 				except binascii.Error:
 					self.log.warning("Invalid base64 hash %s, skipping" % path)
 					continue
