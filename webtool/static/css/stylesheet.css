@@ -287,19 +287,23 @@ select {
 	width: 330px;
 }
 
-
-#query_status {
-	text-align: center;
-	padding-top: 0.5em;
+#query-status-header {
+	margin-bottom: 0;
 }
 
-#query_status .status_message .queue_message {
+#query-status {
+	text-align: center;
+	padding: 1.5em 0 1.5em 0;
+	margin: 0;
+}
+
+#query-status .status_message .queue_message {
 	border-bottom: 1px solid #000;
 	width: 50%;
 	margin: 0 auto;
 }
 
-#query_status .queue_message > span#circle {
+#query-status .queue_message > span#circle {
 	height: 10px;
 	width: 10px;
 	border-radius: 50%;
@@ -307,7 +311,7 @@ select {
 	background-color: green;
 }
 
-#query_status .queue_message > span#circle.full {
+#query-status .queue_message > span#circle.full {
 	background-color: red;
 }
 
@@ -652,6 +656,7 @@ input, textarea {
 
 label {
 	cursor:pointer;
+	margin: 0.225rem 0 0.5rem 0;
 }
 
 .board {
@@ -770,8 +775,16 @@ form.wide .form-element > *:not(button) {
 	display: block;
 }
 
+form .form-intro {
+	margin-top: 1em;
+}
+
 form .form-element label {
 	text-align: right;
+}
+
+form .form-element select {
+	max-width: 90%;
 }
 
 form.wide .form-element label {
@@ -848,6 +861,10 @@ nav > ul.flat > li:not(:last-child)::after {
 
 .plain-page article h2, .plain-page article p, .frontpage .row p {
 	margin-bottom: 0.5em;
+}
+
+.plain-page article h2.sparse-header {
+	margin-bottom: 0;
 }
 
 .plain-page article p, .frontpage .row p {
@@ -1274,6 +1291,15 @@ ol.processor-list {
 @keyframes blur-out {
     from { opacity: 1; }
     to { opacity: 0; }
+}
+
+@keyframes scroll-background {
+  0% {
+  	background-position: 0 0;
+  }
+  100% {
+  	background-position: 350px 0;
+  }
 }
 
 .flashing, .flashing .query-core, .flashing .query-core p, .flashing .query-core .property-badge { animation: flash 0.5s 3 normal forwards; }

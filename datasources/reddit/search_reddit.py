@@ -1,20 +1,17 @@
-"""
-Search reddit
-"""
 import requests
-import shutil
 import re
 
-from backend.abstract.processor import BasicProcessor
-from backend.lib.dataset import DataSet
-from backend.lib.helpers import posts_to_csv
+from backend.abstract.search import Search
+from backend.lib.exceptions import QueryParametersException
 
 
-class SearchReddit(BasicProcessor):
+class SearchReddit(Search):
 	"""
-	Convert a CSV file to JSON
+	Search 4chan corpus
+
+	Defines methods that are used to query the 4chan data indexed and saved.
 	"""
-	type = "reddit-search"  # job type ID
+	type = "reddit-search"  # job ID
 	category = "Search"  # category
 	title = "Reddit Search"  # title displayed in UI
 	description = "Query the Pushshift API to retrieve Reddit posts and threads matching the search parameters"  # description displayed in UI
@@ -26,58 +23,16 @@ class SearchReddit(BasicProcessor):
 	max_workers = 1
 	max_retries = 3
 
-	def process(self):
+	def get_posts_simple(self, query):
 		"""
-		Run 4CAT search query
-
-		Gets query details, passes them on to the object's search method, and
-		writes the results to a CSV file. If that all went well, the query and
-		job are marked as finished.
+		In the case of Reddit, there is no need for multiple pathways, so we
+		can route it all to the one post query method.
+		:param query:
+		:return:
 		"""
-		query_parameters = self.dataset.get_parameters()
-		results_file = self.dataset.get_results_path()
+		return self.get_posts_complex(query)
 
-		self.log.info("Querying: %s" % str(query_parameters))
-		posts = self.execute_string_query(query_parameters)
-
-		# Write posts to csv and update the DataBase status to finished
-		if posts:
-			self.dataset.update_status("Writing posts to result file")
-			posts_to_csv(posts, results_file)
-			self.dataset.update_status("Query finished, results are available.")
-		elif posts is not None:
-			self.dataset.update_status("Query finished, no results found.")
-
-		num_posts = len(posts) if posts else 0
-
-		# queue predefined post-processors
-		if num_posts > 0 and query_parameters.get("next", []):
-			for next in query_parameters.get("next"):
-				next_parameters = next.get("parameters", {})
-				next_type = next.get("type", "")
-				available_processors = self.dataset.get_available_processors()
-
-				# run it only if the post-processor is actually available for this query
-				if next_type in available_processors:
-					next_analysis = DataSet(parameters=next_parameters, type=next_type, db=self.db,
-											parent=self.dataset.key, extension=available_processors[next_type]["extension"])
-					self.queue.add_job(next_type, remote_id=next_analysis.key)
-
-		# see if we need to register the result somewhere
-		if query_parameters.get("copy_to", None):
-			# copy the results to an arbitrary place that was passed
-			if self.dataset.get_results_path().exists():
-				# but only if we actually have something to copy
-				shutil.copyfile(self.dataset.get_results_path(), query_parameters.get("copy_to"))
-			else:
-				# if copy_to was passed, that means it's important that this
-				# file exists somewhere, so we create it as an empty file
-				with open(query_parameters.get("copy_to"), "w") as empty_file:
-					empty_file.write("")
-
-		self.dataset.finish(num_rows=num_posts)
-
-	def execute_string_query(self, query):
+	def get_posts_complex(self, query):
 		"""
 		Execute a query; get post data for given parameters
 
@@ -90,9 +45,6 @@ class SearchReddit(BasicProcessor):
 		:param dict query:  Query parameters, as part of the DataSet object
 		:return list:  Posts, sorted by thread and post ID, in ascending order
 		"""
-
-		# we need this to check thread URLs (but maybe don't filter?)
-		image_match = re.compile(r"\.(jpg|jpeg|png|gif|webm|mp4)$", flags=re.IGNORECASE)
 
 		# first, build the sphinx query
 		post_parameters = {
@@ -112,8 +64,8 @@ class SearchReddit(BasicProcessor):
 			post_parameters["subreddit"] = query["board"]
 
 		# escape / since it's a special character for Sphinx
-		if query["body_query"]:
-			post_parameters["q"] = query["body_query"]
+		if query["body_match"]:
+			post_parameters["q"] = query["body_match"]
 		else:
 			post_parameters["q"] = ""
 
@@ -126,8 +78,8 @@ class SearchReddit(BasicProcessor):
 		submission_parameters = post_parameters.copy()
 		submission_parameters["selftext"] = submission_parameters["q"]
 
-		if query["subject_query"]:
-			submission_parameters["title"] = query["subject_query"]
+		if query["subject_match"]:
+			submission_parameters["title"] = query["subject_match"]
 
 		# Check whether only OPs linking to certain URLs should be retreived
 		if query.get("url", None):
@@ -198,23 +150,7 @@ class SearchReddit(BasicProcessor):
 
 				if thread["id"] not in seen_threads:
 					seen_threads.add(thread["id"])
-					return_posts.append({
-						"thread_id": thread["id"],
-						"id": thread["id"],
-						"timestamp": thread["created_utc"],
-						"body": thread.get("selftext", "").strip().replace("\r", ""),
-						"subject": thread["title"],
-						"author": thread["author"],
-						"image_file": thread["url"] if image_match.search(thread["url"]) else "",
-						"domain": thread["domain"],
-						"url": thread["url"],
-						"image_md5": "",
-						"country_code": "",
-						"country_name": "",
-						"subreddit": thread["subreddit"],
-						"parent": "",
-						"score": thread.get("score", 0)
-					})
+					return_posts.append(self.thread_to_4cat(thread))
 
 					# this is the only way to go to the next page right now...
 					submission_parameters["after"] = thread["created_utc"]
@@ -223,71 +159,12 @@ class SearchReddit(BasicProcessor):
 			# update status
 			self.dataset.update_status("Retrieved %i threads via Pushshift API." % total_threads)
 
-		# if we want full thread data, we need the comment IDs for all threads
-		chunked_index = 0
-		if query["full_thread"]:
-			chunked_search = True
-			chunks = []
-			chunk = []
-
-			threads_checked = 0
-			for thread_id in seen_threads:
-				response = self.call_pushshift_api(
-					"https://api.pushshift.io/reddit/submission/comment_ids/%s" % thread_id)
-				if response is None:
-					return response
-
-				# we can continue if this is the case but some posts will be missing
-				if response.status_code != 200:
-					self.dataset.update_status(
-						"HTTP Status code %i while receiving thread comment IDs from Pushshift API. Not all posts are saved." % (
-							response.status_code))
-					continue
-
-				# divide the results in 500-ID chunks
-				comment_ids = response.json()["data"]
-				for comment_id in comment_ids:
-					if len(chunk) == 500:
-						chunks.append(chunk)
-						chunk = []
-
-					chunk.append(comment_id)
-
-				threads_checked += 1
-				self.dataset.update_status(
-					"Fetched post IDs for %i of %i threads via Pushshift API..." % (threads_checked, len(seen_threads)))
-
-			# full thread search overrides other search params
-			chunks.append(chunk)
-			post_parameters["q"] = ""
-			post_parameters["after"] = ""
-			post_parameters["before"] = ""
-
-		else:
-			# non-chunked search, if we're not searching by thread
-			chunked_search = False
-			chunks = []
-
 		# okay, search the pushshift API for posts
 		# we have two modes here: by keyword, or by ID. ID is set above where
 		# ID chunks are defined: these chunks are used here if available
 		seen_posts = set()
 
-		# do we need to query posts at all?
-		# Yes if explicitly stated with the 'full thread' checkmark
-		# or if post bodies need to be searched.
-		do_posts_search = chunked_search or query["body_query"]
-
-		while do_posts_search:
-			# chunked search: search within the given IDs only
-			if chunked_search:
-				if len(chunks) <= chunked_index:
-					# we're out of chunks - done fetching data
-					break
-
-				post_parameters["ids"] = ",".join(chunks[chunked_index])
-				chunked_index += 1
-
+		while True:
 			response = self.call_pushshift_api("https://api.pushshift.io/reddit/comment/search", params=post_parameters)
 			if response is None:
 				return response
@@ -306,7 +183,7 @@ class SearchReddit(BasicProcessor):
 
 			# no more posts
 			posts = response.json()["data"]
-			if len(posts) == 0 and not chunked_search:
+			if len(posts) == 0:
 				# this could happen in some edge cases if we're searching by
 				# chunk (if no IDs in the chunk match the other parameters)
 				# so only break if that's not the case
@@ -319,30 +196,8 @@ class SearchReddit(BasicProcessor):
 
 				if post["id"] not in seen_posts:
 					seen_posts.add(post["id"])
-					return_posts.append({
-						"thread_id": post["link_id"].split("_")[1],
-						"id": post["id"],
-						"timestamp": post["created_utc"],
-						"subreddit": post["subreddit"],
-						"body": post["body"].strip().replace("\r", ""),
-						"subject": "",
-						"author": post["author"],
-						"domain": "",
-						"url": "",
-						"image_file": "",
-						"image_md5": "",
-						"country_code": "",
-						"country_name": "",
-						"subreddit": post["subreddit"],
-						"parent": post["parent_id"],
-						# this is missing sometimes, but upon manual inspection
-						# the post always has 1 point
-						"score": post.get("score", 1)
-					})
-
-					if not chunked_search:
-						# this is the only way to go to the next page right now...
-						post_parameters["after"] = post["created_utc"]
+					return_posts.append(self.post_to_4cat(post))
+					post_parameters["after"] = post["created_utc"]
 
 					total_posts += 1
 
@@ -351,6 +206,160 @@ class SearchReddit(BasicProcessor):
 
 		# and done!
 		return return_posts
+
+	def fetch_posts(self, post_ids, where=None, replacements=None):
+		"""
+		Fetch post data from Pushshift API by post ID
+
+		:param list post_ids:  List of post IDs to return data for
+		:return list: List of posts, with a dictionary representing the record for each post
+		"""
+		chunk_size = 500
+		posts = []
+
+		# search threads in chunks
+		offset = 0
+		while True:
+			chunk = post_ids[offset:offset + chunk_size]
+			if not chunk:
+				break
+
+			response = self.call_pushshift_api("https://api.pushshift.io/reddit/comment/search?ids=" + ",".join(chunk))
+			if not response:
+				break
+
+			if response.status_code != 200:
+				break
+
+			for post in response.json()["data"]:
+				posts.append(self.post_to_4cat(post))
+
+			offset += chunk_size
+
+		return posts
+
+	def fetch_threads(self, thread_ids):
+		"""
+		Get all posts for given thread IDs
+
+		The pushshift API at this time has no endpoint that retrieves comments
+		for multiple threads at the same time, so unfortunately we have to go
+		through the threads one by one.
+
+		:param tuple thread_ids:  Thread IDs to fetch posts for.
+		:return list:  A list of posts, as dictionaries.
+		"""
+		posts = []
+
+		# search threads in chunks
+		offset = 0
+		for thread_id in thread_ids:
+			offset += 1
+			self.dataset.update_status("Retrieving posts for thread %i of %i" % (offset, len(thread_ids)))
+			response = self.call_pushshift_api("https://api.pushshift.io/reddit/comment/search",
+											   params={"link_id": thread_id})
+			if response is None:
+				break
+
+			if response.status_code != 200:
+				break
+
+			posts_raw = response.json()["data"]
+			for post in posts_raw:
+				posts.append(self.post_to_4cat(post))
+
+		return posts
+
+	def get_thread_sizes(self, thread_ids, min_length):
+		"""
+		Get thread lengths for all threads
+
+		:param tuple thread_ids:  List of thread IDs to fetch lengths for
+		:param int min_length:  Min length for a thread to be included in the
+		results
+		:return dict:  Threads sizes, with thread IDs as keys
+		"""
+		chunk_size = 500
+		chunks = []
+		lengths = {}
+		thread_ids = set(thread_ids)  # deduplicate
+
+		# search threads in chunks
+		offset = 0
+		while True:
+			chunk = thread_ids[offset:offset + chunk_size]
+			if not chunk:
+				break
+
+			response = self.call_pushshift_api("https://api.pushshift.io/reddit/submission/search?ids=" + ",".join(chunk))
+			if response is None:
+				break
+
+			if response.status_code != 200:
+				break
+
+			for thread in response.json()["data"]:
+				length = thread["num_comments"]
+				if length >= min_length:
+					lengths[thread["id"]] = length
+
+			offset += chunk_size
+
+		return lengths
+
+	def post_to_4cat(self, post):
+		"""
+		Convert a pushshift post object to 4CAT post data
+
+		:param dict post:  Post data, as from the pushshift API
+		:return dict:  Re-formatted data
+		"""
+		return {
+			"thread_id": post["link_id"].split("_")[1],
+			"id": post["id"],
+			"timestamp": post["created_utc"],
+			"body": post["body"].strip().replace("\r", ""),
+			"subject": "",
+			"author": post["author"],
+			"domain": "",
+			"url": "",
+			"image_file": "",
+			"image_md5": "",
+			"country_code": "",
+			"country_name": "",
+			"subreddit": post["subreddit"],
+			"parent": post["parent_id"],
+			# this is missing sometimes, but upon manual inspection
+			# the post always has 1 point
+			"score": post.get("score", 1)
+		}
+
+	def thread_to_4cat(self, thread):
+		"""
+		Convert a pushshift thread object to 4CAT post data
+
+		:param dict post:  Post data, as from the pushshift API
+		:return dict:  Re-formatted data
+		"""
+		image_match = re.compile(r"\.(jpg|jpeg|png|gif|webm|mp4)$", flags=re.IGNORECASE)
+
+		return {
+			"thread_id": thread["id"],
+			"id": thread["id"],
+			"timestamp": thread["created_utc"],
+			"body": thread.get("selftext", "").strip().replace("\r", ""),
+			"subject": thread["title"],
+			"author": thread["author"],
+			"image_file": thread["url"] if image_match.search(thread["url"]) else "",
+			"domain": thread["domain"],
+			"url": thread["url"],
+			"image_md5": "",
+			"country_code": "",
+			"country_name": "",
+			"subreddit": thread["subreddit"],
+			"parent": "",
+			"score": thread.get("score", 0)
+		}
 
 	def call_pushshift_api(self, *args, **kwargs):
 		"""
@@ -375,3 +384,97 @@ class SearchReddit(BasicProcessor):
 			return None
 
 		return response
+
+	def validate_query(query, request):
+		"""
+		Validate input for a dataset query on the 4chan data source.
+
+		Will raise a QueryParametersException if invalid parameters are
+		encountered. Mutually exclusive parameters may also be sanitised by
+		ignoring either of the mutually exclusive options.
+
+		:param dict query:  Query parameters, from client-side.
+		:param request:  Flask request
+		:return dict:  Safe query parameters
+		"""
+		# we need a board!
+		boards = [board for board in query.get("board", "").split(",") if board.strip()]
+		print(boards)
+
+		if not boards:
+			raise QueryParametersException("Please provide a board or a comma-separated list of boards to query.")
+
+		query["board"] = ",".join(boards)
+
+		# this is the bare minimum, else we can't narrow down the full data set
+		if not query.get("body_match", None) and not query.get("subject_match", None) and not query.get("random_sample",
+																										None):
+			raise QueryParametersException("Please provide a body query, subject query or random sample size.")
+
+		# body query and full threads are incompatible, returning too many posts
+		# in most cases
+		if query.get("body_match", None):
+			if "full_threads" in query:
+				del query["full_threads"]
+
+		# random sample requires a sample size, and is additionally incompatible
+		# with full threads
+		if query.get("random_sample", None):
+			try:
+				sample_size = int(query.get("random_sample_size", 0))
+			except ValueError:
+				raise QueryParametersException("Please provide a valid numerical sample size.")
+
+			if sample_size < 1 or sample_size > 100000:
+				raise QueryParametersException("Please provide a sample size between 1 and 100000.")
+
+			if "full_threads" in query:
+				del query["full_threads"]
+
+		# only one of two dense threads options may be chosen at the same time, and
+		# it requires valid density and length parameters. full threads is implied,
+		# so it is otherwise left alone here
+		if query.get("search_scope", "") == "dense-threads":
+			try:
+				dense_density = int(query.get("scope_density", ""))
+			except ValueError:
+				raise QueryParametersException("Please provide a valid numerical density percentage.")
+
+			if dense_density < 15 or dense_density > 100:
+				raise QueryParametersException("Please provide a density percentage between 15 and 100.")
+
+			try:
+				dense_length = int(query.get("scope_length", ""))
+			except ValueError:
+				raise QueryParametersException("Please provide a valid numerical dense thread length.")
+
+			if dense_length < 30:
+				raise QueryParametersException("Please provide a dense thread length of at least 30.")
+
+		# both dates need to be set, or none
+		if query.get("min_date", None) and not query.get("max_date", None):
+			raise QueryParametersException("When setting a date range, please provide both an upper and lower limit.")
+
+		# the dates need to make sense as a range to search within
+		if query.get("min_date", None) and query.get("max_date", None):
+			try:
+				before = int(query.get("max_date", ""))
+				after = int(query.get("min_date", ""))
+			except ValueError:
+				raise QueryParametersException("Please provide valid dates for the date range.")
+
+			if before < after:
+				raise QueryParametersException(
+					"Please provide a valid date range where the start is before the end of the range.")
+
+			query["min_date"] = after
+			query["max_date"] = before
+
+		is_placeholder = re.compile("_proxy$")
+		filtered_query = {}
+		for field in query:
+			if not is_placeholder.search(field):
+				filtered_query[field] = query[field]
+
+		# if we made it this far, the query can be executed
+		return filtered_query

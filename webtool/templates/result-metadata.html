@@ -1,0 +1,45 @@
+<p class="result">
+    <a href="/results/{{ dataset.key }}/">#</a>
+    <span class="property-badge">{{ dataset.parameters.datasource if "datasource" in dataset.parameters else "4chan" }}/{{ dataset.parameters.board }}/</span>
+    {% if dataset.parameters.body_match and dataset.parameters.body_match != "empty" %}
+        <span class="inline-label">body:</span> <span class="inline-query">{{ dataset.parameters.body_match }}</span>
+    {% endif %}
+    {% if dataset.parameters.subject_match and dataset.parameters.subject_match != "empty" %}
+        <span class="inline-label">subject:</span>
+        <span class="inline-query">{{ dataset.parameters.subject_match }}</span>
+    {% endif %}
+    {% if dataset.parameters.filename %}
+        <span class="inline-label">filename:</span>
+        <span class="inline-query">{{ dataset.parameters.filename }}</span>
+    {% endif %}
+    {% if dataset.parameters.country_code and dataset.parameters.country_code != "all" %}
+        <span class="inline-label">country:</span>
+        <span class="inline-query">{{ dataset.parameters.country_code }}</span>
+    {% endif %}
+    {% if dataset.parameters.url %}
+        <span class="inline-label">URL:</span>
+        <span class="inline-query">{{ dataset.parameters.url }}</span>
+    {% endif %}
+    {% if dataset.parameters.search_scope == "full-threads" %}
+        <span class="property-badge second-tier">full thread</span>
+    {% endif %}
+    {% if dataset.parameters.search_scope == "random-sample" %}
+        <span class="property-badge second-tier">random sample={{ dataset.parameters.random_amount }}</span>
+    {% endif %}
+    {% if dataset.parameters.search_scope == "dense-threads" %}
+        <span class="property-badge second-tier">dense threads ({{ dataset.parameters.scope_density }}%/&gt; {{ dataset.parameters.scope_length }})</span>
+    {% endif %}
+    {%  if dataset.is_finished and dataset.num_rows == 0 %}
+        <span class="property-badge second-tier warning">no results</span>
+    {% endif %}
+
+{% if (dataset.parameters.min_date or dataset.parameters.max_date) and (dataset.parameters.min_date > 0 or dataset.parameters.max_date > 0) %}
+        {% if dataset.parameters.min_date and dataset.parameters.min_date > 0 %}
+            <span class="property-badge">From</span>
+            <span class="inline-query">{{ dataset.parameters.min_date|datetime }}</span>
+        {% endif %}{% if dataset.parameters.max_date and dataset.parameters.max_date > 0 %}
+        <span class="property-badge">Until</span>
+        <span class="inline-query">{{ dataset.parameters.max_date|datetime }}</span>
+    {% endif %}
+{% endif %}
+    </p>

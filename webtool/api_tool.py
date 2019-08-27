@@ -14,14 +14,15 @@ from pathlib import Path
 
 import backend
 
-from flask import jsonify, abort, request, render_template, redirect
+from flask import jsonify, abort, request, render_template, render_template_string, redirect, send_file, url_for
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 
 from webtool import app, db, log, openapi, limiter, queue
 from webtool.views import queue_processor
-from webtool.lib.helpers import string_to_timestamp, get_preview, validate_query
+from webtool.lib.helpers import string_to_timestamp, get_preview
 
+from backend.lib.exceptions import QueryParametersException
 from backend.lib.queue import JobQueue
 from backend.lib.dataset import DataSet
 
@@ -85,6 +86,82 @@ def api_status():
 	return jsonify(response)
 
 
+@app.route("/api/datasource-form/<string:datasource_id>/")
+@login_required
+def datasource_form(datasource_id):
+	"""
+	Get data source query form HTML
+
+	The data source needs to have been loaded as a module with a
+	`ModuleCollector`, and also needs to be present in `config.py`. If so, this
+	endpoint returns the HTML form configured by the template in the
+	data source's folder, or a default tool template if that one is not
+	available.
+
+	If a file `tool.js` is available in the data source's `webtool` folder, the
+	response will indicate that a javascript file is available for this data
+	source.
+
+	:param datasource_id:  Data source ID, as specified in the data source and
+						   config.py
+	:return: A JSON object with the `html` of the template,
+	         a boolean `javascript` determining whether javascript should be
+	         loaded for this template, a `status` code and the `datasource` ID.
+	"""
+	if datasource_id not in backend.all_modules.datasources:
+		abort(404)
+
+	if datasource_id not in config.DATASOURCES:
+		abort(404)
+
+	datasource = backend.all_modules.datasources[datasource_id]
+	template_path = datasource["path"].joinpath("webtool", "query-form.html")
+
+	if not template_path.exists():
+		template_path = Path("tool_default.html")
+
+	javascript_path = datasource["path"].joinpath("webtool", "tool.js")
+	has_javascript = javascript_path.exists()
+
+	if not template_path.exists():
+		abort(404)
+
+	html = render_template_string(template_path.read_text(), datasource_id=datasource_id,
+								  datasource_config=config.DATASOURCES[datasource_id], datasource=datasource)
+
+	return jsonify({"status": "success", "datasource": datasource_id, "has_javascript": has_javascript, "html": html})
+
+
+@app.route("/api/datasource-script/<string:datasource_id>/")
+@login_required
+def datasource_script(datasource_id):
+	"""
+	Get data source query form HTML
+
+	The data source needs to have been loaded as a module with a
+	`ModuleCollector`, and also needs to be present in `config.py`. If so, this
+	endpoint returns the data source's tool javascript file, if it exists as
+	`tool.js` in the data source's `webtool` folder.
+
+	:param datasource_id:  Datasource ID, as specified in the datasource and
+						   config.py
+	:return: A javascript file
+	"""
+	if datasource_id not in backend.all_modules.datasources:
+		abort(404)
+
+	if datasource_id not in config.DATASOURCES:
+		abort(404)
+
+	datasource = backend.all_modules.datasources[datasource_id]
+	script_path = datasource["path"].joinpath("webtool", "tool.js")
+
+	if not script_path.exists():
+		abort(404)
+
+	return send_file(str(script_path))
+
+
 @app.route("/api/queue-query/", methods=["POST"])
 @login_required
 @limiter.limit("5 per minute")
@@ -94,20 +171,13 @@ def queue_dataset():
 	Queue a 4CAT search query for processing into a dataset
 
 	Requires authentication by logging in or providing a valid access token.
+	Request parameters vary by data source. The ones mandated constitute the
+	minimum but more may be required.
 
 	:request-param str board:  Board ID to query
 	:request-param str datasource:  Data source ID to query
 	:request-param str body_query:  String to match in the post body
 	:request-param str subject_query:  String to match in the post subject
-	:request-param str ?full_thread:  Whether to return full thread data: if
-	                                   set, return full thread data.
-    :request-param int dense_percentage:  Lower threshold for dense threads
-    :request-param int dense_length: Minimum length for dense threads matching
-    :request-param str ?random_sample:  Whether to return a random sample: if
-                                   set, return random posts.
-    :request-param int random_amount:  The amount of random posts to return.
-    :request-param str ?use_data:  Match within given time period: if set,
-                                   match within period.
     :request-param int min_date:  Timestamp marking the beginning of the match
                                   period
     :request-param int max_date:  Timestamp marking the end of the match period
@@ -118,39 +188,32 @@ def queue_dataset():
 	              status and results.
 	"""
 
-	parameters = {
-		"board": request.form.get("board", ""),
-		"datasource": request.form.get("datasource", ""),
-		"body_query": request.form.get("body_query", ""),
-		"subject_query": request.form.get("subject_query", ""),
-		"full_thread": (request.form.get("full_thread", "no") != "no"),
-		"url": (request.form.get("url_query", "")),
-		"dense_threads": (request.form.get("dense_threads", "no") != "no"),
-		"dense_percentage": int(request.form.get("dense_percentage", 0)),
-		"dense_length": int(request.form.get("dense_length", 0)),
-		"country_flag": request.form.get("country_flag", "all") if request.form.get("country_check",
-																					"no") != "no" else "all",
-		"dense_country_percentage": int(request.form.get("dense_country_percentage", 0)) if request.form.get(
-			"check_dense_country",
-			"no") != "no" else 0,
-		"random_amount": int(request.form.get("random_amount", 0)) if request.form.get("random_sample",
-																					   "no") != "no" else False,
-		"min_date": string_to_timestamp(request.form.get("min_date", "")) if request.form.get("use_date",
-																							  "no") != "no" else 0,
-		"max_date": string_to_timestamp(request.form.get("max_date", "")) if request.form.get("use_date",
-																							  "no") != "no" else 0,
-		"user": current_user.get_id()
-	}
+	datasource_id = request.form.get("datasource", "")
+	if datasource_id not in backend.all_modules.datasources:
+		abort(404)
 
-	valid = validate_query(parameters)
+	search_worker_id = datasource_id + "-search"
+	if search_worker_id not in backend.all_modules.workers:
+		abort(404)
 
-	if valid != True:
-		return "Invalid query. " + valid
+	search_worker = backend.all_modules.workers[search_worker_id]
 
-	# Queue dataset
-	dataset = DataSet(parameters=parameters, db=db)
+	if hasattr(search_worker["class"], "validate_query"):
+		try:
+			sanitised_query = search_worker["class"].validate_query(request.form.to_dict(), request)
+		except QueryParametersException as e:
+			return "Invalid query. %s" % e
+	else:
+		sanitised_query = request.form.to_dict()
 
-	queue.add_job(jobtype="%s-search" % parameters["datasource"], remote_id=dataset.key)
+	sanitised_query["user"] = current_user.get_id()
+	dataset = DataSet(parameters=sanitised_query, db=db, type="search")
+
+	if hasattr(search_worker["class"], "after_create"):
+		print("calling after")
+		search_worker["class"].after_create(sanitised_query, dataset, request)
+
+	queue.add_job(jobtype=search_worker_id, remote_id=dataset.key)
 
 	return dataset.key
 
@@ -193,6 +256,7 @@ def check_dataset():
 
 	status = {
 		"status": dataset.get_status(),
+		"label": dataset.get_label(),
 		"query": dataset.data["query"],
 		"rows": dataset.data["num_rows"],
 		"key": dataset_key,
@@ -237,7 +301,6 @@ def delete_dataset():
 
 
 @app.route("/api/check-queue/")
-@api_ratelimit
 @login_required
 @openapi.endpoint
 def check_queue():
@@ -353,7 +416,8 @@ def check_processor():
 		children.append({
 			"key": dataset.key,
 			"finished": dataset.is_finished(),
-			"html": render_template("result-child.html", child=dataset, dataset=dataset.get_genealogy()[-2], query=dataset.get_genealogy()[0],
+			"html": render_template("result-child.html", child=dataset, dataset=dataset.get_genealogy()[-2],
+									query=dataset.get_genealogy()[0],
 									processors=backend.all_modules.processors),
 			"url": "/result/" + dataset.data["result_file"]
 		})
