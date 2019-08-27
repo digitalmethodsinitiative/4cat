@@ -107,10 +107,11 @@ class ImageDownloader(BasicProcessor):
 			# hash needs to be hexified if it's a 4chan hash
 			if not isinstance(path, Path) and path[-2:] == "==":
 				md5 = hashlib.md5()
+				b64hash = base64.b64decode(path.split("/")[-1].split(".")[0].replace("_", "/"))
 				try:
-					md5.update(base64.b64decode(path.split("/")[-1].split(".")[0]))
+					md5.update(b64hash)
 				except binascii.Error:
-					self.log.warning("Invalid base64 hash %s, skipping" % path)
+					self.log.warning("Invalid base64 hash %s, skipping" % b64hash)
 					continue
 
 				hash = md5.hexdigest()
