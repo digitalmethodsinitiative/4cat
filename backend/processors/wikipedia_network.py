@@ -10,7 +10,7 @@ from lxml.cssselect import CSSSelector as css
 from io import StringIO
 
 from backend.abstract.processor import BasicProcessor
-
+from backend.lib.helpers import UserInput
 
 class WikipediaCatgegoryNetwork(BasicProcessor):
 	"""
@@ -22,6 +22,14 @@ class WikipediaCatgegoryNetwork(BasicProcessor):
 	description = "Create a Gephi-compatible network comprised of wikipedia pages linked in the data set, linked to the categories they are part of. English Wikipedia only."  # description displayed in UI
 	extension = "gdf"  # extension of result file, used internally and in UI
 
+	options = {
+		"extra_depth": {
+			"type": UserInput.OPTION_TOGGLE,
+			"default": False,
+			"help": "Include pages linked to by linked pages"
+		}
+	}
+
 	def process(self):
 		"""
 		This takes a 4CAT results file as input, and outputs a new CSV file
@@ -32,6 +40,7 @@ class WikipediaCatgegoryNetwork(BasicProcessor):
 
 		# we use these to extract URLs and host names if needed
 		link_regex = re.compile(r"https?://en.wikipedia\.org/wiki/[^\s.]+")
+		wiki_page = re.compile(r"[\[\[[^\]]+\]\]")
 		category_regex = re.compile(r"\[\[Category:[^\]]+\]\]")
 		trailing_comma = re.compile(r",$")
 
@@ -41,6 +50,8 @@ class WikipediaCatgegoryNetwork(BasicProcessor):
 		counter = 1
 		errors = 0
 		page_categories = {}
+		page_links = {}
+		deep_pages = {}
 
 		# find all links in post bodies
 		self.dataset.update_status("Reading source file")
@@ -50,6 +61,11 @@ class WikipediaCatgegoryNetwork(BasicProcessor):
 			for post in reader:
 				wiki_links = link_regex.findall(post["body"])
 				wiki_links = [trailing_comma.sub("", link) for link in wiki_links]
+
+				# if we have a per-post URL, include that as well
+				if "url" in post and link_regex.match(post["url"]):
+					wiki_links.append(post["url"])
+
 
 				for link in wiki_links:
 					link = "/wiki/".join(link.split("/wiki/")[1:]).split("#")[0]
@@ -73,7 +89,7 @@ class WikipediaCatgegoryNetwork(BasicProcessor):
 			if link not in page_categories:
 				page_categories[link] = set()
 				self.dataset.update_status(
-					"Fetching categories from Wikipedia API (page %i of %i)" % (counter, len(links)))
+					"Fetching categories from Wikipedia API, page %i of %i" % (counter, len(links)))
 				counter += 1
 
 				# fetch wikipedia source
@@ -110,6 +126,23 @@ class WikipediaCatgegoryNetwork(BasicProcessor):
 
 					all_categories[category] += 1
 					page_categories[link].add(category)
+
+				# if needed, also include pages linked to from within the
+				# fetched page source
+				if self.parameters["deep_pages"]:
+					linked_pages = wiki_page.findall(wiki_source)
+					for page in linked_pages:
+						page = page.split("|")[0]
+
+						if page not in deep_pages:
+							deep_pages[page] = 0
+
+						deep_pages[page] += 1
+
+						if link not in page_links:
+							page_links[link] = set()
+
+						page_links[link].add(page)
 
 		# write GDF file
 		with self.dataset.get_results_path().open("w", encoding="utf-8") as results:
