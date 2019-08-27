@@ -39,7 +39,7 @@ class CountPosts(BasicProcessor):
 		posts = OrderedDict()
 		posts["date"] = "count" #eventual headers
 
-		timeframe = self.parameters["timeframe"]
+		timeframe = self.parameters.get("timeframe", self.options["timeframe"]["default"])
 		
 		self.dataset.update_status("Processing posts")
 		with self.dataset.get_results_path().open("w") as results:

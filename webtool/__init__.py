@@ -37,6 +37,7 @@ import webtool.access
 import webtool.views
 import webtool.api_tool
 import webtool.api_data
+import webtool.api_standalone
 
 # import custom jinja2 template filters
 import webtool.lib.template_filters
