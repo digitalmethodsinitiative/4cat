@@ -373,7 +373,7 @@ span#imagenavigation {
 	max-width: 130px;
 }
 
-input.input-number {
+input.input-number, input[type="number"] {
 	width: 50px;
 }
 
@@ -644,6 +644,11 @@ span.activity.needed {
 
 input, textarea {
 	max-width: 100%;
+}
+
+textarea {
+	width: 80%;
+	height: 6em;
 }
 
 .page-footer {

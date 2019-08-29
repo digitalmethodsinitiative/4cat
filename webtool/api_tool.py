@@ -210,7 +210,6 @@ def queue_dataset():
 	dataset = DataSet(parameters=sanitised_query, db=db, type="search")
 
 	if hasattr(search_worker["class"], "after_create"):
-		print("calling after")
 		search_worker["class"].after_create(sanitised_query, dataset, request)
 
 	queue.add_job(jobtype=search_worker_id, remote_id=dataset.key)

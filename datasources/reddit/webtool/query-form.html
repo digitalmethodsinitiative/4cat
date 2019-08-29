@@ -5,8 +5,10 @@
     </div>
 </div>
 
-
 <fieldset class="basic-options">
+    <p class="form-intro">Reddit data is retrieved from <a href="https://pushshift.io">Pushshift</a>. Consider
+    citing them if you use this data for your research.</p>
+
     <div class="form-element">
         <label for="body-input">Post body:</label>
         <div>
@@ -52,7 +54,8 @@
                 <option value="posts-only" selected>All matching posts</option>
                 <option value="random-sample">Random sample</option>
                 <option value="full-threads">All posts in threads with matching posts (full threads)</option>
-                <option value="dense-threads">All posts in threads in which at least x% of posts match (dense threads)</option>
+                <option value="dense-threads">All posts in threads in which at least x% of posts match (dense threads)
+                </option>
             </select>
         </div>
     </div>
@@ -68,14 +71,16 @@
     <div class="form-element dense-element">
         <label for="scope-density">Density:</label>
         <div>
-            At least <input name="scope_density" id="scope-density" class="input-number" value="15">% of posts in thread must match
+            At least <input name="scope_density" id="scope-density" class="input-number" value="15">% of posts in thread
+            must match
         </div>
     </div>
 
     <div class="form-element dense-element">
         <label for="scope-length">Length:</label>
         <div>
-            Threads must contain at least <input name="scope_length" id="scope-length" class="input-number" value="15"> posts
+            Threads must contain at least <input name="scope_length" id="scope-length" class="input-number" value="15">
+            posts
         </div>
     </div>
 </fieldset>
