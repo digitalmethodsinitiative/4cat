@@ -110,7 +110,7 @@ class SearchInstagram(Search):
 				"url": post.video_url if post.is_video else post.url,
 				"hashtags": ",".join(post.caption_hashtags),
 				"usertags": ",".join(post.tagged_users),
-				"mentioned": ",".join(mention.findall(post.text)),
+				"mentioned": ",".join(mention.findall(post.caption)),
 				"num_likes": post.likes,
 				"num_comments": post.comments,
 				"subject": ""
