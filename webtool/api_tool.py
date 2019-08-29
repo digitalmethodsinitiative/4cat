@@ -207,6 +207,7 @@ def queue_dataset():
 		sanitised_query = request.form.to_dict()
 
 	sanitised_query["user"] = current_user.get_id()
+	sanitised_query["datasource"] = datasource_id
 	dataset = DataSet(parameters=sanitised_query, db=db, type="search")
 
 	if hasattr(search_worker["class"], "after_create"):
