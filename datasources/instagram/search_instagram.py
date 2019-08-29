@@ -70,6 +70,7 @@ class SearchInstagram(Search):
 
 		# for each query, get items
 		for query in queries:
+			self.dataset.update("Retrieving posts ('%s')" % query)
 			try:
 				if scope == "hashtag":
 					query = query.replace("#", "")
