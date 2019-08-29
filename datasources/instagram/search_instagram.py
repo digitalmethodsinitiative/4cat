@@ -199,6 +199,7 @@ class SearchInstagram(Search):
 		return {
 			"max_posts": max_posts,
 			"query": items,
+			"board": items,  # used in web interface
 			"search_scope": query.get("search_scope")
 		}
 
