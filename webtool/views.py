@@ -162,7 +162,7 @@ def show_index():
 	"""
 	Main tool frontend
 	"""
-	return render_template('create-dataset.html', boards=config.DATASOURCES)
+	return render_template('create-dataset.html', datasources=backend.all_modules.datasources)
 
 
 @app.route('/get-boards/<string:datasource>/')

@@ -17,8 +17,8 @@
                     <label for="datasource-select">Data source:</label>
                     <div>
                         <select name="datasource" id="datasource-select">
-                            {% for datasource in boards %}
-                                <option value="{{ datasource }}">{{ datasource|capitalize }}</option>
+                            {% for datasource in datasources %}
+                                <option value="{{ datasource }}">{{ datasources[datasource].name }}</option>
                             {% endfor %}
                         </select>
                     </div>
