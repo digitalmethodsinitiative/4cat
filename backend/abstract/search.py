@@ -88,6 +88,7 @@ class Search(BasicProcessor, ABC):
 		self.dataset.finish(num_rows=num_posts)
 
 	def search(self, query):
+		mode = self.get_search_mode(query)
 		if query.get("body_match", None) or query.get("subject_match", None):
 			mode = "complex"
 			posts = self.get_posts_complex(query)
@@ -100,7 +101,6 @@ class Search(BasicProcessor, ABC):
 
 		# handle the various search scope options after retrieving initial post
 		# list
-		self.log.info("Scope: %s" % query.get("search_scope"))
 		if query.get("search_scope", None) == "dense-threads":
 			# dense threads - all posts in all threads in which the requested
 			# proportion of posts matches
@@ -176,6 +176,19 @@ class Search(BasicProcessor, ABC):
 					pass
 
 		return posts
+
+	def get_search_mode(self, query):
+		"""
+		Determine search mode
+
+		By default this looks for body/subject match parameters, which would
+		necessitate complex search for most datasources, but this can be
+		overridden by descending classes.
+
+		:param dict query:  Query parameters
+		:return str:  `complex` or `simple`
+		"""
+		return "complex" if query.get("body_match", None) or query.get("subject_match", None) else "simple"
 
 	@abstractmethod
 	def get_posts_simple(self, query):
