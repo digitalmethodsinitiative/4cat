@@ -32,7 +32,8 @@ libraries = [
 		"markdown==3.0.1",
 		"cssselect==1.0.3",
 		"youtube_dl==2019.1.2",
-		"google-api-python-client==1.7.7"
+		"google-api-python-client==1.7.7",
+		"datedelta==1.3"
 	]
 
 # Some libraries don't run on Windows
