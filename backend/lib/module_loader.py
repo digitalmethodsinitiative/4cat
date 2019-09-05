@@ -163,5 +163,9 @@ class ModuleCollector:
 
 			datasource_id = datasource.DATASOURCE
 			self.datasources[datasource_id] = {
-				"path": subdirectory
+				"path": subdirectory,
+				"name": datasource.NAME if hasattr(datasource, "NAME") else datasource_id
 			}
+
+		sorted_datasources = {datasource_id: self.datasources[datasource_id] for datasource_id in sorted(self.datasources, key=lambda id: self.datasources[id]["name"])}
+		self.datasources = sorted_datasources
