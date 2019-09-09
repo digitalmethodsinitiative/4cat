@@ -15,6 +15,12 @@ DATASOURCES = {
 	}
 }
 
+# Configure how the tool is to be named in its web interface. The backend will
+# refer to '4CAT' - the name of the software, and a 'powered by 4CAT' notice
+# may also show up in the web interface.
+TOOL_NAME = "4CAT"
+TOOL_NAME_LONG = "4CAT: Capture and Analysis Toolkit"
+
 # Postgres login details
 DB_HOST = "localhost"
 DB_PORT = 5432

@@ -1,0 +1,243 @@
+/* query block wrapper */
+.child-list > li:nth-child(even) {
+    /* override general zebra striping */
+    background: transparent;
+}
+
+.child {
+	transition: 0.25s;
+    padding: 0;
+}
+
+.child-list {
+	padding: 0;
+	list-style: none;
+}
+
+.child-list > li {
+    background: transparent;
+    margin-bottom: 0.5em;
+}
+
+.child .child-list {
+	padding: 0;
+}
+
+.child.focus {
+    margin: 0 auto;
+    max-width: 725px;
+    position: relative;
+    margin-top: 2em;
+}
+
+.child.focus::before {
+	content: ' ';
+	border-left: 2px dotted #000;
+	height: 0.9em;
+	position: absolute;
+	left: 50%;
+	top: -1.5em;
+	margin-left: -1px;
+}
+
+.child.focus .query-core, .child.focus .sub-controls {
+    background: var(--white);
+}
+
+.child.focus > .query-core, .child.focus > .sub-controls {
+    border-right: 1px solid var(--penelope-gray);
+    border-left: 1px solid var(--penelope-gray);
+}
+
+.child.focus > .query-core {
+    border-top: 1px solid var(--penelope-gray);
+}
+
+.child.focus > .sub-controls {
+    border-bottom: 1px solid var(--penelope-gray);
+    padding-top: 0em;
+}
+
+.child[aria-expanded=false], .details-only[aria-expanded=false] {
+	height: 0;
+	overflow: hidden;
+	display: none;
+}
+
+/* top-level tree */
+.result-tree > div > .child-list {
+	margin: 0.5em 0 3em 0;
+}
+
+.result-tree > div > .child-list > li > .query-core > button:not(.active) {
+	line-height: 1.65em;
+}
+
+/* query description in query block */
+li:not(.focus) > .query-core {
+	position: relative;
+	display: inline-block;
+	width: 90%;
+	padding: 0.25em 0.5em;
+}
+
+.focus > .query-core {
+	padding: 2em 0.5em 1em 0.5em;
+	background: transparent;
+}
+
+.plain-page article .query-core p {
+	padding-left: 0;
+}
+
+.query-core button {
+	border-radius: 0;
+}
+
+.query-core button:not(.active) {
+	border-left: 0;
+    border-left: 2px solid #000;
+	display: block;
+	z-index: 0;
+    padding: 0 0.5em;
+    line-height: 1.5em;
+}
+
+li:not(.focus):not(.running) > .query-core.fullwidth-description > .query-descriptor, li:not(.focus) > .query-core.fullwidth-description > .query-descriptor {
+	border-right: 2px solid #000;
+}
+
+li:not(.focus) > .query-core.fullwidth-description > button:not(.active) {
+	border-top: 0;
+	clear: left;
+	margin-left: 0;
+}
+
+li:not(.focus):not(.running) > .query-core.fullwidth-button > .query-descriptor, li:not(.focus) > .query-core.fullwidth-button > .query-descriptor {
+	border-bottom: 0;
+}
+
+li:not(.focus) > .query-core.fullwidth-description > button:not(.active) {
+	clear: left;
+	margin-left: 0;
+}
+
+.query-core button.active {
+	position:  absolute;
+	top: 0.1em;
+	right: 0.1em;
+    border: 0;
+    border-left: 2px solid var(--penelope-gray);
+	background: var(--penelope-black);
+    color: var(--penelope-white);
+	margin: 0;
+}
+
+.query-core button.active:hover {
+	background: var(--penelope-red);
+    color: var(--penelope-white);
+}
+
+.query-core {
+	font-size: 0;
+}
+
+.query-core > * {
+	font-size: 16px;
+}
+
+li:not(.focus) .query-descriptor {
+	border: 2px solid var(--penelope-black);
+	background: var(--penelope-black);
+	color: var(--penelope-white);
+	display: inline-block;
+	padding: 0 0.5em;
+	border-right: 2px solid #000;
+	z-index: 1;
+	float: left;
+	margin-top: 2px;
+}
+
+li:not(.focus) .query-descriptor .property-badge {
+	border-color: var(--penelope-gray);
+}
+
+li:not(.focus) .query-descriptor a {
+	color: var(--penelope-highlight);
+}
+
+li:not(.focus):not(.running) .query-descriptor {
+	border-right: 0;
+}
+
+
+/* post-processor and child controls */
+li > .sub-controls {
+	height: auto;
+}
+
+li:not(.focus) > .sub-controls {
+	height: 0;
+	overflow: hidden;
+}
+
+.child-list > li:not(.focus)::before {
+	content: '';
+	border-left: 2px dotted #000;
+	border-bottom: 2px dotted #000;
+	width: 0.85em;
+	height: 0.85em;
+	display: inline-block;
+	vertical-align: top;
+	margin-left: 1em;
+}
+
+body.result-list .child-list > li:not(.focus)::before {
+	margin-left: 2em;
+	margin-right: 0.5em;
+}
+
+.child .processor-wrap .processor-list {
+	list-style: none;
+	padding: 0;
+}
+
+.sub-controls p.details-only {
+	padding: 0 0.5em 0.5em 0.5em;
+	text-align: center;
+}
+
+.processor-wrap {
+	margin-top: 0.5em;
+}
+
+.processor-wrap h4 {
+    background: var(--penelope-black);
+    color: #FFF;
+    text-align: center;
+}
+
+.child-header {
+    text-align: center;
+    color: var(--penelope-white);
+    background: var(--penelope-black);
+    padding: 0.25em 0;
+}
+
+li.focus .query-descriptor p {
+	padding: 1em;
+}
+
+li:not(.focus) .query-descriptor > * {
+    background: transparent;
+    display: inline;
+    font-weight: normal;
+    color: var(--penelope-white);
+}
+
+
+/** result preview **/
+.details-only img {
+	max-width: 75%;
+	margin: 0.5em auto;
+}

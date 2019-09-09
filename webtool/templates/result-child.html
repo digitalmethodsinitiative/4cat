@@ -2,12 +2,13 @@
 {% set can_process = (current_user.is_authenticated and item.processors) %}
 <li id="child-{{ child.key }}" class="child{% if not child.is_finished() %} running{% endif %}" data-status="{{ child.status }}">
     <div class="query-core">
-        <p>{{ processors[child.type].name if child.type in processors else "(Deprecated analysis) " + child.type }}
-
+        <div class="query-descriptor">
+            <h4 class="child-header">{{ processors[child.type].name if child.type in processors else "(Deprecated analysis) " + child.type }}</h4>
+            <p>
             {% if child.is_finished() %}
-                (<a href="/result/{{ child.result_file }}">{{ child.num_rows }} item{% if child.num_rows != 1 %}s{% endif %}, {{ processors[child.type].extension if child.type in processors else "download" }}</a>)
+                <a href="/result/{{ child.result_file }}">{{ child.num_rows }} item{% if child.num_rows != 1 %}s{% endif %}, {{ processors[child.type].extension if child.type in processors else "download" }}</a>
             {% else %}
-                ({{ child.status }})
+                {{ child.status }}
             {% endif %}
 
         {% for option in child.parameters %}
@@ -18,18 +19,18 @@
         <span class="property-badge">{{ option }}={{ child.parameters[option] }}</span>{% endif %}
             {% endif %}
         {% endfor %}
+            </p>
     {% if not item.is_finished() %}
+        </div>
     </div>
     {% else %}
-    </p><button class="expand-processors" aria-controls="{{ item.key }}-sub">
+    </div><button class="expand-processors" aria-controls="{{ item.key }}-sub">
             {% if can_process %}{{ item.processors|length }} further analys{% if item.processors|length == 1 %}i{% else %}e{% endif %}s{% endif %}
             {% if can_process and item.children %}and{% endif %}
             {% if item.children %}{{ item.children|length }} further result{% if item.children|length != 1 %}s{% endif %}{% endif %}
             {% if not can_process and not item.children %}details{% endif %}
         </button>
-    </div>
-    {% if item.is_finished() %}
-    <div class="sub-controls" id="{{ item.key }}-sub">
+    </div>{% if item.is_finished() %}<div class="sub-controls" id="{{ item.key }}-sub">
 
         <ul class="child-list" aria-expanded="false">
             {% for child in item.children %}

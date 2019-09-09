@@ -4,12 +4,10 @@
 {% block body_class %}login_page{% endblock %}
 
 {% block body %}
-    <div class="middle-wrapper">
-        <div class="login-form">
+    <article class="small">
+        <section class="login-form">
             <h2><span>Log in</span></h2>
-            <article>
-                <p>Please log in to access 4CAT. Note that you can no longer log in automatically
-                    via the University of Amsterdam.</p>
+                <p>Please log in to access {{ __tool_name }}. If you do not have an account, you can <a href="/request-access/">request one</a>.</p>
                 {% for notice in flashes %}
                 <p class="form-notice">{{notice}}</p>
                 {%  endfor %}
@@ -22,11 +20,10 @@
                         <label for="form-password">Password</label>
                         <input type="password" name="password" id="form-password">
                     </div>
-                    <div class="form-footer">
+                    <div class="submit-container">
                         <button>Log in</button>
                     </div>
                 </form>
-            </article>
             <footer class="form-footer">
                 <nav>
                     <ul class="flat">
@@ -36,6 +33,6 @@
                     </ul>
                 </nav>
             </footer>
-        </div>
-    </div>
+        </section>
+    </article>
 {% endblock %}
