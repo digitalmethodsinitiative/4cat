@@ -1,6 +1,7 @@
 import datetime
 import markdown
 import json
+import uuid
 
 from urllib.parse import urlencode
 from webtool import app
@@ -62,4 +63,17 @@ def _jinja2_filter_conf(data, property=""):
 
 @app.context_processor
 def inject_now():
-	return {'__datenow': datetime.datetime.utcnow()}
+	def uniqid():
+		"""
+		Return a unique string (UUID)
+
+		:return str:
+		"""
+		return str(uuid.uuid4())
+
+	return {
+		"__datenow": datetime.datetime.utcnow(),
+		"__tool_name": config.TOOL_NAME,
+		"__tool_name_long": config.TOOL_NAME_LONG,
+		"uniqid": uniqid
+	}
