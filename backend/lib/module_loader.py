@@ -127,7 +127,7 @@ class ModuleCollector:
 		sorted_processors = {id: self.processors[id] for id in
 						   sorted(self.processors, key=lambda item: self.processors[item]["name"])}
 		categorised_processors = {id: sorted_processors[id] for id in
-						   sorted(sorted_processors, key=lambda item: sorted_processors[item]["category"])}
+						   sorted(sorted_processors, key=lambda item: "0" if sorted_processors[item]["category"] == "Presets" else sorted_processors[item]["category"])}
 
 		# determine what processors are available as a follow-up for each
 		# processor. This can only be done here because we need to know all
