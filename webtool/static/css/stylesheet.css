@@ -38,17 +38,17 @@
       Colour definitions
   * --------------------- */
 :root {
-    --penelope-red: #CE1B28;
-    --penelope-highlight: #FF2231;
-    --penelope-alternate: #19B0A3;
-    --penelope-gray-dark: #DFDFDF;
-    --penelope-gray: #E9E9E9;
-    --penelope-gray-light: #EEE;
-    --penelope-white: #F5F5F5;
-    --penelope-black: #21202E;
-    --white: #FFF;
+    --accent: #CE1B28;
+    --highlight: #FF2231;
+    --accent-alternate: #19B0A3;
+    --gray-dark: #DFDFDF;
+    --gray: #E9E9E9;
+    --gray-light: #EEE;
+    --contrast-bright: #F5F5F5;
+    --contrast-dark: #21202E;
+    --always-white: #FFF;
     --text: #37373C;
-    --warning: var(--penelope-red);
+    --warning: var(--accent);
 }
 
 
@@ -60,24 +60,24 @@
 }
 
 body {
-    background: var(--penelope-white);
+    background: var(--contrast-bright);
     color: var(--text);
     line-height: 1.5em;
     padding-bottom: 5em;
 }
 
 a {
-    color: var(--penelope-red);
+    color: var(--accent);
     text-decoration: none;
 }
 
 a:hover {
-    color: var(--penelope-highlight);
+    color: var(--highlight);
     text-decoration: underline;
 }
 
 code {
-    color: var(--penelope-alternate);
+    color: var(--accent-alternate);
     font-weight: bold;
 }
 
@@ -89,19 +89,19 @@ table {
     margin: 1em auto;
     font-size: inherit;
     border-collapse: collapse;
-    border: 2px solid var(--penelope-black);
+    border: 2px solid var(--contrast-dark);
 }
 
 table td, table th {
     font-size: inherit;
     padding: 0 0.5em;
-    border: 2px solid var(--penelope-black);
+    border: 2px solid var(--contrast-dark);
 }
 
 table th {
     text-align: center;
-    background: var(--penelope-alternate);
-    color: var(--penelope-white);
+    background: var(--accent-alternate);
+    color: var(--contrast-bright);
     font-weight: bold;
     padding: 0 1em;
 }
@@ -111,15 +111,15 @@ table th {
             Forms
   * --------------------- */
 select, input, textarea {
-    background: var(--penelope-gray);
-    border: 1px solid var(--penelope-gray);
+    background: var(--gray);
+    border: 1px solid var(--gray);
     font: inherit;
     padding: 0.25em;
     max-width: 80%;
 }
 
 fieldset {
-    border-bottom: 1px dotted var(--penelope-black);
+    border-bottom: 1px dotted var(--contrast-dark);
 }
 
 .form-element {
@@ -153,8 +153,8 @@ article.small .form-element > * {
 }
 
 button, .button-like {
-    border: 2px solid var(--penelope-black);
-    background: var(--penelope-white);
+    border: 2px solid var(--contrast-dark);
+    background: var(--contrast-bright);
     color: var(--text);
     border-radius: 0.5em;
     font-size: inherit;
@@ -163,8 +163,8 @@ button, .button-like {
 }
 
 button:hover, .button-like:hover {
-    background: var(--penelope-red);
-    color: var(--penelope-white);
+    background: var(--accent);
+    color: var(--contrast-bright);
 }
 
 .form-intro {
@@ -200,13 +200,13 @@ nav > ul.flat > li:not(:last-child)::after {
   * --------------------- */
 *[role=tooltip], article p[role=tooltip] {
 	display: none;
-	background: var(--penelope-gray);
+	background: var(--gray);
 	color: var(--text);
 	padding: 0.5em;
 	box-sizing: border-box;
 	position: absolute;
 	max-width: 25em;
-	border: 2px solid var(--penelope-black);
+	border: 2px solid var(--contrast-dark);
 }
 
 *[role=tooltip].force-width, article p[role=toolip].force-width {
@@ -225,8 +225,8 @@ button.tooltip-trigger {
          Site header
   * --------------------- */
 h1 {
-    background: var(--penelope-red);
-    color: var(--penelope-white);
+    background: var(--accent);
+    color: var(--contrast-bright);
     text-align: center;
     font-size: 1.5em;
     font-weight: bold;
@@ -239,11 +239,11 @@ h1 a {
 }
 
 .main-nav {
-    background: var(--penelope-black);
+    background: var(--contrast-dark);
     margin-bottom: 2em;
-    color: var(--penelope-white);
+    color: var(--contrast-bright);
     box-shadow: 0 5px 10px #888;
-    border: 1em solid var(--penelope-black);
+    border: 1em solid var(--contrast-dark);
     border-width: 0.4em 0;
 }
 
@@ -279,8 +279,8 @@ h1 a {
     box-sizing: border-box;
     position: fixed;
     bottom: 0;
-    background: var(--penelope-black);
-    color: var(--penelope-white);
+    background: var(--contrast-dark);
+    color: var(--contrast-bright);
     padding: 0.6em 1em;
     width: 100%;
     text-align: right;
@@ -312,9 +312,9 @@ article.with-aside {
 }
 
 article h2, .blocktitle {
-    border-left: 0.5em solid var(--penelope-red);
-    background: var(--penelope-black);
-    color: var(--penelope-white);
+    border-left: 0.5em solid var(--accent);
+    background: var(--contrast-dark);
+    color: var(--contrast-bright);
     text-align: center;
     font-size: 1.5em;
     font-weight: bold;
@@ -352,8 +352,8 @@ article h3:not(.blocktitle) {
 
 article section, article aside,
 .query.card  {
-    background: var(--white);
-    border: 1px solid var(--penelope-gray);
+    background: var(--always-white);
+    border: 1px solid var(--gray);
 }
 
 article p {
@@ -365,7 +365,7 @@ ol li {
 }
 
 ol li:nth-child(even) {
-    background: var(--penelope-gray-light);
+    background: var(--gray-light);
 }
 
 article section ul, article aside ul {
@@ -398,7 +398,7 @@ article section li p, article aside li p {
 }
 
 .pagination li.page a, .pagination li.page .current {
-	border: 2px solid var(--penelope-black);
+	border: 2px solid var(--contrast-dark);
 	padding: 0.25em;
 	text-align: center;
 	min-width: 2.25em;
@@ -407,8 +407,8 @@ article section li p, article aside li p {
 }
 
 .pagination li.page a:hover, .pagination li.page a:focus {
-	background: var(--penelope-red);
-    color: var(--penelope-white);
+	background: var(--accent);
+    color: var(--contrast-bright);
 }
 
 /** --------------------- *
@@ -455,13 +455,13 @@ article section li p, article aside li p {
   Pages -> Results metadata
   * --------------------- */
 .result .inline-label {
-    color: var(--penelope-alternate);
+    color: var(--accent-alternate);
 }
 
 .property-badge {
     font-size: 0.6em;
     display: inline;
-    border: 1px solid var(--penelope-black);
+    border: 1px solid var(--contrast-dark);
     border-radius: 2px;
     padding: 0.1em 0.5em;
     position: relative;
@@ -470,7 +470,7 @@ article section li p, article aside li p {
 }
 
 .result .second-tier {
-    color: var(--penelope-gray-dark);
+    color: var(--gray-dark);
 }
 
 .result .warning {
@@ -554,7 +554,7 @@ article section li p, article aside li p {
 
 .processor-list li.expanded .processor-options {
 	margin-top: 0.5em;
-    border-top: 1px dotted var(--penelope-black);
+    border-top: 1px dotted var(--contrast-dark);
     padding: 0;
 }
 
@@ -564,8 +564,8 @@ article section li p, article aside li p {
 
 /* processor configuration options */
 .processor-options h4 {
-    background: var(--penelope-black);
-    color: var(--penelope-white);
+    background: var(--contrast-dark);
+    color: var(--contrast-bright);
     text-align: center;
     padding: 0.25em;
 }
@@ -575,11 +575,11 @@ article section li p, article aside li p {
 }
 
 .processor-options {
-    background: var(--penelope-gray-dark);
+    background: var(--gray-dark);
 }
 
 .processor-list li:nth-child(odd) .processor-options {
-    background: var(--penelope-gray-light);
+    background: var(--gray-light);
 }
 
 .processor-options label {
@@ -588,7 +588,7 @@ article section li p, article aside li p {
 }
 
 .processor-options .multichoice-wrapper {
-    border-left: 2px solid var(--penelope-black);
+    border-left: 2px solid var(--contrast-dark);
     padding-left: 0.5em;
     margin: 0.5em 0 0 0.5em;
 }
@@ -627,8 +627,8 @@ article section li p, article aside li p {
 .processor-tree > ul > li::before {
 	display: inline-block;
 	content: '';
-	border-left: 2px dotted var(--penelope-black);
-	border-bottom: 2px dotted var(--penelope-black);
+	border-left: 2px dotted var(--contrast-dark);
+	border-bottom: 2px dotted var(--contrast-dark);
 	width: 0.75em;
 	height: 0.75em;
 	vertical-align: top;
@@ -662,7 +662,7 @@ iframe.query-result-iframe {
 	margin: 0 auto;
 	height: 40em;
 	display: block;
-	border: 1px dashed #000;
+	border: 1px dashed var(--contrast-dark);
 }
 
 iframe.query-result-iframe.csvfile {
@@ -675,7 +675,7 @@ iframe.query-result-iframe.csvfile {
 
 .csv-preview .warning {
     width: 100%;
-    background: var(--penelope-gray-dark);
+    background: var(--gray-dark);
     text-align: center;
 }
 
