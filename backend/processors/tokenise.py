@@ -49,6 +49,11 @@ class Tokenise(BasicProcessor):
 			"default": False,
 			"help": "Lemmatise tokens (English only)"
 		},
+		"strip_symbols": {
+			"type": UserInput.OPTION_TOGGLE,
+			"default": False,
+			"help": "Strip non-alphanumeric characters (e.g. punctuation)"
+		},
 		"exclude_duplicates": {
 			"type": UserInput.OPTION_TOGGLE,
 			"default": False,
@@ -79,6 +84,7 @@ class Tokenise(BasicProcessor):
 		self.dataset.update_status("Processing posts")
 
 		link_regex = re.compile(r"https?://[^\s]+")
+		symbol = re.compile(r"[^a-zA-Z0-9]")
 
 		# load word filters - words to exclude from tokenisation
 		word_filter = set()
@@ -87,6 +93,7 @@ class Tokenise(BasicProcessor):
 				word_filter = set.union(word_filter, pickle.load(input))
 
 		language = self.parameters.get("language", "english")
+		strip_symbols = self.parameters.get("strip_symbols", self.options["strip_symbols"]["default"])
 
 		# initialise pre-processors if needed
 		if self.parameters["stem"]:
@@ -157,6 +164,9 @@ class Tokenise(BasicProcessor):
 				# stem, lemmatise and save tokens that are not stopwords
 				for token in tokens:
 					token = token.lower()
+
+					if strip_symbols:
+						token = symbol.sub("", token)
 
 					if token in word_filter:
 						continue

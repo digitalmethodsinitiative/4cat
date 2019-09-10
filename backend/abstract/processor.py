@@ -108,8 +108,22 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 		if "copy_to" in self.parameters:
 			# copy the results to an arbitray place that was passed
 			if self.dataset.get_results_path().exists():
-				# but only if we actually have something to copy
-				shutil.copyfile(str(self.dataset.get_results_path()), self.parameters["copy_to"])
+				# were we given a dataset ID to copy to?
+				try:
+					surrogate = DataSet(key=self.parameters["copy_to"], db=self.db)
+
+					# copy metadata and results to the surrogate
+					shutil.copyfile(str(self.dataset.get_results_path()), str(surrogate.get_results_path()))
+					try:
+						surrogate.finish(self.dataset.data["num_rows"])
+					except RuntimeError:
+						# already finished, could happen
+						pass
+
+					surrogate.update_status(self.dataset.get_status())
+				except ValueError:
+					# if not, it's a path to copy to
+					shutil.copyfile(str(self.dataset.get_results_path()), self.parameters["copy_to"])
 			else:
 				# if copy_to was passed, that means it's important that this
 				# file exists somewhere, so we create it as an empty file
