@@ -207,7 +207,6 @@ def show_page(page):
 
 @app.route('/result/<string:query_file>/')
 @login_required
-@openapi.endpoint
 def get_result(query_file):
 	"""
 	Get dataset result file
