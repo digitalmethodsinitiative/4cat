@@ -1,5 +1,5 @@
 /* query block wrapper */
-.child-list > li:nth-child(even) {
+.child-list > li:nth-child(even), .processor-tree li:nth-child(even) {
     /* override general zebra striping */
     background: transparent;
 }
@@ -32,7 +32,7 @@
 
 .child.focus::before {
 	content: ' ';
-	border-left: 2px dotted #000;
+	border-left: 2px dotted var(--contrast-dark);
 	height: 0.9em;
 	position: absolute;
 	left: 50%;
@@ -41,20 +41,20 @@
 }
 
 .child.focus .query-core, .child.focus .sub-controls {
-    background: var(--white);
+    background: var(--always-white);
 }
 
 .child.focus > .query-core, .child.focus > .sub-controls {
-    border-right: 1px solid var(--penelope-gray);
-    border-left: 1px solid var(--penelope-gray);
+    border-right: 1px solid var(--gray);
+    border-left: 1px solid var(--gray);
 }
 
 .child.focus > .query-core {
-    border-top: 1px solid var(--penelope-gray);
+    border-top: 1px solid var(--gray);
 }
 
 .child.focus > .sub-controls {
-    border-bottom: 1px solid var(--penelope-gray);
+    border-bottom: 1px solid var(--gray);
     padding-top: 0em;
 }
 
@@ -96,7 +96,7 @@ li:not(.focus) > .query-core {
 
 .query-core button:not(.active) {
 	border-left: 0;
-    border-left: 2px solid #000;
+    border-left: 2px solid var(--contrast-dark);
 	display: block;
 	z-index: 0;
     padding: 0 0.5em;
@@ -104,7 +104,7 @@ li:not(.focus) > .query-core {
 }
 
 li:not(.focus):not(.running) > .query-core.fullwidth-description > .query-descriptor, li:not(.focus) > .query-core.fullwidth-description > .query-descriptor {
-	border-right: 2px solid #000;
+	border-right: 2px solid var(--contrast-dark);
 }
 
 li:not(.focus) > .query-core.fullwidth-description > button:not(.active) {
@@ -127,15 +127,15 @@ li:not(.focus) > .query-core.fullwidth-description > button:not(.active) {
 	top: 0.1em;
 	right: 0.1em;
     border: 0;
-    border-left: 2px solid var(--penelope-gray);
-	background: var(--penelope-black);
-    color: var(--penelope-white);
+    border-left: 2px solid var(--gray);
+	background: var(--contrast-dark);
+    color: var(--contrast-bright);
 	margin: 0;
 }
 
 .query-core button.active:hover {
-	background: var(--penelope-red);
-    color: var(--penelope-white);
+	background: var(--accent);
+    color: var(--contrast-bright);
 }
 
 .query-core {
@@ -147,23 +147,23 @@ li:not(.focus) > .query-core.fullwidth-description > button:not(.active) {
 }
 
 li:not(.focus) .query-descriptor {
-	border: 2px solid var(--penelope-black);
-	background: var(--penelope-black);
-	color: var(--penelope-white);
+	border: 2px solid var(--contrast-dark);
+	background: var(--contrast-dark);
+	color: var(--contrast-bright);
 	display: inline-block;
 	padding: 0 0.5em;
-	border-right: 2px solid #000;
+	border-right: 2px solid var(--contrast-dark);
 	z-index: 1;
 	float: left;
 	margin-top: 2px;
 }
 
 li:not(.focus) .query-descriptor .property-badge {
-	border-color: var(--penelope-gray);
+	border-color: var(--gray);
 }
 
 li:not(.focus) .query-descriptor a {
-	color: var(--penelope-highlight);
+	color: var(--highlight);
 }
 
 li:not(.focus):not(.running) .query-descriptor {
@@ -183,8 +183,8 @@ li:not(.focus) > .sub-controls {
 
 .child-list > li:not(.focus)::before {
 	content: '';
-	border-left: 2px dotted #000;
-	border-bottom: 2px dotted #000;
+	border-left: 2px dotted var(--contrast-dark);
+	border-bottom: 2px dotted var(--contrast-dark);
 	width: 0.85em;
 	height: 0.85em;
 	display: inline-block;
@@ -212,15 +212,15 @@ body.result-list .child-list > li:not(.focus)::before {
 }
 
 .processor-wrap h4 {
-    background: var(--penelope-black);
-    color: #FFF;
+    background: var(--contrast-dark);
+    color: var(--contrast-bright);
     text-align: center;
 }
 
 .child-header {
     text-align: center;
-    color: var(--penelope-white);
-    background: var(--penelope-black);
+    color: var(--contrast-bright);
+    background: var(--contrast-dark);
     padding: 0.25em 0;
 }
 
@@ -232,7 +232,7 @@ li:not(.focus) .query-descriptor > * {
     background: transparent;
     display: inline;
     font-weight: normal;
-    color: var(--penelope-white);
+    color: var(--contrast-bright);
 }
 
 
