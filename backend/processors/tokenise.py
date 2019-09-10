@@ -10,6 +10,7 @@ import re
 from csv import DictReader
 from nltk.stem.snowball import SnowballStemmer
 from nltk.stem import WordNetLemmatizer
+from nltk.tokenize import word_tokenize
 
 from backend.lib.helpers import UserInput
 from backend.abstract.processor import BasicProcessor
@@ -33,16 +34,15 @@ class Tokenise(BasicProcessor):
 			"options": {"all": "Overall", "year": "Year", "month": "Month", "day": "Day"},
 			"help": "Produce files per"
 		},
-		"stem": {
+		"language": {
 			"type": UserInput.OPTION_CHOICE,
-			"default": "none",
-			"options": {"none": "No stemming", **{language: language[0].upper() + language[1:] for language in SnowballStemmer.languages}},
-			"help": "Stem tokens (with SnowballStemmer)"
+			"options": {language: language[0].upper() + language[1:] for language in SnowballStemmer.languages},
+			"help": "Language"
 		},
-		"echobrackets": {
+		"stem": {
 			"type": UserInput.OPTION_TOGGLE,
 			"default": False,
-			"help": "Allow (parentheses) in tokens"
+			"help": "Stem tokens (with SnowballStemmer)"
 		},
 		"lemmatise": {
 			"type": UserInput.OPTION_TOGGLE,
@@ -52,7 +52,7 @@ class Tokenise(BasicProcessor):
 		"exclude_duplicates": {
 			"type": UserInput.OPTION_TOGGLE,
 			"default": False,
-			"help": "Exclude duplicate words"
+			"help": "Remove duplicate words"
 		},
 		"filter": {
 			"type": UserInput.OPTION_MULTI,
@@ -64,7 +64,8 @@ class Tokenise(BasicProcessor):
 				"stopwords-iso-all": "Multi-language stopwords (stopwords-iso)",
 				"wordlist-cracklib-english": "English word list (cracklib, recommended)",
 				"wordlist-infochimps-english": "English word list (infochimps)",
-				"wordlist-unknown-dutch": "Dutch word list (unknown)"
+				"wordlist-unknown-dutch": "Dutch word list (unknown)",
+				"wordlist-googlebooks-min40": "Google Books pre-2012 top unigrams (van Soest)"
 			},
 			"help": "Word lists to exclude (i.e. not tokenise)"
 		}
@@ -78,18 +79,18 @@ class Tokenise(BasicProcessor):
 		self.dataset.update_status("Processing posts")
 
 		link_regex = re.compile(r"https?://[^\s]+")
-		token_regex = re.compile(r"[a-zA-Z\-]{3,50}")
-		token_regex_echobrackets = re.compile(r"[a-zA-Z\-\)\(]{3,50}")
 
 		# load word filters - words to exclude from tokenisation
 		word_filter = set()
 		for wordlist in self.parameters["filter"]:
-			with open(config.PATH_ROOT + "/backend/assets/%s.pb" % wordlist, "rb") as input:
+			with open(config.PATH_ROOT + "/backend/assets/wordlists/%s.pb" % wordlist, "rb") as input:
 				word_filter = set.union(word_filter, pickle.load(input))
+
+		language = self.parameters.get("language", "english")
 
 		# initialise pre-processors if needed
 		if self.parameters["stem"]:
-			stemmer = SnowballStemmer("english")
+			stemmer = SnowballStemmer(language)
 
 		if self.parameters["lemmatise"]:
 			lemmatizer = WordNetLemmatizer()
@@ -112,10 +113,6 @@ class Tokenise(BasicProcessor):
 			"""
 			with results_path.joinpath(subunit + ".pb").open("wb") as outputfile:
 				pickle.dump(subunits[subunit], outputfile)
-
-		# determine what regex to use for tokens
-		if self.dataset.parameters["echobrackets"]:
-			token_regex = token_regex_echobrackets
 
 		# process posts
 		self.dataset.update_status("Processing posts")
@@ -151,7 +148,7 @@ class Tokenise(BasicProcessor):
 
 				# clean up text and get tokens from it
 				body = link_regex.sub("", post["body"])
-				tokens = token_regex.findall(body)
+				tokens = word_tokenize(body, language=language)
 
 				# Only keep unique terms if indicated
 				if self.parameters.get("exclude_duplicates", False):
