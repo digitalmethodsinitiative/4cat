@@ -36,7 +36,7 @@ API_FAIL = 404
 
 @app.route("/api/get-standalone-processors/")
 @api_ratelimit
-@openapi.endpoint
+@openapi.endpoint("standalone")
 def get_standalone_processors():
 	"""
 	Get processors available for standalone API requests
@@ -61,7 +61,7 @@ def get_standalone_processors():
 @app.route("/api/process/<processor>/", methods=["POST"])
 @api_ratelimit
 @login_required
-@openapi.endpoint
+@openapi.endpoint("standalone")
 def process_standalone(processor):
 	"""
 	Run a standalone processor

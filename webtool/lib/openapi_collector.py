@@ -29,6 +29,7 @@ class OpenAPICollector:
 	Flask-compatible OpenAPI generator
 	"""
 	endpoints = {}
+	apis = set()
 	flask_app = None
 	type_map = {"int": "integer", "str": "string"}  # openapi is picky about type names
 
@@ -43,105 +44,115 @@ class OpenAPICollector:
 		"""
 		self.flask_app = app
 
-	def endpoint(self, callback):
+	def endpoint(self, api_id="all"):
 		"""
-		Mark as OpenAPI endpoint
+		Factory for OpenAPI mark decorator
+		:param api_id:  Optional, API ID, for subsetting specific APIs
+		:return:  Decorator
+		"""
+		self.apis.add(api_id)
 
-		Decorator that marks a route as an endpoint that should be documented
-		in the OpenAPI specification.
+		def openapi_decorator(callback):
+			"""
+			Mark as OpenAPI endpoint
 
-		:param callback:  Route view function
-		:return:  The same function, but meanwhile the function metadata has
+			Decorator that marks a route as an endpoint that should be documented
+			in the OpenAPI specification.
+
+			:param callback:  Route view function
+			:return:  The same function, but meanwhile the function metadata has
 		          been stored to be integrated in the OpenAPI spec later.
-		"""
+			"""
+			collapse_whitespace = re.compile(r"\s+")
+			if callback.__doc__:
+				# if there is a docstring, we can get most metadata about the
+				# endpoint from there
 
-		collapse_whitespace = re.compile(r"\s+")
-		if callback.__doc__:
-			# if there is a docstring, we can get most metadata about the
-			# endpoint from there
+				# extract first paragraph of docstring as endpoint title
+				docstring = inspect.cleandoc(callback.__doc__).strip()
+				elements = re.split(r"(\n\s*\n)", docstring)
+				title = elements[0].strip()
 
-			# extract first paragraph of docstring as endpoint title
-			docstring = inspect.cleandoc(callback.__doc__).strip()
-			elements = re.split(r"(\n\s*\n)", docstring)
-			title = elements[0].strip()
+				# split remaining docstring in description and structured metadata
+				docbits = re.split(r"(\n\s*:)", "".join(elements[1:]))
+				description = docbits[0].strip()
+				metadata = "".join(docbits[1:])
 
-			# split remaining docstring in description and structured metadata
-			docbits = re.split(r"(\n\s*:)", "".join(elements[1:]))
-			description = docbits[0].strip()
-			metadata = "".join(docbits[1:])
+				# extract definitions of http request parameters
+				request_vars = {var[0].split(" ").pop(): {"name": var[0].strip(), "description": var[1].strip()} for var in
+								re.findall(r":request-param ([^:]+):([^:]+)", metadata)}
 
-			# extract definitions of http request parameters
-			request_vars = {var[0].split(" ").pop(): {"name": var[0].strip(), "description": var[1].strip()} for var in
-							re.findall(r":request-param ([^:]+):([^:]+)", metadata)}
+				# clean http request metadata
+				for name in request_vars:
+					var_definition = request_vars[name]["name"].split(" ")
+					request_vars[name]["type"] = var_definition[0] if len(var_definition) > 1 else "string"
+					request_vars[name]["type"] = self.type_map.get(request_vars[name]["type"], request_vars[name]["type"])
+					request_vars[name]["name"] = var_definition.pop()
+					request_vars[name]["in"] = "request"
+					request_vars[name]["description"] = collapse_whitespace.sub(" ", request_vars[name]["description"])
 
-			# clean http request metadata
-			for name in request_vars:
-				var_definition = request_vars[name]["name"].split(" ")
-				request_vars[name]["type"] = var_definition[0] if len(var_definition) > 1 else "string"
-				request_vars[name]["type"] = self.type_map.get(request_vars[name]["type"], request_vars[name]["type"])
-				request_vars[name]["name"] = var_definition.pop()
-				request_vars[name]["in"] = "request"
-				request_vars[name]["description"] = collapse_whitespace.sub(" ", request_vars[name]["description"])
+					# optional parameters are marked by a ? before the parameter name
+					if request_vars[name]["name"][0] == "?":
+						request_vars[name]["required"] = False
+						request_vars[name]["name"] = request_vars[name]["name"][1:].strip()
+					else:
+						request_vars[name]["required"] = True
 
-				# optional parameters are marked by a ? before the parameter name
-				if request_vars[name]["name"][0] == "?":
-					request_vars[name]["required"] = False
-					request_vars[name]["name"] = request_vars[name]["name"][1:].strip()
-				else:
-					request_vars[name]["required"] = True
+				# extract definitions of function parameters
+				rest_keywords = "param|parameter|arg|argument|key|keyword"
+				vars = {var[1].strip().split(" ").pop(): {"name": var[1].strip(), "description": var[2].strip()} for var in
+						re.findall(r":(" + rest_keywords + ") ([^:]+):([^:]+)", metadata)}
 
-			# extract definitions of function parameters
-			rest_keywords = "param|parameter|arg|argument|key|keyword"
-			vars = {var[1].strip().split(" ").pop(): {"name": var[1].strip(), "description": var[2].strip()} for var in
-					re.findall(r":(" + rest_keywords + ") ([^:]+):([^:]+)", metadata)}
+				# clean var metadata
+				for name in vars:
+					var_definition = vars[name]["name"].split(" ")
+					vars[name]["type"] = var_definition[0].strip() if len(var_definition) > 1 else "string"
+					vars[name]["type"] = self.type_map.get(vars[name]["type"], vars[name]["type"])
+					vars[name]["name"] = var_definition.pop()
+					vars[name]["description"] = collapse_whitespace.sub(" ", vars[name]["description"])
 
-			# clean var metadata
-			for name in vars:
-				var_definition = vars[name]["name"].split(" ")
-				vars[name]["type"] = var_definition[0].strip() if len(var_definition) > 1 else "string"
-				vars[name]["type"] = self.type_map.get(vars[name]["type"], vars[name]["type"])
-				vars[name]["name"] = var_definition.pop()
-				vars[name]["description"] = collapse_whitespace.sub(" ", vars[name]["description"])
+				# see if the mime type of the outcome has been defined
+				mime = re.search(r":rmime:([^:]+)", metadata)
+				mime = mime[1].strip() if mime else "application/json"
 
-			# see if the mime type of the outcome has been defined
-			mime = re.search(r":rmime:([^:]+)", metadata)
-			mime = mime[1].strip() if mime else "application/json"
+				# determine error codes
+				error_codes = {str(var[0]): {"description": re.sub("[\s]+", " ", var[1].strip())} for var in re.findall(r":return-error ([0-9]+): ([^:]+)", metadata)}
 
-			# determine error codes
-			error_codes = {str(var[0]): {"description": re.sub("[\s]+", " ", var[1].strip())} for var in re.findall(r":return-error ([0-9]+): ([^:]+)", metadata)}
+			else:
+				# if there is no docstring (shame!) assume defaults
+				docstring = ""
+				vars = request_vars = {}
+				title = description = ""
+				mime = "application/json"
+				error_codes = {}
 
-		else:
-			# if there is no docstring (shame!) assume defaults
-			docstring = ""
-			vars = request_vars = {}
-			title = description = ""
-			mime = "application/json"
-			error_codes = {}
+			# Use return description as endpoint data summary
+			result = re.search(r":(return|returns)[^:]*:([^:]+)", docstring)
+			if result and result[2].strip():
+				result = collapse_whitespace.sub(" ", result[2].strip())
+			else:
+				# captain obvious to the rescue
+				result = "Query result"
 
-		# Use return description as endpoint data summary
-		result = re.search(r":(return|returns)[^:]*:([^:]+)", docstring)
-		if result and result[2].strip():
-			result = collapse_whitespace.sub(" ", result[2].strip())
-		else:
-			# captain obvious to the rescue
-			result = "Query result"
+			# store endpoint metadata for later use
+			self.endpoints[callback.__name__] = {
+				"method": "get",
+				"title": title,
+				"description": collapse_whitespace.sub(" ", description),
+				"mime": mime,
+				"return": result,
+				"return-error": error_codes,
+				"vars": vars,
+				"request-vars": request_vars,
+				"api_id": api_id
+			}
 
-		# store endpoint metadata for later use
-		self.endpoints[callback.__name__] = {
-			"method": "get",
-			"title": title,
-			"description": collapse_whitespace.sub(" ", description),
-			"mime": mime,
-			"return": result,
-			"return-error": error_codes,
-			"vars": vars,
-			"request-vars": request_vars
-		}
+			# return the original function, unchanged
+			return callback
 
-		# return the original function, unchanged
-		return callback
+		return openapi_decorator
 
-	def generate(self):
+	def generate(self, api_id="all"):
 		"""
 		Generate OpenAPI API specification
 
@@ -187,7 +198,10 @@ class OpenAPICollector:
 			if rule_func not in self.endpoints:
 				continue
 
-			pointspec = self.endpoints[rule_func]
+			if not api_id or api_id == "all" or self.endpoints[rule_func]["api_id"] == api_id:
+				pointspec = self.endpoints[rule_func]
+			else:
+				continue
 
 			# find parameters in endpoint path
 			vars = {}

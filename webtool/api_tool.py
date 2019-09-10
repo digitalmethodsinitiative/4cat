@@ -31,17 +31,26 @@ api_ratelimit = limiter.shared_limit("1 per second", scope="api")
 API_SUCCESS = 200
 API_FAIL = 404
 
-
-@app.route('/api/')
+@app.route("/api/")
 @api_ratelimit
-@openapi.endpoint
-def openapi_specification():
+def openapi_overview():
+	return jsonify({
+		"status": "The following API specifications are available from this server.",
+		"data": {
+			api_id: "http" + ("s" if config.FlaskConfig.SERVER_HTTPS else "") + "://" + config.FlaskConfig.SERVER_NAME + "/api/" + api_id + "/"
+	 for api_id in openapi.apis
+		}
+	})
+
+@app.route('/api/<string:api_id>/')
+@api_ratelimit
+def openapi_specification(api_id="all"):
 	"""
 	Show OpenAPI specification of 4CAT API
 
 	:return: OpenAPI-formatted API specification
 	"""
-	return jsonify(openapi.generate())
+	return jsonify(openapi.generate(api_id))
 
 
 @app.route('/api/status.json')
@@ -165,7 +174,7 @@ def datasource_script(datasource_id):
 @app.route("/api/queue-query/", methods=["POST"])
 @login_required
 @limiter.limit("5 per minute")
-@openapi.endpoint
+@openapi.endpoint("tool")
 def queue_dataset():
 	"""
 	Queue a 4CAT search query for processing into a dataset
@@ -220,7 +229,7 @@ def queue_dataset():
 
 @app.route('/api/check-query/')
 @login_required
-@openapi.endpoint
+@openapi.endpoint("tool")
 def check_dataset():
 	"""
 	Check dataset status
@@ -272,7 +281,7 @@ def check_dataset():
 @app.route("/api/delete-query/", methods=["DELETE", "POST"])
 @api_ratelimit
 @login_required
-@openapi.endpoint
+@openapi.endpoint("tool")
 def delete_dataset():
 	"""
 	Delete a dataset
@@ -302,7 +311,7 @@ def delete_dataset():
 
 @app.route("/api/check-queue/")
 @login_required
-@openapi.endpoint
+@openapi.endpoint("tool")
 def check_queue():
 	"""
 	Get the amount of datasets yet to finish processing
@@ -318,7 +327,7 @@ def check_queue():
 @app.route("/api/queue-processor/", methods=["POST"])
 @api_ratelimit
 @login_required
-@openapi.endpoint
+@openapi.endpoint("tool")
 def queue_processor_api():
 	"""
 	Queue a new processor
@@ -366,7 +375,7 @@ def queue_processor_api():
 @app.route("/api/get-available-processors/")
 @login_required
 @api_ratelimit
-@openapi.endpoint
+@openapi.endpoint("tool")
 def available_processors():
 	"""
 	Get processors available for a dataset
@@ -388,7 +397,7 @@ def available_processors():
 
 @app.route('/api/check-processors/')
 @login_required
-@openapi.endpoint
+@openapi.endpoint("tool")
 def check_processor():
 	"""
 	Check processor status
@@ -427,7 +436,7 @@ def check_processor():
 
 @app.route("/api/request-token/")
 @login_required
-@openapi.endpoint
+@openapi.endpoint("tool")
 def request_token():
 	"""
 	Request an access token
