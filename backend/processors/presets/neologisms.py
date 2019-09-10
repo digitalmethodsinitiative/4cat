@@ -57,7 +57,7 @@ class NeologismExtractor(BasicProcessor):
 			"strip_symbols": True,
 			"lemmatise": False,
 			"timeframe": timeframe,
-			"filter": ["wordlist-googlebooks-min40", "stopwords-iso-all"]
+			"filter": ["wordlist-googlebooks-english", "stopwords-iso-all"]
 		}, type="tokenise-posts", db=self.db, parent=self.dataset.key_parent)
 
 		# this starts the chain
