@@ -25,7 +25,7 @@
     </div>
 
     <div id="{{ dataset.key }}-sub" class="article-ish">
-        <ol class="child-list">
+        <ol class="child-list top-level">
             {% for child in dataset.children %}
                 {% include 'result-child.html' %}
             {% endfor %}
