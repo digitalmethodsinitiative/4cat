@@ -162,7 +162,7 @@ def show_index():
 	"""
 	Main tool frontend
 	"""
-	return render_template('create-dataset.html', boards=config.DATASOURCES)
+	return render_template('create-dataset.html', datasources=backend.all_modules.datasources)
 
 
 @app.route('/get-boards/<string:datasource>/')
@@ -207,7 +207,6 @@ def show_page(page):
 
 @app.route('/result/<string:query_file>/')
 @login_required
-@openapi.endpoint
 def get_result(query_file):
 	"""
 	Get dataset result file

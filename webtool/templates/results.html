@@ -5,68 +5,79 @@
 
 {% block body %}
     <nav class="view-controls">
-    <form action="" method="GET">
-    <ul>
-        <li><label><input type="checkbox" id="all-results" name="all_results"{% if filter.all_results %} checked="checked"{% endif %} #}> Show all results, not just my own</label></li>
-        <li><input aria-label="Query filter" placeholder="Filter queries..." name="filter" value="{{ filter.filter }}"></li>
-    </ul>
-    <button>Update</button>
-    </form>
+        <form action="" method="GET">
+            <ul>
+                <li><label><input type="checkbox" id="all-results" name="all_results"{% if filter.all_results %}
+                                  checked="checked"{% endif %} #}> Show all results, not just my own</label></li>
+                <li><input aria-label="Query filter" placeholder="Filter queries..." name="filter"
+                           value="{{ filter.filter }}"></li>
+            </ul>
+            <button>Update</button>
+        </form>
     </nav>
     <article>
-      <h2 class="sparse-header"><span>Recent results</span></h2>
-      <ol class="result-list">
-      {% for dataset in queries %}{% if dataset.key_parent == "" %}
-        <li id="{{ dataset.key }}" class="result{% if dataset.is_finished and dataset.num_rows > 0 %} has_results{% endif %}" data-numrows="{{ dataset.num_rows }}">
-        {% include 'result-metadata.html' %}
+        <section>
+            <h2><span>Recent results</span></h2>
+            <ol class="result-list">
+                {% for dataset in queries %}{% if dataset.key_parent == "" %}
+                    <li id="{{ dataset.key }}"
+                        class="result{% if dataset.is_finished %} {% if dataset.num_rows > 0 %}has_results{% else %}no_results{% endif %}{% endif %}"
+                        data-numrows="{{ dataset.num_rows }}">
+                        {% include 'result-metadata.html' %}
 
-          <div class="result-files">
-        {% if dataset.is_finished %}
-            <p class="result-file">
-              {{ dataset.num_rows }} posts;
-              {% if dataset.num_rows > 0 %}
-                <a href="/result/{{ dataset.result_file }}">{{ dataset.result_file }}</a>
-              {% endif %}
-            </p>
-        {% elif dataset.status %}
-            <p>Currently executing query ({{ dataset.status }}).</p>
-        {% else %}
-            <p>Query is queued.</p>
-        {% endif %}
-        {% if dataset.is_finished and dataset.children|length > 0 %}
-            <ol class="child-list">
-                <li><a href="/results/{{ dataset.key }}/">{{ dataset.children|length }} analysis result{% if dataset.childrenf|length != 1 %}s{% endif %} available</a></li>
+                        {% if not (dataset.is_finished and dataset.num_rows == 0) %}
+                        <div class="result-files">
+                            {% if dataset.is_finished %}
+                                <p class="result-file">
+                                    {{ dataset.num_rows }} posts;
+                                    {% if dataset.num_rows > 0 %}
+                                        <a href="/result/{{ dataset.result_file }}">{{ dataset.result_file }}</a>
+                                    {% endif %}
+                                </p>
+                            {% elif dataset.status %}
+                                <p>Currently executing query ({{ dataset.status }}).</p>
+                            {% else %}
+                                <p>Query is queued.</p>
+                            {% endif %}
+                            {% if dataset.is_finished and dataset.children|length > 0 %}
+                                <ol class="child-list">
+                                    <li><a href="/results/{{ dataset.key }}/">{{ dataset.children|length }} analysis
+                                        result{% if dataset.childrenf|length != 1 %}s{% endif %} available</a></li>
+                                </ol>
+                            {% endif %}
+
+                        </div>
+                        {% endif %}
+                        {% if dataset.num_rows > 0 %}
+                            <div class="analysis-button-container">
+                                <a class="button-like processor-link" href="/results/{{ dataset.key }}/">Analysis</a>
+                            </div>
+                        {% endif %}
+                    </li>
+                {% endif %}{% endfor %}
             </ol>
-        {% endif %}
-
-          </div>
-          {% if dataset.num_rows > 0 %}
-              <div><a class="button-like processor-link" href="/results/{{ dataset.key }}/">Analysis</a></div>
-              {% endif %}
-        </li>
-      {% endif %}{% endfor %}
-      </ol>
+        </section>
     </article>
 
     <nav class="pagination">
-      <ol>
-      {% if pagination.has_prev %}
-        <li><a href="/results/page/{{ pagination.page - 1 }}/?{{ filter|http_query }}">&laquo; Previous</a></li>
-      {% endif %}
-      {%- for page in pagination.iter_pages() %}
-        {% if page %}
-          {% if page != pagination.page %}
-            <li class="page"><a href="/results/page/{{ page }}/?{{ filter|http_query }}">{{ page }}</a></li>
-          {% else %}
-            <li class="page"><strong class="current">{{ page }}</strong></li>
-          {% endif %}
-        {% else %}
-          <li class="ellipsis">…</li>
-        {% endif %}
-      {%- endfor %}
-      {% if pagination.has_next %}
-        <li><a href="/results/page/{{ pagination.page + 1 }}/?{{ filter|http_query }}">Next &raquo;</a></li>
-      {% endif %}
-      </ol>
-      </nav>
+        <ol>
+            {% if pagination.has_prev %}
+                <li><a href="/results/page/{{ pagination.page - 1 }}/?{{ filter|http_query }}">&laquo; Previous</a></li>
+            {% endif %}
+            {%- for page in pagination.iter_pages() %}
+                {% if page %}
+                    {% if page != pagination.page %}
+                        <li class="page"><a href="/results/page/{{ page }}/?{{ filter|http_query }}">{{ page }}</a></li>
+                    {% else %}
+                        <li class="page"><strong class="current">{{ page }}</strong></li>
+                    {% endif %}
+                {% else %}
+                    <li class="ellipsis">…</li>
+                {% endif %}
+            {%- endfor %}
+            {% if pagination.has_next %}
+                <li><a href="/results/page/{{ pagination.page + 1 }}/?{{ filter|http_query }}">Next &raquo;</a></li>
+            {% endif %}
+        </ol>
+    </nav>
 {% endblock %}

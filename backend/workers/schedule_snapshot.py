@@ -52,18 +52,13 @@ class SnapshotScheduler(BasicWorker):
 				query = DataSet(parameters={
 					"datasource": datasource,
 					"board": board,
-					"body_query": "",
-					"subject_query": "",
+					"body_match": "",
+					"subject_match": "",
 					"min_date": epoch - 86400,
 					"max_date": epoch,
-					"country_flag": "all",
-					"full_thread": False,
-					"dense_threads": False,
-					"user": "daily-snapshot",
-					"dense_percentage": 0,
-					"dense_country_percentage": 0,
-					"random_amount": False,
-					"dense_length": 0
+					"country_code": "all",
+					"search-scope": "posts-only",
+					"user": "daily-snapshot"
 				}, type="search", db=self.db)
 
 				# run the search and queue further analysis for once the

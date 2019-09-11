@@ -128,7 +128,7 @@ processor = {
             });
 
             //close this level and any underlying
-            siblings.attr('aria-expanded', 'true');
+            siblings.attr('aria-expanded', null);
             block.attr('aria-expanded', null);
             block.removeClass('card').removeClass('focus');
             $(this).text($(this).attr('data-original'));
@@ -145,12 +145,7 @@ processor = {
             block.addClass('card').addClass('focus');
             block.find('> .details-only').attr('aria-expanded', 'true');
 
-            if (siblings.length === 0) {
-                $(this).attr('data-original', $(this).text()).text('Close');
-            } else {
-                let vowel = (siblings.length === 1) ? 'i' : 'e';
-                $(this).attr('data-original', $(this).text()).text('Show ' + siblings.length + ' other analys' + vowel + 's of the query above');
-            }
+            $(this).attr('data-original', $(this).text()).text('Close');
 
             if (parent_block) {
                 parent_block.removeClass('card').find('> .query-core').addClass('card');
@@ -174,7 +169,12 @@ processor = {
             $(this).text('Queue');
             let li = $(this).parent().parent().parent();
             li.removeClass('collapsed').addClass('expanded');
-            li.find('fieldset').css('height', li.attr('data-options-height') + 'px');
+
+            // good ol 'ffs css, allow us to use 'auto' in animations' workaround
+            let container = li.find('fieldset');
+            container.css('height', 'auto');
+            height = container.height();
+            container.css('height', 0).animate({'height': height}, 200);
         } else {
             $('html,body').scrollTop(200);
             let form = $(this).parents('form');
@@ -196,36 +196,30 @@ processor = {
                     alert('The analysis could not be queued: ' + response.responseText);
                 }
             });
+
+            processor.collapse_options();
         }
     },
 
     collapse_options: function () {
         $('.processor-list li').each(function () {
-            if ($(this).hasClass('collapsed') || $(this).hasClass('expanded')) {
+            if ($(this).hasClass('collapsed')) {
                 return;
             }
             let fieldset = $(this).find('fieldset');
             if (fieldset.length === 0) {
                 return;
             }
-            $(this).attr('data-options-height', fieldset.height());
+            $(this).attr('data-options-height', fieldset.css('height').replace('px', ''));
             fieldset.css('height', '0');
-            $(this).addClass('collapsed');
+            $(this).addClass('collapsed').removeClass('expanded');
             $(this).find('button.control-processor').text('Options');
         });
-
-        let index = 0;
-        $('article > .processor-list > li').each(function() {
-            if(index % 2 === 0) {
-                $(this).addClass('zebra');
-            }
-            index += 1;
-        })
     },
 
     resize_blocks: function() {
         $('.query-core').each(function() {
-           let description = $(this).find('> p');
+           let description = $(this).find('> .query-descriptor');
            let button = $(this).find('> button');
 
            let max_width = $(this).width();
@@ -281,8 +275,6 @@ query = {
 
         let form = $('#query-form');
         let formdata = new FormData(form[0]);
-        
-        console.log(formdata);
         
         // Disable form
         query.disable_form();
@@ -581,9 +573,20 @@ tooltip = {
         }
         let tooltip_container = $('#' + $(parent).attr('aria-controls'));
         if ($(tooltip_container).is(':hidden')) {
+            $(tooltip_container.removeClass('force-width'));
             let position = $(parent).position();
             let parent_width = parseFloat($(parent).css('width').replace('px', ''));
             $(tooltip_container).show();
+
+            // figure out if this is a multiline tooltip
+            content = $(tooltip_container).html();
+            $(tooltip_container).html('1');
+            em_height = $(tooltip_container).height();
+            $(tooltip_container).html(content);
+            if($(tooltip_container).height() > em_height) {
+                $(tooltip_container.addClass('force-width'));
+            }
+
             let width = parseFloat($(tooltip_container).css('width').replace('px', ''));
             let height = parseFloat($(tooltip_container).css('height').replace('px', ''));
             $(tooltip_container).css('top', (position.top - height - 5) + 'px');
@@ -621,60 +624,6 @@ tooltip = {
 };
 
 /**
- * Page-in-page popups
- */
-popup_panel = {
-    panel: false,
-    blur: false,
-    wrap: false,
-    url: '',
-
-    show: function (url, fade = true) {
-        popup_panel.url = url;
-        if (!popup_panel.blur) {
-            popup_panel.blur = $('<div id="popup-blur"></div>');
-            popup_panel.blur.on('click', popup_panel.hide);
-            $('body').append(popup_panel.blur);
-        }
-
-        if (!popup_panel.panel) {
-            popup_panel.panel = $('<div id="popup-panel"><div class="popup-wrap"></div></div>');
-            popup_panel.wrap = popup_panel.panel.find('.popup-wrap');
-            $('body').append(popup_panel.panel);
-        }
-
-        if (fade) {
-            popup_panel.panel.addClass('loading');
-            popup_panel.wrap.html('');
-            popup_panel.panel.removeClass('closed').addClass('open');
-            popup_panel.blur.removeClass('closed').addClass('open');
-        }
-
-        $.get(url).done(function (html) {
-            popup_panel.wrap.animate({opacity: 1}, 250);
-            popup_panel.panel.removeClass('loading');
-            popup_panel.wrap.html(html);
-        }).fail(function (html, code) {
-            alert('The page could not be loaded (HTTP error ' + code + ').');
-            popup_panel.hide();
-        });
-
-        processor.collapse_options();
-    },
-
-    refresh: function () {
-        popup_panel.wrap.animate({opacity: 0}, 250, function () {
-            popup_panel.show(popup_panel.url, false);
-        });
-    },
-
-    hide: function () {
-        popup_panel.panel.removeClass('open').addClass('closed');
-        popup_panel.blur.removeClass('open').addClass('closed');
-    }
-};
-
-/**
  * Resets the form with correct checks and disablings
  */
 function reset_form() {
@@ -692,7 +641,6 @@ function toggleButton(e) {
     e.preventDefault();
 
     target = '#' + $(this).attr('aria-controls');
-    console.log(target);
     
     is_open = $(target).attr('aria-expanded') !== 'false';
     if (is_open) {
