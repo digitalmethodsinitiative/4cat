@@ -21,7 +21,7 @@ api_ratelimit = limiter.shared_limit("1 per second", scope="api")
 
 @app.route('/api/<datasource>/<board>/thread/<int:thread_id>.json')
 @api_ratelimit
-@openapi.endpoint
+@openapi.endpoint("data")
 def api_thread(datasource, board, thread_id):
 	"""
 	Emulate 4chan thread.json API endpoint
@@ -69,7 +69,7 @@ def api_thread(datasource, board, thread_id):
 
 @app.route('/api/<datasource>/<board>/threads.json')
 @api_ratelimit
-@openapi.endpoint
+@openapi.endpoint("data")
 def api_board(datasource, board):
 	"""
 	Emulate 4chan API /[board]/threads.json endpoint
@@ -111,7 +111,7 @@ def api_board(datasource, board):
 
 @app.route('/api/<datasource>/<board>/<int:page>.json')
 @api_ratelimit
-@openapi.endpoint
+@openapi.endpoint("data")
 def api_board_page(datasource, board, page):
 	"""
 	Emulate 4chan API /[board]/[page].json endpoint
@@ -149,7 +149,7 @@ def api_board_page(datasource, board, page):
 
 @app.route('/api/<datasource>/<board>/catalog.json')
 @api_ratelimit
-@openapi.endpoint
+@openapi.endpoint("data")
 def api_board_catalog(datasource, board):
 	"""
 	Emulate 4chan API /[board]/catalog.json endpoint
@@ -199,7 +199,7 @@ def api_board_catalog(datasource, board):
 
 @app.route('/api/<datasource>/<board>/archive.json')
 @api_ratelimit
-@openapi.endpoint
+@openapi.endpoint("data")
 def get_archive(datasource, board):
 	"""
 	Emulate 4chan API /[board]/archive.json endpoint
@@ -222,7 +222,7 @@ def get_archive(datasource, board):
 
 @app.route('/api/<datasource>/boards.json')
 @api_ratelimit
-@openapi.endpoint
+@openapi.endpoint("data")
 def get_boards(datasource):
 	"""
 	Get available boards in datasource

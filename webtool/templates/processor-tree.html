@@ -1,8 +1,9 @@
-<li>
+{% if processor != "convert-csv" %}<li> {# we're hardcoding this exception for now, may need to make it more dynamic if other processors should also be ignored #}
     <span class="processor">
+    {% set pid = uniqid() %}
     	<em>{{ processors[processor].name }}</em>
-    	<button class="tooltip-trigger" aria-controls="tooltip-processor-{{ processors[processor].id }}-{{ processors[processor].id }}" aria-label="Post-processor details">?</button>
-    	<p role="tooltip" id="tooltip-processor-{{ processors[processor].id }}-{{ processors[processor].id }}">
+    	<button class="tooltip-trigger" aria-controls="tooltip-processor-{{ pid }}-{{ processors[processor].id }}-{{ processors[processor].id }}" aria-label="Post-processor details">?</button>
+    	<p role="tooltip" id="tooltip-processor-{{ pid }}-{{ processors[processor].id }}-{{ processors[processor].id }}">
                 {{ processors[processor].description }}{% if processors[processor].description[-1] != "." %}.{% endif %}
                 Output: {{ processors[processor].extension }} file. </p>
     </span>
@@ -13,4 +14,4 @@
         {% endfor %}
         </ul>
     {% endif %}
-</li>
+</li>{% endif %}

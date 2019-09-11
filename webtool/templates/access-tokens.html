@@ -5,36 +5,39 @@
 
 {% block body %}
     <article>
-        <h2><span>Access tokens</span></h2>
-        <p>4CAT has an API, which is documented with an OpenAPI-compatible specification
-            <a href="/api/">here</a>. Some API endpoints require authentication. You can generate an
-        access token through which to authenticate yourself on this page. Alternatively, tokens may be requested
-        programmatically via the <code>/api/request-token/</code> endpoint, when requested with a currently logged-in
-        session.</p>
+        <section>
+            <h2><span>Access tokens</span></h2>
+            <p>{{ __tool_name }} has an API, which is documented with an OpenAPI-compatible specification
+                <a href="/api/">here</a>. Some API endpoints require authentication. You can generate an
+                access token through which to authenticate yourself on this page. Alternatively, tokens may be requested
+                programmatically via the <code>/api/request-token/</code> endpoint, when requested with a currently
+                logged-in
+                session.</p>
 
-    {% if not tokens %}
-        <form action="/api/request-token/" method="GET" class="wide">
-            <p>You currently have no active access token(s). Request one:</p>
-            <div class="form-element form-footer">
-                <input type="hidden" name="forward" value="yes">
-                <button>Request token</button>
-            </div>
-        </form>
-    {% else %}
-        <table class="token-list">
-            <tr>
-                <th>Token</th>
-                <th>Calls so far</th>
-                <th>Expiration</th>
-            </tr>
-        {% for token in tokens %}
-            <tr>
-                <td><code>{{ token.token }}</code></td>
-                <td>{{ token.calls }}</td>
-                <td>{{ token.expires|datetime }}</td>
-            </tr>
-        {% endfor %}
-        </table>
-    {% endif %}
+            {% if not tokens %}
+                <form action="/api/request-token/" method="GET" class="wide">
+                    <p>You currently have no active access token(s). Request one:</p>
+                    <div class="form-element form-footer">
+                        <input type="hidden" name="forward" value="yes">
+                        <button>Request token</button>
+                    </div>
+                </form>
+            {% else %}
+                <table class="token-list">
+                    <tr>
+                        <th>Token</th>
+                        <th>Calls so far</th>
+                        <th>Expiration</th>
+                    </tr>
+                    {% for token in tokens %}
+                        <tr>
+                            <td><code>{{ token.token }}</code></td>
+                            <td>{{ token.calls }}</td>
+                            <td>{{ token.expires|datetime }}</td>
+                        </tr>
+                    {% endfor %}
+                </table>
+            {% endif %}
+        </section>
     </article>
 {% endblock %}

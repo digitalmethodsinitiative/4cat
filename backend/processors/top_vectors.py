@@ -49,8 +49,26 @@ class VectorRanker(BasicProcessor):
 
 		# go through all archived token sets and vectorise them
 		results = []
+
+		def file_to_timestamp(file):
+			"""
+			Get comparable datestamp value for token file
+
+			Token files are named YYYY-m.pb. This function converts that to a
+			YYYYmm string, then that string to an int, so that it may be
+			compared for sorting chronologically.
+
+			:param str file:  File name
+			:return int:  Comparable datestamp
+			"""
+			stem = file.split("/")[-1].split(".")[0].split("-")
+			try:
+				return int(stem[0] + stem[1].zfill(2))
+			except ValueError:
+				return 0
+
 		with zipfile.ZipFile(self.source_file, "r") as token_archive:
-			vector_sets = token_archive.namelist()
+			vector_sets = sorted(token_archive.namelist(), key=file_to_timestamp)
 			index = 0
 
 			for vector_set in vector_sets:

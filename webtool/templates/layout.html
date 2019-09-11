@@ -1,7 +1,6 @@
 <!DOCTYPE html>
 <head>
-	<title>{% block title %}4CAT: Capture and Analysis Toolkit{% endblock %} &bull; 4CAT</title>
-	<link rel="stylesheet" href="{{url_for('static', filename='css/bootstrap.min.css')}}">
+	<title>{% block title %}{{ __tool_name_long }}{% endblock %} &bull; {{ __tool_name }}</title>
 	<link rel="stylesheet" type="text/css" href="{{url_for('static', filename='css/stylesheet.css')}}">
 {% if "default"|config_override("STYLE") == "corporate" %}
 	<link rel="stylesheet" type="text/css" href="{{url_for('static', filename='css/penelope.css')}}">
@@ -20,7 +19,7 @@
 
 </head>
 <body class="{% block body_class%}{% endblock %} style-{{ "default"|config_override("STYLE") }}">
-	<h1><span><a href="/">{% block site_header %}4CAT: Capture and Analysis Toolkit{% endblock %}</a></span></h1>
+	<h1><span><a href="/">{% block site_header %}{{ __tool_name_long }}{% endblock %}</a></span></h1>
 	<nav class="main-nav">
 		<ul>
 			<li><a href="/create-dataset/">Create dataset</a></li>

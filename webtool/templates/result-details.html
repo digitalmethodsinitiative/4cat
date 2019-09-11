@@ -1,75 +1,76 @@
 <section class="result-tree">
-{% if messages %}
-    {% for message in messages %}
-        <p class="result-warning glued">{{ message }}</p>
-    {% endfor %}
-{% endif %}
-
-<div class="card query">
-    <h3 class="blocktitle"><span><a href="/results/{{ dataset.key }}/">Query{% if dataset.query != "query" %}:
-    {{ dataset.get_label() }}{% endif %}</a></span></h3>
-
-    {% include 'result-metadata.html' %}
-
-    <p class="result">
-        Queued on {{ dataset.timestamp|datetime(fmt="%Y-%m-%d %H:%M") }}.
-    </p>
-
-    <!--{% if dataset.num_rows > 0 and dataset.is_finished() %}
-    <div class="query-result">
-        <iframe class="query-result-iframe csvfile" src="/preview-csv/{{ dataset.key }}/"></iframe>
-    </div>
-    {% endif %}-->
-
-    <p class="result">
-        {% if dataset.status %}{{ dataset.status }}{% else %}Query is queued.{% endif %} {% if dataset.is_finished() %}({{ dataset.num_rows }} posts{% if dataset.num_rows > 0 %}; <a href="/result/{{ dataset.result_file }}">{{ dataset.result_file }}</a>{% endif %}){% endif %}
-    </p>
-</div>
-
-    <div id="{{ dataset.key }}-sub">
-    <ol class="child-list">
-        {% for child in dataset.children %}
-            {% include 'result-child.html' %}
+    {% if messages %}
+        {% for message in messages %}
+            <p class="result-warning glued">{{ message }}</p>
         {% endfor %}
-    </ol>
+    {% endif %}
+
+    <div class="card query article-ish">
+        <h3 class="blocktitle"><span><a href="/results/{{ dataset.key }}/">Query{% if dataset.query != "query" %}:
+            {{ dataset.get_label() }}{% endif %}</a></span></h3>
+
+        <div class="metadata-wrapper">
+        {% include 'result-metadata.html' %}
+
+        <p class="result">
+            Queued on {{ dataset.timestamp|datetime(fmt="%Y-%m-%d %H:%M") }}{% if "user" in dataset.parameters and current_user.get_id() == dataset.parameters.user %}, by {{ dataset.parameters.user }}{% endif %}.
+        </p>
+
+        <p class="result">
+            {% if dataset.status %}{{ dataset.status }}{% else %}Query is queued.{% endif %}
+            {% if dataset.is_finished() %}({{ dataset.num_rows }} posts{% if dataset.num_rows > 0 %};
+                <a href="/result/{{ dataset.result_file }}">{{ dataset.result_file }}</a>{% endif %}){% endif %}
+        </p>
+        </div>
+    </div>
+
+    <div id="{{ dataset.key }}-sub" class="article-ish">
+        <ol class="child-list">
+            {% for child in dataset.children %}
+                {% include 'result-child.html' %}
+            {% endfor %}
+        </ol>
     </div>
 </section>
 
 <article>
-{% if current_user.is_authenticated %}
-    {% if dataset.num_rows == 0 or dataset.processors|length == 0 %}
-        <h3 class="blocktitle section-header"><span>Analyses</span></h3>
-        <p>
-            No further analytical post-processors are available for this dataset.
-            {% if subqueries|length > 0 %}
-                Results for analyses that were run earlier are available in the panel above.
+    <section>
+        {% if current_user.is_authenticated %}
+            {% if dataset.num_rows == 0 or dataset.processors|length == 0 %}
+                <h3 class="blocktitle section-header"><span>Analyses</span></h3>
+                <p>
+                    No further analytical post-processors are available for this dataset.
+                    {% if subqueries|length > 0 %}
+                        Results for analyses that were run earlier are available in the panel above.
+                    {% endif %}
+                </p>
+            {% else %}
+                {% set part = "main" %}
+                <h3 class="blocktitle section-header"><span>Select analysis</span></h3>
+                {% if is_processor_running %}
+                    <p class="result-warning glued">Further analyses may be queued once all analyses currently queued
+                        for this
+                        result have been completed.</p>
+                {% endif %}
+
+                <p>Start your analysis of the retrieved data by choosing one of the post-processors below.
+                    Note that some may take a while to complete, so carefully consider which one you want to run
+                    before queueing it.</p>
+                <p><a href="#">Documentation</a> about the various modes of analysis and what to take into
+                    account when using {{ __tool_name }} data is available as well.</p>
+
+
+                {% set cat = namespace(egory='') %}
+                {% for processor in dataset.processors.values() %}
+                    {% if processor.category != cat.egory %}
+                        {% if cat.egory != '' %}</ol>{% endif %}
+                        {% set cat.egory = processor.category %}
+                        <h4 class="blocktitle section-subheader"><span>{{ processor.category }}</span></h4>
+                        <ol class="processor-list">
+                    {% endif %}
+                    {% include "processor-details.html" %}
+                {% endfor %}
             {% endif %}
-        </p>
-    {% else %}
-        {% set part = "main" %}
-        <h3 class="blocktitle section-header"><span>Select analysis</span></h3>
-        {% if is_processor_running %}
-            <p class="result-warning glued">Further analyses may be queued once all analyses currently queued for this
-                result have been completed.</p>
         {% endif %}
-
-        <p>Start your analysis of the retrieved data by choosing one of the post-processors below.
-        Note that some may take a while to complete, so carefully consider which one you want to run
-        before queueing it.</p>
-        <p><a href="#">Documentation</a> about the various modes of analysis and what to take into
-        account when using 4CAT data is available as well.</p>
-
-
-        {% set cat = namespace(egory='') %}
-        {% for processor in dataset.processors.values() %}
-            {% if processor.category != cat.egory %}
-                {% if cat.egory != '' %}</ol>{% endif %}
-                {% set cat.egory = processor.category %}
-                <h4 class="blocktitle section-subheader"><span>{{ processor.category }}</span></h4>
-                <ol class="processor-list">
-            {% endif %}
-            {% include "processor-details.html" %}
-        {% endfor %}
-    {% endif %}
-{% endif %}
+    </section>
 </article>

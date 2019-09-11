@@ -1,6 +1,6 @@
 <p class="result">
     <a href="/results/{{ dataset.key }}/">#</a>
-    <span class="property-badge">{{ dataset.parameters.datasource if "datasource" in dataset.parameters else "4chan" }}/{{ dataset.parameters.board }}/</span>
+    <span class="property-badge">{{ dataset.parameters.datasource if "datasource" in dataset.parameters else "4chan" }}{% if "board" in dataset.parameters and dataset.parameters.board %}/{{ dataset.parameters.board }}/{% endif %}</span>
     {% if dataset.parameters.body_match and dataset.parameters.body_match != "empty" %}
         <span class="inline-label">body:</span> <span class="inline-query">{{ dataset.parameters.body_match }}</span>
     {% endif %}
@@ -29,9 +29,6 @@
     {% if dataset.parameters.search_scope == "dense-threads" %}
         <span class="property-badge second-tier">dense threads ({{ dataset.parameters.scope_density }}%/&gt; {{ dataset.parameters.scope_length }})</span>
     {% endif %}
-    {%  if dataset.is_finished and dataset.num_rows == 0 %}
-        <span class="property-badge second-tier warning">no results</span>
-    {% endif %}
 
 {% if (dataset.parameters.min_date or dataset.parameters.max_date) and (dataset.parameters.min_date > 0 or dataset.parameters.max_date > 0) %}
         {% if dataset.parameters.min_date and dataset.parameters.min_date > 0 %}
@@ -42,4 +39,8 @@
         <span class="inline-query">{{ dataset.parameters.max_date|datetime }}</span>
     {% endif %}
 {% endif %}
+
+    {%  if dataset.is_finished and dataset.num_rows == 0 %}
+        <span class="property-badge second-tier warning">no results</span>
+    {% endif %}
     </p>

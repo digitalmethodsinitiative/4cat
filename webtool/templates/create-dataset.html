@@ -4,7 +4,7 @@
 {% block body_class %}plain-page frontpage {% endblock %}
 
 {% block body %}
-    <article>
+    <article class="with-aside">
         <section>
             <div>
                 <h2><span>Create new dataset</span></h2>
@@ -17,22 +17,20 @@
                     <label for="datasource-select">Data source:</label>
                     <div>
                         <select name="datasource" id="datasource-select">
-                            {% for datasource in boards %}
-                                <option value="{{ datasource }}">{{ datasource|capitalize }}</option>
+                            {% for datasource in datasources %}
+                                <option value="{{ datasource }}">{{ datasources[datasource].name }}</option>
                             {% endfor %}
                         </select>
                     </div>
                 </fieldset>
 
-                <fieldset id="datasource-form">
+                <div id="datasource-form">
                     Loading query form for chosen datasource...
-                </fieldset>
+                </div>
 
-                <fieldset class="submit-container">
-                    <div>
-                        <button>Create dataset</button>
-                    </div>
-                </fieldset>
+                <div class="submit-container">
+                    <button>Create dataset</button>
+                </div>
             </form>
         </section>
 

@@ -4,9 +4,10 @@
 {% block body_class %}plain-page markdown-page {{ body_class }}{% endblock %}
 
 {% block body %}
-    <article>
+    <article class="small">
+    <section>
         <h2><span>Request account</span></h2>
-        <p>Access to 4CAT is available upon request for researchers and students who would like to use it for their
+        <p>Access to {{ __tool_name }} is available upon request for researchers and students who would like to use it for their
             project. Please provide your details via the form below to request an account.</p>
         <p>Note that unfortunately due to limited resources we need to evaluate applications on a case-by-case basis
             and cannot guarantee access.</p>
@@ -28,16 +29,27 @@
                 <input type="text" name="university" id="request-uni" value="{{ form.university }}">
             </div>
             <div class="form-element{% if "source" in incomplete %} missing{% endif %}">
-                <label for="request-source">How did you hear about 4CAT?</label>
+                <label for="request-source">How did you hear about {{ __tool_name }}?</label>
                 <input type="text" name="source" id="request-source"  value="{{ form.source }}">
             </div>
             <div class="form-element{% if "intent" in incomplete %} missing{% endif %}">
-                <label for="request-intent">What do you intend to use 4CAT for?</label>
+                <label for="request-intent">What do you intend to use {{ __tool_name }} for?</label>
                 <textarea rows="10" cols="50" name="intent" id="request-intent">{{ form.intent }}</textarea>
             </div>
-            <div class="form-element form-footer">
+            <div class="submit-container">
                 <button>Request account</button>
             </div>
         </form>
+
+            <footer class="form-footer">
+                <nav>
+                    <ul class="flat">
+                        <li><a href="/request-access/">Request access</a></li>
+                        <li><a href="/request-password">Recover password</a></li>
+                        <li><a href="/page/data-policy">Data policy</a></li>
+                    </ul>
+                </nav>
+            </footer>
+    </section>
     </article>
 {% endblock %}
