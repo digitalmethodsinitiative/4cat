@@ -48,7 +48,7 @@ class NeologismExtractor(BasicProcessor):
 						"parameters": {
 							"amount": True,
 							"top": 15,
-							"copy_to": self.dataset.key  # copy to the dataset with this key
+							"attach_to": self.dataset.key  # copy to the dataset with this key
 						}
 					}]
 				}

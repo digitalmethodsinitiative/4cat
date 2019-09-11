@@ -534,6 +534,14 @@ class DataSet:
 
 		self.db.update("queries", where={"key": self.key}, data={"job": job.data["id"]})
 
+	def link_parent(self, key_parent):
+		"""
+		Set parent key for this dataset
+
+		:param key_parent:  Parent key. Not checked for validity
+		"""
+		self.db.update("queries", where={"key": self.key}, data={"key_parent": key_parent})
+
 	def __getattr__(self, attr):
 		"""
 		Getter so we don't have to use .data all the time
