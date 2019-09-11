@@ -5,11 +5,11 @@
         <div class="query-descriptor">
             <h4 class="child-header">{{ processors[child.type].name if child.type in processors else "(Deprecated analysis) " + child.type }}</h4>
             <p>
-            {% if child.is_finished() %}
+                <span class="query-status">{% if child.is_finished() %}
                 <a href="/result/{{ child.result_file }}">{{ child.num_rows }} item{% if child.num_rows != 1 %}s{% endif %}, {{ processors[child.type].extension if child.type in processors else "download" }}</a>
             {% else %}
                 {{ child.status }}
-            {% endif %}
+                {% endif %}</span>
 
         {% for option in child.parameters %}
             {% if child.type in processors and "options" in processors[child.type] and option in processors[child.type].options %}
@@ -20,11 +20,11 @@
             {% endif %}
         {% endfor %}
             </p>
-    {% if not item.is_finished() %}
         </div>
+    {% if not item.is_finished() %}
     </div>
     {% else %}
-    </div><button class="expand-processors" aria-controls="{{ item.key }}-sub">
+        <button class="expand-processors" aria-controls="{{ item.key }}-sub">
             {% if can_process %}{{ item.processors|length }} further analys{% if item.processors|length == 1 %}i{% else %}e{% endif %}s{% endif %}
             {% if can_process and item.children %}and{% endif %}
             {% if item.children %}{{ item.children|length }} further result{% if item.children|length != 1 %}s{% endif %}{% endif %}
@@ -42,7 +42,7 @@
         </p>
     
         {% if child.type in processors and processors[child.type].extension in ("jpg", "jpeg", "png", "csv", "html") %}
-            <div class="query-result">
+            <div class="query-result details-only">
             {% if processors[child.type].extension == "html" %}
                 <iframe class="query-result-iframe" src="/result/{{ child.result_file }}"></iframe>
             {% elif processors[child.type].extension in ("png", "jpg", "jpeg", "gif") %}
