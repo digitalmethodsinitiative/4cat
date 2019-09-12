@@ -18,7 +18,7 @@ libraries = [
 		"Flask_Login==0.4.1",
 		"matplotlib==3.0.0",
 		"adjustText==0.7.3",
-		"werkzeug==0.15.5"
+		"werkzeug==0.15.5",
 		"cssselect==1.0.3",
 		"requests==2.20.0",
 		"psycopg2==2.7.5",
