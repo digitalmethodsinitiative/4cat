@@ -86,9 +86,10 @@ class User:
 			self.is_active = True
 
 		self.name = self.data["name"]
-		if authenticated:
-			print("Authenticating %s" % data["name"])
 		self.is_authenticated = authenticated
+
+		if not self.is_anonymous and self.is_authenticated:
+			db.update("users", where={"name": self.data["name"]}, data={"timestamp_seen": int(time.time())})
 
 	def authenticate(self):
 		"""
