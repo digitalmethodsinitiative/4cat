@@ -31,7 +31,7 @@ class YouTubeMetadata(BasicProcessor):
 	title = "YouTube URL metadata"  # title displayed in UI
 	description = "Extract information from YouTube links to videos and channels"  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
-	datasources = ["4chan", "8chan", "reddit"]
+	datasources = ["4chan", "8chan", "reddit", "breitbart"]
 
 	max_retries = 3
 	sleep_time = 20
