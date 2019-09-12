@@ -65,6 +65,7 @@ li:not(.focus) > .query-core {
 	display: inline-block;
 	width: 90%;
 	padding: 0.25em 0.5em;
+	border-right: 0;
 }
 
 .focus > .query-core {
