@@ -435,7 +435,8 @@ article section li p, article aside li p {
   * --------------------- */
 #query-status {
     text-align: center;
-    padding-top: 0.5em;
+    margin: 1.5em 0 0 0;
+    padding: 0.5em 1em;
 }
 
 #query-status.active {
@@ -449,7 +450,7 @@ article section li p, article aside li p {
     ) 0 0;
 }
 
-@keyframes query-status-scroll-background {
+@keyframes scroll-background {
     0% {
         background-position: 0 0;
     }
