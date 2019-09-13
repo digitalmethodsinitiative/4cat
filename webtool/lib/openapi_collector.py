@@ -10,15 +10,16 @@ Usage:
       from [flask-app-name] import openapi
 
 - Decorate endpoint routes with the collector decorator:
-      @openapi.endpoint
+      @openapi.endpoint(api_id="api_name")
       def some_route():
 
 - Add a route (or other output method) for the generated specification in which
   the following call returns a dictionary representing the OpenAPI
   specification tree:
-      return json.dumps(openapi.generate())
+      return json.dumps(openapi.generate(api_id))
 """
 import inspect
+import json
 import re
 
 import config
@@ -79,16 +80,21 @@ class OpenAPICollector:
 				metadata = "".join(docbits[1:])
 
 				# extract definitions of http request parameters
-				request_vars = {var[0].split(" ").pop(): {"name": var[0].strip(), "description": var[1].strip()} for var in
-								re.findall(r":request-param ([^:]+):([^:]+)", metadata)}
+				request_vars = {var[1].split(" ").pop(): {"context": var[0].strip(), "name": var[1].strip(), "description": var[2].strip()} for var
+								in
+								re.findall(r":request-(param|body) ([^:]+):([^:]+)", metadata)}
+
+				request_schemas = {var[0].strip(): self.schema_to_schema(var[1].strip()) for var in
+								   re.findall(r":request-schema ([^:]+):([^:]+)", metadata)}
 
 				# clean http request metadata
 				for name in request_vars:
 					var_definition = request_vars[name]["name"].split(" ")
 					request_vars[name]["type"] = var_definition[0] if len(var_definition) > 1 else "string"
-					request_vars[name]["type"] = self.type_map.get(request_vars[name]["type"], request_vars[name]["type"])
+					request_vars[name]["type"] = self.type_map.get(request_vars[name]["type"],
+																   request_vars[name]["type"])
 					request_vars[name]["name"] = var_definition.pop()
-					request_vars[name]["in"] = "request"
+					request_vars[name]["in"] = "query" if request_vars[name]["context"] == "param" else "body"
 					request_vars[name]["description"] = collapse_whitespace.sub(" ", request_vars[name]["description"])
 
 					# optional parameters are marked by a ? before the parameter name
@@ -98,9 +104,13 @@ class OpenAPICollector:
 					else:
 						request_vars[name]["required"] = True
 
+					if name in request_schemas:
+						request_vars[name]["schema"] = request_schemas[name]
+
 				# extract definitions of function parameters
 				rest_keywords = "param|parameter|arg|argument|key|keyword"
-				vars = {var[1].strip().split(" ").pop(): {"name": var[1].strip(), "description": var[2].strip()} for var in
+				vars = {var[1].strip().split(" ").pop(): {"name": var[1].strip(), "description": var[2].strip()} for var
+						in
 						re.findall(r":(" + rest_keywords + ") ([^:]+):([^:]+)", metadata)}
 
 				# clean var metadata
@@ -111,12 +121,16 @@ class OpenAPICollector:
 					vars[name]["name"] = var_definition.pop()
 					vars[name]["description"] = collapse_whitespace.sub(" ", vars[name]["description"])
 
+					if name in request_schemas:
+						vars[name]["schema"] = request_schemas[name]
+
 				# see if the mime type of the outcome has been defined
 				mime = re.search(r":rmime:([^:]+)", metadata)
 				mime = mime[1].strip() if mime else "application/json"
 
 				# determine error codes
-				error_codes = {str(var[0]): {"description": re.sub("[\s]+", " ", var[1].strip())} for var in re.findall(r":return-error ([0-9]+): ([^:]+)", metadata)}
+				error_codes = {str(var[0]): {"description": re.sub("[\s]+", " ", var[1].strip())} for var in
+							   re.findall(r":return-error ([0-9]+): ([^:]+)", metadata)}
 
 			else:
 				# if there is no docstring (shame!) assume defaults
@@ -134,6 +148,13 @@ class OpenAPICollector:
 				# captain obvious to the rescue
 				result = "Query result"
 
+			# There may be a schema for the return value
+			result_schema = re.search(r":return-schema:([^:]+)", docstring)
+			if result_schema and result_schema[1].strip():
+				result_schema = self.schema_to_schema(result_schema[1].strip())
+			else:
+				result_schema = None
+
 			# store endpoint metadata for later use
 			self.endpoints[callback.__name__] = {
 				"method": "get",
@@ -142,6 +163,7 @@ class OpenAPICollector:
 				"mime": mime,
 				"return": result,
 				"return-error": error_codes,
+				"return-schema": result_schema,
 				"vars": vars,
 				"request-vars": request_vars,
 				"api_id": api_id
@@ -175,10 +197,10 @@ class OpenAPICollector:
 			"swagger": "2.0",
 			"host": config.FlaskConfig.SERVER_NAME,
 			"info": {
-				"title": "4CAT: Capture and Analysis Toolkit RESTful API",
-				"description": "This API allows interfacing with the 4CAT Capture and Analysis Toolkit, offering "
-							   "endpoints through which one may query our 4chan and 8chan corpora via keyword-based "
-							   "search, and run further analysis on the results.",
+				"title": config.TOOL_NAME_LONG + " RESTful API",
+				"description": "This API allows interfacing with the " + config.TOOL_NAME + " Capture and Analysis"
+							   "Toolkit, offering endpoints through which one may query our corpora via "
+							   "keyword-based search, and run further analysis on the results.",
 				"version": "1.0.0",
 				"contact": {
 					"email": config.ADMIN_EMAILS[0] if config.ADMIN_EMAILS else ""
@@ -223,7 +245,7 @@ class OpenAPICollector:
 			# add paths to spec
 			spec["paths"][path] = {
 				method.lower(): {
-					"operationId": rule_func,  # use function name as endpoint ID
+					"operationId": rule_func + ("-" + method.lower() if len(rule.methods) > 1 else ""),  # use function name as endpoint ID
 					"description": pointspec["title"],
 					"summary": pointspec["description"],
 					"produces": [
@@ -231,9 +253,9 @@ class OpenAPICollector:
 					],
 					# we cannot cope with other response codes, unfortunately
 					"responses": {
-						"200": {
+						"200": {**{
 							"description": pointspec["return"]
-						},
+						}, **({"schema": pointspec["return-schema"]} if pointspec.get("return-schema", None) else {})},
 						"429": {
 							"description": "If your request has been rate-limited."
 						},
@@ -246,14 +268,32 @@ class OpenAPICollector:
 						"required": True,
 						"description": pointspec["vars"][var]["description"] if var in pointspec["vars"] else var,
 						"type": vars[var]
-					} for var in vars] + [{
+					} for var in vars] + [({**{
 						"name": request_var["name"],
-						"in": "query",
+						"in": request_var.get("in", "request"),
 						"required": request_var["required"],
-						"description": request_var["description"],
-						"type": request_var["type"]
-					} for request_var in pointspec["request-vars"].values()]
+						"description": request_var["description"]
+					}, **({"schema": request_var["schema"]} if "schema" in request_var else {"type": request_var["type"]})}) for
+										  request_var in pointspec["request-vars"].values()]
 				} for method in rule.methods if method in ("GET", "POST", "PUT", "DELETE")}  # RESTful methods only
 
-			# return a dictionary that can (should) be json'ed or yaml'ed
+		# return a dictionary that can (should) be json'ed or yaml'ed
 		return spec
+
+	def schema_to_schema(self, schema):
+		"""
+		Convert the schema definition in method comments to OpenAPI format
+
+		:param str schema:  Schema definition
+		:return list: Definition, formatted
+		"""
+
+		quote = re.compile(r"([a-zA-Z0-9_]+)")
+
+		try:
+			schema = json.loads(quote.sub('"\\1"', schema.strip().replace("=", ":")))
+			return schema
+		except json.JSONDecodeError as e:
+			print(e)
+			print(quote.sub('"\\1"', schema.strip().replace("=", ":")))
+			return {"type": schema}

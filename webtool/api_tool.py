@@ -20,7 +20,7 @@ from werkzeug.utils import secure_filename
 
 from webtool import app, db, log, openapi, limiter, queue
 from webtool.views import queue_processor
-from webtool.lib.helpers import string_to_timestamp, get_preview
+from webtool.lib.helpers import get_preview, error
 
 from backend.lib.exceptions import QueryParametersException
 from backend.lib.queue import JobQueue
@@ -116,12 +116,14 @@ def datasource_form(datasource_id):
 	:return: A JSON object with the `html` of the template,
 	         a boolean `javascript` determining whether javascript should be
 	         loaded for this template, a `status` code and the `datasource` ID.
+
+	:return-error 404: If the datasource does not exist.
 	"""
 	if datasource_id not in backend.all_modules.datasources:
-		abort(404)
+		return error(404, message="Datasource '%s' does not exist" % datasource_id)
 
 	if datasource_id not in config.DATASOURCES:
-		abort(404)
+		return error(404, message="Datasource '%s' does not exist" % datasource_id)
 
 	datasource = backend.all_modules.datasources[datasource_id]
 	template_path = datasource["path"].joinpath("webtool", "query-form.html")
@@ -133,7 +135,7 @@ def datasource_form(datasource_id):
 	has_javascript = javascript_path.exists()
 
 	if not template_path.exists():
-		abort(404)
+		return error(404, message="No interface exists for datasource '%s'" % datasource_id)
 
 	html = render_template_string(template_path.read_text(), datasource_id=datasource_id,
 								  datasource_config=config.DATASOURCES[datasource_id], datasource=datasource)
@@ -155,18 +157,19 @@ def datasource_script(datasource_id):
 	:param datasource_id:  Datasource ID, as specified in the datasource and
 						   config.py
 	:return: A javascript file
+	:return-error 404: If the datasource does not exist.
 	"""
 	if datasource_id not in backend.all_modules.datasources:
-		abort(404)
+		return error(404, message="Datasource '%s' does not exist" % datasource_id)
 
 	if datasource_id not in config.DATASOURCES:
-		abort(404)
+		return error(404, message="Datasource '%s' does not exist" % datasource_id)
 
 	datasource = backend.all_modules.datasources[datasource_id]
 	script_path = datasource["path"].joinpath("webtool", "tool.js")
 
 	if not script_path.exists():
-		abort(404)
+		return error(404, message="Datasource '%s' does not exist" % datasource_id)
 
 	return send_file(str(script_path))
 
@@ -195,15 +198,16 @@ def queue_dataset():
 
 	:return str:  The dataset key, which may be used to later retrieve dataset
 	              status and results.
+	:return-error 404: If the datasource does not exist.
 	"""
 
 	datasource_id = request.form.get("datasource", "")
 	if datasource_id not in backend.all_modules.datasources:
-		abort(404)
+		return error(404, message="Datasource '%s' does not exist" % datasource_id)
 
 	search_worker_id = datasource_id + "-search"
 	if search_worker_id not in backend.all_modules.workers:
-		abort(404)
+		return error(404, message="Datasource '%s' has no search interface" % datasource_id)
 
 	search_worker = backend.all_modules.workers[search_worker_id]
 
@@ -240,12 +244,27 @@ def check_dataset():
 	:return: Dataset status, containing the `status`, `query`, number of `rows`,
 	         the dataset `key`, whether the dataset is `done`, the `path` of the
 	         result file and whether the dataset is `empty`.
+
+	:return-schema: {
+		type=object,
+		properties={
+			status={type=string},
+			query={type=string},
+			rows={type=integer},
+			key={type=string},
+			done={type=boolean},
+			path={type=string},
+			empty={type=boolean}
+		}
+	}
+
+	:return-error 404:  If the dataset does not exist.
 	"""
 	dataset_key = request.args.get("key")
 	try:
 		dataset = DataSet(key=dataset_key, db=db)
 	except TypeError:
-		return jsonify({"error": "Not a valid dataset key."})
+		return error(404, error="Dataset does not exist.")
 
 	results = dataset.check_dataset_finished()
 	if results == 'empty':
@@ -294,7 +313,11 @@ def delete_dataset():
     :request-param str ?access_token:  Access token; only required if not
                                        logged in currently.
 
-	:return: A dictionary with either an `error` or a successful `status`.
+	:return: A dictionary with a successful `status`.
+
+	:return-schema: {type=object,properties={status={type=string}}}
+
+	:return-error 404:  If the dataset does not exist.
 	"""
 	if not current_user.is_admin():
 		return jsonify({"error": "Not allowed"})
@@ -303,7 +326,7 @@ def delete_dataset():
 	try:
 		dataset = DataSet(key=dataset_key, db=db)
 	except TypeError:
-		return jsonify({"error": "Not a valid dataset key."})
+		return error(404, error="Dataset does not exist.")
 
 	dataset.delete()
 	return jsonify({"status": "success"})
@@ -318,6 +341,8 @@ def check_queue():
 
 	:return: An JSON object with one item `count` containing the number of
 	queued or active datasets.
+
+	:return-schema: {type=object,properties={count={type=integer}}}
 	"""
 	unfinished_datasets = db.fetchone("SELECT COUNT(*) AS count FROM jobs WHERE jobtype LIKE '%-search'")
 
@@ -350,6 +375,14 @@ def queue_processor_api():
 	        whether it had `finished`, a `html` snippet containing details,
 	        a `url` at which the result may be downloaded when finished, and a
 	        list of `messages` describing any warnings generated while queuing.
+
+	:return-schema: {type=object,additionalProperties={type=object,properties={
+		key={type=string},
+		finished={type=boolean},
+		html={type=string},
+		url={type=string},
+		messages={type=array,items={type=string}}
+	}}}
 	"""
 	if request.files and "input_file" in request.files:
 		input_file = request.files["input_file"]
@@ -386,11 +419,22 @@ def available_processors():
 	         `description` of what it does, the `extension` of the file it
 	         produces, a `category` name, what types of datasets it `accepts`,
 	         and a list of `options`, if applicable.
+
+	:return-schema: {type=array,items={type=object,properties={
+		name={type=string},
+		type={type=string},
+		description={type=string},
+		extension={type=string},
+		category={type=string},
+		accepts={type=array,items={type=string}}
+	}}}
+
+	:return-error 404:  If the dataset does not exist.
 	"""
 	try:
 		dataset = DataSet(key=request.args.get("key"), db=db)
 	except TypeError:
-		return jsonify({"error": "Not a valid dataset key."})
+		return error(404, error="Dataset does not exist.")
 
 	return jsonify(dataset.get_available_processors())
 
@@ -407,12 +451,20 @@ def check_processor():
 	:return: A list of dataset data, with each dataset an item with a `key`,
 	        whether it had `finished`, a `html` snippet containing details, and
 	        a `url` at which the result may be downloaded when finished.
-	         `finished`, `html` and `result_path`.
+
+	:return-schema:{type=array,items={type=object,properties={
+		key={type=string},
+		finished={type=boolean},
+		html={type=string},
+		url={type=string}
+	}}}
+
+	:return-error 406:  If the list of subqueries could not be parsed.
 	"""
 	try:
 		keys = json.loads(request.args.get("subqueries"))
 	except (TypeError, json.decoder.JSONDecodeError):
-		return jsonify({"error": "Unexpected format for child dataset key list."})
+		return error(406, error="Unexpected format for child dataset key list.")
 
 	children = []
 
@@ -444,11 +496,15 @@ def request_token():
 	Requires that the user is currently logged in to 4CAT.
 
 	:return: An object with one item `token`
+
+	:return-schema={type=object,properties={token={type=string}}}
+
+	:return-error 403:  If the user is logged in with an anonymous account.
 	"""
 	if current_user.get_id() == "autologin":
 		# access tokens are only for 'real' users so we can keep track of who
 		# (ab)uses them
-		abort(403)
+		return error(403, error="Anonymous users may not request access tokens.")
 
 	token = db.fetchone("SELECT * FROM access_tokens WHERE name = %s AND (expires = 0 OR expires > %s)",
 						(current_user.get_id(), int(time.time())))

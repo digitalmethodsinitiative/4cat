@@ -16,7 +16,7 @@
 
 .child-list > li {
     background: transparent;
-    margin-bottom: 0.5em;
+    padding-bottom: 0.5em;
 }
 
 .child .child-list {
@@ -40,21 +40,7 @@
 	margin-left: -1px;
 }
 
-.child.focus .query-core, .child.focus .sub-controls {
-    background: var(--always-white);
-}
-
-.child.focus > .query-core, .child.focus > .sub-controls {
-    border-right: 1px solid var(--gray);
-    border-left: 1px solid var(--gray);
-}
-
-.child.focus > .query-core {
-    border-top: 1px solid var(--gray);
-}
-
 .child.focus > .sub-controls {
-    border-bottom: 1px solid var(--gray);
     padding-top: 0em;
 }
 
@@ -79,11 +65,11 @@ li:not(.focus) > .query-core {
 	display: inline-block;
 	width: 90%;
 	padding: 0.25em 0.5em;
+	border-right: 0;
 }
 
 .focus > .query-core {
 	padding: 2em 0.5em 1em 0.5em;
-	background: transparent;
 }
 
 .plain-page article .query-core p {
@@ -124,13 +110,14 @@ li:not(.focus) > .query-core.fullwidth-description > button:not(.active) {
 
 .query-core button.active {
 	position:  absolute;
-	top: 0.1em;
-	right: 0.1em;
+	top: 0;
+	right: 0;
     border: 0;
     border-left: 2px solid var(--gray);
 	background: var(--contrast-dark);
     color: var(--contrast-bright);
 	margin: 0;
+	height: 2em;
 }
 
 .query-core button.active:hover {
@@ -156,6 +143,18 @@ li:not(.focus) .query-descriptor {
 	z-index: 1;
 	float: left;
 	margin-top: 2px;
+}
+
+li:not(.focus) .query-descriptor .query-status::before {
+	content: '(';
+	display: inline;
+	margin-right: -0.25em;
+}
+
+li:not(.focus) .query-descriptor .query-status::after {
+	content: ')';
+	display: inline;
+	margin-left: -0.25em;
 }
 
 li:not(.focus) .query-descriptor .property-badge {
@@ -208,13 +207,17 @@ body.result-list .child-list > li:not(.focus)::before {
 }
 
 .processor-wrap {
-	margin-top: 0.5em;
+	padding-top: 0.5em;
 }
 
 .processor-wrap h4 {
     background: var(--contrast-dark);
     color: var(--contrast-bright);
     text-align: center;
+}
+
+.details-only .processor-description {
+	align-self: center;
 }
 
 .child-header {
@@ -235,9 +238,17 @@ li:not(.focus) .query-descriptor > * {
     color: var(--contrast-bright);
 }
 
+/** colours etc **/
+.query-core, .card > .sub-controls > .child-list, .details-only {
+	background: var(--always-white);
+	border-left: 1px solid var(--gray);
+	border-right: 1px solid var(--gray);
+}
 
-/** result preview **/
-.details-only img {
-	max-width: 75%;
-	margin: 0.5em auto;
+.top-level > .child:not(.focus) > .query-core {
+	background: transparent;
+}
+
+.details-only:last-child {
+	border-bottom: 1px solid var(--gray);
 }

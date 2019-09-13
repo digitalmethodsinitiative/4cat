@@ -412,6 +412,13 @@ article section li p, article aside li p {
 }
 
 /** --------------------- *
+   Pages -> Markdown pages
+  * --------------------- */
+.markdown-page section {
+    padding-bottom: 1em;
+}
+
+/** --------------------- *
      Pages -> Front page
   * --------------------- */
 .frontpage li time {
@@ -428,7 +435,8 @@ article section li p, article aside li p {
   * --------------------- */
 #query-status {
     text-align: center;
-    padding-top: 0.5em;
+    margin: 1.5em 0 0 0;
+    padding: 0.5em 1em;
 }
 
 #query-status.active {
@@ -442,7 +450,7 @@ article section li p, article aside li p {
     ) 0 0;
 }
 
-@keyframes query-status-scroll-background {
+@keyframes scroll-background {
     0% {
         background-position: 0 0;
     }
@@ -539,6 +547,7 @@ article section li p, article aside li p {
 
 .processor-list .queue-button-wrap {
     text-align: center;
+    align-self: center;
 }
 
 .processor-list .processor-drilldown {
@@ -554,7 +563,6 @@ article section li p, article aside li p {
 
 .processor-list li.expanded .processor-options {
 	margin-top: 0.5em;
-    border-top: 1px dotted var(--contrast-dark);
     padding: 0;
 }
 
@@ -665,12 +673,21 @@ iframe.query-result-iframe {
 	border: 1px dashed var(--contrast-dark);
 }
 
+.query-result {
+    padding-bottom: 0.5em;
+}
+
 iframe.query-result-iframe.csvfile {
 	height: 11em;
 }
 
 .child.focus:not(.card) > .sub-controls > .query-result > .query-result-iframe {
 	display: none;
+}
+
+img.details-only {
+	max-width: 75%;
+	margin: 0.5em auto;
 }
 
 .csv-preview .warning {

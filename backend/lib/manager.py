@@ -143,12 +143,6 @@ class WorkerManager:
 			if datasource + "-search" not in backend.all_modules.workers:
 				self.log.error("No search worker defined for datasource %s. Search queries will not be executed." % datasource)
 
-			if datasource + "-thread" not in backend.all_modules.workers:
-				self.log.warning("No thread scraper defined for datasource %s." % datasource)
-
-			if datasource + "-board" not in backend.all_modules.workers:
-				self.log.warning("No board scraper defined for datasource %s." % datasource)
-
 	def abort(self, signal=None, stack=None):
 		"""
 		Stop looping the delegator and prepare for shutdown

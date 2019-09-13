@@ -2,22 +2,21 @@
 Extract semantic frames
 """
 import requests
+import json
+import time
+import csv
+import re
 
 from backend.abstract.processor import BasicProcessor
 
 
-class SemanticFrameExtractor(): #BasicProcessor):
+class SemanticFrameExtractor(BasicProcessor):
 	"""
 	Extract Semantic Frames
 
 	Extracts semantic frames from the (combined) corpus. This calls the
 	PENELOPE-compatible API at the VUB's EHAI group which can extract
-	semantic frames from utterances containing causal phrasing. The
-	post-processor runs only on a previously 'stringified' dataset as
-	there is comparatively little value in doing this on a per-post basis,
-	but significant costs would be involved with doing that (such as needing to
-	make one API call per post due to the way it is set up, which can get
-	costly).
+	semantic frames from utterances containing causal phrasing.
 
 	Right now causal frames are the only ones that may be retrieved using the
 	API. If others become available, an option interface could be added to this
@@ -27,8 +26,8 @@ class SemanticFrameExtractor(): #BasicProcessor):
 	category = "Text analysis"  # category
 	title = "Semantic frames"  # title displayed in UI
 	description = "Extract semantic frames from text. This connects to the VUB's PENELOPE API to extract causal frames from the text using the framework developed by the Evolutionary and Hybrid AI (EHAI) group."  # description displayed in UI
-	extension = "json"  # extension of result file, used internally and in UI
-	accepts = ["stringify-posts"]  # types of result this post-processor can run on
+	extension = "csv"  # extension of result file, used internally and in UI
+	accepts = ["sentence-split"]  # types of result this post-processor can run on
 
 	def process(self):
 		"""
@@ -36,45 +35,79 @@ class SemanticFrameExtractor(): #BasicProcessor):
 		"""
 		self.dataset.update_status("Sending post data to PENELOPE API endpoint")
 
-		try:
-			# write the result in chunks as it can be pretty large
-			with requests.post("https://penelope.vub.be/semantic-frame-extractor/texts-extract-frames",
-							   data=self.chunked_dataset(), stream=True,
-							   headers={"Content-type": "application/json"}) as stream:
-				with self.dataset.get_results_path().open("wb") as output:
-					for chunk in stream.iter_content(chunk_size=1024):
-						if chunk:
-							output.write(chunk)
+		chunk_size = 50  # results may vary
+		chunk = []
+		processed = 0
+		entities = 0
 
-		except requests.RequestException:
-			self.dataset.update_status("Trouble reaching PENELOPE endpoint; analysis halted.")
-			self.dataset.finish()
+		# the API has some problems with fancy quote characters, etc, and they
+		# presumably don't make a difference for the results, so strip
+		# everything that's not plain text (or a few non-harmful characters)
+		# would need updating if languages other than English are supported
+		non_alpha = re.compile(r"[^a-zA-Z0-9%!?+*&@#)(/:;, -]")
 
-		with self.dataset.get_results_path().open("a") as init:
-			init.write("]")
+		with self.dataset.get_results_path().open("w") as output:
+			writer = csv.DictWriter(output, fieldnames=("sentence", "utterance", "frameEvokingElement", "cause", "effect"))
+			writer.writeheader()
 
-		self.dataset.update_status("Finished")
-		self.dataset.finish(self.parent.num_rows)
+			with self.source_file.open("r") as input:
+				reader = csv.DictReader(input)
 
-	def chunked_dataset(self):
-		"""
-		Read dataset in chunks
+				while True:
+					# the API can't handle too many sentences at once, so send
+					# them in chunks
+					self.dataset.update_status("%i sentences processed via PENELOPE API..." % processed)
 
-		Datasets can get quite large so instead of loading them into memory all
-		at once, read them in chunks. This is complicated by the fact that
-		we're required to send a JSON object to the API; this method takes care
-		of that by including a first and last chunk that wrap the rest of the
-		data in such an object.
+					end_of_the_line = False
+					try:
+						post = reader.__next__()
+						sentence = non_alpha.sub("", post["sentence"])
+						processed += 1
+						if not sentence:
+							# could be that it's just symbols, no text
+							continue
 
-		:return bytes:  Chunks of data
-		"""
-		input_file = self.source_file.open("rb")
-		# wrap the input file in a JSON object
-		chunk = bytes('{"texts": [""', encoding="utf-8")
+						chunk.append(sentence)
+					except StopIteration:
+						end_of_the_line = True
 
-		while chunk:
-			yield chunk
-			chunk = input_file.read(1024).replace(b"\"", b"\\\"")
+					if len(chunk) == chunk_size or end_of_the_line:
+						payload = {"texts": chunk, "frames": ["Causation"]}
+						response = requests.post("https://penelope.vub.be/semantic-frame-extractor/texts-extract-frames", data=json.dumps(payload), headers={"Content-type": "application/json"})
 
-		yield bytes('"], "frames": ["Causation"]}', encoding="utf-8")
-		input_file.close()
+						if response.status_code != 200:
+							self.log.warning("PENELOPE Semantic Frame API crashed for chunk %s" % repr(chunk))
+							self.dataset.update_status("PENELOPE API response could not be parsed.")
+							entities = 0
+							break
+
+						# filter response to only include those sentences that
+						# actually contained any semantic frames
+						for frameset_list in response.json().get("frameSets", []):
+							if not frameset_list:
+								continue
+
+							for frameset in frameset_list:
+								if not frameset.get("entities", None):
+									continue
+
+								for entity in frameset.get("entities"):
+									entities += 1
+									writer.writerow({
+										"sentence": frameset["utterance"],
+										"utterance": entity.get("utterance", ""),
+										"frameEvokingElement": entity.get("frameEvokingElement", ""),
+										"cause": entity.get("cause", ""),
+										"effect": entity.get("effect", "")
+									})
+
+						chunk = []
+
+					if end_of_the_line:
+						self.dataset.update_status("Finished")
+						break
+					else:
+						# let 'em breathe
+						time.sleep(1)
+
+		self.dataset.finish(entities)

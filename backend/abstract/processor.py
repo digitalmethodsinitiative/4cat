@@ -58,10 +58,10 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 			except TypeError:
 				# we need to know what the parent dataset was to properly handle the
 				# analysis
-				self.log.warning("Processor %s queued for orphan query %s: cannot run, cancelling job" % (self.type, self.dataset.key))
+				self.log.warning("Processor %s queued for orphan query %s: cannot run, cancelling job" % (
+					self.type, self.dataset.key))
 				self.job.finish()
 				return
-
 
 			if not self.parent.is_finished():
 				# not finished yet - retry after a while
@@ -101,34 +101,47 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 
 			# run it only if the post-processor is actually available for this query
 			if next_type in available_processors:
-				next_analysis = DataSet(parameters=next_parameters, type=next_type, db=self.db, parent=self.dataset.key, extension=available_processors[next_type]["extension"])
+				next_analysis = DataSet(parameters=next_parameters, type=next_type, db=self.db, parent=self.dataset.key,
+										extension=available_processors[next_type]["extension"])
 				self.queue.add_job(next_type, remote_id=next_analysis.key)
 
 		# see if we need to register the result somewhere
 		if "copy_to" in self.parameters:
 			# copy the results to an arbitray place that was passed
 			if self.dataset.get_results_path().exists():
-				# were we given a dataset ID to copy to?
-				try:
-					surrogate = DataSet(key=self.parameters["copy_to"], db=self.db)
-
-					# copy metadata and results to the surrogate
-					shutil.copyfile(str(self.dataset.get_results_path()), str(surrogate.get_results_path()))
-					try:
-						surrogate.finish(self.dataset.data["num_rows"])
-					except RuntimeError:
-						# already finished, could happen
-						pass
-
-					surrogate.update_status(self.dataset.get_status())
-				except ValueError:
-					# if not, it's a path to copy to
-					shutil.copyfile(str(self.dataset.get_results_path()), self.parameters["copy_to"])
+				shutil.copyfile(str(self.dataset.get_results_path()), self.parameters["copy_to"])
 			else:
 				# if copy_to was passed, that means it's important that this
 				# file exists somewhere, so we create it as an empty file
 				with open(self.parameters["copy_to"], "w") as empty_file:
 					empty_file.write("")
+
+		# see if this query chain is to be attached to another query
+		# if so, the full genealogy of this query (minus the original dataset)
+		# is attached to the given query - this is mostly useful for presets,
+		# where a chain of processors can be marked as 'underlying' a preset
+		if "attach_to" in self.parameters:
+			try:
+				# copy metadata and results to the surrogate
+				surrogate = DataSet(key=self.parameters["attach_to"], db=self.db)
+
+				if self.dataset.get_results_path().exists():
+					shutil.copyfile(str(self.dataset.get_results_path()), str(surrogate.get_results_path()))
+
+				top_parent = self.dataset.get_genealogy()[1]
+				top_parent.link_parent(surrogate.key)
+
+				try:
+					surrogate.finish(self.dataset.data["num_rows"])
+				except RuntimeError:
+					# already finished, could happen (though it shouldn't)
+					pass
+
+				surrogate.update_status(self.dataset.get_status())
+
+			except ValueError:
+				# dataset with key to attach to doesn't exist...
+				self.log.warning("Cannot attach dataset chain containing %s to %s (dataset does not exist)" % (self.dataset.key, self.parameters["attach_to"]))
 
 		self.job.finish()
 
