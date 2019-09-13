@@ -64,7 +64,7 @@ class VectorRanker(BasicProcessor):
 			stem = file.split("/")[-1].split(".")[0].split("-")
 			try:
 				return int(stem[0] + stem[1].zfill(2))
-			except ValueError:
+			except (ValueError, IndexError):
 				return 0
 
 		with zipfile.ZipFile(self.source_file, "r") as token_archive:

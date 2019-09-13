@@ -1,6 +1,9 @@
 """
 Miscellaneous helper functions for the 4CAT backend
 """
+import socket
+import json
+import ssl
 import csv
 import re
 
@@ -246,3 +249,40 @@ def get_yt_compatible_ids(yt_ids):
 			ids.append(ids_string)
 
 	return ids
+
+
+def call_api(action, payload=None):
+	"""
+	Send message to server
+
+	Calls the internal API and returns interpreted response.
+
+	:param str action: API action
+	:param payload: API payload
+
+	:return: API response, or timeout message in case of timeout
+	"""
+	connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+	connection.settimeout(5)
+	connection.connect(("localhost", config.API_PORT))
+
+	msg = json.dumps({"request": action, "payload": payload})
+	connection.sendall(msg.encode("ascii", "ignore"))
+
+	try:
+		response = connection.recv(2048)
+		response = response.decode("ascii", "ignore")
+	except (socket.timeout, TimeoutError):
+		response = "(Connection timed out)"
+
+	try:
+		connection.shutdown(socket.SHUT_RDWR)
+	except OSError:
+		# already shut down automatically
+		pass
+	connection.close()
+
+	try:
+		return json.loads(response)
+	except json.JSONDecodeError:
+		return response

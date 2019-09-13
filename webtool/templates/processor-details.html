@@ -9,7 +9,7 @@
                         {% endif %}
                         {{ processor.description }}
                         {% if processor.description[-1] != "." %}.{% endif %}
-                        Output: <code>{{ processor.extension }}</code> file.{% if processor.further and part == "main" %} Further analyses available.{% endif %}{% if inline %}
+                        Output: <code>{{ processor.extension }}</code> file.{% if inline %}
                         </p>{% endif %}
                     </div>
                     <div class="queue-button-wrap {% if is_processor_running %}hidden{% endif %}">

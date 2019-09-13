@@ -88,7 +88,7 @@ function init() {
 
     //collapse post-processor options
     processor.collapse_options();
-    processor.resize_blocks();
+    setTimeout(processor.resize_blocks, 100);
 }
 
 /**
@@ -222,13 +222,14 @@ processor = {
            let description = $(this).find('> .query-descriptor');
            let button = $(this).find('> button');
 
+           $(this).removeClass('fullwidth-description').removeClass('fullwidth-button');
+
            let max_width = $(this).width();
            let description_width = description.width();
            let description_height = description.height();
            let button_width = button.width();
            let button_height = button.height();
 
-           $(this).removeClass('fullwidth-description').removeClass('fullwidth-button');
            if(description_width + button_width > max_width || button_height > description_height) {
                if(description_width > button_width || button_height > description_height) {
                    $(this).addClass('fullwidth-description');

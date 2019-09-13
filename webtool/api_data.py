@@ -13,7 +13,7 @@ from pathlib import Path
 from flask import jsonify, abort, send_file, request, render_template
 
 from webtool import app, db, log, openapi, limiter
-from webtool.lib.helpers import format_post
+from webtool.lib.helpers import format_post, error
 from backend.lib.helpers import strip_tags
 
 api_ratelimit = limiter.shared_limit("1 per second", scope="api")
@@ -31,10 +31,15 @@ def api_thread(datasource, board, thread_id):
 	:param int thread_id:  Thread ID
 
 	:request-param str format:  Data format. Can be `json` (default) or `html`.
+
 	:return: Thread data, as a list of `posts`.
+
+	:return-schema: {type=object,properties={posts={type=object,additionalProperties={}}}}
+
+	:return-error 404:  If the thread ID does not exist for the given data source.
 	"""
 	if datasource not in config.DATASOURCES:
-		return jsonify({"error": "Invalid data source", "endpoint": request.url_rule.rule})
+		return error(404, error="Invalid data source")
 
 	thread = db.fetchone("SELECT * FROM threads_" + datasource + " WHERE board = %s AND id = %s", (board, thread_id))
 
@@ -50,7 +55,8 @@ def api_thread(datasource, board, thread_id):
 	response["posts"] = [strip_html(post) for post in response["posts"]]
 
 	if not response:
-		abort(404)
+		return error(404, error="No posts available for this datasource")
+
 	elif request.args.get("format", "json") == "html":
 		def format(post):
 			post["com"] = format_post(post.get("com", "")).replace("\n", "<br>")
@@ -79,16 +85,27 @@ def api_board(datasource, board):
 	:return:  Thread index for board, as a list of pages, each page containing
 	          a page number `page` and a list of `threads`, each thread having
 	          the keys `no` and `last_modified`.
+
+	:return-schema:{type=array,items={type=object,properties={
+		page={type=integer},
+		threads={type=array,items={type=object,properties={
+			no={type=integer},
+			last_modified={type=integer},
+			replies={type=integer}
+		}}}
+	}}}
+
+	:return-error 404:  If the board does not exist for the given datasource.
 	"""
 	if datasource not in config.DATASOURCES:
-		return jsonify({"error": "Invalid datasource", "endpoint": request.url_rule.rule})
+		return error(404, error="Invalid data source")
 
 	threads = db.fetchall(
 		"SELECT * FROM threads_" + datasource + " WHERE board = %s ORDER BY is_sticky DESC, timestamp_modified DESC LIMIT 200",
 		(board,))
 
 	if not threads:
-		abort(404)
+		return error(404, error="No threads available for this datasource")
 
 	response = []
 	page = 1
@@ -121,14 +138,22 @@ def api_board_page(datasource, board, page):
 	:param int page:  Page to show
 	:return:  A page containing a list of `threads`, each thread a list of
 	          `posts`.
+
+	:return-schema:{type=object,properties={
+		threads={type=array,items={type=object,properties={
+			posts={type=array,items={type=object,additionalProperties={}}}
+		}}}
+	}}
+
+	:return-error 404:  If the board does not exist for the given datasource.
 	"""
 	if datasource not in config.DATASOURCES:
-		return jsonify({"error": "Invalid datasource", "endpoint": request.url_rule.rule})
+		return error(404, error="Invalid data source")
 
 	try:
 		page = int(page)
 	except ValueError:
-		return jsonify({"error": "Invalid page number", "endpoint": request.url_rule.rule})
+		return error(404, error="Invalid page number")
 
 	limit = "LIMIT 15 OFFSET %i" % ((int(page) - 1) * 15)
 	threads = db.fetchall(
@@ -136,7 +161,7 @@ def api_board_page(datasource, board, page):
 		(board,))
 
 	if not threads:
-		abort(404)
+		return error(404, error="No threads available for this datasource")
 
 	response = {
 		"threads": [
@@ -159,16 +184,27 @@ def api_board_catalog(datasource, board):
 	:return:  Board catalog, up to 150 threads divided over a list of
 	          20-thread pages, each page having a `page` number and a
 	          list of `threads`, each thread containing the first post.
+
+	:return-schema:{type=array,items={type=object,properties={
+		page={type=integer},
+		threads={type=array,items={type=object,properties={
+			no={type=integer},
+			last_modified={type=integer},
+			replies={type=integer}
+		}}}
+	}}}
+
+	:return-error 404:  If the board does not exist for the given datasource.
 	"""
 	if datasource not in config.DATASOURCES:
-		return jsonify({"error": "Invalid datasource", "endpoint": request.url_rule.rule})
+		return error(404, error="Invalid data source")
 
 	threads = db.fetchall(
 		"SELECT * FROM threads_" + datasource + " WHERE board = %s ORDER BY is_sticky DESC, timestamp_modified DESC LIMIT 150",
 		(board,))
 
 	if not threads:
-		abort(404)
+		return error(404, error="No threads available for this datasource")
 
 	response = []
 	page = 1
@@ -204,15 +240,17 @@ def get_archive(datasource, board):
 	"""
 	Emulate 4chan API /[board]/archive.json endpoint
 
-	hello
-
 	:param str datasource:  Data source ID
 	:param board: Board to get list of archived thread IDs for
 	:return:  Thread archive, a list of threads IDs of threads within this
 	          board.
+
+	:return-schema: {type=array,items={type=integer}}
+
+	:return-error 404: If the datasource does not exist.
 	"""
 	if datasource not in config.DATASOURCES:
-		return jsonify({"error": "Invalid datasource", "endpoint": request.url_rule.rule})
+		return error(404, error="Invalid data source")
 
 	threads = db.fetchall(
 		"SELECT id FROM threads_" + datasource + " WHERE board = %s AND timestamp_archived > 0 ORDER BY timestamp_archived ASC",
@@ -230,9 +268,17 @@ def get_boards(datasource):
 	:param datasource:  The datasource for which to acquire the list of available
 	                  boards.
 	:return:  A list containing a list of `boards`, as string IDs.
+
+	:return-schema: {type=object,properties={
+		boards={type=array,items={type=object,properties={
+			board={type=string}
+		}}}
+	}}
+
+	:return-error 404: If the datasource does not exist.
 	"""
 	if datasource not in config.DATASOURCES:
-		return jsonify({"error": "Invalid datasource", "endpoint": request.url_rule.rule})
+		return error(404, error="Invalid data source")
 
 	boards = db.fetchall("SELECT DISTINCT board FROM threads_" + datasource)
 	return jsonify({"boards": [{"board": board["board"]} for board in boards]})

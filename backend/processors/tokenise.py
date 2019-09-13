@@ -86,6 +86,7 @@ class Tokenise(BasicProcessor):
 
 		link_regex = re.compile(r"https?://[^\s]+")
 		symbol = re.compile(r"[^a-zA-Z0-9]")
+		numbers = re.compile(r"\b[0-9]+\b")
 
 		# load word filters - words to exclude from tokenisation
 		word_filter = set()
@@ -167,7 +168,7 @@ class Tokenise(BasicProcessor):
 					token = token.lower()
 
 					if strip_symbols:
-						token = symbol.sub("", token)
+						token = numbers.sub("", symbol.sub("", token))
 
 					if token in word_filter:
 						continue

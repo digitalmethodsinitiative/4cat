@@ -129,7 +129,7 @@ class WikipediaCatgegoryNetwork(BasicProcessor):
 
 				# if needed, also include pages linked to from within the
 				# fetched page source
-				if self.parameters["deep_pages"]:
+				if self.parameters.get("deep_pages", None):
 					linked_pages = wiki_page.findall(wiki_source)
 					for page in linked_pages:
 						page = page.split("|")[0]

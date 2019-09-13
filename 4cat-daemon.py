@@ -7,6 +7,8 @@ from pathlib import Path
 import config
 import backend.bootstrap as bootstrap
 
+from backend.lib.helpers import call_api
+
 # check if we can run a daemon
 if os.name not in ("posix"):
 	# if not, run the backend directly and quit
@@ -162,5 +164,19 @@ elif command == "status":
 	else:
 		if pid in psutil.pids():
 			print("4CAT Backend Daemon is currently up and running.")
+			
+			# fetch more detailed status via internal API
+			if not config.API_PORT:
+				sys.exit(0)
+
+			print("\n     Active workers:\n-------------------------")
+			active_workers = call_api("workers")["response"]
+			active_workers = {worker: active_workers[worker] for worker in sorted(active_workers, key=lambda id: active_workers[id], reverse=True)}
+			for worker in active_workers:
+				print("%s: %i" % (worker, active_workers[worker]))
+
+			print("\n")
+
+
 		else:
 			print("4CAT Backend Daemon is not running, but a PID file exists. Has it crashed?")
