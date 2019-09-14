@@ -55,7 +55,7 @@ class WikipediaCatgegoryNetwork(BasicProcessor):
 
 		# find all links in post bodies
 		self.dataset.update_status("Reading source file")
-		with self.source_file.open() as input:
+		with self.source_file.open(encoding="utf-8") as input:
 			reader = csv.DictReader(input)
 
 			for post in reader:
