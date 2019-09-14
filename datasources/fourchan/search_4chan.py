@@ -304,6 +304,12 @@ class Search4Chan(Search):
 																										None):
 			raise QueryParametersException("Please provide a body query, subject query or random sample size.")
 
+		# Make sure to accept only a body or subject match.
+		if not query.get("body_match", None) and query.get("subject_match", None):
+			query["body_match"] = ""
+		elif query.get("body_match", None) and not query.get("subject_match", None):
+			query["subject_match"] = ""
+
 		# body query and full threads are incompatible, returning too many posts
 		# in most cases
 		if query.get("body_match", None):
