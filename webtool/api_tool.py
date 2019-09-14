@@ -37,12 +37,12 @@ def openapi_overview():
 	return jsonify({
 		"status": "The following API specifications are available from this server.",
 		"data": {
-			api_id: "http" + ("s" if config.FlaskConfig.SERVER_HTTPS else "") + "://" + config.FlaskConfig.SERVER_NAME + "/api/" + api_id + "/"
+			api_id: "http" + ("s" if config.FlaskConfig.SERVER_HTTPS else "") + "://" + config.FlaskConfig.SERVER_NAME + "/api/spec/" + api_id + "/"
 	 for api_id in openapi.apis
 		}
 	})
 
-@app.route('/api/<string:api_id>/')
+@app.route('/api/spec/<string:api_id>/')
 @api_ratelimit
 def openapi_specification(api_id="all"):
 	"""
