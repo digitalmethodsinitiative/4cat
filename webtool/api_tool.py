@@ -240,7 +240,7 @@ def check_dataset():
 
 	Requires authentication by logging in or providing a valid access token.
 
-	:request-param str query_key:  ID of the dataset for which to return the status
+	:request-param str key:  ID of the dataset for which to return the status
 	:return: Dataset status, containing the `status`, `query`, number of `rows`,
 	         the dataset `key`, whether the dataset is `done`, the `path` of the
 	         result file and whether the dataset is `empty`.
@@ -261,6 +261,7 @@ def check_dataset():
 	:return-error 404:  If the dataset does not exist.
 	"""
 	dataset_key = request.args.get("key")
+	print(dataset_key)
 	try:
 		dataset = DataSet(key=dataset_key, db=db)
 	except TypeError:
