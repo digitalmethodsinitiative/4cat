@@ -188,8 +188,8 @@ def queue_dataset():
 
 	:request-param str board:  Board ID to query
 	:request-param str datasource:  Data source ID to query
-	:request-param str body_query:  String to match in the post body
-	:request-param str subject_query:  String to match in the post subject
+	:request-param str body_match:  String to match in the post body
+	:request-param str subject_match:  String to match in the post subject
     :request-param int min_date:  Timestamp marking the beginning of the match
                                   period
     :request-param int max_date:  Timestamp marking the end of the match period
@@ -240,7 +240,7 @@ def check_dataset():
 
 	Requires authentication by logging in or providing a valid access token.
 
-	:request-param str query_key:  ID of the dataset for which to return the status
+	:request-param str key:  ID of the dataset for which to return the status
 	:return: Dataset status, containing the `status`, `query`, number of `rows`,
 	         the dataset `key`, whether the dataset is `done`, the `path` of the
 	         result file and whether the dataset is `empty`.
@@ -261,6 +261,7 @@ def check_dataset():
 	:return-error 404:  If the dataset does not exist.
 	"""
 	dataset_key = request.args.get("key")
+	print(dataset_key)
 	try:
 		dataset = DataSet(key=dataset_key, db=db)
 	except TypeError:
