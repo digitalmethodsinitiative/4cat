@@ -437,7 +437,12 @@ def available_processors():
 	except TypeError:
 		return error(404, error="Dataset does not exist.")
 
-	return jsonify(dataset.get_available_processors())
+	# Class type is not JSON serialisable
+	processors = dataset.get_available_processors()
+	for key, value in processors.items():
+		del value["class"]
+
+	return jsonify(processors)
 
 
 @app.route('/api/check-processors/')
