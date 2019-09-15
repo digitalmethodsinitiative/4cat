@@ -440,7 +440,8 @@ def available_processors():
 	# Class type is not JSON serialisable
 	processors = dataset.get_available_processors()
 	for key, value in processors.items():
-		del value["class"]
+		if "class" in value:
+			del value["class"]
 
 	return jsonify(processors)
 
