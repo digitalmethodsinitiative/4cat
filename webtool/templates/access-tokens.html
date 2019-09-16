@@ -38,6 +38,11 @@
                     {% endfor %}
                 </table>
             {% endif %}
+
+            <p>Tokens can be passed to API calls in two ways; via a <code>GET</code> parameter, <code>access-token</code>:</p>
+            <p><code>/api/endpoint?access-token=[token]</code></p>
+            <p>Alternatively, you can pass it as a request header, <code>Authentication</code>:</p>
+            <p><code>headers = {"Authentication": "[access-token]"}</code></p>
         </section>
     </article>
 {% endblock %}
