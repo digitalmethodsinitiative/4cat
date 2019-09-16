@@ -54,3 +54,20 @@ class SearchBreitbart(Search4Chan):
 			processed_posts.append(post)
 
 		return processed_posts
+
+	def validate_query(query, request):
+		"""
+		Validate input for a dataset query on the 4chan data source.
+
+		Will raise a QueryParametersException if invalid parameters are
+		encountered. Mutually exclusive parameters may also be sanitised by
+		ignoring either of the mutually exclusive options.
+
+		:param dict query:  Query parameters, from client-side.
+		:param request:  Flask request
+		:return dict:  Safe query parameters
+		"""
+		request = Search4Chan.validate_query(query, request)
+		request["board"] = "*"
+
+		return request
