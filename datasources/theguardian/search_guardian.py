@@ -205,7 +205,7 @@ class SearchGuardian(Search):
 			"url": thread["url"],
 			"summary": thread["description"],
 			"body": thread.get("text", ""),
-			"author": ", ".join(thread["authors"]),
+			"author": ", ".join(thread.get("authors", [])),
 			"score": 0,
 			"parent": ""
 		}
