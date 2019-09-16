@@ -37,6 +37,7 @@ class Tokenise(BasicProcessor):
 		"language": {
 			"type": UserInput.OPTION_CHOICE,
 			"options": {language: language[0].upper() + language[1:] for language in SnowballStemmer.languages},
+			"default": "english",
 			"help": "Language"
 		},
 		"stem": {
@@ -133,7 +134,13 @@ class Tokenise(BasicProcessor):
 				if timeframe == "all":
 						output = "overall"
 				else:
-					timestamp = int(datetime.datetime.strptime(post["timestamp"], "%Y-%m-%d %H:%M:%S").timestamp())
+					if "timestamp_unix" in post:
+						timestamp = post["timestamp_unix"]
+					else:
+						try:
+							timestamp = int(datetime.datetime.strptime(post["timestamp"], "%Y-%m-%d %H:%M:%S").timestamp())
+						except ValueError:
+							timestamp = 0
 					date = datetime.datetime.fromtimestamp(timestamp)
 					if timeframe == "year":
 						output = str(date.year)
