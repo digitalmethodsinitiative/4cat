@@ -5,7 +5,7 @@ import sys
 import re
 import os
 
-sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)) + '/..')
+sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)) + "/../..")
 
 from backend.lib.database import Database
 from backend.lib.logger import Logger
