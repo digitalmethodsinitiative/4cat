@@ -123,15 +123,15 @@ class Search4Chan(Search):
 			except ValueError:
 				pass
 
-		if query["board"] and query["board"] != "*":
+		if query.get("board", None) and query["board"] != "*":
 			where.append("board = %s")
 			replacements.append(query["board"])
 
 		# escape full text matches
-		if query["body_match"]:
+		if query.get("body_match", None):
 			match.append("@body " + self.escape_for_sphinx(query["body_match"]))
 
-		if query["subject_match"]:
+		if query.get("subject_match", None):
 			match.append("@subject " + self.escape_for_sphinx(query["subject_match"]))
 
 		# handle country codes through sphinx if not looking for density
