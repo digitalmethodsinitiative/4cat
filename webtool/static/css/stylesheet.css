@@ -122,6 +122,11 @@ fieldset {
     border-bottom: 1px dotted var(--contrast-dark);
 }
 
+.form-element textarea {
+    min-width: 25em;
+    min-height: 6em;
+}
+
 .form-element {
     display: flex;
     align-items: center;
