@@ -5,41 +5,45 @@
 
 {% block body %}
     <article class="small">
-    <section>
-        <h2><span>Request account</span></h2>
-        <p>Access to {{ __tool_name }} is available upon request for researchers and students who would like to use it for their
-            project. Please provide your details via the form below to request an account.</p>
-        <p>Note that unfortunately due to limited resources we need to evaluate applications on a case-by-case basis
-            and cannot guarantee access.</p>
+        <section>
+            <h2><span>Request account</span></h2>
+            <p>Access to {{ __tool_name }} is available upon request for researchers and students who would like to use
+                it for their
+                project. Please provide your details via the form below to request an account.</p>
+            <p>Note that unfortunately due to limited resources we need to evaluate applications on a case-by-case basis
+                and cannot guarantee access.</p>
+            <p><em>Please try to be somewhat specific</em>, we're interested in how people use our tool so we'd be
+                grateful if you
+                could provide some more detail than e.g. just "research" as your stated intent.</p>
 
-        <form action="/request-access/" method="POST" class="wide">
-        {% for notice in flashes %}
-            <p class="form-notice">{{ notice }}</p>
-        {% endfor %}
-            <div class="form-element{% if "name" in incomplete %} missing{% endif %}">
-                <label for="request-name">Name</label>
-                <input type="text" name="name" id="request-name" value="{{ form.name }}">
-            </div>
-            <div class="form-element{% if "email" in incomplete %} missing{% endif %}">
-                <label for="request-email">E-mail (will be your username if granted)</label>
-                <input type="text" name="email" id="request-email" value="{{ form.email }}">
-            </div>
-            <div class="form-element{% if "university" in incomplete %} missing{% endif %}">
-                <label for="request-uni">Institutional affiliation</label>
-                <input type="text" name="university" id="request-uni" value="{{ form.university }}">
-            </div>
-            <div class="form-element{% if "source" in incomplete %} missing{% endif %}">
-                <label for="request-source">How did you hear about {{ __tool_name }}?</label>
-                <input type="text" name="source" id="request-source"  value="{{ form.source }}">
-            </div>
-            <div class="form-element{% if "intent" in incomplete %} missing{% endif %}">
-                <label for="request-intent">What do you intend to use {{ __tool_name }} for?</label>
-                <textarea rows="10" cols="50" name="intent" id="request-intent">{{ form.intent }}</textarea>
-            </div>
-            <div class="submit-container">
-                <button>Request account</button>
-            </div>
-        </form>
+            <form action="/request-access/" method="POST" class="wide">
+                {% for notice in flashes %}
+                    <p class="form-notice">{{ notice }}</p>
+                {% endfor %}
+                <div class="form-element{% if "name" in incomplete %} missing{% endif %}">
+                    <label for="request-name">Name</label>
+                    <input type="text" name="name" id="request-name" value="{{ form.name }}">
+                </div>
+                <div class="form-element{% if "email" in incomplete %} missing{% endif %}">
+                    <label for="request-email">E-mail (will be your username if granted)</label>
+                    <input type="text" name="email" id="request-email" value="{{ form.email }}">
+                </div>
+                <div class="form-element{% if "university" in incomplete %} missing{% endif %}">
+                    <label for="request-uni">Institutional affiliation</label>
+                    <input type="text" name="university" id="request-uni" value="{{ form.university }}">
+                </div>
+                <div class="form-element{% if "source" in incomplete %} missing{% endif %}">
+                    <label for="request-source">How did you hear about {{ __tool_name }}?</label>
+                    <input type="text" name="source" id="request-source" value="{{ form.source }}">
+                </div>
+                <div class="form-element{% if "intent" in incomplete %} missing{% endif %}">
+                    <label for="request-intent">What do you intend to use {{ __tool_name }} for?</label>
+                    <textarea rows="10" cols="50" name="intent" id="request-intent">{{ form.intent }}</textarea>
+                </div>
+                <div class="submit-container">
+                    <button>Request account</button>
+                </div>
+            </form>
 
             <footer class="form-footer">
                 <nav>
@@ -50,6 +54,6 @@
                     </ul>
                 </nav>
             </footer>
-    </section>
+        </section>
     </article>
 {% endblock %}
