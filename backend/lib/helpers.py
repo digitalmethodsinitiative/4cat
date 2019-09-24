@@ -143,7 +143,7 @@ def convert_to_int(value, default=0):
 	"""
 	Convert a value to an integer, with a fallback
 
-	The fallback is used if a TypeError is thrown during converstion to int.
+	The fallback is used if an Error is thrown during converstion to int.
 	This is a convenience function, but beats putting try-catches everywhere
 	we're using user input as an integer.
 
@@ -153,7 +153,7 @@ def convert_to_int(value, default=0):
 	"""
 	try:
 		return int(value)
-	except TypeError:
+	except (ValueError, TypeError):
 		return default
 
 

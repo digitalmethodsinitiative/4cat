@@ -35,7 +35,7 @@ class NeologismExtractor(ProcessorPreset):
 		"""
 		timeframe = self.parameters.get("timeframe", self.options["timeframe"]["default"])
 
-		return [
+		pipeline = [
 			# first, tokenise the posts, excluding all common words
 			{
 				"type": "tokenise-posts",
@@ -61,3 +61,5 @@ class NeologismExtractor(ProcessorPreset):
 				}
 			}
 		]
+
+		return pipeline
