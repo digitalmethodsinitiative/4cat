@@ -236,5 +236,4 @@ class RankFlowRenderer(BasicProcessor):
 
 		# finally, save the svg file
 		canvas.saveas(pretty=True, filename=str(self.dataset.get_results_path()))
-		raise Exception
 		self.dataset.finish(len(items) * len(list(items.items()).pop()))
