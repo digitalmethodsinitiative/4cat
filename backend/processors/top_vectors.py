@@ -25,12 +25,12 @@ class VectorRanker(BasicProcessor):
 	options = {
 		"top": {
 			"type": UserInput.OPTION_TEXT,
-			"default": 100,
+			"default": 25,
 			"help": "Cut-off for top list"
 		},
 		"amount": {
 			"type": UserInput.OPTION_TOGGLE,
-			"default": False,
+			"default": True,
 			"help": "Include number of occurrences"
 		}
 	}
