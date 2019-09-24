@@ -23,6 +23,7 @@ libraries = [
 		"requests==2.20.0",
 		"psycopg2==2.7.5",
 		"markdown==3.0.1",
+		"svgwrite==1.1.9",
 		"pymysql==0.9.2",
 		"pandas==0.23.4",
 		"datedelta==1.3",
@@ -34,7 +35,8 @@ libraries = [
 		"scipy==1.1.0",
 		"Flask==1.1.0",
 		"nltk==3.4.5",
-		"mpld3==0.3"
+		"mpld3==0.3",
+		"ijson==2.4"
 	]
 
 # Some libraries don't run on Windows

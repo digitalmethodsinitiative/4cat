@@ -6,8 +6,11 @@ import csv
 
 from backend.abstract.processor import BasicProcessor
 from backend.lib.helpers import UserInput, convert_to_int
-from backend.lib.svgpathtools import Path, Line, CubicBezier, disvg
 
+from svgwrite import Drawing
+from svgwrite.shapes import Rect
+from svgwrite.path import Path
+from svgwrite.text import Text
 from svgwrite.gradients import LinearGradient
 
 
@@ -25,7 +28,8 @@ class RankFlowRenderer(BasicProcessor):
 	description = "Create a diagram showing changes in prevalence over time for sequential ranked lists (following Bernhard Rieder's RankFlow grapher)."  # description displayed in UI
 	extension = "svg"  # extension of result file, used internally and in UI
 
-	accepts = ["vector-ranker", "preset-neologisms"]
+	accepts = ["vector-ranker", "preset-neologisms", "tfidf"]
+
 	options = {
 		"colour_property": {
 			"type": UserInput.OPTION_CHOICE,
@@ -49,32 +53,16 @@ class RankFlowRenderer(BasicProcessor):
 
 		# first create a map with the ranks for each period
 		with self.source_file.open() as input:
-			reader = csv.reader(input)
+			reader = csv.DictReader(input)
 
-			# detect whether the 'include amount of occurences' options was
-			# checked for the top vectors source file - read the header and
-			# look for the relevant column name. We're not using a DictReader
-			# because we don't know what header format to expect
-			header = reader.__next__()
-			weighted = ("occurrences" in header)
-
-			# create a dictionary per period in the source file (which should
-			# be in chronological order already)
-			for i in range(0, len(header)):
-				if not weighted or i % 2 == 0:
-					items[header[i]] = {}
-
-			# determine items that are ranked per period and also weigh them;
-			# if the amount of occurence is included use that, else weight
-			# is always 1. Max length is stored to later properly scale the
-			# invidual items in the flowchart.
+			weighted = ("value" in reader.fieldnames)
 			for row in reader:
-				for i in range(0, len(row)):
-					if not weighted or i % 2 == 0:
-						period = list(items)[int(i / (2 if weighted else 1))]
-						weight = 1 if not weighted else convert_to_int(row[i + 1], default=1)
-						items[period][row[i]] = weight
-						max_weight = max(weight, max_weight)
+				if row["date"] not in items:
+					items[row["date"]] = {}
+
+				weight = convert_to_int(row["value"], 1) if weighted else 1
+				items[row["date"]][row["text"]] = weight
+				max_weight = max(max_weight, weight)
 
 		# determine per-period changes
 		# this is used for determining what colour to give to nodes, and
@@ -100,42 +88,45 @@ class RankFlowRenderer(BasicProcessor):
 				else:
 					changes[period][item] = 1
 
-		# some sizing parameters for the chart
+		# some sizing parameters for the chart - experiment with those
 		box_width = 12
 		box_height = 10  # boxes will never be smaller than this
 		box_max_height = 100
 		box_gap_x = 90
 		box_gap_y = 5
 
+		# don't change this - initial X value for top left box
 		box_start_x = 0
-		paths = []
 
 		# we use this to know if and where to draw the flow curve between a box
 		# and its previous counterpart
-		previous_box_coordinates = {}
-		previous_box_attributes = {}
-		boxes = []
+		previous_boxes = {}
+		previous = []
 
-		# svgpathtools has this weird setup where path attributes are
-		# decoupled from path definitions
-		definitions = []
+		# we need to store the svg elements before drawing them to the canvas
+		# because we need to know what elements to draw before we can set the
+		# canvas up for drawing to
+		boxes = []
 		labels = []
-		flow_attributes = []
-		box_attributes = []
-		path_widths = []
-		box_widths = []
+		flows = []
+		definitions = []
 
 		# this is the default colour for items (it's blue-ish)
 		# we're using HSV, so we can increase the hue for more prominent items
 		base_colour = [.55, .95, .95]
+		max_y = 0
 
+		# go through all periods and draw boxes and flows
 		for period in items:
+			# reset Y coordinate, i.e. start at top
 			box_start_y = 0
 
 			for item in items[period]:
+				# determine weight (and thereby height) of this particular item
 				weight = items[period][item]
 				weight_factor = weight / max_weight
-				height = int(max(box_height, box_max_height * weight_factor)) if size_property and weighted else box_height
+				height = int(
+					max(box_height, box_max_height * weight_factor)) if size_property and weighted else box_height
 
 				# colour ranges from blue to red
 				change = changes[period][item]
@@ -144,54 +135,34 @@ class RankFlowRenderer(BasicProcessor):
 				colour[0] += (1 - base_colour[0]) * (weight_factor if colour_property == "weight" else change_factor)
 
 				# first draw the box
-				box = (
-					Line(complex(box_start_x, box_start_y), complex(box_start_x + box_width, box_start_y)),
-					Line(complex(box_start_x + box_width, box_start_y),
-						 complex(box_start_x + box_width, box_start_y + height)),
-					Line(complex(box_start_x + box_width, box_start_y + height),
-						 complex(box_start_x, box_start_y + height)),
-					Line(complex(box_start_x, box_start_y + height), complex(box_start_x, box_start_y))
+				box_fill = "rgb(%i, %i, %i)" % tuple([int(v * 255) for v in colorsys.hsv_to_rgb(*colour)])
+				box = Rect(
+					insert=(box_start_x, box_start_y),
+					size=(box_width, height),
+					fill=box_fill
 				)
+				boxes.append(box)
 
-				# add box label
+				# then the text label
 				label_y = (box_start_y + (height / 2)) + 3
-				labels.append((item + (" (%s)" % weight if weight != 1 else ""), "8px", Path(Line(
-					complex(box_start_x + box_width + box_gap_y, label_y),
-					complex(box_start_x + box_width + box_gap_x, label_y)
-				))))
+				label = Text(
+					text=(item + (" (%s)" % weight if weight != 1 else "")),
+					insert=(box_start_x + box_width + box_gap_y, label_y)
+				)
+				labels.append(label)
 
-				box_start_y += box_gap_y + height
-				boxes.append(Path(*box))
-				box_attributes.append(
-					{"fill": "rgb(%i, %i, %i)" % tuple([int(v * 255) for v in colorsys.hsv_to_rgb(*colour)])})
-				box_widths.append(1)
+				# store the max y coordinate, which marks the SVG overall height
+				max_y = max(max_y, (box["y"] + box["height"]))
 
 				# then draw the flow curve, if the box was ranked in an earlier
 				# period as well
-				if item in previous_box_coordinates:
-					previous_box = previous_box_coordinates[item]
-
-					top_offset = (box[0].start.real - previous_box[1].start.real) / 2
-					control_top_left = complex(previous_box[1].start.real + top_offset, previous_box[1].start.imag)
-					control_top_right = complex(box[0].start.real - top_offset, box[0].start.imag)
-
-					bottom_offset = (box[3].start.real - previous_box[2].start.real) / 2
-					control_bottom_left = complex(previous_box[2].start.real + bottom_offset, previous_box[2].start.imag)
-					control_bottom_right = complex(box[3].start.real - bottom_offset, box[3].start.imag)
-
-					paths.append(Path(*(
-						CubicBezier(start=previous_box[1].start, end=box[0].start, control1=control_top_left,
-									control2=control_top_right),
-						Line(box[0].start, box[3].start),
-						CubicBezier(start=box[3].start, end=previous_box[2].start, control1=control_bottom_right,
-									control2=control_bottom_left),
-						Line(previous_box[2].start, previous_box[1].start)
-					)))
+				if item in previous:
+					previous_box = previous_boxes[item]
 
 					# create a gradient from the colour of the previous box for
 					# this item to this box's colour
-					colour_from = previous_box_attributes[item]["fill"]
-					colour_to = box_attributes[-1]["fill"]
+					colour_from = previous_box["fill"]
+					colour_to = box["fill"]
 
 					gradient = LinearGradient(start=(0, 0), end=(1, 0))
 					gradient.add_stop_color(offset="0%", color=colour_from)
@@ -201,29 +172,69 @@ class RankFlowRenderer(BasicProcessor):
 					# the addition of ' none' in the auto-generated fill colour
 					# messes up some viewers/browsers, so get rid of it
 					gradient_key = gradient.get_paint_server().replace(" none", "")
-					flow_attributes.append({"fill": gradient_key, "opacity": 0.35})
-					path_widths.append(0)
 
-				previous_box_coordinates[item] = box
-				previous_box_attributes[item] = box_attributes[-1]
+					# calculate control points for the connecting bezier bar
+					# the top_offset determines the 'steepness' of the curve,
+					# experiment with the "/ 2" part to make it less or more
+					# steep
+					top_offset = (box["x"] - previous_box["x"] + previous_box["width"]) / 2
+					control_top_left = (previous_box["x"] + previous_box["width"] + top_offset, previous_box["y"])
+					control_top_right = (box["x"] - top_offset, box["y"])
+
+					bottom_offset = top_offset  # mirroring looks best
+					control_bottom_left = (
+						previous_box["x"] + previous_box["width"] + bottom_offset,
+						previous_box["y"] + previous_box["height"])
+					control_bottom_right = (box["x"] - bottom_offset, box["y"] + box["height"])
+
+					# now add the bezier curves - svgwrite has no convenience
+					# function for beziers unfortunately. we're using cubic
+					# beziers though quadratic could work as well since our
+					# control points are, in principle, mirrored
+					flow_start = (previous_box["x"] + previous_box["width"], previous_box["y"])
+					flow = Path(fill=gradient_key, opacity="0.35")
+					flow.push("M %f %f" % flow_start)  # go to start
+					flow.push("C %f %f %f %f %f %f" % (
+						*control_top_left, *control_top_right, box["x"], box["y"]))  # top bezier
+					flow.push("L %f %f" % (box["x"], box["y"] + box["height"]))  # right boundary
+					flow.push("C %f %f %f %f %f %f" % (
+						*control_bottom_right, *control_bottom_left, previous_box["x"] + previous_box["width"],
+						previous_box["y"] + previous_box["height"]
+					))  # bottom bezier
+					flow.push("L %f %f" % flow_start)  # back to start
+					flow.push("Z")  # close path
+
+					flows.append(flow)
+
+				# mark this item as having appeared previously
+				previous.append(item)
+				previous_boxes[item] = box
+
+				box_start_y += height + box_gap_y
 
 			box_start_x += (box_gap_x + box_width)
 
-		paths += boxes
-		path_attributes = flow_attributes + box_attributes
-		path_widths += box_widths
+		# generate SVG canvas to add elements to
+		canvas = Drawing(self.dataset.get_results_path(), size=(len(items) * (box_width + box_gap_x), max_y),
+						 style="font-family:monospace;font-size:8px;")
 
-		# generate svgwrite object
-		# todo: not use the shitty svgpathtools library and just manipulate
-		# the svgwrite Drawing directly
-		canvas = disvg(paths=paths, stroke_widths=path_widths, attributes=path_attributes,
-					   paths2Drawing=True, openinbrowser=False, text=[label[0] for label in labels],
-					   text_path=[label[2] for label in labels], font_size=[label[1] for label in labels],
-					   svg_attributes={"style": "font-family:monospace;"}, mindim=1)
+		# now add the various shapes and paths. We only do this here rather than
+		# as we go because only at this point can the canvas be instantiated, as
+		# before we don't know the dimensions of the SVG drawing.
 
 		# add our gradients so they can be referenced
 		for definition in definitions:
 			canvas.defs.add(definition)
 
+		# add flows (which should go beyond the boxes)
+		for flow in flows:
+			canvas.add(flow)
+
+		# add boxes and labels:
+		for item in (*boxes, *labels):
+			canvas.add(item)
+
+		# finally, save the svg file
 		canvas.saveas(pretty=True, filename=str(self.dataset.get_results_path()))
+		raise Exception
 		self.dataset.finish(len(items) * len(list(items.items()).pop()))
