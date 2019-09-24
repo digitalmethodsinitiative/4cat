@@ -67,6 +67,14 @@ class VectorRanker(BasicProcessor):
 			except (ValueError, IndexError):
 				return 0
 
+		results = []
+
+		# truncate results as needed
+		try:
+			cutoff = int(self.parameters.get("top", 100))
+		except TypeError:
+			cutoff = 10
+
 		with zipfile.ZipFile(self.source_file, "r") as token_archive:
 			vector_sets = sorted(token_archive.namelist(), key=file_to_timestamp)
 			index = 0
@@ -84,41 +92,19 @@ class VectorRanker(BasicProcessor):
 					vectors = pickle.load(binary_tokens)
 				temp_path.unlink()
 
-				if len(results) == 0:
-					results.append([])
+				vectors = sorted(vectors, key=lambda x: x[1], reverse=True)[0:cutoff]
+				for vector in vectors:
+					results.append({"date": vector_set_name.split(".")[0], "text": vector[0], "value": vector[1]})
 
-				results[0].append(vector_set_name.split(".")[0])
-				if self.parameters["amount"]:
-					results[0].append("occurrences")
-
-				for row in range(1, 102):
-					if len(results) < (row + 1):
-						results.append([])
-
-					if row >= len(vectors):
-						results[row].append("")
-						if self.parameters["amount"]:
-							results[row].append("")
-					else:
-						results[row].append(vectors[row][0])
-						if self.parameters["amount"]:
-							results[row].append(vectors[row][1])
 
 		# delete temporary files and folder
 		shutil.rmtree(results_path)
 
-		# truncate results as needed
-		try:
-			cutoff = int(self.parameters.get("top", 100))
-		except TypeError:
-			cutoff = 10
-
-		results = results[0:cutoff]
-
 		# done!
 		self.dataset.update_status("Writing results file")
 		with open(self.dataset.get_results_path(), "w", encoding="utf-8") as output:
-			writer = csv.writer(output)
+			writer = csv.DictWriter(output, fieldnames = ("date", "text", "value"))
+			writer.writeheader()
 			for row in results:
 				writer.writerow(row)
 
