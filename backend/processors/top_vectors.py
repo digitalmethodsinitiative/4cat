@@ -94,6 +94,8 @@ class VectorRanker(BasicProcessor):
 
 				vectors = sorted(vectors, key=lambda x: x[1], reverse=True)[0:cutoff]
 				for vector in vectors:
+					if not vector[0].strip():
+						continue
 					results.append({"date": vector_set_name.split(".")[0], "text": vector[0], "value": vector[1]})
 
 

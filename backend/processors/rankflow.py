@@ -28,7 +28,7 @@ class RankFlowRenderer(BasicProcessor):
 	description = "Create a diagram showing changes in prevalence over time for sequential ranked lists (following Bernhard Rieder's RankFlow grapher)."  # description displayed in UI
 	extension = "svg"  # extension of result file, used internally and in UI
 
-	accepts = ["vector-ranker", "preset-neologisms", "tfidf"]
+	accepts = ["vector-ranker", "preset-neologisms", "tfidf", "collocations"]
 
 	options = {
 		"colour_property": {
