@@ -52,7 +52,7 @@ class Tokenise(BasicProcessor):
 		},
 		"strip_symbols": {
 			"type": UserInput.OPTION_TOGGLE,
-			"default": False,
+			"default": True,
 			"help": "Strip non-alphanumeric characters (e.g. punctuation)"
 		},
 		"exclude_duplicates": {
