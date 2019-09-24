@@ -87,7 +87,7 @@ function init() {
     });
 
     //collapse post-processor options
-    processor.collapse_options();
+    setTimeout(processor.collapse_options, 100);
     setTimeout(processor.resize_blocks, 100);
 
     $('.query-result-svg').on('load', function() {
