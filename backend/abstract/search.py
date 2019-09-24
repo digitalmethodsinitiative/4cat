@@ -175,6 +175,11 @@ class Search(BasicProcessor, ABC):
 				except ValueError:
 					pass
 
+		# search workers may define an 'after_search' hook that is called after
+		# the query is first completed
+		if hasattr(self, "after_search") and callable(self.after_search):
+			posts = self.after_search(posts)
+
 		return posts
 
 	def get_search_mode(self, query):
