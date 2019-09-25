@@ -53,7 +53,7 @@ class ModuleCollector:
 		`BasicProcessor` or `BasicWorker` and are not abstract.
 		"""
 		# look for workers and processors in pre-defined folders and datasources
-		paths = [Path(config.PATH_ROOT, "backend", "processors"), Path(config.PATH_ROOT, "backend", "workers"),
+		paths = [Path(config.PATH_ROOT, "processors"), Path(config.PATH_ROOT, "backend", "workers"),
 				 *[self.datasources[datasource]["path"] for datasource in self.datasources]]
 
 		for folder in paths:
