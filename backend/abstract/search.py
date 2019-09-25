@@ -148,8 +148,12 @@ class Search(BasicProcessor, ABC):
 						qualifying_thread_ids))
 				return None
 
-			self.dataset.update_status("Fetching all posts in %i threads" % len(qualifying_thread_ids))
-			posts = self.fetch_threads(tuple(qualifying_thread_ids))
+			if qualifying_thread_ids:
+				self.dataset.update_status("Fetching all posts in %i threads" % len(qualifying_thread_ids))
+				posts = self.fetch_threads(tuple(qualifying_thread_ids))
+			else:
+				self.dataset.update_status("No threads matched the full thread search parameters.")
+				return None
 
 		elif query.get("search_scope", None) == "full-threads":
 			# get all post in threads containing at least one matching post
