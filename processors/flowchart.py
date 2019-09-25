@@ -20,7 +20,7 @@ class flowChart(BasicProcessor):
 	description = "Create a flow chart of elements over time."  # description displayed in UI
 	extension = "html"  # extension of result file, used internally and in UI
 
-	accepts = ["collocations", "tfidf"]  # query types this post-processor accepts as input
+	accepts = ["vector-ranker", "preset-neologisms", "tfidf", "collocations"]  # query types this post-processor accepts as input
 
 	def process(self):
 
