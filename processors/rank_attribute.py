@@ -34,12 +34,13 @@ class AttributeRanker(BasicProcessor):
 			"default": True,
 			"options": {
 				"author": "Username",
-				"image_md5": "Image (hash)",
-				"image_file": "Image (filename)",
-				"country_code": "Country code",
 				"url": "URLs (in post body)",
 				"hostname": "Host names (in post body)",
-				"subreddit": "Subreddit (only for Reddit datasets)"
+				"wildcard": "Regular expression (match any filtered value in post)",
+				"image_md5": "Image (hash, for 4chan and 8chan datasets)",
+				"image_file": "Image (filename, for 4chan and 8chan datasets)",
+				"country_code": "Country code (for 4chan datasets)",
+				"subreddit": "Subreddit (for Reddit datasets)"
 			},
 			"help": "Attribute to aggregate"
 		},
@@ -53,6 +54,17 @@ class AttributeRanker(BasicProcessor):
 			"type": UserInput.OPTION_TEXT,
 			"default": 15,
 			"help": "Limit to this amount of top items (0 for unlimited)"
+		},
+		"top-style": {
+			"type": UserInput.OPTION_CHOICE,
+			"default": "per-item",
+			"options": {"per-item": "per interval (separate ranking per interval)", "overall": "overall (per-interval ranking for overall top items)"},
+			"help": "Determine top items"
+		},
+		"regex": {
+			"type": UserInput.OPTION_TEXT,
+			"default": "",
+			"help": "Filter for items (Python regular expression)"
 		}
 	}
 
@@ -62,14 +74,18 @@ class AttributeRanker(BasicProcessor):
 		and aggregates the results per chosen time frame
 		"""
 
-		# we use these to extract URLs and host names if needed
-		link_regex = re.compile(r"https?://[^\s]+")
-		www_regex = re.compile(r"^www\.")
-
 		# convenience variables
 		timeframe = self.parameters.get("timeframe", self.options["timeframe"]["default"])
 		attribute = self.parameters.get("attribute", self.options["attribute"]["default"])
+		rank_style = self.parameters.get("top-style", self.options["top-style"]["default"])
 		cutoff = convert_to_int(self.parameters.get("top", self.options["top"]["default"]))
+
+		try:
+			filter = re.compile(self.parameters.get("regex", None))
+		except (TypeError, re.error):
+			self.dataset.update_status("Could not complete: regular expression invalid")
+			self.dataset.finish(0)
+			return
 
 		# This is needed to check for URLs in the "domain" and "url" columns for Reddit submissions
 		datasource = self.parent.parameters.get("datasource")
@@ -78,6 +94,25 @@ class AttributeRanker(BasicProcessor):
 		# and OrderedDict; all frequencies go into this variable
 		items = OrderedDict()
 
+		# if we're interested in overall top-ranking items rather than a
+		# per-period ranking, we need to do a first pass in which all posts are
+		# inspected to determine those overall top-scoring items
+		overall_top = {}
+		if rank_style == "overall":
+			self.dataset.update_status("Determining overall top-%i items" % cutoff)
+			with open(self.source_file, encoding='utf-8') as source:
+				csv = DictReader(source)
+				for post in csv:
+					values = self.get_values(post, attribute, filter)
+					for value in values:
+						if value not in overall_top:
+							overall_top[value] = 0
+
+						overall_top[value] += 1
+
+			overall_top = sorted(overall_top, key=lambda item: overall_top[item], reverse=True)[0:cutoff]
+
+		# now for the real deal
 		self.dataset.update_status("Reading source file")
 		with open(self.source_file, encoding='utf-8') as source:
 			csv = DictReader(source)
@@ -91,34 +126,22 @@ class AttributeRanker(BasicProcessor):
 					if timeframe == "year":
 						time_unit = str(date.year)
 					elif timeframe == "month":
-						time_unit = str(date.year) + "-" + str(date.month)
+						time_unit = str(date.year) + "-" + str(date.month).zfill(2)
 					else:
-						time_unit = str(date.year) + "-" + str(date.month) + "-" + str(date.day)
+						time_unit = str(date.year) + "-" + str(date.month).zfill(2) + "-" + str(date.day).zfill(2)
 
 				# again, we need to be able to sort, so OrderedDict it is
 				if time_unit not in items:
 					items[time_unit] = OrderedDict()
 
 				# get values from post
-				if attribute in ("url", "hostname"):
-					# URLs need some processing because there may be multiple per post
-					post_links = link_regex.findall(post["body"])
-
-					if "url" in post:
-						# some datasources may provide a specific URL per post
-						# as a separate attribute
-						post_links.append(post["url"])
-
-					if attribute == "hostname":
-						values = [www_regex.sub("", link.split("/")[2]) for link in post_links]
-					else:
-						values = post_links
-				else:
-					# simply copy the CSV column
-					values = [post.get(attribute, "")]
+				values = self.get_values(post, attribute, filter)
 
 				# keep track of occurrences of found items per relevant time period
 				for value in values:
+					if rank_style == "overall" and value not in overall_top:
+						continue
+
 					if value not in items[time_unit]:
 						items[time_unit][value] = 0
 
@@ -159,3 +182,37 @@ class AttributeRanker(BasicProcessor):
 
 		# write as csv
 		self.dataset.write_csv_and_finish(rows)
+
+	def get_values(self, post, attribute, filter):
+		"""
+		Get relevant values for attribute per post
+
+		:param dict post:  Post dictionary
+		:param str attribute:  Attribute to extract from post body
+		:param filter:  A compiled regular expression to filter values with, or None
+		:return list:  Items found for attribute
+		"""
+		# we use these to extract URLs and host names if needed
+		link_regex = re.compile(r"https?://[^\s]+")
+		www_regex = re.compile(r"^www\.")
+
+		if attribute == "wildcard":
+			return filter.findall(post["body"])
+		elif attribute in ("url", "hostname"):
+			# URLs need some processing because there may be multiple per post
+			post_links = link_regex.findall(post["body"])
+
+			if "url" in post:
+				# some datasources may provide a specific URL per post
+				# as a separate attribute
+				post_links.append(post["url"])
+
+			if attribute == "hostname":
+				values = [www_regex.sub("", link.split("/")[2]) for link in post_links]
+			else:
+				values = post_links
+		else:
+			# simply copy the CSV column
+			values = [post.get(attribute, "")]
+
+		return [value for value in values if not filter or filter.match(value)]
