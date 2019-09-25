@@ -276,7 +276,7 @@ class DataSet:
 		else:
 			query_bit = self.data["query"].replace(" ", "-").lower()
 			query_bit = re.sub(r"[^a-z0-9\-]", "", query_bit)
-			query_bit = query_bit[:100] # Crop to avoid OSError
+			query_bit = query_bit[:100]  # Crop to avoid OSError
 			file = query_bit + "-" + self.data["key"]
 			file = re.sub(r"[-]+", "-", file)
 
@@ -359,7 +359,10 @@ class DataSet:
 		:return bool:  Update successul?
 		"""
 		self.data["software_version"] = version
-		updated = self.db.update("queries", where={"key": self.data["key"]}, data={"software_version": version})
+		updated = self.db.update("queries", where={"key": self.data["key"]}, data={
+			"software_version": version,
+			"software_file": backend.all_modules.processors.get(self.data["type"], {"path": ""})["path"]
+		})
 
 		return updated > 0
 
@@ -373,7 +376,7 @@ class DataSet:
 		if not self.data["software_version"] or not config.GITHUB_URL:
 			return ""
 
-		return config.GITHUB_URL + "/blob/" + self.data["software_version"] + "/" + file
+		return config.GITHUB_URL + "/blob/" + self.data["software_version"] + self.data.get("software_file", "")
 
 	def write_csv_and_finish(self, data):
 		"""

@@ -35,7 +35,8 @@ CREATE TABLE IF NOT EXISTS queries (
   status           text,
   num_rows         integer DEFAULT 0,
   is_finished      boolean DEFAULT FALSE,
-  software_version text
+  software_version text,
+  software_file    text DEFAULT ''
 );
 
 -- users

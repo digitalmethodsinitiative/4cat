@@ -6,6 +6,7 @@ import importlib
 import inspect
 import config
 import sys
+import re
 
 from backend.abstract.worker import BasicWorker
 from backend.abstract.processor import BasicProcessor
@@ -56,6 +57,8 @@ class ModuleCollector:
 		paths = [Path(config.PATH_ROOT, "processors"), Path(config.PATH_ROOT, "backend", "workers"),
 				 *[self.datasources[datasource]["path"] for datasource in self.datasources]]
 
+		root_match = re.compile(r"^%s" % re.escape(config.PATH_ROOT))
+
 		for folder in paths:
 			# loop through folders, and files in those folders, recursively
 			for file in folder.rglob("*.py"):
@@ -98,8 +101,10 @@ class ModuleCollector:
 
 					# extract data that is useful for the scheduler and other
 					# parts of 4CAT
+					relative_path = root_match.sub("", str(file))
 					metadata = {
 						"file": file.name,
+						"path": relative_path,
 						"id": component[1].type,
 						"name": component[0],
 						"max": component[1].max_workers,
