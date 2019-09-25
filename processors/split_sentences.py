@@ -7,6 +7,7 @@ from nltk.tokenize import sent_tokenize, word_tokenize
 from backend.lib.helpers import UserInput
 from backend.abstract.processor import BasicProcessor
 
+
 class SplitSentences(BasicProcessor):
 	"""
 	Split sentences
@@ -60,7 +61,6 @@ class SplitSentences(BasicProcessor):
 							if len(words) >= min_length:
 								num_sentences += 1
 								writer.writerow({"post_id": post.get("id", ""), "sentence": sentence})
-
 
 		# done!
 		self.dataset.update_status("Finished")

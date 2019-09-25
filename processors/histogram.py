@@ -10,6 +10,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
 from backend.abstract.processor import BasicProcessor
+from backend.lib.helpers import UserInput
 
 import config
 
@@ -19,9 +20,17 @@ class HistogramRenderer(BasicProcessor):
 	"""
 	type = "monthly-histogram"  # job type ID
 	category = "Visual" # category
-	title = "Histogram (monthly)"  # title displayed in UI
-	description = "Generates a histogram (bar graph) that aggregates the number of posts per month to provide an impression of over-time activity in the data set"  # description displayed in UI
+	title = "Histogram"  # title displayed in UI
+	description = "Generates a histogram (bar graph) that aggregates the number of posts per unit of time to provide an impression of over-time activity in the data set"  # description displayed in UI
 	extension = "png"  # extension of result file, used internally and in UI
+
+	options = {
+		"resolution": {
+			"type": UserInput.OPTION_TOGGLE,
+			"options": {"year": "Year", "month": "Month", "day": "Day"},
+			"default": "month"
+		}
+	}
 
 	def process(self):
 		"""
@@ -32,6 +41,7 @@ class HistogramRenderer(BasicProcessor):
 		months = {}
 
 		self.dataset.update_status("Reading source file")
+		resolution = self.parameters.get("resolution", self.options["resolution"]["default"])
 		first_post = int(time.time())
 		last_post = 0
 		max_posts = 0
@@ -189,7 +199,7 @@ class HistogramRenderer(BasicProcessor):
 			header_y = (header_rect_height / 2) - (headersize[1] / 2)
 			draw.text((header_x, header_y), header, font=headerfont, fill="white")
 
-			# x labels
+			# y labels
 			labelfont = ImageFont.truetype(str(fontfile), int(x_margin_left / 5))
 			origin = x_margin_left - (tick_width * 2)
 			step = y_height / 10
@@ -200,7 +210,7 @@ class HistogramRenderer(BasicProcessor):
 				label_y = height - y_margin - (i * step) - (labelsize[1] / 2)
 				draw.text((label_x, label_y), label, font=labelfont, fill="black")
 
-			# y labels
+			# x labels
 			labelfont = ImageFont.truetype(str(fontfile), int(x_margin_left / 6))
 			month_labels = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
 			label_width = labelfont.getsize("2018")[0]
