@@ -264,7 +264,7 @@ class Search4Chan(Search):
 			self.log.info("Sphinx query timed out after %i seconds" % (time.time() - sphinx_start))
 			return None
 		except ProgrammingError as e:
-			self.dataset.update_status("Error during query. 4CAT admins have been notified; try again later.")
+			self.dataset.update_status("Error during query. Your query syntax may be invalid (check for loose parentheses).")
 			self.log.error("Sphinx crash during query %s: %s" % (self.dataset.key, e))
 			return None
 
