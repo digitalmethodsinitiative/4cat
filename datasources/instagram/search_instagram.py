@@ -116,6 +116,9 @@ class SearchInstagram(Search):
 				"subject": ""
 			})
 
+			if not self.parameters.get("scrape_comments", False):
+				continue
+
 			self.dataset.update_status("Getting comments for post %i" % posts_processed)
 			for comment in post.get_comments():
 				answers = [answer for answer in comment.answers]
@@ -200,7 +203,8 @@ class SearchInstagram(Search):
 			"max_posts": max_posts,
 			"query": items,
 			"board": query.get("search_scope") + ":" + items,  # used in web interface
-			"search_scope": query.get("search_scope")
+			"search_scope": query.get("search_scope"),
+			"scrape_comments": bool(query.get("scrape_comments", False))
 		}
 
 	def get_search_mode(self, query):
