@@ -121,7 +121,10 @@ class AttributeRanker(BasicProcessor):
 				if timeframe == "all":
 					time_unit = "overall"
 				else:
-					timestamp = int(datetime.datetime.strptime(post["timestamp"], "%Y-%m-%d %H:%M:%S").timestamp())
+					try:
+						timestamp = int(datetime.datetime.strptime(post["timestamp"], "%Y-%m-%d %H:%M:%S").timestamp())
+					except ValueError:
+						timestamp = 0
 					date = datetime.datetime.fromtimestamp(timestamp)
 					if timeframe == "year":
 						time_unit = str(date.year)
