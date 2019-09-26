@@ -20,4 +20,11 @@
             </select>
         </div>
     {% endif %}
+    {% if "tooltip" in processor.options[option] %}
+        {% set pid = uniqid() %}
+        <button class="tooltip-trigger" aria-controls="tooltip-option-{{ pid }}" aria-label="Post-processor option details">?</button>
+    	<p role="tooltip" id="tooltip-option-{{ pid }}">
+            {{ processor.options[option].tooltip }}
+        </p>
+    {% endif %}
 </label>

@@ -39,21 +39,23 @@ class tfIdf(BasicProcessor):
 			"default": 1,
 			"min": 1,
 			"max": 10000,
-			"help": "Ignore terms that appear in less than this amount of token sets. Useful for filtering out very sporadic terms"
+			"help": "Ignore terms that appear in less than this amount of token sets",
+			"tooltip": "Useful for filtering out very sporadic terms."
 		},
 		"max_occurrences": {
 			"type": UserInput.OPTION_TEXT,
 			"default": "",
 			"min": 1,
 			"max": 10000,
-			"help": "Ignore terms that appear in more than this amount of token sets. Useful for getting rarer terms not consistent troughout the dataset. Leave empty if terms may appear in all sets"
+			"help": "Ignore terms that appear in more than this amount of token sets",
+			"tooltip": "Useful for getting rarer terms not consistent troughout the dataset. Leave empty if terms may appear in all sets."
 		},
 		"max_output": {
 			"type": UserInput.OPTION_TEXT,
 			"default": 10,
 			"min": 1,
 			"max": 100,
-			"help": "Output number - The amount of words to return per timeframe"
+			"help": "Words to return per timeframe"
 		}
 	}
 

@@ -19,7 +19,7 @@ class CoTagger(BasicProcessor):
 				  "weighted by the frequency of the tag."  # description displayed in UI
 	extension = "gdf"  # extension of result file, used internally and in UI
 
-	datasources = ["breitbart", "instagram"]
+	datasources = ["instagram"]
 
 	def process(self):
 		"""

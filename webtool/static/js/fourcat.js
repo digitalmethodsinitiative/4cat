@@ -194,6 +194,7 @@ processor = {
                         let new_element = $(response.html);
                         let parent_list = $('#' + response.container + ' > .child-list');
                         new_element.appendTo($(parent_list));
+                        processor.collapse_options();
                     }
                 },
                 'error': function (response) {
