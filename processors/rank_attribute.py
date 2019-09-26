@@ -42,7 +42,8 @@ class AttributeRanker(BasicProcessor):
 				"country_code": "Country code (for 4chan datasets)",
 				"subreddit": "Subreddit (for Reddit datasets)"
 			},
-			"help": "Attribute to aggregate"
+			"help": "Attribute to aggregate",
+			"tooltip": "When choosing 'Regular expression', any value in a post matching the regular expression will be saved as a separate value."
 		},
 		"timeframe": {
 			"type": UserInput.OPTION_CHOICE,
@@ -59,12 +60,14 @@ class AttributeRanker(BasicProcessor):
 			"type": UserInput.OPTION_CHOICE,
 			"default": "per-item",
 			"options": {"per-item": "per interval (separate ranking per interval)", "overall": "overall (per-interval ranking for overall top items)"},
-			"help": "Determine top items"
+			"help": "Determine top items",
+			"tooltip": "'Overall' is usually the right choice if you intend to generate side-by-side graphs from the results."
 		},
 		"regex": {
 			"type": UserInput.OPTION_TEXT,
 			"default": "",
-			"help": "Filter for items (Python regular expression)"
+			"help": "Filter for items (Python regular expression)",
+			"tooltip": "Only items matching this regular expression will be included in the result."
 		}
 	}
 

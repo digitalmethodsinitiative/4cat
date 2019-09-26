@@ -43,12 +43,14 @@ class Tokenise(BasicProcessor):
 		"stem": {
 			"type": UserInput.OPTION_TOGGLE,
 			"default": False,
-			"help": "Stem tokens (with SnowballStemmer)"
+			"help": "Stem tokens (with SnowballStemmer)",
+			"tooltip": "Stemming removes suffixes from words: 'running' becomes 'runn', 'bicycles' becomes 'bicycl', and so on."
 		},
 		"lemmatise": {
 			"type": UserInput.OPTION_TOGGLE,
 			"default": False,
-			"help": "Lemmatise tokens (English only)"
+			"help": "Lemmatise tokens (English only)",
+			"tooltip": "Lemmatisation replaces inflections of a word with its root form: 'running' becomes 'run', 'bicycles' becomes 'bicycle', better' becomes 'good'."
 		},
 		"strip_symbols": {
 			"type": UserInput.OPTION_TOGGLE,

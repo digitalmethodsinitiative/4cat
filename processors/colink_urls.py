@@ -37,7 +37,8 @@ class URLCoLinker(BasicProcessor):
 				"thread": "Thread (works best in full-thread data sets)",
 				"post": "Post"
 			},
-			"default": "thread"
+			"default": "thread",
+			"tooltip": "If 'thread' is selected, URLs are considered to occur together if they appear within the same thread, even if they are in different posts."
 		}
 	}
 

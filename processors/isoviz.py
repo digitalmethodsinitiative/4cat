@@ -40,7 +40,8 @@ class IsometricMultigraphRenderer(BasicProcessor):
 		"normalise": {
 			"type": UserInput.OPTION_TOGGLE,
 			"default": True,
-			"help": "Normalise values to 0-100% for each graph"
+			"help": "Normalise values to 0-100% for each graph",
+			"tooltip": "This allows for easier trend comparison, but note that absolute prevalence is no longer visible when this is enabled."
 		},
 		"complete": {
 			"type": UserInput.OPTION_TEXT,
