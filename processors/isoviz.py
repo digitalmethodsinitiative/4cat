@@ -36,6 +36,11 @@ class IsometricMultigraphRenderer(BasicProcessor):
 			"type": UserInput.OPTION_TOGGLE,
 			"default": True,
 			"help": "Smooth curves"
+		},
+		"normalise": {
+			"type": UserInput.OPTION_TOGGLE,
+			"default": True,
+			"help": "Normalise values to 0-100% for each graph"
 		}
 	}
 
@@ -48,7 +53,9 @@ class IsometricMultigraphRenderer(BasicProcessor):
 	def process(self):
 		graphs = {}
 		intervals = []
+
 		smooth = self.parameters.get("smooth", self.options["smooth"]["default"])
+		normalise_values = self.parameters.get("normalise", self.options["normalise"]["default"])
 
 		# first gather graph data: each distinct item gets its own graph and
 		# for each graph we have a sequence of intervals, each interval with
@@ -65,7 +72,7 @@ class IsometricMultigraphRenderer(BasicProcessor):
 					graphs[row[item_key]] = {}
 
 				# make sure the months and days are zero-padded
-				interval = row[date_key]
+				interval = row.get(date_key, "")
 				interval = "-".join([str(bit).zfill(2 if len(bit) != 4 else 4) for bit in interval.split("-")])
 
 				if interval not in intervals:
@@ -136,9 +143,11 @@ class IsometricMultigraphRenderer(BasicProcessor):
 
 		# determine max value per item, so we can normalize them later
 		limits = {}
+		max_limit = 0
 		for graph in graphs:
 			for interval in graphs[graph]:
 				limits[graph] = max(limits.get(graph, 0), abs(graphs[graph][interval]))
+				max_limit = max(max_limit, abs(graphs[graph][interval]))
 
 		# how many vertical grid lines (and labels) are to be included at most
 		# 12 is a sensible default because it allows one label per month for a full
@@ -193,11 +202,11 @@ class IsometricMultigraphRenderer(BasicProcessor):
 
 		# now we have the dimensions, the canvas can be instantiated
 		canvas = Drawing(str(self.dataset.get_results_path()),
-						 size=(canvas_width + (2 * margin), canvas_height + (2 * margin)),
+						 size=(canvas_width + margin, canvas_height + (2 * margin)),
 						 style="font-family:monospace")
 
 		# draw gridlines - vertical
-		gridline_x = margin + y_axis_width
+		gridline_x = y_axis_width
 		gridline_y = margin + canvas_height
 
 		step_x_horizontal = sin(plane_angle / 2) * item_width
@@ -247,14 +256,13 @@ class IsometricMultigraphRenderer(BasicProcessor):
 
 		# draw graphs as filled beziers
 		top = step_y_vertical * 1.5
-		graph_start_x = margin
-		graph_start_y = margin + canvas_height - y_axis_height
+		graph_start_x = y_axis_width
+		graph_start_y = margin + canvas_height
 
-		iteration = 5
-		for graph in graphs:
+		# draw graphs in reverse order, so the bottom one is most in the
+		# foreground (in case of overlap)
+		for graph in reversed(list(graphs)):
 			self.dataset.update_status("Rendering graph for '%s'" % graph)
-			graph_start_x += step_x_vertical
-			graph_start_y += step_y_vertical
 
 			# path starting at lower left corner of graph
 			area_graph = Path(fill=self.colours[self.colour_index])
@@ -267,7 +275,8 @@ class IsometricMultigraphRenderer(BasicProcessor):
 				# normalise value
 				value = graphs[graph][interval]
 				try:
-					value = top * copysign(abs(value) / limits[graph], value)
+					limit = limits[graph] if normalise_values else max_limit
+					value = top * copysign(abs(value) / limit, value)
 				except ZeroDivisionError:
 					value = 0
 
@@ -320,13 +329,15 @@ class IsometricMultigraphRenderer(BasicProcessor):
 			))
 
 			# cycle colours, back to the beginning if all have been used
-			iteration += 1
 			self.colour_index += 1
 			if self.colour_index >= len(self.colours):
 				self.colour_index = 0
 
+			graph_start_x -= step_x_vertical
+			graph_start_y -= step_y_vertical
+
 		# draw gridlines - horizontal
-		gridline_x = margin
+		gridline_x = 0
 		gridline_y = margin + canvas_height - y_axis_height
 		for graph in graphs:
 			gridline_x += step_x_vertical
@@ -336,8 +347,8 @@ class IsometricMultigraphRenderer(BasicProcessor):
 
 		# x axis
 		canvas.add(Line(
-			start=(margin + y_axis_width, margin + canvas_height),
-			end=(margin + canvas_width, margin + canvas_height - x_axis_height),
+			start=(y_axis_width, margin + canvas_height),
+			end=(canvas_width, margin + canvas_height - x_axis_height),
 			stroke="black",
 			stroke_width=2
 		))
