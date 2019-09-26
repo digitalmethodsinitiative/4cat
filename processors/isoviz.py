@@ -5,7 +5,7 @@ import csv
 import re
 
 from backend.abstract.processor import BasicProcessor
-from backend.lib.helpers import UserInput
+from backend.lib.helpers import UserInput, convert_to_int
 
 from calendar import monthrange, month_abbr
 from math import sin, cos, tan, degrees, radians, copysign
@@ -41,6 +41,11 @@ class IsometricMultigraphRenderer(BasicProcessor):
 			"type": UserInput.OPTION_TOGGLE,
 			"default": True,
 			"help": "Normalise values to 0-100% for each graph"
+		},
+		"complete": {
+			"type": UserInput.OPTION_TEXT,
+			"default": 0,
+			"help": "Data completeness required (at least this % of intervals should be present for an item to be graphed; 0 to disable)"
 		}
 	}
 
@@ -56,6 +61,7 @@ class IsometricMultigraphRenderer(BasicProcessor):
 
 		smooth = self.parameters.get("smooth", self.options["smooth"]["default"])
 		normalise_values = self.parameters.get("normalise", self.options["normalise"]["default"])
+		completeness = convert_to_int(self.parameters.get("complete", self.options["complete"]["default"]), 0)
 
 		# first gather graph data: each distinct item gets its own graph and
 		# for each graph we have a sequence of intervals, each interval with
@@ -92,6 +98,7 @@ class IsometricMultigraphRenderer(BasicProcessor):
 		# there may be items that do not have values for all intervals
 		# this will distort the graph, so the next step is to make sure all
 		# graphs consist of the same continuous interval list
+		missing = {graph: 0 for graph in graphs}
 
 		if re.match(r"^[0-9]{4}$", intervals[0]):
 			# years are quite straightforward
@@ -100,6 +107,7 @@ class IsometricMultigraphRenderer(BasicProcessor):
 				for year in range(first, last + 1):
 					if str(year) not in graphs[graph]:
 						graphs[graph][str(year)] = 0
+						missing[graph] += 1
 
 		elif re.match(r"^[0-9]{4}-[0-9]{2}(-[0-9]{2})?", intervals[0]):
 			# more granular intervals require the following monstrosity to
@@ -126,6 +134,7 @@ class IsometricMultigraphRenderer(BasicProcessor):
 						if not has_day:
 							if key not in graphs[graph]:
 								graphs[graph][key] = 0
+								missing[graph] += 1
 						else:
 							start_day = first_day if year == first_year and month == first_month else 1
 							end_day = last_day if year == last_year and month == last_month else \
@@ -135,11 +144,24 @@ class IsometricMultigraphRenderer(BasicProcessor):
 								day_key = key + "-" + str(day).zfill(2)
 								if day_key not in graphs[graph]:
 									graphs[graph][day_key] = 0
+									missing[graph] += 1
 
 		# now that's done, make sure the graph datapoints are in order
 		intervals = sorted(list(graphs[list(graphs)[0]].keys()))
 		for graph in graphs:
 			graphs[graph] = {interval: graphs[graph][interval] for interval in sorted(graphs[graph])}
+
+		# delete graphs that do not have the required amount of intervals
+		# this is useful to get rid of outliers and items that only occur
+		# very few times over the full interval
+		if completeness > 0:
+			intervals_required = len(intervals) * (completeness / 100)
+			disqualified = []
+			for graph in graphs:
+				if len(intervals) - missing[graph] < intervals_required:
+					disqualified.append(graph)
+
+			graphs = {graph: graphs[graph] for graph in graphs if graph not in disqualified}
 
 		# determine max value per item, so we can normalize them later
 		limits = {}
@@ -148,6 +170,10 @@ class IsometricMultigraphRenderer(BasicProcessor):
 			for interval in graphs[graph]:
 				limits[graph] = max(limits.get(graph, 0), abs(graphs[graph][interval]))
 				max_limit = max(max_limit, abs(graphs[graph][interval]))
+
+		# order graphs by highest (or lowest) value)
+		limits = {limit: limits[limit] for limit in sorted(limits, key=lambda l: limits[l])}
+		graphs = {graph: graphs[graph] for graph in limits}
 
 		# how many vertical grid lines (and labels) are to be included at most
 		# 12 is a sensible default because it allows one label per month for a full
