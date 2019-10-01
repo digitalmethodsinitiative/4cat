@@ -6,7 +6,7 @@ import pickle
 import shutil
 import csv
 
-from backend.lib.helpers import UserInput
+from backend.lib.helpers import UserInput, convert_to_int
 from backend.abstract.processor import BasicProcessor
 
 
@@ -22,17 +22,22 @@ class VectorRanker(BasicProcessor):
 
 	accepts = ["vectorise-tokens"]
 
+	input = "zip"
+	output = "csv:date,text,value"
+
 	options = {
 		"top": {
 			"type": UserInput.OPTION_TEXT,
 			"default": 25,
 			"help": "Cut-off for top list"
 		},
-		"amount": {
-			"type": UserInput.OPTION_TOGGLE,
-			"default": True,
-			"help": "Include number of occurrences"
-		}
+		"top-style": {
+			"type": UserInput.OPTION_CHOICE,
+			"default": "per-item",
+			"options": {"per-item": "per interval (separate ranking per interval)", "overall": "overall (per-interval ranking for overall top items)"},
+			"help": "Determine top items",
+			"tooltip": "'Overall' will first determine the most prevalent vectors across all intervals, then calculate top vectors per interval using this as a shortlist."
+		},
 	}
 
 	def process(self):
@@ -70,11 +75,14 @@ class VectorRanker(BasicProcessor):
 		results = []
 
 		# truncate results as needed
+		rank_style = self.parameters.get("top-style", self.options["top-style"]["default"])
 		try:
-			cutoff = int(self.parameters.get("top", 100))
+			cutoff = convert_to_int(self.parameters.get("top", self.options["top"]["default"]), self.options["top"]["default"])
 		except TypeError:
 			cutoff = 10
 
+		# now rank the vectors by most prevalent per "file" (i.e. interval)
+		overall_top = {}
 		with zipfile.ZipFile(self.source_file, "r") as token_archive:
 			vector_sets = sorted(token_archive.namelist(), key=file_to_timestamp)
 			index = 0
@@ -92,11 +100,35 @@ class VectorRanker(BasicProcessor):
 					vectors = pickle.load(binary_tokens)
 				temp_path.unlink()
 
-				vectors = sorted(vectors, key=lambda x: x[1], reverse=True)[0:cutoff]
+				vectors = sorted(vectors, key=lambda x: x[1], reverse=True)
+				# for overall ranking we need the full vector space per interval
+				# because maybe an overall top-ranking vector is at the bottom
+				# in this particular interval - we'll truncate the top list at
+				# a later point in that case. Else, truncate it here
+				if rank_style == "per-item":
+					vectors = vectors[0:cutoff]
+
 				for vector in vectors:
 					if not vector[0].strip():
 						continue
+
 					results.append({"date": vector_set_name.split(".")[0], "text": vector[0], "value": vector[1]})
+
+					if vector[0] not in overall_top:
+						overall_top[vector[0]] = 0
+
+					overall_top[vector[0]] += int(vector[1])
+
+		# this eliminates all items from the results that were not in the
+		# *overall* top-occuring items. This only has an effect when vectors
+		# were generated for multiple intervals
+		if rank_style == "overall":
+			filtered_results = []
+			for item in results:
+				if item["text"] in overall_top:
+					filtered_results.append(item)
+
+			results = filtered_results[0:cutoff]
 
 
 		# delete temporary files and folder
