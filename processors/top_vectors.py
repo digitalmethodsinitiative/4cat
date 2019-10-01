@@ -123,18 +123,11 @@ class VectorRanker(BasicProcessor):
 		# *overall* top-occuring items. This only has an effect when vectors
 		# were generated for multiple intervals
 		if rank_style == "overall":
-			intervals = {}
+			overall_top = {item: overall_top[item] for item in sorted(overall_top, key=lambda x: overall_top[x], reverse=True)}[0:cutoff]
 			filtered_results = []
 			for item in results:
-				if item["date"] not in intervals:
-					intervals[item["date"]] = 0
-				elif intervals[item["date"]] > cutoff:
-					continue
-
-				if item["text"] in overall_top:
+				if item["text"] in overall_top[0:cutoff]:
 					filtered_results.append(item)
-
-				intervals[item["date"]] += 1
 
 			results = filtered_results
 
