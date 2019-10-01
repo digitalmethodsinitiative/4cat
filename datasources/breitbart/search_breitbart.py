@@ -38,20 +38,23 @@ class SearchBreitbart(Search4Chan):
 			if post["thread_id"] == post["id"] and post["subject"]:
 				thread_ids.add(post["thread_id"])
 
-		self.dataset.update_status("Fetching thread metadata for %i threads..." % len(thread_ids))
-		thread_metadata = {row["id"]: {"url": row["url"], "section": row["section"], "tags": row["tags"]} for row in
-						   self.db.fetchall("SELECT id, url, section, tags FROM threads_breitbart WHERE id IN %s",
-											tuple(thread_ids))}
+		if thread_ids:
+			self.dataset.update_status("Fetching thread metadata for %i threads..." % len(thread_ids))
+			thread_metadata = {row["id"]: {"url": row["url"], "section": row["section"], "tags": row["tags"]} for row in
+							   self.db.fetchall("SELECT id, url, section, tags FROM threads_breitbart WHERE id IN %s",
+												tuple(thread_ids))}
 
-		self.dataset.update_status("Adding metadata to %i articles..." % len(thread_ids))
-		while posts:
-			post = posts.pop(0)
-			if post["subject"] and post["thread_id"] in thread_ids:
-				post = {**post, **thread_metadata[post["thread_id"]]}
-			else:
-				post = {**post, **{"url": "", "section": "", "tags": ""}}
+			self.dataset.update_status("Adding metadata to %i articles..." % len(thread_ids))
+			while posts:
+				post = posts.pop(0)
+				if post["subject"] and post["thread_id"] in thread_ids:
+					post = {**post, **thread_metadata[post["thread_id"]]}
+				else:
+					post = {**post, **{"url": "", "section": "", "tags": ""}}
 
-			processed_posts.append(post)
+				processed_posts.append(post)
+		else:
+				processed_posts = posts
 
 		return processed_posts
 
