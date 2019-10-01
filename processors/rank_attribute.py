@@ -61,7 +61,7 @@ class AttributeRanker(BasicProcessor):
 			"default": "per-item",
 			"options": {"per-item": "per interval (separate ranking per interval)", "overall": "overall (per-interval ranking for overall top items)"},
 			"help": "Determine top items",
-			"tooltip": "'Overall' is usually the right choice if you intend to generate side-by-side graphs from the results."
+			"tooltip": "'Overall' will first determine the most prevalent items across all intervals, then calculate top items per interval using this as a shortlist."
 		},
 		"regex": {
 			"type": UserInput.OPTION_TEXT,
