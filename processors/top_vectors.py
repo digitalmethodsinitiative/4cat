@@ -123,7 +123,7 @@ class VectorRanker(BasicProcessor):
 		# *overall* top-occuring items. This only has an effect when vectors
 		# were generated for multiple intervals
 		if rank_style == "overall":
-			overall_top = {item: overall_top[item] for item in sorted(overall_top, key=lambda x: overall_top[x], reverse=True)}[0:cutoff]
+			overall_top = {item: overall_top[item] for item in sorted(overall_top, key=lambda x: overall_top[x], reverse=True)[0:cutoff]}
 			filtered_results = []
 			for item in results:
 				if item["text"] in overall_top[0:cutoff]:
