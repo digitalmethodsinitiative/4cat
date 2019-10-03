@@ -19,15 +19,15 @@
         <section>
             <h2><span>Recent results</span></h2>
             <ol class="result-list">
-                {% for dataset in queries %}{% if dataset.key_parent == "" %}
+                {% for dataset in datasets %}{% if dataset.key_parent == "" %}
                     <li id="{{ dataset.key }}"
-                        class="result{% if dataset.is_finished %} {% if dataset.num_rows > 0 %}has_results{% else %}no_results{% endif %}{% endif %}"
+                        class="result{% if dataset.is_finished() %} {% if dataset.num_rows > 0 %}has_results{% else %}no_results{% endif %}{% endif %}"
                         data-numrows="{{ dataset.num_rows }}">
                         {% include 'result-metadata.html' %}
 
-                        {% if not (dataset.is_finished and dataset.num_rows == 0) %}
+                        {% if not (dataset.is_finished() and dataset.num_rows == 0) %}
                         <div class="result-files">
-                            {% if dataset.is_finished %}
+                            {% if dataset.is_finished() %}
                                 <p class="result-file">
                                     {{ dataset.num_rows }} posts;
                                     {% if dataset.num_rows > 0 %}
@@ -39,10 +39,10 @@
                             {% else %}
                                 <p>Query is queued.</p>
                             {% endif %}
-                            {% if dataset.is_finished and dataset.children|length > 0 %}
+                            {% if dataset.is_finished() and dataset.children|length > 0 %}
                                 <ol class="child-list">
                                     <li><a href="/results/{{ dataset.key }}/">{{ dataset.children|length }} analysis
-                                        result{% if dataset.childrenf|length != 1 %}s{% endif %} available</a></li>
+                                        result{% if dataset.children|length != 1 %}s{% endif %} available</a></li>
                                 </ol>
                             {% endif %}
 
