@@ -70,6 +70,7 @@ class SearchInstagram(Search):
 
 		# for each query, get items
 		for query in queries:
+			chunk_size = 0
 			self.dataset.update_status("Retrieving posts ('%s')" % query)
 			try:
 				if scope == "hashtag":
@@ -85,6 +86,8 @@ class SearchInstagram(Search):
 				# "chunk" is a generator so actually retrieve the posts next
 				posts_processed = 0
 				for post in chunk:
+					chunk_size += 1
+					self.dataset.update_status("Retrieving posts ('%s', %i posts)" % (query, chunk_size))
 					if posts_processed >= max_posts:
 						break
 					posts.append(chunk.__next__())
@@ -99,18 +102,19 @@ class SearchInstagram(Search):
 		for post in posts:
 			posts_processed += 1
 			thread_id = post.shortcode
+			
 			results.append({
 				"id": thread_id,
 				"thread_id": thread_id,
 				"parent_id": thread_id,
-				"body": post.caption,
+				"body": post.caption if post.caption is not None else "",
 				"author": post.owner_username,
 				"timestamp": int(post.date_utc.timestamp()),
 				"type": "video" if post.is_video else "picture",
 				"url": post.video_url if post.is_video else post.url,
 				"hashtags": ",".join(post.caption_hashtags),
 				"usertags": ",".join(post.tagged_users),
-				"mentioned": ",".join(mention.findall(post.caption)),
+				"mentioned": ",".join(mention.findall(post.caption) if post.caption else ""),
 				"num_likes": post.likes,
 				"num_comments": post.comments,
 				"subject": ""
@@ -184,7 +188,7 @@ class SearchInstagram(Search):
 			raise QueryParametersException("You must provide a search query.")
 
 		# 500 is mostly arbitrary - may need tweaking
-		max_posts = 500
+		max_posts = 2500
 		if query.get("max_posts", ""):
 			try:
 				max_posts = min(abs(int(query.get("max_posts"))), max_posts)
