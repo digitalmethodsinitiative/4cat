@@ -99,10 +99,14 @@ class SearchInstagram(Search):
 		# go through posts, and retrieve comments
 		results = []
 		posts_processed = 0
+		comments_bit = " and comments" if self.parameters.get("scrape_comments", False) else ""
+		
 		for post in posts:
 			posts_processed += 1
+			self.dataset.update_status("Retrieving metadata%s for post %i" % (comments_bit, posts_processed))
+
 			thread_id = post.shortcode
-			
+
 			results.append({
 				"id": thread_id,
 				"thread_id": thread_id,
@@ -123,7 +127,6 @@ class SearchInstagram(Search):
 			if not self.parameters.get("scrape_comments", False):
 				continue
 
-			self.dataset.update_status("Getting comments for post %i" % posts_processed)
 			for comment in post.get_comments():
 				answers = [answer for answer in comment.answers]
 				results.append({
