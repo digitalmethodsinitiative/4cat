@@ -40,7 +40,9 @@
     {% endif %}
 {% endif %}
 
-    {%  if dataset.is_finished and dataset.num_rows == 0 %}
+    {%  if dataset.is_finished() and dataset.num_rows == 0 %}
         <span class="property-badge second-tier warning">no results</span>
+    {% elif not dataset.is_finished() %}
+        <span class="property-badge second-tier warning">in progress</span>
     {% endif %}
     </p>

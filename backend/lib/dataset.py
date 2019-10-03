@@ -552,8 +552,14 @@ class DataSet:
 		:param attr:  Data key to get
 		:return:  Value
 		"""
-		if attr in self.data:
+
+		if attr in dir(self):
+			# an explicitly defined attribute should always be called in favour
+			# of this passthrough
+			attribute = getattr(self, attr)
+			return attribute
+		elif attr in self.data:
+			print("in data: %s" % attr)
 			return self.data[attr]
 		else:
-			print(self.data)
 			raise KeyError("DataSet instance has no attribute %s" % attr)

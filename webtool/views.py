@@ -253,7 +253,7 @@ def show_results(page):
 
 	replacements.append(page_size)
 	replacements.append(offset)
-	datasets = db.fetchall("SELECT * FROM queries WHERE " + where + " ORDER BY timestamp DESC LIMIT %s OFFSET %s", tuple(replacements))
+	datasets = db.fetchall("SELECT key FROM queries WHERE " + where + " ORDER BY timestamp DESC LIMIT %s OFFSET %s", tuple(replacements))
 
 	if not datasets and page != 1:
 		abort(404)
@@ -263,20 +263,9 @@ def show_results(page):
 	processors = backend.all_modules.processors
 
 	for dataset in datasets:
-		dataset["parameters"] = json.loads(dataset["parameters"])
-		dataset["children"] = []
+		filtered.append(DataSet(key=dataset["key"], db=db))
 
-		children = db.fetchall("SELECT * FROM queries WHERE key_parent = %s ORDER BY timestamp ASC", (dataset["key"],))
-		for child in children:
-			child["parameters"] = json.loads(child["parameters"])
-			if child["type"] not in processors:
-				continue
-			child["processor"] = processors[child["type"]]
-			dataset["children"].append(child)
-
-		filtered.append(dataset)
-
-	return render_template("results.html", filter={"filter": query_filter, "all_results": all_results}, queries=filtered, pagination=pagination)
+	return render_template("results.html", filter={"filter": query_filter, "all_results": all_results}, datasets=filtered, pagination=pagination)
 
 
 @app.route('/results/<string:key>/')
