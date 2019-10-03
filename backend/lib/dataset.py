@@ -559,7 +559,6 @@ class DataSet:
 			attribute = getattr(self, attr)
 			return attribute
 		elif attr in self.data:
-			print("in data: %s" % attr)
 			return self.data[attr]
 		else:
 			raise KeyError("DataSet instance has no attribute %s" % attr)
