@@ -204,5 +204,5 @@ class Job:
 				return details
 			else:
 				return {}
-		except json.JSONDecodeError:
+		except (TypeError, json.JSONDecodeError):
 			return {}
