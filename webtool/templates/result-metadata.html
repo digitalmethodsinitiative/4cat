@@ -1,44 +1,47 @@
-    {% if dataset.parameters.body_match and dataset.parameters.body_match != "empty" %}
+{% for parameter in dataset.parameters %}
+    {% if parameter == "body_match" and dataset.parameters[parameter] %}
         <span class="inline-label">body:</span> <span class="inline-query">{{ dataset.parameters.body_match }}</span>
-    {% endif %}
-    {% if dataset.parameters.subject_match and dataset.parameters.subject_match != "empty" %}
+    {% elif parameter == "subject_match" and dataset.parameters[parameter] %}
         <span class="inline-label">subject:</span>
         <span class="inline-query">{{ dataset.parameters.subject_match }}</span>
-    {% endif %}
-    {% if dataset.parameters.filename %}
+    {% elif parameter == "filename" and dataset.parameters[parameter] %}
         <span class="inline-label">filename:</span>
         <span class="inline-query">{{ dataset.parameters.filename }}</span>
-    {% endif %}
-    {% if dataset.parameters.country_code and dataset.parameters.country_code != "all" %}
+    {% elif parameter == "country_code" and dataset.parameters[parameter] != "all" %}
         <span class="inline-label">country:</span>
         <span class="inline-query">{{ dataset.parameters.country_code }}</span>
+    {% elif dataset.parameters[parameter] and parameter not in ("user", "time", "search_scope", "random_amount", "scope_length", "scope_density", "min_date", "max_date", "board", "datasource", "type") %}
+        {% if not dataset.parameters[parameter]|isbool and dataset.parameters[parameter] %}
+        <span class="inline-label">{{ parameter }}:</span>
+        <span class="inline-query">{{ dataset.parameters[parameter] }}</span>
+        {% elif dataset.parameters[parameter] %}
+        <span class="property-badge">{{ parameter }}</span>
+        {% endif %}
     {% endif %}
-    {% if dataset.parameters.url %}
-        <span class="inline-label">URL:</span>
-        <span class="inline-query">{{ dataset.parameters.url }}</span>
-    {% endif %}
-    {% if dataset.parameters.search_scope == "full-threads" %}
-        <span class="property-badge second-tier">full thread</span>
-    {% endif %}
-    {% if dataset.parameters.search_scope == "random-sample" %}
-        <span class="property-badge second-tier">random sample={{ dataset.parameters.random_amount }}</span>
-    {% endif %}
-    {% if dataset.parameters.search_scope == "dense-threads" %}
-        <span class="property-badge second-tier">dense threads ({{ dataset.parameters.scope_density }}%/&gt; {{ dataset.parameters.scope_length }})</span>
-    {% endif %}
+{% endfor %}
 
-{% if (dataset.parameters.min_date or dataset.parameters.max_date) and (dataset.parameters.min_date > 0 or dataset.parameters.max_date > 0) %}
-        {% if dataset.parameters.min_date and dataset.parameters.min_date > 0 %}
-            <span class="property-badge">From</span>
-            <span class="inline-query">{{ dataset.parameters.min_date|datetime }}</span>
-        {% endif %}{% if dataset.parameters.max_date and dataset.parameters.max_date > 0 %}
-        <span class="property-badge">Until</span>
-        <span class="inline-query">{{ dataset.parameters.max_date|datetime }}</span>
-    {% endif %}
+{% if dataset.parameters.search_scope == "full-threads" %}
+    <span class="property-badge second-tier">full thread</span>
+{% endif %}
+{% if dataset.parameters.search_scope == "random-sample" %}
+    <span class="property-badge second-tier">random sample={{ dataset.parameters.random_amount }}</span>
+{% endif %}
+{% if dataset.parameters.search_scope == "dense-threads" %}
+    <span class="property-badge second-tier">dense threads ({{ dataset.parameters.scope_density }}%/&gt; {{ dataset.parameters.scope_length }})</span>
 {% endif %}
 
-    {%  if dataset.is_finished() and dataset.num_rows == 0 %}
-        <span class="property-badge second-tier warning">no results</span>
-    {% elif not dataset.is_finished() %}
-        <span class="property-badge second-tier warning">in progress</span>
-    {% endif %}
+{% if (dataset.parameters.min_date or dataset.parameters.max_date) and (dataset.parameters.min_date > 0 or dataset.parameters.max_date > 0) %}
+    {% if dataset.parameters.min_date and dataset.parameters.min_date > 0 %}
+        <span class="property-badge">From</span>
+        <span class="inline-query">{{ dataset.parameters.min_date|datetime }}</span>
+    {% endif %}{% if dataset.parameters.max_date and dataset.parameters.max_date > 0 %}
+    <span class="property-badge">Until</span>
+    <span class="inline-query">{{ dataset.parameters.max_date|datetime }}</span>
+{% endif %}
+{% endif %}
+
+{% if dataset.is_finished() and dataset.num_rows == 0 %}
+    <span class="property-badge second-tier warning">no results</span>
+{% elif not dataset.is_finished() %}
+    <span class="property-badge second-tier warning">in progress</span>
+{% endif %}
