@@ -39,7 +39,7 @@ class User:
 		:return:  User object, or `None` if login was invalid
 		"""
 		user = db.fetchone("SELECT * FROM users WHERE name = %s", (name,))
-		if not user.get("password", None):
+		if not user or not user.get("password", None):
 			# registration not finished yet
 			return None
 		elif not user or not bcrypt.checkpw(password.encode("ascii"), user["password"].encode("ascii")):
