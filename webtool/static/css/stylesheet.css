@@ -627,7 +627,7 @@ ol.result-list li.has_results .property-container.status {
 
 ol.result-list li.has_results .property-container.status a {
     justify-content: flex-end;
-    width: 8em;
+    width: 9em;
     text-align: center;
 }
 
