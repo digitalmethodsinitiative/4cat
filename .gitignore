@@ -38,6 +38,9 @@ dist/
 !webtool/static/img/*.jpg
 !webtool/static/img/favicon/*.ico
 
+# font awesome requires a commercial license and can't be included in the repository
+webtool/static/fontawesome
+
 # data files
 results
 snapshots
