@@ -135,7 +135,7 @@ def tree_to_op(tree):
 	return op_post
 
 def tree_to_posts(tree, thread_id):
-	posts = tree.xpath(".//article[contains(@class, 'post ') and contains(@class, 'doc_id_')]")
+	posts = tree.xpath(".//article[contains(@class, 'post ') and contains(@class, 'doc_id_') and not(contains(@class, 'post_ghost'))]")
 
 	for post_tree in posts:
 		try:
@@ -191,7 +191,8 @@ def thread_html_to_dict(html):
 	posts.append(op)
 
 	for post in tree_to_posts(tree, op["no"]):
-		posts.append(post)
+		if post:
+			posts.append(post)
 
 	return {"posts": posts}
 
