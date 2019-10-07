@@ -90,7 +90,7 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 		After processing, declare job finished
 		"""
 		if self.dataset.data["num_rows"] > 0:
-			self.dataset.update_status("Results processed")
+			self.dataset.update_status("Dataset saved.")
 
 		if not self.dataset.is_finished():
 			self.dataset.finish()

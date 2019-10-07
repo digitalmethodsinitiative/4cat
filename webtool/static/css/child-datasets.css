@@ -90,11 +90,10 @@ li:not(.focus) > .query-core {
 }
 
 li:not(.focus):not(.running) > .query-core.fullwidth-description > .query-descriptor, li:not(.focus) > .query-core.fullwidth-description > .query-descriptor {
-	border-right: 2px solid var(--contrast-dark);
+	border-right: 1px solid var(--gray-light);
 }
 
 li:not(.focus) > .query-core.fullwidth-description > button:not(.active) {
-	border-top: 0;
 	clear: left;
 	margin-left: 0;
 }
@@ -134,15 +133,16 @@ li:not(.focus) > .query-core.fullwidth-description > button:not(.active) {
 }
 
 li:not(.focus) .query-descriptor {
-	border: 2px solid var(--contrast-dark);
-	background: var(--contrast-dark);
-	color: var(--contrast-bright);
+	border: 1px solid var(--gray-light);
+	background: var(--always-white);
+	color: var(--text);
 	display: inline-block;
-	padding: 0 0.5em;
-	border-right: 2px solid var(--contrast-dark);
+	padding: 1px 0.5em;
+	border-right: 2px solid var(--always-white);
 	z-index: 1;
 	float: left;
 	margin-top: 2px;
+	min-height: 1.65em;
 }
 
 li:not(.focus) .query-descriptor .query-status::before {
@@ -161,12 +161,14 @@ li:not(.focus) .query-descriptor .property-badge {
 	border-color: var(--gray);
 }
 
-li:not(.focus) .query-descriptor a {
-	color: var(--highlight);
-}
-
 li:not(.focus):not(.running) .query-descriptor {
 	border-right: 0;
+}
+
+li:not(.focus) .query-descriptor > * {
+    background: transparent;
+    display: inline;
+    color: var(--text);
 }
 
 
@@ -229,13 +231,6 @@ body.result-list .child-list > li:not(.focus)::before {
 
 li.focus .query-descriptor p {
 	padding: 1em;
-}
-
-li:not(.focus) .query-descriptor > * {
-    background: transparent;
-    display: inline;
-    font-weight: normal;
-    color: var(--contrast-bright);
 }
 
 /** colours etc **/

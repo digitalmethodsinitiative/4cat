@@ -1,5 +1,8 @@
             <li>
-                <form action="/results/{{ dataset.key }}/processors/queue/{{ processor.id }}/" method="POST">
+                <form action="/results/{{ dataset.key }}/processors/queue/{{ processor.id }}/" data-async-action="/api/queue-processor/" method="POST">
+                    <input type="hidden" name="key" value="{{ dataset.key }}">
+                    <input type="hidden" name="processor" value="{{ processor.id }}">
+
                     <div class="processor-description">
                         <em>{{ processor.name }}</em>
                         {% if inline %}

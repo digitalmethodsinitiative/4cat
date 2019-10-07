@@ -13,18 +13,24 @@ from pathlib import Path
 
 import backend
 
-from flask import render_template, jsonify, abort, request, redirect, send_from_directory, flash, get_flashed_messages
+from flask import render_template, jsonify, abort, request, redirect, send_from_directory, flash, get_flashed_messages, \
+	url_for
 from flask_login import login_required, current_user
-from webtool import app, db, queue, openapi
-from webtool.lib.helpers import Pagination, get_preview
+
+from webtool import app, db, log
+from webtool.lib.helpers import Pagination, get_preview, error
+
+from webtool.api_tool import delete_dataset, toggle_favourite, queue_processor
 
 from backend.lib.dataset import DataSet
-from backend.lib.helpers import UserInput
+from backend.lib.queue import JobQueue
+
 
 @app.route("/robots.txt")
 def robots():
 	with open(os.path.dirname(os.path.abspath(__file__)) + "/static/robots.txt") as robotstxt:
 		return robotstxt.read()
+
 
 @app.route("/access-tokens/")
 @login_required
@@ -37,6 +43,7 @@ def show_access_tokens():
 	tokens = db.fetchall("SELECT * FROM access_tokens WHERE name = %s", (user,))
 
 	return render_template("access-tokens.html", tokens=tokens)
+
 
 @app.route('/')
 @login_required
@@ -60,6 +67,7 @@ def show_frontpage():
 		stats = None
 
 	return render_template("frontpage.html", stats=stats, datasources=config.DATASOURCES)
+
 
 @app.route("/overview/")
 @login_required
@@ -156,6 +164,7 @@ def show_overview():
 
 	return render_template("overview.html", graphs=graphs)
 
+
 @app.route('/create-dataset/')
 @login_required
 def show_index():
@@ -215,10 +224,9 @@ def get_result(query_file):
 	:return:  Result file
 	:rmime: text/csv
 	"""
+	directory = config.PATH_ROOT + "/" + config.PATH_DATA
+	return send_from_directory(directory=directory, filename=query_file)
 
-	# Return localhost URL when debugging locally
-	if app.debug:
-		return redirect("http://localhost/fourcat/data/" + query_file)
 
 @app.route('/results/', defaults={'page': 1})
 @app.route('/results/page/<int:page>/')
@@ -233,14 +241,22 @@ def show_results(page):
 	"""
 	page_size = 20
 	offset = (page - 1) * page_size
-	all_results = request.args.get("all_results", False)
-	query_filter = request.args.get("filter", "")
 
 	where = ["key_parent = ''"]
 	replacements = []
 
-	if not all_results:
+	query_filter = request.args.get("filter", "")
+
+	depth = request.args.get("depth", "own")
+	if depth not in ("own", "favourites", "all"):
+		depth = "own"
+
+	if depth == "own":
 		where.append("parameters::json->>'user' = %s")
+		replacements.append(current_user.get_id())
+
+	if depth == "favourites":
+		where.append("key IN ( SELECT key FROM users_favourites WHERE name = %s )")
 		replacements.append(current_user.get_id())
 
 	if query_filter:
@@ -253,7 +269,8 @@ def show_results(page):
 
 	replacements.append(page_size)
 	replacements.append(offset)
-	datasets = db.fetchall("SELECT key FROM queries WHERE " + where + " ORDER BY timestamp DESC LIMIT %s OFFSET %s", tuple(replacements))
+	datasets = db.fetchall("SELECT key FROM queries WHERE " + where + " ORDER BY timestamp DESC LIMIT %s OFFSET %s",
+						   tuple(replacements))
 
 	if not datasets and page != 1:
 		abort(404)
@@ -265,7 +282,11 @@ def show_results(page):
 	for dataset in datasets:
 		filtered.append(DataSet(key=dataset["key"], db=db))
 
-	return render_template("results.html", filter={"filter": query_filter, "all_results": all_results}, datasets=filtered, pagination=pagination)
+	favourites = [row["key"] for row in
+				  db.fetchall("SELECT key FROM users_favourites WHERE name = %s", (current_user.get_id(),))]
+
+	return render_template("results.html", filter={"filter": query_filter}, depth=depth, datasets=filtered,
+						   pagination=pagination, favourites=favourites)
 
 
 @app.route('/results/<string:key>/')
@@ -299,12 +320,17 @@ def show_result(key):
 	else:
 		preview = None
 
+	is_favourite = (db.fetchone("SELECT COUNT(*) AS num FROM users_favourites WHERE name = %s AND key = %s",
+								(current_user.get_id(), dataset.key))["num"] > 0)
+
 	# we can either show this view as a separate page or as a bunch of html
 	# to be retrieved via XHR
 	standalone = "processors" not in request.url
 	template = "result.html" if standalone else "result-details.html"
 	return render_template(template, preview=preview, dataset=dataset, processors=backend.all_modules.processors,
-						   is_processor_running=is_processor_running, messages=get_flashed_messages())
+						   is_processor_running=is_processor_running, messages=get_flashed_messages(),
+						   is_favourite=is_favourite)
+
 
 @app.route("/preview-csv/<string:key>/")
 @login_required
@@ -321,7 +347,7 @@ def preview_csv(key):
 	try:
 		dataset = DataSet(key=key, db=db)
 	except TypeError:
-		abort(404)
+		return error(404, "Dataset not found.")
 
 	try:
 		with dataset.get_results_path().open(encoding="utf-8") as csvfile:
@@ -338,9 +364,97 @@ def preview_csv(key):
 
 	return render_template("result-csv-preview.html", rows=rows, filename=dataset.get_results_path().name)
 
+
+@app.route("/result/<string:key>/toggle-favourite/")
+@login_required
+def toggle_favourite_interactive(key):
+	"""
+	Toggle dataset 'favourite' status
+
+	Uses code from corresponding API endpoint, but redirects to a normal page
+	rather than returning JSON as the API does, so this can be used for
+	'normal' links.
+
+	:param str key:  Dataset key
+	:return:
+	"""
+	success = toggle_favourite(key)
+	if not success.is_json:
+		return success
+
+	if success.json["success"]:
+		if success.json["favourite_status"]:
+			flash("Dataset added to favourites.")
+		else:
+			flash("Dataset removed from favourites.")
+
+		return redirect("/results/" + key + "/")
+	else:
+		return render_template("error.html", message="Error while toggling favourite status for dataset %s." % key)
+
+
+@app.route("/result/<string:key>/restart/")
+@login_required
+def restart_dataset(key):
+	"""
+	Run a dataset's query again
+
+	Deletes all underlying datasets, marks dataset as unfinished, and queues a
+	job for it.
+
+	:param str key:  Dataset key
+	:return:
+	"""
+	try:
+		dataset = DataSet(key=key, db=db)
+	except TypeError:
+		return error(404, message="Dataset not found.")
+
+	if current_user.get_id() != dataset.parameters.get("user", "") and not current_user.is_admin:
+		return error(403, message="Not allowed.")
+
+	if not dataset.is_finished():
+		return render_template("error.html", message="This dataset is not finished yet - you cannot re-run it.")
+
+	if "type" not in dataset.parameters:
+		return render_template("error.html",
+							   message="This is an older dataset that unfortunately lacks the information necessary to properly restart it.")
+
+	for child in dataset.children:
+		child.delete()
+
+	dataset.unfinish()
+	queue = JobQueue(logger=log, database=db)
+	queue.add_job(jobtype=dataset.parameters["type"], remote_id=dataset.key)
+
+	flash("Dataset queued for re-running.")
+	return redirect("/results/" + dataset.key + "/")
+
+
+@app.route("/result/<string:key>/delete/")
+@login_required
+def delete_dataset_interactive(key):
+	"""
+	Delete dataset
+
+	Uses code from corresponding API endpoint, but redirects to a normal page
+	rather than returning JSON as the API does, so this can be used for
+	'normal' links.
+
+	:param str key:  Dataset key
+	:return:
+	"""
+	success = delete_dataset(key)
+	if not success.is_json:
+		return success
+	else:
+		flash("Dataset deleted.")
+		return redirect(url_for('show_results'))
+
+
 @app.route('/results/<string:key>/processors/queue/<string:processor>/', methods=["GET", "POST"])
 @login_required
-def queue_processor(key, processor, is_async=False):
+def queue_processor_interactive(key, processor):
 	"""
 	Queue a new processor
 
@@ -348,51 +462,10 @@ def queue_processor(key, processor, is_async=False):
 	:param str processor:  ID of the processor to queue
 	:return:  Either a redirect, or a JSON status if called asynchronously
 	"""
-	if not is_async:
-		is_async = request.args.get("async", "no") != "no"
+	result = queue_processor(key, processor)
 
-	# cover all bases - can only run processor on "parent" dataset
-	try:
-		dataset = DataSet(key=key, db=db)
-	except TypeError:
-		if is_async:
-			return jsonify({"error": "Not a valid dataset key."})
-		else:
-			abort(404)
+	if not result.is_json:
+		return result
 
-	# check if processor is available for this dataset
-	if processor not in dataset.processors:
-		if is_async:
-			return jsonify({"error": "This processor is not available for this dataset or has already been run."})
-		else:
-			abort(404)
-
-	# create a dataset now
-	options = {}
-	for option in dataset.processors[processor]["options"]:
-		settings = dataset.processors[processor]["options"][option]
-		choice = request.values.get("option-" + option, None)
-		options[option] = UserInput.parse(settings, choice)
-
-	analysis = DataSet(parent=dataset.key, parameters=options, db=db,
-					   extension=dataset.processors[processor]["extension"], type=processor)
-	if analysis.is_new:
-		# analysis has not been run or queued before - queue a job to run it
-		job = queue.add_job(jobtype=processor, remote_id=analysis.key)
-		analysis.link_job(job)
-		analysis.update_status("Queued")
-	else:
-		flash("This analysis (%s) is currently queued or has already been run with these parameters." %
-			  dataset.processors[processor]["name"])
-
-	if is_async:
-		return jsonify({
-			"status": "success",
-			"container": dataset.key + "-sub",
-			"key": analysis.key,
-			"html": render_template("result-child.html", child=analysis, dataset=dataset,
-									processors=backend.all_modules.processors) if analysis.is_new else "",
-			"messages": get_flashed_messages()
-		})
-	else:
-		return redirect("/results/" + analysis.top_key() + "/")
+	if result.json["status"] == "success":
+		return redirect("/results/" + key + "/")

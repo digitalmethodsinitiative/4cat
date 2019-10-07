@@ -152,7 +152,7 @@ def show_login():
 	registered_user = User.get_by_login(username, password)
 
 	if registered_user is None:
-		flash('Username or Password is invalid', 'error')
+		flash('Username or Password is invalid.', 'error')
 		return redirect(url_for('show_login'))
 
 	login_user(registered_user, remember=True)

@@ -1,6 +1,3 @@
-<p class="result">
-    <a href="/results/{{ dataset.key }}/">#</a>
-    <span class="property-badge">{{ dataset.parameters.datasource if "datasource" in dataset.parameters else "4chan" }}{% if "board" in dataset.parameters and dataset.parameters.board %}/{{ dataset.parameters.board }}/{% endif %}</span>
     {% if dataset.parameters.body_match and dataset.parameters.body_match != "empty" %}
         <span class="inline-label">body:</span> <span class="inline-query">{{ dataset.parameters.body_match }}</span>
     {% endif %}
@@ -45,4 +42,3 @@
     {% elif not dataset.is_finished() %}
         <span class="property-badge second-tier warning">in progress</span>
     {% endif %}
-    </p>

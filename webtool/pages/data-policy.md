@@ -3,7 +3,7 @@
 We collect the following data:
 
 - Your IP address and the URL through which you query our web tool will be 
-  logged by our web server. This is required to  monitor web server use, and 
+  logged by our web server. This is required to monitor web server use, and 
   detect errors and abuse.
 
 If you use our web tool to query 4CAT, we additionally save the following 
@@ -15,23 +15,31 @@ data:
   personal information this will be saved on our server as part of the query 
   data. 
   
-  Other users of 4CAT may see your query in the tool's interface. They will 
-  not be able to see what account was used to submit the query, only the query 
-  itself.
+  Other users of 4CAT may see your dataset in the tool's interface. They will 
+  not be able to see what account was used to create the dataset, only the  
+  dataset itself.
 
 If you access our web tool with a personal account, we additionally save the 
 following data:
 
 - Your e-mail address, which we use to identify you and to allow you to log in 
-  to your personal account.
+  to your personal account. We will not send you newsletters or other
+  unsollicited e-mails, unless this is required to inform you of changes to
+  this data policy or of incidents and major changes to the tool that might
+  influence whether you want to continue using it.
   
-- Any search query you perform will be linked to the account you are logged in 
-  with. This makes it easier for you to revisit past queries and access your 
+- Any dataset you create will be linked to the account you are logged in 
+  with. This makes it easier for you to revisit past datasets and access your 
   search results. We may also use this data to detect abuse and excessive usage 
   of our web tool. 
   
+- When you mark a dataset as 'favourite', that information is stored on our
+  servers, and may be viewed by 4CAT maintainers to monitor general usage 
+  patterns. Regular users cannot see your favourites.
+  
 We do not share any of this data with anyone else. Anonymised data may be used 
-as part of research projects.
+as part of research projects. All data is stored on a secure server and can 
+only be accessed by the two maintainers of 4CAT.
 
 If you want to see or remove your personal data, please contact us at 
 [4cat@oilab.eu](mailto:4cat@oilab.eu). Please allow up to four weeks for us to 
