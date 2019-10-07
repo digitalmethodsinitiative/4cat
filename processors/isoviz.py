@@ -176,6 +176,12 @@ class IsometricMultigraphRenderer(BasicProcessor):
 		limits = {limit: limits[limit] for limit in sorted(limits, key=lambda l: limits[l])}
 		graphs = {graph: graphs[graph] for graph in limits}
 
+		if not graphs:
+			# maybe nothing is actually there to be graphed
+			self.dataset.update_status("No items match the selection criteria - nothing to visualise.")
+			self.dataset.finish(0)
+			return None
+
 		# how many vertical grid lines (and labels) are to be included at most
 		# 12 is a sensible default because it allows one label per month for a full
 		# year's data
