@@ -2,6 +2,7 @@ import datetime
 import markdown
 import json
 import uuid
+import os
 
 from urllib.parse import urlencode
 from webtool import app
@@ -48,6 +49,10 @@ def _jinja2_filter_markdown(text):
 	return markdown.markdown(text)
 
 
+@app.template_filter('repr')
+def _jinja2_filter_repr(value):
+	return repr(value)
+
 @app.template_filter('json')
 def _jinja2_filter_json(data):
 	return json.dumps(data)
@@ -60,6 +65,23 @@ def _jinja2_filter_conf(data, property=""):
 	except AttributeError:
 		return data
 
+@app.template_filter('filesize')
+def _jinja2_filter_filesize(file):
+	try:
+		stats = os.stat(file)
+	except FileNotFoundError:
+		return "0 bytes"
+
+	bytes = stats.st_size
+
+	if bytes > (1024 * 1024 * 1024):
+		return "{0:.2f} GB".format(bytes / 1024 / 1024 / 1024)
+	if bytes > (1024 * 1024):
+		return "{0:.2f} MB".format(bytes / 1024 / 1024)
+	elif bytes > 1024:
+		return "{0:.2f} kB".format(bytes / 1024)
+	else:
+		return "%i bytes" % bytes
 
 @app.context_processor
 def inject_now():
