@@ -87,7 +87,10 @@ a configuration file for the Sphinx search daemon that is used by 4CAT to run
 *data sets*.
 
 Finally, the data source contains a file defining methods through which the
-data may be searched for a given search query.
+data may be searched for a given search query. It also defines a web form that
+will be used in the *front-end* to show users how the data source may be
+subsetted. Optionally, an accompanying JavaScript file is provided for more
+advanced configuration of queries.
 
 ### Processors
 Processors are a special type of *worker* that take an existing data set and 
@@ -98,7 +101,7 @@ to do their work. That *data set* then contains a reference to an earlier
 Processors are classes extending a base class that set a number of class
 attributes for configuration, and contain at least one method `process()` that
 is called when 4CAT is ready to run the processor. Usually, the method will 
-read the result file of an earlier *query*, then process that data somehow, 
+read the result file of an earlier *data set*, then process that data somehow, 
 writing the result to the result file of its own *data set*. Like other
 *workers*, they have a type and can set how many instances may be run
 simultaneously.

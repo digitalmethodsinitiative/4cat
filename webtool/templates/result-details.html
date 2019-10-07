@@ -1,27 +1,54 @@
 <section class="result-tree">
-    {% if messages %}
-        {% for message in messages %}
-            <p class="result-warning glued">{{ message }}</p>
-        {% endfor %}
-    {% endif %}
+    <div class="card query article-ish{% if not dataset.is_finished() %} unfinished{% endif %}" data-key="{{ dataset.key }}">
 
-    <div class="card query article-ish">
         <h3 class="blocktitle"><span><a href="/results/{{ dataset.key }}/">Query{% if dataset.query != "query" %}:
             {{ dataset.get_label() }}{% endif %}</a></span></h3>
 
-        <div class="metadata-wrapper">
-        {% include 'result-metadata.html' %}
+        {% if current_user.is_authenticated %}
+            <nav class="dataset-toolbox" aria-label="Actions for dataset">
+                <ul>
+                    <li><a href="/result/{{ dataset.key }}/toggle-favourite/" class="toggle-favourites"><i class="fa{% if is_favourite %}r{% else %}s{% endif %} fa-star" aria-hidden="true"></i> {% if is_favourite %}Delete from{% else %}Add to{% endif %} favourites</a></li>
+                    <li><a href="/results/{{ dataset.key }}/"><i class="fas fa-link" aria-hidden="true"></i> Permalink</a></li>
+                    {% if current_user.get_id() == dataset.parameters.user %}
+                        <li><a href="/result/{{ dataset.key }}/delete/" class="confirm-first" data-confirm-action="delete this dataset"><i class="fas fa-trash-alt" aria-hidden="true"></i> Delete dataset</a></li>
+                        <li><a href="/result/{{ dataset.key }}/restart/" class="confirm-first" data-confirm-action="delete all results for this dataset, including processor results, and re-run the query"><i class="fas fa-sync-alt" aria-hidden="true"></i> Re-run dataset</a></li>
+                    {% endif %}
+                </ul>
+            </nav>
+        {% endif %}
 
-        <p class="result">
-            Queued on {{ dataset.timestamp|datetime(fmt="%Y-%m-%d %H:%M") }}{% if "user" in dataset.parameters and current_user.get_id() == dataset.parameters.user %}, by {{ dataset.parameters.user }}{% endif %}.
-        </p>
+        <dl class="metadata-wrapper">
+            <div>
+                <dt>Data source</dt>
+                <dd><span class="property-badge">{{ dataset.parameters.datasource if "datasource" in dataset.parameters else "4chan" }}{% if "board" in dataset.parameters and dataset.parameters.board %}/{{ dataset.parameters.board }}/{% endif %}</span></dd>
+            </div>
 
-        <p class="result">
-            {% if dataset.status %}{{ dataset.status }}{% else %}Query is queued.{% endif %}
-            {% if dataset.is_finished() %}({{ dataset.num_rows }} posts{% if dataset.num_rows > 0 %};
-                <a href="/result/{{ dataset.result_file }}">{{ dataset.result_file }}</a>{% endif %}){% endif %}
-        </p>
-        </div>
+            <div>
+                <dt>Queued at</dt>
+                <dd>{{ dataset.timestamp|datetime(fmt="%d %b %Y, %H:%M") }}</dd>
+            </div>
+            <div>
+                <dt>Status</dt>
+                <dd class="dataset-status">{% include "result-status.html" %}</dd>
+            </div>
+
+            <div>
+                <dt>Results</dt>
+                <dd>{% if dataset.is_finished() %}{{ "{:,}".format(dataset.num_rows) }} item{% if dataset.num_rows != 1 %}s{% endif %}{% else %}Pending{% endif %}</dd>
+            </div>
+
+            <div class="fullwidth">
+                <dt>Parameters</dt>
+                <dd>{% include 'result-metadata.html' %}</dd>
+            </div>
+
+            {% if dataset.is_finished() and dataset.num_rows > 0 %}
+            <div class="fullwidth">
+                <dt>Result file</dt>
+                <dd><a href="/result/{{ dataset.result_file }}"><i class="fas fa-download" aria-hidden="false"></i> Download ({{ dataset.get_results_path()|filesize }}, {{ dataset.result_file.split(".")[-1] }})</a></dd>
+            </div>
+            {% endif %}
+        </dl>
     </div>
 
     <div id="{{ dataset.key }}-sub" class="article-ish">
@@ -33,44 +60,28 @@
     </div>
 </section>
 
-<article>
+{% if dataset.num_rows > 0 and dataset.processors|length > 0 and current_user.is_authenticated %}
+<article class="analysis-overview">
     <section>
-        {% if current_user.is_authenticated %}
-            {% if dataset.num_rows == 0 or dataset.processors|length == 0 %}
-                <h3 class="blocktitle section-header"><span>Analyses</span></h3>
-                <p>
-                    No further analytical post-processors are available for this dataset.
-                    {% if subqueries|length > 0 %}
-                        Results for analyses that were run earlier are available in the panel above.
-                    {% endif %}
-                </p>
-            {% else %}
-                {% set part = "main" %}
-                <h3 class="blocktitle section-header"><span>Select analysis</span></h3>
-                {% if is_processor_running %}
-                    <p class="result-warning glued">Further analyses may be queued once all analyses currently queued
-                        for this
-                        result have been completed.</p>
-                {% endif %}
-
-                <p>Start your analysis of the retrieved data by choosing one of the post-processors below.
-                    Note that some may take a while to complete, so carefully consider which one you want to run
-                    before queueing it.</p>
-                <p><a href="#">Documentation</a> about the various modes of analysis and what to take into
-                    account when using {{ __tool_name }} data is available as well.</p>
+        <h3 class="blocktitle section-header"><span>Analyses</span></h3>
+        {% set part = "main" %}
+        <p>Start your analysis of the retrieved data by choosing one of the post-processors below.
+            Note that some may take a while to complete, so carefully consider which one you want to run
+            before queueing it.</p>
+        <p><a href="#">Documentation</a> about the various modes of analysis and what to take into
+            account when using {{ __tool_name }} data is available as well.</p>
 
 
-                {% set cat = namespace(egory='') %}
-                {% for processor in dataset.processors.values() %}
-                    {% if processor.category != cat.egory %}
-                        {% if cat.egory != '' %}</ol>{% endif %}
-                        {% set cat.egory = processor.category %}
-                        <h4 class="blocktitle section-subheader"><span>{{ processor.category }}</span></h4>
-                        <ol class="processor-list">
-                    {% endif %}
-                    {% include "processor-details.html" %}
-                {% endfor %}
+        {% set cat = namespace(egory='') %}
+        {% for processor in dataset.processors.values() %}
+            {% if processor.category != cat.egory %}
+                {% if cat.egory != '' %}</ol>{% endif %}
+                {% set cat.egory = processor.category %}
+                <h4 class="blocktitle section-subheader"><span>{{ processor.category }}</span></h4>
+                <ol class="processor-list">
             {% endif %}
-        {% endif %}
+            {% include "processor-details.html" %}
+        {% endfor %}
     </section>
 </article>
+{% endif %}

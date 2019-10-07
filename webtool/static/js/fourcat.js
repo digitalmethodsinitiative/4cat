@@ -15,7 +15,6 @@ function init() {
 
     // Check queue length
     query.check_queue();
-    setInterval(function () {query.check_queue();}, 4000);
 
     // Start querying when go button is clicked
     $('#query-form').bind('submit', function (e) {
@@ -90,8 +89,29 @@ function init() {
     setTimeout(processor.collapse_options, 100);
     setTimeout(processor.resize_blocks, 100);
 
+    //regularly check for unfinished datasets
+    setInterval(query.check_resultpage, 4000);
+
     $('.query-result-svg').on('load', function() {
         svgPanZoom(this, {contain: true});
+    });
+
+    //confirm links
+    $(document).on('click', '.confirm-first', function(e) {
+        let action = 'do this';
+
+        if($(this).attr('data-confirm-action')) {
+            action = $(this).attr('data-confirm-action');
+            console.log('done');
+        }
+        console.log(action);
+
+        if(!confirm('Are you sure you want to ' + action + '? This cannot be undone.')) {
+            e.preventDefault();
+            return false;
+        } else {
+            return true;
+        }
     });
 }
 
@@ -182,7 +202,7 @@ processor = {
         } else {
             $('html,body').scrollTop(200);
             let form = $(this).parents('form');
-            $.ajax(form.attr('action') + '?async', {
+            $.ajax(form.attr('data-async-action') + '?async', {
                 'method': form.attr('method'),
                 'data': form.serialize(),
                 'success': function (response) {
@@ -366,6 +386,35 @@ query = {
             error: function () {
                 console.log('Something went wrong while checking query status');
             }
+        });
+    },
+
+    check_resultpage: function() {
+        let unfinished = $('.dataset-unfinished');
+        if(unfinished.length === 0) {
+            return;
+        }
+
+        $('.dataset-unfinished').each(function() {
+            let container = $(this);
+            $.getJSON({
+                url: '/api/check-query/',
+                data: {key: $(this).attr('data-key')},
+                success: function (json) {
+                    if (json.done) {
+                        //refresh
+                        window.location = window.location;
+                        return;
+                    }
+
+                    let current_status = container.find('.dataset-status').html();
+                    if (current_status !== json.status_html) {
+                        container.find('.dataset-status').html(json.status_html);
+                        container.find('.dataset-status').removeClass('flashing');
+                        container.find('.dataset-status').addClass('flashing');
+                    }
+                }
+            });
         });
     },
 

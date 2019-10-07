@@ -118,8 +118,21 @@ select, input, textarea {
     max-width: 80%;
 }
 
+select, input {
+    max-width: 15em;
+}
+
+input[type=date] {
+    max-width: 10em;
+}
+
 fieldset {
     border-bottom: 1px dotted var(--contrast-dark);
+}
+
+p.form-notice {
+    text-align: center;
+    color: var(--accent-alternate);
 }
 
 .form-element textarea {
@@ -167,9 +180,14 @@ button, .button-like {
     padding: 0.25em 1em;
 }
 
-button:hover, .button-like:hover {
+button:hover, .button-like:not(.inactive):hover {
     background: var(--accent);
     color: var(--contrast-bright);
+}
+
+.button-like.inactive {
+    cursor: default;
+    border-color: var(--gray-dark);
 }
 
 .form-intro {
@@ -365,6 +383,11 @@ article p {
     margin: 0 1em 0.5em 1em;
 }
 
+p.banner {
+    text-align: center;
+    padding: 1em;
+}
+
 ol li {
     padding: 1em;
 }
@@ -414,6 +437,45 @@ article section li p, article aside li p {
 .pagination li.page a:hover, .pagination li.page a:focus {
 	background: var(--accent);
     color: var(--contrast-bright);
+}
+
+.tabs {
+    border-bottom: 1px dotted var(--contrast-dark);
+    max-height: 5em;
+    transition: 0.25s;
+    overflow: hidden;
+    background: var(--gray);
+}
+
+.tabs.inactive {
+    max-height: 0;
+    border-width: 0;
+}
+
+.tabs ul {
+    list-style: none;
+    text-align: center;
+    padding: 0.5em;
+}
+
+.tabs ul li {
+    display: inline-block;
+    background: var(--gray-light);
+    padding: 0 0.5em;
+    border: 1px solid var(--gray-dark);
+}
+
+.tabs ul li.current, .tabs ul li:hover {
+    border-color: var(--contrast-dark);
+    background: var(--gray-dark);
+}
+
+.tabs ul li:not(:last-child) {
+    margin-right: 1em;
+}
+
+.tabs ul li a {
+    text-decoration: none;
 }
 
 /** --------------------- *
@@ -467,7 +529,7 @@ article section li p, article aside li p {
 /** --------------------- *
   Pages -> Results metadata
   * --------------------- */
-.result .inline-label {
+.inline-label {
     color: var(--accent-alternate);
 }
 
@@ -482,12 +544,32 @@ article section li p, article aside li p {
 	vertical-align: baseline;
 }
 
-.result .second-tier {
+.second-tier {
     color: var(--gray-dark);
 }
 
-.result .warning {
+.warning {
     color: var(--warning);
+}
+
+.flashing {
+    animation: flashing 1s linear 2;
+    transition: 0.25s;
+}
+
+@keyframes flashing {
+    0% {
+        opacity: 0;
+        color: var(--text);
+    }
+    50% {
+        opacity: 1;
+        color: var(--warning);
+    }
+    100% {
+        opacity: 1;
+        color: var(--text);
+    }
 }
 
 /** --------------------- *
@@ -520,17 +602,44 @@ article section li p, article aside li p {
     opacity: 1;
 }
 
-.result-list .has_results {
+ol.result-list li {
     display: grid;
-    grid-template-columns: auto 6em;
+    grid-template-columns: auto auto 10em;
 }
 
-.result-list .has_results .analysis-button-container {
-    grid-row: 1 / span 2;
-    grid-column-start: 2;
+ol.result-list li:not(.has_results) {
+    grid-template-columns: auto auto;
+}
+
+ol.result-list .property-container.status, ol.result-list .property-container.analysis {
     display: flex;
     justify-content: center;
     align-items: center;
+}
+
+ol.result-list .property-container.status {
+    justify-content: flex-end;
+}
+
+ol.result-list li.has_results .property-container.status {
+    margin-right: 1em;
+}
+
+ol.result-list li.has_results .property-container.status a {
+    justify-content: flex-end;
+    width: 8em;
+    text-align: center;
+}
+
+ol.result-list li:not(.has_results) .property-container.status p {
+    margin: 0;
+}
+
+
+ol.result-list li.has_results .property-container.analysis a {
+    justify-content: flex-end;
+    width: 9em;
+    text-align: center;
 }
 
 .result-list .child-list > li {
@@ -543,7 +652,37 @@ article section li p, article aside li p {
    Pages -> Result details
     This is the big one!
   * --------------------- */
+/** dataset toolbox **/
+.dataset-toolbox {
+    border-bottom: 1px solid var(--gray-light);
+}
+
+.dataset-toolbox ul {
+    list-style: none;
+    display: flex;
+    justify-content: space-evenly;
+    font-size: 0.8em;
+}
+
+.dataset-toolbox a {
+    display: inline-block;
+    padding: 0 0.5em;
+    margin: 0.5em 0;
+    text-decoration: none;
+    background: var(--gray-light);
+    border: 1px solid var(--gray-dark);
+}
+
+.dataset-toolbox a:hover {
+    border-color: var(--contrast-dark);
+    background: var(--gray-dark);
+}
+
 /* processor list */
+.analysis-overview h3 + p {
+    margin-top: 0.5em;
+}
+
 .processor-list li form {
     display: grid;
     grid-template-columns: auto 8em;
@@ -662,11 +801,32 @@ article section li p, article aside li p {
 
 /** result card **/
 .metadata-wrapper {
-    margin: 1em;
+    display: grid;
+    grid-template-columns: 50% 50%;
 }
 
-.metadata-wrapper p:not(:last-child) {
-    margin-bottom: 0.5em;
+.metadata-wrapper div.fullwidth {
+    grid-column: 1 / span 2;
+}
+
+.metadata-wrapper div {
+    display: grid;
+    grid-template-columns: 9em auto;
+}
+
+.metadata-wrapper div:not(:last-child) {
+    border-bottom: 1px solid var(--gray-light);
+}
+
+.metadata-wrapper dt, .metadata-wrapper dd {
+    padding: 0.5em;
+}
+
+.metadata-wrapper dt {
+    color: var(--accent-alternate);
+    border: 1px solid var(--gray-light);
+    border-width: 0 1px;
+    text-align: right;
 }
 
 /** processor result preview **/
@@ -675,11 +835,19 @@ iframe.query-result-iframe {
 	margin: 0 auto;
 	height: 40em;
 	display: block;
-	border: 1px dashed var(--contrast-dark);
+	border: 1px dashed var(--gray-dark);
 }
 
 .query-result {
     padding-bottom: 0.5em;
+}
+
+body.csv-preview {
+    background: var(--always-white);
+}
+
+body.csv-preview table td, body.csv-preview table th {
+    border: 1px solid var(--gray-light);
 }
 
 iframe.query-result-iframe.csvfile {
@@ -700,10 +868,15 @@ embed.details-only, embed.details-only svg {
     cursor: grab;
 }
 
+embed.details-only {
+    border-top: 1px solid var(--gray-light);
+}
+
 .csv-preview .warning {
     width: 100%;
-    background: var(--gray-dark);
+    background: var(--gray-light);
     text-align: center;
+    font-size: 0.8em;
 }
 
 .csv-preview table {

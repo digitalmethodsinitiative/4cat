@@ -6,7 +6,7 @@
             <h4 class="child-header">{{ processors[child.type].name if child.type in processors else "(Deprecated analysis) " + child.type }}</h4>
             <p>
                 <span class="query-status">{% if child.is_finished() %}
-                <a href="/result/{{ child.result_file }}">{{ child.num_rows }} item{% if child.num_rows != 1 %}s{% endif %}, {{ processors[child.type].extension if child.type in processors else "download" }}</a>
+                    <a href="/result/{{ child.result_file }}"><i class="fas fa-download" aria-label="Download result file"></i> {{ "{:,}".format(child.num_rows) }} item{% if child.num_rows != 1 %}s{% endif %}, {{ processors[child.type].extension if child.type in processors else "download" }}</a>
             {% else %}
                 {{ child.status }}
                 {% endif %}</span>
@@ -25,9 +25,10 @@
     </div>
     {% else %}
         <button class="expand-processors" aria-controls="{{ item.key }}-sub">
-            {% if can_process %}{{ item.processors|length }} further analys{% if item.processors|length == 1 %}i{% else %}e{% endif %}s{% endif %}
-            {% if can_process and item.children %}and{% endif %}
-            {% if item.children %}{{ item.children|length }} further result{% if item.children|length != 1 %}s{% endif %}{% endif %}
+            &#x2192;
+            {% if can_process %}{{ item.processors|length }} processor{% if item.processors|length != 1 %}s{% endif %}{% endif %}
+            {% if can_process and item.children %}&amp;{% endif %}
+            {% if item.children %}{{ item.children|length }} dataset{% if item.children|length != 1 %}s{% endif %}{% endif %}
             {% if not can_process and not item.children %}details{% endif %}
         </button>
     </div>{% if item.is_finished() %}<div class="sub-controls" id="{{ item.key }}-sub">

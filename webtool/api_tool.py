@@ -14,17 +14,17 @@ from pathlib import Path
 
 import backend
 
-from flask import jsonify, abort, request, render_template, render_template_string, redirect, send_file, url_for
+from flask import jsonify, abort, request, render_template, render_template_string, redirect, send_file, url_for, flash, get_flashed_messages
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 
 from webtool import app, db, log, openapi, limiter, queue
-from webtool.views import queue_processor
 from webtool.lib.helpers import get_preview, error
 
 from backend.lib.exceptions import QueryParametersException
 from backend.lib.queue import JobQueue
 from backend.lib.dataset import DataSet
+from backend.lib.helpers import UserInput
 
 api_ratelimit = limiter.shared_limit("1 per second", scope="api")
 
@@ -221,6 +221,8 @@ def queue_dataset():
 
 	sanitised_query["user"] = current_user.get_id()
 	sanitised_query["datasource"] = datasource_id
+	sanitised_query["type"] = search_worker_id
+
 	dataset = DataSet(parameters=sanitised_query, db=db, type="search")
 
 	if hasattr(search_worker["class"], "after_create"):
@@ -254,14 +256,14 @@ def check_dataset():
 			key={type=string},
 			done={type=boolean},
 			path={type=string},
-			empty={type=boolean}
+			empty={type=boolean},
+			is_favourite={type=boolean}
 		}
 	}
 
 	:return-error 404:  If the dataset does not exist.
 	"""
 	dataset_key = request.args.get("key")
-	print(dataset_key)
 	try:
 		dataset = DataSet(key=dataset_key, db=db)
 	except TypeError:
@@ -285,14 +287,16 @@ def check_dataset():
 
 	status = {
 		"status": dataset.get_status(),
+		"status_html": render_template("result-status.html", dataset=dataset),
 		"label": dataset.get_label(),
 		"query": dataset.data["query"],
 		"rows": dataset.data["num_rows"],
 		"key": dataset_key,
-		"done": True if results else False,
+		"done": True if dataset.is_finished() else False,
 		"preview": preview,
 		"path": path,
-		"empty": (dataset.data["num_rows"] == 0)
+		"empty": (dataset.data["num_rows"] == 0),
+		"is_favourite": (db.fetchone("SELECT COUNT(*) AS num FROM users_favourites WHERE name = %s AND key = %s", (current_user.get_id(), dataset.key))["num"] > 0)
 	}
 
 	return jsonify(status)
@@ -302,7 +306,7 @@ def check_dataset():
 @api_ratelimit
 @login_required
 @openapi.endpoint("tool")
-def delete_dataset():
+def delete_dataset(key=None):
 	"""
 	Delete a dataset
 
@@ -321,9 +325,10 @@ def delete_dataset():
 	:return-error 404:  If the dataset does not exist.
 	"""
 	if not current_user.is_admin():
-		return jsonify({"error": "Not allowed"})
+		return error(403, message="Not allowed")
 
-	dataset_key = request.form.get("key")
+	dataset_key = request.form.get("key", "") if not key else key
+
 	try:
 		dataset = DataSet(key=dataset_key, db=db)
 	except TypeError:
@@ -349,12 +354,43 @@ def check_queue():
 
 	return jsonify(unfinished_datasets)
 
+@app.route("/api/toggle-dataset-favourite/<string:key>")
+@login_required
+@openapi.endpoint("tool")
+def toggle_favourite(key):
+	"""
+	'Like' a dataset
+
+	Marks the dataset as being liked by the currently active user, which can be
+	used for organisation in the front-end.
+
+	:param str key: Key of the dataset to mark as favourite.
+
+	:return: A JSON object with the status of the request
+	:return-schema: {type=object,properties={success={type=boolean},favourite_status={type=bool}}}
+
+	:return-error 404:  If the dataset key was not found
+	"""
+	try:
+		dataset = DataSet(key=key, db=db)
+	except TypeError:
+		return error(404, error="Dataset does not exist.")
+
+	current_status = db.fetchone("SELECT * FROM users_favourites WHERE name = %s AND key = %s", (current_user.get_id(), dataset.key))
+	if not current_status:
+		db.insert("users_favourites", data={"name": current_user.get_id(), "key": dataset.key})
+		return jsonify({"success": True, "favourite_status": True})
+	else:
+		db.delete("users_favourites", where={"name": current_user.get_id(), "key": dataset.key})
+		return jsonify({"success": True, "favourite_status": False})
+
+
 
 @app.route("/api/queue-processor/", methods=["POST"])
 @api_ratelimit
 @login_required
 @openapi.endpoint("tool")
-def queue_processor_api():
+def queue_processor(key=None, processor=None):
 	"""
 	Queue a new processor
 
@@ -400,10 +436,48 @@ def queue_processor_api():
 		filename = secure_filename(input_file.filename)
 		input_file.save(config.PATH_DATA + "/")
 
-	else:
+	elif not key:
 		key = request.form.get("key", "")
 
-	return queue_processor(key, request.form.get("processor", ""), is_async=True)
+	if not processor:
+		processor = request.form.get("processor", "")
+
+	# cover all bases - can only run processor on "parent" dataset
+	try:
+		dataset = DataSet(key=key, db=db)
+	except TypeError:
+		return jsonify({"error": "Not a valid dataset key."})
+
+	# check if processor is available for this dataset
+	if processor not in dataset.processors:
+		return jsonify({"error": "This processor is not available for this dataset or has already been run."})
+
+	# create a dataset now
+	options = {}
+	for option in dataset.processors[processor]["options"]:
+		settings = dataset.processors[processor]["options"][option]
+		choice = request.values.get("option-" + option, None)
+		options[option] = UserInput.parse(settings, choice)
+
+	analysis = DataSet(parent=dataset.key, parameters=options, db=db,
+					   extension=dataset.processors[processor]["extension"], type=processor)
+	if analysis.is_new:
+		# analysis has not been run or queued before - queue a job to run it
+		job = queue.add_job(jobtype=processor, remote_id=analysis.key)
+		analysis.link_job(job)
+		analysis.update_status("Queued")
+	else:
+		flash("This analysis (%s) is currently queued or has already been run with these parameters." %
+			  dataset.processors[processor]["name"])
+
+	return jsonify({
+		"status": "success",
+		"container": dataset.key + "-sub",
+		"key": analysis.key,
+		"html": render_template("result-child.html", child=analysis, dataset=dataset,
+								processors=backend.all_modules.processors) if analysis.is_new else "",
+		"messages": get_flashed_messages()
+	})
 
 
 @app.route("/api/get-available-processors/")

@@ -1,0 +1,8 @@
+{% if not dataset.is_finished() %}
+    {% if not dataset.get_status() or "queued" in dataset.get_status().lower() %}
+        <i class="fas fa-hourglass-half" aria-label="Query in progress..."></i>
+    {% else %}
+        <i class="fas fa-sync fa-spin" aria-label="Query in progress..."></i>
+    {% endif %}
+{% endif %}{% if dataset.get_status() %}
+    {{ dataset.get_status() }}{% if dataset.get_status()[-1] != '.' %}.{% endif %}{% endif %}

@@ -186,6 +186,27 @@ class DataSet:
 		self.data["is_finished"] = True
 		self.data["num_rows"] = num_rows
 
+	def unfinish(self):
+		"""
+		Declare unfinished, and reset status, so that it may be executed again.
+		"""
+		if not self.is_finished():
+			raise RuntimeError("Cannot unfinish an unfinished dataset")
+
+		self.get_results_path().unlink()
+		self.data["timestamp"] = int(time.time())
+		self.data["is_finished"] = False
+		self.data["num_rows"] = 0
+		self.data["status"] = "Dataset is queued."
+
+		self.db.update("queries", data={
+			"timestamp": self.data["timestamp"],
+			"is_finished": self.data["is_finished"],
+			"num_rows": self.data["num_rows"],
+			"status": self.data["status"]
+		}, where={"key": self.key})
+
+
 	def delete(self):
 		"""
 		Delete the dataset, and all its children
