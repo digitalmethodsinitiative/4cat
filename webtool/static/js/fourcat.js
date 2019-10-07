@@ -410,8 +410,6 @@ query = {
                     let current_status = container.find('.dataset-status').html();
                     if (current_status !== json.status_html) {
                         container.find('.dataset-status').html(json.status_html);
-                        container.find('.dataset-status').removeClass('flashing');
-                        container.find('.dataset-status').addClass('flashing');
                     }
                 }
             });
