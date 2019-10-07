@@ -49,9 +49,9 @@ def _jinja2_filter_markdown(text):
 	return markdown.markdown(text)
 
 
-@app.template_filter('repr')
-def _jinja2_filter_repr(value):
-	return repr(value)
+@app.template_filter('isbool')
+def _jinja2_filter_isbool(value):
+	return isinstance(value, bool)
 
 @app.template_filter('json')
 def _jinja2_filter_json(data):
