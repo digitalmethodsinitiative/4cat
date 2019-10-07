@@ -27,7 +27,7 @@ class SearchInstagram(Search):
 	# not available as a processor for existing datasets
 	accepts = [None]
 
-	# let's not get rate limitred
+	# let's not get rate limited
 	max_workers = 1
 
 	def get_posts_simple(self, query):
@@ -66,7 +66,7 @@ class SearchInstagram(Search):
 		queries = [query.strip() for query in parameters.get("query", "").split(",")]
 
 		posts = []
-		max_posts = self.dataset.parameters.get("max_posts", 500)
+		max_posts = self.dataset.parameters.get("items", 500)
 
 		# for each query, get items
 		for query in queries:
@@ -100,7 +100,7 @@ class SearchInstagram(Search):
 		results = []
 		posts_processed = 0
 		comments_bit = " and comments" if self.parameters.get("scrape_comments", False) else ""
-		
+
 		for post in posts:
 			posts_processed += 1
 			self.dataset.update_status("Retrieving metadata%s for post %i" % (comments_bit, posts_processed))
@@ -207,9 +207,9 @@ class SearchInstagram(Search):
 
 		# simple!
 		return {
-			"max_posts": max_posts,
+			"items": max_posts,
 			"query": items,
-			"board": query.get("search_scope") + ":" + items,  # used in web interface
+			"board": query.get("search_scope") + "s",  # used in web interface
 			"search_scope": query.get("search_scope"),
 			"scrape_comments": bool(query.get("scrape_comments", False))
 		}
