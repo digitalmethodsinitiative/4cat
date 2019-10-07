@@ -42,7 +42,7 @@
             {{ processors[item.type].description if item.type in processors else "This post-processor has been deprecated but you can still download the result." }}
         </p>
     
-        {% if child.type in processors and processors[child.type].extension in ("jpg", "jpeg", "png", "csv", "html", "svg") %}
+        {% if child.num_rows > 0 and child.type in processors and processors[child.type].extension in ("jpg", "jpeg", "png", "csv", "html", "svg") %}
             <div class="query-result details-only">
             {% if processors[child.type].extension == "html" %}
                 <iframe class="query-result-iframe" src="/result/{{ child.result_file }}"></iframe>
