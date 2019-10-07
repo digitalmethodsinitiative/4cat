@@ -448,7 +448,6 @@ query = {
                     }
 
                     target.replaceWith(update);
-                    $('#child-' + child.key).addClass('flashing');
 
                     if (!$('body').hasClass('result-page')) {
                         return;
