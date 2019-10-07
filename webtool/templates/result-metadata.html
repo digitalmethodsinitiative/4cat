@@ -10,7 +10,7 @@
     {% elif parameter == "country_code" and dataset.parameters[parameter] != "all" %}
         <span class="inline-label">country:</span>
         <span class="inline-query">{{ dataset.parameters.country_code }}</span>
-    {% elif dataset.parameters[parameter] and parameter not in ("user", "time", "search_scope", "random_amount", "scope_length", "scope_density", "min_date", "max_date", "board", "datasource", "type") %}
+    {% elif dataset.parameters[parameter] and parameter not in ("user", "time", "search-scope", "search_scope", "random_amount", "scope_length", "scope_density", "country_code", "min_date", "max_date", "board", "datasource", "type") %}
         {% if not dataset.parameters[parameter]|isbool and dataset.parameters[parameter] %}
         <span class="inline-label">{{ parameter }}:</span>
         <span class="inline-query">{{ dataset.parameters[parameter] }}</span>
