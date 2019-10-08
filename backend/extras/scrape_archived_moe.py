@@ -81,8 +81,6 @@ def tree_to_op(tree):
 		return None
 
 	op = op[0]
-	op_image = op.xpath(".//div[contains(@class, 'thread_image_box')]")[0]
-	op_image_stats = stringify_children(op_image.xpath(".//div[@class='post_file']")[0])
 
 	try:
 		op_body = stringify_children(op.xpath(".//div[@class='text']")[0])
@@ -93,9 +91,6 @@ def tree_to_op(tree):
 		op_subject = stringify_children(op.xpath(".//h2")[0]).strip()
 	except IndexError:
 		op_subject = ""
-
-	filename = op_image.xpath(".//a[@class='post_file_filename']")[0]
-	filename = ".".join(filename.attrib.get("filename", stringify_children(filename)).split(".")[:-1])
 
 	if not op_subject:
 		semantic_url = re.sub(r"[^a-z0-9 ]", "", " ".join(strip_tags(op_body).split(" ")[:9]).lower()).replace(" ", "-")
@@ -108,22 +103,31 @@ def tree_to_op(tree):
 		"name": stringify_children(op.xpath(".//span[@class='post_author']")[0]),
 		"sub": op_subject,
 		"com": op_body,
-		"filename": filename,
-		"ext": "." + op_image.xpath(".//a[contains(@class, 'thread_image_link')]")[0].attrib.get("href").split("/")[-1].split(".")[1],
-		"w": int(op_image_stats.split(",")[1].strip().split("x")[0]),
-		"h": int(op_image_stats.split(",")[1].strip().split("x")[1]),
-		"tn_w": -1,
-		"tn_h": -1,
-		"tim": int(op_image.xpath(".//a[contains(@class, 'thread_image_link')]")[0].attrib.get("href").split("/")[-1].split(".")[0]),
 		"time": totime(op.xpath(".//time")[0].attrib.get("datetime").strip()),
-		"md5": op_image.xpath(".//div[contains(@class, 'post_file_controls')]")[0].xpath(".//a[contains(@href, 'search/image')]")[0].attrib.get("href").split("/")[-2]+"==",
-		"fsize": fsize(op_image_stats.split(",")[0].strip()),
 		"resto": 0,
 		"semantic_url": semantic_url,
 		"replies": len(tree.xpath(".//aside[@class='posts']/article[contains(@class, 'post doc_id')]")),
 		"images": len(tree.xpath(".//aside[@class='posts']/article[contains(@class, 'post') and contains(@class, 'has_image')]")),
 		"unique_ips": -1
 	}
+
+	op_image = op.xpath(".//div[contains(@class, 'thread_image_box')]")[0]
+	op_image_stats = op_image.xpath(".//div[@class='post_file']")
+	if op_image_stats:
+		filename = op_image.xpath(".//a[@class='post_file_filename']")[0]
+		filename = ".".join(filename.attrib.get("filename", stringify_children(filename)).split(".")[:-1])
+		op_image_stats = stringify_children(op_image_stats[0])
+		op_post = {**op_post, ** {
+			"ext": "." + op_image.xpath(".//a[contains(@class, 'thread_image_link')]")[0].attrib.get("href").split("/")[-1].split(".")[1],
+			"filename": filename,
+			"tn_w": -1,
+			"tn_h": -1,
+			"w": int(op_image_stats.split(",")[1].strip().split("x")[0]),
+			"h": int(op_image_stats.split(",")[1].strip().split("x")[1]),
+			"fsize": fsize(op_image_stats.split(",")[0].strip()),
+			"md5": op_image.xpath(".//div[contains(@class, 'post_file_controls')]")[0].xpath(".//a[contains(@href, 'search/image')]")[0].attrib.get("href").split("/")[-2]+"==",
+			"tim": int(op_image.xpath(".//a[contains(@class, 'thread_image_link')]")[0].attrib.get("href").split("/")[-1].split(".")[0]),
+		}}
 
 	country = op.xpath(".//span[contains(@class, 'flag')]")
 	if country:
@@ -208,7 +212,7 @@ if not folder.exists() or not folder.is_dir():
 	print("Folder %s does not exist or is not a folder." % args.output)
 	sys.exit(1)
 
-page = args.page
+page = int(args.page)
 thread_link = re.compile(r'<a href="https://archived.moe/[^/]+/thread/([0-9]+)/#reply" class="btnr parent">Reply</a>')
 
 while True:
