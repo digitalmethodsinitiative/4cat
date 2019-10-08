@@ -242,7 +242,7 @@ def show_results(page):
 	page_size = 20
 	offset = (page - 1) * page_size
 
-	where = ["key_parent = ''"]
+	where = ["key_parent IS NULL"]
 	replacements = []
 
 	query_filter = request.args.get("filter", "")
@@ -266,12 +266,12 @@ def show_results(page):
 	where = " AND ".join(where)
 
 	num_datasets = db.fetchone("SELECT COUNT(*) AS num FROM queries WHERE " + where, tuple(replacements))["num"]
-
+	
 	replacements.append(page_size)
 	replacements.append(offset)
 	datasets = db.fetchall("SELECT key FROM queries WHERE " + where + " ORDER BY timestamp DESC LIMIT %s OFFSET %s",
 						   tuple(replacements))
-
+	
 	if not datasets and page != 1:
 		abort(404)
 

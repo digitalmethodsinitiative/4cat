@@ -25,7 +25,7 @@
             </nav>
         {% if datasets %}
             <ol class="result-list">
-                {% for dataset in datasets %}{% if dataset.key_parent == "" %}
+                {% for dataset in datasets %}{% if dataset.key_parent == None %}
                     <li id="{{ dataset.key }}"
                         class="result{% if dataset.is_finished() %} {% if dataset.num_rows > 0 %}has_results{% else %}no_results{% endif %}{% else %} dataset-unfinished{% endif %}"
                         data-numrows="{{ dataset.num_rows }}" data-key="{{ dataset.key }}">
