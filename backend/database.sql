@@ -49,6 +49,12 @@ CREATE TABLE IF NOT EXISTS users (
   timestamp_seen     INTEGER DEFAULT 0
 );
 
+-- users favourites
+CREATE TABLE IF NOT EXISTS users_favourites (
+  name              TEXT UNIQUE PRIMARY KEY,
+  key               TEXT
+)
+
 INSERT INTO users
   (name, password)
   VALUES ('anonymous', ''), ('autologin', '')
