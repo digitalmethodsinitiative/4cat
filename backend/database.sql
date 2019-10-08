@@ -49,12 +49,6 @@ CREATE TABLE IF NOT EXISTS users (
   timestamp_seen     INTEGER DEFAULT 0
 );
 
--- users favourites
-CREATE TABLE IF NOT EXISTS users_favourites (
-  name              TEXT UNIQUE PRIMARY KEY,
-  key               TEXT
-)
-
 INSERT INTO users
   (name, password)
   VALUES ('anonymous', ''), ('autologin', '')
@@ -67,3 +61,16 @@ CREATE TABLE IF NOT EXISTS access_tokens (
   calls INTEGER DEFAULT 0,
   expires INTEGER DEFAULT 0
 );
+
+
+-- favourites
+CREATE TABLE IF NOT EXISTS users_favourites (
+  name TEXT,
+  key TEXT
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS unique_favourite
+  ON users_favourites (
+    name,
+    key
+  );
