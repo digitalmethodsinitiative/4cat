@@ -242,7 +242,7 @@ def show_results(page):
 	page_size = 20
 	offset = (page - 1) * page_size
 
-	where = ["(key_parent IS NULL OR key_parent = '')"]
+	where = ["key_parent = ''"]
 	replacements = []
 
 	query_filter = request.args.get("filter", "")
