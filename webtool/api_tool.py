@@ -2,6 +2,7 @@
 4CAT Tool API - To be used to queue and check datasets
 """
 
+import importlib
 import hashlib
 import psutil
 import config
@@ -565,6 +566,49 @@ def check_processor():
 		})
 
 	return jsonify(children)
+
+
+@app.route("/api/datasource-call/<string:datasource>/<string:action>/")
+@login_required
+@openapi.endpoint("tool")
+def datasource_call(datasource, action):
+	"""
+	Call datasource function
+
+	Datasources may define custom API calls as functions in a file
+	'webtool/views.py'. These are then available as 'actions' with this API
+	endpoint. Any GET parameters are passed as keyword arguments to the
+	function.
+
+	:param str action:  Action to call
+	:return:  A JSON object
+	"""
+	# allow prettier URLs
+	action = action.replace("-", "_")
+
+	if datasource not in backend.all_modules.datasources:
+		return error(404, error="Datasource not found.")
+
+	folder = backend.all_modules.datasources[datasource]["path"]
+	views_file = folder.joinpath("webtool", "views.py")
+	if not views_file.exists():
+		return error(406, error="Datasources '%s' has no call '%s'" % (datasource, action))
+
+	datasource_id = backend.all_modules.datasources[datasource]["id"]
+	datasource_calls = importlib.import_module("datasources.%s.webtool.views" % datasource_id)
+
+	if not hasattr(datasource_calls, action) or not callable(getattr(datasource_calls, action)):
+		return error(406, error="Datasources '%s' has no call '%s'" % (datasource, action))
+
+	parameters = request.args
+	response = getattr(datasource_calls, action).__call__(request, current_user, **parameters)
+
+	if not response:
+		return jsonify({"success": False})
+	elif response is True:
+		return jsonify({"success": True})
+	else:
+		return jsonify({"success": True, "data": response})
 
 
 @app.route("/api/request-token/")
