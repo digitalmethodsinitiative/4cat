@@ -17,7 +17,7 @@ function init() {
     query.check_queue();
 
     // Start querying when go button is clicked
-    $('#query-form').bind('submit', function (e) {
+    $('#query-form').on('submit', function (e) {
         e.preventDefault();
         query.start();
     });
@@ -592,6 +592,8 @@ query = {
             'url': '/api/datasource-form/' + datasource + '/',
             'success': function(data) {
                 $('#query-form-script').remove();
+                $('#query-form').removeClass();
+                $('#query-form').addClass(datasource);
                 $('#datasource-form').html(data.html);
                 if(data.has_javascript) {
                     $('<script id="query-form-script">').attr('src', '/api/datasource-script/' + data.datasource + '/').appendTo('body');
