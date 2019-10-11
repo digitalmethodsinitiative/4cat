@@ -146,6 +146,11 @@ p.form-notice {
     min-height: 3.5em;
 }
 
+.optional-form-element {
+    transition: 0.25s;
+    max-height: 10em;
+}
+
 article.small .form-element {
     display: grid;
     grid-template-columns: 34% 66%;
@@ -203,6 +208,12 @@ button:hover, .button-like:not(.inactive):hover {
 /** --------------------- *
   Utility classes -> Lists
   * --------------------- */
+.hidden {
+    max-height: 0;
+    overflow: hidden;
+    box-sizing: border-box;
+    border-width: 0;
+}
 nav > ul.flat {
     list-style: none;
 }
