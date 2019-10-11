@@ -304,6 +304,7 @@ query = {
         
         // Disable form
         query.disable_form();
+        $('html,body').scrollTop(200);
 
         // AJAX the query to the server
         $.post({
