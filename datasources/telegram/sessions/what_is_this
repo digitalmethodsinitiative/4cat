@@ -1,0 +1,9 @@
+This directory stores Telegram session data. This contains information that,
+combined with with API ID and API hash (which are stored elsewhere, as
+temporary dataset metadata), can be used to interact with the Telegram API.
+
+This is stored persistently so users do not need to authenticate with a
+security code for each Telegram query, which is annoying and easily triggers
+rate limiting.
+
+TL;DR You can ignore this directory.
