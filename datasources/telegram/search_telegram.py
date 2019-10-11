@@ -109,7 +109,7 @@ class SearchTelegram(Search):
 			query_posts = []
 			i = 0
 			for message in client.iter_messages(entity=query):
-				parsed_message = self.import_message(client, message, get_full_userinfo=userinfo)
+				parsed_message = self.import_message(client, message, query, get_full_userinfo=userinfo)
 				query_posts.append(parsed_message)
 
 				i += 1
@@ -120,7 +120,7 @@ class SearchTelegram(Search):
 
 		return posts
 
-	def import_message(self, client, message, get_full_userinfo=False):
+	def import_message(self, client, message, entity, get_full_userinfo=False):
 		"""
 		Convert Message object to 4CAT-ready data object
 
@@ -271,6 +271,7 @@ class SearchTelegram(Search):
 		msg = {
 			"id": message.id,
 			"thread_id": thread_id,
+			"search_entity": entity,
 			"author": user_id,
 			"author_name": username,
 			"author_is_bot": user_is_bot,
