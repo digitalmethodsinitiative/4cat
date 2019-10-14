@@ -193,7 +193,7 @@ class SearchTelegram(Search):
 			# videos, etc
 			# This could add a separate routine for videos to make them a
 			# separate type, which could then be scraped later, etc
-			attachment_type = message.media.mime_type.split("/")[0]
+			attachment_type = message.media.document.mime_type.split("/")[0]
 			attachment_data = ""
 
 		elif attachment_type == "game":
