@@ -193,7 +193,11 @@ class DataSet:
 		if not self.is_finished():
 			raise RuntimeError("Cannot unfinish an unfinished dataset")
 
-		self.get_results_path().unlink()
+		try:
+			self.get_results_path().unlink()
+		except FileNotFoundError:
+			pass
+
 		self.data["timestamp"] = int(time.time())
 		self.data["is_finished"] = False
 		self.data["num_rows"] = 0
