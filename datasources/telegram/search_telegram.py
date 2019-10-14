@@ -248,7 +248,10 @@ class SearchTelegram(Search):
 
 		elif attachment_type == "url":
 			# easy!
-			attachment_data = message.web_preview.url
+			if hasattr(message.web_preview, "url"):
+				attachment_data = message.web_preview.url
+			else:
+				attachment_data = ""
 
 		else:
 			attachment_data = ""
