@@ -1,6 +1,7 @@
 """
 Telegram-specific web tool call hooks
 """
+import traceback
 import asyncio
 import uuid
 
@@ -59,8 +60,14 @@ def authenticate(request, user, **kwargs):
 	# maybe we've entered a code already and submitted it with the request
 	if "code" in kwargs and kwargs["code"].strip():
 		code_callback = lambda: kwargs["code"]
+		max_attempts = 1
 	else:
-		code_callback = None
+		code_callback = lambda: -1
+		# max_attempts = 0 because authing will always fail: we can't wait for
+		# the code to be entered interactively, we'll need to do a new request
+		# but we can't just immediately return, we still need to call start()
+		# to get telegram to send us a code
+		max_attempts = 0
 
 	# now try autenticating
 	try:
@@ -68,7 +75,7 @@ def authenticate(request, user, **kwargs):
 		client = TelegramClient(str(session_path), api_id, kwargs["api_hash"], loop=eventloop)
 
 		try:
-			client.start(max_attempts=1, phone=kwargs.get("phone"), code_callback=code_callback, password=None)
+			client.start(max_attempts=max_attempts, phone=kwargs.get("phone"), code_callback=code_callback, password=None)
 			result = {"authenticated": True, "session": session_id}
 
 		except ValueError:
@@ -93,7 +100,8 @@ def authenticate(request, user, **kwargs):
 	except Exception as e:
 		# ?
 		result = {"error": "other",
-				  "error-message": "An unexpected error (%s) occurred and your authentication could not be verified." % e}
+				  "error-message": "An unexpected error (%s) occurred and your authentication could not be verified." % e,
+				  "error-trace": traceback.format_exc()}
 		pass
 	finally:
 		if client:
