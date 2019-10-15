@@ -69,6 +69,12 @@ class HatebaseAnalyser(BasicProcessor):
 					terms_ambig = []
 					terms_unambig = []
 					for term in hatebase_regex.findall(post["body"].lower()):
+						if hatebase[term]["plural_of"]:
+							if hatebase[term]["plural_of"] in terms:
+								continue
+							elif hatebase[term]["plural_of"] in hatebase:
+								term = hatebase[term]["plural_of"]
+
 						terms.append(term)
 						row["hatebase_num"] += 1
 						if hatebase[term]["is_unambiguous"]:
