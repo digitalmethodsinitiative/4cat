@@ -345,7 +345,7 @@ class SearchTelegram(Search):
 			del query["api_phone"]
 
 		# 5000 is mostly arbitrary - may need tweaking
-		max_posts = 5000
+		max_posts = 25000
 		if query.get("max_posts", ""):
 			try:
 				max_posts = min(abs(int(query.get("max_posts"))), max_posts)
@@ -356,8 +356,8 @@ class SearchTelegram(Search):
 		# whitespace
 		whitespace = re.compile(r"\s+")
 		items = whitespace.sub("", query.get("query").replace("\n", ","))
-		if len(items.split(",")) > 5:
-			raise QueryParametersException("You cannot query more than 5 items at a time.")
+		if len(items.split(",")) > 25:
+			raise QueryParametersException("You cannot query more than 25 items at a time.")
 
 		# simple!
 		return {
