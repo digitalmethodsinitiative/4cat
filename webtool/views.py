@@ -291,7 +291,6 @@ def show_results(page):
 
 @app.route('/results/<string:key>/')
 @app.route('/results/<string:key>/processors/')
-@login_required
 def show_result(key):
 	"""
 	Show result page
