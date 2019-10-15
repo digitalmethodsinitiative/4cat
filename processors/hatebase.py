@@ -11,11 +11,11 @@ from backend.abstract.processor import BasicProcessor
 import config
 
 
-class HateBaseanalyser(BasicProcessor):
+class HatebaseAnalyser(BasicProcessor):
 	"""
 	Identify hatebase-listed words in posts
 	"""
-	type = "hatebase-ranker"  # job type ID
+	type = "hatebase-data"  # job type ID
 	category = "Post metrics"  # category
 	title = "Hatebase analysis"  # title displayed in UI
 	description = "Analyse all posts' content with Hatebase, assigning a score for 'offensiveness' and a propability that the post contains hate speech."  # description displayed in UI
@@ -44,18 +44,18 @@ class HateBaseanalyser(BasicProcessor):
 			reader = DictReader(input)
 			processed = 0
 			with self.dataset.get_results_path().open("w") as output:
-				writer = DictWriter(output, fieldnames=(
-					"id", "body", "hatebase_num", "hatebase_num_ambiguous", "hatebase_num_unambiguous",
+				fieldnames = reader.fieldnames
+				fieldnames += ("hatebase_num", "hatebase_num_ambiguous", "hatebase_num_unambiguous",
 					"hatebase_terms", "hatebase_terms_ambiguous", "hatebase_terms_unambiguous",
-					"hatebase_offensiveness_avg"))
+					"hatebase_offensiveness_avg")
+
+				writer = DictWriter(output, fieldnames=fieldnames)
 				writer.writeheader()
 
 				for post in reader:
 					processed += 1
 					self.dataset.update_status("Processing post %i" % processed)
-					row = {
-						"id": post["id"],
-						"body": post["body"],
+					row = {**post, **{
 						"hatebase_num": 0,
 						"hatebase_num_ambiguous": 0,
 						"hatebase_num_unambiguous": 0,
@@ -63,8 +63,8 @@ class HateBaseanalyser(BasicProcessor):
 						"hatebase_terms_ambiguous": "",
 						"hatebase_terms_unambiguous": "",
 						"hatebase_offensiveness_avg": 0,
+					}}
 
-					}
 					terms = []
 					terms_ambig = []
 					terms_unambig = []
@@ -86,7 +86,7 @@ class HateBaseanalyser(BasicProcessor):
 					row["hatebase_terms_unambiguous"] = ",".join(terms_unambig)
 
 					if len(terms) > 0:
-						row["hatebase_offensiveness_avg"] = int(row["hatebase_offensiveness_avg"]) / len(terms)
+						row["hatebase_offensiveness_avg"] = int(int(row["hatebase_offensiveness_avg"]) / len(terms))
 
 					writer.writerow(row)
 

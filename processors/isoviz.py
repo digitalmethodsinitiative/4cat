@@ -30,7 +30,11 @@ class IsometricMultigraphRenderer(BasicProcessor):
 	description = "Generate area graphs showing prevalence per item over time and project these side-by-side on an isometric plane for easy comparison."  # description displayed in UI
 	extension = "svg"  # extension of result file, used internally and in UI
 
-	accepts = ["vector-ranker", "preset-neologisms", "tfidf", "collocations", "attribute-frequencies"]
+	input = "csv:item,time,frequency"
+	output = "svg"
+
+	accepts = ["vector-ranker", "preset-neologisms", "tfidf", "collocations", "attribute-frequencies", "hatebase-frequencies"]
+
 	options = {
 		"smooth": {
 			"type": UserInput.OPTION_TOGGLE,
