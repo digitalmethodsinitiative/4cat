@@ -33,7 +33,7 @@ class IsometricMultigraphRenderer(BasicProcessor):
 	input = "csv:item,time,frequency"
 	output = "svg"
 
-	accepts = ["telegram-overtime", "vector-ranker", "preset-neologisms", "tfidf", "collocations",
+	accepts = ["overtime-hateful", "vector-ranker", "preset-neologisms", "tfidf", "collocations",
 			   "attribute-frequencies", "hatebase-frequencies"]
 
 	options = {
