@@ -109,6 +109,7 @@ class SearchTelegram(Search):
 			query_posts = []
 			i = 0
 			for message in client.iter_messages(entity=query):
+				self.dataset.update_status("Retrieved %i posts" % (len(query_posts) + len(posts)))
 				parsed_message = self.import_message(client, message, query, get_full_userinfo=userinfo)
 				query_posts.append(parsed_message)
 
