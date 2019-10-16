@@ -40,7 +40,8 @@ class AttributeRanker(BasicProcessor):
 				"image_md5": "Image (hash, for 4chan and 8chan datasets)",
 				"image_file": "Image (filename, for 4chan and 8chan datasets)",
 				"country_code": "Country code (for 4chan datasets)",
-				"subreddit": "Subreddit (for Reddit datasets)"
+				"subreddit": "Subreddit (for Reddit datasets)",
+				"search_entity": "Entity (for Telegram datasets)"
 			},
 			"help": "Attribute to aggregate",
 			"tooltip": "When choosing 'Regular expression', any value in a post matching the regular expression will be saved as a separate value."
