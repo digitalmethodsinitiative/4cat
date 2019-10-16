@@ -33,7 +33,8 @@ class IsometricMultigraphRenderer(BasicProcessor):
 	input = "csv:item,time,frequency"
 	output = "svg"
 
-	accepts = ["vector-ranker", "preset-neologisms", "tfidf", "collocations", "attribute-frequencies", "hatebase-frequencies"]
+	accepts = ["telegram-overtime", "vector-ranker", "preset-neologisms", "tfidf", "collocations",
+			   "attribute-frequencies", "hatebase-frequencies"]
 
 	options = {
 		"smooth": {
@@ -51,6 +52,11 @@ class IsometricMultigraphRenderer(BasicProcessor):
 			"type": UserInput.OPTION_TEXT,
 			"default": 0,
 			"help": "Data completeness required (at least this % of intervals should be present for an item to be graphed; 0 to disable)"
+		},
+		"label": {
+			"type": UserInput.OPTION_TEXT,
+			"default": "",
+			"help": "Graph label (optional)"
 		}
 	}
 
@@ -67,6 +73,7 @@ class IsometricMultigraphRenderer(BasicProcessor):
 		smooth = self.parameters.get("smooth", self.options["smooth"]["default"])
 		normalise_values = self.parameters.get("normalise", self.options["normalise"]["default"])
 		completeness = convert_to_int(self.parameters.get("complete", self.options["complete"]["default"]), 0)
+		graph_label = self.parameters.get("label", self.options["label"]["default"])
 
 		# first gather graph data: each distinct item gets its own graph and
 		# for each graph we have a sequence of intervals, each interval with
@@ -211,7 +218,7 @@ class IsometricMultigraphRenderer(BasicProcessor):
 		item_height = max(min_item_height, min_full_height / len(graphs))
 
 		# margin - this should be enough for the text labels to fit in
-		margin = 100
+		margin = 75
 
 		# this determines the "flatness" of the isometric projection and an be
 		# tweaked for different looks - basically corresponds to how far the
@@ -389,6 +396,14 @@ class IsometricMultigraphRenderer(BasicProcessor):
 			stroke="black",
 			stroke_width=2
 		))
+
+		if graph_label:
+			canvas.add(Text(
+				insert=((margin / 10), (margin / 2)),
+				text=graph_label,
+				style="font-size:2em;",
+				alignment_baseline="hanging"
+			))
 
 		# and finally save the SVG
 		canvas.save(pretty=True)
