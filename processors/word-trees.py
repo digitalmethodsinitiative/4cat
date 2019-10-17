@@ -50,7 +50,8 @@ class MakeWordtree(BasicProcessor):
 			"min": 1,
 			"max": 10,
 			"default": 5,
-			"help": "Window size"
+			"help": "Window size",
+			"tooltip": "This many words before and/or after the queried phrase will be visualised"
 		},
 		"sides": {
 			"type": UserInput.OPTION_CHOICE,
@@ -69,7 +70,7 @@ class MakeWordtree(BasicProcessor):
 				"middle": "Vertically centered",
 				"top": "Top",
 			},
-			"help": "Item alignment"
+			"help": "Visual alignment"
 		}
 	}
 
@@ -109,6 +110,16 @@ class MakeWordtree(BasicProcessor):
 		left_leaves = []
 		right_leaves = []
 
+		# do some validation
+		if not query.strip():
+			self.dataset.update_status("Invalid query for word tree generation")
+			self.dataset.finish(0)
+			return
+
+		window = min(window, self.options["window"]["max"] + 1)
+		window = max(1, window)
+
+		# find matching posts
 		processed = 0
 		with self.source_file.open() as input:
 			reader = DictReader(input)
