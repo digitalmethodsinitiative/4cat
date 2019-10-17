@@ -24,14 +24,6 @@ class HistogramRenderer(BasicProcessor):
 	description = "Generates a histogram (bar graph) that aggregates the number of posts per unit of time to provide an impression of over-time activity in the data set"  # description displayed in UI
 	extension = "png"  # extension of result file, used internally and in UI
 
-	options = {
-		"resolution": {
-			"type": UserInput.OPTION_TOGGLE,
-			"options": {"year": "Year", "month": "Month", "day": "Day"},
-			"default": "month"
-		}
-	}
-
 	def process(self):
 		"""
 		This takes a 4CAT results file as input, and outputs a new CSV file
