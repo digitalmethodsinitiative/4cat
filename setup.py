@@ -29,6 +29,7 @@ libraries = [
 		"pymysql==0.9.2",
 		"pandas==0.23.4",
 		"datedelta==1.3",
+		"anytree==2.7.2",
 		"gensim==3.6.0",
 		"psutil==5.4.7",
 		"numpy==1.15.2",
