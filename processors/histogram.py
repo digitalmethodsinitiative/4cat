@@ -33,7 +33,6 @@ class HistogramRenderer(BasicProcessor):
 		months = {}
 
 		self.dataset.update_status("Reading source file")
-		resolution = self.parameters.get("resolution", self.options["resolution"]["default"])
 		first_post = int(time.time())
 		last_post = 0
 		max_posts = 0
