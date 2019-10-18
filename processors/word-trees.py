@@ -26,14 +26,15 @@ class MakeWordtree(BasicProcessor):
 	type = "word-trees"  # job type ID
 	category = "Visual"  # category
 	title = "Word tree"  # title displayed in UI
-	description = "Generates a word tree for a given query, a \"graphical version of the traditional 'keyword-in-context' method\" (Wattenberg & Viégas, 2008)"  # description displayed in UI
+	description = "Generates a word tree for a given query, a \"graphical version of the traditional 'keyword-in-context' method\" (Wattenberg & Viégas, 2008). NOTE: Running this on large data sets is discouraged as word trees will quickly become too large to be useful. Works best with < 250 matching posts."  # description displayed in UI
 	extension = "svg"  # extension of result file, used internally and in UI
 
 	options = {
 		"query": {
 			"type": UserInput.OPTION_TEXT,
 			"default": "",
-			"help": "Query"
+			"help": "Word tree root query",
+			"tooltip": "Enter a word here to serve as the root of the word tree. The context of this query will be mapped in the tree visualisation."
 		},
 		"strip-urls": {
 			"type": UserInput.OPTION_TOGGLE,
@@ -51,15 +52,15 @@ class MakeWordtree(BasicProcessor):
 			"max": 10,
 			"default": 5,
 			"help": "Window size",
-			"tooltip": "This many words before and/or after the queried phrase will be visualised"
+			"tooltip": "Up to this many words before and/or after the queried phrase will be visualised"
 		},
 		"sides": {
 			"type": UserInput.OPTION_CHOICE,
-			"default": "both",
+			"default": "right",
 			"options": {
-				"both": "Before and after query",
 				"left": "Before query",
-				"right": "After query"
+				"right": "After query",
+				"both": "Before and after query"
 			},
 			"help": "Query context to visualise"
 		},
@@ -75,7 +76,7 @@ class MakeWordtree(BasicProcessor):
 	}
 
 	input = "csv:body"
-	output = "txt"
+	output = "svg"
 
 	# 'fontsize' can be changed, the others are derived
 	fontsize = 16
