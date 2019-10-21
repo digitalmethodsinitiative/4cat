@@ -23,7 +23,7 @@ class SVGHistogramRenderer(BasicProcessor):
 	"""
 	type = "histogram"  # job type ID
 	category = "Visual"  # category
-	title = "SVG Histogram"  # title displayed in UI
+	title = "Histogram"  # title displayed in UI
 	description = "Generates a histogram (bar graph) from a previous frequency analysis."  # description displayed in UI
 	extension = "svg"  # extension of result file, used internally and in UI
 
@@ -59,7 +59,7 @@ class SVGHistogramRenderer(BasicProcessor):
 				max_posts = max(max_posts, int(post["frequency"]))
 
 		self.dataset.update_status("Cleaning up data")
-		(missing, intervals) = pad_interval(intervals, strip=True)
+		(missing, intervals) = pad_interval(intervals)
 
 		# create histogram
 		self.dataset.update_status("Drawing histogram")
