@@ -27,6 +27,9 @@ class tfIdf(BasicProcessor):
 	extension = "csv"  # extension of result file, used internally and in UI
 	accepts = ["tokenise-posts"]  # query types this post-processor accepts as input
 
+	input = "zip"
+	output = "csv:text,value,date"
+
 	options = {
 		"n_size": {
 			"type": UserInput.OPTION_CHOICE,
@@ -158,8 +161,8 @@ class tfIdf(BasicProcessor):
 			df_tim = (df_matrix.sort_values(by=[document], ascending=False))[:top_n]
 			for i in range(top_n):
 				result = {}
-				result['text'] = df_tim.index.values[i]
-				result['value'] = df_tim[document].values[i].tolist()
+				result['item'] = df_tim.index.values[i]
+				result['frequency'] = df_tim[document].values[i].tolist()
 				result['date'] = document
 				results.append(result)
 		return results
