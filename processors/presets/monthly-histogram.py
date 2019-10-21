@@ -20,6 +20,10 @@ class MonthlyHistogramCreator(ProcessorPreset):
 		activity.
 		"""
 
+		header = "'" + self.parent.data["query"] + "': Posts per month"
+		if len(header) > 40:
+			header = "Posts per month"
+
 		pipeline = [
 			# first, count activity per month
 			{
@@ -31,7 +35,9 @@ class MonthlyHistogramCreator(ProcessorPreset):
 			# then, render it
 			{
 				"type": "histogram",
-				"parameters": {}
+				"parameters": {
+					"header": header
+				}
 			}
 		]
 
