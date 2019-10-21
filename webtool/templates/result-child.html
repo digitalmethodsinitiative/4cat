@@ -5,10 +5,10 @@
         <div class="query-descriptor">
             <h4 class="child-header">{{ processors[child.type].name if child.type in processors else "(Deprecated analysis) " + child.type }}</h4>
             <p>
-                <span class="query-status">{% if child.is_finished() %}
+                <span class="query-status">{% if child.is_finished() and child.num_rows > 0 %}
                     <a href="/result/{{ child.result_file }}"><i class="fas fa-download" aria-label="Download result file"></i> {{ "{:,}".format(child.num_rows) }} item{% if child.num_rows != 1 %}s{% endif %}, {{ processors[child.type].extension if child.type in processors else "download" }}</a>
             {% else %}
-                {{ child.status }}
+                {% if child.is_finished() %}No results{% else %}{{ child.status }}{% endif %}
                 {% endif %}</span>
 
         {% for option in child.parameters %}
@@ -21,7 +21,7 @@
         {% endfor %}
             </p>
         </div>
-    {% if not item.is_finished() %}
+    {% if child.num_rows == 0 or not item.is_finished() %}
     </div>
     {% else %}
         <button class="expand-processors" aria-controls="{{ item.key }}-sub">
@@ -58,7 +58,7 @@
         <p class="details-only">
             <a class="permalink" href="/results/{{ dataset.key }}/#nav={{ child.get_breadcrumbs() }}" target="_blank">Permanent link to this analysis result (with context)</a>
         </p>
-        {% if item.type in processors and current_user.is_admin() and item.get_version_url("backend/processors/" + processors[item.type].file) %}
+        {% if item.type in processors and current_user.is_authenticated and current_user.is_admin() and item.get_version_url("backend/processors/" + processors[item.type].file) %}
         <p class="details-only">
             <a class="permalink" href="{{ item.get_version_url("backend/processors/" + processors[item.type].file) }}" target="_blank">Review the code that generated this result</a>
         </p>
