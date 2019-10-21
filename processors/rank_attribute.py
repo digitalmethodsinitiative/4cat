@@ -174,7 +174,7 @@ class AttributeRanker(BasicProcessor):
 		for time_unit in sorted_items:
 			for item in sorted_items[time_unit]:
 				row = {
-					"time": time_unit,
+					"date": time_unit,
 					"item": item,
 					"frequency": sorted_items[time_unit][item]
 				}

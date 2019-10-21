@@ -71,13 +71,13 @@ class flowChart(BasicProcessor):
 			for post in csv:
 
 				# Set label names
-				if post["text"] not in labels:
-					labels.append(post["text"])
+				if post["item"] not in labels:
+					labels.append(post["item"])
 					label_key = str(len(result["labels"]))
 					result["labels"][label_key] = {}
-					result["labels"][label_key]["n"] = post["text"]
+					result["labels"][label_key]["n"] = post["item"]
 				else:
-					label_key = labels.index(post["text"])
+					label_key = labels.index(post["item"])
 
 				# Make a bucket when a new timestamp appears
 				if post["date"] == "overall":
@@ -92,7 +92,7 @@ class flowChart(BasicProcessor):
 					timestamp = int(datetime.datetime.strptime(post["date"], time_format).timestamp())
 
 				# Multiply small floats so they can be converted to ints (necessary for tf-idf scores)
-				value = float(post["value"])
+				value = float(post["frequency"])
 				if value % 1 != 0:
 					value = value * 100
 				value = int(value)
