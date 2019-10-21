@@ -131,7 +131,9 @@ class OvertimeAnalysis(BasicProcessor):
 
 				terms = []
 				for term in hatebase_regex.findall(post["body"].lower()):
-					if hatebase[term]["plural_of"]:
+					if not term:
+						continue
+					if "plural_of" in hatebase[term] and hatebase[term]["plural_of"]:
 						if hatebase[term]["plural_of"] in terms:
 							continue
 						elif hatebase[term]["plural_of"] in hatebase:
@@ -165,4 +167,7 @@ class OvertimeAnalysis(BasicProcessor):
 			})
 
 		# write as csv
-		self.dataset.write_csv_and_finish(rows)
+		if rows:
+			self.dataset.write_csv_and_finish(rows)
+		else:
+			self.dataset.finish(0)
