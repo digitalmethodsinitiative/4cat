@@ -4,11 +4,10 @@ Collapse post bodies into one long string
 import re
 import datetime
 
-from csv import DictReader, writer
+from csv import DictReader, DictWriter
 
 from backend.lib.helpers import UserInput
 from backend.abstract.processor import BasicProcessor
-from collections import OrderedDict
 
 class CountPosts(BasicProcessor):
 	"""
@@ -19,6 +18,9 @@ class CountPosts(BasicProcessor):
 	title = "Count posts"  # title displayed in UI
 	description = "Counts how many posts are in the query overall or per timeframe."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
+
+	input = "csv:timestamp"
+	output = "csv"
 
 	options = {
 		"timeframe": {
@@ -36,8 +38,7 @@ class CountPosts(BasicProcessor):
 		"""
 
 		# OrderedDict because dates and headers should have order
-		posts = OrderedDict()
-		posts["date"] = "count" #eventual headers
+		intervals = {}
 
 		timeframe = self.parameters.get("timeframe", self.options["timeframe"]["default"])
 		
@@ -60,14 +61,14 @@ class CountPosts(BasicProcessor):
 						if timeframe == "year":
 							date = str(date.year)
 						elif timeframe == "month":
-							date = str(date.year) + "-" + str(date.month)
+							date = str(date.year) + "-" + str(date.month).zfill(2)
 						else:
-							date = str(date.year) + "-" + str(date.month) + "-" + str(date.day)
+							date = str(date.year) + "-" + str(date.month).zfill(2) + "-" + str(date.day).zfill(2)
 
-					if date not in posts:
-						posts[date] = 1
+					if date not in intervals:
+						intervals[date] = 1
 					else:
-						posts[date] += 1
+						intervals[date] += 1
 
 					counter += 1
 
@@ -75,8 +76,12 @@ class CountPosts(BasicProcessor):
 						self.dataset.update_status("Counted through " + str(counter) + " posts.")
 
 			# Write to csv
-			csv_writer = writer(results)
-			for key, value in posts.items():
-				csv_writer.writerow([key, value])
+			csv_writer = DictWriter(results, fieldnames=("date", "item", "frequency"))
+			csv_writer.writeheader()
+			for interval in intervals:
+				csv_writer.writerow({
+					"date": interval,
+					"item": "activity",
+					"frequency": intervals[interval]})
 
-		self.dataset.finish(len(posts))
+		self.dataset.finish(len(intervals))
