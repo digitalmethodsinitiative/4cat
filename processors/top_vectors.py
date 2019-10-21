@@ -112,7 +112,7 @@ class VectorRanker(BasicProcessor):
 					if not vector[0].strip():
 						continue
 
-					results.append({"date": vector_set_name.split(".")[0], "text": vector[0], "value": vector[1]})
+					results.append({"date": vector_set_name.split(".")[0], "item": vector[0], "frequency": vector[1]})
 
 					if vector[0] not in overall_top:
 						overall_top[vector[0]] = 0
