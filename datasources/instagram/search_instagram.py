@@ -136,7 +136,7 @@ class SearchInstagram(Search):
 				answers = [answer for answer in comment.answers]
 
 				try:
-					comment_username = comment.owner_username
+					comment_username = comment.owner.username
 				except instaloader.QueryReturnedNotFoundException:
 					comment_username = ""
 
@@ -160,12 +160,17 @@ class SearchInstagram(Search):
 				# instagram only has one reply depth level at the time of
 				# writing, represented here
 				for answer in answers:
+					try:
+						answer_username = answer.owner.username
+					except instaloader.QueryReturnedNotFoundException:
+						answer_username = ""
+
 					results.append({
 						"id": answer.id,
 						"thread_id": thread_id,
 						"parent_id": comment.id,
 						"body": answer.text,
-						"author": answer.owner.username,
+						"author": answer_username,
 						"timestamp": int(answer.created_at_utc.timestamp()),
 						"type": "comment",
 						"url": "",
