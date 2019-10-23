@@ -205,6 +205,8 @@ class SearchReddit(Search):
 			self.dataset.update_status("Found %i posts via Pushshift API..." % total_posts)
 
 		# and done!
+		if not return_posts:
+			self.dataset.update_status("No posts found")
 		return return_posts
 
 	def fetch_posts(self, post_ids, where=None, replacements=None):
