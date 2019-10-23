@@ -398,14 +398,15 @@ class SearchReddit(Search):
 		:return dict:  Safe query parameters
 		"""
 		# we need a board!
-		boards = [board for board in query.get("board", "").split(",") if board.strip()]
+		r_prefix = re.compile(r"^/?r/")
+		boards = [r_prefix.sub("", board) for board in query.get("board", "").split(",") if board.strip()]
+		print(boards)
 
 		if not boards:
 			raise QueryParametersException("Please provide a board or a comma-separated list of boards to query.")
 
 		# ignore leading r/ for boards
-		r_prefix = re.compile(r"^/?r/")
-		query["board"] = ",".join([r_prefix.sub(board, "") for board in boards])
+		query["board"] = ",".join(boards)
 
 		# this is the bare minimum, else we can't narrow down the full data set
 		if not query.get("body_match", None) and not query.get("subject_match", None) and not query.get("random_sample",
