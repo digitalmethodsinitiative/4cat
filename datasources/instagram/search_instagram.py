@@ -107,12 +107,17 @@ class SearchInstagram(Search):
 
 			thread_id = post.shortcode
 
+			try:
+				post_username = post.owner_username
+			except instaloader.QueryReturnedNotFoundException:
+				post_username = ""
+
 			results.append({
 				"id": thread_id,
 				"thread_id": thread_id,
 				"parent_id": thread_id,
 				"body": post.caption if post.caption is not None else "",
-				"author": post.owner_username,
+				"author": post_username,
 				"timestamp": int(post.date_utc.timestamp()),
 				"type": "video" if post.is_video else "picture",
 				"url": post.video_url if post.is_video else post.url,
@@ -129,12 +134,18 @@ class SearchInstagram(Search):
 
 			for comment in post.get_comments():
 				answers = [answer for answer in comment.answers]
+
+				try:
+					comment_username = comment.owner_username
+				except instaloader.QueryReturnedNotFoundException:
+					comment_username = ""
+
 				results.append({
 					"id": comment.id,
 					"thread_id": thread_id,
 					"parent_id": thread_id,
 					"body": comment.text,
-					"author": comment.owner.username,
+					"author": comment_username,
 					"timestamp": int(comment.created_at_utc.timestamp()),
 					"type": "comment",
 					"url": "",
