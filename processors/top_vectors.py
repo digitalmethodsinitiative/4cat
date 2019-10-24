@@ -138,7 +138,7 @@ class VectorRanker(BasicProcessor):
 		# done!
 		self.dataset.update_status("Writing results file")
 		with open(self.dataset.get_results_path(), "w", encoding="utf-8") as output:
-			writer = csv.DictWriter(output, fieldnames = ("date", "text", "value"))
+			writer = csv.DictWriter(output, fieldnames = ("date", "item", "frequency"))
 			writer.writeheader()
 			for row in results:
 				writer.writerow(row)
