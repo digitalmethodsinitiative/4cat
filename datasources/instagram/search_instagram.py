@@ -90,8 +90,11 @@ class SearchInstagram(Search):
 					self.dataset.update_status("Retrieving posts ('%s', %i posts)" % (query, chunk_size))
 					if posts_processed >= max_posts:
 						break
-					posts.append(chunk.__next__())
-					posts_processed += 1
+					try:
+						posts.append(chunk.__next__())
+						posts_processed += 1
+					except StopIteration:
+						break
 			except instaloader.InstaloaderException:
 				# should we abort here and return 0 posts?
 				self.log.info("Instaloader exception during query %s" % self.dataset.key)
