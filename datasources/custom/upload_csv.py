@@ -1,6 +1,7 @@
 """
 Custom data upload to create bespoke datasets
 """
+import datetime
 import time
 import csv
 import re
@@ -60,7 +61,7 @@ class SearchCustom(BasicWorker):
 			raise QueryParametersException("Uploaded file is not a well-formed CSV file.")
 
 		# check if all required fields are present
-		required = ("id", "thread_id", "subject", "author", "body")
+		required = ("id", "thread_id", "subject", "author", "body", "timestamp")
 		missing = []
 		for field in required:
 			if field not in reader.fieldnames:
@@ -69,6 +70,15 @@ class SearchCustom(BasicWorker):
 		if missing:
 			raise QueryParametersException(
 				"The following required columns are not present in the csv file: %s" % ", ".join(missing))
+
+		try:
+			row = reader.__next__()
+			try:
+				datetime.datetime.strptime(row["timestamp"], "%Y-%m-%d %H:%M:%S")
+			except ValueError:
+				raise QueryParametersException("Your 'timestamp' column does not have the required format (YYY-MM-DD hh:mm:ss)")
+		except StopIteration:
+			pass
 
 		wrapped_upload.detach()
 
