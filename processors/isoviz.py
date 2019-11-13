@@ -78,7 +78,7 @@ class IsometricMultigraphRenderer(BasicProcessor):
 		# first gather graph data: each distinct item gets its own graph and
 		# for each graph we have a sequence of intervals, each interval with
 		# its own value
-		first_date = "999-99-99"
+		first_date = "9999-99-99"
 		last_date = "0000-00-00"
 
 		with self.source_file.open() as input:
