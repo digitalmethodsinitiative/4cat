@@ -77,6 +77,7 @@ class SearchInstagram(Search):
 					query = query.replace("#", "")
 					chunk = instagram.get_hashtag_posts(query)
 				elif scope == "username":
+					query = query.replace("@", "")
 					profile = instaloader.Profile.from_username(instagram.context, query)
 					chunk = profile.get_posts()
 				else:
@@ -98,6 +99,7 @@ class SearchInstagram(Search):
 			except instaloader.InstaloaderException:
 				# should we abort here and return 0 posts?
 				self.log.info("Instaloader exception during query %s" % self.dataset.key)
+				self.dataset.update_status("Error while retrieving posts for query '%s'" % query)
 
 		# go through posts, and retrieve comments
 		results = []
