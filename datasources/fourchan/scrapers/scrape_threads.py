@@ -24,6 +24,7 @@ import requests
 import psycopg2
 import hashlib
 import base64
+import flag
 import json
 import time
 import six
@@ -182,8 +183,19 @@ class ThreadScraper4chan(BasicJSONScraper):
 			for highlight in config.HIGHLIGHT_MATCH:
 				attachments = []
 				if highlight in post_data["body"]:
+					if not post_data["country_code"]:
+						country_flag = " (%s)" % post_data["country_name"] if post_data["country_name"] else ""
+					else:
+						pattern = " :%s:" % post_data["country_code"]
+						country_flag = flag.flagize(pattern)
+						if country_flag == pattern:
+							print("NOPE: %s" % post_data["country_code"])
+							country_flag = " (%s)" % post_data["country_code"]
+						else:
+							print(repr(country_flag))
+
 					attachments.append({
-						"title": "%s%s in thread %s" % (post_data["author"], ("/" + post_data["country_code"]) if post_data["country_code"] else "", thread["id"]),
+						"title": "%s%s in thread %s" % (post_data["author"], country_flag, thread["id"]),
 						"title_link": "https://boards.4chan.org/%s/thread/%s#pc%s" % (thread["board"], thread["id"], post_data["id"]),
 						"text": strip_tags(post_data["body"], convert_newlines=True).replace(highlight, "*%s*" % highlight),
 						"mrkdwn_in": ["text", "pretext"],
