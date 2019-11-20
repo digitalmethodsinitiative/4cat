@@ -20,6 +20,7 @@ Flow:
          -> queue_image(): if an image was attached, queue a job to scrape it
    -> update_thread(): update thread data
 """
+import requests
 import psycopg2
 import hashlib
 import base64
@@ -31,6 +32,7 @@ from pathlib import Path
 
 from backend.abstract.scraper import BasicJSONScraper
 from backend.lib.exceptions import JobAlreadyExistsException
+from backend.lib.helpers import strip_tags
 
 import config
 
@@ -152,6 +154,7 @@ class ThreadScraper4chan(BasicJSONScraper):
 		else:
 			dimensions = {}
 
+		# aggregate post data
 		post_data = {
 			"id": post["no"],
 			"thread_id": thread["id"],
@@ -174,6 +177,34 @@ class ThreadScraper4chan(BasicJSONScraper):
 				{field: post[field] for field in post.keys() if field not in self.known_fields})
 		}
 
+		# this is mostly unsupported, feel free to ignore
+		if hasattr(config, "HIGHLIGHT_SLACKHOOK") and hasattr(config, "HIGHLIGHT_MATCH"):
+			for highlight in config.HIGHLIGHT_MATCH:
+				attachments = []
+				if highlight in post_data["body"]:
+					attachments.append({
+						"title": "%s%s in thread %s" % (post_data["author"], ("/" + post_data["country_code"]) if post_data["country_code"] else "", thread["id"]),
+						"title_link": "https://boards.4chan.org/%s/thread/%s#pc%s" % (thread["board"], thread["id"], post_data["id"]),
+						"text": strip_tags(post_data["body"], convert_newlines=True),
+						"mrkdwn_in": ["text", "pretext"],
+						"color": "#73ad34"
+					})
+
+				if not attachments:
+					continue
+
+				try:
+					plural = "s" if len(attachments) != 1 else ""
+					verb = "were" if len(attachments) != 1 else "was"
+					requests.post(config.HIGHLIGHT_SLACKHOOK, json.dumps({
+						"text": "%i post%s mentioning '%s' %s just scraped from 4chan /%s/:" % (len(attachments), plural, highlight, verb, thread["board"]),
+						"attachments": attachments
+					}))
+				except requests.RequestException as e:
+					self.log.warning("Could not send highlight alerts to Slack webhook (%s)" % e)
+
+
+		# now insert the post into the database
 		try:
 			for field in post_data:
 				if not isinstance(post_data[field], six.string_types):
