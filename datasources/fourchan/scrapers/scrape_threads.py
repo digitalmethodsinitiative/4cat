@@ -185,7 +185,7 @@ class ThreadScraper4chan(BasicJSONScraper):
 					attachments.append({
 						"title": "%s%s in thread %s" % (post_data["author"], ("/" + post_data["country_code"]) if post_data["country_code"] else "", thread["id"]),
 						"title_link": "https://boards.4chan.org/%s/thread/%s#pc%s" % (thread["board"], thread["id"], post_data["id"]),
-						"text": strip_tags(post_data["body"], convert_newlines=True),
+						"text": strip_tags(post_data["body"], convert_newlines=True).replace(highlight, "*%s*" % highlight),
 						"mrkdwn_in": ["text", "pretext"],
 						"color": "#73ad34"
 					})
