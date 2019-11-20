@@ -120,7 +120,7 @@ class ThreadScraper4chan(BasicJSONScraper):
 		new = set(post_dict_scrape.keys()) - set(post_dict_db.keys())
 		new_posts = 0
 		for post_id in new:
-			added = self.save_post(post_dict_scrape[post_id], thread)
+			added = self.save_post(post_dict_scrape[post_id], thread, first_post)
 			if added:
 				new_posts += 1
 
@@ -135,12 +135,13 @@ class ThreadScraper4chan(BasicJSONScraper):
 		# return the amount of new posts
 		return new_posts
 
-	def save_post(self, post, thread):
+	def save_post(self, post, thread, first_post):
 		"""
 		Add post to database
 
 		:param dict post: Post data to add
 		:param dict thread: Data for thread the post belongs to
+		:param dict first_post:  First post in thread
 		:return bool:  Whether the post was inserted
 		"""
 		# check for data integrity
@@ -179,7 +180,7 @@ class ThreadScraper4chan(BasicJSONScraper):
 		}
 
 		# this is mostly unsupported, feel free to ignore
-		if hasattr(config, "HIGHLIGHT_SLACKHOOK") and hasattr(config, "HIGHLIGHT_MATCH"):
+		if hasattr(config, "HIGHLIGHT_SLACKHOOK") and hasattr(config, "HIGHLIGHT_MATCH") and self.type == "4chan-thread":
 			for highlight in config.HIGHLIGHT_MATCH:
 				attachments = []
 				if highlight in post_data["body"]:
@@ -189,13 +190,13 @@ class ThreadScraper4chan(BasicJSONScraper):
 						pattern = " :%s:" % post_data["country_code"]
 						country_flag = flag.flagize(pattern)
 						if country_flag == pattern:
-							print("NOPE: %s" % post_data["country_code"])
 							country_flag = " (%s)" % post_data["country_code"]
 						else:
 							print(repr(country_flag))
 
+					subject = first_post.get("sub", first_post["no"])
 					attachments.append({
-						"title": "%s%s in thread %s" % (post_data["author"], country_flag, thread["id"]),
+						"title": "%s%s in '%s''" % (post_data["author"], country_flag, subject),
 						"title_link": "https://boards.4chan.org/%s/thread/%s#pc%s" % (thread["board"], thread["id"], post_data["id"]),
 						"text": strip_tags(post_data["body"], convert_newlines=True).replace(highlight, "*%s*" % highlight),
 						"mrkdwn_in": ["text", "pretext"],
@@ -206,10 +207,8 @@ class ThreadScraper4chan(BasicJSONScraper):
 					continue
 
 				try:
-					plural = "s" if len(attachments) != 1 else ""
-					verb = "were" if len(attachments) != 1 else "was"
 					requests.post(config.HIGHLIGHT_SLACKHOOK, json.dumps({
-						"text": "%i post%s mentioning '%s' %s just scraped from 4chan /%s/:" % (len(attachments), plural, highlight, verb, thread["board"]),
+						"text": "A post mentioning '%s' was just scraped from 4chan /%s/:" % (len(attachments), highlight, thread["board"]),
 						"attachments": attachments
 					}))
 				except requests.RequestException as e:
