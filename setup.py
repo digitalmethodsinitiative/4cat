@@ -7,6 +7,7 @@ with open("README.md", 'r') as readmefile:
 # Universal libraries
 libraries = [
 		"google-api-python-client==1.7.7",
+		"emoji-country-flag==1.1.0",
 		"psycopg2_binary==2.7.5",
 		"stop_words==2018.7.23",
 		"scikit_learn==0.20.1",
@@ -21,7 +22,7 @@ libraries = [
 		"werkzeug==0.15.5",
 		"cssselect==1.0.3",
 		"requests==2.20.0",
-		"telethon=1.10.6",
+		"telethon==1.10.6",
 		"psycopg2==2.7.5",
 		"markdown==3.0.1",
 		"jsonpickle==1.2",
@@ -33,7 +34,7 @@ libraries = [
 		"gensim==3.6.0",
 		"psutil==5.4.7",
 		"numpy==1.15.2",
-		"Pillow==5.3.0",
+		"Pillow==6.2.0",
 		"bcrypt==3.1.4",
 		"scipy==1.1.0",
 		"Flask==1.1.0",
