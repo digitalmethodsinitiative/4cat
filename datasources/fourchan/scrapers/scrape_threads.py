@@ -208,7 +208,7 @@ class ThreadScraper4chan(BasicJSONScraper):
 
 				try:
 					requests.post(config.HIGHLIGHT_SLACKHOOK, json.dumps({
-						"text": "A post mentioning '%s' was just scraped from 4chan /%s/:" % (len(attachments), highlight, thread["board"]),
+						"text": "A post mentioning '%s' was just scraped from 4chan /%s/:" % (highlight, thread["board"]),
 						"attachments": attachments
 					}))
 				except requests.RequestException as e:
