@@ -179,12 +179,6 @@ class AttributeRanker(BasicProcessor):
 					"frequency": sorted_items[time_unit][item]
 				}
 
-				# we don't need the time column if we're calculating overall
-				# values... though maybe for consistency it's better to include
-				# it nonetheless?
-				if timeframe == "all":
-					del row["time"]
-
 				rows.append(row)
 
 		# write as csv
