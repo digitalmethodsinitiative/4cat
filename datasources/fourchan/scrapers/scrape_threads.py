@@ -183,7 +183,7 @@ class ThreadScraper4chan(BasicJSONScraper):
 		if hasattr(config, "HIGHLIGHT_SLACKHOOK") and hasattr(config, "HIGHLIGHT_MATCH") and self.type == "4chan-thread":
 			for highlight in config.HIGHLIGHT_MATCH:
 				attachments = []
-				if highlight in post_data["body"]:
+				if highlight.lower() in post_data["body"].lower():
 					if not post_data["country_code"]:
 						country_flag = " (%s)" % post_data["country_name"] if post_data["country_name"] else ""
 					else:
