@@ -38,6 +38,7 @@ class Logger:
 		"CRITICAL": logging.CRITICAL,
 		"FATAL": logging.FATAL
 	}
+	alert_level = "FATAL"
 
 	def __init__(self, output=False, db=None):
 		"""
@@ -47,7 +48,7 @@ class Logger:
 		"""
 		if self.logger:
 			return
-		
+
 		self.print_logs = output
 		self.log_path = Path(config.PATH_ROOT, config.PATH_LOGS, "4cat.log")
 		self.previous_report = time.time()
@@ -62,6 +63,9 @@ class Logger:
 											   "%d-%m-%Y %H:%M:%S"))
 
 		self.logger.addHandler(handler)
+
+		if hasattr(config, "WARN_LEVEL"):
+			self.alert_level = self.levels.get(config.WARN_LEVEL, self.alert_level)
 
 		if db:
 			self.db = db
@@ -91,18 +95,66 @@ class Logger:
 		# because we use a wrapper the context location the logger itself is
 		# useless (it will always point to this function) so we get it
 		# ourselves
+		bare_message = message
 		try:
-			frame = sys._getframe(2)
-			location = frame.f_code.co_filename.split("/").pop() + ":" + str(frame.f_lineno)
-			message = "(" + location + ")" + ": " + message
+			frames = []
+			frame_index = 2
+			while True:
+				try:
+					frame = sys._getframe(frame_index)
+					frames.append(frame)
+				except ValueError:
+					break
+				frame_index += 1
+
+			file_location = frames[-1].f_code.co_filename.split("/").pop() + ":" + str(frames[-1].f_lineno)
+			message = "(" + file_location + ")" + ": " + message
 		except AttributeError:
 			# the _getframe method may not be available
 			message = ": " + message
+			location = "Unknown"
+			frames = []
 
 		self.logger.log(level, message)
 
+		# log messages can optionally be sent as a Slack alert
+		# this is configured in config.py with WARN_SLACK_URL and WARN_LEVEL
+		if level >= self.alert_level and hasattr(config, "WARN_SLACK_URL") and config.WARN_SLACK_URL:
+			# determine appropriate colour - red = uh oh, orange = warning, rest = green
+			if level in (logging.ERROR, logging.CRITICAL):
+				color = "#FF0000"  # red
+			elif level == logging.WARNING:
+				color = "#DD7711"  # orange
+			else:
+				color = "#3CC619"  # green
+
+			# include full call stack for easier debugging
+			location = "`%s`" % "` ← `".join(
+				[frame.f_code.co_filename.split("/").pop() + ":" + str(frame.f_lineno) for frame in frames])
+
+			# prepare slack webhook payload
+			message = {
+				"text": "4CAT Alert logged on `%s`:" % platform.uname().node,
+				"mrkdwn_in": ["text"],
+				"attachments": [{
+					"color": color,
+					"text": bare_message + "\n",
+					"fields": [{
+						"title": "Location",
+						"value": location,
+						"short": False
+					}]
+				}]
+			}
+
+			# call the Slack web hook
+			try:
+				e = requests.post(config.WARN_SLACK_URL, json.dumps(message))
+			except requests.RequestException as e:
+				self.warning("Could not send log alerts to Slack webhook (%s)" % e)
+
 		# every 10 minutes, collect and send warnings etc
-		if self.previous_report < time.time() - config.WARN_INTERVAL:
+		if config.WARN_EMAILS and self.previous_report < time.time() - config.WARN_INTERVAL:
 			self.previous_report = time.time()
 			self.collect_and_send()
 
@@ -222,57 +274,7 @@ class Logger:
 		for logkey in sorted(sort_keys, key=sort_keys.__getitem__):
 			sorted_logs[logkey] = grouped_logs[logkey]
 
-		# compile a report to send to an unfortunate admin
-		# post compiled report to slack webhook, if configured
-		if config.WARN_SLACK_URL:
-			attachments = []
-			for logkey in reversed(sorted_logs):
-				log = sorted_logs[logkey]
-				if log["level"] in ("ERROR", "CRITICAL"):
-					color = "#FF0000"
-				elif log["level"] == "WARNING":
-					color = "#DD7711"
-				else:
-					color = "#3CC619"
-
-				attachment = {
-					"title": log["message"],
-					"pretext": "%ix at `%s`" % (log["amount"], log["location"]),
-					"mrkdwn_in": ["text", "pretext"],
-					"color": color
-				}
-
-				if log["amount"] > 1:
-					attachment["fields"] = [
-						{
-							"title": "First",
-							"value": datetime.datetime.fromtimestamp(log["first"]).strftime("%d %b '%y %H:%M:%S"),
-							"short": True
-						},
-						{
-							"title": "Last",
-							"value": datetime.datetime.fromtimestamp(log["last"]).strftime("%d %b '%y %H:%M:%S"),
-							"short": True
-						}
-					]
-				else:
-					attachment["fields"] = [{
-						"title": "Logged at",
-						"value": datetime.datetime.fromtimestamp(log["first"]).strftime("%d %b '%y %H:%M:%S"),
-						"short": False
-					}]
-
-				attachments.append(attachment)
-
-			try:
-				requests.post(config.WARN_SLACK_URL, json.dumps({
-					"text": "%i alerts were logged from `%s`." % (warnings, platform.uname().node),
-					"attachments": attachments
-				}))
-			except requests.RequestException as e:
-				self.warning("Could not send log alerts to Slack webhook (%s)" % e)
-
-		# also send them to the configured admins
+		# compile a report to send to an unfortunate admin, if so configured
 		if config.WARN_EMAILS:
 			mail = "Hello! The following 4CAT warnings were logged since the last alert:\n\n"
 			for logkey in reversed(sorted_logs):
