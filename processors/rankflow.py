@@ -28,7 +28,10 @@ class RankFlowRenderer(BasicProcessor):
 	description = "Create a diagram showing changes in prevalence over time for sequential ranked lists (following Bernhard Rieder's RankFlow grapher)."  # description displayed in UI
 	extension = "svg"  # extension of result file, used internally and in UI
 
-	accepts = ["vector-ranker", "preset-neologisms", "tfidf", "collocations"]
+	accepts = ["vector-ranker", "preset-neologisms", "tfidf", "collocations", "attribute-frequencies", "hatebase-frequencies"]
+
+	input = "csv:item,time,value"
+	output = "svg"
 
 	options = {
 		"colour_property": {
@@ -55,13 +58,17 @@ class RankFlowRenderer(BasicProcessor):
 		with self.source_file.open() as input:
 			reader = csv.DictReader(input)
 
-			weighted = ("value" in reader.fieldnames)
-			for row in reader:
-				if row["date"] not in items:
-					items[row["date"]] = {}
+			weight_attribute = "value" if "value" in reader.fieldnames else "frequency"
+			item_attribute = "item" if "item" in reader.fieldnames else "text"
+			date_attribute = "date" if "date" in reader.fieldnames else "time"
 
-				weight = convert_to_int(row["value"], 1) if weighted else 1
-				items[row["date"]][row["text"]] = weight
+			weighted = (weight_attribute in reader.fieldnames)
+			for row in reader:
+				if row[date_attribute] not in items:
+					items[row[date_attribute]] = {}
+
+				weight = convert_to_int(row[weight_attribute], 1) if weighted else 1
+				items[row[date_attribute]][row[item_attribute]] = weight
 				max_weight = max(max_weight, weight)
 
 		# determine per-period changes

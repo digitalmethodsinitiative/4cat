@@ -1,0 +1,60 @@
+<fieldset class="basic-options">
+    <p class="form-intro">Messages are scraped in reverse chronological order: the most recent message for a given
+        entity (e.g. a group) will be scraped first.
+    </p>
+
+    <p class="form-intro">To query the Telegram API, you need to supply your <a href="https://my.telegram.org/apps">API
+        credentials</a>. These <em>will be sent to the 4CAT server</em> and will be stored there while data is fetched.
+        After the dataset has been created your credentials will be deleted from the server.</p>
+
+    <p class="form-intro">The credentials you enter here will also be saved locally to make subsequent dataset creation
+        easier. 4CAT at this time does not support two-factor authentication for Telegram.</p>
+
+    <div class="form-element">
+        <label for="query-api_id">API ID</label>
+        <input type="text" id="query-api_id" name="api_id" value="">
+    </div>
+
+    <div class="form-element">
+        <label for="query-api_hash">API Hash</label>
+        <input type="text" id="query-api_hash" name="api_hash" value="">
+    </div>
+
+    <div class="form-element">
+        <label for="query-api_phone">Phone number</label>
+        <input type="text" id="query-api_phone" name="api_phone" placeholder="+xxxxxxxxxx" value="">
+    </div>
+</fieldset>
+
+<fieldset>
+    <p class="form-intro">You can scrape up to <strong>25</strong> items at a time. Separate the items with commas
+        or line breaks.</p>
+
+    <div class="form-element">
+        <label for="query-input">Entities to scrape:</label>
+        <div>
+            <textarea id="query-input" name="query" placeholder="Separate with commas or line breaks."></textarea>
+        </div>
+    </div>
+
+    <!--<div class="form-element">
+        <label for="query-usernames">Scrape usernames?</label>
+        <div>
+            <input type="checkbox" name="scrape-userinfo" id="query-usernames">
+        </div>
+    </div>-->
+
+    <div class="form-element">
+        <label for="max-posts">Messages per group:</label>
+        <input name="max_posts" id="max-posts" min="0" max="25000" placeholder="Max: 500" value="10" type="number">
+    </div>
+</fieldset>
+
+<fieldset id="telegram-security" class="optional-form-element hidden">
+    <div class="form-element">
+        <label for="query-security">Security code:</label>
+        <div>
+            <input type="text" name="security-code" id="query-security">
+        </div>
+    </div>
+</fieldset>

@@ -3,12 +3,12 @@ Miscellaneous helper functions for the 4CAT backend
 """
 import socket
 import json
-import ssl
 import csv
 import re
 
 from pathlib import Path
 from html.parser import HTMLParser
+from calendar import monthrange
 
 import config
 
@@ -286,3 +286,88 @@ def call_api(action, payload=None):
 		return json.loads(response)
 	except json.JSONDecodeError:
 		return response
+
+
+def pad_interval(intervals, first_interval=None, last_interval=None):
+	"""
+	Pad an interval so all intermediate intervals are filled
+
+	:param dict intervals:  A dictionary, with dates (YYYY{-MM}{-DD}) as keys
+	and a numerical value.
+	:param first_interval:
+	:param last_interval:
+	:return:
+	"""
+	missing = 0
+	test_key = list(intervals.keys())[0]
+
+	# first determine the boundaries of the interval
+	# these may be passed as parameters, or they can be inferred from the
+	# interval given
+
+	if first_interval:
+		first_interval = str(first_interval)
+		first_year = int(first_interval[0:4])
+		if len(first_interval) > 4:
+			first_month = int(first_interval[5:7])
+		if len(first_interval) > 7:
+			first_day = int(first_interval[8:10])
+	else:
+		first_year = min([int(i[0:4]) for i in intervals])
+		if len(test_key) > 4:
+			first_month = min([int(i[5:7]) for i in intervals if int(i[0:4]) == first_year])
+		if len(test_key) > 7:
+			first_day = min(
+				[int(i[8:10]) for i in intervals if int(i[0:4]) == first_year and int(i[5:7]) == first_month])
+	if last_interval:
+		last_interval = str(last_interval)
+		last_year = int(last_interval[0:4])
+		if len(last_interval) > 4:
+			last_month = int(last_interval[5:7])
+		if len(last_interval) > 7:
+			last_day = int(last_interval[8:10])
+	else:
+		last_year = max([int(i[0:4]) for i in intervals])
+		if len(test_key) > 4:
+			last_month = max([int(i[5:7]) for i in intervals if int(i[0:4]) == last_year])
+		if len(test_key) > 7:
+			last_day = max(
+				[int(i[8:10]) for i in intervals if int(i[0:4]) == last_year and int(i[5:7]) == last_month])
+
+	if re.match(r"^[0-9]{4}$", test_key):
+		# years are quite straightforward
+		for year in range(first_year, last_year + 1):
+			if str(year) not in intervals:
+				intervals[str(year)] = 0
+				missing += 1
+
+	elif re.match(r"^[0-9]{4}-[0-9]{2}(-[0-9]{2})?", test_key):
+		# more granular intervals require the following monstrosity to
+		# ensure all intervals are available for every single graph
+		has_day = re.match(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}", test_key)
+
+		for year in range(first_year, last_year + 1):
+			start_month = first_month if year == first_year else 1
+			end_month = last_month if year == last_year else 12
+
+			for month in range(start_month, end_month + 1):
+				key = str(year) + "-" + str(month).zfill(2)
+				if not has_day:
+					if key not in intervals:
+						intervals[key] = 0
+						missing += 1
+				else:
+					start_day = first_day if year == first_year and month == first_month else 1
+					end_day = last_day if year == last_year and month == last_month else \
+						monthrange(year, month)[1]
+
+					for day in range(start_day, end_day + 1):
+						day_key = key + "-" + str(day).zfill(2)
+						if day_key not in intervals:
+							intervals[day_key] = 0
+							missing += 1
+
+	# sort while we're at it
+	intervals = {key: intervals[key] for key in sorted(intervals)}
+
+	return missing, intervals

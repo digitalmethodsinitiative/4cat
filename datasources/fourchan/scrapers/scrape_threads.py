@@ -20,9 +20,11 @@ Flow:
          -> queue_image(): if an image was attached, queue a job to scrape it
    -> update_thread(): update thread data
 """
+import requests
 import psycopg2
 import hashlib
 import base64
+import flag
 import json
 import time
 import six
@@ -31,6 +33,7 @@ from pathlib import Path
 
 from backend.abstract.scraper import BasicJSONScraper
 from backend.lib.exceptions import JobAlreadyExistsException
+from backend.lib.helpers import strip_tags
 
 import config
 
@@ -117,7 +120,7 @@ class ThreadScraper4chan(BasicJSONScraper):
 		new = set(post_dict_scrape.keys()) - set(post_dict_db.keys())
 		new_posts = 0
 		for post_id in new:
-			added = self.save_post(post_dict_scrape[post_id], thread)
+			added = self.save_post(post_dict_scrape[post_id], thread, first_post)
 			if added:
 				new_posts += 1
 
@@ -132,12 +135,13 @@ class ThreadScraper4chan(BasicJSONScraper):
 		# return the amount of new posts
 		return new_posts
 
-	def save_post(self, post, thread):
+	def save_post(self, post, thread, first_post):
 		"""
 		Add post to database
 
 		:param dict post: Post data to add
 		:param dict thread: Data for thread the post belongs to
+		:param dict first_post:  First post in thread
 		:return bool:  Whether the post was inserted
 		"""
 		# check for data integrity
@@ -152,6 +156,7 @@ class ThreadScraper4chan(BasicJSONScraper):
 		else:
 			dimensions = {}
 
+		# aggregate post data
 		post_data = {
 			"id": post["no"],
 			"thread_id": thread["id"],
@@ -174,6 +179,43 @@ class ThreadScraper4chan(BasicJSONScraper):
 				{field: post[field] for field in post.keys() if field not in self.known_fields})
 		}
 
+		# this is mostly unsupported, feel free to ignore
+		if hasattr(config, "HIGHLIGHT_SLACKHOOK") and hasattr(config, "HIGHLIGHT_MATCH") and self.type == "4chan-thread":
+			for highlight in config.HIGHLIGHT_MATCH:
+				attachments = []
+				if highlight.lower() in post_data["body"].lower():
+					if not post_data["country_code"]:
+						country_flag = " (%s)" % post_data["country_name"] if post_data["country_name"] else ""
+					else:
+						pattern = " :%s:" % post_data["country_code"]
+						country_flag = flag.flagize(pattern)
+						if country_flag == pattern:
+							country_flag = " (%s)" % post_data["country_code"]
+						else:
+							print(repr(country_flag))
+
+					subject = first_post.get("sub", first_post["no"])
+					attachments.append({
+						"title": "%s%s in '%s''" % (post_data["author"], country_flag, subject),
+						"title_link": "https://boards.4chan.org/%s/thread/%s#pc%s" % (thread["board"], thread["id"], post_data["id"]),
+						"text": strip_tags(post_data["body"], convert_newlines=True).replace(highlight, "*%s*" % highlight),
+						"mrkdwn_in": ["text", "pretext"],
+						"color": "#73ad34"
+					})
+
+				if not attachments:
+					continue
+
+				try:
+					requests.post(config.HIGHLIGHT_SLACKHOOK, json.dumps({
+						"text": "A post mentioning '%s' was just scraped from 4chan /%s/:" % (highlight, thread["board"]),
+						"attachments": attachments
+					}))
+				except requests.RequestException as e:
+					self.log.warning("Could not send highlight alerts to Slack webhook (%s)" % e)
+
+
+		# now insert the post into the database
 		try:
 			for field in post_data:
 				if not isinstance(post_data[field], six.string_types):
