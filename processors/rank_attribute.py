@@ -40,7 +40,8 @@ class AttributeRanker(BasicProcessor):
 				"image_md5": "Image (hash, for 4chan and 8chan datasets)",
 				"image_file": "Image (filename, for 4chan and 8chan datasets)",
 				"country_code": "Country code (for 4chan datasets)",
-				"subreddit": "Subreddit (for Reddit datasets)"
+				"subreddit": "Subreddit (for Reddit datasets)",
+				"search_entity": "Entity (for Telegram datasets)"
 			},
 			"help": "Attribute to aggregate",
 			"tooltip": "When choosing 'Regular expression', any value in a post matching the regular expression will be saved as a separate value."
@@ -173,16 +174,10 @@ class AttributeRanker(BasicProcessor):
 		for time_unit in sorted_items:
 			for item in sorted_items[time_unit]:
 				row = {
-					"time": time_unit,
+					"date": time_unit,
 					"item": item,
 					"frequency": sorted_items[time_unit][item]
 				}
-
-				# we don't need the time column if we're calculating overall
-				# values... though maybe for consistency it's better to include
-				# it nonetheless?
-				if timeframe == "all":
-					del row["time"]
 
 				rows.append(row)
 

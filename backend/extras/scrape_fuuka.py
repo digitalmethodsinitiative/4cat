@@ -7,8 +7,8 @@ import re
 
 from pathlib import Path
 
-postlink = re.compile(r"&gt;&gt;([0-9]+)")
-quote = re.compile(r"\n&gt;([^\n]+)")
+postlink = re.compile(r"^&gt;&gt;([0-9]+)", flags=re.MULTILINE)
+quote = re.compile(r"^&gt;([^\n]+)", flags=re.MULTILINE)
 
 def htmlize(post):
 	if not post:
@@ -18,7 +18,7 @@ def htmlize(post):
 	post = post.replace("<", "&lt;")
 
 	post = postlink.sub('<a href="#p\\1" class="quotelink">&gt;&gt;\\1</a>', post)
-	post = quote.sub('\n<span class="quote">&gt;\\1</span>', post)
+	post = quote.sub('<span class="quote">&gt;\\1</span>', post)
 
 	return post.strip().replace("\n", "<br>")
 
@@ -171,17 +171,17 @@ while True:
 		try:
 			thread_html = requests.get(thread_url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:61.0) Gecko/20100101 Firefox/61.0"})
 		except requests.RequestException as e:
-			print("RequestException while requesting thread %i: %s" % (thread_id, traceback.format_exc()))
+			print("RequestException while requesting thread %s: %s" % (thread_id, traceback.format_exc()))
 			break
 
 		if thread_html.status_code != 200:
-			print("HTTP error %i while scraping thread %i" % (page_html.status_code, thread_id))
+			print("HTTP error %i while scraping thread %s" % (page_html.status_code, thread_id))
 			break
 
 		try:
 			thread_json = json.loads(thread_html.content)
 		except json.JSONDecodeError:
-			print("JSON decode error while trying to decode thread %i, dumped as error.json" % thread_id)
+			print("JSON decode error while trying to decode thread %s, dumped as error.json" % thread_id)
 			with open("error.json", "wb") as output:
 				output.write(thread_html.content)
 			break
