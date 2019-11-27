@@ -205,6 +205,8 @@ class SearchReddit(Search):
 			self.dataset.update_status("Found %i posts via Pushshift API..." % total_posts)
 
 		# and done!
+		if not return_posts:
+			self.dataset.update_status("No posts found")
 		return return_posts
 
 	def fetch_posts(self, post_ids, where=None, replacements=None):
@@ -398,12 +400,14 @@ class SearchReddit(Search):
 		:return dict:  Safe query parameters
 		"""
 		# we need a board!
-		boards = [board for board in query.get("board", "").split(",") if board.strip()]
+		r_prefix = re.compile(r"^/?r/")
+		boards = [r_prefix.sub("", board) for board in query.get("board", "").split(",") if board.strip()]
 		print(boards)
 
 		if not boards:
 			raise QueryParametersException("Please provide a board or a comma-separated list of boards to query.")
 
+		# ignore leading r/ for boards
 		query["board"] = ",".join(boards)
 
 		# this is the bare minimum, else we can't narrow down the full data set
