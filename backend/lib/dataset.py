@@ -193,7 +193,11 @@ class DataSet:
 		if not self.is_finished():
 			raise RuntimeError("Cannot unfinish an unfinished dataset")
 
-		self.get_results_path().unlink()
+		try:
+			self.get_results_path().unlink()
+		except FileNotFoundError:
+			pass
+
 		self.data["timestamp"] = int(time.time())
 		self.data["is_finished"] = False
 		self.data["num_rows"] = 0
@@ -384,6 +388,24 @@ class DataSet:
 			"software_version": version,
 			"software_file": backend.all_modules.processors.get(self.data["type"], {"path": ""})["path"]
 		})
+
+		return updated > 0
+
+	def delete_parameter(self, parameter):
+		"""
+		Delete a parameter from the dataset metadata
+
+		:param string parameter:  Parameter to delete
+		:return bool:  Update successul?
+		"""
+		parameters = self.parameters
+		if parameter in parameters:
+			del parameters[parameter]
+		else:
+			return False
+
+		updated = self.db.update("queries", where={"key": self.data["key"]}, data={"parameters": json.dumps(parameters)})
+		self.parameters = parameters
 
 		return updated > 0
 

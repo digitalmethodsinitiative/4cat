@@ -5,6 +5,7 @@ import html2text
 import hashlib
 import smtplib
 import bcrypt
+import json
 import time
 import os
 
@@ -92,6 +93,8 @@ class User:
 
 		self.name = self.data["name"]
 		self.is_authenticated = authenticated
+
+		self.userdata = json.loads(self.data.get("userdata", "{}"))
 
 		if not self.is_anonymous and self.is_authenticated:
 			db.update("users", where={"name": self.data["name"]}, data={"timestamp_seen": int(time.time())})
@@ -234,6 +237,28 @@ class User:
 				smtp.sendmail("4cat@oilab.nl", [username], message.as_string())
 		except (smtplib.SMTPException, ConnectionRefusedError) as e:
 			raise RuntimeError("Could not send password reset e-mail: %s" % e)
+
+	def get_value(self, key, default=None):
+		"""
+		Get persistently stored user property
+
+		:param key:  Name of item to get
+		:param default:  What to return if key is not avaiable (default None)
+		:return:
+		"""
+		return self.userdata.get(key, default)
+
+	def set_value(self, key, value):
+		"""
+		Set persistently stored user property
+
+		:param key:  Name of item to store
+		:param value:  Value
+		:return:
+		"""
+		self.userdata[key] = value
+
+		db.update("users", where={"name": self.get_id()}, data={"userdata": json.dumps(self.userdata)})
 
 	def set_password(self, password):
 		"""

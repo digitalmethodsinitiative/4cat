@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS queries (
   id               SERIAL PRIMARY KEY,
   key              text,
   type             text DEFAULT 'search',
-  key_parent       text,
+  key_parent       text DEFAULT '',
   query            text,
   job              integer DEFAULT 0,
   parameters       text,
@@ -46,7 +46,8 @@ CREATE TABLE IF NOT EXISTS users (
   is_admin           BOOLEAN DEFAULT FALSE,
   register_token     TEXT DEFAULT '',
   timestamp_token    INTEGER DEFAULT 0,
-  timestamp_seen     INTEGER DEFAULT 0
+  timestamp_seen     INTEGER DEFAULT 0,
+  userdata           TEXT DEFAULT '{}'
 );
 
 INSERT INTO users

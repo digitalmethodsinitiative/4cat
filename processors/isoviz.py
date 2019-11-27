@@ -5,9 +5,9 @@ import csv
 import re
 
 from backend.abstract.processor import BasicProcessor
-from backend.lib.helpers import UserInput, convert_to_int
+from backend.lib.helpers import UserInput, convert_to_int, pad_interval
 
-from calendar import monthrange, month_abbr
+from calendar import month_abbr
 from math import sin, cos, tan, degrees, radians, copysign
 
 from svgwrite import Drawing
@@ -30,7 +30,12 @@ class IsometricMultigraphRenderer(BasicProcessor):
 	description = "Generate area graphs showing prevalence per item over time and project these side-by-side on an isometric plane for easy comparison."  # description displayed in UI
 	extension = "svg"  # extension of result file, used internally and in UI
 
-	accepts = ["vector-ranker", "preset-neologisms", "tfidf", "collocations", "attribute-frequencies"]
+	input = "csv:item,time,frequency"
+	output = "svg"
+
+	accepts = ["overtime-hateful", "vector-ranker", "preset-neologisms", "tfidf", "collocations",
+			   "attribute-frequencies", "hatebase-frequencies"]
+
 	options = {
 		"smooth": {
 			"type": UserInput.OPTION_TOGGLE,
@@ -47,6 +52,11 @@ class IsometricMultigraphRenderer(BasicProcessor):
 			"type": UserInput.OPTION_TEXT,
 			"default": 0,
 			"help": "Data completeness required (at least this % of intervals should be present for an item to be graphed; 0 to disable)"
+		},
+		"label": {
+			"type": UserInput.OPTION_TEXT,
+			"default": "",
+			"help": "Graph label (optional)"
 		}
 	}
 
@@ -63,10 +73,14 @@ class IsometricMultigraphRenderer(BasicProcessor):
 		smooth = self.parameters.get("smooth", self.options["smooth"]["default"])
 		normalise_values = self.parameters.get("normalise", self.options["normalise"]["default"])
 		completeness = convert_to_int(self.parameters.get("complete", self.options["complete"]["default"]), 0)
+		graph_label = self.parameters.get("label", self.options["label"]["default"])
 
 		# first gather graph data: each distinct item gets its own graph and
 		# for each graph we have a sequence of intervals, each interval with
 		# its own value
+		first_date = "9999-99-99"
+		last_date = "0000-00-00"
+
 		with self.source_file.open() as input:
 			reader = csv.DictReader(input)
 
@@ -81,6 +95,8 @@ class IsometricMultigraphRenderer(BasicProcessor):
 				# make sure the months and days are zero-padded
 				interval = row.get(date_key, "")
 				interval = "-".join([str(bit).zfill(2 if len(bit) != 4 else 4) for bit in interval.split("-")])
+				first_date = min(first_date, interval)
+				last_date = max(last_date, interval)
 
 				if interval not in intervals:
 					intervals.append(interval)
@@ -100,57 +116,11 @@ class IsometricMultigraphRenderer(BasicProcessor):
 		# this will distort the graph, so the next step is to make sure all
 		# graphs consist of the same continuous interval list
 		missing = {graph: 0 for graph in graphs}
-
-		if re.match(r"^[0-9]{4}$", intervals[0]):
-			# years are quite straightforward
-			first, last = min([int(i) for i in intervals]), max([int(i) for i in intervals])
-			for graph in graphs:
-				for year in range(first, last + 1):
-					if str(year) not in graphs[graph]:
-						graphs[graph][str(year)] = 0
-						missing[graph] += 1
-
-		elif re.match(r"^[0-9]{4}-[0-9]{2}(-[0-9]{2})?", intervals[0]):
-			# more granular intervals require the following monstrosity to
-			# ensure all intervals are available for every single graph
-			has_day = re.match(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}", intervals[0])
-
-			first_year, last_year = min([int(i[0:4]) for i in intervals]), max([int(i[0:4]) for i in intervals])
-			first_month = min([int(i[5:7]) for i in intervals if int(i[0:4]) == first_year])
-			last_month = max([int(i[5:7]) for i in intervals if int(i[0:4]) == last_year])
-
-			if has_day:
-				first_day = min(
-					[int(i[8:10]) for i in intervals if int(i[0:4]) == first_year and int(i[5:7]) == first_month])
-				last_day = max(
-					[int(i[8:10]) for i in intervals if int(i[0:4]) == last_year and int(i[5:7]) == last_month])
-
-			for graph in graphs:
-				for year in range(first_year, last_year + 1):
-					start_month = first_month if year == first_year else 1
-					end_month = last_month if year == last_year else 12
-
-					for month in range(start_month, end_month + 1):
-						key = str(year) + "-" + str(month).zfill(2)
-						if not has_day:
-							if key not in graphs[graph]:
-								graphs[graph][key] = 0
-								missing[graph] += 1
-						else:
-							start_day = first_day if year == first_year and month == first_month else 1
-							end_day = last_day if year == last_year and month == last_month else \
-								monthrange(year, month)[1]
-
-							for day in range(start_day, end_day + 1):
-								day_key = key + "-" + str(day).zfill(2)
-								if day_key not in graphs[graph]:
-									graphs[graph][day_key] = 0
-									missing[graph] += 1
+		for graph in graphs:
+			missing[graph], graphs[graph] = pad_interval(graphs[graph], first_interval=first_date, last_interval=last_date)
 
 		# now that's done, make sure the graph datapoints are in order
 		intervals = sorted(list(graphs[list(graphs)[0]].keys()))
-		for graph in graphs:
-			graphs[graph] = {interval: graphs[graph][interval] for interval in sorted(graphs[graph])}
 
 		# delete graphs that do not have the required amount of intervals
 		# this is useful to get rid of outliers and items that only occur
@@ -207,7 +177,7 @@ class IsometricMultigraphRenderer(BasicProcessor):
 		item_height = max(min_item_height, min_full_height / len(graphs))
 
 		# margin - this should be enough for the text labels to fit in
-		margin = 100
+		margin = 75
 
 		# this determines the "flatness" of the isometric projection and an be
 		# tweaked for different looks - basically corresponds to how far the
@@ -385,6 +355,14 @@ class IsometricMultigraphRenderer(BasicProcessor):
 			stroke="black",
 			stroke_width=2
 		))
+
+		if graph_label:
+			canvas.add(Text(
+				insert=((margin / 10), (margin / 2)),
+				text=graph_label,
+				style="font-size:2em;",
+				alignment_baseline="hanging"
+			))
 
 		# and finally save the SVG
 		canvas.save(pretty=True)

@@ -77,6 +77,7 @@ class SearchInstagram(Search):
 					query = query.replace("#", "")
 					chunk = instagram.get_hashtag_posts(query)
 				elif scope == "username":
+					query = query.replace("@", "")
 					profile = instaloader.Profile.from_username(instagram.context, query)
 					chunk = profile.get_posts()
 				else:
@@ -90,11 +91,15 @@ class SearchInstagram(Search):
 					self.dataset.update_status("Retrieving posts ('%s', %i posts)" % (query, chunk_size))
 					if posts_processed >= max_posts:
 						break
-					posts.append(chunk.__next__())
-					posts_processed += 1
+					try:
+						posts.append(chunk.__next__())
+						posts_processed += 1
+					except StopIteration:
+						break
 			except instaloader.InstaloaderException:
 				# should we abort here and return 0 posts?
 				self.log.info("Instaloader exception during query %s" % self.dataset.key)
+				self.dataset.update_status("Error while retrieving posts for query '%s'" % query)
 
 		# go through posts, and retrieve comments
 		results = []
@@ -107,17 +112,27 @@ class SearchInstagram(Search):
 
 			thread_id = post.shortcode
 
+			try:
+				post_username = post.owner_username
+			except instaloader.QueryReturnedNotFoundException:
+				post_username = ""
+
+			try:
+				tagged_users = post.tagged_users
+			except instaloader.QueryReturnedNotFoundException:
+				tagged_users = []
+
 			results.append({
 				"id": thread_id,
 				"thread_id": thread_id,
 				"parent_id": thread_id,
 				"body": post.caption if post.caption is not None else "",
-				"author": post.owner_username,
+				"author": post_username,
 				"timestamp": int(post.date_utc.timestamp()),
 				"type": "video" if post.is_video else "picture",
 				"url": post.video_url if post.is_video else post.url,
 				"hashtags": ",".join(post.caption_hashtags),
-				"usertags": ",".join(post.tagged_users),
+				"usertags": ",".join(tagged_users),
 				"mentioned": ",".join(mention.findall(post.caption) if post.caption else ""),
 				"num_likes": post.likes,
 				"num_comments": post.comments,
@@ -129,12 +144,18 @@ class SearchInstagram(Search):
 
 			for comment in post.get_comments():
 				answers = [answer for answer in comment.answers]
+
+				try:
+					comment_username = comment.owner.username
+				except instaloader.QueryReturnedNotFoundException:
+					comment_username = ""
+
 				results.append({
 					"id": comment.id,
 					"thread_id": thread_id,
 					"parent_id": thread_id,
 					"body": comment.text,
-					"author": comment.owner.username,
+					"author": comment_username,
 					"timestamp": int(comment.created_at_utc.timestamp()),
 					"type": "comment",
 					"url": "",
@@ -149,12 +170,17 @@ class SearchInstagram(Search):
 				# instagram only has one reply depth level at the time of
 				# writing, represented here
 				for answer in answers:
+					try:
+						answer_username = answer.owner.username
+					except instaloader.QueryReturnedNotFoundException:
+						answer_username = ""
+
 					results.append({
 						"id": answer.id,
 						"thread_id": thread_id,
 						"parent_id": comment.id,
 						"body": answer.text,
-						"author": answer.owner.username,
+						"author": answer_username,
 						"timestamp": int(answer.created_at_utc.timestamp()),
 						"type": "comment",
 						"url": "",
