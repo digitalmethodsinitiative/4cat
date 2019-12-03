@@ -1,0 +1,34 @@
+4CAT design issues
+___________
+
+Bug:
+- Split by thread folder overload
+
+Suggestions:
+- Make queries private(?)
+- Killing postprocessors
+- Give datasets a name?
+- Clicking anywhere on the results page entries should take you to its postprocessors
+- Highlight colour in header shoudl change
+
+Analysis page:
+- Decrease query information?
+- Components as tabs?
+- Split 
+- Group/hide components?
+- Why is the result of posprocessors two columns?
+- Queue buttons / Options?
+---- Queue -> run
+---- Option button should go below
+---- Change option to arrow?
+- Results should remain visible when result is expanded
+- Result file download string outside results box? Next to the "Add to favourites" and "Permalink" buttons?
+- Buttons on top of results box in the header as icon?
+- Metadata as etiquette?
+- Make distinction between ran analyses and still-to-ran analyses clearer
+---- Change "Analyses" to "Avalable analyses
+---- Grey out already ran analyses and make sure that people see there's results on top
+---- Add a label "already ran with some parameters" for processors with multiple options
+
+Bonus options:
+- Change colours on reload
