@@ -126,7 +126,7 @@ class VectorRanker(BasicProcessor):
 			overall_top = {item: overall_top[item] for item in sorted(overall_top, key=lambda x: overall_top[x], reverse=True)[0:cutoff]}
 			filtered_results = []
 			for item in results:
-				if item["text"] in overall_top:
+				if item["item"] in overall_top:
 					filtered_results.append(item)
 
 			results = filtered_results
