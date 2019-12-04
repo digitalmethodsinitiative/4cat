@@ -108,7 +108,8 @@ class IsometricMultigraphRenderer(BasicProcessor):
 
 		# first make sure we actually have something to render
 		intervals = sorted(intervals)
-		if not intervals:
+		if len(intervals) <= 1:
+			self.dataset.update_status("Not enough data for a side-by-side over-time visualisation.")
 			self.job.finish(0)
 			return
 
