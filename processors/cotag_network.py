@@ -21,6 +21,9 @@ class CoTagger(BasicProcessor):
 
 	datasources = ["instagram"]
 
+	input = "csv:tags|hashtags"
+	output = "gdf"
+
 	def process(self):
 		"""
 		Generates a GDF co-tag graph.

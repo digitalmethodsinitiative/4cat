@@ -22,6 +22,9 @@ class TopImageCounter(BasicProcessor):
 	extension = "csv"  # extension of result file, used internally and in UI
 	datasources = ["4chan"]
 
+	input = "csv:image_file, image_md5"
+	output = "csv:md5_hash,filename,num_posts,url_4cat,url_4plebs,url_fireden"
+
 	def process(self):
 		"""
 		This takes a 4CAT results file as input, and outputs a new CSV file

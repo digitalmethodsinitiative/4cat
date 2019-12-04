@@ -18,6 +18,9 @@ class SplitSentences(BasicProcessor):
 	description = "Split a body of posts into discrete sentences. Assumes the posts are written in English; success for other languages, particularly those using other punctuation systems, may vary."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
+	input = "csv:id,body"
+	output = "csv:post_id,sentence"
+
 	options = {
 		"min_length": {
 			"type": UserInput.OPTION_TEXT,

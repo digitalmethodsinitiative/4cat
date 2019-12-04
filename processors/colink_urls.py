@@ -20,6 +20,9 @@ class URLCoLinker(BasicProcessor):
 				  "of co-links."  # description displayed in UI
 	extension = "gdf"  # extension of result file, used internally and in UI
 
+	input = "csv:body,thread_id,id"
+	output = "gdf"
+
 	options = {
 		"detail": {
 			"type": UserInput.OPTION_CHOICE,

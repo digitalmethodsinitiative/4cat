@@ -22,6 +22,9 @@ class WikipediaCatgegoryNetwork(BasicProcessor):
 	description = "Create a Gephi-compatible network comprised of wikipedia pages linked in the data set, linked to the categories they are part of. English Wikipedia only."  # description displayed in UI
 	extension = "gdf"  # extension of result file, used internally and in UI
 
+	input = "csv:body"
+	output = "gdf"
+
 	def process(self):
 		"""
 		This takes a 4CAT results file as input, and outputs a new CSV file

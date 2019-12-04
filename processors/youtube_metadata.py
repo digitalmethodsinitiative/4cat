@@ -33,6 +33,9 @@ class YouTubeMetadata(BasicProcessor):
 	extension = "csv"  # extension of result file, used internally and in UI
 	datasources = ["4chan", "8chan", "reddit", "breitbart"]
 
+	input = "csv:id,body"
+	output = "csv:id,channel_id,channel_title"
+
 	max_retries = 3
 	sleep_time = 20
 
