@@ -54,7 +54,8 @@ class HatebaseAnalyser(BasicProcessor):
 
 				for post in reader:
 					processed += 1
-					self.dataset.update_status("Processing post %i" % processed)
+					if processed % 1000 == 0:
+						self.dataset.update_status("Processing post %i" % processed)
 					row = {**post, **{
 						"hatebase_num": 0,
 						"hatebase_num_ambiguous": 0,
