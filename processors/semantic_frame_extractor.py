@@ -29,6 +29,9 @@ class SemanticFrameExtractor(BasicProcessor):
 	extension = "csv"  # extension of result file, used internally and in UI
 	accepts = ["sentence-split"]  # types of result this post-processor can run on
 
+	input = "csv:sentence"
+	output = "csv:sentence,utterance,frameEvokingElement,cause,effect"
+
 	def process(self):
 		"""
 		Post the stringified dataset to the VUB API and process the results

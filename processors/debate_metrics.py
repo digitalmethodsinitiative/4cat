@@ -31,6 +31,9 @@ class DebateMetrics(BasicProcessor):
 	extension = "csv"  # extension of result file, used internally and in UI
 	datasources = ["4chan","8chan"]
 
+	input = "csv:id,thread_id,timestamp"
+	output = "csv"
+
 
 	def process(self):
 		"""

@@ -23,6 +23,9 @@ class ThreadSplitter(BasicProcessor):
 	extension = "zip"  # extension of result file, used internally and in UI
 	datasources = ["4chan","8chan","reddit","breitbart"]
 
+	input = "csv:id,thread_id,body,subject,author,timestamp"
+	output = "zip"
+
 	def process(self):
 		"""
 		This takes a 4CAT results file as input, and outputs a new CSV file

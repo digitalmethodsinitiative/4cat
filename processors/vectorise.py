@@ -18,6 +18,9 @@ class Vectorise(BasicProcessor):
 	description = "Creates word vectors for a token set. Token lists are transformed into word => frequency counts."  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
 
+	input = "zip"
+	output = "zip"
+
 	accepts = ["tokenise-posts"]  # query types this post-processor accepts as input
 
 	def process(self):
