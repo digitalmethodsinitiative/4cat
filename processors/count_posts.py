@@ -56,7 +56,13 @@ class CountPosts(BasicProcessor):
 					if timeframe == "all":
 						date = "overall"
 					else:
-						timestamp = int(datetime.datetime.strptime(post["timestamp"], "%Y-%m-%d %H:%M:%S").timestamp())
+						try:
+							timestamp = int(datetime.datetime.strptime(post["timestamp"], "%Y-%m-%d %H:%M:%S").timestamp())
+						except ValueError:
+							self.dataset.update_status("Invalid date found in dataset; cannot count posts per interval.")
+							self.dataset.finish(0)
+							return
+
 						date = datetime.datetime.fromtimestamp(timestamp)
 						if timeframe == "year":
 							date = str(date.year)
@@ -72,7 +78,7 @@ class CountPosts(BasicProcessor):
 
 					counter += 1
 
-					if counter % 10 == 0:
+					if counter % 2500 == 0:
 						self.dataset.update_status("Counted through " + str(counter) + " posts.")
 
 			# Write to csv
