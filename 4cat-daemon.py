@@ -164,14 +164,14 @@ elif command == "status":
 	else:
 		if pid in psutil.pids():
 			print("4CAT Backend Daemon is currently up and running.")
-			
+
 			# fetch more detailed status via internal API
 			if not config.API_PORT:
 				sys.exit(0)
 
 			print("\n     Active workers:\n-------------------------")
 			active_workers = call_api("workers")["response"]
-			active_workers = {worker: active_workers[worker] for worker in sorted(active_workers, key=lambda id: active_workers[id], reverse=True)}
+			active_workers = {worker: active_workers[worker] for worker in sorted(active_workers, key=lambda id: active_workers[id], reverse=True) if active_workers[worker] > 0}
 			for worker in active_workers:
 				print("%s: %i" % (worker, active_workers[worker]))
 
