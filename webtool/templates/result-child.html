@@ -8,7 +8,7 @@
                 <span class="query-status">{% if child.is_finished() and child.num_rows > 0 %}
                     <a href="/result/{{ child.result_file }}"><i class="fas fa-download" aria-label="Download result file"></i> {{ "{:,}".format(child.num_rows) }} item{% if child.num_rows != 1 %}s{% endif %}, {{ processors[child.type].extension if child.type in processors else "download" }}</a>
             {% else %}
-                {% if child.is_finished() %}No results ({{ child.status }}){% else %}{{ child.status }}{% endif %}
+                {% if child.is_finished() %}No results. {{ child.status }}{% else %}{{ child.status }}{% endif %}
                 {% endif %}</span>
 
         {% for option in child.parameters %}
