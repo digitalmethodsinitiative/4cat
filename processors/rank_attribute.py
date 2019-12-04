@@ -182,7 +182,11 @@ class AttributeRanker(BasicProcessor):
 				rows.append(row)
 
 		# write as csv
-		self.dataset.write_csv_and_finish(rows)
+		if rows:
+			self.dataset.write_csv_and_finish(rows)
+		else:
+			self.dataset.update_status("No posts contain the requested attributes.")
+			self.dataset.finish(0)
 
 	def get_values(self, post, attribute, filter):
 		"""
