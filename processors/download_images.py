@@ -36,6 +36,9 @@ class ImageDownloader(BasicProcessor):
 	extension = "zip"  # extension of result file, used internally and in UI
 	accepts = ["top-images"]  # query types this post-processor accepts as input
 
+	input = "csv:filename,url_4cat"
+	output = "zip"
+
 	options = {
 		"amount": {
 			"type": UserInput.OPTION_TEXT,

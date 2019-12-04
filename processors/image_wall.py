@@ -36,6 +36,9 @@ class ImageWallGenerator(BasicProcessor):
 	accepts = ["top-images"]  # query types this post-processor accepts as input
 	datasources = ["4chan"]
 
+	input = "csv:filename,url_4cat"
+	output = "png"
+
 	options = {
 		"amount": {
 			"type": UserInput.OPTION_TEXT,

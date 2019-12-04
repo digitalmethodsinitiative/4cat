@@ -22,11 +22,14 @@ class ThreadMetadata(BasicProcessor):
 	to describe this post-processor with in a user interface.
 	"""
 	type = "thread-metadata"  # job type ID
-	category = "Thread metrics" # category
+	category = "Thread metrics"  # category
 	title = "Thread metadata"  # title displayed in UI
 	description = "Create an overview of the threads present in the dataset, containing thread IDs, subjects and post counts."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
-	datasources = ["4chan","8chan"]
+	datasources = ["4chan", "8chan"]
+
+	input = "csv:id,thread_id,subject,author,body"
+	output = "csv:thread_id,timestamp,timestamp_lastpost,timestamp_unix,timestamp_lastpost_unix,subject,author,op_body,country_code,num_posts,num_images,image_md5,preview_url"
 
 	def process(self):
 		"""
@@ -73,8 +76,10 @@ class ThreadMetadata(BasicProcessor):
 
 		results = [{
 			"thread_id": thread_id,
-			"timestamp": datetime.datetime.fromtimestamp(threads[thread_id]["first_post"]).strftime('%Y-%m-%d %H:%M:%S'),
-			"timestamp_lastpost": datetime.datetime.fromtimestamp(threads[thread_id]["last_post"]).strftime('%Y-%m-%d %H:%M:%S'),
+			"timestamp": datetime.datetime.fromtimestamp(threads[thread_id]["first_post"]).strftime(
+				'%Y-%m-%d %H:%M:%S'),
+			"timestamp_lastpost": datetime.datetime.fromtimestamp(threads[thread_id]["last_post"]).strftime(
+				'%Y-%m-%d %H:%M:%S'),
 			"timestamp_unix": threads[thread_id]["first_post"],
 			"timestamp_lastpost_unix": threads[thread_id]["last_post"],
 			"subject": threads[thread_id]["subject"],

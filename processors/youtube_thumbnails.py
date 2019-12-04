@@ -34,6 +34,9 @@ class YouTubeThumbnails(BasicProcessor):
 	title = "Download YouTube thumbnails"  # title displayed in UI
 	description = "Download YouTube video thumbnails."  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
+
+	input = "csv:id"
+	output = "zip"
 	
 	max_retries = 3
 	sleep_time = 10

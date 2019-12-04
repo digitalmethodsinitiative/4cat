@@ -29,6 +29,9 @@ class YouTubeImageWall(BasicProcessor):
 	title = "YouTube thumbnails image wall"  # title displayed in UI
 	description = "Make an image wall from YouTube video thumbnails."  # description displayed in UI
 	extension = "png"  # extension of result file, used internally and in UI
+
+	input = "zip"
+	output = "png"
 	
 	accepts = ["youtube-thumbnails"]
 

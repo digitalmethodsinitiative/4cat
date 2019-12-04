@@ -19,6 +19,9 @@ class QuoteRanker(BasicProcessor):
 	extension = "csv"  # extension of result file, used internally and in UI
 	datasources = ["4chan","8chan"]
 
+	input = "csv:id,body"
+	output = "csv:id,body,num_quoted"
+
 
 	def process(self):
 		"""
