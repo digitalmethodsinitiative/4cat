@@ -126,7 +126,8 @@ class MakeWordtree(BasicProcessor):
 			reader = DictReader(input)
 			for post in reader:
 				processed += 1
-				self.dataset.update_status("Processing and tokenising post %i" % processed)
+				if processed % 500 == 0:
+					self.dataset.update_status("Processing and tokenising post %i" % processed)
 				body = post["body"]
 
 				if strip_urls:

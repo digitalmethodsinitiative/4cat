@@ -27,6 +27,9 @@ class Tokenise(BasicProcessor):
 	description = "Tokenises post bodies, producing corpus data that may be used for further processing by (for example) corpus analytics software."  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
 
+	input = "csv:body"
+	output = "zip"
+
 	options = {
 		"timeframe": {
 			"type": UserInput.OPTION_CHOICE,

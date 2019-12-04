@@ -23,6 +23,9 @@ class ConvertCSVToJSON(BasicProcessor):
 			   "count-countries", "top-images", "url-extractor", "extract-usernames", "vector-ranker",
 			   "count-words", "youtube-metadata", "attribute-frequencies", "count-posts"]
 
+	input = "csv"
+	output = "json"
+
 	def process(self):
 		"""
 		This takes a CSV file as input and writes the same data as a JSON file

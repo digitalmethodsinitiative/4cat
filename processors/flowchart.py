@@ -22,6 +22,9 @@ class flowChart(BasicProcessor):
 
 	accepts = ["vector-ranker", "preset-neologisms", "tfidf", "collocations"]  # query types this post-processor accepts as input
 
+	input = "csv:text,date,value"
+	output = "html"
+
 	def process(self):
 
 		# Get json data to use in a graph
