@@ -58,6 +58,11 @@ class SVGHistogramRenderer(BasicProcessor):
 				intervals[post["date"]] = int(post["frequency"])
 				max_posts = max(max_posts, int(post["frequency"]))
 
+		if len(intervals) <= 1:
+			self.dataset.update_status("Not enough data available for a histogram; need more than one time series.")
+			self.dataset.finish(0)
+			return
+
 		self.dataset.update_status("Cleaning up data")
 		(missing, intervals) = pad_interval(intervals)
 
@@ -209,7 +214,7 @@ class SVGHistogramRenderer(BasicProcessor):
 		step = y_height / 10
 		for i in range(0, 11):
 			label = str(int((max_neat / 10) * i))
-			labelsize = (len(label) * fontsize_normal, fontsize_normal)
+			labelsize = (len(label) * fontsize_normal * 1.25, fontsize_normal)
 			label_x = origin - (tick_width * 2)
 			label_y = height - y_margin - (i * step) - (labelsize[1] / 2)
 			label_container = SVG(
