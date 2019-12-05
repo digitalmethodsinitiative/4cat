@@ -95,7 +95,13 @@ class HatebaseAnalyser(BasicProcessor):
 					if len(terms) > 0:
 						row["hatebase_offensiveness_avg"] = int(int(row["hatebase_offensiveness_avg"]) / len(terms))
 
-					writer.writerow(row)
+					try:
+						writer.writerow(row)
+					except ValueError:
+						self.dataset.update_status("Cannot write results. Your input file may contain invalid CSV data.")
+						self.dataset.finish(0)
+						return
+
 
 		self.dataset.update_status("Finished")
 		self.dataset.finish(processed)
