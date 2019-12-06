@@ -6,7 +6,7 @@ import datetime
 
 from csv import DictReader, DictWriter
 
-from backend.lib.helpers import UserInput
+from backend.lib.helpers import UserInput, pad_interval
 from backend.abstract.processor import BasicProcessor
 
 class CountPosts(BasicProcessor):
@@ -25,9 +25,15 @@ class CountPosts(BasicProcessor):
 	options = {
 		"timeframe": {
 			"type": UserInput.OPTION_CHOICE,
-			"default": "all",
+			"default": "month",
 			"options": {"all": "Overall", "year": "Year", "month": "Month", "day": "Day"},
 			"help": "Produce counts per"
+		},
+		"pad": {
+			"type": UserInput.OPTION_TOGGLE,
+			"default": True,
+			"help": "Make time series continuous - add intervals if no data is available",
+			"tooltip": "For example, if there are posts for May and July but not June, June will be included as having 0 posts."
 		}
 	}
 
@@ -41,6 +47,9 @@ class CountPosts(BasicProcessor):
 		intervals = {}
 
 		timeframe = self.parameters.get("timeframe", self.options["timeframe"]["default"])
+
+		first_interval = "9999"
+		last_interval = "0000"
 		
 		self.dataset.update_status("Processing posts")
 		with self.dataset.get_results_path().open("w") as results:
@@ -76,10 +85,18 @@ class CountPosts(BasicProcessor):
 					else:
 						intervals[date] += 1
 
+					first_interval = min(first_interval, date)
+					last_interval = max(last_interval, date)
+
 					counter += 1
 
 					if counter % 2500 == 0:
 						self.dataset.update_status("Counted through " + str(counter) + " posts.")
+
+			# pad interval if needed, this is useful if the result is to be
+			# visualised as a histogram, for example
+			if self.parameters.get("pad", self.options["pad"].get("default", True)) and timeframe != "all":
+				missing, intervals = pad_interval(intervals, first_interval, last_interval)
 
 			# Write to csv
 			csv_writer = DictWriter(results, fieldnames=("date", "item", "frequency"))
