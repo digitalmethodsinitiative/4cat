@@ -177,11 +177,13 @@ class Tokenise(BasicProcessor):
 
 				# stem, lemmatise and save tokens that are not stopwords
 				for token in tokens:
+
 					token = token.lower()
 
 					if strip_symbols:
 						token = numbers.sub("", symbol.sub("", token))
-
+					if not token: # Skip empty strings
+						continue
 					if token in word_filter:
 						continue
 					if self.parameters["stem"]:
