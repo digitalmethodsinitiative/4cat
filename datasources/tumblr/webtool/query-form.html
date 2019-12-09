@@ -1,0 +1,44 @@
+<fieldset class="basic-options">
+    <p class="form-intro">Retrieve any kind of Tumblr posts with specific tags.</p>
+
+    <div class="form-element">
+        <label for="search-scope">Search by:</label>
+        <div>
+            <select name="search_scope" id="search-scope">
+                <option value="hashtag">Tag</option>
+                <option value="blog">Blog</option>
+            </select>
+        </div>
+    </div>
+
+    <p class="form-intro">You can scrape up to <strong>five</strong> items at a time. Separate the items with commas or blank lines.
+        Including <code>#</code> in tags is optional. Note that Tumblr tags may include whitespace.</p>
+
+    <div class="form-element">
+        <label for="query-input">Items to scrape:</label>
+        <div>
+            <textarea id="query-input" name="query" placeholder="Separate with commas or new lines."></textarea>
+        </div>
+    </div>
+
+    <div class="form-element">
+        <label for="query-comments">Also scrape comments/reblogs?</label>
+        <div>
+            <input type="checkbox" name="scrape_comments" id="query-comments">
+        </div>
+    </div>
+
+</fieldset>
+<fieldset class="date-options">
+    <div class="form-element">
+        <label>Date range:</label>
+        <div class="filter-parameters">
+            Before:
+            <input name="max_date_proxy" id="input-max-time" class="input-time" type="date"
+                   placeholder="dd-mm-yyyy"> <span class="red"></span>
+
+            <input name="max_date" type="hidden" value="0">
+            The Tumblr API only allows querying <em>before</em> a certain date.
+        </div>
+    </div>
+</fieldset>
