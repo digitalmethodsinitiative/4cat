@@ -40,7 +40,8 @@ libraries = [
 		"Flask==1.1.0",
 		"nltk==3.4.5",
 		"mpld3==0.3",
-		"ijson==2.4"
+		"ijson==2.4",
+		"pytumblr==0.1.0"
 	]
 
 # Some libraries don't run on Windows
