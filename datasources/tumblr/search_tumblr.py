@@ -10,6 +10,8 @@ import re
 import time
 import pytumblr
 
+import config
+
 from backend.abstract.search import Search
 from backend.lib.exceptions import QueryParametersException
 
@@ -35,29 +37,40 @@ class SearchTumblr(Search):
 		"""
 		Fetches data from Tumblr via its API.
 		"""
-		
-
-		# this is useful to include in the results because researchers are
-		# always thirsty for them hashtags
-		hashtag = re.compile(r"#([^\s,.+=-]+)")
-		mention = re.compile(r"@([a-zA-Z0-9_]+)")
-
-		# reserve a folder for temporary downloaded data
-		# working_directory = self.dataset.get_temporary_path()
-		# working_directory.mkdir()
-		# os.chdir(working_directory)
 
 		# ready our parameters
 		parameters = self.dataset.get_parameters()
 		scope = parameters.get("search_scope", "")
-		queries = [query.strip() for query in parameters.get("query", "").split(",")]
+		queries = parameters.get("query").lstrip().rstrip().replace("#","").replace("\n", ",").replace("\r", ",").split(",")
+		print(parameters)
+		# store all info here
+		results = []
 
-		# for each query, get items
-		for query in queries:
-			results = self.get_posts_by_tag(query, before=parameters.get("before"))
+		if scope == "tag":
+			# for each tag, get post
+			for query in queries:
+				results += self.get_posts_by_tag(query, before=parameters.get("before"))
 
-		# remove temporary fetched data and return posts
-		# shutil.rmtree(working_directory)
+		elif scope == "blog":
+			# for each blog, get its posts
+			for query in queries:
+				results += self.get_posts_by_blog(query, before=parameters.get("before"))
+
+		# If we also want the posts that reblogged the fetched posts:
+		if parameters.get("fetch_reblogs"):
+
+			self.dataset.update_status("Fetching text reblogs.")
+
+			for key, value in results.items():
+				# First extract the text reblogs from the notes of each post
+				text_reblogs = self.get_text_reblogs([value["blog_name"]])
+
+				# If there's text reblogs, get the full data for these posts.
+				if text_reblogs:
+					# This has to be done one-by-one - fetching them all together is not supported by the Tumblr API.
+					for text_reblog in text_reblogs:
+						for key, value in text_reblog.items():
+							results += self.get_post_by_id(key, value)
 
 		print(results)
 		self.job.finish()
@@ -98,7 +111,7 @@ class SearchTumblr(Search):
 		while True:
 
 			# Use the pytumblr library to make the API call
-			posts = client.tagged(tag, before=before, limit=20, filter="raw")
+			posts = client.tagged(tag, before=before, limit=50, filter="raw")
 
 			# Nothing left to do?
 			if not posts:
@@ -118,6 +131,52 @@ class SearchTumblr(Search):
 			time.sleep(3)
 
 		return all_posts
+	
+	def get_text_reblogs(di_blogs_ids):
+		"""
+		Gets the reblogs with a text addition.
+		:param di_blogs_ids, dict: A dictionary with blog names as keys and post IDs as values.
+		"""
+
+		# List of dict to get reblogs. Items are: [{"blog_name": post_id}]
+		text_reblogs = []
+
+		before = None
+
+		for key, value in di_blogs_ids.items():
+			# First, get the blog names and post_ids from reblogs
+			# Keep digging till there's nothing left
+			while True:
+				notes = client.notes(key, id=value, before_timestamp=before)
+				
+
+				for note in notes["notes"]:	
+					# If it's a reblog, extract the data and save the rest of the posts for later
+					if note["type"] == "reblog":
+						if note.get("added_text"):
+							text_reblogs.append({note["blog_name"]: note["post_id"]})
+
+				if notes.get("_links"):
+					before = notes["_links"]["next"]["query_params"]["before_timestamp"]
+				# If there's no _links key, that's all.
+				else:
+					break
+
+		return text_reblogs
+
+
+	def get_post_by_id(self, blog_name, id):
+		"""
+		Fetch individual posts
+		:param blog_name, str: The blog's name
+		:param id, int: The post ID
+
+		"""
+
+		post = client.posts(key, id=value)
+		results.append([post["posts"][0]])
+
+		return results
 
 	def validate_query(query, request):
 		"""
@@ -132,27 +191,34 @@ class SearchTumblr(Search):
 		"""
 
 		# 'location' would be possible as well but apparently requires a login
-		if query.get("search_scope", "") not in ("hashtag", "blog"):
-			raise QueryParametersException("Invalid search scope: must be hashtag or blog")
+		if query.get("search_scope", "") not in ("tag", "blog"):
+			raise QueryParametersException("Invalid search scope: must be tag or blog")
 
 		# no query 4 u
 		if not query.get("query", "").strip():
 			raise QueryParametersException("You must provide a search query.")
 
+		# reformat queries to be a comma-separated list
+		items = query.get("query").lstrip().rstrip().replace("\n", ",").split(",")
+
+		# Not more than 5 plox
+		if len(items) > 5:
+			raise QueryParametersException("Only query for five or less tags or blogs.")
+
 		# 500 is mostly arbitrary - may need tweaking
-		max_posts = 2500
-		if query.get("max_posts", ""):
-			try:
-				max_posts = min(abs(int(query.get("max_posts"))), max_posts)
-			except TypeError:
-				raise QueryParametersException("Provide a valid number of posts to query.")
+		# max_posts = 2500
+		# if query.get("max_posts", ""):
+		# 	try:
+		# 		max_posts = min(abs(int(query.get("max_posts"))), max_posts)
+		# 	except TypeError:
+		# 		raise QueryParametersException("Provide a valid number of posts to query.")
 
 		# reformat queries to be a comma-separated list
-		items = query.get("query").replace("\n", ",")
+		items = query.get("query").replace("\n", ",").replace("\r", ",")
 
 		# simple!
 		return {
-			"items": max_posts,
+			#"items": max_posts,
 			"query": items,
 			"board": query.get("search_scope") + "s",  # used in web interface
 			"search_scope": query.get("search_scope"),
@@ -167,7 +233,7 @@ class SearchTumblr(Search):
 		:param posts, list: List of Tumblr posts as returned form the Tumblr API.
 
 		"""
-		print(posts)
+
 		# Store processed posts here
 		processed_posts = []
 
@@ -202,10 +268,16 @@ class SearchTumblr(Search):
 					video_url = post["video_url"]
 					video_id = None
 					video_source = "tumblr"
+			else:
+				video_source = None
+				video_id = None
+				video_url = None
 
 			# All the fields to write
 			processed_post = {
 				"type": post_type,
+				"timestamp_full": post["date"],
+				"timestamp": post["timestamp"],
 
 				# Blog columns
 				"author": post["blog_name"],
@@ -220,8 +292,6 @@ class SearchTumblr(Search):
 				"post_url": post["post_url"],
 				"post_slug": post["slug"],
 				"thread_id": post["reblog_key"],
-				"date": post["date"],
-				"timestamp": post["timestamp"],
 				"body": text,
 				"tags": post.get("tags"),
 				"notes": post["note_count"],
