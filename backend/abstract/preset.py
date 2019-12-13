@@ -43,8 +43,7 @@ class ProcessorPreset(BasicProcessor):
 		In this case, this is run immediately after the underlying analyses
 		have been queued. This overrides the default behaviour which finishes
 		the DataSet after processing; in this case, it is left 'open' until it
-		is finished by the last underlying analysis, in this case the vector
-		ranker.
+		is finished by the last underlying analysis.
 		"""
 		self.dataset.update_status("Awaiting completion of underlying analyses...")
 		self.job.finish()
