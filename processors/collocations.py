@@ -66,7 +66,6 @@ class GetCollocations(BasicProcessor):
 		Unzips token sets, vectorises them and zips them again.
 		"""
 
-
 		# Validate and process user inputs
 		try:
 			n_size = int(self.parameters.get("n_size", 2))
@@ -122,13 +121,13 @@ class GetCollocations(BasicProcessor):
 				# Get the collocations. Returns a tuple.
 				self.dataset.update_status("Generating collocations for " + date_string)
 				collocations = self.get_collocations(tokens, window_size, n_size, query_string=query_string, max_output=max_output, forbidden_words=forbidden_words)
-
+				print(collocations)
 				# Loop through the results and store them in the results list
 				for tpl in collocations:
 					result = {}
-					result['text'] = ' '.join(tpl[0])
-					result['value'] = tpl[1]
-					result['date'] = date_string
+					result["item"] = " ".join(tpl[0])
+					result["value"] = tpl[1]
+					result["date"] = date_string
 					results.append(result)
 
 		if not results:
@@ -151,6 +150,8 @@ class GetCollocations(BasicProcessor):
 		:return: list of tuples with collocations 
 		
 		"""
+
+		print(tokens[:50])
 
 		# Two-word collocations (~ bigrams)
 		if n_size == 2:

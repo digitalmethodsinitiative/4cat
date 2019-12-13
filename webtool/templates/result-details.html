@@ -63,9 +63,9 @@
 {% if dataset.num_rows > 0 and dataset.processors|length > 0 and current_user.is_authenticated %}
 <article class="analysis-overview">
     <section>
-        <h3 class="blocktitle section-header"><span>Analyses</span></h3>
+        <h3 class="blocktitle section-header"><span>Analysis modules</span></h3>
         {% set part = "main" %}
-        <p>Start your analysis of the retrieved data by choosing one of the post-processors below.
+        <p>Start your analysis of the retrieved data by choosing one of the analysis modules below.
             Note that some may take a while to complete, so carefully consider which one you want to run
             before queueing it.</p>
         <p><a href="#">Documentation</a> about the various modes of analysis and what to take into

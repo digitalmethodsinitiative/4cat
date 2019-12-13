@@ -1,0 +1,47 @@
+<fieldset class="basic-options">
+    <p class="form-intro">Retrieve any kind of Tumblr posts with specific tags or from specific blogs.</p>
+
+    <div class="form-element">
+        <label for="search-scope">Search by:</label>
+        <div>
+            <select name="search_scope" id="search-scope">
+                <option value="tag">Tag</option>
+                <option value="blog">Blog</option>
+            </select>
+        </div>
+    </div>
+
+    <p class="form-intro">Insert tags or names of blogs separated with commas or blank lines. You may insert up to five tags or blogs.</p>
+    <p class="form-intro">Note: Tumblr tags may include whitespace. You don't have to put a <code>#</code> before the tag.</p>
+    <p class="form-intro">Tag search only get posts explicitly associated with the exact tag you insert here. Querying <code>gogh</code> will thus not get posts only tagged with <code>van gogh</code>. Keyword search is unfortunately not allowed by the <a href="https://api.tumblr.com" target="_blank">Tumblr API</a>.</p>
+        
+    <div class="form-element">
+        <label for="query-input">Items to scrape:</label>
+        <div>
+            <textarea id="query-input" name="query" placeholder="Separate queries with commas or new lines."></textarea>
+        </div>
+    </div>
+
+    <div class="form-element">
+        <label for="query-reblogs">Also fetch reblogs with text?</label>
+        <div>
+            <input type="checkbox" name="fetch_reblogs" id="query-reblogs">
+        </div>
+    </div>
+
+</fieldset>
+<fieldset class="date-options">
+    <div class="form-element">
+        <label>Date range:</label>
+        <div class="filter-parameters">
+            Before:
+            <input name="max_date_proxy" id="input-max-time" class="input-time" type="date"
+                   placeholder="dd-mm-yyyy"> <span class="red"></span>
+
+            <input name="max_date" type="hidden" value="0">
+            The <a href="https://api.tumblr.com" target="_blank">Tumblr API</a> only allows querying <em>before</em> a certain date.
+        </div>
+    </div>
+</fieldset>
+
+<p class="form-intro">If 4CAT reached its Tumblr API rate limit, try again 24 hours later.</p>

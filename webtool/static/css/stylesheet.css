@@ -144,6 +144,7 @@ p.form-notice {
     display: flex;
     align-items: center;
     min-height: 3.5em;
+    margin: 0 1em 0.5em 1em;
 }
 
 .optional-form-element {
