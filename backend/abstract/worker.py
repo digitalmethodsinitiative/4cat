@@ -30,9 +30,10 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
 	log = None
 	manager = None
 	looping = True
+	modules = None
 	loop_time = 0
 
-	def __init__(self, logger, job, db=None, queue=None, manager=None):
+	def __init__(self, logger, job, db=None, queue=None, manager=None, modules=None):
 		"""
 		Basic init, just make sure our thread name is meaningful
 
@@ -47,6 +48,11 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
 		self.job = job
 		self.loop_time = int(time.time())
 
+		# all_modules cannot be easily imported into a worker because all_modules itself
+		# imports all workers, so you get a recursive import that Python (rightly) blocks
+		# so for workers, all_modules' content is passed as a constructor argument
+		self.all_modules = modules
+
 		self.db = Database(logger=self.log, appname=self.type) if not db else db
 		self.queue = JobQueue(logger=self.log, database=self.db) if not queue else queue
 
@@ -54,7 +60,7 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
 		"""
 		Loop the worker
 
-		This simply calls the work method continually, with a pause in-between calls.
+		This simply calls the work method
 		"""
 		try:
 			self.work()

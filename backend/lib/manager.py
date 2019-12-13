@@ -4,11 +4,7 @@ The heart of the app - manages jobs and workers
 import signal
 import time
 
-from pathlib import Path
-
-import config
-import backend
-
+from backend import all_modules
 from backend.lib.keyboard import KeyPoller
 from backend.lib.exceptions import JobClaimedException
 
@@ -52,8 +48,7 @@ class WorkerManager:
 
 		# queue corpus stats and snapshot generators for a daily run
 		self.queue.add_job("corpus-stats", remote_id="localhost", interval=86400)
-		if config.PATH_SNAPSHOTDATA and Path(config.PATH_SNAPSHOTDATA).exists():
-			self.queue.add_job("schedule-snapshot", remote_id="localhost", interval=86400)
+		self.queue.add_job("expire-datasets", remote_id="localhost", interval=300)
 
 		# it's time
 		self.loop()
@@ -84,8 +79,8 @@ class WorkerManager:
 		for job in jobs:
 			jobtype = job.data["jobtype"]
 
-			if jobtype in backend.all_modules.workers:
-				worker_info = backend.all_modules.workers[jobtype]
+			if jobtype in all_modules.workers:
+				worker_info = all_modules.workers[jobtype]
 				if jobtype not in self.worker_pool:
 					self.worker_pool[jobtype] = []
 
@@ -95,7 +90,7 @@ class WorkerManager:
 					try:
 						self.log.debug("Starting new worker for job %s" % jobtype)
 						job.claim()
-						worker = worker_info["class"](logger=self.log, manager=self, job=job)
+						worker = worker_info["class"](logger=self.log, manager=self, job=job, modules=all_modules)
 						worker.start()
 						self.worker_pool[jobtype].append(worker)
 					except JobClaimedException:
@@ -139,8 +134,8 @@ class WorkerManager:
 		Logs warnings if not all information is precent for the configured data
 		sources.
 		"""
-		for datasource in backend.all_modules.datasources:
-			if datasource + "-search" not in backend.all_modules.workers:
+		for datasource in all_modules.datasources:
+			if datasource + "-search" not in all_modules.workers:
 				self.log.error("No search worker defined for datasource %s. Search queries will not be executed." % datasource)
 
 	def abort(self, signal=None, stack=None):

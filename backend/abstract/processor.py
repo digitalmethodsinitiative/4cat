@@ -30,12 +30,6 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 	options = {}
 	parameters = {}
 
-	def __init__(self, db=None, logger=None, manager=None, job=job):
-		"""
-		Set up database connection - we need one to store the thread data
-		"""
-		super().__init__(db=db, logger=logger, manager=manager, job=job)
-
 	def work(self):
 		"""
 		Scrape a URL
