@@ -322,13 +322,20 @@ def show_result(key):
 	is_favourite = (db.fetchone("SELECT COUNT(*) AS num FROM users_favourites WHERE name = %s AND key = %s",
 								(current_user.get_id(), dataset.key))["num"] > 0)
 
+	# if the datasource is configured for it, this dataset may be deleted at some point
+	datasource = dataset.parameters.get("datasource", "")
+	if datasource in backend.all_modules.datasources and backend.all_modules.datasources[datasource].get("expire-datasets", None):
+		timestamp_expires = dataset.timestamp + int(backend.all_modules.datasources[datasource].get("expire-datasets"))
+	else:
+		timestamp_expires = None
+
 	# we can either show this view as a separate page or as a bunch of html
 	# to be retrieved via XHR
 	standalone = "processors" not in request.url
 	template = "result.html" if standalone else "result-details.html"
 	return render_template(template, preview=preview, dataset=dataset, processors=backend.all_modules.processors,
 						   is_processor_running=is_processor_running, messages=get_flashed_messages(),
-						   is_favourite=is_favourite)
+						   is_favourite=is_favourite, timestamp_expires=timestamp_expires)
 
 
 @app.route("/preview-csv/<string:key>/")
