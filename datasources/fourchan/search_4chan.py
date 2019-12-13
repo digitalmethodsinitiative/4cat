@@ -46,11 +46,11 @@ class Search4Chan(Search):
 		:return:
 		"""
 		where = []
-		replacements = []
+		replacements = [query.get("board", "")]
 
 		if query.get("min_date", 0):
 			try:
-				where.append("p.timestamp >= %i")
+				where.append("p.timestamp >= %s")
 				replacements.append(int(query.get("min_date")))
 			except ValueError:
 				pass
@@ -58,7 +58,7 @@ class Search4Chan(Search):
 		if query.get("max_date", 0):
 			try:
 				replacements.append(int(query.get("max_date")))
-				where.append("p.timestamp < %i")
+				where.append("p.timestamp < %s")
 			except ValueError:
 				pass
 
@@ -86,7 +86,7 @@ class Search4Chan(Search):
 		else:
 			sql_query += " ORDER BY p.timestamp ASC"
 
-		return self.db.query(sql_query, replacements)
+		return self.db.fetchall(sql_query, replacements)
 
 	def get_posts_complex(self, query):
 		"""
