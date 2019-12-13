@@ -812,6 +812,16 @@ ol.result-list li.has_results .property-container.analysis a {
 }
 
 /** result card **/
+.metadata-wrapper div.notice {
+    color: var(--warning);
+    text-align: center;
+    padding: 0.5em;
+}
+
+.metadata-wrapper div.fullwidth.notice {
+    display: block;
+}
+
 .metadata-wrapper {
     display: grid;
     grid-template-columns: 50% 50%;
