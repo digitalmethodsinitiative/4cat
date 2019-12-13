@@ -23,11 +23,11 @@ class BasicHTTPScraper(BasicWorker, metaclass=abc.ABCMeta):
 	"""
 	db = None
 
-	def __init__(self, job, db=None, logger=None, manager=None):
+	def __init__(self, job, db=None, logger=None, manager=None, modules=None):
 		"""
 		Set up database connection - we need one to store the thread data
 		"""
-		super().__init__(db=db, logger=logger, manager=manager, job=job)
+		super().__init__(db=db, logger=logger, manager=manager, job=job, modules=modules)
 		self.prefix = self.type.split("-")[0]
 
 	def work(self):
