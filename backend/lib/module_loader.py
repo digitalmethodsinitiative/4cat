@@ -156,8 +156,11 @@ class ModuleCollector:
 		datasource.
 		"""
 		for subdirectory in Path(config.PATH_ROOT, "datasources").iterdir():
+			# folder name, also the name used in config.py
+			folder_name = subdirectory.parts[-1]
+
 			# determine module name
-			module_name = "datasources." + subdirectory.parts[-1]
+			module_name = "datasources." + folder_name
 			try:
 				datasource = importlib.import_module(module_name)
 			except ImportError:
@@ -167,7 +170,13 @@ class ModuleCollector:
 				continue
 
 			datasource_id = datasource.DATASOURCE
+
+			if datasource_id not in config.DATASOURCES:
+				# not configured, so we're going to just ignore it
+				continue
+
 			self.datasources[datasource_id] = {
+				"expire-datasets": config.DATASOURCES[datasource_id].get("expire-datasets", None),
 				"path": subdirectory,
 				"name": datasource.NAME if hasattr(datasource, "NAME") else datasource_id,
 				"id": subdirectory.parts[-1]
