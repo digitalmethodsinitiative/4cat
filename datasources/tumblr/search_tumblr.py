@@ -41,8 +41,8 @@ class SearchTumblr(Search):
 		# ready our parameters
 		parameters = self.dataset.get_parameters()
 		scope = parameters.get("search_scope", "")
-		queries = parameters.get("query").lstrip().rstrip().replace("#","").replace("\n", ",").replace("\r", ",").split(",")
-		print(parameters)
+		queries = parameters.get("query")
+
 		# store all info here
 		results = []
 
@@ -58,21 +58,27 @@ class SearchTumblr(Search):
 
 		# If we also want the posts that reblogged the fetched posts:
 		if parameters.get("fetch_reblogs"):
+			self.dataset.update_status("Getting notes from all posts")
 
-			self.dataset.update_status("Fetching text reblogs.")
+			posts_to_fetch = {result["author"]: result["id"] for result in results}
+			print(posts_to_fetch)
 
-			for key, value in results.items():
-				# First extract the text reblogs from the notes of each post
-				text_reblogs = self.get_text_reblogs([value["blog_name"]])
+			# First extract the notes of each post, and only keep text reblogs
+			text_reblogs = self.get_post_notes(posts_to_fetch)
 
-				# If there's text reblogs, get the full data for these posts.
-				if text_reblogs:
-					# This has to be done one-by-one - fetching them all together is not supported by the Tumblr API.
-					for text_reblog in text_reblogs:
-						for key, value in text_reblog.items():
-							results += self.get_post_by_id(key, value)
-
+			# Get the full data for text reblogs.
+			if text_reblogs:
+				self.dataset.update_status("Fetching text reblogs")
+				
+				# This has to be done one-by-one - fetching them all together is not supported by the Tumblr API.
+				for text_reblog in text_reblogs:
+					for key, value in text_reblog.items():
+						reblog_post = self.get_post_by_id(key, value)
+						reblog_post = self.parse_tumblr_posts([reblog_post], reblog=True)
+						print(type(reblog_post))
+						results.append(reblog_post[0])
 		print(results)
+
 		self.job.finish()
 		return results
 
@@ -81,25 +87,12 @@ class SearchTumblr(Search):
 		Get Tumblr posts posts with a certain tag
 		:param tag, str: the tag you want to look for
 		:param after: a unix timestamp, indicates posts should be after this date.
-	    :param before: a unix timestamp, , indicates posts should be before this date.
+	    :param before: a unix timestamp, indicates posts should be before this date.
 
 	    :returns: a dict created from the JSON response
 		"""
 
-		# Connect to the Tumblr API
-		client = pytumblr.TumblrRestClient(
-			config.TUMBLR_CONSUMER_KEY,
-			config.TUMBLR_CONSUMER_SECRET_KEY,
-			config.TUMBLR_API_KEY,
-			config.TUMBLR_API_SECRET_KEY
-		)
-		client_info = client.info()
-
-		# Check if there's any errors
-		if client_info.get("meta"):
-			if client_info["meta"].get("status") == 429:
-				self.log.info("Tumblr API timed out during query %s" % self.dataset.key)
-				self.dataset.update_status("Tumblr API timed out during query '%s'" % query)
+		client = self.connect_to_tumblr()
 
 		if not before:
 			before = int(time.time())
@@ -115,28 +108,29 @@ class SearchTumblr(Search):
 
 			# Nothing left to do?
 			if not posts:
-				print("No posts with tag left.")
 				break
 
 			else: # Append posts to main list
 				posts = self.parse_tumblr_posts(posts)
-				for one_post in posts:
-					all_posts.append(one_post)
+				all_posts += posts
 
 			before = posts[len(posts) - 1]["timestamp"]
 			
-			self.dataset.update_status("Collected %s posts" % str(len(posts)))
+			self.dataset.update_status("Collected %s posts" % str(len(all_posts)))
 
 			# Wait a bit to stay friends with the bouncer
-			time.sleep(3)
+			#time.sleep(3)
 
 		return all_posts
 	
-	def get_text_reblogs(di_blogs_ids):
+	def get_post_notes(self, di_blogs_ids, only_text_reblogs=True):
 		"""
-		Gets the reblogs with a text addition.
+		Gets the post notes.
 		:param di_blogs_ids, dict: A dictionary with blog names as keys and post IDs as values.
+		:param only_text_reblogs, bool: Whether to only keep notes that are text reblogs.
 		"""
+
+		client = self.connect_to_tumblr()
 
 		# List of dict to get reblogs. Items are: [{"blog_name": post_id}]
 		text_reblogs = []
@@ -147,36 +141,65 @@ class SearchTumblr(Search):
 			# First, get the blog names and post_ids from reblogs
 			# Keep digging till there's nothing left
 			while True:
+
+				# Requests a post's notes
 				notes = client.notes(key, id=value, before_timestamp=before)
-				
+				print(notes)
+				if only_text_reblogs:
 
-				for note in notes["notes"]:	
-					# If it's a reblog, extract the data and save the rest of the posts for later
-					if note["type"] == "reblog":
-						if note.get("added_text"):
-							text_reblogs.append({note["blog_name"]: note["post_id"]})
+					for note in notes["notes"]:	
+						# If it's a reblog, extract the data and save the rest of the posts for later
+						if note["type"] == "reblog":
+							if note.get("added_text"):
+								text_reblogs.append({note["blog_name"]: note["post_id"]})
 
-				if notes.get("_links"):
-					before = notes["_links"]["next"]["query_params"]["before_timestamp"]
-				# If there's no _links key, that's all.
-				else:
-					break
+					if notes.get("_links"):
+						before = notes["_links"]["next"]["query_params"]["before_timestamp"]
+					# If there's no `_links` key, that's all.
+					else:
+						break
 
 		return text_reblogs
 
-
-	def get_post_by_id(self, blog_name, id):
+	def get_post_by_id(self, blog_name, post_id):
 		"""
 		Fetch individual posts
 		:param blog_name, str: The blog's name
 		:param id, int: The post ID
-
+		
+		returns result list, a list with a dictionary with the post's information
 		"""
+		client = self.connect_to_tumblr()
+		
+		# Request the specific post.
+		post = client.posts(blog_name, id=post_id)
+	
+		# Get the first element of the list - it's always one post.
+		result = post["posts"][0]
 
-		post = client.posts(key, id=value)
-		results.append([post["posts"][0]])
+		return result
 
-		return results
+	def connect_to_tumblr(self):
+		"""
+		Returns a connection to the Tumblr API using the pytumblr library.
+		
+		"""
+		client = pytumblr.TumblrRestClient(
+			config.TUMBLR_CONSUMER_KEY,
+			config.TUMBLR_CONSUMER_SECRET_KEY,
+			config.TUMBLR_API_KEY,
+			config.TUMBLR_API_SECRET_KEY
+		)
+		client_info = client.info()
+
+		# Check if there's any errors
+		if client_info.get("meta"):
+			if client_info["meta"].get("status") == 429:
+				self.log.info("Tumblr API timed out during query %s" % self.dataset.key)
+				self.dataset.update_status("Tumblr API timed out during query '%s', try again in 24 hours." % query)
+				raise ConnectionRefusedError("Tumblr API timed out during query %s" % self.dataset.key)
+
+		return client
 
 	def validate_query(query, request):
 		"""
@@ -199,39 +222,31 @@ class SearchTumblr(Search):
 			raise QueryParametersException("You must provide a search query.")
 
 		# reformat queries to be a comma-separated list
-		items = query.get("query").lstrip().rstrip().replace("\n", ",").split(",")
+		items = query.get("query").replace("\n", ",").replace("#","").replace("\r", ",")
+		items = items.split(",")
+		items = [item.lstrip().rstrip() for item in items]
 
 		# Not more than 5 plox
 		if len(items) > 5:
 			raise QueryParametersException("Only query for five or less tags or blogs.")
 
-		# 500 is mostly arbitrary - may need tweaking
-		# max_posts = 2500
-		# if query.get("max_posts", ""):
-		# 	try:
-		# 		max_posts = min(abs(int(query.get("max_posts"))), max_posts)
-		# 	except TypeError:
-		# 		raise QueryParametersException("Provide a valid number of posts to query.")
-
-		# reformat queries to be a comma-separated list
-		items = query.get("query").replace("\n", ",").replace("\r", ",")
-
 		# simple!
 		return {
-			#"items": max_posts,
 			"query": items,
 			"board": query.get("search_scope") + "s",  # used in web interface
 			"search_scope": query.get("search_scope"),
-			"scrape_comments": bool(query.get("scrape_comments", False))
+			"fetch_reblogs": bool(query.get("fetch_reblogs", False))
 		}
 
-	def parse_tumblr_posts(self, posts):
+	def parse_tumblr_posts(self, posts, reblog=False):
 		"""
 		Function to parse Tumblr posts into the same dict items.
 		Tumblr posts can be many different types, so some data processing is necessary.
 
 		:param posts, list: List of Tumblr posts as returned form the Tumblr API.
+		:param reblog, bool: Whether the post concerns a reblog of posts from the original dataset.
 
+		returns list processed_posts, a list with dictionary items of post info.
 		"""
 
 		# Store processed posts here
@@ -275,9 +290,11 @@ class SearchTumblr(Search):
 
 			# All the fields to write
 			processed_post = {
+				# General columns
 				"type": post_type,
 				"timestamp_full": post["date"],
 				"timestamp": post["timestamp"],
+				"is_reblog": reblog,
 
 				# Blog columns
 				"author": post["blog_name"],
