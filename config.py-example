@@ -74,6 +74,12 @@ YOUTUBE_API_SERVICE_NAME = "youtube"
 YOUTUBE_API_VERSION = "v3"
 YOUTUBE_DEVELOPER_KEY = ""
 
+# Tumblr API keys to use for data capturing
+TUMBLR_CONSUMER_KEY = ""
+TUMBLR_CONSUMER_SECRET_KEY = ""
+TUMBLR_API_KEY = ""
+TUMBLR_API_SECRET_KEY = ""
+
 # Web tool settings
 class FlaskConfig:
 	FLASK_APP = 'webtool/fourcat'
