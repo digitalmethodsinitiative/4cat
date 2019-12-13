@@ -18,6 +18,11 @@
         {% endif %}
 
         <dl class="metadata-wrapper">
+        {% if timestamp_expires %}
+            <div class="fullwidth notice">
+                <strong>Note:</strong> this dataset will no longer be available after {{ timestamp_expires|datetime("%d %b %Y, %H:%M") }} per the data source's configuration.
+            </div>
+        {% endif %}
             <div>
                 <dt>Data source</dt>
                 <dd><span class="property-badge">{{ dataset.parameters.datasource if "datasource" in dataset.parameters else "4chan" }}{% if "board" in dataset.parameters and dataset.parameters.board %}/{{ dataset.parameters.board }}/{% endif %}</span></dd>
