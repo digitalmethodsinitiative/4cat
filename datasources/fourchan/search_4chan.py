@@ -70,12 +70,14 @@ class Search4Chan(Search):
 				where.append("p.country_code = %s")
 				replacements.append(query.get("country_code"))
 
-		sql_query = ("SELECT p.*, t.board" \
-					 "FROM posts_" + self.prefix + " AS p," \
-												   "LEFT JOIN threads_" + self.prefix + " AS t" \
-																						"ON t.id = p.thread_id" \
-																						"WHERE t.board = %s" \
-																						"AND" + " AND ".join(where))
+		sql_query = ("SELECT p.*, t.board " \
+					 "FROM posts_" + self.prefix + " AS p " \
+					 "LEFT JOIN threads_" + self.prefix + " AS t " \
+					 "ON t.id = p.thread_id " \
+					 "WHERE t.board = %s ")
+
+		if where:
+			sql_query += " AND " + " AND ".join(where)
 
 		if query.get("search_scope", None) == "random-sample":
 			try:
