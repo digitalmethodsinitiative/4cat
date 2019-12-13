@@ -77,7 +77,7 @@ class SearchTumblr(Search):
 						reblog_post = self.parse_tumblr_posts([reblog_post], reblog=True)
 						print(type(reblog_post))
 						results.append(reblog_post[0])
-		print(results)
+		#print(results)
 
 		self.job.finish()
 		return results
@@ -100,22 +100,34 @@ class SearchTumblr(Search):
 		# Store all posts in here
 		all_posts = []
 
+		# Some retries to make sure the Tumblr API actually returns everything
+		retries = 0
+		max_retries = 20
+
 		# Get Tumblr posts until there's no more left.
 		while True:
 
-			# Use the pytumblr library to make the API call
-			posts = client.tagged(tag, before=before, limit=50, filter="raw")
-
-			# Nothing left to do?
-			if not posts:
+			# Stop after 20 retries
+			if retries >= max_retries:
+				self.dataset.update_status("No more posts")
 				break
 
+			# Use the pytumblr library to make the API call
+			posts = client.tagged(tag, before=before, limit=50, filter="raw")
+			
+			# Make sure the Tumblr API doesn't magically stop at an earlier date
+			if not posts:
+				self.dataset.update_status("No posts with tag left, trying again with timestamp %s" % str(before))
+				before -= 43200 # Decrease by half a day
+				retries += 1
+				continue
+			
 			else: # Append posts to main list
 				posts = self.parse_tumblr_posts(posts)
 				all_posts += posts
+				retries = 0
+				before = posts[len(posts) - 1]["timestamp"]
 
-			before = posts[len(posts) - 1]["timestamp"]
-			
 			self.dataset.update_status("Collected %s posts" % str(len(all_posts)))
 
 			# Wait a bit to stay friends with the bouncer
@@ -267,9 +279,12 @@ class SearchTumblr(Search):
 				text = post["body"]
 			elif post_type == "answer":
 				text = post["question"] + "\n" + post["answer"]
+			else:
+				text = ""
 
 			# Different options for video types (YouTube- or Tumblr-hosted)
 			if post_type == "video":
+				video_source = "unknown"
 				if post["video_type"] == "youtube":
 					# Use `get` since some videos are deleted
 					video_url = post.get("permalink_url")
