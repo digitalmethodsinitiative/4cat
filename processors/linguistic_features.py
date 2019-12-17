@@ -18,7 +18,7 @@ from backend.lib.helpers import UserInput, convert_to_int
 from backend.abstract.processor import BasicProcessor
 
 __author__ = "Sal Hagen"
-__credits__ = ["Sal Hagen", "Stijn Peeters", "SpaCy"]
+__credits__ = ["Sal Hagen", "Stijn Peeters"]
 __maintainer__ = "Sal Hagen"
 __email__ = "4cat@oilab.eu"
 

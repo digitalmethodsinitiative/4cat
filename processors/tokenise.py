@@ -17,6 +17,11 @@ from backend.abstract.processor import BasicProcessor
 
 import config
 
+__author__ = ["Stijn Peeters", "Sal Hagen"]
+__credits__ = ["Stijn Peeters", "Sal Hagen"]
+__maintainer__ = ["Stijn Peeters", "Sal Hagen"]
+__email__ = "4cat@oilab.eu"
+
 class Tokenise(BasicProcessor):
 	"""
 	Tokenize posts

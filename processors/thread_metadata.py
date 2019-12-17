@@ -10,6 +10,10 @@ from backend.abstract.processor import BasicProcessor
 
 import config
 
+__author__ = "Sal Hagen"
+__credits__ = ["Sal Hagen"]
+__maintainer__ = "Sal Hagen"
+__email__ = "4cat@oilab.eu"
 
 class ThreadMetadata(BasicProcessor):
 	"""

@@ -22,6 +22,10 @@ import config
 from backend.lib.helpers import UserInput
 from backend.abstract.processor import BasicProcessor
 
+__author__ = "Stijn Peeters, Sal Hagen"
+__credits__ = ["Stijn Peeters, Sal Hagen"]
+__maintainer__ = "Stijn Peeters, Sal Hagen"
+__email__ = "4cat@oilab.eu"
 
 class ImageDownloader(BasicProcessor):
 	"""

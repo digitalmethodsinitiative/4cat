@@ -7,6 +7,10 @@ import re
 from backend.abstract.processor import BasicProcessor
 from backend.lib.helpers import UserInput
 
+__author__ = "Stijn Peeters"
+__credits__ = ["Stijn Peeters"]
+__maintainer__ = "Stijn Peeters"
+__email__ = "4cat@oilab.eu"
 
 class URLCoLinker(BasicProcessor):
 	"""
