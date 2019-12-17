@@ -15,6 +15,10 @@ from PIL import Image, ImageFile, ImageOps, ImageDraw, ImageFont
 from backend.abstract.processor import BasicProcessor
 from backend.lib.helpers import UserInput, convert_to_int
 
+__author__ = "Sal Hagen"
+__credits__ = ["Sal Hagen", "Partha Das"]
+__maintainer__ = "Sal Hagen"
+__email__ = "4cat@oilab.eu"
 
 class YouTubeImageWall(BasicProcessor):
 	"""

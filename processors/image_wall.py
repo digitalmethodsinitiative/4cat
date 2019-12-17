@@ -22,6 +22,11 @@ from backend.lib.helpers import UserInput
 from backend.abstract.processor import BasicProcessor
 
 
+__author__ = "Sal Hagen, Stijn Peeters"
+__credits__ = ["Sal Hagen, Stijn Peeters"]
+__maintainer__ = "Sal Hagen, Stijn Peeters"
+__email__ = "4cat@oilab.eu"
+
 class ImageWallGenerator(BasicProcessor):
 	"""
 	Image wall generator

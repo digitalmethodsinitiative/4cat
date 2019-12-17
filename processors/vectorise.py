@@ -7,6 +7,10 @@ import shutil
 
 from backend.abstract.processor import BasicProcessor
 
+__author__ = "Stijn Peeters"
+__credits__ = ["Stijn Peeters"]
+__maintainer__ = "Stijn Peeters"
+__email__ = "4cat@oilab.eu"
 
 class Vectorise(BasicProcessor):
 	"""

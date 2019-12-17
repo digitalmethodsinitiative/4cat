@@ -16,6 +16,10 @@ from svgwrite.text import Text
 
 from anytree import Node
 
+__author__ = "Stijn Peeters"
+__credits__ = ["Stijn Peeters", "Martin Wattenberg", "Fernanda Viégas"]
+__maintainer__ = "Stijn Peeters"
+__email__ = "4cat@oilab.eu"
 
 class MakeWordtree(BasicProcessor):
 	"""
