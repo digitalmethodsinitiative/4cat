@@ -12,6 +12,11 @@ DATASOURCES = {
 		"interval": 60,
 		"boards": ["europe", "politics"],
 		"boards_snapshots": []
+	},
+	"tumblr": {
+		"interval": 60,
+		"boards_snapshots": [],
+		"expire-datasets": 255600 # Three days - required by the Tumblr API
 	}
 }
 
