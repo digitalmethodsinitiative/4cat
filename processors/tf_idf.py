@@ -13,6 +13,10 @@ from backend.abstract.processor import BasicProcessor
 
 from sklearn.feature_extraction.text import TfidfVectorizer
 
+__author__ = "Sal Hagen"
+__credits__ = ["Sal Hagen"]
+__maintainer__ = "Sal Hagen"
+__email__ = "4cat@oilab.eu"
 
 class tfIdf(BasicProcessor):
 	"""

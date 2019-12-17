@@ -7,6 +7,10 @@ from csv import DictReader
 from backend.abstract.processor import BasicProcessor
 from backend.lib.helpers import UserInput, convert_to_int
 
+__author__ = "Stijn Peeters"
+__credits__ = ["Stijn Peeters", "hatebase.org"]
+__maintainer__ = "Stijn Peeters"
+__email__ = "4cat@oilab.eu"
 
 class HatebaseRanker(BasicProcessor):
 	"""

@@ -7,6 +7,10 @@ from nltk.tokenize import sent_tokenize, word_tokenize
 from backend.lib.helpers import UserInput
 from backend.abstract.processor import BasicProcessor
 
+__author__ = "Stijn Peeters"
+__credits__ = ["Stijn Peeters"]
+__maintainer__ = "Stijn Peeters"
+__email__ = "4cat@oilab.eu"
 
 class SplitSentences(BasicProcessor):
 	"""

@@ -13,6 +13,10 @@ from svgwrite.path import Path
 from svgwrite.text import Text
 from svgwrite.gradients import LinearGradient
 
+__author__ = ["Stijn Peeters","Sal Hagen"]
+__credits__ = ["Stijn Peeters","Sal Hagen","Bernhard Rieder"]
+__maintainer__ = ["Stijn Peeters, Sal Hagen"]
+__email__ = "4cat@oilab.eu"
 
 class RankFlowRenderer(BasicProcessor):
 	"""
