@@ -7,14 +7,14 @@ import zipfile
 import pickle
 import shutil
 import csv
+import re
 
 import spacy
-import re
 import en_core_web_sm
 from spacy.tokenizer import Tokenizer
 from spacy.util import compile_prefix_regex, compile_infix_regex, compile_suffix_regex
 
-from backend.lib.helpers import UserInput, convert_to_int
+from backend.lib.helpers import UserInput
 from backend.abstract.processor import BasicProcessor
 
 __author__ = "Sal Hagen"
@@ -36,14 +36,6 @@ class LinguisticFeatures(BasicProcessor):
 	output = "zip"
 
 	options = {
-		# "language-model": {
-		# 	"type": UserInput.OPTION_CHOICE,
-		# 	"default": ["en_core_web_sm"],
-		# 	"options": {
-		# 		"en_core_web_sm": "English (en_core_web_sm)"
-		# 	},
-		# 	"help": "Lanuage model to use. See https://spacy.io/usage/models"
-		# },
 		"enable": {
 			"type": UserInput.OPTION_MULTI,
 			"default": [],
@@ -52,7 +44,7 @@ class LinguisticFeatures(BasicProcessor):
 				"parser": "Dependency parsing: Extract how words in a sentence relate to each other",
 				"ner": "Named entity recognition: Labels what kind of objects are in a sentence (e.g. Apple -> Organisation)"
 			},
-			"help": "What lignuistic features to extract. See https://spacy.io/usage/linguistic-features"
+			"help": "What linguistic features to extract. See https://spacy.io/usage/linguistic-features"
 		}
 	}
 
@@ -86,15 +78,15 @@ class LinguisticFeatures(BasicProcessor):
 			
 			# Process the text in batches
 			if len(posts) < 10000:
-				self.dataset.update_status("Tagging, parsing, and getting named entities")
+				self.dataset.update_status("Extracting linguistic features")
 			else:
-				self.dataset.update_status("Tagging, parsing, and getting named entities. This will take a while")
+				self.dataset.update_status("Extracting linguistic features. This will take a while")
 
 			# Start the processing!
 			docs = nlp.pipe(posts, disable=disable)
 
 			# Then serialize the NLP docs and the vocab
-			self.dataset.update_status("Serializing results")
+			self.dataset.update_status("Serializing results - this might take a while")
 			doc_bytes = [doc.to_bytes() for doc in docs]
 			vocab_bytes = nlp.vocab.to_bytes()
 

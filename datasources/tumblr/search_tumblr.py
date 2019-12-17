@@ -66,8 +66,7 @@ class SearchTumblr(Search):
 
 			# Prepare dicts to pass to `get_post_notes`
 			posts_to_fetch = {result["author"]: result["id"] for result in results}
-			print(posts_to_fetch)
-
+			
 			# First extract the notes of each post, and only keep text reblogs
 			text_reblogs = self.get_post_notes(posts_to_fetch)
 
@@ -80,10 +79,9 @@ class SearchTumblr(Search):
 					for key, value in text_reblog.items():
 						reblog_post = self.get_post_by_id(key, value)
 						reblog_post = self.parse_tumblr_posts([reblog_post], reblog=True)
-						print(type(reblog_post))
+						
 						results.append(reblog_post[0])
-		#print(results)
-
+		
 		self.job.finish()
 		return results
 
@@ -161,7 +159,7 @@ class SearchTumblr(Search):
 
 				# Requests a post's notes
 				notes = client.notes(key, id=value, before_timestamp=before)
-				print(notes)
+				
 				if only_text_reblogs:
 
 					for note in notes["notes"]:	
@@ -301,7 +299,6 @@ class SearchTumblr(Search):
 					else:
 						video_id = "deleted"
 				else:
-					print(post)
 					video_id = "unknown"
 
 			else:
