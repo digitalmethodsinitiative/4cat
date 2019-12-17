@@ -12,6 +12,10 @@ from backend.lib.helpers import UserInput, convert_to_int
 
 import config
 
+__author__ = "Stijn Peeters"
+__credits__ = ["Stijn Peeters"]
+__maintainer__ = "Stijn Peeters"
+__email__ = "4cat@oilab.eu"
 
 class OvertimeAnalysis(BasicProcessor):
 	"""

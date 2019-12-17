@@ -9,6 +9,11 @@ from csv import DictReader, DictWriter
 from backend.lib.helpers import UserInput, pad_interval
 from backend.abstract.processor import BasicProcessor
 
+__author__ = "Stijn Peeters"
+__credits__ = ["Stijn Peeters"]
+__maintainer__ = "Stijn Peeters"
+__email__ = "4cat@oilab.eu"
+
 class CountPosts(BasicProcessor):
 	"""
 	Merge post body into one long string
