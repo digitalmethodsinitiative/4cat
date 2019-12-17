@@ -10,8 +10,8 @@ import pickle
 from collections import Counter
 from pathlib import Path
 
-import spacy
 import en_core_web_sm
+import spacy
 from spacy.tokens import Doc
 
 from backend.lib.helpers import UserInput
@@ -28,8 +28,8 @@ class ExtractNouns(BasicProcessor):
 	"""
 	type = "extract-nouns"  # job type ID
 	category = "Text analysis" # category
-	title = "Extract Nouns"  # title displayed in UI
-	description = "Get the nouns from your text corpus, as annotated by SpaCy's part-of-speech tagging. Make sure to have selected \"Part of Speech\" in the previous module, as well as \"Dependency parsing\" if you want to extract compound nouns. The output is a csv with the most-used nouns ranked."  # description displayed in UI
+	title = "Extract nouns"  # title displayed in UI
+	description = "Get the prediction of nouns from your text corpus, as annotated by SpaCy's part-of-speech tagging. Make sure to have selected \"Part of Speech\" in the previous module, as well as \"Dependency parsing\" if you want to extract compound nouns. The output is a csv with the most-used nouns ranked."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
 	accepts = ["linguistic-features"]
@@ -123,7 +123,7 @@ class ExtractNouns(BasicProcessor):
 			with archive.open(file_name, "r") as pickle_file:
 				doc_bytes, vocab_bytes = pickle.load(pickle_file)
 	
-			nlp = en_core_web_sm.load()	# Load moodel
+			nlp = en_core_web_sm.load()	# Load model
 
 			nlp.vocab.from_bytes(vocab_bytes)
 			docs = [Doc(nlp.vocab).from_bytes(b) for b in doc_bytes]
