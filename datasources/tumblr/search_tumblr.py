@@ -15,6 +15,10 @@ import config
 from backend.abstract.search import Search
 from backend.lib.exceptions import QueryParametersException
 
+__author__ = "Sal Hagen"
+__credits__ = ["Sal Hagen", "Tumblr API (api.tumblr.com)"]
+__maintainer__ = "Sal Hagen"
+__email__ = "4cat@oilab.eu"
 
 class SearchTumblr(Search):
 	"""
@@ -60,6 +64,7 @@ class SearchTumblr(Search):
 		if parameters.get("fetch_reblogs"):
 			self.dataset.update_status("Getting notes from all posts")
 
+			# Prepare dicts to pass to `get_post_notes`
 			posts_to_fetch = {result["author"]: result["id"] for result in results}
 			print(posts_to_fetch)
 
@@ -102,7 +107,7 @@ class SearchTumblr(Search):
 
 		# Some retries to make sure the Tumblr API actually returns everything
 		retries = 0
-		max_retries = 20
+		max_retries = 48 # 2 days
 
 		# Get Tumblr posts until there's no more left.
 		while True:
@@ -113,13 +118,13 @@ class SearchTumblr(Search):
 				break
 
 			# Use the pytumblr library to make the API call
-			posts = client.tagged(tag, before=before, limit=50, filter="raw")
+			posts = client.tagged(tag, before=before, limit=20, filter="raw")
 			
 			# Make sure the Tumblr API doesn't magically stop at an earlier date
 			if not posts:
-				self.dataset.update_status("No posts with tag left, trying again with timestamp %s" % str(before))
-				before -= 43200 # Decrease by half a day
 				retries += 1
+				before -= 3600 # Decrease by an hour
+				self.dataset.update_status("No posts - querying again but an hour earlier (retry %s/30)" % str(retries))
 				continue
 			
 			else: # Append posts to main list
@@ -284,20 +289,21 @@ class SearchTumblr(Search):
 
 			# Different options for video types (YouTube- or Tumblr-hosted)
 			if post_type == "video":
-				video_source = "unknown"
-				if post["video_type"] == "youtube":
-					# Use `get` since some videos are deleted
-					video_url = post.get("permalink_url")
-					# There's no URL if the post is deleted
+				
+				video_source = post["video_type"]
+				# Use `get` since some videos are deleted
+				video_url = post.get("permalink_url")
+
+				if video_source == "youtube":
+					# There's no URL if the YouTube video is deleted
 					if video_url:
 						video_id = post["video"]["youtube"]["video_id"]
 					else:
 						video_id = "deleted"
-					video_source = "youtube"
-				elif post["video_type"] == "tumblr":
-					video_url = post["video_url"]
-					video_id = None
-					video_source = "tumblr"
+				else:
+					print(post)
+					video_id = "unknown"
+
 			else:
 				video_source = None
 				video_id = None
