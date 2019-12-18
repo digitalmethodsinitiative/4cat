@@ -49,4 +49,4 @@ new_set = DataSet(
 	db=Database(logger=logger))
 
 shutil.copyfile(input, new_set.get_results_path())
-new_set.finish(rows)
+new_set.finish(rows)w
