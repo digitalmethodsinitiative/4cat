@@ -1,5 +1,10 @@
+"""
+Queue JSON files in a given folder to be processed by 4CAT's scrapers
+
+This can be used to import, for example, 4chan API output that has been
+downloaded elsewhere.
+"""
 import argparse
-import time
 import sys
 import os
 
