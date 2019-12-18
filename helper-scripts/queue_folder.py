@@ -1,8 +1,7 @@
 import argparse
-import glob
 import time
 import sys
-#import os
+import os
 
 from pathlib import Path
 
@@ -23,17 +22,19 @@ if not Path(args.input).exists() or not Path(args.input).is_dir():
 	sys.exit(1)
 
 input = Path(args.input).resolve()
-jsons = input.glob("/*.json")
+jsons = input.glob("*.json")
 
 print("Initialising queue...")
 logger = Logger()
-queue = JobQueue(logger=logger, database=Database(logger=logger), appname="queue-folder")
+queue = JobQueue(logger=logger, database=Database(logger=logger, appname="queue-folder"))
 
 print("Adding files to queue...")
-deadline = int(time.time()) + 1
+files = 0
 for file in jsons:
-	file = file.name
+	deadline = 0
+	files += 1
+	file = str(file)
 	queue.add_job(args.datasource + "-thread", remote_id=file, details={"board": args.board, "file": str(file)}, claim_after=deadline)
 	deadline += 1
 
-print("Queued %i files." % len(jsons))
+print("Queued %i files." % files)
