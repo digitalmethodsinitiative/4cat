@@ -9,6 +9,11 @@ from backend.lib.dataset import DataSet
 class DatasetExpirer(BasicWorker):
 	"""
 	Delete old datasets
+
+	This may be useful for two reasons: to conserve disk space and if the user
+	agreement of a particular data source does not allow storing scraped or
+	extracted data for longer than a given amount of time, as is the case for
+	e.g. Tumblr.
 	"""
 	type = "expire-datasets"
 	max_workers = 1
