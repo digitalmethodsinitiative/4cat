@@ -265,11 +265,11 @@ def show_results(page):
 
 	where = " AND ".join(where)
 
-	num_datasets = db.fetchone("SELECT COUNT(*) AS num FROM queries WHERE " + where, tuple(replacements))["num"]
+	num_datasets = db.fetchone("SELECT COUNT(*) AS num FROM datasets WHERE " + where, tuple(replacements))["num"]
 	
 	replacements.append(page_size)
 	replacements.append(offset)
-	datasets = db.fetchall("SELECT key FROM queries WHERE " + where + " ORDER BY timestamp DESC LIMIT %s OFFSET %s",
+	datasets = db.fetchall("SELECT key FROM datasets WHERE " + where + " ORDER BY timestamp DESC LIMIT %s OFFSET %s",
 						   tuple(replacements))
 	
 	if not datasets and page != 1:
