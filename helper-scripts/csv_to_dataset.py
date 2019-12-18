@@ -1,5 +1,5 @@
 """
-Delete a query
+Import a CSV file as a new dataset
 """
 import argparse
 import sys
@@ -8,12 +8,8 @@ import os
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)) + "/../..")
 from backend.lib.database import Database
 from backend.lib.logger import Logger
-from backend.lib.queue import JobQueue
-from backend.lib.job import Job, JobNotFoundException
 from backend.lib.dataset import DataSet
 
-import os
-import config
 import csv
 import time
 import argparse
@@ -49,4 +45,4 @@ new_set = DataSet(
 	db=Database(logger=logger))
 
 shutil.copyfile(input, new_set.get_results_path())
-new_set.finish(rows)w
+new_set.finish(rows)
