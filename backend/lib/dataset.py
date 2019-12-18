@@ -53,13 +53,13 @@ class DataSet:
 
 		if key is not None:
 			self.key = key
-			current = self.db.fetchone("SELECT * FROM queries WHERE key = %s", (self.key,))
+			current = self.db.fetchone("SELECT * FROM datasets WHERE key = %s", (self.key,))
 			if not current:
 				raise TypeError("DataSet() requires a valid dataset key for its 'key' argument, \"%s\" given" % key)
 
 			self.dataset = current["query"]
 		elif job is not None:
-			current = self.db.fetchone("SELECT * FROM queries WHERE parameters::json->>'job' = %s", (job,))
+			current = self.db.fetchone("SELECT * FROM datasets WHERE parameters::json->>'job' = %s", (job,))
 			if not current:
 				raise TypeError("DataSet() requires a valid job ID for its 'job' argument")
 
@@ -78,7 +78,7 @@ class DataSet:
 
 			self.dataset = self.get_label(parameters, default=type)
 			self.key = self.get_key(self.dataset, parameters, parent)
-			current = self.db.fetchone("SELECT * FROM queries WHERE key = %s AND query = %s", (self.key, self.dataset))
+			current = self.db.fetchone("SELECT * FROM datasets WHERE key = %s AND query = %s", (self.key, self.dataset))
 
 		if current:
 			self.data = current
@@ -101,11 +101,11 @@ class DataSet:
 			if parent:
 				self.data["key_parent"] = parent
 
-			self.db.insert("queries", data=self.data)
+			self.db.insert("datasets", data=self.data)
 			self.reserve_result_file(parameters, extension)
 
 		# retrieve analyses and processors that may be run for this dataset
-		analyses = self.db.fetchall("SELECT * FROM queries WHERE key_parent = %s ORDER BY timestamp ASC", (self.key,))
+		analyses = self.db.fetchall("SELECT * FROM datasets WHERE key_parent = %s ORDER BY timestamp ASC", (self.key,))
 		self.children = [DataSet(data=analysis, db=self.db) for analysis in analyses]
 		self.processors = self.get_available_processors()
 
@@ -181,7 +181,7 @@ class DataSet:
 		if self.data["is_finished"]:
 			raise RuntimeError("Cannot finish a finished dataset again")
 
-		self.db.update("queries", where={"key": self.data["key"]},
+		self.db.update("datasets", where={"key": self.data["key"]},
 					   data={"is_finished": True, "num_rows": num_rows})
 		self.data["is_finished"] = True
 		self.data["num_rows"] = num_rows
@@ -203,7 +203,7 @@ class DataSet:
 		self.data["num_rows"] = 0
 		self.data["status"] = "Dataset is queued."
 
-		self.db.update("queries", data={
+		self.db.update("datasets", data={
 			"timestamp": self.data["timestamp"],
 			"is_finished": self.data["is_finished"],
 			"num_rows": self.data["num_rows"],
@@ -219,13 +219,13 @@ class DataSet:
 		a dataset object after it has been deleted is undefined behaviour.
 		"""
 		# first, recursively delete children
-		children = self.db.fetchall("SELECT * FROM queries WHERE key_parent = %s", (self.key,))
+		children = self.db.fetchall("SELECT * FROM datasets WHERE key_parent = %s", (self.key,))
 		for child in children:
 			child = DataSet(key=child["key"], db=self.db)
 			child.delete()
 
 		# delete from database
-		self.db.execute("DELETE FROM queries WHERE key = %s", (self.key,))
+		self.db.execute("DELETE FROM datasets WHERE key = %s", (self.key,))
 
 		# delete from drive
 		try:
@@ -312,7 +312,7 @@ class DataSet:
 			index += 1
 
 		file = path.name
-		updated = self.db.update("queries", where={"query": self.data["query"], "key": self.data["key"]},
+		updated = self.db.update("datasets", where={"query": self.data["query"], "key": self.data["key"]},
 								 data={"result_file": file})
 		self.data["result_file"] = file
 		return updated > 0
@@ -370,7 +370,7 @@ class DataSet:
 		:return bool:  Status update successful?
 		"""
 		self.data["status"] = status
-		updated = self.db.update("queries", where={"key": self.data["key"]}, data={"status": status})
+		updated = self.db.update("datasets", where={"key": self.data["key"]}, data={"status": status})
 
 		return updated > 0
 
@@ -384,7 +384,7 @@ class DataSet:
 		:return bool:  Update successul?
 		"""
 		self.data["software_version"] = version
-		updated = self.db.update("queries", where={"key": self.data["key"]}, data={
+		updated = self.db.update("datasets", where={"key": self.data["key"]}, data={
 			"software_version": version,
 			"software_file": backend.all_modules.processors.get(self.data["type"], {"path": ""})["path"]
 		})
@@ -404,7 +404,7 @@ class DataSet:
 		else:
 			return False
 
-		updated = self.db.update("queries", where={"key": self.data["key"]}, data={"parameters": json.dumps(parameters)})
+		updated = self.db.update("datasets", where={"key": self.data["key"]}, data={"parameters": json.dumps(parameters)})
 		self.parameters = parameters
 
 		return updated > 0
@@ -578,7 +578,7 @@ class DataSet:
 			except JobNotFoundException:
 				return
 
-		self.db.update("queries", where={"key": self.key}, data={"job": job.data["id"]})
+		self.db.update("datasets", where={"key": self.key}, data={"job": job.data["id"]})
 
 	def link_parent(self, key_parent):
 		"""
@@ -586,7 +586,7 @@ class DataSet:
 
 		:param key_parent:  Parent key. Not checked for validity
 		"""
-		self.db.update("queries", where={"key": self.key}, data={"key_parent": key_parent})
+		self.db.update("datasets", where={"key": self.key}, data={"key_parent": key_parent})
 
 	def __getattr__(self, attr):
 		"""
