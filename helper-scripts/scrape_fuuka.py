@@ -1,3 +1,8 @@
+"""
+Scrape any FoolFuuka archive (e.g. archived.moe) and convert found data to
+4chan API-compatible data files that may then be imported into 4CAT with
+queue_folder.py
+"""
 import traceback
 import requests
 import argparse
