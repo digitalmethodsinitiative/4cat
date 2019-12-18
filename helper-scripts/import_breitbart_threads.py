@@ -12,7 +12,7 @@ from backend.lib.logger import Logger
 log = Logger(output=True)
 db = Database(logger=log)
 
-articles = db.fetchall("SELECT * FROM breitbart_articles WHERE comments_scraped > 0")
+articles = db.fetchall("SELECT * FROM breitbart_articles WHERE comments_scraped > 0 AND priority = 1")
 exists = {row["id"] for row in db.fetchall("SELECT id FROM threads_breitbart")}
 
 for article in articles:
