@@ -70,6 +70,7 @@ for conf in confs:
 	defined_sources = regex_source.findall(confsrc)
 
 	# parse found sources into index definitions
+	prefix = ""
 	for source in defined_sources:
 		sources.append("source %s : 4cat {%s}" % source)
 		name = source[0]
