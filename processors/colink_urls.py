@@ -67,7 +67,7 @@ class URLCoLinker(BasicProcessor):
 		colink = {}
 		urls = set()
 		links = {}
-		with self.source_file.open() as input:
+		with self.source_file.open(encoding="utf-8") as input:
 			reader = csv.DictReader(input)
 			for post in reader:
 				post_links = link_regex.findall(post["body"])
