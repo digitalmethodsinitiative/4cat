@@ -33,15 +33,10 @@
         </button>
     </div>{% if item.is_finished() %}<div class="sub-controls" id="{{ item.key }}-sub">
 
-        <ul class="child-list" aria-expanded="false">
-            {% for child in item.children %}
-                {% include "result-child.html" %}
-            {% endfor %}
-        </ul>
         <p class="details-only">
             {{ processors[item.type].description if item.type in processors else "This analysis module has been deprecated but you can still download the result." }}
         </p>
-    
+
         {% if child.num_rows > 0 and child.type in processors and processors[child.type].extension in ("jpg", "jpeg", "png", "csv", "html", "svg") %}
             <div class="query-result details-only">
             {% if processors[child.type].extension == "html" %}
@@ -65,7 +60,7 @@
         {% endif %}
         {% if can_process %}
         <div class="processor-wrap details-only" aria-expanded="true">
-            <h4 class="section-subheader">Available analysis modules</h4>
+            <h4 class="section-subheader">Further analysis modules</h4>
             <ul class="processor-list">
                 {% for processor in item.processors.values() %}
                     {% set dataset = item %}
@@ -75,7 +70,13 @@
                 {% endfor %}
             </ul>
         </div>
-        {% endif %}
+    {% endif %}
+    <!-- Further analysis modules -->
+    <ul class="child-list" aria-expanded="false">
+            {% for child in item.children %}
+                {% include "result-child.html" %}
+            {% endfor %}
+    </ul>
     </div>
     {% endif %}
     {% endif %}
