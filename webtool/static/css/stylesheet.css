@@ -706,6 +706,10 @@ ol.result-list li.has_results .property-container.analysis a {
     align-self: center;
 }
 
+.processor-list .queue-button-wrap > button {
+    min-width: 120px;
+}
+
 .processor-list .processor-drilldown {
     grid-column: 1 / span 2;
 }

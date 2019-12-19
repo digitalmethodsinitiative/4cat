@@ -46,11 +46,11 @@ class SplitSentences(BasicProcessor):
 		num_posts = 1
 		min_length = self.parameters.get("min_length", self.options["min_length"]["default"])
 
-		with self.dataset.get_results_path().open("w") as output:
+		with self.dataset.get_results_path().open("w", encoding="utf-8") as output:
 			writer = csv.DictWriter(output, fieldnames=("post_id", "sentence",))
 			writer.writeheader()
 
-			with self.source_file.open("r") as input:
+			with self.source_file.open("r", encoding="utf-8") as input:
 				reader = csv.DictReader(input)
 
 				for post in reader:
