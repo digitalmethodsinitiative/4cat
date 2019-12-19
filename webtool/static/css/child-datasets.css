@@ -40,6 +40,24 @@
 	margin-left: -1px;
 }
 
+.child-list.top-level > .child.focus::before {
+	content: '';
+	border-left: 2px dotted var(--contrast-dark);
+	border-bottom: 2px dotted var(--contrast-dark);
+	width: 8em;
+	height: 0.85em;
+	display: inline-block;
+	vertical-align: top;
+	margin-left: -8.4em;
+	position: absolute;
+	top: 0;
+	left: 0;
+}
+
+.child-list.top-level > .child.focus {
+	margin-top: 0;
+}
+
 .child.focus > .sub-controls {
     padding-top: 0em;
 }
@@ -234,10 +252,10 @@ li.focus .query-descriptor p {
 }
 
 /** colours etc **/
-.query-core, .card > .sub-controls > .child-list, .details-only {
+.query-core > .card > .sub-controls > .child-list, .details-only, .query-descriptor {
 	background: var(--always-white);
-	border-left: 1px solid var(--gray);
-	border-right: 1px solid var(--gray);
+	/*border-left: 1px solid var(--gray);
+	border-right: 1px solid var(--gray);*/
 }
 
 .top-level > .child:not(.focus) > .query-core {
