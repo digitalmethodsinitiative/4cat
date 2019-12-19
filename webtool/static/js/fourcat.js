@@ -164,7 +164,6 @@ processor = {
             }
         } else {
             //open this level and collapse siblings
-            siblings.attr('aria-expanded', 'false');
             block.attr('aria-expanded', 'true');
             block.addClass('card').addClass('focus');
             block.find('> .details-only').attr('aria-expanded', 'true');
