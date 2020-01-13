@@ -15,6 +15,10 @@ import config
 from backend.abstract.search import Search
 from backend.lib.exceptions import QueryParametersException
 
+__author__ = "Sal Hagen"
+__credits__ = ["Sal Hagen", "Tumblr API (api.tumblr.com)"]
+__maintainer__ = "Sal Hagen"
+__email__ = "4cat@oilab.eu"
 
 class SearchTumblr(Search):
 	"""
@@ -60,9 +64,9 @@ class SearchTumblr(Search):
 		if parameters.get("fetch_reblogs"):
 			self.dataset.update_status("Getting notes from all posts")
 
+			# Prepare dicts to pass to `get_post_notes`
 			posts_to_fetch = {result["author"]: result["id"] for result in results}
-			print(posts_to_fetch)
-
+			
 			# First extract the notes of each post, and only keep text reblogs
 			text_reblogs = self.get_post_notes(posts_to_fetch)
 
@@ -75,10 +79,9 @@ class SearchTumblr(Search):
 					for key, value in text_reblog.items():
 						reblog_post = self.get_post_by_id(key, value)
 						reblog_post = self.parse_tumblr_posts([reblog_post], reblog=True)
-						print(type(reblog_post))
+						
 						results.append(reblog_post[0])
-		print(results)
-
+		
 		self.job.finish()
 		return results
 
@@ -100,22 +103,34 @@ class SearchTumblr(Search):
 		# Store all posts in here
 		all_posts = []
 
+		# Some retries to make sure the Tumblr API actually returns everything
+		retries = 0
+		max_retries = 48 # 2 days
+
 		# Get Tumblr posts until there's no more left.
 		while True:
 
-			# Use the pytumblr library to make the API call
-			posts = client.tagged(tag, before=before, limit=50, filter="raw")
-
-			# Nothing left to do?
-			if not posts:
+			# Stop after 20 retries
+			if retries >= max_retries:
+				self.dataset.update_status("No more posts")
 				break
 
+			# Use the pytumblr library to make the API call
+			posts = client.tagged(tag, before=before, limit=20, filter="raw")
+			
+			# Make sure the Tumblr API doesn't magically stop at an earlier date
+			if not posts:
+				retries += 1
+				before -= 3600 # Decrease by an hour
+				self.dataset.update_status("No posts - querying again but an hour earlier (retry %s/30)" % str(retries))
+				continue
+			
 			else: # Append posts to main list
 				posts = self.parse_tumblr_posts(posts)
 				all_posts += posts
+				retries = 0
+				before = posts[len(posts) - 1]["timestamp"]
 
-			before = posts[len(posts) - 1]["timestamp"]
-			
 			self.dataset.update_status("Collected %s posts" % str(len(all_posts)))
 
 			# Wait a bit to stay friends with the bouncer
@@ -144,7 +159,7 @@ class SearchTumblr(Search):
 
 				# Requests a post's notes
 				notes = client.notes(key, id=value, before_timestamp=before)
-				print(notes)
+				
 				if only_text_reblogs:
 
 					for note in notes["notes"]:	
@@ -267,22 +282,25 @@ class SearchTumblr(Search):
 				text = post["body"]
 			elif post_type == "answer":
 				text = post["question"] + "\n" + post["answer"]
+			else:
+				text = ""
 
 			# Different options for video types (YouTube- or Tumblr-hosted)
 			if post_type == "video":
-				if post["video_type"] == "youtube":
-					# Use `get` since some videos are deleted
-					video_url = post.get("permalink_url")
-					# There's no URL if the post is deleted
+				
+				video_source = post["video_type"]
+				# Use `get` since some videos are deleted
+				video_url = post.get("permalink_url")
+
+				if video_source == "youtube":
+					# There's no URL if the YouTube video is deleted
 					if video_url:
 						video_id = post["video"]["youtube"]["video_id"]
 					else:
 						video_id = "deleted"
-					video_source = "youtube"
-				elif post["video_type"] == "tumblr":
-					video_url = post["video_url"]
-					video_id = None
-					video_source = "tumblr"
+				else:
+					video_id = "unknown"
+
 			else:
 				video_source = None
 				video_id = None

@@ -1,5 +1,7 @@
 {% set item = child %}
 {% set can_process = (current_user.is_authenticated and item.processors) %}
+
+
 <li id="child-{{ child.key }}" class="child{% if not child.is_finished() %} running{% endif %}" data-status="{{ child.status }}">
     <div class="query-core">
         <div class="query-descriptor">
@@ -24,8 +26,8 @@
     {% if child.num_rows == 0 or not item.is_finished() %}
     </div>
     {% else %}
+        <span class="module-line"></span>
         <button class="expand-processors" aria-controls="{{ item.key }}-sub">
-            &#x2192;
             {% if can_process %}{{ item.processors|length }} module{% if item.processors|length != 1 %}s{% endif %}{% endif %}
             {% if can_process and item.children %}&amp;{% endif %}
             {% if item.children %}{{ item.children|length }} dataset{% if item.children|length != 1 %}s{% endif %}{% endif %}
@@ -33,15 +35,10 @@
         </button>
     </div>{% if item.is_finished() %}<div class="sub-controls" id="{{ item.key }}-sub">
 
-        <ul class="child-list" aria-expanded="false">
-            {% for child in item.children %}
-                {% include "result-child.html" %}
-            {% endfor %}
-        </ul>
         <p class="details-only">
             {{ processors[item.type].description if item.type in processors else "This analysis module has been deprecated but you can still download the result." }}
         </p>
-    
+
         {% if child.num_rows > 0 and child.type in processors and processors[child.type].extension in ("jpg", "jpeg", "png", "csv", "html", "svg") %}
             <div class="query-result details-only">
             {% if processors[child.type].extension == "html" %}
@@ -65,7 +62,7 @@
         {% endif %}
         {% if can_process %}
         <div class="processor-wrap details-only" aria-expanded="true">
-            <h4 class="section-subheader">Available analysis modules</h4>
+            <h4 class="section-subheader">Further analysis modules</h4>
             <ul class="processor-list">
                 {% for processor in item.processors.values() %}
                     {% set dataset = item %}
@@ -75,7 +72,14 @@
                 {% endfor %}
             </ul>
         </div>
-        {% endif %}
+    {% endif %}
+    <!-- Further analysis modules -->
+    <ul class="child-list" aria-expanded="false">
+            {% for child in item.children %}
+                <span class="module-line"></span>
+                {% include "result-child.html" %}
+            {% endfor %}
+    </ul>
     </div>
     {% endif %}
     {% endif %}
