@@ -284,7 +284,7 @@ class SearchReddit(Search):
 		chunk_size = 500
 		chunks = []
 		lengths = {}
-		thread_ids = set(thread_ids)  # deduplicate
+		thread_ids = list(set(thread_ids))  # deduplicate
 
 		# search threads in chunks
 		offset = 0
