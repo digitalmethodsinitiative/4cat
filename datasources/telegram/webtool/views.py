@@ -31,7 +31,7 @@ def authenticate(request, user, **kwargs):
 	if "phone" not in kwargs or "api_id" not in kwargs or "api_hash" not in kwargs:
 		return False
 
-	kwargs = {key: kwargs[key][0].strip() for key in kwargs}
+	kwargs = {key: kwargs[key].strip() for key in kwargs}
 
 	# session IDs need to be unique...
 	# Sessions are important because they are the way we don't need to enter
@@ -75,13 +75,13 @@ def authenticate(request, user, **kwargs):
 		client = TelegramClient(str(session_path), api_id, kwargs["api_hash"], loop=eventloop)
 
 		try:
-			client.start(max_attempts=max_attempts, phone=kwargs.get("phone"), code_callback=code_callback, password=None)
+			client.start(max_attempts=max_attempts, phone=kwargs.get("api_phone"), code_callback=code_callback, password=None)
 			result = {"authenticated": True, "session": session_id}
 
-		except ValueError:
+		except ValueError as e:
 			# this happens if 2FA is required
 			result = {"error": "2fa",
-					  "error-message": "Your account requires two-factor authentication. 4CAT at this time does not support this authentication mode for Telegram."}
+					  "error-message": "Your account requires two-factor authentication. 4CAT at this time does not support this authentication mode for Telegram. (%s)" % e}
 		except RuntimeError:
 			# A code was sent to the given phone number
 			result = {"authenticated": False, "session": session_id}
