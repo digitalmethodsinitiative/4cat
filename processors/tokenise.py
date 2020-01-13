@@ -84,7 +84,17 @@ class Tokenise(BasicProcessor):
 				"wordlist-opentaal-dutch": "Dutch word list (OpenTaal)",
 				"wordlist-unknown-dutch": "Dutch word list (unknown)"
 			},
-			"help": "Word lists to exclude (i.e. not tokenise)"
+			"help": "Word lists to exclude (i.e. not tokenise). It is highly recommended to ."
+		},
+		"accept_words": {
+			"type": UserInput.OPTION_TEXT,
+			"default": "",
+			"help": "Accept/whitelist these words (separate by commas - stem or lemmatise yourself)"
+		},
+		"reject_words": {
+			"type": UserInput.OPTION_TEXT,
+			"default": "",
+			"help": "Reject/blacklist these words (separate by commas - stem or lemmatise yourself)"
 		}
 	}
 
@@ -104,6 +114,18 @@ class Tokenise(BasicProcessor):
 		for wordlist in self.parameters["filter"]:
 			with open(config.PATH_ROOT + "/backend/assets/wordlists/%s.pb" % wordlist, "rb") as input:
 				word_filter = set.union(word_filter, pickle.load(input))
+
+		# Extend or limit the word filter with optionally added words
+		# Remove accepted words from filter
+		if self.parameters["accept_words"]:
+			accept_words = [str(word).strip() for word in self.parameters["accept_words"].split(",")]
+			for accept_word in accept_words:
+				if accept_word in word_filter:
+					word_filter.remove(accept_word)
+		# Add rejected words to filter
+		if self.parameters["reject_words"]:
+			reject_words = [str(word).strip() for word in self.parameters["reject_words"].split(",")]
+			word_filter.update(reject_words)
 
 		language = self.parameters.get("language", "english")
 		strip_symbols = self.parameters.get("strip_symbols", self.options["strip_symbols"]["default"])
