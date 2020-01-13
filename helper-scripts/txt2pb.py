@@ -1,3 +1,8 @@
+"""
+Convert a word list (i.e. a plain text file with one item per line) to a
+pickle dump of a list of words, so the text file doesn't have to be
+converted first on later occasions
+"""
 import argparse
 import pickle
 import sys

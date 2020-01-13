@@ -137,7 +137,8 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 
 			except ValueError:
 				# dataset with key to attach to doesn't exist...
-				self.log.warning("Cannot attach dataset chain containing %s to %s (dataset does not exist)" % (self.dataset.key, self.parameters["attach_to"]))
+				self.log.warning("Cannot attach dataset chain containing %s to %s (dataset does not exist)" % (
+				self.dataset.key, self.parameters["attach_to"]))
 
 		self.job.finish()
 
