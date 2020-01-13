@@ -33,7 +33,7 @@ class DatasetExpirer(BasicWorker):
 
 			cutoff = time.time() - datasource.get("expire-datasets")
 			datasets = self.db.fetchall(
-				"SELECT key FROM queries WHERE key_parent = '' AND parameters::json->>'datasource' = %s AND timestamp < %s",
+				"SELECT key FROM datasets WHERE key_parent = '' AND parameters::json->>'datasource' = %s AND timestamp < %s",
 				(datasource_id, cutoff))
 
 			# we instantiate the dataset, because its delete() method does all
