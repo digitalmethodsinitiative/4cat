@@ -18,14 +18,14 @@ $(document).ready(function () {
     // submitting the parameters and waiting for the result; we need
     // to confirm our API credentials first
     $('#query-form.telegram').on('submit', function (e) {
-        let phone = $('#query-api_phone').val();
+        let api_phone = $('#query-api_phone').val();
         let api_id = $('#query-api_id').val();
         let api_hash = $('#query-api_hash').val();
 
         // locally cache input values
         storage.setItem('telegram.api_id', api_id);
         storage.setItem('telegram.api_hash', api_hash);
-        storage.setItem('telegram.api_phone', phone);
+        storage.setItem('telegram.api_phone', api_phone);
 
         let session_bit = '';
         if ($('#telegram-session').length > 0) {
