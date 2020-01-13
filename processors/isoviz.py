@@ -16,6 +16,10 @@ from svgwrite.shapes import Line, Rect
 from svgwrite.path import Path
 from svgwrite.text import Text
 
+__author__ = "Stijn Peeters"
+__credits__ = ["Stijn Peeters"]
+__maintainer__ = "Stijn Peeters"
+__email__ = "4cat@oilab.eu"
 
 class IsometricMultigraphRenderer(BasicProcessor):
 	"""

@@ -7,6 +7,11 @@ from csv import DictReader
 
 from backend.abstract.processor import BasicProcessor
 
+__author__ = "Stijn Peeters"
+__credits__ = ["Stijn Peeters"]
+__maintainer__ = "Stijn Peeters"
+__email__ = "4cat@oilab.eu"
+
 class flowChart(BasicProcessor):
 	"""
 	Creates a visualisation showing the 'flow' of elements
