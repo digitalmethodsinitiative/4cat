@@ -50,7 +50,7 @@ $(document).ready(function () {
                         alert(message + data['data']['error-message']);
 
                     } else if (!data['data']['authenticated']) {
-                        alert('A security code has been sent to phone number ' + phone + '. Enter it to continue.');
+                        alert('A security code has been sent to phone number ' + api_phone + '. Enter it to continue.');
                         $('#telegram-security').removeClass('hidden');
 
                     } else {
