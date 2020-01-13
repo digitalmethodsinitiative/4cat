@@ -224,4 +224,7 @@ class AttributeRanker(BasicProcessor):
 			# simply copy the CSV column
 			values = [post.get(attribute, "")]
 
-		return [value for value in values if not filter or filter.match(value)]
+		if not values:
+			return []
+		else:
+			return [value for value in values if not filter or filter.match(value)]

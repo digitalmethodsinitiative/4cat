@@ -18,14 +18,14 @@ $(document).ready(function () {
     // submitting the parameters and waiting for the result; we need
     // to confirm our API credentials first
     $('#query-form.telegram').on('submit', function (e) {
-        let phone = $('#query-api_phone').val();
+        let api_phone = $('#query-api_phone').val();
         let api_id = $('#query-api_id').val();
         let api_hash = $('#query-api_hash').val();
 
         // locally cache input values
         storage.setItem('telegram.api_id', api_id);
         storage.setItem('telegram.api_hash', api_hash);
-        storage.setItem('telegram.api_phone', phone);
+        storage.setItem('telegram.api_phone', api_phone);
 
         let session_bit = '';
         if ($('#telegram-session').length > 0) {
@@ -38,7 +38,7 @@ $(document).ready(function () {
         }
 
         $.get({
-            'url': '/api/datasource-call/telegram/authenticate/?api_id=' + api_id + '&api_hash=' + api_hash + '&phone=' + phone + session_bit + code_bit,
+            'url': '/api/datasource-call/telegram/authenticate/?api_id=' + api_id + '&api_hash=' + api_hash + '&api_phone=' + api_phone + session_bit + code_bit,
             'success': function (data) {
                 if (data['success']) {
                     if (data['data']['session'] && !$('#telegram-session').length > 0) {
@@ -50,7 +50,7 @@ $(document).ready(function () {
                         alert(message + data['data']['error-message']);
 
                     } else if (!data['data']['authenticated']) {
-                        alert('A security code has been sent to phone number ' + phone + '. Enter it to continue.');
+                        alert('A security code has been sent to phone number ' + api_phone + '. Enter it to continue.');
                         $('#telegram-security').removeClass('hidden');
 
                     } else {

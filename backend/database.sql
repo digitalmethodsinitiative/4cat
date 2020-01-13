@@ -22,7 +22,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS unique_job
 
 
 -- queries
-CREATE TABLE IF NOT EXISTS queries (
+CREATE TABLE IF NOT EXISTS datasets (
   id               SERIAL PRIMARY KEY,
   key              text,
   type             text DEFAULT 'search',
