@@ -1,3 +1,6 @@
+"""
+Create a new 4CAT user and send them a registration e-mail
+"""
 import argparse
 import psycopg2
 import time
