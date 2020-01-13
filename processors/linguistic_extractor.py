@@ -1,4 +1,3 @@
-
 """
 Extract linguistic features from text using SpaCy.
 
@@ -40,9 +39,9 @@ class LinguisticFeatures(BasicProcessor):
 			"type": UserInput.OPTION_MULTI,
 			"default": [],
 			"options": {
-				"tagger": "Part-of-speech tagging: Tags the kind of words in a sentence, like nouns and verbs.",
+				"tagger": "Part-of-speech tagging: Tags the kind of words in a sentence, like nouns and verbs",
 				"parser": "Dependency parsing: Extract how words in a sentence relate to each other",
-				"ner": "Named entity recognition: Labels what kind of objects are in a sentence (e.g. Apple -> Organisation)"
+				"ner": "Named entity recognition: Labels what kind of objects appear in a sentence (e.g. Apple -> Organisation)"
 			},
 			"help": "What linguistic features to extract. See https://spacy.io/usage/linguistic-features"
 		}
