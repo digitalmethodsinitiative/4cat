@@ -31,7 +31,7 @@ def authenticate(request, user, **kwargs):
 	if "api_phone" not in kwargs or "api_id" not in kwargs or "api_hash" not in kwargs:
 		return False
 
-	kwargs = {key: kwargs[key][0].strip() for key in kwargs}
+	kwargs = {key: kwargs[key].strip() for key in kwargs}
 
 	# session IDs need to be unique...
 	# Sessions are important because they are the way we don't need to enter
