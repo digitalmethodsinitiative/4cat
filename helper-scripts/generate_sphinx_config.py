@@ -20,13 +20,13 @@ import sys
 import os
 import re
 
-sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)) + "/../..")
+sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)) + "/..")
 import config
 
 
 # parse parameters
 cli = argparse.ArgumentParser()
-cli.add_argument("-i", "--input", default="../../datasources", help="Folder to read data source data from")
+cli.add_argument("-i", "--input", default="../datasources", help="Folder to read data source data from")
 cli.add_argument("-o", "--output", default="sphinx.conf", help="Filename of generated configuration file")
 cli.add_argument("-s", "--source", default="4cat-sphinx.conf.src", help="Filename of configuration template")
 args = cli.parse_args()
@@ -50,18 +50,25 @@ for conf in confs:
 	datasource_id = re.split(r"[\/\\]", conf)[0]
 	module = "datasources." + datasource_id
 
+	print("Checking Sphinx configuration file for data source %s..." % datasource_id)
+
 	# check if data source can be imported
 	try:
 		importlib.import_module(module)
 	except ImportError:
-		print("Error loading settings for data source %s. Skipping." % datasource_id)
+		print("...error loading settings for data source %s. Skipping." % datasource_id)
 		continue
 
 	# check if imported data source has the required attribute (i.e. the data source identifier)
 	try:
 		datasource = sys.modules[module].DATASOURCE
 	except AttributeError:
-		print("Data source %s has no datasource identifier set. Skipping." % datasource_id)
+		print("...data source %s has no datasource identifier set. Skipping." % datasource_id)
+		continue
+
+	if datasource not in config.DATASOURCES:
+		# data source is not enabled
+		print("...not enabled. Skipping.")
 		continue
 
 	with open(conf) as conffile:
@@ -72,6 +79,7 @@ for conf in confs:
 	# parse found sources into index definitions
 	prefix = ""
 	for source in defined_sources:
+		print("...adding one Sphinx source for data source %s" % datasource_id)
 		sources.append("source %s : 4cat {%s}" % source)
 		name = source[0]
 		index_name = datasource + "_posts" if "posts" in name else datasource + "_threads" if "threads" in name else False
@@ -85,6 +93,7 @@ for conf in confs:
 		indexes.append(index)
 
 # write results to file
+print("Writing results to file.")
 os.chdir(HOME)
 sphinxconf = sphinxconf.replace("%%SOURCES%%", "\n".join(sources))
 sphinxconf = sphinxconf.replace("%%INDEXES%%", "\n".join(indexes))
@@ -98,3 +107,5 @@ sphinxconf = sphinxconf.replace("%%DBPORT%%", str(config.DB_PORT))
 
 with open(args.output, "w") as output:
 	output.write(sphinxconf)
+
+print("Done.")
