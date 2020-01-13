@@ -7,6 +7,11 @@ from csv import DictReader
 from backend.abstract.processor import BasicProcessor
 from backend.lib.helpers import UserInput
 
+__author__ = "Sal Hagen"
+__credits__ = ["Sal Hagen"]
+__maintainer__ = "Sal Hagen"
+__email__ = "4cat@oilab.eu"
+
 class Stringify(BasicProcessor):
 	"""
 	Merge post body into one long string

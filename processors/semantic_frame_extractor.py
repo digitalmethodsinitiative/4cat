@@ -9,6 +9,10 @@ import re
 
 from backend.abstract.processor import BasicProcessor
 
+__author__ = "Stijn Peeters"
+__credits__ = ["Katrien Beuls", "Paul van Eecke"]
+__maintainer__ = "Stijn Peeters"
+__email__ = "4cat@oilab.eu"
 
 class SemanticFrameExtractor(BasicProcessor):
 	"""

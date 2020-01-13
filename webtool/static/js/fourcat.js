@@ -154,6 +154,7 @@ processor = {
             //close this level and any underlying
             siblings.attr('aria-expanded', null);
             block.attr('aria-expanded', null);
+            block.find('.module-line').first().show();
             block.removeClass('card').removeClass('focus');
             $(this).text($(this).attr('data-original'));
             block.find('> .details-only').attr('aria-expanded', 'true');
@@ -163,12 +164,13 @@ processor = {
                 parent_block.find('> .sub-controls > .details-only').attr('aria-expanded', 'true');
             }
         } else {
-            //open this level and collapse siblings
-            siblings.attr('aria-expanded', 'false');
+            //open this level
             block.attr('aria-expanded', 'true');
             block.addClass('card').addClass('focus');
             block.find('> .details-only').attr('aria-expanded', 'true');
 
+            block.find('.module-line').hide();
+            
             $(this).attr('data-original', $(this).text()).text('Close');
 
             if (parent_block) {
@@ -189,8 +191,8 @@ processor = {
      */
     queue: function (e) {
         e.preventDefault();
-        if ($(this).text() === 'Options') {
-            $(this).text('Queue');
+        if ($(this).text().includes('Options')) {
+            $(this).text('Run');
             let li = $(this).parent().parent().parent();
             li.removeClass('collapsed').addClass('expanded');
 
@@ -238,7 +240,7 @@ processor = {
             $(this).attr('data-options-height', fieldset.css('height').replace('px', ''));
             fieldset.css('height', '0');
             $(this).addClass('collapsed').removeClass('expanded');
-            $(this).find('button.control-processor').text('Options');
+            $(this).find('button.control-processor').html('<i class="fas fa-cog"></i> Options');
         });
     },
 

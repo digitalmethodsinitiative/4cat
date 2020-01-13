@@ -1,12 +1,12 @@
 /* query block wrapper */
 .child-list > li:nth-child(even), .processor-tree li:nth-child(even) {
-    /* override general zebra striping */
-    background: transparent;
+	/* override general zebra striping */
+	background: transparent;
 }
 
 .child {
 	transition: 0.25s;
-    padding: 0;
+	padding: 0;
 }
 
 .child-list {
@@ -15,8 +15,9 @@
 }
 
 .child-list > li {
-    background: transparent;
-    padding-bottom: 0.5em;
+	background: transparent;
+	padding-bottom: 0.5em;
+	padding-top: 0.5em;
 }
 
 .child .child-list {
@@ -24,30 +25,49 @@
 }
 
 .child.focus {
-    margin: 0 auto;
-    max-width: 725px;
-    position: relative;
-    margin-top: 2em;
+	width: 50vw;
+	min-width: 390px;
+	position: relative;
+	display: inline-block;
+	margin-top: 5px;
 }
 
-.child.focus::before {
+li.child::before {
 	content: ' ';
+	display: inline;
+	border-bottom: 2px dotted var(--contrast-dark);
 	border-left: 2px dotted var(--contrast-dark);
+	float:left;
+	width: 17px;
 	height: 0.9em;
-	position: absolute;
-	left: 50%;
-	top: -1.5em;
-	margin-left: -1px;
+	margin-left: 20px;
+}
+
+.module-line {
+	content: ' ';
+	display: inline;
+	border-bottom: 2px dotted var(--contrast-dark);
+	float:left;
+	width: 17px;
+	height: 0.9em;
+}
+
+.child-list.top-level > .child.focus {
+	margin-top: 0;
 }
 
 .child.focus > .sub-controls {
-    padding-top: 0em;
+	padding-top: 0em;
 }
 
 .child[aria-expanded=false], .details-only[aria-expanded=false] {
 	height: 0;
 	overflow: hidden;
 	display: none;
+}
+
+.child[aria-expanded=true] > div {
+	margin-left: 40px;
 }
 
 /* top-level tree */
@@ -63,7 +83,7 @@
 li:not(.focus) > .query-core {
 	position: relative;
 	display: inline-block;
-	width: 90%;
+	width: 85%;
 	padding: 0.25em 0.5em;
 	border-right: 0;
 }
@@ -81,12 +101,13 @@ li:not(.focus) > .query-core {
 }
 
 .query-core button:not(.active) {
+	border-radius: 0.5em;
 	border-left: 0;
-    border-left: 2px solid var(--contrast-dark);
-	display: block;
+	border-left: 2px solid var(--contrast-dark);
+	display: inline;
 	z-index: 0;
-    padding: 0 0.5em;
-    line-height: 1.5em;
+	padding: 0 0.5em;
+	line-height: 1.5em;
 }
 
 li:not(.focus):not(.running) > .query-core.fullwidth-description > .query-descriptor, li:not(.focus) > .query-core.fullwidth-description > .query-descriptor {
@@ -111,17 +132,18 @@ li:not(.focus) > .query-core.fullwidth-description > button:not(.active) {
 	position:  absolute;
 	top: 0;
 	right: 0;
-    border: 0;
-    border-left: 2px solid var(--gray);
+	border: 0;
+	border-left: 2px solid var(--gray);
 	background: var(--contrast-dark);
-    color: var(--contrast-bright);
+	color: var(--contrast-bright);
 	margin: 0;
+	margin-top: 0.5em;
 	height: 2em;
 }
 
 .query-core button.active:hover {
 	background: var(--accent);
-    color: var(--contrast-bright);
+	color: var(--contrast-bright);
 }
 
 .query-core {
@@ -166,9 +188,9 @@ li:not(.focus):not(.running) .query-descriptor {
 }
 
 li:not(.focus) .query-descriptor > * {
-    background: transparent;
-    display: inline;
-    color: var(--text);
+	background: transparent;
+	display: inline;
+	color: var(--text);
 }
 
 
@@ -180,17 +202,6 @@ li > .sub-controls {
 li:not(.focus) > .sub-controls {
 	height: 0;
 	overflow: hidden;
-}
-
-.child-list > li:not(.focus)::before {
-	content: '';
-	border-left: 2px dotted var(--contrast-dark);
-	border-bottom: 2px dotted var(--contrast-dark);
-	width: 0.85em;
-	height: 0.85em;
-	display: inline-block;
-	vertical-align: top;
-	margin-left: 1em;
 }
 
 body.result-list .child-list > li:not(.focus)::before {
@@ -213,9 +224,9 @@ body.result-list .child-list > li:not(.focus)::before {
 }
 
 .processor-wrap h4 {
-    background: var(--contrast-dark);
-    color: var(--contrast-bright);
-    text-align: center;
+	background: var(--contrast-dark);
+	color: var(--contrast-bright);
+	text-align: center;
 }
 
 .details-only .processor-description {
@@ -223,10 +234,10 @@ body.result-list .child-list > li:not(.focus)::before {
 }
 
 .child-header {
-    text-align: center;
-    color: var(--contrast-bright);
-    background: var(--contrast-dark);
-    padding: 0.25em 0;
+	text-align: center;
+	color: var(--contrast-bright);
+	background: var(--contrast-dark);
+	padding: 0.25em 0;
 }
 
 li.focus .query-descriptor p {
@@ -234,10 +245,10 @@ li.focus .query-descriptor p {
 }
 
 /** colours etc **/
-.query-core, .card > .sub-controls > .child-list, .details-only {
+.query-core > .card > .sub-controls > .child-list, .details-only, .query-descriptor {
 	background: var(--always-white);
-	border-left: 1px solid var(--gray);
-	border-right: 1px solid var(--gray);
+	/*border-left: 1px solid var(--gray);
+	border-right: 1px solid var(--gray);*/
 }
 
 .top-level > .child:not(.focus) > .query-core {
