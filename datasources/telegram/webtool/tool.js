@@ -38,7 +38,7 @@ $(document).ready(function () {
         }
 
         $.get({
-            'url': '/api/datasource-call/telegram/authenticate/?api_id=' + api_id + '&api_hash=' + api_hash + '&phone=' + phone + session_bit + code_bit,
+            'url': '/api/datasource-call/telegram/authenticate/?api_id=' + api_id + '&api_hash=' + api_hash + '&api_phone=' + phone + session_bit + code_bit,
             'success': function (data) {
                 if (data['success']) {
                     if (data['data']['session'] && !$('#telegram-session').length > 0) {
