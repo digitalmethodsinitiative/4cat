@@ -7,6 +7,10 @@ import re
 from backend.abstract.processor import BasicProcessor
 from backend.lib.helpers import UserInput
 
+__author__ = "Stijn Peeters"
+__credits__ = ["Stijn Peeters"]
+__maintainer__ = "Stijn Peeters"
+__email__ = "4cat@oilab.eu"
 
 class URLCoLinker(BasicProcessor):
 	"""
@@ -63,7 +67,7 @@ class URLCoLinker(BasicProcessor):
 		colink = {}
 		urls = set()
 		links = {}
-		with self.source_file.open() as input:
+		with self.source_file.open(encoding="utf-8") as input:
 			reader = csv.DictReader(input)
 			for post in reader:
 				post_links = link_regex.findall(post["body"])

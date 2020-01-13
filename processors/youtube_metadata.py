@@ -17,6 +17,11 @@ from backend.lib.helpers import UserInput, get_yt_compatible_ids
 
 import config
 
+__author__ = "Sal Hagen"
+__credits__ = ["Sal Hagen"]
+__maintainer__ = "Sal Hagen"
+__email__ = "4cat@oilab.eu"
+
 class YouTubeMetadata(BasicProcessor):
 	"""
 	
