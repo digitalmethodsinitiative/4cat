@@ -23,7 +23,7 @@ class CoTagger(BasicProcessor):
 				  "weighted by the frequency of the tag."  # description displayed in UI
 	extension = "gdf"  # extension of result file, used internally and in UI
 
-	datasources = ["instagram"]
+	datasources = ["instagram", "tumblr"]
 
 	input = "csv:tags|hashtags"
 	output = "gdf"
@@ -38,7 +38,7 @@ class CoTagger(BasicProcessor):
 		"""
 		leading_hash = re.compile(r"^#")
 
-		with open(self.source_file) as input:
+		with open(self.source_file, encoding="utf-8") as input:
 			reader = csv.DictReader(input)
 
 			all_tags = {}
@@ -50,8 +50,14 @@ class CoTagger(BasicProcessor):
 				posts += 1
 
 				# create a list of tags
-				tags = post.get("tags", "").split(",")
-				tags += [leading_hash.sub("", tag) for tag in post.get("hashtags", "").split(",")]
+				if self.parent.parameters["datasource"] == "instagram":
+					tags = post.get("tags", "").split(",")
+					tags += [leading_hash.sub("", tag) for tag in post.get("hashtags", "").split(",")]
+
+				elif self.parent.parameters["datasource"] == "tumblr":
+					tags = str(post.get("tags", ""))
+					if not tags:
+						tags = []
 
 				# just in case
 				tags = [tag.strip() for tag in tags]
@@ -78,6 +84,7 @@ class CoTagger(BasicProcessor):
 						pairs[pair_key] += 1
 
 		# write GDF file
+		self.dataset.update_status("Writing to Gephi-compatible file")
 		with self.dataset.get_results_path().open("w", encoding="utf-8") as results:
 			results.write("nodedef>name VARCHAR,weight INTEGER\n")
 			for tag in all_tags:
