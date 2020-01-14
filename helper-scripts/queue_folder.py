@@ -5,6 +5,7 @@ This can be used to import, for example, 4chan API output that has been
 downloaded elsewhere.
 """
 import argparse
+import time
 import sys
 import os
 
@@ -35,11 +36,11 @@ queue = JobQueue(logger=logger, database=Database(logger=logger, appname="queue-
 
 print("Adding files to queue...")
 files = 0
+deadline = time.time()
 for file in jsons:
-	deadline = 0
 	files += 1
 	file = str(file)
-	queue.add_job(args.datasource + "-thread", remote_id=file, details={"board": args.board, "file": str(file)}, claim_after=deadline)
-	deadline += 1
+	queue.add_job(args.datasource + "-thread", remote_id=file, details={"board": args.board, "file": str(file)}, claim_after=int(deadline))
+	deadline += 0.1
 
 print("Queued %i files." % files)
