@@ -53,7 +53,7 @@
             </div>
         {% endif %}
         <p class="details-only">
-            <a class="permalink" href="/results/{{ dataset.key }}/#nav={{ child.get_breadcrumbs() }}" target="_blank">Permanent link to this analysis result (with context)</a>
+            <a class="permalink" href="/results/{{ parent_key }}/#nav={{ child.get_breadcrumbs() }}" target="_blank">Permanent link to this analysis result (with context)</a>
         </p>
         {% if item.type in processors and current_user.is_authenticated and current_user.is_admin() and item.get_version_url("backend/processors/" + processors[item.type].file) %}
         <p class="details-only">
