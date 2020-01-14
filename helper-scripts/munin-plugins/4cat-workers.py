@@ -1,4 +1,4 @@
-#!/usr/local/bin/python3
+#!/usr/bin/python3
 
 # Munin plugin for 4CAT - Current active workers
 # Reports the number of workers currently active in the 4CAT backend, sorted by
