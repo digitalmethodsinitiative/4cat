@@ -217,7 +217,7 @@ class InternalAPI(BasicWorker):
 			week = 86400 * 7
 			now = int(time.time())
 
-			items = self.db.fetchall("SELECT * FROM queries WHERE timestamp > %s ORDER BY timestamp ASC", (now - week,))
+			items = self.db.fetchall("SELECT * FROM datasets WHERE timestamp > %s ORDER BY timestamp ASC", (now - week,))
 
 			response = {
 				"1h": 0,
