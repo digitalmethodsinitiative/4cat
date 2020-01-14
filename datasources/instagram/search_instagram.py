@@ -122,6 +122,11 @@ class SearchInstagram(Search):
 			except instaloader.QueryReturnedNotFoundException:
 				tagged_users = []
 
+			try:
+				num_comments = post.comments
+			except instaloader.QueryReturnedNotFoundException:
+				num_comments = 0
+
 			results.append({
 				"id": thread_id,
 				"thread_id": thread_id,
@@ -135,7 +140,7 @@ class SearchInstagram(Search):
 				"usertags": ",".join(tagged_users),
 				"mentioned": ",".join(mention.findall(post.caption) if post.caption else ""),
 				"num_likes": post.likes,
-				"num_comments": post.comments,
+				"num_comments": num_comments,
 				"subject": ""
 			})
 
