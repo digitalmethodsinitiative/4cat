@@ -10,8 +10,8 @@ import time
 import sys
 import os
 
-os.chdir("/srv/backend/4cat")
-sys.path.append("/srv/backend/4cat")
+os.chdir("/opt/4cat")
+sys.path.append("/opt/4cat")
 from config import DATASOURCES, DB_NAME, DB_USER, DB_PASSWORD, DB_HOST, DB_PORT
 
 if len(sys.argv) > 1 and sys.argv[1] == "config":
