@@ -1,4 +1,4 @@
-#!/usr/local/bin/python3
+#!/usr/bin/python3
 
 # Munin plugin for 4CAT - Max non-recurring job age in queue
 # Reports the age of the oldest job in the queue that is not a recurring job.
