@@ -128,7 +128,13 @@ class ImageDownloader(BasicProcessor):
 
 			# determine file name
 			imagepath = str(results_path.joinpath(hash)) + "." + extensions[path]
-			picture.save(imagepath)
+
+			# save file
+			try:
+				picture.save(imagepath)
+			except OSError:
+				self.log.warning("Could not save image %s to disk - invalid format" % path)
+				continue
 
 		# finish up
 		self.dataset.update_status("Compressing images")
