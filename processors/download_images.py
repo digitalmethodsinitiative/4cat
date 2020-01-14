@@ -49,7 +49,7 @@ class ImageDownloader(BasicProcessor):
 			"help": "No. of images (max 1000)",
 			"default": 100,
 			"min": 0,
-			"max": 1000
+			"max": 5000
 		}
 	}
 
