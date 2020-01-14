@@ -1,4 +1,4 @@
-#!/usr/local/bin/python3
+#!/usr/bin/python3
 
 # Munin plugin for 4CAT - Posts deleted per hour
 # Reports the amount of posts deleted for all platforms that are actively
