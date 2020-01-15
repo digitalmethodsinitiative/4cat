@@ -7,6 +7,7 @@ import re
 from csv import DictReader, DictWriter
 
 from backend.abstract.processor import BasicProcessor
+from backend.lib.helpers import UserInput
 
 import config
 
@@ -28,6 +29,18 @@ class HatebaseAnalyser(BasicProcessor):
 	token_expires = 0
 	token = ""
 
+	options = {
+		"language": {
+			"type": UserInput.OPTION_CHOICE,
+			"default": "en",
+			"options": {
+				"en": "English",
+				"it": "Italian"
+			},
+			"help": "Language"
+		}
+	}
+
 	def process(self):
 		"""
 		This takes a 4CAT results file as input, and outputs a new CSV file
@@ -38,7 +51,14 @@ class HatebaseAnalyser(BasicProcessor):
 		processed = 0
 		parent = self.dataset.get_genealogy()[-2]
 
-		with open(config.PATH_ROOT + "/backend/assets/hatebase.json") as hatebasedata:
+		# determine what vocabulary to use
+		language = self.parameters.get("language", "")
+		if language not in self.options["language"]["options"]:
+			language = self.options["language"]["default"]
+
+
+		# read and convert to a way we can easily match whether any word occurs
+		with open(config.PATH_ROOT + "/backend/assets/hatebase/hatebase-%s.json" % language) as hatebasedata:
 			hatebase = json.loads(hatebasedata.read())
 
 		hatebase = {term.lower(): hatebase[term] for term in hatebase}
