@@ -51,10 +51,10 @@ class OvertimeAnalysis(BasicProcessor):
 			"type": UserInput.OPTION_MULTI,
 			"default": [],
 			"options": {
-				"hatebase-en-unambiguous": "Hatebase hate speech list (English, unambiguous terms)",
-				"hatebase-en-ambiguous": "Hatebase hate speech list (English, ambiguous terms)",
-				"hatebase-it-unambiguous": "Hatebase hate speech list (Italian, unambiguous terms)",
-				"hatebase-it-ambiguous": "Hatebase hate speech list (italian, ambiguous terms)"
+				"hatebase-en-unambiguous": "Hatebase.org hate speech list (English, unambiguous terms)",
+				"hatebase-en-ambiguous": "Hatebase.org hate speech list (English, ambiguous terms)",
+				"hatebase-it-unambiguous": "Hatebase.org hate speech list (Italian, unambiguous terms)",
+				"hatebase-it-ambiguous": "Hatebase.org hate speech list (italian, ambiguous terms)"
 			},
 			"help": "Language"
 		},
