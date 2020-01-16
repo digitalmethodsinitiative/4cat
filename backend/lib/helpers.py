@@ -13,7 +13,7 @@ from calendar import monthrange
 import config
 
 
-def posts_to_csv(sql_results, filepath, clean_csv=True):
+def posts_to_csv(sql_results, filepath):
 	"""
 	Takes a dictionary of results, converts it to a csv, and writes it to the
 	given location. This is mostly a generic dictionary-to-CSV processor but
@@ -22,8 +22,6 @@ def posts_to_csv(sql_results, filepath, clean_csv=True):
 
 	:param sql_results:		List with results derived with db.fetchall()
 	:param filepath:    	Filepath for the resulting csv
-	:param clean_csv:   	Whether to parse the raw HTML data to clean text.
-							If True (default), writing takes 1.5 times longer.
 
 	:return int:  Amount of posts that were processed
 
@@ -31,37 +29,36 @@ def posts_to_csv(sql_results, filepath, clean_csv=True):
 	if not filepath:
 		raise Exception("No result file for query")
 
-	fieldnames = list(sql_results[0].keys())
-	fieldnames.append("unix_timestamp")
-
 	# write the dictionary to a csv
 	if not isinstance(filepath, Path):
 		filepath = Path(filepath)
 
 	processed = 0
+	header_written = False
 	with filepath.open("w", encoding="utf-8") as csvfile:
-		writer = csv.DictWriter(csvfile, fieldnames=fieldnames, lineterminator='\n')
-		writer.writeheader()
+		# Parsing: remove the HTML tags, but keep the <br> as a newline
+		# Takes around 1.5 times longer
+		for row in sql_results:
+			if not header_written:
+				fieldnames = list(row.keys())
+				fieldnames.append("unix_timestamp")
+				writer = csv.DictWriter(csvfile, fieldnames=fieldnames, lineterminator='\n')
+				writer.writeheader()
+				header_written = True
 
-		if clean_csv:
-			# Parsing: remove the HTML tags, but keep the <br> as a newline
-			# Takes around 1.5 times longer
-			for row in sql_results:
-				processed += 1
-				# Create human dates from timestamp
-				from datetime import datetime
-				if "timestamp" in row:
-					row["unix_timestamp"] = row["timestamp"]
-					row["timestamp"] = datetime.utcfromtimestamp(row["timestamp"]).strftime('%Y-%m-%d %H:%M:%S')
-				else:
-					row["timestamp"] = "undefined"
-				# Parse html to text
-				if row["body"]:
-					row["body"] = strip_tags(row["body"])
+			processed += 1
+			# Create human dates from timestamp
+			from datetime import datetime
+			if "timestamp" in row:
+				row["unix_timestamp"] = row["timestamp"]
+				row["timestamp"] = datetime.utcfromtimestamp(row["timestamp"]).strftime('%Y-%m-%d %H:%M:%S')
+			else:
+				row["timestamp"] = "undefined"
+			# Parse html to text
+			if row["body"]:
+				row["body"] = strip_tags(row["body"])
 
-				writer.writerow(row)
-		else:
-			writer.writerows(sql_results)
+			writer.writerow(row)
 
 	return processed
 
