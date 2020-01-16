@@ -50,14 +50,13 @@ class Search(BasicProcessor, ABC):
 		posts = self.search(query_parameters)
 
 		# Write posts to csv and update the DataBase status to finished
+		num_posts = 0
 		if posts:
 			self.dataset.update_status("Writing posts to result file")
-			posts_to_csv(posts, results_file)
+			num_posts = posts_to_csv(posts, results_file)
 			self.dataset.update_status("Query finished, results are available.")
 		elif posts is not None:
 			self.dataset.update_status("Query finished, no results found.")
-
-		num_posts = len(posts) if posts else 0
 
 		# queue predefined post-processors
 		if num_posts > 0 and query_parameters.get("next", []):

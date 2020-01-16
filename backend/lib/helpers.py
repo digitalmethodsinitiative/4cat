@@ -25,6 +25,8 @@ def posts_to_csv(sql_results, filepath, clean_csv=True):
 	:param clean_csv:   	Whether to parse the raw HTML data to clean text.
 							If True (default), writing takes 1.5 times longer.
 
+	:return int:  Amount of posts that were processed
+
 	"""
 	if not filepath:
 		raise Exception("No result file for query")
@@ -36,6 +38,7 @@ def posts_to_csv(sql_results, filepath, clean_csv=True):
 	if not isinstance(filepath, Path):
 		filepath = Path(filepath)
 
+	processed = 0
 	with filepath.open("w", encoding="utf-8") as csvfile:
 		writer = csv.DictWriter(csvfile, fieldnames=fieldnames, lineterminator='\n')
 		writer.writeheader()
@@ -44,6 +47,7 @@ def posts_to_csv(sql_results, filepath, clean_csv=True):
 			# Parsing: remove the HTML tags, but keep the <br> as a newline
 			# Takes around 1.5 times longer
 			for row in sql_results:
+				processed += 1
 				# Create human dates from timestamp
 				from datetime import datetime
 				if "timestamp" in row:
@@ -59,7 +63,7 @@ def posts_to_csv(sql_results, filepath, clean_csv=True):
 		else:
 			writer.writerows(sql_results)
 
-	return filepath
+	return processed
 
 
 def init_datasource(database, logger, queue, name):
