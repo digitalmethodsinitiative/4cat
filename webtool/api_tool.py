@@ -15,7 +15,8 @@ from pathlib import Path
 
 import backend
 
-from flask import jsonify, abort, request, render_template, render_template_string, redirect, send_file, url_for, flash, get_flashed_messages
+from flask import jsonify, abort, request, render_template, render_template_string, redirect, send_file, url_for, flash, \
+	get_flashed_messages
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 
@@ -32,16 +33,19 @@ api_ratelimit = limiter.shared_limit("1 per second", scope="api")
 API_SUCCESS = 200
 API_FAIL = 404
 
+
 @app.route("/api/")
 @api_ratelimit
 def openapi_overview():
 	return jsonify({
 		"status": "The following API specifications are available from this server.",
 		"data": {
-			api_id: "http" + ("s" if config.FlaskConfig.SERVER_HTTPS else "") + "://" + config.FlaskConfig.SERVER_NAME + "/api/spec/" + api_id + "/"
-	 for api_id in openapi.apis
+			api_id: "http" + (
+				"s" if config.FlaskConfig.SERVER_HTTPS else "") + "://" + config.FlaskConfig.SERVER_NAME + "/api/spec/" + api_id + "/"
+			for api_id in openapi.apis
 		}
 	})
+
 
 @app.route('/api/spec/<string:api_id>/')
 @api_ratelimit
@@ -297,7 +301,8 @@ def check_dataset():
 		"preview": preview,
 		"path": path,
 		"empty": (dataset.data["num_rows"] == 0),
-		"is_favourite": (db.fetchone("SELECT COUNT(*) AS num FROM users_favourites WHERE name = %s AND key = %s", (current_user.get_id(), dataset.key))["num"] > 0)
+		"is_favourite": (db.fetchone("SELECT COUNT(*) AS num FROM users_favourites WHERE name = %s AND key = %s",
+									 (current_user.get_id(), dataset.key))["num"] > 0)
 	}
 
 	return jsonify(status)
@@ -355,6 +360,7 @@ def check_queue():
 
 	return jsonify(unfinished_datasets)
 
+
 @app.route("/api/toggle-dataset-favourite/<string:key>")
 @login_required
 @openapi.endpoint("tool")
@@ -377,14 +383,14 @@ def toggle_favourite(key):
 	except TypeError:
 		return error(404, error="Dataset does not exist.")
 
-	current_status = db.fetchone("SELECT * FROM users_favourites WHERE name = %s AND key = %s", (current_user.get_id(), dataset.key))
+	current_status = db.fetchone("SELECT * FROM users_favourites WHERE name = %s AND key = %s",
+								 (current_user.get_id(), dataset.key))
 	if not current_status:
 		db.insert("users_favourites", data={"name": current_user.get_id(), "key": dataset.key})
 		return jsonify({"success": True, "favourite_status": True})
 	else:
 		db.delete("users_favourites", where={"name": current_user.get_id(), "key": dataset.key})
 		return jsonify({"success": True, "favourite_status": False})
-
 
 
 @app.route("/api/queue-processor/", methods=["POST"])
