@@ -23,7 +23,9 @@ class ConvertCSVToJSON(BasicProcessor):
 	extension = "json"  # extension of result file, used internally and in UI
 
 	# all post-processors with CSV output
-	accepts = ["search", "collocations", "debate_metrics", "quote-ranker", "tfidf", "thread-metadata",
+	accepts = ["search", "collocations", "count-posts", "debate_metrics", "get-entities",
+			   "extract-nouns", "hatebase-data", "penelope-semanticframe", "quote-ranker",
+			   "tfidf", "thread-metadata", "sentence-split", "hatebase-frequencies",
 			   "count-countries", "top-images", "url-extractor", "extract-usernames", "vector-ranker",
 			   "count-words", "youtube-metadata", "attribute-frequencies", "count-posts"]
 
