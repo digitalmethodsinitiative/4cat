@@ -349,7 +349,7 @@ class SearchTelegram(Search):
 			del query["api_phone"]
 
 		# 5000 is mostly arbitrary - may need tweaking
-		max_posts = 25000
+		max_posts = 50000
 		if query.get("max_posts", ""):
 			try:
 				max_posts = min(abs(int(query.get("max_posts"))), max_posts)
