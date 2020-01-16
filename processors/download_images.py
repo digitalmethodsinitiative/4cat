@@ -49,7 +49,7 @@ class ImageDownloader(BasicProcessor):
 			"help": "No. of images (max 1000)",
 			"default": 100,
 			"min": 0,
-			"max": 1000
+			"max": 5000
 		}
 	}
 
@@ -128,7 +128,13 @@ class ImageDownloader(BasicProcessor):
 
 			# determine file name
 			imagepath = str(results_path.joinpath(hash)) + "." + extensions[path]
-			picture.save(imagepath)
+
+			# save file
+			try:
+				picture.save(imagepath)
+			except OSError:
+				self.log.warning("Could not save image %s to disk - invalid format" % path)
+				continue
 
 		# finish up
 		self.dataset.update_status("Compressing images")
