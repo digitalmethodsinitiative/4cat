@@ -106,8 +106,12 @@ class ExtractNouns(BasicProcessor):
 			results = [{"word": tpl[0], "count": tpl[1]} for tpl in count_nouns]
 
 		# done!
-		self.dataset.update_status("Finished")
-		self.dataset.write_csv_and_finish(results)
+		if results:
+			self.dataset.update_status("Finished")
+			self.dataset.write_csv_and_finish(results)
+		else:
+			self.dataset.update_status("Finished, but no nouns were extracted.")
+			self.dataset.finish(0)
 
 	def extract_docs(self):
 		"""
