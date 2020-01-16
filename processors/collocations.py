@@ -126,7 +126,7 @@ class GetCollocations(BasicProcessor):
 				for tpl in collocations:
 					result = {}
 					result["item"] = " ".join(tpl[0])
-					result["value"] = tpl[1]
+					result["frequency"] = tpl[1]
 					result["date"] = date_string
 					results.append(result)
 
