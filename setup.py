@@ -26,6 +26,7 @@ libraries = [
 		"markdown==3.0.1",
 		"jsonpickle==1.2",
 		"svgwrite==1.3.1",
+		"pytumblr==0.1.0",
 		"pymysql==0.9.2",
 		"pandas==0.23.4",
 		"datedelta==1.3",
@@ -37,11 +38,10 @@ libraries = [
 		"bcrypt==3.1.4",
 		"scipy==1.1.0",
 		"Flask==1.1.0",
+		"spacy==2.1.4",
 		"nltk==3.4.5",
 		"mpld3==0.3",
 		"ijson==2.4",
-		"pytumblr==0.1.0",
-		"spacy==2.1.4",
 		"en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-2.0.0/en_core_web_sm-2.0.0.tar.gz"
 	]
 
