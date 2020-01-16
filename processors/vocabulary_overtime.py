@@ -41,14 +41,20 @@ class OvertimeAnalysis(BasicProcessor):
 			"options": {"all": "Overall", "year": "Year", "month": "Month", "day": "Day"},
 			"help": "Count frequencies per"
 		},
+		"partition": {
+			"type": UserInput.OPTION_TOGGLE,
+			"default": False,
+			"help": "Track vocabularies separately",
+			"tooltip": "Instead of checking whether a post matches any of the selected vocabularies, provide separate frequencies per vocabulary."
+		},
 		"vocabulary": {
 			"type": UserInput.OPTION_MULTI,
 			"default": [],
 			"options": {
-				"hatebase-en-unambig": "Hatebase hate speech list (English, unambiguous terms)",
-				"hatebase-en-ambig": "Hatebase hate speech list (English, ambiguous terms)",
-				"hatebase-it-unambig": "Hatebase hate speech list (Italian, unambiguous terms)",
-				"hatebase-it-ambig": "Hatebase hate speech list (italian, ambiguous terms)"
+				"hatebase-en-unambiguous": "Hatebase hate speech list (English, unambiguous terms)",
+				"hatebase-en-ambiguous": "Hatebase hate speech list (English, ambiguous terms)",
+				"hatebase-it-unambiguous": "Hatebase hate speech list (Italian, unambiguous terms)",
+				"hatebase-it-ambiguous": "Hatebase hate speech list (italian, ambiguous terms)"
 			},
 			"help": "Language"
 		},
@@ -67,83 +73,89 @@ class OvertimeAnalysis(BasicProcessor):
 
 		# convenience variables
 		timeframe = self.parameters.get("timeframe", self.options["timeframe"]["default"])
+		partition = bool(self.parameters.get("partition", self.options["partition"]["default"]))
 
 		# load vocabularies from word lists
-		vocabulary = set()
+		vocabularies = {}
 		for vocabulary_id in self.parameters.get("vocabulary", []):
 			vocabulary_file = Path(config.PATH_ROOT, "backend/assets/wordlists/%s.pb" % vocabulary_id)
 			if not vocabulary_file.exists():
 				continue
 
+			if not partition:
+				vocabulary_id = "frequency"
+
+			if vocabulary_id not in vocabularies:
+				vocabularies[vocabulary_id] = set()
+
 			with open(vocabulary_file, "rb") as vocabulary_handle:
-				vocabulary |= pickle.load(vocabulary_handle)
+				vocabularies[vocabulary_id] |= pickle.load(vocabulary_handle)
 
 		# add user-defined words
+		custom_id = "user-defined" if partition else "frequency"
+		if custom_id not in vocabularies:
+			vocabularies[custom_id] = set()
+
 		custom_vocabulary = set([word.strip() for word in self.parameters.get("vocabulary-custom", "").split(",")])
-		vocabulary |= custom_vocabulary
+		vocabularies[custom_id] |= custom_vocabulary
 
 		# compile into regex for quick matching
-		vocabulary_regex = re.compile(r"\b(" + "|".join([re.escape(term) for term in vocabulary if term]) + r")\b")
-
+		vocabulary_regexes = {}
+		for vocabulary_id in vocabularies:
+			vocabulary_regexes[vocabulary_id] = re.compile(r"\b(" + "|".join([re.escape(term) for term in vocabularies[vocabulary_id] if term]) + r")\b")
+		print(vocabulary_regexes)
 
 		# now for the real deal
 		self.dataset.update_status("Reading source file")
-		activity = {}
-		hateful = {}
-		views = {}
+		activity = {vocabulary_id: {} for vocabulary_id in vocabularies}
 		intervals = set()
 
 		with self.source_file.open() as input:
 			reader = DictReader(input)
 
-			# see if we need to multiply by engagement
-			if not self.parameters.get("use-engagement", False):
-				engagement_field = None
-			elif "views" in reader.fieldnames:
-				engagement_field = "views"
-			elif "score" in reader.fieldnames:
-				engagement_field = "score"
-			elif "likes" in reader.fieldnames:
-				engagement_field = "likes"
-			else:
-				engagement_field = None
-
-			# check each post for matches
+			# if 'partition' is false, there will just be one combined
+			# vocabulary, but else we'll have different ones we can
+			# check separately
 			for post in reader:
-				# this is the check!
-				if not vocabulary_regex.findall(post["body"].lower()):
-					continue
+				for vocabulary_id in vocabularies:
+					vocabulary_regex = vocabulary_regexes[vocabulary_id]
 
-				# count towards the required interval
-				if timeframe == "all":
-					time_unit = "overall"
-				else:
-					try:
-						timestamp = int(datetime.datetime.strptime(post["timestamp"], "%Y-%m-%d %H:%M:%S").timestamp())
-					except ValueError:
-						timestamp = 0
-					date = datetime.datetime.fromtimestamp(timestamp)
-					if timeframe == "year":
-						time_unit = str(date.year)
-					elif timeframe == "month":
-						time_unit = str(date.year) + "-" + str(date.month).zfill(2)
+					# check if we match
+					if not vocabulary_regex.findall(post["body"].lower()):
+						continue
+
+					# determine what interval to save the frequency for
+					if timeframe == "all":
+						interval = "overall"
 					else:
-						time_unit = str(date.year) + "-" + str(date.month).zfill(2) + "-" + str(date.day).zfill(2)
+						try:
+							timestamp = int(datetime.datetime.strptime(post["timestamp"], "%Y-%m-%d %H:%M:%S").timestamp())
+						except ValueError:
+							timestamp = 0
 
-				if time_unit not in activity:
-					activity[time_unit] = 0
+						date = datetime.datetime.fromtimestamp(timestamp)
+						if timeframe == "year":
+							interval = str(date.year)
+						elif timeframe == "month":
+							interval = str(date.year) + "-" + str(date.month).zfill(2)
+						else:
+							interval = str(date.year) + "-" + str(date.month).zfill(2) + "-" + str(date.day).zfill(2)
 
-				activity[time_unit] += 1
+					if interval not in activity[vocabulary_id]:
+						activity[vocabulary_id][interval] = 0
 
-				intervals.add(time_unit)
+					activity[vocabulary_id][interval] += 1
+					intervals.add(interval)
 
+		# turn all that data into a simple three-column frequency table
 		rows = []
 		for interval in sorted(intervals):
-			rows.append({
-				"date": interval,
-				"item": "matching posts",
-				"frequency": activity[interval]
-			})
+			for vocabulary_id in vocabularies:
+				rows.append({
+					"date": interval,
+					"item": vocabulary_id,
+					"frequency": activity.get(vocabulary_id, {}).get(interval, 0)
+				})
 
 		# write as csv
 		if rows:
