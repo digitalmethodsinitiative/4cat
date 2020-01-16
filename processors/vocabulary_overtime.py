@@ -37,7 +37,7 @@ class OvertimeAnalysis(BasicProcessor):
 	options = {
 		"timeframe": {
 			"type": UserInput.OPTION_CHOICE,
-			"default": "all",
+			"default": "month",
 			"options": {"all": "Overall", "year": "Year", "month": "Month", "day": "Day"},
 			"help": "Count frequencies per"
 		},
