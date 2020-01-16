@@ -38,7 +38,7 @@ class IsometricMultigraphRenderer(BasicProcessor):
 	output = "svg"
 
 	accepts = ["overtime-hateful", "vector-ranker", "preset-neologisms", "tfidf", "collocations",
-			   "attribute-frequencies", "hatebase-frequencies"]
+			   "attribute-frequencies", "hatebase-frequencies", "overtime-vocabulary"]
 
 	options = {
 		"smooth": {
