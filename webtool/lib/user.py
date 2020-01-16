@@ -181,6 +181,9 @@ class User:
 		no notification, but an admin could forward the correct link).
 
 		If the user is a 'special' user, a `ValueError` is raised.
+
+		:param bool new:  Is this the first time setting a password for this
+						  account?
 		"""
 		if not config.MAILHOST:
 			raise RuntimeError("No e-mail server configured. 4CAT cannot send any e-mails.")

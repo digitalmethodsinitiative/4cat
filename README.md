@@ -56,6 +56,11 @@ high-traffic 4chan and 8chan boards. Access is available on request via
 ## Contributing
 This section yet to be written!
 
+## License
+
+4CAT is licensed under the Mozilla Public License, 2.0. Refer to the `LICENSE`
+file form ore information.
+
 ## Links
 - [Website](https://4cat.oilab.nl)
 - [Open Intelligence Lab](https://www.oilab.eu)
