@@ -150,7 +150,7 @@ class SearchReddit(Search):
 
 				if thread["id"] not in seen_threads:
 					seen_threads.add(thread["id"])
-					return_posts.append(self.thread_to_4cat(thread))
+					yield self.thread_to_4cat(thread)
 
 					# this is the only way to go to the next page right now...
 					submission_parameters["after"] = thread["created_utc"]
@@ -196,7 +196,7 @@ class SearchReddit(Search):
 
 				if post["id"] not in seen_posts:
 					seen_posts.add(post["id"])
-					return_posts.append(self.post_to_4cat(post))
+					yield self.post_to_4cat(post)
 					post_parameters["after"] = post["created_utc"]
 
 					total_posts += 1
@@ -205,9 +205,8 @@ class SearchReddit(Search):
 			self.dataset.update_status("Found %i posts via Pushshift API..." % total_posts)
 
 		# and done!
-		if not return_posts:
+		if total_posts == 0 and total_threads == 0:
 			self.dataset.update_status("No posts found")
-		return return_posts
 
 	def fetch_posts(self, post_ids, where=None, replacements=None):
 		"""
