@@ -9,6 +9,7 @@ import os
 import re
 import time
 import pytumblr
+import datetime
 
 import config
 
@@ -37,6 +38,10 @@ class SearchTumblr(Search):
 	max_workers = 1
 	max_retries = 3
 
+	max_posts = 1000000
+	max_posts_reached = False
+	api_limit_reached = False
+
 	def get_posts_simple(self, query):
 		"""
 		Fetches data from Tumblr via its API.
@@ -53,15 +58,32 @@ class SearchTumblr(Search):
 		if scope == "tag":
 			# for each tag, get post
 			for query in queries:
-				results += self.get_posts_by_tag(query, before=parameters.get("before"))
+
+				new_results = self.get_posts_by_tag(query, before=parameters.get("before"))
+				results += new_results
+
+				if self.max_posts_reached:
+					self.dataset.update_status("Max posts exceeded")
+					break
+				if self.api_limit_reached:
+					self.dataset.update_status("API limit reached")
+					break
 
 		elif scope == "blog":
 			# for each blog, get its posts
 			for query in queries:
-				results += self.get_posts_by_blog(query, before=parameters.get("before"))
+				new_results = self.get_posts_by_blog(query, before=parameters.get("before"))
+				results += new_results
+
+				if self.max_posts_reached:
+					self.update_status("Max posts exceeded")
+					break
+				if self.api_limit_reached:
+					self.update_status("API limit reached")
+					break
 
 		# If we also want the posts that reblogged the fetched posts:
-		if parameters.get("fetch_reblogs"):
+		if parameters.get("fetch_reblogs") and not self.max_posts_reached and not self.api_limit_reached:
 			self.dataset.update_status("Getting notes from all posts")
 
 			# Prepare dicts to pass to `get_post_notes`
@@ -115,26 +137,43 @@ class SearchTumblr(Search):
 				self.dataset.update_status("No more posts")
 				break
 
-			# Use the pytumblr library to make the API call
-			posts = client.tagged(tag, before=before, limit=20, filter="raw")
-			
+			try:
+				# Use the pytumblr library to make the API call
+				posts = client.tagged(tag, before=before, limit=20, filter="raw")
+				
+				#if (before - posts[0]["timestamp"]) > 500000:
+					#print("ALERT - DATES LIKELY SKIPPED")
+					#print([post["timestamp"] for post in posts])
+
+			except Exception as e:
+				#print(e)
+				self.dataset.update_status("Reached the limit of the Tumblr API. Last timestamp: %s" % str(before))
+				self.api_limit_reached = True
+				break
+
 			# Make sure the Tumblr API doesn't magically stop at an earlier date
 			if not posts:
 				retries += 1
 				before -= 3600 # Decrease by an hour
-				self.dataset.update_status("No posts - querying again but an hour earlier (retry %s/30)" % str(retries))
+				self.dataset.update_status("No posts - querying again but an hour earlier (retry %s/48)" % str(retries))
 				continue
 			
-			else: # Append posts to main list
+			# Append posts to main list
+			else:
 				posts = self.parse_tumblr_posts(posts)
 				all_posts += posts
 				retries = 0
+				#if (before - posts[len(posts) - 1]["timestamp"]) > 500000:
+					#print("ALERT - DATES LIKELY SKIPPED")
+					#print([post["timestamp"] for post in posts])
+
 				before = posts[len(posts) - 1]["timestamp"]
 
-			self.dataset.update_status("Collected %s posts" % str(len(all_posts)))
+			if len(all_posts) >= self.max_posts:
+				self.max_posts_reached = True
+				break
 
-			# Wait a bit to stay friends with the bouncer
-			#time.sleep(3)
+			self.dataset.update_status("Collected %s posts" % str(len(all_posts)))
 
 		return all_posts
 	
@@ -241,6 +280,12 @@ class SearchTumblr(Search):
 		items = items.split(",")
 		items = [item.lstrip().rstrip() for item in items]
 
+		# set before
+		if query.get("before"):
+			before = int(datetime.datetime.strptime(query.get("before", ""), "%Y-%m-%d").timestamp())
+		else:
+			before = None
+
 		# Not more than 5 plox
 		if len(items) > 5:
 			raise QueryParametersException("Only query for five or less tags or blogs.")
@@ -250,7 +295,8 @@ class SearchTumblr(Search):
 			"query": items,
 			"board": query.get("search_scope") + "s",  # used in web interface
 			"search_scope": query.get("search_scope"),
-			"fetch_reblogs": bool(query.get("fetch_reblogs", False))
+			"fetch_reblogs": bool(query.get("fetch_reblogs", False)),
+			"before": before
 		}
 
 	def parse_tumblr_posts(self, posts, reblog=False):
