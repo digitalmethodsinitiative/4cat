@@ -117,13 +117,13 @@ class Tokenise(BasicProcessor):
 
 		# Extend or limit the word filter with optionally added words
 		# Remove accepted words from filter
-		if self.parameters["accept_words"]:
+		if self.parameters.get("accept_words"):
 			accept_words = [str(word).strip() for word in self.parameters["accept_words"].split(",")]
 			for accept_word in accept_words:
 				if accept_word in word_filter:
 					word_filter.remove(accept_word)
 		# Add rejected words to filter
-		if self.parameters["reject_words"]:
+		if self.parameters.get("reject_words"):
 			reject_words = [str(word).strip() for word in self.parameters["reject_words"].split(",")]
 			word_filter.update(reject_words)
 
