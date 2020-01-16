@@ -56,7 +56,7 @@ class OvertimeAnalysis(BasicProcessor):
 				"hatebase-it-unambiguous": "Hatebase.org hate speech list (Italian, unambiguous terms)",
 				"hatebase-it-ambiguous": "Hatebase.org hate speech list (italian, ambiguous terms)"
 			},
-			"help": "Language"
+			"help": "Vocabularies to detect"
 		},
 		"vocabulary-custom": {
 			"type": UserInput.OPTION_TEXT,
