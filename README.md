@@ -2,7 +2,7 @@
 
 4CAT is a tool that can be used to analyse and process data from forum-like
 platforms (such as [Reddit](https://www.reddit.com), [4chan](https://4chan.org)
-or [Telegram](https://www.telegram.com) for research purposes.
+or [Telegram](https://www.telegram.com)) for research purposes.
 
 A "forum", to 4CAT, is any data structure that can be represented in terms of 
 threads and posts. This includes traditional forums and imageboards, but may
