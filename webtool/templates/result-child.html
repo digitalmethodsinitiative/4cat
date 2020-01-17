@@ -3,6 +3,13 @@
 
 
 <li id="child-{{ child.key }}" class="child{% if not child.is_finished() %} running{% endif %}" data-status="{{ child.status }}">
+    <header>
+        <h4>{{ processor[child.type].name if child.type in processors else "(Deprecated analysis) " + child.type }}</h4>
+        <div class="child-status">
+            {% if not child.is_finished() %}
+            <i class="fa fa-spin fa-circle-notch" aria-hidden></i>
+            <span class="sr-only">
+    </header>
     <div class="query-core">
         <div class="query-descriptor">
             <h4 class="child-header">{{ processors[child.type].name if child.type in processors else "(Deprecated analysis) " + child.type }}</h4>
