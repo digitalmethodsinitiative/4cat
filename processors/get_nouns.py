@@ -108,7 +108,7 @@ class ExtractNouns(BasicProcessor):
 		# done!
 		if results:
 			self.dataset.update_status("Finished")
-			self.dataset.write_csv_and_finish(results)
+			self.write_csv_items_and_finish(results)
 		else:
 			self.dataset.update_status("Finished, but no nouns were extracted.")
 			self.dataset.finish(0)

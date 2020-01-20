@@ -30,4 +30,19 @@ class JobNotFoundException(QueueException):
 	pass
 
 class QueryParametersException(FourcatException):
+	"""
+	Raise if a dataset query has invalid parameters
+	"""
+	pass
+
+class WorkerInterruptedException(FourcatException):
+	"""
+	Raise when killing a worker before it's done with its job
+	"""
+	pass
+
+class ProcessorInterruptedException(WorkerInterruptedException):
+	"""
+	Raise when killing a processor before it's done with its job
+	"""
 	pass

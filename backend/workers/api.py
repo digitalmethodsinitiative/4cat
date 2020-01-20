@@ -62,11 +62,11 @@ class InternalAPI(BasicWorker):
 		self.manager.log.info("Local API listening for requests at localhost:%s" % self.port)
 
 		# continually listen for new connections
-		while self.looping:
+		while not self.interrupted:
 			try:
 				client, address = server.accept()
 			except (socket.timeout, TimeoutError) as e:
-				if not self.looping:
+				if self.interrupted:
 					break
 				# no problemo, just listen again - this only times out so it won't hang the entire app when
 				# trying to exit, as there's no other way to easily interrupt accept()

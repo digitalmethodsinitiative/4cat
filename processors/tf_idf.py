@@ -9,6 +9,7 @@ import pandas as pd
 from pathlib import Path
 
 from backend.lib.helpers import UserInput, convert_to_int
+from backend.lib.exceptions import ProcessorInterruptedException
 from backend.abstract.processor import BasicProcessor
 
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -93,6 +94,9 @@ class tfIdf(BasicProcessor):
 
 			# Loop through the tokens (can also be a single set)
 			for tokens_name in token_sets:
+				if self.interrupted:
+					raise ProcessorInterruptedException("Interrupted while loading token sets")
+
 				# Get the date
 				date_string = tokens_name.split('.')[0]
 				dates.append(date_string)
@@ -118,7 +122,7 @@ class tfIdf(BasicProcessor):
 
 			# Generate csv and finish
 			self.dataset.update_status("Writing to csv and finishing")
-			self.dataset.write_csv_and_finish(results)
+			self.write_csv_items_and_finish(results)
 		except MemoryError:
 			self.dataset.update_status("Out of memory - dataset to large to run tf-idf analysis.")
 			self.dataset.finish(0)

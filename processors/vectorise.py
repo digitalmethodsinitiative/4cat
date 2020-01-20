@@ -5,6 +5,7 @@ import zipfile
 import pickle
 import shutil
 
+from backend.lib.exceptions import ProcessorInterruptedException
 from backend.abstract.processor import BasicProcessor
 
 __author__ = "Stijn Peeters"
@@ -45,6 +46,9 @@ class Vectorise(BasicProcessor):
 			index = 0
 
 			for vector_set in vector_sets:
+				if self.interrupted:
+					raise ProcessorInterruptedException("Interrupted while processing token sets")
+
 				index += 1
 				vector_set_name = vector_set.split("/")[-1]  # we don't need the full path
 				self.dataset.update_status("Processing token set %i/%i" % (index, len(vector_sets)))

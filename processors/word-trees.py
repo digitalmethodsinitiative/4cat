@@ -126,26 +126,24 @@ class MakeWordtree(BasicProcessor):
 
 		# find matching posts
 		processed = 0
-		with self.source_file.open() as input:
-			reader = DictReader(input)
-			for post in reader:
-				processed += 1
-				if processed % 500 == 0:
-					self.dataset.update_status("Processing and tokenising post %i" % processed)
-				body = post["body"]
+		for post in self.iterate_csv_items(self.source_file):
+			processed += 1
+			if processed % 500 == 0:
+				self.dataset.update_status("Processing and tokenising post %i" % processed)
+			body = post["body"]
 
-				if strip_urls:
-					body = link_regex.sub("", body)
+			if strip_urls:
+				body = link_regex.sub("", body)
 
-				if strip_symbols:
-					body = delete_regex.sub("", body)
+			if strip_symbols:
+				body = delete_regex.sub("", body)
 
-				body = word_tokenize(body)
-				positions = [i for i, x in enumerate(body) if x.lower() == query.lower()]
+			body = word_tokenize(body)
+			positions = [i for i, x in enumerate(body) if x.lower() == query.lower()]
 
-				for position in positions:
-					right_leaves.append(body[position:position + window])
-					left_leaves.append(body[max(0, position - window):position + 1])
+			for position in positions:
+				right_leaves.append(body[position:position + window])
+				left_leaves.append(body[max(0, position - window):position + 1])
 
 		self.step = self.fontsize * 0.6  # approximately the width of a monospace char
 		self.gap = (7 * self.step)  # space for lines between nodes

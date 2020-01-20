@@ -2,7 +2,7 @@ import requests
 import re
 
 from backend.abstract.search import Search
-from backend.lib.exceptions import QueryParametersException
+from backend.lib.exceptions import QueryParametersException, ProcessorInterruptedException
 
 
 class SearchReddit(Search):
@@ -121,6 +121,9 @@ class SearchReddit(Search):
 
 		# loop through results bit by bit
 		while True:
+			if self.interrupted:
+				raise ProcessorInterruptedException("Interrupted while fetching thread data from the Pushshift API")
+
 			retries = 0
 
 			response = self.call_pushshift_api("https://api.pushshift.io/reddit/submission/search",
@@ -165,6 +168,9 @@ class SearchReddit(Search):
 		seen_posts = set()
 
 		while True:
+			if self.interrupted:
+				raise ProcessorInterruptedException("Interrupted while fetching post data from the Pushshift API")
+
 			response = self.call_pushshift_api("https://api.pushshift.io/reddit/comment/search", params=post_parameters)
 			if response is None:
 				return response
