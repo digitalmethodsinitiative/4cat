@@ -112,8 +112,12 @@ class tfIdf(BasicProcessor):
 
 		# Get the collocations. Returns a tuple.
 		self.dataset.update_status("Generating tf-idf for token set")
-		results = self.get_tfidf(tokens, dates, ngram_range=n_size, min_occurrences=min_occurrences,
+		try:
+			results = self.get_tfidf(tokens, dates, ngram_range=n_size, min_occurrences=min_occurrences,
 								 max_occurrences=max_occurrences, top_n=max_output)
+		except MemoryError:
+			self.dataset.update_status("Out of memory - dataset to large to run tf-idf analysis.")
+			self.dataset.finish(0)
 
 		# Generate csv and finish
 		self.dataset.update_status("Writing to csv and finishing")
