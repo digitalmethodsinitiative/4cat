@@ -49,10 +49,8 @@ may be analysed from various epistemological perspectives.
   4CAT and manipulate or process datasets created with 4CAT. There is an API
   you can use to [make your own processors](https://github.com/digitalmethodsinitiative/4cat/wiki/How-to-make-a-processor).
   
-You can 
-[set up 4CAT locally](https://github.com/stijn-uva/4cat/wiki/Installing-4CAT),
-but we also run our own 4CAT instance which covers (among other things) some
-high-traffic 4chan and 8chan boards. Access is available on request.
+We use 4CAT for our own purposes at the Universtiy of Amsterdam but
+you can (and are encouraged to!) [set up 4CAT locally](https://github.com/stijn-uva/4cat/wiki/Installing-4CAT).
 
 ## Contributing
 This section yet to be written!
