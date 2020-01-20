@@ -1,8 +1,7 @@
 # 4CAT: Capture and Analysis Toolkit
 
-4CAT is a tool that can be used to analyse and process data from forum-like
-platforms (such as [Reddit](https://www.reddit.com), [4chan](https://4chan.org)
-or [Telegram](https://www.telegram.com)) for research purposes.
+4CAT is a research tool that can be used to analyse and process data from forum-like
+platforms, ranging from [Reddit](https://www.reddit.com) and imageboards to Instagram and Tumblr.
 
 A "forum", to 4CAT, is any data structure that can be represented in terms of 
 threads and posts. This includes traditional forums and imageboards, but may
@@ -51,8 +50,7 @@ may be analysed from various epistemological perspectives.
   
 You can 
 [set up 4CAT locally](https://github.com/stijn-uva/4cat/wiki/Installing-4CAT),
-but we also run our own 4CAT instance which covers (among other things) some
-high-traffic 4chan and 8chan boards. Access is available on request.
+but we also run our own 4CAT instance which archives ephemeral imageboard content. Access is available on request.
 
 ## Contributing
 This section yet to be written!
