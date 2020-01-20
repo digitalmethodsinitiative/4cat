@@ -50,24 +50,21 @@ class SplitSentences(BasicProcessor):
 			writer = csv.DictWriter(output, fieldnames=("post_id", "sentence",))
 			writer.writeheader()
 
-			with self.source_file.open("r", encoding="utf-8") as input:
-				reader = csv.DictReader(input)
+			for post in self.iterate_csv_items(self.source_file):
+				self.dataset.update_status("Processing post %i" % num_posts)
+				num_posts += 1
+				sentences = sent_tokenize(post.get("body", ""))
 
-				for post in reader:
-					self.dataset.update_status("Processing post %i" % num_posts)
-					num_posts += 1
-					sentences = sent_tokenize(post.get("body", ""))
-
-					for sentence in sentences:
-						if min_length == 0:
+				for sentence in sentences:
+					if min_length == 0:
+						num_sentences += 1
+						writer.writerow({"sentence": sentence})
+					else:
+						# use NLTK's tokeniser to determine word count
+						words = word_tokenize(sentence)
+						if len(words) >= min_length:
 							num_sentences += 1
-							writer.writerow({"sentence": sentence})
-						else:
-							# use NLTK's tokeniser to determine word count
-							words = word_tokenize(sentence)
-							if len(words) >= min_length:
-								num_sentences += 1
-								writer.writerow({"post_id": post.get("id", ""), "sentence": sentence})
+							writer.writerow({"post_id": post.get("id", ""), "sentence": sentence})
 
 		# done!
 		self.dataset.update_status("Finished")

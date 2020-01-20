@@ -45,20 +45,18 @@ class ThreadSplitter(BasicProcessor):
 		# read and write
 		threadfiles = []
 		self.dataset.update_status("Creating thread files")
-		with self.source_file.open(encoding="utf-8") as source:
-			csv = DictReader(source)
-			for post in csv:
-				thread = results_path.joinpath(post["thread_id"] + ".csv")
-				new = not thread.exists()
+		for post in self.iterate_csv_items(self.source_file):
+			thread = results_path.joinpath(post["thread_id"] + ".csv")
+			new = not thread.exists()
 
-				with thread.open("a", encoding="utf-8") as output:
-					outputcsv = DictWriter(output, fieldnames=post.keys())
+			with thread.open("a", encoding="utf-8") as output:
+				outputcsv = DictWriter(output, fieldnames=post.keys())
 
-					if new:
-						outputcsv.writeheader()
-						threadfiles.append(thread)
+				if new:
+					outputcsv.writeheader()
+					threadfiles.append(thread)
 
-					outputcsv.writerow(post)
+				outputcsv.writerow(post)
 
 		self.dataset.update_status("Writing results to archive")
 		with zipfile.ZipFile(self.dataset.get_results_path(), "w") as zip:

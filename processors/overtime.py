@@ -8,7 +8,8 @@ import re
 from csv import DictReader
 
 from backend.abstract.processor import BasicProcessor
-from backend.lib.helpers import UserInput, convert_to_int
+from backend.lib.helpers import UserInput
+from backend.lib.exceptions import ProcessorInterruptedException
 
 import config
 
@@ -114,6 +115,9 @@ class OvertimeAnalysis(BasicProcessor):
 		with open(self.source_file, encoding='utf-8') as source:
 			csv = DictReader(source)
 			for post in csv:
+				if self.interrupted:
+					raise ProcessorInterruptedException("Interrupted while reading input")
+
 				# determine where to put this data
 				if timeframe == "all":
 					time_unit = "overall"
@@ -186,6 +190,6 @@ class OvertimeAnalysis(BasicProcessor):
 
 		# write as csv
 		if rows:
-			self.dataset.write_csv_and_finish(rows)
+			self.write_csv_items_and_finish(rows)
 		else:
 			self.dataset.finish(0)
