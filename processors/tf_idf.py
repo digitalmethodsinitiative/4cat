@@ -115,13 +115,13 @@ class tfIdf(BasicProcessor):
 		try:
 			results = self.get_tfidf(tokens, dates, ngram_range=n_size, min_occurrences=min_occurrences,
 								 max_occurrences=max_occurrences, top_n=max_output)
+
+			# Generate csv and finish
+			self.dataset.update_status("Writing to csv and finishing")
+			self.dataset.write_csv_and_finish(results)
 		except MemoryError:
 			self.dataset.update_status("Out of memory - dataset to large to run tf-idf analysis.")
 			self.dataset.finish(0)
-
-		# Generate csv and finish
-		self.dataset.update_status("Writing to csv and finishing")
-		self.dataset.write_csv_and_finish(results)
 
 	def get_tfidf(self, tokens, dates, ngram_range=(1,1), min_occurrences=0, max_occurrences=0, top_n=25):
 		"""
