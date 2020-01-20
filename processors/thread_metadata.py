@@ -44,39 +44,37 @@ class ThreadMetadata(BasicProcessor):
 		threads = {}
 
 		self.dataset.update_status("Reading source file")
-		with open(self.source_file, encoding="utf-8") as source:
-			csv = DictReader(source)
-			for post in csv:
-				if post["thread_id"] not in threads:
-					threads[post["thread_id"]] = {
-						"subject": post["subject"],
-						"first_post": int(time.time()),
-						"image_md5": "",
-						"country_code": "",
-						"op_body": "",
-						"author": "",
-						"last_post": 0,
-						"images": 0,
-						"count": 0,
-					}
+		for post in self.iterate_csv_items(self.source_file):
+			if post["thread_id"] not in threads:
+				threads[post["thread_id"]] = {
+					"subject": post["subject"],
+					"first_post": int(time.time()),
+					"image_md5": "",
+					"country_code": "",
+					"op_body": "",
+					"author": "",
+					"last_post": 0,
+					"images": 0,
+					"count": 0,
+				}
 
-				if post["subject"]:
-					threads[post["thread_id"]]["subject"] = post["subject"]
+			if post["subject"]:
+				threads[post["thread_id"]]["subject"] = post["subject"]
 
-				if post["image_md5"]:
-					threads[post["thread_id"]]["images"] += 1
+			if post["image_md5"]:
+				threads[post["thread_id"]]["images"] += 1
 
-				if post["id"] == post["thread_id"]:
-					threads[post["thread_id"]]["author"] = post["author"]
-					threads[post["thread_id"]]["country_code"] = post["country_code"]
-					threads[post["thread_id"]]["image_md5"] = post["image_md5"]
-					threads[post["thread_id"]]["op_body"] = post["body"]
+			if post["id"] == post["thread_id"]:
+				threads[post["thread_id"]]["author"] = post["author"]
+				threads[post["thread_id"]]["country_code"] = post["country_code"]
+				threads[post["thread_id"]]["image_md5"] = post["image_md5"]
+				threads[post["thread_id"]]["op_body"] = post["body"]
 
-				timestamp = int(datetime.datetime.strptime(post["timestamp"], "%Y-%m-%d %H:%M:%S").timestamp())
+			timestamp = int(datetime.datetime.strptime(post["timestamp"], "%Y-%m-%d %H:%M:%S").timestamp())
 
-				threads[post["thread_id"]]["first_post"] = min(timestamp, threads[post["thread_id"]]["first_post"])
-				threads[post["thread_id"]]["last_post"] = max(timestamp, threads[post["thread_id"]]["last_post"])
-				threads[post["thread_id"]]["count"] += 1
+			threads[post["thread_id"]]["first_post"] = min(timestamp, threads[post["thread_id"]]["first_post"])
+			threads[post["thread_id"]]["last_post"] = max(timestamp, threads[post["thread_id"]]["last_post"])
+			threads[post["thread_id"]]["count"] += 1
 
 		results = [{
 			"thread_id": thread_id,
@@ -100,4 +98,4 @@ class ThreadMetadata(BasicProcessor):
 		if not results:
 			return
 
-		self.dataset.write_csv_and_finish(results)
+		self.write_csv_items_and_finish(results)

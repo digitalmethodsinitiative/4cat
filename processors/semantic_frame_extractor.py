@@ -8,6 +8,7 @@ import csv
 import re
 
 from backend.abstract.processor import BasicProcessor
+from backend.lib.exceptions import ProcessorInterruptedException
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Katrien Beuls", "Paul van Eecke"]
@@ -56,7 +57,6 @@ class SemanticFrameExtractor(BasicProcessor):
 		with self.dataset.get_results_path().open("w") as output:
 			writer = csv.DictWriter(output, fieldnames=("sentence", "utterance", "frameEvokingElement", "cause", "effect"))
 			writer.writeheader()
-
 			with self.source_file.open("r") as input:
 				reader = csv.DictReader(input)
 
@@ -64,6 +64,8 @@ class SemanticFrameExtractor(BasicProcessor):
 					# the API can't handle too many sentences at once, so send
 					# them in chunks
 					self.dataset.update_status("%i sentences processed via PENELOPE API..." % processed)
+					if self.interrupted:
+						raise ProcessorInterruptedException("Interrupted while interfacing with PENELOPE API")
 
 					end_of_the_line = False
 					try:

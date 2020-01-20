@@ -113,7 +113,10 @@ class WorkerManager:
 		self.log.info("Telling all workers to stop doing whatever they're doing...")
 		for jobtype in self.worker_pool:
 			for worker in self.worker_pool[jobtype]:
-				worker.abort()
+				if hasattr(worker, "request_abort"):
+					worker.request_abort()
+				else:
+					worker.abort()
 
 		# wait for all workers to finish
 		self.log.info("Waiting for all workers to finish...")

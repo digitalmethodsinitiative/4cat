@@ -19,6 +19,7 @@ __credits__ = ["Stijn Peeters"]
 __maintainer__ = "Stijn Peeters"
 __email__ = "4cat@oilab.eu"
 
+
 class OvertimeAnalysis(BasicProcessor):
 	"""
 	Show overall activity levels for Telegram datasets
@@ -102,50 +103,47 @@ class OvertimeAnalysis(BasicProcessor):
 		# compile into regex for quick matching
 		vocabulary_regexes = {}
 		for vocabulary_id in vocabularies:
-			vocabulary_regexes[vocabulary_id] = re.compile(r"\b(" + "|".join([re.escape(term) for term in vocabularies[vocabulary_id] if term]) + r")\b")
-		print(vocabulary_regexes)
+			vocabulary_regexes[vocabulary_id] = re.compile(
+				r"\b(" + "|".join([re.escape(term) for term in vocabularies[vocabulary_id] if term]) + r")\b")
 
 		# now for the real deal
 		self.dataset.update_status("Reading source file")
 		activity = {vocabulary_id: {} for vocabulary_id in vocabularies}
 		intervals = set()
 
-		with self.source_file.open() as input:
-			reader = DictReader(input)
-
+		for post in self.iterate_csv_items(self.source_file):
 			# if 'partition' is false, there will just be one combined
 			# vocabulary, but else we'll have different ones we can
 			# check separately
-			for post in reader:
-				for vocabulary_id in vocabularies:
-					vocabulary_regex = vocabulary_regexes[vocabulary_id]
+			for vocabulary_id in vocabularies:
+				vocabulary_regex = vocabulary_regexes[vocabulary_id]
 
-					# check if we match
-					if not vocabulary_regex.findall(post["body"].lower()):
-						continue
+				# check if we match
+				if not vocabulary_regex.findall(post["body"].lower()):
+					continue
 
-					# determine what interval to save the frequency for
-					if timeframe == "all":
-						interval = "overall"
+				# determine what interval to save the frequency for
+				if timeframe == "all":
+					interval = "overall"
+				else:
+					try:
+						timestamp = int(datetime.datetime.strptime(post["timestamp"], "%Y-%m-%d %H:%M:%S").timestamp())
+					except ValueError:
+						timestamp = 0
+
+					date = datetime.datetime.fromtimestamp(timestamp)
+					if timeframe == "year":
+						interval = str(date.year)
+					elif timeframe == "month":
+						interval = str(date.year) + "-" + str(date.month).zfill(2)
 					else:
-						try:
-							timestamp = int(datetime.datetime.strptime(post["timestamp"], "%Y-%m-%d %H:%M:%S").timestamp())
-						except ValueError:
-							timestamp = 0
+						interval = str(date.year) + "-" + str(date.month).zfill(2) + "-" + str(date.day).zfill(2)
 
-						date = datetime.datetime.fromtimestamp(timestamp)
-						if timeframe == "year":
-							interval = str(date.year)
-						elif timeframe == "month":
-							interval = str(date.year) + "-" + str(date.month).zfill(2)
-						else:
-							interval = str(date.year) + "-" + str(date.month).zfill(2) + "-" + str(date.day).zfill(2)
+				if interval not in activity[vocabulary_id]:
+					activity[vocabulary_id][interval] = 0
 
-					if interval not in activity[vocabulary_id]:
-						activity[vocabulary_id][interval] = 0
-
-					activity[vocabulary_id][interval] += 1
-					intervals.add(interval)
+				activity[vocabulary_id][interval] += 1
+				intervals.add(interval)
 
 		# turn all that data into a simple three-column frequency table
 		rows = []
@@ -159,6 +157,6 @@ class OvertimeAnalysis(BasicProcessor):
 
 		# write as csv
 		if rows:
-			self.dataset.write_csv_and_finish(rows)
+			self.write_csv_items_and_finish(rows)
 		else:
 			self.dataset.finish(0)

@@ -52,28 +52,26 @@ class DebateMetrics(BasicProcessor):
 		board = self.parent.parameters["board"]
 
 		self.dataset.update_status("Reading source file")
-		with open(self.source_file, encoding="utf-8") as source:
-			csv = DictReader(source)
-			for post in csv:
-				if post["thread_id"] not in threads:
-					threads[post["thread_id"]] = {
-						"subject": post["subject"],
-						"first_post": int(time.time()),
-						"images": 0,
-						"count": 0,
-						"op_length": len(post["body"])
-					}
+		for post in self.iterate_csv_items(self.source_file):
+			if post["thread_id"] not in threads:
+				threads[post["thread_id"]] = {
+					"subject": post["subject"],
+					"first_post": int(time.time()),
+					"images": 0,
+					"count": 0,
+					"op_length": len(post["body"])
+				}
 
-				if post["subject"]:
-					threads[post["thread_id"]]["subject"] = post["subject"]
+			if post["subject"]:
+				threads[post["thread_id"]]["subject"] = post["subject"]
 
-				if post["image_md5"]:
-					threads[post["thread_id"]]["images"] += 1
+			if post["image_md5"]:
+				threads[post["thread_id"]]["images"] += 1
 
-				timestamp = int(datetime.datetime.strptime(post["timestamp"], "%Y-%m-%d %H:%M:%S").timestamp())
+			timestamp = int(datetime.datetime.strptime(post["timestamp"], "%Y-%m-%d %H:%M:%S").timestamp())
 
-				threads[post["thread_id"]]["first_post"] = min(timestamp, threads[post["thread_id"]]["first_post"])
-				threads[post["thread_id"]]["count"] += 1
+			threads[post["thread_id"]]["first_post"] = min(timestamp, threads[post["thread_id"]]["first_post"])
+			threads[post["thread_id"]]["count"] += 1
 
 		results = [{
 			"thread_id": thread_id,
@@ -93,4 +91,4 @@ class DebateMetrics(BasicProcessor):
 		if not results:
 			return
 
-		self.dataset.write_csv_and_finish(results)
+		self.write_csv_items_and_finish(results)

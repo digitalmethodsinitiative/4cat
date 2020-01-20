@@ -36,22 +36,19 @@ class QuoteNetworkGrapher(BasicProcessor):
 		"""
 		nodes = []
 		edges = []
-		gdf = ""
 		link = re.compile(r">>([0-9]+)")
 
 		self.dataset.update_status("Reading source file")
-		with open(self.source_file, encoding='utf-8') as source:
-			csv = DictReader(source)
-			for post in csv:
-				quotes = link.findall(post["body"])
-				if quotes:
-					if post["id"] not in nodes:
-						nodes.append(post["id"])
+		for post in self.iterate_csv_items(self.source_file):
+			quotes = link.findall(post["body"])
+			if quotes:
+				if post["id"] not in nodes:
+					nodes.append(post["id"])
 
-					if quotes[0] not in nodes:
-						nodes.append(quotes[0])
+				if quotes[0] not in nodes:
+					nodes.append(quotes[0])
 
-					edges.append([post["id"], quotes[0]])
+				edges.append([post["id"], quotes[0]])
 
 		self.dataset.update_status("Writing results file")
 		with self.dataset.get_results_path().open("w", encoding="utf-8") as results:

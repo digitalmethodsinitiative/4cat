@@ -3,9 +3,8 @@ Convert a CSV file to JSON
 """
 import json
 
-from csv import DictReader
-
 from backend.abstract.processor import BasicProcessor
+from backend.lib.exceptions import ProcessorInterruptedException
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -39,22 +38,23 @@ class ConvertCSVToJSON(BasicProcessor):
 		posts = 0
 		self.dataset.update_status("Converting posts")
 
-		with self.source_file.open(encoding="utf-8") as source:
-			csv = DictReader(source)
+		# we write to file per row, instead of json.dumps()ing all of it at
+		# once, since else we risk having to keep a lot of data in memory,
+		# and this buffers one row at most
+		with self.dataset.get_results_path().open("w") as output:
+			output.write("[")
+			for post in self.iterate_csv_items(self.source_file):
+				# stop processing if worker has been asked to stop
+				if self.interrupted:
+					raise ProcessorInterruptedException("Interrupted while processing CSV file")
 
-			# we write to file per row, instead of json.dumps()ing all of it at
-			# once, since else we risk having to keep a lot of data in memory,
-			# and this buffers one row at most
-			with self.dataset.get_results_path().open("w") as output:
-				output.write("[")
-				for post in csv:
-					posts += 1
+				posts += 1
 
-					if posts > 1:
-						output.write(",")
+				if posts > 1:
+					output.write(",")
 
-					output.write(json.dumps(post))
-				output.write("]")
+				output.write(json.dumps(post))
+			output.write("]")
 
 		self.dataset.update_status("Finished.")
 		self.dataset.finish(num_rows=posts)

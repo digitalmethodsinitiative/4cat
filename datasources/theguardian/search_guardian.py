@@ -7,7 +7,7 @@ import datetime
 import re
 
 from backend.abstract.search import Search
-from backend.lib.exceptions import QueryParametersException
+from backend.lib.exceptions import QueryParametersException, ProcessorInterruptedException
 
 
 class SearchGuardian(Search):
@@ -221,6 +221,9 @@ class SearchGuardian(Search):
 		"""
 		retries = 0
 		while retries < self.max_retries:
+			if self.interrupted:
+				raise ProcessorInterruptedException("Interrupted while fetching data from the Penelope API")
+
 			try:
 				url = "http://penelope.vub.be/guardian-climate-change-data/" + endpoint
 				response = requests.get(url, *args, **kwargs)

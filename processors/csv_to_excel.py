@@ -4,6 +4,7 @@ Convert a CSV file to MacOS Excel-compatible CSV
 import csv
 
 from backend.abstract.processor import BasicProcessor
+from backend.lib.exceptions import ProcessorInterruptedException
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -51,15 +52,19 @@ class ConvertCSVToMacExcel(BasicProcessor):
 		)
 
 		# recreate CSV file with the new dialect
-		with self.source_file.open(encoding="utf-8") as source:
-			reader = csv.DictReader(source)
-			with self.dataset.get_results_path().open("w") as output:
+		with self.dataset.get_results_path().open("w") as output:
+			with self.source_file.open() as input:
+				reader = csv.DictReader(input)
 				writer = csv.DictWriter(output, fieldnames=reader.fieldnames, dialect="excel-mac")
 				writer.writeheader()
 
-				for post in reader:
-					writer.writerow(post)
-					posts += 1
+			for post in self.iterate_csv_items(self.source_file):
+				# stop processing if worker has been asked to stop
+				if self.interrupted:
+					raise ProcessorInterruptedException("Interrupted while processing CSV file")
+
+				writer.writerow(post)
+				posts += 1
 
 
 		# done!

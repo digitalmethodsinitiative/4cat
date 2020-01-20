@@ -16,6 +16,7 @@ from spacy.tokens import Doc
 
 from backend.lib.helpers import UserInput
 from backend.abstract.processor import BasicProcessor
+from backend.lib.exceptions import ProcessorInterruptedException
 
 __author__ = "Sal Hagen"
 __credits__ = ["Sal Hagen"]
@@ -79,6 +80,10 @@ class ExtractNouns(BasicProcessor):
 		li_entities = []
 
 		for doc in docs:
+			# stop processing if worker has been asked to stop
+			if self.interrupted:
+				raise ProcessorInterruptedException("Interrupted while processing documents")
+
 			for ent in doc.ents:
 				if ent.label_ in self.parameters["entities"]:
 					li_entities.append((ent.text, ent.label_)) # Add a tuple
@@ -95,7 +100,7 @@ class ExtractNouns(BasicProcessor):
 		# done!
 		if results:
 			self.dataset.update_status("Finished")
-			self.dataset.write_csv_and_finish(results)
+			self.write_csv_items_and_finish(results)
 		else:
 			self.dataset.update_status("Finished, but no entities were extracted.")
 			self.dataset.finish(0)

@@ -8,6 +8,7 @@ import abc
 
 from backend.lib.queue import JobQueue
 from backend.lib.database import Database
+from backend.lib.exceptions import WorkerInterruptedException
 
 
 class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
@@ -29,7 +30,7 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
 	job = None
 	log = None
 	manager = None
-	looping = True
+	interrupted = False
 	modules = None
 	loop_time = 0
 
@@ -64,13 +65,15 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
 		"""
 		try:
 			self.work()
+		except WorkerInterruptedException:
+			self.log.info("Worker %s interrupted - cancelling." % self.type)
+			self.abort()
 		except Exception as e:
 			frames = traceback.extract_tb(e.__traceback__)
 			frames = [frame.filename.split("/").pop() + ":" + str(frame.lineno) for frame in frames]
 			location = "->".join(frames)
 			self.log.error("Worker %s raised exception %s and will abort: %s at %s" % (self.type, e.__class__.__name__, str(e).replace("\n", ""), location))
 			self.job.add_status("Crash during execution")
-			self.abort()
 
 	def abort(self):
 		"""
@@ -79,6 +82,16 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
 		Can be used to stop loops, for looping workers.
 		"""
 		pass
+
+	def request_abort(self):
+		"""
+		Set the 'abort requested' flag
+
+		Child workers should quit at their earliest convenience when this is set
+
+		:return:
+		"""
+		self.interrupted = True
 
 	@abc.abstractmethod
 	def work(self):
