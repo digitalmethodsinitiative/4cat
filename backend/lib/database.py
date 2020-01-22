@@ -8,7 +8,6 @@ import time
 
 from psycopg2 import sql
 from psycopg2.extras import execute_values
-from psycopg2.extensions import POLL_OK, POLL_READ, POLL_WRITE
 
 from backend.lib.exceptions import DatabaseQueryInterruptedException
 
@@ -60,14 +59,7 @@ class Database:
 		if self.log is None:
 			raise NotImplementedError
 
-		self.setup()
-
-	def setup(self):
-		"""
-		This used to do something, but now it doesn't really
-		"""
-		if not self.is_async:
-			self.commit()
+		self.commit()
 
 	def query(self, query, replacements=None, cursor=None):
 		"""
@@ -85,24 +77,23 @@ class Database:
 
 		return cursor.execute(query, replacements)
 
-	def execute(self, query, replacements=None, cursor=None):
+	def execute(self, query, replacements=None):
 		"""
 		Execute a query, and commit afterwards
 
 		This is required for UPDATE/INSERT/DELETE/etc to stick
 		:param string query:  Query
 		:param replacements: Replacement values
-		:param cursor: Cursor to use. Default - use common cursor
 		"""
-		if not cursor:
-			cursor = self.get_cursor()
-
+		cursor = self.get_cursor()
 
 		self.log.debug("Executing query %s" % self.cursor.mogrify(query, replacements))
 		cursor.execute(query, replacements)
 		self.commit()
 
-	def execute_many(self, query, replacements=None, cursor=None):
+		cursor.close()
+
+	def execute_many(self, query, replacements=None):
 		"""
 		Execute a query multiple times, each time with different values
 
@@ -111,12 +102,10 @@ class Database:
 
 		:param string query:  Query
 		:param replacements: A list of replacement values
-		:param cursor: Cursor to use. Default - use common cursor
 		"""
-		if not cursor:
-			cursor = self.get_cursor()
-
+		cursor = self.get_cursor()
 		execute_values(cursor, query, replacements)
+		cursor.close()
 
 	def update(self, table, data, where=None, commit=True):
 		"""
@@ -153,7 +142,9 @@ class Database:
 		if commit:
 			self.commit()
 
-		return cursor.rowcount
+		result = cursor.rowcount
+		cursor.close()
+		return result
 
 	def delete(self, table, where, commit=True):
 		"""
@@ -180,7 +171,9 @@ class Database:
 		if commit:
 			self.commit()
 
-		return cursor.rowcount
+		result = cursor.rowcount
+		cursor.close()
+		return result
 
 	def insert(self, table, data, commit=True, safe=False, constraints=None):
 		"""
@@ -225,7 +218,9 @@ class Database:
 		if commit:
 			self.commit()
 
-		return cursor.rowcount
+		result = cursor.rowcount
+		cursor.close()
+		return result
 
 	def fetchall(self, query, *args):
 		"""
@@ -244,6 +239,7 @@ class Database:
 		except AttributeError:
 			result = []
 
+		cursor.close()
 		return result
 
 	def fetchone(self, query, *args):
@@ -260,12 +256,12 @@ class Database:
 		try:
 			result = cursor.fetchone()
 		except psycopg2.ProgrammingError as e:
-			print("%s error: %s " % (query, e))
 			# no results to fetch
 			if not self.is_async:
 				self.commit()
 			result = None
 
+		cursor.close()
 		return result
 
 	def fetchall_interruptable(self, queue, query, *args):
@@ -297,6 +293,7 @@ class Database:
 		except psycopg2.extensions.QueryCanceledError:
 			# interrupted with cancellation worker (or manually)
 			self.rollback()
+			cursor.close()
 			raise DatabaseQueryInterruptedException("Interrupted while querying database")
 
 		# collect results
@@ -309,6 +306,7 @@ class Database:
 		self.interruptable_job.finish()
 		self.interruptable_job = None
 
+		cursor.close()
 		return result
 
 
@@ -338,9 +336,9 @@ class Database:
 		"""
 		Get a new cursor
 
+		Re-using cursors seems to give issues when using per-thread
+		connections, so simply instantiate a new one each time
+
 		:return: Cursor
 		"""
-		if not self.cursor or self.cursor.closed:
-			self.cursor = self.connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-
-		return self.cursor
+		return self.connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
