@@ -15,6 +15,7 @@ fourcat = {
         });
 
         $('#datasource-form #board-select').on('change', function() {
+            $('#datasource-form .country-element').val(null);
             if($(this).val() == 'pol') {
                 $('#datasource-form .country-element').show();
             } else {

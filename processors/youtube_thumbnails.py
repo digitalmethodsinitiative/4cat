@@ -1,25 +1,18 @@
 """
 Get YouTube metadata from video links posted
 """
-import datetime
 import time
-import re
 import zipfile
 import shutil
 import urllib.request
-import youtube_dl
-import pandas as pd
-import math
 import os
 
 import config
 
 from apiclient.discovery import build
-from collections import Counter
-from csv import DictReader
-from PIL import Image, ImageFile, ImageOps, ImageDraw, ImageFont
 
 from backend.abstract.processor import BasicProcessor
+from backend.lib.exceptions import ProcessorInterruptedException
 from backend.lib.helpers import UserInput, convert_to_int, get_yt_compatible_ids
 
 __author__ = "Sal Hagen"
@@ -52,21 +45,13 @@ class YouTubeThumbnails(BasicProcessor):
 		Downloads thumbnails from YouTube videos. 
 
 		"""
+		self.dataset.update_status("Extracting YouTube links")
+		video_ids = set()
+		for youtube_video in self.iterate_csv_items(self.source_file):
+			video_ids.add(youtube_video["id"])
 
-		self.dataset.update_status("Reading source file")
-
-		with open(self.source_file, encoding="utf-8") as source:
-
-			# Read source file
-			csv = DictReader(source)
-
-			# Add all the video IDs to a list
-			self.dataset.update_status("Extracting YouTube links")
-			video_ids = [youtube_vid["id"] for youtube_vid in csv]
-			
-			# Get the thumbnails
-			self.dataset.update_status("Downloading thumbnails")
-			self.download_thumbnails(video_ids)
+		self.dataset.update_status("Downloading thumbnails")
+		self.download_thumbnails(video_ids)
 
 	def download_thumbnails(self, video_ids):
 		"""
@@ -84,7 +69,11 @@ class YouTubeThumbnails(BasicProcessor):
 		
 		ids_list = get_yt_compatible_ids(video_ids)
 		retries = 0
+
 		for i, ids_string in enumerate(ids_list):
+			if self.interrupted:
+				raise ProcessorInterruptedException("Interrupted while downloading thumbnails from YouTube")
+
 			while retries < self.max_retries:
 				try:
 					response = youtube.videos().list(
@@ -94,11 +83,10 @@ class YouTubeThumbnails(BasicProcessor):
 						).execute()
 					break
 				except Exception as error:
-					self.dataset.update_status("Encountered exception " + str(error) + ".\nSleeping for " + str(sleep_time))
+					self.dataset.update_status("Encountered exception " + str(error) + ".\nSleeping for " + str(self.sleep_time))
 					retries += 1
 					api_error = error
-					time.sleep(sleep_time) # Wait a bit before trying again
-					pass
+					time.sleep(self.sleep_time)  # Wait a bit before trying again
 
 			# Do nothing with the results if the requests failed -
 			# be in the final results file
@@ -125,6 +113,9 @@ class YouTubeThumbnails(BasicProcessor):
 
 		with zipfile.ZipFile(self.dataset.get_results_path(), "w") as zip:
 			for image in os.listdir(results_path):
+				if self.interrupted:
+					raise ProcessorInterruptedException("Interrupted while compressing thumbnails")
+
 				zip.write(str(results_path) + "/" + image, image)
 				results_path.joinpath(image).unlink()
 				image_count += 1

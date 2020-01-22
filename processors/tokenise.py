@@ -159,67 +159,65 @@ class Tokenise(BasicProcessor):
 		# process posts
 		self.dataset.update_status("Processing posts")
 		timeframe = self.parameters["timeframe"]
-		with open(self.source_file, encoding="utf-8") as source:
-			csv = DictReader(source)
-			for post in csv:
-				# determine what output unit this post belongs to
-				if timeframe == "all":
-						output = "overall"
+
+		for post in self.iterate_csv_items(self.source_file):
+			# determine what output unit this post belongs to
+			if timeframe == "all":
+					output = "overall"
+			else:
+				if "timestamp_unix" in post:
+					timestamp = post["timestamp_unix"]
 				else:
-					if "timestamp_unix" in post:
-						timestamp = post["timestamp_unix"]
-					else:
-						try:
-							timestamp = int(datetime.datetime.strptime(post["timestamp"], "%Y-%m-%d %H:%M:%S").timestamp())
-						except ValueError:
-							timestamp = 0
-					date = datetime.datetime.fromtimestamp(timestamp)
-					if timeframe == "year":
-						output = str(date.year)
-					elif timeframe == "month":
-						output = str(date.year) + "-" + str(date.month)
-					else:
-						output = str(date.year) + "-" + str(date.month) + "-" + str(date.day)
+					try:
+						timestamp = int(datetime.datetime.strptime(post["timestamp"], "%Y-%m-%d %H:%M:%S").timestamp())
+					except ValueError:
+						timestamp = 0
+				date = datetime.datetime.fromtimestamp(timestamp)
+				if timeframe == "year":
+					output = str(date.year)
+				elif timeframe == "month":
+					output = str(date.year) + "-" + str(date.month)
+				else:
+					output = str(date.year) + "-" + str(date.month) + "-" + str(date.day)
 
-				# write each subunit to disk as it is done, to avoid
-				# unnecessary RAM hogging
-				if current_subunit and current_subunit != output:
-					save_subunit(current_subunit)
-					self.dataset.update_status("Processing posts (" + output + ")")
-					subunits[current_subunit] = list()  # free up memory
+			# write each subunit to disk as it is done, to avoid
+			# unnecessary RAM hogging
+			if current_subunit and current_subunit != output:
+				save_subunit(current_subunit)
+				self.dataset.update_status("Processing posts (" + output + ")")
+				subunits[current_subunit] = list()  # free up memory
 
-				current_subunit = output
+			current_subunit = output
 
-				# create a new list if we're starting a new subunit
-				if output not in subunits:
-					subunits[output] = list()
+			# create a new list if we're starting a new subunit
+			if output not in subunits:
+				subunits[output] = list()
 
-				# clean up text and get tokens from it
-				body = link_regex.sub("", post["body"])
-				tokens = word_tokenize(body, language=language)
+			# clean up text and get tokens from it
+			body = link_regex.sub("", post["body"])
+			tokens = word_tokenize(body, language=language)
 
-				# Only keep unique terms if indicated
-				if self.parameters.get("exclude_duplicates", False):
-					tokens = set(tokens)
+			# Only keep unique terms if indicated
+			if self.parameters.get("exclude_duplicates", False):
+				tokens = set(tokens)
 
-				# stem, lemmatise and save tokens that are not stopwords
-				for token in tokens:
+			# stem, lemmatise and save tokens that are not stopwords
+			for token in tokens:
+				token = token.lower()
 
-					token = token.lower()
+				if strip_symbols:
+					token = numbers.sub("", symbol.sub("", token))
+				if not token: # Skip empty strings
+					continue
+				if token in word_filter:
+					continue
+				if self.parameters["stem"]:
+					token = stemmer.stem(token)
 
-					if strip_symbols:
-						token = numbers.sub("", symbol.sub("", token))
-					if not token: # Skip empty strings
-						continue
-					if token in word_filter:
-						continue
-					if self.parameters["stem"]:
-						token = stemmer.stem(token)
+				if self.parameters["lemmatise"]:
+					token = lemmatizer.lemmatize(token)
 
-					if self.parameters["lemmatise"]:
-						token = lemmatizer.lemmatize(token)
-
-					subunits[output].append(token)
+				subunits[output].append(token)
 
 		# save the last subunit we worked on too
 		save_subunit(current_subunit)

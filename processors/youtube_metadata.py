@@ -125,7 +125,7 @@ class YouTubeMetadata(BasicProcessor):
 			return
 
 		self.dataset.update_status("Writing results to csv.")
-		self.dataset.write_csv_and_finish(results)
+		self.write_csv_items_and_finish(results)
 
 	def get_youtube_metadata(self, urls):
 		"""

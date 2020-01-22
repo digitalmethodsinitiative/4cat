@@ -7,7 +7,6 @@ import time
 import re
 
 from pathlib import Path
-from csv import DictWriter
 
 import config
 import backend
@@ -420,35 +419,6 @@ class DataSet:
 			return ""
 
 		return config.GITHUB_URL + "/blob/" + self.data["software_version"] + self.data.get("software_file", "")
-
-	def write_csv_and_finish(self, data):
-		"""
-		Write data as csv to results file and finish dataset
-
-		Determines result file path using dataset's path determination helper
-		methods. After writing results, the dataset is marked finished.
-
-		:param data: A list or tuple of dictionaries, all with the same keys
-		"""
-		if not (isinstance(data, typing.List) or isinstance(data, typing.Tuple)) or isinstance(data, str):
-			raise TypeError("write_as_csv requires a list or tuple of dictionaries as argument")
-
-		if not data:
-			raise ValueError("write_as_csv requires a dictionary with at least one item")
-
-		if not isinstance(data[0], dict):
-			raise TypeError("write_as_csv requires a list or tuple of dictionaries as argument")
-
-		self.update_status("Writing results file")
-		with self.get_results_path().open("w", encoding="utf-8", newline='') as results:
-			writer = DictWriter(results, fieldnames=data[0].keys())
-			writer.writeheader()
-
-			for row in data:
-				writer.writerow(row)
-
-		self.update_status("Finished")
-		self.finish(len(data))
 
 	def top_key(self):
 		"""

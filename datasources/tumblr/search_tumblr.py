@@ -14,7 +14,7 @@ import datetime
 import config
 
 from backend.abstract.search import Search
-from backend.lib.exceptions import QueryParametersException
+from backend.lib.exceptions import QueryParametersException, ProcessorInterruptedException
 
 __author__ = "Sal Hagen"
 __credits__ = ["Sal Hagen", "Tumblr API (api.tumblr.com)"]
@@ -131,6 +131,8 @@ class SearchTumblr(Search):
 
 		# Get Tumblr posts until there's no more left.
 		while True:
+			if self.interrupted:
+				raise ProcessorInterruptedException("Interrupted while fetching tag posts from Tumblr")
 
 			# Stop after 20 retries
 			if retries >= max_retries:
@@ -192,6 +194,9 @@ class SearchTumblr(Search):
 		before = None
 
 		for key, value in di_blogs_ids.items():
+			if self.interrupted:
+				raise ProcessorInterruptedException("Interrupted while fetching post notes from Tumblr")
+
 			# First, get the blog names and post_ids from reblogs
 			# Keep digging till there's nothing left
 			while True:
@@ -223,6 +228,9 @@ class SearchTumblr(Search):
 		
 		returns result list, a list with a dictionary with the post's information
 		"""
+		if self.interrupted:
+			raise ProcessorInterruptedException("Interrupted while fetching post from Tumblr")
+
 		client = self.connect_to_tumblr()
 		
 		# Request the specific post.

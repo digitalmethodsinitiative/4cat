@@ -11,7 +11,7 @@ import os
 import re
 
 from backend.abstract.search import Search
-from backend.lib.exceptions import QueryParametersException
+from backend.lib.exceptions import QueryParametersException, ProcessorInterruptedException
 
 
 class SearchInstagram(Search):
@@ -87,6 +87,9 @@ class SearchInstagram(Search):
 				# "chunk" is a generator so actually retrieve the posts next
 				posts_processed = 0
 				for post in chunk:
+					if self.interrupted:
+						raise ProcessorInterruptedException("Interrupted while fetching posts from Instagram")
+
 					chunk_size += 1
 					self.dataset.update_status("Retrieving posts ('%s', %i posts)" % (query, chunk_size))
 					if posts_processed >= max_posts:
@@ -107,6 +110,9 @@ class SearchInstagram(Search):
 		comments_bit = " and comments" if self.parameters.get("scrape_comments", False) else ""
 
 		for post in posts:
+			if self.interrupted:
+				raise ProcessorInterruptedException("Interrupted while fetching post metadata from Instagram")
+
 			posts_processed += 1
 			self.dataset.update_status("Retrieving metadata%s for post %i" % (comments_bit, posts_processed))
 

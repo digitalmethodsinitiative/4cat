@@ -10,7 +10,7 @@ from lxml.cssselect import CSSSelector as css
 from io import StringIO
 
 from backend.abstract.processor import BasicProcessor
-from backend.lib.helpers import UserInput
+from backend.lib.exceptions import ProcessorInterruptedException
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -55,24 +55,20 @@ class WikipediaCatgegoryNetwork(BasicProcessor):
 
 		# find all links in post bodies
 		self.dataset.update_status("Reading source file")
-		with self.source_file.open(encoding="utf-8") as input:
-			reader = csv.DictReader(input)
+		for post in self.iterate_csv_items(self.source_file):
+			wiki_links = link_regex.findall(post["body"])
+			wiki_links = [trailing_comma.sub("", link) for link in wiki_links]
 
-			for post in reader:
-				wiki_links = link_regex.findall(post["body"])
-				wiki_links = [trailing_comma.sub("", link) for link in wiki_links]
+			# if we have a per-post URL, include that as well
+			if "url" in post and link_regex.match(post["url"]):
+				wiki_links.append(post["url"])
 
-				# if we have a per-post URL, include that as well
-				if "url" in post and link_regex.match(post["url"]):
-					wiki_links.append(post["url"])
+			for link in wiki_links:
+				link = "/wiki/".join(link.split("/wiki/")[1:]).split("#")[0]
+				if link not in links:
+					links[link] = 0
 
-
-				for link in wiki_links:
-					link = "/wiki/".join(link.split("/wiki/")[1:]).split("#")[0]
-					if link not in links:
-						links[link] = 0
-
-					links[link] += 1
+				links[link] += 1
 
 		# just a helper function to get the HTML content of a node
 		def stringify_children(node):
@@ -87,6 +83,9 @@ class WikipediaCatgegoryNetwork(BasicProcessor):
 		self.dataset.update_status("Fetching categories from Wikipedia API...")
 		for link in links:
 			if link not in page_categories:
+				if self.interrupted:
+					raise ProcessorInterruptedException("Interrupted while fetching data from Wikipedia")
+
 				page_categories[link] = set()
 				self.dataset.update_status(
 					"Fetching categories from Wikipedia API, page %i of %i" % (counter, len(links)))

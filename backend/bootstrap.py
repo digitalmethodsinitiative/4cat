@@ -1,5 +1,5 @@
 """
-4CAT Backend init - run this to start the backend!
+4CAT Backend init - used to start the backend!
 """
 import shutil
 

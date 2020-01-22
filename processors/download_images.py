@@ -21,6 +21,7 @@ from io import StringIO
 import config
 from backend.lib.helpers import UserInput
 from backend.abstract.processor import BasicProcessor
+from backend.lib.exceptions import ProcessorInterruptedException
 
 __author__ = "Stijn Peeters, Sal Hagen"
 __credits__ = ["Stijn Peeters, Sal Hagen"]
@@ -75,25 +76,27 @@ class ImageDownloader(BasicProcessor):
 
 		extensions = {}
 
-		with open(self.source_file) as source:
-			csv = DictReader(source)
-			for post in csv:
-				if len(urls) >= amount:
-					break
+		for post in self.iterate_csv_items(self.source_file):
+			# stop processing if worker has been asked to stop
+			if self.interrupted:
+				raise ProcessorInterruptedException("Interrupted while extracting image URLs")
 
-				extension = post["filename"].split(".")[1].lower()
-				if extension not in ("jpg", "jpeg", "png", "gif"):
-					continue
+			if len(urls) >= amount:
+				break
 
-				local_file = post["url_4cat"].split("/")[-1]
-				local_path = Path(config.PATH_IMAGES, local_file)
-				if local_path.exists():
-					url = local_path
-				else:
-					url = post["url_" + external]
+			extension = post["filename"].split(".")[1].lower()
+			if extension not in ("jpg", "jpeg", "png", "gif"):
+				continue
 
-				urls.append(url)
-				extensions[url] = extension
+			local_file = post["url_4cat"].split("/")[-1]
+			local_path = Path(config.PATH_IMAGES, local_file)
+			if local_path.exists():
+				url = local_path
+			else:
+				url = post["url_" + external]
+
+			urls.append(url)
+			extensions[url] = extension
 
 		# prepare staging area
 		results_path = self.dataset.get_temporary_path()
@@ -102,6 +105,10 @@ class ImageDownloader(BasicProcessor):
 
 		# loop through images and copy them onto the wall
 		for path in urls:
+			# stop processing if worker has been asked to stop
+			if self.interrupted:
+				raise ProcessorInterruptedException("Interrupted while downloading images.")
+
 			counter += 1
 			self.dataset.update_status("Downloading image %i of %i" % (counter, len(urls)))
 
