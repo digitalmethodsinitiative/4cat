@@ -21,7 +21,6 @@ class BasicHTTPScraper(BasicWorker, metaclass=abc.ABCMeta):
 	the URL for that job is scraped and the result is parsed as JSON. The parsed JSON is
 	then passed to a processor method for further handling.
 	"""
-	db = None
 
 	def __init__(self, job, db=None, logger=None, manager=None, modules=None):
 		"""

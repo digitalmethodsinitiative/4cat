@@ -55,12 +55,14 @@ class JobQueue:
 
 		return Job.get_by_data(job, database=self.db) if job else None
 
-	def get_all_jobs(self, jobtype="*", remote_id=False):
+	def get_all_jobs(self, jobtype="*", remote_id=False, restrict_claimable=True):
 		"""
 		Get all unclaimed (and claimable) jobs
 
 		:param string jobtype:  Type of job, "*" for all types
 		:param string remote_id:  Remote ID, takes precedence over `jobtype`
+		:param bool restrict_claimable:  Only return jobs that may be claimed
+		according to their parameters
 		:return list:
 		"""
 		replacements = []
@@ -73,15 +75,19 @@ class JobQueue:
 		else:
 			filter = "WHERE jobtype != ''"
 
-		now = int(time.time())
-		replacements.append(now)
-		replacements.append(now)
 
 		query = "SELECT * FROM jobs %s" % filter
-		query += ("        AND timestamp_claimed = 0"
-				  "              AND timestamp_after < %s"
-				  "              AND (interval = 0 OR timestamp_lastclaimed + interval < %s)"
-				  "         ORDER BY timestamp ASC")
+
+		if restrict_claimable:
+			query += ("        AND timestamp_claimed = 0"
+					  "              AND timestamp_after < %s"
+					  "              AND (interval = 0 OR timestamp_lastclaimed + interval < %s)")
+
+			now = int(time.time())
+			replacements.append(now)
+			replacements.append(now)
+
+		query += "         ORDER BY timestamp ASC"
 
 		try:
 			jobs = self.db.fetchall(query, replacements)

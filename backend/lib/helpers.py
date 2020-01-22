@@ -3,7 +3,6 @@ Miscellaneous helper functions for the 4CAT backend
 """
 import socket
 import json
-import csv
 import re
 
 from pathlib import Path
@@ -11,56 +10,6 @@ from html.parser import HTMLParser
 from calendar import monthrange
 
 import config
-
-
-def posts_to_csv(sql_results, filepath):
-	"""
-	Takes a dictionary of results, converts it to a csv, and writes it to the
-	given location. This is mostly a generic dictionary-to-CSV processor but
-	some specific processing is done on the "body" key to strip HTML from it,
-	and a human-readable timestamp is provided next to the UNIX timestamp.
-
-	:param sql_results:		List with results derived with db.fetchall()
-	:param filepath:    	Filepath for the resulting csv
-
-	:return int:  Amount of posts that were processed
-
-	"""
-	if not filepath:
-		raise Exception("No result file for query")
-
-	# write the dictionary to a csv
-	if not isinstance(filepath, Path):
-		filepath = Path(filepath)
-
-	processed = 0
-	header_written = False
-	with filepath.open("w", encoding="utf-8") as csvfile:
-		# Parsing: remove the HTML tags, but keep the <br> as a newline
-		# Takes around 1.5 times longer
-		for row in sql_results:
-			if not header_written:
-				fieldnames = list(row.keys())
-				fieldnames.append("unix_timestamp")
-				writer = csv.DictWriter(csvfile, fieldnames=fieldnames, lineterminator='\n')
-				writer.writeheader()
-				header_written = True
-
-			processed += 1
-			# Create human dates from timestamp
-			from datetime import datetime
-			if "timestamp" in row:
-				row["unix_timestamp"] = row["timestamp"]
-				row["timestamp"] = datetime.utcfromtimestamp(row["timestamp"]).strftime('%Y-%m-%d %H:%M:%S')
-			else:
-				row["timestamp"] = "undefined"
-			# Parse html to text
-			if row["body"]:
-				row["body"] = strip_tags(row["body"])
-
-			writer.writerow(row)
-
-	return processed
 
 
 def init_datasource(database, logger, queue, name):
