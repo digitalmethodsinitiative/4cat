@@ -21,7 +21,6 @@ class Search4Chan(Search):
 	type = "4chan-search"  # job ID
 	sphinx_index = "4chan"  # prefix for sphinx indexes for this data source. Should usually match sphinx.conf
 	prefix = "4chan"  # table identifier for this datasource; see below for usage
-	interruptable_database = True  # need to be able to cancel long-running queries
 
 	# Columns to return in csv
 	return_cols = ['thread_id', 'id', 'timestamp', 'body', 'subject', 'author', 'image_file', 'image_md5',
