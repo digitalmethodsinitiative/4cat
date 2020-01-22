@@ -30,7 +30,7 @@ class InternalAPI(BasicWorker):
 			# and workers that end just get started again
 			self.db.close()
 			self.manager.log.info("Local API not available per configuration")
-			while self.looping:
+			while not self.interrupted:
 				time.sleep(1)
 			return
 
@@ -47,7 +47,7 @@ class InternalAPI(BasicWorker):
 				server.bind(("localhost", self.port))
 				break
 			except OSError as e:
-				if has_time and self.looping:
+				if has_time and not self.interrupted:
 					self.manager.log.info("Could not open port %i yet (%s), retrying in 10 seconds" % (self.port, e))
 					time.sleep(10.0)  # wait a few seconds before retrying
 					continue
@@ -237,12 +237,6 @@ class InternalAPI(BasicWorker):
 
 		# no appropriate response
 		return False
-
-	def abort(self):
-		"""
-		Stop main loop
-		"""
-		self.looping = False
 
 
 class InternalAPIException(Exception):
