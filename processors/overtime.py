@@ -8,7 +8,8 @@ import re
 from csv import DictReader
 
 from backend.abstract.processor import BasicProcessor
-from backend.lib.helpers import UserInput, convert_to_int
+from backend.lib.helpers import UserInput
+from backend.lib.exceptions import ProcessorInterruptedException
 
 import config
 
@@ -35,6 +36,15 @@ class OvertimeAnalysis(BasicProcessor):
 	# the following determines the options available to the user via the 4CAT
 	# interface.
 	options = {
+		"language": {
+			"type": UserInput.OPTION_CHOICE,
+			"default": "en",
+			"options": {
+				"en": "English",
+				"it": "Italian"
+			},
+			"help": "Language"
+		},
 		"timeframe": {
 			"type": UserInput.OPTION_CHOICE,
 			"default": "all",
@@ -71,6 +81,11 @@ class OvertimeAnalysis(BasicProcessor):
 		scope = self.parameters.get("scope", self.options["scope"]["default"])
 		min_offensive = self.parameters.get("hatefulness-score", self.options["hatefulness-score"]["default"])
 
+		# determine what vocabulary to use
+		language = self.parameters.get("language", "")
+		if language not in self.options["language"]["options"]:
+			language = self.options["language"]["default"]
+
 		# now for the real deal
 		self.dataset.update_status("Reading source file")
 		activity = {}
@@ -91,7 +106,7 @@ class OvertimeAnalysis(BasicProcessor):
 				self.dataset.finish(0)
 				return
 
-		with open(config.PATH_ROOT + "/backend/assets/hatebase.json") as hatebasedata:
+		with open(config.PATH_ROOT + "/backend/assets/hatebase/hatebase-%s.json" % language) as hatebasedata:
 			hatebase = json.loads(hatebasedata.read())
 
 		hatebase = {term.lower(): hatebase[term] for term in hatebase}
@@ -100,6 +115,9 @@ class OvertimeAnalysis(BasicProcessor):
 		with open(self.source_file, encoding='utf-8') as source:
 			csv = DictReader(source)
 			for post in csv:
+				if self.interrupted:
+					raise ProcessorInterruptedException("Interrupted while reading input")
+
 				# determine where to put this data
 				if timeframe == "all":
 					time_unit = "overall"
@@ -172,6 +190,6 @@ class OvertimeAnalysis(BasicProcessor):
 
 		# write as csv
 		if rows:
-			self.dataset.write_csv_and_finish(rows)
+			self.write_csv_items_and_finish(rows)
 		else:
 			self.dataset.finish(0)

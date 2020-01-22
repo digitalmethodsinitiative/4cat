@@ -8,6 +8,7 @@ import abc
 
 from backend.lib.queue import JobQueue
 from backend.lib.database import Database
+from backend.lib.exceptions import WorkerInterruptedException
 
 
 class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
@@ -21,17 +22,22 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
 	worker code.
 	"""
 	type = "misc"  # this should match the job type as saved in the database
-	jobdata = {}
 	pause = 1  # time to wait between scrapes
 	max_workers = 1  # max amount of workers of this type
 
-	queue = None
-	job = None
-	log = None
-	manager = None
-	looping = True
+	# flag values to indicate what to do when an interruption is requested
+	INTERRUPT_NONE = False
+	INTERRUPT_RETRY = 1
+	INTERRUPT_CANCEL = 2
+
+	queue = None  # JobQueue
+	job = None  # Job for this worker
+	log = None  # Logger
+	manager = None  # WorkerManager that manages this worker
+	interrupted = False  # interrupt flag, to request halting
 	modules = None
-	loop_time = 0
+	init_time = 0  # Time this worker was started
+	interruptable_database = False  # Whether this worker needs to be able to make interruptable Postgres queries
 
 	def __init__(self, logger, job, db=None, queue=None, manager=None, modules=None):
 		"""
@@ -46,14 +52,14 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
 		self.log = logger
 		self.manager = manager
 		self.job = job
-		self.loop_time = int(time.time())
+		self.init_time = int(time.time())
 
 		# all_modules cannot be easily imported into a worker because all_modules itself
 		# imports all workers, so you get a recursive import that Python (rightly) blocks
 		# so for workers, all_modules' content is passed as a constructor argument
 		self.all_modules = modules
 
-		self.db = Database(logger=self.log, appname=self.type) if not db else db
+		self.db = Database(logger=self.log, appname=self.type, is_async=self.interruptable_database) if not db else db
 		self.queue = JobQueue(logger=self.log, database=self.db) if not queue else queue
 
 	def run(self):
@@ -64,13 +70,22 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
 		"""
 		try:
 			self.work()
+		except WorkerInterruptedException:
+			self.log.info("Worker %s interrupted - cancelling." % self.type)
+
+			# interrupted - retry later or cancel job altogether?
+			if self.interrupted == self.INTERRUPT_RETRY:
+				self.job.release(delay=10)
+			elif self.interrupted == self.INTERRUPT_CANCEL:
+				self.job.finish()
+
+			self.abort()
 		except Exception as e:
 			frames = traceback.extract_tb(e.__traceback__)
 			frames = [frame.filename.split("/").pop() + ":" + str(frame.lineno) for frame in frames]
 			location = "->".join(frames)
 			self.log.error("Worker %s raised exception %s and will abort: %s at %s" % (self.type, e.__class__.__name__, str(e).replace("\n", ""), location))
 			self.job.add_status("Crash during execution")
-			self.abort()
 
 	def abort(self):
 		"""
@@ -79,6 +94,19 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
 		Can be used to stop loops, for looping workers.
 		"""
 		pass
+
+	def request_abort(self, level=1):
+		"""
+		Set the 'abort requested' flag
+
+		Child workers should quit at their earliest convenience when this is set
+
+		:param int level:  Retry or cancel? Either `self.INTERRUPT_RETRY` or
+		`self.INTERRUPT_CANCEL`.
+
+		:return:
+		"""
+		self.interrupted = level
 
 	@abc.abstractmethod
 	def work(self):

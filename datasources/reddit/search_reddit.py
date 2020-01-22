@@ -2,7 +2,7 @@ import requests
 import re
 
 from backend.abstract.search import Search
-from backend.lib.exceptions import QueryParametersException
+from backend.lib.exceptions import QueryParametersException, ProcessorInterruptedException
 
 
 class SearchReddit(Search):
@@ -121,6 +121,9 @@ class SearchReddit(Search):
 
 		# loop through results bit by bit
 		while True:
+			if self.interrupted:
+				raise ProcessorInterruptedException("Interrupted while fetching thread data from the Pushshift API")
+
 			retries = 0
 
 			response = self.call_pushshift_api("https://api.pushshift.io/reddit/submission/search",
@@ -150,7 +153,7 @@ class SearchReddit(Search):
 
 				if thread["id"] not in seen_threads:
 					seen_threads.add(thread["id"])
-					return_posts.append(self.thread_to_4cat(thread))
+					yield self.thread_to_4cat(thread)
 
 					# this is the only way to go to the next page right now...
 					submission_parameters["after"] = thread["created_utc"]
@@ -165,6 +168,9 @@ class SearchReddit(Search):
 		seen_posts = set()
 
 		while True:
+			if self.interrupted:
+				raise ProcessorInterruptedException("Interrupted while fetching post data from the Pushshift API")
+
 			response = self.call_pushshift_api("https://api.pushshift.io/reddit/comment/search", params=post_parameters)
 			if response is None:
 				return response
@@ -196,7 +202,7 @@ class SearchReddit(Search):
 
 				if post["id"] not in seen_posts:
 					seen_posts.add(post["id"])
-					return_posts.append(self.post_to_4cat(post))
+					yield self.post_to_4cat(post)
 					post_parameters["after"] = post["created_utc"]
 
 					total_posts += 1
@@ -205,9 +211,8 @@ class SearchReddit(Search):
 			self.dataset.update_status("Found %i posts via Pushshift API..." % total_posts)
 
 		# and done!
-		if not return_posts:
+		if total_posts == 0 and total_threads == 0:
 			self.dataset.update_status("No posts found")
-		return return_posts
 
 	def fetch_posts(self, post_ids, where=None, replacements=None):
 		"""

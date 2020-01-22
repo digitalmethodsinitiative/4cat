@@ -1,12 +1,16 @@
 """
 Basic post-processor worker - should be inherited by workers to post-process results
 """
+import typing
 import shutil
 import abc
+import csv
+import os
 
 from backend.abstract.worker import BasicWorker
 from backend.lib.dataset import DataSet
 from backend.lib.helpers import get_software_version
+from backend.lib.exceptions import WorkerInterruptedException, ProcessorInterruptedException
 
 
 class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
@@ -17,26 +21,27 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 	result in some way, with another result set as output. The input thus is
 	a CSV file, and the output (usually) as well. In other words, the result of
 	a post-processor run can be used as input for another post-processor
-	(though whether this is useful is another question).
+	(though whether and when this is useful is another question).
 	"""
-	db = None
-	dataset = None
-	job = None
-	parent = None
-	source_file = None
-	description = "No description available"
-	category = "Other"
-	extension = "csv"
-	options = {}
-	parameters = {}
+	db = None  # database handler
+	dataset = None  # Dataset object representing the dataset to be created
+	job = None  # Job object that requests the execution of this processor
+	parent = None  # Dataset object to be processed, if applicable
+	source_file = None  # path to dataset to be processed, if applicable
+
+	description = "No description available"  # processor description, shown in web front-end
+	category = "Other"  # processor category, for sorting in web front-end
+	extension = "csv"  # extension of files created by this processor
+	options = {}  # configurable options for this processor
+	parameters = {}  # values for the processor's configurable options
 
 	def work(self):
 		"""
-		Scrape a URL
+		Process a dataset
 
-		This acquires a job - if none are found, the loop pauses for a while. The job's URL
-		is then requested and parsed. If that went well, the parsed data is passed on to the
-		processor.
+		Loads dataset metadata, sets up the scaffolding for performing some kind
+		of processing on that dataset, and then processes it. Afterwards, clean
+		up.
 		"""
 		try:
 			self.dataset = DataSet(key=self.job.data["remote_id"], db=self.db)
@@ -47,6 +52,8 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 			return
 
 		if self.dataset.type != "search":
+			# search workers never have parents (for now), so we don't need to
+			# find out what the parent dataset is if it's a search worker
 			try:
 				self.parent = DataSet(key=self.dataset.data["key_parent"], db=self.db)
 			except TypeError:
@@ -74,10 +81,16 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 		self.dataset.update_status("Processing data")
 		self.dataset.update_version(get_software_version())
 
-		if not self.dataset.is_finished():
-			self.process()
+		if self.interrupted:
+			return self.abort()
 
-		self.after_process()
+		if not self.dataset.is_finished():
+			try:
+				self.process()
+				self.after_process()
+			except WorkerInterruptedException:
+				self.abort()
+
 
 	def after_process(self):
 		"""
@@ -103,7 +116,7 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 
 		# see if we need to register the result somewhere
 		if "copy_to" in self.parameters:
-			# copy the results to an arbitray place that was passed
+			# copy the results to an arbitrary place that was passed
 			if self.dataset.get_results_path().exists():
 				shutil.copyfile(str(self.dataset.get_results_path()), self.parameters["copy_to"])
 			else:
@@ -142,11 +155,88 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 
 		self.job.finish()
 
+	def abort(self):
+		"""
+		Abort dataset creation and clean up so it may be attempted again later
+		"""
+		# remove any result files that have been created so far
+		if self.dataset.get_results_path().exists():
+			os.unlink(str(self.dataset.get_results_path()))
+
+		if self.dataset.get_temporary_path().exists():
+			shutil.rmtree(str(self.dataset.get_temporary_path()))
+
+		# we release instead of finish, since interrupting is just that - the
+		# job should resume at a later point. Delay resuming by 10 seconds to
+		# give 4CAT the time to do whatever it wants (though usually this isn't
+		# needed since restarting also stops the spawning of new workers)
+		self.dataset.update_status("Dataset processing interrupted. Retrying later.")
+
+		if self.interrupted == self.INTERRUPT_RETRY:
+			# retry later - wait at least 10 seconds to give the backend time to shut down
+			self.job.release(delay=10)
+		elif self.interrupted == self.INTERRUPT_CANCEL:
+			# cancel job
+			self.job.finish()
+
+	def iterate_csv_items(self, path):
+		"""
+		A generator that iterates through a CSV file
+
+		With every iteration, the processor's 'interrupted' flag is checked,
+		and if set a ProcessorInterruptedException is raised, which by default
+		is caught and subsequently stops execution gracefully.
+
+		:param Path path:  Path to csv file to read
+		:return:
+		"""
+		with open(path) as input:
+			reader = csv.DictReader(input)
+
+			for item in reader:
+				if self.interrupted:
+					raise ProcessorInterruptedException("Processor interrupted while iterating through CSV file")
+
+				yield item
+
+	def write_csv_items_and_finish(self, data):
+		"""
+		Write data as csv to results file and finish dataset
+
+		Determines result file path using dataset's path determination helper
+		methods. After writing results, the dataset is marked finished. Will
+		raise a ProcessorInterruptedException if the interrupted flag for this
+		processor is set while iterating.
+
+		:param data: A list or tuple of dictionaries, all with the same keys
+		"""
+		if not (isinstance(data, typing.List) or isinstance(data, typing.Tuple)) or isinstance(data, str):
+			raise TypeError("write_csv_items requires a list or tuple of dictionaries as argument")
+
+		if not data:
+			raise ValueError("write_csv_items requires a dictionary with at least one item")
+
+		if not isinstance(data[0], dict):
+			raise TypeError("write_csv_items requires a list or tuple of dictionaries as argument")
+
+		self.dataset.update_status("Writing results file")
+		with self.dataset.get_results_path().open("w", encoding="utf-8", newline='') as results:
+			writer = csv.DictWriter(results, fieldnames=data[0].keys())
+			writer.writeheader()
+
+			for row in data:
+				if self.interrupted:
+					raise ProcessorInterruptedException("Interrupted while writing results file")
+				writer.writerow(row)
+
+		self.dataset.update_status("Finished")
+		self.dataset.finish(len(data))
+
 	@abc.abstractmethod
 	def process(self):
 		"""
-		Process scraped data
+		Process data
 
-		:param data:  Parsed JSON data
+		To be defined by the child processor.
 		"""
 		pass

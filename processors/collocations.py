@@ -11,6 +11,7 @@ from nltk.collocations import *
 
 from backend.lib.helpers import UserInput
 from backend.abstract.processor import BasicProcessor
+from backend.lib.exceptions import ProcessorInterruptedException
 
 class GetCollocations(BasicProcessor):
 	"""
@@ -107,6 +108,10 @@ class GetCollocations(BasicProcessor):
 
 			# Loop through the tokens (can also be a single set)
 			for tokens_name in token_sets:
+				# stop processing if worker has been asked to stop
+				if self.interrupted:
+					raise ProcessorInterruptedException
+
 				# temporarily extract file (we cannot use ZipFile.open() as it doesn't support binary modes)
 				temp_path = dirname.joinpath(tokens_name)
 				token_archive.extract(tokens_name, dirname)
@@ -126,7 +131,7 @@ class GetCollocations(BasicProcessor):
 				for tpl in collocations:
 					result = {}
 					result["item"] = " ".join(tpl[0])
-					result["value"] = tpl[1]
+					result["frequency"] = tpl[1]
 					result["date"] = date_string
 					results.append(result)
 
@@ -135,7 +140,7 @@ class GetCollocations(BasicProcessor):
 
 		# Generate csv and finish
 		self.dataset.update_status("Writing to csv and finishing")
-		self.dataset.write_csv_and_finish(results)
+		self.write_csv_items_and_finish(results)
 
 	def get_collocations(self, tokens, window_size, n_size, query_string=False, max_output=25, forbidden_words=False):
 		""" Generates a tuple of word collocations (bigrams or trigrams).

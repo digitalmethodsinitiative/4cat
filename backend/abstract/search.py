@@ -1,12 +1,15 @@
 import shutil
 import random
 import math
+import csv
 
+from pathlib import Path
 from abc import ABC, abstractmethod
 
 from backend.lib.dataset import DataSet
 from backend.abstract.processor import BasicProcessor
-from backend.lib.helpers import posts_to_csv, get_software_version
+from backend.lib.helpers import strip_tags
+from backend.lib.exceptions import WorkerInterruptedException, ProcessorInterruptedException
 
 
 class Search(BasicProcessor, ABC):
@@ -22,8 +25,6 @@ class Search(BasicProcessor, ABC):
 	max_workers = 2
 
 	prefix = ""
-
-	dataset = None
 
 	# Columns to return in csv
 	# Mandatory columns: ['thread_id', 'body', 'subject', 'timestamp']
@@ -47,17 +48,19 @@ class Search(BasicProcessor, ABC):
 		self.log.info("Querying: %s" % str(query_parameters))
 
 		# Execute the relevant query (string-based, random, countryflag-based)
-		posts = self.search(query_parameters)
+		try:
+			posts = self.search(query_parameters)
+		except WorkerInterruptedException:
+			raise ProcessorInterruptedException("Interrupted while collecting data, trying again later.")
 
 		# Write posts to csv and update the DataBase status to finished
+		num_posts = 0
 		if posts:
 			self.dataset.update_status("Writing posts to result file")
-			posts_to_csv(posts, results_file)
+			num_posts = self.posts_to_csv(posts, results_file)
 			self.dataset.update_status("Query finished, results are available.")
 		elif posts is not None:
 			self.dataset.update_status("Query finished, no results found.")
-
-		num_posts = len(posts) if posts else 0
 
 		# queue predefined post-processors
 		if num_posts > 0 and query_parameters.get("next", []):
@@ -89,6 +92,7 @@ class Search(BasicProcessor, ABC):
 
 	def search(self, query):
 		mode = self.get_search_mode(query)
+
 		if query.get("body_match", None) or query.get("subject_match", None):
 			mode = "complex"
 			posts = self.get_posts_complex(query)
@@ -198,6 +202,58 @@ class Search(BasicProcessor, ABC):
 		:return str:  `complex` or `simple`
 		"""
 		return "complex" if query.get("body_match", None) or query.get("subject_match", None) else "simple"
+
+	def posts_to_csv(self, sql_results, filepath):
+		"""
+		Takes a dictionary of results, converts it to a csv, and writes it to the
+		given location. This is mostly a generic dictionary-to-CSV processor but
+		some specific processing is done on the "body" key to strip HTML from it,
+		and a human-readable timestamp is provided next to the UNIX timestamp.
+
+		:param sql_results:		List with results derived with db.fetchall()
+		:param filepath:    	Filepath for the resulting csv
+
+		:return int:  Amount of posts that were processed
+
+		"""
+		if not filepath:
+			raise ResourceWarning("No result file for query")
+
+		# write the dictionary to a csv
+		if not isinstance(filepath, Path):
+			filepath = Path(filepath)
+
+		processed = 0
+		header_written = False
+		with filepath.open("w", encoding="utf-8") as csvfile:
+			# Parsing: remove the HTML tags, but keep the <br> as a newline
+			# Takes around 1.5 times longer
+			for row in sql_results:
+				if self.interrupted:
+					raise ProcessorInterruptedException("Interrupted while writing results to file")
+
+				if not header_written:
+					fieldnames = list(row.keys())
+					fieldnames.append("unix_timestamp")
+					writer = csv.DictWriter(csvfile, fieldnames=fieldnames, lineterminator='\n')
+					writer.writeheader()
+					header_written = True
+
+				processed += 1
+				# Create human dates from timestamp
+				from datetime import datetime
+				if "timestamp" in row:
+					row["unix_timestamp"] = row["timestamp"]
+					row["timestamp"] = datetime.utcfromtimestamp(row["timestamp"]).strftime('%Y-%m-%d %H:%M:%S')
+				else:
+					row["timestamp"] = "undefined"
+				# Parse html to text
+				if row["body"]:
+					row["body"] = strip_tags(row["body"])
+
+				writer.writerow(row)
+
+		return processed
 
 	@abstractmethod
 	def get_posts_simple(self, query):

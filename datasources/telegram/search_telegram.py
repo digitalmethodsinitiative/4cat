@@ -9,7 +9,7 @@ import re
 from pathlib import Path
 
 from backend.abstract.search import Search
-from backend.lib.exceptions import QueryParametersException
+from backend.lib.exceptions import QueryParametersException, ProcessorInterruptedException
 from backend.lib.helpers import convert_to_int
 
 from telethon.sync import TelegramClient
@@ -110,7 +110,11 @@ class SearchTelegram(Search):
 			i = 0
 			try:
 				for message in client.iter_messages(entity=query):
-					self.dataset.update_status("Retrieved %i posts" % (len(query_posts) + len(posts)))
+					if self.interrupted:
+						raise ProcessorInterruptedException("Interrupted while fetching message data from the Telegram API")
+
+					if i % 500 == 0:
+						self.dataset.update_status("Retrieved %i posts for entity '%s'" % (len(query_posts) + len(posts), query))
 					parsed_message = self.import_message(client, message, query, get_full_userinfo=userinfo)
 					query_posts.append(parsed_message)
 
@@ -349,7 +353,7 @@ class SearchTelegram(Search):
 			del query["api_phone"]
 
 		# 5000 is mostly arbitrary - may need tweaking
-		max_posts = 25000
+		max_posts = 50000
 		if query.get("max_posts", ""):
 			try:
 				max_posts = min(abs(int(query.get("max_posts"))), max_posts)

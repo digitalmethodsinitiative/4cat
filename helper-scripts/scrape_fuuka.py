@@ -29,7 +29,7 @@ def htmlize(post):
 
 def fuuka_to_4chan(post, thread_id = 0):
 	post_4chan = {
-		"no": int(post["thread_num"]),
+		"no": int(post["num"]),
 		"now": post["fourchan_date"],
 		"name": post["name"],
 		"resto": thread_id,
