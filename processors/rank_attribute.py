@@ -108,55 +108,51 @@ class AttributeRanker(BasicProcessor):
 		overall_top = {}
 		if rank_style == "overall":
 			self.dataset.update_status("Determining overall top-%i items" % cutoff)
-			with open(self.source_file, encoding='utf-8') as source:
-				csv = DictReader(source)
-				for post in csv:
-					values = self.get_values(post, attribute, filter)
-					for value in values:
-						if value not in overall_top:
-							overall_top[value] = 0
+			for post in self.iterate_csv_items(self.source_file):
+				values = self.get_values(post, attribute, filter)
+				for value in values:
+					if value not in overall_top:
+						overall_top[value] = 0
 
-						overall_top[value] += 1
+					overall_top[value] += 1
 
 			overall_top = sorted(overall_top, key=lambda item: overall_top[item], reverse=True)[0:cutoff]
 
 		# now for the real deal
 		self.dataset.update_status("Reading source file")
-		with open(self.source_file, encoding='utf-8') as source:
-			csv = DictReader(source)
-			for post in csv:
-				# determine where to put this data
-				if timeframe == "all":
-					time_unit = "overall"
+		for post in self.iterate_csv_items(self.source_file):
+			# determine where to put this data
+			if timeframe == "all":
+				time_unit = "overall"
+			else:
+				try:
+					timestamp = int(datetime.datetime.strptime(post["timestamp"], "%Y-%m-%d %H:%M:%S").timestamp())
+				except ValueError:
+					timestamp = 0
+				date = datetime.datetime.fromtimestamp(timestamp)
+				if timeframe == "year":
+					time_unit = str(date.year)
+				elif timeframe == "month":
+					time_unit = str(date.year) + "-" + str(date.month).zfill(2)
 				else:
-					try:
-						timestamp = int(datetime.datetime.strptime(post["timestamp"], "%Y-%m-%d %H:%M:%S").timestamp())
-					except ValueError:
-						timestamp = 0
-					date = datetime.datetime.fromtimestamp(timestamp)
-					if timeframe == "year":
-						time_unit = str(date.year)
-					elif timeframe == "month":
-						time_unit = str(date.year) + "-" + str(date.month).zfill(2)
-					else:
-						time_unit = str(date.year) + "-" + str(date.month).zfill(2) + "-" + str(date.day).zfill(2)
+					time_unit = str(date.year) + "-" + str(date.month).zfill(2) + "-" + str(date.day).zfill(2)
 
 				# again, we need to be able to sort, so OrderedDict it is
-				if time_unit not in items:
-					items[time_unit] = OrderedDict()
+			if time_unit not in items:
+				items[time_unit] = OrderedDict()
 
-				# get values from post
-				values = self.get_values(post, attribute, filter)
+			# get values from post
+			values = self.get_values(post, attribute, filter)
 
-				# keep track of occurrences of found items per relevant time period
-				for value in values:
-					if rank_style == "overall" and value not in overall_top:
-						continue
+			# keep track of occurrences of found items per relevant time period
+			for value in values:
+				if rank_style == "overall" and value not in overall_top:
+					continue
 
-					if value not in items[time_unit]:
-						items[time_unit][value] = 0
+				if value not in items[time_unit]:
+					items[time_unit][value] = 0
 
-					items[time_unit][value] += 1
+				items[time_unit][value] += 1
 
 		# sort by time and frequency
 		self.dataset.update_status("Sorting items")
@@ -187,7 +183,7 @@ class AttributeRanker(BasicProcessor):
 
 		# write as csv
 		if rows:
-			self.dataset.write_csv_and_finish(rows)
+			self.write_csv_items_and_finish(rows)
 		else:
 			self.dataset.update_status("No posts contain the requested attributes.")
 			self.dataset.finish(0)

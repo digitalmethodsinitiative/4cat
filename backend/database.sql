@@ -1,3 +1,8 @@
+-- 4CAT Database structure
+-- Running this file as an SQL query should be enough to set up the database
+-- on a fresh 4CAT install - individual data sources may also provide their
+-- own database.sql files with data source-specific tables and indices.
+
 -- jobs table
 CREATE TABLE IF NOT EXISTS jobs (
   id                     SERIAL PRIMARY KEY,

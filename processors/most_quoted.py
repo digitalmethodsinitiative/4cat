@@ -39,18 +39,16 @@ class QuoteRanker(BasicProcessor):
 		link = re.compile(r">>([0-9]+)")
 
 		self.dataset.update_status("Reading source file")
-		with open(self.source_file, encoding='utf-8') as source:
-			csv = DictReader(source)
-			for post in csv:
-				quotes = re.findall(link, post["body"])
-				if quotes:
-					if quotes[0] not in quoted:
-						quoted[quotes[0]] = 0
-						quoted_posts[post["id"]] = post
-						if not fieldnames:
-							fieldnames = list(post.keys())
+		for post in self.iterate_csv_items(self.source_file):
+			quotes = re.findall(link, post["body"])
+			if quotes:
+				if quotes[0] not in quoted:
+					quoted[quotes[0]] = 0
+					quoted_posts[post["id"]] = post
+					if not fieldnames:
+						fieldnames = list(post.keys())
 
-					quoted[quotes[0]] += 1
+				quoted[quotes[0]] += 1
 
 		if not quoted_posts :
 			return

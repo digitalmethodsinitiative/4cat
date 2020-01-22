@@ -22,4 +22,4 @@ class BoardScraper8chan(BoardScraper4chan):
 		:return string: URL to scrape
 		"""
 		board_id = self.job.data["remote_id"].split("/").pop()
-		return "http://8ch.net/%s/threads.json" % board_id
+		return "http://8kun.net/%s/threads.json" % board_id

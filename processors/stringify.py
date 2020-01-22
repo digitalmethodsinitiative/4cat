@@ -47,13 +47,11 @@ class Stringify(BasicProcessor):
 		posts = 0
 		self.dataset.update_status("Processing posts")
 		with self.dataset.get_results_path().open("w") as results:
-			with open(self.source_file, encoding="utf-8") as source:
-				csv = DictReader(source)
-				for post in csv:
-					posts += 1
-					if strip_urls:
-						post["body"] = link_regex.sub("", post["body"])
-					results.write(re.sub(r"\s+", " ", delete_regex.sub(" ", post["body"])).strip() + " ")
+			for post in self.iterate_csv_items(self.source_file):
+				posts += 1
+				if strip_urls:
+					post["body"] = link_regex.sub("", post["body"])
+				results.write(re.sub(r"\s+", " ", delete_regex.sub(" ", post["body"])).strip() + " ")
 
 
 		self.dataset.update_status("Finished")

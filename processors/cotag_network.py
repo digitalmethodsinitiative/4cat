@@ -38,50 +38,47 @@ class CoTagger(BasicProcessor):
 		"""
 		leading_hash = re.compile(r"^#")
 
-		with open(self.source_file, encoding="utf-8") as input:
-			reader = csv.DictReader(input)
+		all_tags = {}
+		pairs = {}
+		posts = 1
 
-			all_tags = {}
-			pairs = {}
+		for post in self.iterate_csv_items(self.source_file):
+			self.dataset.update_status("Reading post %i..." % posts)
+			posts += 1
 
-			posts = 1
-			for post in reader:
-				self.dataset.update_status("Reading post %i..." % posts)
-				posts += 1
+			# create a list of tags
+			if self.parent.parameters["datasource"] == "instagram":
+				tags = post.get("tags", "").split(",")
+				tags += [leading_hash.sub("", tag) for tag in post.get("hashtags", "").split(",")]
 
-				# create a list of tags
-				if self.parent.parameters["datasource"] == "instagram":
-					tags = post.get("tags", "").split(",")
-					tags += [leading_hash.sub("", tag) for tag in post.get("hashtags", "").split(",")]
+			elif self.parent.parameters["datasource"] == "tumblr":
+				tags = str(post.get("tags", ""))
+				if not tags:
+					tags = []
 
-				elif self.parent.parameters["datasource"] == "tumblr":
-					tags = str(post.get("tags", ""))
-					if not tags:
-						tags = []
+			# just in case
+			tags = [tag.strip() for tag in tags]
 
-				# just in case
-				tags = [tag.strip() for tag in tags]
+			for tag in tags:
+				# ignore empty tags
+				if not tag:
+					continue
 
-				for tag in tags:
-					# ignore empty tags
-					if not tag:
+				if tag not in all_tags:
+					all_tags[tag] = 0
+				all_tags[tag] += 1
+
+				for co_tag in tags:
+					if co_tag == tag or not co_tag:
 						continue
 
-					if tag not in all_tags:
-						all_tags[tag] = 0
-					all_tags[tag] += 1
+					pair = sorted((tag, co_tag))
+					pair_key = " ".join(pair)
 
-					for co_tag in tags:
-						if co_tag == tag or not co_tag:
-							continue
+					if pair_key not in pairs:
+						pairs[pair_key] = 0
 
-						pair = sorted((tag, co_tag))
-						pair_key = " ".join(pair)
-
-						if pair_key not in pairs:
-							pairs[pair_key] = 0
-
-						pairs[pair_key] += 1
+					pairs[pair_key] += 1
 
 		# write GDF file
 		self.dataset.update_status("Writing to Gephi-compatible file")

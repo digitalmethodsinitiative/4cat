@@ -58,45 +58,40 @@ class CountPosts(BasicProcessor):
 		
 		self.dataset.update_status("Processing posts")
 		with self.dataset.get_results_path().open("w") as results:
-			with self.source_file.open(encoding="utf-8") as source:
+			counter = 0
 
-				csv = DictReader(source)
-				
-				counter = 0
+			for post in self.iterate_csv_items(self.source_file):
+				# Add a count for the respective timeframe
+				if timeframe == "all":
+					date = "overall"
+				else:
+					try:
+						timestamp = int(datetime.datetime.strptime(post["timestamp"], "%Y-%m-%d %H:%M:%S").timestamp())
+					except ValueError:
+						self.dataset.update_status("Invalid date found in dataset; cannot count posts per interval.")
+						self.dataset.finish(0)
+						return
 
-				for post in csv:
-
-					# Add a count for the respective timeframe
-					if timeframe == "all":
-						date = "overall"
+					date = datetime.datetime.fromtimestamp(timestamp)
+					if timeframe == "year":
+						date = str(date.year)
+					elif timeframe == "month":
+						date = str(date.year) + "-" + str(date.month).zfill(2)
 					else:
-						try:
-							timestamp = int(datetime.datetime.strptime(post["timestamp"], "%Y-%m-%d %H:%M:%S").timestamp())
-						except ValueError:
-							self.dataset.update_status("Invalid date found in dataset; cannot count posts per interval.")
-							self.dataset.finish(0)
-							return
+						date = str(date.year) + "-" + str(date.month).zfill(2) + "-" + str(date.day).zfill(2)
 
-						date = datetime.datetime.fromtimestamp(timestamp)
-						if timeframe == "year":
-							date = str(date.year)
-						elif timeframe == "month":
-							date = str(date.year) + "-" + str(date.month).zfill(2)
-						else:
-							date = str(date.year) + "-" + str(date.month).zfill(2) + "-" + str(date.day).zfill(2)
+				if date not in intervals:
+					intervals[date] = 1
+				else:
+					intervals[date] += 1
 
-					if date not in intervals:
-						intervals[date] = 1
-					else:
-						intervals[date] += 1
+				first_interval = min(first_interval, date)
+				last_interval = max(last_interval, date)
 
-					first_interval = min(first_interval, date)
-					last_interval = max(last_interval, date)
+				counter += 1
 
-					counter += 1
-
-					if counter % 2500 == 0:
-						self.dataset.update_status("Counted through " + str(counter) + " posts.")
+				if counter % 2500 == 0:
+					self.dataset.update_status("Counted through " + str(counter) + " posts.")
 
 			# pad interval if needed, this is useful if the result is to be
 			# visualised as a histogram, for example

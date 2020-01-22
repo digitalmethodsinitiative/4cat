@@ -12,6 +12,7 @@ __credits__ = ["Stijn Peeters", "hatebase.org"]
 __maintainer__ = "Stijn Peeters"
 __email__ = "4cat@oilab.eu"
 
+
 class HatebaseRanker(BasicProcessor):
 	"""
 	Count occurrence of values for a given post attribute for a given time
@@ -85,52 +86,50 @@ class HatebaseRanker(BasicProcessor):
 		overall_top = {}
 		interval_top = {}
 
-		with open(self.source_file, encoding='utf-8') as source:
-			csv = DictReader(source)
-			for post in csv:
-				# determine where to put this data
-				if timeframe == "all":
-					time_unit = "overall"
+		for post in self.iterate_csv_items(self.source_file):
+			# determine where to put this data
+			if timeframe == "all":
+				time_unit = "overall"
+			else:
+				try:
+					timestamp = int(datetime.datetime.strptime(post["timestamp"], "%Y-%m-%d %H:%M:%S").timestamp())
+				except ValueError:
+					timestamp = 0
+				date = datetime.datetime.fromtimestamp(timestamp)
+				if timeframe == "year":
+					time_unit = str(date.year)
+				elif timeframe == "month":
+					time_unit = str(date.year) + "-" + str(date.month).zfill(2)
 				else:
-					try:
-						timestamp = int(datetime.datetime.strptime(post["timestamp"], "%Y-%m-%d %H:%M:%S").timestamp())
-					except ValueError:
-						timestamp = 0
-					date = datetime.datetime.fromtimestamp(timestamp)
-					if timeframe == "year":
-						time_unit = str(date.year)
-					elif timeframe == "month":
-						time_unit = str(date.year) + "-" + str(date.month).zfill(2)
-					else:
-						time_unit = str(date.year) + "-" + str(date.month).zfill(2) + "-" + str(date.day).zfill(2)
+					time_unit = str(date.year) + "-" + str(date.month).zfill(2) + "-" + str(date.day).zfill(2)
 
-				if time_unit not in interval_top:
-					interval_top[time_unit] = {}
+			if time_unit not in interval_top:
+				interval_top[time_unit] = {}
 
-				if scope == "unambiguous":
-					terms = post["hatebase_terms_unambiguous"]
-				elif scope == "ambiguous":
-					terms = post["hatebase_terms_ambiguous"]
-				else:
-					terms = post["hatebase_terms"]
+			if scope == "unambiguous":
+				terms = post["hatebase_terms_unambiguous"]
+			elif scope == "ambiguous":
+				terms = post["hatebase_terms_ambiguous"]
+			else:
+				terms = post["hatebase_terms"]
 
-				terms = terms.split(",")
-				if not terms:
+			terms = terms.split(",")
+			if not terms:
+				continue
+
+			for term in terms:
+				if not term.strip():
 					continue
 
-				for term in terms:
-					if not term.strip():
-						continue
+				if term not in overall_top:
+					overall_top[term] = 0
 
-					if term not in overall_top:
-						overall_top[term] = 0
+				overall_top[term] += 1
 
-					overall_top[term] += 1
+				if term not in interval_top[time_unit]:
+					interval_top[time_unit][term] = 0
 
-					if term not in interval_top[time_unit]:
-						interval_top[time_unit][term] = 0
-
-					interval_top[time_unit][term] += 1
+				interval_top[time_unit][term] += 1
 
 		# this eliminates all items from the results that were not in the
 		# *overall* top-occuring items. This only has an effect when vectors
@@ -164,6 +163,6 @@ class HatebaseRanker(BasicProcessor):
 
 		# write as csv
 		if rows:
-			self.dataset.write_csv_and_finish(rows)
+			self.write_csv_items_and_finish(rows)
 		else:
 			self.dataset.finish(0)

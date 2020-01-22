@@ -11,14 +11,19 @@
             </div>
 
             <form id="query-form" action="/api/queue-query/" method="POST">
-                <fieldset class="form-element">
-                    <label for="datasource-select">Data source:</label>
-                    <div>
-                        <select name="datasource" id="datasource-select">
-                            {% for datasource in datasources %}
-                                <option value="{{ datasource }}">{{ datasources[datasource].name }}</option>
-                            {% endfor %}
-                        </select>
+                <fieldset class="datasource-form">
+                    <p><br>Please be conservative; 4CAT is a shared resource and large dataset queries may prevent others
+                        from using it. We recommend to start with smaller date ranges and specific queries and then cast
+                        a wider net if needed.</p>
+                    <div class="form-element">
+                        <label for="datasource-select">Data source:</label>
+                        <div>
+                            <select name="datasource" id="datasource-select">
+                                {% for datasource in datasources %}
+                                    <option value="{{ datasource }}">{{ datasources[datasource].name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
                     </div>
                 </fieldset>
 

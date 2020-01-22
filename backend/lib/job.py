@@ -28,6 +28,8 @@ class Job:
 		self.data = data
 		self.db = database
 
+		self.data["remote_id"] = str(self.data["remote_id"])
+
 		try:
 			self.is_finished = "is_finished" in self.data and self.data["is_finished"]
 			self.is_claimed = self.data["timestamp_claimed"] and self.data["timestamp_claimed"] > 0
@@ -135,7 +137,7 @@ class Job:
 		update = {"timestamp_claimed": 0, "attempts": self.data["attempts"] + 1}
 		if delay > 0:
 			update["timestamp_after"] = int(time.time()) + delay
-		elif claim_after > 0:
+		elif claim_after is not None:
 			update["timestamp_after"] = claim_after
 
 		self.db.update("jobs", data=update,

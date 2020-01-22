@@ -1,4 +1,4 @@
-#!/usr/local/bin/python3
+#!/usr/bin/python3
 
 # Munin plugin for 4CAT - All jobs in queue
 # Reports the number of jobs currently queued in the 4CAT backend, sorted by

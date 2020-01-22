@@ -80,10 +80,10 @@ class BoardScraper4chan(BasicJSONScraper):
 			self.db.insert("threads_" + self.prefix, thread_data)
 
 		# update timestamps and position
-		position_update = str(self.loop_time) + ":" + str(self.position) + ","
+		position_update = str(self.init_time) + ":" + str(self.position) + ","
 		self.db.execute("UPDATE threads_" + self.prefix + " SET timestamp_scraped = %s, timestamp_modified = %s,"
 						"index_positions = CONCAT(index_positions, %s) WHERE id = %s",
-						(self.loop_time, thread["last_modified"], position_update, str(thread_id)))
+						(self.init_time, thread["last_modified"], position_update, str(thread_id)))
 
 		return new_thread
 

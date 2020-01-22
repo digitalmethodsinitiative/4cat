@@ -41,8 +41,8 @@ class SearchBreitbart(Search4Chan):
 		if thread_ids:
 			self.dataset.update_status("Fetching thread metadata for %i threads..." % len(thread_ids))
 			thread_metadata = {row["id"]: {"url": row["url"], "section": row["section"], "tags": row["tags"]} for row in
-							   self.db.fetchall("SELECT id, url, section, tags FROM threads_breitbart WHERE id IN %s",
-												tuple(thread_ids))}
+							   self.db.fetchall_interruptable(self.queue, "SELECT id, url, section, tags FROM threads_breitbart WHERE id IN %s",
+															  tuple(thread_ids))}
 
 			self.dataset.update_status("Adding metadata to %i articles..." % len(thread_ids))
 			while posts:
