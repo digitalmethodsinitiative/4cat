@@ -198,7 +198,7 @@ class AttributeRanker(BasicProcessor):
 		:return list:  Items found for attribute
 		"""
 		# we use these to extract URLs and host names if needed
-		link_regex = re.compile(r"https?://[^\s]+")
+		link_regex = re.compile(r"https?://[^\s\]()]+")
 		www_regex = re.compile(r"^www\.")
 
 		if attribute == "wildcard":
@@ -207,7 +207,7 @@ class AttributeRanker(BasicProcessor):
 			# URLs need some processing because there may be multiple per post
 			post_links = link_regex.findall(post["body"])
 
-			if "url" in post:
+			if "url" in post and link_regex.match(post["url"]):
 				# some datasources may provide a specific URL per post
 				# as a separate attribute
 				post_links.append(post["url"])
