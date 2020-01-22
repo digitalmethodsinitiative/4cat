@@ -37,7 +37,6 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
 	interrupted = False  # interrupt flag, to request halting
 	modules = None
 	init_time = 0  # Time this worker was started
-	interruptable_database = False  # Whether this worker needs to be able to make interruptable Postgres queries
 
 	def __init__(self, logger, job, db=None, queue=None, manager=None, modules=None):
 		"""
@@ -59,7 +58,7 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
 		# so for workers, all_modules' content is passed as a constructor argument
 		self.all_modules = modules
 
-		self.db = Database(logger=self.log, appname=self.type, is_async=self.interruptable_database) if not db else db
+		self.db = Database(logger=self.log, appname=self.type) if not db else db
 		self.queue = JobQueue(logger=self.log, database=self.db) if not queue else queue
 
 	def run(self):
