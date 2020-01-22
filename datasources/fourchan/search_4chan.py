@@ -9,7 +9,7 @@ from pymysql import OperationalError, ProgrammingError, Error
 import config
 from backend.lib.database_mysql import MySQLDatabase
 from backend.abstract.search import Search
-from backend.lib.exceptions import QueryParametersException
+from backend.lib.exceptions import QueryParametersException, ProcessorInterruptedException
 
 
 class Search4Chan(Search):
@@ -21,6 +21,7 @@ class Search4Chan(Search):
 	type = "4chan-search"  # job ID
 	sphinx_index = "4chan"  # prefix for sphinx indexes for this data source. Should usually match sphinx.conf
 	prefix = "4chan"  # table identifier for this datasource; see below for usage
+	interruptable_database = True  # need to be able to cancel long-running queries
 
 	# Columns to return in csv
 	return_cols = ['thread_id', 'id', 'timestamp', 'body', 'subject', 'author', 'image_file', 'image_md5',
@@ -88,7 +89,7 @@ class Search4Chan(Search):
 		else:
 			sql_query += " ORDER BY p.timestamp ASC"
 
-		return self.db.fetchall(sql_query, replacements)
+		return self.db.fetchall_interruptable(self.queue, sql_query, replacements)
 
 	def get_posts_complex(self, query):
 		"""
@@ -163,6 +164,7 @@ class Search4Chan(Search):
 			self.dataset.update_status("Query finished, but no results were found.")
 			return None
 
+
 		# query posts database
 		self.dataset.update_status("Found %i matches. Collecting post data" % len(posts))
 		datafetch_start = time.time()
@@ -217,9 +219,12 @@ class Search4Chan(Search):
 		where.append("id IN %s")
 		replacements.append(post_ids)
 
+		if self.interrupted:
+			raise ProcessorInterruptedException("Interrupted while fetching post data")
+
 		query = "SELECT " + columns + " FROM posts_" + self.prefix + " WHERE " + " AND ".join(
 			where) + " ORDER BY id ASC"
-		return self.db.fetchall(query, replacements)
+		return self.db.fetchall_interruptable(self.queue, query, replacements)
 
 	def fetch_threads(self, thread_ids):
 		"""
@@ -229,9 +234,13 @@ class Search4Chan(Search):
 		:return list: List of posts, with a dictionary representing the database record for each post
 		"""
 		columns = ", ".join(self.return_cols)
-		return self.db.fetchall(
+
+		if self.interrupted:
+			raise ProcessorInterruptedException("Interrupted while fetching thread data")
+
+		return self.db.fetchall_interruptable(self.queue,
 			"SELECT " + columns + " FROM posts_" + self.prefix + " WHERE thread_id IN %s ORDER BY thread_id ASC, id ASC",
-			(thread_ids,))
+											  (thread_ids,))
 
 	def fetch_sphinx(self, where, replacements):
 		"""
@@ -282,8 +291,8 @@ class Search4Chan(Search):
 		:return dict:  Threads sizes, with thread IDs as keys
 		"""
 		# find total thread lengths for all threads in initial data set
-		thread_sizes = {row["thread_id"]: row["num_posts"] for row in self.db.fetchall(
-			"SELECT COUNT(*) as num_posts, thread_id FROM posts_" + self.prefix + " WHERE thread_id IN %s GROUP BY thread_id",
+		thread_sizes = {row["thread_id"]: row["num_posts"] for row in self.db.fetchall_interruptable(
+			self.queue, "SELECT COUNT(*) as num_posts, thread_id FROM posts_" + self.prefix + " WHERE thread_id IN %s GROUP BY thread_id",
 			(thread_ids,)) if int(row["num_posts"]) > min_length}
 
 		return thread_sizes

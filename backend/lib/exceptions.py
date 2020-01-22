@@ -46,3 +46,9 @@ class ProcessorInterruptedException(WorkerInterruptedException):
 	Raise when killing a processor before it's done with its job
 	"""
 	pass
+
+class DatabaseQueryInterruptedException(WorkerInterruptedException):
+	"""
+	Raise when interrupting a DB query before it has finished
+	"""
+	pass
