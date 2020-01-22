@@ -21,26 +21,27 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 	result in some way, with another result set as output. The input thus is
 	a CSV file, and the output (usually) as well. In other words, the result of
 	a post-processor run can be used as input for another post-processor
-	(though whether this is useful is another question).
+	(though whether and when this is useful is another question).
 	"""
-	db = None
-	dataset = None
-	job = None
-	parent = None
-	source_file = None
-	description = "No description available"
-	category = "Other"
-	extension = "csv"
-	options = {}
-	parameters = {}
+	db = None  # database handler
+	dataset = None  # Dataset object representing the dataset to be created
+	job = None  # Job object that requests the execution of this processor
+	parent = None  # Dataset object to be processed, if applicable
+	source_file = None  # path to dataset to be processed, if applicable
+
+	description = "No description available"  # processor description, shown in web front-end
+	category = "Other"  # processor category, for sorting in web front-end
+	extension = "csv"  # extension of files created by this processor
+	options = {}  # configurable options for this processor
+	parameters = {}  # values for the processor's configurable options
 
 	def work(self):
 		"""
-		Scrape a URL
+		Process a dataset
 
-		This acquires a job - if none are found, the loop pauses for a while. The job's URL
-		is then requested and parsed. If that went well, the parsed data is passed on to the
-		processor.
+		Loads dataset metadata, sets up the scaffolding for performing some kind
+		of processing on that dataset, and then processes it. Afterwards, clean
+		up.
 		"""
 		try:
 			self.dataset = DataSet(key=self.job.data["remote_id"], db=self.db)
@@ -115,7 +116,7 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 
 		# see if we need to register the result somewhere
 		if "copy_to" in self.parameters:
-			# copy the results to an arbitray place that was passed
+			# copy the results to an arbitrary place that was passed
 			if self.dataset.get_results_path().exists():
 				shutil.copyfile(str(self.dataset.get_results_path()), self.parameters["copy_to"])
 			else:
@@ -166,11 +167,17 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 			shutil.rmtree(str(self.dataset.get_temporary_path()))
 
 		# we release instead of finish, since interrupting is just that - the
-		# job should resume at a later point. delay resuming by 3 seconds to
+		# job should resume at a later point. Delay resuming by 10 seconds to
 		# give 4CAT the time to do whatever it wants (though usually this isn't
 		# needed since restarting also stops the spawning of new workers)
 		self.dataset.update_status("Dataset processing interrupted. Retrying later.")
-		self.job.release(delay=3)
+
+		if self.interrupted == self.INTERRUPT_RETRY:
+			# retry later - wait at least 10 seconds to give the backend time to shut down
+			self.job.release(delay=10)
+		elif self.interrupted == self.INTERRUPT_CANCEL:
+			# cancel job
+			self.job.finish()
 
 	def iterate_csv_items(self, path):
 		"""
@@ -197,7 +204,9 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 		Write data as csv to results file and finish dataset
 
 		Determines result file path using dataset's path determination helper
-		methods. After writing results, the dataset is marked finished.
+		methods. After writing results, the dataset is marked finished. Will
+		raise a ProcessorInterruptedException if the interrupted flag for this
+		processor is set while iterating.
 
 		:param data: A list or tuple of dictionaries, all with the same keys
 		"""
@@ -226,8 +235,8 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 	@abc.abstractmethod
 	def process(self):
 		"""
-		Process scraped data
+		Process data
 
-		:param data:  Parsed JSON data
+		To be defined by the child processor.
 		"""
 		pass

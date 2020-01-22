@@ -113,7 +113,7 @@ class ThreadScraper4chan(BasicJSONScraper):
 		# mark deleted posts as such
 		deleted = set(post_dict_db.keys()) - set(post_dict_scrape.keys())
 		for post_id in deleted:
-			self.db.update("posts_" + self.prefix, where={"id": post_id}, data={"timestamp_deleted": self.loop_time}, commit=False)
+			self.db.update("posts_" + self.prefix, where={"id": post_id}, data={"timestamp_deleted": self.init_time}, commit=False)
 		self.db.commit()
 
 		# add new posts
@@ -368,7 +368,7 @@ class ThreadScraper4chan(BasicJSONScraper):
 			"id": thread_db_id,
 			"board": self.job.details["board"],
 			"timestamp": first_post["time"],
-			"timestamp_scraped": self.loop_time,
+			"timestamp_scraped": self.init_time,
 			"timestamp_modified": first_post["time"],
 			"post_last": last_post
 		})
@@ -384,7 +384,7 @@ class ThreadScraper4chan(BasicJSONScraper):
 		thread_db_id = self.job.data["remote_id"].split("/").pop()
 		self.log.info(
 			"Thread %s/%s/%s was deleted, marking as such" % (self.datasource, self.job.details["board"], self.job.data["remote_id"]))
-		self.db.update("threads_" + self.prefix, data={"timestamp_deleted": self.loop_time},
+		self.db.update("threads_" + self.prefix, data={"timestamp_deleted": self.init_time},
 					   where={"id": thread_db_id, "timestamp_deleted": 0})
 		self.job.finish()
 

@@ -143,7 +143,23 @@ class WorkerManager:
 
 	def abort(self, signal=None, stack=None):
 		"""
-		Stop looping the delegator and prepare for shutdown
+		Stop looping the delegator, clean up, and prepare for shutdown
 		"""
 		self.log.info("Received SIGTERM")
+
+		# cancel all interruptible postgres queries
+		# this needs to be done before we stop looping since after that no new
+		# jobs will be claimed
+		for job in self.queue.get_all_jobs("cancel-pg-query", restrict_claimable=False):
+			# this will make all these jobs immediately claimable, i.e. queries
+			# will get cancelled asap
+			self.log.info("Cancelling interruptable Postgres query %s..." % job.data["remote_id"])
+			job.claim()
+			job.release(delay=0, claim_after=0)
+
+		# wait until all cancel jobs are completed
+		while self.queue.get_all_jobs("cancel-pg-query", restrict_claimable=False):
+			time.sleep(0.1)
+
+		# now stop looping (i.e. accepting new jobs)
 		self.looping = False
