@@ -32,7 +32,7 @@ class Database:
 	interruptable_timeout = 86400  # if a query takes this long, it should be cancelled. see also fetchall_interruptable()
 	interruptable_job = None
 
-	def __init__(self, logger, dbname=None, user=None, password=None, host=None, port=None, appname=None, is_async=False):
+	def __init__(self, logger, dbname=None, user=None, password=None, host=None, port=None, appname=None):
 		"""
 		Set up database connection
 
@@ -52,11 +52,7 @@ class Database:
 
 		appname = "4CAT" if not appname else "4CAT-%s" % appname
 
-		self.connection = psycopg2.connect(async_=is_async, dbname=dbname, user=user, password=password, host=host, port=port, application_name=appname)
-		self.is_async = is_async
-		if is_async:
-			self.wait_for_connection()
-
+		self.connection = psycopg2.connect(dbname=dbname, user=user, password=password, host=host, port=port, application_name=appname)
 		self.cursor = self.connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 		self.log = logger
 
@@ -85,9 +81,6 @@ class Database:
 		if not cursor:
 			cursor = self.get_cursor()
 
-		if self.is_async:
-			self.wait_for_connection()
-
 		self.log.debug("Executing query %s" % self.cursor.mogrify(query, replacements))
 
 		return cursor.execute(query, replacements)
@@ -104,15 +97,10 @@ class Database:
 		if not cursor:
 			cursor = self.get_cursor()
 
-		if self.is_async:
-			self.wait_for_connection()
-
 
 		self.log.debug("Executing query %s" % self.cursor.mogrify(query, replacements))
 		cursor.execute(query, replacements)
-
-		if not self.is_async:
-			self.commit()
+		self.commit()
 
 	def execute_many(self, query, replacements=None, cursor=None):
 		"""
@@ -127,9 +115,6 @@ class Database:
 		"""
 		if not cursor:
 			cursor = self.get_cursor()
-
-		if self.is_async:
-			self.wait_for_connection()
 
 		execute_values(cursor, query, replacements)
 
@@ -146,9 +131,6 @@ class Database:
 		"""
 		if where is None:
 			where = {}
-
-		if self.is_async:
-			self.wait_for_connection()
 
 		# build query
 		identifiers = [sql.Identifier(column) for column in data.keys()]
@@ -168,7 +150,7 @@ class Database:
 		self.log.debug("Executing query: %s" % cursor.mogrify(query, replacements))
 		cursor.execute(query, replacements)
 
-		if commit and not self.is_async:
+		if commit:
 			self.commit()
 
 		return cursor.rowcount
@@ -183,9 +165,6 @@ class Database:
 
 		:return int: Number of affected rows. Note that this may be unreliable if `commit` is `False`
 		"""
-		if self.is_async:
-			self.wait_for_connection()
-
 		where_sql = ["{} = %s" for column in where.keys()]
 		replacements = list(where.values())
 
@@ -198,7 +177,7 @@ class Database:
 		self.log.debug("Executing query: %s" % cursor.mogrify(query, replacements))
 		cursor.execute(query, replacements)
 
-		if commit and not self.is_async:
+		if commit:
 			self.commit()
 
 		return cursor.rowcount
@@ -218,9 +197,6 @@ class Database:
 		"""
 		if constraints is None:
 			constraints = []
-
-		if self.is_async:
-			self.wait_for_connection()
 
 		# escape identifiers
 		identifiers = [sql.Identifier(column) for column in data.keys()]
@@ -246,7 +222,7 @@ class Database:
 		self.log.debug("Executing query: %s" % cursor.mogrify(query, replacements))
 		cursor.execute(query, replacements)
 
-		if commit and not self.is_async:
+		if commit:
 			self.commit()
 
 		return cursor.rowcount
@@ -259,15 +235,9 @@ class Database:
 		:param args: Replacement values
 		:return list: The result rows, as a list
 		"""
-		if self.is_async:
-			self.wait_for_connection()
-
 		cursor = self.get_cursor()
 		self.log.debug("Executing query: %s" % cursor.mogrify(query, *args))
 		self.query(query, cursor=cursor, *args)
-
-		if self.is_async:
-			self.wait_for_connection()
 
 		try:
 			result = cursor.fetchall()
@@ -284,18 +254,13 @@ class Database:
 		:param args: Replacement values
 		:return: The row, as a dictionary, or None if there were no rows
 		"""
-		if self.is_async:
-			self.wait_for_connection()
-
 		cursor = self.get_cursor()
 		self.query(query, cursor=cursor, *args)
 
-		if self.is_async:
-			self.wait_for_connection()
-
 		try:
 			result = cursor.fetchone()
-		except psycopg2.ProgrammingError:
+		except psycopg2.ProgrammingError as e:
+			print("%s error: %s " % (query, e))
 			# no results to fetch
 			if not self.is_async:
 				self.commit()
@@ -319,63 +284,32 @@ class Database:
 		:param list args:  Replacement variables
 		:return list:  A list of rows, as dictionaries
 		"""
-		if not self.is_async:
-			raise RuntimeError("Interruptable queries may only be executed via an asynchronous Postgres connection")
-
-		if self.interruptable_job:
-			raise RuntimeError("You cannot run two queries at the same time on a single Postgres connection")
-
 		# schedule a job that will cancel the query we're about to make
 		pid = self.connection.get_backend_pid()
-		self.wait_for_connection()
 		self.interruptable_job = queue.add_job("cancel-pg-query", details={}, remote_id=pid, claim_after=time.time() + self.interruptable_timeout)
 
 		# make the query
-		self.wait_for_connection()
 		cursor = self.get_cursor()
 		self.log.debug("Executing interruptable query: %s" % cursor.mogrify(query, *args))
-		self.query(query, cursor=cursor, *args)
+
+		try:
+			self.query(query, cursor=cursor, *args)
+		except psycopg2.extensions.QueryCanceledError:
+			# interrupted with cancellation worker (or manually)
+			self.rollback()
+			raise DatabaseQueryInterruptedException("Interrupted while querying database")
 
 		# collect results
-		self.wait_for_connection()
 		try:
 			result = cursor.fetchall()
 		except (AttributeError, psycopg2.ProgrammingError) as e:
 			result = []
 
 		# clean up cancelling job when we have the data
-		self.wait_for_connection()
 		self.interruptable_job.finish()
 		self.interruptable_job = None
 
 		return result
-
-	def wait_for_connection(self):
-		"""
-		Loop until a query has finished
-
-		Used for asynchronous queries
-		"""
-		poll_interval = 0.5  # poll every so often
-
-		while True:
-			try:
-				# loop this until the query is done
-				state = self.connection.poll()
-
-				if state == POLL_OK:
-					break
-				elif state == POLL_READ:
-					select.select([self.connection.fileno()], [], [], poll_interval)
-				elif state == POLL_WRITE:
-					select.select([], [self.connection.fileno()], [], poll_interval)
-				else:
-					raise self.connection.OperationalError("Bad state from postgres connection poll: %s" % state)
-			except psycopg2.extensions.QueryCanceledError:
-				# this happens if the query gets interrupted because of a backend shutdown
-				# (or if someone manually does pg_cancel_backend()....)
-				self.connection.cancel()
-				raise DatabaseQueryInterruptedException
 
 
 	def commit(self):
@@ -384,9 +318,6 @@ class Database:
 
 		This is required for UPDATE etc to stick.
 		"""
-		if self.is_async:
-			raise RuntimeError("Cannot commit a transaction via an asynchronous Postgres connection")
-
 		self.connection.commit()
 
 	def rollback(self):
@@ -410,8 +341,6 @@ class Database:
 		:return: Cursor
 		"""
 		if not self.cursor or self.cursor.closed:
-			if self.is_async:
-				self.wait_for_connection()
 			self.cursor = self.connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
 		return self.cursor
