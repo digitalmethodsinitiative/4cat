@@ -47,6 +47,11 @@ class ExtractNouns(BasicProcessor):
 				"noun_chunks": "Noun chunks"
 			},
 			"help": "Whether to only get 1) separate words indicated as nouns, 2) nouns and compound nouns (nouns with multiple words, e.g.\"United States\") using a custom parser, or 3) noun chunks: nouns plus the words describing them, e.g. \"the old grandpa\" - see https://spacy.io/usage/linguistic-features#noun-chunks."
+		},
+		"sent_must_contain": {
+			"type": UserInput.OPTION_TEXT,
+			"default": "",
+			"help": "Only extract nouns from sentences that contain these text string(s) (comma-separated, case-insensitive)"
 		}
 	}
 
@@ -59,42 +64,53 @@ class ExtractNouns(BasicProcessor):
 		# Extract the SpaCy docs first
 		self.dataset.update_status("Unzipping SpaCy docs")
 		docs = self.extract_docs()
-	
+
+		# Extract words that must appear in a sentence
+		sent_must_contain = []
+		if self.parameters["sent_must_contain"]:
+			sent_must_contain = [str(word).strip().lower() for word in self.parameters["sent_must_contain"].split(",")]
+
 		# Store all the nouns in this list		
 		li_nouns = []
 
-		# Simply add each word if its POS is "NOUN"
-		if self.parameters["type"] == "nouns":
-			for doc in docs:
-				li_nouns += [token for token in doc if token.pos_ == "NOUN"]
+		for doc in docs:
 
-		# Use SpaCy's noun chunk detection
-		elif self.parameters["type"] == "noun_chunks":
-			for doc in docs:
-				for chunk in doc.noun_chunks:
-					li_nouns.append(chunk.text)
+			# Filter out irrelevant sentences, if needed
+			for sent in doc.sents:
 
-		# Use a custom script to get single nouns and compound nouns
-		elif self.parameters["type"] == "nouns_and_compounds":
-			
-			for doc in docs:
-				noun = ""
+				# Stop if sentence does not contain the right string.
+				if self.parameters["sent_must_contain"]:
+					if not any(must_contain in sent.text.lower() for must_contain in sent_must_contain):
+						continue
 
-				for i, token in enumerate(doc):
-					
-					# Check for common nouns (general, e.g. "people")
-					# and proper nouns (specific, e.g. "London")
-					if token.pos_ == "NOUN" or token.pos_ == "PROPN":
-						# Check if the token is part of a noun chunk
-						if token.dep_ == "compound": # Check for a compound relation
-							noun = token.text
-						else:
-							if noun:
-								noun += " " + token.text
-								li_nouns.append(noun)
-								noun = ""
+				# Simply add each word if its POS is "NOUN"
+					if self.parameters["type"] == "nouns":	
+							li_nouns += [token for token in sent if token.pos_ == "NOUN"]
+
+				# Use SpaCy's noun chunk detection
+				elif self.parameters["type"] == "noun_chunks":
+					for chunk in sent.noun_chunks:
+						li_nouns.append(chunk.text)
+
+				# Use a custom script to get single nouns and compound nouns
+				elif self.parameters["type"] == "nouns_and_compounds":
+					noun = ""
+
+					for token in sent:
+						
+						# Check for common nouns (general, e.g. "people")
+						# and proper nouns (specific, e.g. "London")
+						if token.pos_ == "NOUN" or token.pos_ == "PROPN":
+							# Check if the token is part of a noun chunk
+							if token.dep_ == "compound": # Check for a compound relation
+								noun = token.text
 							else:
-								li_nouns.append(token.text)
+								if noun:
+									noun += " " + token.text
+									li_nouns.append(noun)
+									noun = ""
+								else:
+									li_nouns.append(token.text)
 			
 		results = []
 		if li_nouns:
@@ -107,6 +123,9 @@ class ExtractNouns(BasicProcessor):
 
 		# done!
 		self.dataset.update_status("Finished")
+		if not results:
+			self.dataset.finish(len(results))
+		
 		self.dataset.write_csv_and_finish(results)
 
 	def extract_docs(self):

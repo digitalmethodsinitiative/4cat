@@ -62,7 +62,7 @@ class LinguisticFeatures(BasicProcessor):
 		results = []
 
 		# Load the spacy goods
-		nlp = en_core_web_sm.load()
+		nlp = spacy.load("en_core_web_sm")
 		nlp.tokenizer = self.custom_tokenizer(nlp) # Keep words with a dash in between
 
 		# Disable what has _not_ been selected
@@ -85,7 +85,7 @@ class LinguisticFeatures(BasicProcessor):
 			docs = nlp.pipe(posts, disable=disable)
 
 			# Then serialize the NLP docs and the vocab
-			self.dataset.update_status("Serializing results - this might take a while")
+			self.dataset.update_status("Serializing results - this will take a while")
 			doc_bytes = [doc.to_bytes() for doc in docs]
 			vocab_bytes = nlp.vocab.to_bytes()
 
