@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 
-# Munin plugin for 4CAT - Queries per day
-# Reports the number of queries queried over the past day. Can be used to check
+# Munin plugin for 4CAT - Datasets per day
+# Reports the number of datasets created over the past day. Can be used to check
 # user activity on the web tool.
 
 import socket
@@ -20,18 +20,18 @@ def get_api(type):
 
 
 if len(sys.argv) > 1 and sys.argv[1] == "config":
-	print("graph_title Search queries queued per day")
+	print("graph_title Datasets created per day")
 	print("graph_args -l 0")
-	print("graph_vlabel queries")
+	print("graph_vlabel datasets")
 	print("graph_category 4cat")
-	print("graph_info The number of queries queued over the past day")
-	print("queriesd.label Queries queued")
+	print("graph_info The number of datasets created over the past day")
+	print("datasetsd.label Datasetse created")
 	sys.exit(0)
 
 try:
-	queries = get_api("queries")
+	queries = get_api("datasets")
 	queries = json.loads(queries)["response"]
-	print("queriesd.value %i" % queries["1d"])
+	print("datasetsd.value %i" % queries["1d"])
 except (KeyError, json.JSONDecodeError, ConnectionError) as e:
 	print(e)
-	print("queriesd.value 0")
+	print("datasetsd.value 0")
