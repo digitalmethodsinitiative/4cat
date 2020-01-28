@@ -111,19 +111,19 @@ class Tokenise(BasicProcessor):
 
 		# load word filters - words to exclude from tokenisation
 		word_filter = set()
-		for wordlist in self.parameters["filter"]:
+		for wordlist in self.parameters.get("filter", self.options["filter"]["default"]):
 			with open(config.PATH_ROOT + "/backend/assets/wordlists/%s.pb" % wordlist, "rb") as input:
 				word_filter = set.union(word_filter, pickle.load(input))
 
 		# Extend or limit the word filter with optionally added words
 		# Remove accepted words from filter
-		if self.parameters.get("accept_words"):
+		if self.parameters.get("accept_words", self.options["accept_words"]["default"]):
 			accept_words = [str(word).strip() for word in self.parameters["accept_words"].split(",")]
 			for accept_word in accept_words:
 				if accept_word in word_filter:
 					word_filter.remove(accept_word)
 		# Add rejected words to filter
-		if self.parameters.get("reject_words"):
+		if self.parameters.get("reject_words", self.options["reject_words"]["default"]):
 			reject_words = [str(word).strip() for word in self.parameters["reject_words"].split(",")]
 			word_filter.update(reject_words)
 
@@ -131,10 +131,10 @@ class Tokenise(BasicProcessor):
 		strip_symbols = self.parameters.get("strip_symbols", self.options["strip_symbols"]["default"])
 
 		# initialise pre-processors if needed
-		if self.parameters["stem"]:
+		if self.parameters.get("stem", self.options["stem"]["default"]):
 			stemmer = SnowballStemmer(language)
 
-		if self.parameters["lemmatise"]:
+		if self.parameters.get("lemmatise", self.options["lemmatise"]["default"]):
 			lemmatizer = WordNetLemmatizer()
 
 		# this is how we'll keep track of the subsets of tokens
@@ -158,7 +158,7 @@ class Tokenise(BasicProcessor):
 
 		# process posts
 		self.dataset.update_status("Processing posts")
-		timeframe = self.parameters["timeframe"]
+		timeframe = self.parameters.get("timeframe", self.options["timeframe"]["default"])
 
 		for post in self.iterate_csv_items(self.source_file):
 			# determine what output unit this post belongs to
@@ -198,7 +198,7 @@ class Tokenise(BasicProcessor):
 			tokens = word_tokenize(body, language=language)
 
 			# Only keep unique terms if indicated
-			if self.parameters.get("exclude_duplicates", False):
+			if self.parameters.get("exclude_duplicates", self.options["exclude_duplicates"]["default"]):
 				tokens = set(tokens)
 
 			# stem, lemmatise and save tokens that are not stopwords
