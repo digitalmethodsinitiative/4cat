@@ -179,7 +179,8 @@ class Search(BasicProcessor, ABC):
 				try:
 					self.dataset.update_status("Creating random sample")
 					sample_size = int(query.get("sample_size", 5000))
-					random.shuffle(list(posts))
+					posts = list(posts)
+					random.shuffle(posts)
 					return posts[0:sample_size]
 				except ValueError:
 					pass
