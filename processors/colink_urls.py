@@ -58,7 +58,7 @@ class URLCoLinker(BasicProcessor):
 		months = {}
 
 		# we use these to extract URLs and host names if needed
-		link_regex = re.compile(r"https?://[^\s)]+")
+		link_regex = re.compile(r"https?://[^\s\]()]+")
 		www_regex = re.compile(r"^www\.")
 		trailing_dot = re.compile(r"[.,)]$")
 
