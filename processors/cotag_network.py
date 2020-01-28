@@ -52,7 +52,13 @@ class CoTagger(BasicProcessor):
 				tags += [leading_hash.sub("", tag) for tag in post.get("hashtags", "").split(",")]
 
 			elif self.parent.parameters["datasource"] == "tumblr":
-				tags = str(post.get("tags", ""))
+
+				# Convert string of list to actual list
+				tags = post.get("tags", "").split("', '")
+				# Remove list brackets
+				tags[0] = tags[0][2:]
+				tags[-1] = tags[-1][:-2]
+				
 				if not tags:
 					tags = []
 
@@ -69,6 +75,7 @@ class CoTagger(BasicProcessor):
 				all_tags[tag] += 1
 
 				for co_tag in tags:
+					
 					if co_tag == tag or not co_tag:
 						continue
 
