@@ -19,13 +19,38 @@ class SplitSentences(BasicProcessor):
 	type = "sentence-split"  # job type ID
 	category = "Text analysis"  # category
 	title = "Sentence split"  # title displayed in UI
-	description = "Split a body of posts into discrete sentences. Assumes the posts are written in English; success for other languages, particularly those using other punctuation systems, may vary."  # description displayed in UI
+	description = "Split a body of posts into discrete sentences. Output file has one row per sentence, containing the sentence and post ID."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
 	input = "csv:id,body"
 	output = "csv:post_id,sentence"
 
 	options = {
+		"language": {
+			"type": UserInput.OPTION_CHOICE,
+			"default": "english",
+			"options": {
+				"czech": "Czech",
+				"danish": "Danish",
+				"dutch": "Dutch",
+				"english": "English",
+				"estonian": "Estonian",
+				"finnish": "Finnish",
+				"french": "French",
+				"german": "German",
+				"greek": "Greek",
+				"italian": "Italian",
+				"norwegian": "Norwegian",
+				"polish": "Polish",
+				"portugese": "Portugese",
+				"russian": "Russian",
+				"slovene": "Slovene",
+				"spanish": "Spanish",
+				"swedish": "Swedish",
+				"turkish": "Turkish"
+			},
+			"help": "Language"
+		},
 		"min_length": {
 			"type": UserInput.OPTION_TEXT,
 			"min": 0,
@@ -45,15 +70,18 @@ class SplitSentences(BasicProcessor):
 		num_sentences = 0
 		num_posts = 1
 		min_length = self.parameters.get("min_length", self.options["min_length"]["default"])
+		language = self.parameters.get("language", self.options["language"]["default"])
 
 		with self.dataset.get_results_path().open("w", encoding="utf-8") as output:
 			writer = csv.DictWriter(output, fieldnames=("post_id", "sentence",))
 			writer.writeheader()
 
 			for post in self.iterate_csv_items(self.source_file):
-				self.dataset.update_status("Processing post %i" % num_posts)
+				if num_posts % 100 == 0:
+					self.dataset.update_status("Processing post %i" % num_posts)
+					
 				num_posts += 1
-				sentences = sent_tokenize(post.get("body", ""))
+				sentences = sent_tokenize(post.get("body", ""), language=language)
 
 				for sentence in sentences:
 					if min_length == 0:

@@ -80,7 +80,7 @@ class Tokenise(BasicProcessor):
 				"stopwords-iso-all": "Multi-language stopwords (stopwords-iso)",
 				"wordlist-cracklib-english": "English word list (cracklib, recommended)",
 				"wordlist-infochimps-english": "English word list (infochimps)",
-				"wordlist-googlebooks-english": "Google Books pre-2012 top unigrams (van Soest)",
+				"wordlist-googlebooks-english": "Google One Million Books pre-2008 top unigrams (van Soest)",
 				"wordlist-opentaal-dutch": "Dutch word list (OpenTaal)",
 				"wordlist-unknown-dutch": "Dutch word list (unknown)"
 			},
