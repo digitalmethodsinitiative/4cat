@@ -190,7 +190,7 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 		:param Path path:  Path to csv file to read
 		:return:
 		"""
-		with open(path) as input:
+		with open(path, encoding="utf-8") as input:
 			reader = csv.DictReader(input)
 
 			for item in reader:
