@@ -154,7 +154,7 @@ class SearchTumblr(Search):
 				break
 
 			# Make sure the Tumblr API doesn't magically stop at an earlier date
-			if not posts:
+			if not posts or isinstance(post, str):
 				retries += 1
 				before -= 3600 # Decrease by an hour
 				self.dataset.update_status("No posts - querying again but an hour earlier (retry %s/48)" % str(retries))
@@ -286,7 +286,7 @@ class SearchTumblr(Search):
 		# reformat queries to be a comma-separated list
 		items = query.get("query").replace("\n", ",").replace("#","").replace("\r", ",")
 		items = items.split(",")
-		items = [item.lstrip().rstrip() for item in items]
+		items = [item.lstrip().rstrip() for item in items if item]
 
 		# set before
 		if query.get("before"):
@@ -297,6 +297,9 @@ class SearchTumblr(Search):
 		# Not more than 5 plox
 		if len(items) > 5:
 			raise QueryParametersException("Only query for five or less tags or blogs.")
+		# no query 4 u
+		if not items:
+			raise QueryParametersException("Invalid search search query.")
 
 		# simple!
 		return {
