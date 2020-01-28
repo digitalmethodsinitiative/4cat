@@ -5,6 +5,7 @@ import csv
 import re
 
 from backend.abstract.processor import BasicProcessor
+from backend.lib.helpers import UserInput
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -27,6 +28,15 @@ class CoTagger(BasicProcessor):
 
 	input = "csv:tags|hashtags"
 	output = "gdf"
+
+	options = {
+		"to_lowercase": {
+			"type": UserInput.OPTION_TOGGLE,
+			"default": True,
+			"help": "Convert the tags to lowercase",
+			"tooltip": "Converting the tags to lowercase can help in removing duplicate edges between nodes"
+		}
+	}
 
 	def process(self):
 		"""
@@ -63,7 +73,11 @@ class CoTagger(BasicProcessor):
 					tags = []
 
 			# just in case
-			tags = [tag.strip() for tag in tags]
+			tags = [tag.strip().replace("'","") for tag in tags]
+
+			# To lowercase if so desired
+			if self.parameters.get("to_lowercase"):
+				tags = [tag.lower() for tag in tags]
 
 			for tag in tags:
 				# ignore empty tags
