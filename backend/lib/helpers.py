@@ -139,6 +139,9 @@ class UserInput:
 		elif type == UserInput.OPTION_MULTI:
 			# any number of values out of a list of possible values
 			# comma-separated during input, returned as a list of valid options
+			if not choice:
+				return []
+			
 			chosen = choice.split(",")
 			return [item for item in chosen if item in settings.get("options", [])]
 		elif type == UserInput.OPTION_CHOICE:

@@ -30,7 +30,7 @@ class InternalAPI(BasicWorker):
 			# and workers that end just get started again
 			self.db.close()
 			self.manager.log.info("Local API not available per configuration")
-			while self.looping:
+			while not self.interrupted:
 				time.sleep(1)
 			return
 
@@ -47,7 +47,7 @@ class InternalAPI(BasicWorker):
 				server.bind(("localhost", self.port))
 				break
 			except OSError as e:
-				if has_time and self.looping:
+				if has_time and not self.interrupted:
 					self.manager.log.info("Could not open port %i yet (%s), retrying in 10 seconds" % (self.port, e))
 					time.sleep(10.0)  # wait a few seconds before retrying
 					continue
@@ -150,28 +150,6 @@ class InternalAPI(BasicWorker):
 
 			return workers
 
-		if request == "posts" or request == "threads":
-			# return the amount of posts or threads scraped in the past minute, day and hour
-			now = int(time.time())
-			then = now - 86400
-			field = "timestamp" if request == "posts" else "timestamp_scraped"
-			items = self.db.fetchall("SELECT " + field + " FROM " + request + " WHERE " + field + " > %s", (then,))
-			if items is None:
-				return {"error": "Database unavailable"}
-
-			response = {
-				"1m": 0,
-				"1h": 0,
-				"1d": 0
-			}
-			for item in items:
-				response["1d"] += 1
-				if item[field] > now - 60:
-					response["1m"] += 1
-				if item[field] > now - 3600:
-					response["1h"] += 1
-			return response
-
 		if request == "jobs":
 			# return queued jobs, sorted by type
 			jobs = self.db.fetchall("SELECT * FROM jobs")
@@ -188,32 +166,8 @@ class InternalAPI(BasicWorker):
 
 			return response
 
-		if request == "posts-deleted" or request == "threads-deleted":
-			# return the amount of posts or threads deleted in the past minute, day and hour
-			table = "posts" if request == "posts-deleted" else "threads"
-			now = int(time.time())
-			then = now - 86400
-			items = self.db.fetchall("SELECT * FROM " + table + " WHERE timestamp_deleted > %s", (then,))
-			if items is None:
-				return {"error": "Database unavailable"}
-
-			response = {
-				"1m": 0,
-				"1h": 0,
-				"1d": 0
-			}
-
-			for item in items:
-				response["1d"] += 1
-				if item["timestamp_deleted"] > now - 60:
-					response["1m"] += 1
-				if item["timestamp_deleted"] > now - 3600:
-					response["1h"] += 1
-
-			return response
-
-		if request == "queries":
-			# search queries per time period
+		if request == "datasets":
+			# datasets created per time period
 			week = 86400 * 7
 			now = int(time.time())
 
@@ -237,12 +191,6 @@ class InternalAPI(BasicWorker):
 
 		# no appropriate response
 		return False
-
-	def abort(self):
-		"""
-		Stop main loop
-		"""
-		self.looping = False
 
 
 class InternalAPIException(Exception):
