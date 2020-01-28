@@ -52,9 +52,15 @@ class SearchCustom(BasicWorker):
 		if not file:
 			raise QueryParametersException("No file was offered for upload.")
 
-		# validate file as CSV
 		wrapped_upload = io.TextIOWrapper(file)
-		reader = csv.DictReader(wrapped_upload)
+		
+		# validate file as tab
+		if ".tab" in file.filename:
+			reader = csv.DictReader(wrapped_upload, delimiter="\t")
+		# validate file as csv
+		else:
+			reader = csv.DictReader(wrapped_upload)
+
 		try:
 			fields = reader.fieldnames
 		except UnicodeDecodeError:
