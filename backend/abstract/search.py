@@ -177,8 +177,9 @@ class Search(BasicProcessor, ABC):
 			# for simple queries, this is handled in get_posts_simple
 			if query.get("search_scope", None) == "random-sample":
 				try:
+					self.dataset.update_status("Creating random sample")
 					sample_size = int(query.get("sample_size", 5000))
-					random.shuffle(posts)
+					random.shuffle(list(posts))
 					return posts[0:sample_size]
 				except ValueError:
 					pass
