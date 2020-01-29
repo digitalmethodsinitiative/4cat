@@ -37,7 +37,7 @@ class SearchCustom(BasicWorker):
 		"""
 		Validate custom data input
 
-		Confirms that the uploaded file is a valid CSV file and, if so, returns
+		Confirms that the uploaded file is a valid CSV or tab file and, if so, returns
 		some metadata.
 
 		:param dict query:  Query parameters, from client-side.
@@ -52,11 +52,12 @@ class SearchCustom(BasicWorker):
 		if not file:
 			raise QueryParametersException("No file was offered for upload.")
 
-		wrapped_upload = io.TextIOWrapper(file)
+		wrapped_upload = io.TextIOWrapper(file, encoding="utf-8")
 		
 		# validate file as tab
-		if ".tab" in file.filename:
-			reader = csv.DictReader(wrapped_upload, delimiter="\t")
+		if file.filename.endswith(".tab"):
+			reader = csv.DictReader(wrapped_upload, delimiter="\t", quoting=csv.QUOTE_NONE)
+		
 		# validate file as csv
 		else:
 			reader = csv.DictReader(wrapped_upload)
@@ -64,7 +65,7 @@ class SearchCustom(BasicWorker):
 		try:
 			fields = reader.fieldnames
 		except UnicodeDecodeError:
-			raise QueryParametersException("Uploaded file is not a well-formed CSV file.")
+		 	raise QueryParametersException("Uploaded file is not a well-formed CSV or TAB file.")
 
 		# check if all required fields are present
 		required = ("id", "thread_id", "subject", "author", "body", "timestamp")
@@ -104,13 +105,38 @@ class SearchCustom(BasicWorker):
 		:param DataSet dataset:  Dataset created for this query
 		:param request:  Flask request submitted for its creation
 		"""
+
 		file = request.files["data_upload"]
+		
 		file.seek(0)
-		file.save(dataset.get_results_path().open("wb"))
+
+		# Convert .tab files to comma delimited files
+		if file.filename.endswith(".tab"):
+			
+			wrapped_upload = io.TextIOWrapper(file, encoding="utf-8")
+			reader = csv.DictReader(wrapped_upload, delimiter="\t", quoting=csv.QUOTE_NONE)
+
+			# Write to csv
+			with dataset.get_results_path().open("w", encoding="utf-8", newline='') as output_csv:
+				writer = csv.DictWriter(output_csv, fieldnames=reader.fieldnames)
+				writer.writeheader()
+				for row in reader:
+					writer.writerow(row)
+
+			wrapped_upload.detach()
+
+		# With validated csvs, just save the raw file
+		else:
+			file.save(dataset.get_results_path().open("wb"))
+
 		file.close()
 
-		with dataset.get_results_path().open() as input:
-			reader = csv.DictReader(input)
+		with dataset.get_results_path().open(encoding="utf-8") as input:
+			if file.filename.endswith(".tab"):
+				reader = csv.DictReader(input, delimiter="\t", quoting=csv.QUOTE_NONE)
+			else:
+				reader = csv.DictReader(input)
+
 			dataset.finish(sum(1 for line in reader))
 			dataset.update_status("Result processed")
 

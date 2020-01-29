@@ -1,12 +1,11 @@
 <fieldset class="basic-options">
-    <p class="form-intro">You can upload a CSV file here that, after upload, will be available for
-        further analysis and processing. CSV files need to contain a header row
-        and at least the following columns: <code>id</code>, <code>thread_id</code>, <code>author</code>, <code>body</code>,
-        <code>subject</code>, <code>timestamp</code>.</p>
+    <p class="form-intro">You can upload a CSV or TAB file here that, after upload, will be available for
+        further analysis and processing. Files need to be utf-8 encoded and must contain a header row
+        with at least the following columns: <code>id</code>, <code>thread_id</code>, <code>author</code>, <code>body</code>, <code>subject</code>, <code>timestamp</code>.</p>
     <p class="form-intro">The <code>timestamp</code> column should be formatted <code>YYYY-mm-dd HH:MM:SS</code>.</p>
 
     <div class="form-element">
-        <label for="data-input">CSV File:</label>
+        <label for="data-input">File:</label>
         <div>
             <input name="data_upload" id="data-input" type="file">
         </div>
