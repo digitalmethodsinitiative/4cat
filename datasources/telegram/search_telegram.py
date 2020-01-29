@@ -367,6 +367,9 @@ class SearchTelegram(Search):
 		if len(items.split(",")) > 25:
 			raise QueryParametersException("You cannot query more than 25 items at a time.")
 
+		# eliminate empty queries
+		items = ",".join([item for item in items.split(",") if item])
+
 		# simple!
 		return {
 			"items": max_posts,
