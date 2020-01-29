@@ -52,6 +52,13 @@ GITHUB_URL = "https://github.com/digitalmethodsinitiative/4cat"  # URL to the gi
 # and will listen for requests on the following port. "0" disables the API.
 API_PORT = 4444
 
+# 4CAT can anonymise author names in results and does so using a hashed version
+# of the author name + a salt. The salt should be defined here. This should be
+# a random string; in Python you can generate one with e.g. bcrypt.gensalt()
+# You need to set this before running 4CAT. 4CAT will refuse to run if this is
+# left at its default value.
+ANONYMISATION_SALT = "REPLACE_THIS"
+
 # Warning report configuration
 WARN_INTERVAL = 600  # every so many seconds, compile a report of logged warnings and e-mail it to admins
 WARN_LEVEL = "WARNING"  # only alerts above this level are mailed: DEBUG/INFO/WARNING/ERROR/CRITICAL
