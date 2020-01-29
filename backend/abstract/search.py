@@ -1,3 +1,4 @@
+import hashlib
 import shutil
 import random
 import math
@@ -5,6 +6,8 @@ import csv
 
 from pathlib import Path
 from abc import ABC, abstractmethod
+
+import config
 
 from backend.lib.dataset import DataSet
 from backend.abstract.processor import BasicProcessor
@@ -225,6 +228,18 @@ class Search(BasicProcessor, ABC):
 		if not isinstance(filepath, Path):
 			filepath = Path(filepath)
 
+		# cache hashed author names, so the hashing function (which is
+		# relatively expensive) is not run too often
+		pseudonymise_author = bool(self.parameters.get("pseudonymise", None))
+		hash_cache = {}
+
+		# prepare hasher (which we may or may not need)
+		# we use BLAKE2	for its (so far!) resistance against cryptanalysis and
+		# speed, since we will potentially need to calculate a large amount of
+		# hashes
+		hasher = hashlib.blake2b(digest_size=24)
+		hasher.update(str(config.ANONYMISATION_SALT).encode("utf-8"))
+
 		processed = 0
 		header_written = False
 		with filepath.open("w", encoding="utf-8") as csvfile:
@@ -252,6 +267,17 @@ class Search(BasicProcessor, ABC):
 				# Parse html to text
 				if row["body"]:
 					row["body"] = strip_tags(row["body"])
+
+				# replace author column with salted hash of the author name, if
+				# pseudonymisation is enabled
+				if pseudonymise_author:
+					if row["author"] not in hash_cache:
+						author_hasher = hasher.copy()
+						author_hasher.update(str(row["author"]).encode("utf-8"))
+						hash_cache[row["author"]] = author_hasher.hexdigest()
+						del author_hasher
+
+					row["author"] = hash_cache[row["author"]]
 
 				writer.writerow(row)
 

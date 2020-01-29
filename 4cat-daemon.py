@@ -9,6 +9,12 @@ import backend.bootstrap as bootstrap
 
 from backend.lib.helpers import call_api
 
+# check validity of config file
+# (right now, just check if defaults have been updated where required)
+if not config.ANONYMISATION_SALT or config.ANONYMISATION_SALT == "REPLACE_THIS":
+	print("You need to set a random value for anonymisation in config.py before you can run 4CAT. Look for the ANONYMISATION_SALT option.")
+	sys.exit(1)
+
 # check if we can run a daemon
 if os.name not in ("posix"):
 	# if not, run the backend directly and quit
