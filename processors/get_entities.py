@@ -71,39 +71,45 @@ class ExtractNouns(BasicProcessor):
 		Opens the SpaCy output and gets ze entities.
 
 		"""
-
-		# Extract the SpaCy docs first
-		self.dataset.update_status("Unzipping SpaCy docs")
-		docs = self.extract_docs()
-	
-		# Store all the entities in this list		
-		li_entities = []
-
-		for doc in docs:
-			# stop processing if worker has been asked to stop
-			if self.interrupted:
-				raise ProcessorInterruptedException("Interrupted while processing documents")
-
-			for ent in doc.ents:
-				if ent.label_ in self.parameters["entities"]:
-					li_entities.append((ent.text, ent.label_)) # Add a tuple
-
-		results = []
-		if li_entities:
-			# Convert to lower and filter out one-letter words. Join the words with the entities so we can group easily.
-			li_entities = [str(tpl[0]).lower() + " |#| " + str(tpl[1]) for tpl in li_entities if len(tpl[0]) > 1]
-			# Group and rank
-			count_nouns = Counter(li_entities).most_common()
-			# Unsplit and list the count.
-			results = [{"word": tpl[0].split(" |#| ")[0], "entity": tpl[0].split(" |#| ")[1], "count": tpl[1]} for tpl in count_nouns]
-
-		# done!
-		if results:
-			self.dataset.update_status("Finished")
-			self.write_csv_items_and_finish(results)
-		else:
-			self.dataset.update_status("Finished, but no entities were extracted.")
+		
+		# Validate whether the user enabled the right parameters.
+		if "ner" not in self.parent.parameters["enable"]:
+			self.dataset.update_status("Enable \"Named entity recognition\" in previous module")
 			self.dataset.finish(0)
+
+		else:
+			# Extract the SpaCy docs first
+			self.dataset.update_status("Unzipping SpaCy docs")
+			docs = self.extract_docs()
+		
+			# Store all the entities in this list		
+			li_entities = []
+
+			for doc in docs:
+				# stop processing if worker has been asked to stop
+				if self.interrupted:
+					raise ProcessorInterruptedException("Interrupted while processing documents")
+
+				for ent in doc.ents:
+					if ent.label_ in self.parameters["entities"]:
+						li_entities.append((ent.text, ent.label_)) # Add a tuple
+
+			results = []
+			if li_entities:
+				# Convert to lower and filter out one-letter words. Join the words with the entities so we can group easily.
+				li_entities = [str(tpl[0]).lower() + " |#| " + str(tpl[1]) for tpl in li_entities if len(tpl[0]) > 1]
+				# Group and rank
+				count_nouns = Counter(li_entities).most_common()
+				# Unsplit and list the count.
+				results = [{"word": tpl[0].split(" |#| ")[0], "entity": tpl[0].split(" |#| ")[1], "count": tpl[1]} for tpl in count_nouns]
+
+			# done!
+			if results:
+				self.dataset.update_status("Finished")
+				self.write_csv_items_and_finish(results)
+			else:
+				self.dataset.update_status("Finished, but no entities were extracted.")
+				self.dataset.finish(0)
 
 	def extract_docs(self):
 		"""

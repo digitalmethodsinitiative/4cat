@@ -43,7 +43,7 @@ class LinguisticFeatures(BasicProcessor):
 				"parser": "Dependency parsing: Extract how words in a sentence relate to each other",
 				"ner": "Named entity recognition: Labels what kind of objects appear in a sentence (e.g. Apple -> Organisation)"
 			},
-			"help": "What linguistic features to extract. See https://spacy.io/usage/linguistic-features"
+			"help": "What linguistic features to extract. Without any of these selected, it simply saves the SpaCy docs (tokenised sentences) as a serialized file. See https://spacy.io/usage/linguistic-features"
 		}
 	}
 
