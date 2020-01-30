@@ -48,6 +48,7 @@
 			<li>Logged in {% if not current_user.is_special() %} as {{ current_user.get_name() }} (<a href="/logout">Log out</a>){% else %} via {{ current_user.get_name() }}{% endif %}</li>
 		{% endif %}
 		  <li><a href="/page/citing">How to cite</a></li>
+		  <li><a href="/page/issues">Report issues</a></li>
 		  <li><a href="https://www.oilab.eu">Open Intelligence Lab</a>, 2018 &ndash; {{ __datenow.year }}</li>
 		</ul>
 	</nav>
