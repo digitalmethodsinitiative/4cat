@@ -76,7 +76,11 @@ class URLCoLinker(BasicProcessor):
 				post_links.append(post["url"])
 
 			if self.parameters.get("detail", self.options["detail"]["default"]) == "domain":
-				post_links = [www_regex.sub("", link.split("/")[2]) for link in post_links]
+				try:
+					post_links = [www_regex.sub("", link.split("/")[2]) for link in post_links]
+				except IndexError:
+					# not a valid URL, e.g. "http://" without anything after the //
+					pass
 
 			# deduplicate, so repeated links within one posts don't inflate
 			post_links = [trailing_dot.sub("", link) for link in post_links]
