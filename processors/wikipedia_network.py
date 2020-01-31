@@ -60,7 +60,7 @@ class WikipediaCatgegoryNetwork(BasicProcessor):
 			wiki_links = [trailing_comma.sub("", link) for link in wiki_links]
 
 			# if we have a per-post URL, include that as well
-			if "url" in post and link_regex.match(post["url"]):
+			if "url" in post and post["url"] and link_regex.match(post["url"]):
 				wiki_links.append(post["url"])
 
 			for link in wiki_links:
