@@ -148,7 +148,7 @@ class OvertimeAnalysis(BasicProcessor):
 				activity[time_unit] += 1
 				try:
 					views[time_unit] += int(post[engagement_field])
-				except ValueError:
+				except (ValueError, TypeError):
 					pass
 
 				terms = []
