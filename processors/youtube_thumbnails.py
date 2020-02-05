@@ -51,7 +51,7 @@ class YouTubeThumbnails(BasicProcessor):
 			video_ids.add(youtube_video["id"])
 
 		self.dataset.update_status("Downloading thumbnails")
-		self.download_thumbnails(video_ids)
+		self.download_thumbnails(list(video_ids))
 
 	def download_thumbnails(self, video_ids):
 		"""
