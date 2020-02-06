@@ -291,7 +291,7 @@ class DataSet:
 			raise RuntimeError("Cannot reserve results file for a finished dataset")
 
 		# Use 'random' for random post queries
-		if "random_amount" in parameters and parameters["random_amount"] > 0:
+		if "random_amount" in parameters and int(parameters["random_amount"]) > 0:
 			file = 'random-' + str(parameters["random_amount"]) + '-' + self.data["key"]
 		# Use country code for country flag queries
 		elif "country_flag" in parameters and parameters["country_flag"] != 'all':

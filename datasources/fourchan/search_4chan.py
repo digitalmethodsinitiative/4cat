@@ -310,8 +310,7 @@ class Search4Chan(Search):
 		"""
 
 		# this is the bare minimum, else we can't narrow down the full data set
-		if not query.get("body_match", None) and not query.get("subject_match", None) and not query.get("random_sample",
-																										None):
+		if not query.get("body_match", None) and not query.get("subject_match", None) and query.get("search_scope",	"") != "random-sample":
 			raise QueryParametersException("Please provide a body query, subject query or random sample size.")
 
 		# Make sure to accept only a body or subject match.
@@ -328,9 +327,9 @@ class Search4Chan(Search):
 
 		# random sample requires a sample size, and is additionally incompatible
 		# with full threads
-		if query.get("random_sample", None):
+		if query.get("search_scope", "") == "random-sample":
 			try:
-				sample_size = int(query.get("random_sample_size", 0))
+				sample_size = int(query.get("random_amount", 0))
 			except ValueError:
 				raise QueryParametersException("Please provide a valid numerical sample size.")
 

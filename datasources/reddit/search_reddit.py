@@ -413,32 +413,17 @@ class SearchReddit(Search):
 
 		# ignore leading r/ for boards
 		query["board"] = ",".join(boards)
-
+		
 		# this is the bare minimum, else we can't narrow down the full data set
-		if not query.get("body_match", None) and not query.get("subject_match", None) and not query.get("random_sample",
-																										None):
-			raise QueryParametersException("Please provide a body query, subject query or random sample size.")
+		if not query.get("body_match", None) and not query.get("subject_match", None):
+			raise QueryParametersException("Please provide a body query or subject query.")
 
 		# body query and full threads are incompatible, returning too many posts
 		# in most cases
 		if query.get("body_match", None):
 			if "full_threads" in query:
 				del query["full_threads"]
-
-		# random sample requires a sample size, and is additionally incompatible
-		# with full threads
-		if query.get("random_sample", None):
-			try:
-				sample_size = int(query.get("random_sample_size", 0))
-			except ValueError:
-				raise QueryParametersException("Please provide a valid numerical sample size.")
-
-			if sample_size < 1 or sample_size > 100000:
-				raise QueryParametersException("Please provide a sample size between 1 and 100000.")
-
-			if "full_threads" in query:
-				del query["full_threads"]
-
+		
 		# only one of two dense threads options may be chosen at the same time, and
 		# it requires valid density and length parameters. full threads is implied,
 		# so it is otherwise left alone here
