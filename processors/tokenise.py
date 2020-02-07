@@ -10,7 +10,7 @@ import re
 from csv import DictReader
 from nltk.stem.snowball import SnowballStemmer
 from nltk.stem import WordNetLemmatizer
-from nltk.tokenize import word_tokenize
+from nltk.tokenize import word_tokenize, TweetTokenizer
 
 from backend.lib.helpers import UserInput
 from backend.abstract.processor import BasicProcessor
@@ -29,7 +29,7 @@ class Tokenise(BasicProcessor):
 	type = "tokenise-posts"  # job type ID
 	category = "Text analysis"  # category
 	title = "Tokenise"  # title displayed in UI
-	description = "Tokenises post bodies, producing corpus data that may be used for further processing by (for example) corpus analytics software."  # description displayed in UI
+	description = "Tokenises post bodies, producing corpus data that may be used for further processing by e.g. NLP. The output is a serialized list of lists, with each post treated as a single document (so no sentence splitting)."  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
 
 	input = "csv:body"
@@ -41,6 +41,12 @@ class Tokenise(BasicProcessor):
 			"default": "all",
 			"options": {"all": "Overall", "year": "Year", "month": "Month", "day": "Day"},
 			"help": "Produce files per"
+		},
+		"tokenizer_type": {
+			"type": UserInput.OPTION_CHOICE,
+			"default": "twitter",
+			"options": {"twitter": "nltk TweetTokenizer", "regular": "nltk word_tokenize"},
+			"help": "What NLTK tokenizer to use"
 		},
 		"language": {
 			"type": UserInput.OPTION_CHOICE,
@@ -109,6 +115,13 @@ class Tokenise(BasicProcessor):
 		symbol = re.compile(r"[^a-zA-Z0-9]")
 		numbers = re.compile(r"\b[0-9]+\b")
 
+		# Twitter tokenizer if indicated
+		if self.parameters.get("tokenizer_type") == "twitter":
+			tokenizer = TweetTokenizer(preserve_case=False)
+			tweet_tokenizer = True
+		else:
+			tweet_tokenizer = False
+
 		# load word filters - words to exclude from tokenisation
 		word_filter = set()
 		for wordlist in self.parameters.get("filter", self.options["filter"]["default"]):
@@ -122,6 +135,7 @@ class Tokenise(BasicProcessor):
 			for accept_word in accept_words:
 				if accept_word in word_filter:
 					word_filter.remove(accept_word)
+
 		# Add rejected words to filter
 		if self.parameters.get("reject_words", self.options["reject_words"]["default"]):
 			reject_words = [str(word).strip() for word in self.parameters["reject_words"].split(",")]
@@ -200,7 +214,11 @@ class Tokenise(BasicProcessor):
 			# clean up text and get tokens from it
 			body = link_regex.sub("", post["body"])
 
-			tokens = word_tokenize(body, language=language)
+			# Use differing tokenizers depending on the user input
+			if tweet_tokenizer:
+				tokens = tokenizer.tokenize(body)
+			else:
+				tokens = word_tokenize(body, language=language)
 
 			# Only keep unique terms if indicated
 			if self.parameters.get("exclude_duplicates", self.options["exclude_duplicates"]["default"]):
