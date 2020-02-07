@@ -5,6 +5,7 @@ import pickle
 import zipfile
 import numpy as np
 import pandas as pd
+import itertools
 
 from pathlib import Path
 
@@ -100,12 +101,22 @@ class tfIdf(BasicProcessor):
 				# Get the date
 				date_string = tokens_name.split('.')[0]
 				dates.append(date_string)
+
 				# Temporarily extract file (we cannot use ZipFile.open() as it doesn't support binary modes)
 				temp_path = dirname.joinpath(tokens_name)
 				token_archive.extract(str(tokens_name), str(dirname))
+
 				with temp_path.open("rb") as binary_tokens:
+
 					# these were saved as pickle dumps so we need the binary mode
-					tokens.append(pickle.load(binary_tokens))
+					post_tokens = pickle.load(binary_tokens)
+	
+					# Flatten the list of list of tokens - we're treating the whole time series as one document.
+					post_tokens = list(itertools.chain.from_iterable(post_tokens))
+
+					# Add to all date's tokens
+					tokens.append(post_tokens)
+
 				temp_path.unlink()
 
 		# Make sure `min_occurrences` and `max_occurrences` are valid
@@ -114,7 +125,7 @@ class tfIdf(BasicProcessor):
 		if max_occurrences <= 0 or max_occurrences > len(tokens):
 			max_occurrences = len(tokens)
 
-		# Get the collocations. Returns a tuple.
+		# Get the tf-idf matrix.
 		self.dataset.update_status("Generating tf-idf for token set")
 		try:
 			results = self.get_tfidf(tokens, dates, ngram_range=n_size, min_occurrences=min_occurrences,
@@ -124,7 +135,7 @@ class tfIdf(BasicProcessor):
 			self.dataset.update_status("Writing to csv and finishing")
 			self.write_csv_items_and_finish(results)
 		except MemoryError:
-			self.dataset.update_status("Out of memory - dataset to large to run tf-idf analysis.")
+			self.dataset.update_status("Out of memory - dataset too large to run tf-idf analysis.")
 			self.dataset.finish(0)
 
 	def get_tfidf(self, tokens, dates, ngram_range=(1,1), min_occurrences=0, max_occurrences=0, top_n=25):

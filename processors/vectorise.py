@@ -4,6 +4,7 @@ Transform tokeniser output into vectors
 import zipfile
 import pickle
 import shutil
+import itertools
 
 from backend.lib.exceptions import ProcessorInterruptedException
 from backend.abstract.processor import BasicProcessor
@@ -59,7 +60,11 @@ class Vectorise(BasicProcessor):
 				with temp_path.open("rb") as binary_tokens:
 					# these were saved as pickle dumps so we need the binary mode
 					tokens = pickle.load(binary_tokens)
+
 				temp_path.unlink()
+
+				# flatten token list first - we don't have to separate per post
+				tokens = list(itertools.chain.from_iterable(tokens))
 
 				# all we need is a pretty straightforward frequency count
 				vectors = {}

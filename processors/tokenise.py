@@ -163,7 +163,7 @@ class Tokenise(BasicProcessor):
 		for post in self.iterate_csv_items(self.source_file):
 			# determine what output unit this post belongs to
 			if timeframe == "all":
-					output = "overall"
+				output = "overall"
 			else:
 				if "timestamp_unix" in post:
 					timestamp = post["timestamp_unix"]
@@ -193,8 +193,13 @@ class Tokenise(BasicProcessor):
 			if output not in subunits:
 				subunits[output] = list()
 
+			# we're treating every post as one document.
+			# this means it is not sensitive to sentences.
+			post_tokens = []
+
 			# clean up text and get tokens from it
 			body = link_regex.sub("", post["body"])
+
 			tokens = word_tokenize(body, language=language)
 
 			# Only keep unique terms if indicated
@@ -217,7 +222,12 @@ class Tokenise(BasicProcessor):
 				if self.parameters["lemmatise"]:
 					token = lemmatizer.lemmatize(token)
 
-				subunits[output].append(token)
+				# append tokens to the post's token list
+				post_tokens.append(token)
+
+			# append the post's tokens as a list within a larger list
+			if post_tokens:
+				subunits[output].append(post_tokens)
 
 		# save the last subunit we worked on too
 		save_subunit(current_subunit)
