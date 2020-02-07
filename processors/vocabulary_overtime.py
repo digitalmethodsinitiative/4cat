@@ -55,7 +55,8 @@ class OvertimeAnalysis(BasicProcessor):
 				"hatebase-en-unambiguous": "Hatebase.org hate speech list (English, unambiguous terms)",
 				"hatebase-en-ambiguous": "Hatebase.org hate speech list (English, ambiguous terms)",
 				"hatebase-it-unambiguous": "Hatebase.org hate speech list (Italian, unambiguous terms)",
-				"hatebase-it-ambiguous": "Hatebase.org hate speech list (italian, ambiguous terms)"
+				"hatebase-it-ambiguous": "Hatebase.org hate speech list (italian, ambiguous terms)",
+				"wordlist-oilab-altright": "Alt-right vocabulary (OILab)"
 			},
 			"help": "Vocabularies to detect"
 		},
