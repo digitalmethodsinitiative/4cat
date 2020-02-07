@@ -156,8 +156,8 @@ class Tokenise(BasicProcessor):
 		current_subunit = ""
 
 		# prepare staging area
-		results_path = self.dataset.get_temporary_path()
-		results_path.mkdir()
+		tmp_path = self.dataset.get_temporary_path()
+		tmp_path.mkdir()
 
 		# this needs to go outside the loop because we need to call it one last
 		# time after the post loop has finished
@@ -167,7 +167,7 @@ class Tokenise(BasicProcessor):
 
 			:param str subunit:  Subset ID
 			"""
-			with results_path.joinpath(subunit + ".pb").open("wb") as outputfile:
+			with tmp_path.joinpath(subunit + ".pb").open("wb") as outputfile:
 				pickle.dump(subunits[subunit], outputfile)
 
 		# process posts
@@ -254,11 +254,11 @@ class Tokenise(BasicProcessor):
 		self.dataset.update_status("Compressing results into archive")
 		with zipfile.ZipFile(self.dataset.get_results_path(), "w") as zip:
 			for subunit in subunits:
-				zip.write(results_path.joinpath(subunit + ".pb"), subunit + ".pb")
-				results_path.joinpath(subunit + ".pb").unlink()
+				zip.write(tmp_path.joinpath(subunit + ".pb"), subunit + ".pb")
+				tmp_path.joinpath(subunit + ".pb").unlink()
 
-		# delete temporary files and folder
-		shutil.rmtree(results_path)
+		# delete temporary folder
+		shutil.rmtree(tmp_path)
 
 		# done!
 		self.dataset.update_status("Finished")
