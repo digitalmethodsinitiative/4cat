@@ -80,9 +80,11 @@ class Search4Chan(Search):
 			sql_query += " AND " + " AND ".join(where)
 
 		if query.get("search_scope", None) == "random-sample":
+
 			try:
 				sample_size = int(query.get("sample_size", 5000))
-				sql_query += " ORDER BY RANDOM() LIMIT " + str(int(query.get("random_amount", 0)))
+				sql_query = "SELECT * FROM (" + sql_query +  " ORDER BY RANDOM() LIMIT " + str(int(query.get("random_amount", 0))) + ") AS full_table ORDER BY full_table.timestamp ASC"
+			
 			except ValueError:
 				pass
 		else:
