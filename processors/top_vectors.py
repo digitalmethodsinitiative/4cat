@@ -5,6 +5,7 @@ import zipfile
 import pickle
 import shutil
 import csv
+import itertools
 
 from backend.lib.helpers import UserInput, convert_to_int
 from backend.lib.exceptions import ProcessorInterruptedException
@@ -109,6 +110,7 @@ class VectorRanker(BasicProcessor):
 				temp_path.unlink()
 
 				vectors = sorted(vectors, key=lambda x: x[1], reverse=True)
+				
 				# for overall ranking we need the full vector space per interval
 				# because maybe an overall top-ranking vector is at the bottom
 				# in this particular interval - we'll truncate the top list at
