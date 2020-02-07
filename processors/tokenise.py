@@ -141,6 +141,9 @@ class Tokenise(BasicProcessor):
 			reject_words = [str(word).strip() for word in self.parameters["reject_words"].split(",")]
 			word_filter.update(reject_words)
 
+		# Create a regex for the word list which should be faster than iterating
+		filter_regex = re.compile("|".join([re.escape(word) for word in word_filter if word]))
+
 		language = self.parameters.get("language", "english")
 		strip_symbols = self.parameters.get("strip_symbols", self.options["strip_symbols"]["default"])
 
@@ -230,10 +233,13 @@ class Tokenise(BasicProcessor):
 
 				if strip_symbols:
 					token = numbers.sub("", symbol.sub("", token))
+
 				if not token: # Skip empty strings
 					continue
-				if token in word_filter:
+
+				if not filter_regex.match(token):
 					continue
+
 				if self.parameters["stem"]:
 					token = stemmer.stem(token)
 
