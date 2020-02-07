@@ -42,7 +42,7 @@ libraries = [
 		"nltk==3.4.5",
 		"mpld3==0.3",
 		"ijson==2.4",
-		"en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-2.0.0/en_core_web_sm-2.0.0.tar.gz"
+		"cython==0.29.14"
 	]
 
 # Some libraries don't run on Windows
