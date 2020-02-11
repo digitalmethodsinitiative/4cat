@@ -27,11 +27,12 @@ libraries = [
 		"jsonpickle==1.2",
 		"svgwrite==1.3.1",
 		"pytumblr==0.1.0",
+		"cython==0.29.14"
 		"pymysql==0.9.2",
 		"pandas==0.23.4",
 		"datedelta==1.3",
 		"anytree==2.7.2",
-		"gensim==3.6.0",
+		"gensim==3.8.1",
 		"psutil==5.4.7",
 		"numpy==1.15.2",
 		"Pillow==6.2.0",
@@ -42,7 +43,6 @@ libraries = [
 		"nltk==3.4.5",
 		"mpld3==0.3",
 		"ijson==2.4",
-		"cython==0.29.14"
 	]
 
 # Some libraries don't run on Windows
