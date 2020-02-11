@@ -21,7 +21,7 @@ class word_embeddings(BasicProcessor):
 	Generate a word embedding model from tokenised text.
 	"""
 
-	type = "word_embedding"  # job type ID
+	type = "word-embeddings"  # job type ID
 	category = "Text analysis"  # category
 	title = "Word embeddings"  # title displayed in UI
 	description = "Generate a word embedding model from the tokenised text. Note: good models require a lot of data."  # description displayed in UI
@@ -34,7 +34,7 @@ class word_embeddings(BasicProcessor):
 	options = {
 		"model_type": {
 			"type": UserInput.OPTION_CHOICE,
-			"default": "word2vec",
+			"default": "word2vec (Mikolov et al. 2013)",
 			"options": {
 				"word2vec": "word2vec"
 			},

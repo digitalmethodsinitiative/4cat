@@ -165,8 +165,6 @@ class GetCollocations(BasicProcessor):
 							"date": date_string
 							})
 
-		print(results)
-
 		if not results:
 			return
 
