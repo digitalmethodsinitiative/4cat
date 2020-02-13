@@ -416,7 +416,7 @@ class SearchReddit(Search):
 		query["board"] = ",".join(boards)
 		
 		# this is the bare minimum, else we can't narrow down the full data set
-		if not query.get("body_match", None) and not query.get("subject_match", None):
+		if not user.is_admin() and not user.get_value("reddit.can_query_without_keyword", False) and not query.get("body_match", None) and not query.get("subject_match", None):
 			raise QueryParametersException("Please provide a body query or subject query.")
 
 		# body query and full threads are incompatible, returning too many posts
