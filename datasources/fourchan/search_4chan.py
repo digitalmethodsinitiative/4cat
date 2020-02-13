@@ -298,7 +298,7 @@ class Search4Chan(Search):
 
 		return thread_sizes
 
-	def validate_query(query, request):
+	def validate_query(query, request, user):
 		"""
 		Validate input for a dataset query on the 4chan data source.
 
@@ -308,6 +308,7 @@ class Search4Chan(Search):
 
 		:param dict query:  Query parameters, from client-side.
 		:param request:  Flask request
+		:param User user:  User object of user who has submitted the query
 		:return dict:  Safe query parameters
 		"""
 

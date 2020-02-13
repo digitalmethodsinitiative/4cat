@@ -207,7 +207,7 @@ class SearchInstagram(Search):
 		shutil.rmtree(working_directory)
 		return results
 
-	def validate_query(query, request):
+	def validate_query(query, request, user):
 		"""
 		Validate custom data input
 
@@ -216,6 +216,7 @@ class SearchInstagram(Search):
 
 		:param dict query:  Query parameters, from client-side.
 		:param request:  Flask request
+		:param User user:  User object of user who has submitted the query
 		:return dict:  Safe query parameters
 		"""
 
