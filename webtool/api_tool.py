@@ -218,7 +218,7 @@ def queue_dataset():
 
 	if hasattr(search_worker["class"], "validate_query"):
 		try:
-			sanitised_query = search_worker["class"].validate_query(request.form.to_dict(), request)
+			sanitised_query = search_worker["class"].validate_query(request.form.to_dict(), request, current_user)
 		except QueryParametersException as e:
 			return "Invalid query. %s" % e
 	else:

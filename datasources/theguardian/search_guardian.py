@@ -257,7 +257,7 @@ class SearchGuardian(Search):
 			timestamp = datetime.datetime.fromtimestamp(int(obj["date_published"]["$date"]) / 1000).strftime("%Y-%m-%d")
 			return str(timestamp) + "-" + obj["_id"]["$oid"]
 
-	def validate_query(query, request):
+	def validate_query(query, request, user):
 		"""
 		Validate input for a dataset query on the 4chan data source.
 
@@ -267,6 +267,7 @@ class SearchGuardian(Search):
 
 		:param dict query:  Query parameters, from client-side.
 		:param request:  Flask request
+		:param User user:  User object of user who has submitted the query
 		:return dict:  Safe query parameters
 		"""
 		# this is the bare minimum, else we can't narrow down the full data set
