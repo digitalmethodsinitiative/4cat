@@ -167,7 +167,11 @@ class SearchReddit(Search):
 		# ID chunks are defined: these chunks are used here if available
 		seen_posts = set()
 
-		while True:
+		# only query for individual posts if there is a body keyword
+		# since individual posts don't have subjects
+		do_body_query = bool(query["body_match"].strip())
+
+		while do_body_query:
 			if self.interrupted:
 				raise ProcessorInterruptedException("Interrupted while fetching post data from the Pushshift API")
 
