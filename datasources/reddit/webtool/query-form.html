@@ -1,5 +1,11 @@
 <p class="form-intro">Results are limited to 5 million rows. Note that large queries can take up to 30 minutes to complete.</p>
 
+{% if current_user.is_admin() or current_user.get_value("reddit.can_query_without_keyword", False) %}
+<p class="warning form-intro">The requirement for searching by keyword has been lifted for your account; you can search by date
+    range only. This can potentially return hundreds of millions of posts, so <strong>please be careful</strong> when
+    using this privilege.</p>
+{% endif %}
+
 <div class="form-element">
     <label>Board:</label>
     <div class="filter-parameters" id="board-filter">
