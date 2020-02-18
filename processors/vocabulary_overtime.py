@@ -113,6 +113,9 @@ class OvertimeAnalysis(BasicProcessor):
 		intervals = set()
 
 		for post in self.iterate_csv_items(self.source_file):
+			if not post.get("body", None):
+				continue
+				
 			# if 'partition' is false, there will just be one combined
 			# vocabulary, but else we'll have different ones we can
 			# check separately
