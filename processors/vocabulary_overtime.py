@@ -56,7 +56,17 @@ class OvertimeAnalysis(BasicProcessor):
 				"hatebase-en-ambiguous": "Hatebase.org hate speech list (English, ambiguous terms)",
 				"hatebase-it-unambiguous": "Hatebase.org hate speech list (Italian, unambiguous terms)",
 				"hatebase-it-ambiguous": "Hatebase.org hate speech list (italian, ambiguous terms)",
-				"wordlist-oilab-altright": "Alt-right vocabulary (OILab)"
+				"oilab-extreme-other": "OILab Extreme Speech Lexicon (other)",
+				"oilab-extreme-anticon": "OILab Extreme Speech Lexicon (anti-conservative)",
+				"oilab-extreme-antileft": "OILab Extreme Speech Lexicon (anti-left)",
+				"oilab-extreme-antilowerclass": "OILab Extreme Speech Lexicon (anti-lowerclass)",
+				"oilab-extreme-antisemitism": "OILab Extreme Speech Lexicon (antisemitic)",
+				"oilab-extreme-antidisability": "OILab Extreme Speech Lexicon (anti-disability)",
+				"oilab-extreme-homophobia": "OILab Extreme Speech Lexicon (homophobic)",
+				"oilab-extreme-islamophobia": "OILab Extreme Speech Lexicon (islamophobic)",
+				"oilab-extreme-misogyny": "OILab Extreme Speech Lexicon (misogynistic)",
+				"oilab-extreme-racism": "OILab Extreme Speech Lexicon (racist)",
+				"oilab-extreme-sexual": "OILab Extreme Speech Lexicon (sexual)"
 			},
 			"help": "Vocabularies to detect"
 		},
