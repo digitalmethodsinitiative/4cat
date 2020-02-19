@@ -169,7 +169,7 @@ class SearchReddit(Search):
 
 		# only query for individual posts if there is a body keyword
 		# since individual posts don't have subjects
-		do_body_query = bool(query["body_match"].strip())
+		do_body_query = bool(query["body_match"].strip()) or not bool(query["subject_match"].strip())
 
 		while do_body_query:
 			if self.interrupted:
