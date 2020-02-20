@@ -28,7 +28,7 @@ class LinguisticFeatures(BasicProcessor):
 	type = "linguistic-features"  # job type ID
 	category = "Text analysis" # category
 	title = "Linguistic features"  # title displayed in UI
-	description = "Annotate your text with a variety of linguistic features, including part-of-speech tagging, depencency parsing, and named entity recognition. Uses the SpaCy library and the en_core_web_sm model."  # description displayed in UI
+	description = "Annotate your text with a variety of linguistic features, including part-of-speech tagging, depencency parsing, and named entity recognition. Uses the SpaCy library and the en_core_web_sm model. Currently only available for datasets with less than 25.000 items."  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
 
 	input = "csv"
@@ -76,10 +76,12 @@ class LinguisticFeatures(BasicProcessor):
 			posts = [post["body"] for post in csv_reader if post["body"]]
 			
 			# Process the text in batches
-			if len(posts) < 10000:
+			if len(posts) < 25000:
 				self.dataset.update_status("Extracting linguistic features")
 			else:
-				self.dataset.update_status("Extracting linguistic features. This will take a while")
+				self.dataset.update_status("Extracting linguistic features is currently only available for datasets with less than 25.000 items.")
+				self.dataset.finish(0)
+				return
 
 			# Start the processing!
 			docs = nlp.pipe(posts, disable=disable)
