@@ -23,7 +23,7 @@ __credits__ = ["Sal Hagen"]
 __maintainer__ = "Sal Hagen"
 __email__ = "4cat@oilab.eu"
 
-class ExtractNouns(): #BasicProcessor):  TEMPORARILY DISABLED
+class ExtractNouns(BasicProcessor):  #TEMPORARILY DISABLED
 	"""
 	Rank vectors over time
 	"""
