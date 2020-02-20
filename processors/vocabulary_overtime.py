@@ -104,16 +104,20 @@ class OvertimeAnalysis(BasicProcessor):
 				vocabularies[vocabulary_id] |= pickle.load(vocabulary_handle)
 
 		# add user-defined words
-		custom_id = "user-defined" if partition else "frequency"
-		if custom_id not in vocabularies:
-			vocabularies[custom_id] = set()
+		custom_vocabulary = set([word.strip() for word in self.parameters.get("vocabulary-custom", "").split(",") if word.strip()])
+		if custom_vocabulary:
+			custom_id = "user-defined" if partition else "frequency"
+			if custom_id not in vocabularies:
+				vocabularies[custom_id] = set()
 
-		custom_vocabulary = set([word.strip() for word in self.parameters.get("vocabulary-custom", "").split(",")])
-		vocabularies[custom_id] |= custom_vocabulary
+			vocabularies[custom_id] |= custom_vocabulary
+
 
 		# compile into regex for quick matching
 		vocabulary_regexes = {}
 		for vocabulary_id in vocabularies:
+			if not vocabularies[vocabulary_id]:
+				continue
 			vocabulary_regexes[vocabulary_id] = re.compile(
 				r"\b(" + "|".join([re.escape(term) for term in vocabularies[vocabulary_id] if term]) + r")\b")
 
@@ -122,14 +126,21 @@ class OvertimeAnalysis(BasicProcessor):
 		activity = {vocabulary_id: {} for vocabulary_id in vocabularies}
 		intervals = set()
 
+		processed = 0
 		for post in self.iterate_csv_items(self.source_file):
 			if not post.get("body", None):
 				continue
+
+			if processed % 2500 == 0:
+				self.dataset.update_status("Processed %i posts" % processed)
 				
 			# if 'partition' is false, there will just be one combined
 			# vocabulary, but else we'll have different ones we can
 			# check separately
 			for vocabulary_id in vocabularies:
+				if vocabulary_id not in vocabulary_regexes:
+					continue
+
 				vocabulary_regex = vocabulary_regexes[vocabulary_id]
 
 				# check if we match
@@ -159,10 +170,12 @@ class OvertimeAnalysis(BasicProcessor):
 				activity[vocabulary_id][interval] += 1
 				intervals.add(interval)
 
+			processed += 1
+
 		# turn all that data into a simple three-column frequency table
 		rows = []
 		for interval in sorted(intervals):
-			for vocabulary_id in vocabularies:
+			for vocabulary_id in activity:
 				rows.append({
 					"date": interval,
 					"item": vocabulary_id,
