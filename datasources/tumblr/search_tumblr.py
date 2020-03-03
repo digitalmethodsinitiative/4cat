@@ -281,7 +281,7 @@ class SearchTumblr(Search):
 
 		return client
 
-	def validate_query(query, request):
+	def validate_query(query, request, user):
 		"""
 		Validate custom data input
 
@@ -290,6 +290,7 @@ class SearchTumblr(Search):
 
 		:param dict query:  Query parameters, from client-side.
 		:param request:  Flask request
+		:param User user:  User object of user who has submitted the query
 		:return dict:  Safe query parameters
 		"""
 

@@ -23,14 +23,14 @@ __credits__ = ["Sal Hagen"]
 __maintainer__ = "Sal Hagen"
 __email__ = "4cat@oilab.eu"
 
-class ExtractNouns(BasicProcessor):
+class ExtractNouns(BasicProcessor):  #TEMPORARILY DISABLED
 	"""
 	Rank vectors over time
 	"""
 	type = "get-entities"  # job type ID
 	category = "Text analysis" # category
 	title = "Extract named entities"  # title displayed in UI
-	description = "Get the prediction of various named entities from a text, ranked on frequency. Be sure to have selected \"Named Entity Recognition\" in the previous module"  # description displayed in UI
+	description = "Get the prediction of various named entities from a text, ranked on frequency. Be sure to have selected \"Named Entity Recognition\" in the previous module. Currently only available for datasets with less than 25.000 items."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
 	accepts = ["linguistic-features"]
@@ -76,6 +76,12 @@ class ExtractNouns(BasicProcessor):
 		if "ner" not in self.parent.parameters["enable"]:
 			self.dataset.update_status("Enable \"Named entity recognition\" in previous module")
 			self.dataset.finish(0)
+			return
+
+		if self.dataset.get_genealogy()[0].num_rows > 25000:
+			self.dataset.update_status("Named entity recognition is only available for datasets smaller than 25.000 items.")
+			self.dataset.finish(0)
+			return
 
 		else:
 			# Extract the SpaCy docs first

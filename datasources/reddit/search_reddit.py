@@ -167,7 +167,11 @@ class SearchReddit(Search):
 		# ID chunks are defined: these chunks are used here if available
 		seen_posts = set()
 
-		while True:
+		# only query for individual posts if there is a body keyword
+		# since individual posts don't have subjects
+		do_body_query = bool(query["body_match"].strip()) or not bool(query["subject_match"].strip())
+
+		while do_body_query:
 			if self.interrupted:
 				raise ProcessorInterruptedException("Interrupted while fetching post data from the Pushshift API")
 
@@ -392,7 +396,7 @@ class SearchReddit(Search):
 
 		return response
 
-	def validate_query(query, request):
+	def validate_query(query, request, user):
 		"""
 		Validate input for a dataset query on the 4chan data source.
 
@@ -402,6 +406,7 @@ class SearchReddit(Search):
 
 		:param dict query:  Query parameters, from client-side.
 		:param request:  Flask request
+		:param User user:  User object of user who has submitted the query
 		:return dict:  Safe query parameters
 		"""
 		# we need a board!
@@ -415,7 +420,7 @@ class SearchReddit(Search):
 		query["board"] = ",".join(boards)
 		
 		# this is the bare minimum, else we can't narrow down the full data set
-		if not query.get("body_match", None) and not query.get("subject_match", None):
+		if not user.is_admin() and not user.get_value("reddit.can_query_without_keyword", False) and not query.get("body_match", None) and not query.get("subject_match", None):
 			raise QueryParametersException("Please provide a body query or subject query.")
 
 		# body query and full threads are incompatible, returning too many posts
