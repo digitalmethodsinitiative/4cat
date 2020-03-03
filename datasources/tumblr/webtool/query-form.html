@@ -30,14 +30,18 @@
     <p><strong>Note:</strong> The <a href="https://api.tumblr.com" target="_blank">Tumblr API</a> currently has an odd bug: when fetching sporadically used tags, it may return zero posts, even though older posts exist. To mitigate this, 4CAT decreases the date parameter (<code>before</code>) with an hour and sends the query again. This often successfully returns older, un-fetched posts. If it didn't find new data after 48 retries (2 days), it assumes the dataset is complete. Check the oldest post in your dataset to see if it this is indeed the case.</p>
 
 </fieldset>
+
 <fieldset class="date-options">
     <div class="form-element">
-        <label for="before">Before:</label>
+        <label>Date range:</label>
         <div class="filter-parameters">
-            Before:
-            <input name="before" id="before" class="input-time" type="date"
-                   placeholder="dd-mm-yyyy">
-            The <a href="https://api.tumblr.com" target="_blank">Tumblr API</a> only allows querying <em>before</em> a certain date.
+            <input name="min_date" id="input-min-time" class="input-time" type="date"
+                   placeholder="dd-mm-yyyy"> to
+            <input name="max_date" id="input-max-time" class="input-time" type="date"
+                   placeholder="dd-mm-yyyy"> <span class="red"></span>
+
+            <input name="min_date" type="hidden" value="0">
+            <input name="max_date" type="hidden" value="0">
         </div>
     </div>
 </fieldset>
