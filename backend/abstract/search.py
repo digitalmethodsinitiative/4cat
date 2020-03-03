@@ -25,7 +25,7 @@ class Search(BasicProcessor, ABC):
 	to their database layouts.
 	"""
 	type = "query"
-	max_workers = 2
+	max_workers = 1
 
 	prefix = ""
 

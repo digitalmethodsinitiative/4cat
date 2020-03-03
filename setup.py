@@ -27,7 +27,7 @@ libraries = [
 		"jsonpickle==1.2",
 		"svgwrite==1.3.1",
 		"pytumblr==0.1.0",
-		"cython==0.29.14"
+		"cython==0.29.14",
 		"pymysql==0.9.2",
 		"pandas==0.23.4",
 		"datedelta==1.3",

@@ -58,7 +58,7 @@ class SearchBreitbart(Search4Chan):
 
 		return processed_posts
 
-	def validate_query(query, request):
+	def validate_query(query, request, user):
 		"""
 		Validate input for a dataset query on the 4chan data source.
 
@@ -68,9 +68,10 @@ class SearchBreitbart(Search4Chan):
 
 		:param dict query:  Query parameters, from client-side.
 		:param request:  Flask request
+		:param User user:  User object of user who has submitted the query
 		:return dict:  Safe query parameters
 		"""
-		request = Search4Chan.validate_query(query, request)
+		request = Search4Chan.validate_query(query, request, user)
 		request["board"] = "*"
 
 		return request
