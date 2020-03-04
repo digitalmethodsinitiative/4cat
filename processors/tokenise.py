@@ -183,7 +183,10 @@ class Tokenise(BasicProcessor):
 				output = "overall"
 			else:
 				if "timestamp_unix" in post:
-					timestamp = post["timestamp_unix"]
+					try:
+						timestamp = int(post["timestamp_unix"])
+					except ValueError:
+						timestamp = 0
 				else:
 					try:
 						timestamp = int(datetime.datetime.strptime(post["timestamp"], "%Y-%m-%d %H:%M:%S").timestamp())
