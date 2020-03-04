@@ -86,6 +86,10 @@ TUMBLR_CONSUMER_SECRET_KEY = ""
 TUMBLR_API_KEY = ""
 TUMBLR_API_SECRET_KEY = ""
 
+# Reddit API keys
+REDDIT_API_CLIENTID = ""
+REDDIT_API_SECRET = ""
+
 # Web tool settings
 class FlaskConfig:
 	FLASK_APP = 'webtool/fourcat'

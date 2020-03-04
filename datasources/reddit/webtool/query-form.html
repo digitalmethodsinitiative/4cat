@@ -1,9 +1,10 @@
-<p class="form-intro">Results are limited to 5 million rows. Note that large queries can take up to 30 minutes to complete.</p>
+<p class="form-intro">Results are limited to 5 million rows. Note that large queries can take up to 30 minutes to
+    complete.</p>
 
 {% if current_user.is_admin() or current_user.get_value("reddit.can_query_without_keyword", False) %}
-<p class="warning form-intro">The requirement for searching by keyword has been lifted for your account; you can search by date
-    range only. This can potentially return hundreds of millions of posts, so <strong>please be careful</strong> when
-    using this privilege.</p>
+    <p class="warning form-intro">The requirement for searching by keyword has been lifted for your account; you can
+        search by date range only. This can potentially return hundreds of millions of posts, so <strong>please be
+        careful</strong> when using this privilege.</p>
 {% endif %}
 
 <div class="form-element">
@@ -14,9 +15,12 @@
 </div>
 
 <fieldset class="basic-options">
-    <p class="form-intro">Reddit data is retrieved from <a href="https://pushshift.io">Pushshift</a>. <a href="https://arxiv.org/abs/2001.08435">This paper</a> details the dataset. Cite them if you use this data for your research.</p>
-    <p>The form inputs below correspond to the Pushshift API parameters. Check the <a href="https://github.com/pushshift/api">Puhshift API</a> reference for documentation, e.g. on how to format keyword queries.</p>
-    <p><strong>Note:</strong> post scores are usually inaccurate. Pushshift archives most posts as soon as they are posted, and scores are not re-checked at a later moment.</p>
+    <p class="form-intro">Reddit data is retrieved from <a href="https://pushshift.io">Pushshift</a>. <a
+            href="https://arxiv.org/abs/2001.08435">This paper</a> details the dataset. Cite them if you use this data
+        for your research. Check the <a href="https://github.com/pushshift/api">Puhshift API</a> reference for
+        documentation on query syntax, e.g. on how to format keyword queries.</p>
+    <p><strong>Note:</strong> post scores are usually inaccurate. Pushshift archives most posts as soon as they are
+        posted, and scores are not re-checked at a later moment.</p>
 
     <div class="form-element">
         <label for="body-input">Post body:</label>
