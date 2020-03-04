@@ -464,6 +464,7 @@ query = {
                     }
 
                     processor.resize_blocks();
+                    processor.collapse_options();
                 });
             }
         });
