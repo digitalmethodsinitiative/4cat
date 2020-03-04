@@ -240,7 +240,7 @@ class Tokenise(BasicProcessor):
 				if not token: # Skip empty strings
 					continue
 
-				if not filter_regex.match(token):
+				if filter_regex.match(token):
 					continue
 
 				if self.parameters["stem"]:
