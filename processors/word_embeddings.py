@@ -81,7 +81,7 @@ class word_embeddings(BasicProcessor):
 		# Get token sets
 		self.dataset.update_status("Processing token sets")
 		tokens = []
-		complete_models = []
+		finished_models = 0
 
 		results_path = self.dataset.get_results_path()
 		dirname = Path(results_path.parent, results_path.name.replace(".", ""))
@@ -123,21 +123,24 @@ class word_embeddings(BasicProcessor):
 						if model:
 							# Store the model as KeyedVectors - we don't need to resume training later.
 							model.wv.save(str(tmp_path.joinpath(date_string + ".model")))
-							complete_models.append(date_string)
+							finished_models += 1
 
 		# Zip the whole lot of them
 		self.dataset.update_status("Compressing results into archive")
 		with zipfile.ZipFile(self.dataset.get_results_path(), "w") as zip:
-			for date in complete_models:
+
+			# Loop through all the files
+			for file in tmp_path.glob("*"):
+				
 				# Zip a model and delete the original file
-				zip.write(tmp_path.joinpath(date + ".model"), date + ".model")
-				tmp_path.joinpath(date + ".model").unlink()
+				zip.write(file, file.name)
+				tmp_path.joinpath(file).unlink()
 
 		# delete temporary files and folder
 		shutil.rmtree(tmp_path)
 
 		# Finish
-		self.dataset.finish(len(complete_models))
+		self.dataset.finish(finished_models)
 
 	def train_w2v_model(self, tokens, min_word=0):
 		"""
