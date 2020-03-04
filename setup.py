@@ -40,6 +40,7 @@ libraries = [
 		"scipy==1.1.0",
 		"Flask==1.1.0",
 		"spacy==2.1.4",
+		"praw==6.5.1",
 		"nltk==3.4.5",
 		"mpld3==0.3",
 		"ijson==2.4",
