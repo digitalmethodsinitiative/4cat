@@ -76,10 +76,14 @@ class word_embeddings_neigbours(BasicProcessor):
 
 		# Go through all archived token sets and generate collocations for each
 		with zipfile.ZipFile(str(self.source_file), "r") as model_archive:
-			model_names = model_archive.namelist()
+			
+			# Get the filenames and only keep those containing the model (so e.g. no vectors.npy files)
+			model_files = model_archive.namelist()
+			model_names = [model_name for model_name in model_files if model_name.endswith(".model")]
 			
 			# Extract the models and output nearest neighbour(s)
 			for model_name in model_names:
+
 				if self.interrupted:
 					raise ProcessorInterruptedException("Interrupted while loading token sets")
 
@@ -90,8 +94,13 @@ class word_embeddings_neigbours(BasicProcessor):
 				temp_path = dirname.joinpath(model_name)
 				model_archive.extract(model_name, dirname)
 
+				# Check if there's also a vectors.npy file (for large models) in the folder, and if so, extract it
+				if model_name + ".vectors.npy" in model_files:
+					model_archive.extract(model_name + ".vectors.npy", dirname)
+
 				model = KeyedVectors.load(str(temp_path), mmap="r")
 
+				# Delete the extracted file now that we've loaded the model
 				temp_path.unlink()
 
 				# Check all words in this model
@@ -100,8 +109,9 @@ class word_embeddings_neigbours(BasicProcessor):
 					# Get the nearest neigbours
 					try:
 						nearest_neighbours = model.wv.most_similar(positive=[check_word], topn=top_n)
+					
 					# If not in vocabulary
-					except KeyError:
+					except KeyError as e:	
 						results.append({
 							"input_word": check_word,
 							"nearest_neighbour": "ERROR: input word not in this model's vocabulary, be sure to insert lemmatized or stemmed versions",
