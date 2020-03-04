@@ -6,6 +6,7 @@ import shutil
 import abc
 import csv
 import os
+import sys
 
 from backend.abstract.worker import BasicWorker
 from backend.lib.dataset import DataSet
@@ -34,6 +35,9 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 	extension = "csv"  # extension of files created by this processor
 	options = {}  # configurable options for this processor
 	parameters = {}  # values for the processor's configurable options
+
+	# Tumblr posts can overflow the regular limit, so double this.
+	csv.field_size_limit(131072 * 2)
 
 	def work(self):
 		"""
