@@ -72,7 +72,7 @@ class word_embeddings_neigbours(BasicProcessor):
 
 		results = []
 		results_path = self.dataset.get_results_path()
-		dirname = Path(results_path.parent, results_path.name.replace(".", ""))
+		tmp_dir = self.dataset.get_temporary_path()
 
 		# Go through all archived token sets and generate collocations for each
 		with zipfile.ZipFile(str(self.source_file), "r") as model_archive:
@@ -81,6 +81,9 @@ class word_embeddings_neigbours(BasicProcessor):
 			model_files = model_archive.namelist()
 			model_names = [model_name for model_name in model_files if model_name.endswith(".model")]
 			
+			if not model_names:
+				return
+
 			# Extract the models and output nearest neighbour(s)
 			for model_name in model_names:
 
@@ -91,17 +94,14 @@ class word_embeddings_neigbours(BasicProcessor):
 				date_string = model_name.split('.')[0]
 				
 				# Temporarily extract file (we cannot use ZipFile.open() as it doesn't support binary modes)
-				temp_path = dirname.joinpath(model_name)
-				model_archive.extract(model_name, dirname)
+				tmp_file_path = tmp_dir.joinpath(model_name)
+				model_archive.extract(model_name, tmp_dir)
 
 				# Check if there's also a vectors.npy file (for large models) in the folder, and if so, extract it
 				if model_name + ".vectors.npy" in model_files:
-					model_archive.extract(model_name + ".vectors.npy", dirname)
+					model_archive.extract(model_name + ".vectors.npy", tmp_dir)
 
-				model = KeyedVectors.load(str(temp_path), mmap="r")
-
-				# Delete the extracted file now that we've loaded the model
-				temp_path.unlink()
+				model = KeyedVectors.load(str(tmp_file_path), mmap="r")
 
 				# Check all words in this model
 				for check_word in check_words:
@@ -130,6 +130,9 @@ class word_embeddings_neigbours(BasicProcessor):
 							"model": model_name,
 							"date": date_string
 						})
+
+			# Delete the temporary folder
+			shutil.rmtree(tmp_dir)
 
 		if not results:
 			return
