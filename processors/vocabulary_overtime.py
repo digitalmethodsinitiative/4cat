@@ -66,7 +66,8 @@ class OvertimeAnalysis(BasicProcessor):
 				"oilab-extreme-islamophobia": "OILab Extreme Speech Lexicon (islamophobic)",
 				"oilab-extreme-misogyny": "OILab Extreme Speech Lexicon (misogynistic)",
 				"oilab-extreme-racism": "OILab Extreme Speech Lexicon (racist)",
-				"oilab-extreme-sexual": "OILab Extreme Speech Lexicon (sexual)"
+				"oilab-extreme-sexual": "OILab Extreme Speech Lexicon (sexual)",
+				"wildcard": "Match everything (useful as comparison, only has effect when tracking separately)"
 			},
 			"help": "Vocabularies to detect"
 		},
@@ -121,6 +122,14 @@ class OvertimeAnalysis(BasicProcessor):
 			vocabulary_regexes[vocabulary_id] = re.compile(
 				r"\b(" + "|".join([re.escape(term) for term in vocabularies[vocabulary_id] if term]) + r")\b")
 
+		# if the results are partitioned, then it is useful to have a way to
+		# compare the frequencies to the overall activity in the graph. This
+		# option adds a 'vocabulary' that matches everything, providing that
+		# data.
+		if partition and "wildcard" in self.parameters.get("vocabulary", []):
+			vocabularies["everything"] = set()
+			vocabulary_regexes["everything"] = re.compile(r".*")
+
 		# now for the real deal
 		self.dataset.update_status("Reading source file")
 		activity = {vocabulary_id: {} for vocabulary_id in vocabularies}
@@ -128,9 +137,9 @@ class OvertimeAnalysis(BasicProcessor):
 
 		processed = 0
 		for post in self.iterate_csv_items(self.source_file):
-			if not post.get("body", None):
-				continue
-
+			if not post["body"]:
+				post["body"] = ""
+				
 			if processed % 2500 == 0:
 				self.dataset.update_status("Processed %i posts" % processed)
 				
