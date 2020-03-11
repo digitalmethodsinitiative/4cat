@@ -95,7 +95,7 @@ class word_embeddings_neigbours(BasicProcessor):
 				
 				# Temporarily extract file (we cannot use ZipFile.open() as it doesn't support binary modes)
 				tmp_file_path = tmp_dir.joinpath(model_name)
-				model_archive.extract(model_name, tmp_dir)
+				model_archive.extract(model_name, tmp_file_path)
 
 				# Check if there's also a vectors.npy file (for large models) in the folder, and if so, extract it
 				if model_name + ".vectors.npy" in model_files:
