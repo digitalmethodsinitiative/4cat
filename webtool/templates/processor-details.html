@@ -1,43 +1,58 @@
-            <li>
-                <form action="/results/{{ dataset.key }}/processors/queue/{{ processor.id }}/" data-async-action="/api/queue-processor/" method="POST">
-                    <input type="hidden" name="key" value="{{ dataset.key }}">
-                    <input type="hidden" name="processor" value="{{ processor.id }}">
+<li{% if inline %} class="inline"{% endif %}>
+    <form action="/results/{{ dataset.key }}/processors/queue/{{ processor.id }}/" data-async-action="/api/queue-processor/" method="POST" class="processor-child-wrapper child-wrapper">
 
-                    <div class="processor-description">
-                        <em>{{ processor.name }}</em>
-                        {% if inline %}
-                        <button class="tooltip-trigger" aria-controls="tooltip-processor-{{ item.id }}-{{ processor.id }}" aria-label="Post-processor details">?</button>
-                        <p role="tooltip" id="tooltip-processor-{{ item.id }}-{{ processor.id }}">
-                        {% else %}:
-                        {% endif %}
-                        {{ processor.description }}
-                        {% if processor.description[-1] != "." %}.{% endif %}
-                        Output: <code>{{ processor.extension }}</code> file.{% if inline %}
-                        </p>{% endif %}
-                    </div>
-                    <div class="queue-button-wrap {% if is_processor_running %}hidden{% endif %}">
-                        <button class="control-processor">Run</button>
-                    </div>
-                    <div class="processor-drilldown">
-                    {% if processor.options %}
-                        <fieldset class="processor-options">
-                            <h4>Options</h4>
-                            <div class="options-wrapper">
-                            {% for option in processor.options %}
-                                {% include "processor-option.html" %}
-                            {% endfor %}
-                            </div>
-                        </fieldset>
+    {# The button for this processor #}
+    <div class="button-wrap processor-result-indicator">
+        <button class="processor-queue-button{% if processor.options %} toggle-button{% endif %}" {% if processor.options %}aria-controls="processor-options-{{ dataset.key }}-{{ processor.id }}"{% endif %}>
+            <span class="headline">
+                <i class="fa fa-{% if processor.options %}cog{% else %}play{% endif %}" aria-hidden="true"></i>
+            </span>
+            <span class="byline">
+                {% if processor.options %}Options{% else %}Run{% endif %}
+            </span>
+        </button>
+    </div>
+
+    {# Processor header, showing title and description #}
+    <div class="processor-header">
+        <header>
+            {% if inline %}
+                <button class="tooltip-trigger" aria-controls="tooltip-processor-{{ dataset.key }}-{{ processor.id }}" aria-label="Post-processor details">?</button>
+                <p role="tooltip" id="tooltip-processor-{{ dataset.key }}-{{ processor.id }}">{{ processor.description }}</p>
+            {% endif %}
+            <h4>{{ processor.name }}</h4>
+            {% if not inline %}
+                <p>{{ processor.description }}</p>
+            {% endif %}
+        </header>
+
+        {% if processor.further_flat %}
+        <div class="processor-further">
+            <p><i class="fa fa-arrow-alt-from-left" aria-hidden="true"></i> Allows for:</p>
+            <ul>
+                {% for processor_name in processor.further_flat %}
+                    {% if processors[processor_name].category != "Conversion" %}
+                    <li>{{ processors[processor_name].name }}</li>
                     {% endif %}
-                    {% if processor.further and part == "main" %}
-                        <div class="processor-tree">
-                            <ul id="processor-tree-{{ processor.id }}" aria-expanded="true">
-                                {% for processor in processor.further %}
-                                    {% include "processor-tree.html" %}
-                                {% endfor %}
-                            </ul>
-                        </div>
-                    {% endif %}
-                    </div>
-                </form>
-            </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+
+        <input type="hidden" name="key" value="{{ dataset.key }}">
+        <input type="hidden" name="processor" value="{{ processor.id }}">
+
+
+        {# Processor configuration #}
+        {% if processor.options %}
+        <div class="processor-options-wrap" aria-expanded="false" id="processor-options-{{ dataset.key }}-{{ processor.id }}">
+            <fieldset class="processor-options">
+                {% for option in processor.options %}
+                    {% include "processor-option.html" %}
+                {% endfor %}
+            </fieldset>
+        </div>
+        {% endif %}
+    </div>
+    </form>
+</li>

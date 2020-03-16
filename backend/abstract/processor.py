@@ -236,6 +236,18 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 		self.dataset.update_status("Finished")
 		self.dataset.finish(len(data))
 
+	def is_filter(self):
+		"""
+		Is this processor a filter?
+
+		Filters do not produce their own dataset but replace the parent dataset
+		instead.
+
+		:todo: Make this a bit more robust than sniffing the processor category
+		:return bool:
+		"""
+		return hasattr(self, "category") and self.category and "filter" in self.category.lower()
+
 	@abc.abstractmethod
 	def process(self):
 		"""

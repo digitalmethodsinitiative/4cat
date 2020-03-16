@@ -1,0 +1,2 @@
+<dt>Result file</dt>
+                <dd><a href="/result/{{ dataset.result_file }}"><i class="fas fa-download" aria-hidden="false"></i> Download {{ dataset.result_file.split(".")[-1] }} ({{ "{:,}".format(dataset.num_rows) }} items, {{ dataset.get_results_path()|filesize }})</a></dd>

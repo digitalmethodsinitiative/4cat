@@ -46,7 +46,8 @@ class Tokenise(BasicProcessor):
 			"type": UserInput.OPTION_CHOICE,
 			"default": "twitter",
 			"options": {"twitter": "nltk TweetTokenizer", "regular": "nltk word_tokenize"},
-			"help": "What NLTK tokenizer to use"
+			"help": "Tokeniser",
+			"tooltip": "TweetTokenizer is recommended for social media content, as it is optimised for informal language."
 		},
 		"language": {
 			"type": UserInput.OPTION_CHOICE,
@@ -64,17 +65,24 @@ class Tokenise(BasicProcessor):
 			"type": UserInput.OPTION_TOGGLE,
 			"default": False,
 			"help": "Lemmatise tokens (English only)",
-			"tooltip": "Lemmatisation replaces inflections of a word with its root form: 'running' becomes 'run', 'bicycles' becomes 'bicycle', better' becomes 'good'."
+			"tooltip": "Lemmatisation replaces inflections of a word with its root form: 'running' becomes 'run', 'bicycles' becomes 'bicycle', 'better' becomes 'good'."
 		},
 		"strip_symbols": {
 			"type": UserInput.OPTION_TOGGLE,
 			"default": True,
 			"help": "Strip non-alphanumeric characters (e.g. punctuation)"
 		},
-		"exclude_duplicates": {
-			"type": UserInput.OPTION_TOGGLE,
-			"default": False,
-			"help": "Remove duplicate words"
+		"accept_words": {
+			"type": UserInput.OPTION_TEXT,
+			"default": "",
+			"help": "Always allow these words",
+			"tooltip": "Separate with commas. These are not stemmed or lemmatised; provide variations yourself if needed."
+		},
+		"reject_words": {
+			"type": UserInput.OPTION_TEXT,
+			"default": "",
+			"help": "Exclude these words",
+			"tooltip": "Separate with commas. These are not stemmed or lemmatised; provide variations yourself if needed."
 		},
 		"filter": {
 			"type": UserInput.OPTION_MULTI,
@@ -88,19 +96,9 @@ class Tokenise(BasicProcessor):
 				"wordlist-infochimps-english": "English word list (infochimps)",
 				"wordlist-googlebooks-english": "Google One Million Books pre-2008 top unigrams (van Soest)",
 				"wordlist-opentaal-dutch": "Dutch word list (OpenTaal)",
-				"wordlist-unknown-dutch": "Dutch word list (unknown)"
+				"wordlist-unknown-dutch": "Dutch word list (unknown origin, larger than OpenTaal)"
 			},
-			"help": "Word lists to exclude (i.e. not tokenise). It is highly recommended to ."
-		},
-		"accept_words": {
-			"type": UserInput.OPTION_TEXT,
-			"default": "",
-			"help": "Accept/whitelist these words (separate by commas - stem or lemmatise yourself)"
-		},
-		"reject_words": {
-			"type": UserInput.OPTION_TEXT,
-			"default": "",
-			"help": "Reject/blacklist these words (separate by commas - stem or lemmatise yourself)"
+			"help": "Word lists to exclude (i.e. not tokenise). It is highly recommended to exclude stop words:"
 		}
 	}
 
@@ -178,11 +176,6 @@ class Tokenise(BasicProcessor):
 		timeframe = self.parameters.get("timeframe", self.options["timeframe"]["default"])
 
 		for post in self.iterate_csv_items(self.source_file):
-
-			# If it's empty, skip it!
-			if post.get("body", None)
-				continue
-
 			# determine what output unit this post belongs to
 			if timeframe == "all":
 				output = "overall"
@@ -230,10 +223,6 @@ class Tokenise(BasicProcessor):
 				tokens = tokenizer.tokenize(body)
 			else:
 				tokens = word_tokenize(body, language=language)
-
-			# Only keep unique terms if indicated
-			if self.parameters.get("exclude_duplicates", self.options["exclude_duplicates"]["default"]):
-				tokens = set(tokens)
 
 			# stem, lemmatise and save tokens that are not stopwords
 			for token in tokens:

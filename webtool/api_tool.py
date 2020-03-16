@@ -15,7 +15,7 @@ from pathlib import Path
 
 import backend
 
-from flask import jsonify, abort, request, render_template, render_template_string, redirect, send_file, url_for, flash, \
+from flask import jsonify, request, render_template, render_template_string, redirect, send_file, url_for, flash, \
 	get_flashed_messages
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
@@ -25,6 +25,7 @@ from webtool.lib.helpers import get_preview, error
 
 from backend.lib.exceptions import QueryParametersException
 from backend.lib.queue import JobQueue
+from backend.lib.job import Job
 from backend.lib.dataset import DataSet
 from backend.lib.helpers import UserInput
 
@@ -470,7 +471,8 @@ def queue_processor(key=None, processor=None):
 					   extension=dataset.processors[processor]["extension"], type=processor)
 	if analysis.is_new:
 		# analysis has not been run or queued before - queue a job to run it
-		job = queue.add_job(jobtype=processor, remote_id=analysis.key)
+		queue.add_job(jobtype=processor, remote_id=analysis.key)
+		job = Job.get_by_remote_ID(analysis.key, database=db)
 		analysis.link_job(job)
 		analysis.update_status("Queued")
 	else:
@@ -479,11 +481,12 @@ def queue_processor(key=None, processor=None):
 
 	return jsonify({
 		"status": "success",
-		"container": dataset.key + "-sub",
+		"container": "*[data-dataset-key=" + dataset.key + "]",
 		"key": analysis.key,
-		"html": render_template("result-child.html", child=analysis, dataset=dataset,
+		"html": render_template("result-child.html", child=analysis, dataset=dataset, parent_key=dataset.key,
 								processors=backend.all_modules.processors) if analysis.is_new else "",
-		"messages": get_flashed_messages()
+		"messages": get_flashed_messages(),
+		"is_filter": dataset.processors[processor]["is_filter"]
 	})
 
 
@@ -562,12 +565,17 @@ def check_processor():
 		except TypeError:
 			continue
 
+		genealogy = dataset.get_genealogy()
+		parent = genealogy[-2]
+		top_parent = genealogy[0]
+
 		children.append({
 			"key": dataset.key,
 			"finished": dataset.is_finished(),
-			"html": render_template("result-child.html", child=dataset, dataset=dataset.get_genealogy()[-2],
-									query=dataset.get_genealogy()[0],
+			"html": render_template("result-child.html", child=dataset, dataset=parent,
+									query=dataset.get_genealogy()[0], parent_key=parent.key,
 									processors=backend.all_modules.processors),
+			"resultrow_html": render_template("result-result-row.html", dataset=top_parent),
 			"url": "/result/" + dataset.data["result_file"]
 		})
 

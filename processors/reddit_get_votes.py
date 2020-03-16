@@ -20,7 +20,7 @@ class RedditVoteChecker(BasicProcessor):
 	Update voting information for Reddit data
 	"""
 	type = "get-reddit-votes"  # job type ID
-	category = "Conversion" # category
+	category = "Filtering" # category
 	title = "Update Reddit post scores"  # title displayed in UI
 	description = "Updates the scores for each post to more accurately reflect the real score. Can only be used on datasets with < 5,000 posts due to the heavy usage of the API this requires."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
@@ -50,7 +50,7 @@ class RedditVoteChecker(BasicProcessor):
 		# processor to smaller datasets
 		if self.dataset.get_genealogy()[0].num_rows > 5000:
 			self.dataset.update_status("Reddit score updating is only available for datasets smaller than 5.000 items.")
-			self.dataset.finish(0)
+			self.dataset.finish(-1)
 			return
 
 		# get thread IDs
@@ -66,6 +66,7 @@ class RedditVoteChecker(BasicProcessor):
 		thread_scores = {}
 
 		processed = 0
+		self.dataset.update_status("Retrieving scores via Reddit API")
 		for thread_id in thread_ids:
 			if self.interrupted:
 				raise ProcessorInterruptedException("Halted while querying thread data from Reddit")

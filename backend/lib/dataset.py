@@ -11,6 +11,7 @@ from pathlib import Path
 import config
 import backend
 from backend.lib.job import Job, JobNotFoundException
+from backend.lib.helpers import get_software_version
 
 
 class DataSet:
@@ -93,6 +94,8 @@ class DataSet:
 				"type": type,
 				"timestamp": int(time.time()),
 				"is_finished": False,
+				"software_version": get_software_version(),
+				"software_file": "",
 				"num_rows": 0
 			}
 			self.parameters = parameters
@@ -105,7 +108,7 @@ class DataSet:
 
 		# retrieve analyses and processors that may be run for this dataset
 		analyses = self.db.fetchall("SELECT * FROM datasets WHERE key_parent = %s ORDER BY timestamp ASC", (self.key,))
-		self.children = [DataSet(data=analysis, db=self.db) for analysis in analyses]
+		self.children = sorted([DataSet(data=analysis, db=self.db) for analysis in analyses], key=lambda dataset: dataset.is_finished(), reverse=True)
 		self.processors = self.get_available_processors()
 
 	def check_dataset_finished(self):
@@ -272,6 +275,8 @@ class DataSet:
 			return "Country: %s" % parameters["country_code"]
 		elif "filename" in parameters and parameters["filename"]:
 			return parameters["filename"]
+		elif "board" in parameters and parameters["board"] and "datasource" in parameters:
+			return parameters["datasource"] + "/" + parameters["board"]
 		else:
 			return default
 

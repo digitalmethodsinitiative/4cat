@@ -59,7 +59,7 @@ class AttributeRanker(BasicProcessor):
 		"top": {
 			"type": UserInput.OPTION_TEXT,
 			"default": 15,
-			"help": "Limit to this amount of top items (0 for unlimited)"
+			"help": "Limit to n items"
 		},
 		"top-style": {
 			"type": UserInput.OPTION_CHOICE,
@@ -71,8 +71,8 @@ class AttributeRanker(BasicProcessor):
 		"regex": {
 			"type": UserInput.OPTION_TEXT,
 			"default": "",
-			"help": "Filter for items (Python regular expression)",
-			"tooltip": "Only items matching this regular expression will be included in the result."
+			"help": "Item filter",
+			"tooltip": "Only items matching this will be included in the result. You can use Python regular expressions here."
 		}
 	}
 
