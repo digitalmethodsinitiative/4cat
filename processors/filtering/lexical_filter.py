@@ -1,8 +1,9 @@
 """
 Filter posts by lexicon
 """
-import re
+import shutil
 import pickle
+import re
 
 from csv import DictReader, DictWriter
 from pathlib import Path
@@ -34,6 +35,12 @@ class LexicalFilter(BasicProcessor):
 	# the following determines the options available to the user via the 4CAT
 	# interface.
 	options = {
+		"replace-parent": {
+			"type": UserInput.OPTION_TOGGLE,
+			"default": False,
+			"help": "Replace original dataset",
+			"tooltip": "If this is enabled, the result of this processor will replace the original, parent dataset. This allows you to run other analyses on the filtered data."
+		},
 		"lexicon": {
 			"type": UserInput.OPTION_MULTI,
 			"default": [],
@@ -54,7 +61,7 @@ class LexicalFilter(BasicProcessor):
 				"oilab-extreme-racism": "OILab Extreme Speech Lexicon (racist)",
 				"oilab-extreme-sexual": "OILab Extreme Speech Lexicon (sexual)"
 			},
-			"help": "lexicons to detect"
+			"help": "Filter items containing words in these lexicons"
 		},
 		"lexicon-custom": {
 			"type": UserInput.OPTION_TEXT,
@@ -68,6 +75,9 @@ class LexicalFilter(BasicProcessor):
 		Reads a CSV file, counts occurences of chosen values over all posts,
 		and aggregates the results per chosen time frame
 		"""
+
+		# replace parent or save as new file?
+		replace = bool(self.parameters.get("replace-parent", self.options["replace-parent"]["default"]))
 
 		# load lexicons from word lists
 		lexicons = {}
@@ -152,4 +162,11 @@ class LexicalFilter(BasicProcessor):
 				matching_items += 1
 
 		# file has been written, finish
-		self.dataset.finish(matching_items)
+		if replace:
+			parent = self.dataset.get_genealogy()[0]
+			shutil.move(self.dataset.get_results_path(), parent.get_results_path())
+			self.dataset.update_status("Parent dataset updated.")
+			parent.num_rows = matching_items
+			self.dataset.finish(-1)
+		else:
+			self.dataset.finish(matching_items)

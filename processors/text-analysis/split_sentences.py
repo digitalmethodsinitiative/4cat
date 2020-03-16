@@ -79,7 +79,7 @@ class SplitSentences(BasicProcessor):
 			for post in self.iterate_csv_items(self.source_file):
 				if num_posts % 100 == 0:
 					self.dataset.update_status("Processing post %i" % num_posts)
-					
+
 				num_posts += 1
 				sentences = sent_tokenize(post.get("body", ""), language=language)
 
