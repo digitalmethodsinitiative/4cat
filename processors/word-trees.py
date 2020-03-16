@@ -40,16 +40,6 @@ class MakeWordtree(BasicProcessor):
 			"help": "Word tree root query",
 			"tooltip": "Enter a word here to serve as the root of the word tree. The context of this query will be mapped in the tree visualisation."
 		},
-		"strip-urls": {
-			"type": UserInput.OPTION_TOGGLE,
-			"default": True,
-			"help": "Remove URLs"
-		},
-		"strip-symbols": {
-			"type": UserInput.OPTION_TOGGLE,
-			"default": True,
-			"help": "Remove non-alphanumeric characters"
-		},
 		"window": {
 			"type": UserInput.OPTION_TEXT,
 			"min": 1,
@@ -76,6 +66,16 @@ class MakeWordtree(BasicProcessor):
 				"top": "Top",
 			},
 			"help": "Visual alignment"
+		},
+		"strip-urls": {
+			"type": UserInput.OPTION_TOGGLE,
+			"default": True,
+			"help": "Remove URLs"
+		},
+		"strip-symbols": {
+			"type": UserInput.OPTION_TOGGLE,
+			"default": True,
+			"help": "Remove non-alphanumeric characters"
 		}
 	}
 

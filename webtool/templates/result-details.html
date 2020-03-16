@@ -1,8 +1,8 @@
-<section class="result-tree">
-    <div class="card query article-ish{% if not dataset.is_finished() %} unfinished{% endif %}" data-key="{{ dataset.key }}">
+<article class="result">
+<section class="result-tree" data-dataset-key="{{ dataset.key }}">
+    <div class="card query{% if not dataset.is_finished() %} unfinished{% endif %}">
 
-        <h3 class="blocktitle"><span><a href="/results/{{ dataset.key }}/">Query{% if dataset.query != "query" %}:
-            {{ dataset.get_label() }}{% endif %}</a></span></h3>
+        <h2 class="blocktitle"><span><a href="/results/{{ dataset.key }}/">{{ dataset.get_label() }}</a></span></h2>
 
         {% if current_user.is_authenticated %}
             <nav class="dataset-toolbox" aria-label="Actions for dataset">
@@ -32,50 +32,48 @@
                 <dt>Queued at</dt>
                 <dd>{{ dataset.timestamp|datetime(fmt="%d %b %Y, %H:%M") }}</dd>
             </div>
-            <div>
-                <dt>Status</dt>
-                <dd class="dataset-status">{% include "result-status.html" %}</dd>
-            </div>
-
-            <div>
-                <dt>Results</dt>
-                <dd>{% if dataset.is_finished() %}{{ "{:,}".format(dataset.num_rows) }} item{% if dataset.num_rows != 1 %}s{% endif %}{% else %}Pending{% endif %}</dd>
-            </div>
 
             <div class="fullwidth">
                 <dt>Parameters</dt>
                 <dd>{% include 'result-metadata.html' %}</dd>
             </div>
 
+            <div class="fullwidth" id="dataset-results">
             {% if dataset.is_finished() and dataset.num_rows > 0 %}
-            <div class="fullwidth">
-                <dt>Result file</dt>
-                <dd><a href="/result/{{ dataset.result_file }}"><i class="fas fa-download" aria-hidden="false"></i> Download ({{ dataset.get_results_path()|filesize }}, {{ dataset.result_file.split(".")[-1] }})</a></dd>
+                {% include "result-result-row.html" %}
+            {% else %}
+                <dt>Status</dt>
+                <dd class="dataset-status">{% include "result-status.html" %}</dd>
             </div>
             {% endif %}
         </dl>
     </div>
 
-    <div id="{{ dataset.key }}-sub" class="article-ish">
-        <ol class="child-list top-level">
-            {% for child in dataset.children %}
-                {% include 'result-child.html' %}
-            {% endfor %}
-        </ol>
-    </div>
+    {% if dataset.children %}
+        <h3 class="blocktitle section-subheader">
+            <span>Analysis results</span>
+            <button id="expand-datasets">Expand all</button>
+        </h3>
+    {% endif %}
+    <ol class="child-list top-level">
+        {% for child in dataset.children %}
+            {% include "result-child.html" %}
+        {% endfor %}
+    </ol>
 </section>
 
 {% if dataset.num_rows > 0 and dataset.processors|length > 0 and current_user.is_authenticated %}
-<article class="analysis-overview">
-    <section>
-        <h3 class="blocktitle section-header"><span>Analysis modules</span></h3>
+    <section class="analysis-gallery">
+        <h3 class="blocktitle section-subheader"><span>Analytical processors</span></h3>
         {% set part = "main" %}
+    <div class="intro">
         <p>Start your analysis of the retrieved data by choosing one of the analysis modules below.
             Note that some may take a while to complete, so carefully consider which one you want to run
             before queueing it.</p>
-        <p><a href="#">Documentation</a> about the various modes of analysis and what to take into
-            account when using {{ __tool_name }} data is available as well.</p>
-
+        <p>If you are new to {{ __tool_name }}, we recommend you consult the
+            <a href="https://bit.ly/37fzES6">4CAT Cookbook</a>, which explains this interface and
+            includes examples of several analyses you can run.</p>
+</div>
 
         {% set cat = namespace(egory='') %}
         {% for processor in dataset.processors.values() %}
@@ -83,7 +81,7 @@
                 {% if cat.egory != '' %}</ol>{% endif %}
                 {% set cat.egory = processor.category %}
                 <h4 class="blocktitle section-subheader"><span>{{ processor.category }}</span></h4>
-                <ol class="processor-list">
+                <ol class="processor-list child-list">
             {% endif %}
             {% include "processor-details.html" %}
         {% endfor %}

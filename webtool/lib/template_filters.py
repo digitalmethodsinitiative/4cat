@@ -66,22 +66,40 @@ def _jinja2_filter_conf(data, property=""):
 		return data
 
 @app.template_filter('filesize')
-def _jinja2_filter_filesize(file):
+def _jinja2_filter_filesize(file, short=False):
 	try:
 		stats = os.stat(file)
 	except FileNotFoundError:
 		return "0 bytes"
 
 	bytes = stats.st_size
+	format_precision = ".2f" if not short else ".0f"
 
 	if bytes > (1024 * 1024 * 1024):
-		return "{0:.2f} GB".format(bytes / 1024 / 1024 / 1024)
+		return "{0:.2f}GB".format(bytes / 1024 / 1024 / 1024)
 	if bytes > (1024 * 1024):
-		return "{0:.2f} MB".format(bytes / 1024 / 1024)
+		return ("{0:" + format_precision + "}MB").format(bytes / 1024 / 1024)
 	elif bytes > 1024:
-		return "{0:.2f} kB".format(bytes / 1024)
+		return ("{0:" + format_precision + "}kB").format(bytes / 1024)
+	elif short:
+		return "%iB" % bytes
 	else:
 		return "%i bytes" % bytes
+
+@app.template_filter('filesize_short')
+def _jinja2_filter_filesize_short(file):
+	return _jinja2_filter_filesize(file, True)
+
+@app.template_filter('ext2noun')
+def _jinja2_filter_extension_to_noun(ext):
+	if ext == "csv":
+		return "row"
+	elif ext == "gdf":
+		return "node"
+	elif ext == "zip":
+		return "file"
+	else:
+		return "item"
 
 @app.context_processor
 def inject_now():

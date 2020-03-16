@@ -13,9 +13,9 @@ from svgwrite.path import Path
 from svgwrite.text import Text
 from svgwrite.gradients import LinearGradient
 
-__author__ = ["Stijn Peeters","Sal Hagen"]
-__credits__ = ["Stijn Peeters","Sal Hagen","Bernhard Rieder"]
-__maintainer__ = ["Stijn Peeters, Sal Hagen"]
+__author__ = ["Stijn Peeters"]
+__credits__ = ["Stijn Peeters","Bernhard Rieder"]
+__maintainer__ = ["Stijn Peeters"]
 __email__ = "4cat@oilab.eu"
 
 class RankFlowRenderer(BasicProcessor):
@@ -28,7 +28,7 @@ class RankFlowRenderer(BasicProcessor):
 	"""
 	type = "render-rankflow"  # job type ID
 	category = "Visual"  # category
-	title = "Create RankFlow diagram"  # title displayed in UI
+	title = "RankFlow diagram"  # title displayed in UI
 	description = "Create a diagram showing changes in prevalence over time for sequential ranked lists (following Bernhard Rieder's RankFlow grapher)."  # description displayed in UI
 	extension = "svg"  # extension of result file, used internally and in UI
 

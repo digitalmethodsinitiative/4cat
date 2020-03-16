@@ -21,7 +21,7 @@ class FlowChart(BasicProcessor):
 
 	type = "flochart"  # job type ID
 	category = "Visual"  # category
-	title = "Flow chart"  # title displayed in UI
+	title = "Interactive Flowchart"  # title displayed in UI
 	description = "Create a flow chart of elements over time."  # description displayed in UI
 	extension = "html"  # extension of result file, used internally and in UI
 

@@ -2,6 +2,7 @@
 Load modules and datasources dynamically
 """
 from pathlib import Path
+import itertools
 import importlib
 import inspect
 import config
@@ -121,7 +122,10 @@ class ModuleCollector:
 							"accepts": component[1].accepts if hasattr(component[1], "accepts") else [],
 							"options": component[1].options if hasattr(component[1], "options") else {},
 							"datasources": component[1].datasources if hasattr(component[1], "datasources") else [],
-							"further": []
+							"references": component[1].references if hasattr(component[1], "references") else [],
+							"is_filter": hasattr(component[1], "category") and "filter" in component[1].category.lower(),
+							"further": [],
+							"further_flat": set()
 						}}
 
 						# maintain a separate cache of processors
@@ -145,6 +149,20 @@ class ModuleCollector:
 					categorised_processors[type]["further"].append(possible_child)
 
 		self.processors = categorised_processors
+
+
+		flat_further = set()
+		def collapse_flat_list(processor):
+			for further_processor in processor["further"]:
+				if further_processor not in flat_further:
+					collapse_flat_list(self.processors[further_processor])
+					flat_further.add(further_processor)
+
+
+		for processor in self.processors:
+			flat_further = set()
+			collapse_flat_list(self.processors[processor])
+			self.processors[processor]["further_flat"] = flat_further
 
 	def load_datasources(self):
 		"""

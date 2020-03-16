@@ -32,15 +32,20 @@ function init() {
         $(this).parents('form').trigger('submit');
     });
 
+    //expand/collapse
+    $(document).on('click', '.toggle-button', toggleButton);
+    $(document).on('click', '#expand-datasets', toggleDatasets);
+
     //tooltips
     $(document).on('mousemove', '.tooltip-trigger', tooltip.show);
     $(document).on('mouseout', '.tooltip-trigger', tooltip.hide);
     $(document).on('click', '.tooltip-trigger', tooltip.toggle);
 
+    //popups
+    $(document).on('click', '.popup-trigger', popup.show);
+
     // child of child of child etc interface bits
-    $(document).on('click', '.expand-processors', processor.toggle);
-    $(document).on('click', '.control-processor', processor.queue);
-    $(document).on('click', '.processor-tree button', toggleButton);
+    $(document).on('click', '.processor-queue-button', processor.queue);
 
     //allow opening given analysis path via anchor links
     navpath = window.location.hash.substr(1);
@@ -85,16 +90,8 @@ function init() {
         select.remove();
     });
 
-    //collapse post-processor options
-    setTimeout(processor.collapse_options, 100);
-    setTimeout(processor.resize_blocks, 100);
-
     //regularly check for unfinished datasets
     setInterval(query.check_resultpage, 4000);
-
-    $('.query-result-svg').on('load', function() {
-        svgPanZoom(this, {contain: true});
-    });
 
     //confirm links
     $(document).on('click', '.confirm-first', function(e) {
@@ -102,9 +99,7 @@ function init() {
 
         if($(this).attr('data-confirm-action')) {
             action = $(this).attr('data-confirm-action');
-            console.log('done');
         }
-        console.log(action);
 
         if(!confirm('Are you sure you want to ' + action + '? This cannot be undone.')) {
             e.preventDefault();
@@ -120,69 +115,6 @@ function init() {
  */
 processor = {
     /**
-     * Toggle options for a processor
-     *
-     * A bit more involved than it should be, but this way it looks nicer because
-     * of the animation...
-     */
-    toggle: function (e) {
-        let mode = 'on';
-        if ($(this).hasClass('active')) {
-            mode = 'off';
-            $(this).removeClass('active');
-        } else {
-            $(this).addClass('active');
-        }
-
-        e.preventDefault();
-
-        let block = $(this).parent().parent();
-        let parent_block = $(block.parents('.child')[0]);
-        let siblings = block.siblings();
-
-        if (mode === 'off') {
-            //trigger closing of lower levels
-            let open_children = block.find('.child.focus');
-            if (open_children.length > 0) {
-                $(open_children[0]).find('> .query-core > .expand-processors').trigger('click');
-            }
-
-            block.find('.sub-controls .expand-processors.active').each(function () {
-                $(this).trigger('click');
-            });
-
-            //close this level and any underlying
-            siblings.attr('aria-expanded', null);
-            block.attr('aria-expanded', null);
-            block.find('.module-line').first().show();
-            block.removeClass('card').removeClass('focus');
-            $(this).text($(this).attr('data-original'));
-            block.find('> .details-only').attr('aria-expanded', 'true');
-
-            if (parent_block) {
-                parent_block.addClass('card').find('> .query-core').removeClass('card');
-                parent_block.find('> .sub-controls > .details-only').attr('aria-expanded', 'true');
-            }
-        } else {
-            //open this level
-            block.attr('aria-expanded', 'true');
-            block.addClass('card').addClass('focus');
-            block.find('> .details-only').attr('aria-expanded', 'true');
-
-            block.find('.module-line').hide();
-            
-            $(this).attr('data-original', $(this).text()).text('Close');
-
-            if (parent_block) {
-                parent_block.removeClass('card').find('> .query-core').addClass('card');
-                parent_block.find('> .sub-controls > .details-only').attr('aria-expanded', 'false');
-            }
-        }
-
-        processor.resize_blocks();
-    },
-
-    /**
      * Queue a post-processor
      *
      * Submit parameters and update result tree with new item if added
@@ -191,19 +123,10 @@ processor = {
      */
     queue: function (e) {
         e.preventDefault();
-        if ($(this).text().includes('Options')) {
-            $(this).text('Run');
-            let li = $(this).parent().parent().parent();
-            li.removeClass('collapsed').addClass('expanded');
 
-            // good ol 'ffs css, allow us to use 'auto' in animations' workaround
-            let container = li.find('fieldset');
-            container.css('height', 'auto');
-            height = container.height();
-            container.css('height', 0).animate({'height': height}, 200);
-        } else {
-            $('html,body').scrollTop(200);
+        if ($(this).text().includes('Run')) {
             let form = $(this).parents('form');
+            let position = form.position().top + parseInt(form.height());
             $.ajax(form.attr('data-async-action') + '?async', {
                 'method': form.attr('method'),
                 'data': form.serialize(),
@@ -214,9 +137,35 @@ processor = {
 
                     if (response.html.length > 0) {
                         let new_element = $(response.html);
-                        let parent_list = $('#' + response.container + ' > .child-list');
+                        let container_id = response.container + ' .child-list';
+
+                        let parent_list = $(container_id);
+
+                        // this is hardcoded, see next comment
+
+                        let targetHeight = 68;
+                        // the position of the newly inserted element is always 0 for some reason
+                        // so we use the fact that it's inserted at the bottom of the parent to
+                        // infer it
+                        let position = parent_list.offset().top + parent_list.height() - (targetHeight * 2);
+
+                        let viewport_top = $(window).scrollTop();
+                        let viewport_bottom = viewport_top + $(window).height();
                         new_element.appendTo($(parent_list));
-                        processor.collapse_options();
+                        new_element = $('body #' + new_element.attr('id'));
+                        new_element.css('height', '0px').css('border-width', '0px').css('opacity', 0);
+
+                        let expand = function() {
+                            new_element.animate({'height': targetHeight, 'opacity': 1}, 500, false, function() { $(this).css('height', '').css('opacity', '').css('border-width', ''); });
+                        }
+
+                        if(position < viewport_top || position > viewport_bottom) {
+                            $('html,body').animate({scrollTop: position + 'px'}, 500, false, expand);
+                        } else {
+                            expand();
+                        }
+
+
                     }
                 },
                 'error': function (response) {
@@ -224,47 +173,17 @@ processor = {
                 }
             });
 
-            processor.collapse_options();
+            if($(this).data('original-content')) {
+                $(this).html($(this).data('original-content'));
+                $(this).trigger('click');
+                $(this).html($(this).data('original-content'));
+                form.trigger('reset');
+            }
+        } else {
+            $(this).data('original-content', $(this).html());
+            $(this).find('.byline').html('Run');
+            $(this).find('.fa').removeClass('.fa-cog').addClass('fa-play');
         }
-    },
-
-    collapse_options: function () {
-        $('.processor-list li').each(function () {
-            if ($(this).hasClass('collapsed')) {
-                return;
-            }
-            let fieldset = $(this).find('fieldset');
-            if (fieldset.length === 0) {
-                return;
-            }
-            $(this).attr('data-options-height', fieldset.css('height').replace('px', ''));
-            fieldset.css('height', '0');
-            $(this).addClass('collapsed').removeClass('expanded');
-            $(this).find('button.control-processor').html('<i class="fas fa-cog"></i> Options');
-        });
-    },
-
-    resize_blocks: function() {
-        $('.query-core').each(function() {
-           let description = $(this).find('> .query-descriptor');
-           let button = $(this).find('> button');
-
-           $(this).removeClass('fullwidth-description').removeClass('fullwidth-button');
-
-           let max_width = $(this).width();
-           let description_width = description.width();
-           let description_height = description.height();
-           let button_width = button.width();
-           let button_height = button.height();
-
-           if(description_width + button_width > max_width || button_height > description_height) {
-               if(description_width > button_width || button_height > description_height) {
-                   $(this).addClass('fullwidth-description');
-               } else {
-                   $(this).addClass('fullwidth-button');
-               }
-           }
-        });
     }
 };
 
@@ -427,14 +346,14 @@ query = {
      * analyses if all subqueries have finished
      */
     update_status: function () {
-        let queued = $('.running.child');
+        let queued = $('.child-wrapper.running');
         if (queued.length === 0) {
             return;
         }
 
         let keys = [];
         queued.each(function () {
-            keys.push($(this).attr('id').split('-')[1]);
+            keys.push($(this).attr('data-dataset-key'));
         });
 
         $.get({
@@ -442,29 +361,20 @@ query = {
             data: {subqueries: JSON.stringify(keys)},
             success: function (json) {
                 json.forEach(child => {
-                    let target = $('#child-' + child.key);
+                    let target = $('body #child-' + child.key);
                     let update = $(child.html);
                     update.attr('aria-expanded', target.attr('aria-expanded'));
 
-                    if (target.attr('data-status') === update.attr('data-status')) {
+                    if (target.attr('data-status') === update.attr('data-status') && target.attr('class') === update.attr('class')) {
+                        console.log(target.attr('data-status'));
                         return;
                     }
+
+                    $('#dataset-results').html(child.resultrow_html);
 
                     target.replaceWith(update);
-
-                    if (!$('body').hasClass('result-page')) {
-                        return;
-                    }
-
-                    if ($('.running.child').length == 0) {
-                        $('.result-warning').animate({height: 0}, 250, function () {
-                            $(this).remove();
-                        });
-                        $('.queue-button-wrap').removeClass('hidden');
-                    }
-
-                    processor.resize_blocks();
-                    processor.collapse_options();
+                    update.addClass('updated');
+                    target.remove();
                 });
             }
         });
@@ -629,9 +539,19 @@ tooltip = {
         if (!parent) {
             parent = this;
         }
-        let tooltip_container = $('#' + $(parent).attr('aria-controls'));
+
+        //determine target - last aria-controls value starting with 'tooltip-'
+        let targets = $(parent).attr('aria-controls').split(' ');
+        let tooltip_container = '';
+        targets.forEach(function(target) {
+            if(target.split('-')[0] === 'tooltip') {
+                tooltip_container = target;
+            }
+        });
+        tooltip_container = '#' + tooltip_container;
+
         if ($(tooltip_container).is(':hidden')) {
-            $(tooltip_container.removeClass('force-width'));
+            $(tooltip_container).removeClass('force-width');
             let position = $(parent).position();
             let parent_width = parseFloat($(parent).css('width').replace('px', ''));
             $(tooltip_container).show();
@@ -642,7 +562,7 @@ tooltip = {
             em_height = $(tooltip_container).height();
             $(tooltip_container).html(content);
             if($(tooltip_container).height() > em_height) {
-                $(tooltip_container.addClass('force-width'));
+                $(tooltip_container).addClass('force-width');
             }
 
             let width = parseFloat($(tooltip_container).css('width').replace('px', ''));
@@ -659,10 +579,18 @@ tooltip = {
      * @param parent  Element the tooltip belongs to
      */
     hide: function (e, parent = false) {
-        if (!parent) {
+        //determine target - last aria-controls value starting with 'tooltip-'
+        if(!parent) {
             parent = this;
         }
-        let tooltip_container = $('#' + $(parent).attr('aria-controls'));
+        let targets = $(parent).attr('aria-controls');
+        let tooltip_container = '';
+        targets.split(' ').forEach(function(target) {
+            if(target.split('-')[0] === 'tooltip') {
+                tooltip_container = target;
+            }
+        });
+        tooltip_container = '#' + tooltip_container;
         $(tooltip_container).hide();
     },
     /**
@@ -670,7 +598,10 @@ tooltip = {
      * @param e  Event that triggered the toggle
      */
     toggle: function (e) {
-        e.preventDefault();
+        if(this.tagName.toLowerCase() !== 'a') {
+            // Allow links to have tooltips and still work
+            e.preventDefault();
+        }
 
         let tooltip_container = $('#' + $(this).attr('aria-controls'));
         if ($(tooltip_container).is(':hidden')) {
@@ -678,6 +609,70 @@ tooltip = {
         } else {
             tooltip.hide(e, this);
         }
+    }
+};
+
+/**
+ * Popup management
+ */
+popup = {
+    /**
+     * Set up containers and event listeners for popup
+     */
+    is_initialised: false,
+    init: function() {
+      $('<div id="blur"></div>').appendTo('body');
+      $('<div id="popup"><div class="content"></div><button id="popup-close"><i class="fa fa-times" aria-hidden="true"></i> <span class="sr-only">Close popup</span></button></div>').appendTo('body');
+      $('body').on('click', '#blur, #popup-close', popup.hide);
+      popup.is_initialised = true;
+    },
+    /**
+     * Show popup, using the content of a designated container
+     *
+     * @param e  Event
+     * @param parent  Parent, i.e. the button controlling the popup
+     */
+    show: function(e, parent) {
+        if(!popup.is_initialised) {
+            popup.init();
+        }
+
+        if (!parent) {
+            parent = this;
+        }
+
+        if(e) {
+            e.preventDefault();
+        }
+
+        //determine target - last aria-controls value starting with 'popup-'
+        let targets = $(parent).attr('aria-controls').split(' ');
+        let popup_container = '';
+        targets.forEach(function(target) {
+            if(target.split('-')[0] === 'popup') {
+                popup_container = target;
+            }
+        });
+        popup_container = '#' + popup_container;
+
+        //copy popup contents into container
+        $('#popup .content').html($(popup_container).html());
+        $('#blur').attr('aria-expanded', true);
+        $('#popup').attr('aria-expanded', true);
+
+        $('#popup embed').each(function() {
+            svgPanZoom(this, {contain: true});
+        });
+    },
+    /**
+     * Hide popup
+     *
+     * @param e  Event
+     */
+    hide: function(e) {
+        $('#popup .content').html('');
+        $('#blur').attr('aria-expanded', false);
+        $('#popup').attr('aria-expanded', false);
     }
 };
 
@@ -695,17 +690,43 @@ function reset_form() {
 }
 
 /** General-purpose toggle buttons **/
-function toggleButton(e) {
+function toggleButton(e, force_close=false) {
     e.preventDefault();
 
     target = '#' + $(this).attr('aria-controls');
     
     is_open = $(target).attr('aria-expanded') !== 'false';
-    if (is_open) {
-        $(target).attr('aria-expanded', false);
+    if (is_open || force_close) {
+        $(target).animate({'height': 0}, 250, function() { $(this).attr('aria-expanded', false).css('height', ''); });
+
+        // Also collapse underlying panels that are still open
+        $(target).find('*[aria-expanded=true]').attr('aria-expanded', false);
     } else {
-        $(target).attr('aria-expanded', true);
+        $(target).css('visibility', 'hidden').css('position', 'absolute').css('display', 'block').attr('aria-expanded', true);
+        let targetHeight = $(target).height();
+        $(target).css('aria-expanded', false).css('position', '').css('display', '').css('visibility', '').css('height', 0);
+        $(target).attr('aria-expanded', true).animate({"height": targetHeight}, 250, function() { $(this).css('height', '')});
     }
+}
+
+function toggleDatasets(e) {
+    let new_text;
+    let expanded_state;
+
+    if($(this).text().toLowerCase().indexOf('expand') >= 0) {
+        new_text = 'Collapse all';
+        expanded_state = true;
+    } else {
+        new_text = 'Expand all';
+        expanded_state = false;
+    }
+
+    $(this).text(new_text);
+    $('.processor-expand > button').each(function() {
+        if($('#' + $(this).attr('aria-controls')).attr('aria-expanded')) {
+            $('#' + $(this).attr('aria-controls')).attr('aria-expanded', expanded_state);
+        }
+    });
 }
 
 /**
