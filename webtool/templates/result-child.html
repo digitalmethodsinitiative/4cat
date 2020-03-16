@@ -76,7 +76,7 @@
                         <h2>References for &quot;{{ processors[item.type]["name"] }}&quot;:</h2>
                         <ol>
                             {% for reference in processors[item.type]["references"] %}
-                                <li>{{ reference }}</li>
+                                <li>{{ reference|markdown|safe }}</li>
                             {% endfor %}
                         </ol>
                     </div>
