@@ -33,7 +33,7 @@ libraries = [
 		"datedelta==1.3",
 		"anytree==2.7.2",
 		"gensim==3.8.1",
-		"psutil==5.4.7",
+		"psutil==5.6.6",
 		"numpy==1.15.2",
 		"Pillow==6.2.0",
 		"bcrypt==3.1.4",

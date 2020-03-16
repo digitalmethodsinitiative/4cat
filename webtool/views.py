@@ -65,7 +65,22 @@ def show_frontpage():
 	else:
 		stats = None
 
-	return render_template("frontpage.html", stats=stats, datasources=config.DATASOURCES)
+	news_path = Path(config.PATH_ROOT, "news.json")
+	if news_path.exists():
+		with news_path.open() as news_file:
+			news = news_file.read()
+		try:
+			news = json.loads(news)
+			for item in news:
+				if "time" not in item or "text" not in item:
+					raise RuntimeError()
+		except (json.JSONDecodeError, RuntimeError):
+			news = None
+	else:
+		news = None
+
+
+	return render_template("frontpage.html", stats=stats, news=news, datasources=config.DATASOURCES)
 
 
 @app.route("/overview/")
