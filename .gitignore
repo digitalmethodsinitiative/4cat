@@ -29,6 +29,7 @@ data/
 4cat.log.1
 webtool/fourcat/static/boards.json
 stats.json
+news.json
 startup/
 build/
 dist/
