@@ -11,63 +11,20 @@
                 <a href="https://oilab.eu">OILab</a> at the University of Amsterdam as part of the ERC-funded
                 <a href="https://www.odycceus.eu">ODYCCEUS</a> project.</p>
             <p>It is currently under development. At this time, you can use it to <a
-                    href="/create-dataset/">query</a> select
-                boards of 4chan, Reddit and 8chan. We welcome feedback: mail us at
+                    href="/create-dataset/">create datasets</a> for multiple online social platforms. We welcome feedback: mail us at
                 <a href="mailto:4cat@oilab.eu">4cat@oilab.eu</a>.</p>
-            <h2><span>Updates</span></h2>
-            <ol>
+            <h2><span>News and updates</span></h2>
+            <ol class="news">
+                {% if news %}
+                {% for item in news %}
                 <li>
-                    <time>17 January 2020</time>
-                    Hooray, 4CAT is now open-source! <a href="https://github.com/digitalmethodsinitiative/4cat/">Check out the code on GitHub</a>. Fork or download your own version, <a href="https://github.com/digitalmethodsinitiative/4cat/wiki">check out the wiki</a>, and start adding your own data sources and modules. You can now also add issues, bugs, and suggestions on the repository's <a href="https://github.com/digitalmethodsinitiative/4cat/issues">issues page</a>.
+                    <time>{{ item.time }}</time>
+                    {{ item.text|markdown|safe }}
                 </li>
-                <li>
-                    <time>9 December 2019</time>
-                    Added the Tumblr data source. Tumblr posts with specific tags can be fetched through the Tumblr API v2. Check out the <a href="https://www.tumblr.com/docs/en/api/v2">Tumblr API documentation</a> for its functionalities.
-                </li>
-                <li>
-                    <time>11 October 2019</time>
-                    Telegram data source added.
-                </li>
-                <li>
-                    <time>27 August 2019</time>
-                    The interface for creating datasets has been updated and now additionally allows you to upload
-                    your own CSV files for processing.
-                </li>
-                <li>
-                    <time>6 August 2019</time>
-                    4CAT was inaccesible for a few days because of some TLS issues. Apologies
-                    for the inconvenience.
-                </li>
-                <li>
-                    <time>19 June 2019</time>
-                    We are aware of some issues with our 8chan search where queries return
-                    no results when they ostensibly should. We hope to have a fix for this out soon &emdash; our
-                    apologies for the inconvenience.
-                </li>
-                <li>
-                    <time>2 May 2019</time>
-                    Reddit is now available as a data source capture and analysis. This data is
-                    sourced from the <a href="https://pushshift.io">Pushshift</a> API.
-                </li>
-                <li>
-                    <time>6 Feb 2019</time>
-                    Result pages now include a preview of the posts found, so you can get a
-                    quick impression of what your query returned.
-                </li>
-                <li>
-                    <time>29 Jan 2019</time>
-                    We've upgraded our server hardware and rebuilt the search indexes; the
-                    full corpus of posts is now once again available.
-                </li>
-                <li>
-                    <time>18 Jan 2019</time>
-                    Added 8chan as a data source. The boards <code>pol</code>,
-                    <code>leftypol</code>, <code>v</code> and <code>brit</code> will be scraped.
-                </li>
-                <li>
-                    <time>11 Jan 2019</time>
-                    Added the <code>lgbt</code> board to the 4chan scraper.
-                </li>
+                {% endfor %}
+                {% else %}
+                <li>You can add news for your 4CAT instance in <code>news.json</code> in the 4CAT root folder.</li>
+                {% endif %}
             </ol>
         </section>
 

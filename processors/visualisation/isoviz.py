@@ -52,6 +52,14 @@ class IsometricMultigraphRenderer(BasicProcessor):
 			"help": "Normalise values to 0-100% for each graph",
 			"tooltip": "This allows for easier trend comparison, but note that absolute prevalence is no longer visible when this is enabled."
 		},
+		"top": {
+			"type": UserInput.OPTION_TEXT,
+			"min": 1,
+			"max": 50,
+			"default": 10,
+			"help": "Cut-off for top list",
+			"tooltip": "Only the most-occuring items are retained. Sorted by total amount of occurences (i.e. all frequencies per item, summed)."
+		},
 		"complete": {
 			"type": UserInput.OPTION_TEXT,
 			"default": 0,
@@ -78,6 +86,7 @@ class IsometricMultigraphRenderer(BasicProcessor):
 		normalise_values = self.parameters.get("normalise", self.options["normalise"]["default"])
 		completeness = convert_to_int(self.parameters.get("complete", self.options["complete"]["default"]), 0)
 		graph_label = self.parameters.get("label", self.options["label"]["default"])
+		top = convert_to_int(self.parameters.get("top", self.options["top"]["default"]), 10)
 
 		# first gather graph data: each distinct item gets its own graph and
 		# for each graph we have a sequence of intervals, each interval with
@@ -92,23 +101,23 @@ class IsometricMultigraphRenderer(BasicProcessor):
 			date_key = "time" if "time" in reader.fieldnames else "date"
 			value_key = "value" if "value" in reader.fieldnames else "frequency"
 
-			for row in reader:
-				if row[item_key] not in graphs:
-					graphs[row[item_key]] = {}
+		for row in self.iterate_csv_items(self.source_file):
+			if row[item_key] not in graphs:
+				graphs[row[item_key]] = {}
 
-				# make sure the months and days are zero-padded
-				interval = row.get(date_key, "")
-				interval = "-".join([str(bit).zfill(2 if len(bit) != 4 else 4) for bit in interval.split("-")])
-				first_date = min(first_date, interval)
-				last_date = max(last_date, interval)
+			# make sure the months and days are zero-padded
+			interval = row.get(date_key, "")
+			interval = "-".join([str(bit).zfill(2 if len(bit) != 4 else 4) for bit in interval.split("-")])
+			first_date = min(first_date, interval)
+			last_date = max(last_date, interval)
 
-				if interval not in intervals:
-					intervals.append(interval)
+			if interval not in intervals:
+				intervals.append(interval)
 
-				if interval not in graphs[row[item_key]]:
-					graphs[row[item_key]][interval] = 0
+			if interval not in graphs[row[item_key]]:
+				graphs[row[item_key]][interval] = 0
 
-				graphs[row[item_key]][interval] += float(row.get(value_key, 0))
+			graphs[row[item_key]][interval] += float(row.get(value_key, 0))
 
 		# first make sure we actually have something to render
 		intervals = sorted(intervals)
@@ -116,6 +125,11 @@ class IsometricMultigraphRenderer(BasicProcessor):
 			self.dataset.update_status("Not enough data for a side-by-side over-time visualisation.")
 			self.dataset.finish(0)
 			return
+
+		# only retain most-occurring series - sort by sum of all frequencies
+		if len(graphs) > top:
+			selected_graphs = {graph: graphs[graph] for graph in sorted(graphs, key=lambda x: sum([graphs[x][interval] for interval in graphs[x]]), reverse=True)[0:top]}
+			graphs = selected_graphs
 
 		# there may be items that do not have values for all intervals
 		# this will distort the graph, so the next step is to make sure all

@@ -577,6 +577,10 @@ article section li p, article aside li p {
     margin-left: 0.5em;
 }
 
+.frontpage .news time + p {
+    display: inline;
+}
+
 /** --------------------- *
    Pages -> Create Dataset
   * --------------------- */
