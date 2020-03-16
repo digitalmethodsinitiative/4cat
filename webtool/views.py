@@ -76,6 +76,8 @@ def show_frontpage():
 					raise RuntimeError()
 		except (json.JSONDecodeError, RuntimeError):
 			news = None
+	else:
+		news = None
 
 
 	return render_template("frontpage.html", stats=stats, news=news, datasources=config.DATASOURCES)
