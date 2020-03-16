@@ -118,7 +118,6 @@ class YouTubeMetadata(BasicProcessor):
 
 						# Get rid of unwanted (often trailing) characters
 						post_url = re.sub(r"[(),]", "", post_url)
-						print(post_url)
 
 						if post_url in urls:
 							urls[post_url].append(post["id"])
@@ -338,7 +337,6 @@ class YouTubeMetadata(BasicProcessor):
 			if "youtu" in url:
 
 				query = urllib.parse.urlparse(url)
-				print(query)
 
 				# youtu.be URLs always reference videos
 				if query.hostname == "youtu.be":
