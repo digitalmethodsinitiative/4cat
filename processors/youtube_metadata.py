@@ -36,7 +36,7 @@ class YouTubeMetadata(BasicProcessor):
 	title = "YouTube URL metadata"  # title displayed in UI
 	description = "Extract information from YouTube links to videos and channels"  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
-	datasources = ["4chan", "8chan", "reddit", "breitbart"]
+	datasources = ["4chan", "8chan", "reddit", "breitbart","custom"]
 
 	input = "csv:id,body"
 	output = "csv:id,channel_id,channel_title"
@@ -59,8 +59,8 @@ class YouTubeMetadata(BasicProcessor):
 
 	def process(self):
 		"""
-		Takes a 4CAT input file with a URL column.
-		Checks whether these URLs contain YouTube URLs.
+		Takes a 4CAT input file with a body columns.
+		Extracts URLs and checks whether these are YouTube URLs.
 		If so, it extracts these, groups and orders them by frequency,
 		and extracts metadata per link.
 		These links may contain URLs to	videos or channels.
@@ -85,10 +85,11 @@ class YouTubeMetadata(BasicProcessor):
 			www_regex = re.compile(r"^www\.")
 
 			for post in csv:
-				# Reddit posts have a dedicated URL column.
-				# Start with these and then append URLs from the OP text and commments.
+
 				post_urls = []
 
+				# Reddit posts have a dedicated URL column.
+				# Start with these and then append URLs from the OP text and commments.
 				if datasource == "reddit":
 					if "youtu.be" in post.get("domain") or "youtube.com" in post.get("domain"):
 						post_urls.append(post["url"])
@@ -105,6 +106,20 @@ class YouTubeMetadata(BasicProcessor):
 				# Store the URLs as values with the post ID as a key
 				if post_urls:
 					for post_url in post_urls:
+
+						# Sometimes markdown links appear,
+						# like https://streamlink.ou](https://www.youtube.com/watch?v=PHgc8Q6qTjc)
+						# Split and keep the last containing a YT link
+						if "](" in post_url:
+							post_url = post_url.split("](")
+							for post_url_single in post_url:
+								if "youtu" in post_url_single:
+									post_url = post_url_single
+
+						# Get rid of unwanted (often trailing) characters
+						post_url = re.sub(r"[(),]", "", post_url)
+						print(post_url)
+
 						if post_url in urls:
 							urls[post_url].append(post["id"])
 						else:
@@ -127,23 +142,17 @@ class YouTubeMetadata(BasicProcessor):
 		self.dataset.update_status("Writing results to csv.")
 		self.write_csv_items_and_finish(results)
 
-	def get_youtube_metadata(self, urls):
+	def get_youtube_metadata(self, di_urls):
 		"""
 		Gets metadata from various YouTube URLs.
 		Currently only supports channels and videos.
 
-		:param list or dict url, a list to urls referencing a channel or video
-				or a dictionary with the urls as keys and post IDs as avlues
-		:returns dict, containing metadata on the YouTube URL
+		:param di_urls, dict: A dictionary with URLs as keys and post ids as values
+		:returns dict: containing metadata on the YouTube URL
 
 		"""
 
-		if isinstance(urls, str):
-			urls = [urls]
-
-		if isinstance(urls, dict):
-			di_urls = urls
-			urls = list(urls.keys())
+		urls = list(di_urls.keys())
 
 		# Parse video and channel IDs from URLs and add back together
 		video_ids = self.parse_video_ids(urls)
@@ -174,6 +183,7 @@ class YouTubeMetadata(BasicProcessor):
 				# spammers posting the same link in one post
 				# to overrepresent
 				referenced_by += list(set(di_urls[url]))
+
 			url_metadata["referenced_urls"] = urls
 			url_metadata["referenced_by"] = referenced_by
 
@@ -186,6 +196,7 @@ class YouTubeMetadata(BasicProcessor):
 
 		# Sort the dict by frequency
 		urls_metadata = sorted(urls_metadata, key=lambda i: i['count'], reverse=True)
+
 		# Slice the amount of URLs depending on the user inputs
 		try:
 			top = int(self.parameters.get("top"))
@@ -258,6 +269,7 @@ class YouTubeMetadata(BasicProcessor):
 			for key in entry.keys():
 				if key not in all_keys:
 					all_keys.append(key)
+
 		# Make sure all possible items are in every dict entry.
 		for entry in all_metadata:
 			for contain_key in all_keys:
@@ -289,6 +301,7 @@ class YouTubeMetadata(BasicProcessor):
 				try:
 					url_splitted = url.split("channel")
 					channel_id = url_splitted[1].split("/")[1]
+
 					# Check if we already encountered the ID.
 					# If so, we're appending the URL to that existing
 					# key in the dictionary
@@ -323,11 +336,14 @@ class YouTubeMetadata(BasicProcessor):
 			video_id = False
 
 			if "youtu" in url:
+
 				query = urllib.parse.urlparse(url)
+				print(query)
 
 				# youtu.be URLs always reference videos
 				if query.hostname == "youtu.be":
 					video_id = query.path[1:]
+
 				elif query.hostname in ("www.youtube.com", "youtube.com", "m.youtube.com"):
 					if query.path == "/watch":
 						parsed_url = urllib.parse.parse_qs(query.query)
@@ -455,6 +471,6 @@ def request_youtube_api(self, ids, object_type="video"):
 				results[result_id] = result
 
 		# Update status per response item
-		self.dataset.update_status("Got metadata from " + str(i * 50) + "/" + str(len(ids)) + " YouTube URLs")
+		self.dataset.update_status("Got metadata from " + str(i * 50) + "/" + str(len(ids)) + " " + object_type + " YouTube URLs")
 
 	return results
