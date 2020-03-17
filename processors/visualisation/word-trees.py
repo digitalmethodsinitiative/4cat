@@ -2,7 +2,6 @@
 Generate word tree from dataset
 """
 import re
-from csv import DictReader
 
 from backend.abstract.processor import BasicProcessor
 from backend.lib.helpers import UserInput, convert_to_int
@@ -17,7 +16,7 @@ from svgwrite.text import Text
 from anytree import Node
 
 __author__ = "Stijn Peeters"
-__credits__ = ["Stijn Peeters", "Martin Wattenberg", "Fernanda Viégas"]
+__credits__ = ["Stijn Peeters"]
 __maintainer__ = "Stijn Peeters"
 __email__ = "4cat@oilab.eu"
 
@@ -30,7 +29,7 @@ class MakeWordtree(BasicProcessor):
 	type = "word-trees"  # job type ID
 	category = "Visual"  # category
 	title = "Word tree"  # title displayed in UI
-	description = "Generates a word tree for a given query, a \"graphical version of the traditional 'keyword-in-context' method\" (Wattenberg & Viégas, 2008). NOTE: Running this on large data sets is discouraged as word trees will quickly become too large to be useful. Works best with < 250 matching posts."  # description displayed in UI
+	description = "Generates a word tree for a given query, a \"graphical version of the traditional 'keyword-in-context' method\" (Wattenberg & Viégas, 2008)."  # description displayed in UI
 	extension = "svg"  # extension of result file, used internally and in UI
 
 	options = {
@@ -38,7 +37,15 @@ class MakeWordtree(BasicProcessor):
 			"type": UserInput.OPTION_TEXT,
 			"default": "",
 			"help": "Word tree root query",
-			"tooltip": "Enter a word here to serve as the root of the word tree. The context of this query will be mapped in the tree visualisation."
+			"tooltip": "Enter a word here to serve as the root of the word tree. The context of this query will be mapped in the tree visualisation. Cannot be empty or contain whitespace."
+		},
+		"limit": {
+			"type": UserInput.OPTION_TEXT,
+			"default": 3,
+			"min": 1,
+			"max": 25,
+			"help": "Max branches/level",
+			"tooltip": "Limit the amount of branches per level, sorted by most-occuring phrases. Range 1-25."
 		},
 		"window": {
 			"type": UserInput.OPTION_TEXT,
@@ -79,8 +86,15 @@ class MakeWordtree(BasicProcessor):
 		}
 	}
 
+	references = [
+		"Wattenberg, M., & Viégas, F. B. (2008). The Word Tree, an Interactive Visual Concordance. IEEE Transactions on Visualization and Computer Graphics, 14(6), 1221–1228. <https://doi.org/10.1109/TVCG.2008.172>"
+	]
+
 	input = "csv:body"
 	output = "svg"
+
+	# determines how close the nodes are displayed to each other (min. 1)
+	whitespace = 2
 
 	# 'fontsize' can be changed, the others are derived
 	fontsize = 16
@@ -90,10 +104,16 @@ class MakeWordtree(BasicProcessor):
 	# to be used later to determine dimensions of graph
 	x_min = 0
 	x_max = 0
+	max_occurrences = {}
 
 	# constants
 	SIDE_LEFT = -1
 	SIDE_RIGHT = 1
+
+	# amount of nodes to include per branch
+	# set as a parameter, but stored as a property to be accessed by child
+	# methods
+	limit = 1
 
 	def process(self):
 		"""
@@ -111,13 +131,14 @@ class MakeWordtree(BasicProcessor):
 		self.align = self.parameters.get("align", self.options["align"]["default"])
 		window = convert_to_int(self.parameters.get("window", self.options["window"]["default"]), 5) + 1
 		query = self.parameters.get("query", self.options["query"]["default"])
+		self.limit = convert_to_int(self.parameters.get("limit", self.options["limit"]["default"]), 100)
 
-		left_leaves = []
-		right_leaves = []
+		left_branches = []
+		right_branches = []
 
 		# do some validation
-		if not query.strip():
-			self.dataset.update_status("Invalid query for word tree generation")
+		if not query.strip() or re.sub(r"\s", "", query) != query:
+			self.dataset.update_status("Invalid query for word tree generation. Query cannot be empty or contain whitespace.")
 			self.dataset.finish(0)
 			return
 
@@ -141,60 +162,115 @@ class MakeWordtree(BasicProcessor):
 			body = word_tokenize(body)
 			positions = [i for i, x in enumerate(body) if x.lower() == query.lower()]
 
+			# get lists of tokens for both the left and right side of the tree
+			# on the left side, all lists end with the query, on the right side,
+			# they start with the query
 			for position in positions:
-				right_leaves.append(body[position:position + window])
-				left_leaves.append(body[max(0, position - window):position + 1])
+				right_branches.append(body[position:position + window])
+				left_branches.append(body[max(0, position - window):position + 1])
 
+		# Some settings for rendering the tree later
 		self.step = self.fontsize * 0.6  # approximately the width of a monospace char
 		self.gap = (7 * self.step)  # space for lines between nodes
 		width = 1  # will be updated later
-		height = self.fontsize * max(len(right_leaves), len(left_leaves)) * 2
 
-		canvas = Drawing(str(self.dataset.get_results_path()),
-						 size=(width, height),
-						 style="font-family:monospace;font-size:%ipx" % self.fontsize)
+		# invert the left side of the tree (because that's the way we want the
+		# branching to work for that side)
+		# we'll visually invert the nodes in the tree again later
+		left_branches = [list(reversed(branch)) for branch in left_branches]
 
 		# first create vertical slices of tokens per level
-		# invert the left side of the tree
-		# we'll invert the nodes in the tree again later
-		self.dataset.update_status("Generating data tree from posts")
-		left_leaves = [list(reversed(leave)) for leave in left_leaves]
+		self.dataset.update_status("Generating token tree from posts")
 		levels_right = [{} for i in range(0, window)]
 		levels_left = [{} for i in range(0, window)]
 		tokens_left = []
 		tokens_right = []
+
+		# for each "level" (each branching point representing a level), turn
+		# tokens into nodes, record the max amount of occurences for any
+		# token in that level, and keep track of what nodes are in which level.
+		# The latter is needed because a token may occur multiple times, at
+		# different points in the graph. Do this for both the left and right
+		# side of the tree.
 		for i in range(0, window):
-			for leave in right_leaves:
-				if i >= len(leave):
+			for branch in right_branches:
+				if i >= len(branch):
 					continue
 
-				token = leave[i].lower()
+				token = branch[i].lower()
 				if token not in levels_right[i]:
-					parent = levels_right[i - 1][leave[i - 1].lower()] if i > 0 else None
-					levels_right[i][token] = Node(token, parent=parent)
+					parent = levels_right[i - 1][branch[i - 1].lower()] if i > 0 else None
+					levels_right[i][token] = Node(token, parent=parent, occurrences=1, is_top_root=(parent is None))
 					tokens_right.append(levels_right[i][token])
+				else:
+					levels_right[i][token].occurrences += 1
 
-			for leave in left_leaves:
-				if i >= len(leave):
+				occurrences = levels_right[i][token].occurrences
+				self.max_occurrences[i] = max(occurrences, self.max_occurrences[i]) if i in self.max_occurrences else occurrences
+
+			for branch in left_branches:
+				if i >= len(branch):
 					continue
 
-				token = leave[i].lower()
+				token = branch[i].lower()
 				if token not in levels_left[i]:
-					parent = levels_left[i - 1][leave[i - 1].lower()] if i > 0 else None
-					levels_left[i][token] = Node(token, parent=parent)
+					parent = levels_left[i - 1][branch[i - 1].lower()] if i > 0 else None
+					levels_left[i][token] = Node(token, parent=parent, occurrences=1, is_top_root=(parent is None))
 					tokens_left.append(levels_left[i][token])
+				else:
+					levels_left[i][token].occurrences += 1
+
+				occurrences = levels_left[i][token].occurrences
+				self.max_occurrences[i] = max(occurrences, self.max_occurrences[i]) if i in self.max_occurrences else occurrences
 
 		# nodes that have no siblings can be merged with their parents, else
 		# the graph becomes unnecessarily large with lots of single-word nodes
-		# connected to single-word nodes
+		# connected to single-word nodes. additionally, we want the nodes with
+		# the most branches to be sorted to the top, and then only retain the
+		# most interesting (i.e. most-occurring) branches
 		self.dataset.update_status("Merging and sorting tree nodes")
 		for token in tokens_left:
 			self.merge_upwards(token)
 			self.sort_node(token)
+			self.limit_subtree(token)
 
 		for token in tokens_right:
 			self.merge_upwards(token)
 			self.sort_node(token)
+			self.limit_subtree(token)
+
+		# somewhat annoyingly, anytree does not simply delete nodes detached
+		# from the tree in the previous steps, but makes them root nodes. We
+		# don't need these root nodes (we only need the original root), so the
+		# next step is to remove all root nodes that are not the main root.
+		# We cannot modify a list in-place, so make a new list with the
+		# relevant nodes
+		level_sizes = {}
+		filtered_tokens_right = []
+		for token in tokens_right:
+			if token.is_root and not token.is_top_root:
+				continue
+
+			filtered_tokens_right.append(token)
+
+		filtered_tokens_left = []
+		for token in tokens_left:
+			if token.is_root and not token.is_top_root:
+				continue
+
+			filtered_tokens_left.append(token)
+
+		# now we know which nodes are left, and can therefore determine how
+		# large the canvas needs to be - this is based on the max number of
+		# branches found on any level of the tree, in other words, the number
+		# of "terminal nodes"
+		height_left = self.whitespace * self.fontsize * max([self.max_breadth(node) for node in filtered_tokens_left if node.is_top_root])
+		height_right = self.whitespace * self.fontsize * max([self.max_breadth(node) for node in filtered_tokens_right if node.is_top_root])
+		height = max(height_left, height_right)
+
+		canvas = Drawing(str(self.dataset.get_results_path()),
+						 size=(width, height),
+						 style="font-family:monospace;font-size:%ipx" % self.fontsize)
 
 		# the nodes on the left side of the graph now have the wrong word order,
 		# because we reversed them earlier to generate the correct tree
@@ -207,91 +283,25 @@ class MakeWordtree(BasicProcessor):
 
 		self.dataset.update_status("Rendering tree to SVG file")
 		if sides != "right":
-			wrapper = self.render(wrapper, [token for token in tokens_left if token.is_root and token.children],
+			wrapper = self.render(wrapper, [token for token in filtered_tokens_left if token.is_root and token.children],
 								  height=height, side=self.SIDE_LEFT)
 
 		if sides != "left":
-			wrapper = self.render(wrapper, [token for token in tokens_right if token.is_root and token.children],
+			wrapper = self.render(wrapper, [token for token in filtered_tokens_right if token.is_root and token.children],
 								  height=height, side=self.SIDE_RIGHT)
 
+		# things may have been rendered outside the canvas, in which case we
+		# need to readjust the SVG properties
 		wrapper.update({"x": 0 if self.x_min >= 0 else self.x_min * -1})
 		canvas.update({"width": (self.x_max - self.x_min)})
+
 		canvas.add(wrapper)
 		canvas.save(pretty=True)
 
 		self.dataset.update_status("Finished")
 		self.dataset.finish(len(tokens_left) + len(tokens_right))
 
-	def merge_upwards(self, node):
-		"""
-		Merge a node with the parent node if it has no siblings
-
-		Used to string together tokens into one longer text string
-
-		:param Node node:
-		"""
-		if not node or not node.parent:
-			return
-
-		parent = node.parent
-		if len(node.siblings) == 0:
-			node.parent.name += " " + node.name
-			# we need a reference because after the next line the node will
-			# have no parent
-			node.parent.children = node.children
-
-		self.merge_upwards(parent)
-
-	def invert_node_labels(self, node):
-		"""
-		Invert the word order in node labels
-
-		Used for nodes on the left side of the tree view, which would be the
-		wrong way around otherwise.
-
-		:param node:
-		"""
-		if hasattr(node, "is_inverted"):
-			return
-
-		node.is_inverted = True
-		node.name = " ".join(reversed(node.name.split(" ")))
-		for child in node.children:
-			self.invert_node_labels(child)
-
-	def max_children(self, node, current_max=1):
-		"""
-		Get max amount of children of any node under the given node
-
-		:param Node node:  Node to check
-		:param int current_max:  Max amount found so far
-		:return int:
-		"""
-		for child in node.children:
-			current_max = max(current_max, self.max_children(child, current_max))
-
-		return max(len(node.children), current_max)
-
-	def max_breadth(self, node):
-		"""
-		Get max sibling nodes at any underlying level of children for a node
-
-		:param Node node:  Node to check
-		:return int:
-		"""
-		level_breadths = {}
-		for descendant in node.descendants:
-			level = len(descendant.path)
-			if level not in level_breadths:
-				level_breadths[level] = 0
-			level_breadths[level] += 1
-
-		if not level_breadths:
-			return 1
-		else:
-			return max(list(level_breadths.values()))
-
-	def render(self, canvas, level, x=0, y=0, origin=None, height=None, side=1, init=True):
+	def render(self, canvas, level, x=0, y=0, origin=None, height=None, side=1, init=True, level_index=0):
 		"""
 		Render node set to canvas
 
@@ -300,7 +310,7 @@ class MakeWordtree(BasicProcessor):
 		:param int x:  X coordinate of top left of level block
 		:param int y:  Y coordinate of top left of level block
 		:param tuple origin:  Coordinates to draw 'connecting' line to
-		:param int height:  Block height budget
+		:param float height:  Block height budget
 		:param int side:  What direction to move into: 1 for rightwards, -1 for leftwards
 		:param bool init:  Whether the draw the top level of nodes. Only has an effect if
 						   side == self.SIDE_LEFT
@@ -323,17 +333,19 @@ class MakeWordtree(BasicProcessor):
 			# determine how high this block will be based on the available
 			# height and the nodes we'll need to fit in it
 			required_space_node = self.max_breadth(node)
+
 			block_height = (required_space_node / required_space_level) * height
 
 			# determine how much we want to enlarge the text
-			if len(node.children) > 4:
+			occurrence_ratio = node.occurrences / self.max_occurrences[level_index]
+			if occurrence_ratio >= 0.75:
+				embiggen = 3
+			elif occurrence_ratio > 0.5:
 				embiggen = 2
-			elif len(node.children) > 3:
+			elif occurrence_ratio > 0.25:
 				embiggen = 1.75
-			elif len(node.children) > 2:
+			elif occurrence_ratio > 0.15:
 				embiggen = 1.5
-			elif len(node.children) > 1:
-				embiggen = 1.25
 			else:
 				embiggen = 1
 
@@ -342,7 +354,8 @@ class MakeWordtree(BasicProcessor):
 			characters = len(node.name)
 			text_width = characters * self.step
 			text_width *= (embiggen * 1)
-			text_offset_y = self.fontsize if self.align == "top" else (block_height / 2)
+
+			text_offset_y = self.fontsize if self.align == "top" else ((block_height) / 2)
 
 			# determine where in the block to draw the text and where on the
 			# canvas the block appears
@@ -405,10 +418,69 @@ class MakeWordtree(BasicProcessor):
 
 			# draw this node's children
 			canvas = self.render(canvas, node.children, x=x + ((text_width + self.gap) * side), y=y, origin=new_origin,
-								 height=int(block_height), side=side, init=False)
+								 height=int(block_height), side=side, init=False, level_index=level_index+1)
 			y += block_height
 
 		return canvas
+
+	def merge_upwards(self, node):
+		"""
+		Merge a node with the parent node if it has no siblings
+
+		Used to string together tokens into one longer text string
+
+		:param Node node:
+		"""
+		if not node or not node.parent:
+			return
+
+		parent = node.parent
+		if len(node.siblings) == 0:
+			node.parent.name += " " + node.name
+			# we need a reference because after the next line the node will
+			# have no parent
+			node.parent.children = node.children
+
+		self.merge_upwards(parent)
+
+	def invert_node_labels(self, node):
+		"""
+		Invert the word order in node labels
+
+		Used for nodes on the left side of the tree view, which would be the
+		wrong way around otherwise.
+
+		:param node:
+		"""
+		if hasattr(node, "is_inverted"):
+			return
+
+		node.is_inverted = True
+		node.name = " ".join(reversed(node.name.split(" ")))
+		for child in node.children:
+			self.invert_node_labels(child)
+
+	def max_children(self, node, current_max=1):
+		"""
+		Get max amount of children of any node under the given node
+
+		:param Node node:  Node to check
+		:param int current_max:  Max amount found so far
+		:return int:
+		"""
+		for child in node.children:
+			current_max = max(current_max, self.max_children(child, current_max))
+
+		return max(len(node.children), current_max)
+
+	def max_breadth(self, node):
+		"""
+		Get max sibling nodes at any underlying level of children for a node
+
+		:param Node node:  Node to check
+		:return int:
+		"""
+		return len([descendant for descendant in node.descendants if not descendant.children]) + 1
 
 	def sort_node(self, node):
 		"""
@@ -421,4 +493,19 @@ class MakeWordtree(BasicProcessor):
 			node.children = [self.sort_node(child) for child in node.children]
 
 		node.children = sorted(node.children, reverse=True, key=lambda x: len(x.children))
+		return node
+
+	def limit_subtree(self, node):
+		"""
+		Limit the amount of branches in a (sub)tree
+
+		Branches are sorted by most occurences and then the top n are kept.
+
+		:param node: Node of which to filter children
+		:return:  Node, with pruned branches
+		"""
+		if node.children:
+			node.children = [self.limit_subtree(child) for child in node.children]
+
+		node.children = sorted(node.children, reverse=True, key=lambda x: x.occurrences)[0:self.limit]
 		return node
