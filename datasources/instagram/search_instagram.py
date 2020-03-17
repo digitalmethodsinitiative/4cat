@@ -119,36 +119,24 @@ class SearchInstagram(Search):
 			thread_id = post.shortcode
 
 			try:
-				post_username = post.owner_username
+				results.append({
+					"id": thread_id,
+					"thread_id": thread_id,
+					"parent_id": thread_id,
+					"body": post.caption if post.caption is not None else "",
+					"author": post.owner_username,
+					"timestamp": int(post.date_utc.timestamp()),
+					"type": "video" if post.is_video else "picture",
+					"url": post.video_url if post.is_video else post.url,
+					"hashtags": ",".join(post.caption_hashtags),
+					"usertags": ",".join(post.tagged_users),
+					"mentioned": ",".join(mention.findall(post.caption) if post.caption else ""),
+					"num_likes": post.likes,
+					"num_comments": post.comments,
+					"subject": ""
+				})
 			except instaloader.QueryReturnedNotFoundException:
-				post_username = ""
-
-			try:
-				tagged_users = post.tagged_users
-			except instaloader.QueryReturnedNotFoundException:
-				tagged_users = []
-
-			try:
-				num_comments = post.comments
-			except instaloader.QueryReturnedNotFoundException:
-				num_comments = 0
-
-			results.append({
-				"id": thread_id,
-				"thread_id": thread_id,
-				"parent_id": thread_id,
-				"body": post.caption if post.caption is not None else "",
-				"author": post_username,
-				"timestamp": int(post.date_utc.timestamp()),
-				"type": "video" if post.is_video else "picture",
-				"url": post.video_url if post.is_video else post.url,
-				"hashtags": ",".join(post.caption_hashtags),
-				"usertags": ",".join(tagged_users),
-				"mentioned": ",".join(mention.findall(post.caption) if post.caption else ""),
-				"num_likes": post.likes,
-				"num_comments": num_comments,
-				"subject": ""
-			})
+				pass
 
 			if not self.parameters.get("scrape_comments", False):
 				continue
@@ -158,53 +146,51 @@ class SearchInstagram(Search):
 					answers = [answer for answer in comment.answers]
 
 					try:
-						comment_username = comment.owner.username
+						results.append({
+							"id": comment.id,
+							"thread_id": thread_id,
+							"parent_id": thread_id,
+							"body": comment.text,
+							"author": comment.owner.username,
+							"timestamp": int(comment.created_at_utc.timestamp()),
+							"type": "comment",
+							"url": "",
+							"hashtags": ",".join(hashtag.findall(comment.text)),
+							"usertags": "",
+							"mentioned": ",".join(mention.findall(comment.text)),
+							"num_likes": comment.likes_count if hasattr(comment, "likes_count") else 0,
+							"num_comments": len(answers),
+							"subject": ""
+						})
 					except instaloader.QueryReturnedNotFoundException:
-						comment_username = ""
+						pass
 
-					results.append({
-						"id": comment.id,
-						"thread_id": thread_id,
-						"parent_id": thread_id,
-						"body": comment.text,
-						"author": comment_username,
-						"timestamp": int(comment.created_at_utc.timestamp()),
-						"type": "comment",
-						"url": "",
-						"hashtags": ",".join(hashtag.findall(comment.text)),
-						"usertags": "",
-						"mentioned": ",".join(mention.findall(comment.text)),
-						"num_likes": comment.likes_count if hasattr(comment, "likes_count") else 0,
-						"num_comments": len(answers),
-						"subject": ""
-					})
 
 					# instagram only has one reply depth level at the time of
 					# writing, represented here
 					for answer in answers:
 						try:
-							answer_username = answer.owner.username
+							results.append({
+								"id": answer.id,
+								"thread_id": thread_id,
+								"parent_id": comment.id,
+								"body": answer.text,
+								"author": answer.owner.username,
+								"timestamp": int(answer.created_at_utc.timestamp()),
+								"type": "comment",
+								"url": "",
+								"hashtags": ",".join(hashtag.findall(answer.text)),
+								"usertags": "",
+								"mentioned": ",".join(mention.findall(answer.text)),
+								"num_likes": answer.likes_count if hasattr(answer, "likes_count") else 0,
+								"num_comments": 0,
+								"subject": ""
+							})
 						except instaloader.QueryReturnedNotFoundException:
-							answer_username = ""
+							pass
 
-						results.append({
-							"id": answer.id,
-							"thread_id": thread_id,
-							"parent_id": comment.id,
-							"body": answer.text,
-							"author": answer_username,
-							"timestamp": int(answer.created_at_utc.timestamp()),
-							"type": "comment",
-							"url": "",
-							"hashtags": ",".join(hashtag.findall(answer.text)),
-							"usertags": "",
-							"mentioned": ",".join(mention.findall(answer.text)),
-							"num_likes": answer.likes_count if hasattr(answer, "likes_count") else 0,
-							"num_comments": 0,
-							"subject": ""
-						})
 			except instaloader.QueryReturnedNotFoundException:
-				# comments not available...? this happens sometimes, not clear why
+				# data not available...? this happens sometimes, not clear why
 				pass
 
 		# remove temporary fetched data and return posts
