@@ -153,55 +153,59 @@ class SearchInstagram(Search):
 			if not self.parameters.get("scrape_comments", False):
 				continue
 
-			for comment in post.get_comments():
-				answers = [answer for answer in comment.answers]
+			try:
+				for comment in post.get_comments():
+					answers = [answer for answer in comment.answers]
 
-				try:
-					comment_username = comment.owner.username
-				except instaloader.QueryReturnedNotFoundException:
-					comment_username = ""
-
-				results.append({
-					"id": comment.id,
-					"thread_id": thread_id,
-					"parent_id": thread_id,
-					"body": comment.text,
-					"author": comment_username,
-					"timestamp": int(comment.created_at_utc.timestamp()),
-					"type": "comment",
-					"url": "",
-					"hashtags": ",".join(hashtag.findall(comment.text)),
-					"usertags": "",
-					"mentioned": ",".join(mention.findall(comment.text)),
-					"num_likes": comment.likes_count if hasattr(comment, "likes_count") else 0,
-					"num_comments": len(answers),
-					"subject": ""
-				})
-
-				# instagram only has one reply depth level at the time of
-				# writing, represented here
-				for answer in answers:
 					try:
-						answer_username = answer.owner.username
+						comment_username = comment.owner.username
 					except instaloader.QueryReturnedNotFoundException:
-						answer_username = ""
+						comment_username = ""
 
 					results.append({
-						"id": answer.id,
+						"id": comment.id,
 						"thread_id": thread_id,
-						"parent_id": comment.id,
-						"body": answer.text,
-						"author": answer_username,
-						"timestamp": int(answer.created_at_utc.timestamp()),
+						"parent_id": thread_id,
+						"body": comment.text,
+						"author": comment_username,
+						"timestamp": int(comment.created_at_utc.timestamp()),
 						"type": "comment",
 						"url": "",
-						"hashtags": ",".join(hashtag.findall(answer.text)),
+						"hashtags": ",".join(hashtag.findall(comment.text)),
 						"usertags": "",
-						"mentioned": ",".join(mention.findall(answer.text)),
-						"num_likes": answer.likes_count if hasattr(answer, "likes_count") else 0,
-						"num_comments": 0,
+						"mentioned": ",".join(mention.findall(comment.text)),
+						"num_likes": comment.likes_count if hasattr(comment, "likes_count") else 0,
+						"num_comments": len(answers),
 						"subject": ""
 					})
+
+					# instagram only has one reply depth level at the time of
+					# writing, represented here
+					for answer in answers:
+						try:
+							answer_username = answer.owner.username
+						except instaloader.QueryReturnedNotFoundException:
+							answer_username = ""
+
+						results.append({
+							"id": answer.id,
+							"thread_id": thread_id,
+							"parent_id": comment.id,
+							"body": answer.text,
+							"author": answer_username,
+							"timestamp": int(answer.created_at_utc.timestamp()),
+							"type": "comment",
+							"url": "",
+							"hashtags": ",".join(hashtag.findall(answer.text)),
+							"usertags": "",
+							"mentioned": ",".join(mention.findall(answer.text)),
+							"num_likes": answer.likes_count if hasattr(answer, "likes_count") else 0,
+							"num_comments": 0,
+							"subject": ""
+						})
+			except instaloader.QueryReturnedNotFoundException:
+				# comments not available...? this happens sometimes, not clear why
+				pass
 
 		# remove temporary fetched data and return posts
 		shutil.rmtree(working_directory)
