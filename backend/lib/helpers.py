@@ -19,16 +19,12 @@ def init_datasource(database, logger, queue, name):
 	Queues jobs to scrape the boards that were configured to be scraped in the
 	4CAT configuration file. If none were configured, nothing happens.
 
-	:param database:
-	:param logger:
-	:param queue:
-	:param name:
+	:param Database database:  Database connection instance
+	:param Logger logger:  Log handler
+	:param JobQueue queue:  Job Queue instance
+	:param string name:  ID of datasource that is being initialised
 	"""
-	if True or name not in config.DATASOURCES or "boards" not in config.DATASOURCES[name]:
-		return
-
-	for board in config.DATASOURCES[name]["boards"]:
-		queue.add_job(name + "-board", remote_id=board, interval=60)
+	pass
 
 
 def strip_tags(html, convert_newlines=True):

@@ -141,6 +141,8 @@ class WorkerManager:
 			if datasource + "-search" not in all_modules.workers:
 				self.log.error("No search worker defined for datasource %s. Search queries will not be executed." % datasource)
 
+			all_modules.datasources[datasource]["init"](self.db, self.log, self.queue, datasource)
+
 	def abort(self, signal=None, stack=None):
 		"""
 		Stop looping the delegator, clean up, and prepare for shutdown

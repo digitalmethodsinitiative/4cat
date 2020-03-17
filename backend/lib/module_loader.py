@@ -197,7 +197,8 @@ class ModuleCollector:
 				"expire-datasets": config.DATASOURCES[datasource_id].get("expire-datasets", None),
 				"path": subdirectory,
 				"name": datasource.NAME if hasattr(datasource, "NAME") else datasource_id,
-				"id": subdirectory.parts[-1]
+				"id": subdirectory.parts[-1],
+				"init": datasource.init_datasource
 			}
 
 		sorted_datasources = {datasource_id: self.datasources[datasource_id] for datasource_id in sorted(self.datasources, key=lambda id: self.datasources[id]["name"])}

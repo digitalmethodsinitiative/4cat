@@ -67,9 +67,15 @@ def start():
 		sys.exit(0)
 	else:
 		# wait a few seconds and see if PIDfile was created and refers to a running process
-		time.sleep(6)
+		now = time.time()
+		while time.time() < now + 10:
+			if lockfile.is_file():
+				break
+			else:
+				time.sleep(0.1)
+
 		if not lockfile.is_file():
-			print("...error while starting 4CAT Backend Daemon.")
+			print("...error while starting 4CAT Backend Daemon (lockfile not found).")
 		else:
 			with lockfile.open() as file:
 				pid = int(file.read().strip())
