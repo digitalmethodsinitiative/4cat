@@ -398,11 +398,33 @@ h1 a {
 /** --------------------- *
       Basic page layout
   * --------------------- */
-article, .block,
-.article-ish {
-    min-width: 350px;
-    max-width: 75%;
+article, .block, .article-ish {
+    min-width: 540px;
     margin: 0 auto;
+}
+
+@media (min-width: 576px) {
+  article, .block, .article-ish {
+    max-width: 540px;
+  }
+}
+
+@media (min-width: 768px) {
+  article, .block, .article-ish{
+    max-width: 720px;
+  }
+}
+
+@media (min-width: 992px) {
+  article, .block, .article-ish {
+    max-width: 960px;
+  }
+}
+
+@media (min-width: 1200px) {
+  article, .block, .article-ish {
+    max-width: 1140px;
+  }
 }
 
 article.small {
@@ -640,9 +662,7 @@ article section li p, article aside li p {
   Pages -> Results overview
   * --------------------- */
 .result-list .view-controls {
-    margin: 0 auto 0.5em auto;
-    max-width: 75%;
-    min-width: 350px;
+    margin-bottom: 0.5em;
     text-align: right;
 }
 
