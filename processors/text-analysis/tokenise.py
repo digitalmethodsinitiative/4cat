@@ -178,7 +178,7 @@ class Tokenise(BasicProcessor):
 		for post in self.iterate_csv_items(self.source_file):
 
 			# If it's empty, skip it!
-			if post.get("body", None)
+			if post.get("body", None):
 				continue
 
 			# determine what output unit this post belongs to
