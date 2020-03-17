@@ -67,7 +67,7 @@ def start():
 		sys.exit(0)
 	else:
 		# wait a few seconds and see if PIDfile was created and refers to a running process
-		time.sleep(3)
+		time.sleep(6)
 		if not lockfile.is_file():
 			print("...error while starting 4CAT Backend Daemon.")
 		else:
