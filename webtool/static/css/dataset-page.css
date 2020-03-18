@@ -131,8 +131,12 @@ article.result > section:first-child {
     color: var(--gray-dark);
 }
 
-.child-wrapper:hover::before {
+.child-wrapper:hover::before, .child-wrapper.anchor-child::before {
     color: var(--text);
+}
+
+.child-wrapper.anchor-child {
+    outline: 1px solid var(--gray-dark);
 }
 
 /** middle column **/
