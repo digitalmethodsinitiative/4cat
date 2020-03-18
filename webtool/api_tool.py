@@ -573,7 +573,7 @@ def check_processor():
 			"key": dataset.key,
 			"finished": dataset.is_finished(),
 			"html": render_template("result-child.html", child=dataset, dataset=parent,
-									query=dataset.get_genealogy()[0], parent_key=parent.key,
+									query=dataset.get_genealogy()[0], parent_key=top_parent.key,
 									processors=backend.all_modules.processors),
 			"resultrow_html": render_template("result-result-row.html", dataset=top_parent),
 			"url": "/result/" + dataset.data["result_file"]
