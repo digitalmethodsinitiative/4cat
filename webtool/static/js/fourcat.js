@@ -57,7 +57,7 @@ function init() {
                 return;
             }
             let breadcrumb = analyses.shift();
-            $('#child-' + breadcrumb + ' > .query-core > button').trigger('click');
+            $('#child-' + breadcrumb + ' > .processor-expand > button').trigger('click');
         }, 25);
     }
 
