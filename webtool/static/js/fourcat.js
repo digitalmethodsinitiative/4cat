@@ -57,6 +57,10 @@ function init() {
                 return;
             }
             let breadcrumb = analyses.shift();
+            if (analyses.length === 0) {
+                $('.anchor-child').removeClass('anchor-child');
+                $('#child-' + breadcrumb).addClass('anchor-child');
+            }
             $('#child-' + breadcrumb + ' > .processor-expand > button').trigger('click');
         }, 25);
     }
