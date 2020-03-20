@@ -427,7 +427,7 @@ query = {
                 }
                 else if (search_queue_length == 1) {
                     search_queue_box.html('Currently processing 1 search query: ');
-                    search_queue_list.html(search_queue_noitice);
+                    search_queue_list.html(search_queue_notice);
                 }
                 else {
                     search_queue_box.html('Currently processing ' + search_queue_length + ' search queries: ');
@@ -471,7 +471,6 @@ query = {
                     let processor_started = $('.processor-result-indicator.' + queued_process + '-button');
                     if ($(processor_started).length > 0){
 
-                        console.log(processor.status)
                         $('.processor-result-indicator.' + queued_process + '-button.queued-button > .button-object > .queue-notice').html(notice);
                     }
                 }
