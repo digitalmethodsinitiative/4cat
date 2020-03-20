@@ -115,7 +115,7 @@ class LexicalFilter(BasicProcessor):
 		processed = 0
 		matching_items = 0
 
-		with self.dataset.get_results_path().open("w") as output:
+		with self.dataset.get_results_path().open("w", encoding="utf-8") as output:
 			# get header row, we need to copy it for the output
 			with self.source_file.open() as input:
 				reader = DictReader(input)
