@@ -131,6 +131,20 @@ processor = {
         if ($(this).text().includes('Run')) {
             let form = $(this).parents('form');
             let position = form.position().top + parseInt(form.height());
+
+            // if it's a big dataset, ask if the user is *really* sure
+            let parent = $(this).parents('li.child-wrapper');
+            if(parent.length == 0) {
+                parent = $('.result-tree');
+            }
+            let num_rows = parseInt($('#dataset-' + parent.attr('data-dataset-key') + '-result-count').attr('data-num-results'));
+
+            if(num_rows > 500000) {
+                if(!confirm('You are about to start a processor for a dataset with over 500,000 items. This may take a very long time and block others from running the same type of analysis on their datasets.\n\nYou may be able to get useful analysis results with a smaller dataset instead. Are you sure you want to start this analysis?')) {
+                    return;
+                }
+            }
+
             $.ajax(form.attr('data-async-action') + '?async', {
                 'method': form.attr('method'),
                 'data': form.serialize(),
