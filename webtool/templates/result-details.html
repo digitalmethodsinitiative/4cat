@@ -64,6 +64,7 @@
 
 {% if dataset.num_rows > 0 and dataset.processors|length > 0 and current_user.is_authenticated %}
     <section class="analysis-gallery">
+
         <h3 class="blocktitle section-subheader"><span>Analytical processors</span></h3>
         {% set part = "main" %}
     <div class="intro">
@@ -74,6 +75,11 @@
             <a href="https://bit.ly/37fzES6">4CAT Cookbook</a>, which explains this interface and
             includes examples of several analyses you can run.</p>
 </div>
+        <h4 class="blocktitle section-subheader"><span>Queue</span></h3>
+        <div class="intro">
+            <p><span id="queue-indicator">o</span> There are currently no other analysis modules in the queue.</p>
+        </div>
+
 
         {% set cat = namespace(egory='') %}
         {% for processor in dataset.processors.values() %}

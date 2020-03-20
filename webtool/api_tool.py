@@ -357,7 +357,7 @@ def check_queue():
 
 	:return-schema: {type=object,properties={count={type=integer}}}
 	"""
-	unfinished_datasets = db.fetchone("SELECT COUNT(*) AS count FROM jobs WHERE jobtype LIKE '%-search'")
+	unfinished_datasets = db.fetchall("SELECT jobtype, COUNT(*)count FROM jobs WHERE jobtype LIKE '%-search' GROUP BY jobtype ORDER BY count DESC;")
 
 	return jsonify(unfinished_datasets)
 
