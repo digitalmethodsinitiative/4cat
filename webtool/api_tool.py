@@ -345,22 +345,36 @@ def delete_dataset(key=None):
 	return jsonify({"status": "success"})
 
 
-@app.route("/api/check-queue/")
+@app.route("/api/check-search-queue/")
 @login_required
 @openapi.endpoint("tool")
-def check_queue():
+def check_search_queue():
 	"""
-	Get the amount of datasets yet to finish processing
+	Get the amount of search query datasets yet to finish processing.
 
-	:return: An JSON object with one item `count` containing the number of
-	queued or active datasets.
+	:return: An JSON array with search jobtypes and their counts.
 
-	:return-schema: {type=object,properties={count={type=integer}}}
+	:return-schema: {type=array,properties={jobtype={type=string}, count={type=integer}}}
 	"""
 	unfinished_datasets = db.fetchall("SELECT jobtype, COUNT(*)count FROM jobs WHERE jobtype LIKE '%-search' GROUP BY jobtype ORDER BY count DESC;")
 
 	return jsonify(unfinished_datasets)
 
+
+@app.route("/api/check-processor-queue/")
+@login_required
+@openapi.endpoint("tool")
+def check_processor_queue():
+	"""
+	Get the amount of processor datasets yet to finish processing
+
+	:return: An JSON array with processor jobtypes and their counts.
+
+	:return-schema: {type=array,properties={jobtype={type=string}, count={type=integer}}}
+	"""
+	unfinished_datasets = db.fetchall("SELECT jobtype, COUNT(*)count FROM jobs WHERE jobtype LIKE '%-search' GROUP BY jobtype ORDER BY count DESC;")
+
+	return jsonify(unfinished_datasets)
 
 @app.route("/api/toggle-dataset-favourite/<string:key>")
 @login_required

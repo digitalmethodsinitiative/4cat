@@ -13,9 +13,13 @@ function init() {
     query.update_status();
     setInterval(query.update_status, 4000);
 
+    // Check search queue
+    query.check_search_queue();
+    setInterval(query.check_search_queue, 4000);
+
     // Check queue length
-    query.check_queue();
-    setInterval(query.check_queue, 4000);
+    query.check_processor_queue();
+    setInterval(query.check_processor_queue, 4000);
 
     // Start querying when go button is clicked
     $('#query-form').on('submit', function (e) {
@@ -235,7 +239,7 @@ query = {
         }
 
         // Show loader
-        query.check_queue();
+        query.check_search_queue();
 
         let form = $('#query-form');
         let formdata = new FormData(form[0]);
@@ -292,7 +296,7 @@ query = {
             url: '/api/check-query/',
             data: {key: query_key},
             success: function (json) {
-                query.check_queue();
+                query.check_search_queue();
 
                 let status_box = $('#query-status .message');
                 let current_status = status_box.html();
@@ -397,41 +401,83 @@ query = {
         });
     },
 
-    check_queue: function () {
+    check_search_queue: function () {
         /*
         Polls server to check how many search queries are still in the queue
         */
         $.getJSON({
-            url: '/api/check-queue/',
+            url: '/api/check-search-queue/',
             success: function (json) {
 
                 // Update the query status box with the queue status
-                let queue_box = $('#search-query-status .queue-message');
-                let queue_list = $('#search-query-status .queue-list');
+                let search_queue_box = $('#search-queue-status .search-queue-message');
+                let search_queue_list = $('#search-queue-status .search-queue-list');
 
                 // To display in the search queue box
-                let queue_length = 0
-                let queue_ul = "<ul>"
-                for(let i = 0; i < json.length; i += 1){
-                    queue_length += json[i]['count'];
-                    queue_ul += "<li>" + json[i]['jobtype'].replace('-search','') + ' (' + json[i]['count'] + ')' + '</li>'
-                }
-                queue_ul += "</ul>"
+                let search_queue_length = 0
+                let search_queue_notice = ""
 
-                if (queue_length == 0) {
-                    queue_box.html('Search queue is empty.');
+                for(let i = 0; i < json.length; i += 1){
+                    search_queue_length += json[i]['count'];
+                    search_queue_notice += " <span class='property-badge'>" + json[i]['jobtype'].replace('-search','') + ' (' + json[i]['count'] + ')' + '</span>'
                 }
-                else if (queue_length == 1) {
-                    queue_box.html('4CAT is currently processing 1 search query for:');
-                    queue_list.html(queue_ul.replace(' (1)',''));
+
+                if (search_queue_length == 0) {
+                    search_queue_box.html('Search queue is empty.');
+                }
+                else if (search_queue_length == 1) {
+                    search_queue_box.html('Currently processing 1 search query: ');
+                    search_queue_list.html(search_queue_noitice);
                 }
                 else {
-                    queue_box.html('4CAT is currently processing ' + queue_length + ' search queries for:');
-                    queue_list.html(queue_ul);
+                    search_queue_box.html('Currently processing ' + search_queue_length + ' search queries: ');
+                    search_queue_list.html(search_queue_notice);
                 }
             },
             error: function () {
-                console.log('Something went wrong when checking query queue');
+                console.log('Something went wrong when checking search query queue');
+            }
+        });
+    },
+
+    check_processor_queue: function () {
+        /*
+        Checks what processors are in the queue and keeps updating the option/run buttons
+        and already-queued processes buttons.
+        */
+        
+        $.getJSON({
+            url: '/api/status.json',
+            success: function (json) {
+
+                // Remove previous notices
+                $(".queue-notice").html("");
+
+                queued_processes = json["items"]["backend"]["queued"];
+
+                // Loop through all running processors
+                for (queued_process in queued_processes) {
+
+                    // The message to display
+                    let notice = json["items"]["backend"]["queued"][queued_process] + " in queue"
+
+                    // Add notice if this processor has a run/options button
+                    let processor_run = $('.processor-queue-button.' + queued_process + '-button');
+                    if ($(processor_run).length > 0){
+                        $('.processor-queue-button.' + queued_process + '-button > .queue-notice').html(notice);
+                    }
+
+                    // Add another notice to "analysis results" section if processor is pending
+                    let processor_started = $('.processor-result-indicator.' + queued_process + '-button');
+                    if ($(processor_started).length > 0){
+
+                        console.log(processor.status)
+                        $('.processor-result-indicator.' + queued_process + '-button.queued-button > .button-object > .queue-notice').html(notice);
+                    }
+                }
+            },
+            error: function () {
+                console.log('Something went wrong when checking 4CAT\'s status');
             }
         });
     },
