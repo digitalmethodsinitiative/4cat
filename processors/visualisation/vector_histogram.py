@@ -157,6 +157,7 @@ class SVGHistogramRenderer(BasicProcessor):
 			bar_bottom = height - y_margin
 
 			if bar_height == 0:
+				x += item_width
 				continue
 
 			bar = Path(fill="#000")
