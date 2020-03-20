@@ -88,17 +88,17 @@ class Tokenise(BasicProcessor):
 			"type": UserInput.OPTION_MULTI,
 			"default": [],
 			"options": {
-				"stopwords-terrier-english": "English stopwords (terrier, recommended)",
-				"stopwords-iso-english": "English stopwords (stopwords-iso)",
+				#"stopwords-terrier-english": "English stopwords (terrier, recommended)",
+				"stopwords-iso-english": "English stopwords (stopwords-iso, recommended)",
 				"stopwords-iso-dutch": "Dutch stopwords (stopwords-iso)",
 				"stopwords-iso-all": "Multi-language stopwords (stopwords-iso)",
-				"wordlist-cracklib-english": "English word list (cracklib, recommended)",
-				"wordlist-infochimps-english": "English word list (infochimps)",
-				"wordlist-googlebooks-english": "Google One Million Books pre-2008 top unigrams (van Soest)",
+				#"wordlist-infochimps-english": "English word list (infochimps)",
+				"wordlist-googlebooks-english": "English word list (Google One Million Books pre-2008 top unigrams, recommended)",
+				"wordlist-cracklib-english": "English word list (cracklib)",
 				"wordlist-opentaal-dutch": "Dutch word list (OpenTaal)",
-				"wordlist-unknown-dutch": "Dutch word list (unknown origin, larger than OpenTaal)"
+				#"wordlist-unknown-dutch": "Dutch word list (unknown origin, larger than OpenTaal)"
 			},
-			"help": "Word lists to exclude (i.e. not tokenise). It is highly recommended to exclude stop words:"
+			"help": "Word lists to exclude (i.e. not tokenise). It is highly recommended to exclude stop words. Note that choosing more word lists increases processing time"
 		}
 	}
 
