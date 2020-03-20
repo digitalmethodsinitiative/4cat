@@ -633,6 +633,14 @@ article section li p, article aside li p {
 }
 
 /** --------------------- *
+  Pages -> Queue
+  * --------------------- */
+
+.queue-list > ul {
+    list-style-type: none;
+}
+
+/** --------------------- *
   Pages -> Results metadata
   * --------------------- */
 .inline-label {

@@ -3,7 +3,7 @@
 
 <li id="child-{{ item.key }}" data-dataset-key="{{ item.key }}" class="child-wrapper{% if not item.is_finished() %} running{% endif %}" data-status="{{ item.status }}">
     {# The status button for this processor #}
-    <div class="processor-result-indicator button-wrap {% if not item.is_finished() %} pending{% elif item.num_rows == 0 %} failed{% else %} finished {% endif %}">
+    <div class="processor-result-indicator button-wrap {{processors[item.type].id}}-button {% if 'queued' in item.status|lower %} queued-button{% endif %} {% if not item.is_finished() %} pending{% elif item.num_rows == 0 %} failed{% else %} finished {% endif %}">
     <div class="button-object">
     {% if item.is_finished() and not processors[item.type].is_filter %}<a href="/result/{{ item.result_file }}">{% endif %}
         <span class="headline">
@@ -37,6 +37,7 @@
                 {% if processors[item.type].is_filter %}Filtering...{% else %}In progress{% endif %}
             {% endif %}
         </span>
+        <span class="queue-notice"></span>
     {% if item.is_finished() and not processors[item.type].is_filter %}</a>{% endif %}
     </div>
     </div>

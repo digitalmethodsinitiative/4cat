@@ -206,6 +206,16 @@ article.result > section:first-child {
     font-size: 0.8em;
 }
 
+.child-wrapper .button-wrap .queue-notice {
+    font-size: 0.8em;
+    color: var(--accent-alternate);
+}
+
+.child-wrapper .queued-button .button-object .queue-notice {
+    font-size: 0.8em;
+    color: var(--always-white);
+}
+
 .child-list .processor-header ul {
     margin: 0;
 }
