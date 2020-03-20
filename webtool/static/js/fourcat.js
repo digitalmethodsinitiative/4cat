@@ -15,6 +15,7 @@ function init() {
 
     // Check queue length
     query.check_queue();
+    setInterval(query.check_queue, 4000);
 
     // Start querying when go button is clicked
     $('#query-form').on('submit', function (e) {
@@ -182,8 +183,6 @@ processor = {
                         } else {
                             expand();
                         }
-
-
                     }
                 },
                 'error': function (response) {
@@ -407,20 +406,28 @@ query = {
             success: function (json) {
 
                 // Update the query status box with the queue status
-                let queue_box = $('#query-status .queue_message > span#queue_string');
-                let circle = $('#query-status .queue_message > span#circle');
-                if (json.count == 0) {
-                    queue_box.html('Search queue is empty');
-                    $(circle).removeClass('full');
+                let queue_box = $('#search-query-status .queue-message');
+                let queue_list = $('#search-query-status .queue-list');
+
+                // To display in the search queue box
+                let queue_length = 0
+                let queue_ul = "<ul>"
+                for(let i = 0; i < json.length; i += 1){
+                    queue_length += json[i]['count'];
+                    queue_ul += "<li>" + json[i]['jobtype'].replace('-search','') + ' (' + json[i]['count'] + ')' + '</li>'
                 }
-                else if (json.count == 1) {
-                    queue_box.html('Processing 1 query.');
-                    circle.className = 'full';
-                    $(circle).addClass('full');
+                queue_ul += "</ul>"
+
+                if (queue_length == 0) {
+                    queue_box.html('Search queue is empty.');
+                }
+                else if (queue_length == 1) {
+                    queue_box.html('4CAT is currently processing 1 search query for:');
+                    queue_list.html(queue_ul.replace(' (1)',''));
                 }
                 else {
-                    queue_box.html('Processing ' + json.count + ' queries.');
-                    $(circle).addClass('full');
+                    queue_box.html('4CAT is currently processing ' + queue_length + ' search queries for:');
+                    queue_list.html(queue_ul);
                 }
             },
             error: function () {
