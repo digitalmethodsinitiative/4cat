@@ -135,7 +135,7 @@ class SearchInstagram(Search):
 					"num_comments": post.comments,
 					"subject": ""
 				})
-			except instaloader.QueryReturnedNotFoundException:
+			except (instaloader.QueryReturnedNotFoundException, instaloader.ConnectionException):
 				pass
 
 			if not self.parameters.get("scrape_comments", False):
@@ -189,7 +189,7 @@ class SearchInstagram(Search):
 						except instaloader.QueryReturnedNotFoundException:
 							pass
 
-			except instaloader.QueryReturnedNotFoundException:
+			except (instaloader.QueryReturnedNotFoundException, instaloader.ConnectionException):
 				# data not available...? this happens sometimes, not clear why
 				pass
 
