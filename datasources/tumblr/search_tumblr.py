@@ -55,11 +55,10 @@ class SearchTumblr(Search):
 		# store all info here
 		results = []
 
+
 		# Get date parameters
-		if parameters["after"]:
-			after = int(parameters["after"])
-		if parameters["before"]:
-			before = int(parameters["before"])
+		after = parameters.get("after", None)
+		before = parameters.get("before", None)
 
 		if scope == "tag":
 			# for each tag, get post
@@ -173,13 +172,14 @@ class SearchTumblr(Search):
 				before = posts[len(posts) - 1]["timestamp"]
 
 				# manually check if we've reached the `after` already (not natively supported by Tumblr)
-				if before <= after:
-					# Get rid of all the posts that are earlier than the before timestamp
-					posts = [post for post in posts if post["timestamp"] > after]
+				if after:
+					if before <= after:
+						# Get rid of all the posts that are earlier than the before timestamp
+						posts = [post for post in posts if post["timestamp"] > after]
 
-					if posts:
-						all_posts += posts
-					break
+						if posts:
+							all_posts += posts
+						break
 
 				all_posts += posts
 				retries = 0
