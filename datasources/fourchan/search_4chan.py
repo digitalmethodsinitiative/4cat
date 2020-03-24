@@ -131,12 +131,12 @@ class Search4Chan(Search):
 			where.append("board = %s")
 			replacements.append(query["board"])
 
-		# escape full text matches
+		# escape full text matches and convert quotes
 		if query.get("body_match", None):
-			match.append("@body " + self.escape_for_sphinx(query["body_match"]))
+			match.append("@body " + self.convert_for_sphinx(query["body_match"]))
 
 		if query.get("subject_match", None):
-			match.append("@subject " + self.escape_for_sphinx(query["subject_match"]))
+			match.append("@subject " + self.convert_for_sphinx(query["subject_match"]))
 
 		# handle country codes through sphinx if not looking for density
 		if query.get("country_code", None) and not query.get("check_dense_country", None) and query.get(
@@ -190,7 +190,7 @@ class Search4Chan(Search):
 
 		return posts_full
 
-	def escape_for_sphinx(self, string):
+	def convert_for_sphinx(self, string):
 		"""
 		SphinxQL has a couple of special characters that should be escaped if
 		they are part of a query, but no native function is available to
@@ -198,10 +198,18 @@ class Search4Chan(Search):
 
 		Thanks: https://stackoverflow.com/a/6288301
 
+		Also converts curly quotes to straight quotes to catch users copy-pasting
+		their search full match queries from e.g. word.
+
 		:param str string:  String to escape
 		:return str: Escaped string
 		"""
-		return string.replace("/", "\\/")
+
+		# Convert curly quotes
+		string = string.replace("“","\"").replace("”","\"")
+		# Escape forward slashes
+		string = string.replace("/", "\\/")
+		return string
 
 	def fetch_posts(self, post_ids, where=None, replacements=None):
 		"""
@@ -263,6 +271,7 @@ class Search4Chan(Search):
 
 		try:
 			sql = "SELECT thread_id, post_id FROM `" + self.prefix + "_posts` WHERE " + where + " LIMIT 5000000 OPTION max_matches = 5000000, ranker = none, boolean_simplify = 1, sort_method = kbuffer, cutoff = 5000000"
+			print(sql)
 			# sql = "SELECT thread_id, post_id FROM `" + self.prefix + "_posts` WHERE " + where + " LIMIT 5000000 OPTION max_matches = 5000000, ranker = none, boolean_simplify = 1, sort_method = kbuffer, cutoff = 5000000"
 			self.log.info("Running Sphinx query %s " % sql)
 			self.log.info("Parameters: %s " % repr(replacements))
