@@ -15,11 +15,11 @@ function init() {
 
     // Check search queue
     query.check_search_queue();
-    setInterval(query.check_search_queue, 4000);
+    setInterval(query.check_search_queue, 8000);
 
-    // Check queue length
+    // Check processor queue
     query.check_processor_queue();
-    setInterval(query.check_processor_queue, 4000);
+    setInterval(query.check_processor_queue, 10000);
 
     // Start querying when go button is clicked
     $('#query-form').on('submit', function (e) {
@@ -475,7 +475,8 @@ query = {
                     }
                 }
             },
-            error: function () {
+            error: function (error) {
+                console.log(error["responseText"])
                 console.log('Something went wrong when checking 4CAT\'s status');
             }
         });
