@@ -24,8 +24,7 @@ The following syntax is supported:
    or `netherlands` (or both)
 
 - `"amsterdam netherlands"` - Match the phrase `amsterdam netherlands`, 
-   occurring exactly like that. Be sure not to use curly quotations
-   (`“` and `”`).
+   occurring exactly like that.
 
 - `amsterdam -netherlands` - Match posts containing `amsterdam` but 
    not `netherlands`

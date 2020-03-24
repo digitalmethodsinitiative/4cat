@@ -220,7 +220,7 @@ def show_page(page):
 	if not os.path.exists(page_path):
 		abort(404)
 
-	with open(page_path) as file:
+	with open(page_path, encoding="utf-8") as file:
 		page_raw = file.read()
 		page_parsed = markdown.markdown(page_raw)
 		page_parsed = re.sub(r"<h2>(.*)</h2>", r"<h2><span>\1</span></h2>", page_parsed)
