@@ -101,7 +101,7 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 
 				parent_key = self.dataset.get_genealogy()[0].key
 
-				raise ProcessorException("Processor %s raised %s while processing dataset %s (%s) in %s:\n   %s\n" % (self.type, e.__class__.__name__, self.dataset.key, parent_key, location, str(e)))
+				raise ProcessorException("Processor %s raised %s while processing dataset %s (via %s) in %s:\n   %s\n" % (self.type, e.__class__.__name__, self.dataset.key, parent_key, location, str(e)))
 
 
 	def after_process(self):

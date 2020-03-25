@@ -8,7 +8,7 @@ import abc
 
 from backend.lib.queue import JobQueue
 from backend.lib.database import Database
-from backend.lib.exceptions import WorkerInterruptedException
+from backend.lib.exceptions import WorkerInterruptedException, ProcessorException
 
 
 class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
@@ -79,6 +79,9 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
 				self.job.finish()
 
 			self.abort()
+		except ProcessorException as e:
+			self.log.error(str(e))
+			self.job.add_status("Crash during execution")
 		except Exception as e:
 			frames = traceback.extract_tb(e.__traceback__)
 			frames = [frame.filename.split("/").pop() + ":" + str(frame.lineno) for frame in frames]
