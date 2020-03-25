@@ -336,7 +336,12 @@ class YouTubeMetadata(BasicProcessor):
 
 			if "youtu" in url:
 
-				query = urllib.parse.urlparse(url)
+				# Extract the YouTube link
+				try:
+					query = urllib.parse.urlparse(url)
+				# In large datasets, malformed links occur. Catch these and continue.
+				except ValueError as e:
+					continue
 
 				# youtu.be URLs always reference videos
 				if query.hostname == "youtu.be":
