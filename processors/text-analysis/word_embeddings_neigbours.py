@@ -57,8 +57,10 @@ class word_embeddings_neigbours(BasicProcessor):
 		# Extract text input
 		check_words = self.parameters.get("words")
 		if not check_words:
-			self.dataset.update_status("No text inserted")
-			self.dataset.finish(0)
+			self.dataset.update_status("No words to find nearest neighbours of were provided")
+			self.dataset.finish(-1)
+			return
+
 		check_words = [word.strip() for word in check_words.split(",")]
 
 		# Extract top n
@@ -67,8 +69,9 @@ class word_embeddings_neigbours(BasicProcessor):
 			if top_n == 0:
 				top_n = 10
 		except ValueError:
-			self.dataset.update_status("No valid top_n inserted")
-			self.dataset.finish(0)
+			self.dataset.update_status("Invalid number of nearest neighbours provided")
+			self.dataset.finish(-1)
+			return
 
 		results = []
 		results_path = self.dataset.get_results_path()
