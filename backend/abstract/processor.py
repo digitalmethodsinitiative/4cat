@@ -1,17 +1,17 @@
 """
 Basic post-processor worker - should be inherited by workers to post-process results
 """
+import traceback
 import typing
 import shutil
 import abc
 import csv
 import os
-import sys
 
 from backend.abstract.worker import BasicWorker
 from backend.lib.dataset import DataSet
 from backend.lib.helpers import get_software_version
-from backend.lib.exceptions import WorkerInterruptedException, ProcessorInterruptedException
+from backend.lib.exceptions import WorkerInterruptedException, ProcessorInterruptedException, ProcessorException
 
 
 class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
@@ -94,6 +94,12 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 				self.after_process()
 			except WorkerInterruptedException:
 				self.abort()
+			except Exception as e:
+				frames = traceback.extract_tb(e.__traceback__)
+				frames = [frame.filename.split("/").pop() + ":" + str(frame.lineno) for frame in frames[1:]]
+				location = "->".join(frames)
+
+				raise ProcessorException("Processor %s raised %s while processing dataset %s in %s: %s" % (self.type, e.__class__.__name__, self.dataset.key, location, e))
 
 
 	def after_process(self):
