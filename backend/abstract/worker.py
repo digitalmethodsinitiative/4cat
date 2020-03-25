@@ -83,7 +83,7 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
 			frames = traceback.extract_tb(e.__traceback__)
 			frames = [frame.filename.split("/").pop() + ":" + str(frame.lineno) for frame in frames]
 			location = "->".join(frames)
-			self.log.error("Worker %s raised exception %s and will abort: %s at %s" % (self.type, e.__class__.__name__, str(e).replace("\n", ""), location))
+			self.log.error("Worker %s raised exception %s and will abort: %s at %s" % (self.type, e.__class__.__name__, str(e), location))
 			self.job.add_status("Crash during execution")
 
 	def abort(self):
