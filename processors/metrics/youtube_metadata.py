@@ -422,8 +422,9 @@ def request_youtube_api(self, ids, object_type="video"):
 		# Do nothing with the results if the requests failed -
 		# be in the final results file
 		if retries >= self.max_retries:
-			self.log.error("Error during YouTube API request of query %s" % self.dataset.key)
-			self.dataset.update_status("Error while getting YouTube data")
+			self.log.error("YouTube API request exceeded when processing query %s" % self.dataset.key)
+			self.dataset.update_status("YouTube API quota limit exceeded. Saving the " + str(len(results)) + " results retreived thus far")
+			return results
 
 		else:
 			# Get and return results for each video
