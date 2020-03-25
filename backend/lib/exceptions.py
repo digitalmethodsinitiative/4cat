@@ -8,6 +8,12 @@ class QueueException(FourcatException):
 	"""
 	pass
 
+class ProcessorException(FourcatException):
+	"""
+	Raise if processor throws an exception
+	"""
+	pass
+
 
 class JobClaimedException(QueueException):
 	"""
