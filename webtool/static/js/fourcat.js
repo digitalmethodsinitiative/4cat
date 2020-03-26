@@ -424,6 +424,7 @@ query = {
 
                 if (search_queue_length == 0) {
                     search_queue_box.html('Search queue is empty.');
+                    search_queue_list.html('');
                 }
                 else if (search_queue_length == 1) {
                     search_queue_box.html('Currently processing 1 search query: ');
