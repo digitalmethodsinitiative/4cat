@@ -44,7 +44,7 @@ class YouTubeMetadata(BasicProcessor):
 	output = "csv:id,channel_id,channel_title"
 
 	max_retries = 3
-	sleep_time = 2
+	sleep_time = 20
 
 	api_limit_reached = False
 	invalid_api_key = False
@@ -423,8 +423,10 @@ class YouTubeMetadata(BasicProcessor):
 				if e.resp.status == 400: # "Bad Request"
 					self.invalid_api_key = True
 					return results
-				else:	# Make sure other errors are still raised
-					raise e
+			# Google API's also throws other weird errors that might be resolved by retrying, like SSLEOFError
+			except Exception as e:
+				time.sleep(self.sleep_time) # Wait a bit before trying again
+				pass
 
 			while retries < self.max_retries:
 				try:
@@ -440,25 +442,41 @@ class YouTubeMetadata(BasicProcessor):
 							id = ids_string,
 							maxResults = 50
 						).execute()
+
+					self.api_limit_reached = False
+
 					break
 
 				# Check rate limits
-				except HttpError as e:
-					if e.resp.status == 403: # "Forbidden", what Google returns with rate limits
-						self.api_limit_reached = True
+				except HttpError as httperror:
+
+					status_code = httperror.resp.status
+
+					if status_code == 403: # "Forbidden", what Google returns with rate limits
 						retries += 1
+						self.api_limit_reached = True
+						self.dataset.update_status("API quota limit might be reached (HTTP" + str(status_code) + "), sleeping for " + str(self.sleep_time))
 						time.sleep(self.sleep_time) # Wait a bit before trying again
 						pass
 
-					else:	# Stil raise other possible errors
-						raise e
+					else:
+						retries += 1
+						self.dataset.update_status("API error encoutered (HTTP" + str(status_code) + "), sleeping for " + str(self.sleep_time))
+						time.sleep(self.sleep_time) # Wait a bit before trying again
+						pass
 
-			# Do nothing with the results if the requests failed -
-			# be in the final results file
+				# Google API's also throws other weird errors that might be resolved by retrying, like SSLEOFError
+				except Exception as e:
+					retries += 1
+					self.dataset.update_status("Error encoutered, sleeping for " + str(self.sleep_time))
+					time.sleep(self.sleep_time) # Wait a bit before trying again
+					pass
+
+			# Do nothing with the results if the requests failed
 			if retries >= self.max_retries:
-				self.api_limit_reached = True
-				self.log.error("YouTube API requests exceeded when processing query %s" % self.dataset.key)
-				
+				if self.api_limit_reached == True:
+					self.dataset.update_status("YouTube API requests exceeded.")
+
 				return results
 
 			else:
