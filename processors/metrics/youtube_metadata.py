@@ -3,11 +3,13 @@ Get YouTube metadata from video links posted
 """
 import datetime
 import time
+import json
 import re
 import urllib.request
 import youtube_dl
 
-from apiclient.discovery import build
+from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
 from collections import OrderedDict, Counter
 from operator import itemgetter
 from csv import DictReader
@@ -42,7 +44,10 @@ class YouTubeMetadata(BasicProcessor):
 	output = "csv:id,channel_id,channel_title"
 
 	max_retries = 3
-	sleep_time = 20
+	sleep_time = 2
+
+	api_limit_reached = False
+	invalid_api_key = False
 
 	options = {
 		"top": {
@@ -54,6 +59,11 @@ class YouTubeMetadata(BasicProcessor):
 			"type": UserInput.OPTION_TEXT,
 			"default": 0,
 			"help": "Times a page must be referenced (0 = all)"
+		},
+		"custom-key": {
+			"type": UserInput.OPTION_TEXT,
+			"default": "",
+			"help": "Optional: A custom YouTube API key. Leave empty for 4CAT's API key."
 		}
 	}
 
@@ -117,7 +127,7 @@ class YouTubeMetadata(BasicProcessor):
 									post_url = post_url_single
 
 						# Get rid of unwanted (often trailing) characters
-						post_url = re.sub(r"[(),]", "", post_url)
+						post_url = re.sub(r"[(),|]", "", post_url)
 
 						if post_url in urls:
 							urls[post_url].append(post["id"])
@@ -159,6 +169,9 @@ class YouTubeMetadata(BasicProcessor):
 		unique_video_ids = list(set(video_ids.keys()))
 		unique_channel_ids = list(set(channel_ids.keys()))
 		all_ids = dict(video_ids, **channel_ids)
+
+		# Use a custom API key if provided
+		custom_key = self.parameters.get("custom-key")
 
 		try:
 			min_mentions = int(self.parameters.get("min"))
@@ -224,8 +237,8 @@ class YouTubeMetadata(BasicProcessor):
 		counter = 0
 
 		# Get YouTube API data for all videos and channels
-		video_data = request_youtube_api(self, videos_to_fetch, object_type="video")
-		channel_data = request_youtube_api(self, channels_to_fetch, object_type="channel")
+		video_data = self.request_youtube_api(videos_to_fetch, custom_key=custom_key, object_type="video")
+		channel_data = self.request_youtube_api(channels_to_fetch, custom_key=custom_key, object_type="channel")
 		api_results = {**video_data, **channel_data}
 
 		# Loop through retreived videos and channels
@@ -369,112 +382,148 @@ class YouTubeMetadata(BasicProcessor):
 
 		return ids
 
-def request_youtube_api(self, ids, object_type="video"):
-	"""
-	Use the YouTube API to fetch metadata from videos or channels.
-	:param video_ids str, a list of valid YouTube IDs
-	:param type str, the type of object to query. Currently only `video` or `channel`. 
-	:return list, containing dicts with YouTube's response metadata.
-	Max 50 results per try.
+	def request_youtube_api(self, ids, custom_key=None, object_type="video"):
+		"""
+		Use the YouTube API to fetch metadata from videos or channels.
 
-	"""
-	
-	ids_list = get_yt_compatible_ids(ids)
-
-	if object_type != "video" and object_type != "channel":
-		return "No valid YouTube object type (currently only 'channel' and 'video' are supported)"
-
-	# List of dicts for all video data
-	results = {}
-
-	for i, ids_string in enumerate(ids_list):
-
-		retries = 0
-		api_error = ""
-
-		# Use YouTubeDL and the YouTube API to request video data
-		youtube = build(config.YOUTUBE_API_SERVICE_NAME, config.YOUTUBE_API_VERSION,
-											developerKey=config.YOUTUBE_DEVELOPER_KEY)
+		:param video_ids, str:		A list of valid YouTube IDs
+		:param custom_key, str:		A custom API key which can be provided by the user.
+		:param object_type, str:	The type of object to query. Currently only `video` or `channel`. 
 		
-		while retries < self.max_retries:
-			try:
-				if object_type == "video":
-					response = youtube.videos().list(
-						part = 'snippet,contentDetails,statistics',
-						id = ids_string,
-						maxResults = 50
-						).execute()
-				elif object_type == "channel":
-					response = youtube.channels().list(
-						part = "snippet,topicDetails,statistics,brandingSettings",
-						id = ids_string,
-						maxResults = 50
-					).execute()
-				break
+		:return list, containing dicts with YouTube's response metadata.
+		Max 50 results per try.
 
-			except Exception as error:
-				self.dataset.update_status("Encountered exception " + str(error) + ".\nSleeping for " + str(self.sleep_time))
-				retries += 1
-				api_error = error
-				time.sleep(self.sleep_time) # Wait a bit before trying again
-				pass
+		"""
+		
+		ids_list = get_yt_compatible_ids(ids)
 
-		# Do nothing with the results if the requests failed -
-		# be in the final results file
-		if retries >= self.max_retries:
-			self.log.error("YouTube API request exceeded when processing query %s" % self.dataset.key)
-			self.dataset.update_status("YouTube API quota limit exceeded. Saving the " + str(len(results)) + " results retreived thus far")
-			return results
+		if object_type != "video" and object_type != "channel":
+			return "No valid YouTube object type (currently only 'channel' and 'video' are supported)"
 
+		# List of dicts for all video data
+		results = {}
+
+		# Use standard key or custom key
+		if custom_key:
+			api_key = custom_key
 		else:
-			# Get and return results for each video
-			for metadata in response["items"]:
-				result = {}
+			api_key = config.YOUTUBE_DEVELOPER_KEY
 
-				# This will become the key
-				result_id = metadata["id"]
+		for i, ids_string in enumerate(ids_list):
 
-				if object_type == "video":
+			retries = 0
+			api_error = ""
 
-					# Results as dict entries
-					result["type"] = "video"
+			try:
+				# Use YouTubeDL and the YouTube API to request video data
+				youtube = build(config.YOUTUBE_API_SERVICE_NAME, config.YOUTUBE_API_VERSION,
+												developerKey=api_key)
+			# Catch invalid API keys
+			except HttpError as e:
+				if e.resp.status == 400: # "Bad Request"
+					self.invalid_api_key = True
+					return results
+				else:	# Make sure other errors are still raised
+					raise e
 
-					result["upload_time"] = metadata["snippet"].get("publishedAt")
-					result["channel_id"] = metadata["snippet"].get("channelId")
-					result["channel_title"] = metadata["snippet"].get("channelTitle")
-					result["video_id"] = metadata["snippet"].get("videoId")
-					result["video_title"] = metadata["snippet"].get("title")
-					result["video_duration"] = metadata.get("contentDetails").get("duration")
-					result["video_view_count"] = metadata["statistics"].get("viewCount")
-					result["video_comment_count"] = metadata["statistics"].get("commentCount")
-					result["video_likes_count"] = metadata["statistics"].get("likeCount")
-					result["video_dislikes_count"] = metadata["statistics"].get("dislikeCount")
-					result["video_topic_ids"] = metadata.get("topicDetails")
-					result["video_category_id"] = metadata["snippet"].get("categoryId")
-					result["video_tags"] = metadata["snippet"].get("tags")
+			while retries < self.max_retries:
+				try:
+					if object_type == "video":
+						response = youtube.videos().list(
+							part = 'snippet,contentDetails,statistics',
+							id = ids_string,
+							maxResults = 50
+							).execute()
+					elif object_type == "channel":
+						response = youtube.channels().list(
+							part = "snippet,topicDetails,statistics,brandingSettings",
+							id = ids_string,
+							maxResults = 50
+						).execute()
+					break
 
-				elif object_type == "channel":
+				# Check rate limits
+				except HttpError as e:
+					if e.resp.status == 403: # "Forbidden", what Google returns with rate limits
+						self.api_limit_reached = True
+						retries += 1
+						time.sleep(self.sleep_time) # Wait a bit before trying again
+						pass
 
-					# Results as dict entries
-					result["type"] = "channel"
-					result["channel_id"] = metadata["snippet"].get("channelId")
-					result["channel_title"] = metadata["snippet"].get("title")
-					result["channel_description"] = metadata["snippet"].get("description")
-					result["channel_default_language"] = metadata["snippet"].get("defaultLanguage")
-					result["channel_country"] = metadata["snippet"].get("country")
-					result["channel_viewcount"] = metadata["statistics"].get("viewCount")
-					result["channel_commentcount"] = metadata["statistics"].get("commentCount")
-					result["channel_subscribercount"] = metadata["statistics"].get("subscriberCount")
-					result["channel_videocount"] = metadata["statistics"].get("videoCount")
-					# This one sometimes fails for some reason
-					if "topicDetails" in metadata:
-						result["channel_topic_ids"] = metadata["topicDetails"].get("topicIds")
-						result["channel_topic_categories"] = metadata["topicDetails"].get("topicCategories")
-					result["channel_branding_keywords"] = metadata.get("brandingSettings").get("channel").get("keywords")
+					else:	# Stil raise other possible errors
+						raise e
 
-				results[result_id] = result
+			# Do nothing with the results if the requests failed -
+			# be in the final results file
+			if retries >= self.max_retries:
+				self.api_limit_reached = True
+				self.log.error("YouTube API requests exceeded when processing query %s" % self.dataset.key)
+				
+				return results
 
-		# Update status per response item
-		self.dataset.update_status("Got metadata from " + str(i * 50) + "/" + str(len(ids)) + " " + object_type + " YouTube URLs")
+			else:
+				# Get and return results for each video
+				for metadata in response["items"]:
+					result = {}
 
-	return results
+					# This will become the key
+					result_id = metadata["id"]
+
+					if object_type == "video":
+
+						# Results as dict entries
+						result["type"] = "video"
+
+						result["upload_time"] = metadata["snippet"].get("publishedAt")
+						result["channel_id"] = metadata["snippet"].get("channelId")
+						result["channel_title"] = metadata["snippet"].get("channelTitle")
+						result["video_id"] = metadata["snippet"].get("videoId")
+						result["video_title"] = metadata["snippet"].get("title")
+						result["video_duration"] = metadata.get("contentDetails").get("duration")
+						result["video_view_count"] = metadata["statistics"].get("viewCount")
+						result["video_comment_count"] = metadata["statistics"].get("commentCount")
+						result["video_likes_count"] = metadata["statistics"].get("likeCount")
+						result["video_dislikes_count"] = metadata["statistics"].get("dislikeCount")
+						result["video_topic_ids"] = metadata.get("topicDetails")
+						result["video_category_id"] = metadata["snippet"].get("categoryId")
+						result["video_tags"] = metadata["snippet"].get("tags")
+
+					elif object_type == "channel":
+
+						# Results as dict entries
+						result["type"] = "channel"
+						result["channel_id"] = metadata["snippet"].get("channelId")
+						result["channel_title"] = metadata["snippet"].get("title")
+						result["channel_description"] = metadata["snippet"].get("description")
+						result["channel_default_language"] = metadata["snippet"].get("defaultLanguage")
+						result["channel_country"] = metadata["snippet"].get("country")
+						result["channel_viewcount"] = metadata["statistics"].get("viewCount")
+						result["channel_commentcount"] = metadata["statistics"].get("commentCount")
+						result["channel_subscribercount"] = metadata["statistics"].get("subscriberCount")
+						result["channel_videocount"] = metadata["statistics"].get("videoCount")
+						# This one sometimes fails for some reason
+						if "topicDetails" in metadata:
+							result["channel_topic_ids"] = metadata["topicDetails"].get("topicIds")
+							result["channel_topic_categories"] = metadata["topicDetails"].get("topicCategories")
+						result["channel_branding_keywords"] = metadata.get("brandingSettings").get("channel").get("keywords")
+
+					results[result_id] = result
+
+			# Update status per response item
+			self.dataset.update_status("Got metadata from " + str(i * 50) + "/" + str(len(ids)) + " " + object_type + " YouTube URLs")
+
+		return results
+
+	def after_process(self):
+		"""
+		Override of the same function in processor.py
+		Used to notify of potential API rate limit errors.
+
+		"""
+		super().after_process()
+		if self.api_limit_reached:
+			self.dataset.update_status("YouTube API quota limit exceeded. Saving the results retreived thus far. To get all data, use your own API key, or try to split up the dataset and get the YouTube data over the course of a few days.")
+		elif self.invalid_api_key:
+			self.dataset.update_status("Invalid API key. Extracted YouTube links but did not retreive any video information.")
+		else:
+			self.dataset.update_status("Dataset saved.")
