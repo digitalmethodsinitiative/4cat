@@ -9,7 +9,7 @@ import io
 
 from backend.abstract.worker import BasicWorker
 from backend.lib.exceptions import QueryParametersException
-from backend.lib.helpers import get_software_version
+from backend.lib.helpers import get_software_version, strip_tags
 
 
 class SearchCustom(BasicWorker):
@@ -31,6 +31,7 @@ class SearchCustom(BasicWorker):
 		All work is done while uploading the data, so this just has to 'finish'
 		the job.
 		"""
+
 		self.job.finish()
 
 	def validate_query(query, request, user):
@@ -45,6 +46,7 @@ class SearchCustom(BasicWorker):
 		:param User user:  User object of user who has submitted the query
 		:return dict:  Safe query parameters
 		"""
+
 		# do we have an uploaded file?
 		if "data_upload" not in request.files:
 			raise QueryParametersException("No file was offered for upload.")
@@ -90,10 +92,15 @@ class SearchCustom(BasicWorker):
 
 		wrapped_upload.detach()
 
+		# Whether to strip the HTML tags
+		strip_html = False
+		if query.get("strip_html"):
+			strip_html = True
+
 		# return metadata - the filename is sanitised and serves no purpose at
 		# this point in time, but can be used to uniquely identify a dataset
 		disallowed_characters = re.compile(r"[^a-zA-Z0-9._+-]")
-		return {"filename": disallowed_characters.sub("", file.filename), "time": time.time(), "datasource": "custom", "board": "upload"}
+		return {"filename": disallowed_characters.sub("", file.filename), "time": time.time(), "datasource": "custom", "board": "upload", "strip_html": strip_html}
 
 	def after_create(query, dataset, request):
 		"""
@@ -107,8 +114,10 @@ class SearchCustom(BasicWorker):
 		:param request:  Flask request submitted for its creation
 		"""
 
+		strip_html = query.get("strip_html")
+
 		file = request.files["data_upload"]
-		
+
 		file.seek(0)
 
 		# Convert .tab files to comma delimited files
@@ -118,17 +127,29 @@ class SearchCustom(BasicWorker):
 			reader = csv.DictReader(wrapped_upload, delimiter="\t", quoting=csv.QUOTE_NONE)
 
 			# Write to csv
-			with dataset.get_results_path().open("w", encoding="utf-8", newline='') as output_csv:
+			with dataset.get_results_path().open("w", encoding="utf-8", newline="") as output_csv:
 				writer = csv.DictWriter(output_csv, fieldnames=reader.fieldnames)
 				writer.writeheader()
 				for row in reader:
+					if strip_html: # Possibly strip HTML
+						row["body"] = strip_tags(row["body"])
 					writer.writerow(row)
 
 			wrapped_upload.detach()
 
-		# With validated csvs, just save the raw file
 		else:
-			file.save(dataset.get_results_path().open("wb"))
+			# With validated csvs, just save the raw file
+			if not strip_html:
+				file.save(dataset.get_results_path().open("wb"))
+			else:
+				with dataset.get_results_path().open("w", encoding="utf-8", newline="") as output_csv:
+					wrapped_upload = io.TextIOWrapper(file, encoding="utf-8")
+					reader = csv.DictReader(wrapped_upload)
+					writer = csv.DictWriter(output_csv, fieldnames=reader.fieldnames)
+					writer.writeheader()
+					for row in reader:
+						row["body"] = strip_tags(row["body"])
+						writer.writerow(row)
 
 		file.close()
 
