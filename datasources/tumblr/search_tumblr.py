@@ -96,17 +96,15 @@ class SearchTumblr(Search):
 			
 			# First extract the notes of each post, and only keep text reblogs
 			text_reblogs = self.get_post_notes(posts_to_fetch)
-
+			
 			# Get the full data for text reblogs.
 			if text_reblogs:
-				self.dataset.update_status("Fetching text reblogs")
-				
 				# This has to be done one-by-one - fetching them all together is not supported by the Tumblr API.
-				for text_reblog in text_reblogs:
+				for i, text_reblog in enumerate(text_reblogs):
+					self.dataset.update_status("Got %i/%i text reblogs" % (i, len(text_reblogs)))
 					for key, value in text_reblog.items():
 						reblog_post = self.get_post_by_id(key, value)
 						reblog_post = self.parse_tumblr_posts([reblog_post], reblog=True)
-						
 						results.append(reblog_post[0])
 		
 		self.job.finish()
@@ -211,7 +209,14 @@ class SearchTumblr(Search):
 
 		before = None
 
+		# Do some counting
+		len_blogs = len(di_blogs_ids)
+		count = 0
+
 		for key, value in di_blogs_ids.items():
+
+			count += 1
+
 			if self.interrupted:
 				raise ProcessorInterruptedException("Interrupted while fetching post notes from Tumblr")
 
@@ -235,6 +240,8 @@ class SearchTumblr(Search):
 					# If there's no `_links` key, that's all.
 					else:
 						break
+
+			self.dataset.update_status("Got notes for post %i/%i" % (count, len_blogs))
 
 		return text_reblogs
 
