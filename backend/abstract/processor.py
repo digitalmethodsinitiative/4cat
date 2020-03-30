@@ -98,8 +98,12 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 				frames = traceback.extract_tb(e.__traceback__)
 				frames = [frame.filename.split("/").pop() + ":" + str(frame.lineno) for frame in frames[1:]]
 				location = "->".join(frames)
-
-				parent_key = self.dataset.get_genealogy()[0].key
+				
+				# Not all datasets have parent keys
+				if self.dataset.get_genealogy():
+					parent_key = self.dataset.get_genealogy()[0].key
+				else:
+					parent_key = ""
 
 				raise ProcessorException("Processor %s raised %s while processing dataset %s (via %s) in %s:\n   %s\n" % (self.type, e.__class__.__name__, self.dataset.key, parent_key, location, str(e)))
 
