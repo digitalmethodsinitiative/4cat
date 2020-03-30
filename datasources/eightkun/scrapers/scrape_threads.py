@@ -35,7 +35,7 @@ class ThreadScraper8kun(ThreadScraper4chan):
 		:return string: URL to scrape
 		"""
 		thread_id = self.job.data["remote_id"].split("/").pop()
-		url = "https://8kun.net/%s/res/%s.json" % (self.job.details["board"], thread_id)
+		url = "https://8kun.top/%s/res/%s.json" % (self.job.details["board"], thread_id)
 		return url
 
 	def queue_image(self, post, thread):
