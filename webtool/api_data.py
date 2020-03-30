@@ -16,7 +16,7 @@ from webtool import app, db, log, openapi, limiter
 from webtool.lib.helpers import format_post, error
 from backend.lib.helpers import strip_tags
 
-api_ratelimit = limiter.shared_limit("1 per second", scope="api")
+api_ratelimit = limiter.shared_limit("45 per minute", scope="api")
 
 
 @app.route('/api/<datasource>/<board>/thread/<int:thread_id>.json')
