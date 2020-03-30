@@ -27,7 +27,9 @@ class BoardScraper4chan(BasicJSONScraper):
 
 		:param dict data: The board data, parsed JSON data
 		"""
+		self.datasource = self.type.split("-")[0]
 		new_threads = 0
+
 		if not data:
 			self.log.error("No thread data from board scrape of %s/%s/" % (self.datasource, self.job.data["remote_id"]))
 			return False

@@ -262,10 +262,10 @@ class ThreadScraper4chan(BasicJSONScraper):
 		md5 = hashlib.md5()
 		md5.update(base64.b64decode(post["md5"]))
 
-		image_folder = Path(config.PATH_IMAGES)
+		image_folder = Path(config.PATH_ROOT, config.PATH_IMAGES)
 		image_path = image_folder.joinpath(md5.hexdigest() + post["ext"])
 
-		if image_folder.is_dir() and not image_path.is_file():
+		if config.PATH_IMAGES and image_folder.is_dir() and not image_path.is_file():
 			claimtime = int(time.time()) + config.IMAGE_INTERVAL
 
 			try:
