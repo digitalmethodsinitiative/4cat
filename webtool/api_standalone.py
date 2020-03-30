@@ -29,7 +29,7 @@ from backend.lib.queue import JobQueue
 from backend.lib.job import Job
 from backend.lib.dataset import DataSet
 
-api_ratelimit = limiter.shared_limit("1 per second", scope="api")
+api_ratelimit = limiter.shared_limit("45 per minute", scope="api")
 
 API_SUCCESS = 200
 API_FAIL = 404
