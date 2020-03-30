@@ -25,7 +25,7 @@ class RedditVoteChecker(BasicProcessor):
 	description = "Updates the scores for each post to more accurately reflect the real score. Can only be used on datasets with < 5,000 posts due to the heavy usage of the API this requires."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
-	datasource = ["reddit"]
+	datasources = ["reddit"]
 
 	input = "csv:body"
 	output = "csv"
