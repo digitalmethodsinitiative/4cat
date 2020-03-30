@@ -86,8 +86,8 @@ class BasicHTTPScraper(BasicWorker, metaclass=abc.ABCMeta):
 			# because it may indicate that the resource has been deleted
 			self.not_found()
 		else:
-			data = self.parse(data.content)
-			if data is None:
+			parsed_data = self.parse(data.content)
+			if parsed_data is None:
 				if self.job.data["attempts"] < 2:
 					self.log.info("Data for %s %s could not be parsed, retrying later" % (self.type, id))
 					self.job.release(delay=random.choice(range(15, 45)))  # try again later
@@ -98,7 +98,7 @@ class BasicHTTPScraper(BasicWorker, metaclass=abc.ABCMeta):
 				return
 
 			# finally, pass it on
-			self.process(data)
+			self.process(parsed_data)
 			self.after_process()
 
 	def after_process(self):
