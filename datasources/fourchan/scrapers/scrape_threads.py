@@ -96,7 +96,7 @@ class ThreadScraper4chan(BasicJSONScraper):
 		thread = self.register_thread(first_post, last_reply, last_post, num_replies=len(data["posts"]))
 
 		if not thread:
-			self.log.info("Thread %s/%s scraped, but no changes found" % (self.job.details["board"], first_post["no"]))
+			self.log.info("Thread %s/%s/%s scraped, but no changes found" % (self.datasource, self.job.details["board"], first_post["no"]))
 			return True
 
 		if thread["timestamp_deleted"] > 0:
