@@ -45,6 +45,7 @@ class SearchTumblr(Search):
 	def get_posts_simple(self, query):
 		"""
 		Fetches data from Tumblr via its API.
+
 		"""
 
 		# ready our parameters
@@ -213,6 +214,10 @@ class SearchTumblr(Search):
 		len_blogs = len(di_blogs_ids)
 		count = 0
 
+		# Stop trying to fetch the notes after this many retries
+		max_notes_retries = 10
+		notes_retries = 0
+
 		for key, value in di_blogs_ids.items():
 
 			count += 1
@@ -221,7 +226,7 @@ class SearchTumblr(Search):
 				raise ProcessorInterruptedException("Interrupted while fetching post notes from Tumblr")
 
 			# First, get the blog names and post_ids from reblogs
-			# Keep digging till there's nothing left
+			# Keep digging till there's nothing left, or if we can fetch no new notes
 			while True:
 
 				# Requests a post's notes
@@ -229,19 +234,32 @@ class SearchTumblr(Search):
 				
 				if only_text_reblogs:
 
-					for note in notes["notes"]:	
-						# If it's a reblog, extract the data and save the rest of the posts for later
-						if note["type"] == "reblog":
-							if note.get("added_text"):
-								text_reblogs.append({note["blog_name"]: note["post_id"]})
+					if "notes" in notes:
+						notes_retries = 0
 
-					if notes.get("_links"):
-						before = notes["_links"]["next"]["query_params"]["before_timestamp"]
-					# If there's no `_links` key, that's all.
+						for note in notes["notes"]:	
+							# If it's a reblog, extract the data and save the rest of the posts for later
+							if note["type"] == "reblog":
+								if note.get("added_text"):
+									text_reblogs.append({note["blog_name"]: note["post_id"]})
+
+						if notes.get("_links"):
+							before = notes["_links"]["next"]["query_params"]["before_timestamp"]
+						
+						# If there's no `_links` key, that's all.
+						else:
+							break
+
+					# If there's no "notes" key in the returned dict, something might be up
 					else:
+						self.log.error("Couldn't get notes for Tumblr request " + str(notes))
+						notes_retries += 1
+						pass
+
+					if notes_retries > max_notes_retries:
 						break
 
-			self.dataset.update_status("Got notes for post %i/%i" % (count, len_blogs))
+			self.dataset.update_status("Identified %i text reblogs in %i/%i notes" % (len(text_reblogs), count, len_blogs))
 
 		return text_reblogs
 
