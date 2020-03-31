@@ -108,7 +108,7 @@ if args.skip > 0:
 if args.fast:
 	print("Fast mode enabled.")
 
-with open(args.input) as inputfile:
+with open(args.input, encoding="utf-8") as inputfile:
 	postscsv = csv.DictReader(inputfile, fieldnames=FourPlebs.columns, dialect=FourPlebs)
 
 	postbuffer = []
