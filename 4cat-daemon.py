@@ -94,15 +94,18 @@ def start():
 	return True
 
 
-def stop():
+def stop(signal=15):
 	"""
 	Stop the backend daemon, if it is running
 
 	Sends a SIGTERM signal - this is intercepted by the daemon after which it
 	shuts down gracefully.
 
+	:param int signal:  Kill signal, defaults to 15/SIGTERM
+
 	:return bool:   True if the backend was running (and a shut down signal was
 					sent, False if not.
+
 	"""
 	if lockfile.is_file():
 		# see if the listed process is actually running right now
@@ -114,8 +117,9 @@ def stop():
 			return False
 
 		# tell the backend to stop
-		os.system("kill %s" % str(pid))
-		print("...sending SIGTERM to process %i. Waiting for backend to quit..." % pid)
+		signame = {9: "SIGKILL", 15: "SIGTERM"}.get(signal, "-%s" % str(signal))
+		os.system("kill -%s %s" % (str(signal), str(pid)))
+		print("...sending %s to process %i. Waiting for backend to quit..." % (signame, pid))
 
 		# periodically check if the process has quit
 		starttime = time.time()
@@ -127,7 +131,10 @@ def stop():
 				return False
 			time.sleep(1)
 
-		# backend quit gracefully
+		if signal == 9 and lockfile.is_file():
+			# SIGKILL doesn't clean up the pidfile, so we do it here
+			os.unlink(lockfile)
+
 		print("...4CAT Backend stopped.")
 		return True
 	else:
@@ -137,11 +144,11 @@ def stop():
 
 
 # display manual if invalid command was given
-manual = """Usage: python(3) backend.py <start|stop|restart|status>
+manual = """Usage: python(3) backend.py <start|stop|restart|force-restart|status>
 
 Starts, stops or restarts the 4CAT backend daemon.
 """
-if len(sys.argv) < 2 or sys.argv[1].lower() not in ("start", "stop", "restart", "status"):
+if len(sys.argv) < 2 or sys.argv[1].lower() not in ("start", "stop", "restart", "status", "force-restart"):
 	print(manual)
 	sys.exit(1)
 
@@ -169,6 +176,14 @@ elif command == "stop":
 	# stop
 	print("Stopping 4CAT Backend Daemon...")
 	stop()
+elif command == "force-restart":
+	# force quit and start
+	print("Force-restarting 4CAT Backend Daemon...")
+	# restart daemon, but only if it's already running and could successfully be stopped
+	stopped = stop(9)
+	if stopped:
+		print("...starting 4CAT Backend Daemon...")
+		start()
 elif command == "status":
 	# show whether the daemon is currently running
 	if not pid:
