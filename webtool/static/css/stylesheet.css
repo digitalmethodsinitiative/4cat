@@ -348,13 +348,15 @@ h1 a {
     color: var(--contrast-bright);
     box-shadow: 0 5px 10px #888;
     border: 1em solid var(--contrast-dark);
-    border-width: 0.4em 0;
+    border-width: 0.4em 0 0 0;
 }
 
 .main-nav ul {
     list-style: none;
     text-align: center;
-    margin: 0.25em 0;
+    margin: 0.25em 0 0 0;
+    padding-bottom: 0.5em;
+    background: var(--contrast-dark);
 }
 
 .main-nav li {
@@ -373,6 +375,20 @@ h1 a {
 
 .main-nav li a:hover, .main-nav li a:focus {
     text-decoration: underline;
+}
+
+.site-announcement {
+    text-align: center;
+    background: var(--accent);
+    color: var(--contrast-bright);
+    padding: 0.5em 0;
+}
+
+.site-announcement p::before {
+    font-family: 'Font Awesome 5 Pro', 'Font Awesome 5 Free';
+    content: '\f0f3';
+    margin-right: 0.5em;
+    font-weight: bold;
 }
 
 

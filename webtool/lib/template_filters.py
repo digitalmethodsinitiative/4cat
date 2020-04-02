@@ -4,6 +4,7 @@ import json
 import uuid
 import os
 
+from pathlib import Path
 from urllib.parse import urlencode
 from webtool import app
 
@@ -111,9 +112,12 @@ def inject_now():
 		"""
 		return str(uuid.uuid4())
 
+	announcement_file = Path(config.PATH_ROOT, "ANNOUNCEMENT.md")
+
 	return {
 		"__datenow": datetime.datetime.utcnow(),
 		"__tool_name": config.TOOL_NAME,
 		"__tool_name_long": config.TOOL_NAME_LONG,
+		"__announcement": announcement_file.open().read().strip() if announcement_file.exists() else None,
 		"uniqid": uniqid
 	}
