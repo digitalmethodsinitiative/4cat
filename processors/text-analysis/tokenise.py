@@ -94,7 +94,7 @@ class Tokenise(BasicProcessor):
 				"stopwords-iso-all": "Multi-language stopwords (stopwords-iso)",
 				#"wordlist-infochimps-english": "English word list (infochimps)",
 				"wordlist-googlebooks-english": "English word list (Google One Million Books pre-2008 top unigrams, recommended)",
-				"wordlist-cracklib-english": "English word list (cracklib)",
+				"wordlist-cracklib-english": "English word list (cracklib, warning: computationally heavy)",
 				"wordlist-opentaal-dutch": "Dutch word list (OpenTaal)",
 				#"wordlist-unknown-dutch": "Dutch word list (unknown origin, larger than OpenTaal)"
 			},
