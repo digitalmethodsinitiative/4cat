@@ -38,7 +38,8 @@ article.result > section:first-child {
 
 /** result card **/
 .metadata-wrapper div.notice {
-    color: var(--warning);
+    color: var(--accent-alternate);
+    background: var(--contrast-bright);
     text-align: center;
     padding: 0.5em;
 }
