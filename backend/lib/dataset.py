@@ -34,6 +34,7 @@ class DataSet:
 	children = []
 	processors = {}
 	genealogy = []
+	parameters = {}
 
 	db = None
 	folder = None
@@ -223,7 +224,7 @@ class DataSet:
 		instead refers to the same file as the original dataset did
 		:return Dataset:  Copied dataset
 		"""
-		parameters = self.parameters
+		parameters = self.parameters.copy()
 
 		# a key is partially based on the parameters. so by setting these extra
 		# attributes, we also ensure a unique key will be generated for the
