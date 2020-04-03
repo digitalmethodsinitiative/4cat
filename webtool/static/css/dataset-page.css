@@ -38,7 +38,8 @@ article.result > section:first-child {
 
 /** result card **/
 .metadata-wrapper div.notice {
-    color: var(--warning);
+    color: var(--accent-alternate);
+    background: var(--contrast-bright);
     text-align: center;
     padding: 0.5em;
 }
@@ -125,7 +126,7 @@ article.result > section:first-child {
     position: absolute;
     top: 1.25em;
     left: -1.5em;
-    font-family: 'Font Awesome 5 Pro';
+    font-family: 'Font Awesome 5 Pro', 'Font Awesome 5 Free';
     font-weight: 900;
     content: '\f347';
     color: var(--gray-dark);

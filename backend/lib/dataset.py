@@ -1,7 +1,7 @@
 import collections
 import hashlib
 import random
-import typing
+import shutil
 import json
 import time
 import re
@@ -26,17 +26,20 @@ class DataSet:
 	The data is usually stored in a file on the disk; the parameters are stored
 	in a database. The handling of the data, et cetera, is done by other
 	workers; this class defines method to create and manipulate the dataset's
-	properties.x
+	properties.
 	"""
-	db = None
-	data = None
-	folder = None
-	parameters = {}
-	is_new = True
+	data = {}
+	key = ""
 
 	children = []
 	processors = {}
 	genealogy = []
+	parameters = {}
+
+	db = None
+	folder = None
+	is_new = True
+	no_status_updates = False
 
 	def __init__(self, parameters={}, key=None, job=None, data=None, db=None, parent=None, extension="csv",
 				 type="search"):
@@ -57,28 +60,28 @@ class DataSet:
 			if not current:
 				raise TypeError("DataSet() requires a valid dataset key for its 'key' argument, \"%s\" given" % key)
 
-			self.dataset = current["query"]
+			query = current["query"]
 		elif job is not None:
 			current = self.db.fetchone("SELECT * FROM datasets WHERE parameters::json->>'job' = %s", (job,))
 			if not current:
 				raise TypeError("DataSet() requires a valid job ID for its 'job' argument")
 
-			self.dataset = current["query"]
+			query = current["query"]
 			self.key = current["key"]
 		elif data is not None:
 			current = data
 			if "query" not in data or "key" not in data or "parameters" not in data or "key_parent" not in data:
 				raise ValueError("DataSet() requires a complete dataset record for its 'data' argument")
 
-			self.dataset = current["query"]
+			query = current["query"]
 			self.key = current["key"]
 		else:
 			if parameters is None:
 				raise TypeError("DataSet() requires either 'key', or 'parameters' to be given")
 
-			self.dataset = self.get_label(parameters, default=type)
-			self.key = self.get_key(self.dataset, parameters, parent)
-			current = self.db.fetchone("SELECT * FROM datasets WHERE key = %s AND query = %s", (self.key, self.dataset))
+			query = self.get_label(parameters, default=type)
+			self.key = self.get_key(query, parameters, parent)
+			current = self.db.fetchone("SELECT * FROM datasets WHERE key = %s AND query = %s", (self.key, query))
 
 		if current:
 			self.data = current
@@ -211,6 +214,46 @@ class DataSet:
 			"num_rows": self.data["num_rows"],
 			"status": self.data["status"]
 		}, where={"key": self.key})
+
+	def copy(self, shallow=True):
+		"""
+		Copies the dataset, making a new version with a unique key
+
+
+		:param bool shallow:  Shallow copy: does not copy the result file, but
+		instead refers to the same file as the original dataset did
+		:return Dataset:  Copied dataset
+		"""
+		parameters = self.parameters.copy()
+
+		# a key is partially based on the parameters. so by setting these extra
+		# attributes, we also ensure a unique key will be generated for the
+		# copy
+		# possibly todo: don't use time for uniqueness (but one shouldn't be
+		# copying a dataset multiple times per microsecond, that's not what
+		# this is for)
+		parameters["copied_from"] = self.key
+		parameters["copied_at"] = time.time()
+
+		copy = DataSet(parameters=parameters, db=self.db, extension=self.result_file.split(".")[-1], type=self.type)
+		for field in self.data:
+			if field in ("id", "key", "timestamp", "job", "parameters", "result_file"):
+				continue
+
+			copy.__setattr__(field, self.data[field])
+
+		if shallow:
+			# use the same result file
+			copy.result_file = self.result_file
+		else:
+			# copy to new file with new key
+			shutil.copy(self.get_results_path(), copy.get_results_path())
+
+		if self.is_finished():
+			copy.finish(self.num_rows)
+
+		return copy
+
 
 
 	def delete(self):
@@ -361,7 +404,7 @@ class DataSet:
 		"""
 		return self.data["status"]
 
-	def update_status(self, status):
+	def update_status(self, status, is_final=False):
 		"""
 		Update dataset status
 
@@ -371,10 +414,19 @@ class DataSet:
 		updated.
 
 		:param string status:  Dataset status
+		:param bool is_final:  If this is `True`, subsequent calls to this
+		method while the object is instantiated will not update the dataset
+		status.
 		:return bool:  Status update successful?
 		"""
+		if self.no_status_updates:
+			return
+
 		self.data["status"] = status
 		updated = self.db.update("datasets", where={"key": self.data["key"]}, data={"status": status})
+
+		if is_final:
+			self.no_status_updates = True
 
 		return updated > 0
 
@@ -563,6 +615,12 @@ class DataSet:
 		"""
 		self.db.update("datasets", where={"key": self.key}, data={"key_parent": key_parent})
 
+	def detach(self):
+		"""
+		Makes the datasets standalone, i.e. not having any parent dataset
+		"""
+		self.link_parent("")
+
 	def __getattr__(self, attr):
 		"""
 		Getter so we don't have to use .data all the time
@@ -580,3 +638,34 @@ class DataSet:
 			return self.data[attr]
 		else:
 			raise KeyError("DataSet instance has no attribute %s" % attr)
+
+	def __setattr__(self, attr, value):
+		"""
+		Setter so we can flexibly update the database
+
+		Also updates internal data stores (.data etc). If the attribute is
+		unknown, it is stored within the 'parameters' attribute.
+
+		:param str attr:  Attribute to update
+		:param value:  New value
+		"""
+
+		# don't override behaviour for *actual* class attributes
+		if attr in dir(self):
+			super().__setattr__(attr, value)
+			return
+
+		if attr not in self.data:
+			self.parameters[attr] = value
+			attr = "parameters"
+			value = self.parameters
+
+		if attr == "parameters":
+			value = json.dumps(value)
+
+		self.db.update("datasets", where={"key": self.key}, data={attr: value})
+
+		self.data[attr] = value
+
+		if attr == "parameters":
+			self.parameters = json.loads(value)
