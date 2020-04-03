@@ -1,14 +1,18 @@
 {% set item = child %}
 {% set can_process = (current_user.is_authenticated and item.processors) %}
+{% set deprecated = (item.type not in processors) %}
+{% set is_filtered = (not deprecated and processors[item.type].is_filter) %}
 
 <li id="child-{{ item.key }}" data-dataset-key="{{ item.key }}" class="child-wrapper{% if not item.is_finished() %} running{% endif %}" data-status="{{ item.status }}">
     {# The status button for this processor #}
-    <div class="processor-result-indicator button-wrap {{processors[item.type].id}}-button {% if 'queued' in item.status|lower %} queued-button{% endif %} {% if not item.is_finished() %} pending{% elif item.num_rows == 0 %} failed{% else %} finished {% endif %}">
+    
+    <div class="processor-result-indicator button-wrap {{ processors[item.type].id if not deprecated else 'deprecated' }}-button {% if 'queued' in item.status|lower %} queued-button{% endif %} {% if not item.is_finished() %} pending{% elif item.num_rows == 0 %} failed{% else %} finished {% endif %}">
+    
     <div class="button-object">
+
+    {% if item.is_finished() and not is_filtered %}<a href="/result/{{ item.result_file }}">{% endif %}
         <span class="headline">
-            {% if item.is_finished() and not processors[item.type].is_filter %}<a href="/result/{{ item.result_file }}">{% endif %}
-            {% if item.is_finished() and processors[item.type].is_filter and "copied_to" in item.parameters %}<a href="/result/{{ item.parameters.copied_to }}/">{% endif %}
-            {% if processors[item.type].is_filter %}
+            {% if is_filtered %}
             <i class="fa fa-filter" aria-hidden="true"></i> <span class="sr-only">Filter</span>
             {% elif item.is_finished() and item.num_rows > 0 %}
             <i class="fa fa-download" aria-hidden="true"></i> <span class="sr-only">Download</span> {{ processors[item.type].extension if item.type in processors else "" }}, {{ item.get_results_path()|filesize_short }}
@@ -19,34 +23,28 @@
             {% else %}
             <i class="fa fa-spin fa-sync-alt" aria-hidden="true"></i>
             {% endif %}
-            {% if item.is_finished() and ("copied_to" in item.parameters or not processors[item.type].is_filter) %}</a>{% endif %}
         </span>
         <span class="byline">
-            {% if item.is_finished() and not processors[item.type].is_filter %}<a href="/result/{{ item.result_file }}">{% endif %}
-            {% if item.is_finished() and processors[item.type].is_filter and "copied_to" in item.parameters %}<a href="/result/{{ item.parameters.copied_to }}/">{% endif %}
             {% if item.is_finished() and item.num_rows != 0 %}
-                {% if processors[item.type].is_filter %}
-                    {% if "copied_to" in item.parameters %}
-                        <a href="/results/{{ item.parameters.copied_to }}">New dataset</a>
-                    {% else %}
-                        Filtered
-                    {% endif %}
+                {% if is_filtered %}
+                    Filtered
                 {% else %}
                 <span class="tooltip-trigger" aria-controls="tooltip-metadata-{{ item.key }}" aria-hidden="true">
                 <i class="fa fa-file-alt" aria-hidden="true"></i> <span class="sr-only" id="dataset-{{ item.key }}-result-count" data-num-results="{{ item.num_rows }}">Items:</span> {{ "{:,}".format(item.num_rows) }}
                 </span>
-                <span role="tooltip" id="tooltip-metadata-{{ item.key }}" aria-hidden="true">{{ "{:,}".format(item.num_rows) }} {{processors[item.type].extension|ext2noun}}{% if item.num_rows != 1 %}s{% endif %}</span>
+                <p role="tooltip" id="tooltip-metadata-{{ item.key }}" aria-hidden="true">{{ "{:,}".format(item.num_rows) }} {{processors[item.type].extension|ext2noun if not deprecated else ""}}{% if item.num_rows != 1 %}s{% endif %}</p>
                 {% endif %}
             {% elif item.is_finished() %}
-                {% if processors[item.type].is_filter %}{% if item.num_rows == 0 %}No posts left{% else %}Filter failed{% endif %}{% else %}No results{% endif %}
+                {% if is_filtered %}{% if item.num_rows == 0 %}No posts left{% else %}Filter failed{% endif %}{% else %}No results{% endif %}
             {% elif "queued" in item.status|lower %}
-                {% if processors[item.type].is_filter %}Filter queued{% else %}Queued{% endif %}
+                {% if is_filtered %}Filter queued{% else %}Queued{% endif %}
             {% else %}
-                {% if processors[item.type].is_filter %}Filtering...{% else %}In progress{% endif %}
+                {% if is_filtered %}Filtering...{% else %}In progress{% endif %}
             {% endif %}
-            {% if item.is_finished() and ("copied_to" in item.parameters or not processors[item.type].is_filter) %}</a>{% endif %}
         </span>
         <span class="queue-notice"></span>
+   
+    {% if item.is_finished() and not is_filtered %}</a>{% endif %}
     </div>
     </div>
 
@@ -54,15 +52,14 @@
     <div class="processor-header">
         <header>
             <button class="tooltip-trigger" aria-controls="tooltip-processor-result-{{ item.key }}" aria-label="Post-processor details">?</button>
-            <p role="tooltip" id="tooltip-processor-result-{{ item.key }}">{{ processors[item.type].description if item.type in processors else "This analysis module has been deprecated but you can still download the result." }}</p>
-            <h4>{{ processors[item.type].name if item.type in processors else "(Deprecated analysis) " + item.type }}</h4>
+            <p role="tooltip" id="tooltip-processor-result-{{ item.key }}">{{ processors[item.type].description if not deprecated else "This analysis module has been deprecated but you can still download the result." }}</p>
+            <h4>{{ processors[item.type].name if not deprecated else "(Deprecated analysis) " + item.type }}</h4>
         </header>
 
         <span class="processor-status">
             {% if item.is_finished() and item.num_rows == 0 %}No results.{% endif %}
             {{ item.status }}
         </span>
-
 
         {# Parameters #}
         <div class="parameters">
