@@ -128,6 +128,7 @@ class ModuleCollector:
 						"module": relative_path[1:-3].replace("/", "."),
 						"id": component[1].type,
 						"name": component[0],
+						"class_name": component[0],
 						"max": component[1].max_workers
 					}
 
