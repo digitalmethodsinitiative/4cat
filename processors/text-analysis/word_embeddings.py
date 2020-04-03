@@ -116,7 +116,8 @@ class word_embeddings(BasicProcessor):
 				# word2vec - more types to follow
 				if self.parameters.get("model_type") == "word2vec":
 					if tokens:
-						# Train that data!
+
+						# Train that datar!
 						model = self.train_w2v_model(tokens)
 						
 						# Too token datasets with too little data (< 10 posts) will be skipped
@@ -177,8 +178,8 @@ class word_embeddings(BasicProcessor):
 		else:
 			sg = 0
 
-		# Skip tokenset with less than ten posts
-		if len(tokens) < 10:
+		# Skip tokenset with less than a thousand posts
+		if len(tokens) < 1000:
 			return None
 
 		# Train the model!
