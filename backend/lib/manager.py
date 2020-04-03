@@ -1,8 +1,10 @@
 """
 The heart of the app - manages jobs and workers
 """
+import importlib
 import signal
 import time
+import sys
 
 from backend import all_modules
 from backend.lib.keyboard import KeyPoller
@@ -90,7 +92,8 @@ class WorkerManager:
 					try:
 						self.log.debug("Starting new worker for job %s" % jobtype)
 						job.claim()
-						worker = worker_info["class"](logger=self.log, manager=self, job=job, modules=all_modules)
+						worker_class = self.load_worker_class(worker_info)
+						worker = worker_class(logger=self.log, manager=self, job=job, modules=all_modules)
 						worker.start()
 						self.worker_pool[jobtype].append(worker)
 					except JobClaimedException:
@@ -165,3 +168,19 @@ class WorkerManager:
 
 		# now stop looping (i.e. accepting new jobs)
 		self.looping = False
+
+	def load_worker_class(self, metadata):
+		"""
+		Get class for worker
+
+		This import worker modules on-demand, so the code is only loaded if a
+		worker that needs the code is actually queued and run
+
+		:return:  Worker class for the given worker metadata
+		"""
+		module = metadata["module"]
+
+		if module not in sys.modules:
+			importlib.import_module(module)
+
+		return getattr(sys.modules[module], metadata["name"])
