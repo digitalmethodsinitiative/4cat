@@ -320,9 +320,12 @@ def show_result(key):
 	except TypeError:
 		abort(404)
 
-	# child datasets are not available via a separate page
+	# child datasets are not available via a separate page - redirect to parent
 	if dataset.key_parent:
-		abort(404)
+		genealogy = dataset.get_genealogy()
+		nav = ",".join([family.key for family in genealogy])
+		url = "/results/%s/#nav=%s" % (genealogy[0].key, nav)
+		return redirect(url)
 
 	# load list of processors compatible with this dataset
 	is_processor_running = False

@@ -30,6 +30,7 @@ data/
 webtool/fourcat/static/boards.json
 stats.json
 news.json
+ANNOUNCEMENT.md
 startup/
 build/
 dist/
