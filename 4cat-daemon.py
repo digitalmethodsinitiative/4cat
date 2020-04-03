@@ -94,7 +94,7 @@ def start():
 	return True
 
 
-def stop(signal=15):
+def stop(force=False):
 	"""
 	Stop the backend daemon, if it is running
 
@@ -107,6 +107,8 @@ def stop(signal=15):
 					sent, False if not.
 
 	"""
+	killed=False
+
 	if lockfile.is_file():
 		# see if the listed process is actually running right now
 		with lockfile.open() as file:
@@ -117,21 +119,25 @@ def stop(signal=15):
 			return False
 
 		# tell the backend to stop
-		signame = {9: "SIGKILL", 15: "SIGTERM"}.get(signal, "-%s" % str(signal))
-		os.system("kill -%s %s" % (str(signal), str(pid)))
-		print("...sending %s to process %i. Waiting for backend to quit..." % (signame, pid))
+		os.system("kill -15 %s" % str(pid))
+		print("...sending SIGTERM to process %i. Waiting for backend to quit..." % pid)
 
 		# periodically check if the process has quit
 		starttime = time.time()
 		while pid in psutil.pids():
 			nowtime = time.time()
-			if nowtime - starttime > 60:
+			if nowtime - starttime > 60 and not killed:
 				# give up if it takes too long
-				print("...error: the 4CAT backend daemon did not quit within 60 seconds. Something probably crashed.")
-				return False
+				if force == True:
+					os.system("kill -9 %s" % str(pid))
+					print("...error: the 4CAT backend daemon did not quit within 60 seconds. Sending SIGKILL...")
+					killed = True
+				else:
+					print("...error: the 4CAT backend daemon did not quit within 60 seconds. A worker may not have quit (yet).")
+					return False
 			time.sleep(1)
 
-		if signal == 9 and lockfile.is_file():
+		if killed and lockfile.is_file():
 			# SIGKILL doesn't clean up the pidfile, so we do it here
 			os.unlink(lockfile)
 
@@ -161,10 +167,10 @@ else:
 	pid = None
 
 # interpret commands
-if command == "restart":
+if command in ("restart", "force-restart"):
 	print("Restarting 4CAT Backend Daemon...")
 	# restart daemon, but only if it's already running and could successfully be stopped
-	stopped = stop()
+	stopped = stop(force=(command == "force-restart"))
 	if stopped:
 		print("...starting 4CAT Backend Daemon...")
 		start()
@@ -176,14 +182,6 @@ elif command == "stop":
 	# stop
 	print("Stopping 4CAT Backend Daemon...")
 	stop()
-elif command == "force-restart":
-	# force quit and start
-	print("Force-restarting 4CAT Backend Daemon...")
-	# restart daemon, but only if it's already running and could successfully be stopped
-	stopped = stop(9)
-	if stopped:
-		print("...starting 4CAT Backend Daemon...")
-		start()
 elif command == "status":
 	# show whether the daemon is currently running
 	if not pid:
