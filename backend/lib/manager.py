@@ -183,4 +183,4 @@ class WorkerManager:
 		if module not in sys.modules:
 			importlib.import_module(module)
 
-		return getattr(sys.modules[module], metadata["name"])
+		return getattr(sys.modules[module], metadata["class_name"])
