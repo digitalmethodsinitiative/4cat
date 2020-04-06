@@ -216,10 +216,11 @@ def queue_dataset():
 		return error(404, message="Datasource '%s' has no search interface" % datasource_id)
 
 	search_worker = backend.all_modules.workers[search_worker_id]
+	worker_class = backend.all_modules.load_worker_class(search_worker)
 
-	if hasattr(search_worker["class"], "validate_query"):
+	if hasattr(worker_class, "validate_query"):
 		try:
-			sanitised_query = search_worker["class"].validate_query(request.form.to_dict(), request, current_user)
+			sanitised_query = worker_class.validate_query(request.form.to_dict(), request, current_user)
 		except QueryParametersException as e:
 			return "Invalid query. %s" % e
 	else:
@@ -231,8 +232,8 @@ def queue_dataset():
 
 	dataset = DataSet(parameters=sanitised_query, db=db, type="search")
 
-	if hasattr(search_worker["class"], "after_create"):
-		search_worker["class"].after_create(sanitised_query, dataset, request)
+	if hasattr(worker_class, "after_create"):
+		worker_class.after_create(sanitised_query, dataset, request)
 
 	queue.add_job(jobtype=search_worker_id, remote_id=dataset.key)
 

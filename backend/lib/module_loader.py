@@ -261,6 +261,21 @@ class ModuleCollector:
 		except pickle.UnpicklingError:
 			return None
 
+	def load_worker_class(self, worker):
+		"""
+		Get class for worker
+
+		This import worker modules on-demand, so the code is only loaded if a
+		worker that needs the code is actually queued and run
+
+		:return:  Worker class for the given worker metadata
+		"""
+		module = worker["module"]
+		if module not in sys.modules:
+			importlib.import_module(module)
+
+		return getattr(sys.modules[module], worker["class_name"])
+
 	@staticmethod
 	def get_cache_path():
 		"""
