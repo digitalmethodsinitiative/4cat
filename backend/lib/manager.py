@@ -20,6 +20,7 @@ class WorkerManager:
 	log = None
 
 	worker_pool = {}
+	job_mapping = {}
 	pool = []
 	looping = True
 
@@ -92,7 +93,7 @@ class WorkerManager:
 					try:
 						self.log.debug("Starting new worker for job %s" % jobtype)
 						job.claim()
-						worker_class = self.load_worker_class(worker_info)
+						worker_class = all_modules.load_worker_class(worker_info)
 						worker = worker_class(logger=self.log, manager=self, job=job, modules=all_modules)
 						worker.start()
 						self.worker_pool[jobtype].append(worker)
@@ -169,18 +170,22 @@ class WorkerManager:
 		# now stop looping (i.e. accepting new jobs)
 		self.looping = False
 
-	def load_worker_class(self, metadata):
+
+	def request_interrupt(self, job, interrupt_level):
 		"""
-		Get class for worker
 
-		This import worker modules on-demand, so the code is only loaded if a
-		worker that needs the code is actually queued and run
-
-		:return:  Worker class for the given worker metadata
+		:param Job job:
+		:return:
 		"""
-		module = metadata["module"]
 
-		if module not in sys.modules:
-			importlib.import_module(module)
+		# find worker for given job
+		if job.data["jobtype"] not in self.worker_pool:
+			# no jobs of this type currently known
+			return
 
-		return getattr(sys.modules[module], metadata["class_name"])
+		for worker in self.worker_pool[job.data["jobtype"]]:
+			if worker.job.data["id"] == job.data["id"]:
+				worker.request_abort(interrupt_level)
+				return
+
+		# todo: trip cancellable pg queries associated with worker
