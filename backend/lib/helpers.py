@@ -219,8 +219,13 @@ def call_api(action, payload=None):
 	connection.sendall(msg.encode("ascii", "ignore"))
 
 	try:
-		response = connection.recv(2048)
-		response = response.decode("ascii", "ignore")
+		response = ""
+		while True:
+			bytes = connection.recv(2048)
+			if not bytes:
+				break
+
+			response += bytes.decode("ascii", "ignore")
 	except (socket.timeout, TimeoutError):
 		response = "(Connection timed out)"
 
