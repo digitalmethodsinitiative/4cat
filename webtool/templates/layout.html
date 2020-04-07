@@ -36,6 +36,9 @@
             {% if current_user.is_authenticated and not current_user.is_special() %}
                 <li><a href="/access-tokens">API Access</a></li>
             {% endif %}
+            {% if current_user.is_admin() %}
+                <li><a href="/admin/">Control Panel</a></li>
+            {% endif %}
 		</ul>
     {% if __announcement %}
         <div class="site-announcement">{{ __announcement|markdown|safe }}</div>
