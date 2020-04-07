@@ -1,5 +1,6 @@
 @import url('reset.css');
 @import url('dataset-page.css');
+@import url('control-panel.css');
 
 
 /** --------------------- *
@@ -233,6 +234,11 @@ nav > ul.flat > li {
 nav > ul.flat > li:not(:last-child)::after {
     content: '\2022';
     margin-left: 0.5em;
+}
+
+.content-container .content-placeholder {
+    padding: 0.5em 1em;
+    text-align: center;
 }
 
 

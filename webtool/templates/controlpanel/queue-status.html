@@ -1,0 +1,11 @@
+<ol class="worker-list">
+{% for worker in queue %}
+    {% set worker_uniqid = uniqid() %}
+    <li>
+    <h4>
+        {% if worker in worker_types %}{{ worker_types[worker].name }}{% else %}{{ worker }}{% endif %}
+    </h4>
+    <p>x {{ queue[worker] }}</p>
+    </li>
+{% endfor %}
+</ol>

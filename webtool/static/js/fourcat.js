@@ -14,12 +14,17 @@ function init() {
     setInterval(query.update_status, 4000);
 
     // Check search queue
-    query.check_search_queue();
-    setInterval(query.check_search_queue, 8000);
+    if($('#search-queue-status .search-queue-message') || $('#search-queue-status .search-queue-list')) {
+        query.check_search_queue();
+        setInterval(query.check_search_queue, 8000);
+    }
 
     // Check processor queue
     query.check_processor_queue();
     setInterval(query.check_processor_queue, 10000);
+
+    // Update dynamic containers
+    setInterval(dynamic_container.refresh, 2500);
 
     // Start querying when go button is clicked
     $('#query-form').on('submit', function (e) {
@@ -745,6 +750,36 @@ popup = {
         $('#popup .content').html('');
         $('#blur').attr('aria-expanded', false);
         $('#popup').attr('aria-expanded', false);
+    }
+};
+
+/**
+ * Dynamic panels
+ */
+dynamic_container = {
+    refresh: function() {
+        $('.content-container').each(function() {
+            let url = $(this).attr('data-source');
+            let interval = parseInt($(this).attr('data-interval'));
+            let previous = $(this).attr('data-last-call');
+            if(!previous) {
+                previous = 0;
+            }
+
+            let now = Math.floor(Date.now() / 1000);
+            if((now - previous) < interval) {
+                return;
+            }
+
+            let container = $(this);
+            $.get({'url': url, 'success': function(response) {
+                if(response === container.html()) {
+                    return;
+                }
+                container.html(response);
+                container.attr('data-last-call', Math.floor(Date.now() / 1000));
+            }, 'error': function() { container.attr('data-last-call', Math.floor(Date.now() / 1000)); }})
+        });
     }
 };
 
