@@ -135,7 +135,7 @@ class InternalAPI(BasicWorker):
 
 		try:
 			response = client.sendall(response.encode("ascii"))
-		except BrokenPipeError:
+		except (BrokenPipeError, ConnectionError):
 			response = None
 
 		return response
