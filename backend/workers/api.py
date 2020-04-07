@@ -133,9 +133,8 @@ class InternalAPI(BasicWorker):
 		except (json.JSONDecodeError, InternalAPIException):
 			response = json.dumps({"error": "Invalid JSON"})
 
-
 		try:
-			response = client.sendall(json.dumps({"error": False, "response": response}).encode("ascii"))
+			response = client.sendall(response.encode("ascii"))
 		except BrokenPipeError:
 			response = None
 
