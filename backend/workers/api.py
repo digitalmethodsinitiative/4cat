@@ -95,7 +95,11 @@ class InternalAPI(BasicWorker):
 			buffer = ""
 			while True:
 				# receive data in 1k chunks
-				data = client.recv(1024).decode("ascii")
+				try:
+					data = client.recv(1024).decode("ascii")
+				except UnicodeDecodeError:
+					raise InternalAPIException
+
 				buffer += data
 				if not data or data.strip() == "" or len(data) > 2048:
 					break
@@ -187,6 +191,33 @@ class InternalAPI(BasicWorker):
 					response["1d"] += 1
 
 			return response
+
+		if request == "worker-status":
+			open_jobs = self.db.fetchall("SELECT * FROM jobs ORDER BY jobtype ASC, timestamp ASC, remote_id ASC")
+			response = []
+
+			for job in open_jobs:
+				try:
+					worker = list(filter(lambda worker: worker.job.data["jobtype"] == job["jobtype"] and worker.job.data["remote_id"] == job["remote_id"], self.manager.worker_pool.get(job["jobtype"], [])))[0]
+				except IndexError:
+					worker = None
+
+				response.append({
+					"type": job["jobtype"],
+					"is_claimed": job["timestamp_claimed"] > 0,
+					"is_running": bool(worker),
+					"is_processor": hasattr(worker, "dataset"),
+					"is_recurring": (int(job["interval"]) > 0),
+					"is_maybe_crashed": job["timestamp_claimed"] > 0 and not worker,
+					"dataset_key": worker.dataset.key if hasattr(worker, "dataset") else None,
+					"dataset_parent_key": worker.dataset.top_key() if hasattr(worker, "dataset") else None,
+					"dataset_parent_user": worker.dataset.get_genealogy()[0].parameters.get("user", "") if hasattr(worker, "dataset") else None,
+					"timestamp_queued": job["timestamp"],
+					"timestamp_claimed": job["timestamp_lastclaimed"]
+				})
+
+			return response
+
 
 
 		# no appropriate response
