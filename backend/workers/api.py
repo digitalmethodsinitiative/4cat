@@ -128,10 +128,18 @@ class InternalAPI(BasicWorker):
 			response = self.process_request(payload["request"], payload)
 			if not response:
 				raise InternalAPIException
-		except (json.JSONDecodeError, InternalAPIException):
-			return client.sendall(json.dumps({"error": "Invalid JSON"}).encode("ascii"))
 
-		return client.sendall(json.dumps({"error": False, "response": response}).encode("ascii"))
+			response = json.dumps({"error": False, "response": response}
+		except (json.JSONDecodeError, InternalAPIException):
+			response = json.dumps({"error": "Invalid JSON"})
+
+
+		try:
+			response = client.sendall(json.dumps({"error": False, "response": response}).encode("ascii"))
+		except BrokenPipeError:
+			response = None
+
+		return response
 
 	def process_request(self, request, payload):
 		"""
