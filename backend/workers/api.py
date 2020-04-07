@@ -129,7 +129,7 @@ class InternalAPI(BasicWorker):
 			if not response:
 				raise InternalAPIException
 
-			response = json.dumps({"error": False, "response": response}
+			response = json.dumps({"error": False, "response": response})
 		except (json.JSONDecodeError, InternalAPIException):
 			response = json.dumps({"error": "Invalid JSON"})
 
