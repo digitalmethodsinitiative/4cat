@@ -12,6 +12,7 @@ libraries = [
 		"scikit_learn==0.20.1",
 		"Flask_Limiter==1.0.1",
 		"youtube_dl==2019.1.2",
+		"pyahocorasick==1.4.0",
 		"html2text==2018.1.9",
 		"setuptools==40.8.0",
 		"APScheduler==3.5.3",

@@ -1,13 +1,13 @@
 """
 Tokenize post bodies
 """
+import ahocorasick
 import datetime
 import zipfile
 import shutil
 import pickle
 import re
 
-from csv import DictReader
 from nltk.stem.snowball import SnowballStemmer
 from nltk.stem import WordNetLemmatizer
 from nltk.tokenize import word_tokenize, TweetTokenizer
@@ -107,7 +107,7 @@ class Tokenise(BasicProcessor):
 		This takes a 4CAT results file as input, and outputs a number of files containing
 		tokenised posts, grouped per time unit as specified in the parameters.
 		"""
-		self.dataset.update_status("Processing posts")
+		self.dataset.update_status("Building filtering automaton")
 
 		link_regex = re.compile(r"https?://[^\s]+")
 		symbol = re.compile(r"[^a-zA-Z0-9]")
@@ -140,7 +140,12 @@ class Tokenise(BasicProcessor):
 			word_filter.update(reject_words)
 
 		# Create a regex for the word list which should be faster than iterating
-		filter_regex = re.compile("|".join([re.escape(word) for word in word_filter if word]))
+		automaton = ahocorasick.Automaton()
+		for word in word_filter:
+			if word:
+				# the value doesn't matter to us here, we just want to know if
+				# the string occurs
+				automaton.add_word(word, 1)
 
 		language = self.parameters.get("language", "english")
 		strip_symbols = self.parameters.get("strip_symbols", self.options["strip_symbols"]["default"])
@@ -176,7 +181,6 @@ class Tokenise(BasicProcessor):
 		timeframe = self.parameters.get("timeframe", self.options["timeframe"]["default"])
 
 		for post in self.iterate_csv_items(self.source_file):
-
 			# If it's empty, skip it!
 			if not post.get("body", None):
 				continue
@@ -239,7 +243,7 @@ class Tokenise(BasicProcessor):
 				if not token: # Skip empty strings
 					continue
 
-				if filter_regex.fullmatch(token):
+				if token in automaton:
 					continue
 
 				if self.parameters["stem"]:
