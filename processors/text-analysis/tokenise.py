@@ -91,7 +91,7 @@ class Tokenise(BasicProcessor):
 				#"stopwords-terrier-english": "English stopwords (terrier, recommended)",
 				"stopwords-iso-english": "English stopwords (stopwords-iso, recommended)",
 				"stopwords-iso-dutch": "Dutch stopwords (stopwords-iso)",
-				"stopwords-iso-all": "Multi-language stopwords (stopwords-iso)",
+				"stopwords-iso-all": "Stopwords for many languages (including Dutch/English, stopwords-iso)",
 				#"wordlist-infochimps-english": "English word list (infochimps)",
 				"wordlist-googlebooks-english": "English word list (Google One Million Books pre-2008 top unigrams, recommended)",
 				"wordlist-cracklib-english": "English word list (cracklib, warning: computationally heavy)",
