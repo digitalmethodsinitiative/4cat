@@ -27,7 +27,7 @@ from backend.lib.exceptions import QueryParametersException
 from backend.lib.queue import JobQueue
 from backend.lib.job import Job
 from backend.lib.dataset import DataSet
-from backend.lib.helpers import UserInput
+from backend.lib.helpers import UserInput, call_api
 
 api_ratelimit = limiter.shared_limit("3 per second", scope="api")
 
@@ -465,6 +465,8 @@ def queue_processor(key=None, processor=None):
 		settings = dataset.processors[processor]["options"][option]
 		choice = request.values.get("option-" + option, None)
 		options[option] = UserInput.parse(settings, choice)
+
+	options["user"] = current_user.get_id()
 
 	analysis = DataSet(parent=dataset.key, parameters=options, db=db,
 					   extension=dataset.processors[processor]["extension"], type=processor)
