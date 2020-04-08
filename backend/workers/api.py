@@ -200,6 +200,10 @@ class InternalAPI(BasicWorker):
 			return response
 
 		if request == "worker-status":
+			# technically more 'job status' than 'worker status', this returns
+			# all jobs plus, for those that are currently active, some worker
+			# info as well as related datasets. useful to monitor server
+			# activity and judge whether 4CAT can safely be interrupted
 			open_jobs = self.db.fetchall("SELECT * FROM jobs ORDER BY jobtype ASC, timestamp ASC, remote_id ASC")
 			response = []
 
