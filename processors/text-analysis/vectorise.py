@@ -1,6 +1,7 @@
 """
 Transform tokeniser output into vectors
 """
+import json
 import zipfile
 import pickle
 import shutil
@@ -54,12 +55,16 @@ class Vectorise(BasicProcessor):
 				vector_set_name = vector_set.split("/")[-1]  # we don't need the full path
 				self.dataset.update_status("Processing token set %i/%i" % (index, len(vector_sets)))
 
+				# we support both pickle and json dumps of vectors
+				token_unpacker = pickle if vector_set_name.split(".")[-1] == "pb" else json
+				write_mode = "wb" if token_unpacker is pickle else "w"
+
 				# temporarily extract file (we cannot use ZipFile.open() as it doesn't support binary modes)
 				temp_path = results_path.joinpath(vector_set_name)
 				token_archive.extract(vector_set_name, results_path)
 				with temp_path.open("rb") as binary_tokens:
 					# these were saved as pickle dumps so we need the binary mode
-					tokens = pickle.load(binary_tokens)
+					tokens = token_unpacker.load(binary_tokens)
 
 				temp_path.unlink()
 
@@ -83,8 +88,8 @@ class Vectorise(BasicProcessor):
 				vector_path = results_path.joinpath(vector_set_name)
 				vector_paths.append(vector_path)
 
-				with vector_path.open("wb") as output:
-					pickle.dump(vectors_list, output)
+				with vector_path.open(write_mode) as output:
+					token_unpacker.dump(vectors_list, output)
 
 		# create zip of archive and delete temporary files and folder
 		self.dataset.update_status("Compressing results into archive")

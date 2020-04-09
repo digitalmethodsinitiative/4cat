@@ -5,7 +5,7 @@ import zipfile
 import pickle
 import shutil
 import csv
-import itertools
+import json
 
 from backend.lib.helpers import UserInput, convert_to_int
 from backend.lib.exceptions import ProcessorInterruptedException
@@ -94,6 +94,9 @@ class VectorRanker(BasicProcessor):
 				if self.interrupted:
 					raise ProcessorInterruptedException("Interrupted while processing vector sets")
 
+				# we support both pickle and json dumps of vectors
+				vector_unpacker = pickle if vector_set.split(".")[-1] == "pb" else json
+
 				index += 1
 				vector_set_name = vector_set.split("/")[-1]  # we don't need the full path
 				self.dataset.update_status("Processing token set %i/%i" % (index, len(vector_sets)))
@@ -103,7 +106,7 @@ class VectorRanker(BasicProcessor):
 				token_archive.extract(vector_set_name, results_path)
 				with temp_path.open("rb") as binary_tokens:
 					# these were saved as pickle dumps so we need the binary mode
-					vectors = pickle.load(binary_tokens)
+					vectors = vector_unpacker.load(binary_tokens)
 				temp_path.unlink()
 
 				vectors = sorted(vectors, key=lambda x: x[1], reverse=True)

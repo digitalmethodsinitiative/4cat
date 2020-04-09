@@ -1,6 +1,7 @@
 """
 Create a word embedding model of tokenised strings.
 """
+import json
 import pickle
 import zipfile
 import shutil
@@ -10,6 +11,7 @@ from pathlib import Path
 
 from backend.lib.helpers import UserInput
 from backend.abstract.processor import BasicProcessor
+from backend.lib.exceptions import ProcessorInterruptedException
 
 __author__ = "Sal Hagen"
 __credits__ = ["Sal Hagen"]
@@ -101,9 +103,11 @@ class word_embeddings(BasicProcessor):
 				temp_path = dirname.joinpath(tokens_name)
 				token_archive.extract(tokens_name, dirname)
 				with temp_path.open("rb") as binary_tokens:
+					# we support both pickle and json dumps of vectors
+					token_unpacker = pickle if tokens_name.split(".")[-1] == "pb" else json
 
 					# these were saved as pickle dumps so we need the binary mode
-					tokens = pickle.load(binary_tokens)
+					tokens = token_unpacker.load(binary_tokens)
 
 				temp_path.unlink()
 
