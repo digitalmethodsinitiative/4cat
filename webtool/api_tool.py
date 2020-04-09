@@ -10,6 +10,7 @@ import json
 import time
 import csv
 import os
+import re
 
 from pathlib import Path
 
@@ -604,16 +605,20 @@ def datasource_call(datasource, action):
 	if datasource not in backend.all_modules.datasources:
 		return error(404, error="Datasource not found.")
 
+	forbidden_call_name = re.compile(r"[^a-zA-Z0-9_]")
+	if forbidden_call_name.findall(action) or action[0:2] == "__":
+		return error(406, error="Datasource '%s' has no call '%s'" % (datasource, action))
+
 	folder = backend.all_modules.datasources[datasource]["path"]
 	views_file = folder.joinpath("webtool", "views.py")
 	if not views_file.exists():
-		return error(406, error="Datasources '%s' has no call '%s'" % (datasource, action))
+		return error(406, error="Datasource '%s' has no call '%s'" % (datasource, action))
 
 	datasource_id = backend.all_modules.datasources[datasource]["id"]
 	datasource_calls = importlib.import_module("datasources.%s.webtool.views" % datasource_id)
 
 	if not hasattr(datasource_calls, action) or not callable(getattr(datasource_calls, action)):
-		return error(406, error="Datasources '%s' has no call '%s'" % (datasource, action))
+		return error(406, error="Datasource '%s' has no call '%s'" % (datasource, action))
 
 	parameters = request.args
 	response = getattr(datasource_calls, action).__call__(request, current_user, **parameters)
