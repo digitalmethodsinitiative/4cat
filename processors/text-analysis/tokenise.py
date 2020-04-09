@@ -264,6 +264,8 @@ class Tokenise(BasicProcessor):
 				output_path = str(output_file)
 
 				if current_output_path != output_path:
+					if output_file_handle:
+						output_file_handle.close()
 					output_file_handle = output_file.open("a")
 
 					if output_path not in output_files:
@@ -277,6 +279,9 @@ class Tokenise(BasicProcessor):
 
 				output_file_handle.write(json.dumps(post_tokens))
 				output_files[output_path] += 1
+
+		if output_file_handle:
+			output_file_handle.close()
 
 		# close all files
 		# we do this now because only here do we know all files have been
