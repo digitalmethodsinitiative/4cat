@@ -124,6 +124,7 @@ class ModuleCollector:
 							"datasources": component[1].datasources if hasattr(component[1], "datasources") else [],
 							"references": component[1].references if hasattr(component[1], "references") else [],
 							"is_filter": hasattr(component[1], "category") and "filter" in component[1].category.lower(),
+							"can_preview": bool(component[1].preview_allowed) if hasattr(component[1], "preview_allowed") else True,
 							"further": [],
 							"further_flat": set()
 						}}

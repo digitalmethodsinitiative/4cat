@@ -88,7 +88,7 @@
                     </div>
                 </li>
                 {% endif %}
-                {% if item.num_rows > 0 and item.type in processors and processors[item.type].extension in ("jpg", "jpeg", "png", "csv", "html") %}
+                {% if item.num_rows > 0 and item.type in processors and processors[item.type].extension in ("jpg", "jpeg", "png", "csv", "html") and processors[item.type].can_preview %}
                 <li>
                     <a class="property-badge permalink popup-trigger tooltip-trigger" aria-controls="popup-preview-{{ item.key }} tooltip-preview-{{ item.key }}"><i class="fa fa-fw fa-eye" aria-hidden="true"></i> <span class="sr-only">Preview this dataset</span></a>
                     <p role="tooltip" id="tooltip-preview-{{ item.key }}" aria-hidden="true">Preview this dataset</p>
