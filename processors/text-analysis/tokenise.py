@@ -202,7 +202,7 @@ class Tokenise(BasicProcessor):
 		for post in self.iterate_csv_items(self.source_file):
 			# determine what output unit this post belongs to
 			if timeframe == "all":
-				output = "overall"
+				date_descriptor = "overall"
 			else:
 				if "timestamp_unix" in post:
 					try:
@@ -216,11 +216,11 @@ class Tokenise(BasicProcessor):
 						timestamp = 0
 				date = datetime.datetime.fromtimestamp(timestamp)
 				if timeframe == "year":
-					output = str(date.year)
+					date_descriptor = str(date.year)
 				elif timeframe == "month":
-					output = str(date.year) + "-" + str(date.month)
+					date_descriptor = str(date.year) + "-" + str(date.month)
 				else:
-					output = str(date.year) + "-" + str(date.month) + "-" + str(date.day)
+					date_descriptor = str(date.year) + "-" + str(date.month) + "-" + str(date.day)
 
 			# tokenise...
 			# we're treating every post as one document.
@@ -260,10 +260,11 @@ class Tokenise(BasicProcessor):
 
 			# append the post's tokens as a list within a larger list
 			if post_tokens:
-				output_file = tmp_path.joinpath(output + ".json")
+				output_file = tmp_path.joinpath(date_descriptor + ".json")
 				output_path = str(output_file)
 
 				if current_output_path != output_path:
+					self.dataset.update_status("Processing posts (%s)" % date_descriptor)
 					if output_file_handle:
 						output_file_handle.close()
 					output_file_handle = output_file.open("a")
