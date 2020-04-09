@@ -106,7 +106,7 @@ class RedditVoteChecker(BasicProcessor):
 				if post["thread_id"] == post["id"]:
 					post["score"] = thread_scores[post["thread_id"]]
 				else:
-					post["score"] = post_scores[post["id"]]
+					post["score"] = post_scores.get(post["id"], post["score"])
 
 				writer.writerow(post)
 				processed += 1

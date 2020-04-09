@@ -100,12 +100,12 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 				location = "->".join(frames)
 				
 				# Not all datasets have parent keys
-				if self.dataset.get_genealogy():
+				if len(self.dataset.get_genealogy()) > 1:
 					parent_key = " (via " + self.dataset.get_genealogy()[0].key + ")"
 				else:
 					parent_key = ""
 
-				raise ProcessorException("Processor %s raised %s while processing dataset %s %sin %s:\n   %s\n" % (self.type, e.__class__.__name__, self.dataset.key, parent_key, location, str(e)))
+				raise ProcessorException("Processor %s raised %s while processing dataset %s%s in %s:\n   %s\n" % (self.type, e.__class__.__name__, self.dataset.key, parent_key, location, str(e)))
 		else:
 			# dataset already finished, job shouldn't be open anymore
 			self.log.warning("Job %s/%s was queued for a dataset already marked as finished, deleting..." % (self.job.data["jobtype"], self.job.data["remote_id"]))

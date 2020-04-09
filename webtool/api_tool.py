@@ -10,6 +10,7 @@ import json
 import time
 import csv
 import os
+import re
 
 from pathlib import Path
 
@@ -27,7 +28,7 @@ from backend.lib.exceptions import QueryParametersException
 from backend.lib.queue import JobQueue
 from backend.lib.job import Job
 from backend.lib.dataset import DataSet
-from backend.lib.helpers import UserInput
+from backend.lib.helpers import UserInput, call_api
 
 api_ratelimit = limiter.shared_limit("3 per second", scope="api")
 
@@ -216,10 +217,11 @@ def queue_dataset():
 		return error(404, message="Datasource '%s' has no search interface" % datasource_id)
 
 	search_worker = backend.all_modules.workers[search_worker_id]
+	worker_class = backend.all_modules.load_worker_class(search_worker)
 
-	if hasattr(search_worker["class"], "validate_query"):
+	if hasattr(worker_class, "validate_query"):
 		try:
-			sanitised_query = search_worker["class"].validate_query(request.form.to_dict(), request, current_user)
+			sanitised_query = worker_class.validate_query(request.form.to_dict(), request, current_user)
 		except QueryParametersException as e:
 			return "Invalid query. %s" % e
 	else:
@@ -231,8 +233,8 @@ def queue_dataset():
 
 	dataset = DataSet(parameters=sanitised_query, db=db, type="search")
 
-	if hasattr(search_worker["class"], "after_create"):
-		search_worker["class"].after_create(sanitised_query, dataset, request)
+	if hasattr(worker_class, "after_create"):
+		worker_class.after_create(sanitised_query, dataset, request)
 
 	queue.add_job(jobtype=search_worker_id, remote_id=dataset.key)
 
@@ -465,6 +467,8 @@ def queue_processor(key=None, processor=None):
 		choice = request.values.get("option-" + option, None)
 		options[option] = UserInput.parse(settings, choice)
 
+	options["user"] = current_user.get_id()
+
 	analysis = DataSet(parent=dataset.key, parameters=options, db=db,
 					   extension=dataset.processors[processor]["extension"], type=processor)
 	if analysis.is_new:
@@ -601,16 +605,20 @@ def datasource_call(datasource, action):
 	if datasource not in backend.all_modules.datasources:
 		return error(404, error="Datasource not found.")
 
+	forbidden_call_name = re.compile(r"[^a-zA-Z0-9_]")
+	if forbidden_call_name.findall(action) or action[0:2] == "__":
+		return error(406, error="Datasource '%s' has no call '%s'" % (datasource, action))
+
 	folder = backend.all_modules.datasources[datasource]["path"]
 	views_file = folder.joinpath("webtool", "views.py")
 	if not views_file.exists():
-		return error(406, error="Datasources '%s' has no call '%s'" % (datasource, action))
+		return error(406, error="Datasource '%s' has no call '%s'" % (datasource, action))
 
 	datasource_id = backend.all_modules.datasources[datasource]["id"]
 	datasource_calls = importlib.import_module("datasources.%s.webtool.views" % datasource_id)
 
 	if not hasattr(datasource_calls, action) or not callable(getattr(datasource_calls, action)):
-		return error(406, error="Datasources '%s' has no call '%s'" % (datasource, action))
+		return error(406, error="Datasource '%s' has no call '%s'" % (datasource, action))
 
 	parameters = request.args
 	response = getattr(datasource_calls, action).__call__(request, current_user, **parameters)

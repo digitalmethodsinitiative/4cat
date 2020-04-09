@@ -501,7 +501,7 @@ class DataSet:
 
 		:return list:  Dataset genealogy, oldest dataset first
 		"""
-		if self.genealogy or not self.key_parent:
+		if self.genealogy:
 			return self.genealogy
 
 		key_parent = self.key_parent
@@ -521,6 +521,7 @@ class DataSet:
 
 		genealogy.reverse()
 		genealogy.append(self)
+
 		self.genealogy = genealogy
 		return self.genealogy
 

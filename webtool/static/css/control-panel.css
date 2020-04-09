@@ -1,0 +1,7 @@
+.worker-list li > * {
+    display: inline-block
+}
+
+.worker-list li {
+    padding: 0.75em 1em 0.5em 1em;
+}

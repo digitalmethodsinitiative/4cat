@@ -1,0 +1,25 @@
+{% extends "layout.html" %}
+
+{% block title %}Control Panel{% endblock %}
+{% block body_class %}plain-page frontpage admin {{ body_class }}{% endblock %}
+
+{% block body %}
+    <article class="with-aside">
+        <section>
+            <h2><span>Welcome, welcome to the admin panel</span></h2>
+            <p>It's safer here</p>
+        </section>
+
+        <aside>
+            <h2><span>Active workers</span></h2>
+            <div class="content-container" data-source="/admin/worker-status/" data-interval="5">
+                <p class="content-placeholder">Loading worker status...</p>
+            </div>
+
+            <h2><span>Worker queue</span></h2>
+            <div class="content-container" data-source="/admin/queue-status/" data-interval="5">
+                <p class="content-placeholder">Loading worker status...</p>
+            </div>
+        </aside>
+    </article>
+{% endblock %}
