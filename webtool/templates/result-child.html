@@ -77,9 +77,8 @@
                 {% if item.type in processors and "references" in processors[item.type] and processors[item.type]["references"] %}
                 <li>
                     <a class="property-badge permalink popup-trigger tooltip-trigger" aria-controls="tooltip-references-{{ item.key }} popup-references-{{ item.key }}"><i class="fa fa-fw fa-graduation-cap"></i> <span class="sr-only">References for this processor</span></a>
-                    <p role="tooltip" id="tooltip-references-{{ item.key }}" aria-hidden="true">Academic references for this analytical processor</p>
+                    <p role="tooltip" id="tooltip-references-{{ item.key }}" aria-hidden="true">References for this analytical processor</p>
                     <div role="dialog" id="popup-references-{{ item.key }}">
-                        <h2>References for &quot;{{ processors[item.type]["name"] }}&quot;:</h2>
                         <ol>
                             {% for reference in processors[item.type]["references"] %}
                                 <li>{{ reference|markdown|safe }}</li>
