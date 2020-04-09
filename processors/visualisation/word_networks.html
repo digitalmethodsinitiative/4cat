@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+	<title>Word network</title>
+	<meta content="text/html;charset=utf-8" http-equiv="Content-Type">
+	<meta content="utf-8" http-equiv="encoding">
+
+	<link rel="stylesheet" type="text/css" href="**server**/static/css/word_networks.css">
+
+	<!-- Font Awesome -->
+    <link href="**server**/static/fontawesome/css/fontawesome.css" rel="stylesheet">
+    <link href="**server**/static/fontawesome/css/regular.css" rel="stylesheet">
+    <link href="**server**/static/fontawesome/css/solid.css" rel="stylesheet">
+    <link href="**server**/static/fontawesome/css/brands.css" rel="stylesheet">
+
+	<!-- START SIGMA IMPORTS -->
+	<script  src="https://code.jquery.com/jquery-3.4.1.min.js" integrity="sha256-CSXorXvZcTkaix6Yvo6HppcZGetbYMGWSFlBw8HfCJo=" crossorigin="anonymous"></script>
+	<script src="**server**/static/js/sigma.js-1.2.1/src/sigma.core.js"></script>
+	<script src="**server**/static/js/sigma.js-1.2.1/src/conrad.js"></script>
+	<script src="**server**/static/js/sigma.js-1.2.1/src/utils/sigma.utils.js"></script>
+	<script src="**server**/static/js/sigma.js-1.2.1/src/utils/sigma.polyfills.js"></script>
+	<script src="**server**/static/js/sigma.js-1.2.1/src/sigma.settings.js"></script>
+	<script src="**server**/static/js/sigma.js-1.2.1/src/classes/sigma.classes.dispatcher.js"></script>
+	<script src="**server**/static/js/sigma.js-1.2.1/src/classes/sigma.classes.configurable.js"></script>
+	<script src="**server**/static/js/sigma.js-1.2.1/src/classes/sigma.classes.graph.js"></script>
+	<script src="**server**/static/js/sigma.js-1.2.1/src/classes/sigma.classes.camera.js"></script>
+	<script src="**server**/static/js/sigma.js-1.2.1/src/classes/sigma.classes.quad.js"></script>
+	<script src="**server**/static/js/sigma.js-1.2.1/src/classes/sigma.classes.edgequad.js"></script>
+	<script src="**server**/static/js/sigma.js-1.2.1/src/captors/sigma.captors.mouse.js"></script>
+	<script src="**server**/static/js/sigma.js-1.2.1/src/captors/sigma.captors.touch.js"></script>
+	<script src="**server**/static/js/sigma.js-1.2.1/src/renderers/sigma.renderers.canvas.js"></script>
+	<script src="**server**/static/js/sigma.js-1.2.1/src/renderers/sigma.renderers.webgl.js"></script>
+	<script src="**server**/static/js/sigma.js-1.2.1/src/renderers/sigma.renderers.svg.js"></script>
+	<script src="**server**/static/js/sigma.js-1.2.1/src/renderers/sigma.renderers.def.js"></script>
+	<script src="**server**/static/js/sigma.js-1.2.1/src/renderers/webgl/sigma.webgl.nodes.def.js"></script>
+	<script src="**server**/static/js/sigma.js-1.2.1/src/renderers/webgl/sigma.webgl.nodes.fast.js"></script>
+	<script src="**server**/static/js/sigma.js-1.2.1/src/renderers/webgl/sigma.webgl.edges.def.js"></script>
+	<script src="**server**/static/js/sigma.js-1.2.1/src/renderers/webgl/sigma.webgl.edges.fast.js"></script>
+	<script src="**server**/static/js/sigma.js-1.2.1/src/renderers/webgl/sigma.webgl.edges.arrow.js"></script>
+	<script src="**server**/static/js/sigma.js-1.2.1/src/renderers/canvas/sigma.canvas.labels.def.js"></script>
+	<script src="**server**/static/js/sigma.js-1.2.1/src/renderers/canvas/sigma.canvas.hovers.def.js"></script>
+	<script src="**server**/static/js/sigma.js-1.2.1/src/renderers/canvas/sigma.canvas.nodes.def.js"></script>
+	<script src="**server**/static/js/sigma.js-1.2.1/src/renderers/canvas/sigma.canvas.edges.def.js"></script>
+	<script src="**server**/static/js/sigma.js-1.2.1/src/renderers/canvas/sigma.canvas.edges.curve.js"></script>
+	<script src="**server**/static/js/sigma.js-1.2.1/src/renderers/canvas/sigma.canvas.edges.arrow.js"></script>
+	<script src="**server**/static/js/sigma.js-1.2.1/src/renderers/canvas/sigma.canvas.edges.curvedArrow.js"></script>
+	<script src="**server**/static/js/sigma.js-1.2.1/src/renderers/canvas/sigma.canvas.edgehovers.def.js"></script>
+	<script src="**server**/static/js/sigma.js-1.2.1/src/renderers/canvas/sigma.canvas.edgehovers.curve.js"></script>
+	<script src="**server**/static/js/sigma.js-1.2.1/src/renderers/canvas/sigma.canvas.edgehovers.arrow.js"></script>
+	<script src="**server**/static/js/sigma.js-1.2.1/src/renderers/canvas/sigma.canvas.edgehovers.curvedArrow.js"></script>
+	<script src="**server**/static/js/sigma.js-1.2.1/src/renderers/canvas/sigma.canvas.extremities.def.js"></script>
+	<script src="**server**/static/js/sigma.js-1.2.1/src/renderers/svg/sigma.svg.utils.js"></script>
+	<script src="**server**/static/js/sigma.js-1.2.1/src/renderers/svg/sigma.svg.nodes.def.js"></script>
+	<script src="**server**/static/js/sigma.js-1.2.1/src/renderers/svg/sigma.svg.edges.def.js"></script>
+	<script src="**server**/static/js/sigma.js-1.2.1/src/renderers/svg/sigma.svg.edges.curve.js"></script>
+	<script src="**server**/static/js/sigma.js-1.2.1/src/renderers/svg/sigma.svg.labels.def.js"></script>
+	<script src="**server**/static/js/sigma.js-1.2.1/src/renderers/svg/sigma.svg.hovers.def.js"></script>
+	<script src="**server**/static/js/sigma.js-1.2.1/src/middlewares/sigma.middlewares.rescale.js"></script>
+	<script src="**server**/static/js/sigma.js-1.2.1/src/middlewares/sigma.middlewares.copy.js"></script>
+	<script src="**server**/static/js/sigma.js-1.2.1/src/misc/sigma.misc.animation.js"></script>
+	<script src="**server**/static/js/sigma.js-1.2.1/src/misc/sigma.misc.bindEvents.js"></script>
+	<script src="**server**/static/js/sigma.js-1.2.1/src/misc/sigma.misc.bindDOMEvents.js"></script>
+	<script src="**server**/static/js/sigma.js-1.2.1/src/misc/sigma.misc.drawHovers.js"></script>
+
+	<script src="**server**/static/js/sigma.js-1.2.1/plugins/sigma.layout.forceAtlas2/worker.js"></script>
+	<script src="**server**/static/js/sigma.js-1.2.1/plugins/sigma.layout.forceAtlas2/supervisor.js"></script>
+	<!-- END SIGMA IMPORTS -->
+
+</head>
+
+<body>
+
+	<!-- Control panel -->
+	<div id='control-panel'>
+
+		<div id="alert-box" class="control-panel-notice"></div>
+
+		<!-- dynamic slider for manipulating animated networks -->
+		<div id='slider-container'></div>
+		<hr>
+		<!-- Start / stop ForceAtlas2 -->
+		<div id="start-force-container">
+			<button id="start-force" class="standalone-button">
+				<span id="hourglass"><i class='fa fa-spin fa-sync-alt' aria-hidden='true'></i></span>
+				Start ForceAtlas2
+			</button>
+		</div>
+
+	</div>
+
+	<div id="footer">
+		<p>Made with <a href='https://archive.4plebs.org' target='_blank'>4CAT</a> and <a href="https://github.com/jacomyal/sigma.js">sigma.js</a>.</p>
+	</div>
+
+	<!-- Where the network graph will be -->
+	<div id="graph-container">
+	</div>
+
+	<!-- Load up some more JavaScripts -->
+	<script src="**server**/static/js/word_networks.js" charset="utf-8"></script>
+	<script type="text/javascript">
+
+		// Initialise the graph
+		var core_json = JSON.parse('**json**');
+		init_network(core_json);
+
+	</script>
+
+</body>
+</html>
