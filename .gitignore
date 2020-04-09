@@ -2,6 +2,7 @@
 *.pyc
 *.pid
 *.log
+*.log.*
 *.csv
 *.png
 *.gif
@@ -15,25 +16,22 @@
 # actual files that are part of 4CAT but should not be included
 config.py
 deploy.sh
-backend/extras/sphinx.conf
-webtool/venv/
-webtool/fourcat/js/jquery-csv-master/.gitattributes
-webtool/fourcat/js/jquery-csv-master/.gitignore
+backend/module_cache.pb
 webtool/fourcat/js/jquery-csv-master/
-webtool/fourcat/static/data/word_embeddings/w2v_model_all-chan-test.model
-webtool/fourcat/static/data/word_embeddings/w2v_model_all-yt-rightwing-transcripts.model
 webtool/fourcat/static/data/word_embeddings/
 *.session
-fourcat.egg-info/
 data/
-4cat.log.1
 webtool/fourcat/static/boards.json
 stats.json
 news.json
 ANNOUNCEMENT.md
+
+# build artefacts
 startup/
 build/
 dist/
+fourcat.egg-info/
+webtool/venv/
 
 # do not ignore interface images
 !webtool/static/img/*.png

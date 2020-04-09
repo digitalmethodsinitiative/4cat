@@ -1,13 +1,16 @@
 """
 Tokenize post bodies
 """
+import ahocorasick
 import datetime
 import zipfile
 import shutil
 import pickle
+import json
 import re
 
-from csv import DictReader
+from pathlib import Path
+
 from nltk.stem.snowball import SnowballStemmer
 from nltk.stem import WordNetLemmatizer
 from nltk.tokenize import word_tokenize, TweetTokenizer
@@ -91,7 +94,7 @@ class Tokenise(BasicProcessor):
 				#"stopwords-terrier-english": "English stopwords (terrier, recommended)",
 				"stopwords-iso-english": "English stopwords (stopwords-iso, recommended)",
 				"stopwords-iso-dutch": "Dutch stopwords (stopwords-iso)",
-				"stopwords-iso-all": "Multi-language stopwords (stopwords-iso)",
+				"stopwords-iso-all": "Stopwords for many languages (including Dutch/English, stopwords-iso)",
 				#"wordlist-infochimps-english": "English word list (infochimps)",
 				"wordlist-googlebooks-english": "English word list (Google One Million Books pre-2008 top unigrams, recommended)",
 				"wordlist-cracklib-english": "English word list (cracklib, warning: computationally heavy)",
@@ -104,10 +107,36 @@ class Tokenise(BasicProcessor):
 
 	def process(self):
 		"""
-		This takes a 4CAT results file as input, and outputs a number of files containing
-		tokenised posts, grouped per time unit as specified in the parameters.
+		This takes a 4CAT results file as input, and outputs a number of files
+		containing tokenised posts, grouped per time unit as specified in the
+		parameters.
+
+		Tokens are stored as a JSON dump per 'output unit'; each output unit
+		corresponds to e.g. a month or year depending on the processor
+		parameters. JSON files are partially encoded 'manually', since we don't
+		want to keep all tokens for a given output unit in memory until it's
+		done, as for large datasets that may exceed memory capacity. Instead,
+		we keep a file handle open while tokenising and write the tokens to
+		that file per tokenised post. Since we simply need to store a list of
+		strings, we can concatenate these lists manually, only using the json
+		export options for the token lists. In other words, files are written
+		as such:
+
+		first, the opening bracket for a list of lists:
+			[
+
+		then, if not the first token in the list, a comma:
+			,
+
+		then for each post, a list of tokens, with json.dumps:
+			["token1","token2"]
+
+		then after all tokens are done for an output unit, a closing bracket:
+			]
+
+		The result is valid JSON, written in chunks.
 		"""
-		self.dataset.update_status("Processing posts")
+		self.dataset.update_status("Building filtering automaton")
 
 		link_regex = re.compile(r"https?://[^\s]+")
 		symbol = re.compile(r"[^a-zA-Z0-9]")
@@ -140,7 +169,12 @@ class Tokenise(BasicProcessor):
 			word_filter.update(reject_words)
 
 		# Create a regex for the word list which should be faster than iterating
-		filter_regex = re.compile("|".join([re.escape(word) for word in word_filter if word]))
+		automaton = ahocorasick.Automaton()
+		for word in word_filter:
+			if word:
+				# the value doesn't matter to us here, we just want to know if
+				# the string occurs
+				automaton.add_word(word, 1)
 
 		language = self.parameters.get("language", "english")
 		strip_symbols = self.parameters.get("strip_symbols", self.options["strip_symbols"]["default"])
@@ -152,38 +186,23 @@ class Tokenise(BasicProcessor):
 		if self.parameters.get("lemmatise", self.options["lemmatise"]["default"]):
 			lemmatizer = WordNetLemmatizer()
 
-		# this is how we'll keep track of the subsets of tokens
-		subunits = {}
-		current_subunit = ""
-
 		# prepare staging area
 		tmp_path = self.dataset.get_temporary_path()
 		tmp_path.mkdir()
-
-		# this needs to go outside the loop because we need to call it one last
-		# time after the post loop has finished
-		def save_subunit(subunit):
-			"""
-			Save token set to disk
-
-			:param str subunit:  Subset ID
-			"""
-			with tmp_path.joinpath(subunit + ".pb").open("wb") as outputfile:
-				pickle.dump(subunits[subunit], outputfile)
 
 		# process posts
 		self.dataset.update_status("Processing posts")
 		timeframe = self.parameters.get("timeframe", self.options["timeframe"]["default"])
 
+		# this is how we'll keep track of the subsets of tokens
+		output_files = {}
+		current_output_path = None
+		output_file_handle = None
+
 		for post in self.iterate_csv_items(self.source_file):
-
-			# If it's empty, skip it!
-			if not post.get("body", None):
-				continue
-
 			# determine what output unit this post belongs to
 			if timeframe == "all":
-				output = "overall"
+				date_descriptor = "overall"
 			else:
 				if "timestamp_unix" in post:
 					try:
@@ -197,25 +216,13 @@ class Tokenise(BasicProcessor):
 						timestamp = 0
 				date = datetime.datetime.fromtimestamp(timestamp)
 				if timeframe == "year":
-					output = str(date.year)
+					date_descriptor = str(date.year)
 				elif timeframe == "month":
-					output = str(date.year) + "-" + str(date.month)
+					date_descriptor = str(date.year) + "-" + str(date.month)
 				else:
-					output = str(date.year) + "-" + str(date.month) + "-" + str(date.day)
+					date_descriptor = str(date.year) + "-" + str(date.month) + "-" + str(date.day)
 
-			# write each subunit to disk as it is done, to avoid
-			# unnecessary RAM hogging
-			if current_subunit and current_subunit != output:
-				save_subunit(current_subunit)
-				self.dataset.update_status("Processing posts (" + output + ")")
-				subunits[current_subunit] = list()  # free up memory
-
-			current_subunit = output
-
-			# create a new list if we're starting a new subunit
-			if output not in subunits:
-				subunits[output] = list()
-
+			# tokenise...
 			# we're treating every post as one document.
 			# this means it is not sensitive to sentences.
 			post_tokens = []
@@ -236,10 +243,10 @@ class Tokenise(BasicProcessor):
 				if strip_symbols:
 					token = numbers.sub("", symbol.sub("", token))
 
-				if not token: # Skip empty strings
+				if not token:  # Skip empty strings
 					continue
 
-				if filter_regex.fullmatch(token):
+				if token in automaton:
 					continue
 
 				if self.parameters["stem"]:
@@ -253,21 +260,48 @@ class Tokenise(BasicProcessor):
 
 			# append the post's tokens as a list within a larger list
 			if post_tokens:
-				subunits[output].append(post_tokens)
+				output_file = tmp_path.joinpath(date_descriptor + ".json")
+				output_path = str(output_file)
 
-		# save the last subunit we worked on too
-		save_subunit(current_subunit)
+				if current_output_path != output_path:
+					self.dataset.update_status("Processing posts (%s)" % date_descriptor)
+					if output_file_handle:
+						output_file_handle.close()
+					output_file_handle = output_file.open("a")
+
+					if output_path not in output_files:
+						output_file_handle.write("[")
+						output_files[output_path] = 0
+
+					current_output_path = output_path
+
+				if output_files[current_output_path] > 0:
+					output_file_handle.write(",")
+
+				output_file_handle.write(json.dumps(post_tokens))
+				output_files[output_path] += 1
+
+		if output_file_handle:
+			output_file_handle.close()
+
+		# close all files
+		# we do this now because only here do we know all files have been
+		# fully written
+		for output_path in output_files:
+			with open(output_path, "a") as file_handle:
+				file_handle.write("]")
 
 		# create zip of archive and delete temporary files and folder
 		self.dataset.update_status("Compressing results into archive")
 		with zipfile.ZipFile(self.dataset.get_results_path(), "w") as zip:
-			for subunit in subunits:
-				zip.write(tmp_path.joinpath(subunit + ".pb"), subunit + ".pb")
-				tmp_path.joinpath(subunit + ".pb").unlink()
+			for output_path in output_files:
+				output_path = Path(output_path)
+				zip.write(output_path, output_path.name)
+				output_path.unlink()
 
 		# delete temporary folder
 		shutil.rmtree(tmp_path)
 
 		# done!
 		self.dataset.update_status("Finished")
-		self.dataset.finish(len(subunits))
+		self.dataset.finish(len(output_files))

@@ -56,15 +56,17 @@ class SearchTelegram(Search):
 		"""
 		self.eventloop = asyncio.new_event_loop()
 		session_path = Path(__file__).parent.joinpath("sessions", self.dataset.parameters.get("session"))
-		client = TelegramClient(str(session_path), self.dataset.parameters.get("api_id"),
-								self.dataset.parameters.get("api_hash"), loop=self.eventloop)
 
+		client = None
 		try:
+			client = TelegramClient(str(session_path), self.dataset.parameters.get("api_id"),
+								self.dataset.parameters.get("api_hash"), loop=self.eventloop)
 			client.start()
 		except Exception as e:
-			self.dataset.update_status("Error connecting to the Telegram API with provided credentials.")
+			self.dataset.update_status("Error connecting to the Telegram API with provided credentials.", is_final=True)
 			self.dataset.finish()
-			client.disconnect()
+			if client and hasattr(client, "disconnect"):
+				client.disconnect()
 			return None
 
 		# ready our parameters

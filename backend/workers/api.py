@@ -95,7 +95,11 @@ class InternalAPI(BasicWorker):
 			buffer = ""
 			while True:
 				# receive data in 1k chunks
-				data = client.recv(1024).decode("ascii")
+				try:
+					data = client.recv(1024).decode("ascii")
+				except UnicodeDecodeError:
+					raise InternalAPIException
+
 				buffer += data
 				if not data or data.strip() == "" or len(data) > 2048:
 					break
@@ -124,10 +128,17 @@ class InternalAPI(BasicWorker):
 			response = self.process_request(payload["request"], payload)
 			if not response:
 				raise InternalAPIException
-		except (json.JSONDecodeError, InternalAPIException):
-			return client.sendall(json.dumps({"error": "Invalid JSON"}).encode("ascii"))
 
-		return client.sendall(json.dumps({"error": False, "response": response}).encode("ascii"))
+			response = json.dumps({"error": False, "response": response})
+		except (json.JSONDecodeError, InternalAPIException):
+			response = json.dumps({"error": "Invalid JSON"})
+
+		try:
+			response = client.sendall(response.encode("ascii"))
+		except (BrokenPipeError, ConnectionError, socket.timeout):
+			response = None
+
+		return response
 
 	def process_request(self, request, payload):
 		"""
@@ -187,6 +198,37 @@ class InternalAPI(BasicWorker):
 					response["1d"] += 1
 
 			return response
+
+		if request == "worker-status":
+			# technically more 'job status' than 'worker status', this returns
+			# all jobs plus, for those that are currently active, some worker
+			# info as well as related datasets. useful to monitor server
+			# activity and judge whether 4CAT can safely be interrupted
+			open_jobs = self.db.fetchall("SELECT * FROM jobs ORDER BY jobtype ASC, timestamp ASC, remote_id ASC")
+			response = []
+
+			for job in open_jobs:
+				try:
+					worker = list(filter(lambda worker: worker.job.data["jobtype"] == job["jobtype"] and worker.job.data["remote_id"] == job["remote_id"], self.manager.worker_pool.get(job["jobtype"], [])))[0]
+				except IndexError:
+					worker = None
+
+				response.append({
+					"type": job["jobtype"],
+					"is_claimed": job["timestamp_claimed"] > 0,
+					"is_running": bool(worker),
+					"is_processor": hasattr(worker, "dataset"),
+					"is_recurring": (int(job["interval"]) > 0),
+					"is_maybe_crashed": job["timestamp_claimed"] > 0 and not worker,
+					"dataset_key": worker.dataset.key if hasattr(worker, "dataset") else None,
+					"dataset_user": worker.dataset.parameters.get("user", None) if hasattr(worker, "dataset") else None,
+					"dataset_parent_key": worker.dataset.top_key() if hasattr(worker, "dataset") else None,
+					"timestamp_queued": job["timestamp"],
+					"timestamp_claimed": job["timestamp_lastclaimed"]
+				})
+
+			return response
+
 
 
 		# no appropriate response

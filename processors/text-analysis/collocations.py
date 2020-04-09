@@ -1,9 +1,9 @@
 """
 Calculate word collocations from tokens
 """
+import json
 import zipfile
 import pickle
-import operator
 
 from pathlib import Path
 
@@ -112,13 +112,16 @@ class GetCollocations(BasicProcessor):
 				if self.interrupted:
 					raise ProcessorInterruptedException
 
+				# we support both pickle and json dumps of vectors
+				token_unpacker = pickle if tokens_name.split(".")[-1] == "pb" else json
+
 				# temporarily extract file (we cannot use ZipFile.open() as it doesn't support binary modes)
 				temp_path = dirname.joinpath(tokens_name)
 				token_archive.extract(tokens_name, dirname)
 				with temp_path.open("rb") as binary_tokens:
 
 					# these were saved as pickle dumps so we need the binary mode
-					tokens = pickle.load(binary_tokens)
+					tokens = token_unpacker.load(binary_tokens)
 
 				temp_path.unlink()
 

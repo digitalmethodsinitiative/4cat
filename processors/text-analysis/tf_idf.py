@@ -1,6 +1,7 @@
 """
 Create a csv with tf-idf ranked terms
 """
+import json
 import pickle
 import zipfile
 import numpy as np
@@ -134,10 +135,13 @@ class TfIdf(BasicProcessor):
 				temp_path = dirname.joinpath(tokens_name)
 				token_archive.extract(str(tokens_name), str(dirname))
 
+				# we support both pickle and json dumps of vectors
+				token_unpacker = pickle if tokens_name.split(".")[-1] == "pb" else json
+
 				with temp_path.open("rb") as binary_tokens:
 
 					# these were saved as pickle dumps so we need the binary mode
-					post_tokens = pickle.load(binary_tokens)
+					post_tokens = token_unpacker.load(binary_tokens)
 	
 					# Flatten the list of list of tokens - we're treating the whole time series as one document.
 					post_tokens = list(itertools.chain.from_iterable(post_tokens))

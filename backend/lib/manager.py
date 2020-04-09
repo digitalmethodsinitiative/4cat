@@ -1,8 +1,10 @@
 """
 The heart of the app - manages jobs and workers
 """
+import importlib
 import signal
 import time
+import sys
 
 from backend import all_modules
 from backend.lib.keyboard import KeyPoller
@@ -18,6 +20,7 @@ class WorkerManager:
 	log = None
 
 	worker_pool = {}
+	job_mapping = {}
 	pool = []
 	looping = True
 
@@ -90,7 +93,8 @@ class WorkerManager:
 					try:
 						self.log.debug("Starting new worker for job %s" % jobtype)
 						job.claim()
-						worker = worker_info["class"](logger=self.log, manager=self, job=job, modules=all_modules)
+						worker_class = all_modules.load_worker_class(worker_info)
+						worker = worker_class(logger=self.log, manager=self, job=job, modules=all_modules)
 						worker.start()
 						self.worker_pool[jobtype].append(worker)
 					except JobClaimedException:
@@ -165,3 +169,23 @@ class WorkerManager:
 
 		# now stop looping (i.e. accepting new jobs)
 		self.looping = False
+
+
+	def request_interrupt(self, job, interrupt_level):
+		"""
+
+		:param Job job:
+		:return:
+		"""
+
+		# find worker for given job
+		if job.data["jobtype"] not in self.worker_pool:
+			# no jobs of this type currently known
+			return
+
+		for worker in self.worker_pool[job.data["jobtype"]]:
+			if worker.job.data["id"] == job.data["id"]:
+				worker.request_abort(interrupt_level)
+				return
+
+		# todo: trip cancellable pg queries associated with worker

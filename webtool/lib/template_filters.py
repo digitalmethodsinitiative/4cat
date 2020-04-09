@@ -2,6 +2,7 @@ import datetime
 import markdown
 import json
 import uuid
+import math
 import os
 
 from pathlib import Path
@@ -33,6 +34,32 @@ def _jinja2_filter_numberify(number):
 		return str(int(number / 1000)) + "k"
 
 	return str(number)
+
+@app.template_filter('timify')
+def _jinja2_filter_numberify(number):
+	try:
+		number = int(number)
+	except TypeError:
+		return number
+
+	time_str = ""
+
+	hours = math.floor(number / 3600)
+	if hours > 0:
+		time_str += "%ih " % hours
+		number -= (hours * 3600)
+
+	minutes = math.floor(number / 60)
+	if minutes > 0:
+		time_str += "%im " % minutes
+		number -= (minutes * 60)
+
+	seconds = number
+	time_str += "%is " % seconds
+
+	return time_str.strip()
+
+
 
 
 @app.template_filter("http_query")

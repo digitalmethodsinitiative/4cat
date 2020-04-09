@@ -2,12 +2,13 @@
 Load modules and datasources dynamically
 """
 from pathlib import Path
-import itertools
 import importlib
 import inspect
 import config
+import pickle
 import sys
 import re
+import os
 
 from backend.abstract.worker import BasicWorker
 from backend.abstract.processor import BasicProcessor
@@ -42,8 +43,25 @@ class ModuleCollector:
 		Datasources are loaded first so that the datasource folders may be
 		scanned for workers subsequently.
 		"""
+
+		# try to load module data from cache
+		cached_modules = self.load_from_cache()
+		if cached_modules:
+			self.datasources = cached_modules["datasources"]
+			self.workers = cached_modules["workers"]
+			self.processors = cached_modules["processors"]
+			return
+
+		# no cache available, regenerate...
+		self.regenerate_cache()
+
+	def regenerate_cache(self):
+		"""
+		Load all module data from disk and cache results
+		"""
 		self.load_datasources()
 		self.load_modules()
+		self.cache()
 
 	def load_modules(self):
 		"""
@@ -55,6 +73,7 @@ class ModuleCollector:
 		`BasicProcessor` or `BasicWorker` and are not abstract.
 		"""
 		# look for workers and processors in pre-defined folders and datasources
+
 		paths = [Path(config.PATH_ROOT, "processors"), Path(config.PATH_ROOT, "backend", "workers"),
 				 *[self.datasources[datasource]["path"] for datasource in self.datasources]]
 
@@ -106,10 +125,11 @@ class ModuleCollector:
 					metadata = {
 						"file": file.name,
 						"path": relative_path,
+						"module": relative_path[1:-3].replace("/", "."),
 						"id": component[1].type,
 						"name": component[0],
-						"max": component[1].max_workers,
-						"class": component[1],
+						"class_name": component[0],
+						"max": component[1].max_workers
 					}
 
 					# processors have some extra metadata that is useful to store
@@ -165,6 +185,9 @@ class ModuleCollector:
 			collapse_flat_list(self.processors[processor])
 			self.processors[processor]["further_flat"] = flat_further
 
+		# Cache data
+		self.cache()
+
 	def load_datasources(self):
 		"""
 		Load datasources
@@ -204,3 +227,75 @@ class ModuleCollector:
 
 		sorted_datasources = {datasource_id: self.datasources[datasource_id] for datasource_id in sorted(self.datasources, key=lambda id: self.datasources[id]["name"])}
 		self.datasources = sorted_datasources
+
+	def cache(self):
+		"""
+		Write module data to cache file
+
+		The cache is written to disk, not kept in memory, because e.g. the
+		web tool and backend don't share memory, but can still use the same
+		cache as it should only be refreshed when the back end restarts,
+		since else you'd get processors in the web tool that aren't known
+		to the back end yet
+		"""
+		with ModuleCollector.get_cache_path().open("wb") as output:
+			pickle.dump({
+				"datasources": self.datasources,
+				"workers": self.workers,
+				"processors": self.processors
+			}, output)
+
+	def load_from_cache(self):
+		"""
+		Load module data from cache
+
+		:return: Dictionary with `datasources`, `workers` and `processors`
+		keys, or None if no cached data is available
+		"""
+		cache_path = ModuleCollector.get_cache_path()
+
+		if not cache_path.exists():
+			return None
+
+		try:
+			return pickle.load(cache_path.open("rb"))
+		except pickle.UnpicklingError:
+			return None
+
+	def load_worker_class(self, worker):
+		"""
+		Get class for worker
+
+		This import worker modules on-demand, so the code is only loaded if a
+		worker that needs the code is actually queued and run
+
+		:return:  Worker class for the given worker metadata
+		"""
+		module = worker["module"]
+		if module not in sys.modules:
+			importlib.import_module(module)
+
+		return getattr(sys.modules[module], worker["class_name"])
+
+	@staticmethod
+	def get_cache_path():
+		"""
+		Get path to module cache file
+
+		:return Path:  Path object to cache file
+		"""
+		return Path(config.PATH_ROOT, "backend", "module_cache.pb")
+
+	@staticmethod
+	def invalidate_cache():
+		"""
+		Invalidate cache
+
+		Practically this means just deleting the cache file, ensuring it will
+		be regenerated
+		"""
+		try:
+			os.unlink(ModuleCollector.get_cache_path())
+		except FileNotFoundError:
+			# cache not made yet, which is okay for our purposes
+			pass
