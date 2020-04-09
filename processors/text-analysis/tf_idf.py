@@ -14,13 +14,15 @@ from backend.lib.exceptions import ProcessorInterruptedException
 from backend.abstract.processor import BasicProcessor
 
 from sklearn.feature_extraction.text import TfidfVectorizer
+from gensim.models import TfidfModel
+from gensim import corpora
 
 __author__ = "Sal Hagen"
 __credits__ = ["Sal Hagen"]
 __maintainer__ = "Sal Hagen"
 __email__ = "4cat@oilab.eu"
 
-class tfIdf(BasicProcessor):
+class TfIdf(BasicProcessor):
 	"""
 	
 	Get tf-idf terms
@@ -37,27 +39,12 @@ class tfIdf(BasicProcessor):
 	output = "csv:text,value,date"
 
 	options = {
-		"n_size": {
+		"library": {
 			"type": UserInput.OPTION_CHOICE,
-			"default": 1,
-			"options": {"1": 1, "2": 2},
-			"help": "Amount of words to return (tf-idf unigrams or bigrams)"
-		},
-		"min_occurrences": {
-			"type": UserInput.OPTION_TEXT,
-			"default": 1,
-			"min": 1,
-			"max": 10000,
-			"help": "Ignore terms that appear in less than this amount of token sets",
-			"tooltip": "Useful for filtering out very sporadic terms."
-		},
-		"max_occurrences": {
-			"type": UserInput.OPTION_TEXT,
-			"default": "",
-			"min": 1,
-			"max": 10000,
-			"help": "Ignore terms that appear in more than this amount of token sets",
-			"tooltip": "Useful for getting rarer terms not consistent troughout the dataset. Leave empty if terms may appear in all sets."
+			"default": "gensim",
+			"options": {"gensim": "gensim", "scikit-learn": "scikit-learn"},
+			"help": "Library",
+			"tooltip": "Which Python library should do the calculations? Gensim is better in optimising memory, so should be used for large datasets. Check the documentation in this module's references."
 		},
 		"max_output": {
 			"type": UserInput.OPTION_TEXT,
@@ -65,8 +52,48 @@ class tfIdf(BasicProcessor):
 			"min": 1,
 			"max": 100,
 			"help": "Words to return per timeframe"
+		},
+		"min_occurrences": {
+			"type": UserInput.OPTION_TEXT,
+			"default": 1,
+			"min": 1,
+			"max": 10000,
+			"help": "[scikit-learn] Ignore terms that appear in less than this amount of token sets",
+			"tooltip": "Useful for filtering out very sporadic terms."
+		},
+		"max_occurrences": {
+			"type": UserInput.OPTION_TEXT,
+			"default": "",
+			"min": 1,
+			"max": 10000,
+			"help": "[scikit-learn] Ignore terms that appear in more than this amount of token sets",
+			"tooltip": "Useful for getting rarer terms not consistent troughout the dataset. Leave empty if terms may appear in all sets."
+		},
+		"n_size": {
+			"type": UserInput.OPTION_CHOICE,
+			"default": 1,
+			"options": {"1": 1, "2": 2},
+			"help": "[scikit-learn] Amount of words to return (1 = unigrams, 2 = bigrams)"
+		},
+		"smartirs": {
+			"type": UserInput.OPTION_TEXT,
+			"default": "nfc",
+			"help": "[gensim] SMART parameters",
+			"tooltip": "SMART is a mnemonic notation type for various tf-idf parameters. Check this module's references for more information."
 		}
 	}
+
+	references = [
+		"[Spärck Jones, Karen. 1972. \"A statistical interpretation of term specificity and its application in retrieval.\" *Journal of Documentation* (28), 1: 11–21.](http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.115.8343&rep=rep1&type=pdf)",
+		"[Robertson, Stephen. 2004. \"Understanding Inverse Document value: On Theoretical arguments for IDF.\" *Journal of Documentation* (60), 5: 503–520](http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.438.2284&rep=rep1&type=pdf)",
+		"[Spärck Jones, Karen. 2004. \"IDF term weighting and IR research lessons\". *Journal of Communication* (60), 5: 521-523.](https://www.staff.city.ac.uk/~sb317/idfpapers/ksj_reply.pdf)",
+		"[Gensim tf-idf documentation.](https://radimrehurek.com/gensim/models/tfidfmodel.html)",
+		"[Scikit learn tf-idf documentation.](https://scikit-learn.org/stable/modules/generated/sklearn.feature_extraction.text.TfidfVectorizer.html)",
+		"[Tf-idf - Wikipedia.](https://en.wikipedia.org/wiki/Tf%E2%80%93idf)",
+		"[What is tf-idf? - William Scott](https://towardsdatascience.com/tf-idf-for-document-ranking-from-scratch-in-python-on-real-world-dataset-796d339a4089)",
+		"[SMART Information Retrieval System](https://en.wikipedia.org/wiki/SMART_Information_Retrieval_System)"
+	]
+
 
 	def process(self):
 		"""
@@ -74,11 +101,12 @@ class tfIdf(BasicProcessor):
 		"""
 
 		# Validate and process user inputs - parse to int
+		library = self.parameters.get("library", "gensim")
 		n_size = convert_to_int(self.parameters.get("n_size", 1), 1)
-		n_size = (n_size, n_size)
 		min_occurrences = convert_to_int(self.parameters.get("min_occurrences", 1), 1)
 		max_occurrences = convert_to_int(self.parameters.get("min_occurrences", -1), -1)
 		max_output = convert_to_int(self.parameters.get("max_output", 10), 10)
+		smartirs = self.parameters.get("smartirs", "nfc")
 
 		# Get token sets
 		self.dataset.update_status("Processing token sets")
@@ -128,33 +156,96 @@ class tfIdf(BasicProcessor):
 		# Get the tf-idf matrix.
 		self.dataset.update_status("Generating tf-idf for token set")
 		try:
-			results = self.get_tfidf(tokens, dates, ngram_range=n_size, min_occurrences=min_occurrences,
-								 max_occurrences=max_occurrences, top_n=max_output)
 
-			# Generate csv and finish
-			self.dataset.update_status("Writing to csv and finishing")
-			self.write_csv_items_and_finish(results)
+			if library == "gensim":
+				results = self.get_tfidf_gensim(tokens, dates, top_n=max_output, smartirs=smartirs)
+			elif library == "scikit-learn":
+				results = self.get_tfidf_sklearn(tokens, dates, ngram_range=n_size, min_occurrences=min_occurrences,
+								 max_occurrences=max_occurrences, top_n=max_output)
+			else:
+				self.dataset.update_status("Invalid library.")
+				self.dataset.finish(0)
+				return
+
+			if results:
+				# Generate csv and finish
+				self.dataset.update_status("Writing to csv and finishing")
+				self.write_csv_items_and_finish(results)
+
 		except MemoryError:
 			self.dataset.update_status("Out of memory - dataset too large to run tf-idf analysis.")
 			self.dataset.finish(0)
 
-	def get_tfidf(self, tokens, dates, ngram_range=(1,1), min_occurrences=0, max_occurrences=0, top_n=25):
+	def get_tfidf_gensim(self, tokens, dates, top_n=25, smartirs="nfc"):
 		"""
 		Creates a csv with the top n highest scoring tf-idf words.
 
-		:param tokens list,			list of tokens. Should be unpickled first
-		:param dates list,			list of column names  
-		:param max_occurrences int,	filter out words that appear in more than length of token list - max_occurrences
-		:param min_occurrences int,	filter out words that appear in less than min_occurrences
-		:param ngram_range tuple,	the amount of words to extract
+		:param input, list:			List of tokens.
+		:param dates, list:			List of dates.
+		:param top_n, int:			The amount of top weighted tf-idf terms to return per date.
+		:param smartirs, str:		Parameters for SMART Information Retrieval System.
 
-		:returns ...
+		:returns dict, results
 		"""
+
+		# Create a bag of words with words repsented as ints.
+		self.dataset.update_status("Converting corpus to bag of words")
+		dict_tokens = corpora.Dictionary()
+		corpus = [dict_tokens.doc2bow(doc, allow_update=True) for doc in tokens]
+
+		# Calculate the tf-idf
+		self.dataset.update_status("Vectorizing")
+		try:
+			tfidf_model = TfidfModel(corpus, smartirs=smartirs)
+		except ValueError:
+			self.dataset.update_status("Invalid SMART string")
+			return
+
+		# Retrieve the words and their tf-idf weights.
+		vector = tfidf_model[corpus]
+
+		data = []
+		row = []
+		col = []
+		vocab = []
+
+		results = []
+
+		self.dataset.update_status("Extracting results")
+		for i, doc in enumerate(vector):
+			doc_results = [[dict_tokens[id], freq] for id, freq in doc]
+			doc_results.sort(key = lambda x: x[1], reverse=True) # Sort on score
+			
+			for word, score in doc_results[:top_n]:
+				result = {}
+				result["item"] = word
+				result["value"] = score
+				result["date"] = dates[i]
+				results.append(result)
+
+		return results
+
+	def get_tfidf_sklearn(self, tokens, dates, ngram_range=1, min_occurrences=0, max_occurrences=0, top_n=25):
+		"""
+		Creates a csv with the top n highest scoring tf-idf words using sklearn's TfIdfVectoriser.
+
+		:param tokens, list:			List of tokens. Should be unpickled first
+		:param dates, list:				List of column names.
+		:param max_occurrences, int:	Filter out words that appear in more than length of token list - max_occurrences.
+		:param min_occurrences, int:	Filter out words that appear in less than min_occurrences.
+		:param ngram_range, tuple:		The amount of words to extract.
+		:param top_n, int:				The amount of top weighted tf-idf terms to return per date.
+
+		:returns dict, results
+		"""
+
+		# Convert to tuple
+		ngram_range = (ngram_range, ngram_range)
 		
 		# Vectorise
-		self.dataset.update_status('Vectorizing')
+		self.dataset.update_status("Vectorizing")
 		tfidf_vectorizer = TfidfVectorizer(min_df=min_occurrences, max_df=max_occurrences, ngram_range=ngram_range,
-										   analyzer='word', token_pattern=None, tokenizer=lambda i: i, lowercase=False)
+										   analyzer="word", token_pattern=None, tokenizer=lambda i: i, lowercase=False)
 		tfidf_matrix = tfidf_vectorizer.fit_transform(tokens)
 
 		feature_array = np.array(tfidf_vectorizer.get_feature_names())
@@ -163,10 +254,10 @@ class tfIdf(BasicProcessor):
 		# Print and store top n highest scoring tf-idf scores
 		top_words = feature_array[tfidf_sorting][:top_n]
 		weights = np.asarray(tfidf_matrix.mean(axis=0)).ravel().tolist()
-		df_weights = pd.DataFrame({'term': tfidf_vectorizer.get_feature_names(), 'weight': weights})
-		df_weights = df_weights.sort_values(by='weight', ascending=False).head(100)
+		df_weights = pd.DataFrame({"term": tfidf_vectorizer.get_feature_names(), "weight": weights})
+		df_weights = df_weights.sort_values(by="weight", ascending=False).head(100)
 
-		self.dataset.update_status('Writing tf-idf vector to csv')
+		self.dataset.update_status("Writing tf-idf vector to csv")
 		df_matrix = pd.DataFrame(tfidf_matrix.toarray(), columns=tfidf_vectorizer.get_feature_names())
 
 		# Turn the dataframe 90 degrees
@@ -184,8 +275,8 @@ class tfIdf(BasicProcessor):
 			df_tim = (df_matrix.sort_values(by=[document], ascending=False))[:top_n]
 			for i in range(top_n):
 				result = {}
-				result['item'] = df_tim.index.values[i]
-				result['frequency'] = df_tim[document].values[i].tolist()
-				result['date'] = document
+				result["item"] = df_tim.index.values[i]
+				result["value"] = df_tim[document].values[i].tolist()
+				result["date"] = document
 				results.append(result)
 		return results
