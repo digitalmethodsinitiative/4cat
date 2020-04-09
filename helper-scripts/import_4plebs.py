@@ -9,6 +9,7 @@ import sys
 import csv
 import re
 import os
+import pickle
 
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)) + "/..")
 from backend.lib.database import Database
@@ -130,7 +131,7 @@ with open(args.input, encoding="utf-8") as inputfile:
 			# skip ghost posts
 			continue
 
-		post = sanitize(csvpost)
+		post = csvpost
 		if post["thread_num"] not in threads:
 			threads[post["thread_num"]] = {
 				"timestamp": int(time.time()),
@@ -186,10 +187,12 @@ with open(args.input, encoding="utf-8") as inputfile:
 			commit(postbuffer, post_fields, db, args.datasource, fast=args.fast)
 			postbuffer = []
 
-# commit remainder
-print("\nSkipped %i post IDs that were already known." % skipped)
-print("Committing final posts.")
-commit(postbuffer, post_fields, db, args.datasource, fast=args.fast)
+	# commit remainder
+	print("\nSkipped %i post IDs that were already known." % skipped)
+	print("Committing final posts.")
+	commit(postbuffer, post_fields, db, args.datasource, fast=args.fast)
+
+pickle.dump(threads, open("threads.p", "wb"))
 
 # update threads
 print("Updating threads.")
@@ -214,10 +217,10 @@ for thread_id in threads:
 		if thread["timestamp"] < exists["timestamp"]:
 			thread["is_sticky"] = exists["is_sticky"]
 			thread["is_closed"] = exists["is_closed"]
-		thread["post_last"] = max(thread["post_last"], exists["post_last"])
-		thread["timestamp_modified"] = max(thread["timestamp_modified"], exists["timestamp_modified"])
-		thread["timestamp_modified"] = max(thread["timestamp_archived"], exists["timestamp_archived"])
-		thread["timestamp"] = min(thread["timestamp"], exists["timestamp"])
+		thread["post_last"] = max(int(thread.get("post_last") or 0), int(exists.get("post_last") or 0))
+		thread["timestamp_modified"] = max(int(thread.get("timestamp_modified") or 0), int(exists.get("timestamp_modified") or 0))
+		thread["timestamp_modified"] = max(int(thread.get("timestamp_archived") or 0), int(exists.get("timestamp_archived") or 0))
+		thread["timestamp"] = min(int(thread.get("timestamp") or 0), int(exists.get("timestamp") or 0))
 
 		db.update("threads_" + args.datasource, data=thread, where={"id": thread_id})
 
