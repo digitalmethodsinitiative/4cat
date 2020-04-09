@@ -1,0 +1,180 @@
+@import url('reset.css');
+@import url('dataset-page.css');
+
+
+/** --------------------- *
+            Fonts
+  * --------------------- */
+@font-face {
+    font-family: 'Open Sans';
+    src: url("../fonts/OpenSans-Regular.ttf")
+}
+
+@font-face {
+    font-family: 'Open Sans';
+    font-weight: bold;
+    src: url("../fonts/OpenSans-Bold.ttf")
+}
+
+@font-face {
+    font-family: 'Open Sans';
+    font-style: italic;
+    src: url("../fonts/OpenSans-Italic.ttf")
+}
+
+@font-face {
+    font-family: 'Open Sans';
+    font-weight: bold;
+    font-style: italic;
+    src: url("../fonts/OpenSans-BoldItalic.ttf")
+}
+
+@font-face {
+    font-family: 'Fixedsys';
+    src: url("../fonts/fsex300-webfont.woff")
+}
+
+/** --------------------- *
+      Colour definitions
+  * --------------------- */
+:root {
+    --accent: #CE1B28;
+    --highlight: #FF2231;
+    --accent-alternate: #19B0A3;
+    --accent-okay: #26b018;
+    --accent-warning: #b05d13;
+    --accent-error: #ff2231;
+    --gray-dark: #DFDFDF;
+    --gray: #E9E9E9;
+    --gray-light: #EEE;
+    --contrast-bright: #F5F5F5;
+    --contrast-dark: #21202E;
+    --always-white: #FFF;
+    --text: #37373C;
+    --warning: var(--accent);
+}
+
+
+/** --------------------- *
+     Basic HTML elements
+  * --------------------- */
+*, body, code, select, input, textarea {
+    font-family: 'Open Sans', 'Trebuchet MS', sans-serif;
+}
+
+body {
+    background: var(--contrast-bright);
+    color: var(--text);
+    line-height: 1.5em;
+    padding-bottom: 5em;
+}
+
+a {
+    color: var(--accent);
+    text-decoration: none;
+}
+
+a:hover {
+    color: var(--highlight);
+    text-decoration: underline;
+}
+
+code {
+    color: var(--accent-alternate);
+    font-weight: bold;
+}
+
+em, strong {
+    font-weight: bold;
+}
+
+/** --------------------- *
+            Forms
+  * --------------------- */
+select, input, textarea {
+    background: var(--gray);
+    border: 1px solid var(--gray);
+    font: inherit;
+    padding: 0.25em;
+    max-width: 80%;
+}
+
+select, input {
+    max-width: 15em;
+}
+
+.form-element label {
+    text-align: right;
+    padding-right: 1em;
+}
+
+button, .button-like {
+    border: 2px solid var(--contrast-dark);
+    background: var(--contrast-bright);
+    color: var(--text);
+    border-radius: 0.5em;
+    font-size: inherit;
+    cursor: pointer;
+    padding: 0.25em 1em;
+}
+
+button:hover, .button-like:not(.inactive):hover {
+    background: var(--accent);
+    color: var(--contrast-bright);
+}
+
+/** --------------------- *
+            Specific 
+            for word
+            networks
+  * --------------------- */
+
+.button-like.inactive {
+    cursor: default;
+    border-color: var(--gray-dark);
+}
+
+#graph-container {
+	top: 0;
+	bottom: 0;
+	left: 0;
+	right: 0;
+	position: absolute;
+	z-index: 0;
+}
+
+#control-panel {
+	position: absolute;
+	top: 0;
+	left: 0;
+	padding: 10px;
+	z-index: 1;
+}
+
+.control-panel-notice {
+	padding: 8px;
+}
+
+.standalone-button {
+	margin-top: 5px;
+	margin-bottom: 5px;
+}
+
+#footer {
+	position: absolute;
+	bottom: 0;
+	right: 0;
+	padding: 10px;
+	z-index: 1;
+}
+
+#alert-box {
+	color: var(--accent-alternate);
+}
+
+#hourglass {
+}
+
+hr {
+	color: var(--grey-light);
+}
