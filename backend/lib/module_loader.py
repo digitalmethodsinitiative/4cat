@@ -105,7 +105,6 @@ class ModuleCollector:
 				# see if module contains the right type of content by looping
 				# through all of its members
 				components = inspect.getmembers(module)
-				
 				for component in components:
 					# check if found object qualifies as a worker class
 					is_4cat_module = False
@@ -123,11 +122,10 @@ class ModuleCollector:
 					# extract data that is useful for the scheduler and other
 					# parts of 4CAT
 					relative_path = root_match.sub("", str(file))
-
 					metadata = {
 						"file": file.name,
 						"path": relative_path,
-						"module": relative_path[1:-3].replace(os.sep, ".").replace("/", "."),
+						"module": relative_path[1:-3].replace(os.sep, "."),
 						"id": component[1].type,
 						"name": component[0],
 						"class_name": component[0],
@@ -146,7 +144,6 @@ class ModuleCollector:
 							"datasources": component[1].datasources if hasattr(component[1], "datasources") else [],
 							"references": component[1].references if hasattr(component[1], "references") else [],
 							"is_filter": hasattr(component[1], "category") and "filter" in component[1].category.lower(),
-							"can_preview": bool(component[1].preview_allowed) if hasattr(component[1], "preview_allowed") else True,
 							"further": [],
 							"further_flat": set()
 						}}
@@ -273,9 +270,7 @@ class ModuleCollector:
 
 		:return:  Worker class for the given worker metadata
 		"""
-
 		module = worker["module"]
-
 		if module not in sys.modules:
 			importlib.import_module(module)
 
