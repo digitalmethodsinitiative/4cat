@@ -59,9 +59,9 @@
     {# Processor header, showing title, status, and a tooltip with a description #}
     <div class="processor-header">
         <header>
+            <h4>{{ processors[item.type].name if not deprecated else "(Deprecated analysis) " + item.type }}</h4>
             <button class="tooltip-trigger" aria-controls="tooltip-processor-result-{{ item.key }}" aria-label="Post-processor details">?</button>
             <p role="tooltip" id="tooltip-processor-result-{{ item.key }}">{{ processors[item.type].description if not deprecated else "This analysis module has been deprecated but you can still download the result." }}</p>
-            <h4>{{ processors[item.type].name if not deprecated else "(Deprecated analysis) " + item.type }}</h4>
         </header>
 
         <span class="processor-status">
@@ -82,19 +82,7 @@
                     <p role="tooltip" id="tooltip-code-{{ item.key }}" aria-hidden="true">Review the code that generated this result</p>
                 </li>
                 {% endif %}
-                {% if item.type in processors and "references" in processors[item.type] and processors[item.type]["references"] %}
-                <li>
-                    <a class="property-badge permalink popup-trigger tooltip-trigger" aria-controls="tooltip-references-{{ item.key }} popup-references-{{ item.key }}"><i class="fa fa-fw fa-graduation-cap"></i> <span class="sr-only">References for this processor</span></a>
-                    <p role="tooltip" id="tooltip-references-{{ item.key }}" aria-hidden="true">References for this analytical processor</p>
-                    <div role="dialog" id="popup-references-{{ item.key }}">
-                        <ol>
-                            {% for reference in processors[item.type]["references"] %}
-                                <li>{{ reference|markdown|safe }}</li>
-                            {% endfor %}
-                        </ol>
-                    </div>
-                </li>
-                {% endif %}
+
                 {% if item.num_rows > 0 and item.type in processors and processors[item.type].extension in ("jpg", "jpeg", "png", "csv", "html") and processors[item.type].can_preview %}
                 <li>
                     <a class="property-badge permalink popup-trigger tooltip-trigger" aria-controls="popup-preview-{{ item.key }} tooltip-preview-{{ item.key }}"><i class="fa fa-fw fa-eye" aria-hidden="true"></i> <span class="sr-only">Preview this dataset</span></a>
@@ -160,9 +148,11 @@
         {# Possible further analyses #}
         <ol class="children-processors">
             {% for processor in item.processors.values() %}
+
+                {% set git_url = item.get_version_url("backend/processors/" + processor.file)%}
                 {% set dataset = item %}
                 {% set inline = true %}
-                    {% include "processor-details.html" %}
+                {% include "processor-details.html" %}
                 {% set inline = false %}
             {% endfor %}
         </ol>

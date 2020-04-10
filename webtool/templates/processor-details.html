@@ -18,13 +18,32 @@
     {# Processor header, showing title and description #}
     <div class="processor-header">
         <header>
+            <h4>{{ processor.name }}</h4>
+
+            {% if processor.references %}
+            <span>
+                <ul>
+                    <li>
+                        <a class="property-badge permalink popup-trigger tooltip-trigger" aria-controls="tooltip-references-{{ processor.key }} popup-references-{{ processor.key }}"><i class="fa fa-fw fa-graduation-cap"></i> <span class="sr-only">References for this processor</span></a>
+                        <p role="tooltip" id="tooltip-references-{{ processor.key }}" aria-hidden="true">References for this analytical processor</p>
+                        <div role="dialog" id="popup-references-{{ processor.key }}">
+                            <ol>
+                                {% for reference in processor.references %}
+                                    <li>{{ reference|markdown|safe }}</li>
+                                {% endfor %}
+                            </ol>
+                        </div>
+                    </li>
+                </ul>
+            </span>
+            {% endif %}
+
+            {% if not inline %}
+                <p>{{ processor.description }}</p>
+            {% endif %}
             {% if inline %}
                 <button class="tooltip-trigger" aria-controls="tooltip-processor-{{ dataset.key }}-{{ processor.id }}" aria-label="Post-processor details">?</button>
                 <p role="tooltip" id="tooltip-processor-{{ dataset.key }}-{{ processor.id }}">{{ processor.description }}</p>
-            {% endif %}
-            <h4>{{ processor.name }}</h4>
-            {% if not inline %}
-                <p>{{ processor.description }}</p>
             {% endif %}
         </header>
 
