@@ -7,13 +7,14 @@ import re
 from pathlib import Path
 
 import config
-import backend.bootstrap as bootstrap
 
 from backend.lib.helpers import call_api
 
 cli = argparse.ArgumentParser()
-cli.add_argument("--interactive", "-i", default=False, help="Run 4CAT in interactive mode (not in the background).", action="store_true")
-cli.add_argument("--no-version-check", "-n", default=False, help="Skip version check that may prompt the user to migrate first.", action="store_true")
+cli.add_argument("--interactive", "-i", default=False, help="Run 4CAT in interactive mode (not in the background).",
+				 action="store_true")
+cli.add_argument("--no-version-check", "-n", default=False,
+				 help="Skip version check that may prompt the user to migrate first.", action="store_true")
 cli.add_argument("command")
 args = cli.parse_args()
 
@@ -47,7 +48,8 @@ if not args.no_version_check:
 # (could be expanded to check for other values)
 # ---------------------------------------------
 if not config.ANONYMISATION_SALT or config.ANONYMISATION_SALT == "REPLACE_THIS":
-	print("You need to set a random value for anonymisation in config.py before you can run 4CAT. Look for the ANONYMISATION_SALT option.")
+	print(
+		"You need to set a random value for anonymisation in config.py before you can run 4CAT. Look for the ANONYMISATION_SALT option.")
 	sys.exit(1)
 
 # ---------------------------------------------
@@ -59,12 +61,13 @@ if os.name not in ("posix"):
 	# if not, run the backend directly and quit
 	print("Using '%s' to run the 4CAT backend is only supported on UNIX-like systems." % __file__)
 	print("Running backend in interactive mode instead.")
+	import backend.bootstrap as bootstrap
 	bootstrap.run(as_daemon=False)
 	sys.exit(0)
 
-
 if args.interactive:
 	print("Running backend in interactive mode.")
+	import backend.bootstrap as bootstrap
 	bootstrap.run(as_daemon=False)
 	sys.exit(0)
 else:
@@ -74,7 +77,8 @@ else:
 	from daemon import pidfile
 
 # determine PID file
-lockfile = Path(config.PATH_ROOT, config.PATH_LOCKFILE, "4cat.pid") # pid file location
+lockfile = Path(config.PATH_ROOT, config.PATH_LOCKFILE, "4cat.pid")  # pid file location
+
 
 # ---------------------------------------------
 #   These functions start and stop the daemon
@@ -106,6 +110,13 @@ def start():
 				pidfile=pidfile.TimeoutPIDLockFile(str(lockfile)),
 				detach_process=True
 		) as context:
+			# clear module cache first so it will be regenerated
+			# ideally we'd do this in ModuleLoader, but we need to do this
+			# before that class is loaded...
+			module_cache = Path(config.PATH_ROOT, "backend", "module_cache.pb")
+			if module_cache.exists():
+				module_cache.unlink()
+			import backend.bootstrap as bootstrap
 			bootstrap.run(as_daemon=True)
 		sys.exit(0)
 	else:
@@ -150,7 +161,7 @@ def stop(force=False):
 					sent, False if not.
 
 	"""
-	killed=False
+	killed = False
 
 	if lockfile.is_file():
 		# see if the listed process is actually running right now
@@ -176,7 +187,8 @@ def stop(force=False):
 					print("...error: the 4CAT backend daemon did not quit within 60 seconds. Sending SIGKILL...")
 					killed = True
 				else:
-					print("...error: the 4CAT backend daemon did not quit within 60 seconds. A worker may not have quit (yet).")
+					print(
+						"...error: the 4CAT backend daemon did not quit within 60 seconds. A worker may not have quit (yet).")
 					return False
 			time.sleep(1)
 
@@ -233,22 +245,23 @@ elif command == "status":
 	# show whether the daemon is currently running
 	if not pid:
 		print("4CAT Backend Daemon is currently not running.")
+	elif pid in psutil.pids():
+		print("4CAT Backend Daemon is currently up and running.")
+
+		# fetch more detailed status via internal API
+		if not config.API_PORT:
+			sys.exit(0)
+
+		print("\n     Active workers:\n-------------------------")
+		active_workers = call_api("workers")["response"]
+		active_workers = {worker: active_workers[worker] for worker in
+						  sorted(active_workers, key=lambda id: active_workers[id], reverse=True) if
+						  active_workers[worker] > 0}
+		for worker in active_workers:
+			print("%s: %i" % (worker, active_workers[worker]))
+
+		print("\n")
+
+
 	else:
-		if True or pid in psutil.pids():
-			print("4CAT Backend Daemon is currently up and running.")
-
-			# fetch more detailed status via internal API
-			if not config.API_PORT:
-				sys.exit(0)
-
-			print("\n     Active workers:\n-------------------------")
-			active_workers = call_api("workers")["response"]
-			active_workers = {worker: active_workers[worker] for worker in sorted(active_workers, key=lambda id: active_workers[id], reverse=True) if active_workers[worker] > 0}
-			for worker in active_workers:
-				print("%s: %i" % (worker, active_workers[worker]))
-
-			print("\n")
-
-
-		else:
-			print("4CAT Backend Daemon is not running, but a PID file exists. Has it crashed?")
+		print("4CAT Backend Daemon is not running, but a PID file exists. Has it crashed?")
