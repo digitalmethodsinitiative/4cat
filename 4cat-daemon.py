@@ -1,6 +1,8 @@
+import argparse
 import time
 import sys
 import os
+import re
 
 from pathlib import Path
 
@@ -9,22 +11,59 @@ import backend.bootstrap as bootstrap
 
 from backend.lib.helpers import call_api
 
-# check validity of config file
-# (right now, just check if defaults have been updated where required)
+cli = argparse.ArgumentParser()
+cli.add_argument("--interactive", "-i", default=False, help="Run 4CAT in interactive mode (not in the background).", action="store_true")
+cli.add_argument("--no-version-check", "-n", default=False, help="Skip version check that may prompt the user to migrate first.", action="store_true")
+cli.add_argument("command")
+args = cli.parse_args()
+
+# ---------------------------------------------
+#     Do not start if migration is required
+# ---------------------------------------------
+if not args.no_version_check:
+	target_version_file = Path("VERSION")
+	current_version_file = Path(".current-version")
+
+	if not current_version_file.exists():
+		# this is the latest version lacking version files
+		current_version = "1.9"
+	else:
+		with current_version_file.open() as handle:
+			current_version = re.split(r"\s", handle.read())[0].strip()
+
+	if not target_version_file.exists():
+		target_version = "1.9"
+	else:
+		with target_version_file.open() as handle:
+			target_version = re.split(r"\s", handle.read())[0].strip()
+
+	if current_version != target_version:
+		print("Version change detected. You should run the following command to update 4CAT before (re)starting:")
+		print("  %s helper-scripts/migrate.py" % sys.executable)
+		exit(0)
+
+# ---------------------------------------------
+#     Check validity of configuration file
+# (could be expanded to check for other values)
+# ---------------------------------------------
 if not config.ANONYMISATION_SALT or config.ANONYMISATION_SALT == "REPLACE_THIS":
 	print("You need to set a random value for anonymisation in config.py before you can run 4CAT. Look for the ANONYMISATION_SALT option.")
 	sys.exit(1)
 
-# check if we can run a daemon
+# ---------------------------------------------
+#   Running as a daemon is only supported on
+#   POSIX-compatible systems - run interactive
+#                on Windows.
+# ---------------------------------------------
 if os.name not in ("posix"):
 	# if not, run the backend directly and quit
 	print("Using '%s' to run the 4CAT backend is only supported on UNIX-like systems." % __file__)
-	print("Running backend in terminal instead.")
+	print("Running backend in interactive mode instead.")
 	bootstrap.run(as_daemon=False)
 	sys.exit(0)
 
 
-if sys.argv[-2].lower() in ("-i", "--interactive"):
+if args.interactive:
 	print("Running backend in interactive mode.")
 	bootstrap.run(as_daemon=False)
 	sys.exit(0)
@@ -37,7 +76,11 @@ else:
 # determine PID file
 lockfile = Path(config.PATH_ROOT, config.PATH_LOCKFILE, "4cat.pid") # pid file location
 
-
+# ---------------------------------------------
+#   These functions start and stop the daemon
+# ---------------------------------------------
+# These are only defined at this point because they require the psutil and
+# daemon modules which are not available on Windows.
 def start():
 	"""
 	Start backend, as a daemon
@@ -149,24 +192,28 @@ def stop(force=False):
 		return False
 
 
-# display manual if invalid command was given
+# ---------------------------------------------
+#   Show manual, if command does not exists
+# ---------------------------------------------
 manual = """Usage: python(3) backend.py <start|stop|restart|force-restart|status>
 
 Starts, stops or restarts the 4CAT backend daemon.
 """
-if len(sys.argv) < 2 or sys.argv[1].lower() not in ("start", "stop", "restart", "status", "force-restart"):
+if args.command not in ("start", "stop", "restart", "status", "force-restart"):
 	print(manual)
 	sys.exit(1)
 
 # determine command given and get the current PID (if any)
-command = sys.argv[-1].lower()
+command = args.command
 if lockfile.is_file():
 	with lockfile.open() as file:
 		pid = int(file.read().strip())
 else:
 	pid = None
 
-# interpret commands
+# ---------------------------------------------
+#        Run code for valid commands
+# ---------------------------------------------
 if command in ("restart", "force-restart"):
 	print("Restarting 4CAT Backend Daemon...")
 	# restart daemon, but only if it's already running and could successfully be stopped
@@ -187,7 +234,7 @@ elif command == "status":
 	if not pid:
 		print("4CAT Backend Daemon is currently not running.")
 	else:
-		if pid in psutil.pids():
+		if True or pid in psutil.pids():
 			print("4CAT Backend Daemon is currently up and running.")
 
 			# fetch more detailed status via internal API
