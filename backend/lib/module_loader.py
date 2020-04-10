@@ -125,7 +125,7 @@ class ModuleCollector:
 					metadata = {
 						"file": file.name,
 						"path": relative_path,
-						"module": relative_path[1:-3].replace("/", "."),
+						"module": relative_path[1:-3].replace("/", ".").replace("\\", "."),
 						"id": component[1].type,
 						"name": component[0],
 						"class_name": component[0],
