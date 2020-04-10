@@ -42,8 +42,8 @@ class TfIdf(BasicProcessor):
 	options = {
 		"library": {
 			"type": UserInput.OPTION_CHOICE,
-			"default": "gensim",
-			"options": {"gensim": "gensim", "scikit-learn": "scikit-learn"},
+			"default": "scikit-learn",
+			"options": {"scikit-learn": "scikit-learn", "gensim": "gensim"},
 			"help": "Library",
 			"tooltip": "Which Python library should do the calculations? Gensim is better in optimising memory, so should be used for large datasets. Check the documentation in this module's references."
 		},
@@ -56,7 +56,7 @@ class TfIdf(BasicProcessor):
 		},
 		"min_occurrences": {
 			"type": UserInput.OPTION_TEXT,
-			"default": 1,
+			"default": "",
 			"min": 1,
 			"max": 10000,
 			"help": "[scikit-learn] Ignore terms that appear in less than this amount of token sets",
@@ -72,7 +72,7 @@ class TfIdf(BasicProcessor):
 		},
 		"n_size": {
 			"type": UserInput.OPTION_CHOICE,
-			"default": 1,
+			"default": "",
 			"options": {"1": 1, "2": 2},
 			"help": "[scikit-learn] Amount of words to return (1 = unigrams, 2 = bigrams)"
 		},
@@ -244,7 +244,7 @@ class TfIdf(BasicProcessor):
 		"""
 
 		# Convert to tuple
-		ngram_range = (ngram_range, ngram_range)
+		ngram_range = (int(ngram_range), int(ngram_range))
 		
 		# Vectorise
 		self.dataset.update_status("Vectorizing")
