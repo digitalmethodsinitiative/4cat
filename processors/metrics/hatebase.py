@@ -30,6 +30,10 @@ class HatebaseAnalyser(BasicProcessor):
 	token_expires = 0
 	token = ""
 
+	references = [
+		"[Hatebase.org](https://hatebase.org)"
+	]
+
 	options = {
 		"language": {
 			"type": UserInput.OPTION_CHOICE,

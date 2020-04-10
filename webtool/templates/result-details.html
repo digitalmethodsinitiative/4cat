@@ -90,6 +90,7 @@
                 <h4 class="blocktitle section-subheader"><span>{{ processor.category }}</span></h4>
                 <ol class="processor-list child-list">
             {% endif %}
+            {% set git_url = dataset.get_version_url("backend/processors/" + processor.file)%}
             {% include "processor-details.html" %}
         {% endfor %}
     </section>
