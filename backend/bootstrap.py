@@ -1,17 +1,12 @@
 """
 4CAT Backend init - used to start the backend!
 """
-import pathlib
 import shutil
-import os
-
-import config
 
 from backend.lib.queue import JobQueue
 from backend.lib.database import Database
 from backend.lib.manager import WorkerManager
 from backend.lib.logger import Logger
-from backend import all_modules
 
 
 def run(as_daemon=True):

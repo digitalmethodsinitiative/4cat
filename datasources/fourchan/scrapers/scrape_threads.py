@@ -113,7 +113,7 @@ class ThreadScraper4chan(BasicJSONScraper):
 		# mark deleted posts as such
 		deleted = set(post_dict_db.keys()) - set(post_dict_scrape.keys())
 		for post_id in deleted:
-			self.db.update("posts_" + self.prefix, where={"id": post_id}, data={"timestamp_deleted": self.init_time}, commit=False)
+			self.db.update("posts_" + self.prefix, where={"id": post_id, "board": self.job.details["board"]}, data={"timestamp_deleted": self.init_time}, commit=False)
 		self.db.commit()
 
 		# add new posts
@@ -159,6 +159,7 @@ class ThreadScraper4chan(BasicJSONScraper):
 		# aggregate post data
 		post_data = {
 			"id": post["no"],
+			"board": self.job.details["board"],
 			"thread_id": thread["id"],
 			"timestamp": post["time"],
 			"subject": post.get("sub", ""),

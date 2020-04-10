@@ -34,6 +34,7 @@ CREATE INDEX IF NOT EXISTS threads_seq
 CREATE TABLE IF NOT EXISTS posts_4chan (
   id                bigint PRIMARY KEY,  -- matches 4chan post ID
   id_seq            SERIAL,  -- sequential ID for easier indexing
+  board             TEXT,
   thread_id         bigint,
   timestamp         integer,
   timestamp_deleted integer DEFAULT 0,
@@ -53,6 +54,12 @@ CREATE TABLE IF NOT EXISTS posts_4chan (
   semantic_url      text,
   unsorted_data     text
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS posts_id (
+  ON posts_4chan (
+    id, board
+  )
+)
 
 CREATE INDEX IF NOT EXISTS posts_timestamp
   ON posts_4chan (
