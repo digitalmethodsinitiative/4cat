@@ -70,11 +70,9 @@ class Search4Chan(Search):
 				where.append("p.country_code = %s")
 				replacements.append(query.get("country_code"))
 
-		sql_query = ("SELECT p.*, t.board " \
+		sql_query = ("SELECT p.* " \
 					 "FROM posts_" + self.prefix + " AS p " \
-					 "LEFT JOIN threads_" + self.prefix + " AS t " \
-					 "ON t.id = p.thread_id " \
-					 "WHERE t.board = %s ")
+					 "WHERE p.board = %s ")
 
 		if where:
 			sql_query += " AND " + " AND ".join(where)
@@ -183,6 +181,9 @@ class Search4Chan(Search):
 				postgres_where.append("country_code = %s")
 				postgres_replacements.append(query.get("country_code"))
 
+		postgres_where.append("board = %s")
+		postgres_replacements.append(query.get("board"))
+
 		posts_full = self.fetch_posts(tuple([post["post_id"] for post in posts]), postgres_where, postgres_replacements)
 
 		self.dataset.update_status("Post data collected")
@@ -270,7 +271,7 @@ class Search4Chan(Search):
 		)
 
 		try:
-			sql = "SELECT thread_id, post_id FROM `" + self.prefix + "_posts` WHERE " + where + " LIMIT 5000000 OPTION max_matches = 5000000, ranker = none, boolean_simplify = 1, sort_method = kbuffer, cutoff = 5000000"
+			sql = "SELECT thread_id, post_id, board FROM `" + self.prefix + "_posts` WHERE " + where + " LIMIT 5000000 OPTION max_matches = 5000000, ranker = none, boolean_simplify = 1, sort_method = kbuffer, cutoff = 5000000"
 			print(sql)
 			# sql = "SELECT thread_id, post_id FROM `" + self.prefix + "_posts` WHERE " + where + " LIMIT 5000000 OPTION max_matches = 5000000, ranker = none, boolean_simplify = 1, sort_method = kbuffer, cutoff = 5000000"
 			self.log.info("Running Sphinx query %s " % sql)
@@ -389,6 +390,8 @@ class Search4Chan(Search):
 
 			query["min_date"] = after
 			query["max_date"] = before
+
+		query["with_deleted"] = bool(query.get("with_deleted", False))
 
 		is_placeholder = re.compile("_proxy$")
 		filtered_query = {}
