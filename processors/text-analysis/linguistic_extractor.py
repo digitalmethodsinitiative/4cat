@@ -34,6 +34,10 @@ class LinguisticFeatures(BasicProcessor):
 	input = "csv"
 	output = "zip"
 
+	references = [
+		"[SpaCy Linguistic Features - Documentation](https://spacy.io/usage/linguistic-features/)"
+	]
+	
 	options = {
 		"enable": {
 			"type": UserInput.OPTION_MULTI,
@@ -46,6 +50,7 @@ class LinguisticFeatures(BasicProcessor):
 			"help": "What linguistic features to extract. Without any of these selected, it simply saves the SpaCy docs (tokenised sentences) as a serialized file. See https://spacy.io/usage/linguistic-features"
 		}
 	}
+
 
 	def process(self):
 		"""

@@ -49,6 +49,11 @@ class YouTubeMetadata(BasicProcessor):
 	api_limit_reached = False
 	invalid_api_key = False
 
+	references = [
+		"[YouTube API v3 documentation](https://developers.google.com/youtube/v3)",
+		"[4chan’s YouTube: A Fringe Perspective on YouTube’s Great Purge of 2019 - OILab.eu](https://oilab.eu/4chans-youtube-a-fringe-perspective-on-youtubes-great-purge-of-2019/)"
+	]
+
 	options = {
 		"top": {
 			"type": UserInput.OPTION_TEXT,
