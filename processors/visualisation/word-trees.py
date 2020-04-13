@@ -32,6 +32,10 @@ class MakeWordtree(BasicProcessor):
 	description = "Generates a word tree for a given query, a \"graphical version of the traditional 'keyword-in-context' method\" (Wattenberg & Viégas, 2008)."  # description displayed in UI
 	extension = "svg"  # extension of result file, used internally and in UI
 
+	references = [
+		"Wattenberg, M., & Viégas, F. B. (2008). The Word Tree, an Interactive Visual Concordance. IEEE Transactions on Visualization and Computer Graphics, 14(6), 1221–1228. <https://doi.org/10.1109/TVCG.2008.172>"
+	]
+
 	options = {
 		"query": {
 			"type": UserInput.OPTION_TEXT,
@@ -85,10 +89,6 @@ class MakeWordtree(BasicProcessor):
 			"help": "Remove non-alphanumeric characters"
 		}
 	}
-
-	references = [
-		"Wattenberg, M., & Viégas, F. B. (2008). The Word Tree, an Interactive Visual Concordance. IEEE Transactions on Visualization and Computer Graphics, 14(6), 1221–1228. <https://doi.org/10.1109/TVCG.2008.172>"
-	]
 
 	input = "csv:body"
 	output = "svg"
