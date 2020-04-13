@@ -55,11 +55,10 @@ CREATE TABLE IF NOT EXISTS posts_4chan (
   unsorted_data     text
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS posts_id (
+CREATE UNIQUE INDEX IF NOT EXISTS posts_id
   ON posts_4chan (
     id, board
-  )
-)
+  );
 
 CREATE INDEX IF NOT EXISTS posts_timestamp
   ON posts_4chan (
