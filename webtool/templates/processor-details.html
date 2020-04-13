@@ -19,14 +19,14 @@
     <div class="processor-header">
         <header>
             <h4>{{ processor.name }}</h4>
-
+            
             {% if processor.references %}
             <span>
                 <ul>
                     <li>
-                        <a class="property-badge permalink popup-trigger tooltip-trigger" aria-controls="tooltip-references-{{ processor.key }} popup-references-{{ processor.key }}"><i class="fa fa-fw fa-graduation-cap"></i> <span class="sr-only">References for this processor</span></a>
-                        <p role="tooltip" id="tooltip-references-{{ processor.key }}" aria-hidden="true">References for this analytical processor</p>
-                        <div role="dialog" id="popup-references-{{ processor.key }}">
+                        <a class="property-badge permalink popup-trigger tooltip-trigger" aria-controls="tooltip-references-{{ processor.id }} popup-references-{{ processor.id }}"><i class="fa fa-fw fa-graduation-cap"></i> <span class="sr-only">References for this processor</span></a>
+                        <p role="tooltip" id="tooltip-references-{{ processor.id }}" aria-hidden="true">References for this analytical processor</p>
+                        <div role="dialog" id="popup-references-{{ processor.id }}">
                             <ol>
                                 {% for reference in processor.references %}
                                     <li>{{ reference|markdown|safe }}</li>
