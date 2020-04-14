@@ -65,8 +65,6 @@
 body {
     background: var(--contrast-bright);
     color: var(--text);
-    line-height: 1.5em;
-    padding-bottom: 5em;
 }
 
 a {
@@ -141,21 +139,63 @@ button:hover, .button-like:not(.inactive):hover {
 	right: 0;
 	position: absolute;
 	z-index: 0;
+    overflow: hidden;
 }
 
 #control-panel {
-	position: absolute;
-	top: 0;
-	left: 0;
+	position: relative;
+    line-height: 1.5;
+    max-height: 97vh;
+    max-width: 250px;
 	padding: 10px;
 	z-index: 1;
+    overflow-y: scroll;
+    background-color: rgba(250, 250, 250, 0.8)
+}
+
+#network-name-box {
+    color: black;
+    font-weight: bold;
+    font-size: 18px;
 }
 
 .control-panel-notice {
 	padding: 8px;
 }
 
-.standalone-button {
+#graph-manipulation .parameter-input {
+    width: 45px;
+    height: 20px;
+    float: right;
+}
+
+#graph-manipulation .parameter-input.full-width {
+    width: 95%;
+    height: 20px;
+    float: center;
+}
+
+.graph-manipulation-box {
+    margin-top: 25px;
+    margin-bottom: 25px;
+}
+
+.graph-manipulation-box-header {
+    color: var(--contrast-dark);
+    font-weight: bold;
+}
+
+.graph-manipulation-subbox {
+    margin-top: 10px;
+    margin-bottom: 10px;
+}
+
+.graph-manipulation-subbox > p {
+    margin-top: 8px;
+    margin-bottom: 8px;
+}
+
+#graph-manipulation > .standalone-button {
 	margin-top: 5px;
 	margin-bottom: 5px;
 }
@@ -168,13 +208,19 @@ button:hover, .button-like:not(.inactive):hover {
 	z-index: 1;
 }
 
-#alert-box {
-	color: var(--accent-alternate);
+.alert-box {
+	color: var(--accent-error);
+    font-weight: bold;
 }
 
 #hourglass {
+
 }
 
 hr {
-	color: var(--grey-light);
+	color: var(--gray-light);
+}
+
+i.invisible {
+    display: none;
 }

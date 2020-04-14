@@ -161,8 +161,8 @@ class word_embeddings_neighbours(BasicProcessor):
 						except KeyError as e:	
 							results.append({
 								"source_word": word,
-								"target_word": "ERROR: input word not in this model's vocabulary, be sure to insert lemmatized or stemmed versions",
-								"weight": 0,
+								"nearest_neighbour": "ERROR: input word not in this model's vocabulary, be sure to insert lemmatized or stemmed versions",
+								"cosime_similarity": 0,
 								"source_occurrences": 0,
 								"target_occurrences": 0,
 								"model": model_name,
@@ -175,8 +175,8 @@ class word_embeddings_neighbours(BasicProcessor):
 							if nearest_neighbour[1] >= cosine_threshold: # Cosine similarity threshold check
 								results.append({
 									"source_word": word,
-									"target_word": nearest_neighbour[0],
-									"weight": nearest_neighbour[1], # The edge weight
+									"nearest_neighbour": nearest_neighbour[0],
+									"cosine_similarity": nearest_neighbour[1],
 									"source_occurrences": model.vocab[word].count, # How often the source word appears in the model
 									"target_occurrences": model.vocab[nearest_neighbour[0]].count, # How often the target word appears in the model
 									"model": model_name,
