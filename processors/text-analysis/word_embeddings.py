@@ -34,9 +34,8 @@ class word_embeddings(BasicProcessor):
 	output = "zip"
 
 	references = [
-		"[Mikolov, Tomas, Ilya Sutskever, Kai Chen, Greg Corrado, and Jeffrey Dean. 2013. “Distributed Representations of Words and Phrases and Their Compositionality.” _Advances in Neural Information Processing Systems_,2013: 3111-3119.](https://papers.nips.cc/paper/5021-distributed-representations-of-words-and-phrases-and-their-compositionality.pdf)",
+		"[Mikolov, Tomas, Ilya Sutskever, Kai Chen, Greg Corrado, and Jeffrey Dean. 2013. “Distributed Representations of Words and Phrases and Their Compositionality.” Advances in Neural Information Processing Systems, 2013: 3111-3119.](https://papers.nips.cc/paper/5021-distributed-representations-of-words-and-phrases-and-their-compositionality.pdf)",
 		"[Mikolov, Tomas, Kai Chen, Greg Corrado, and Jeffrey Dean. 2013. “Efficient Estimation of Word Representations in Vector Space.” ICLR Workshop Papers, 2013: 1-12.](https://arxiv.org/pdf/1301.3781.pdf)",
-		"Goldberg, Yoav, and Omer Levy. 2014. “word2vec Explained: Deriving Mikolov et al.’s Negative-Sampling Word-Embedding Method.” arXiv:1402.3722v1.",
 		"[word2vec - Google Code](https://code.google.com/archive/p/word2vec/)",
 		"[word2vec - Gensim documentation](https://radimrehurek.com/gensim/models/word2vec.html)",
 		"[A Beginner's Guide to Word Embedding with Gensim Word2Vec Model - Towards Data Science](https://towardsdatascience.com/a-beginners-guide-to-word-embedding-with-gensim-word2vec-model-5970fa56cc92)"

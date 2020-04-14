@@ -147,14 +147,14 @@ class WikipediaCatgegoryNetwork(BasicProcessor):
 		with self.dataset.get_results_path().open("w", encoding="utf-8") as results:
 			results.write("nodedef>name VARCHAR,type VARCHAR,weight INTEGER\n")
 			for page in page_categories:
-				results.write("'" + page.replace("_", " ") + "',page," + str(links[page]) + "\n")
+				results.write("'" + page.replace("_", " ").replace(",", "") + "',page," + str(links[page]).replace(",", "") + "\n")
 
 			for category in all_categories:
-				results.write("'" + category.replace("_", " ") + "',category," + str(all_categories[category]) + "\n")
+				results.write("'" + category.replace("_", " ").replace(",", "") + "',category," + str(all_categories[category]).replace(",", "") + "\n")
 
 			results.write("edgedef>node1 VARCHAR, node2 VARCHAR, weight INTEGER\n")
 			for page in page_categories:
 				for category in page_categories[page]:
-					results.write("'" + page.replace("_", " ") + "','" + category.replace("_", " ") + "'\n")
+					results.write("'" + page.replace("_", " ").replace(",", "") + "','" + category.replace("_", " ").replace(",", "") + "'\n")
 
 		self.dataset.finish(len(page_categories))

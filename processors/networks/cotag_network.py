@@ -73,7 +73,7 @@ class CoTagger(BasicProcessor):
 					tags = []
 
 			# just in case
-			tags = [tag.strip().replace("'","") for tag in tags]
+			tags = [tag.strip().replace("'","").replace("\"","").replace(",","") for tag in tags]
 
 			# To lowercase if so desired
 			if self.parameters.get("to_lowercase"):
@@ -94,7 +94,7 @@ class CoTagger(BasicProcessor):
 						continue
 
 					pair = sorted((tag, co_tag))
-					pair_key = " ".join(pair)
+					pair_key = "-_-".join(pair)
 
 					if pair_key not in pairs:
 						pairs[pair_key] = 0
@@ -111,6 +111,6 @@ class CoTagger(BasicProcessor):
 			results.write("edgedef>node1 VARCHAR, node2 VARCHAR, weight INTEGER\n")
 			for pair in pairs:
 				results.write(
-					"'" + pair.split(" ")[0] + "','" + pair.split(" ")[1] + "',%i\n" % pairs[pair])
+					"'" + pair.split("-_-")[0] + "','" + pair.split("-_-")[1] + "',%i\n" % pairs[pair])
 
 		self.dataset.finish(len(pairs))
