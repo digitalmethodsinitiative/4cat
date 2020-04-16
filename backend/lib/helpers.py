@@ -212,7 +212,7 @@ def call_api(action, payload=None):
 	:return: API response, or timeout message in case of timeout
 	"""
 	connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-	connection.settimeout(5)
+	connection.settimeout(15)
 	connection.connect(("localhost", config.API_PORT))
 
 	msg = json.dumps({"request": action, "payload": payload})
