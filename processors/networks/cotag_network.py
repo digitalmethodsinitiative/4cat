@@ -73,7 +73,7 @@ class CoTagger(BasicProcessor):
 					tags = []
 
 			# just in case
-			tags = [tag.strip().replace("'","").replace("\"","").replace(",","") for tag in tags]
+			tags = [tag.strip().replace(",","").replace("\"","'") for tag in tags]
 
 			# To lowercase if so desired
 			if self.parameters.get("to_lowercase"):

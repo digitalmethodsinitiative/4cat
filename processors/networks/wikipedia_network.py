@@ -120,6 +120,13 @@ class WikipediaCatgegoryNetwork(BasicProcessor):
 
 				# save category links
 				for category in categories:
+
+					# Add " (cat)" to the category strings.
+					# This is needed because pages can sometimes have the same name as the category.
+					# This will result in a faulty graph, since there's duplicate nodes.
+					
+					category += " (cat)"
+
 					if category not in all_categories:
 						all_categories[category] = 0
 
