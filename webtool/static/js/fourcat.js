@@ -10,18 +10,23 @@ $(init);
 
 function init() {
     // Check status of query
-    query.update_status();
-    setInterval(query.update_status, 4000);
+    if($('body.result-page').length > 0) {
+        query.update_status();
+        setInterval(query.update_status, 4000);
+
+        // Check processor queue
+        query.check_processor_queue();
+        setInterval(query.check_processor_queue, 10000);
+    }
 
     // Check search queue
-    if($('#search-queue-status .search-queue-message') || $('#search-queue-status .search-queue-list')) {
+    if($('#query-form').length > 0) {
         query.check_search_queue();
         setInterval(query.check_search_queue, 8000);
     }
 
-    // Check processor queue
-    query.check_processor_queue();
-    setInterval(query.check_processor_queue, 10000);
+    //regularly check for unfinished datasets
+    setInterval(query.check_resultpage, 4000);
 
     // Update dynamic containers
     setInterval(dynamic_container.refresh, 2500);
@@ -103,9 +108,6 @@ function init() {
         });
         select.remove();
     });
-
-    //regularly check for unfinished datasets
-    setInterval(query.check_resultpage, 4000);
 
     //confirm links
     $(document).on('click', '.confirm-first', function(e) {
@@ -372,6 +374,11 @@ query = {
      * analyses if all subqueries have finished
      */
     update_status: function () {
+        if(!document.hasFocus()) {
+            //don't hammer the server while user is looking at something else
+            return;
+        }
+
         let queued = $('.child-wrapper.running');
         if (queued.length === 0) {
             return;
@@ -410,6 +417,11 @@ query = {
         /*
         Polls server to check how many search queries are still in the queue
         */
+        if(!document.hasFocus()) {
+            //don't hammer the server while user is looking at something else
+            return;
+        }
+
         $.getJSON({
             url: '/api/check-search-queue/',
             success: function (json) {
@@ -451,6 +463,10 @@ query = {
         Checks what processors are in the queue and keeps updating the option/run buttons
         and already-queued processes buttons.
         */
+        if(!document.hasFocus()) {
+            //don't hammer the server while user is looking at something else
+            return;
+        }
         
         $.getJSON({
             url: '/api/status.json',
@@ -758,6 +774,11 @@ popup = {
  */
 dynamic_container = {
     refresh: function() {
+        if(!document.hasFocus()) {
+            //don't hammer the server while user is looking at something else
+            return;
+        }
+
         $('.content-container').each(function() {
             let url = $(this).attr('data-source');
             let interval = parseInt($(this).attr('data-interval'));

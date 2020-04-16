@@ -35,8 +35,8 @@
                 {% if stats %}
                     {% for datasource in datasources %}{% if datasource != "overall" %}
                         <li>
-                            {{ stats[datasource]["name"] if "name" in stats[datasource] else datasource|capitalize }}{% if datasource in stats and "posts" in stats[datasource] %} (
-                                {{ stats[datasource]["posts"]|numberify }} posts since
+                            {{ stats[datasource]["name"] if "name" in stats[datasource] else datasource|capitalize }}{% if datasource in stats and "posts" in stats[datasource] %}
+                                ({{ stats[datasource]["posts"]|numberify }} posts since
                                 {{ stats[datasource]["first"]|datetime('%-d %b %Y') }}){% endif %}
                             {% if "boards" in datasources[datasource] and datasources[datasource]["boards"] != "*" and datasources[datasource]["boards"] != ["*"] %}
                                 <ul>

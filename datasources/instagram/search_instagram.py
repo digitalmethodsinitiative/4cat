@@ -36,8 +36,6 @@ class SearchInstagram(Search):
 
 		Fetches data from Instagram via instaloader.
 		"""
-		self.job.finish()
-
 		# this is useful to include in the results because researchers are
 		# always thirsty for them hashtags
 		hashtag = re.compile(r"#([^\s,.+=-]+)")
