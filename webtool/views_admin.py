@@ -24,13 +24,6 @@ def admin_frontpage():
 	return render_template("controlpanel/frontpage.html")
 
 
-@app.route("/admin/add-user/")
-@login_required
-@admin_required
-def add_user():
-	pass
-
-
 @app.route("/admin/worker-status/")
 @login_required
 @admin_required
