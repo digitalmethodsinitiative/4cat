@@ -7,6 +7,7 @@ import traceback
 import requests
 import argparse
 import json
+import time
 import sys
 import re
 
@@ -151,8 +152,9 @@ while True:
 		break
 
 	if page_html.status_code != 200:
-		print("HTTP error %i while scraping page %i" % (page_html.status_code, page))
-		break
+		print("HTTP error %i while scraping page %i, retrying in 10 seconds" % (page_html.status_code, page))
+		time.sleep(10)
+		continue
 
 	try:
 		page_json = json.loads(page_html.content)
@@ -162,8 +164,17 @@ while True:
 			output.write(page_html.content)
 		break
 
-	thread_ids = list(page_json.keys())
-	for thread_id in thread_ids:
+	thread_ids = iter(list(page_json.keys()))
+	retry = False
+	while True:
+		try:
+			if not retry:
+				thread_id = thread_ids.__next__()
+			else:
+				retry = False
+		except StopIteration:
+			break
+
 		print("Thread %s" % thread_id)
 		thread_path = Path(folder, "%s.json" % thread_id)
 		if thread_path.exists():
@@ -179,9 +190,14 @@ while True:
 			print("RequestException while requesting thread %s: %s" % (thread_id, traceback.format_exc()))
 			break
 
+		if thread_html.status_code > 399 and thread_html.status_code < 500:
+			print("HTTP error %i while scraping thread %s, skipping" % (thread_html.status_code, thread_id))
+			continue
 		if thread_html.status_code != 200:
-			print("HTTP error %i while scraping thread %s" % (page_html.status_code, thread_id))
-			break
+			print("HTTP error %i while scraping thread %s, waiting 10 seconds before retrying" % (thread_html.status_code, thread_id))
+			time.sleep(10)
+			retry = True
+			continue
 
 		try:
 			thread_json = json.loads(thread_html.content)
