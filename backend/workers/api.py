@@ -205,7 +205,8 @@ class InternalAPI(BasicWorker):
 			# info as well as related datasets. useful to monitor server
 			# activity and judge whether 4CAT can safely be interrupted
 			open_jobs = self.db.fetchall("SELECT * FROM jobs ORDER BY jobtype ASC, timestamp ASC, remote_id ASC")
-			response = []
+			running = []
+			queue = {}
 
 			for job in open_jobs:
 				try:
@@ -213,21 +214,30 @@ class InternalAPI(BasicWorker):
 				except IndexError:
 					worker = None
 
-				response.append({
-					"type": job["jobtype"],
-					"is_claimed": job["timestamp_claimed"] > 0,
-					"is_running": bool(worker),
-					"is_processor": hasattr(worker, "dataset"),
-					"is_recurring": (int(job["interval"]) > 0),
-					"is_maybe_crashed": job["timestamp_claimed"] > 0 and not worker,
-					"dataset_key": worker.dataset.key if hasattr(worker, "dataset") else None,
-					"dataset_user": worker.dataset.parameters.get("user", None) if hasattr(worker, "dataset") else None,
-					"dataset_parent_key": worker.dataset.top_key() if hasattr(worker, "dataset") else None,
-					"timestamp_queued": job["timestamp"],
-					"timestamp_claimed": job["timestamp_lastclaimed"]
-				})
+				if not bool(worker):
+					if job["jobtype"] not in queue:
+						queue[job["jobtype"]] = 0
 
-			return response
+					queue[job["jobtype"]] += 1
+				else:
+					running.append({
+						"type": job["jobtype"],
+						"is_claimed": job["timestamp_claimed"] > 0,
+						"is_running": bool(worker),
+						"is_processor": hasattr(worker, "dataset"),
+						"is_recurring": (int(job["interval"]) > 0),
+						"is_maybe_crashed": job["timestamp_claimed"] > 0 and not worker,
+						"dataset_key": worker.dataset.key if hasattr(worker, "dataset") else None,
+						"dataset_user": worker.dataset.parameters.get("user", None) if hasattr(worker, "dataset") else None,
+						"dataset_parent_key": worker.dataset.top_key() if hasattr(worker, "dataset") else None,
+						"timestamp_queued": job["timestamp"],
+						"timestamp_claimed": job["timestamp_lastclaimed"]
+					})
+
+			return {
+				"running": running,
+				"queued": queue
+			}
 
 
 

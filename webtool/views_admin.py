@@ -28,26 +28,16 @@ def admin_frontpage():
 @login_required
 @admin_required
 def get_worker_status():
-	workers = call_api("worker-status")["response"]
+	workers = call_api("worker-status")["response"]["running"]
 	return render_template("controlpanel/worker-status.html", workers=workers, worker_types=backend.all_modules.workers,
 						   now=time.time())
-
-	pass
 
 
 @app.route("/admin/queue-status/")
 @login_required
 @admin_required
 def get_queue_status():
-	workers = call_api("worker-status")["response"]
-	queue = {}
-	for worker in workers:
-		if not worker["is_running"]:
-			if worker["type"] not in queue:
-				queue[worker["type"]] = 0
-
-			queue[worker["type"]] += 1
-
+	queue = call_api("worker-status")["response"]["queued"]
 	return render_template("controlpanel/queue-status.html", queue=queue, worker_types=backend.all_modules.workers,
 						   now=time.time())
 
