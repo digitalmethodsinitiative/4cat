@@ -8,6 +8,7 @@ The corresponding CSS file is found in webtool/static/css.
 import json
 import random
 import re
+import requests
 
 import config
 
@@ -74,26 +75,24 @@ class SigmaNetwork(BasicProcessor):
 
 		self.dataset.update_status("Generating HTML file")
 
-		# We need to use absolute URLs in the generated HTML, because they
-		# may be downloaded (ideally they'd be fully self-contained, but that
-		# would lead to very big files). So determine what URL we can use to
-		# link to 4CAT's server in the generated HTML.
-		if config.FlaskConfig.SERVER_HTTPS:
-			server_url = "https://" + config.FlaskConfig.SERVER_NAME
-		else:
-			server_url = "http://" + config.FlaskConfig.SERVER_NAME
-
 		# Generate a html file based on the retrieved json data
-		with open(config.PATH_ROOT + "/processors/visualisation/sigma_network.html") as template:
-			output = template.read().replace("**json**", json.dumps(data)).replace("**server**", server_url)
+		try:
+			if config.FlaskConfig.SERVER_HTTPS:
+				response = requests.post("https://" + config.FlaskConfig.SERVER_NAME + "/sigma_network/", json=data)
+			else:
+				response = requests.post("http://" + config.FlaskConfig.SERVER_NAME + "/sigma_network/", json=data)
+		
+		except Exception as error:
+			self.dataset.update_status("Couldn't reach the server to generate the HTML file.")
+			return
 
 		# Write HTML file
 		with self.dataset.get_results_path().open("w", encoding="utf-8") as output_file:
-			output_file.write(output)
+			output_file.write(response.text)
 
 		# Finish
 		self.dataset.update_status("Finished")
-		self.dataset.finish(len(output))
+		self.dataset.finish(1)
 
 	def generate_json_from_gdf(self, source_file):
 		""" 
@@ -137,41 +136,46 @@ class SigmaNetwork(BasicProcessor):
 				if looping_through_nodes:
 
 					# Save the node info here
-					node = {}
+					node = {"size": 1}
 
 					# If everything is ok, there's no commas in gdf file's node info,
 					# so split on a comma and loop through the items
+
 					node_items = line.split(",")
 
 					for i, node_item in enumerate(node_items):
 
 						# Do some string cleaning
 						node_item = node_item.strip()
-						if node_item.startswith("'"):
-							node_item = node_item[1:]
-						if node_item.endswith("'"):
-							node_item = node_item[:-1]
 						if node_item.endswith("\n"):
 							node_item = node_item[:-2]
+						if node_item.startswith("'") or node_item.startswith("\""):
+							node_item = node_item[1:]
+						if node_item.endswith("'") or node_item.endswith("\""):
+							node_item = node_item[:-1]
 
 						# Mandatory nodes
+
+						# Use the "name" info to write mandatory data
 						if node_types[i].startswith("name "):
-							node["id"] = str(node_item)
-							nodes_added.append(node_item)
-							node["label"] = str(node_item)
+							node["id"] = node_item
+							node["label"] = node_item
 							node["x"] = random.randrange(1, 20)
 							node["y"] = random.randrange(1, 20)
 							if highlight_words and node_item in highlight_words:
 								node["color"] = "#19B0A3"
 
+						elif node_types[i].startswith("label "):
+							node["label"] = node_item
+
 						elif node_types[i].startswith("weight "):
 							node["size"] = float(node_item)
 
-						# A new, custom node type (e.g. "category")
+						# A new, custom node attribute (e.g. "category")
 						else:
 							if node_types[i].endswith("INTEGER"): # Parse to int if it's indicated
 								node_item = int(node_item)
-							node[node_types[i]] = node_item
+							node[node_types[i].split(" ")[0]] = node_item
 					
 					network["nodes"].append(node)
 
@@ -188,27 +192,27 @@ class SigmaNetwork(BasicProcessor):
 
 						# Do some string cleaning
 						edge_item = edge_item.strip()
-						if edge_item.startswith("'"):
-							edge_item = edge_item[1:]
-						if edge_item.endswith("'"):
-							edge_item = edge_item[:-1]
 						if edge_item.endswith("\n"):
 							edge_item = edge_item[:-2]
+						if edge_item.startswith("'") or edge_item.startswith("\""):
+							edge_item = edge_item[1:]
+						if edge_item.endswith("'") or edge_item.endswith("\""):
+							edge_item = edge_item[:-1]
 
 						# Loop through the types of nodes we've encountered before
 						if edge_types[i].startswith("node1 "):
-							edge["source"] = str(edge_item)
+							edge["source"] = edge_item
 							edges_added.append(edge_item)
 						elif edge_types[i].startswith("node2 "):
-							edge["target"] = str(edge_item)
+							edge["target"] = edge_item
 
 						elif edge_types[i].startswith("weight "):
 							edge["size"] = float(edge_item)
 						else:
-							# A new, custom node type (e.g. "category")
+							# A new, custom edge attribute (e.g. "category")
 							if edge_types[i].endswith("INTEGER"): # Parse to int if it's indicated
 								edge_item = int(edge_item)
-							edge[edge_types[i]] = edge_item
+							edge[edge_types[i].split(" ")[0]] = edge_item # Store the item under first word, like 'category VARCHAR'
 					
 					edge["id"] = "-".join(sorted([edge["source"], edge["target"]]))
 					edge["label"] = "-".join(sorted([edge["source"], edge["target"]]))

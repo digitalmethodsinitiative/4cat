@@ -122,7 +122,7 @@
 						<input class="parameter-input" id="strong-gravity" name="strong-gravity" type="checkbox">
 					</p>
 					<p><label for="edge-weight-influence">Edge weight influence: </label>
-						<input class="parameter-input" id="edge-weight-influence" name="edge-weight-influence" type="checkbox" checked>
+						<input class="parameter-input" id="edge-weight-influence" name="edge-weight-influence" type="checkbox">
 					</p>
 					<p><label for="scaling-ratio">Scaling ratio: </label>
 						<input class="parameter-input" id="scaling-ratio" name="scaling-ratio" type="number" min="1" value="1">
@@ -223,8 +223,8 @@
 	<script type="text/javascript">
 
 		// Initialise the graph
-		var core_json = JSON.parse('**json**');
-		console.log(core_json)
+		var core_json = JSON.parse( {{ sigma_network }} );
+		console.log(core_json);
 		init_network(core_json);
 
 	</script>
