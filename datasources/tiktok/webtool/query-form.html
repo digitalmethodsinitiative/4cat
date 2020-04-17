@@ -6,7 +6,7 @@
     <p class="form-intro">Posts are scraped in reverse chronological order; the most recent post for a given query will
         be scraped first. Unfortunately comments cannot be scraped at this time.</p>
 
-{% if current_user.is_admin() or current_user.get_value("4chan.can_query_without_keyword", False) %}
+{% if current_user.is_admin() or current_user.get_value("tiktok.allow_more_posts", False) %}
 <p class="warning form-intro">Your account has been granted an increased upper limit to the amount of posts that can be
     scraped. Scraping TikTok is slow, so be considerate and only query higher amounts of posts when this is really
     needed.</p>
