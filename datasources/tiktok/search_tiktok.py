@@ -20,6 +20,16 @@ from backend.lib.exceptions import QueryParametersException, ProcessorInterrupte
 class SearchTikTok(Search):
 	"""
 	TikTok scraper
+
+	Since TikTok has no API of its own, we use pyppeteer to start a headless
+	browser that we manipulate to browse the TikTok website and download the
+	information we need. Unfortunately this is a bit limited - it's slower and
+	requires far more resources than using an API or directly scraping HTML.
+	The latter is not possible as TikTok loads everything asynchronously so the
+	HTML one scrapes has no useful data. The website also does not include any
+	comments, so those cannot be scraped this way.
+
+	It's the best we can do, for now!
 	"""
 	type = "tiktok-search"  # job ID
 	category = "Search"  # category
@@ -65,8 +75,14 @@ class SearchTikTok(Search):
 		:param int limit:  Amount of posts to scrape per item
 		:return list:  List of dictionaries, one per scraped post
 		"""
+
+		# we cannot handle signals as this runs in a thread, so disable those
+		# handlers launching the browser
 		browser = await launch({"handleSIGINT": False, "handleSIGHUP": False, "handleSIGTERM": False})
 		page = await browser.newPage()
+
+		# enable 'stealth' mode, which tries to hide that we're doing this with
+		# a headless browser - without this TikTok doesn't give us anything
 		await stealth(page)
 
 		try:
@@ -74,15 +90,19 @@ class SearchTikTok(Search):
 				"width": 1920,
 				"height": 1080
 			})
+
+			# naughty
 			await page.setUserAgent(
 				"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/81.0.4044.113 Safari/537.36")
 
+			# scrape overview pages for items first to get individual post URLs
 			posts = []
 			for query in queries:
 				posts += await self.fetch_overview_page(query, page, limit)
 
 			everything = []
 
+			# then scrape each post's page to get post data
 			for index, post in enumerate(posts):
 				self.dataset.update_status("Getting post data for post %i/%i" % (index + 1, len(posts)))
 				if self.interrupted:
@@ -92,6 +112,7 @@ class SearchTikTok(Search):
 					everything.append(post)
 				else:
 					everything.append(post_data)
+
 		except ProcessorInterruptedException as e:
 			await browser.close()
 			raise ProcessorInterruptedException(str(e))
@@ -305,8 +326,8 @@ class SearchTikTok(Search):
 		if not query.get("query", "").strip():
 			raise QueryParametersException("You must provide a search query.")
 
-		# 500 is mostly arbitrary - may need tweaking
-		max_posts = 2500
+		# 100 is mostly arbitrary - may need tweaking
+		max_posts = 100
 		if query.get("max_posts", ""):
 			try:
 				max_posts = min(abs(int(query.get("max_posts"))), max_posts)
