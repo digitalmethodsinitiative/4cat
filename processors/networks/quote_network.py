@@ -54,11 +54,11 @@ class QuoteNetworkGrapher(BasicProcessor):
 		with self.dataset.get_results_path().open("w", encoding="utf-8") as results:
 			results.write("nodedef>name VARCHAR,label VARCHAR\n")
 			for node in nodes:
-				results.write("post-" + node + ',"' + node + '"\n')
+				results.write("post-" + node.replace(",", "") + ',"' + node.replace(",", "") + '"\n')
 
 			results.write("edgedef>node1 VARCHAR, node2 VARCHAR\n")
 			for edge in edges:
-				results.write("post-" + edge[0] + ",post-" + edge[1] + "\n")
+				results.write("post-" + edge[0].replace(",", "") + ",post-" + edge[1].replace(",", "") + "\n")
 
 		self.dataset.update_status("Finished")
 		self.dataset.finish(len(edges))

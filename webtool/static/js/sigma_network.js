@@ -17,7 +17,7 @@ var fa2config = {
 	worker: true,
 	barnesHutOptimize: false,
 	barnesHutTheta: 0.5,
-	edgeWeightInfluence: 1,
+	edgeWeightInfluence: 0,
 	scalingRatio: 1,
 	startingIterations: 10,
 	iterationsPerRender: 10,
@@ -41,10 +41,6 @@ function render_new_network(json) {
 
 	//console.log(json)
 
-	// Get the largest and smallest 
-	var node_size_limits = get_size_limits(json["nodes"]);
-	var edge_size_limits = get_size_limits(json["edges"]);
-
 	s = new sigma({
 		graph: json,
 		container: "graph-container",
@@ -52,11 +48,10 @@ function render_new_network(json) {
 	});
 
 	// Start the ForceAtlas2 algorithm on a new graph start
-	$("#start-force").addClass("running");
+	/*$("#start-force").addClass("running");
 	$("#start-force > .button-text").text("Stop ForceAtlas2");
 	$("#start-force > i").removeClass("invisible");
-
-	s.startForceAtlas2(fa2config);
+	s.startForceAtlas2(fa2config);*/
 
 	// To render everything
 	s.refresh();
@@ -356,29 +351,6 @@ function disable_graph_manipulation() {
 	/*
 	Disable manipulating the graph, e.g. with edge sizes.
 	*/
-}
-
-function get_size_limits(json) {
-	/*
-	Gets the minimum and maximum "size"
-	and returns it as a tuple.
-	*/
-
-	// Take the first value as a starting point
-	var min_size = parseFloat(json[0]["size"]);
-	var max_size = parseFloat(json[0]["size"]);
-
-	for (var i = 0; i < json.length; i++) {
-		let size = parseFloat(json[i]["size"])
-		if (size < min_size) {
-			min_size = size;
-		}
-		if (size > max_size) {
-			max_size = size;
-		}
-	}
-
-	return [min_size, max_size];
 }
 
 function save_to_svg() {
