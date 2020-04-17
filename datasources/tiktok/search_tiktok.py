@@ -60,6 +60,9 @@ class SearchTikTok(Search):
 
 		return posts
 
+	async def get_browser(self):
+		return await launch(options={"headless": True, "defaultViewport": {"width": 1920, "height": 1080}, "handleSIGINT": False, "handleSIGHUP": False, "handleSIGTERM": False})
+
 	async def get_posts_async(self, queries, limit):
 		"""
 		Get posts for queries
@@ -78,27 +81,12 @@ class SearchTikTok(Search):
 
 		# we cannot handle signals as this runs in a thread, so disable those
 		# handlers launching the browser
-		browser = await launch({"handleSIGINT": False, "handleSIGHUP": False, "handleSIGTERM": False})
-		page = await browser.newPage()
-
-		# enable 'stealth' mode, which tries to hide that we're doing this with
-		# a headless browser - without this TikTok doesn't give us anything
-		await stealth(page)
 
 		try:
-			await page.setViewport({
-				"width": 1920,
-				"height": 1080
-			})
-
-			# naughty
-			await page.setUserAgent(
-				"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/81.0.4044.113 Safari/537.36")
-
 			# scrape overview pages for items first to get individual post URLs
 			posts = []
 			for query in queries:
-				posts += await self.fetch_overview_page(query, page, limit)
+				posts += await self.fetch_overview_page(query, limit)
 
 			everything = []
 
@@ -107,21 +95,20 @@ class SearchTikTok(Search):
 				self.dataset.update_status("Getting post data for post %i/%i" % (index + 1, len(posts)))
 				if self.interrupted:
 					raise ProcessorInterruptedException("Interrupted while fetching post data from TikTok")
-				post_data = await self.fetch_post(post["tiktok_url"], page)
+				post_data = await self.fetch_post(post["tiktok_url"])
+				print("CALL TO FETCH POST FINISHED")
 				if not post_data:
 					everything.append(post)
 				else:
 					everything.append(post_data)
 
 		except ProcessorInterruptedException as e:
-			await browser.close()
 			raise ProcessorInterruptedException(str(e))
 
 		self.dataset.update_status("Finished scraping TikTok website.")
-		await browser.close()
 		return everything
 
-	async def fetch_overview_page(self, item, page, limit=1):
+	async def fetch_overview_page(self, item, limit=1):
 		"""
 		Scrape all items for a given hashtag
 
@@ -135,6 +122,10 @@ class SearchTikTok(Search):
 		:param int limit:  Amount of posts to scrape
 		:return list:  A list of posts that were scraped
 		"""
+		browser = await self.get_browser()
+		page = await browser.newPage()
+		await stealth(page)
+
 		if item[0] == "#":
 			# hashtag query
 			url = "https://www.tiktok.com/tag/%s" % item[1:]
@@ -143,13 +134,15 @@ class SearchTikTok(Search):
 			url = "https://www.tiktok.com/%s" % item
 
 		try:
-			await page.goto(url, timeout=5000)
+			await page.goto(url, option={"timeout": 5000})
 			# this waits until the first video items have been loaded as these
 			# are loaded asynchronously
 			await page.waitForFunction("document.querySelectorAll('a.video-feed-item-wrapper').length > 0",
-									   timeout=1000)
+									   option={"timeout": 2500})
 		except errors.TimeoutError:
 			# takes too long to load videos... 1000 may be a bit too strict?
+			await browser.close()
+			await page.close()
 			return []
 
 		items = 0
@@ -169,7 +162,7 @@ class SearchTikTok(Search):
 			page_height = await page.evaluate("document.body.scrollHeight")
 			await page.evaluate("window.scrollTo(0,document.body.scrollHeight)")
 			try:
-				await page.waitForFunction("(document.body.scrollHeight > %i)" % (page_height + 100), timeout=2500)
+				await page.waitForFunction("(document.body.scrollHeight > %i)" % (page_height + 100), option={"timeout": 1000})
 			except errors.TimeoutError:
 				break
 
@@ -207,9 +200,11 @@ class SearchTikTok(Search):
 				"fully_scraped": False
 			})
 
+		await page.close()
+		await browser.close()
 		return result
 
-	async def fetch_post(self, post_url, page):
+	async def fetch_post(self, post_url):
 		"""
 		Fetch TikTok post data
 
@@ -219,32 +214,51 @@ class SearchTikTok(Search):
 		:param page.Page page:  Pyppeteer page handler to scrape from
 		:return dict:  Post data
 		"""
+		browser = await self.get_browser()
+		page = await browser.newPage()
+		await stealth(page)
+		print("OPENING POST PAGE")
 		try:
-			await page.goto(post_url, timeout=5000)
+			print("URL: %s" % post_url)
+			await page.goto(post_url, options={"timeout": 10000})
 		except errors.TimeoutError:
 			# page took too long to load
+			await page.close()
+			await browser.close()
 			return None
 
 		# most of the post data can simply be gotten from one HTML element or
 		# another or its attributes
 		bits = post_url.split("/")
-		data = {
-			"id": bits[-1],
-			"thread_id": bits[-1],
-			"author_name": await page.evaluate('document.querySelector(".user-info .user-username").innerHTML'),
-			"author_name_full": await page.evaluate('document.querySelector(".user-info .user-nickname").innerHTML'),
-			"subject": "",
-			"body": await page.evaluate('document.querySelector(".video-meta-info .video-meta-title").innerHTML'),
-			"timestamp": 0,
-			"has_harm_warning": bool(await page.evaluate("document.querySelectorAll('.warn-info').length > 0")),
-			"music_name": await page.evaluate('document.querySelector(".music-info a").innerHTML'),
-			"music_url": await page.evaluate('document.querySelector(".music-info a").getAttribute("href")'),
-			"video_url": await page.evaluate('document.querySelector(".video-card video").getAttribute("src")'),
-			"tiktok_url": post_url
-		}
+		data = {}
+
+		print("GETTING ID")
+		data["id"] = bits[-1]
+		data["thread_id"] = bits[-1]
+		print("GETTING AUTHOR NAME")
+		data["author_name"] = await page.evaluate('document.querySelector(".user-info .user-username").innerHTML')
+		print("GETTING AUTHOR FULL NAME")
+		data["author_name_full"] = await page.evaluate('document.querySelector(".user-info .user-nickname").innerHTML')
+		data["subject"] = ""
+		print("GETTING BODY")
+		data["body"] = await page.evaluate('document.querySelector(".video-meta-info .video-meta-title").innerHTML')
+		data["timestamp"] = 0
+		print("GETTING HARM WARNING")
+		data["has_harm_warning"] = bool(await page.evaluate("document.querySelectorAll('.warn-info').length > 0"))
+		print("GETTING MUSIC NAME")
+		data["music_name"] = await page.evaluate('document.querySelector(".music-info a").innerHTML')
+		print("GETTING MUSIC URL")
+		data["music_url"] = await page.evaluate('document.querySelector(".music-info a").getAttribute("href")')
+		print("GETTING VIDEO URL")
+		data["video_url"] = await page.evaluate('document.querySelector(".video-card video").getAttribute("src")')
+		print("GETTING TIKTOK URL")
+		data["tiktok_url"] = post_url
+
 
 		# these are a bit more involved
+		print("GETTING COUNTS")
 		counts = await page.evaluate('document.querySelector(".video-meta-info .video-meta-count").innerHTML')
+		print("WRAPPING UP")
 		data["likes"] = expand_short_number(counts.split(" ")[0])
 		data["comments"] = expand_short_number(counts.split(" ")[-2])
 		data["hashtags"] = ",".join([tag.replace("?", "") for tag in re.findall(r'href="/tag/([^"]+)"', data["body"])])
@@ -255,6 +269,8 @@ class SearchTikTok(Search):
 		data["body"] = body_soup.text.strip()
 		data["fully_scraped"] = True
 
+		await page.close()
+		await browser.close()
 		return data
 
 	def get_search_mode(self, query):
@@ -327,7 +343,7 @@ class SearchTikTok(Search):
 			raise QueryParametersException("You must provide a search query.")
 
 		# 100 is mostly arbitrary - may need tweaking
-		max_posts = 100
+		max_posts = 100 if not user.get_value("tiktok.allow_more_posts", False) and not user.is_admin() else 1000
 		if query.get("max_posts", ""):
 			try:
 				max_posts = min(abs(int(query.get("max_posts"))), max_posts)
