@@ -69,7 +69,7 @@ class SearchTikTok(Search):
 		this method returns one with the proper settings
 		:return pyppeteer.browser.Browser:
 		"""
-		return await launch(options={"headless": False, "defaultViewport": {"width": 1920, "height": 1080}, "handleSIGINT": False, "handleSIGHUP": False, "handleSIGTERM": False})
+		return await launch(options={"defaultViewport": {"width": 1920, "height": 1080}, "handleSIGINT": False, "handleSIGHUP": False, "handleSIGTERM": False})
 
 	async def get_posts_async(self, queries, limit):
 		"""
