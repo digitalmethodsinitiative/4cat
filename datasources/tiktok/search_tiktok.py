@@ -61,7 +61,15 @@ class SearchTikTok(Search):
 		return posts
 
 	async def get_browser(self):
-		return await launch(options={"headless": True, "defaultViewport": {"width": 1920, "height": 1080}, "handleSIGINT": False, "handleSIGHUP": False, "handleSIGTERM": False})
+		"""
+		Get a new browser instance
+
+		The scraper seemed to hang when re-using browser or page instances, so
+		unfortunately we'll have to use a new browser instance every time -
+		this method returns one with the proper settings
+		:return pyppeteer.browser.Browser:
+		"""
+		return await launch(options={"headless": False, "defaultViewport": {"width": 1920, "height": 1080}, "handleSIGINT": False, "handleSIGHUP": False, "handleSIGTERM": False})
 
 	async def get_posts_async(self, queries, limit):
 		"""
@@ -96,7 +104,6 @@ class SearchTikTok(Search):
 				if self.interrupted:
 					raise ProcessorInterruptedException("Interrupted while fetching post data from TikTok")
 				post_data = await self.fetch_post(post["tiktok_url"])
-				print("CALL TO FETCH POST FINISHED")
 				if not post_data:
 					everything.append(post)
 				else:
@@ -118,7 +125,6 @@ class SearchTikTok(Search):
 
 		:param str item: Item ID, a username (if starting with '@') or hashtag
 		(if starting with '#')
-		:param page.Page page:  Pyppeteer page handler to scrape from
 		:param int limit:  Amount of posts to scrape
 		:return list:  A list of posts that were scraped
 		"""
@@ -211,15 +217,13 @@ class SearchTikTok(Search):
 		Retrieves data for a given post URL.
 
 		:param str post_url:  URL of the post's page
-		:param page.Page page:  Pyppeteer page handler to scrape from
 		:return dict:  Post data
 		"""
 		browser = await self.get_browser()
 		page = await browser.newPage()
 		await stealth(page)
-		print("OPENING POST PAGE")
+
 		try:
-			print("URL: %s" % post_url)
 			await page.goto(post_url, options={"timeout": 10000})
 		except errors.TimeoutError:
 			# page took too long to load
@@ -232,33 +236,22 @@ class SearchTikTok(Search):
 		bits = post_url.split("/")
 		data = {}
 
-		print("GETTING ID")
 		data["id"] = bits[-1]
 		data["thread_id"] = bits[-1]
-		print("GETTING AUTHOR NAME")
 		data["author_name"] = await page.evaluate('document.querySelector(".user-info .user-username").innerHTML')
-		print("GETTING AUTHOR FULL NAME")
 		data["author_name_full"] = await page.evaluate('document.querySelector(".user-info .user-nickname").innerHTML')
 		data["subject"] = ""
-		print("GETTING BODY")
 		data["body"] = await page.evaluate('document.querySelector(".video-meta-info .video-meta-title").innerHTML')
 		data["timestamp"] = 0
-		print("GETTING HARM WARNING")
 		data["has_harm_warning"] = bool(await page.evaluate("document.querySelectorAll('.warn-info').length > 0"))
-		print("GETTING MUSIC NAME")
 		data["music_name"] = await page.evaluate('document.querySelector(".music-info a").innerHTML')
-		print("GETTING MUSIC URL")
 		data["music_url"] = await page.evaluate('document.querySelector(".music-info a").getAttribute("href")')
-		print("GETTING VIDEO URL")
 		data["video_url"] = await page.evaluate('document.querySelector(".video-card video").getAttribute("src")')
-		print("GETTING TIKTOK URL")
 		data["tiktok_url"] = post_url
 
 
 		# these are a bit more involved
-		print("GETTING COUNTS")
 		counts = await page.evaluate('document.querySelector(".video-meta-info .video-meta-count").innerHTML')
-		print("WRAPPING UP")
 		data["likes"] = expand_short_number(counts.split(" ")[0])
 		data["comments"] = expand_short_number(counts.split(" ")[-2])
 		data["hashtags"] = ",".join([tag.replace("?", "") for tag in re.findall(r'href="/tag/([^"]+)"', data["body"])])
