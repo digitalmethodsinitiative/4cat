@@ -24,7 +24,7 @@ class CoTagger(BasicProcessor):
 				  "weighted by the frequency of the tag."  # description displayed in UI
 	extension = "gdf"  # extension of result file, used internally and in UI
 
-	datasources = ["instagram", "tumblr"]
+	datasources = ["instagram", "tumblr", "tiktok"]
 
 	input = "csv:tags|hashtags"
 	output = "gdf"
@@ -57,7 +57,7 @@ class CoTagger(BasicProcessor):
 			posts += 1
 
 			# create a list of tags
-			if self.parent.parameters["datasource"] == "instagram":
+			if self.parent.parameters["datasource"] in ("instagram", "tiktok"):
 				tags = post.get("tags", "").split(",")
 				tags += [leading_hash.sub("", tag) for tag in post.get("hashtags", "").split(",")]
 
