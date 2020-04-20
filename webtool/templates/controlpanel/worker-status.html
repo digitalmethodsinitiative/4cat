@@ -1,6 +1,5 @@
 <ol class="worker-list">
 {% for worker in workers %}
-    {% if worker.is_running %}
     {% set worker_uniqid = uniqid() %}
     <li>
     <h4>
@@ -11,6 +10,5 @@
     </h4>
     <p>Started {{ (now - worker.timestamp_claimed)|int|timify }} ago</p>
     </li>
-    {% endif %}
 {% endfor %}
 </ol>
