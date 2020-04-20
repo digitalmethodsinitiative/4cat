@@ -236,18 +236,22 @@ class SearchTikTok(Search):
 		bits = post_url.split("/")
 		data = {}
 
-		data["id"] = bits[-1]
-		data["thread_id"] = bits[-1]
-		data["author_name"] = await page.evaluate('document.querySelector(".user-info .user-username").innerHTML')
-		data["author_name_full"] = await page.evaluate('document.querySelector(".user-info .user-nickname").innerHTML')
-		data["subject"] = ""
-		data["body"] = await page.evaluate('document.querySelector(".video-meta-info .video-meta-title").innerHTML')
-		data["timestamp"] = 0
-		data["has_harm_warning"] = bool(await page.evaluate("document.querySelectorAll('.warn-info').length > 0"))
-		data["music_name"] = await page.evaluate('document.querySelector(".music-info a").innerHTML')
-		data["music_url"] = await page.evaluate('document.querySelector(".music-info a").getAttribute("href")')
-		data["video_url"] = await page.evaluate('document.querySelector(".video-card video").getAttribute("src")')
-		data["tiktok_url"] = post_url
+		try:
+			data["id"] = bits[-1]
+			data["thread_id"] = bits[-1]
+			data["author_name"] = await page.evaluate('document.querySelector(".user-info .user-username").innerHTML')
+			data["author_name_full"] = await page.evaluate('document.querySelector(".user-info .user-nickname").innerHTML')
+			data["subject"] = ""
+			data["body"] = await page.evaluate('document.querySelector(".video-meta-info .video-meta-title").innerHTML')
+			data["timestamp"] = 0
+			data["has_harm_warning"] = bool(await page.evaluate("document.querySelectorAll('.warn-info').length > 0"))
+			data["music_name"] = await page.evaluate('document.querySelector(".music-info a").innerHTML')
+			data["music_url"] = await page.evaluate('document.querySelector(".music-info a").getAttribute("href")')
+			data["video_url"] = await page.evaluate('document.querySelector(".video-card video").getAttribute("src")')
+			data["tiktok_url"] = post_url
+		except Exception as e:
+			self.log.warning("Skipping post %s for TikTok scrape (%s)" % (post_url, e))
+			return None
 
 
 		# these are a bit more involved
