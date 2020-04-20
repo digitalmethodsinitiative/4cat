@@ -137,7 +137,7 @@ class User:
 
 		:return str: Password reset token
 		"""
-		return self.data["register_token"]
+		return self.generate_token(regenerate=False)
 
 	def clear_token(self):
 		"""
@@ -194,11 +194,7 @@ class User:
 		username = self.get_id()
 
 		# generate a password reset token
-		register_token = hashlib.sha256()
-		register_token.update(os.urandom(128))
-		register_token = register_token.hexdigest()
-		db.update("users", data={"register_token": register_token, "timestamp_token": int(time.time())},
-				  where={"name": username})
+		register_token = self.generate_token(regenerate=True)
 
 		# prepare welcome e-mail
 		sender = "4cat@oilab.nl"
@@ -240,6 +236,31 @@ class User:
 				smtp.sendmail("4cat@oilab.nl", [username], message.as_string())
 		except (smtplib.SMTPException, ConnectionRefusedError) as e:
 			raise RuntimeError("Could not send password reset e-mail: %s" % e)
+
+	def generate_token(self, username=None, regenerate=True):
+		"""
+		Generate and store a new registration token for this user
+
+		Tokens are not re-generated if they exist already
+
+		:param username:  Username to generate for: if left empty, it will be
+		inferred from self.data
+		:param regenerate:  Force regenerating even if token exists
+		:return str:  The token
+		"""
+		if self.data.get("register_token", None) and not regenerate:
+			return self.data["register_token"]
+
+		if not username:
+			username = self.data["name"]
+
+		register_token = hashlib.sha256()
+		register_token.update(os.urandom(128))
+		register_token = register_token.hexdigest()
+		db.update("users", data={"register_token": register_token, "timestamp_token": int(time.time())},
+				  where={"name": username})
+
+		return register_token
 
 	def get_value(self, key, default=None):
 		"""
