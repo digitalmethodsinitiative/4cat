@@ -122,7 +122,7 @@ class SearchTikTok(Search):
 
 			start_time = time.time()
 			have_new_content = False
-			while time.time() - 30 > start_time:
+			while time.time() - 5 < start_time:
 				# a somewhat generous timeout here as as you scroll down on the
 				# page it takes longer and longer to load the new posts
 				scroll_height = browser.execute_script("return document.body.scrollHeight")
@@ -130,6 +130,7 @@ class SearchTikTok(Search):
 					page_height = scroll_height
 					have_new_content = True
 					break
+				time.sleep(0.25)
 
 			# the amount of videos on the page:
 			items = int(browser.execute_script("return document.querySelectorAll('a.video-feed-item-wrapper').length"))
@@ -169,7 +170,6 @@ class SearchTikTok(Search):
 
 		result = []
 		while len(result) < limit:
-			print("Scraping...!")
 			if self.interrupted:
 				raise ProcessorInterruptedException("Interrupted while downloading post data")
 
@@ -177,7 +177,6 @@ class SearchTikTok(Search):
 			try:
 				browser.find_element_by_css_selector("%s .user-info" % selector)
 			except NoSuchElementException:
-				print("No element anymore...")
 				continue
 
 			# annoyingly the post URL does not seem to be loaded into the modal
