@@ -80,6 +80,7 @@ class SearchTikTok(Search):
 		options = Options()
 		options.headless = True
 		options.add_argument("--user-agent=%s" % "Naverbot")
+		options.add_argument("--disable-gpu")
 
 		browser = webdriver.Chrome(options=options)
 		browser.set_page_load_timeout(10)
@@ -131,12 +132,12 @@ class SearchTikTok(Search):
 					break
 
 			# the amount of videos on the page:
-			items = browser.execute_script("return document.querySelectorAll('a.video-feed-item-wrapper').length")
+			items = int(browser.execute_script("return document.querySelectorAll('a.video-feed-item-wrapper').length"))
 			if not have_new_content or int(items) >= limit:
 				break
 
 
-		if int(items) == 0:
+		if items == 0:
 			return []
 
 		# next determine what selector we need to use to find the modal window
@@ -223,7 +224,6 @@ class SearchTikTok(Search):
 					[tag.replace("?", "") for tag in re.findall(r'href="/tag/([^"]+)"', data["body"])])
 				body_soup = BeautifulSoup(data["body"], "html.parser")
 				data["body"] = body_soup.text.strip()
-				data["fully_scraped"] = True
 			except Exception as e:
 				self.log.warning("Skipping post %s for TikTok scrape (%s)" % (href, e))
 				break
