@@ -10,6 +10,7 @@ import asyncio
 import time
 import re
 
+from bs4 import BeautifulSoup
 from pyppeteer import errors, launch
 from pyppeteer_stealth import stealth
 
@@ -240,6 +241,19 @@ class SearchTikTok(Search):
 				data["video_url"] = await page.evaluate(
 					'document.querySelector("%s video").getAttribute("src")' % selector)
 				data["tiktok_url"] = href
+
+				# these are a bit more involved
+				counts = await page.evaluate('document.querySelector("%s .video-meta-count").innerHTML' % selector)
+				data["likes"] = expand_short_number(counts.split(" ")[0])
+				data["comments"] = expand_short_number(counts.split(" ")[-2])
+				data["hashtags"] = ",".join(
+					[tag.replace("?", "") for tag in re.findall(r'href="/tag/([^"]+)"', data["body"])])
+
+				# we strip the HTML here because TikTok does not allow user markup
+				# anyway, so this is not really significant
+				body_soup = BeautifulSoup(data["body"], "html.parser")
+				data["body"] = body_soup.text.strip()
+				data["fully_scraped"] = True
 			except Exception as e:
 				self.log.warning("Skipping post %s for TikTok scrape (%s)" % (href, e))
 				break
