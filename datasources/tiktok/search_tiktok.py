@@ -5,6 +5,7 @@ TikTok is, after a fashion, an imageboard - people post videos and then
 other people reply. So this datasource uses this affordance to retrieve
 TikTok data for 4CAT.
 """
+import urllib.parse
 import asyncio
 import re
 
@@ -94,28 +95,15 @@ class SearchTikTok(Search):
 			# scrape overview pages for items first to get individual post URLs
 			posts = []
 			for query in queries:
-				posts += await self.fetch_overview_page(query, limit)
-
-			everything = []
-
-			# then scrape each post's page to get post data
-			for index, post in enumerate(posts):
-				self.dataset.update_status("Getting post data for post %i/%i" % (index + 1, len(posts)))
-				if self.interrupted:
-					raise ProcessorInterruptedException("Interrupted while fetching post data from TikTok")
-				post_data = await self.fetch_post(post["tiktok_url"])
-				if not post_data:
-					everything.append(post)
-				else:
-					everything.append(post_data)
+				posts += await self.fetch_from_overview_page(query, limit)
 
 		except ProcessorInterruptedException as e:
 			raise ProcessorInterruptedException(str(e))
 
 		self.dataset.update_status("Finished scraping TikTok website.")
-		return everything
+		return posts
 
-	async def fetch_overview_page(self, item, limit=1):
+	async def fetch_from_overview_page(self, item, limit=1):
 		"""
 		Scrape all items for a given hashtag
 
@@ -131,6 +119,7 @@ class SearchTikTok(Search):
 		browser = await self.get_browser()
 		page = await browser.newPage()
 		await stealth(page)
+		limit = 100
 
 		if item[0] == "#":
 			# hashtag query
@@ -146,7 +135,7 @@ class SearchTikTok(Search):
 			await page.waitForFunction("document.querySelectorAll('a.video-feed-item-wrapper').length > 0",
 									   option={"timeout": 5000})
 		except errors.TimeoutError:
-			# takes too long to load videos... 1000 may be a bit too strict?
+			# takes too long to load videos...
 			await page.close()
 			await browser.close()
 			return []
@@ -168,7 +157,9 @@ class SearchTikTok(Search):
 			page_height = await page.evaluate("document.body.scrollHeight")
 			await page.evaluate("window.scrollTo(0,document.body.scrollHeight)")
 			try:
-				await page.waitForFunction("(document.body.scrollHeight > %i)" % (page_height + 100), option={"timeout": 1000})
+				# a somewhat generous timeout here as as you scroll down on the
+				# page it takes longer and longer to load the new posts
+				await page.waitForFunction("(document.body.scrollHeight > %i)" % (page_height + 100), options={"timeout": 3000})
 			except errors.TimeoutError:
 				break
 
@@ -177,114 +168,96 @@ class SearchTikTok(Search):
 			if int(items) >= limit:
 				break
 
-		posts = await page.querySelectorAll("a.video-feed-item-wrapper")
-		result = []
-		for post in posts[0:limit]:
-			# most of these are placeholders, since we know very little based
-			# on just the overview page, but we need to define these
-			# nevertheless in case the scrape for the post data goes wrong
-			# in which case this is where the post gets defined (and something
-			# is better than nothing)
-			href = await page.evaluate('(element) => element.getAttribute("href")', post)
-			bits = href.split("/")
+		# next determine what selector we need to use to find the modal window
+		# containing the actual tiktok post. this seems to differ from time to
+		# time (possibly resolution-related?) so we try a list until we find
+		# one that works
+		await page.click("a.video-feed-item-wrapper")
+		selectors = [".video-card-big.browse-mode", ".video-card-modal"]
+		have_selector = False
+
+		while selectors:
+			selector = selectors[0]
+			selectors = selectors[1:]
+
 			try:
-				result.append({
-					"id": bits[5],
-					"thread_id": bits[5],
-					"author_name": bits[3],
-					"author_name_full": "",
-					"subject": "",
-					"body": "",
-					"timestamp": 0,
-					"has_harm_warning": "",
-					"music_name": "",
-					"music_url": "",
-					"video_url": "",
-					"tiktok_url": href,
-					"likes": "",
-					"comments": "",
-					"hashtags": "",
-					"fully_scraped": False
-				})
-			except IndexError:
-				self.log.warning("Invalid TikTok URL %s, skipping" % href)
+				# just opening the modal is not enough - we need to know that
+				# the post info has actually been loaded into it
+				await page.waitForFunction("document.querySelectorAll('%s .user-info').length > 0" % selector,
+										   options={"timeout": 2000})
+				have_selector = True
+				break
+			except errors.TimeoutError:
 				continue
 
-		try:
-			await page.close()
-			await browser.close()
-		except OSError:
-			pass
-		
+		# if at this point we still don't have a selector it means that we
+		# don't know how to find the post info in the page, so we can't scrape
+		if not have_selector:
+			self.dataset.update_status("Could not load post data. Scraping not possible.", is_final=True)
+			return []
+
+		result = []
+		while len(result) < limit:
+			# wait until the post info has been loaded asynchronously
+			try:
+				await page.waitForFunction("document.querySelectorAll('%s .user-info').length > 0" % selector,
+										   options={"timeout": 2000})
+			except errors.TimeoutError:
+				continue
+
+			# annoyingly the post URL does not seem to be loaded into the modal
+			# but we can use the share buttons (that include the post URL in
+			# their share URL) to infer it
+			href = await page.evaluate("document.querySelector('%s .share-group a').getAttribute('href')" % selector)
+			href = href.split("&u=")[1].split("&")[0]
+			href = urllib.parse.unquote(href)
+			bits = href.split("/")
+
+			# now extract the data from the various page elements containing
+			# them
+			data = {}
+			try:
+				data["id"] = bits[-1]
+				data["thread_id"] = bits[-1]
+				data["author_name"] = await page.evaluate(
+					'document.querySelector("%s .user-info .user-username").innerHTML' % selector)
+				data["author_name_full"] = await page.evaluate(
+					'document.querySelector("%s .user-info .user-nickname").innerHTML' % selector)
+				data["subject"] = ""
+				data["body"] = await page.evaluate(
+					'document.querySelector("%s .video-meta-title").innerHTML' % selector)
+				data["timestamp"] = 0
+				data["has_harm_warning"] = bool(
+					await page.evaluate("document.querySelectorAll('%s .warn-info').length > 0" % selector))
+				data["music_name"] = await page.evaluate('document.querySelector("%s .music-info a").innerHTML' % selector)
+				data["music_url"] = await page.evaluate(
+					'document.querySelector("%s .music-info a").getAttribute("href")' % selector)
+				data["video_url"] = await page.evaluate(
+					'document.querySelector("%s video").getAttribute("src")' % selector)
+				data["tiktok_url"] = href
+			except Exception as e:
+				self.log.warning("Skipping post %s for TikTok scrape (%s)" % (href, e))
+				break
+
+
+			# store data and - if possible - click the "next post" button to
+			# load the next one. If the button does not exist, no more posts
+			# can be loaded, so end the scrape
+			result.append(data)
+			has_next = int(await page.evaluate("document.querySelectorAll('%s .control-icon.arrow-right').length" % selector)) > 0
+			if has_next:
+				await page.click("%s .control-icon.arrow-right" % selector)
+			else:
+				break
+
+		await page.close()
+		await browser.close()
+
 		return result
-
-	async def fetch_post(self, post_url):
-		"""
-		Fetch TikTok post data
-
-		Retrieves data for a given post URL.
-
-		:param str post_url:  URL of the post's page
-		:return dict:  Post data
-		"""
-		browser = await self.get_browser()
-		page = await browser.newPage()
-		await stealth(page)
-
-		try:
-			await page.goto(post_url, options={"timeout": 10000})
-		except errors.TimeoutError:
-			# page took too long to load
-			await page.close()
-			await browser.close()
-			return None
-
-		# most of the post data can simply be gotten from one HTML element or
-		# another or its attributes
-		bits = post_url.split("/")
-		data = {}
-
-		try:
-			data["id"] = bits[-1]
-			data["thread_id"] = bits[-1]
-			data["author_name"] = await page.evaluate('document.querySelector(".user-info .user-username").innerHTML')
-			data["author_name_full"] = await page.evaluate('document.querySelector(".user-info .user-nickname").innerHTML')
-			data["subject"] = ""
-			data["body"] = await page.evaluate('document.querySelector(".video-meta-info .video-meta-title").innerHTML')
-			data["timestamp"] = 0
-			data["has_harm_warning"] = bool(await page.evaluate("document.querySelectorAll('.warn-info').length > 0"))
-			data["music_name"] = await page.evaluate('document.querySelector(".music-info a").innerHTML')
-			data["music_url"] = await page.evaluate('document.querySelector(".music-info a").getAttribute("href")')
-			data["video_url"] = await page.evaluate('document.querySelector(".video-card video").getAttribute("src")')
-			data["tiktok_url"] = post_url
-		except Exception as e:
-			self.log.warning("Skipping post %s for TikTok scrape (%s)" % (post_url, e))
-			return None
-
-
-		# these are a bit more involved
-		counts = await page.evaluate('document.querySelector(".video-meta-info .video-meta-count").innerHTML')
-		data["likes"] = expand_short_number(counts.split(" ")[0])
-		data["comments"] = expand_short_number(counts.split(" ")[-2])
-		data["hashtags"] = ",".join([tag.replace("?", "") for tag in re.findall(r'href="/tag/([^"]+)"', data["body"])])
-
-		# we strip the HTML here because TikTok does not allow user markup
-		# anyway, so this is not really significant
-		body_soup = BeautifulSoup(data["body"], "html.parser")
-		data["body"] = body_soup.text.strip()
-		data["fully_scraped"] = True
-
-		try:
-			await page.close()
-			await browser.close()
-		except OSError:
-			pass
-
-		return data
 
 	def get_search_mode(self, query):
 		"""
-		Instagram searches are always simple
+		TikTok searches are always simple
 
 		:return str:
 		"""
@@ -292,7 +265,7 @@ class SearchTikTok(Search):
 
 	def get_posts_complex(self, query):
 		"""
-		Complex post fetching is not used by the Instagram datasource
+		Complex post fetching is not used by the TikTok datasource
 
 		:param query:
 		:return:
