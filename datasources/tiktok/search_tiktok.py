@@ -144,11 +144,11 @@ class SearchTikTok(Search):
 			# this waits until the first video items have been loaded as these
 			# are loaded asynchronously
 			await page.waitForFunction("document.querySelectorAll('a.video-feed-item-wrapper').length > 0",
-									   option={"timeout": 2500})
+									   option={"timeout": 5000})
 		except errors.TimeoutError:
 			# takes too long to load videos... 1000 may be a bit too strict?
-			await browser.close()
 			await page.close()
+			await browser.close()
 			return []
 
 		items = 0
