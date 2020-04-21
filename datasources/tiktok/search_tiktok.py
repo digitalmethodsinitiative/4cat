@@ -60,6 +60,7 @@ class SearchTikTok(Search):
 		for query in queries:
 			posts += self.fetch_from_overview_page(query, max_posts)
 
+		raise RuntimeError()
 		return posts
 
 
@@ -78,7 +79,7 @@ class SearchTikTok(Search):
 		:return list:  A list of posts that were scraped
 		"""
 		options = Options()
-		options.headless = True
+		#options.headless = True
 		options.add_argument("--user-agent=%s" % "Naverbot")
 		options.add_argument("--disable-gpu")
 
@@ -238,7 +239,7 @@ class SearchTikTok(Search):
 			try:
 				has_next = browser.find_element_by_css_selector("%s .control-icon.arrow-right" % selector)
 				browser.execute_script("document.querySelector('%s .control-icon.arrow-right').click()" % selector)
-				time.sleep(0.5)
+				time.sleep(0.8)
 			except NoSuchElementException:
 				break
 
