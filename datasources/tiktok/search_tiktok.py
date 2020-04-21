@@ -243,14 +243,15 @@ class SearchTikTok(Search):
 				data["tiktok_url"] = href
 
 				# these are a bit more involved
-				counts = await page.evaluate('document.querySelector("%s .video-meta-count").innerHTML' % selector)
-				data["likes"] = expand_short_number(counts.split(" ")[0])
-				data["comments"] = expand_short_number(counts.split(" ")[-2])
-				data["hashtags"] = ",".join(
-					[tag.replace("?", "") for tag in re.findall(r'href="/tag/([^"]+)"', data["body"])])
+				data["likes"] = expand_short_number(
+					await page.evaluate('document.querySelector("%s .like-text").innerHTML' % selector))
+				data["comments"] = expand_short_number(
+					await page.evaluate('document.querySelector("%s .comment-text").innerHTML' % selector))
 
 				# we strip the HTML here because TikTok does not allow user markup
 				# anyway, so this is not really significant
+				data["hashtags"] = ",".join(
+					[tag.replace("?", "") for tag in re.findall(r'href="/tag/([^"]+)"', data["body"])])
 				body_soup = BeautifulSoup(data["body"], "html.parser")
 				data["body"] = body_soup.text.strip()
 				data["fully_scraped"] = True
