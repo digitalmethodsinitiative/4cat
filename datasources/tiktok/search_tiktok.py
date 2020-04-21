@@ -273,6 +273,7 @@ class SearchTikTok(Search):
 
 			has_next = int(await page.evaluate("document.querySelectorAll('%s .control-icon.arrow-right').length" % selector)) > 0
 			if has_next:
+				await page.waitFor(500)
 				await page.click("%s .control-icon.arrow-right" % selector)
 			else:
 				break
