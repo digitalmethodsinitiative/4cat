@@ -125,9 +125,13 @@ class SearchTikTok(Search):
 		if item[0] == "#":
 			# hashtag query
 			url = "https://www.tiktok.com/tag/%s" % item[1:]
-		else:
+		elif item[0] == "@":
 			# user query
 			url = "https://www.tiktok.com/%s" % item
+		else:
+			# music
+			music_id = item.split("?")[0].split("-")[-1]
+			url = "https://www.tiktok.com/music/original-sound-%s" % music_id
 
 		try:
 			await page.goto(url, option={"timeout": 5000})
@@ -340,8 +344,8 @@ class SearchTikTok(Search):
 		"""
 
 		# 'location' would be possible as well but apparently requires a login
-		if query.get("search_scope", "") not in ("hashtag", "username"):
-			raise QueryParametersException("Invalid search scope: must be hashtag or username")
+		if query.get("search_scope", "") not in ("hashtag", "username", "music"):
+			raise QueryParametersException("Invalid search scope: must be hashtag, username or music")
 
 		# no query 4 u
 		if not query.get("query", "").strip():
@@ -363,13 +367,13 @@ class SearchTikTok(Search):
 		if len(items) > 5:
 			raise QueryParametersException("You cannot query more than 5 items at a time.")
 
-		sigil = "#" if query.get("search_scope") == "hashtag" else "@"
+		sigil = {"hashtag": "#", "username": "@", "music": "🎶"}[query.get("search_scope")]
 		items = ",".join([sigil + item for item in items])
 
 		# simple!
 		return {
 			"items": max_posts,
 			"query": items,
-			"board": query.get("search_scope") + "s",  # used in web interface
+			"board": query.get("search_scope"),  # used in web interface
 			"search_scope": query.get("search_scope")
 		}
