@@ -172,6 +172,7 @@ class SearchTikTok(Search):
 		result = []
 		while len(result) < limit:
 			if self.interrupted:
+				browser.close()
 				raise ProcessorInterruptedException("Interrupted while downloading post data")
 
 			# wait until the post info has been loaded asynchronously
