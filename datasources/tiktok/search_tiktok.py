@@ -7,10 +7,10 @@ TikTok data for 4CAT.
 """
 import urllib.parse
 import asyncio
+import time
 import re
 
-from bs4 import BeautifulSoup
-from pyppeteer import errors, page, launch
+from pyppeteer import errors, launch
 from pyppeteer_stealth import stealth
 
 from backend.abstract.search import Search
@@ -96,6 +96,7 @@ class SearchTikTok(Search):
 			posts = []
 			for query in queries:
 				posts += await self.fetch_from_overview_page(query, limit)
+				time.sleep(3)  # give some time to clean up
 
 		except ProcessorInterruptedException as e:
 			raise ProcessorInterruptedException(str(e))
@@ -194,13 +195,15 @@ class SearchTikTok(Search):
 		# don't know how to find the post info in the page, so we can't scrape
 		if not have_selector:
 			self.dataset.update_status("Could not load post data. Scraping not possible.", is_final=True)
+			await page.close()
+			await browser.close()
 			return []
 
 		result = []
 		while len(result) < limit:
 			if self.interrupted:
 				raise ProcessorInterruptedException("Interrupted while downloading post data")
-			
+
 			# wait until the post info has been loaded asynchronously
 			try:
 				await page.waitForFunction("document.querySelectorAll('%s .user-info').length > 0" % selector,
