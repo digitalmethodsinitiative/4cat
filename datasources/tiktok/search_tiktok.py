@@ -79,7 +79,7 @@ class SearchTikTok(Search):
 		:return list:  A list of posts that were scraped
 		"""
 		options = Options()
-		#options.headless = True
+		options.headless = True
 		options.add_argument("--user-agent=%s" % "Naverbot")
 		options.add_argument("--disable-gpu")
 
