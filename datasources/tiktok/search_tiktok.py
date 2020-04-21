@@ -190,43 +190,43 @@ class SearchTikTok(Search):
 			# now extract the data from the various page elements containing
 			# them
 			data = {}
-			#try:
-			data["id"] = bits[-1]
-			data["thread_id"] = bits[-1]
-			data["author"] = browser.execute_script(
-				"return document.querySelector('%s .user-info .user-username').innerHTML" % selector)
-			data["author_full"] = browser.execute_script(
-				"return document.querySelector('%s .user-info .user-nickname').innerHTML" % selector)
-			data["subject"] = ""
-			data["body"] = browser.execute_script(
-				"return document.querySelector('%s .video-meta-title').innerHTML" % selector)
-			data["timestamp"] = 0
-			data["has_harm_warning"] = bool(
-				browser.execute_script("return document.querySelectorAll('%s .warn-info').length > 0" % selector))
-			data["music_name"] = browser.execute_script(
-				"return document.querySelector('%s .music-info a').innerHTML" % selector)
-			data["music_url"] = browser.execute_script(
-				"return document.querySelector('%s .music-info a').getAttribute('href')" % selector)
-			data["video_url"] = browser.execute_script(
-				"return document.querySelector('%s video').getAttribute('src')" % selector)
-			data["tiktok_url"] = href
+			try:
+				data["id"] = bits[-1]
+				data["thread_id"] = bits[-1]
+				data["author"] = browser.execute_script(
+					"return document.querySelector('%s .user-info .user-username').innerHTML" % selector)
+				data["author_full"] = browser.execute_script(
+					"return document.querySelector('%s .user-info .user-nickname').innerHTML" % selector)
+				data["subject"] = ""
+				data["body"] = browser.execute_script(
+					"return document.querySelector('%s .video-meta-title').innerHTML" % selector)
+				data["timestamp"] = 0
+				data["has_harm_warning"] = bool(
+					browser.execute_script("return document.querySelectorAll('%s .warn-info').length > 0" % selector))
+				data["music_name"] = browser.execute_script(
+					"return document.querySelector('%s .music-info a').innerHTML" % selector)
+				data["music_url"] = browser.execute_script(
+					"return document.querySelector('%s .music-info a').getAttribute('href')" % selector)
+				data["video_url"] = browser.execute_script(
+					"return document.querySelector('%s video').getAttribute('src')" % selector)
+				data["tiktok_url"] = href
 
-			# these are a bit more involved
-			data["likes"] = expand_short_number(
-				browser.execute_script("return document.querySelector('%s .like-text').innerHTML" % selector))
-			data["comments"] = expand_short_number(
-				browser.execute_script("return document.querySelector('%s .comment-text').innerHTML" % selector))
+				# these are a bit more involved
+				data["likes"] = expand_short_number(
+					browser.execute_script("return document.querySelector('%s .like-text').innerHTML" % selector))
+				data["comments"] = expand_short_number(
+					browser.execute_script("return document.querySelector('%s .comment-text').innerHTML" % selector))
 
-			# we strip the HTML here because TikTok does not allow user markup
-			# anyway, so this is not really significant
-			data["hashtags"] = ",".join(
-				[tag.replace("?", "") for tag in re.findall(r'href="/tag/([^"]+)"', data["body"])])
-			body_soup = BeautifulSoup(data["body"], "html.parser")
-			data["body"] = body_soup.text.strip()
-			data["fully_scraped"] = True
-			#except Exception as e:
-			#	self.log.warning("Skipping post %s for TikTok scrape (%s)" % (href, e))
-			#	break
+				# we strip the HTML here because TikTok does not allow user markup
+				# anyway, so this is not really significant
+				data["hashtags"] = ",".join(
+					[tag.replace("?", "") for tag in re.findall(r'href="/tag/([^"]+)"', data["body"])])
+				body_soup = BeautifulSoup(data["body"], "html.parser")
+				data["body"] = body_soup.text.strip()
+				data["fully_scraped"] = True
+			except Exception as e:
+				self.log.warning("Skipping post %s for TikTok scrape (%s)" % (href, e))
+				break
 
 
 			# store data and - if possible - click the "next post" button to
