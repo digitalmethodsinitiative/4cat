@@ -210,8 +210,12 @@ class SearchTikTok(Search):
 				self.log.warning("Invalid TikTok URL %s, skipping" % href)
 				continue
 
-		await page.close()
-		await browser.close()
+		try:
+			await page.close()
+			await browser.close()
+		except OSError:
+			pass
+		
 		return result
 
 	async def fetch_post(self, post_url):
@@ -270,8 +274,12 @@ class SearchTikTok(Search):
 		data["body"] = body_soup.text.strip()
 		data["fully_scraped"] = True
 
-		await page.close()
-		await browser.close()
+		try:
+			await page.close()
+			await browser.close()
+		except OSError:
+			pass
+
 		return data
 
 	def get_search_mode(self, query):
