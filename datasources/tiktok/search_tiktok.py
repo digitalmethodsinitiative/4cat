@@ -187,24 +187,28 @@ class SearchTikTok(Search):
 			# is better than nothing)
 			href = await page.evaluate('(element) => element.getAttribute("href")', post)
 			bits = href.split("/")
-			result.append({
-				"id": bits[5],
-				"thread_id": bits[5],
-				"author_name": bits[3],
-				"author_name_full": "",
-				"subject": "",
-				"body": "",
-				"timestamp": 0,
-				"has_harm_warning": "",
-				"music_name": "",
-				"music_url": "",
-				"video_url": "",
-				"tiktok_url": href,
-				"likes": "",
-				"comments": "",
-				"hashtags": "",
-				"fully_scraped": False
-			})
+			try:
+				result.append({
+					"id": bits[5],
+					"thread_id": bits[5],
+					"author_name": bits[3],
+					"author_name_full": "",
+					"subject": "",
+					"body": "",
+					"timestamp": 0,
+					"has_harm_warning": "",
+					"music_name": "",
+					"music_url": "",
+					"video_url": "",
+					"tiktok_url": href,
+					"likes": "",
+					"comments": "",
+					"hashtags": "",
+					"fully_scraped": False
+				})
+			except IndexError:
+				self.log.warning("Invalid TikTok URL %s, skipping" % href)
+				continue
 
 		await page.close()
 		await browser.close()
