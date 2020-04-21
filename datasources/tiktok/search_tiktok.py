@@ -120,7 +120,6 @@ class SearchTikTok(Search):
 		browser = await self.get_browser()
 		page = await browser.newPage()
 		await stealth(page)
-		limit = 100
 
 		if item[0] == "#":
 			# hashtag query
