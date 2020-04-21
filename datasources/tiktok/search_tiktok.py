@@ -264,6 +264,9 @@ class SearchTikTok(Search):
 			# load the next one. If the button does not exist, no more posts
 			# can be loaded, so end the scrape
 			result.append(data)
+			if len(result) % 10 == 0:
+				self.dataset.update_status("Scraped data for %i/%i posts..." % (len(result), min(items, limit)))
+
 			has_next = int(await page.evaluate("document.querySelectorAll('%s .control-icon.arrow-right').length" % selector)) > 0
 			if has_next:
 				await page.click("%s .control-icon.arrow-right" % selector)
