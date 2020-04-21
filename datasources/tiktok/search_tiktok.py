@@ -225,9 +225,9 @@ class SearchTikTok(Search):
 			try:
 				data["id"] = bits[-1]
 				data["thread_id"] = bits[-1]
-				data["author_name"] = await page.evaluate(
+				data["author"] = await page.evaluate(
 					'document.querySelector("%s .user-info .user-username").innerHTML' % selector)
-				data["author_name_full"] = await page.evaluate(
+				data["author_full"] = await page.evaluate(
 					'document.querySelector("%s .user-info .user-nickname").innerHTML' % selector)
 				data["subject"] = ""
 				data["body"] = await page.evaluate(
