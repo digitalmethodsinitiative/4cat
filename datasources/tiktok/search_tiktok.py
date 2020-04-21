@@ -60,7 +60,6 @@ class SearchTikTok(Search):
 		for query in queries:
 			posts += self.fetch_from_overview_page(query, max_posts)
 
-		raise RuntimeError()
 		return posts
 
 
