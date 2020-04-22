@@ -1,6 +1,6 @@
 """
 
-4CAT processor views - iews generated for specific processors.
+4CAT processor views - generated for specific processors.
 
 """
 
@@ -28,7 +28,7 @@ from webtool.api_tool import delete_dataset, toggle_favourite, queue_processor
 from backend.lib.dataset import DataSet
 from backend.lib.queue import JobQueue
 
-@app.route('/sigma_network/', methods=["POST"])
+@app.route('/sigma-network/', methods=["POST"])
 @login_required
 def sigma_network():
 	"""

@@ -76,14 +76,18 @@ class SigmaNetwork(BasicProcessor):
 		self.dataset.update_status("Generating HTML file")
 
 		# Generate a html file based on the retrieved json data
+		sigma_url = "https" if config.FlaskConfig.SERVER_HTTPS else "http"
+		sigma_url += "://%s/sigma-network/" % (config.FlaskConfig.SERVER_NAME)
 		try:
-			if config.FlaskConfig.SERVER_HTTPS:
-				response = requests.post("https://" + config.FlaskConfig.SERVER_NAME + "/sigma_network/", json=data)
-			else:
-				response = requests.post("http://" + config.FlaskConfig.SERVER_NAME + "/sigma_network/", json=data)
-		
-		except Exception as error:
-			self.dataset.update_status("Couldn't reach the server to generate the HTML file.")
+			response = requests.post(sigma_url, json=data)
+			response.raise_for_status()
+		except requests.exceptions.HTTPError as error:
+			self.dataset.update_status("HTTP error when fetching sigma HTML template: %s" % error)
+			self.dataset.finish(-1)
+			return
+		except requests.exceptions.RequestException as error:
+			self.dataset.update_status("Request error when fetching sigma HTML template: %s" % error)
+			self.dataset.finish(-1)
 			return
 
 		# Write HTML file
