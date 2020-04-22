@@ -137,7 +137,6 @@ class SearchTikTok(Search):
 			if not have_new_content or int(items) >= limit:
 				break
 
-
 		if items == 0:
 			return []
 
@@ -204,10 +203,15 @@ class SearchTikTok(Search):
 				data["timestamp"] = 0
 				data["has_harm_warning"] = bool(
 					browser.execute_script("return document.querySelectorAll('%s .warn-info').length > 0" % selector))
-				data["music_name"] = browser.execute_script(
-					"return document.querySelector('%s .music-info a').innerHTML" % selector)
-				data["music_url"] = browser.execute_script(
-					"return document.querySelector('%s .music-info a').getAttribute('href')" % selector)
+				try:
+					data["music_name"] = browser.execute_script(
+						"return document.querySelector('%s .music-info a').innerHTML" % selector)
+					data["music_url"] = browser.execute_script(
+						"return document.querySelector('%s .music-info a').getAttribute('href')" % selector)
+				except JavascriptException:
+					# some posts don't have a music link...?
+					data["music_name"] = ""
+					data["music_url"] = ""
 				data["video_url"] = browser.execute_script(
 					"return document.querySelector('%s video').getAttribute('src')" % selector)
 				data["tiktok_url"] = href
@@ -224,15 +228,15 @@ class SearchTikTok(Search):
 					[tag.replace("?", "") for tag in re.findall(r'href="/tag/([^"]+)"', data["body"])])
 				body_soup = BeautifulSoup(data["body"], "html.parser")
 				data["body"] = body_soup.text.strip()
+
+				result.append(data)
 			except Exception as e:
 				self.log.warning("Skipping post %s for TikTok scrape (%s)" % (href, e))
-				break
 
 
 			# store data and - if possible - click the "next post" button to
 			# load the next one. If the button does not exist, no more posts
 			# can be loaded, so end the scrape
-			result.append(data)
 			if len(result) % 10 == 0:
 				self.dataset.update_status("Scraped data for %i/%i posts..." % (len(result), min(items, limit)))
 
