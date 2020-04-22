@@ -36,7 +36,6 @@ login_manager.login_view = "show_login"
 import webtool.access
 import webtool.views
 import webtool.views_admin
-import webtool.views_processors
 import webtool.api_tool
 import webtool.api_data
 import webtool.api_standalone
