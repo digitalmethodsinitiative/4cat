@@ -271,13 +271,15 @@ class Search(BasicProcessor, ABC):
 				# replace author column with salted hash of the author name, if
 				# pseudonymisation is enabled
 				if pseudonymise_author:
-					if row["author"] not in hash_cache:
-						author_hasher = hasher.copy()
-						author_hasher.update(str(row["author"]).encode("utf-8"))
-						hash_cache[row["author"]] = author_hasher.hexdigest()
-						del author_hasher
+					author_fields = [field for field in row.keys() if "author" in field]
+					for author_field in author_fields:
+						if row[author_field] not in hash_cache:
+							author_hasher = hasher.copy()
+							author_hasher.update(str(row[author_field]).encode("utf-8"))
+							hash_cache[row[author_field]] = author_hasher.hexdigest()
+							del author_hasher
 
-					row["author"] = hash_cache[row["author"]]
+						row[author_field] = hash_cache[row[author_field]]
 
 				writer.writerow(row)
 
