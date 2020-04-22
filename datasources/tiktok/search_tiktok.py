@@ -7,10 +7,11 @@ TikTok data for 4CAT.
 """
 import urllib.parse
 import time
+import json
 import re
 
 from bs4 import BeautifulSoup
-from selenium import webdriver
+from seleniumwire import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.common.exceptions import NoSuchElementException, JavascriptException
 
@@ -77,15 +78,30 @@ class SearchTikTok(Search):
 		:param int limit:  Amount of posts to scrape
 		:return list:  A list of posts that were scraped
 		"""
+		scraper_ua = "Naverbot"
+		iphone_ua = "Mozilla/5.0 (iPhone; CPU iPhone OS 13_3_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.0.5 Mobile/15E148 Safari/604.1"
+
 		options = Options()
 		options.headless = True
-		options.add_argument("--user-agent=%s" % "Naverbot")
+		options.add_argument("--user-agent=%s" % scraper_ua)
 		options.add_argument("--disable-gpu")
 
-		browser = webdriver.Chrome(options=options)
-		browser.set_page_load_timeout(10)
-		browser.set_script_timeout(5)
-		browser.implicitly_wait(2)
+		mobile_emulation = {"deviceName": "iPhone X"}
+		chrome_options = webdriver.ChromeOptions()
+		chrome_options.add_experimental_option("mobileEmulation", mobile_emulation)
+
+		browser = webdriver.Chrome(options=options, desired_capabilities=chrome_options.to_capabilities())
+
+		browser.scopes = [
+			".*" + re.escape("m.tiktok.com/share/item/list") + ".*"
+		]
+		browser.set_page_load_timeout(15)
+		browser.set_script_timeout(10)
+		browser.implicitly_wait(5)
+
+		if len(item) < 2:
+			# empty query... should have been discarded though
+			return []
 
 		if item[0] == "#":
 			# hashtag query
@@ -107,7 +123,7 @@ class SearchTikTok(Search):
 			# TikTok's overview page is one of those infinite scroll affairs,
 			# so we scroll down until we have enough posts to then scrape
 			# individually
-			self.dataset.update_status("Getting post URLs for '%s' (%i so far)" % (item, items))
+			self.dataset.update_status("Finding posts for '%s' (%i so far)" % (item, items))
 			if self.interrupted:
 				raise ProcessorInterruptedException("Interrupted while fetching post list from TikTok")
 
@@ -138,113 +154,60 @@ class SearchTikTok(Search):
 				break
 
 		if items == 0:
-			return []
-
-		# next determine what selector we need to use to find the modal window
-		# containing the actual tiktok post. this seems to differ from time to
-		# time (possibly resolution-related?) so we try a list until we find
-		# one that works
-		browser.execute_script("document.querySelector('a.video-feed-item-wrapper').click()")
-		selectors = [".video-card-big.browse-mode", ".video-card-modal"]
-		have_selector = False
-
-		while selectors:
-			selector = selectors[0]
-			selectors = selectors[1:]
-
-			have_selector = False
-			try:
-				browser.find_element_by_css_selector("%s .user-info" % selector)
-				have_selector = True
-				break
-			except (JavascriptException, NoSuchElementException):
-				continue
-
-		# if at this point we still don't have a selector it means that we
-		# don't know how to find the post info in the page, so we can't scrape
-		if not have_selector:
-			self.dataset.update_status("Could not load post data. Scraping not possible.", is_final=True)
 			browser.close()
 			return []
 
 		result = []
-		while len(result) < limit:
-			if self.interrupted:
-				browser.close()
-				raise ProcessorInterruptedException("Interrupted while downloading post data")
-
-			# wait until the post info has been loaded asynchronously
+		for update in browser.requests:
 			try:
-				browser.find_element_by_css_selector("%s .user-info" % selector)
-			except NoSuchElementException:
+				data = json.loads(update.response.body)
+			except json.JSONDecodeError:
+				self.log.warning("Error decoding TikTok response for %s" % update)
 				continue
 
-			# annoyingly the post URL does not seem to be loaded into the modal
-			# but we can use the share buttons (that include the post URL in
-			# their share URL) to infer it
-			href = browser.execute_script("return document.querySelector('%s .share-group a').getAttribute('href')" % selector)
-			href = href.split("&u=")[1].split("&")[0]
-			href = urllib.parse.unquote(href)
-			bits = href.split("/")
+			if "body" not in data or "statusCode" not in data:
+				self.log.info("Trying to parse TikTok API request %s, but unknown format" % update)
+				continue
 
-			# now extract the data from the various page elements containing
-			# them
-			data = {}
-			try:
-				data["id"] = bits[-1]
-				data["thread_id"] = bits[-1]
-				data["author"] = browser.execute_script(
-					"return document.querySelector('%s .user-info .user-username').innerHTML" % selector)
-				data["author_full"] = browser.execute_script(
-					"return document.querySelector('%s .user-info .user-nickname').innerHTML" % selector)
-				data["subject"] = ""
-				data["body"] = browser.execute_script(
-					"return document.querySelector('%s .video-meta-title').innerHTML" % selector)
-				data["timestamp"] = 0
-				data["has_harm_warning"] = bool(
-					browser.execute_script("return document.querySelectorAll('%s .warn-info').length > 0" % selector))
-				try:
-					data["music_name"] = browser.execute_script(
-						"return document.querySelector('%s .music-info a').innerHTML" % selector)
-					data["music_url"] = browser.execute_script(
-						"return document.querySelector('%s .music-info a').getAttribute('href')" % selector)
-				except JavascriptException:
-					# some posts don't have a music link...?
-					data["music_name"] = ""
-					data["music_url"] = ""
-				data["video_url"] = browser.execute_script(
-					"return document.querySelector('%s video').getAttribute('src')" % selector)
-				data["tiktok_url"] = href
+			if data["statusCode"] != 0:
+				continue
 
-				# these are a bit more involved
-				data["likes"] = expand_short_number(
-					browser.execute_script("return document.querySelector('%s .like-text').innerHTML" % selector))
-				data["comments"] = expand_short_number(
-					browser.execute_script("return document.querySelector('%s .comment-text').innerHTML" % selector))
+			items = data["body"]["itemListData"]
+			for post_data in items:
+				if len(result) >= limit:
+					break
 
-				# we strip the HTML here because TikTok does not allow user markup
-				# anyway, so this is not really significant
-				data["hashtags"] = ",".join(
-					[tag.replace("?", "") for tag in re.findall(r'href="/tag/([^"]+)"', data["body"])])
-				body_soup = BeautifulSoup(data["body"], "html.parser")
-				data["body"] = body_soup.text.strip()
+				post = post_data["itemInfos"]
+				user = post_data["authorInfos"]
+				user_stats = post_data["authorStats"]
+				music = post_data["musicInfos"]
+				hashtags = [item["HashtagName"] for item in post_data["textExtra"] if item["HashtagName"]]
 
-				result.append(data)
-			except Exception as e:
-				self.log.warning("Skipping post %s for TikTok scrape (%s)" % (href, e))
+				post_entry = {
+					"id": post["id"],
+					"thread_id": post["id"],
+					"author": user["uniqueId"],
+					"author_full": user["nickName"],
+					"author_followers": user_stats["followerCount"],
+					"subject": "",
+					"body": post["text"],
+					"timestamp": int(post["createTime"]),
+					"is_harmful": len(post["warnInfo"]) > 0,
+					"is_duet": post_data["duetInfo"] != "0",
+					"music_name": music["musicName"],
+					"music_id": music["musicId"],
+					"video_url": post["video"]["urls"][0],
+					"tiktok_url": "https://tiktok.com/@%s/%s" % (user["uniqueId"], post["id"]),
+					"amount_likes": post["diggCount"],
+					"amount_comments": post["commentCount"],
+					"amount_shares": post["shareCount"],
+					"amount_plays": post["playCount"],
+					"hashtags": ",".join(hashtags),
+				}
 
+				result.append(post_entry)
 
-			# store data and - if possible - click the "next post" button to
-			# load the next one. If the button does not exist, no more posts
-			# can be loaded, so end the scrape
-			if len(result) % 10 == 0:
-				self.dataset.update_status("Scraped data for %i/%i posts..." % (len(result), min(items, limit)))
-
-			try:
-				has_next = browser.find_element_by_css_selector("%s .control-icon.arrow-right" % selector)
-				browser.execute_script("document.querySelector('%s .control-icon.arrow-right').click()" % selector)
-				time.sleep(0.8)
-			except NoSuchElementException:
+			if len(result) >= limit:
 				break
 
 		browser.close()
@@ -618,7 +581,7 @@ class SearchTikTok(Search):
 			raise QueryParametersException("You cannot query more than 5 items at a time.")
 
 		sigil = {"hashtag": "#", "username": "@", "music": "🎶"}[query.get("search_scope")]
-		items = ",".join([sigil + item for item in items])
+		items = ",".join([sigil + item for item in items if item])
 
 		# simple!
 		return {

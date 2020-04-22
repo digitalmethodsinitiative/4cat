@@ -9,6 +9,7 @@ libraries = [
 	"google-api-python-client==1.7.7",
 	"emoji-country-flag==1.1.0",
 	"stop_words==2018.7.23",
+	"selenium-wire==1.0.11",
 	"scikit_learn==0.20.1",
 	"Flask_Limiter==1.0.1",
 	"youtube_dl==2019.1.2",
