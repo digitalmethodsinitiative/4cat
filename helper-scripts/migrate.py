@@ -87,8 +87,8 @@ if current_version_c > target_version_c:
 # ---------------------------------------------
 migrate_files = Path(".").glob("helper-scripts/migrate/migrate-*.py")
 for file in migrate_files:
-	migrate_minimum = make_version_comparable(file.stem.split("-")[2])
-	migrate_target = make_version_comparable(file.stem.split("-")[1])
+	migrate_minimum = make_version_comparable(file.stem.split("-")[1])
+	migrate_target = make_version_comparable(file.stem.split("-")[2])
 
 	if migrate_minimum >= current_version_c and migrate_target <= target_version_c:
 		migrate_to_run.append(file)
