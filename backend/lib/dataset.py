@@ -42,7 +42,7 @@ class DataSet:
 	no_status_updates = False
 
 	def __init__(self, parameters={}, key=None, job=None, data=None, db=None, parent=None, extension="csv",
-				 type="search"):
+				 type=None):
 		"""
 		Create new dataset object
 
@@ -79,6 +79,9 @@ class DataSet:
 			if parameters is None:
 				raise TypeError("DataSet() requires either 'key', or 'parameters' to be given")
 
+			if not type:
+				raise ValueError("Datasets must have their type set explicitly")
+
 			query = self.get_label(parameters, default=type)
 			self.key = self.get_key(query, parameters, parent)
 			current = self.db.fetchone("SELECT * FROM datasets WHERE key = %s AND query = %s", (self.key, query))
@@ -111,7 +114,8 @@ class DataSet:
 
 		# retrieve analyses and processors that may be run for this dataset
 		analyses = self.db.fetchall("SELECT * FROM datasets WHERE key_parent = %s ORDER BY timestamp ASC", (self.key,))
-		self.children = sorted([DataSet(data=analysis, db=self.db) for analysis in analyses], key=lambda dataset: dataset.is_finished(), reverse=True)
+		self.children = sorted([DataSet(data=analysis, db=self.db) for analysis in analyses],
+							   key=lambda dataset: dataset.is_finished(), reverse=True)
 		self.processors = self.get_available_processors()
 
 	def check_dataset_finished(self):
@@ -253,8 +257,6 @@ class DataSet:
 			copy.finish(self.num_rows)
 
 		return copy
-
-
 
 	def delete(self):
 		"""
@@ -460,7 +462,8 @@ class DataSet:
 		else:
 			return False
 
-		updated = self.db.update("datasets", where={"key": self.data["key"]}, data={"parameters": json.dumps(parameters)})
+		updated = self.db.update("datasets", where={"key": self.data["key"]},
+								 data={"parameters": json.dumps(parameters)})
 		self.parameters = parameters
 
 		return updated > 0
@@ -552,10 +555,12 @@ class DataSet:
 		processors = backend.all_modules.processors
 
 		available = collections.OrderedDict()
+		is_search = re.match(r".*search$", self.data["type"])
 		for processor in processors.values():
-			if (self.data["type"] == "search" and not processor["accepts"] and (
-					not processor["datasources"] or self.parameters.get("datasource") in processor["datasources"])) or \
-					self.data["type"] in processor["accepts"]:
+			if ((is_search and (not processor["accepts"] or "search" in processor["accepts"])) or
+					self.data["type"] in processor["accepts"]) and (
+					not processor["datasources"] or self.parameters.get("datasource", None) in processor[
+				"datasources"]):
 				available[processor["id"]] = processor
 
 		return available

@@ -18,7 +18,7 @@ class HashtagUserBipartiteGrapher(BasicProcessor):
 	"""
 	type = "bipartite-user-hashtag-network"  # job type ID
 	category = "Networks"  # category
-	title = "Bipartite Person-Hashtag Network"  # title displayed in UI
+	title = "Bipartite Author-Hashtag Network"  # title displayed in UI
 	description = "Produces a bipartite graph based on co-occurence of hashtags and people. If someone wrote a post with a certain hashtag, there will be a link between that person and the hashtag. The more often they appear together, the stronger the link."  # description displayed in UI
 	extension = "gdf"  # extension of result file, used internally and in UI
 
