@@ -5,18 +5,14 @@ TikTok is, after a fashion, an imageboard - people post videos and then
 other people reply. So this datasource uses this affordance to retrieve
 TikTok data for 4CAT.
 """
-import urllib.parse
 import time
 import json
 import re
 
-from bs4 import BeautifulSoup
 from seleniumwire import webdriver
 from selenium.webdriver.chrome.options import Options
-from selenium.common.exceptions import NoSuchElementException, JavascriptException
 
 from backend.abstract.search import Search
-from backend.lib.helpers import expand_short_number
 from backend.lib.exceptions import QueryParametersException, ProcessorInterruptedException
 
 
@@ -24,13 +20,11 @@ class SearchTikTok(Search):
 	"""
 	TikTok scraper
 
-	Since TikTok has no API of its own, we use pyppeteer to start a headless
+	Since TikTok has no API of its own, we use selenium to start a headless
 	browser that we manipulate to browse the TikTok website and download the
-	information we need. Unfortunately this is a bit limited - it's slower and
-	requires far more resources than using an API or directly scraping HTML.
-	The latter is not possible as TikTok loads everything asynchronously so the
-	HTML one scrapes has no useful data. The website also does not include any
-	comments, so those cannot be scraped this way.
+	information we need. Unfortunately this is a bit limited - we can't
+	download comments for example, though we could potentially if we log in
+	(but logging in is complicated in itself).
 
 	It's the best we can do, for now!
 	"""
