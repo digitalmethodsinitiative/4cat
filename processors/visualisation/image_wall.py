@@ -4,9 +4,11 @@ Create an image wall of the most-used images
 import requests
 import hashlib
 import random
+import shutil
 import base64
 import math
 import time
+import sys
 import re
 
 from pathlib import Path
@@ -22,9 +24,9 @@ from backend.lib.helpers import UserInput
 from backend.abstract.processor import BasicProcessor
 
 
-__author__ = "Sal Hagen, Stijn Peeters"
-__credits__ = ["Sal Hagen, Stijn Peeters"]
-__maintainer__ = "Sal Hagen, Stijn Peeters"
+__author__ = "Stijn Peeters"
+__credits__ = ["Stijn Peeters"]
+__maintainer__ = "Stijn Peeters"
 __email__ = "4cat@oilab.eu"
 
 class ImageWallGenerator(BasicProcessor):
@@ -36,10 +38,10 @@ class ImageWallGenerator(BasicProcessor):
 	type = "image-wall"  # job type ID
 	category = "Visual"  # category
 	title = "Image wall"  # title displayed in UI
-	description = "Download top images and create an image wall. The amount of images used can be configured; the more images, the longer it takes to create the image wall. May take a while to complete as images are sourced externally."  # description displayed in UI
+	description = "Download top images and create an image wall. The amount of images used can be configured; the more images, the longer it takes to create the image wall. May take a while to complete as images need to be downloaded externally."  # description displayed in UI
 	extension = "png"  # extension of result file, used internally and in UI
-	accepts = ["top-images"]  # query types this post-processor accepts as input
-	datasources = ["4chan"]
+	accepts = ["top-images", "tiktok-search"]  # query types this post-processor accepts as input
+	datasources = ["4chan", "tiktok"]
 
 	input = "csv:filename,url_4cat"
 	output = "png"
@@ -54,6 +56,14 @@ class ImageWallGenerator(BasicProcessor):
 		}
 	}
 
+	# to help with rate-limiting
+	previous_download = 0
+
+	# images will be arranged and resized to fit these image wall dimensions
+	# note that image aspect ratio may not allow for a precise fit
+	TARGET_WIDTH = 2560
+	TARGET_HEIGHT = 1440
+
 	def process(self):
 		"""
 		This takes a 4CAT results file as input, and outputs a new CSV file
@@ -64,15 +74,35 @@ class ImageWallGenerator(BasicProcessor):
 
 		self.dataset.update_status("Reading source file")
 		parent = self.dataset.get_genealogy()[0]
-		external = "fireden" if parent.parameters["board"] == "v" else "4plebs"
-		rate_limit = 1 if external == "fireden" else 16
 
 		urls = []
+		# determine where and how to get the image
+		# this is different between 4chan and other data sources since for
+		# 4chan the file may be stored locally
+		if parent.parameters["datasource"] == "4chan":
+			column_attempt = []
+			column_attempt.append("url_fireden" if parent.parameters["board"] == "v" else "url_4plebs")
+			rate_limit = 1 if parent.parameters["board"] == "v" else 16
+			image_download_method = self.get_image_4chan
+			tile_width = 100
+			tile_height = 100
+
+		else:
+			column_attempt = ["thumbnail_url"]
+			image_download_method = self.get_image_generic
+			rate_limit = 1
+			tile_width = 200
+			tile_height = None
 
 		try:
 			amount = max(0, min(200, int(self.parameters.get("amount", 0))))
 		except ValueError:
 			amount = 100
+
+
+		# prepare staging area
+		tmp_path = self.dataset.get_temporary_path()
+		tmp_path.mkdir()
 
 		with open(self.source_file) as source:
 			csv = DictReader(source)
@@ -80,29 +110,18 @@ class ImageWallGenerator(BasicProcessor):
 				if len(urls) >= amount:
 					break
 
-				extension = post["filename"].split(".")[1].lower()
-				if extension not in ("jpg", "jpeg", "png", "gif"):
-					continue
-
-				local_file = post["url_4cat"].split("/")[-1]
-				local_path = Path(config.PATH_IMAGES, local_file)
-				if local_path.exists():
-					urls.append(local_path)
-				else:
-					urls.append(post["url_" + external])
+				for field in column_attempt:
+					if field in post:
+						urls.append(post[field])
+						break
 
 		# randomize it
 		random.shuffle(urls)
 
-		# calculate image wall dimensions
-		tiles_x = int(math.sqrt(len(urls))) + int(math.sqrt(len(urls)) / 3) + 1
-		tiles_y = int(math.sqrt(len(urls))) - int(math.sqrt(len(urls)) / 3) + 1
-
-		# initialize our canvas
+		# prepare
 		ImageFile.LOAD_TRUNCATED_IMAGES = True
-		tile_size = 100  # size of each tile, in pixels (they'll all be square)
-		wall = Image.new('RGB', (tiles_x * tile_size, tiles_y * tile_size))
 		counter = 0
+		wall = None
 
 		# loop through images and copy them onto the wall
 		for path in urls:
@@ -111,26 +130,75 @@ class ImageWallGenerator(BasicProcessor):
 
 			# acquire and resize image
 			try:
-				picture = self.get_image(path, rate_limit=rate_limit)
-			except (requests.RequestException, IndexError, FileNotFoundError):
+				picture = image_download_method(path, tmp_path, rate_limit=rate_limit)
+			except (requests.RequestException, IndexError, FileNotFoundError) as e:
+				# increase the counter here to leave an empty space for the
+				# missing image, since that itself can be significant
+				counter += 1
 				continue
 
-			picture = ImageOps.fit(picture, (tile_size, tile_size), method=Image.BILINEAR)
+			if not wall:
+				# we can only initialise the wall here, since before we
+				# download an image we don't know what the best dimensions are
+				if not tile_width:
+					tile_width = int(picture.width)
+				if not tile_height:
+					tile_height = int((tile_width / picture.width) * picture.height)
+
+				ratio = self.TARGET_WIDTH / self.TARGET_HEIGHT
+				tiles_y = math.ceil(math.sqrt((tile_width * len(urls)) / (ratio * tile_height)))
+				tiles_x = math.ceil(len(urls) / tiles_y)
+				wall = Image.new('RGB', (tiles_x * tile_width, tiles_y * tile_height))
+
+			picture = ImageOps.fit(picture, (tile_width, tile_height), method=Image.BILINEAR)
 
 			# put image on wall
 			index = counter - 1
 			x = index % tiles_x
 			y = math.floor(index / tiles_x)
-			wall.paste(picture, (x * tile_size, y * tile_size))
+			wall.paste(picture, (x * tile_width, y * tile_height))
+
+
+		if not wall:
+			self.dataset.update_status("No images could be downloaded", is_final=True)
+			shutil.rmtree(tmp_path)
+			self.dataset.finish(0)
+			return
+
+		if wall.width > self.TARGET_WIDTH:
+			self.dataset.update_status("Resizing image wall")
+			new_height = math.ceil((self.TARGET_WIDTH / wall.width) * wall.height)
+			wall = ImageOps.fit(wall, (self.TARGET_WIDTH, new_height), method=Image.BILINEAR)
 
 		# finish up
 		self.dataset.update_status("Saving result")
 		wall.save(str(self.dataset.get_results_path()))
+		shutil.rmtree(tmp_path)
 
 		self.dataset.update_status("Finished")
-		self.dataset.finish(len(urls))
+		self.dataset.finish(counter)
 
-	def get_image(self, path, rate_limit=0):
+	def get_image_generic(self, path, staging, rate_limit = 0):
+		while self.previous_download > time.time() - rate_limit:
+			time.sleep(0.1)
+
+		self.previous_download = time.time()
+		image = requests.get(path, stream=True)
+		image.raw.decode_content = True
+
+		staging = staging.joinpath("temp-image")
+
+		with staging.open("wb") as output:
+			for chunk in image.iter_content(1024):
+				output.write(chunk)
+
+		picture = Image.open(str(staging))
+		picture.load()
+		staging.unlink()
+
+		return picture
+
+	def get_image_4chan(self, path, staging, rate_limit=0):
 		"""
 		Create image from path
 
@@ -144,11 +212,18 @@ class ImageWallGenerator(BasicProcessor):
 
 		:return Image:  Image object, or nothing if loading it failed
 		"""
-		rate_regex = re.compile(r"Search limit exceeded. Please wait ([0-9]+) seconds before attempting again.")
+		# do we have the file locally?
+		filename = Path(config.PATH_IMAGES, path.split("/")[-1])
+		if filename.exists():
+			return Image.open(str(filename))
 
-		if isinstance(path, Path):
-			# local file
-			return Image.open(path)
+
+		while self.previous_download > time.time() - rate_limit:
+			time.sleep(0.1)
+
+		self.previous_download = time.time()
+
+		rate_regex = re.compile(r"Search limit exceeded. Please wait ([0-9]+) seconds before attempting again.")
 
 		# get link to image from external HTML search results
 		# detect rate limiting and wait until we're good to go again
@@ -172,7 +247,7 @@ class ImageWallGenerator(BasicProcessor):
 			raise FileNotFoundError
 
 		# cache the image for later, if needed
-		if config.PATH_IMAGES:
+		if config.PATH_IMAGES and Path(config.PATH_ROOT, config.PATH_IMAGES).exists():
 			md5 = hashlib.md5()
 
 			based_hash = path.split("/")[-1].split(".")[0].replace("_", "/")
@@ -182,12 +257,11 @@ class ImageWallGenerator(BasicProcessor):
 			local_path = Path(config.PATH_IMAGES, md5.hexdigest() + "." + extension)
 			delete_after = False
 		else:
-			query_result = self.dataset.get_results_path()
-			local_path = Path(query_result.parent, query_result.name + "-temp")
+			local_path = staging.joinpath("temp-image")
 			delete_after = True
 
 		# save file, somewhere
-		with open(local_path, 'wb') as file:
+		with local_path.open('wb') as file:
 			for chunk in image.iter_content(1024):
 				file.write(chunk)
 

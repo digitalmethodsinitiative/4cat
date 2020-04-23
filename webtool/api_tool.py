@@ -233,7 +233,7 @@ def queue_dataset():
 
 	sanitised_query["pseudonymise"] = bool(request.form.to_dict().get("pseudonymise", False))
 
-	dataset = DataSet(parameters=sanitised_query, db=db, type="search")
+	dataset = DataSet(parameters=sanitised_query, db=db, type=search_worker_id)
 
 	if hasattr(worker_class, "after_create"):
 		worker_class.after_create(sanitised_query, dataset, request)
