@@ -126,6 +126,7 @@ class SearchInstagram(Search):
 					"timestamp": int(post.date_utc.timestamp()),
 					"type": "video" if post.is_video else "picture",
 					"url": post.video_url if post.is_video else post.url,
+					"thumbnail_url": post.url,
 					"hashtags": ",".join(post.caption_hashtags),
 					"usertags": ",".join(post.tagged_users),
 					"mentioned": ",".join(mention.findall(post.caption) if post.caption else ""),
