@@ -119,6 +119,7 @@ class SearchTikTok(Search):
 			# individually
 			self.dataset.update_status("Finding posts for '%s' (%i so far)" % (item, items))
 			if self.interrupted:
+				browser.close()
 				raise ProcessorInterruptedException("Interrupted while fetching post list from TikTok")
 
 			# we can determine whether the new items after scrolling have
@@ -137,19 +138,14 @@ class SearchTikTok(Search):
 				# page it takes longer and longer to load the new posts
 				scroll_height = browser.execute_script("return document.body.scrollHeight")
 				if scroll_height > page_height + 100:
-					page_height = scroll_height
 					have_new_content = True
 					break
 				time.sleep(0.25)
 
-			# the amount of videos on the page:
+			# the amount of posts on the page:
 			items = int(browser.execute_script("return document.querySelectorAll('a.video-feed-item-wrapper').length"))
 			if not have_new_content or int(items) >= limit:
 				break
-
-		if items == 0:
-			browser.close()
-			return []
 
 		result = []
 		for update in browser.requests:
