@@ -40,8 +40,8 @@ class ImageWallGenerator(BasicProcessor):
 	title = "Image wall"  # title displayed in UI
 	description = "Download top images and create an image wall. The amount of images used can be configured; the more images, the longer it takes to create the image wall. May take a while to complete as images need to be downloaded externally."  # description displayed in UI
 	extension = "png"  # extension of result file, used internally and in UI
-	accepts = ["top-images", "tiktok-search"]  # query types this post-processor accepts as input
-	datasources = ["4chan", "tiktok"]
+	accepts = ["top-images", "tiktok-search", "instagram-search"]  # query types this post-processor accepts as input
+	datasources = ["4chan", "tiktok", "instagram"]
 
 	input = "csv:filename,url_4cat"
 	output = "png"
@@ -88,7 +88,7 @@ class ImageWallGenerator(BasicProcessor):
 			tile_height = 100
 
 		else:
-			column_attempt = ["thumbnail_url"]
+			column_attempt = ["thumbnail_url", "url"]
 			image_download_method = self.get_image_generic
 			rate_limit = 1
 			tile_width = 200
@@ -131,7 +131,7 @@ class ImageWallGenerator(BasicProcessor):
 			# acquire and resize image
 			try:
 				picture = image_download_method(path, tmp_path, rate_limit=rate_limit)
-			except (requests.RequestException, IndexError, FileNotFoundError) as e:
+			except (requests.RequestException, IndexError, FileNotFoundError, OSError) as e:
 				# increase the counter here to leave an empty space for the
 				# missing image, since that itself can be significant
 				counter += 1
