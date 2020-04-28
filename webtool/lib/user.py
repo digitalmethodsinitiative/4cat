@@ -199,7 +199,6 @@ class User:
 		# prepare welcome e-mail
 		sender = "4cat@oilab.nl"
 		message = MIMEMultipart("alternative")
-		message["Subject"] = "Account created"
 		message["From"] = sender
 		message["To"] = username
 
@@ -209,6 +208,8 @@ class User:
 
 		# we use slightly different e-mails depending on whether this is the first time setting a password
 		if new:
+			
+			message["Subject"] = "Account created"
 			mail = """
 			<p>Hello %s,</p>
 			<p>A 4CAT account has been created for you. You can now log in to 4CAT at <a href="http://%s">%s</a>.</p>
@@ -217,6 +218,8 @@ class User:
 			<p>Please complete your registration within 72 hours as the link above will become invalid after this time.</p>
 			""" % (username, url_base, url_base, url, url)
 		else:
+			
+			message["Subject"] = "Password reset"
 			mail = """
 			<p>Hello %s,</p>
 			<p>Someone has requested a password reset for your 4CAT account. If that someone is you, great! If not, feel free to ignore this e-mail.</p>
