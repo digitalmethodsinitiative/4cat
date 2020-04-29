@@ -206,7 +206,7 @@ button:hover, .button-like:not(.inactive):hover {
 
 .form-footer {
     text-align: center;
-    margin-bottom: 1em;
+    padding-bottom: 1em;
 }
 
 
