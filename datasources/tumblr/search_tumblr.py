@@ -332,6 +332,7 @@ class SearchTumblr(Search):
 		items = items.split(",")
 		items = [item.lstrip().rstrip() for item in items if item]
 
+		print(query.get("max_date"), query.get("min_date"))
 
 		# Set dates, if given.
 		if query.get("max_date") or query.get("min_date"):
@@ -339,7 +340,7 @@ class SearchTumblr(Search):
 			# On some OSes, the date is submitted as dd-mm-yyyy. Make sure to also fetch these.
 			ddmmyyyy = r"^([0-2][0-9]|(3)[0-1])(-)(((0)[0-9])|((1)[0-2]))(-)\d{4}$"
 			date_format = "%Y-%m-%d"
-			
+
 			# Before
 			if query.get("max_date"):
 				try:
@@ -357,7 +358,7 @@ class SearchTumblr(Search):
 				try:
 					if re.match(ddmmyyyy, query.get("min_date","")):
 						date_format = "%d-%m-%Y"
-					after = int(datetime.datetime.strptime(query.get("min_date", ""), "%d-%m-%Y").timestamp())
+					after = int(datetime.datetime.strptime(query.get("min_date", ""), date_format).timestamp())
 				except ValueError:
 					raise QueryParametersException("Invalid value for min date %s " % str(query.get("min_date")))
 			else:
