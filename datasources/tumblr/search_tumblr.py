@@ -332,16 +332,38 @@ class SearchTumblr(Search):
 		items = items.split(",")
 		items = [item.lstrip().rstrip() for item in items if item]
 
-		# set before
-		if query.get("max_date"):
-			before = int(datetime.datetime.strptime(query.get("max_date", ""), "%Y-%m-%d").timestamp())
+
+		# Set dates, if given.
+		if query.get("max_date") or query.get("min_date"):
+
+			# On some OSes, the date is submitted as dd-mm-yyyy. Make sure to also fetch these.
+			ddmmyyyy = r"^([0-2][0-9]|(3)[0-1])(-)(((0)[0-9])|((1)[0-2]))(-)\d{4}$"
+			date_format = "%Y-%m-%d"
+			
+			# Before
+			if query.get("max_date"):
+				try:
+					if re.match(ddmmyyyy, query.get("max_date","")):
+						date_format = "%d-%m-%Y"
+					before = int(datetime.datetime.strptime(query.get("max_date", ""), date_format).timestamp())
+				except ValueError:
+					raise QueryParametersException("Invalid value for max date %s " % str(query.get("max_date")))
+			else:
+				before = None
+
+			# After
+			if query.get("min_date"):
+				date_format = "%Y-%m-%d"
+				try:
+					if re.match(ddmmyyyy, query.get("min_date","")):
+						date_format = "%d-%m-%Y"
+					after = int(datetime.datetime.strptime(query.get("min_date", ""), "%d-%m-%Y").timestamp())
+				except ValueError:
+					raise QueryParametersException("Invalid value for min date %s " % str(query.get("min_date")))
+			else:
+				after = None
 		else:
 			before = None
-
-		# set before
-		if query.get("min_date"):
-			after = int(datetime.datetime.strptime(query.get("min_date", ""), "%Y-%m-%d").timestamp())
-		else:
 			after = None
 
 		# Not more than 5 plox
