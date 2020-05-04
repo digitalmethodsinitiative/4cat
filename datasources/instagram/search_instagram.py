@@ -97,9 +97,9 @@ class SearchInstagram(Search):
 						posts_processed += 1
 					except StopIteration:
 						break
-			except instaloader.InstaloaderException:
+			except instaloader.InstaloaderException as e:
 				# should we abort here and return 0 posts?
-				self.log.info("Instaloader exception during query %s" % self.dataset.key)
+				self.log.warning("Instaloader exception during query %s: %s" % (self.dataset.key, e))
 				self.dataset.update_status("Error while retrieving posts for query '%s'" % query)
 
 		# go through posts, and retrieve comments
