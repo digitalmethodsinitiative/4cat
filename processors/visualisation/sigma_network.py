@@ -6,9 +6,11 @@ The corresponding CSS file is found in webtool/static/css.
 
 """
 import json
-import random
 import re
+import unicodedata
+import random
 import requests
+import ast
 
 import config
 
@@ -32,7 +34,7 @@ class SigmaNetwork(BasicProcessor):
 	title = "Sigma js network"  # title displayed in UI
 	description = "Visualise a network in the browser with sigma js."  # description displayed in UI
 	extension = "html"  # extension of result file, used internally and in UI
-	accepts = ["word-embeddings-neighbours", "url-network", "cotag-network", "quote-network", "wiki-category-network"]  # query types this post-processor accepts as input
+	accepts = ["word-embeddings-neighbours", "url-network", "cotag-network", "quote-network", "wiki-category-network", "collocations"]  # query types this post-processor accepts as input
 	preview_allowed = False # Will slow down the page too much
 
 	input = "csv"
@@ -58,6 +60,16 @@ class SigmaNetwork(BasicProcessor):
 		# gdf and non-network files need to be parsed first.
 
 		self.dataset.update_status("Generating graph data")
+
+		# If collocations, make sure n_size is 2 (bigrams)
+		if self.parent.data["type"] == "collocations":
+
+			parent_parameters = json.loads(self.parent.data["parameters"])
+
+			if int(parent_parameters["n_size"]) != 2:
+				self.dataset.update_status("Co-word networks can only be generated for bigrams (n_size: 2)")
+				self.dataset.finish(-1)
+				return
 
 		if str(self.source_file).endswith(".csv"):
 			data = self.generate_json_from_csv(self.source_file)
@@ -137,13 +149,7 @@ class SigmaNetwork(BasicProcessor):
 					for i, node_item in enumerate(node_items):
 
 						# Do some string cleaning
-						node_item = node_item.strip()
-						if node_item.endswith("\n"):
-							node_item = node_item[:-2]
-						if node_item.startswith("'") or node_item.startswith("\""):
-							node_item = node_item[1:]
-						if node_item.endswith("'") or node_item.endswith("\""):
-							node_item = node_item[:-1]
+						node_item = self.sanitise(node_item)
 
 						# Mandatory nodes
 
@@ -175,20 +181,14 @@ class SigmaNetwork(BasicProcessor):
 					
 					edge = {"size": 1}
 
-					# If everything is ok, there's no commas in gdf file's node info,
+					# If everything was parsed ok, there's no commas in gdf file's node info,
 					# so split on a comma and loop through the items
 					edge_items = line.split(",")
 
 					for i, edge_item in enumerate(edge_items):
 
 						# Do some string cleaning
-						edge_item = edge_item.strip()
-						if edge_item.endswith("\n"):
-							edge_item = edge_item[:-2]
-						if edge_item.startswith("'") or edge_item.startswith("\""):
-							edge_item = edge_item[1:]
-						if edge_item.endswith("'") or edge_item.endswith("\""):
-							edge_item = edge_item[:-1]
+						edge_item = self.sanitise(edge_item)
 
 						# Loop through the types of nodes we've encountered before
 						if edge_types[i].startswith("node1 "):
@@ -212,7 +212,6 @@ class SigmaNetwork(BasicProcessor):
 
 		return {"network": network}
 
-
 	def generate_json_from_csv(self, source_file):
 		"""
 		Generates a sigma.js compatible JSON object from a csv file.
@@ -229,10 +228,10 @@ class SigmaNetwork(BasicProcessor):
 			target_column = "nearest_neighbour"
 			weight_column = "cosine_similarity"
 
-		elif self.parent.data["type"] == "collocations": # To do!
-			source_column = "word1"
-			target_column = "word2"
-			weight_column = "weight"
+		elif self.parent.data["type"] == "collocations":
+			source_column = "item" # For collocations, it's only one column that we have to split later
+			target_column = "item"
+			weight_column = "frequency"
 
 		networks = {}
 
@@ -254,10 +253,10 @@ class SigmaNetwork(BasicProcessor):
 			highlight_words = [highlight_word for highlight_word in str(highlight_words).split(",")]
 
 		# Go through the source csv
-		for word_pair in self.iterate_csv_items(self.source_file):
+		for row in self.iterate_csv_items(self.source_file):
 			
 			# Check if this is a new date, and if so, add it as a new list
-			if word_pair["date"] != current_date:
+			if row["date"] != current_date:
  
 				# Add the existing network if it exists (i.e. if we're processing a "current_date")
 				if current_date and date_network:
@@ -268,48 +267,68 @@ class SigmaNetwork(BasicProcessor):
 				nodes_added = []
 				edges_added = []
 
-				current_date = word_pair["date"]
+				current_date = row["date"]
 
 			# Set the source and target word
-			source_word = word_pair[source_column]
-			target_word = word_pair[target_column]
+			# If they're the same, split the values in the column
+			# and use these as inputs
+			if source_column == target_column:
+
+				# Split the values on a space
+				split_values = row[source_column].split(" ")
+				split_values = [value.strip() for value in split_values]
+
+				# If there's more than two values, something is going wrong.
+				if len(split_values) > 2:
+					return "Too many values to unpack in column %s for values %S" % (s, row[source_column])
+				
+				# Set the source and target words as the first and second split values
+				source_word = split_values[0]
+				target_word = split_values[1]
+
+			# Usually we just want to use the source and target columns
+			else:
+				source_word = row[source_column]
+				target_word = row[target_column]
 
 			# Use this to loop through both words
 			source_and_target = [source_word, target_word]
 
 			# Used for edge weights
-			weight = word_pair.get(weight_column)
+			weight = row.get(weight_column)
 			if weight:
 				weight = float(weight)
-				if weight < 1: # Increase edge size for < numbers
-					weight = weight * 10
+				if weight < 0: # Increase edge size for < 0 numbers
+					weight = 1
 				weight = float(weight)
 			if not weight:
 				weight = 1
 
 			# Add nodes, if not already added
-			for i, word in enumerate(source_and_target):
+			for i, node_item in enumerate(source_and_target):
 
-				word_type = "source" # Used for indexing the right column node size
+				node_item_type = "source" # Used for indexing the right column node size
 				if i == 1:
 					word_type = "target"
 
-				if word not in nodes_added:
+				if node_item not in nodes_added:
+
 					# Node attributes
 					node = {}
-					node["id"] = word # We're using the word as an ID here, since it may only appear once anyway.
+					node["id"] = node_item # We're using the node_item as an ID here
 					node["label"] = word
 					node["x"] = random.randrange(1, 20)
 					node["y"] = random.randrange(1, 20)
-					# Size the nodes for how often the word appears in the above dataset, if given.
-					node["size"] = word_pair.get((word_type + "_occurrences"), 1)
 
-					if highlight_words and word in highlight_words:
+					# Size the nodes for how often the node_item appears in the above dataset, if given.
+					node["size"] = row.get((word_type + "_occurrences"), 1)
+
+					if highlight_words and node_item in highlight_words:
 						node["color"] = "#19B0A3"
 					
 					# Add that node
 					date_network["nodes"].append(node)
-					nodes_added.append(word)
+					nodes_added.append(node_item)
 
 			# Add edges, if not already added
 			# Assume its undirectional, for now, so sort the words
@@ -322,7 +341,7 @@ class SigmaNetwork(BasicProcessor):
 				edge["id"] = edge_label
 				edge["source"] =  edge_label.split("-")[0]
 				edge["target"] = edge_label.split("-")[1]
-				edge["size"] = weight * 10
+				edge["size"] = weight
 				edge["label"] = edge_label # Unused by sigma but useful here
 				
 				# Add that edge
@@ -334,6 +353,29 @@ class SigmaNetwork(BasicProcessor):
 		networks[current_date] = date_network
 
 		return networks
+
+	def sanitise(self, string):
+		"""
+		Sanitises string labels
+		"""
+
+		string = string.strip()
+		if string.endswith("\n"):
+			string = string[:-2]
+		if string.startswith("'") or string.startswith("\""):
+			string = string[1:]
+		if string.endswith("'") or string.endswith("\""):
+			string = string[:-1]
+
+		# Happens sometimes
+		string = string.replace("\\\\","") # Not ideal for now, but it works
+		string = string.replace("'","’")
+
+		# This normalises special character to one form
+		# e.g. variable width characters is Japanese signs
+		string = unicodedata.normalize("NFC", string)
+
+		return string
 
 	def get_html_page(self, data):
 		"""
@@ -579,4 +621,20 @@ class SigmaNetwork(BasicProcessor):
 		server_url = "https" if config.FlaskConfig.SERVER_HTTPS else "http"
 		server_url += "://%s" % config.FlaskConfig.SERVER_NAME
 
-		return html_string.replace("**server**", server_url).replace("**json**", json.dumps(data).replace("'", "\\'"))
+		# JSONify and make sure any encoding errors are replaced (happens with large files).
+		json_file = json.dumps(data).replace("\\\\","") # Not ideal for now, but it works.
+
+		with open("tmp.txt","w") as txtfile:
+			txtfile.write(json_file)
+
+		# Let's try and catch as much encoding issues as we can
+		try:
+			json.loads(json_file)
+		
+		except json.decoder.JSONDecodeError as e:
+			p = int(str(e).split("(char ")[-1].replace(")",""))
+			invalid_str = json_file[p-10:p+10]
+			self.dataset.update_status("Invalid JSON - encountered %s" % str(invalid_str))
+			raise Exception(e)
+
+		return html_string.replace("**server**", server_url).replace("**json**", json_file)
