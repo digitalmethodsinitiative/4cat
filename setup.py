@@ -18,7 +18,7 @@ libraries = [
 	"setuptools==40.8.0",
 	"APScheduler==3.5.3",
 	"Flask_Login==0.4.1",
-	"matplotlib==3.0.0",
+	"matplotlib==3.1.1",
 	"adjustText==0.7.3",
 	"selenium==3.141.0",
 	"werkzeug==0.15.5",
