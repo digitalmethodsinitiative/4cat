@@ -428,7 +428,19 @@ class SearchReddit(Search):
 		if query.get("body_match", None):
 			if "full_threads" in query:
 				del query["full_threads"]
-		
+
+		# Make sure no body or subject searches starting with just a minus sign are possible, e.g. "-Trump"
+		if query.get("body_match", None) or query.get("subject_match", None):
+
+			queries_to_check = []
+			if query.get("body_match", None):
+				queries_to_check += [body_query.strip() for body_query in query["body_match"].split(" ")]
+			if query.get("subject_match", None):
+				queries_to_check += [subject_query.strip() for subject_query in query["subject_match"].split(" ")]
+			startswith_minus = [query_check.startswith("-") for query_check in queries_to_check]
+			if all(startswith_minus):
+				raise QueryParametersException("Please provide body queries that do not start with a minus sign.")
+
 		# only one of two dense threads options may be chosen at the same time, and
 		# it requires valid density and length parameters. full threads is implied,
 		# so it is otherwise left alone here
