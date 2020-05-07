@@ -115,9 +115,9 @@ class SigmaNetwork(BasicProcessor):
 		# Used to know wheter the lines we're reading refers to nodes or edges
 		looping_through_nodes = True
 
-		highlight_words = self.parameters.get("highlight")
-		if highlight_words:
-			highlight_words = [highlight_word for highlight_word in str(highlight_words).split(",")]
+		highlight_nodes = self.parameters.get("highlight")
+		if highlight_nodes:
+			highlight_nodes = [highlight_node for highlight_node in str(highlight_nodes).split(",")]
 
 		with source_file.open(encoding="utf-8") as source:
 
@@ -159,7 +159,7 @@ class SigmaNetwork(BasicProcessor):
 							node["label"] = node_item
 							node["x"] = random.randrange(1, 20)
 							node["y"] = random.randrange(1, 20)
-							if highlight_words and node_item in highlight_words:
+							if highlight_nodes and node_item in highlight_nodes:
 								node["color"] = "#19B0A3"
 
 						elif node_types[i].startswith("label "):
@@ -248,9 +248,9 @@ class SigmaNetwork(BasicProcessor):
 		edges_added = []
 
 		# Possible words to highlight
-		highlight_words = self.parameters.get("highlight")
-		if highlight_words:
-			highlight_words = [highlight_word for highlight_word in str(highlight_words).split(",")]
+		highlight_nodes = self.parameters.get("highlight")
+		if highlight_nodes:
+			highlight_nodes = [highlight_node for highlight_node in str(highlight_nodes).split(",")]
 
 		# Go through the source csv
 		for row in self.iterate_csv_items(self.source_file):
@@ -307,23 +307,23 @@ class SigmaNetwork(BasicProcessor):
 			# Add nodes, if not already added
 			for i, node_item in enumerate(source_and_target):
 
-				node_item_type = "source" # Used for indexing the right column node size
+				node_type = "source" # Used for indexing the right column node size
 				if i == 1:
-					word_type = "target"
+					node_type = "target"
 
 				if node_item not in nodes_added:
 
 					# Node attributes
 					node = {}
 					node["id"] = node_item # We're using the node_item as an ID here
-					node["label"] = word
+					node["label"] = node_item
 					node["x"] = random.randrange(1, 20)
 					node["y"] = random.randrange(1, 20)
 
 					# Size the nodes for how often the node_item appears in the above dataset, if given.
-					node["size"] = row.get((word_type + "_occurrences"), 1)
+					node["size"] = row.get((node_type + "_occurrences"), 1)
 
-					if highlight_words and node_item in highlight_words:
+					if highlight_nodes and node_item in highlight_nodes:
 						node["color"] = "#19B0A3"
 					
 					# Add that node
