@@ -82,6 +82,8 @@ class ExtractNouns(BasicProcessor):
 			self.dataset.update_status("Unzipping SpaCy docs")
 			docs = self.extract_docs()
 		
+			self.dataset.update_status("Extracting nouns")
+
 			# Store all the nouns in this list		
 			li_nouns = []
 
