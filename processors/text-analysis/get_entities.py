@@ -7,6 +7,7 @@ Extract nouns from SpaCy NLP docs.
 import zipfile
 import csv
 import pickle
+import shutil
 from collections import Counter
 from pathlib import Path
 
@@ -39,6 +40,12 @@ class ExtractNouns(BasicProcessor):  #TEMPORARILY DISABLED
 	output = "csv"
 
 	options = {
+		"overwrite": {
+			"type": UserInput.OPTION_TOGGLE,
+			"default": False,
+			"help": "Overwrite the source file with extracted features",
+			"tooltip": "Will add the column \"entities\" to the source file with the found values per post."
+		},
 		"entities": {
 			"type": UserInput.OPTION_MULTI,
 			"default": [],
@@ -62,9 +69,15 @@ class ExtractNouns(BasicProcessor):  #TEMPORARILY DISABLED
 				"ORDINAL": "ORDINAL: “first”, “second”, etc.",
 				"CARDINAL": "CARDINAL: Numerals that do not fall under another type."
 			},
-			"help": "What types of entities to extract. The above list is derived from the SpaCy documentation (https://spacy.io/api/annotation#named-entities)."
+			"help": "What types of entities to extract (select at least one)",
+			"tooltip": "The above list is derived from the SpaCy documentation (see references)."
 		}
 	}
+
+	references = [
+		"[SpaCy named entities list](https://spacy.io/api/annotation#named-entities)"
+	]
+
 
 	def process(self):
 		"""
@@ -92,20 +105,37 @@ class ExtractNouns(BasicProcessor):  #TEMPORARILY DISABLED
 			li_entities = []
 
 			for doc in docs:
+				post_entities = []
+
 				# stop processing if worker has been asked to stop
 				if self.interrupted:
 					raise ProcessorInterruptedException("Interrupted while processing documents")
 
 				for ent in doc.ents:
 					if ent.label_ in self.parameters["entities"]:
-						li_entities.append((ent.text, ent.label_)) # Add a tuple
+						post_entities.append((ent.text, ent.label_)) # Add a tuple
+
+				li_entities.append(post_entities)
 
 			results = []
+
 			if li_entities:
+
+				# Also add the data to the original csv file, if indicated.
+				if self.parameters.get("overwrite"):
+					self.update_parent(li_entities)
+
+
+				all_entities = []
 				# Convert to lower and filter out one-letter words. Join the words with the entities so we can group easily.
-				li_entities = [str(tpl[0]).lower() + " |#| " + str(tpl[1]) for tpl in li_entities if len(tpl[0]) > 1]
+				for post_ents in li_entities:
+					for pair in post_ents:
+						if pair and len(pair[0]) > 1:
+							pair = pair[0].lower() + " |#| " + pair[1]
+							all_entities.append(pair)
+
 				# Group and rank
-				count_nouns = Counter(li_entities).most_common()
+				count_nouns = Counter(all_entities).most_common()
 				# Unsplit and list the count.
 				results = [{"word": tpl[0].split(" |#| ")[0], "entity": tpl[0].split(" |#| ")[1], "count": tpl[1]} for tpl in count_nouns]
 
@@ -137,3 +167,52 @@ class ExtractNouns(BasicProcessor):  #TEMPORARILY DISABLED
 			docs = [Doc(nlp.vocab).from_bytes(b) for b in doc_bytes]
 
 		return docs
+
+	def update_parent(self, li_entities):
+		"""
+		Update the original dataset with an "entities" column
+
+		"""
+
+		self.dataset.update_status("Adding entities the source file")
+
+		# Get the parent data path
+		parent = self.dataset.genealogy[0]
+		parent_path = parent.get_results_path()
+
+		# Get a temporary path where we can store the data
+		tmp_path = self.dataset.get_temporary_path()
+		tmp_path.mkdir()
+		tmp_file_path = tmp_path.joinpath(parent_path.name)
+
+		count = 0
+
+		# Get field names
+		with parent_path.open(encoding="utf-8") as input:
+			reader = csv.DictReader(input)
+			fieldnames = reader.fieldnames
+			if "entities" not in fieldnames:
+				fieldnames.append("entities")
+
+		# Iterate through the original dataset and add values to a new "entities" column
+		self.dataset.update_status("Writing csv with entities.")
+		with tmp_file_path.open("w", encoding="utf-8", newline="") as output:
+
+			writer = csv.DictWriter(output, fieldnames=fieldnames)
+			writer.writeheader()
+
+			for post in self.iterate_csv_items(parent_path):
+
+				# Format like "Apple ORG, Gates PERSON, ..." and add to the row
+				pos_tags = ", ".join([":".join(post_entities) for post_entities in li_entities[count]])
+				post["entities"] = pos_tags
+				writer.writerow(post)
+				count += 1
+
+		# Replace the source file path with the new file
+		shutil.copy(str(tmp_file_path), str(parent_path))
+
+		# delete temporary files and folder
+		shutil.rmtree(tmp_path)
+
+		self.dataset.update_status("Parent dataset updated.")

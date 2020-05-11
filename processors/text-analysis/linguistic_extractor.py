@@ -28,7 +28,7 @@ class LinguisticFeatures(BasicProcessor):
 	type = "linguistic-features"  # job type ID
 	category = "Text analysis" # category
 	title = "Linguistic features"  # title displayed in UI
-	description = "Annotate your text with a variety of linguistic features, including part-of-speech tagging, depencency parsing, and named entity recognition. Uses the SpaCy library and the en_core_web_sm model. Currently only available for datasets with less than 25.000 items."  # description displayed in UI
+	description = "Annotate your text with a variety of linguistic features, including part-of-speech tagging, depencency parsing, and named entity recognition. Subsequent modules can add identified tags and nouns to the original data file. Uses the SpaCy library and the en_core_web_sm model. Currently only available for datasets with less than 25.000 items."  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
 
 	input = "csv"
@@ -47,10 +47,9 @@ class LinguisticFeatures(BasicProcessor):
 				"parser": "Dependency parsing: Extract how words in a sentence relate to each other",
 				"ner": "Named entity recognition: Labels what kind of objects appear in a sentence (e.g. Apple -> Organisation)"
 			},
-			"help": "What linguistic features to extract. Without any of these selected, it simply saves the SpaCy docs (tokenised sentences) as a serialized file. See https://spacy.io/usage/linguistic-features"
+			"help": "What linguistic features to extract. Without any of these selected, it simply saves the SpaCy docs (tokenised sentences) as a serialized file. See references for more information."
 		}
 	}
-
 
 	def process(self):
 		"""
@@ -85,7 +84,7 @@ class LinguisticFeatures(BasicProcessor):
 
 			# Get all ze text first so we can process it in batches
 			csv_reader = csv.DictReader(source)
-			posts = [post["body"] for post in csv_reader if post["body"]]
+			posts = [post["body"] if post["body"] else "" for post in csv_reader]
 			
 			# Process the text in batches
 			if len(posts) < 25000:
