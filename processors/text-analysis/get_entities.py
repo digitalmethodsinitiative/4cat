@@ -13,8 +13,7 @@ from pathlib import Path
 
 import en_core_web_sm
 import spacy
-from spacy.tokens import Doc
-
+from spacy.tokens import Doc, DocBin
 from backend.lib.helpers import UserInput
 from backend.abstract.processor import BasicProcessor
 from backend.lib.exceptions import ProcessorInterruptedException
@@ -43,8 +42,8 @@ class ExtractNouns(BasicProcessor):  #TEMPORARILY DISABLED
 		"overwrite": {
 			"type": UserInput.OPTION_TOGGLE,
 			"default": False,
-			"help": "Overwrite the source file with extracted features",
-			"tooltip": "Will add the column \"entities\" to the source file with the found values per post."
+			"help": "Add extracted entities to source csv",
+			"tooltip": "Will add the column \"entities\" to the source file with the found entities per post row."
 		},
 		"entities": {
 			"type": UserInput.OPTION_MULTI,
@@ -154,17 +153,17 @@ class ExtractNouns(BasicProcessor):  #TEMPORARILY DISABLED
 		:returns: SpaCy docs.
 
 		"""
+		
+		nlp = en_core_web_sm.load()	# Load model
 
 		with zipfile.ZipFile(str(self.source_file), "r") as archive:
 			file_name = archive.namelist()[0] # always just one pickle file
 
 			with archive.open(file_name, "r") as pickle_file:
-				doc_bytes, vocab_bytes = pickle.load(pickle_file)
-	
-			nlp = en_core_web_sm.load()	# Load model
-
-			nlp.vocab.from_bytes(vocab_bytes)
-			docs = [Doc(nlp.vocab).from_bytes(b) for b in doc_bytes]
+				# Load DocBin
+				file = pickle.load(pickle_file)
+				doc_bin = DocBin().from_bytes(file)
+				docs = list(doc_bin.get_docs(nlp.vocab))
 
 		return docs
 
