@@ -72,7 +72,14 @@ class LinguisticFeatures(BasicProcessor):
 
 		# Disable what has _not_ been selected
 		options = ["parser","tagger","ner"]
-		disable = [option for option in options if option not in self.parameters["enable"]]
+		enable = self.parameters.get("enable", False)
+
+		if not enable:
+			self.dataset.update_status("Select at least one of the options.")
+			self.dataset.finish(0)
+			return
+
+		disable = [option for option in options if option not in enable]
 
 		with open(self.source_file, encoding="utf-8") as source:
 
