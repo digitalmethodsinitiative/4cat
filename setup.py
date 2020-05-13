@@ -15,6 +15,7 @@ libraries = [
 	"youtube_dl==2019.1.2",
 	"pyahocorasick==1.4.0",
 	"html2text==2018.1.9",
+	"instaloader==4.2.10",
 	"setuptools==40.8.0",
 	"APScheduler==3.5.3",
 	"Flask_Login==0.4.1",
