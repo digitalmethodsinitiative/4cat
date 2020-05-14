@@ -58,10 +58,15 @@ class CoTagger(BasicProcessor):
 
 			# create a list of tags
 			if self.parent.parameters["datasource"] in ("instagram", "tiktok"):
+				if not post.get("hashtags", None):
+					continue
+
 				tags = post.get("tags", "").split(",")
 				tags += [leading_hash.sub("", tag) for tag in post.get("hashtags", "").split(",")]
 
 			elif self.parent.parameters["datasource"] == "tumblr":
+				if not post.get("tags", None):
+					continue
 
 				# Convert string of list to actual list
 				tags = post.get("tags", "").split("', '")
