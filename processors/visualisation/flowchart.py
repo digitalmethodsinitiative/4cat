@@ -1,5 +1,6 @@
 import datetime
 import json
+import csv
 
 import config
 
@@ -73,30 +74,38 @@ class FlowChart(BasicProcessor):
 		labels = []
 		timestamps = []
 
+		with self.source_file.open() as input:
+			reader = csv.DictReader(input)
+
+			item_key = "text" if "text" in reader.fieldnames else "item"
+			date_key = "time" if "time" in reader.fieldnames else "date"
+			value_key = "value" if "value" in reader.fieldnames else "frequency"
+
 		for post in self.iterate_csv_items(self.source_file):
 			# Set label names
-			if post["item"] not in labels:
-				labels.append(post["item"])
+			if post[item_key] not in labels:
+				labels.append(post[item_key])
 				label_key = str(len(result["labels"]))
-				result["labels"][label_key] = {}
-				result["labels"][label_key]["n"] = post["item"]
+				result["labels"][label_key] = {
+					"n": post[item_key]
+				}
 			else:
-				label_key = labels.index(post["item"])
+				label_key = labels.index(post[item_key])
 
 			# Make a bucket when a new timestamp appears
-			if post["date"] == "overall":
+			if post[date_key] == "overall":
 				timestamp = "overall"
 			else:
-				if len(post["date"]) == 4: # years
+				if len(post[date_key]) == 4: # years
 					time_format = "%Y"
-				elif 6 <= len(post["date"]) <= 7: # months (2018-1 or 2018-01)
+				elif 6 <= len(post[date_key]) <= 7: # months (2018-1 or 2018-01)
 					time_format = "%Y-%m"
-				elif 8 <= len(post["date"]) <= 10: # days (2018-1-1, 2018-01-1, 2018-1-01 or 2018-01-01)
+				elif 8 <= len(post[date_key]) <= 10: # days (2018-1-1, 2018-01-1, 2018-1-01 or 2018-01-01)
 					time_format = "%Y-%m-%d"
-				timestamp = int(datetime.datetime.strptime(post["date"], time_format).timestamp())
+				timestamp = int(datetime.datetime.strptime(post[date_key], time_format).timestamp())
 
 			# Multiply small floats so they can be converted to ints (necessary for tf-idf scores)
-			value = float(post["frequency"])
+			value = float(post.get(value_key))
 			if value % 1 != 0:
 				value = value * 100
 			value = int(value)
