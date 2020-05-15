@@ -68,6 +68,9 @@ class URLCoLinker(BasicProcessor):
 		urls = set()
 		links = {}
 		for post in self.iterate_csv_items(self.source_file):
+			if not post["body"]:
+				continue
+
 			post_links = link_regex.findall(post["body"])
 
 			# if the result has an explicit url per post, take that into
