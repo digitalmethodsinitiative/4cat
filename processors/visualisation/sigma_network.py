@@ -507,7 +507,7 @@ class SigmaNetwork(BasicProcessor):
 								<input class="parameter-input" id="strong-gravity" name="strong-gravity" type="checkbox">
 							</p>
 							<p><label for="edge-weight-influence">Edge weight influence: </label>
-								<input class="parameter-input" id="edge-weight-influence" name="edge-weight-influence" type="checkbox">
+								<input class="parameter-input" id="edge-weight-influence" name="edge-weight-influence" type="number" min="0" value="0">
 							</p>
 							<p><label for="scaling-ratio">Scaling ratio: </label>
 								<input class="parameter-input" id="scaling-ratio" name="scaling-ratio" type="number" min="1" value="1">
@@ -623,9 +623,6 @@ class SigmaNetwork(BasicProcessor):
 
 		# JSONify and make sure any encoding errors are replaced (happens with large files).
 		json_file = json.dumps(data).replace("\\\\","") # Not ideal for now, but it works.
-
-		with open("tmp.txt","w") as txtfile:
-			txtfile.write(json_file)
 
 		# Let's try and catch as much encoding issues as we can
 		try:
