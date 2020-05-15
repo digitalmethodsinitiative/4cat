@@ -108,6 +108,8 @@ class GetCollocations(BasicProcessor):
 		else:
 			forbidden_words = False
 
+		sort_words = self.parameters.get("sort_words", False)
+
 		# Get token sets
 		self.dataset.update_status("Processing token sets")
 		dirname = Path(self.dataset.get_results_path().parent, self.dataset.get_results_path().name.replace(".", ""))
@@ -157,7 +159,15 @@ class GetCollocations(BasicProcessor):
 				tokenset_results = {}
 				
 				for tpl in collocations:
-					collocation = " ".join(tpl[0])
+
+					collocation = tpl[0]
+
+					# Sort the words, if indicated.
+					# This can be handy to get rid of (almost) duplicate data.
+					if sort_words:
+						collocation = sorted(collocation)
+					
+					collocation = " ".join(collocation)
 
 					# Check if this collocation already appeared
 					if collocation in tokenset_results:
