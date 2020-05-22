@@ -100,7 +100,7 @@ class ThreadScraper4chan(BasicJSONScraper):
 			return True
 
 		if thread["timestamp_deleted"] > 0:
-			self.log.warning("Thread %s/%s/%s seems to have been undeleted, removing deletion timestamp %s" % (
+			self.log.infos("Thread %s/%s/%s seems to have been undeleted, removing deletion timestamp %s" % (
 			self.datasource, self.job.details["board"], first_post["no"], thread["timestamp_deleted"]))
 			self.db.update("threads_" + self.prefix, where={"id": thread_db_id}, data={"timestamp_deleted": 0})
 
