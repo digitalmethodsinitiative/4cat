@@ -200,7 +200,7 @@ def stop(force=False):
 		return True
 	else:
 		# no pid file, so nothing running
-		print("...error: the 4CAT backend daemon is not currently running.")
+		print("...the 4CAT backend daemon is not currently running.")
 		return False
 
 

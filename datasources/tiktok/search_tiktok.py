@@ -5,15 +5,14 @@ TikTok is, after a fashion, an imageboard - people post videos and then
 other people reply. So this datasource uses this affordance to retrieve
 TikTok data for 4CAT.
 """
-import asyncio
+import time
+import json
 import re
 
-from bs4 import BeautifulSoup
-from pyppeteer import errors, page, launch
-from pyppeteer_stealth import stealth
+from seleniumwire import webdriver
+from selenium.webdriver.chrome.options import Options
 
 from backend.abstract.search import Search
-from backend.lib.helpers import expand_short_number
 from backend.lib.exceptions import QueryParametersException, ProcessorInterruptedException
 
 
@@ -21,13 +20,11 @@ class SearchTikTok(Search):
 	"""
 	TikTok scraper
 
-	Since TikTok has no API of its own, we use pyppeteer to start a headless
+	Since TikTok has no API of its own, we use selenium to start a headless
 	browser that we manipulate to browse the TikTok website and download the
-	information we need. Unfortunately this is a bit limited - it's slower and
-	requires far more resources than using an API or directly scraping HTML.
-	The latter is not possible as TikTok loads everything asynchronously so the
-	HTML one scrapes has no useful data. The website also does not include any
-	comments, so those cannot be scraped this way.
+	information we need. Unfortunately this is a bit limited - we can't
+	download comments for example, though we could potentially if we log in
+	(but logging in is complicated in itself).
 
 	It's the best we can do, for now!
 	"""
@@ -54,68 +51,15 @@ class SearchTikTok(Search):
 		max_posts = self.dataset.parameters.get("items", 10)
 		queries = self.dataset.parameters.get("query").split(",")
 
-		loop = asyncio.new_event_loop()
-		posts = loop.run_until_complete(self.get_posts_async(queries, max_posts))
-		loop.close()
+		posts = []
+		for query in queries:
+			posts += self.fetch_from_overview_page(query, max_posts)
 
 		return posts
 
-	async def get_browser(self):
-		"""
-		Get a new browser instance
 
-		The scraper seemed to hang when re-using browser or page instances, so
-		unfortunately we'll have to use a new browser instance every time -
-		this method returns one with the proper settings
-		:return pyppeteer.browser.Browser:
-		"""
-		return await launch(options={"defaultViewport": {"width": 1920, "height": 1080}, "handleSIGINT": False, "handleSIGHUP": False, "handleSIGTERM": False})
 
-	async def get_posts_async(self, queries, limit):
-		"""
-		Get posts for queries
-
-		This is not in get_posts_simple(), since we need to run this
-		asynchronously (as that is how Pyppeteer works), and thus it needs to
-		be done outside of a function where the event loop gets instantiated.
-
-		Loads posts for a query via the overview page first, and then scrapes
-		data for individual posts that have been collected.
-
-		:param list queries:  Items to scrape, @usernames or #hashtags
-		:param int limit:  Amount of posts to scrape per item
-		:return list:  List of dictionaries, one per scraped post
-		"""
-
-		# we cannot handle signals as this runs in a thread, so disable those
-		# handlers launching the browser
-
-		try:
-			# scrape overview pages for items first to get individual post URLs
-			posts = []
-			for query in queries:
-				posts += await self.fetch_overview_page(query, limit)
-
-			everything = []
-
-			# then scrape each post's page to get post data
-			for index, post in enumerate(posts):
-				self.dataset.update_status("Getting post data for post %i/%i" % (index + 1, len(posts)))
-				if self.interrupted:
-					raise ProcessorInterruptedException("Interrupted while fetching post data from TikTok")
-				post_data = await self.fetch_post(post["tiktok_url"])
-				if not post_data:
-					everything.append(post)
-				else:
-					everything.append(post_data)
-
-		except ProcessorInterruptedException as e:
-			raise ProcessorInterruptedException(str(e))
-
-		self.dataset.update_status("Finished scraping TikTok website.")
-		return everything
-
-	async def fetch_overview_page(self, item, limit=1):
+	def fetch_from_overview_page(self, item, limit=10):
 		"""
 		Scrape all items for a given hashtag
 
@@ -128,36 +72,54 @@ class SearchTikTok(Search):
 		:param int limit:  Amount of posts to scrape
 		:return list:  A list of posts that were scraped
 		"""
-		browser = await self.get_browser()
-		page = await browser.newPage()
-		await stealth(page)
+		scraper_ua = "Naverbot"
+		iphone_ua = "Mozilla/5.0 (iPhone; CPU iPhone OS 13_3_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.0.5 Mobile/15E148 Safari/604.1"
+
+		options = Options()
+		options.headless = True
+		options.add_argument("--user-agent=%s" % scraper_ua)
+		options.add_argument("--disable-gpu")
+
+		mobile_emulation = {"deviceName": "iPhone X"}
+		chrome_options = webdriver.ChromeOptions()
+		chrome_options.add_experimental_option("mobileEmulation", mobile_emulation)
+
+		browser = webdriver.Chrome(options=options, desired_capabilities=chrome_options.to_capabilities())
+
+		browser.scopes = [
+			".*" + re.escape("m.tiktok.com/share/item/list") + ".*"
+		]
+		browser.set_page_load_timeout(15)
+		browser.set_script_timeout(10)
+		browser.implicitly_wait(5)
+
+		if len(item) < 2:
+			# empty query... should have been discarded though
+			return []
 
 		if item[0] == "#":
 			# hashtag query
 			url = "https://www.tiktok.com/tag/%s" % item[1:]
-		else:
+		elif item[0] == "@":
 			# user query
 			url = "https://www.tiktok.com/%s" % item
+		else:
+			# music
+			music_id = item.split("?")[0].split("-")[-1]
+			url = "https://www.tiktok.com/music/original-sound-%s" % music_id
 
-		try:
-			await page.goto(url, option={"timeout": 5000})
-			# this waits until the first video items have been loaded as these
-			# are loaded asynchronously
-			await page.waitForFunction("document.querySelectorAll('a.video-feed-item-wrapper').length > 0",
-									   option={"timeout": 2500})
-		except errors.TimeoutError:
-			# takes too long to load videos... 1000 may be a bit too strict?
-			await browser.close()
-			await page.close()
-			return []
+		self.stealthify_browser(browser)
+		browser.get(url)
+		self.stealthify_browser(browser)
 
 		items = 0
 		while True:
 			# TikTok's overview page is one of those infinite scroll affairs,
 			# so we scroll down until we have enough posts to then scrape
 			# individually
-			self.dataset.update_status("Getting post URLs for '%s' (%i so far)" % (item, items))
+			self.dataset.update_status("Finding posts for '%s' (%i so far)" % (item, items))
 			if self.interrupted:
+				browser.close()
 				raise ProcessorInterruptedException("Interrupted while fetching post list from TikTok")
 
 			# we can determine whether the new items after scrolling have
@@ -165,114 +127,86 @@ class SearchTikTok(Search):
 			# since the loading indicator itself takes up some space and we
 			# don't want to interpret its appearance as the document actually
 			# having scrolled properly
-			page_height = await page.evaluate("document.body.scrollHeight")
-			await page.evaluate("window.scrollTo(0,document.body.scrollHeight)")
-			try:
-				await page.waitForFunction("(document.body.scrollHeight > %i)" % (page_height + 100), option={"timeout": 1000})
-			except errors.TimeoutError:
+			time.sleep(1)
+			page_height = browser.execute_script("return document.body.scrollHeight")
+			browser.execute_script("window.scrollTo(0,document.body.scrollHeight)")
+
+			start_time = time.time()
+			have_new_content = False
+			while time.time() - 5 < start_time:
+				# a somewhat generous timeout here as as you scroll down on the
+				# page it takes longer and longer to load the new posts
+				scroll_height = browser.execute_script("return document.body.scrollHeight")
+				if scroll_height > page_height + 100:
+					have_new_content = True
+					break
+				time.sleep(0.25)
+
+			# the amount of posts on the page:
+			items = int(browser.execute_script("return document.querySelectorAll('a.video-feed-item-wrapper').length"))
+			if not have_new_content or int(items) >= limit:
 				break
 
-			# the amount of videos on the page:
-			items = await page.evaluate("document.querySelectorAll('a.video-feed-item-wrapper').length")
-			if int(items) >= limit:
-				break
-
-		posts = await page.querySelectorAll("a.video-feed-item-wrapper")
 		result = []
-		for post in posts[0:limit]:
-			# most of these are placeholders, since we know very little based
-			# on just the overview page, but we need to define these
-			# nevertheless in case the scrape for the post data goes wrong
-			# in which case this is where the post gets defined (and something
-			# is better than nothing)
-			href = await page.evaluate('(element) => element.getAttribute("href")', post)
-			bits = href.split("/")
-			result.append({
-				"id": bits[5],
-				"thread_id": bits[5],
-				"author_name": bits[3],
-				"author_name_full": "",
-				"subject": "",
-				"body": "",
-				"timestamp": 0,
-				"has_harm_warning": "",
-				"music_name": "",
-				"music_url": "",
-				"video_url": "",
-				"tiktok_url": href,
-				"likes": "",
-				"comments": "",
-				"hashtags": "",
-				"fully_scraped": False
-			})
+		for update in browser.requests:
+			try:
+				data = json.loads(update.response.body)
+			except json.JSONDecodeError:
+				self.log.warning("Error decoding TikTok response for %s" % update)
+				continue
 
-		await page.close()
-		await browser.close()
+			if "body" not in data or "statusCode" not in data:
+				self.log.info("Trying to parse TikTok API request %s, but unknown format" % update)
+				continue
+
+			if data["statusCode"] != 0:
+				continue
+
+			items = data["body"]["itemListData"]
+			for post_data in items:
+				if len(result) >= limit:
+					break
+
+				post = post_data["itemInfos"]
+				user = post_data["authorInfos"]
+				user_stats = post_data["authorStats"]
+				music = post_data["musicInfos"]
+				hashtags = [item["HashtagName"] for item in post_data["textExtra"] if item["HashtagName"]]
+
+				post_entry = {
+					"id": post["id"],
+					"thread_id": post["id"],
+					"author": user["uniqueId"],
+					"author_full": user["nickName"],
+					"author_followers": user_stats["followerCount"],
+					"subject": "",
+					"body": post["text"],
+					"timestamp": int(post["createTime"]),
+					"is_harmful": len(post["warnInfo"]) > 0,
+					"is_duet": post_data["duetInfo"] != "0",
+					"music_name": music["musicName"],
+					"music_id": music["musicId"],
+					"video_url": post["video"]["urls"][0],
+					"tiktok_url": "https://tiktok.com/@%s/video/%s" % (user["uniqueId"], post["id"]),
+					"thumbnail_url": post["covers"][0],
+					"amount_likes": post["diggCount"],
+					"amount_comments": post["commentCount"],
+					"amount_shares": post["shareCount"],
+					"amount_plays": post["playCount"],
+					"hashtags": ",".join(hashtags),
+				}
+
+				result.append(post_entry)
+
+			if len(result) >= limit:
+				break
+
+		browser.close()
 		return result
-
-	async def fetch_post(self, post_url):
-		"""
-		Fetch TikTok post data
-
-		Retrieves data for a given post URL.
-
-		:param str post_url:  URL of the post's page
-		:return dict:  Post data
-		"""
-		browser = await self.get_browser()
-		page = await browser.newPage()
-		await stealth(page)
-
-		try:
-			await page.goto(post_url, options={"timeout": 10000})
-		except errors.TimeoutError:
-			# page took too long to load
-			await page.close()
-			await browser.close()
-			return None
-
-		# most of the post data can simply be gotten from one HTML element or
-		# another or its attributes
-		bits = post_url.split("/")
-		data = {}
-
-		try:
-			data["id"] = bits[-1]
-			data["thread_id"] = bits[-1]
-			data["author_name"] = await page.evaluate('document.querySelector(".user-info .user-username").innerHTML')
-			data["author_name_full"] = await page.evaluate('document.querySelector(".user-info .user-nickname").innerHTML')
-			data["subject"] = ""
-			data["body"] = await page.evaluate('document.querySelector(".video-meta-info .video-meta-title").innerHTML')
-			data["timestamp"] = 0
-			data["has_harm_warning"] = bool(await page.evaluate("document.querySelectorAll('.warn-info').length > 0"))
-			data["music_name"] = await page.evaluate('document.querySelector(".music-info a").innerHTML')
-			data["music_url"] = await page.evaluate('document.querySelector(".music-info a").getAttribute("href")')
-			data["video_url"] = await page.evaluate('document.querySelector(".video-card video").getAttribute("src")')
-			data["tiktok_url"] = post_url
-		except Exception as e:
-			self.log.warning("Skipping post %s for TikTok scrape (%s)" % (post_url, e))
-			return None
-
-
-		# these are a bit more involved
-		counts = await page.evaluate('document.querySelector(".video-meta-info .video-meta-count").innerHTML')
-		data["likes"] = expand_short_number(counts.split(" ")[0])
-		data["comments"] = expand_short_number(counts.split(" ")[-2])
-		data["hashtags"] = ",".join([tag.replace("?", "") for tag in re.findall(r'href="/tag/([^"]+)"', data["body"])])
-
-		# we strip the HTML here because TikTok does not allow user markup
-		# anyway, so this is not really significant
-		body_soup = BeautifulSoup(data["body"], "html.parser")
-		data["body"] = body_soup.text.strip()
-		data["fully_scraped"] = True
-
-		await page.close()
-		await browser.close()
-		return data
 
 	def get_search_mode(self, query):
 		"""
-		Instagram searches are always simple
+		TikTok searches are always simple
 
 		:return str:
 		"""
@@ -280,7 +214,7 @@ class SearchTikTok(Search):
 
 	def get_posts_complex(self, query):
 		"""
-		Complex post fetching is not used by the Instagram datasource
+		Complex post fetching is not used by the TikTok datasource
 
 		:param query:
 		:return:
@@ -318,6 +252,288 @@ class SearchTikTok(Search):
 		"""
 		pass
 
+	def stealthify_browser(self, browser):
+		"""
+		Stealth scripts to hide that we're headless
+
+		From https://github.com/MeiK2333/pyppeteer_stealth
+
+		:param browser:  Selenium browser to stealthify
+		"""
+		browser.execute_script("""
+() => {
+    window.chrome = {
+        runtime: {}
+    }
+};
+
+() => {
+    window.console.debug = () => {
+        return null
+    }
+};
+
+() => {
+    Object.defineProperty(navigator, 'languages', {
+        get: () => ['en-US', 'en']
+    })
+};
+
+() => {
+    const originalQuery = window.navigator.permissions.query
+
+    window.navigator.permissions.__proto__.query = parameters =>
+        parameters.name === 'notifications'
+            ? Promise.resolve({ state: Notification.permission })
+            : originalQuery(parameters)
+
+
+    const oldCall = Function.prototype.call
+    function call () {
+        return oldCall.apply(this, arguments)
+    }
+
+    Function.prototype.call = call
+
+    const nativeToStringFunctionString = Error.toString().replace(
+        /Error/g,
+        'toString'
+    )
+    const oldToString = Function.prototype.toString
+
+    function functionToString () {
+        if (this === window.navigator.permissions.query) {
+            return 'function query() { [native code] }'
+        }
+        if (this === functionToString) {
+            return nativeToStringFunctionString
+        }
+        return oldCall.call(oldToString, this)
+    }
+
+    Function.prototype.toString = functionToString
+};
+
+() => {
+    function mockPluginsAndMimeTypes() {
+        const makeFnsNative = (fns = []) => {
+            const oldCall = Function.prototype.call
+            function call() {
+                return oldCall.apply(this, arguments)
+            }
+
+            Function.prototype.call = call
+
+            const nativeToStringFunctionString = Error.toString().replace(
+                /Error/g,
+                'toString'
+            )
+            const oldToString = Function.prototype.toString
+
+            function functionToString() {
+                for (const fn of fns) {
+                    if (this === fn.ref) {
+                        return `function ${fn.name}() { [native code] }`
+                    }
+                }
+
+                if (this === functionToString) {
+                    return nativeToStringFunctionString
+                }
+                return oldCall.call(oldToString, this)
+            }
+
+            Function.prototype.toString = functionToString
+        }
+
+        const mockedFns = []
+
+        const fakeData = {
+            mimeTypes: [
+                {
+                    type: 'application/pdf',
+                    suffixes: 'pdf',
+                    description: '',
+                    __pluginName: 'Chrome PDF Viewer'
+                },
+                {
+                    type: 'application/x-google-chrome-pdf',
+                    suffixes: 'pdf',
+                    description: 'Portable Document Format',
+                    __pluginName: 'Chrome PDF Plugin'
+                },
+                {
+                    type: 'application/x-nacl',
+                    suffixes: '',
+                    description: 'Native Client Executable',
+                    enabledPlugin: Plugin,
+                    __pluginName: 'Native Client'
+                },
+                {
+                    type: 'application/x-pnacl',
+                    suffixes: '',
+                    description: 'Portable Native Client Executable',
+                    __pluginName: 'Native Client'
+                }
+            ],
+            plugins: [
+                {
+                    name: 'Chrome PDF Plugin',
+                    filename: 'internal-pdf-viewer',
+                    description: 'Portable Document Format'
+                },
+                {
+                    name: 'Chrome PDF Viewer',
+                    filename: 'mhjfbmdgcfjbbpaeojofohoefgiehjai',
+                    description: ''
+                },
+                {
+                    name: 'Native Client',
+                    filename: 'internal-nacl-plugin',
+                    description: ''
+                }
+            ],
+            fns: {
+                namedItem: instanceName => {
+                    const fn = function (name) {
+                        if (!arguments.length) {
+                            throw new TypeError(
+                                `Failed to execute 'namedItem' on '${instanceName}': 1 argument required, but only 0 present.`
+                            )
+                        }
+                        return this[name] || null
+                    }
+                    mockedFns.push({ ref: fn, name: 'namedItem' })
+                    return fn
+                },
+                item: instanceName => {
+                    const fn = function (index) {
+                        if (!arguments.length) {
+                            throw new TypeError(
+                                `Failed to execute 'namedItem' on '${instanceName}': 1 argument required, but only 0 present.`
+                            )
+                        }
+                        return this[index] || null
+                    }
+                    mockedFns.push({ ref: fn, name: 'item' })
+                    return fn
+                },
+                refresh: instanceName => {
+                    const fn = function () {
+                        return undefined
+                    }
+                    mockedFns.push({ ref: fn, name: 'refresh' })
+                    return fn
+                }
+            }
+        }
+
+        const getSubset = (keys, obj) =>
+            keys.reduce((a, c) => ({ ...a, [c]: obj[c] }), {})
+
+        function generateMimeTypeArray() {
+            const arr = fakeData.mimeTypes
+                .map(obj => getSubset(['type', 'suffixes', 'description'], obj))
+                .map(obj => Object.setPrototypeOf(obj, MimeType.prototype))
+            arr.forEach(obj => {
+                arr[obj.type] = obj
+            })
+
+            arr.namedItem = fakeData.fns.namedItem('MimeTypeArray')
+            arr.item = fakeData.fns.item('MimeTypeArray')
+
+            return Object.setPrototypeOf(arr, MimeTypeArray.prototype)
+        }
+
+        const mimeTypeArray = generateMimeTypeArray()
+        Object.defineProperty(navigator, 'mimeTypes', {
+            get: () => mimeTypeArray
+        })
+
+        function generatePluginArray() {
+            const arr = fakeData.plugins
+                .map(obj => getSubset(['name', 'filename', 'description'], obj))
+                .map(obj => {
+                    const mimes = fakeData.mimeTypes.filter(
+                        m => m.__pluginName === obj.name
+                    )
+
+                    mimes.forEach((mime, index) => {
+                        navigator.mimeTypes[mime.type].enabledPlugin = obj
+                        obj[mime.type] = navigator.mimeTypes[mime.type]
+                        obj[index] = navigator.mimeTypes[mime.type]
+                    })
+                    obj.length = mimes.length
+                    return obj
+                })
+                .map(obj => {
+                    obj.namedItem = fakeData.fns.namedItem('Plugin')
+                    obj.item = fakeData.fns.item('Plugin')
+                    return obj
+                })
+                .map(obj => Object.setPrototypeOf(obj, Plugin.prototype))
+            arr.forEach(obj => {
+                arr[obj.name] = obj
+            })
+
+            arr.namedItem = fakeData.fns.namedItem('PluginArray')
+            arr.item = fakeData.fns.item('PluginArray')
+            arr.refresh = fakeData.fns.refresh('PluginArray')
+
+            return Object.setPrototypeOf(arr, PluginArray.prototype)
+        }
+
+        const pluginArray = generatePluginArray()
+        Object.defineProperty(navigator, 'plugins', {
+            get: () => pluginArray
+        })
+
+
+        makeFnsNative(mockedFns)
+    }
+    try {
+        const isPluginArray = navigator.plugins instanceof PluginArray
+        const hasPlugins = isPluginArray && navigator.plugins.length > 0
+        if (isPluginArray && hasPlugins) {
+            return
+        }
+        mockPluginsAndMimeTypes()
+    } catch (err) { }
+};
+
+() => {
+    const newProto = navigator.__proto__
+    delete newProto.webdriver
+    navigator.__proto__ = newProto
+};
+
+() => {
+    try {
+        const getParameter = WebGLRenderingContext.getParameter
+        WebGLRenderingContext.prototype.getParameter = function (parameter) {
+            if (parameter === 37445) {
+                return 'Intel Inc.'
+            }
+            if (parameter === 37446) {
+                return 'Intel Iris OpenGL Engine'
+            }
+            return getParameter(parameter)
+        }
+    } catch (err) { }
+};
+
+() => {
+    try {
+        if (window.outerWidth && window.outerHeight) {
+            return
+        }
+        const windowFrame = 85
+        window.outerWidth = window.innerWidth
+        window.outerHeight = window.innerHeight + windowFrame
+    } catch (err) { }
+};		
+		""")
+
 	def validate_query(query, request, user):
 		"""
 		Validate custom data input
@@ -332,8 +548,8 @@ class SearchTikTok(Search):
 		"""
 
 		# 'location' would be possible as well but apparently requires a login
-		if query.get("search_scope", "") not in ("hashtag", "username"):
-			raise QueryParametersException("Invalid search scope: must be hashtag or username")
+		if query.get("search_scope", "") not in ("hashtag", "username", "music"):
+			raise QueryParametersException("Invalid search scope: must be hashtag, username or music")
 
 		# no query 4 u
 		if not query.get("query", "").strip():
@@ -355,13 +571,13 @@ class SearchTikTok(Search):
 		if len(items) > 5:
 			raise QueryParametersException("You cannot query more than 5 items at a time.")
 
-		sigil = "#" if query.get("search_scope") == "hashtag" else "@"
-		items = ",".join([sigil + item for item in items])
+		sigil = {"hashtag": "#", "username": "@", "music": "🎶"}[query.get("search_scope")]
+		items = ",".join([sigil + item for item in items if item])
 
 		# simple!
 		return {
 			"items": max_posts,
 			"query": items,
-			"board": query.get("search_scope") + "s",  # used in web interface
+			"board": query.get("search_scope"),  # used in web interface
 			"search_scope": query.get("search_scope")
 		}

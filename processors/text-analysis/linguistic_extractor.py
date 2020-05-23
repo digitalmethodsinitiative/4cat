@@ -7,13 +7,16 @@ import pickle
 import shutil
 import csv
 import re
+import time
 
 import spacy
 import en_core_web_sm
+from spacy.tokens import DocBin
 from spacy.tokenizer import Tokenizer
 from spacy.util import compile_prefix_regex, compile_infix_regex, compile_suffix_regex
 
 from backend.lib.helpers import UserInput
+from backend.lib.exceptions import ProcessorInterruptedException
 from backend.abstract.processor import BasicProcessor
 
 __author__ = "Sal Hagen"
@@ -28,7 +31,7 @@ class LinguisticFeatures(BasicProcessor):
 	type = "linguistic-features"  # job type ID
 	category = "Text analysis" # category
 	title = "Linguistic features"  # title displayed in UI
-	description = "Annotate your text with a variety of linguistic features, including part-of-speech tagging, depencency parsing, and named entity recognition. Uses the SpaCy library and the en_core_web_sm model. Currently only available for datasets with less than 25.000 items."  # description displayed in UI
+	description = "Annotate your text with a variety of linguistic features, including part-of-speech tagging, depencency parsing, and named entity recognition. Subsequent modules can add identified tags and nouns to the original data file. Uses the SpaCy library and the en_core_web_sm model. Currently only available for datasets with less than 100.000 items."  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
 
 	input = "csv"
@@ -47,10 +50,9 @@ class LinguisticFeatures(BasicProcessor):
 				"parser": "Dependency parsing: Extract how words in a sentence relate to each other",
 				"ner": "Named entity recognition: Labels what kind of objects appear in a sentence (e.g. Apple -> Organisation)"
 			},
-			"help": "What linguistic features to extract. Without any of these selected, it simply saves the SpaCy docs (tokenised sentences) as a serialized file. See https://spacy.io/usage/linguistic-features"
+			"help": "What linguistic features to extract. Without any of these selected, it simply saves the SpaCy docs (tokenised sentences) as a serialized file. See references for more information."
 		}
 	}
-
 
 	def process(self):
 		"""
@@ -72,33 +74,64 @@ class LinguisticFeatures(BasicProcessor):
 
 		# Disable what has _not_ been selected
 		options = ["parser","tagger","ner"]
-		disable = [option for option in options if option not in self.parameters["enable"]]
+		enable = self.parameters.get("enable", False)
+
+		if not enable:
+			self.dataset.update_status("Select at least one of the options.")
+			self.dataset.finish(0)
+			return
+
+		disable = [option for option in options if option not in enable]
 
 		with open(self.source_file, encoding="utf-8") as source:
 
 			# Get all ze text first so we can process it in batches
 			csv_reader = csv.DictReader(source)
-			posts = [post["body"] for post in csv_reader if post["body"]]
+			posts = [post["body"] if post["body"] else "" for post in csv_reader]
 			
 			# Process the text in batches
-			if len(posts) < 25000:
+			if len(posts) < 100000:
 				self.dataset.update_status("Extracting linguistic features")
 			else:
-				self.dataset.update_status("Extracting linguistic features is currently only available for datasets with less than 25.000 items.")
+				self.dataset.update_status("Extracting linguistic features is currently only available for datasets with less than 100.000 items.")
 				self.dataset.finish(0)
 				return
 
+			# Make sure only the needed information is extracted.
+			attrs = []
+			if "tagger" not in disable:
+				attrs.append("POS")
+			if "parser" not in disable:
+				attrs.append("DEP")
+			if "ner":
+				attrs.append("ENT_IOB")
+				attrs.append("ENT_TYPE")
+				attrs.append("ENT_ID")
+				attrs.append("ENT_KB_ID")
+
+			# DocBin for quick saving
+			doc_bin = DocBin(attrs=attrs)
+
 			# Start the processing!
-			docs = nlp.pipe(posts, disable=disable)
+			for i, doc in enumerate(nlp.pipe(posts, disable=disable)):
+				doc_bin.add(doc)
 
-			# Then serialize the NLP docs and the vocab
+				# It's quite a heavy process, so make sure it can be interrupted
+				if self.interrupted:
+					raise ProcessorInterruptedException("Processor interrupted while iterating through CSV file")
+
+				if i % 1000 == 0:
+					self.dataset.update_status("Done with post %s out of %s" % (i, len(posts)))
+
 			self.dataset.update_status("Serializing results - this will take a while")
-			doc_bytes = [doc.to_bytes() for doc in docs]
-			vocab_bytes = nlp.vocab.to_bytes()
+			
+			# Then serialize the NLP docs and the vocab
+			doc_bytes = doc_bin.to_bytes()
 
+			
 		# Dump ze data in a temporary folder
 		with results_path.joinpath("spacy_docs.pb").open("wb") as outputfile:
-			pickle.dump((doc_bytes, vocab_bytes), outputfile)
+			pickle.dump(doc_bytes, outputfile)
 
 		# create zip of archive and delete temporary files and folder
 		self.dataset.update_status("Compressing results into archive")

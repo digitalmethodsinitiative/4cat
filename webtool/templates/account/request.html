@@ -11,7 +11,7 @@
                 it for their
                 project. Please provide your details via the form below to request an account.</p>
             <p>Note that unfortunately due to limited resources we need to evaluate applications on a case-by-case basis
-                and cannot guarantee access.</p>
+                and cannot guarantee access. Applications are processed manually, and may take some time to complete.</p>
             <p><em>Please try to be somewhat specific</em>, we're interested in how people use our tool so we'd be
                 grateful if you
                 could provide some more detail than e.g. just "research" as your stated intent.</p>
@@ -25,12 +25,12 @@
                     <input type="text" name="name" id="request-name" value="{{ form.name }}">
                 </div>
                 <div class="form-element{% if "email" in incomplete %} missing{% endif %}">
-                    <label for="request-email">E-mail (will be your username if granted)</label>
-                    <input type="text" name="email" id="request-email" value="{{ form.email }}">
+                    <label for="request-email">E-mail (will be your username)</label>
+                    <input type="text" name="email" id="request-email" value="{{ form.email }}" placeholder="If possible, please use your university or work e-mail">
                 </div>
                 <div class="form-element{% if "university" in incomplete %} missing{% endif %}">
                     <label for="request-uni">Institutional affiliation</label>
-                    <input type="text" name="university" id="request-uni" value="{{ form.university }}">
+                    <input type="text" name="university" id="request-uni" value="{{ form.university }}" placeholder="E.g. university, employer, et cetera">
                 </div>
                 <div class="form-element{% if "source" in incomplete %} missing{% endif %}">
                     <label for="request-source">How did you hear about {{ __tool_name }}?</label>

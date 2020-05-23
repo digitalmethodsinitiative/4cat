@@ -116,4 +116,4 @@ class RedditVoteChecker(BasicProcessor):
 		shutil.move(self.dataset.get_results_path(), parent.get_results_path())
 
 		self.dataset.update_status("Parent dataset updated.")
-		self.dataset.finish(-1)
+		self.dataset.finish(processed)

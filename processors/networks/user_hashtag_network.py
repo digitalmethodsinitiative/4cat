@@ -18,8 +18,8 @@ class HashtagUserBipartiteGrapher(BasicProcessor):
 	"""
 	type = "bipartite-user-hashtag-network"  # job type ID
 	category = "Networks"  # category
-	title = "Bipartite User-Hashtag Network"  # title displayed in UI
-	description = "Produces a bipartite graph based on co-occurence of hashtags and users. If a user wrote a tweet with a certain hashtag, there will be a link between that user and the hashtag. The more often they appear together, the stronger the link"  # description displayed in UI
+	title = "Bipartite Author-Hashtag Network"  # title displayed in UI
+	description = "Produces a bipartite graph based on co-occurence of hashtags and people. If someone wrote a post with a certain hashtag, there will be a link between that person and the hashtag. The more often they appear together, the stronger the link."  # description displayed in UI
 	extension = "gdf"  # extension of result file, used internally and in UI
 
 	datasources = ["instagram", "tumblr", "tiktok"]
@@ -52,7 +52,8 @@ class HashtagUserBipartiteGrapher(BasicProcessor):
 		posts = 1
 
 		for post in self.iterate_csv_items(self.source_file):
-			self.dataset.update_status("Reading post %i..." % posts)
+			if posts % 25 == 0:
+				self.dataset.update_status("Reading post %i..." % posts)
 			posts += 1
 
 			# create a list of tags

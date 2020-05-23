@@ -100,7 +100,7 @@ class ThreadScraper4chan(BasicJSONScraper):
 			return True
 
 		if thread["timestamp_deleted"] > 0:
-			self.log.warning("Thread %s/%s/%s seems to have been undeleted, removing deletion timestamp %s" % (
+			self.log.infos("Thread %s/%s/%s seems to have been undeleted, removing deletion timestamp %s" % (
 			self.datasource, self.job.details["board"], first_post["no"], thread["timestamp_deleted"]))
 			self.db.update("threads_" + self.prefix, where={"id": thread_db_id}, data={"timestamp_deleted": 0})
 
@@ -229,7 +229,7 @@ class ThreadScraper4chan(BasicJSONScraper):
 			self.db.rollback()
 			dupe = self.db.fetchone("SELECT * from posts_" + self.prefix + " WHERE id = %s" % (str(post["no"]),))
 			if dupe:
-				self.log.warning("Post %s in thread %s/%s/%s (time: %s) scraped twice: first seen as %s in thread %s at %s" % (
+				self.log.info("Post %s in thread %s/%s/%s (time: %s) scraped twice: first seen as %s in thread %s at %s" % (
 				 post["no"], self.datasource, thread["board"], thread["id"], post["time"], dupe["id"], dupe["thread_id"], dupe["timestamp"]))
 			else:
 				self.log.error("Post %s in thread %s/%s/%s hit database constraint but no dupe was found?" % (

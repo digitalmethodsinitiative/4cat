@@ -30,7 +30,7 @@
         <span class="byline">
             {% if item.is_finished() and not is_filtered %}<a href="/result/{{ item.result_file }}">{% endif %}
             {% if item.is_finished() and is_filtered and "copied_to" in item.parameters %}<a href="/results/{{ item.parameters.copied_to }}/">{% endif %}
-            {% if item.is_finished() and item.num_rows != 0 %}
+            {% if item.is_finished() and item.num_rows >= 0 %}
                 {% if is_filtered and "copied_to" in item.parameters %}
                     New dataset
                 {% elif is_filtered %}
