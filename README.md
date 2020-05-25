@@ -33,6 +33,15 @@ goal is to provide a straightforward aid for *chan and forum research, through
 which such platforms - often described as amorphous, volatile, or ephemeral - 
 may be analysed from various epistemological perspectives.
 
+## Install
+  We use 4CAT for our own purposes at the Universtiy of Amsterdam but
+you can (and are encouraged to!) [You can find detailled install instructions in our wiki:](https://github.com/stijn-uva/4cat/wiki/Installing-4CAT).
+
+Install using [docker-compose](https://docs.docker.com/compose/install/) simply by running:
+```
+docker-compose up
+```
+
 ## Components
 4CAT consists of several components, each in a separate folder:
 
@@ -48,9 +57,6 @@ may be analysed from various epistemological perspectives.
 - `processors`: A collection of data processing scripts that can plug into
   4CAT and manipulate or process datasets created with 4CAT. There is an API
   you can use to [make your own processors](https://github.com/digitalmethodsinitiative/4cat/wiki/How-to-make-a-processor).
-  
-We use 4CAT for our own purposes at the Universtiy of Amsterdam but
-you can (and are encouraged to!) [set up 4CAT locally](https://github.com/stijn-uva/4cat/wiki/Installing-4CAT).
 
 ## Contributing
 This section yet to be written!
