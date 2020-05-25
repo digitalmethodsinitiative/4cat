@@ -6,6 +6,7 @@ services:
       POSTGRES_USER: test
       POSTGRES_PASSWORD: test
       POSTGRES_DB: 4cat
+      POSTGRES_HOST_AUTH_METHOD: trust
     image: postgres:latest
     networks:
       - default
