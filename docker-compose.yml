@@ -18,6 +18,7 @@ services:
 
   api:
     build: .
+    container_name: api
     depends_on:
       - db
     environment:
