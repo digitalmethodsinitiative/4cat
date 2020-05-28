@@ -477,6 +477,13 @@ class YouTubeMetadata(BasicProcessor):
 					time.sleep(self.sleep_time) # Wait a bit before trying again
 					pass
 
+				if not "items" in response:
+					retries += 1
+					self.dataset.update_status("No video information returned by the YouTube API, sleeping for " + str(self.sleep_time))
+					self.log.warning("Invalid info returned by the YouTube API (%s) when requesting with %s" % (str(response), ids_string))
+					time.sleep(self.sleep_time) # Wait a bit before trying again
+					pass
+
 			# Do nothing with the results if the requests failed
 			if retries >= self.max_retries:
 				if self.api_limit_reached == True:
