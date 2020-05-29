@@ -109,10 +109,12 @@ class Search4Chan(Search):
 						self.dataset.update_status("The IDs inserted are not valid 4chan post IDs.")
 						return None
 
+					if len(valid_query_ids) > 5000000:
+						self.dataset.update_status("Too many IDs inserted. Max 5.000.000.")
+						return None
+
 					valid_query_ids = "(" + ",".join(valid_query_ids) + ")"
-					print(valid_query_ids)
 					sql_query = "SELECT * FROM (" + sql_query +  "AND p.id IN " + valid_query_ids + ") AS full_table ORDER BY full_table.timestamp ASC"
-					print(sql_query)
 
 				else:
 					self.dataset.update_status("No 4chan post IDs inserted.")
