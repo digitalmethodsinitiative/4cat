@@ -69,6 +69,7 @@
                 <option value="random-sample">Random sample</option>
                 <option value="full-threads">All posts in threads with matching posts (full threads)</option>
                 <option value="dense-threads">All posts in threads in which at least x% of posts match (dense threads)</option>
+                <option value="match-ids">Only posts matching IDs</option>
             </select>
         </div>
     </div>
@@ -93,5 +94,12 @@
         <div>
             Threads must contain at least <input name="scope_length" id="scope-length" class="input-number" value="15"> posts
         </div>
+    </div>
+    <div class="form-element ids-element">
+        <label for="valid-ids">IDs (comma-separated):</label>
+         <div>
+            <input name="valid_ids" id="valid-ids" type="text">
+        </div>
+
     </div>
 </fieldset>
