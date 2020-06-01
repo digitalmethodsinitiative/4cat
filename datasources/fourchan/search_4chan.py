@@ -87,6 +87,42 @@ class Search4Chan(Search):
 			
 			except ValueError:
 				pass
+
+		elif query.get("search_scope", None) == "match-ids":
+			
+			try:
+				query_ids = query.get("valid_ids", None)
+				
+				# Parse query IDs
+				if query_ids:
+					query_ids = query_ids.split(",")
+					valid_query_ids = []
+					for query_id in query_ids:
+						try:
+							# Make sure the text can be parsed to an integer.
+							query_id = int(query_id.strip())
+							valid_query_ids.append(str(query_id))
+						except ValueError:
+							# If not, just skip it.
+							continue
+					if not valid_query_ids:
+						self.dataset.update_status("The IDs inserted are not valid 4chan post IDs.")
+						return None
+
+					if len(valid_query_ids) > 5000000:
+						self.dataset.update_status("Too many IDs inserted. Max 5.000.000.")
+						return None
+
+					valid_query_ids = "(" + ",".join(valid_query_ids) + ")"
+					sql_query = "SELECT * FROM (" + sql_query +  "AND p.id IN " + valid_query_ids + ") AS full_table ORDER BY full_table.timestamp ASC"
+
+				else:
+					self.dataset.update_status("No 4chan post IDs inserted.")
+					return None
+
+			except ValueError:
+				pass
+
 		else:
 			sql_query += " ORDER BY p.timestamp ASC"
 
@@ -164,7 +200,6 @@ class Search4Chan(Search):
 			# no results
 			self.dataset.update_status("Query finished, but no results were found.")
 			return None
-
 
 		# query posts database
 		self.dataset.update_status("Found %i matches. Collecting post data" % len(posts))

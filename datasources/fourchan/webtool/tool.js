@@ -2,6 +2,7 @@ fourcat = {
     init: function() {
         $('.dense-element').hide();
         $('.sample-element').hide();
+        $('.ids-element').hide();
         
         $('#datasource-form #body-input').on('keyup', function() {
             value = $(this).val();
@@ -38,6 +39,14 @@ fourcat = {
            } else {
                $('#datasource-form .sample-element').prop('disabled', false);
                $('#datasource-form .sample-element').show();
+           }
+
+           if($(this).val() != 'match-ids') {
+               $('#datasource-form .ids-element').prop('disabled', true);
+               $('#datasource-form .ids-element').hide();
+           } else {
+               $('#datasource-form .ids-element').prop('disabled', false);
+               $('#datasource-form .ids-element').show();
            }
         });
 
