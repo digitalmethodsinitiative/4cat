@@ -264,8 +264,29 @@ class MakeWordtree(BasicProcessor):
 		# large the canvas needs to be - this is based on the max number of
 		# branches found on any level of the tree, in other words, the number
 		# of "terminal nodes"
-		height_left = self.whitespace * self.fontsize * max([self.max_breadth(node) for node in filtered_tokens_left if node.is_top_root])
-		height_right = self.whitespace * self.fontsize * max([self.max_breadth(node) for node in filtered_tokens_right if node.is_top_root])
+		breadths_left = [self.max_breadth(node) for node in filtered_tokens_left if node.is_top_root]
+		breadths_right = [self.max_breadth(node) for node in filtered_tokens_right if node.is_top_root]
+
+		if not breadths_left:
+			if sides == "left":
+				self.dataset.update_status("No data available to the left of the query", is_final=True)
+				self.dataset.finish(0)
+				return None
+			elif sides == "both":
+				sides = "right"
+				breadths_left = [0]
+
+		if not breadths_right:
+			if sides == "right":
+				self.dataset.update_status("No data available to the right of the query", is_final=True)
+				self.dataset.finish(0)
+				return None
+			elif sides == "both":
+				sides = "left"
+				breadths_right = [0]
+
+		height_left = self.whitespace * self.fontsize * max(breadths_left)
+		height_right = self.whitespace * self.fontsize * max(breadths_right)
 		height = max(height_left, height_right)
 
 		canvas = Drawing(str(self.dataset.get_results_path()),
