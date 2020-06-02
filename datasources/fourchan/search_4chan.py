@@ -247,6 +247,8 @@ class Search4Chan(Search):
 		string = string.replace("“","\"").replace("”","\"")
 		# Escape forward slashes
 		string = string.replace("/", "\\/")
+		# Escape @
+		string = string.replace("@", "\\@")
 		return string
 
 	def fetch_posts(self, post_ids, where=None, replacements=None):
