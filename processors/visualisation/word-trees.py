@@ -152,6 +152,8 @@ class MakeWordtree(BasicProcessor):
 			if processed % 500 == 0:
 				self.dataset.update_status("Processing and tokenising post %i" % processed)
 			body = post["body"]
+			if not body:
+				continue
 
 			if strip_urls:
 				body = link_regex.sub("", body)
