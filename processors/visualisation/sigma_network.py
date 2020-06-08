@@ -126,7 +126,6 @@ class SigmaNetwork(BasicProcessor):
 			node_types = [node.strip() for node in first_line.replace("nodedef>", "").split(",")]
 
 			for line in source.readlines():
-
 				if not line:
 					continue
 				
@@ -145,14 +144,12 @@ class SigmaNetwork(BasicProcessor):
 					# so split on a comma and loop through the items
 
 					node_items = line.split(",")
-
 					for i, node_item in enumerate(node_items):
 
 						# Do some string cleaning
 						node_item = self.sanitise(node_item)
 
 						# Mandatory nodes
-
 						# Use the "name" info to write mandatory data
 						if node_types[i].startswith("name "):
 							node["id"] = node_item
@@ -280,7 +277,7 @@ class SigmaNetwork(BasicProcessor):
 
 				# If there's more than two values, something is going wrong.
 				if len(split_values) > 2:
-					return "Too many values to unpack in column %s for values %S" % (s, row[source_column])
+					return "Too many values to unpack in column %s for values %s" % (s, row[source_column])
 				
 				# Set the source and target words as the first and second split values
 				source_word = split_values[0]
@@ -371,8 +368,8 @@ class SigmaNetwork(BasicProcessor):
 		string = string.replace("\\\\","") # Not ideal for now, but it works
 		string = string.replace("'","’")
 
-		# This normalises special character to one form
-		# e.g. variable width characters is Japanese signs
+		# This normalises special characters to one form
+		# e.g. variable width characters in Japanese signs
 		string = unicodedata.normalize("NFC", string)
 
 		return string
@@ -608,7 +605,9 @@ class SigmaNetwork(BasicProcessor):
 			<script type="text/javascript">
 
 				// Initialise the graph
-				var core_json = JSON.parse('**json**');
+				json_str = '**json_str**'
+				console.log(json_str)
+				var core_json = JSON.parse(json_str);
 				console.log(core_json);
 				init_network(core_json);
 
@@ -622,16 +621,41 @@ class SigmaNetwork(BasicProcessor):
 		server_url += "://%s" % config.FlaskConfig.SERVER_NAME
 
 		# JSONify and make sure any encoding errors are replaced (happens with large files).
-		json_file = json.dumps(data).replace("\\\\","") # Not ideal for now, but it works.
+		json_str = json.dumps(data).replace("\\\\","") # Not ideal for now, but it works.
 
 		# Let's try and catch as much encoding issues as we can
 		try:
-			json.loads(json_file)
+			json.loads(json_str)
 		
 		except json.decoder.JSONDecodeError as e:
 			p = int(str(e).split("(char ")[-1].replace(")",""))
-			invalid_str = json_file[p-10:p+10]
+			invalid_str = json_str[p-10:p+10]
 			self.dataset.update_status("Invalid JSON - encountered %s" % str(invalid_str))
 			raise Exception(e)
 
-		return html_string.replace("**server**", server_url).replace("**json**", json_file)
+		# Split if the string is very long.
+		# Else it will throw JavaScript errors
+		max_len = 100000
+
+		# This occurs sometimes with URLs
+		json_str = json_str.replace("<script>", "").replace("</script>","")
+
+		if len(json_str) > max_len:
+			self.dataset.update_status("Splitting JSON string into chunks")
+			split_json_str = ""
+			prev_i = 0
+			for i in range(len(json_str)):
+
+				if i > 0 and i % max_len == 0:
+					json_slice = json_str[prev_i:i]
+
+					split_json_str += json_slice + "'+\n'"
+					prev_i = i
+
+			# Also add at the very end
+			json_slice = json_str[prev_i:len(json_str)]
+			split_json_str += json_slice
+
+			json_str = split_json_str
+
+		return html_string.replace("**server**", server_url).replace("**json_str**", json_str)

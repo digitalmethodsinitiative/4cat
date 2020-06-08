@@ -275,7 +275,7 @@ function change_graph_settings(e) {
 		break;
 
 		case "edge-weight-influence":
-		fa2config["edgeWeightInfluence"] = e.checked;
+		fa2config["edgeWeightInfluence"] = e_value;
 		break;
 
 		case "scaling-ratio":
@@ -340,6 +340,8 @@ function change_graph_settings(e) {
 
 		default:
 	}
+
+	console.log(fa2config)
 
 	// Re-initialise
 	s.configForceAtlas2(fa2config);

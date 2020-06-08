@@ -87,6 +87,8 @@ class URLCoLinker(BasicProcessor):
 
 			# deduplicate, so repeated links within one posts don't inflate
 			post_links = [trailing_dot.sub("", link) for link in post_links]
+			# Encode the URLs, e.g. replace commas with '%2c', so it makes a nice gdf file
+			post_links = [link.replace(",", "%2c").replace("'", "").replace('"',"").replace("\\_","_") for link in post_links]
 			post_links = sorted(set(post_links))
 
 			# if we're looking at a post level, each post gets its own
