@@ -57,7 +57,7 @@ class YouTubeMetadata(BasicProcessor):
 	options = {
 		"top": {
 			"type": UserInput.OPTION_TEXT,
-			"default": 0,
+			"default": 100,
 			"help": "Top n most-frequently referenced videos/channels (0 = all)"
 		},
 		"min": {
