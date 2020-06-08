@@ -33,7 +33,7 @@ libraries = [
 	"pytumblr==0.1.0",
 	"cython==0.29.14",
 	"pymysql==0.9.2",
-	"pandas==0.23.4",
+	"pandas==1.0.4",
 	"datedelta==1.3",
 	"anytree==2.7.2",
 	"gensim==3.8.1",

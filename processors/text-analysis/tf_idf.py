@@ -23,7 +23,7 @@ __credits__ = ["Sal Hagen"]
 __maintainer__ = "Sal Hagen"
 __email__ = "4cat@oilab.eu"
 
-class DisabledTfIdf(): #BasicProcessor):
+class TfIdf(BasicProcessor):
 	"""
 	
 	Get tf-idf terms
