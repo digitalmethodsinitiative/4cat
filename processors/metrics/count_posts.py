@@ -55,6 +55,8 @@ class CountPosts(BasicProcessor):
 
 		first_interval = "9999"
 		last_interval = "0000"
+
+		raise RuntimeError("ZZZ")
 		
 		self.dataset.update_status("Processing posts")
 		with self.dataset.get_results_path().open("w") as results:
@@ -72,7 +74,7 @@ class CountPosts(BasicProcessor):
 						self.dataset.finish(0)
 						return
 
-					date = datetime.datetime.fromtimestamp(timestamp)
+					date = datetime.datetime.utcfromtimestamp(timestamp)
 					if timeframe == "year":
 						date = str(date.year)
 					elif timeframe == "month":

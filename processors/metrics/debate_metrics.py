@@ -75,7 +75,7 @@ class DebateMetrics(BasicProcessor):
 
 		results = [{
 			"thread_id": thread_id,
-			"timestamp": datetime.datetime.fromtimestamp(threads[thread_id]["first_post"]).strftime('%Y-%m-%d %H:%M:%S'),
+			"timestamp": datetime.datetime.utcfromtimestamp(threads[thread_id]["first_post"]).strftime('%Y-%m-%d %H:%M:%S'),
 			"subject": threads[thread_id]["subject"],
 			"num_posts": threads[thread_id]["count"],
 			"num_images": threads[thread_id]["images"],

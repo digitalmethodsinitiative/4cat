@@ -129,7 +129,7 @@ class AttributeRanker(BasicProcessor):
 					timestamp = int(datetime.datetime.strptime(post["timestamp"], "%Y-%m-%d %H:%M:%S").timestamp())
 				except ValueError:
 					timestamp = 0
-				date = datetime.datetime.fromtimestamp(timestamp)
+				date = datetime.datetime.utcfromtimestamp(timestamp)
 				if timeframe == "year":
 					time_unit = str(date.year)
 				elif timeframe == "month":

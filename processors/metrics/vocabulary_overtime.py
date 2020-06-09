@@ -165,7 +165,7 @@ class OvertimeAnalysis(BasicProcessor):
 					except ValueError:
 						timestamp = 0
 
-					date = datetime.datetime.fromtimestamp(timestamp)
+					date = datetime.datetime.utcfromtimestamp(timestamp)
 					if timeframe == "year":
 						interval = str(date.year)
 					elif timeframe == "month":

@@ -44,8 +44,8 @@ class SearchGuardian(Search):
 		:param dict query:  Query parameters, as part of the DataSet object
 		:return list:  Posts, sorted by thread and post ID, in ascending order
 		"""
-		start = datetime.datetime.fromtimestamp(query["min_date"]).strftime("%Y-%m-%d")
-		end = datetime.datetime.fromtimestamp(query["max_date"]).strftime("%Y-%m-%d")
+		start = datetime.datetime.utcfromtimestamp(query["min_date"]).strftime("%Y-%m-%d")
+		end = datetime.datetime.utcfromtimestamp(query["max_date"]).strftime("%Y-%m-%d")
 
 		# the first endpoint fetches all articles that match, the second all
 		# articles for which at least one comment matches. All comments on
@@ -251,10 +251,10 @@ class SearchGuardian(Search):
 		:return:  An ID, in the format YYYY-DD-MM-[ID]
 		"""
 		if "schema_org_type" in obj and obj.get("schema_org_type") == "http://schema.org/Comment":
-			timestamp = datetime.datetime.fromtimestamp(int(obj["time_stamp"]["$date"]) / 1000).strftime("%Y-%m-%d")
+			timestamp = datetime.datetime.utcfromtimestamp(int(obj["time_stamp"]["$date"]) / 1000).strftime("%Y-%m-%d")
 			return str(timestamp) + "-" + obj["id"]
 		else:
-			timestamp = datetime.datetime.fromtimestamp(int(obj["date_published"]["$date"]) / 1000).strftime("%Y-%m-%d")
+			timestamp = datetime.datetime.utcfromtimestamp(int(obj["date_published"]["$date"]) / 1000).strftime("%Y-%m-%d")
 			return str(timestamp) + "-" + obj["_id"]["$oid"]
 
 	def validate_query(query, request, user):

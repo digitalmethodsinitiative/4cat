@@ -78,9 +78,9 @@ class ThreadMetadata(BasicProcessor):
 
 		results = [{
 			"thread_id": thread_id,
-			"timestamp": datetime.datetime.fromtimestamp(threads[thread_id]["first_post"]).strftime(
+			"timestamp": datetime.datetime.utcfromtimestamp(threads[thread_id]["first_post"]).strftime(
 				'%Y-%m-%d %H:%M:%S'),
-			"timestamp_lastpost": datetime.datetime.fromtimestamp(threads[thread_id]["last_post"]).strftime(
+			"timestamp_lastpost": datetime.datetime.utcfromtimestamp(threads[thread_id]["last_post"]).strftime(
 				'%Y-%m-%d %H:%M:%S'),
 			"timestamp_unix": threads[thread_id]["first_post"],
 			"timestamp_lastpost_unix": threads[thread_id]["last_post"],

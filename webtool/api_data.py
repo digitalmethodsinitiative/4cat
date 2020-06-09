@@ -301,7 +301,7 @@ def get_thread(datasource, board, thread, db, limit=0):
 			"resto": 0 if first_post else int(thread["id"]),
 			"no": post["id"],
 			"time": post["timestamp"],
-			"now": datetime.datetime.fromtimestamp(post["timestamp"]).strftime("%m/%d/%y(%a)%H:%I")
+			"now": datetime.datetime.utcfromtimestamp(post["timestamp"]).strftime("%m/%d/%y(%a)%H:%I")
 		})
 
 		# first post has some extra data as well that is never present for replies
