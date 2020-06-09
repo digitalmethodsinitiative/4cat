@@ -126,11 +126,18 @@ class SearchCustom(BasicWorker):
 			wrapped_upload = io.TextIOWrapper(file, encoding="utf-8")
 			reader = csv.DictReader(wrapped_upload, delimiter="\t", quoting=csv.QUOTE_NONE)
 
+
 			# Write to csv
 			with dataset.get_results_path().open("w", encoding="utf-8", newline="") as output_csv:
 				writer = csv.DictWriter(output_csv, fieldnames=reader.fieldnames)
 				writer.writeheader()
-				for row in reader:
+
+				# Sort by timestamp
+				dataset.update_status("Sorting file by date")
+				sorted_reader = sorted(reader, key=lambda row:row["timestamp"] if isinstance(row["timestamp"], str) else "")
+
+				dataset.update_status("Writing to file")
+				for row in sorted_reader:
 					if strip_html: # Possibly strip HTML
 						row["body"] = strip_tags(row["body"])
 					writer.writerow(row)
@@ -138,18 +145,22 @@ class SearchCustom(BasicWorker):
 			wrapped_upload.detach()
 
 		else:
-			# With validated csvs, just save the raw file
-			if not strip_html:
-				file.save(dataset.get_results_path().open("wb"))
-			else:
-				with dataset.get_results_path().open("w", encoding="utf-8", newline="") as output_csv:
-					wrapped_upload = io.TextIOWrapper(file, encoding="utf-8")
-					reader = csv.DictReader(wrapped_upload)
-					writer = csv.DictWriter(output_csv, fieldnames=reader.fieldnames)
-					writer.writeheader()
-					for row in reader:
+			# With validated csvs, save as is but make sure the raw file is sorted
+			with dataset.get_results_path().open("w", encoding="utf-8", newline="") as output_csv:
+				wrapped_upload = io.TextIOWrapper(file, encoding="utf-8")
+				reader = csv.DictReader(wrapped_upload)
+
+				# Sort by timestamp
+				dataset.update_status("Sorting file by date")
+				sorted_reader = sorted(reader, key=lambda row:row["timestamp"] if isinstance(row["timestamp"], str) else "")
+				
+				dataset.update_status("Writing to file")
+				writer = csv.DictWriter(output_csv, fieldnames=reader.fieldnames)
+				writer.writeheader()
+				for row in sorted_reader:
+					if strip_html:
 						row["body"] = strip_tags(row["body"])
-						writer.writerow(row)
+					writer.writerow(row)
 
 		file.close()
 
