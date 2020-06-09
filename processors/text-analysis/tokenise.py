@@ -215,7 +215,7 @@ class Tokenise(BasicProcessor):
 				else:
 					try:
 						timestamp = int(datetime.datetime.strptime(post["timestamp"], "%Y-%m-%d %H:%M:%S").timestamp())
-					except ValueError:
+					except (ValueError, TypeError) as e:
 						timestamp = 0
 				date = datetime.datetime.fromtimestamp(timestamp)
 				if timeframe == "year":
