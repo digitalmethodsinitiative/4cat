@@ -168,7 +168,8 @@ class Tokenise(BasicProcessor):
 			reject_words = [str(word).strip() for word in self.parameters["reject_words"].split(",")]
 			word_filter.update(reject_words)
 
-		# Create a regex for the word list which should be faster than iterating
+		# Use an Aho-Corasick trie to filter tokens - significantly faster
+		# than a native Python list or matching by regex
 		automaton = ahocorasick.Automaton()
 		for word in word_filter:
 			if word:
@@ -199,11 +200,13 @@ class Tokenise(BasicProcessor):
 		current_output_path = None
 		output_file_handle = None
 
+		date_descriptor = "overall"
 		for post in self.iterate_csv_items(self.source_file):
+			if not post["body"]:
+				continue
+				
 			# determine what output unit this post belongs to
-			if timeframe == "all":
-				date_descriptor = "overall"
-			else:
+			if timeframe != "all":
 				if "timestamp_unix" in post:
 					try:
 						timestamp = int(post["timestamp_unix"])
@@ -236,17 +239,15 @@ class Tokenise(BasicProcessor):
 			else:
 				tokens = word_tokenize(body, language=language)
 
-			# stem, lemmatise and save tokens that are not stopwords
+			# stem, lemmatise and save tokens that are not in filter
 			for token in tokens:
 				token = token.lower()
 
 				if strip_symbols:
 					token = numbers.sub("", symbol.sub("", token))
 
-				if not token:  # Skip empty strings
-					continue
-
-				if token in automaton:
+				# skip empty and filtered tokens
+				if not token or token in automaton:
 					continue
 
 				if self.parameters["stem"]:
@@ -258,7 +259,9 @@ class Tokenise(BasicProcessor):
 				# append tokens to the post's token list
 				post_tokens.append(token)
 
-			# append the post's tokens as a list within a larger list
+			# write tokens to file
+			# this writes lists of json lists, with the outer list serialised
+			# 'manually' and the token lists serialised by the json library
 			if post_tokens:
 				output_file = tmp_path.joinpath(date_descriptor + ".json")
 				output_path = str(output_file)
@@ -284,9 +287,10 @@ class Tokenise(BasicProcessor):
 		if output_file_handle:
 			output_file_handle.close()
 
-		# close all files
+		# close all json lists
 		# we do this now because only here do we know all files have been
-		# fully written
+		# fully written - if posts are out of order, the tokeniser may
+		# need to repeatedly switch between various token files
 		for output_path in output_files:
 			with open(output_path, "a") as file_handle:
 				file_handle.write("]")
