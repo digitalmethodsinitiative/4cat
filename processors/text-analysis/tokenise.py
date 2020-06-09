@@ -207,20 +207,27 @@ class Tokenise(BasicProcessor):
 				if "timestamp_unix" in post:
 					try:
 						timestamp = int(post["timestamp_unix"])
-					except ValueError:
-						timestamp = 0
+					except (ValueError, TypeError) as e:
+						timestamp = None
 				else:
 					try:
 						timestamp = int(datetime.datetime.strptime(post["timestamp"], "%Y-%m-%d %H:%M:%S").timestamp())
 					except (ValueError, TypeError) as e:
-						timestamp = 0
-				date = datetime.datetime.fromtimestamp(timestamp)
-				if timeframe == "year":
-					date_descriptor = str(date.year)
-				elif timeframe == "month":
-					date_descriptor = str(date.year) + "-" + str(date.month)
+						timestamp = None
+				
+				if timestamp:
+
+					date = datetime.datetime.utcfromtimestamp(timestamp)
+
+					if timeframe == "year":
+						date_descriptor = str(date.year)
+					elif timeframe == "month":
+						date_descriptor = str(date.year) + "-" + str(date.month)
+					else:
+						date_descriptor = str(date.year) + "-" + str(date.month) + "-" + str(date.day)
 				else:
-					date_descriptor = str(date.year) + "-" + str(date.month) + "-" + str(date.day)
+					# Invalid values can occur e.g. in custom csvs.
+					date_descriptor = "invalid_date"
 
 			# tokenise...
 			# we're treating every post as one document.
