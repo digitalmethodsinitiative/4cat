@@ -199,7 +199,7 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 			# cancel job
 			self.job.finish()
 
-	def iterate_csv_items(self, path, sort_by=None):
+	def iterate_csv_items(self, path):
 		"""
 		A generator that iterates through a CSV file
 
@@ -208,37 +208,12 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 		is caught and subsequently stops execution gracefully.
 
 		:param Path path: 	Path to csv file to read
-		:param sort_by str: Column to sort csv by. Can be a string or a list.
-							In case of list, the first valid column will be used to sort.
-							The rest will be ignored. Useful e.g. for ['timestamp_unix', 'timestamp'].
 		:return:
 		"""
 
 		with open(path, encoding="utf-8") as input:
 
 			reader = csv.DictReader(input)
-
-			# If we want to sort, we first generate a new reader and read through the csv items in that order.
-			if sort_by:
-
-				# Allow one or two columns
-				if isinstance(sort_by, str):
-					sort_by = [sort_by]
-				elif isinstance(sort_by, list):
-					sort_by = [sort_by[0], sort_by[1]]
-				else:
-					raise ValueError("Incorrect type %s given for sort_by values" % (type(sort_by)))
-
-				# Delete columsn not in the csv.
-				sort_by = [col for col in sort_by if col in reader.fieldnames]
-
-				# Don't sort if no valid columns were given.
-				if sort_by:
-
-					# Sort by the first valid column in the list.
-					sort_by = sort_by[0]
-					self.dataset.update_status("Sorting csv by %s" % str(sort_by))
-					reader = sorted(reader, key=lambda row:row[sort_by], reverse=False)
 
 			for item in reader:
 				if self.interrupted:
