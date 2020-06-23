@@ -204,7 +204,7 @@ class InternalAPI(BasicWorker):
 			# all jobs plus, for those that are currently active, some worker
 			# info as well as related datasets. useful to monitor server
 			# activity and judge whether 4CAT can safely be interrupted
-			open_jobs = self.db.fetchall("SELECT * FROM jobs ORDER BY jobtype ASC, timestamp ASC, remote_id ASC")
+			open_jobs = self.db.fetchall("SELECT jobtype, timestamp, timestamp_claimed, interval, remote_id FROM jobs ORDER BY jobtype ASC, timestamp ASC, remote_id ASC")
 			running = []
 			queue = {}
 
