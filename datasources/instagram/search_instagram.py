@@ -7,9 +7,14 @@ datasource uses this affordance to retrieve instagram data for 4CAT.
 """
 import instaloader
 import shutil
+import base64
+import json
 import os
 import re
 
+from cryptography.fernet import Fernet
+
+import config
 from backend.abstract.search import Search
 from backend.lib.exceptions import QueryParametersException, ProcessorInterruptedException
 
@@ -62,6 +67,35 @@ class SearchInstagram(Search):
 		parameters = self.dataset.get_parameters()
 		scope = parameters.get("search_scope", "")
 		queries = [query.strip() for query in parameters.get("query", "").split(",")]
+
+		# log in, because else Instagram gets really annoying with rate
+		# limits
+		if not parameters.get("login", None):
+			self.dataset.update_status(
+				"No Instagram login provided. Create a new dataset and provide your login details to scrape.",
+				is_final=True)
+			return []
+		key = SearchInstagram.salt_to_fernet_key()
+		fernet = Fernet(key)
+		login = json.loads(fernet.decrypt(parameters.get("login").encode("utf-8")))
+
+		# we have the login in memory now, get rid of the login info stored in
+		# the database
+		self.dataset.delete_parameter("login")
+
+		try:
+			instagram.login(login[0], login[1])
+		except instaloader.TwoFactorAuthRequiredException:
+			self.dataset.update_status(
+				"Two-factor authentication with Instagram is not available via 4CAT at this time. Disable it for your Instagram account and try again.",
+				is_final=True)
+			return []
+		except (instaloader.InvalidArgumentException, instaloader.BadCredentialsException):
+			self.dataset.update_status("Invalid Instagram username or password", is_final=True)
+			return []
+		except instaloader.ConnectionException:
+			self.dataset.update_status("Could not connect to Instagram to log in.", is_final=True)
+			return []
 
 		posts = []
 		max_posts = self.dataset.parameters.get("items", 500)
@@ -164,7 +198,6 @@ class SearchInstagram(Search):
 					except instaloader.QueryReturnedNotFoundException:
 						pass
 
-
 					# instagram only has one reply depth level at the time of
 					# writing, represented here
 					for answer in answers:
@@ -217,6 +250,32 @@ class SearchInstagram(Search):
 		if not query.get("query", "").strip():
 			raise QueryParametersException("You must provide a search query.")
 
+		if not query.get("username", None).strip() or not query.get("password", None).strip():
+			raise QueryParametersException("You need to provide a username and password")
+
+		username = query.get("username")
+		password = query.get("password")
+		login_tester = instaloader.Instaloader()
+		try:
+			login_tester.login(username, password)
+		except instaloader.TwoFactorAuthRequiredException:
+			raise QueryParametersException(
+				"Two-factor authentication with Instagram is not available via 4CAT at this time. Disable it for your Instagram account and try again.")
+		except (instaloader.InvalidArgumentException, instaloader.BadCredentialsException):
+			raise QueryParametersException("Invalid Instagram username or password.")
+
+		# there are some fundamental limits to how safe we can make this, but
+		# we can at least encrypt it so that if someone has access to the
+		# database but not the 4CAT config file, they cannot use the login
+		# details
+		# we use the 4CAT anyonymisation salt (which *should* be a long,
+		# random string)
+		# making sure the 4CAT config file is kept safe is left as an exercise
+		# for the reader...
+		key = SearchInstagram.salt_to_fernet_key()
+		fernet = Fernet(key)
+		obfuscated_login = fernet.encrypt(json.dumps([username, password]).encode("utf-8"))
+
 		# 500 is mostly arbitrary - may need tweaking
 		max_posts = 2500
 		if query.get("max_posts", ""):
@@ -234,6 +293,7 @@ class SearchInstagram(Search):
 
 		# simple!
 		return {
+			"login": obfuscated_login.decode("utf-8"),
 			"items": max_posts,
 			"query": items,
 			"board": query.get("search_scope") + "s",  # used in web interface
@@ -287,3 +347,25 @@ class SearchInstagram(Search):
 		:return dict:
 		"""
 		pass
+
+	@staticmethod
+	def salt_to_fernet_key():
+		"""
+		Use 4CAT's anonymisation salt to generate a Fernet encryption key
+
+		THIS IS NOT A ROBUST ENCRYPTION METHOD. The goal here is to make it
+		impossible to decrypt data if you have access to the database but
+		*not* to the filesystem. If you have access to the 4CAT configuration
+		file, it is trivial to generate this key yourself.
+
+		For now however, it is better than storing the login details in the
+		database in plain text.
+
+		:return bytes:  Fernet-compatible 256-bit encryption key
+		"""
+		salt = config.ANONYMISATION_SALT
+		while len(salt) < 32:
+			salt += salt
+
+		salt = bytearray(salt.encode("utf-8"))[0:32]
+		return base64.urlsafe_b64encode(bytes(salt))
