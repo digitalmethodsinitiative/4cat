@@ -24,7 +24,31 @@ $(document).ready(function () {
         storage.setItem('instagram.username', username);
         storage.setItem('instagram.password', password);
 
-        query.start();
+        $.post({
+            'url': '/api/datasource-call/instagram/authenticate/',
+            'data': {"username": username, "password": password},
+            'success': function (data) {
+                if (data['success']) {
+                    if (data['data']['error']) {
+                        let message = 'Authentication failed.';
+                        alert(message + data['data']['error-message']);
+
+                    } else if (!data['data']['authenticated']) {
+                        $('#instagram-checkpoint-link').attr('href', data['data']['checkpoint-link'])
+                        $('#instagram-checkpoint').removeClass('hidden');
+
+                    } else {
+                        // all good, let's start the actual query
+                        query.start();
+                    }
+                } else {
+                    // we should have received an error message, if this
+                    // happened something failed quite badly
+                    alert('Big error');
+                }
+            }
+        });
+
         return false;
     })
 });

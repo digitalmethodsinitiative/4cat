@@ -586,7 +586,7 @@ def check_processor():
 	return jsonify(children)
 
 
-@app.route("/api/datasource-call/<string:datasource>/<string:action>/")
+@app.route("/api/datasource-call/<string:datasource>/<string:action>/", methods=["GET", "POST"])
 @login_required
 @openapi.endpoint("tool")
 def datasource_call(datasource, action):
@@ -622,7 +622,7 @@ def datasource_call(datasource, action):
 	if not hasattr(datasource_calls, action) or not callable(getattr(datasource_calls, action)):
 		return error(406, error="Datasource '%s' has no call '%s'" % (datasource, action))
 
-	parameters = request.args
+	parameters = request.args if request.method == "GET" else request.form
 	response = getattr(datasource_calls, action).__call__(request, current_user, **parameters)
 
 	if not response:
