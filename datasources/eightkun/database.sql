@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS posts_8kun (
   thread_id         text,
   timestamp         integer,
   timestamp_deleted integer DEFAULT 0,
+  board             text,
   subject           text,
   body              text,
   author            text,
@@ -69,4 +70,8 @@ CREATE INDEX IF NOT EXISTS posts_seq_8kun
     id_seq
   );
 
-CREATE TABLE posts_8kun_old () INHERITS (posts_8kun);
+CREATE UNIQUE INDEX IF NOT EXISTS posts_idboard_8kun
+  ON posts_9kun (
+    id,
+    board
+  );
