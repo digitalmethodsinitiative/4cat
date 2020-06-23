@@ -358,7 +358,7 @@ def check_search_queue():
 
 	:return: An JSON array with search jobtypes and their counts.
 
-	:return-schema: {type=array,properties={jobtype={type=string}, count={type=integer}}}
+	:return-schema: {type=array,properties={jobtype={type=string}, count={type=integer}},items={type=string}}
 	"""
 	unfinished_datasets = db.fetchall("SELECT jobtype, COUNT(*)count FROM jobs WHERE jobtype LIKE '%-search' GROUP BY jobtype ORDER BY count DESC;")
 
@@ -377,7 +377,7 @@ def toggle_favourite(key):
 	:param str key: Key of the dataset to mark as favourite.
 
 	:return: A JSON object with the status of the request
-	:return-schema: {type=object,properties={success={type=boolean},favourite_status={type=bool}}}
+	:return-schema: {type=object,properties={success={type=boolean},favourite_status={type=boolean}}}
 
 	:return-error 404:  If the dataset key was not found
 	"""
