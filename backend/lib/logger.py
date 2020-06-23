@@ -279,8 +279,8 @@ class Logger:
 			mail = "Hello! The following 4CAT warnings were logged since the last alert:\n\n"
 			for logkey in reversed(sorted_logs):
 				log = sorted_logs[logkey]
-				first = datetime.datetime.fromtimestamp(log["first"]).strftime("%d %b '%y %H:%M:%S")
-				last = datetime.datetime.fromtimestamp(log["last"]).strftime("%d %b '%y %H:%M:%S")
+				first = datetime.datetime.utcfromtimestamp(log["first"]).strftime("%d %b '%y %H:%M:%S")
+				last = datetime.datetime.utcfromtimestamp(log["last"]).strftime("%d %b '%y %H:%M:%S")
 				mail += "- *%s*\n" % log["message"]
 				mail += "  _%s_ - %ix at %s (first %s, last %s)\n\n" % (
 					log["level"], log["amount"], log["location"], first, last)
