@@ -56,8 +56,6 @@ class CountPosts(BasicProcessor):
 		first_interval = "9999"
 		last_interval = "0000"
 
-		raise RuntimeError("ZZZ")
-		
 		self.dataset.update_status("Processing posts")
 		with self.dataset.get_results_path().open("w") as results:
 			counter = 0
