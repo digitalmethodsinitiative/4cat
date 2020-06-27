@@ -68,7 +68,7 @@ for jsonfile in folder.glob("*.json"):
 			"is_sticky": ("sticky" in op and op["sticky"] == 1),
 			"is_closed": ("closed" in op and op["closed"] == 1),
 			"post_last": last_post
-		}, commit=False)
+		}, commit=False, safe=True)
 
 	for post in posts:
 		# save dimensions as a dumpable dict - no need to make it indexable
@@ -98,7 +98,8 @@ for jsonfile in folder.glob("*.json"):
 			"semantic_url": post.get("semantic_url", "")
 		}
 
-		db.insert("posts_4chan", post_data, commit=False)
+		post_data = {k: str(v).replace("\x00", "") for k, v in post_data.items()}
+		db.insert("posts_4chan", post_data, commit=False, safe=True)
 
 	db.commit()
 	print("Added thread with %i posts from %s" % (len(posts), jsonfile))
