@@ -1,18 +1,13 @@
 """
 Get YouTube metadata from video links posted
 """
-import datetime
 import time
-import json
 import re
+import csv
 import urllib.request
-import youtube_dl
 
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
-from collections import OrderedDict, Counter
-from operator import itemgetter
-from csv import DictReader
 
 from backend.abstract.processor import BasicProcessor
 from backend.lib.helpers import UserInput, get_yt_compatible_ids
@@ -23,6 +18,8 @@ __author__ = "Sal Hagen"
 __credits__ = ["Sal Hagen"]
 __maintainer__ = "Sal Hagen"
 __email__ = "4cat@oilab.eu"
+
+csv.field_size_limit(1024 * 1024 * 1024)
 
 class YouTubeMetadata(BasicProcessor):
 	"""
@@ -92,14 +89,14 @@ class YouTubeMetadata(BasicProcessor):
 		with open(self.source_file, encoding="utf-8") as source:
 
 			# Read source file
-			csv = DictReader(source)
+			csvfile = csv.DictReader(source)
 
 			self.dataset.update_status("Extracting YouTube links")
 
 			link_regex = re.compile(r"https?://[^\s]+")
 			www_regex = re.compile(r"^www\.")
 
-			for post in csv:
+			for post in csvfile:
 
 				post_urls = []
 

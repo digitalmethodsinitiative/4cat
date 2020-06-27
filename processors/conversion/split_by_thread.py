@@ -3,8 +3,7 @@ Split results by thread
 """
 import zipfile
 import shutil
-
-from csv import DictReader, DictWriter
+import csv
 
 from backend.abstract.processor import BasicProcessor
 
@@ -12,6 +11,8 @@ __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
 __maintainer__ = "Stijn Peeters"
 __email__ = "4cat@oilab.eu"
+
+csv.field_size_limit(1024 * 1024 * 1024)
 
 class ThreadSplitter(BasicProcessor):
 	"""
@@ -50,7 +51,7 @@ class ThreadSplitter(BasicProcessor):
 			new = not thread.exists()
 
 			with thread.open("a", encoding="utf-8") as output:
-				outputcsv = DictWriter(output, fieldnames=post.keys())
+				outputcsv = csv.DictWriter(output, fieldnames=post.keys())
 
 				if new:
 					outputcsv.writeheader()

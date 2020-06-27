@@ -2,7 +2,6 @@
 Generate ranking per hateful word
 """
 import datetime
-from csv import DictReader
 
 from backend.abstract.processor import BasicProcessor
 from backend.lib.helpers import UserInput, convert_to_int

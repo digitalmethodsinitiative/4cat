@@ -1,9 +1,8 @@
 """
 Example post-processor worker
 """
+import csv
 import re
-
-from csv import DictReader, DictWriter
 
 from backend.abstract.processor import BasicProcessor
 
@@ -11,6 +10,8 @@ __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
 __maintainer__ = "Stijn Peeters"
 __email__ = "4cat@oilab.eu"
+
+csv.field_size_limit(1024 * 1024 * 1024)
 
 class QuoteRanker(BasicProcessor):
 	"""
@@ -58,7 +59,7 @@ class QuoteRanker(BasicProcessor):
 
 		self.dataset.update_status("Writing results file")
 		with self.dataset.get_results_path().open("w", encoding="utf-8") as results:
-			writer = DictWriter(results, fieldnames=fieldnames)
+			writer = csv.DictWriter(results, fieldnames=fieldnames)
 			writer.writeheader()
 
 			for id in most_quoted:

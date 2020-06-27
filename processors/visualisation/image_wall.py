@@ -29,6 +29,8 @@ __credits__ = ["Stijn Peeters"]
 __maintainer__ = "Stijn Peeters"
 __email__ = "4cat@oilab.eu"
 
+csv.field_size_limit(1024 * 1024 * 1024)
+
 class ImageWallGenerator(BasicProcessor):
 	"""
 	Image wall generator
@@ -105,8 +107,8 @@ class ImageWallGenerator(BasicProcessor):
 		tmp_path.mkdir()
 
 		with open(self.source_file) as source:
-			csv = DictReader(source)
-			for post in csv:
+			csvfile = csv.DictReader(source)
+			for post in csvfile:
 				if len(urls) >= amount:
 					break
 

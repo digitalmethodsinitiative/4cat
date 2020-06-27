@@ -4,8 +4,6 @@ Get regular and 'debate' thread metadata
 import datetime
 import time
 
-from csv import DictReader
-
 from backend.abstract.processor import BasicProcessor
 
 import config

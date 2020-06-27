@@ -3,9 +3,8 @@ Over-time trends
 """
 import datetime
 import json
+import csv
 import re
-
-from csv import DictReader
 
 from backend.abstract.processor import BasicProcessor
 from backend.lib.helpers import UserInput
@@ -17,6 +16,8 @@ __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
 __maintainer__ = "Stijn Peeters"
 __email__ = "4cat@oilab.eu"
+
+csv.field_size_limit(1024 * 1024 * 1024)
 
 class OvertimeAnalysis(BasicProcessor):
 	"""
@@ -94,7 +95,7 @@ class OvertimeAnalysis(BasicProcessor):
 		intervals = set()
 
 		with self.source_file.open() as input:
-			reader = DictReader(input)
+			reader = csv.DictReader(input)
 			if "views" in reader.fieldnames:
 				engagement_field = "views"
 			elif "score" in reader.fieldnames:
@@ -113,8 +114,8 @@ class OvertimeAnalysis(BasicProcessor):
 		hatebase_regex = re.compile(r"\b(" + "|".join([re.escape(term) for term in hatebase if not min_offensive or (hatebase[term]["average_offensiveness"] and hatebase[term]["average_offensiveness"] > min_offensive)]) + r")\b")
 
 		with open(self.source_file, encoding='utf-8') as source:
-			csv = DictReader(source)
-			for post in csv:
+			csvfile = csv.DictReader(source)
+			for post in csvfile:
 				if self.interrupted:
 					raise ProcessorInterruptedException("Interrupted while reading input")
 

@@ -4,8 +4,6 @@ Extract most-used images from corpus
 import hashlib
 import base64
 
-from csv import DictReader
-
 from backend.abstract.processor import BasicProcessor
 
 __author__ = "Stijn Peeters"

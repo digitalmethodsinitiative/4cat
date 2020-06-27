@@ -3,10 +3,8 @@ Over-time trends
 """
 import datetime
 import pickle
-import json
 import re
 
-from csv import DictReader
 from pathlib import Path
 
 from backend.abstract.processor import BasicProcessor

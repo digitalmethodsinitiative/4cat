@@ -3,8 +3,6 @@ Extract most-used images from corpus
 """
 import re
 
-from csv import DictReader
-
 from backend.abstract.processor import BasicProcessor
 
 __author__ = "Stijn Peeters"

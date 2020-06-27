@@ -4,14 +4,14 @@ import csv
 
 import config
 
-from csv import DictReader
-
 from backend.abstract.processor import BasicProcessor
 
 __author__ = "Sal Hagen"
 __credits__ = ["Sal Hagen"]
 __maintainer__ = "Sal Hagen"
 __email__ = "sal@oilab.eu"
+
+csv.field_size_limit(1024 * 1024 * 1024)
 
 class FlowChart(BasicProcessor):
 	"""

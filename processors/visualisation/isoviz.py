@@ -21,6 +21,8 @@ __credits__ = ["Stijn Peeters"]
 __maintainer__ = "Stijn Peeters"
 __email__ = "4cat@oilab.eu"
 
+csv.field_size_limit(1024 * 1024 * 1024)
+
 class IsometricMultigraphRenderer(BasicProcessor):
 	"""
 	Generate multiple area graphs, and project them on an isometric plane

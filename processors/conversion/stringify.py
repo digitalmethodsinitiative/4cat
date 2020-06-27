@@ -2,7 +2,6 @@
 Collapse post bodies into one long string
 """
 import re
-from csv import DictReader
 
 from backend.abstract.processor import BasicProcessor
 from backend.lib.helpers import UserInput

@@ -2,9 +2,8 @@
 Determine hatebase scores for posts
 """
 import json
+import csv
 import re
-
-from csv import DictReader, DictWriter
 
 from backend.abstract.processor import BasicProcessor
 from backend.lib.helpers import UserInput
@@ -16,6 +15,8 @@ __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
 __maintainer__ = "Stijn Peeters"
 __email__ = "4cat@oilab.eu"
+
+csv.field_size_limit(1024 * 1024 * 1024)
 
 class HatebaseAnalyser(BasicProcessor):
 	"""
@@ -73,13 +74,13 @@ class HatebaseAnalyser(BasicProcessor):
 		processed = 0
 		with self.dataset.get_results_path().open("w") as output:
 			with self.source_file.open() as input:
-				reader = DictReader(input)
+				reader = csv.DictReader(input)
 				fieldnames = reader.fieldnames
 				fieldnames += ("hatebase_num", "hatebase_num_ambiguous", "hatebase_num_unambiguous",
 					"hatebase_terms", "hatebase_terms_ambiguous", "hatebase_terms_unambiguous",
 					"hatebase_offensiveness_avg")
 
-				writer = DictWriter(output, fieldnames=fieldnames)
+				writer = csv.DictWriter(output, fieldnames=fieldnames)
 				writer.writeheader()
 
 			for post in self.iterate_csv_items(self.source_file):

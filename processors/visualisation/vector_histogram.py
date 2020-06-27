@@ -2,7 +2,6 @@
 Generate histogram of activity
 """
 import math
-import csv
 
 from pathlib import Path
 from calendar import month_abbr

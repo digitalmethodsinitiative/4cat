@@ -13,6 +13,8 @@ from backend.lib.dataset import DataSet
 from backend.lib.helpers import get_software_version
 from backend.lib.exceptions import WorkerInterruptedException, ProcessorInterruptedException, ProcessorException
 
+csv.field_size_limit(1024 * 1024 * 1024)
+
 
 class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 	"""

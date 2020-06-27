@@ -2,7 +2,6 @@
 Generate network of wikipedia pages + categories in posts
 """
 import requests
-import csv
 import re
 
 from lxml import etree

@@ -1,7 +1,6 @@
 """
 Generate co-link network of URLs in posts
 """
-import csv
 import re
 
 from backend.abstract.processor import BasicProcessor

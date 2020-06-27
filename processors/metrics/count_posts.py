@@ -1,10 +1,8 @@
 """
 Collapse post bodies into one long string
 """
-import re
 import datetime
-
-from csv import DictReader, DictWriter
+import csv
 
 from backend.lib.helpers import UserInput, pad_interval
 from backend.abstract.processor import BasicProcessor
@@ -13,6 +11,8 @@ __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
 __maintainer__ = "Stijn Peeters"
 __email__ = "4cat@oilab.eu"
+
+csv.field_size_limit(1024 * 1024 * 1024)
 
 class CountPosts(BasicProcessor):
 	"""
@@ -99,7 +99,7 @@ class CountPosts(BasicProcessor):
 				missing, intervals = pad_interval(intervals, first_interval, last_interval)
 
 			# Write to csv
-			csv_writer = DictWriter(results, fieldnames=("date", "item", "frequency"))
+			csv_writer = csv.DictWriter(results, fieldnames=("date", "item", "frequency"))
 			csv_writer.writeheader()
 			for interval in intervals:
 				csv_writer.writerow({

@@ -18,6 +18,8 @@ __credits__ = ["Stijn Peeters","Bernhard Rieder"]
 __maintainer__ = ["Stijn Peeters"]
 __email__ = "4cat@oilab.eu"
 
+csv.field_size_limit(1024 * 1024 * 1024)
+
 class RankFlowRenderer(BasicProcessor):
 	"""
 	Count occurrence of values for a given post attribute for a given time
