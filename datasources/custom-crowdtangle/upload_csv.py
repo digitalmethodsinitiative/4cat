@@ -1,0 +1,169 @@
+"""
+Custom data upload to create bespoke datasets
+"""
+import datetime
+import time
+import csv
+import re
+import io
+
+from backend.abstract.worker import BasicWorker
+from backend.lib.exceptions import QueryParametersException
+from backend.lib.helpers import get_software_version, strip_tags
+
+
+class SearchCrowdTangleImport(BasicWorker):
+	type = "customcrowdtangle-search"  # job ID
+	category = "Search"  # category
+	title = "Custom Dataset Upload"  # title displayed in UI
+	description = "Upload your own CSV file to be used as a dataset"  # description displayed in UI
+	extension = "csv"  # extension of result file, used internally and in UI
+
+	# not available as a processor for existing datasets
+	accepts = [None]
+
+	max_workers = 1
+
+	required_columns = {
+		"instagram": (
+		"\ufeffAccount", "User Name", "Followers at Posting", "Created", "Type", "Likes", "Comments", "Views", "URL", "Link",
+		"Photo", "Title", "Description", "Image Text", "Sponsor Id", "Sponsor Name", "Overperforming Score")
+	}
+
+	def work(self):
+		"""
+		Run custom search
+
+		All work is done while uploading the data, so this just has to 'finish'
+		the job.
+		"""
+
+		self.job.finish()
+
+	def validate_query(query, request, user):
+		"""
+		Validate custom data input
+
+		Confirms that the uploaded file is a valid CSV or tab file and, if so, returns
+		some metadata.
+
+		:param dict query:  Query parameters, from client-side.
+		:param request:  Flask request
+		:param User user:  User object of user who has submitted the query
+		:return dict:  Safe query parameters
+		"""
+
+		# do we have an uploaded file?
+		if "data_upload" not in request.files:
+			raise QueryParametersException("No file was offered for upload.")
+
+		platform = query.get("platform", "")
+		if platform != "instagram":
+			raise QueryParametersException("Invalid platform")
+
+		file = request.files["data_upload"]
+		if not file:
+			raise QueryParametersException("No file was offered for upload.")
+
+		wrapped_upload = io.TextIOWrapper(file, encoding="utf-8")
+
+
+		# validate file as csv
+		reader = csv.DictReader(wrapped_upload, delimiter=",")
+
+		try:
+			fields = reader.fieldnames
+			print(reader.fieldnames)
+		except UnicodeDecodeError:
+			raise QueryParametersException("Uploaded file is not a well-formed CSV file.")
+
+		# check if all required fields are present
+		required = SearchCrowdTangleImport.required_columns[platform]
+		missing = []
+		for field in required:
+			if field not in reader.fieldnames:
+				missing.append(field)
+
+		if missing:
+			raise QueryParametersException(
+				"The following required columns are not present in the csv file: %s" % ", ".join(missing))
+
+		wrapped_upload.detach()
+
+		# return metadata - the filename is sanitised and serves no purpose at
+		# this point in time, but can be used to uniquely identify a dataset
+		disallowed_characters = re.compile(r"[^a-zA-Z0-9._+-]")
+		return {"filename": disallowed_characters.sub("", file.filename), "time": time.time(), "datasource": platform, "board": "upload", "platform": platform}
+
+	def after_create(query, dataset, request):
+		"""
+		Hook to execute after the dataset for this source has been created
+
+		In this case, it is used to save the uploaded file to the dataset's
+		result path, and finalise the dataset metadata.
+
+		:param dict query:  Sanitised query parameters
+		:param DataSet dataset:  Dataset created for this query
+		:param request:  Flask request submitted for its creation
+		"""
+		hashtag = re.compile(r"#([^\s,.+=-]+)")
+		usertag = re.compile(r"@([^\s,.+=-]+)")
+
+		file = request.files["data_upload"]
+		platform = dataset.parameters.get("platform")
+		dataset.type = "%s-search" % platform
+		dataset.datasource = platform
+
+		file.seek(0)
+		done = 0
+
+		# With validated csvs, save as is but make sure the raw file is sorted
+		if dataset.parameters.get("platform") == "instagram":
+			with dataset.get_results_path().open("w", encoding="utf-8", newline="") as output_csv:
+				wrapped_upload = io.TextIOWrapper(file, encoding="utf-8")
+				reader = csv.DictReader(wrapped_upload)
+				writer = csv.DictWriter(output_csv, fieldnames=(
+				"id", "thread_id", "parent_id", "body", "author", "timestamp", "type", "url", "thumbnail_url",
+				"hashtags", "usertags", "mentioned", "num_likes", "num_comments", "subject"))
+				writer.writeheader()
+
+				dataset.update_status("Sorting by date...")
+				posts = sorted(reader, key=lambda x: x["Created"])
+
+				dataset.update_status("Processing posts...")
+				for item in posts:
+					done += 1
+					url = item["URL"]
+					url = re.sub(r"/*$", "", url)
+
+					id = url.split("/")[-1]
+					caption = item["Description"]
+					hashtags = hashtag.findall(caption)
+					usertags = usertag.findall(caption)
+
+					date = datetime.datetime.strptime(item["Created"], "%Y-%m-%d %H:%M:%S %Z")
+
+					writer.writerow({
+						"id": id,
+						"thread_id": id,
+						"parent_id": id,
+						"body": caption if caption is not None else "",
+						"author": item["User Name"],
+						"timestamp": int(date.timestamp()),
+						"type": "picture" if item["Type"] == "Photo" else item["Type"].lower(),
+						"url": item["URL"],
+						"thumbnail_url": item["Photo"],
+						"hashtags": ",".join(hashtags),
+						"usertags": ",".join(usertags),
+						"mentioned": "",
+						"num_likes": item["Likes"],
+						"num_comments": item["Comments"],
+						"subject": item["Title"]}
+					)
+
+
+		file.close()
+
+		dataset.finish(done)
+		dataset.update_status("Result processed")
+		dataset.update_version(get_software_version())
