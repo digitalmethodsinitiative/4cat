@@ -114,7 +114,11 @@ class LinguisticFeatures(BasicProcessor):
 
 			# Start the processing!
 			for i, doc in enumerate(nlp.pipe(posts, disable=disable)):
-				doc_bin.add(doc)
+				try:
+					doc_bin.add(doc)
+				except MemoryError:
+					self.dataset.update_status("Out of memory while parsing data. Try again with a smaller dataset.", is_final=True)
+					return
 
 				# It's quite a heavy process, so make sure it can be interrupted
 				if self.interrupted:
