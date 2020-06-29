@@ -15,7 +15,7 @@ libraries = [
 	"youtube_dl==2019.1.2",
 	"pyahocorasick==1.4.0",
 	"html2text==2018.1.9",
-	"cryptography==2.6.1"
+	"cryptography==2.6.1",
 	"instaloader==4.4.4",
 	"setuptools==40.8.0",
 	"APScheduler==3.5.3",
@@ -34,6 +34,7 @@ libraries = [
 	"pytumblr==0.1.0",
 	"cython==0.29.14",
 	"pymysql==0.9.2",
+	"docutils==0.16",
 	"pandas==1.0.4",
 	"datedelta==1.3",
 	"anytree==2.7.2",
