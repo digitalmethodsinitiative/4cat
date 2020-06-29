@@ -36,6 +36,12 @@ if not Path(os.getcwd()).glob("4cat-daemon.py"):
 	print("This script needs to be run from the same folder as 4cat-daemon.py\n")
 	exit(1)
 
+if not Path(os.getcwd()).joinpath("config.py").exists():
+	print("config.py is missing from the 4CAT folder.")
+	print("Create a configuration file before continuing. An example is found in:")
+	print("  config.py-example.")
+	exit(1)
+
 # ---------------------------------------------
 #     Determine current and target versions
 # ---------------------------------------------
@@ -125,9 +131,11 @@ print(" done")
 # ---------------------------------------------
 #                    Run pip
 # ---------------------------------------------
-print("- Running pip to install any new dependencies...")
-pip = subprocess.run([interpreter, "-m", "pip", "install", "-r", "requirements.txt"])
-if pip.returncode != 0:
+print("- Running pip to install any new dependencies (this could take a moment)...")
+try:
+	pip = subprocess.check_call([interpreter, "-m", "pip", "install", "-r", "requirements.txt"])
+except subprocess.CalledProcessError as e:
+	print(e)
 	print("\n  Error running pip. You may need to run this script with elevated privileges (e.g. sudo).\n")
 	exit(1)
 print("  ...done")
