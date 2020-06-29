@@ -135,7 +135,6 @@ class ImageWallGenerator(BasicProcessor):
 			except (requests.RequestException, IndexError, FileNotFoundError, OSError) as e:
 				# increase the counter here to leave an empty space for the
 				# missing image, since that itself can be significant
-				counter += 1
 				continue
 
 			if not wall:
