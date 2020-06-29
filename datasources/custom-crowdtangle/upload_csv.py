@@ -141,7 +141,8 @@ class SearchCrowdTangleImport(BasicWorker):
 					hashtags = hashtag.findall(caption)
 					usertags = usertag.findall(caption)
 
-					date = datetime.datetime.strptime(item["Created"], "%Y-%m-%d %H:%M:%S %Z")
+					datestamp = " ".join(item["Created"].split(" ")[:-1])
+					date = datetime.datetime.strptime(datestamp, "%Y-%m-%d %H:%M:%S")
 
 					writer.writerow({
 						"id": id,
