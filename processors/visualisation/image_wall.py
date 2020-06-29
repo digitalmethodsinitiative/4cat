@@ -8,11 +8,10 @@ import shutil
 import base64
 import math
 import time
-import sys
+import csv
 import re
 
 from pathlib import Path
-from csv import DictReader
 from PIL import Image, ImageFile, ImageOps
 
 from lxml import etree
