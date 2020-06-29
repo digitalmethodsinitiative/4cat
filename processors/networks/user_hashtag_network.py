@@ -79,6 +79,9 @@ class HashtagUserBipartiteGrapher(BasicProcessor):
 				tags = [tag.lower() for tag in tags]
 
 			user = post.get("author")
+			if not user:
+				continue
+				
 			for tag in tags:
 				# ignore empty tags
 				if not tag:
