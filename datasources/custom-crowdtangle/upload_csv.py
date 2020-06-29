@@ -27,7 +27,7 @@ class SearchCrowdTangleImport(BasicWorker):
 	required_columns = {
 		"instagram": (
 		"\ufeffAccount", "User Name", "Followers at Posting", "Created", "Type", "Likes", "Comments", "Views", "URL", "Link",
-		"Photo", "Title", "Description", "Image Text", "Sponsor Id", "Sponsor Name", "Overperforming Score")
+		"Photo", "Title", "Description")
 	}
 
 	def work(self):
