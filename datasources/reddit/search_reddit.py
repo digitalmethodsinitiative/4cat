@@ -136,7 +136,7 @@ class SearchReddit(Search):
 				self.dataset.update_status(
 					"HTTP Status code %i while receiving thread data from Pushshift API. Not all posts are saved." % (
 						response.status_code))
-				self.log.warning("HTTP Status code %i while receiving thread data from Pushshift API. Not all posts are saved.")
+				self.log.warning("HTTP Status code %i while receiving thread data from Pushshift API. Not all posts are saved." % response.status_code)
 				return None
 
 			threads = response.json()["data"]
