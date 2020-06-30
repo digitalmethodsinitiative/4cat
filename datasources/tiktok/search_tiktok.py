@@ -5,12 +5,15 @@ TikTok is, after a fashion, an imageboard - people post videos and then
 other people reply. So this datasource uses this affordance to retrieve
 TikTok data for 4CAT.
 """
+import requests
 import time
 import json
 import re
 
 from seleniumwire import webdriver
 from selenium.webdriver.chrome.options import Options
+#from selenium.webdriver.firefox.options import Options
+from selenium.common.exceptions import JavascriptException
 
 from backend.abstract.search import Search
 from backend.lib.exceptions import QueryParametersException, ProcessorInterruptedException
@@ -53,13 +56,155 @@ class SearchTikTok(Search):
 
 		posts = []
 		for query in queries:
-			posts += self.fetch_from_overview_page(query, max_posts)
+			posts += self.fetch_from_overview_page_with_api(query, max_posts)
+
+		if posts:
+			self.dataset.update_status("Scraped %i posts." % len(posts))
 
 		return posts
 
+	def fetch_from_overview_page_with_api(self, item, limit=10):
+		# first, open a browser to sign requests with
+		iphone_ua = "Naverbot" #Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_6) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.1 Safari/605.1.15"
 
+		options = Options()
+		options.headless = False
+		options.add_argument("--user-agent=%s" % iphone_ua)
+		options.add_argument("--disable-gpu")
+		options.add_argument("--disable-infobars")
+		options.add_argument("--window-position=0,0")
+		options.add_argument("--ignore-certificate-errors")
+		options.add_argument("--ignore-certificate-errors-spki-list")
 
-	def fetch_from_overview_page(self, item, limit=10):
+		# not clear if this actually has any benefit
+		#mobile_emulation = {"deviceName": "iPhone X"}
+		#chrome_options = webdriver.ChromeOptions()
+		#chrome_options.add_experimental_option("mobileEmulation", mobile_emulation)
+
+		self.dataset.update_status("Initialising scraper")
+		browser = webdriver.Chrome(options=options) #, desired_capabilities=chrome_options.to_capabilities())
+
+		browser.set_page_load_timeout(15)
+		browser.set_script_timeout(10)
+		browser.implicitly_wait(5)
+		# capture only requests to tiktok's own API
+		browser.scopes = [".*" + re.escape("tiktok.com") + ".*"]
+
+		result = []
+		type = ""
+		if item[0] == "#":
+			# hashtag query
+			base_url = "https://www.tiktok.com/tag/%s" % item[1:]
+			item_type = 3
+		elif item[0] == "@":
+			# user query
+			base_url = "https://www.tiktok.com/%s" % item
+			item_type = 1
+		else:
+			# music
+			music_id = item.split("?")[0].split("-")[-1]
+			base_url = "https://www.tiktok.com/music/original-sound-%s" % music_id
+			item_type = 4
+
+		self.stealthify_browser(browser)
+		browser.get(base_url)
+		self.stealthify_browser(browser)
+
+		# we need the item ID to send API requests - this is a number that is
+		# unique to each hashtag, music, or user. It's included in the page
+		# loaded, as a meta property. However, presumably due to some
+		# javascript shenanigans we can't get it via querySelector - the
+		# element is opaque to it. So we extract it from the 'raw' HTML of the
+		# request with a regex.
+		time.sleep(1)
+		page_request = browser.wait_for_request(base_url)
+		item_iri = re.findall(r'<meta\s+property="al:ios:url"\s+content="([^"]+)"\s*/>', page_request.response.body.decode("utf-8"))
+		item_id = item_iri[0].split("/")[-1].split("?")[0]
+		browser.get("https://www.tiktok.com/discover")
+
+		# API requests need to be 'signed', and this is done via some
+		# complicated mechanism we don't need to figure out because it is a
+		# javascript function we can simply call through the selenium instance
+		# thanks to: https://github.com/carcabot/tiktok-signature/
+		try:
+			web_id = browser.execute_script("return document.cookie.split(';').filter((a) => a.split('=')[0].trim() == 's_v_web_id')[0].split('=')[1];")
+		except JavascriptException:
+			web_id = None
+
+		have_signing_function = browser.execute_script("return typeof(window.byted_acrawler.sign) === 'function'")
+		if not have_signing_function:
+			browser.close()
+			self.dataset.update_status("Could not initiate API scrape. No data scraped.", is_final=True)
+			return []
+
+		# this is a wrapper method that signs and calls any TikTok API request
+		def get_signed(url, verifyFp=None):
+			if verifyFp:
+				url += "&verifyFp=" + verifyFp
+
+			api_signature = browser.execute_script("return window.byted_acrawler.sign({url:'%s'});" % url)
+			url += "&_signature=%s" % api_signature
+
+			api_headers={
+				"Method": "GET",
+				"Accept-encoding": "gzip, deflate, br",
+				"Referer": base_url,
+				"User-Agent": iphone_ua
+			}
+			response = requests.get(url, headers=api_headers)
+
+			return response.json()
+
+		# now we have everything we need to make API calls - start the actual
+		# scraping
+		offset = 0
+		while len(result) < limit:
+			self.dataset.update_status("Scraped %i/%i posts for query '%s'" % (len(result), limit, item))
+			api_url = "https://m.tiktok.com/share/item/list?secUid=&id=%s&type=%i&count=30&minCursor=0&maxCursor=%i&shareUid=&lang=&verifyFp=" % (item_id, item_type, offset)
+			api_call = get_signed(api_url, web_id)
+
+			for post_data in api_call["body"]["itemListData"]:
+				post = post_data["itemInfos"]
+				user = post_data["authorInfos"]
+				user_stats = post_data["authorStats"]
+				music = post_data["musicInfos"]
+				hashtags = [item["HashtagName"] for item in post_data["textExtra"] if item["HashtagName"]]
+
+				post_entry = {
+					"id": post["id"],
+					"thread_id": post["id"],
+					"author": user["uniqueId"],
+					"author_full": user["nickName"],
+					"author_followers": user_stats["followerCount"],
+					"subject": "",
+					"body": post["text"],
+					"timestamp": int(post["createTime"]),
+					"is_harmful": len(post["warnInfo"]) > 0,
+					"is_duet": post_data["duetInfo"] != "0",
+					"music_name": music["musicName"],
+					"music_id": music["musicId"],
+					"video_url": post["video"]["urls"][0],
+					"tiktok_url": "https://tiktok.com/@%s/video/%s" % (user["uniqueId"], post["id"]),
+					"thumbnail_url": post["covers"][0],
+					"amount_likes": post["diggCount"],
+					"amount_comments": post["commentCount"],
+					"amount_shares": post["shareCount"],
+					"amount_plays": post["playCount"],
+					"hashtags": ",".join(hashtags),
+				}
+
+				result.append(post_entry)
+
+			if not api_call["body"]["hasMore"]:
+				break
+
+			offset += 30
+			time.sleep(1.5)
+
+		browser.close()
+		return result
+
+	def fetch_from_overview_page_with_selenium(self, item, limit=10):
 		"""
 		Scrape all items for a given hashtag
 
@@ -72,20 +217,25 @@ class SearchTikTok(Search):
 		:param int limit:  Amount of posts to scrape
 		:return list:  A list of posts that were scraped
 		"""
+
+		# Naverbot seems to get a free pass while other UAs will make the
+		# website not load any data
 		scraper_ua = "Naverbot"
 		iphone_ua = "Mozilla/5.0 (iPhone; CPU iPhone OS 13_3_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.0.5 Mobile/15E148 Safari/604.1"
 
 		options = Options()
-		options.headless = True
+		options.headless = False
 		options.add_argument("--user-agent=%s" % scraper_ua)
 		options.add_argument("--disable-gpu")
 
+		# not clear if this actually has any benefit
 		mobile_emulation = {"deviceName": "iPhone X"}
 		chrome_options = webdriver.ChromeOptions()
 		chrome_options.add_experimental_option("mobileEmulation", mobile_emulation)
 
 		browser = webdriver.Chrome(options=options, desired_capabilities=chrome_options.to_capabilities())
 
+		# capture only requests to tiktok's own API
 		browser.scopes = [
 			".*" + re.escape("m.tiktok.com/share/item/list") + ".*"
 		]
@@ -108,9 +258,9 @@ class SearchTikTok(Search):
 			music_id = item.split("?")[0].split("-")[-1]
 			url = "https://www.tiktok.com/music/original-sound-%s" % music_id
 
-		self.stealthify_browser(browser)
 		browser.get(url)
 		self.stealthify_browser(browser)
+		time.sleep(1.5)
 
 		items = 0
 		while True:
@@ -130,6 +280,7 @@ class SearchTikTok(Search):
 			time.sleep(1)
 			page_height = browser.execute_script("return document.body.scrollHeight")
 			browser.execute_script("window.scrollTo(0,document.body.scrollHeight)")
+			time.sleep(1)
 
 			start_time = time.time()
 			have_new_content = False
@@ -202,7 +353,11 @@ class SearchTikTok(Search):
 				break
 
 		browser.close()
-		return result
+
+		if not result:
+			self.dataset.update_status("No posts could be scraped for '%s'." % item)
+
+		return result[:limit]
 
 	def get_search_mode(self, query):
 		"""
