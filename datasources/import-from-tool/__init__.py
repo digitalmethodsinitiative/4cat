@@ -2,5 +2,5 @@
 from backend.lib.helpers import init_datasource
 
 # Internal identifier for this data source
-DATASOURCE = "customcrowdtangle"
-NAME = "CrowdTangle export (upload)"
+DATASOURCE = "customimport"
+NAME = "Import from other tool (upload)"

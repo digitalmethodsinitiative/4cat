@@ -3,6 +3,7 @@ Custom data upload to create bespoke datasets
 """
 import datetime
 import time
+import json
 import csv
 import re
 import io
@@ -12,8 +13,8 @@ from backend.lib.exceptions import QueryParametersException
 from backend.lib.helpers import get_software_version, strip_tags
 
 
-class SearchCrowdTangleImport(BasicWorker):
-	type = "customcrowdtangle-search"  # job ID
+class ImportFromExternalTool(BasicWorker):
+	type = "customimport-search"  # job ID
 	category = "Search"  # category
 	title = "Custom Dataset Upload"  # title displayed in UI
 	description = "Upload your own CSV file to be used as a dataset"  # description displayed in UI
@@ -26,8 +27,14 @@ class SearchCrowdTangleImport(BasicWorker):
 
 	required_columns = {
 		"instagram": (
-		"\ufeffAccount", "User Name", "Followers at Posting", "Created", "Type", "Likes", "Comments", "Views", "URL", "Link",
-		"Photo", "Title", "Description")
+			"\ufeffAccount", "User Name", "Followers at Posting", "Created", "Type", "Likes", "Comments", "Views",
+			"URL", "Link",
+			"Photo", "Title", "Description"),
+		"tiktok": (
+			"id", "text", "createTime", "authorMeta.name", "authorMeta.id", "musicMeta.musicId", "musicMeta.musicName",
+			"musicMeta.musicAuthor", "imageUrl", "videoUrl", "diggCount", "shareCount", "playCount", "commentCount",
+			"mentions", "hashtags"
+		)
 	}
 
 	def work(self):
@@ -58,7 +65,7 @@ class SearchCrowdTangleImport(BasicWorker):
 			raise QueryParametersException("No file was offered for upload.")
 
 		platform = query.get("platform", "")
-		if platform != "instagram":
+		if platform not in ImportFromExternalTool.required_columns:
 			raise QueryParametersException("Invalid platform")
 
 		file = request.files["data_upload"]
@@ -67,18 +74,16 @@ class SearchCrowdTangleImport(BasicWorker):
 
 		wrapped_upload = io.TextIOWrapper(file, encoding="utf-8")
 
-
 		# validate file as csv
 		reader = csv.DictReader(wrapped_upload, delimiter=",")
 
 		try:
 			fields = reader.fieldnames
-			print(reader.fieldnames)
 		except UnicodeDecodeError:
 			raise QueryParametersException("Uploaded file is not a well-formed CSV file.")
 
 		# check if all required fields are present
-		required = SearchCrowdTangleImport.required_columns[platform]
+		required = ImportFromExternalTool.required_columns[platform]
 		missing = []
 		for field in required:
 			if field not in reader.fieldnames:
@@ -93,7 +98,8 @@ class SearchCrowdTangleImport(BasicWorker):
 		# return metadata - the filename is sanitised and serves no purpose at
 		# this point in time, but can be used to uniquely identify a dataset
 		disallowed_characters = re.compile(r"[^a-zA-Z0-9._+-]")
-		return {"filename": disallowed_characters.sub("", file.filename), "time": time.time(), "datasource": platform, "board": "upload", "platform": platform}
+		return {"filename": disallowed_characters.sub("", file.filename), "time": time.time(), "datasource": platform,
+				"board": "upload", "platform": platform}
 
 	def after_create(query, dataset, request):
 		"""
@@ -123,8 +129,8 @@ class SearchCrowdTangleImport(BasicWorker):
 				wrapped_upload = io.TextIOWrapper(file, encoding="utf-8")
 				reader = csv.DictReader(wrapped_upload)
 				writer = csv.DictWriter(output_csv, fieldnames=(
-				"id", "thread_id", "parent_id", "body", "author", "timestamp", "type", "url", "thumbnail_url",
-				"hashtags", "usertags", "mentioned", "num_likes", "num_comments", "subject"))
+					"id", "thread_id", "parent_id", "body", "author", "timestamp", "type", "url", "thumbnail_url",
+					"hashtags", "usertags", "mentioned", "num_likes", "num_comments", "subject"))
 				writer.writeheader()
 
 				dataset.update_status("Sorting by date...")
@@ -162,6 +168,48 @@ class SearchCrowdTangleImport(BasicWorker):
 						"subject": item["Title"]}
 					)
 
+		elif platform == "tiktok":
+			with dataset.get_results_path().open("w", encoding="utf-8", newline="") as output_csv:
+				wrapped_upload = io.TextIOWrapper(file, encoding="utf-8")
+				reader = csv.DictReader(wrapped_upload)
+				writer = csv.DictWriter(output_csv, fieldnames=("id", "thread_id", "author", "subject", "body",
+					"timestamp", "is_harmful", "is_duet", "music_name", "music_id", "music_author", "video_url",
+					"tiktok_url", "thumbnail_url", "amount_likes", "amount_comments", "amount_shares", "amount_plays",
+					"hashtags"))
+				writer.writeheader()
+
+
+				dataset.update_status("Sorting by date...")
+				posts = sorted(reader, key=lambda x: x["createTime"])
+
+				dataset.update_status("Processing posts...")
+				for item in posts:
+					hashtags = json.loads(item["hashtags"])
+					hashtags = [hashtag["name"] for hashtag in hashtags]
+
+					done += 1
+
+					writer.writerow({
+						"id": item["id"],
+						"thread_id": item["id"],
+						"author": item["authorMeta.name"],
+						"subject": "",
+						"body": item["text"],
+						"timestamp": int(item["createTime"]),
+						"is_harmful": -1,
+						"is_duet": -1,
+						"music_name": item["musicMeta.musicName"],
+						"music_id": item["musicMeta.musicId"],
+						"music_author": item["musicMeta.musicAuthor"],
+						"video_url": item["videoUrl"],
+						"tiktok_url": "https://tiktok.com/@%s/video/%s" % (item["authorMeta.id"], item["id"]),
+						"thumbnail_url": item["covers.default"],
+						"amount_likes": item["diggCount"],
+						"amount_comments": item["commentCount"],
+						"amount_shares": item["shareCount"],
+						"amount_plays": item["playCount"],
+						"hashtags": ",".join(hashtags),
+					})
 
 		file.close()
 

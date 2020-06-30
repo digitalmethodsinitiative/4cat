@@ -1,12 +1,14 @@
 <fieldset class="basic-options">
-    <p class="form-intro">You can upload a CrowdTangle export file here (a CSV file). Currently only the output format for Instagram
-    data is supported.</p>
+    <p class="form-intro">Through this data you can import result files from a variety of third-party tools into 4CAT.
+        Note that the tool expects files as produced by the tool; editing them before importing may lead to unexpected
+        results.</p>
 
     <div class="form-element">
         <label>Platform:</label>
         <div class="filter-parameters" id="platform-filter">
             <select id="platform-select" name="platform">
-                <option value="instagram">Instagram</option>
+                <option value="instagram">Instagram (CrowdTangle)</option>
+                <option value="tiktok">TikTok (drawrowfly/tiktok-scraper)</option>
             </select>
         </div>
     </div>
