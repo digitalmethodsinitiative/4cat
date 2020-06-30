@@ -68,7 +68,7 @@ class SearchTikTok(Search):
 		iphone_ua = "Naverbot" #Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_6) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.1 Safari/605.1.15"
 
 		options = Options()
-		options.headless = False
+		options.headless = True
 		options.add_argument("--user-agent=%s" % iphone_ua)
 		options.add_argument("--disable-gpu")
 		options.add_argument("--disable-infobars")
