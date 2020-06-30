@@ -1,4 +1,6 @@
 import requests
+import json
+import time
 import re
 
 from backend.abstract.search import Search
@@ -7,9 +9,9 @@ from backend.lib.exceptions import QueryParametersException, ProcessorInterrupte
 
 class SearchReddit(Search):
 	"""
-	Search 4chan corpus
+	Search Reddit
 
-	Defines methods that are used to query the 4chan data indexed and saved.
+	Defines methods to fetch Reddit data on demand
 	"""
 	type = "reddit-search"  # job ID
 	category = "Search"  # category
@@ -21,7 +23,10 @@ class SearchReddit(Search):
 	accepts = [None]
 
 	max_workers = 1
-	max_retries = 3
+	max_retries = 5
+
+	rate_limit = 0
+	request_timestamps = []
 
 	def get_posts_simple(self, query):
 		"""
@@ -36,17 +41,14 @@ class SearchReddit(Search):
 		"""
 		Execute a query; get post data for given parameters
 
-		This handles general search - anything that does not involve dense
-		threads (those are handled by get_dense_threads()). First, Sphinx is
-		queries with the search parameters to get the relevant post IDs; then
-		the PostgreSQL is queried to return all posts for the found IDs, as
-		well as (optionally) all other posts in the threads those posts were in.
+		This queries the Pushshift API to find posts and threads mathcing the
+		given parameters.
 
 		:param dict query:  Query parameters, as part of the DataSet object
 		:return list:  Posts, sorted by thread and post ID, in ascending order
 		"""
 
-		# first, build the sphinx query
+		# first, build the request parameters
 		post_parameters = {
 			"sort": "asc",
 			"sort_type": "created_utc",
@@ -63,7 +65,6 @@ class SearchReddit(Search):
 		if query["board"] and query["board"] != "*":
 			post_parameters["subreddit"] = query["board"]
 
-		# escape / since it's a special character for Sphinx
 		if query["body_match"]:
 			post_parameters["q"] = query["body_match"]
 		else:
@@ -71,8 +72,16 @@ class SearchReddit(Search):
 
 		# set up query
 		total_posts = 0
-		return_posts = []
 		max_retries = 3
+
+		# get rate limit from API server
+		try:
+			api_metadata = requests.get("https://api.pushshift.io/meta").json()
+			self.rate_limit = api_metadata["server_ratelimit_per_minute"]
+			self.log.info("Got rate limit from Pushshift: %i requests/minute" % self.rate_limit)
+		except (requests.RequestException, json.JSONDecodeError, KeyError) as e:
+			self.log.warning("Could not retrieve rate limit from Pushshift: %s" % e)
+			self.rate_limit = 120
 
 		# first, search for threads - this is a separate endpoint from comments
 		submission_parameters = post_parameters.copy()
@@ -131,14 +140,6 @@ class SearchReddit(Search):
 			if response is None:
 				return response
 
-			# if this fails, too much is wrong to continue
-			if response.status_code != 200:
-				self.dataset.update_status(
-					"HTTP Status code %i while receiving thread data from Pushshift API. Not all posts are saved." % (
-						response.status_code))
-				self.log.warning("HTTP Status code %i while receiving thread data from Pushshift API. Not all posts are saved." % response.status_code)
-				return None
-
 			threads = response.json()["data"]
 
 			if len(threads) == 0:
@@ -184,14 +185,6 @@ class SearchReddit(Search):
 				self.log.error("Error during pushshift fetch of query %s" % self.dataset.key)
 				self.dataset.update_status("Error while searching for posts on Pushshift")
 				return None
-
-			# this is bad - return what we have so far, but also warn
-			if response.status_code != 200:
-				self.dataset.update_status(
-					"HTTP Status code %i while receiving post data from Pushshift API. Not all posts are saved." % (
-						response.status_code))
-				self.log.warning("HTTP Status code %i while receiving thread data from Pushshift API. Not all posts are saved." % response.status_code)
-				break
 
 			# no more posts
 			posts = response.json()["data"]
@@ -241,9 +234,6 @@ class SearchReddit(Search):
 			if not response:
 				break
 
-			if response.status_code != 200:
-				break
-
 			for post in response.json()["data"]:
 				posts.append(self.post_to_4cat(post))
 
@@ -272,9 +262,6 @@ class SearchReddit(Search):
 			response = self.call_pushshift_api("https://api.pushshift.io/reddit/comment/search",
 											   params={"link_id": thread_id})
 			if response is None:
-				break
-
-			if response.status_code != 200:
 				break
 
 			posts_raw = response.json()["data"]
@@ -306,9 +293,6 @@ class SearchReddit(Search):
 
 			response = self.call_pushshift_api("https://api.pushshift.io/reddit/submission/search?ids=" + ",".join(chunk))
 			if response is None:
-				break
-
-			if response.status_code != 200:
 				break
 
 			for thread in response.json()["data"]:
@@ -378,25 +362,55 @@ class SearchReddit(Search):
 		"""
 		Call pushshift API and don't crash (immediately) if it fails
 
+		Will also try to respect the rate limit, waiting before making a
+		request until it will not violet the rate limit.
+
 		:param args:
 		:param kwargs:
 		:return: Response, or `None`
 		"""
+
 		retries = 0
 		while retries < self.max_retries:
 			try:
+				self.wait_until_window()
 				response = requests.get(*args, **kwargs)
-				break
-			except requests.RequestException as e:
+				self.request_timestamps.append(time.time())
+				if response.status_code == 200:
+					break
+				else:
+					raise RuntimeError("HTTP %s" % response.status_code)
+			except (RuntimeError, requests.RequestException) as e:
 				self.log.info("Error %s while querying Pushshift API - retrying..." % e)
 				retries += 1
 
 		if retries >= self.max_retries:
-			self.log.error("Error during pushshift fetch of query %s" % self.dataset.key)
-			self.dataset.update_status("Error while searching for posts on Pushshift")
+			self.log.error("Error during Pushshift fetch of query %s" % self.dataset.key)
+			self.dataset.update_status("Error while searching for posts on Pushshift - API did not respond as expected", is_final=True)
 			return None
 
 		return response
+
+
+
+	def wait_until_window(self):
+		"""
+		Wait until a request can be made outside of the rate limit
+
+		If we have made more requests in the window (one minute) than allowed
+		by the rate limit, wait until that is no longer the case.
+		"""
+		window_start = time.time() - 60
+		has_warned = False
+		while len([timestamp for timestamp in self.request_timestamps if timestamp >= window_start]) >= self.rate_limit:
+			if not has_warned:
+				self.log.info("Hit Pushshift rate limit - throttling...")
+				has_warned = True
+
+			time.sleep(0.25) # should be enough
+
+		# clean up timestamps outside of window
+		self.request_timestamps = [timestamp for timestamp in self.request_timestamps if timestamp >= window_start]
 
 	def validate_query(query, request, user):
 		"""
@@ -490,3 +504,4 @@ class SearchReddit(Search):
 
 		# if we made it this far, the query can be executed
 		return filtered_query
+
