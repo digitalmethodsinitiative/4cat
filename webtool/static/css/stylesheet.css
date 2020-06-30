@@ -397,6 +397,11 @@ h1 a {
     font-weight: bold;
 }
 
+.site-announcement a {
+    color: inherit;
+    text-decoration: underline;
+}
+
 
 /** --------------------- *
          Site footer
