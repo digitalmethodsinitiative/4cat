@@ -256,6 +256,7 @@ query = {
         $('html,body').scrollTop(200);
 
         // AJAX the query to the server
+        $('#query-status .message').html('Sending input');
         $.post({
             dataType: "text",
             url: form.attr('action'),
