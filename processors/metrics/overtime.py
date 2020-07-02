@@ -133,7 +133,7 @@ class OvertimeAnalysis(BasicProcessor):
 					elif timeframe == "month":
 						time_unit = str(date.year) + "-" + str(date.month).zfill(2)
 					elif timeframe == "week":
-						date_descriptor = str(date.isocalendar()[0]) + "-" + str(date.isocalendar()[1]).zfill(2)
+						time_unit = str(date.isocalendar()[0]) + "-" + str(date.isocalendar()[1]).zfill(2)
 					else:
 						time_unit = str(date.year) + "-" + str(date.month).zfill(2) + "-" + str(date.day).zfill(2)
 
