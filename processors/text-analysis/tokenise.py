@@ -42,7 +42,7 @@ class Tokenise(BasicProcessor):
 		"timeframe": {
 			"type": UserInput.OPTION_CHOICE,
 			"default": "all",
-			"options": {"all": "Overall", "year": "Year", "month": "Month", "day": "Day"},
+			"options": {"all": "Overall", "year": "Year", "month": "Month", "week": "Week", "day": "Day"},
 			"help": "Produce files per"
 		},
 		"tokenizer_type": {
@@ -226,6 +226,8 @@ class Tokenise(BasicProcessor):
 						date_descriptor = str(date.year)
 					elif timeframe == "month":
 						date_descriptor = str(date.year) + "-" + str(date.month)
+					elif timeframe == "week":
+						date_descriptor = str(date.isocalendar()[0]) + "-" + str(date.isocalendar()[1]).zfill(2)
 					else:
 						date_descriptor = str(date.year) + "-" + str(date.month) + "-" + str(date.day)
 				else:

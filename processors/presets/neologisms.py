@@ -22,7 +22,7 @@ class NeologismExtractor(ProcessorPreset):
 		"timeframe": {
 			"type": UserInput.OPTION_CHOICE,
 			"default": "month",
-			"options": {"all": "Overall", "year": "Year", "month": "Month", "day": "Day"},
+			"options": {"all": "Overall", "year": "Year", "month": "Month", "week": "Week", "day": "Day"},
 			"help": "Extract neologisms per"
 		}
 	}

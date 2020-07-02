@@ -37,7 +37,7 @@ class OvertimeAnalysis(BasicProcessor):
 		"timeframe": {
 			"type": UserInput.OPTION_CHOICE,
 			"default": "month",
-			"options": {"all": "Overall", "year": "Year", "month": "Month", "day": "Day"},
+			"options": {"all": "Overall", "year": "Year", "month": "Month", "week": "Week", "day": "Day"},
 			"help": "Count frequencies per"
 		},
 		"partition": {
@@ -168,6 +168,8 @@ class OvertimeAnalysis(BasicProcessor):
 						interval = str(date.year)
 					elif timeframe == "month":
 						interval = str(date.year) + "-" + str(date.month).zfill(2)
+					elif timeframe == "week":
+						date_descriptor = str(date.isocalendar()[0]) + "-" + str(date.isocalendar()[1]).zfill(2)
 					else:
 						interval = str(date.year) + "-" + str(date.month).zfill(2) + "-" + str(date.day).zfill(2)
 
