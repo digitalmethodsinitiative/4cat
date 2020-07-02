@@ -5,11 +5,10 @@ import pickle
 import re
 import os
 
-from csv import DictReader, DictWriter
+import csv
 from pathlib import Path
 
 from backend.abstract.processor import BasicProcessor
-from backend.lib.dataset import DataSet
 from backend.lib.helpers import UserInput, convert_to_int
 
 import config
@@ -19,6 +18,7 @@ __credits__ = ["Stijn Peeters"]
 __maintainer__ = "Stijn Peeters"
 __email__ = "4cat@oilab.eu"
 
+csv.field_size_limit(1024 * 1024 * 1024)
 
 class LexicalFilter(BasicProcessor):
 	"""
@@ -28,7 +28,7 @@ class LexicalFilter(BasicProcessor):
 	category = "Filtering"  # category
 	title = "Filter by lexicon"  # title displayed in UI
 	description = "Copies the dataset, retaining only posts that match any selected lexicon of words or phrases. This creates a new, separate dataset you can run analyses on."  # description displayed in UI
-	extension = "dataset"  # extension of result file, used internally and in UI
+	extension = "csv"  # extension of result file, used internally and in UI
 
 	input = "csv:body"
 	output = "dataset"
@@ -112,12 +112,12 @@ class LexicalFilter(BasicProcessor):
 		with self.dataset.get_results_path().open("w", encoding="utf-8") as output:
 			# get header row, we need to copy it for the output
 			with self.source_file.open(encoding="utf-8") as input:
-				reader = DictReader(input)
+				reader = csv.DictReader(input)
 				fieldnames = reader.fieldnames
 
 			# start the output file
 			fieldnames.append("matching_lexicons")
-			writer = DictWriter(output, fieldnames=fieldnames)
+			writer = csv.DictWriter(output, fieldnames=fieldnames)
 			writer.writeheader()
 
 			# iterate through posts and see if they match
