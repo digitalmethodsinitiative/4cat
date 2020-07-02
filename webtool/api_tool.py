@@ -35,6 +35,7 @@ api_ratelimit = limiter.shared_limit("3 per second", scope="api")
 API_SUCCESS = 200
 API_FAIL = 404
 
+csv.field_size_limit(1024 * 1024 * 1024)
 
 @app.route("/api/")
 @api_ratelimit

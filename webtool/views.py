@@ -25,6 +25,7 @@ from webtool.api_tool import delete_dataset, toggle_favourite, queue_processor
 from backend.lib.dataset import DataSet
 from backend.lib.queue import JobQueue
 
+csv.field_size_limit(1024 * 1024 * 1024)
 
 @app.route("/robots.txt")
 def robots():

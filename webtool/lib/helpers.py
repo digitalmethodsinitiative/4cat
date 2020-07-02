@@ -18,6 +18,7 @@ from backend.abstract.processor import BasicProcessor
 
 import config
 
+csv.field_size_limit(1024 * 1024 * 1024)
 
 class Pagination(object):
 	"""
