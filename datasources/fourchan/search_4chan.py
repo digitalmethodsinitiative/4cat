@@ -325,7 +325,7 @@ class Search4Chan(Search):
 			self.log.info("Sphinx query timed out after %i seconds" % (time.time() - sphinx_start))
 			return None
 		except ProgrammingError as e:
-			if "invalid packet size" in str(e):
+			if "invalid packet size" in str(e) or "query timed out" in str(e):
 				self.dataset.update_status(
 					"Error during query. Your query matches too many items. Try again with a narrower date range or a more specific search query.", is_final=True)
 			elif "syntax error" in str(e):
