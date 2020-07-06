@@ -397,6 +397,8 @@ class Search4Chan(Search):
 
 			if "full_threads" in query:
 				del query["full_threads"]
+		elif "random_amount" in query:
+			del query["random_amount"]
 
 		# only one of two dense threads options may be chosen at the same time, and
 		# it requires valid density and length parameters. full threads is implied,
