@@ -321,12 +321,19 @@ class Search4Chan(Search):
 				"Sphinx query finished in %i seconds, %i results." % (time.time() - sphinx_start, len(results)))
 		except OperationalError:
 			self.dataset.update_status(
-				"Your query timed out. This is likely because it matches too many posts. Try again with a narrower date range or a more specific search query.")
+				"Your query timed out. This is likely because it matches too many posts. Try again with a narrower date range or a more specific search query.", is_final=True)
 			self.log.info("Sphinx query timed out after %i seconds" % (time.time() - sphinx_start))
 			return None
 		except ProgrammingError as e:
-			self.dataset.update_status("Error during query. Your query syntax may be invalid (check for loose parentheses).")
-			self.log.error("Sphinx crash during query %s: %s" % (self.dataset.key, e))
+			if "invalid packet size" in str(e):
+				self.dataset.update_status(
+					"Error during query. Your query matches too many items. Try again with a narrower date range or a more specific search query.", is_final=True)
+			elif "syntax error" in str(e):
+				self.dataset.update_status("Error during query. Your query syntax may be invalid (check for loose parentheses).", is_final=True)
+			else:
+				self.dataset.update_status(
+					"Error during query. Please try a narrow query and double-check your syntax.", is_final=True)
+				self.log.error("Sphinx crash during query %s: %s" % (self.dataset.key, e))
 			return None
 
 		return results
