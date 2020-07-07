@@ -497,6 +497,14 @@ class SearchReddit(Search):
 			query["min_date"] = after
 			query["max_date"] = before
 
+
+
+		if "*" in query.get("body_match", "") and not user.get_value("reddit.can_query_without_keyword", False):
+			raise QueryParametersException("Wildcard queries are not allowed as they typically return too many results to properly process.")
+
+		if "*" in query.get("board", "") and not user.get_value("reddit.can_query_without_keyword", False):
+			raise QueryParametersException("Wildcards are not allowed for boards as this typically returns too many results to properly process.")
+
 		is_placeholder = re.compile("_proxy$")
 		filtered_query = {}
 		for field in query:
