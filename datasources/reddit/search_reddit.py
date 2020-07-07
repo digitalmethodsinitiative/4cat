@@ -169,9 +169,10 @@ class SearchReddit(Search):
 		# ID chunks are defined: these chunks are used here if available
 		seen_posts = set()
 
-		# only query for individual posts if there is a body keyword
-		# since individual posts don't have subjects
-		do_body_query = bool(query["body_match"].strip()) or not bool(query["subject_match"].strip())
+		# only query for individual posts if no subject keyword is given
+		# since individual posts don't have subjects so if there is a subject
+		# query no results should be returned
+		do_body_query = not bool(query["subject_match"].strip())
 
 		while do_body_query:
 			if self.interrupted:
