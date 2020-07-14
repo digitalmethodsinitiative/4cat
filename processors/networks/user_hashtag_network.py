@@ -65,8 +65,8 @@ class HashtagUserBipartiteGrapher(BasicProcessor):
 				# Convert string of list to actual list
 				tags = post.get("tags", None)
 				if tags:
-					# original format is [tag1,tag2,...,tagn], so ignore brackets
-					tags = [tag.strip() for tag in tags[1:-1].split(",")]
+					# original format is ['tag1', 'tag2', ..., 'tagn'], so ignore brackets and '
+					tags = [tag.strip()[1:-1] for tag in tags[1:-1].split(",")]
 				else:
 					tags = []
 
