@@ -196,7 +196,7 @@ class SearchTelegram(Search):
 		attachment_type = self.get_media_type(message.media)
 		if attachment_type == "contact":
 			attachment = message.contact
-			attachment_data = json.dumps({property: attachment[property] for property in
+			attachment_data = json.dumps({property: getattr(attachment, property) for property in
 										  ("phone_number", "first_name", "last_name", "vcard", "user_id")})
 
 		elif attachment_type == "document":
