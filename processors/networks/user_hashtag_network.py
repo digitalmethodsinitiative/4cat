@@ -63,12 +63,11 @@ class HashtagUserBipartiteGrapher(BasicProcessor):
 
 			elif self.parent.parameters["datasource"] == "tumblr":
 				# Convert string of list to actual list
-				tags = post.get("tags", "").split("', '")
-				# Remove list brackets
-				tags[0] = tags[0][2:]
-				tags[-1] = tags[-1][:-2]
-
-				if not tags:
+				tags = post.get("tags", None)
+				if tags:
+					# original format is [tag1,tag2,...,tagn], so ignore brackets
+					tags = [tag.strip() for tag in tags[1:-1].split(",")]
+				else:
 					tags = []
 
 			# just in case
@@ -81,7 +80,7 @@ class HashtagUserBipartiteGrapher(BasicProcessor):
 			user = post.get("author")
 			if not user:
 				continue
-				
+
 			for tag in tags:
 				# ignore empty tags
 				if not tag:
