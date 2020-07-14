@@ -1,10 +1,12 @@
 """
 4chan Search via Sphinx
 """
+import warnings
 import time
 import re
 
 from pymysql import OperationalError, ProgrammingError, Error
+from pymysql.err import Warning as SphinxWarning
 
 import config
 from backend.lib.database_mysql import MySQLDatabase
@@ -34,6 +36,10 @@ class Search4Chan(Search):
 		"BE", "AT", "HU", "CH", "PT", "LT", "CZ", "EE", "UY", "LV", "SK", "MK", "UA", "IS", "BA", "CY", "GE", "LU",
 		"ME",
 		"AL", "MD", "IM", "EU", "BY", "MC", "AX", "KZ", "AM", "GG", "JE", "MT", "FO", "AZ", "LI", "AD")
+
+	# before running a sphinx query, store it here so it can be cancelled via
+	# request_abort() later
+	running_query = ""
 
 	def get_posts_simple(self, query):
 		"""
@@ -83,16 +89,17 @@ class Search4Chan(Search):
 
 			try:
 				sample_size = int(query.get("sample_size", 5000))
-				sql_query = "SELECT * FROM (" + sql_query +  " ORDER BY RANDOM() LIMIT " + str(int(query.get("random_amount", 0))) + ") AS full_table ORDER BY full_table.timestamp ASC"
-			
+				sql_query = "SELECT * FROM (" + sql_query + " ORDER BY RANDOM() LIMIT " + str(
+					int(query.get("random_amount", 0))) + ") AS full_table ORDER BY full_table.timestamp ASC"
+
 			except ValueError:
 				pass
 
 		elif query.get("search_scope", None) == "match-ids":
-			
+
 			try:
 				query_ids = query.get("valid_ids", None)
-				
+
 				# Parse query IDs
 				if query_ids:
 					query_ids = query_ids.split(",")
@@ -114,7 +121,7 @@ class Search4Chan(Search):
 						return None
 
 					valid_query_ids = "(" + ",".join(valid_query_ids) + ")"
-					sql_query = "SELECT * FROM (" + sql_query +  "AND p.id IN " + valid_query_ids + ") AS full_table ORDER BY full_table.timestamp ASC"
+					sql_query = "SELECT * FROM (" + sql_query + "AND p.id IN " + valid_query_ids + ") AS full_table ORDER BY full_table.timestamp ASC"
 
 				else:
 					self.dataset.update_status("No 4chan post IDs inserted.")
@@ -218,8 +225,8 @@ class Search4Chan(Search):
 				postgres_where.append("country_code = %s")
 				postgres_replacements.append(query.get("country_code"))
 
-		#postgres_where.append("board = %s")
-		#postgres_replacements.append(query.get("board"))
+		# postgres_where.append("board = %s")
+		# postgres_replacements.append(query.get("board"))
 
 		posts_full = self.fetch_posts(tuple([post["post_id"] for post in posts]), postgres_where, postgres_replacements)
 
@@ -244,7 +251,7 @@ class Search4Chan(Search):
 		"""
 
 		# Convert curly quotes
-		string = string.replace("“","\"").replace("”","\"")
+		string = string.replace("“", "\"").replace("”", "\"")
 		# Escape forward slashes
 		string = string.replace("/", "\\/")
 		# Escape @
@@ -300,43 +307,67 @@ class Search4Chan(Search):
 		:return list:  List of matching posts; each post as a dictionary with `thread_id` and `post_id` as keys
 		"""
 
+		# if a Sphinx query is interrupted, pymysql will not actually raise an
+		# exception but just a warning. But we need to detect interruption, so here we
+		# make sure pymysql warnings are converted to exceptions
+		warnings.filterwarnings("error", module=".*pymysql.*")
+
 		sphinx_start = time.time()
-		sphinx = MySQLDatabase(
-			host="localhost",
-			user=config.DB_USER,
-			password=config.DB_PASSWORD,
-			port=9306,
-			logger=self.log
-		)
+		sphinx = self.get_sphinx_handler()
 
 		try:
 			sql = "SELECT thread_id, post_id FROM `" + self.prefix + "_posts` WHERE " + where + " LIMIT 5000000 OPTION max_matches = 5000000, ranker = none, boolean_simplify = 1, sort_method = kbuffer, cutoff = 5000000"
-			print(sql)
-			# sql = "SELECT thread_id, post_id FROM `" + self.prefix + "_posts` WHERE " + where + " LIMIT 5000000 OPTION max_matches = 5000000, ranker = none, boolean_simplify = 1, sort_method = kbuffer, cutoff = 5000000"
-			self.log.info("Running Sphinx query %s " % sql)
-			self.log.info("Parameters: %s " % repr(replacements))
-			results = sphinx.fetchall(sql, replacements)
+			parsed_query = sphinx.mogrify(sql, replacements)
+			self.log.info("Running Sphinx query %s " % parsed_query)
+			self.running_query = parsed_query
+			results = sphinx.fetchall(parsed_query, [])
 			sphinx.close()
-			self.log.info(
-				"Sphinx query finished in %i seconds, %i results." % (time.time() - sphinx_start, len(results)))
-		except OperationalError:
+		except SphinxWarning as e:
+			# this is a pymysql warning converted to an exception
+			if "query was killed" in str(e):
+				self.dataset.update_status("Search was interruped and will restart later")
+				raise ProcessorInterruptedException("Interrupted while running Sphinx query")
+			else:
+				self.dataset.update_status("Error while querying full-text search index", is_final=True)
+				self.log.error("Sphinx warning: %s" % e)
+		except OperationalError as e:
 			self.dataset.update_status(
-				"Your query timed out. This is likely because it matches too many posts. Try again with a narrower date range or a more specific search query.", is_final=True)
+				"Your query timed out. This is likely because it matches too many posts. Try again with a narrower date range or a more specific search query.",
+				is_final=True)
 			self.log.info("Sphinx query timed out after %i seconds" % (time.time() - sphinx_start))
 			return None
 		except ProgrammingError as e:
 			if "invalid packet size" in str(e) or "query timed out" in str(e):
 				self.dataset.update_status(
-					"Error during query. Your query matches too many items. Try again with a narrower date range or a more specific search query.", is_final=True)
+					"Error during query. Your query matches too many items. Try again with a narrower date range or a more specific search query.",
+					is_final=True)
 			elif "syntax error" in str(e):
-				self.dataset.update_status("Error during query. Your query syntax may be invalid (check for loose parentheses).", is_final=True)
+				self.dataset.update_status(
+					"Error during query. Your query syntax may be invalid (check for loose parentheses).",
+					is_final=True)
 			else:
 				self.dataset.update_status(
 					"Error during query. Please try a narrow query and double-check your syntax.", is_final=True)
 				self.log.error("Sphinx crash during query %s: %s" % (self.dataset.key, e))
 			return None
 
+
+		self.log.info("Sphinx query finished in %i seconds, %i results." % (time.time() - sphinx_start, len(results)))
 		return results
+
+	def get_sphinx_handler(self):
+		"""
+		Get a MySQL database object that can be used to interact with Sphinx
+
+		:return MySQLDatabase:
+		"""
+		return MySQLDatabase(
+			host="localhost",
+			user=config.DB_USER,
+			password=config.DB_PASSWORD,
+			port=9306,
+			logger=self.log
+		)
 
 	def get_thread_sizes(self, thread_ids, min_length):
 		"""
@@ -447,3 +478,24 @@ class Search4Chan(Search):
 
 		# if we made it this far, the query can be executed
 		return filtered_query
+
+	def request_abort(self, level=1):
+		"""
+		Request an abort of this worker
+
+		This is implemented in the basic worker class, and that method is
+		called, but this additionally kills any running Sphinx queries because
+		they are blocking, and will prevent the worker from actually stopping
+		unless killed.
+
+		:param int level:  Retry or cancel? Either `self.INTERRUPT_RETRY` or
+		`self.INTERRUPT_CANCEL`.
+		"""
+		super(Search4Chan, self).request_abort(level)
+
+		sphinx = self.get_sphinx_handler()
+		threads = sphinx.fetchall("SHOW THREADS OPTION columns=5000")
+		for thread in threads:
+			if thread["Info"] == self.running_query:
+				self.log.info("Killing Sphinx query %s" % thread["Tid"])
+				sphinx.query("KILL %s" % thread["Tid"])

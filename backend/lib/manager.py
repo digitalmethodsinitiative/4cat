@@ -1,7 +1,6 @@
 """
 The heart of the app - manages jobs and workers
 """
-import importlib
 import signal
 import time
 import sys
@@ -155,17 +154,19 @@ class WorkerManager:
 
 		# cancel all interruptible postgres queries
 		# this needs to be done before we stop looping since after that no new
-		# jobs will be claimed
+		# jobs will be claimed, and needs to be done here because the worker's
+		# own database connection is busy executing the query that it should
+		# cancel! so we can't use it to update the job and make it get claimed
 		for job in self.queue.get_all_jobs("cancel-pg-query", restrict_claimable=False):
 			# this will make all these jobs immediately claimable, i.e. queries
 			# will get cancelled asap
-			self.log.info("Cancelling interruptable Postgres query %s..." % job.data["remote_id"])
+			self.log.debug("Cancelling interruptable Postgres queries for connection %s..." % job.data["remote_id"])
 			job.claim()
 			job.release(delay=0, claim_after=0)
 
 		# wait until all cancel jobs are completed
 		while self.queue.get_all_jobs("cancel-pg-query", restrict_claimable=False):
-			time.sleep(0.1)
+			time.sleep(0.25)
 
 		# now stop looping (i.e. accepting new jobs)
 		self.looping = False
@@ -187,5 +188,3 @@ class WorkerManager:
 			if worker.job.data["id"] == job.data["id"]:
 				worker.request_abort(interrupt_level)
 				return
-
-		# todo: trip cancellable pg queries associated with worker

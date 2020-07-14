@@ -36,6 +36,16 @@ class MySQLDatabase:
 		if self.log is None:
 			raise NotImplementedError
 
+	def mogrify(self, query, replacements):
+		"""
+		Parse a query with replacement variables
+
+		:param str query:  Query
+		:param list replacements:  Replacement variables
+		:return str: Parsed query
+		"""
+		return self.cursor.mogrify(query, replacements)
+
 	def query(self, query, replacements=None):
 		"""
 		Execute a query
@@ -44,7 +54,7 @@ class MySQLDatabase:
 		:param args: Replacement values
 		:return None:
 		"""
-		self.log.debug("Executing query %s" % self.cursor.mogrify(query, replacements))
+		self.log.debug("Executing query %s" % self.mogrify(query, replacements))
 
 		return self.cursor.execute(query, replacements)
 

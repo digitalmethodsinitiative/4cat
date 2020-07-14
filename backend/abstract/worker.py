@@ -38,11 +38,10 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
 	modules = None
 	init_time = 0  # Time this worker was started
 
-	def __init__(self, logger, job, db=None, queue=None, manager=None, modules=None):
+	def __init__(self, logger, job, queue=None, manager=None, modules=None):
 		"""
 		Basic init, just make sure our thread name is meaningful
 
-		:param Database db:  Database connection - if not given, a new one will be created
 		:param JobQueue queue: Job Queue - if not given, a new one will be instantiated
 		:param WorkerManager manager:  Worker manager reference
 		"""
@@ -58,7 +57,8 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
 		# so for workers, all_modules' content is passed as a constructor argument
 		self.all_modules = modules
 
-		self.db = Database(logger=self.log, appname=self.type) if not db else db
+		database_appname = "%s-%s" % (self.type, self.job.data["id"])
+		self.db = Database(logger=self.log, appname=database_appname)
 		self.queue = JobQueue(logger=self.log, database=self.db) if not queue else queue
 
 	def run(self):

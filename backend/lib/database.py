@@ -26,6 +26,7 @@ class Database:
 	cursor = None
 	log = None
 	is_async = False
+	appname=""
 
 	interrupted = False
 	interruptable_timeout = 86400  # if a query takes this long, it should be cancelled. see also fetchall_interruptable()
@@ -49,9 +50,9 @@ class Database:
 		host = config.DB_HOST if not host else host
 		port = config.DB_PORT if not port else port
 
-		appname = "4CAT" if not appname else "4CAT-%s" % appname
+		self.appname = "4CAT" if not appname else "4CAT-%s" % appname
 
-		self.connection = psycopg2.connect(dbname=dbname, user=user, password=password, host=host, port=port, application_name=appname)
+		self.connection = psycopg2.connect(dbname=dbname, user=user, password=password, host=host, port=port, application_name=self.appname)
 		self.cursor = self.connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 		self.log = logger
 
@@ -282,7 +283,7 @@ class Database:
 		"""
 		# schedule a job that will cancel the query we're about to make
 		pid = self.connection.get_backend_pid()
-		self.interruptable_job = queue.add_job("cancel-pg-query", details={}, remote_id=pid, claim_after=time.time() + self.interruptable_timeout)
+		self.interruptable_job = queue.add_job("cancel-pg-query", details={}, remote_id=self.appname, claim_after=time.time() + self.interruptable_timeout)
 
 		# make the query
 		cursor = self.get_cursor()
@@ -292,6 +293,7 @@ class Database:
 			self.query(query, cursor=cursor, *args)
 		except psycopg2.extensions.QueryCanceledError:
 			# interrupted with cancellation worker (or manually)
+			self.log.debug("Query in connection %s was interrupted..." % self.appname)
 			self.rollback()
 			cursor.close()
 			raise DatabaseQueryInterruptedException("Interrupted while querying database")
