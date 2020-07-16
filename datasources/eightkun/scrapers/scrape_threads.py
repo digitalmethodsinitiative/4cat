@@ -15,6 +15,7 @@ class ThreadScraper8kun(ThreadScraper4chan):
 	"""
 	type = "8kun-thread"
 	max_workers = 4
+	log_level="info"
 
 	# for new posts, any fields not in here will be saved in the "unsorted_data" column for that post as part of a
 	# JSONified dict

@@ -22,12 +22,20 @@ class BasicHTTPScraper(BasicWorker, metaclass=abc.ABCMeta):
 	then passed to a processor method for further handling.
 	"""
 
+	log_level = "warning"
+	_logger_method = None
+
 	def __init__(self, job, logger=None, manager=None, modules=None):
 		"""
 		Set up database connection - we need one to store the thread data
 		"""
 		super().__init__(logger=logger, manager=manager, job=job, modules=modules)
 		self.prefix = self.type.split("-")[0]
+
+		if not hasattr(logger, self.log_level):
+			self.log_level = "warning"
+
+		self._logger_method = getattr(logger, self.log_level)
 
 	def work(self):
 		"""
@@ -92,7 +100,7 @@ class BasicHTTPScraper(BasicWorker, metaclass=abc.ABCMeta):
 					self.log.info("Data for %s %s could not be parsed, retrying later" % (self.type, id))
 					self.job.release(delay=random.choice(range(15, 45)))  # try again later
 				else:
-					self.log.warning("Data for %s %s could not be parsed after %i attempts, aborting" % (
+					self._logger_method("Data for %s %s could not be parsed after %i attempts, aborting" % (
 					self.type, id, self.job.data["attempts"]))
 					self.job.finish()
 				return

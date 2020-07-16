@@ -14,6 +14,7 @@ class BoardScraper8kun(BoardScraper4chan):
 	type = "8kun-board"
 	datasource = "8kun"
 	max_workers = 4
+	log_level="info"
 
 	def get_url(self):
 		"""
