@@ -3,6 +3,7 @@ import time
 import json
 
 import config
+from backend.lib.dataset import DataSet
 from backend.abstract.worker import BasicWorker
 
 
@@ -151,7 +152,17 @@ class InternalAPI(BasicWorker):
 		:param payload:  Other data sent with the request
 		:return:  API response
 		"""
-		if request == "workers":
+		if request == "cancel-job":
+			# cancel a running job
+			payload = payload.get("payload", {})
+			remote_id = payload.get("remote_id")
+			jobtype = payload.get("jobtype")
+			level = payload.get("level", BasicWorker.INTERRUPT_RETRY)
+
+			self.manager.request_interrupt(remote_id=remote_id, jobtype=jobtype, interrupt_level=level)
+			return "OK"
+
+		elif request == "workers":
 			# return the number of workers, sorted by type
 			workers = {}
 			for jobtype in self.manager.worker_pool:

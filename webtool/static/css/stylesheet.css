@@ -640,22 +640,25 @@ article section li p, article aside li p {
 }
 
 #query-status.active {
-    animation: scroll-background 2s linear infinite;
-    background: repeating-linear-gradient(
-            90deg,
-            #E9E9E9,
-            #E9E9E9 25px,
-            #FFF 25px,
-            #FFF 350px
-    ) 0 0;
+    animation: scroll-background 2s ease infinite;
+}
+
+#query-status button {
+    margin: 0.5em auto 0 auto;
+    display: block;
+    max-width: 7em;
+    clear: both;
 }
 
 @keyframes scroll-background {
     0% {
-        background-position: 0 0;
+        background:#FFF;
+    }
+    50% {
+        background:#E9E9E9;
     }
     100% {
-        background-position: 350px 0;
+        background:#FFF;
     }
 }
 

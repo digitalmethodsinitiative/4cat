@@ -479,7 +479,7 @@ class Search4Chan(Search):
 		# if we made it this far, the query can be executed
 		return filtered_query
 
-	def request_abort(self, level=1):
+	def request_interrupt(self, level=1):
 		"""
 		Request an abort of this worker
 
@@ -491,7 +491,7 @@ class Search4Chan(Search):
 		:param int level:  Retry or cancel? Either `self.INTERRUPT_RETRY` or
 		`self.INTERRUPT_CANCEL`.
 		"""
-		super(Search4Chan, self).request_abort(level)
+		super(Search4Chan, self).request_interrupt(level)
 
 		sphinx = self.get_sphinx_handler()
 		threads = sphinx.fetchall("SHOW THREADS OPTION columns=5000")

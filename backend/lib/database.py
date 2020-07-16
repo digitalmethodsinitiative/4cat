@@ -269,11 +269,17 @@ class Database:
 		"""
 		Fetch all rows for a query, allowing for interruption
 
-		Requires the database connection to be asynchronous (instantiate with
-		`is_async` = `True`). Before running the query, a job is queued to
-		cancel the query after a set amount of time. Usually the query
-		completes before this timeout. If the backend is interrupted, however,
-		the job can be executed immediately, to cancel the database query.
+		Before running the query, a job is queued to cancel the query after a
+		set amount of time. The query is expected to complete before this
+		timeout. If the backend is interrupted, however, that job will be
+		executed immediately, to cancel the database query. If this happens, a
+		DatabaseQueryInterruptedException will be raised, but the database
+		object will otherwise remain useable.
+
+		Note that in the event that the cancellation job is run, all queries
+		for this instance of the database object will be cancelled. However,
+		there should never be more than one active query per connection within
+		4CAT.
 
 		:param JobQueue queue:  A job queue object, required to schedule the
 		query cancellation job

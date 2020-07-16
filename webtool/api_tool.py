@@ -24,11 +24,12 @@ from werkzeug.utils import secure_filename
 from webtool import app, db, log, openapi, limiter, queue
 from webtool.lib.helpers import get_preview, error
 
-from backend.lib.exceptions import QueryParametersException
+from backend.lib.exceptions import QueryParametersException, JobNotFoundException
 from backend.lib.queue import JobQueue
 from backend.lib.job import Job
 from backend.lib.dataset import DataSet
 from backend.lib.helpers import UserInput, call_api
+from backend.abstract.worker import BasicWorker
 
 api_ratelimit = limiter.shared_limit("3 per second", scope="api")
 
@@ -322,13 +323,13 @@ def delete_dataset(key=None):
 	"""
 	Delete a dataset
 
-	Only available to administrators. Deletes a dataset, as well as any
-	children linked to it, from 4CAT. Calling this on a dataset that is
-	currently being executed is undefined behaviour.
+	Only available to administrators and dataset owners. Deletes a dataset, as
+	well as any children linked to it, from 4CAT. Also tells the backend to stop
+	any jobs dealing with the dataset.
 
-	:request-param str query_key:  ID of the dataset for which to return the status
+	:request-param str key:  ID of the dataset to delete
     :request-param str ?access_token:  Access token; only required if not
-                                       logged in currently.
+    logged in currently.
 
 	:return: A dictionary with a successful `status`.
 
@@ -336,9 +337,6 @@ def delete_dataset(key=None):
 
 	:return-error 404:  If the dataset does not exist.
 	"""
-	if not current_user.is_admin():
-		return error(403, message="Not allowed")
-
 	dataset_key = request.form.get("key", "") if not key else key
 
 	try:
@@ -346,8 +344,31 @@ def delete_dataset(key=None):
 	except TypeError:
 		return error(404, error="Dataset does not exist.")
 
+	if not current_user.is_admin() and not current_user.get_id() == dataset.parameters.get("user"):
+		return error(403, message="Not allowed")
+
+	# if there is an active or queued job for some child dataset, cancel and
+	# delete it
+	children = dataset.get_all_children()
+	for child in children:
+		try:
+			job = Job.get_by_remote_ID(child.key, database=db, jobtype=child.type)
+			call_api("cancel-job", {"remote_id": child.key, "jobtype": dataset.type, "level": BasicWorker.INTERRUPT_CANCEL})
+			job.finish()
+		except JobNotFoundException:
+			pass
+
+	# now cancel and delete the job for this one (if it exists)
+	try:
+		job = Job.get_by_remote_ID(dataset.key, database=db, jobtype=dataset.type)
+		call_api("cancel-job", {"remote_id": dataset.key, "jobtype": dataset.type, "level": BasicWorker.INTERRUPT_CANCEL})
+	except JobNotFoundException:
+		pass
+
+	# and delete the dataset and child datasets
 	dataset.delete()
-	return jsonify({"status": "success"})
+
+	return jsonify({"status": "success", "key": dataset.key})
 
 
 @app.route("/api/check-search-queue/")

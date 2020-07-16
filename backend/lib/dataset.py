@@ -528,6 +528,25 @@ class DataSet:
 		self.genealogy = genealogy
 		return self.genealogy
 
+	def get_all_children(self, recursive=True):
+		"""
+		Get all children of this dataset
+
+		Results are returned as a non-hierarchical list, i.e. the result does
+		not reflect the actual dataset hierarchy (but all datasets in the
+		result will have the original dataset as an ancestor somewhere)
+
+		:return list:  List of DataSets
+		"""
+		children = [DataSet(data=record, db=self.db) for record in self.db.fetchall("SELECT * FROM datasets WHERE key_parent = %s", (self.key,))]
+		results = children.copy()
+		if recursive:
+			for child in children:
+				results += child.get_all_children(recursive)
+
+		return results
+
+
 	def get_breadcrumbs(self):
 		"""
 		Get breadcrumbs navlink for use in permalinks

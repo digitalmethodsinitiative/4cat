@@ -62,6 +62,9 @@ function init() {
     // child of child of child etc interface bits
     $(document).on('click', '.processor-queue-button', processor.queue);
 
+    // dataset deletion
+    $(document).on('click', '.delete-link', processor.delete);
+
     //allow opening given analysis path via anchor links
     navpath = window.location.hash.substr(1);
     if (navpath.substring(0, 4) === 'nav=') {
@@ -212,6 +215,26 @@ processor = {
             $(this).find('.byline').html('Run');
             $(this).find('.fa').removeClass('.fa-cog').addClass('fa-play');
         }
+    },
+
+    delete: function(e) {
+        e.preventDefault();
+
+        if(!confirm('Are you sure? Deleted data cannot be restored.')) {
+            return;
+        }
+
+        $.ajax('/api/delete-query/', {
+            method: 'DELETE',
+            data: {key: $(this).attr('data-key')},
+            success: function(json) {
+                $('li#child-' + json.key).animate({height: 0}, 200, function() { $(this).remove(); });
+                query.enable_form();
+            },
+            error: function(json) {
+                alert('Could not delete dataset: ' + json.status);
+            }
+        });
     }
 };
 
@@ -223,6 +246,9 @@ query = {
      * Enable query form, so settings may be changed
      */
     enable_form: function() {
+        $('#query-status .delete-link').remove();
+        $('#query-status .status_message .dots').html('');
+        $('#query-status .message').html('Waiting for input...');
         $('#query-form fieldset').prop('disabled', false);
         $('#query-status').removeClass('active');
     },
@@ -256,7 +282,7 @@ query = {
         $('html,body').scrollTop(200);
 
         // AJAX the query to the server
-        $('#query-status .message').html('Sending input');
+        $('#query-status .message').html('Sending dataset parameters');
         $.post({
             dataType: "text",
             url: form.attr('action'),
@@ -278,6 +304,8 @@ query = {
                     $('#query-status .message').html('Query submitted, waiting for results');
                     query_key = response;
                     query.check(query_key);
+
+                    $('#query-status').append($('<button class="delete-link" data-key="' + query_key + '">Cancel</button>'));
 
                     // poll results every 2000 ms after submitting
                     poll_interval = setInterval(function () {
@@ -318,7 +346,6 @@ query = {
                     let keyword = json.label;
 
                     $('#query-results').append('<li><a href="/results/' + json.key + '">' + keyword + ' (' + json.rows + ' items)</a></li>');
-                    $('#query-status .status_message .dots').html('');
                     query.enable_form();
                     alert('Query for \'' + keyword + '\' complete!');
                 } else {

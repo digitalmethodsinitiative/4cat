@@ -82,6 +82,10 @@
                     <p role="tooltip" id="tooltip-code-{{ item.key }}" aria-hidden="true">Review the code that generated this result</p>
                 </li>
                 {% endif %}
+                <li>
+                    <a class="property-badge delete-link tooltip-trigger" data-key="{{ item.key }}" aria-controls="tooltip-delete-{{ item.key }}" href="/results/{{ item.key }}/delete"><i class="fa fa-fw fa-times" aria-hidden="true"></i> <span class="sr-only">Delete this analysis</span></a>
+                    <p role="tooltip" id="tooltip-delete-{{ item.key }}" aria-hidden="true">{% if not item.is_finished %}Cancel and d{% else %}D{% endif %}elete this analysis and any underlying analyses</p>
+                </li>
 
                 {% if item.num_rows > 0 and item.type in processors and processors[item.type].extension in ("jpg", "jpeg", "png", "csv", "html") and processors[item.type].can_preview %}
                 <li>

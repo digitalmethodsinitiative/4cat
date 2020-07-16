@@ -42,6 +42,7 @@ class WorkerManager:
 			self.key_poller.start()
 		else:
 			signal.signal(signal.SIGTERM, self.abort)
+			signal.signal(signal.SIGINT, self.request_interrupt)
 
 		self.validate_datasources()
 
@@ -117,7 +118,7 @@ class WorkerManager:
 		for jobtype in self.worker_pool:
 			for worker in self.worker_pool[jobtype]:
 				if hasattr(worker, "request_abort"):
-					worker.request_abort()
+					worker.request_interrupt()
 				else:
 					worker.abort()
 
@@ -171,20 +172,49 @@ class WorkerManager:
 		# now stop looping (i.e. accepting new jobs)
 		self.looping = False
 
-
-	def request_interrupt(self, job, interrupt_level):
+	def request_interrupt(self, interrupt_level, job=None, remote_id=None, jobtype=None):
 		"""
+		Interrupt a job
 
-		:param Job job:
-		:return:
+		This method can be called via e.g. the API, to interrupt a specific
+		job's worker. The worker can be targeted either with a Job object or
+		with a combination of job type and remote ID, since those uniquely
+		identify a job.
+
+		:param int interrupt_level:  Retry later or cancel?
+		:param Job job:  Job object to cancel worker for
+		:param str remote_id:  Remote ID for worker job to cancel
+		:param str jobtype:  Job type for worker job to cancel
 		"""
 
 		# find worker for given job
-		if job.data["jobtype"] not in self.worker_pool:
+		if job:
+			jobtype = job.data["jobtype"]
+
+		if jobtype not in self.worker_pool:
 			# no jobs of this type currently known
 			return
 
-		for worker in self.worker_pool[job.data["jobtype"]]:
-			if worker.job.data["id"] == job.data["id"]:
-				worker.request_abort(interrupt_level)
+		for worker in self.worker_pool[jobtype]:
+			if (job and worker.job.data["id"] == job.data["id"]) or (worker.job.data["jobtype"] == jobtype and worker.job.data["remote_id"] == remote_id):
+				# first cancel any interruptable queries for this job's worker
+				while True:
+					active_queries = self.queue.get_all_jobs("cancel-pg-query", remote_id=worker.db.appname, restrict_claimable=False)
+					if not active_queries:
+						# all cancellation jobs have been run
+						break
+
+					for cancel_job in active_queries:
+						if cancel_job.is_claimed:
+							continue
+
+						# this will make the job be run asap
+						cancel_job.claim()
+						cancel_job.release(delay=0, claim_after=0)
+
+					# give the cancel job a moment to run
+					time.sleep(0.25)
+
+				# now all queries are interrupted, formally request an abort
+				worker.request_interrupt(interrupt_level)
 				return

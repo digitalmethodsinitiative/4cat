@@ -97,7 +97,7 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
 		"""
 		pass
 
-	def request_abort(self, level=1):
+	def request_interrupt(self, level=1):
 		"""
 		Set the 'abort requested' flag
 
@@ -108,6 +108,7 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
 
 		:return:
 		"""
+		self.log.debug("Interrupt requested for worker %s/%s" % (self.job.data["jobtype"], self.job.data["remote_id"]))
 		self.interrupted = level
 
 	@abc.abstractmethod
