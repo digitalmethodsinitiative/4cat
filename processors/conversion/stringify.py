@@ -48,6 +48,9 @@ class Stringify(BasicProcessor):
 		with self.dataset.get_results_path().open("w") as results:
 			for post in self.iterate_csv_items(self.source_file):
 				posts += 1
+				if not post["body"]:
+					continue
+
 				if strip_urls:
 					post["body"] = link_regex.sub("", post["body"])
 				results.write(re.sub(r"\s+", " ", delete_regex.sub(" ", post["body"])).strip() + " ")
