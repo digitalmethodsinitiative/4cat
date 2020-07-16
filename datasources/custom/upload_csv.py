@@ -7,6 +7,8 @@ import csv
 import re
 import io
 
+from dateutil.parser import parse as parse_datetime
+
 from backend.abstract.worker import BasicWorker
 from backend.lib.exceptions import QueryParametersException
 from backend.lib.helpers import get_software_version, strip_tags
@@ -58,7 +60,7 @@ class SearchCustom(BasicWorker):
 		encoding = SearchCustom.sniff_encoding(file)
 
 		wrapped_file = io.TextIOWrapper(file, encoding=encoding)
-		sample = wrapped_file.read(2048)
+		sample = wrapped_file.read(1048576)
 		wrapped_file.seek(0)
 		dialect = csv.Sniffer().sniff(sample)
 
@@ -84,9 +86,9 @@ class SearchCustom(BasicWorker):
 		try:
 			row = reader.__next__()
 			try:
-				datetime.datetime.strptime(row["timestamp"], "%Y-%m-%d %H:%M:%S")
+				parse_datetime(row["timestamp"])
 			except ValueError:
-				raise QueryParametersException("Your 'timestamp' column does not have the required format (YYY-MM-DD hh:mm:ss)")
+				raise QueryParametersException("Your 'timestamp' column does not use a recognisable format (yyyy-mm-dd hh:mm:ss is recommended)")
 		except StopIteration:
 			pass
 
@@ -124,7 +126,7 @@ class SearchCustom(BasicWorker):
 		encoding = SearchCustom.sniff_encoding(file)
 
 		wrapped_file = io.TextIOWrapper(file, encoding=encoding)
-		sample = wrapped_file.read(2048)
+		sample = wrapped_file.read(1048576)
 		wrapped_file.seek(0)
 		dialect = csv.Sniffer().sniff(sample)
 
@@ -132,19 +134,33 @@ class SearchCustom(BasicWorker):
 		reader = csv.DictReader(wrapped_file, dialect=dialect)
 		with dataset.get_results_path().open("w", encoding="utf-8", newline="") as output_csv:
 			# Sort by timestamp
+			# note that this relies on the timestamp format to be sortable
+			# but the alternative - first converting timestamps and then
+			# sorting - would be quite intensive
 			dataset.update_status("Sorting file by date")
 			sorted_reader = sorted(reader, key=lambda row:row["timestamp"] if isinstance(row["timestamp"], str) else "")
 
 			dataset.update_status("Writing to file")
-			writer = csv.DictWriter(output_csv, fieldnames=reader.fieldnames)
+			fieldnames = list(reader.fieldnames)
+			if "unix_timestamp" not in fieldnames:
+				fieldnames.append("unix_timestamp")
+
+			writer = csv.DictWriter(output_csv, fieldnames=fieldnames)
 			writer.writeheader()
 			for row in sorted_reader:
+				try:
+					sanitised_time = parse_datetime(row["timestamp"])
+					row["timestamp"] = sanitised_time.strftime("%Y-%m-%d %H:%I:%S")
+					row["unix_timestamp"] = sanitised_time.timestamp()
+				except (TypeError, ValueError):
+					# bad format, skip
+					continue
+
 				if strip_html:
 					row["body"] = strip_tags(row["body"])
 				writer.writerow(row)
 
 		file.close()
-		wrapped_file.detach()
 
 		with dataset.get_results_path().open(encoding="utf-8") as input:
 			if file.filename.endswith(".tab"):
