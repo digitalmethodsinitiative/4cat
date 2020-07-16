@@ -42,6 +42,8 @@ class SearchTumblr(Search):
 	max_posts_reached = False
 	api_limit_reached = False
 
+	failed_notes = []
+
 	def get_posts_simple(self, query):
 		"""
 		Fetches data from Tumblr via its API.
@@ -94,10 +96,10 @@ class SearchTumblr(Search):
 
 			# Prepare dicts to pass to `get_post_notes`
 			posts_to_fetch = {result["author"]: result["id"] for result in results}
-			
+
 			# First extract the notes of each post, and only keep text reblogs
 			text_reblogs = self.get_post_notes(posts_to_fetch)
-			
+
 			# Get the full data for text reblogs.
 			if text_reblogs:
 				# This has to be done one-by-one - fetching them all together is not supported by the Tumblr API.
@@ -107,7 +109,7 @@ class SearchTumblr(Search):
 						reblog_post = self.get_post_by_id(key, value)
 						reblog_post = self.parse_tumblr_posts([reblog_post], reblog=True)
 						results.append(reblog_post[0])
-		
+
 		self.job.finish()
 		return results
 
@@ -125,7 +127,7 @@ class SearchTumblr(Search):
 
 		if not before:
 			before = int(time.time())
-		
+
 		# Store all posts in here
 		all_posts = []
 
@@ -146,13 +148,13 @@ class SearchTumblr(Search):
 			try:
 				# Use the pytumblr library to make the API call
 				posts = client.tagged(tag, before=before, limit=20, filter="raw")
-				
+
 				#if (before - posts[0]["timestamp"]) > 500000:
 					#self.dataset.update_status("ALERT - DATES LIKELY SKIPPED")
 					#self.dataset.update_status([post["timestamp"] for post in posts])
 
 			except Exception as e:
-				
+
 				self.dataset.update_status("Reached the limit of the Tumblr API. Last timestamp: %s" % str(before))
 				self.api_limit_reached = True
 				break
@@ -163,7 +165,7 @@ class SearchTumblr(Search):
 				before -= 3600 # Decrease by an hour
 				self.dataset.update_status("No posts - querying again but an hour earlier (retry %s/48)" % str(retries))
 				continue
-			
+
 			# Append posts to main list
 			else:
 				posts = self.parse_tumblr_posts(posts)
@@ -182,7 +184,7 @@ class SearchTumblr(Search):
 
 				all_posts += posts
 				retries = 0
-				
+
 				#if (before - posts[len(posts) - 1]["timestamp"]) > 500000:
 					#self.dataset.update_status("ALERT - DATES LIKELY SKIPPED")
 					#self.dataset.update_status([post["timestamp"] for post in posts])
@@ -195,7 +197,7 @@ class SearchTumblr(Search):
 			self.dataset.update_status("Collected %s posts" % str(len(all_posts)))
 
 		return all_posts
-	
+
 	def get_post_notes(self, di_blogs_ids, only_text_reblogs=True):
 		"""
 		Gets the post notes.
@@ -231,13 +233,13 @@ class SearchTumblr(Search):
 
 				# Requests a post's notes
 				notes = client.notes(key, id=value, before_timestamp=before)
-				
+
 				if only_text_reblogs:
 
 					if "notes" in notes:
 						notes_retries = 0
 
-						for note in notes["notes"]:	
+						for note in notes["notes"]:
 							# If it's a reblog, extract the data and save the rest of the posts for later
 							if note["type"] == "reblog":
 								if note.get("added_text"):
@@ -245,18 +247,19 @@ class SearchTumblr(Search):
 
 						if notes.get("_links"):
 							before = notes["_links"]["next"]["query_params"]["before_timestamp"]
-						
+
 						# If there's no `_links` key, that's all.
 						else:
 							break
 
 					# If there's no "notes" key in the returned dict, something might be up
 					else:
-						self.log.error("Couldn't get notes for Tumblr request " + str(notes))
+						self.log.update_status("Couldn't get notes for Tumblr request " + str(notes))
 						notes_retries += 1
 						pass
 
 					if notes_retries > max_notes_retries:
+						self.failed_notes.append(key)
 						break
 
 			self.dataset.update_status("Identified %i text reblogs in %i/%i notes" % (len(text_reblogs), count, len_blogs))
@@ -268,17 +271,17 @@ class SearchTumblr(Search):
 		Fetch individual posts
 		:param blog_name, str: The blog's name
 		:param id, int: The post ID
-		
+
 		returns result list, a list with a dictionary with the post's information
 		"""
 		if self.interrupted:
 			raise ProcessorInterruptedException("Interrupted while fetching post from Tumblr")
 
 		client = self.connect_to_tumblr()
-		
+
 		# Request the specific post.
 		post = client.posts(blog_name, id=post_id)
-	
+
 		# Get the first element of the list - it's always one post.
 		result = post["posts"][0]
 
@@ -287,7 +290,7 @@ class SearchTumblr(Search):
 	def connect_to_tumblr(self):
 		"""
 		Returns a connection to the Tumblr API using the pytumblr library.
-		
+
 		"""
 		client = pytumblr.TumblrRestClient(
 			config.TUMBLR_CONSUMER_KEY,
@@ -418,7 +421,7 @@ class SearchTumblr(Search):
 
 			# Different options for video types (YouTube- or Tumblr-hosted)
 			if post_type == "video":
-				
+
 				video_source = post["video_type"]
 				# Use `get` since some videos are deleted
 				video_url = post.get("permalink_url")
@@ -463,13 +466,13 @@ class SearchTumblr(Search):
 				"notes": post["note_count"],
 				"urls": post.get("link_url"),
 				"images": [photo["original_size"]["url"] for photo in post["photos"]] if post.get("photos") else None,
-				
+
 				# Optional video columns
 				"video_source": video_source if post_type == "video" else None,
 				"video_url": video_url if post_type == "video" else None,
 				"video_id": video_id if post_type == "video" else None,
 				"video_thumb": post.get("thumbnail_url"), # Can be deleted
-				
+
 				# Optional audio columns
 				"audio_type": post.get("audio_type"),
 				"audio_url": post.get("audio_source_url"),
@@ -541,3 +544,13 @@ class SearchTumblr(Search):
 		:return dict:
 		"""
 		pass
+
+	def after_process(self):
+		"""
+		Override of the same function in processor.py
+		Used to notify of potential API errors.
+
+		"""
+		super().after_process()
+		if len(self.failed_notes) > 0:
+			self.dataset.update_status("API error(s) when fetching notes %s" % ", ".join(self.failed_notes))
