@@ -55,20 +55,20 @@ class SearchCustom(BasicWorker):
 		if not file:
 			raise QueryParametersException("No file was offered for upload.")
 
-		wrapped_upload = io.TextIOWrapper(file, encoding="utf-8")
-		
-		# validate file as tab
-		if file.filename.endswith(".tab"):
-			reader = csv.DictReader(wrapped_upload, delimiter="\t", quoting=csv.QUOTE_NONE)
-		
-		# validate file as csv
-		else:
-			reader = csv.DictReader(wrapped_upload)
+		encoding = SearchCustom.sniff_encoding(file)
+
+		wrapped_file = io.TextIOWrapper(file, encoding=encoding)
+		sample = wrapped_file.read(2048)
+		wrapped_file.seek(0)
+		dialect = csv.Sniffer().sniff(sample)
+
+		# With validated csvs, save as is but make sure the raw file is sorted
+		reader = csv.DictReader(wrapped_file, dialect=dialect)
 
 		try:
 			fields = reader.fieldnames
 		except UnicodeDecodeError:
-		 	raise QueryParametersException("Uploaded file is not a well-formed CSV or TAB file.")
+			raise QueryParametersException("Uploaded file is not a well-formed CSV or TAB file.")
 
 		# check if all required fields are present
 		required = ("id", "thread_id", "subject", "author", "body", "timestamp")
@@ -90,7 +90,7 @@ class SearchCustom(BasicWorker):
 		except StopIteration:
 			pass
 
-		wrapped_upload.detach()
+		wrapped_file.detach()
 
 		# Whether to strip the HTML tags
 		strip_html = False
@@ -120,49 +120,31 @@ class SearchCustom(BasicWorker):
 
 		file.seek(0)
 
-		# Convert .tab files to comma delimited files
-		if file.filename.endswith(".tab"):
-			
-			wrapped_upload = io.TextIOWrapper(file, encoding="utf-8")
-			reader = csv.DictReader(wrapped_upload, delimiter="\t", quoting=csv.QUOTE_NONE)
+		# detect encoding - UTF-8 with or without BOM
+		encoding = SearchCustom.sniff_encoding(file)
 
+		wrapped_file = io.TextIOWrapper(file, encoding=encoding)
+		sample = wrapped_file.read(2048)
+		wrapped_file.seek(0)
+		dialect = csv.Sniffer().sniff(sample)
 
-			# Write to csv
-			with dataset.get_results_path().open("w", encoding="utf-8", newline="") as output_csv:
-				writer = csv.DictWriter(output_csv, fieldnames=reader.fieldnames)
-				writer.writeheader()
+		# With validated csvs, save as is but make sure the raw file is sorted
+		reader = csv.DictReader(wrapped_file, dialect=dialect)
+		with dataset.get_results_path().open("w", encoding="utf-8", newline="") as output_csv:
+			# Sort by timestamp
+			dataset.update_status("Sorting file by date")
+			sorted_reader = sorted(reader, key=lambda row:row["timestamp"] if isinstance(row["timestamp"], str) else "")
 
-				# Sort by timestamp
-				dataset.update_status("Sorting file by date")
-				sorted_reader = sorted(reader, key=lambda row:row["timestamp"] if isinstance(row["timestamp"], str) else "")
-
-				dataset.update_status("Writing to file")
-				for row in sorted_reader:
-					if strip_html: # Possibly strip HTML
-						row["body"] = strip_tags(row["body"])
-					writer.writerow(row)
-
-			wrapped_upload.detach()
-
-		else:
-			# With validated csvs, save as is but make sure the raw file is sorted
-			with dataset.get_results_path().open("w", encoding="utf-8", newline="") as output_csv:
-				wrapped_upload = io.TextIOWrapper(file, encoding="utf-8")
-				reader = csv.DictReader(wrapped_upload)
-
-				# Sort by timestamp
-				dataset.update_status("Sorting file by date")
-				sorted_reader = sorted(reader, key=lambda row:row["timestamp"] if isinstance(row["timestamp"], str) else "")
-				
-				dataset.update_status("Writing to file")
-				writer = csv.DictWriter(output_csv, fieldnames=reader.fieldnames)
-				writer.writeheader()
-				for row in sorted_reader:
-					if strip_html:
-						row["body"] = strip_tags(row["body"])
-					writer.writerow(row)
+			dataset.update_status("Writing to file")
+			writer = csv.DictWriter(output_csv, fieldnames=reader.fieldnames)
+			writer.writeheader()
+			for row in sorted_reader:
+				if strip_html:
+					row["body"] = strip_tags(row["body"])
+				writer.writerow(row)
 
 		file.close()
+		wrapped_file.detach()
 
 		with dataset.get_results_path().open(encoding="utf-8") as input:
 			if file.filename.endswith(".tab"):
@@ -174,3 +156,16 @@ class SearchCustom(BasicWorker):
 			dataset.update_status("Result processed")
 
 		dataset.update_version(get_software_version())
+
+	def sniff_encoding(file):
+		"""
+		Determine encoding from raw file bytes
+
+		Currently only distinguishes UTF-8 and UTF-8 with BOM
+
+		:param FileStorage file:
+		:return:
+		"""
+		buffer = file.getbuffer()
+		maybe_bom = buffer[:3].tobytes()
+		return "utf-8-sig" if maybe_bom == b"\xef\xbb\xbf" else "utf-8"
