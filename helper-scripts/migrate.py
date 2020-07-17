@@ -8,8 +8,8 @@ the changes necessary for 4CAT to keep running, e.g. changing the database
 structure.
 
 This script runs those migration scripts, as needed, based on the current and
-target version of 4CAT. Note that it does currently NOT actually download the
-new 4CAT version from Github. This could be a future addition.
+target version of 4CAT. It optionally also pulls the latest version of 4CAT
+from Github.
 """
 import subprocess
 import argparse
@@ -29,6 +29,8 @@ def make_version_comparable(version):
 
 cli = argparse.ArgumentParser()
 cli.add_argument("--yes", "-y", default=False, action="store_true", help="Answer 'yes' to all prompts")
+cli.add_argument("--pull", "-p", default=False, action="store_true", help="Pull and check out the latest 4CAT version from Github before migrating")
+cli.add_argument("--repository", "-r", default="https://github.com/digitalmethodsinitiative/4cat.git", help="URL of the repository to pull from")
 args = cli.parse_args()
 
 print("")
@@ -41,6 +43,27 @@ if not Path(os.getcwd()).joinpath("config.py").exists():
 	print("Create a configuration file before continuing. An example is found in:")
 	print("  config.py-example.")
 	exit(1)
+
+# ---------------------------------------------
+#   Pull latest version of 4CAT from git repo
+# ---------------------------------------------
+if args.pull:
+	print("Pulling latest commit from git repository %s..." % args.repository)
+	command = "git pull %s master" % args.repository
+	result = subprocess.run(command.split(" "), stdout=subprocess.PIPE,
+						stderr=subprocess.PIPE)
+
+	if result.returncode != 0:
+		print("Error while pulling latest version with git. Check that the repository URL is correct.")
+		print(result.stderr.decode("ascii"))
+		exit(1)
+
+	if "Already up to date" in str(result.stdout):
+		print("Latest version is already checked out.")
+	else:
+		print(result.stdout.decode("ascii"))
+
+	print("...done\n")
 
 # ---------------------------------------------
 #     Determine current and target versions
@@ -77,7 +100,7 @@ print("Current 4CAT version: %s" % current_version)
 print("Checked out version: %s" % target_version)
 
 if current_version == target_version:
-	print("Already up-to-date.\n")
+	print("Already up to date.\n")
 	exit(0)
 
 if current_version_c[0:3] != target_version_c[0:3]:
