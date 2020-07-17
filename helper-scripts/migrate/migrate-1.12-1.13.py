@@ -15,7 +15,7 @@ for datasource in ("8kun", "8chan"):
 		print("found!")
 	except psycopg2.ProgrammingError:
 		print("not available, nothing to upgrade!")
-		exit(0)
+		continue
 
 	print("  Checking if required columns exist... ", end="")
 	columns = [row["column_name"] for row in db.fetchall("SELECT column_name FROM information_schema.columns WHERE table_name = %s", ("posts_%s" % datasource,))]
