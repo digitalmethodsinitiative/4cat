@@ -18,6 +18,7 @@ DATASOURCES = {
 	"4chan": {  # should correspond to DATASOURCE in the data source's __init__.py
 		"interval": 60,  # scrape interval for boards
 		"boards": ["pol", "v"], # boards to scrape (and generally make available)
+        "autoscrape": True  # automatically start scraping when 4CAT is started
 	}
 }
 ```
@@ -39,7 +40,7 @@ scraping it yourself, two helper scripts are included in `/helper-scripts`:
 
 * `scrape_fuuka.py` can be used to scrape posts from any FoolFuuka-based 4chan
   archive. The resulting JSON files can then be imported into the database with
-  `queue_folder.py`.
+  `import_json_folder`.
 * `import_4plebs.py` can be used to import a data dump from 
   [4plebs](http://4plebs.org), a 4chan archive that publishes semi-annual data
   dumps for a number of large boards. 

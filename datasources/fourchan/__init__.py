@@ -32,7 +32,9 @@ def init_datasource(database, logger, queue, name):
 	:param string name:  ID of datasource that is being initialised
 	"""
 	interval = config.DATASOURCES[name]["interval"]
-	for board in config.DATASOURCES[name]["boards"]:
-		queue.add_job("4chan-board", {}, board, 0, interval)
+
+	if config.DATASOURCES[name].get("autoscrape", False):
+		for board in config.DATASOURCES[name]["boards"]:
+			queue.add_job(name + "-board", {}, board, 0, interval)
 
 	base_init_datasource(database, logger, queue, name)

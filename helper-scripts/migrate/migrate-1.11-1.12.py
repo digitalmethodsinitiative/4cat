@@ -13,8 +13,16 @@ if not version or version.returncode != 0:
 	print("  - Chromedriver is installed")
 	print("  - The binary can be called as 'chromedriver'")
 	print("  - The folder where the binary is located has been added to PATH")
-	print("\n  You can download chromedriver at https://sites.google.com/a/chromium.org/chromedriver/downloads")
-	exit(1)
+	print("  You can download chromedriver at:\n    https://sites.google.com/a/chromium.org/chromedriver/downloads")
+	print("  Chromedriver is required for the TikTok data source. If you do not install it now,")
+	print("  later versions of 4CAT may not work, and you cannot enable the TikTok data source.")
+	print("  Do you want to continue without installing chromedriver? [y/n]", end="")
+	if input("").lower() != "y":
+		print()
+		exit(0)
+	else:
+		print("\n  Install chromedriver and run this script again.")
+		exit(1)
 else:
 	chromedriver_version_str = version.stdout.decode("utf-8").split(" ")[1]
 	chromedriver_version_maj = int(chromedriver_version_str.split(".")[0])
