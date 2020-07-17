@@ -16,15 +16,15 @@ class HashtagUserBipartiteGrapher(BasicProcessor):
 	"""
 	Generate bipartite user-hashtag graph of posts
 	"""
-	type = "bipartite-user-hashtag-network"  # job type ID
+	type = "bipartite-user-tag-network"  # job type ID
 	category = "Networks"  # category
-	title = "Bipartite Author-Hashtag Network"  # title displayed in UI
-	description = "Produces a bipartite graph based on co-occurence of hashtags and people. If someone wrote a post with a certain hashtag, there will be a link between that person and the hashtag. The more often they appear together, the stronger the link."  # description displayed in UI
+	title = "Bipartite Author-tag Network"  # title displayed in UI
+	description = "Produces a bipartite graph based on co-occurence of (hash)tags and people. If someone wrote a post with a certain tag, there will be a link between that person and the tag. The more often they appear together, the stronger the link."  # description displayed in UI
 	extension = "gdf"  # extension of result file, used internally and in UI
 
-	datasources = ["instagram", "tumblr", "tiktok"]
+	datasources = ["instagram", "tumblr", "tiktok", "usenet"]
 
-	input = "csv:tags|hashtags"
+	input = "csv:tags|hashtags|groups"
 	output = "gdf"
 
 	options = {
@@ -69,6 +69,12 @@ class HashtagUserBipartiteGrapher(BasicProcessor):
 					tags = [tag.strip()[1:-1] for tag in tags[1:-1].split(",")]
 				else:
 					tags = []
+
+			elif self.parent.parameters["datasource"] == "usenet":
+				if not post.get("groups"):
+					continue
+
+				tags = post.get("groups", "").split(",")
 
 			# just in case
 			tags = [tag.strip().replace(",", "").replace("\"", "'") for tag in tags]

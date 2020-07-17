@@ -23,9 +23,9 @@ class CoTagger(BasicProcessor):
 				  "weighted by the frequency of the tag."  # description displayed in UI
 	extension = "gdf"  # extension of result file, used internally and in UI
 
-	datasources = ["instagram", "tumblr", "tiktok"]
+	datasources = ["instagram", "tumblr", "tiktok", "usenet"]
 
-	input = "csv:tags|hashtags"
+	input = "csv:tags|hashtags|groups"
 	output = "gdf"
 
 	options = {
@@ -75,6 +75,11 @@ class CoTagger(BasicProcessor):
 				
 				if not tags:
 					tags = []
+			elif self.parent.parameters["datasource"] == "usenet":
+				if not post.get("groups"):
+					continue
+
+				tags = post.get("groups", "").split(",")
 
 			# just in case
 			tags = [tag.strip().replace(",","").replace("\"","'") for tag in tags]

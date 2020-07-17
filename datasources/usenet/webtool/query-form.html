@@ -1,0 +1,78 @@
+<p class="form-intro">Results are limited to 5 million rows. Be sure to read the <a href="/page/query-syntax/">query
+    syntax for local data sources</a> first - your query design will significantly impact the results. Note that large
+    queries can take up to 30 minutes to complete.</p>
+
+{% if current_user.is_admin() or current_user.get_value("usenet.can_query_without_keyword", False) %}
+<p class="warning form-intro">The requirement for searching by keyword has been lifted for your account; you can search by date
+    range only. This can potentially return hundreds of millions of posts, so <strong>please be careful</strong> when
+    using this privilege.</p>
+{% endif %}
+
+
+<fieldset class="basic-options">
+    <div class="form-element">
+        <label for="body-input">Post body:</label>
+        <div>
+            <input name="body_match" id="body-input" type="text">
+        </div>
+    </div>
+
+    <div class="form-element">
+        <label for="subject-input">Post subject:</label>
+        <div>
+            <input name="subject_match" id="subject-input" type="text">
+        </div>
+    </div>
+
+    <p class="form-intro">You can enter multiple newsgroups, separate with commas. Trailing wildcards can be used to
+    select all posts in a given hierarchy (e.g. <code>alt.fan.*</code>).</p>
+
+    <div class="form-element">
+        <label for="group-input">Newsgroup(s):</label>
+        <div>
+            <input name="group_match" id="group-input" type="text">
+        </div>
+    </div>
+</fieldset>
+
+<fieldset class="date-options">
+    <div class="form-element">
+        <label>Date range:</label>
+        <div class="filter-parameters">
+            <input name="min_date_proxy" id="input-min-time" class="input-time" type="date"
+                   placeholder="dd-mm-yyyy"> to
+            <input name="max_date_proxy" id="input-max-time" class="input-time" type="date"
+                   placeholder="dd-mm-yyyy"> <span class="red"></span>
+
+            <input name="min_date" type="hidden" value="0">
+            <input name="max_date" type="hidden" value="0">
+        </div>
+    </div>
+</fieldset>
+
+<fieldset class="thread-options">
+    <div class="form-element">
+        <label for="search-scope">Search scope:</label>
+        <div>
+            <select name="search_scope" id="search-scope">
+                <option value="posts-only" selected>All matching posts</option>
+                <option value="full-threads">All posts in threads with matching posts (full threads)</option>
+                <option value="dense-threads">All posts in threads in which at least x% of posts match (dense threads)</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="form-element dense-element">
+        <label for="scope-density">Density:</label>
+        <div>
+            At least <input name="scope_density" id="scope-density" class="input-number" value="15">% of posts in thread must match
+        </div>
+    </div>
+
+    <div class="form-element dense-element">
+        <label for="scope-length">Length:</label>
+        <div>
+            Threads must contain at least <input name="scope_length" id="scope-length" class="input-number" value="15"> posts
+        </div>
+    </div>
+</fieldset>
