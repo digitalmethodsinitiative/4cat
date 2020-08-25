@@ -26,7 +26,7 @@ class FlowChart(BasicProcessor):
 	description = "Create a flow chart of elements over time."  # description displayed in UI
 	extension = "html"  # extension of result file, used internally and in UI
 
-	accepts = ["vector-ranker", "preset-neologisms", "tfidf", "collocations"]  # query types this post-processor accepts as input
+	accepts = ["vector-ranker", "preset-neologisms", "tfidf", "collocations", "similar-word2vec"]  # query types this post-processor accepts as input
 
 	input = "csv:text,date,value"
 	output = "html"

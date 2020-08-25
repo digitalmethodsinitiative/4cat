@@ -1,10 +1,8 @@
 """
-Generate interval-based Word2Vec models for sentences
+Find similar words based on word2vec modeling
 """
-import datetime
 import zipfile
 import shutil
-import json
 
 from gensim.models import Word2Vec
 
@@ -20,7 +18,7 @@ __email__ = "4cat@oilab.eu"
 
 class SimilarWord2VecWords(BasicProcessor):
 	"""
-	Generate Word2Vec models
+	Find similar words based on word2vec modeling
 	"""
 	type = "similar-word2vec"  # job type ID
 	category = "Text analysis"  # category
@@ -58,8 +56,8 @@ class SimilarWord2VecWords(BasicProcessor):
 
 	def process(self):
 		"""
-		This takes a 4CAT results file as input, and outputs a number of files containing
-		tokenised posts, grouped per time unit as specified in the parameters.
+		This takes previously generated Word2Vec models and uses them to find
+		similar words based on a list of words
 		"""
 		self.dataset.update_status("Processing sentences")
 
