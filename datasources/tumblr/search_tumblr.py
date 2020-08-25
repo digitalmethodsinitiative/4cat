@@ -63,11 +63,19 @@ class SearchTumblr(Search):
 		after = parameters.get("after", None)
 		before = parameters.get("before", None)
 
-		if scope == "tag":
-			# for each tag, get post
-			for query in queries:
+		# for each tag or blog, get post
+		for query in queries:
 
-				new_results = self.get_posts_by_tag(query, before=before, after=after)
+				# Get posts per tag
+				if scope == "tag":
+					new_results = self.get_posts_by_tag(query, before=before, after=after)
+				# Get posts per blog
+				elif scope == "blog":
+					new_results = self.get_posts_by_blog(query, before=before, after=after)
+				else:
+					self.dataset.update_status("Invalid scope")
+					break
+
 				results += new_results
 
 				if self.max_posts_reached:
@@ -75,19 +83,6 @@ class SearchTumblr(Search):
 					break
 				if self.api_limit_reached:
 					self.dataset.update_status("API limit reached")
-					break
-
-		elif scope == "blog":
-			# for each blog, get its posts
-			for query in queries:
-				new_results = self.get_posts_by_blog(query, before=before, after=after)
-				results += new_results
-
-				if self.max_posts_reached:
-					self.update_status("Max posts exceeded")
-					break
-				if self.api_limit_reached:
-					self.update_status("API limit reached")
 					break
 
 		# If we also want the posts that reblogged the fetched posts:
@@ -102,6 +97,7 @@ class SearchTumblr(Search):
 
 			# Get the full data for text reblogs.
 			if text_reblogs:
+
 				# This has to be done one-by-one - fetching them all together is not supported by the Tumblr API.
 				for i, text_reblog in enumerate(text_reblogs):
 					self.dataset.update_status("Got %i/%i text reblogs" % (i, len(text_reblogs)))
@@ -148,6 +144,94 @@ class SearchTumblr(Search):
 			try:
 				# Use the pytumblr library to make the API call
 				posts = client.tagged(tag, before=before, limit=20, filter="raw")
+
+				#if (before - posts[0]["timestamp"]) > 500000:
+					#self.dataset.update_status("ALERT - DATES LIKELY SKIPPED")
+					#self.dataset.update_status([post["timestamp"] for post in posts])
+
+			except Exception as e:
+
+				self.dataset.update_status("Reached the limit of the Tumblr API. Last timestamp: %s" % str(before))
+				self.api_limit_reached = True
+				break
+
+			# Make sure the Tumblr API doesn't magically stop at an earlier date
+			if not posts or isinstance(posts, str):
+				retries += 1
+				before -= 3600 # Decrease by an hour
+				self.dataset.update_status("No posts - querying again but an hour earlier (retry %s/48)" % str(retries))
+				continue
+
+			# Append posts to main list
+			else:
+				posts = self.parse_tumblr_posts(posts)
+
+				before = posts[len(posts) - 1]["timestamp"]
+
+				# manually check if we've reached the `after` already (not natively supported by Tumblr)
+				if after:
+					if before <= after:
+						# Get rid of all the posts that are earlier than the before timestamp
+						posts = [post for post in posts if post["timestamp"] > after]
+
+						if posts:
+							all_posts += posts
+						break
+
+				all_posts += posts
+				retries = 0
+
+				#if (before - posts[len(posts) - 1]["timestamp"]) > 500000:
+					#self.dataset.update_status("ALERT - DATES LIKELY SKIPPED")
+					#self.dataset.update_status([post["timestamp"] for post in posts])
+
+
+			if len(all_posts) >= self.max_posts:
+				self.max_posts_reached = True
+				break
+
+			self.dataset.update_status("Collected %s posts" % str(len(all_posts)))
+
+		return all_posts
+
+	def get_posts_by_blog(self, blog, before=None, after=None):
+		"""
+		Get Tumblr posts posts with a certain blog
+		:param tag, str: the name of the blog you want to look for
+		:param after: a unix timestamp, indicates posts should be after this date.
+	    :param before: a unix timestamp, indicates posts should be before this date.
+
+	    :returns: a dict created from the JSON response
+		"""
+
+		blog = blog + ".tumblr.com"
+		print(blog)
+		client = self.connect_to_tumblr()
+
+		if not before:
+			before = int(time.time())
+
+		# Store all posts in here
+		all_posts = []
+
+		# Some retries to make sure the Tumblr API actually returns everything
+		retries = 0
+		max_retries = 48 # 2 days
+
+		# Get Tumblr posts until there's no more left.
+		while True:
+			if self.interrupted:
+				raise ProcessorInterruptedException("Interrupted while fetching blog posts from Tumblr")
+
+			# Stop after 20 retries
+			if retries >= max_retries:
+				self.dataset.update_status("No more posts")
+				break
+
+			try:
+				# Use the pytumblr library to make the API call
+				posts = client.posts(blog, before=before, limit=20, reblog_info=True, notes_info=True, filter="raw")
+				posts = posts["posts"]
 
 				#if (before - posts[0]["timestamp"]) > 500000:
 					#self.dataset.update_status("ALERT - DATES LIKELY SKIPPED")
