@@ -41,7 +41,7 @@ libraries = [
 	"gensim==3.8.1",
 	"psutil==5.6.6",
 	"numpy==1.15.2",
-	"Pillow==6.2.2",
+	"Pillow==7.1.0",
 	"bcrypt==3.1.4",
 	"scipy==1.1.0",
 	"Flask==1.1.0",
