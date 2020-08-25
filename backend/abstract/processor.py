@@ -38,9 +38,6 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 	options = {}  # configurable options for this processor
 	parameters = {}  # values for the processor's configurable options
 
-	# Tumblr posts can overflow the regular limit, so double this.
-	csv.field_size_limit(131072 * 2)
-
 	def work(self):
 		"""
 		Process a dataset
