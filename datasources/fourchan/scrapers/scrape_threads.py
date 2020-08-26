@@ -133,6 +133,7 @@ class ThreadScraper4chan(BasicJSONScraper):
 				new_posts += 1
 
 		# update thread data
+		self.db.commit()
 		self.update_thread(thread, first_post, last_reply, last_post, thread["num_replies"] + new_posts)
 
 		# save to database

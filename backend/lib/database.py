@@ -25,7 +25,6 @@ class Database:
 	"""
 	cursor = None
 	log = None
-	is_async = False
 	appname=""
 
 	interrupted = False
@@ -94,7 +93,7 @@ class Database:
 
 		cursor.close()
 
-	def execute_many(self, query, replacements=None):
+	def execute_many(self, query, commit=True, replacements=None):
 		"""
 		Execute a query multiple times, each time with different values
 
@@ -103,10 +102,13 @@ class Database:
 
 		:param string query:  Query
 		:param replacements: A list of replacement values
+		:param commit:  Commit transaction after query?
 		"""
 		cursor = self.get_cursor()
 		execute_values(cursor, query, replacements)
 		cursor.close()
+		if commit:
+			self.commit()
 
 	def update(self, table, data, where=None, commit=True):
 		"""
@@ -223,12 +225,13 @@ class Database:
 		cursor.close()
 		return result
 
-	def fetchall(self, query, *args):
+	def fetchall(self, query, commit=True, *args):
 		"""
 		Fetch all rows for a query
 
 		:param string query:  Query
 		:param args: Replacement values
+		:param commit:  Commit transaction after query?
 		:return list: The result rows, as a list
 		"""
 		cursor = self.get_cursor()
@@ -241,14 +244,18 @@ class Database:
 			result = []
 
 		cursor.close()
+		if commit:
+			self.commit()
+
 		return result
 
-	def fetchone(self, query, *args):
+	def fetchone(self, query, commit=True, *args):
 		"""
 		Fetch one result row
 
 		:param string query: Query
 		:param args: Replacement values
+		:param commit:  Commit transaction after query?
 		:return: The row, as a dictionary, or None if there were no rows
 		"""
 		cursor = self.get_cursor()
@@ -258,14 +265,16 @@ class Database:
 			result = cursor.fetchone()
 		except psycopg2.ProgrammingError as e:
 			# no results to fetch
-			if not self.is_async:
-				self.commit()
+			self.rollback()
 			result = None
 
 		cursor.close()
+		if commit:
+			self.commit()
+
 		return result
 
-	def fetchall_interruptable(self, queue, query, *args):
+	def fetchall_interruptable(self, queue, query, commit=True, *args):
 		"""
 		Fetch all rows for a query, allowing for interruption
 
@@ -285,6 +294,7 @@ class Database:
 		query cancellation job
 		:param str query:  SQL query
 		:param list args:  Replacement variables
+		:param commit:  Commit transaction after query?
 		:return list:  A list of rows, as dictionaries
 		"""
 		# schedule a job that will cancel the query we're about to make
@@ -315,6 +325,9 @@ class Database:
 		self.interruptable_job = None
 
 		cursor.close()
+		if commit:
+			self.commit()
+
 		return result
 
 
