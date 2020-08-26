@@ -225,7 +225,7 @@ class Database:
 		cursor.close()
 		return result
 
-	def fetchall(self, query, commit=True, *args):
+	def fetchall(self, query, *args):
 		"""
 		Fetch all rows for a query
 
@@ -244,12 +244,11 @@ class Database:
 			result = []
 
 		cursor.close()
-		if commit:
-			self.commit()
+		self.commit()
 
 		return result
 
-	def fetchone(self, query, commit=True, *args):
+	def fetchone(self, query, *args):
 		"""
 		Fetch one result row
 
@@ -269,12 +268,11 @@ class Database:
 			result = None
 
 		cursor.close()
-		if commit:
-			self.commit()
+		self.commit()
 
 		return result
 
-	def fetchall_interruptable(self, queue, query, commit=True, *args):
+	def fetchall_interruptable(self, queue, query, *args):
 		"""
 		Fetch all rows for a query, allowing for interruption
 
@@ -325,8 +323,7 @@ class Database:
 		self.interruptable_job = None
 
 		cursor.close()
-		if commit:
-			self.commit()
+		self.commit()
 
 		return result
 
