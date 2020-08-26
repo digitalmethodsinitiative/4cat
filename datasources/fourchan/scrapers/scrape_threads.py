@@ -105,15 +105,23 @@ class ThreadScraper4chan(BasicJSONScraper):
 			self.db.update("threads_" + self.prefix, where={"id": thread_db_id}, data={"timestamp_deleted": 0})
 
 		# create a dict mapped as `post id`: `post data` for easier comparisons with existing data
+		known_posts = self.db.fetchall("SELECT id, timestamp_deleted FROM posts_" + self.prefix + " WHERE thread_id = %s ORDER BY id ASC",
+										 (thread_db_id,))
 		post_dict_scrape = {str(post["no"]): post for post in data["posts"] if "no" in post}
-		post_dict_db = {str(post["id"]): post for post in
-						self.db.fetchall("SELECT * FROM posts_" + self.prefix + " WHERE thread_id = %s AND timestamp_deleted = 0 ORDER BY id ASC",
-										 (thread_db_id,))}
+		post_dict_db = {str(post["id"]): post for post in known_posts}
+		post_visible_db = {str(post["id"]): post for post in known_posts if int(post["timestamp_deleted"]) == 0}
+		post_deleted_db = {str(post["id"]): post for post in known_posts if int(post["timestamp_deleted"]) != 0}
 
 		# mark deleted posts as such
-		deleted = set(post_dict_db.keys()) - set(post_dict_scrape.keys())
+		deleted = set(post_visible_db.keys()) - set(post_dict_scrape.keys())
 		for post_id in deleted:
 			self.db.update("posts_" + self.prefix, where={"id": post_id, "board": self.job.details["board"]}, data={"timestamp_deleted": self.init_time}, commit=False)
+		self.db.commit()
+
+		# mark *undeleted* posts as such
+		undeleted = set(post_deleted_db.keys()) - set(post_dict_scrape.keys())
+		for post_id in undeleted:
+			self.db.update("posts_" + self.prefix, where={"id": post_id, "board": self.job.details["board"]}, data={"timestamp_deleted": 0}, commit=False)
 		self.db.commit()
 
 		# add new posts
@@ -128,8 +136,8 @@ class ThreadScraper4chan(BasicJSONScraper):
 		self.update_thread(thread, first_post, last_reply, last_post, thread["num_replies"] + new_posts)
 
 		# save to database
-		self.log.info("Updating %s/%s/%s, new: %s, old: %s, deleted: %s" % (
-			self.datasource, self.job.details["board"], first_post["no"], new_posts, len(post_dict_db), len(deleted)))
+		self.log.info("Updating %s/%s/%s, new: %s, old: %s, deleted: %s, undeleted: %s" % (
+			self.datasource, self.job.details["board"], first_post["no"], new_posts, len(post_dict_db), len(deleted), len(undeleted)))
 		self.db.commit()
 
 		# return the amount of new posts
