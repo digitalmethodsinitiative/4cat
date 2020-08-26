@@ -119,7 +119,7 @@ class ThreadScraper4chan(BasicJSONScraper):
 		self.db.commit()
 
 		# mark *undeleted* posts as such
-		undeleted = set(post_deleted_db.keys()) - set(post_dict_scrape.keys())
+		undeleted = set(post_deleted_db.keys()).intersection(set(post_dict_scrape.keys()))
 		for post_id in undeleted:
 			self.db.update("posts_" + self.prefix, where={"id": post_id, "board": self.job.details["board"]}, data={"timestamp_deleted": 0}, commit=False)
 		self.db.commit()
