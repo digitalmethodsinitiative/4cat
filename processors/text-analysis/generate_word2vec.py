@@ -1,8 +1,6 @@
 """
 Generate interval-based Word2Vec models for sentences
 """
-import zipfile
-import shutil
 import pickle
 import json
 
@@ -93,59 +91,32 @@ class GenerateWord2Vec(BasicProcessor):
 		min_count = max(1, convert_to_int(self.parameters.get("min_count"), self.options["min_count"]["default"]))
 		dimensionality = convert_to_int(self.parameters.get("dimensionality"), 100)
 
-		# prepare staging area
-		temp_path = self.dataset.get_temporary_path()
-		temp_path.mkdir()
+		staging_area = self.dataset.get_staging_area()
 
 		# go through all archived token sets and vectorise them
 		models = 0
-		with zipfile.ZipFile(self.source_file, "r") as token_archive:
-			token_sets = token_archive.namelist()
+		for temp_file in self.iterate_archive_contents(self.source_file):
+			# use the "list of lists" as input for the word2vec model
+			# by default the tokeniser generates one list of tokens per
+			# post... which may actually be preferable for short
+			# 4chan-style posts. But alternatively it could generate one
+			# list per sentence - this processor is agnostic in that regard
+			token_set_name = temp_file.name
+			self.dataset.update_status("Extracting common phrases from token set %s..." % token_set_name)
+			bigram_transformer = Phrases(self.tokens_from_file(temp_file))
 
-			# create one model file per token file
-			for token_set in token_sets:
-				if self.interrupted:
-					raise ProcessorInterruptedException("Interrupted while processing token sets")
+			self.dataset.update_status("Training Word2vec model for token set %s..." % token_set_name)
+			model = Word2Vec(bigram_transformer[self.tokens_from_file(temp_file)], negative=use_negative, size=dimensionality, sg=use_skipgram, window=window, workers=3, min_count=min_count)
 
-				# the model file's name will be based on the token set name,
-				# i.e. 2020-08-01.json becomes 2020-08-01.model
-				token_set_name = token_set.split("/")[-1]
-
-				# temporarily extract file (we cannot use ZipFile.open() as it doesn't support binary modes)
-				temp_file = temp_path.joinpath(token_set_name)
-				token_archive.extract(token_set_name, temp_path)
-
-				# use the "list of lists" as input for the word2vec model
-				# by default the tokeniser generates one list of tokens per
-				# post... which may actually be preferable for short
-				# 4chan-style posts. But alternatively it could generate one
-				# list per sentence - this processor is agnostic in that regard
-				self.dataset.update_status("Extracting common phrases from token set %s..." % token_set_name)
-				bigram_transformer = Phrases(self.tokens_from_file(temp_file))
-
-				self.dataset.update_status("Training Word2vec model for token set %s..." % token_set_name)
-				model = Word2Vec(bigram_transformer[self.tokens_from_file(temp_file)], negative=use_negative, size=dimensionality, sg=use_skipgram, window=window, workers=3, min_count=min_count)
-
-				# save - we only save the KeyedVectors for the model, this
-				# saves space and we don't need to re-train the model later
-				model_name = token_set_name.split(".")[0] + ".model"
-				model.wv.save(str(temp_path.joinpath(model_name)))
-				del model
-				models += 1
-
-				temp_file.unlink()
+			# save - we only save the KeyedVectors for the model, this
+			# saves space and we don't need to re-train the model later
+			model_name = token_set_name.split(".")[0] + ".model"
+			model.wv.save(str(staging_area.joinpath(model_name)))
+			del model
+			models += 1
 
 		# create another archive with all model files in it
-		with zipfile.ZipFile(self.dataset.get_results_path(), "w") as zip:
-			for output_path in temp_path.glob("*.model"):
-				zip.write(output_path, output_path.name)
-				output_path.unlink()
-
-		# delete temporary folder
-		shutil.rmtree(temp_path)
-
-		self.dataset.update_status("Finished")
-		self.dataset.finish(models)
+		self.write_archive_and_finish(staging_area)
 
 	def tokens_from_file(self, file):
 		"""

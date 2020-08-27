@@ -102,7 +102,7 @@ class ImageWallGenerator(BasicProcessor):
 
 
 		# prepare staging area
-		tmp_path = self.dataset.get_temporary_path()
+		tmp_path = self.dataset.get_staging_area()
 		tmp_path.mkdir()
 
 		with open(self.source_file) as source:

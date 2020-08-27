@@ -1,14 +1,11 @@
 """
 Rank top vernacular in tokens
 """
-import zipfile
 import pickle
-import shutil
 import csv
 import json
 
 from backend.lib.helpers import UserInput, convert_to_int
-from backend.lib.exceptions import ProcessorInterruptedException
 from backend.abstract.processor import BasicProcessor
 
 __author__ = "Stijn Peeters"
@@ -50,16 +47,7 @@ class VectorRanker(BasicProcessor):
 		"""
 		Reads vector set and creates a CSV with ranked vectors
 		"""
-
-		# prepare staging area
-		results_path = self.dataset.get_temporary_path()
-		results_path.mkdir()
-
 		self.dataset.update_status("Processing token sets")
-		vector_paths = []
-
-		# go through all archived token sets and vectorise them
-		results = []
 
 		def file_to_timestamp(file):
 			"""
@@ -86,48 +74,38 @@ class VectorRanker(BasicProcessor):
 
 		# now rank the vectors by most prevalent per "file" (i.e. interval)
 		overall_top = {}
-		with zipfile.ZipFile(self.source_file, "r") as token_archive:
-			vector_sets = sorted(token_archive.namelist(), key=file_to_timestamp)
-			index = 0
+		index = 0
+		for vector_file in self.iterate_archive_contents(self.source_file):
+			# we support both pickle and json dumps of vectors
+			vector_unpacker = pickle if vector_file.suffix == "pb" else json
 
-			for vector_set in vector_sets:
-				if self.interrupted:
-					raise ProcessorInterruptedException("Interrupted while processing vector sets")
+			index += 1
+			vector_set_name = vector_file.stem  # we don't need the full path
+			self.dataset.update_status("Processing token set %i (%s)" % (index, vector_set_name))
 
-				# we support both pickle and json dumps of vectors
-				vector_unpacker = pickle if vector_set.split(".")[-1] == "pb" else json
+			with vector_file.open("rb") as binary_tokens:
+				# these were saved as pickle dumps so we need the binary mode
+				vectors = vector_unpacker.load(binary_tokens)
 
-				index += 1
-				vector_set_name = vector_set.split("/")[-1]  # we don't need the full path
-				self.dataset.update_status("Processing token set %i/%i" % (index, len(vector_sets)))
-
-				# temporarily extract file (we cannot use ZipFile.open() as it doesn't support binary modes)
-				temp_path = results_path.joinpath(vector_set_name)
-				token_archive.extract(vector_set_name, results_path)
-				with temp_path.open("rb") as binary_tokens:
-					# these were saved as pickle dumps so we need the binary mode
-					vectors = vector_unpacker.load(binary_tokens)
-				temp_path.unlink()
-
-				vectors = sorted(vectors, key=lambda x: x[1], reverse=True)
+			vectors = sorted(vectors, key=lambda x: x[1], reverse=True)
 				
-				# for overall ranking we need the full vector space per interval
-				# because maybe an overall top-ranking vector is at the bottom
-				# in this particular interval - we'll truncate the top list at
-				# a later point in that case. Else, truncate it here
-				if rank_style == "per-item":
-					vectors = vectors[0:cutoff]
+			# for overall ranking we need the full vector space per interval
+			# because maybe an overall top-ranking vector is at the bottom
+			# in this particular interval - we'll truncate the top list at
+			# a later point in that case. Else, truncate it here
+			if rank_style == "per-item":
+				vectors = vectors[0:cutoff]
 
-				for vector in vectors:
-					if not vector[0].strip():
-						continue
+			for vector in vectors:
+				if not vector[0].strip():
+					continue
 
-					results.append({"date": vector_set_name.split(".")[0], "item": vector[0], "frequency": vector[1]})
+				results.append({"date": vector_set_name.split(".")[0], "item": vector[0], "frequency": vector[1]})
 
-					if vector[0] not in overall_top:
-						overall_top[vector[0]] = 0
+				if vector[0] not in overall_top:
+					overall_top[vector[0]] = 0
 
-					overall_top[vector[0]] += int(vector[1])
+				overall_top[vector[0]] += int(vector[1])
 
 		# this eliminates all items from the results that were not in the
 		# *overall* top-occuring items. This only has an effect when vectors
@@ -140,10 +118,6 @@ class VectorRanker(BasicProcessor):
 					filtered_results.append(item)
 
 			results = filtered_results
-
-
-		# delete temporary files and folder
-		shutil.rmtree(results_path)
 
 		# done!
 		self.dataset.update_status("Writing results file")

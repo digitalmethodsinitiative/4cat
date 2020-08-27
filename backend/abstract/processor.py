@@ -2,11 +2,14 @@
 Basic post-processor worker - should be inherited by workers to post-process results
 """
 import traceback
+import zipfile
 import typing
 import shutil
 import abc
 import csv
 import os
+
+from pathlib import Path, PurePath
 
 from backend.abstract.worker import BasicWorker
 from backend.lib.dataset import DataSet
@@ -78,7 +81,7 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 			if not self.source_file.exists():
 				self.dataset.update_status("Finished, no input data found.")
 
-		self.log.info("Running post-processor %s on query %s" % (self.type, self.job.data["remote_id"]))
+		self.log.info("Running processor %s on dataset %s" % (self.type, self.job.data["remote_id"]))
 
 		self.parameters = self.dataset.parameters
 		self.dataset.update_status("Processing data")
@@ -182,8 +185,8 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 		if self.dataset.get_results_path().exists():
 			os.unlink(str(self.dataset.get_results_path()))
 
-		if self.dataset.get_temporary_path().exists():
-			shutil.rmtree(str(self.dataset.get_temporary_path()))
+		if self.dataset.get_staging_area().exists():
+			shutil.rmtree(str(self.dataset.get_staging_area()))
 
 		# we release instead of finish, since interrupting is just that - the
 		# job should resume at a later point. Delay resuming by 10 seconds to
@@ -210,7 +213,7 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 		:return:
 		"""
 
-		with open(path, encoding="utf-8") as input:
+		with path.open(encoding="utf-8") as input:
 
 			reader = csv.DictReader(input)
 
@@ -219,6 +222,52 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 					raise ProcessorInterruptedException("Processor interrupted while iterating through CSV file")
 
 				yield item
+
+	def iterate_archive_contents(self, path, staging_area=None):
+		"""
+		A generator that iterates through files in an archive
+
+		With every iteration, the processor's 'interrupted' flag is checked,
+		and if set a ProcessorInterruptedException is raised, which by default
+		is caught and subsequently stops execution gracefully.
+
+		Files are temporarily unzipped and deleted after use.
+
+		:param Path path: 	Path to csv file to read
+		:param Path staging_area:  Where to store the files while they're
+		being worked with. If omitted, a temporary folder is created and
+		deleted after use
+		:return:  An iterator with a Path item for each file
+		"""
+
+		if not path.exists():
+			return
+
+		if staging_area and (not staging_area.exists() or not staging_area.is_dir()):
+			raise RuntimeError("Staging area %s is not a valid folder")
+		else:
+			if not hasattr(self, "staging_area"):
+				self.staging_area = self.dataset.get_staging_area()
+
+			staging_area = self.staging_area
+
+		with zipfile.ZipFile(path, "r") as archive_file:
+			archive_contents = sorted(archive_file.namelist())
+
+			for archived_file in archive_contents:
+				if self.interrupted:
+					raise ProcessorInterruptedException("Interrupted while iterating zip file contents")
+
+				file_name = archived_file.split("/")[-1]
+				temp_file = staging_area.joinpath(file_name)
+				archive_file.extract(file_name, staging_area)
+
+				yield temp_file
+				temp_file.unlink()
+
+		if hasattr(self, "staging_area"):
+			shutil.rmtree(self.staging_area)
+			del self.staging_area
 
 	def write_csv_items_and_finish(self, data):
 		"""
@@ -252,6 +301,45 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 
 		self.dataset.update_status("Finished")
 		self.dataset.finish(len(data))
+
+	def write_archive_and_finish(self, files, num_items=None, compression=zipfile.ZIP_STORED):
+		"""
+		Archive a bunch of files into a zip archive and finish processing
+
+		:param list|Path files: If a list, all files will be added to the
+		archive and deleted afterwards. If a folder, all files in the folder
+		will be added and the folder will be deleted afterwards.
+		:param int num_items: Items in the dataset. If None, the amount of
+		files added to the archive will be used.
+		:param int compression:  Type of compression to use. By default, files
+		are not compressed, to speed up unarchiving.
+		"""
+		is_folder = False
+		if issubclass(type(files), PurePath):
+			is_folder = files
+			if not files.exists() or not files.is_dir():
+				raise RuntimeError("Folder %s is not a folder that can be archived" % files)
+
+			files = files.glob("*")
+
+		# create zip of archive and delete temporary files and folder
+		self.dataset.update_status("Compressing results into archive")
+		done = 0
+		with zipfile.ZipFile(self.dataset.get_results_path(), "w", compression=compression) as zip:
+			for output_path in files:
+				zip.write(output_path, output_path.name)
+				output_path.unlink()
+				done += 1
+
+		# delete temporary folder
+		if is_folder:
+			shutil.rmtree(is_folder)
+
+		self.dataset.update_status("Finished")
+		if num_items is None:
+			num_items = done
+
+		self.dataset.finish(num_items)
 
 	def is_filter(self):
 		"""

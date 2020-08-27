@@ -4,8 +4,6 @@ Download images linked in dataset
 import requests
 import binascii
 import hashlib
-import zipfile
-import shutil
 import base64
 import time
 import re
@@ -98,8 +96,7 @@ class ImageDownloader(BasicProcessor):
 			extensions[url] = extension
 
 		# prepare staging area
-		results_path = self.dataset.get_temporary_path()
-		results_path.mkdir()
+		results_path = self.dataset.get_staging_area()
 		counter = 0
 
 		# loop through images and copy them onto the wall
@@ -144,16 +141,7 @@ class ImageDownloader(BasicProcessor):
 
 		# finish up
 		self.dataset.update_status("Compressing images")
-
-		with zipfile.ZipFile(self.dataset.get_results_path(), "w") as zip:
-			for imagefile in results_path.glob("*"):
-				zip.write(imagefile, imagefile.name)
-
-		# delete temporary files and folder
-		shutil.rmtree(results_path)
-
-		self.dataset.update_status("Finished")
-		self.dataset.finish(len(urls))
+		self.write_archive_and_finish(results_path)
 
 	def get_image(self, path, rate_limit=0):
 		"""

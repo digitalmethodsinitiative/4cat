@@ -20,8 +20,8 @@ if len(sys.argv) > 1 and sys.argv[1] == "config":
 	print("graph_vlabel scraped")
 	print("graph_category 4cat")
 	print("graph_info The amount of posts scraped per hour")
-	print("total.warning 500:14000")
-	print("total.critical 250:18000")
+	print("total.warning 500:20000")
+	print("total.critical 250:30000")
 	for platform in DATASOURCES:
 		if "interval" not in DATASOURCES[platform]:
 			continue

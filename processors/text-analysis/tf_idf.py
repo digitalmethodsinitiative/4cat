@@ -3,15 +3,11 @@ Create a csv with tf-idf ranked terms
 """
 import json
 import pickle
-import zipfile
 import numpy as np
 import pandas as pd
 import itertools
 
-from pathlib import Path
-
 from backend.lib.helpers import UserInput, convert_to_int
-from backend.lib.exceptions import ProcessorInterruptedException
 from backend.abstract.processor import BasicProcessor
 
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -114,42 +110,24 @@ class TfIdf(BasicProcessor):
 		tokens = []
 		dates = []
 
-		results_path = self.dataset.get_results_path()
-		dirname = Path(results_path.parent, results_path.name.replace(".", ""))
-
 		# Go through all archived token sets and generate collocations for each
-		with zipfile.ZipFile(str(self.source_file), "r") as token_archive:
-			token_sets = token_archive.namelist()
-			index = 0
+		for token_file in self.iterate_archive_contents(self.source_file):
+			# Get the date
+			date_string = token_file.stem
+			dates.append(date_string)
 
-			# Loop through the tokens (can also be a single set)
-			for tokens_name in token_sets:
-				if self.interrupted:
-					raise ProcessorInterruptedException("Interrupted while loading token sets")
+			# we support both pickle and json dumps of vectors
+			token_unpacker = pickle if token_file.suffix == "pb" else json
 
-				# Get the date
-				date_string = tokens_name.split('.')[0]
-				dates.append(date_string)
+			with token_file.open("rb") as binary_tokens:
+				# these were saved as pickle dumps so we need the binary mode
+				post_tokens = token_unpacker.load(binary_tokens)
 
-				# Temporarily extract file (we cannot use ZipFile.open() as it doesn't support binary modes)
-				temp_path = dirname.joinpath(tokens_name)
-				token_archive.extract(str(tokens_name), str(dirname))
+				# Flatten the list of list of tokens - we're treating the whole time series as one document.
+				post_tokens = list(itertools.chain.from_iterable(post_tokens))
 
-				# we support both pickle and json dumps of vectors
-				token_unpacker = pickle if tokens_name.split(".")[-1] == "pb" else json
-
-				with temp_path.open("rb") as binary_tokens:
-
-					# these were saved as pickle dumps so we need the binary mode
-					post_tokens = token_unpacker.load(binary_tokens)
-	
-					# Flatten the list of list of tokens - we're treating the whole time series as one document.
-					post_tokens = list(itertools.chain.from_iterable(post_tokens))
-
-					# Add to all date's tokens
-					tokens.append(post_tokens)
-
-				temp_path.unlink()
+				# Add to all date's tokens
+				tokens.append(post_tokens)
 
 		# Make sure `min_occurrences` and `max_occurrences` are valid
 		if min_occurrences > len(tokens):

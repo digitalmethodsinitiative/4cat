@@ -148,9 +148,10 @@ class DataSet:
 		"""
 		return self.folder.joinpath(self.data["result_file"])
 
-	def get_temporary_path(self):
+	def get_staging_area(self):
 		"""
-		Get path to a temporary folder
+		Get path to a temporary folder in which files can be stored before
+		finishing
 
 		This folder must be created before use, but is guaranteed to not exist
 		yet. The folder may be used as a staging area for the dataset data
@@ -169,6 +170,7 @@ class DataSet:
 			index += 1
 
 		# create temporary folder
+		results_path.mkdir()
 		return results_path
 
 	def get_results_dir(self):

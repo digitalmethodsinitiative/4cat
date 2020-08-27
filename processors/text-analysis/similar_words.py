@@ -1,9 +1,6 @@
 """
 Find similar words based on word2vec modeling
 """
-import zipfile
-import shutil
-
 from gensim.models import KeyedVectors
 
 from backend.lib.helpers import UserInput, convert_to_int
@@ -80,39 +77,26 @@ class SimilarWord2VecWords(BasicProcessor):
 
 		threshold = max(-1.0, min(1.0, threshold))
 
-		# prepare staging area
-		temp_path = self.dataset.get_temporary_path()
-		temp_path.mkdir()
-
 		# go through all models and calculate similarity for all given input words
 		result = []
-		with zipfile.ZipFile(self.source_file, "r") as model_archive:
-			model_files = sorted(model_archive.namelist())
-
-			for model_file in model_files:
-				if self.interrupted:
-					raise ProcessorInterruptedException("Interrupted while processing token sets")
-
-				# the model is stored as [interval].model
-				model_name = model_file.split("/")[-1]
-				interval = model_name.split(".")[0]
-
-				# temporarily extract file (we cannot use ZipFile.open() as it doesn't support binary modes)
-				temp_file = temp_path.joinpath(model_name)
-				model_archive.extract(model_name, temp_path)
+		for model_file in self.iterate_archive_contents(self.source_file):
+				interval = model_file.stem
 
 				# for each separate model, calculate top similar words for each
 				# input word, giving us at most
 				#   [max amount] * [number of input] * [number of intervals]
 				# items
-				self.dataset.update_status("Running model %s..." % model_name)
-				model = KeyedVectors.load(str(temp_file))
+				self.dataset.update_status("Running model %s..." % model_file.name)
+				model = KeyedVectors.load(str(model_file))
 				word_queue = set()
 				checked_words = set()
 				level = 1
 
 				words = input_words.copy()
 				while words:
+					if self.interrupted:
+						raise ProcessorInterruptedException("Interrupted while extracting similar words")
+
 					word = words.pop()
 					checked_words.add(word)
 
@@ -146,11 +130,6 @@ class SimilarWord2VecWords(BasicProcessor):
 						level += 1
 						words = word_queue.copy()
 						word_queue = set()
-
-				temp_file.unlink()
-
-		# delete temporary folder
-		shutil.rmtree(temp_path)
 
 		if not result:
 			self.dataset.update_status("None of the words were found in the word embedding model.", is_final=True)

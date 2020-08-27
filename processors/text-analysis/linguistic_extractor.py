@@ -4,13 +4,10 @@ Extract linguistic features from text using SpaCy.
 """
 import zipfile
 import pickle
-import shutil
 import csv
 import re
-import time
 
 import spacy
-import en_core_web_sm
 from spacy.tokens import DocBin
 from spacy.tokenizer import Tokenizer
 from spacy.util import compile_prefix_regex, compile_infix_regex, compile_suffix_regex
@@ -24,12 +21,13 @@ __credits__ = ["Sal Hagen", "Stijn Peeters"]
 __maintainer__ = "Sal Hagen"
 __email__ = "4cat@oilab.eu"
 
+
 class LinguisticFeatures(BasicProcessor):
 	"""
 	Rank vectors over time
 	"""
 	type = "linguistic-features"  # job type ID
-	category = "Text analysis" # category
+	category = "Text analysis"  # category
 	title = "Linguistic features"  # title displayed in UI
 	description = "Annotate your text with a variety of linguistic features, including part-of-speech tagging, depencency parsing, and named entity recognition. Subsequent modules can add identified tags and nouns to the original data file. Uses the SpaCy library and the en_core_web_sm model. Currently only available for datasets with less than 100.000 items."  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
@@ -40,7 +38,7 @@ class LinguisticFeatures(BasicProcessor):
 	references = [
 		"[SpaCy Linguistic Features - Documentation](https://spacy.io/usage/linguistic-features/)"
 	]
-	
+
 	options = {
 		"enable": {
 			"type": UserInput.OPTION_MULTI,
@@ -60,20 +58,19 @@ class LinguisticFeatures(BasicProcessor):
 		"""
 
 		# prepare staging area
-		results_path = self.dataset.get_temporary_path()
-		results_path.mkdir()
+		staging_area = self.dataset.get_staging_area()
 
 		self.dataset.update_status("Preparing data")
-		
+
 		# go through all archived token sets and vectorise them
 		results = []
 
 		# Load the spacy goods
 		nlp = spacy.load("en_core_web_sm")
-		nlp.tokenizer = self.custom_tokenizer(nlp) # Keep words with a dash in between
+		nlp.tokenizer = self.custom_tokenizer(nlp)  # Keep words with a dash in between
 
 		# Disable what has _not_ been selected
-		options = ["parser","tagger","ner"]
+		options = ["parser", "tagger", "ner"]
 		enable = self.parameters.get("enable", False)
 
 		if not enable:
@@ -88,12 +85,13 @@ class LinguisticFeatures(BasicProcessor):
 			# Get all ze text first so we can process it in batches
 			csv_reader = csv.DictReader(source)
 			posts = [post["body"] if post["body"] else "" for post in csv_reader]
-			
+
 			# Process the text in batches
 			if len(posts) < 100000:
 				self.dataset.update_status("Extracting linguistic features")
 			else:
-				self.dataset.update_status("Extracting linguistic features is currently only available for datasets with less than 100.000 items.")
+				self.dataset.update_status(
+					"Extracting linguistic features is currently only available for datasets with less than 100.000 items.")
 				self.dataset.finish(0)
 				return
 
@@ -128,27 +126,16 @@ class LinguisticFeatures(BasicProcessor):
 					self.dataset.update_status("Done with post %s out of %s" % (i, len(posts)))
 
 			self.dataset.update_status("Serializing results - this will take a while")
-			
+
 			# Then serialize the NLP docs and the vocab
 			doc_bytes = doc_bin.to_bytes()
 
-			
 		# Dump ze data in a temporary folder
-		with results_path.joinpath("spacy_docs.pb").open("wb") as outputfile:
+		with staging_area.joinpath("spacy_docs.pb").open("wb") as outputfile:
 			pickle.dump(doc_bytes, outputfile)
 
 		# create zip of archive and delete temporary files and folder
-		self.dataset.update_status("Compressing results into archive")
-		with zipfile.ZipFile(self.dataset.get_results_path(), "w") as zip:
-			zip.write(results_path.joinpath("spacy_docs.pb"), "spacy_docs.pb")
-			results_path.joinpath("spacy_docs.pb").unlink() # Deletes the temporary file
-			
-		# delete temporary files and folder
-		shutil.rmtree(results_path)
-
-		# done!
-		self.dataset.update_status("Finished")
-		self.dataset.finish(1)
+		self.write_archive_and_finish(staging_area, compression=zipfile.ZIP_LZMA)
 
 	def custom_tokenizer(self, nlp):
 		"""
@@ -160,6 +147,6 @@ class LinguisticFeatures(BasicProcessor):
 		suffix_re = compile_suffix_regex(nlp.Defaults.suffixes)
 
 		return Tokenizer(nlp.vocab, prefix_search=prefix_re.search,
-									suffix_search=suffix_re.search,
-									infix_finditer=infix_re.finditer,
-									token_match=None)
+						 suffix_search=suffix_re.search,
+						 infix_finditer=infix_re.finditer,
+						 token_match=None)

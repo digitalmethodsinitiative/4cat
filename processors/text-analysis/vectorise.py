@@ -2,12 +2,9 @@
 Transform tokeniser output into vectors
 """
 import json
-import zipfile
 import pickle
-import shutil
 import itertools
 
-from backend.lib.exceptions import ProcessorInterruptedException
 from backend.abstract.processor import BasicProcessor
 
 __author__ = "Stijn Peeters"
@@ -36,37 +33,26 @@ class Vectorise(BasicProcessor):
 		"""
 
 		# prepare staging area
-		results_path = self.dataset.get_temporary_path()
-		results_path.mkdir()
+		staging_area = self.dataset.get_staging_area()
 
 		self.dataset.update_status("Processing token sets")
 		vector_paths = []
 
 		# go through all archived token sets and vectorise them
-		with zipfile.ZipFile(self.source_file, "r") as token_archive:
-			vector_sets = token_archive.namelist()
-			index = 0
+		index = 0
+		for token_file in self.iterate_archive_contents(self.source_file):
+			index += 1
+			vector_set_name = token_file.stem  # we don't need the full path
+			self.dataset.update_status("Processing token set %i (%s)" % (index, vector_set_name))
 
-			for vector_set in vector_sets:
-				if self.interrupted:
-					raise ProcessorInterruptedException("Interrupted while processing token sets")
+			# we support both pickle and json dumps of vectors
+			token_unpacker = pickle if vector_set_name.split(".")[-1] == "pb" else json
+			write_mode = "wb" if token_unpacker is pickle else "w"
 
-				index += 1
-				vector_set_name = vector_set.split("/")[-1]  # we don't need the full path
-				self.dataset.update_status("Processing token set %i/%i" % (index, len(vector_sets)))
-
-				# we support both pickle and json dumps of vectors
-				token_unpacker = pickle if vector_set_name.split(".")[-1] == "pb" else json
-				write_mode = "wb" if token_unpacker is pickle else "w"
-
-				# temporarily extract file (we cannot use ZipFile.open() as it doesn't support binary modes)
-				temp_path = results_path.joinpath(vector_set_name)
-				token_archive.extract(vector_set_name, results_path)
-				with temp_path.open("rb") as binary_tokens:
-					# these were saved as pickle dumps so we need the binary mode
-					tokens = token_unpacker.load(binary_tokens)
-
-				temp_path.unlink()
+			# temporarily extract file (we cannot use ZipFile.open() as it doesn't support binary modes)
+			with token_file.open("rb") as binary_tokens:
+				# these were saved as pickle dumps so we need the binary mode
+				tokens = token_unpacker.load(binary_tokens)
 
 				# flatten token list first - we don't have to separate per post
 				tokens = list(itertools.chain.from_iterable(tokens))
@@ -85,22 +71,11 @@ class Vectorise(BasicProcessor):
 				vectors_list = sorted(vectors_list, key=lambda item: item[1], reverse=True)
 
 				# dump the resulting file via pickle
-				vector_path = results_path.joinpath(vector_set_name)
+				vector_path = staging_area.joinpath(vector_set_name)
 				vector_paths.append(vector_path)
 
 				with vector_path.open(write_mode) as output:
 					token_unpacker.dump(vectors_list, output)
 
 		# create zip of archive and delete temporary files and folder
-		self.dataset.update_status("Compressing results into archive")
-		with zipfile.ZipFile(self.dataset.get_results_path(), "w") as zip:
-			for vector_path in vector_paths:
-				zip.write(vector_path, vector_path.name)
-				vector_path.unlink()
-
-		# delete temporary files and folder
-		shutil.rmtree(results_path)
-
-		# done!
-		self.dataset.update_status("Finished")
-		self.dataset.finish(len(vector_paths))
+		self.write_archive_and_finish(staging_area)

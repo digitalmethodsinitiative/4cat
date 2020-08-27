@@ -265,7 +265,7 @@ def call_api(action, payload=None):
 		return response
 
 
-def get_interval_descriptor(self, item, interval):
+def get_interval_descriptor(item, interval):
 	"""
 	Get interval descriptor based on timestamp
 

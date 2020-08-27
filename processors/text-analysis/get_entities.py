@@ -4,15 +4,13 @@ Extract nouns from SpaCy NLP docs.
 
 """
 
-import zipfile
 import csv
 import pickle
 import shutil
-from collections import Counter
-from pathlib import Path
 
 import en_core_web_sm
-import spacy
+
+from collections import Counter
 from spacy.tokens import Doc, DocBin
 from backend.lib.helpers import UserInput
 from backend.abstract.processor import BasicProcessor
@@ -98,23 +96,30 @@ class ExtractNouns(BasicProcessor):  #TEMPORARILY DISABLED
 		else:
 			# Extract the SpaCy docs first
 			self.dataset.update_status("Unzipping SpaCy docs")
-			docs = self.extract_docs()
 		
 			# Store all the entities in this list		
 			li_entities = []
+			nlp = en_core_web_sm.load()  # Load model
 
-			for doc in docs:
-				post_entities = []
+			for doc_file in self.iterate_archive_contents(self.source_file):
+				with doc_file.open("rb") as pickle_file:
+					# Load DocBin
+					file = pickle.load(pickle_file)
+					doc_bin = DocBin().from_bytes(file)
+					docs = list(doc_bin.get_docs(nlp.vocab))
 
-				# stop processing if worker has been asked to stop
-				if self.interrupted:
-					raise ProcessorInterruptedException("Interrupted while processing documents")
+				for doc in docs:
+					post_entities = []
 
-				for ent in doc.ents:
-					if ent.label_ in self.parameters["entities"]:
-						post_entities.append((ent.text, ent.label_)) # Add a tuple
+					# stop processing if worker has been asked to stop
+					if self.interrupted:
+						raise ProcessorInterruptedException("Interrupted while processing documents")
 
-				li_entities.append(post_entities)
+					for ent in doc.ents:
+						if ent.label_ in self.parameters["entities"]:
+							post_entities.append((ent.text, ent.label_)) # Add a tuple
+
+					li_entities.append(post_entities)
 
 			results = []
 
@@ -146,27 +151,6 @@ class ExtractNouns(BasicProcessor):  #TEMPORARILY DISABLED
 				self.dataset.update_status("Finished, but no entities were extracted.")
 				self.dataset.finish(0)
 
-	def extract_docs(self):
-		"""
-		Extracts serialised SpaCy docs from a zipped archive.
-
-		:returns: SpaCy docs.
-
-		"""
-		
-		nlp = en_core_web_sm.load()	# Load model
-
-		with zipfile.ZipFile(str(self.source_file), "r") as archive:
-			file_name = archive.namelist()[0] # always just one pickle file
-
-			with archive.open(file_name, "r") as pickle_file:
-				# Load DocBin
-				file = pickle.load(pickle_file)
-				doc_bin = DocBin().from_bytes(file)
-				docs = list(doc_bin.get_docs(nlp.vocab))
-
-		return docs
-
 	def update_parent(self, li_entities):
 		"""
 		Update the original dataset with an "entities" column
@@ -180,8 +164,7 @@ class ExtractNouns(BasicProcessor):  #TEMPORARILY DISABLED
 		parent_path = parent.get_results_path()
 
 		# Get a temporary path where we can store the data
-		tmp_path = self.dataset.get_temporary_path()
-		tmp_path.mkdir()
+		tmp_path = self.dataset.get_staging_area()
 		tmp_file_path = tmp_path.joinpath(parent_path.name)
 
 		count = 0

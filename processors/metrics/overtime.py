@@ -7,7 +7,7 @@ import csv
 import re
 
 from backend.abstract.processor import BasicProcessor
-from backend.lib.helpers import UserInput
+from backend.lib.helpers import UserInput, get_interval_descriptor
 from backend.lib.exceptions import ProcessorInterruptedException
 
 import config
@@ -119,24 +119,9 @@ class OvertimeAnalysis(BasicProcessor):
 				if self.interrupted:
 					raise ProcessorInterruptedException("Interrupted while reading input")
 
-				# determine where to put this data
-				if timeframe == "all":
-					time_unit = "overall"
-				else:
-					try:
-						timestamp = int(datetime.datetime.strptime(post["timestamp"], "%Y-%m-%d %H:%M:%S").timestamp())
-					except ValueError:
-						timestamp = 0
-					date = datetime.datetime.utcfromtimestamp(timestamp)
-					if timeframe == "year":
-						time_unit = str(date.year)
-					elif timeframe == "month":
-						time_unit = str(date.year) + "-" + str(date.month).zfill(2)
-					elif timeframe == "week":
-						time_unit = str(date.isocalendar()[0]) + "-" + str(date.isocalendar()[1]).zfill(2)
-					else:
-						time_unit = str(date.year) + "-" + str(date.month).zfill(2) + "-" + str(date.day).zfill(2)
+				time_unit = get_interval_descriptor(post, timeframe)
 
+				# determine where to put this data
 				if time_unit not in activity:
 					activity[time_unit] = 0
 

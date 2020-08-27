@@ -40,11 +40,9 @@ class ThreadSplitter(BasicProcessor):
 		users = {}
 
 		# prepare staging area
-		results_path = self.dataset.get_temporary_path()
-		results_path.mkdir()
+		results_path = self.dataset.get_staging_area()
 
 		# read and write
-		threadfiles = []
 		self.dataset.update_status("Creating thread files")
 		for post in self.iterate_csv_items(self.source_file):
 			thread = results_path.joinpath(post["thread_id"] + ".csv")
@@ -55,18 +53,7 @@ class ThreadSplitter(BasicProcessor):
 
 				if new:
 					outputcsv.writeheader()
-					threadfiles.append(thread)
 
 				outputcsv.writerow(post)
 
-		self.dataset.update_status("Writing results to archive")
-		with zipfile.ZipFile(self.dataset.get_results_path(), "w") as zip:
-			for threadfile in threadfiles:
-				zip.write(threadfile)
-				threadfile.unlink()
-
-		# remove temporary folder
-		shutil.rmtree(results_path)
-
-		self.dataset.update_status("Finished")
-		self.dataset.finish(len(threadfiles))
+		self.write_archive_and_finish(results_path)

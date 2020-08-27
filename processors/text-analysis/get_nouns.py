@@ -4,15 +4,12 @@ Extract nouns from SpaCy NLP docs.
 
 """
 
-import zipfile
 import csv
 import pickle
 import shutil
-from collections import Counter
-from pathlib import Path
-
 import en_core_web_sm
-import spacy
+
+from collections import Counter
 from spacy.tokens import Doc, DocBin
 from backend.lib.helpers import UserInput
 from backend.abstract.processor import BasicProcessor
@@ -80,12 +77,19 @@ class ExtractNouns(BasicProcessor):
 
 			# Extract the SpaCy docs first
 			self.dataset.update_status("Unzipping SpaCy docs")
-			docs = self.extract_docs()
 		
 			self.dataset.update_status("Extracting nouns")
 
 			# Store all the nouns in this list		
 			li_nouns = []
+			nlp = en_core_web_sm.load()  # Load model
+
+			for doc_file in self.iterate_archive_contents(self.source_file):
+				with doc_file.open("rb") as pickle_file:
+					# Load DocBin
+					file = pickle.load(pickle_file)
+					doc_bin = DocBin().from_bytes(file)
+					docs = list(doc_bin.get_docs(nlp.vocab))
 
 			# Simply add each word if its POS is "NOUN"
 			if noun_type == "nouns":
@@ -103,18 +107,17 @@ class ExtractNouns(BasicProcessor):
 
 			# Use a custom script to get single nouns and compound nouns
 			elif noun_type == "nouns_and_compounds":
-
 				for doc in docs:
 					post_nouns = []
 					noun = ""
 
 					for i, token in enumerate(doc):
-						
+
 						# Check for common nouns (general, e.g. "people")
 						# and proper nouns (specific, e.g. "London")
 						if token.pos_ == "NOUN" or token.pos_ == "PROPN":
 							# Check if the token is part of a noun chunk
-							if token.dep_ == "compound": # Check for a compound relation
+							if token.dep_ == "compound":  # Check for a compound relation
 								noun = token.text
 							else:
 								if noun:
@@ -149,27 +152,6 @@ class ExtractNouns(BasicProcessor):
 				self.dataset.update_status("Finished, but no nouns were extracted.")
 				self.dataset.finish(0)
 
-	def extract_docs(self):
-		"""
-		Extracts serialised SpaCy docs from a zipped archive.
-
-		:returns: SpaCy docs.
-
-		"""
-		
-		nlp = en_core_web_sm.load()	# Load model
-
-		with zipfile.ZipFile(str(self.source_file), "r") as archive:
-			file_name = archive.namelist()[0] # always just one pickle file
-
-			with archive.open(file_name, "r") as pickle_file:
-				# Load DocBin
-				file = pickle.load(pickle_file)
-				doc_bin = DocBin().from_bytes(file)
-				docs = list(doc_bin.get_docs(nlp.vocab))
-
-		return docs
-
 	def update_parent(self, li_nouns, noun_type):
 		"""
 		Update the original dataset with a nouns column
@@ -184,8 +166,7 @@ class ExtractNouns(BasicProcessor):
 		parent_path = parent.get_results_path()
 
 		# Get a temporary path where we can store the data
-		tmp_path = self.dataset.get_temporary_path()
-		tmp_path.mkdir()
+		tmp_path = self.dataset.get_staging_area()
 		tmp_file_path = tmp_path.joinpath(parent_path.name)
 
 		count = 0

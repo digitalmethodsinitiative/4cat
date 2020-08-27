@@ -4,7 +4,7 @@ Collapse post bodies into one long string
 import datetime
 import csv
 
-from backend.lib.helpers import UserInput, pad_interval
+from backend.lib.helpers import UserInput, pad_interval, get_interval_descriptor
 from backend.abstract.processor import BasicProcessor
 
 __author__ = "Stijn Peeters"
@@ -61,27 +61,9 @@ class CountPosts(BasicProcessor):
 			counter = 0
 
 			for post in self.iterate_csv_items(self.source_file):
+				date = get_interval_descriptor(post, timeframe)
+
 				# Add a count for the respective timeframe
-				if timeframe == "all":
-					date = "overall"
-				else:
-					try:
-						timestamp = int(datetime.datetime.strptime(post["timestamp"], "%Y-%m-%d %H:%M:%S").timestamp())
-					except ValueError:
-						self.dataset.update_status("Invalid date found in dataset; cannot count posts per interval.")
-						self.dataset.finish(0)
-						return
-
-					date = datetime.datetime.utcfromtimestamp(timestamp)
-					if timeframe == "year":
-						date = str(date.year)
-					elif timeframe == "month":
-						date = str(date.year) + "-" + str(date.month).zfill(2)
-					elif timeframe == "week":
-						date = str(date.isocalendar()[0]) + "-" + str(date.isocalendar()[1]).zfill(2)
-					else:
-						date = str(date.year) + "-" + str(date.month).zfill(2) + "-" + str(date.day).zfill(2)
-
 				if date not in intervals:
 					intervals[date] = 1
 				else:

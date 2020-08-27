@@ -2,10 +2,7 @@
 Get YouTube metadata from video links posted
 """
 import time
-import zipfile
-import shutil
 import urllib.request
-import os
 
 import config
 
@@ -60,8 +57,7 @@ class YouTubeThumbnails(BasicProcessor):
 		"""
 
 		# prepare staging area
-		results_path = self.dataset.get_temporary_path()
-		results_path.mkdir()
+		results_path = self.dataset.get_staging_area()
 
 		# Use YouTubeDL and the YouTube API to request video data
 		youtube = build(config.YOUTUBE_API_SERVICE_NAME, config.YOUTUBE_API_VERSION,
@@ -111,18 +107,4 @@ class YouTubeThumbnails(BasicProcessor):
 		# Save the count of images for `finish` function
 		image_count = 0
 
-		with zipfile.ZipFile(self.dataset.get_results_path(), "w") as zip:
-			for image in os.listdir(results_path):
-				if self.interrupted:
-					raise ProcessorInterruptedException("Interrupted while compressing thumbnails")
-
-				zip.write(str(results_path) + "/" + image, image)
-				results_path.joinpath(image).unlink()
-				image_count += 1
-
-		# delete temporary files and folder
-		shutil.rmtree(results_path)
-
-		# done!
-		self.dataset.update_status("Finished")
-		self.dataset.finish(image_count)
+		self.write_archive_and_finish(results_path)

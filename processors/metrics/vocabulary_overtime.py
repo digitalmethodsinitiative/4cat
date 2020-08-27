@@ -1,14 +1,13 @@
 """
 Over-time trends
 """
-import datetime
 import pickle
 import re
 
 from pathlib import Path
 
 from backend.abstract.processor import BasicProcessor
-from backend.lib.helpers import UserInput, convert_to_int
+from backend.lib.helpers import UserInput, get_interval_descriptor
 
 import config
 
@@ -155,24 +154,7 @@ class OvertimeAnalysis(BasicProcessor):
 					continue
 
 				# determine what interval to save the frequency for
-				if timeframe == "all":
-					interval = "overall"
-				else:
-					try:
-						timestamp = int(datetime.datetime.strptime(post["timestamp"], "%Y-%m-%d %H:%M:%S").timestamp())
-					except ValueError:
-						timestamp = 0
-
-					date = datetime.datetime.utcfromtimestamp(timestamp)
-					if timeframe == "year":
-						interval = str(date.year)
-					elif timeframe == "month":
-						interval = str(date.year) + "-" + str(date.month).zfill(2)
-					elif timeframe == "week":
-						interval = str(date.isocalendar()[0]) + "-" + str(date.isocalendar()[1]).zfill(2)
-					else:
-						interval = str(date.year) + "-" + str(date.month).zfill(2) + "-" + str(date.day).zfill(2)
-
+				interval = get_interval_descriptor(post, timeframe)
 				if interval not in activity[vocabulary_id]:
 					activity[vocabulary_id][interval] = 0
 

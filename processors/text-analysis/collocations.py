@@ -2,7 +2,6 @@
 Calculate word collocations from tokens
 """
 import json
-import zipfile
 import pickle
 
 from pathlib import Path
@@ -12,7 +11,6 @@ from nltk.collocations import *
 
 from backend.lib.helpers import UserInput
 from backend.abstract.processor import BasicProcessor
-from backend.lib.exceptions import ProcessorInterruptedException
 
 class GetCollocations(BasicProcessor):
 	"""
@@ -93,9 +91,9 @@ class GetCollocations(BasicProcessor):
 
 		min_frequency = self.parameters.get("min_frequency")
 		try:
-		 	min_frequency = int(self.parameters.get("min_frequency", 0))
+			min_frequency = int(self.parameters.get("min_frequency", 0))
 		except (ValueError, TypeError) as e:
-		 	min_frequency = 0
+			min_frequency = 0
 		 
 		query_string = self.parameters.get("query_string", "").replace(" ", "")
 		
@@ -118,83 +116,68 @@ class GetCollocations(BasicProcessor):
 		results = []
 
 		# Go through all archived token sets and generate collocations for each
-		with zipfile.ZipFile(self.source_file, "r") as token_archive:
-			token_sets = token_archive.namelist()
-			index = 0
+		for token_file in self.iterate_archive_contents(self.source_file):
+			# we support both pickle and json dumps of vectors
+			token_unpacker = pickle if token_file.suffix == "pb" else json
 
-			# Loop through the tokens (can also be a single set)
-			for tokens_name in token_sets:
-				# stop processing if worker has been asked to stop
-				if self.interrupted:
-					raise ProcessorInterruptedException
+			with token_file.open("rb") as binary_tokens:
+				tokens = token_unpacker.load(binary_tokens)
 
-				# we support both pickle and json dumps of vectors
-				token_unpacker = pickle if tokens_name.split(".")[-1] == "pb" else json
+			# Get the date
+			date_string = token_file.stem
 
-				# temporarily extract file (we cannot use ZipFile.open() as it doesn't support binary modes)
-				temp_path = dirname.joinpath(tokens_name)
-				token_archive.extract(tokens_name, dirname)
-				with temp_path.open("rb") as binary_tokens:
+			# Get the collocations. Returns a tuple.
+			self.dataset.update_status("Generating collocations for " + date_string)
 
-					# these were saved as pickle dumps so we need the binary mode
-					tokens = token_unpacker.load(binary_tokens)
+			# Store all the collocations from this tokenset here.
+			collocations = []
 
-				temp_path.unlink()
+			# The tokens are separated per posts, so we get collocations per post.
+			for post_tokens in tokens:
+				post_collocations = self.get_collocations(post_tokens, window_size, n_size, min_frequency=min_frequency,
+														  query_string=query_string, forbidden_words=forbidden_words)
+				collocations += post_collocations
 
-				# Get the date
-				date_string = tokens_name.split('.')[0]
-				
-				# Get the collocations. Returns a tuple.
-				self.dataset.update_status("Generating collocations for " + date_string)
+			# Loop through the collocation per post, merge, and store in the results list
+			tokenset_results = {}
 
-				# Store all the collocations from this tokenset here.
-				collocations = []
+			for tpl in collocations:
 
-				# The tokens are separated per posts, so we get collocations per post.
-				for post_tokens in tokens:
-					post_collocations = self.get_collocations(post_tokens, window_size, n_size, min_frequency=min_frequency, query_string=query_string, forbidden_words=forbidden_words)
-					collocations += post_collocations
+				collocation = tpl[0]
 
-				# Loop through the collocation per post, merge, and store in the results list	
-				tokenset_results = {}
-				
-				for tpl in collocations:
+				# Sort the words, if indicated.
+				# This can be handy to get rid of (almost) duplicate data.
+				if sort_words:
+					collocation = sorted(collocation)
 
-					collocation = tpl[0]
+				collocation = " ".join(collocation)
 
-					# Sort the words, if indicated.
-					# This can be handy to get rid of (almost) duplicate data.
-					if sort_words:
-						collocation = sorted(collocation)
-					
-					collocation = " ".join(collocation)
+				# Check if this collocation already appeared
+				if collocation in tokenset_results:
+					# If so, just increase the frequency count
+					tokenset_results[collocation] += tpl[1]
+				else:
+					tokenset_results[collocation] = tpl[1]
 
-					# Check if this collocation already appeared
-					if collocation in tokenset_results:
-						# If so, just increase the frequency count
-						tokenset_results[collocation] += tpl[1]
-					else:
-						tokenset_results[collocation] = tpl[1]
+			# Add to the overall results
+			if tokenset_results:
 
-				# Add to the overall results
-				if tokenset_results:
+				sorted_results = sorted(tokenset_results.items(), key=operator.itemgetter(1), reverse=True)
 
-					sorted_results = sorted(tokenset_results.items(), key=operator.itemgetter(1), reverse=True)
-					
-					# Save all results or just the most frequent ones.
-					# Also allow a smaller amount of results than the max.
-					output = max_output
-					if len(sorted_results) < max_output or max_output == 0:
-						output = len(sorted_results)
+				# Save all results or just the most frequent ones.
+				# Also allow a smaller amount of results than the max.
+				output = max_output
+				if len(sorted_results) < max_output or max_output == 0:
+					output = len(sorted_results)
 
-					for i in range(output):
-						results.append({
-							"item": sorted_results[i][0],
-							"frequency": sorted_results[i][1],
-							"date": date_string
-							})
+				for i in range(output):
+					results.append({
+						"item": sorted_results[i][0],
+						"frequency": sorted_results[i][1],
+						"date": date_string
+					})
 
-					max_output = max_output
+				max_output = max_output
 
 		if not results:
 			return

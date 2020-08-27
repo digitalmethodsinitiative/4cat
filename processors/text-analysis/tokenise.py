@@ -3,8 +3,6 @@ Tokenize post bodies
 """
 import ahocorasick
 import datetime
-import zipfile
-import shutil
 import pickle
 import json
 import re
@@ -15,7 +13,7 @@ from nltk.stem.snowball import SnowballStemmer
 from nltk.stem import WordNetLemmatizer
 from nltk.tokenize import word_tokenize, TweetTokenizer, sent_tokenize
 
-from backend.lib.helpers import UserInput
+from backend.lib.helpers import UserInput, get_interval_descriptor
 from backend.abstract.processor import BasicProcessor
 
 import config
@@ -32,7 +30,7 @@ class Tokenise(BasicProcessor):
 	type = "tokenise-posts"  # job type ID
 	category = "Text analysis"  # category
 	title = "Tokenise"  # title displayed in UI
-	description = "Tokenises post bodies, producing corpus data that may be used for further processing by e.g. NLP. The output is a serialized list of lists, with each post treated as a single document (so no sentence splitting)."  # description displayed in UI
+	description = "Tokenises post bodies, producing corpus data that may be used for further processing by e.g. NLP. The output is a serialized list of lists, each list representing either all tokens in a post or all tokens in a sentence in a post."  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
 
 	input = "csv:body"
@@ -148,11 +146,9 @@ class Tokenise(BasicProcessor):
 		numbers = re.compile(r"\b[0-9]+\b")
 
 		# Twitter tokenizer if indicated
-		if self.parameters.get("tokenizer_type") == "twitter":
-			tokenizer = TweetTokenizer(preserve_case=False)
-			tweet_tokenizer = True
-		else:
-			tweet_tokenizer = False
+		language = self.parameters.get("language", "english")
+		tokenizer = TweetTokenizer(preserve_case=False).tokenize if self.parameters.get("tokenizer_type") == "twitter" else word_tokenize
+		tokenizer_args = {} if self.parameters.get("tokenizer_type") == "twitter" else {"language": language}
 
 		# load word filters - words to exclude from tokenisation
 		word_filter = set()
@@ -182,8 +178,6 @@ class Tokenise(BasicProcessor):
 				# the string occurs
 				automaton.add_word(word, 1)
 
-		language = self.parameters.get("language", "english")
-
 		# initialise pre-processors if needed
 		if self.parameters.get("stem", self.options["stem"]["default"]):
 			stemmer = SnowballStemmer(language)
@@ -192,8 +186,7 @@ class Tokenise(BasicProcessor):
 			lemmatizer = WordNetLemmatizer()
 
 		# prepare staging area
-		tmp_path = self.dataset.get_temporary_path()
-		tmp_path.mkdir()
+		staging_area = self.dataset.get_staging_area()
 
 		# process posts
 		self.dataset.update_status("Processing posts")
@@ -211,33 +204,7 @@ class Tokenise(BasicProcessor):
 				continue
 				
 			# determine what output unit this post belongs to
-			if timeframe != "all":
-				if "timestamp_unix" in post:
-					try:
-						timestamp = int(post["timestamp_unix"])
-					except (ValueError, TypeError) as e:
-						timestamp = None
-				else:
-					try:
-						timestamp = int(datetime.datetime.strptime(post["timestamp"], "%Y-%m-%d %H:%M:%S").timestamp())
-					except (ValueError, TypeError) as e:
-						timestamp = None
-				
-				if timestamp:
-
-					date = datetime.datetime.utcfromtimestamp(timestamp)
-
-					if timeframe == "year":
-						date_descriptor = str(date.year)
-					elif timeframe == "month":
-						date_descriptor = str(date.year) + "-" + str(date.month)
-					elif timeframe == "week":
-						date_descriptor = str(date.isocalendar()[0]) + "-" + str(date.isocalendar()[1]).zfill(2)
-					else:
-						date_descriptor = str(date.year) + "-" + str(date.month) + "-" + str(date.day)
-				else:
-					# Invalid values can occur e.g. in custom csvs.
-					date_descriptor = "invalid_date"
+			date_descriptor = get_interval_descriptor(post, timeframe)
 
 			# if told so, first split the post into separate sentences
 			if grouping == "sentence":
@@ -253,10 +220,7 @@ class Tokenise(BasicProcessor):
 				body = link_regex.sub("", document)
 
 				# Use differing tokenizers depending on the user input
-				if tweet_tokenizer:
-					tokens = tokenizer.tokenize(body)
-				else:
-					tokens = word_tokenize(body, language=language)
+				tokens = tokenizer(body, **tokenizer_args)
 
 				# stem, lemmatise and save tokens that are not in filter
 				for token in tokens:
@@ -280,7 +244,7 @@ class Tokenise(BasicProcessor):
 				# this writes lists of json lists, with the outer list serialised
 				# 'manually' and the token lists serialised by the json library
 				if post_tokens:
-					output_file = tmp_path.joinpath(date_descriptor + ".json")
+					output_file = staging_area.joinpath(date_descriptor + ".json")
 					output_path = str(output_file)
 
 					if current_output_path != output_path:
@@ -313,16 +277,4 @@ class Tokenise(BasicProcessor):
 				file_handle.write("\n]")
 
 		# create zip of archive and delete temporary files and folder
-		self.dataset.update_status("Compressing results into archive")
-		with zipfile.ZipFile(self.dataset.get_results_path(), "w") as zip:
-			for output_path in output_files:
-				output_path = Path(output_path)
-				zip.write(output_path, output_path.name)
-				output_path.unlink()
-
-		# delete temporary folder
-		shutil.rmtree(tmp_path)
-
-		# done!
-		self.dataset.update_status("Finished")
-		self.dataset.finish(len(output_files))
+		self.write_archive_and_finish(staging_area)

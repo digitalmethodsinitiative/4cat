@@ -150,7 +150,7 @@ class YouTubeImageWall(BasicProcessor):
 		image_ids = [image[:-4] for image in zipped_images]
 
 		# prepare staging area
-		results_path = self.dataset.get_temporary_path()
+		results_path = self.dataset.get_staging_area()
 		results_path.mkdir()
 
 		# Loop through images and copy them onto the wall
