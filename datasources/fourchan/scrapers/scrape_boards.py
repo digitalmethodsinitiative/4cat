@@ -75,7 +75,7 @@ class BoardScraper4chan(BasicJSONScraper):
 		# add database record for thread, if none exists yet
 		# 8chan supports cyclical threads which have an ID that is *not* the first post's. The
 		# following line accounts for this.
-		thread_row = self.db.fetchone("SELECT * FROM threads_" + self.prefix + " WHERE id = %s", (str(thread_id),))
+		thread_row = self.db.fetchone("SELECT * FROM threads_" + self.prefix + " WHERE id = %s AND board = %s", (str(thread_id), board_id))
 		new_thread = 0
 		if not thread_row:
 			new_thread += 1
@@ -84,8 +84,8 @@ class BoardScraper4chan(BasicJSONScraper):
 		# update timestamps and position
 		position_update = str(self.init_time) + ":" + str(self.position) + ","
 		self.db.execute("UPDATE threads_" + self.prefix + " SET timestamp_scraped = %s, timestamp_modified = %s,"
-						"index_positions = CONCAT(index_positions, %s) WHERE id = %s",
-						(self.init_time, thread["last_modified"], position_update, str(thread_id)))
+						"index_positions = CONCAT(index_positions, %s) WHERE id = %s AND board = %s",
+						(self.init_time, thread["last_modified"], position_update, str(thread_id), board_id))
 
 		return new_thread
 
