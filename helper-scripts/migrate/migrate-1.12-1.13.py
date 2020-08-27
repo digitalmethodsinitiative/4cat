@@ -10,10 +10,9 @@ db = Database(logger=log, dbname=config.DB_NAME, user=config.DB_USER, password=c
 
 for datasource in ("8kun", "8chan"):
 	print("  Checking for %s database tables... " % datasource, end="")
-	try:
-		test = db.fetchone("SELECT * FROM posts_%s LIMIT 1" % datasource)
-		print("found!")
-	except psycopg2.ProgrammingError:
+
+	test = db.fetchone("SELECT EXISTS ( SELECT FROM information_schema.tables WHERE table_schema = %s AND table_name = %s )", ("public", "posts_%s" % datasource))
+	if not test["exists"]:
 		print("not available, nothing to upgrade!")
 		continue
 
