@@ -29,11 +29,11 @@ for datasource in ("4chan", "8kun", "8chan"):
 	db.execute("CREATE TABLE IF NOT EXISTS posts_%s_deleted ( id_seq BIGINT PRIMARY KEY, timestamp_deleted BIGINT DEFAULT 0 )" % datasource)
 	print("done")
 
-	print("\n  Filling table (this can take a while)... ", end="")
+	print("  Filling table (this can take a while)... ", end="")
 	db.execute("INSERT INTO posts_%s_deleted ( SELECT id_seq, timestamp_deleted FROM posts_%s WHERE timestamp_deleted != 0 )" % (datasource, datasource))
 	print("done")
 
-	print("\n Dropping column timestamp_deleted from main table...", end="")
+	print("  Dropping column timestamp_deleted from main table...", end="")
 	db.execute("ALTER TABLE posts_%s DROP COLUMN timestamp_deleted" % datasource)
 
 	print("done!")
