@@ -310,7 +310,7 @@ class Tokenise(BasicProcessor):
 		# need to repeatedly switch between various token files
 		for output_path in output_files:
 			with open(output_path, "a") as file_handle:
-				file_handle.write("]")
+				file_handle.write("\n]")
 
 		# create zip of archive and delete temporary files and folder
 		self.dataset.update_status("Compressing results into archive")

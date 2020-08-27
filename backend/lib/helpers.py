@@ -1,6 +1,7 @@
 """
 Miscellaneous helper functions for the 4CAT backend
 """
+import datetime
 import socket
 import json
 import re
@@ -159,7 +160,7 @@ class UserInput:
 			# comma-separated during input, returned as a list of valid options
 			if not choice:
 				return []
-			
+
 			chosen = choice.split(",")
 			return [item for item in chosen if item in settings.get("options", [])]
 		elif type == UserInput.OPTION_CHOICE:
@@ -262,6 +263,38 @@ def call_api(action, payload=None):
 		return json.loads(response)
 	except json.JSONDecodeError:
 		return response
+
+
+def get_interval_descriptor(self, item, interval):
+	"""
+	Get interval descriptor based on timestamp
+
+	:param dict item:  Item to generate descriptor for, should have a
+	"timestamp" key
+	:param str interval:  Interval, one of "overall", "year", "month",
+	"week", "day"
+	:return str:  Interval descriptor, e.g. "overall", "2020", "2020-08",
+	"2020-43", "2020-08-01"
+	"""
+	if interval == "overall":
+		return interval
+
+	if "timestamp" not in item:
+		return "invalid_date"
+
+	try:
+		timestamp = datetime.datetime.strptime(item["timestamp"], "%Y-%m-%d %H:%M:%S")
+	except (ValueError, TypeError) as e:
+		return "invalid_date"
+
+	if interval == "year":
+		return str(timestamp.year)
+	elif interval == "month":
+		return str(timestamp.year) + "-" + str(timestamp.month)
+	elif interval == "week":
+		return str(timestamp.isocalendar()[0]) + "-" + str(timestamp.isocalendar()[1]).zfill(2)
+	else:
+		return str(timestamp.year) + "-" + str(timestamp.month) + "-" + str(timestamp.day)
 
 
 def pad_interval(intervals, first_interval=None, last_interval=None):

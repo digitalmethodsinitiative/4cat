@@ -4,15 +4,15 @@ Find similar words based on word2vec modeling
 import zipfile
 import shutil
 
-from gensim.models import Word2Vec
+from gensim.models import KeyedVectors
 
 from backend.lib.helpers import UserInput, convert_to_int
 from backend.abstract.processor import BasicProcessor
 from backend.lib.exceptions import ProcessorInterruptedException
 
-__author__ = "Stijn Peeters"
-__credits__ = ["Stijn Peeters", "Tom Willaert"]
-__maintainer__ = "Stijn Peeters"
+__author__ = "Sal Hagen"
+__credits__ = ["Sal Hagen", "Stijn Peeters"]
+__maintainer__ = "Sal Hagen"
 __email__ = "4cat@oilab.eu"
 
 
@@ -47,10 +47,14 @@ class SimilarWord2VecWords(BasicProcessor):
 		"threshold": {
 			"type": UserInput.OPTION_TEXT,
 			"help": "Similarity threshold",
-			"tooltip": "Number between 0 and 1; only words with a higher similarity score than this will be included",
-			"min": 0,
-			"max": 1,
+			"tooltip": "Decimal value between 0 and 1; only words with a higher similarity score than this will be included",
 			"default": "0.25"
+		},
+		"crawl_depth": {
+			"type": UserInput.OPTION_CHOICE,
+			"default": 1,
+			"options": {"1": 1, "2": 2, "3": 3},
+			"help": "The crawl depth. 1 only gets the neighbours of the input word(s), 2 also their neighbours, etc."
 		}
 	}
 
@@ -61,8 +65,9 @@ class SimilarWord2VecWords(BasicProcessor):
 		"""
 		self.dataset.update_status("Processing sentences")
 
-		words = self.parameters.get("words", "").split(",")
-		if not words:
+		depth = max(1, min(3, convert_to_int(self.parameters.get("crawl_depth", self.options["crawl_depth"]["default"]), self.options["crawl_depth"]["default"])))
+		input_words = self.parameters.get("words", "").split(",")
+		if not input_words:
 			self.dataset.update_status("No input words provided, cannot look for similar words.", is_final=True)
 			self.dataset.finish(-1)
 			return
@@ -73,6 +78,8 @@ class SimilarWord2VecWords(BasicProcessor):
 		except ValueError:
 			threshold = float(self.options["threshold"]["default"])
 
+		threshold = max(-1.0, min(1.0, threshold))
+
 		# prepare staging area
 		temp_path = self.dataset.get_temporary_path()
 		temp_path.mkdir()
@@ -80,7 +87,7 @@ class SimilarWord2VecWords(BasicProcessor):
 		# go through all models and calculate similarity for all given input words
 		result = []
 		with zipfile.ZipFile(self.source_file, "r") as model_archive:
-			model_files = model_archive.namelist()
+			model_files = sorted(model_archive.namelist())
 
 			for model_file in model_files:
 				if self.interrupted:
@@ -99,9 +106,21 @@ class SimilarWord2VecWords(BasicProcessor):
 				#   [max amount] * [number of input] * [number of intervals]
 				# items
 				self.dataset.update_status("Running model %s..." % model_name)
-				model = Word2Vec.load(str(temp_file))
-				for word in words:
-					similar_words = model.most_similar(positive=[word], topn=num_words)
+				model = KeyedVectors.load(str(temp_file))
+				word_queue = set()
+				checked_words = set()
+				level = 1
+
+				words = input_words.copy()
+				while words:
+					word = words.pop()
+					checked_words.add(word)
+
+					try:
+						similar_words = model.most_similar(positive=[word], topn=num_words)
+					except KeyError:
+						continue
+
 					for similar_word in similar_words:
 						if similar_word[1] < threshold:
 							continue
@@ -110,12 +129,31 @@ class SimilarWord2VecWords(BasicProcessor):
 							"date": interval,
 							"input": word,
 							"item": similar_word[0],
-							"value": similar_word[1]
+							"value": similar_word[1],
+							"input_occurences": model.vocab[word].count,
+							"item_occurences": model.vocab[similar_word[0]].count,
+							"depth": level
 						})
+
+						# queue word for the next iteration if there is one and
+						# it hasn't been seen yet
+						if level < depth and similar_word[0] not in checked_words:
+							word_queue.add(similar_word[0])
+
+					# if all words have been checked, but we still have an
+					# iteration to go, load the queued words into the list
+					if not words and word_queue and level < depth:
+						level += 1
+						words = word_queue.copy()
+						word_queue = set()
 
 				temp_file.unlink()
 
 		# delete temporary folder
 		shutil.rmtree(temp_path)
 
-		self.write_csv_items_and_finish(result)
+		if not result:
+			self.dataset.update_status("None of the words were found in the word embedding model.", is_final=True)
+			self.dataset.finish(0)
+		else:
+			self.write_csv_items_and_finish(result)
