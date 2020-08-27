@@ -37,7 +37,6 @@ CREATE TABLE IF NOT EXISTS posts_4chan (
   board             TEXT,
   thread_id         bigint,
   timestamp         integer,
-  timestamp_deleted integer DEFAULT 0,
   subject           text,
   body              text,
   author            text,
@@ -76,3 +75,8 @@ CREATE INDEX IF NOT EXISTS posts_seq
   );
 
 CREATE TABLE posts_4chan_old () INHERITS (posts_4chan);
+
+CREATE TABLE IF NOT EXISTS posts_4chan_deleted (
+  id_seq            bigint PRIMARY KEY,
+  timestamp_deleted INTEGER DEFAULT 0
+);

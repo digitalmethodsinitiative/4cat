@@ -1,9 +1,9 @@
 """
 Database wrapper
 """
+import itertools
 import psycopg2.extras
 import psycopg2
-import select
 import time
 
 from psycopg2 import sql
@@ -159,8 +159,15 @@ class Database:
 
 		:return int: Number of affected rows. Note that this may be unreliable if `commit` is `False`
 		"""
-		where_sql = ["{} = %s" for column in where.keys()]
-		replacements = list(where.values())
+		where_sql = []
+		replacements = []
+		for column in where.keys():
+			if type(where[column]) in (set, tuple, list):
+				where_sql.append("{} IN %s")
+				replacements.append(tuple(where[column]))
+			else:
+				where_sql.append("{} = %s")
+				replacements.append(where[column])
 
 		# build query
 		identifiers = [sql.Identifier(column) for column in where.keys()]
@@ -178,7 +185,7 @@ class Database:
 		cursor.close()
 		return result
 
-	def insert(self, table, data, commit=True, safe=False, constraints=None):
+	def insert(self, table, data, commit=True, safe=False, constraints=None, return_field=""):
 		"""
 		Create database record
 
@@ -189,6 +196,9 @@ class Database:
 						  thrown when the insert violates a unique index or other constraint
 		:param tuple constraints: If `safe` is `True`, this tuple may contain the columns that should be used as a
 								  constraint, e.g. ON CONFLICT (name, lastname) DO NOTHING
+		:param str return_field: If not empty or None, this makes the method
+		return this field of the inserted row, instead of the number of
+		affected rows, with `RETURNING`.
 		:return int: Number of affected rows. Note that this may be unreliable if `commit` is `False`
 		"""
 		if constraints is None:
@@ -203,14 +213,65 @@ class Database:
 			safe_bit = " ON CONFLICT "
 			if constraints:
 				safe_bit += "(" + ", ".join(["{}" for each in constraints]) + ")"
-				for column in constraints:
-					identifiers.append(sql.Identifier(column))
+				identifiers.extend([sql.Identifier(column) for column in constraints])
 			safe_bit += " DO NOTHING"
 		else:
 			safe_bit = ""
 
 		# prepare parameter replacements
 		protoquery = "INSERT INTO {} (%s) VALUES %%s" % ", ".join(["{}" for column in data.keys()]) + safe_bit
+
+		if return_field:
+			protoquery += " RETURNING {}"
+			identifiers.append(sql.Identifier(return_field))
+
+		query = sql.SQL(protoquery).format(*identifiers)
+		replacements = (tuple(data.values()),)
+
+		cursor = self.get_cursor()
+		self.log.debug("Executing query: %s" % cursor.mogrify(query, replacements))
+		cursor.execute(query, replacements)
+
+		if commit:
+			self.commit()
+
+		result = cursor.rowcount if not return_field else cursor.fetchone()[return_field]
+		cursor.close()
+		return result
+
+	def upsert(self, table, data, commit=True, constraints=None):
+		"""
+		Create or update database record
+
+		If the record could not be inserted because of a constraint, the
+		constraining record is updated instead.
+
+		:param string table:  Table to upsert record into
+		:param dict data:   Data to upsert
+		:param bool commit: Whether to commit afxter executing the query
+		:param tuple constraints: This tuple may contain the columns that should be used as a
+								  constraint, e.g. ON CONFLICT (name, lastname) DO UPDATE
+		:return int: Number of affected rows. Note that this may be unreliable if `commit` is `False`
+		"""
+		if constraints is None:
+			constraints = []
+
+		# escape identifiers
+		identifiers = [sql.Identifier(column) for column in data.keys()]
+		identifiers.insert(0, sql.Identifier(table))
+
+		# prepare parameter replacements
+		protoquery = "INSERT INTO {} (%s) VALUES %%s" % ", ".join(["{}" for column in data.keys()])
+		protoquery += " ON CONFLICT"
+
+		if constraints:
+			protoquery += "(" + ", ".join(["{}" for each in constraints]) + ")"
+			identifiers.extend([sql.Identifier(column) for column in constraints])
+
+		protoquery += " DO UPDATE SET "
+		protoquery += ", ".join(["%s = EXCLUDED.%s" % (column, column) for column in data.keys()])
+		identifiers.extend(list(itertools.chain.from_iterable([[column, column] for column in data.keys()])))
+
 		query = sql.SQL(protoquery).format(*identifiers)
 		replacements = (tuple(data.values()),)
 

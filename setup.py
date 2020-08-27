@@ -4,6 +4,9 @@ import os
 with open("README.md", 'r') as readmefile:
 	readme = readmefile.read()
 
+with open("VERSION") as versionfile:
+	version = versionfile.readline().strip()
+
 # Universal libraries
 libraries = [
 	"google-api-python-client==1.7.7",
@@ -63,7 +66,7 @@ if os.name != "nt":
 
 setup(
 	name='fourcat',
-	version=1,
+	version=version,
 	description=('4CAT: Capture and Analysis Tool is a comprehensive tool for '
 				 'analysing discourse on web forums and imageboards'),
 	long_description=readme,

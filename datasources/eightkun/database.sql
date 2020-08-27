@@ -71,7 +71,12 @@ CREATE INDEX IF NOT EXISTS posts_seq_8kun
   );
 
 CREATE UNIQUE INDEX IF NOT EXISTS posts_idboard_8kun
-  ON posts_9kun (
+  ON posts_8kun (
     id,
     board
   );
+
+CREATE TABLE IF NOT EXISTS posts_8kun_deleted (
+  id_seq            bigint PRIMARY KEY,
+  timestamp_deleted INTEGER DEFAULT 0
+);

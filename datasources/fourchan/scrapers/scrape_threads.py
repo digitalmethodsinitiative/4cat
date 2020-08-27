@@ -105,32 +105,32 @@ class ThreadScraper4chan(BasicJSONScraper):
 			self.db.update("threads_" + self.prefix, where={"id": thread_db_id}, data={"timestamp_deleted": 0})
 
 		# create a dict mapped as `post id`: `post data` for easier comparisons with existing data
-		known_posts = self.db.fetchall("SELECT id, timestamp_deleted FROM posts_" + self.prefix + " WHERE thread_id = %s ORDER BY id ASC",
-										 (thread_db_id,))
+		known_posts = self.db.fetchall("SELECT id, id_seq FROM posts_" + self.prefix + " WHERE thread_id = %s AND board = %s ORDER BY id ASC",
+										 (thread_db_id, self.job.details["board"]))
 		post_dict_scrape = {str(post["no"]): post for post in data["posts"] if "no" in post}
 		post_dict_db = {str(post["id"]): post for post in known_posts}
-		post_visible_db = {str(post["id"]): post for post in known_posts if int(post["timestamp_deleted"]) == 0}
-		post_deleted_db = {str(post["id"]): post for post in known_posts if int(post["timestamp_deleted"]) != 0}
+		post_id_map = {str(post["id"]): post["id_seq"] for post in known_posts}
 
 		# mark deleted posts as such
-		deleted = set(post_visible_db.keys()) - set(post_dict_scrape.keys())
+		deleted = set(post_dict_db.keys()) - set(post_dict_scrape.keys())
 		for post_id in deleted:
-			self.db.update("posts_" + self.prefix, where={"id": post_id, "board": self.job.details["board"]}, data={"timestamp_deleted": self.init_time}, commit=False)
-		self.db.commit()
-
-		# mark *undeleted* posts as such
-		undeleted = set(post_deleted_db.keys()).intersection(set(post_dict_scrape.keys()))
-		for post_id in undeleted:
-			self.db.update("posts_" + self.prefix, where={"id": post_id, "board": self.job.details["board"]}, data={"timestamp_deleted": 0}, commit=False)
+			self.db.upsert("posts_%s_deleted" % self.prefix, data={"id_seq": post_id_map[post_id], "timestamp_deleted": self.init_time}, constraints=["id_seq"], commit=False)
 		self.db.commit()
 
 		# add new posts
 		new = set(post_dict_scrape.keys()) - set(post_dict_db.keys())
 		new_posts = 0
+		new_ids = set()
 		for post_id in new:
 			added = self.save_post(post_dict_scrape[post_id], thread, first_post)
 			if added:
 				new_posts += 1
+				new_ids.add(added)
+
+		all_ids = set([post_id_map[post_id] for post_id in post_dict_scrape.keys() if post_id in post_id_map]).union(new_ids)
+		undeleted = 0
+		if all_ids:
+			undeleted = self.db.delete("posts_%s_deleted" % self.prefix, where={"id_seq": list(all_ids)})
 
 		# update thread data
 		self.db.commit()
@@ -138,7 +138,7 @@ class ThreadScraper4chan(BasicJSONScraper):
 
 		# save to database
 		self.log.info("Updating %s/%s/%s, new: %s, old: %s, deleted: %s, undeleted: %s" % (
-			self.datasource, self.job.details["board"], first_post["no"], new_posts, len(post_dict_db), len(deleted), len(undeleted)))
+			self.datasource, self.job.details["board"], first_post["no"], new_posts, len(post_dict_db), len(deleted), undeleted))
 		self.db.commit()
 
 		# return the amount of new posts
@@ -226,6 +226,7 @@ class ThreadScraper4chan(BasicJSONScraper):
 
 
 		# now insert the post into the database
+		return_value = True
 		try:
 			for field in post_data:
 				if not isinstance(post_data[field], six.string_types):
@@ -233,7 +234,7 @@ class ThreadScraper4chan(BasicJSONScraper):
 				# apparently, sometimes \0 appears in posts or something; psycopg2 can't cope with this
 				post_data[field] = post_data[field].replace("\0", "")
 
-			self.db.insert("posts_" + self.prefix, post_data)
+			return_value = self.db.insert("posts_" + self.prefix, post_data, return_field="id_seq")
 		except psycopg2.IntegrityError:
 			self.db.rollback()
 			dupe = self.db.fetchone("SELECT * from posts_" + self.prefix + " WHERE id = %s" % (str(post["no"]),))
@@ -253,7 +254,7 @@ class ThreadScraper4chan(BasicJSONScraper):
 		if "filename" in post and post["ext"] != ".webm":
 			self.queue_image(post, thread)
 
-		return True
+		return return_value
 
 	def queue_image(self, post, thread):
 		"""

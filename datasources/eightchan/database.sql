@@ -70,3 +70,9 @@ CREATE INDEX IF NOT EXISTS posts_seq_8chan
   );
 
 CREATE TABLE posts_8chan_old () INHERITS (posts_8chan);
+
+
+CREATE TABLE IF NOT EXISTS posts_8chan_deleted (
+  id_seq            bigint PRIMARY KEY,
+  timestamp_deleted INTEGER DEFAULT 0
+);
