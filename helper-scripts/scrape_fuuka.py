@@ -112,7 +112,7 @@ def thread(thread_json):
 	op = fuuka_to_4chan(thread_json["op"])
 
 	if "posts" in thread_json:
-		posts = [fuuka_to_4chan(thread_json["posts"][id], op["no"]) for id in thread_json["posts"]]
+		posts = [fuuka_to_4chan(thread_json["posts"][id], op["no"]) for id in thread_json["posts"] if thread_json["posts"][id]["subnum"] == "0"]
 		op["replies"] = len(posts)
 		op["images"] = len([post for post in posts if "md5" in post])
 	else:
