@@ -81,11 +81,22 @@ class BoardScraper4chan(BasicJSONScraper):
 			new_thread += 1
 			self.db.insert("threads_" + self.prefix, thread_data)
 
-		# update timestamps and position
-		position_update = str(self.init_time) + ":" + str(self.position) + ","
-		self.db.execute("UPDATE threads_" + self.prefix + " SET timestamp_scraped = %s, timestamp_modified = %s,"
-						"index_positions = CONCAT(index_positions, %s) WHERE id = %s AND board = %s",
-						(self.init_time, thread["last_modified"], position_update, str(thread_id), board_id))
+
+		replacements = [self.init_time, thread["last_modified"]]
+		if "4chan" in self.type:
+			# update timestamps and position, but only for 4chan
+			# other chans have different strategies and often have "infinite"
+			# threads which would rapidly bloat the database with an infinite
+			# stream of thread positions
+			position_update = str(self.init_time) + ":" + str(self.position) + ","
+			positions_bit = ", index_positions = CONCAT(index_positions, %s)"
+			replacements.append(position_update)
+		else:
+			positions_bit = ""
+
+		replacements.extend([str(thread_id), board_id])
+		self.db.execute("UPDATE threads_" + self.prefix + " SET timestamp_scraped = %s, timestamp_modified = %s" + positions_bit + " WHERE id = %s AND board = %s",
+						replacements)
 
 		return new_thread
 
