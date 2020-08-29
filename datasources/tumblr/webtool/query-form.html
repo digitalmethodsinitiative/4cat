@@ -6,7 +6,7 @@
         <div>
             <select name="search_scope" id="search-scope">
                 <option value="tag">Tag</option>
-                <!-- <option value="blog">Blog</option> -->
+                <option value="blog">Blog</option>
             </select>
         </div>
     </div>
@@ -15,7 +15,7 @@
     <p class="form-intro">Tumblr tags may include whitespace. You don't have to put a <code>#</code> before the tag.</p>
     <p class="form-intro">Tag search only get posts explicitly associated with the exact tag you insert here. Querying <code>gogh</code> will thus not get posts only tagged with <code>van gogh</code>. Keyword search is unfortunately not allowed by the <a href="https://api.tumblr.com" target="_blank">Tumblr API</a>.</p>
     <div class="form-element">
-        <label for="query-input">Fetch posts with tag(s):</label>
+        <label for="query-input">Tags/blogs:</label>
         <div>
             <textarea id="query-input" name="query" placeholder="Separate queries with commas or new lines."></textarea>
         </div>

@@ -13,7 +13,7 @@ from pathlib import Path
 
 from nltk.stem.snowball import SnowballStemmer
 from nltk.stem import WordNetLemmatizer
-from nltk.tokenize import word_tokenize, TweetTokenizer
+from nltk.tokenize import word_tokenize, TweetTokenizer, sent_tokenize
 
 from backend.lib.helpers import UserInput
 from backend.abstract.processor import BasicProcessor
@@ -58,6 +58,16 @@ class Tokenise(BasicProcessor):
 			"default": "english",
 			"help": "Language"
 		},
+		"grouping-per": {
+			"type": UserInput.OPTION_CHOICE,
+			"default": "post",
+			"help": "Group tokens per",
+			"options": {
+				"post": "Post",
+				"sentence": "Sentence in post"
+			},
+			"tooltip": "This is relevant to some underlying processors such as Word2Vec and Tf-idf. If you don't know what to choose, choose 'post'."
+		},
 		"stem": {
 			"type": UserInput.OPTION_TOGGLE,
 			"default": False,
@@ -69,11 +79,6 @@ class Tokenise(BasicProcessor):
 			"default": False,
 			"help": "Lemmatise tokens (English only)",
 			"tooltip": "Lemmatisation replaces inflections of a word with its root form: 'running' becomes 'run', 'bicycles' becomes 'bicycle', 'better' becomes 'good'."
-		},
-		"strip_symbols": {
-			"type": UserInput.OPTION_TOGGLE,
-			"default": True,
-			"help": "Strip non-alphanumeric characters (e.g. punctuation)"
 		},
 		"accept_words": {
 			"type": UserInput.OPTION_TEXT,
@@ -178,7 +183,6 @@ class Tokenise(BasicProcessor):
 				automaton.add_word(word, 1)
 
 		language = self.parameters.get("language", "english")
-		strip_symbols = self.parameters.get("strip_symbols", self.options["strip_symbols"]["default"])
 
 		# initialise pre-processors if needed
 		if self.parameters.get("stem", self.options["stem"]["default"]):
@@ -194,6 +198,7 @@ class Tokenise(BasicProcessor):
 		# process posts
 		self.dataset.update_status("Processing posts")
 		timeframe = self.parameters.get("timeframe", self.options["timeframe"]["default"])
+		grouping = "post" if self.parameters.get("grouping-per", "") == "post" else "sentence"
 
 		# this is how we'll keep track of the subsets of tokens
 		output_files = {}
@@ -234,64 +239,67 @@ class Tokenise(BasicProcessor):
 					# Invalid values can occur e.g. in custom csvs.
 					date_descriptor = "invalid_date"
 
-			# tokenise...
-			# we're treating every post as one document.
-			# this means it is not sensitive to sentences.
-			post_tokens = []
-
-			# clean up text and get tokens from it
-			body = link_regex.sub("", post["body"])
-
-			# Use differing tokenizers depending on the user input
-			if tweet_tokenizer:
-				tokens = tokenizer.tokenize(body)
+			# if told so, first split the post into separate sentences
+			if grouping == "sentence":
+				groupings = sent_tokenize(post["body"], language)
 			else:
-				tokens = word_tokenize(body, language=language)
+				groupings = [post["body"]]
 
-			# stem, lemmatise and save tokens that are not in filter
-			for token in tokens:
-				token = token.lower()
+			# tokenise...
+			for document in groupings:
+				post_tokens = []
 
-				if strip_symbols:
+				# clean up text and get tokens from it
+				body = link_regex.sub("", document)
+
+				# Use differing tokenizers depending on the user input
+				if tweet_tokenizer:
+					tokens = tokenizer.tokenize(body)
+				else:
+					tokens = word_tokenize(body, language=language)
+
+				# stem, lemmatise and save tokens that are not in filter
+				for token in tokens:
+					token = token.lower()
 					token = numbers.sub("", symbol.sub("", token))
 
-				# skip empty and filtered tokens
-				if not token or token in automaton:
-					continue
+					# skip empty and filtered tokens
+					if not token or token in automaton:
+						continue
 
-				if self.parameters["stem"]:
-					token = stemmer.stem(token)
+					if self.parameters["stem"]:
+						token = stemmer.stem(token)
 
-				if self.parameters["lemmatise"]:
-					token = lemmatizer.lemmatize(token)
+					if self.parameters["lemmatise"]:
+						token = lemmatizer.lemmatize(token)
 
-				# append tokens to the post's token list
-				post_tokens.append(token)
+					# append tokens to the post's token list
+					post_tokens.append(token)
 
-			# write tokens to file
-			# this writes lists of json lists, with the outer list serialised
-			# 'manually' and the token lists serialised by the json library
-			if post_tokens:
-				output_file = tmp_path.joinpath(date_descriptor + ".json")
-				output_path = str(output_file)
+				# write tokens to file
+				# this writes lists of json lists, with the outer list serialised
+				# 'manually' and the token lists serialised by the json library
+				if post_tokens:
+					output_file = tmp_path.joinpath(date_descriptor + ".json")
+					output_path = str(output_file)
 
-				if current_output_path != output_path:
-					self.dataset.update_status("Processing posts (%s)" % date_descriptor)
-					if output_file_handle:
-						output_file_handle.close()
-					output_file_handle = output_file.open("a")
+					if current_output_path != output_path:
+						self.dataset.update_status("Processing posts (%s)" % date_descriptor)
+						if output_file_handle:
+							output_file_handle.close()
+						output_file_handle = output_file.open("a")
 
-					if output_path not in output_files:
-						output_file_handle.write("[")
-						output_files[output_path] = 0
+						if output_path not in output_files:
+							output_file_handle.write("[")
+							output_files[output_path] = 0
 
-					current_output_path = output_path
+						current_output_path = output_path
 
-				if output_files[current_output_path] > 0:
-					output_file_handle.write(",")
+					if output_files[current_output_path] > 0:
+						output_file_handle.write(",\n")
 
-				output_file_handle.write(json.dumps(post_tokens))
-				output_files[output_path] += 1
+					output_file_handle.write(json.dumps(post_tokens))
+					output_files[output_path] += 1
 
 		if output_file_handle:
 			output_file_handle.close()

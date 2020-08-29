@@ -55,19 +55,30 @@ class SearchTumblr(Search):
 		scope = parameters.get("search_scope", "")
 		queries = parameters.get("query")
 
-		# store all info here
+		# Store all info here
 		results = []
 
+		# Store all notes from posts by blogs here
+		all_notes = []
 
 		# Get date parameters
 		after = parameters.get("after", None)
 		before = parameters.get("before", None)
 
-		if scope == "tag":
-			# for each tag, get post
-			for query in queries:
+		# for each tag or blog, get post
+		for query in queries:
 
-				new_results = self.get_posts_by_tag(query, before=before, after=after)
+				# Get posts per tag
+				if scope == "tag":
+					new_results = self.get_posts_by_tag(query, before=before, after=after)
+				# Get posts per blog
+				elif scope == "blog":
+					new_results, notes = self.get_posts_by_blog(query, before=before, after=after)
+					all_notes.append(notes)
+				else:
+					self.dataset.update_status("Invalid scope")
+					break
+
 				results += new_results
 
 				if self.max_posts_reached:
@@ -77,32 +88,34 @@ class SearchTumblr(Search):
 					self.dataset.update_status("API limit reached")
 					break
 
-		elif scope == "blog":
-			# for each blog, get its posts
-			for query in queries:
-				new_results = self.get_posts_by_blog(query, before=before, after=after)
-				results += new_results
-
-				if self.max_posts_reached:
-					self.update_status("Max posts exceeded")
-					break
-				if self.api_limit_reached:
-					self.update_status("API limit reached")
-					break
-
 		# If we also want the posts that reblogged the fetched posts:
 		if parameters.get("fetch_reblogs") and not self.max_posts_reached and not self.api_limit_reached:
 			self.dataset.update_status("Getting notes from all posts")
 
-			# Prepare dicts to pass to `get_post_notes`
-			posts_to_fetch = {result["author"]: result["id"] for result in results}
+			# Reblog information is already returned for blog-level searches
+			if scope == "blog":
+				text_reblogs = []
 
-			# First extract the notes of each post, and only keep text reblogs
-			text_reblogs = self.get_post_notes(posts_to_fetch)
+				# Loop through and add the text reblogs that came with the results.
+				for post_notes in all_notes:
+					print(post_notes)
+					for post_note in post_notes:
+						for note in post_note:
+							if note["type"] == "reblog":
+								text_reblogs.append({note["blog_name"]: note["post_id"]})
+
+			# Retrieving notes for tag-based posts should be done one-by-one.
+			# Fetching them all at once is not supported by the Tumblr API.
+			elif scope == "tag":
+				# Prepare dicts to pass to `get_post_notes`
+				posts_to_fetch = {result["author"]: result["id"] for result in results}
+
+				# First extract the notes of each post, and only keep text reblogs
+				text_reblogs = self.get_post_notes(posts_to_fetch)
 
 			# Get the full data for text reblogs.
 			if text_reblogs:
-				# This has to be done one-by-one - fetching them all together is not supported by the Tumblr API.
+
 				for i, text_reblog in enumerate(text_reblogs):
 					self.dataset.update_status("Got %i/%i text reblogs" % (i, len(text_reblogs)))
 					for key, value in text_reblog.items():
@@ -197,6 +210,102 @@ class SearchTumblr(Search):
 			self.dataset.update_status("Collected %s posts" % str(len(all_posts)))
 
 		return all_posts
+
+	def get_posts_by_blog(self, blog, before=None, after=None):
+		"""
+		Get Tumblr posts posts with a certain blog
+		:param tag, str: the name of the blog you want to look for
+		:param after: a unix timestamp, indicates posts should be after this date.
+	    :param before: a unix timestamp, indicates posts should be before this date.
+
+	    :returns: a dict created from the JSON response
+		"""
+
+		blog = blog + ".tumblr.com"
+		client = self.connect_to_tumblr()
+
+		if not before:
+			before = int(time.time())
+
+		# Store all posts in here
+		all_posts = []
+
+		# Store notes here, if they exist and are requested
+		all_notes = []
+
+		# Some retries to make sure the Tumblr API actually returns everything
+		retries = 0
+		max_retries = 48 # 2 days
+
+		# Get Tumblr posts until there's no more left.
+		while True:
+			if self.interrupted:
+				raise ProcessorInterruptedException("Interrupted while fetching blog posts from Tumblr")
+
+			# Stop after 20 retries
+			if retries >= max_retries:
+				self.dataset.update_status("No more posts")
+				break
+
+			try:
+				# Use the pytumblr library to make the API call
+				posts = client.posts(blog, before=before, limit=20, reblog_info=True, notes_info=True, filter="raw")
+				posts = posts["posts"]
+
+				#if (before - posts[0]["timestamp"]) > 500000:
+					#self.dataset.update_status("ALERT - DATES LIKELY SKIPPED")
+					#self.dataset.update_status([post["timestamp"] for post in posts])
+
+			except Exception as e:
+
+				self.dataset.update_status("Reached the limit of the Tumblr API. Last timestamp: %s" % str(before))
+				self.api_limit_reached = True
+				break
+
+			# Make sure the Tumblr API doesn't magically stop at an earlier date
+			if not posts or isinstance(posts, str):
+				retries += 1
+				before -= 3600 # Decrease by an hour
+				self.dataset.update_status("No posts - querying again but an hour earlier (retry %s/48)" % str(retries))
+				continue
+
+			# Append posts to main list
+			else:
+				# Keep the notes, if so indicated
+				if self.parameters.get("fetch_reblogs"):
+					for post in posts:
+						if "notes" in post:
+							all_notes.append(post["notes"])
+
+				posts = self.parse_tumblr_posts(posts)
+
+				before = posts[len(posts) - 1]["timestamp"]
+
+				# manually check if we've reached the `after` already (not natively supported by Tumblr)
+				if after:
+					if before <= after:
+						# Get rid of all the posts that are earlier than the before timestamp
+						posts = [post for post in posts if post["timestamp"] > after]
+
+						if posts:
+							all_posts += posts
+						break
+
+				all_posts += posts
+				retries = 0
+
+				#if (before - posts[len(posts) - 1]["timestamp"]) > 500000:
+					#self.dataset.update_status("ALERT - DATES LIKELY SKIPPED")
+					#self.dataset.update_status([post["timestamp"] for post in posts])
+
+
+			if len(all_posts) >= self.max_posts:
+				self.max_posts_reached = True
+				break
+
+			self.dataset.update_status("Collected %s posts" % str(len(all_posts)))
+
+		return all_posts, all_notes
 
 	def get_post_notes(self, di_blogs_ids, only_text_reblogs=True):
 		"""

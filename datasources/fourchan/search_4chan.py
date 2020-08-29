@@ -315,6 +315,7 @@ class Search4Chan(Search):
 		sphinx_start = time.time()
 		sphinx = self.get_sphinx_handler()
 
+		results = []
 		try:
 			sql = "SELECT thread_id, post_id FROM `" + self.prefix + "_posts` WHERE " + where + " LIMIT 5000000 OPTION max_matches = 5000000, ranker = none, boolean_simplify = 1, sort_method = kbuffer, cutoff = 5000000"
 			parsed_query = sphinx.mogrify(sql, replacements)

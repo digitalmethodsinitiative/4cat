@@ -117,7 +117,7 @@ class WorkerManager:
 		self.log.info("Telling all workers to stop doing whatever they're doing...")
 		for jobtype in self.worker_pool:
 			for worker in self.worker_pool[jobtype]:
-				if hasattr(worker, "request_abort"):
+				if hasattr(worker, "request_interrupt"):
 					worker.request_interrupt()
 				else:
 					worker.abort()
