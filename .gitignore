@@ -3,6 +3,7 @@
 *.pid
 *.log
 *.log.*
+*.out
 *.csv
 *.png
 *.gif
