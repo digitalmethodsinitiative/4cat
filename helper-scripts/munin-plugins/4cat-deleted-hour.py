@@ -32,7 +32,7 @@ queries = []
 for platform in DATASOURCES:
 	if "interval" not in DATASOURCES[platform]:
 		continue
-	queries.append("(SELECT COUNT(*) FROM posts_%s AS p LEFT JOIN posts_%s_deleted AS d ON p.id_seq = d.id_seq WHERE p.timestamp > %i AND d.timestamp_deleted IS NOT NULL) AS scraped_%s" % (platform, cutoff, platform))
+	queries.append("(SELECT COUNT(*) FROM posts_%s AS p LEFT JOIN posts_%s_deleted AS d ON p.id_seq = d.id_seq WHERE p.timestamp > %i AND d.timestamp_deleted IS NOT NULL) AS scraped_%s" % (platform, platform, cutoff, platform))
 
 connection = psycopg2.connect(dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD, host=DB_HOST, port=DB_PORT)
 cursor = connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
