@@ -290,11 +290,11 @@ def get_interval_descriptor(item, interval):
 	if interval == "year":
 		return str(timestamp.year)
 	elif interval == "month":
-		return str(timestamp.year) + "-" + str(timestamp.month)
+		return str(timestamp.year) + "-" + str(timestamp.month).zfill(2)
 	elif interval == "week":
 		return str(timestamp.isocalendar()[0]) + "-" + str(timestamp.isocalendar()[1]).zfill(2)
 	else:
-		return str(timestamp.year) + "-" + str(timestamp.month) + "-" + str(timestamp.day)
+		return str(timestamp.year) + "-" + str(timestamp.month).zfill(2) + "-" + str(timestamp.day).zfill(2)
 
 
 def pad_interval(intervals, first_interval=None, last_interval=None):
