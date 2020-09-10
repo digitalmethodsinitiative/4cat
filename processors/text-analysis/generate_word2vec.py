@@ -44,7 +44,7 @@ class GenerateWord2Vec(BasicProcessor):
 	options = {
 		"algorithm": {
 			"type": UserInput.OPTION_CHOICE,
-			"default": "skipgram",
+			"default": "cbow",
 			"options": {
 				"cbow": "Continuous Bag of Words (CBOW)",
 				"skipgram": "Skip-gram"
@@ -54,7 +54,7 @@ class GenerateWord2Vec(BasicProcessor):
 		},
 		"window": {
 			"type": UserInput.OPTION_CHOICE,
-			"default": 5,
+			"default": "5",
 			"options": {"3": 3, "4": 4, "5": 5, "6": 6, "7": 7},
 			"help": "Window",
 			"tooltip": "Maximum distance between the current and predicted word within a sentence"
@@ -68,12 +68,12 @@ class GenerateWord2Vec(BasicProcessor):
 		},
 		"negative": {
 			"type": UserInput.OPTION_TOGGLE,
-			"default": False,
+			"default": True,
 			"help": "Use negative sampling"
 		},
 		"min_count": {
 			"type": UserInput.OPTION_TEXT,
-			"default": 1,
+			"default": 5,
 			"help": "Minimum word occurrence",
 			"tooltip": "How often a word should occur in the corpus to be included"
 		}
@@ -110,7 +110,7 @@ class GenerateWord2Vec(BasicProcessor):
 			try:
 				model = Word2Vec(bigram_transformer[self.tokens_from_file(temp_file, staging_area)], negative=use_negative, size=dimensionality, sg=use_skipgram, window=window, workers=3, min_count=min_count)
 			except RuntimeError as e:
-				if "you must first build vocabulary before training the model" in e:
+				if "you must first build vocabulary before training the model" in str(e):
 					# not enough data. Skip - if this happens for all models
 					# an error will be generated later
 					continue
@@ -121,6 +121,8 @@ class GenerateWord2Vec(BasicProcessor):
 			# saves space and we don't need to re-train the model later
 			model_name = token_set_name.split(".")[0] + ".model"
 			model.wv.save(str(staging_area.joinpath(model_name)))
+
+			# save vocabulary too, some processors need it
 			del model
 			models += 1
 
