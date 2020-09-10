@@ -233,7 +233,7 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 
 		Files are temporarily unzipped and deleted after use.
 
-		:param Path path: 	Path to csv file to read
+		:param Path path: 	Path to zip file to read
 		:param Path staging_area:  Where to store the files while they're
 		being worked with. If omitted, a temporary folder is created and
 		deleted after use
@@ -256,6 +256,8 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 
 			for archived_file in archive_contents:
 				if self.interrupted:
+					if hasattr(self, "staging_area"):
+						shutil.rmtree(self.staging_area)
 					raise ProcessorInterruptedException("Interrupted while iterating zip file contents")
 
 				file_name = archived_file.split("/")[-1]
@@ -268,6 +270,50 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 		if hasattr(self, "staging_area"):
 			shutil.rmtree(self.staging_area)
 			del self.staging_area
+
+	def unpack_archive_contents(self, path, staging_area=None):
+		"""
+		Unpack all files in an archive to a staging area
+
+		With every iteration, the processor's 'interrupted' flag is checked,
+		and if set a ProcessorInterruptedException is raised, which by default
+		is caught and subsequently stops execution gracefully.
+
+		Files are unzipped to a staging area. The staging area is *not*
+		cleaned up automatically.
+
+		:param Path path: 	Path to zip file to read
+		:param Path staging_area:  Where to store the files while they're
+		being worked with. If omitted, a temporary folder is created and
+		deleted after use
+		:return Path:  A path to the staging area
+		"""
+
+		if not path.exists():
+			return
+
+		if staging_area and (not staging_area.exists() or not staging_area.is_dir()):
+			raise RuntimeError("Staging area %s is not a valid folder")
+		else:
+			if not hasattr(self, "staging_area"):
+				self.staging_area = self.dataset.get_staging_area()
+
+			staging_area = self.staging_area
+
+		paths = []
+		with zipfile.ZipFile(path, "r") as archive_file:
+			archive_contents = sorted(archive_file.namelist())
+
+			for archived_file in archive_contents:
+				if self.interrupted:
+					raise ProcessorInterruptedException("Interrupted while iterating zip file contents")
+
+				file_name = archived_file.split("/")[-1]
+				temp_file = staging_area.joinpath(file_name)
+				archive_file.extract(file_name, staging_area)
+				paths.append(temp_file)
+
+		return staging_area
 
 	def write_csv_items_and_finish(self, data):
 		"""

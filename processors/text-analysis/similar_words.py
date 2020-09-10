@@ -1,6 +1,8 @@
 """
 Find similar words based on word2vec modeling
 """
+import shutil
+
 from gensim.models import KeyedVectors
 
 from backend.lib.helpers import UserInput, convert_to_int
@@ -63,11 +65,13 @@ class SimilarWord2VecWords(BasicProcessor):
 		self.dataset.update_status("Processing sentences")
 
 		depth = max(1, min(3, convert_to_int(self.parameters.get("crawl_depth", self.options["crawl_depth"]["default"]), self.options["crawl_depth"]["default"])))
-		input_words = self.parameters.get("words", "").split(",")
-		if not input_words:
+		input_words = self.parameters.get("words", "")
+		if not input_words or not input_words.split(","):
 			self.dataset.update_status("No input words provided, cannot look for similar words.", is_final=True)
-			self.dataset.finish(-1)
+			self.dataset.finish(0)
 			return
+
+		input_words = input_words.split(",")
 
 		num_words = convert_to_int(self.parameters.get("num-words"), self.options["num-words"]["default"])
 		try:
@@ -79,7 +83,8 @@ class SimilarWord2VecWords(BasicProcessor):
 
 		# go through all models and calculate similarity for all given input words
 		result = []
-		for model_file in self.iterate_archive_contents(self.source_file):
+		staging_area = self.unpack_archive_contents(self.source_file)
+		for model_file in staging_area.glob("*.model"):
 				interval = model_file.stem
 
 				# for each separate model, calculate top similar words for each
@@ -95,6 +100,7 @@ class SimilarWord2VecWords(BasicProcessor):
 				words = input_words.copy()
 				while words:
 					if self.interrupted:
+						shutil.rmtree(staging_area)
 						raise ProcessorInterruptedException("Interrupted while extracting similar words")
 
 					word = words.pop()
@@ -130,6 +136,8 @@ class SimilarWord2VecWords(BasicProcessor):
 						level += 1
 						words = word_queue.copy()
 						word_queue = set()
+
+		shutil.rmtree(staging_area)
 
 		if not result:
 			self.dataset.update_status("None of the words were found in the word embedding model.", is_final=True)

@@ -1,6 +1,7 @@
 """
 Generate interval-based Word2Vec models for sentences
 """
+import shutil
 import pickle
 import json
 
@@ -103,10 +104,18 @@ class GenerateWord2Vec(BasicProcessor):
 			# list per sentence - this processor is agnostic in that regard
 			token_set_name = temp_file.name
 			self.dataset.update_status("Extracting common phrases from token set %s..." % token_set_name)
-			bigram_transformer = Phrases(self.tokens_from_file(temp_file))
+			bigram_transformer = Phrases(self.tokens_from_file(temp_file, staging_area))
 
 			self.dataset.update_status("Training Word2vec model for token set %s..." % token_set_name)
-			model = Word2Vec(bigram_transformer[self.tokens_from_file(temp_file)], negative=use_negative, size=dimensionality, sg=use_skipgram, window=window, workers=3, min_count=min_count)
+			try:
+				model = Word2Vec(bigram_transformer[self.tokens_from_file(temp_file, staging_area)], negative=use_negative, size=dimensionality, sg=use_skipgram, window=window, workers=3, min_count=min_count)
+			except RuntimeError as e:
+				if "you must first build vocabulary before training the model" in e:
+					# not enough data. Skip - if this happens for all models
+					# an error will be generated later
+					continue
+				else:
+					raise e
 
 			# save - we only save the KeyedVectors for the model, this
 			# saves space and we don't need to re-train the model later
@@ -115,10 +124,15 @@ class GenerateWord2Vec(BasicProcessor):
 			del model
 			models += 1
 
+		if models == 0:
+			self.dataset.update_status("Not enough data in source file to train Word2Vec models.")
+			shutil.rmtree(staging_area)
+			self.dataset.finish(0)
+
 		# create another archive with all model files in it
 		self.write_archive_and_finish(staging_area)
 
-	def tokens_from_file(self, file):
+	def tokens_from_file(self, file, staging_area):
 		"""
 		Read tokens from token dump
 
@@ -126,6 +140,8 @@ class GenerateWord2Vec(BasicProcessor):
 		them as a generator, reducing memory usage and allowing interruption.
 
 		:param Path file:
+		:param Path staging_area:  Path to staging area, so it can be cleaned
+		up when the processor is interrupted
 		:return list:  A set of tokens
 		"""
 		if file.suffix == "pb":
@@ -140,6 +156,7 @@ class GenerateWord2Vec(BasicProcessor):
 					break
 
 				if self.interrupted:
+					shutil.rmtree(staging_area)
 					raise ProcessorInterruptedException("Interrupted while reading tokens")
 
 				if line == "]":
