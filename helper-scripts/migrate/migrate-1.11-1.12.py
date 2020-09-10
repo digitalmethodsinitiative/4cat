@@ -17,7 +17,7 @@ if not version or version.returncode != 0:
 	print("  Chromedriver is required for the TikTok data source. If you do not install it now,")
 	print("  later versions of 4CAT may not work, and you cannot enable the TikTok data source.")
 	print("  Do you want to continue without installing chromedriver? [y/n]", end="")
-	if input("").lower() != "y":
+	if input("").lower() == "y":
 		print()
 		exit(0)
 	else:
