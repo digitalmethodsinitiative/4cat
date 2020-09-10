@@ -236,9 +236,15 @@ class SVGHistogramRenderer(BasicProcessor):
 		label_x = x_margin_left
 		label_y = height - y_margin + (tick_width * 2)
 		next = 0
+
+		interval_type = self.parent.parameters.get("timeframe", "overall")
 		for interval in intervals:
 			if len(interval) == 7:
-				label = month_abbr[int(interval[5:7])] + "\n" + interval[0:4]
+				if interval_type == "month":
+					label = month_abbr[int(interval[5:7])] + "\n" + interval[0:4]
+				else:
+					label = interval[0:4] + "\nW" + interval[5:7]
+					
 			elif len(interval) == 10:
 				label = str(int(interval[8:10])) + month_abbr[int(interval[5:7])] + "\n" + interval[0:4]
 			else:
