@@ -8,6 +8,7 @@ import re
 import io
 
 from dateutil.parser import parse as parse_datetime
+from werkzeug.datastructures import FileStorage
 
 from backend.abstract.worker import BasicWorker
 from backend.lib.exceptions import QueryParametersException
@@ -60,9 +61,10 @@ class SearchCustom(BasicWorker):
 		encoding = SearchCustom.sniff_encoding(file)
 
 		wrapped_file = io.TextIOWrapper(file, encoding=encoding)
-		sample = wrapped_file.read(1048576)
+		sample = wrapped_file.read(1024 * 1024)
 		wrapped_file.seek(0)
-		dialect = csv.Sniffer().sniff(sample)
+		dialect = csv.Sniffer().sniff(sample, delimiters=(",", ";", "\t"))
+
 
 		# With validated csvs, save as is but make sure the raw file is sorted
 		reader = csv.DictReader(wrapped_file, dialect=dialect)
@@ -126,9 +128,9 @@ class SearchCustom(BasicWorker):
 		encoding = SearchCustom.sniff_encoding(file)
 
 		wrapped_file = io.TextIOWrapper(file, encoding=encoding)
-		sample = wrapped_file.read(1048576)
+		sample = wrapped_file.read(1024 * 1024)
 		wrapped_file.seek(0)
-		dialect = csv.Sniffer().sniff(sample)
+		dialect = csv.Sniffer().sniff(sample, delimiters=(",", ";", "\t"))
 
 		# With validated csvs, save as is but make sure the raw file is sorted
 		reader = csv.DictReader(wrapped_file, dialect=dialect)
@@ -182,6 +184,11 @@ class SearchCustom(BasicWorker):
 		:param FileStorage file:
 		:return:
 		"""
-		buffer = file.getbuffer()
-		maybe_bom = buffer[:3].tobytes()
+		if hasattr(file, "getbuffer"):
+			buffer = file.getbuffer()
+			maybe_bom = buffer[:3].tobytes()
+		elif type(file) is FileStorage:
+			buffer = file.peek(32)
+			maybe_bom = buffer[:3]
+
 		return "utf-8-sig" if maybe_bom == b"\xef\xbb\xbf" else "utf-8"
