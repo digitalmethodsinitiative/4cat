@@ -87,7 +87,7 @@ class GenerateWord2Vec(BasicProcessor):
 		self.dataset.update_status("Processing sentences")
 
 		use_skipgram = 1 if self.parameters.get("algorithm") == "skipgram" else 0
-		window = min(10, max(1, convert_to_int(self.parameters.get("window"), self.options["window"]["default"])))
+		window = min(10, max(1, convert_to_int(self.parameters.get("window"), int(self.options["window"]["default"]))))
 		use_negative = 5 if self.parameters.get("negative") else 0
 		min_count = max(1, convert_to_int(self.parameters.get("min_count"), self.options["min_count"]["default"]))
 		dimensionality = convert_to_int(self.parameters.get("dimensionality"), 100)
