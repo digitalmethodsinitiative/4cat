@@ -81,6 +81,10 @@ class SplitSentences(BasicProcessor):
 					self.dataset.update_status("Processing post %i" % num_posts)
 
 				num_posts += 1
+				
+				if not post["body"]:
+					continue
+					
 				sentences = sent_tokenize(post.get("body", ""), language=language)
 
 				for sentence in sentences:
