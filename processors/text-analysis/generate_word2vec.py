@@ -168,7 +168,11 @@ class GenerateWord2Vec(BasicProcessor):
 				try:
 					# the tokeniser dumps the json with one set of tokens per
 					# line, ending with a comma
-					token_set = json.loads(line.strip()[:-1])
+					line = line.strip()
+					if line[-1] == ",":
+						line = line[:-1]
+						
+					token_set = json.loads(line)
 					yield token_set
 				except json.JSONDecodeError:
 					# old-format json dumps are not suitable for the generator
