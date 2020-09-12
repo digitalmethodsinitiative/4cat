@@ -5,7 +5,8 @@ import shutil
 import pickle
 import json
 
-from gensim.models import Word2Vec, Phrases
+from gensim.models import Word2Vec
+from gensim.models.phrases import Phrases, Phraser
 from pathlib import Path
 
 from backend.lib.helpers import UserInput, convert_to_int
@@ -66,16 +67,22 @@ class GenerateWord2Vec(BasicProcessor):
 			"max": 1000,
 			"help": "Dimensionality of the word vectors"
 		},
-		"negative": {
-			"type": UserInput.OPTION_TOGGLE,
-			"default": True,
-			"help": "Use negative sampling"
-		},
 		"min_count": {
 			"type": UserInput.OPTION_TEXT,
 			"default": 5,
 			"help": "Minimum word occurrence",
 			"tooltip": "How often a word should occur in the corpus to be included"
+		},
+		"negative": {
+			"type": UserInput.OPTION_TOGGLE,
+			"default": True,
+			"help": "Use negative sampling"
+		},
+		"detect-bigrams": {
+			"type": UserInput.OPTION_TOGGLE,
+			"default": True,
+			"help": "Detect bigrams",
+			"tooltip": "If checked, commonly occurring word combinations ('New York') will be replaced with a single-word combination ('New_York')"
 		}
 	}
 
@@ -91,6 +98,7 @@ class GenerateWord2Vec(BasicProcessor):
 		use_negative = 5 if self.parameters.get("negative") else 0
 		min_count = max(1, convert_to_int(self.parameters.get("min_count"), self.options["min_count"]["default"]))
 		dimensionality = convert_to_int(self.parameters.get("dimensionality"), 100)
+		detect_bigrams = self.parameters.get("detect-bigrams")
 
 		staging_area = self.dataset.get_staging_area()
 
@@ -104,11 +112,24 @@ class GenerateWord2Vec(BasicProcessor):
 			# list per sentence - this processor is agnostic in that regard
 			token_set_name = temp_file.name
 			self.dataset.update_status("Extracting common phrases from token set %s..." % token_set_name)
-			bigram_transformer = Phrases(self.tokens_from_file(temp_file, staging_area))
+
+			if detect_bigrams:
+				bigram_transformer = Phrases(self.tokens_from_file(temp_file, staging_area))
+				bigram_transformer = Phraser(bigram_transformer)
+			else:
+				bigram_transformer = None
 
 			self.dataset.update_status("Training Word2vec model for token set %s..." % token_set_name)
 			try:
-				model = Word2Vec(bigram_transformer[self.tokens_from_file(temp_file, staging_area)], negative=use_negative, size=dimensionality, sg=use_skipgram, window=window, workers=3, min_count=min_count)
+				model = Word2Vec(negative=use_negative, size=dimensionality, sg=use_skipgram, window=window, workers=3, min_count=min_count)
+
+				# we do not simply pass a sentences argument to Word2Vec()
+				# because we are using a generator, which exhausts, while
+				# Word2Vec needs to iterate over the sentences twice
+				# https://stackoverflow.com/a/57632747
+				model.build_vocab(self.tokens_from_file(temp_file, staging_area, phraser=bigram_transformer))
+				model.train(self.tokens_from_file(temp_file, staging_area, phraser=bigram_transformer), epochs=model.iter, total_examples=model.corpus_count)
+
 			except RuntimeError as e:
 				if "you must first build vocabulary before training the model" in str(e):
 					# not enough data. Skip - if this happens for all models
@@ -134,7 +155,7 @@ class GenerateWord2Vec(BasicProcessor):
 		# create another archive with all model files in it
 		self.write_archive_and_finish(staging_area)
 
-	def tokens_from_file(self, file, staging_area):
+	def tokens_from_file(self, file, staging_area, phraser=None):
 		"""
 		Read tokens from token dump
 
@@ -144,8 +165,11 @@ class GenerateWord2Vec(BasicProcessor):
 		:param Path file:
 		:param Path staging_area:  Path to staging area, so it can be cleaned
 		up when the processor is interrupted
+		:param Phraser phraser:  Optional. If given, the yielded sentence is
+		passed through the phraser to detect (e.g.) bigrams.
 		:return list:  A set of tokens
 		"""
+
 		if file.suffix == "pb":
 			with file.open("rb") as input:
 				return pickle.load(input)
@@ -163,7 +187,7 @@ class GenerateWord2Vec(BasicProcessor):
 
 				if line == "]":
 					# this marks the end of the file
-					raise StopIteration
+					return
 
 				try:
 					# the tokeniser dumps the json with one set of tokens per
@@ -173,9 +197,13 @@ class GenerateWord2Vec(BasicProcessor):
 						line = line[:-1]
 						
 					token_set = json.loads(line)
-					yield token_set
+					if phraser:
+						yield phraser[token_set]
+					else:
+						yield token_set
 				except json.JSONDecodeError:
 					# old-format json dumps are not suitable for the generator
 					# approach
 					input.seek(0)
-					return json.load(input)
+					everything = json.load(input)
+					return everything
