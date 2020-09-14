@@ -1,5 +1,5 @@
 """
-Generate multiple area graphs and project them isometrically
+Project word embedding vectors for to a 2D space and highlight given words
 """
 import shutil
 import numpy
@@ -30,10 +30,10 @@ csv.field_size_limit(1024 * 1024 * 1024)
 
 class HistWordsVectorSpaceVisualiser(BasicProcessor):
     """
-    Generate multiple area graphs, and project them on an isometric plane
+    Project word embedding vectors for to a 2D space and highlight given words
 
-    Allows for easy side-by-side comparison of prevalence of multiple
-    attributes in a data set over time.
+    Based on Hamilton et al.'s 'HistWords' algorithm. Reduces vectors to two
+    dimensions, plots them, and highlights given words and their neighbours.
     """
     type = "histwords-vectspace"  # job type ID
     category = "Visual"  # category
@@ -144,6 +144,7 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
 
         # sort common vocabulary by combined frequency across all models
         # this should make filtering for common words a bit faster further down
+        self.dataset.update_status("Sorting vocabulary")
         common_vocab = list(common_vocab)
         common_vocab.sort(key=lambda w: sum([model.vocab[w].count for model in models.values()]), reverse=True)
 
