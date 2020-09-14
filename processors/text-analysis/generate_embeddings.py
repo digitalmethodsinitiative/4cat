@@ -1,11 +1,11 @@
 """
-Generate interval-based Word2Vec models for sentences
+Generate interval-based word embedding models for sentences
 """
 import shutil
 import pickle
 import json
 
-from gensim.models import Word2Vec
+from gensim.models import Word2Vec, FastText
 from gensim.models.phrases import Phrases, Phraser
 from pathlib import Path
 
@@ -19,14 +19,14 @@ __maintainer__ = "Sal Hagen"
 __email__ = "4cat@oilab.eu"
 
 
-class GenerateWord2Vec(BasicProcessor):
+class GenerateWordEmbeddings(BasicProcessor):
 	"""
-	Generate Word2Vec models
+	Generate Word Embeddings
 	"""
-	type = "generate-word2vec"  # job type ID
+	type = "generate-embeddings"  # job type ID
 	category = "Text analysis"  # category
-	title = "Generate Word2Vec models"  # title displayed in UI
-	description = "Generates Word2Vec word embedding models for the sentences, per chosen time interval. These can then be used to analyse semantic word associations within the corpus. Note that good models require large(r) datasets."  # description displayed in UI
+	title = "Generate Word Embedding Models"  # title displayed in UI
+	description = "Generates Word2Vec or FastText word embedding models for the sentences, per chosen time interval. These can then be used to analyse semantic word associations within the corpus. Note that good models require large(r) datasets."  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
 
 	accepts = ["tokenise-posts"]
@@ -35,14 +35,22 @@ class GenerateWord2Vec(BasicProcessor):
 	output = "zip"
 
 	references = [
-		"[Mikolov, Tomas, Ilya Sutskever, Kai Chen, Greg Corrado, and Jeffrey Dean. 2013. “Distributed Representations of Words and Phrases and Their Compositionality.” Advances in Neural Information Processing Systems, 2013: 3111-3119.](https://papers.nips.cc/paper/5021-distributed-representations-of-words-and-phrases-and-their-compositionality.pdf)",
-		"[Mikolov, Tomas, Kai Chen, Greg Corrado, and Jeffrey Dean. 2013. “Efficient Estimation of Word Representations in Vector Space.” ICLR Workshop Papers, 2013: 1-12.](https://arxiv.org/pdf/1301.3781.pdf)",
-		"[word2vec - Google Code](https://code.google.com/archive/p/word2vec/)",
-		"[word2vec - Gensim documentation](https://radimrehurek.com/gensim/models/word2vec.html)",
-		"[A Beginner's Guide to Word Embedding with Gensim Word2Vec Model - Towards Data Science](https://towardsdatascience.com/a-beginners-guide-to-word-embedding-with-gensim-word2vec-model-5970fa56cc92)"
+		"Word2Vec: [Mikolov, Tomas, Ilya Sutskever, Kai Chen, Greg Corrado, and Jeffrey Dean. 2013. “Distributed Representations of Words and Phrases and Their Compositionality.” 8Advances in Neural Information Processing Systems*, 2013: 3111-3119.](https://papers.nips.cc/paper/5021-distributed-representations-of-words-and-phrases-and-their-compositionality.pdf)",
+		"Word2Vec: [Mikolov, Tomas, Kai Chen, Greg Corrado, and Jeffrey Dean. 2013. “Efficient Estimation of Word Representations in Vector Space.” *ICLR Workshop Papers*, 2013: 1-12.](https://arxiv.org/pdf/1301.3781.pdf)",
+		"Word2Vec: [A Beginner's Guide to Word Embedding with Gensim Word2Vec Model - Towards Data Science](https://towardsdatascience.com/a-beginners-guide-to-word-embedding-with-gensim-word2vec-model-5970fa56cc92)",
+		"FastText: [Bojanowski, P., Grave, E., Joulin, A., & Mikolov, T. (2017). Enriching word vectors with subword information. *Transactions of the Association for Computational Linguistics*, 5, 135-146.](https://www.mitpressjournals.org/doi/abs/10.1162/tacl_a_00051)"
 	]
 
 	options = {
+		"model-type": {
+			"type": UserInput.OPTION_CHOICE,
+			"default": "Word2Vec",
+			"options": {
+				"Word2Vec": "Word2Vec",
+				"FastText": "FastText"
+			},
+			"help": "Model type"
+		},
 		"algorithm": {
 			"type": UserInput.OPTION_CHOICE,
 			"default": "cbow",
@@ -99,8 +107,13 @@ class GenerateWord2Vec(BasicProcessor):
 		min_count = max(1, convert_to_int(self.parameters.get("min_count"), self.options["min_count"]["default"]))
 		dimensionality = convert_to_int(self.parameters.get("dimensionality"), 100)
 		detect_bigrams = self.parameters.get("detect-bigrams")
+		model_type = self.parameters.get("model-type")
 
 		staging_area = self.dataset.get_staging_area()
+		model_builder = {
+			"Word2Vec": Word2Vec,
+			"FastText": FastText
+		}[model_type]
 
 		# go through all archived token sets and vectorise them
 		models = 0
@@ -111,7 +124,7 @@ class GenerateWord2Vec(BasicProcessor):
 			# 4chan-style posts. But alternatively it could generate one
 			# list per sentence - this processor is agnostic in that regard
 			token_set_name = temp_file.name
-			self.dataset.update_status("Extracting common phrases from token set %s..." % token_set_name)
+			self.dataset.update_status("Extracting bigrams from token set %s..." % token_set_name)
 
 			if detect_bigrams:
 				bigram_transformer = Phrases(self.tokens_from_file(temp_file, staging_area))
@@ -119,11 +132,11 @@ class GenerateWord2Vec(BasicProcessor):
 			else:
 				bigram_transformer = None
 
-			self.dataset.update_status("Training Word2vec model for token set %s..." % token_set_name)
+			self.dataset.update_status("Training %s model for token set %s..." % (model_builder.__name__, token_set_name))
 			try:
-				model = Word2Vec(negative=use_negative, size=dimensionality, sg=use_skipgram, window=window, workers=3, min_count=min_count)
+				model = model_builder(negative=use_negative, size=dimensionality, sg=use_skipgram, window=window, workers=3, min_count=min_count)
 
-				# we do not simply pass a sentences argument to Word2Vec()
+				# we do not simply pass a sentences argument to model builder
 				# because we are using a generator, which exhausts, while
 				# Word2Vec needs to iterate over the sentences twice
 				# https://stackoverflow.com/a/57632747
@@ -148,11 +161,12 @@ class GenerateWord2Vec(BasicProcessor):
 			models += 1
 
 		if models == 0:
-			self.dataset.update_status("Not enough data in source file to train Word2Vec models.")
+			self.dataset.update_status("Not enough data in source file to train %s models." % model_builder.__name__)
 			shutil.rmtree(staging_area)
 			self.dataset.finish(0)
 
 		# create another archive with all model files in it
+		self.dataset.update_status("%s model(s) saved." % model_builder.__name__)
 		self.write_archive_and_finish(staging_area)
 
 	def tokens_from_file(self, file, staging_area, phraser=None):

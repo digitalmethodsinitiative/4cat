@@ -25,7 +25,7 @@ class SimilarWord2VecWords(BasicProcessor):
 	description = "Uses a Word2Vec model to find words used in a similar context"  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
-	accepts = ["generate-word2vec"]
+	accepts = ["generate-embeddings"]
 
 	input = "zip"
 	output = "csv:time,input,item,value"

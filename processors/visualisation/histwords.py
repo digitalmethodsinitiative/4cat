@@ -44,12 +44,13 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
     input = "zip"
     output = "svg"
 
-    accepts = ["align-word2vec", "generate-word2vec"]
+    accepts = ["generate-embeddings"]
     references = [
-        "[Hamilton, W. L., Leskovec, J., & Jurafsky, D. (2016). Diachronic word embeddings reveal statistical laws of semantic change. *arXiv preprint** arXiv:1605.09096.](https://arxiv.org/pdf/1605.09096.pdf)",
-        "[William L. Hamilton, Jure Leskovec, and Dan Jurafsky. HistWords: Word Embeddings for Historical Text](https://nlp.stanford.edu/projects/histwords/)",
-        "[Maaten, L. V. D., & Hinton, G. (2008). Visualizing data using t-SNE. *Journal of machine learning research*, 9(Nov), 2579-2605.](https://www.jmlr.org/papers/v9/vandermaaten08a.html)",
-        "[Joliffe, I. T., & Morgan, B. J. T. (1992). Principal component analysis and exploratory factor analysis. *Statistical methods in medical research*, 1(1), 69-95.](https://journals.sagepub.com/doi/abs/10.1177/096228029200100105)"
+        "HistWords: [Hamilton, W. L., Leskovec, J., & Jurafsky, D. (2016). Diachronic word embeddings reveal statistical laws of semantic change. *arXiv preprint** arXiv:1605.09096.](https://arxiv.org/pdf/1605.09096.pdf)",
+        "HistWords: [William L. Hamilton, Jure Leskovec, and Dan Jurafsky. HistWords: Word Embeddings for Historical Text](https://nlp.stanford.edu/projects/histwords/)",
+        "t-SNE: [Maaten, L. V. D., & Hinton, G. (2008). Visualizing data using t-SNE. *Journal of machine learning research*, 9(Nov), 2579-2605.](https://www.jmlr.org/papers/v9/vandermaaten08a.html)",
+        "PCA: [Joliffe, I. T., & Morgan, B. J. T. (1992). Principal component analysis and exploratory factor analysis. *Statistical methods in medical research*, 1(1), 69-95.](https://journals.sagepub.com/doi/abs/10.1177/096228029200100105)",
+        "Truncated SVD: [Manning, C. D., Raghavan, P., & Schütze, H. (2008). Matrix decompositions and latent semantic indexing. *Introduction to information retrieval*, 403-417.](http://nlp.stanford.edu/IR-book/pdf/18lsi.pdf)"
     ]
 
     options = {
