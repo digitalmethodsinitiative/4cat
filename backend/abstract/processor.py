@@ -124,7 +124,7 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 		if not self.dataset.is_finished():
 			self.dataset.finish()
 
-		if self.staging_area:
+		if self.staging_area and type(self.staging_area) == Path and self.staging_area.exists():
 			shutil.rmtree(self.staging_area)
 
 		# see if we have anything else lined up to run next
