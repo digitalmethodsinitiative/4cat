@@ -24,15 +24,7 @@
             <span>
                 <ul>
                     <li>
-                        <a class="property-badge permalink popup-trigger tooltip-trigger" aria-controls="tooltip-references-{{ processor.id }} popup-references-{{ processor.id }}"><i class="fa fa-fw fa-graduation-cap"></i> <span class="sr-only">References for this processor</span></a>
-                        <p role="tooltip" id="tooltip-references-{{ processor.id }}" aria-hidden="true">References for this analytical processor</p>
-                        <div role="dialog" id="popup-references-{{ processor.id }}">
-                            <ol>
-                                {% for reference in processor.references %}
-                                    <li>{{ reference|markdown|safe }}</li>
-                                {% endfor %}
-                            </ol>
-                        </div>
+                        {% set ref_name = processor.name %}{% set ref_refs = processor.references %}{% set ref_id = processor.id %}{% include "processor-references.html" %}
                     </li>
                 </ul>
             </span>

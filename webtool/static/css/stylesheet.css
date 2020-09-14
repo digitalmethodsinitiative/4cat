@@ -304,6 +304,17 @@ button.tooltip-trigger, button.popup-trigger {
     width: 100%;
 }
 
+#popup .content em {
+    font-weight: normal;
+    font-style: italic;
+}
+
+#popup h2 {
+    font-weight: bold;
+    font-size: 1.25em;
+    padding: 0.8em;
+}
+
 #popup[aria-expanded=true] {
     display: block;
 }

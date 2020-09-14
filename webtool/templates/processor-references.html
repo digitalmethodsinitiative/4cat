@@ -1,0 +1,10 @@
+<a class="property-badge permalink popup-trigger tooltip-trigger" aria-controls="tooltip-references-{{ ref_id }} popup-references-{{ ref_id }}"><i class="fa fa-fw fa-graduation-cap"></i> <span class="sr-only">References for this processor</span></a>
+<p role="tooltip" id="tooltip-references-{{ ref_id }}" aria-hidden="true">References for this analytical processor</p>
+<div role="dialog" id="popup-references-{{ ref_id }}">
+    <h2><i class="fa fa-graduation-cap" aria-hidden="true"></i> References for &quot;{{ ref_name }}&quot;</h2>
+    <ol>
+        {% for reference in ref_refs %}
+            <li>{{ reference|markdown|safe }}</li>
+        {% endfor %}
+    </ol>
+</div>
