@@ -63,9 +63,9 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
             "type": UserInput.OPTION_CHOICE,
             "help": "Vector dimensionality reduction technique",
             "options": {
-                "tsne": "t-SNE (learning rate: 150)",
-                "pca": "PCA",
-                "svd": "Truncated SVD (randomised, 5 iterations)"
+                "t-SNE": "t-SNE (learning rate: 150)",
+                "PCA": "PCA",
+                "TruncatedSVD": "Truncated SVD (randomised, 5 iterations)"
             },
             "default": "tsne"
         },
@@ -118,17 +118,19 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
         reduction_method = self.parameters.get("method")
         all_words = self.parameters.get("all-words")
 
-        # find words that are common to all models
+        # load model files and initialise
+        self.dataset.update_status("Unpacking word embedding models")
         staging_area = self.unpack_archive_contents(self.source_file)
         common_vocab = None
         vector_size = None
         models = {}
-        self.dataset.update_status("Determining cross-model common vocabulary")
 
+        # find words that are common to all models
+        self.dataset.update_status("Determining cross-model common vocabulary")
         for model_file in staging_area.glob("*.model"):
             if self.interrupted:
                 shutil.rmtree(staging_area)
-                raise ProcessorInterruptedException("Interrupted while processing word2vec models")
+                raise ProcessorInterruptedException("Interrupted while processing word embedding models")
 
             model = KeyedVectors.load(str(model_file))
             models[model_file.stem] = model
@@ -138,13 +140,12 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
             if common_vocab is None:
                 common_vocab = set(model.vocab.keys())
             else:
-                common_vocab &= set(model.vocab.keys())
+                common_vocab &= set(model.vocab.keys())  # intersect
 
         # sort common vocabulary by combined frequency across all models
+        # this should make filtering for common words a bit faster further down
         common_vocab = list(common_vocab)
         common_vocab.sort(key=lambda w: sum([model.vocab[w].count for model in models.values()]), reverse=True)
-
-        staging_area = self.unpack_archive_contents(self.source_file)
 
         # initial boundaries of 2D space (to be adjusted later based on t-sne
         # outcome)
@@ -153,14 +154,14 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
         min_x = sys.float_info.max
         min_y = sys.float_info.max
 
-        # for each model, find the words that should be plotted - these are the
-        # nearest neighbours for the given query words
+        # for each model, find the words that we may want to plot - these are
+        # the nearest neighbours for the given query words
         relevant_words = {}
 
         # the vectors need to be reduced all at once - but the vectors are
         # grouped by model. To solve this, keep one numpy array of vectors,
         # but also keep track of which indexes of this array belong to which
-        # model
+        # model, by storing the index of the first vector for a model
         vectors = numpy.empty((0, vector_size))
         vector_offsets = {}
 
@@ -174,22 +175,25 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
                     self.dataset.update_status("Query '%s' was not found in the data; cannot find nearest neighbours.", is_final=True)
                     self.dataset.finish(0)
                     return
-                
+
                 if self.interrupted:
                     shutil.rmtree(staging_area)
                     raise ProcessorInterruptedException("Interrupted while finding similar words")
 
-                context = {query}  # always plot the queries for each model
-                context |= set([word[0] for word in model.most_similar(query, topn=1000) if
+                # use a larger sample (topn) than required since some of the
+                # nearest neighbours may not be in the common vocabulary and
+                # will therefore need to be ignored
+                context = set([word[0] for word in model.most_similar(query, topn=1000) if
                                 word[0] in common_vocab and word[1] >= threshold][:num_words])
 
-                relevant_words[model_name] |= context
+                relevant_words[model_name] |= {query} | context  # always include query word
 
         # now do another loop to determine which words to plot for each model
         # this is either the same as relevant_words, or a superset which
         # combines all relevant words for all models
         plottable_words = {}
         last_model = max(relevant_words.keys())
+        all_relevant_words = set().union(*relevant_words.values())
 
         for model_name, words in relevant_words.items():
             plottable_words[model_name] = []
@@ -198,7 +202,7 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
             # determine which words to plot for this model. either the nearest
             # neighbours for this model, or all nearest neighbours found across
             # all models
-            words_to_include = set().union(*relevant_words.values()) if all_words else relevant_words[model_name]
+            words_to_include = all_relevant_words if all_words else relevant_words[model_name]
 
             for word in words_to_include:
                 if word in plottable_words[model_name] or (not overlay and model_name != last_model and word not in input_words):
@@ -217,20 +221,21 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
         # a two-dimensional coordinate with the previously initialised tsne
         # transformer. here the two-dimensional vectors are interpreted as
         # cartesian coordinates
-        if reduction_method == "pca":
-            pca = PCA(n_components=2)
+        if reduction_method == "PCA":
+            pca = PCA(n_components=2, random_state=0)
             vectors = pca.fit_transform(vectors)
-        elif reduction_method == "tsne":
+        elif reduction_method == "t-SNE":
             # initialise t-sne transformer
             # parameters taken from Hamilton et al.
             # https://github.com/williamleif/histwords/blob/master/viz/common.py
             tsne = TSNE(n_components=2, random_state=0, learning_rate=150, init="pca")
             vectors = tsne.fit_transform(vectors)
-        elif reduction_method == "svd":
+        elif reduction_method == "TruncatedSVD":
             # standard sklearn parameters made explicit
-            svd = TruncatedSVD(n_components=2, algorithm="randomized", n_iter=5)
+            svd = TruncatedSVD(n_components=2, algorithm="randomized", n_iter=5, random_state=0)
             vectors = svd.fit_transform(vectors)
         else:
+            shutil.rmtree(staging_area)
             self.dataset.update_status("Invalid dimensionality reduction technique selected", is_final=True)
             self.dataset.finish(0)
             return
@@ -287,14 +292,15 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
         fontsize_small = width / 100
 
         # now we have the dimensions, the canvas can be instantiated
+        model_type = self.parent.parameters.get("model-type", "word2vec")
         canvas = get_4cat_canvas(self.dataset.get_results_path(), width, height,
-                                 header="word2vec nearest neighbours - '%s'" % ",".join(input_words),
+                                 header="%s nearest neighbours (fitting: %s) - '%s'" % (model_type, reduction_method, ",".join(input_words)),
                                  fontsize_normal=fontsize_normal,
                                  fontsize_large=fontsize_large,
                                  fontsize_small=fontsize_small)
 
         # use colour-coded backgrounds to distinguish the query words in the
-        # graph
+        # graph, each model (= interval) with a separate colour
         for model_name in plottable_words:
             solid = Filter(id="solid-%s" % model_name)
             solid.feFlood(flood_color=colours[colour_index])
@@ -334,6 +340,8 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
                     filter=filter
                 ))
 
+                # we make sure the queries are always rendered on top by
+                # putting them in a separate SVG container
                 if is_query:
                     queries.add(label_container)
                 else:
