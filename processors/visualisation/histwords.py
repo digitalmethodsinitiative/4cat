@@ -4,6 +4,7 @@ Generate multiple area graphs and project them isometrically
 import shutil
 import numpy
 import csv
+import sys
 
 from sklearn.manifold import TSNE
 
@@ -45,29 +46,35 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
 
     accepts = ["align-word2vec", "generate-word2vec"]
     references = [
-        "[William L. Hamilton, Jure Leskovec, and Dan Jurafsky. ACL 2016. Diachronic Word Embeddings Reveal Statistical Laws of Semantic Change. ](https://arxiv.org/pdf/1605.09096.pdf)"
+        "[William L. Hamilton, Jure Leskovec, and Dan Jurafsky. ACL 2016. Diachronic Word Embeddings Reveal Statistical Laws of Semantic Change. ](https://arxiv.org/pdf/1605.09096.pdf)",
         "[William L. Hamilton, Jure Leskovec, and Dan Jurafsky. HistWords: Word Embeddings for Historical Text](https://nlp.stanford.edu/projects/histwords/)"
     ]
 
     options = {
         "words": {
             "type": UserInput.OPTION_TEXT,
-            "help": "Words",
-            "tooltip": "Separate with commas."
+            "help": "Query",
+            "tooltip": "The position of this word will be highlighted in the graph"
         },
         "num-words": {
             "type": UserInput.OPTION_TEXT,
             "help": "Amount of similar words",
             "min": 1,
-            "default": 50,
+            "default": 15,
             "max": 100
         },
         "threshold": {
             "type": UserInput.OPTION_TEXT,
             "help": "Similarity threshold",
             "tooltip": "Decimal value between 0 and 1; only words with a higher similarity score than this will be included",
-            "default": "0.25"
+            "default": "0.3"
         },
+        "overlay": {
+            "type": UserInput.OPTION_TOGGLE,
+            "help": "Plot all models?",
+            "default": True,
+            "tooltip": "Plot similar words for all models? If unchecked, only similar words for the most recent model will be plotted."
+        }
     }
 
     def process(self):
@@ -78,6 +85,7 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
             return
 
         input_words = input_words.split(",")
+
         num_words = convert_to_int(self.parameters.get("num-words"), self.options["num-words"]["default"])
         try:
             threshold = float(self.parameters.get("threshold", self.options["threshold"]["default"]))
@@ -85,6 +93,7 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
             threshold = float(self.options["threshold"]["default"])
 
         threshold = max(-1.0, min(1.0, threshold))
+        overlay = self.parameters.get("overlay")
 
         # retain words that are common to all models
         staging_area = self.unpack_archive_contents(self.source_file)
@@ -104,87 +113,120 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
             else:
                 common_vocab &= set(model.vocab.keys())
 
-            # prime model for further editing
-            # if we don't do this "vectors_norm" will not be available later
-            try:
-                model.most_similar("4cat")
-            except KeyError:
-                pass
-
         # sort common vocabulary by combined frequency across all models
         common_vocab = list(common_vocab)
         common_vocab.sort(key=lambda w: sum([model.vocab[w].count for model in models.values()]), reverse=True)
 
         staging_area = self.unpack_archive_contents(self.source_file)
-        relevant_vocab = set()
-        contexts = {}
-        for query in input_words:
-            for model_file in staging_area.glob("*.model"):
-                if self.interrupted:
-                    shutil.rmtree(staging_area)
-                    raise ProcessorInterruptedException("Interrupted while determining common vocabulary")
 
-                self.dataset.update_status(
-                    "Determining words most similar to '%s' for model %s" % (query, model_file.name))
-                model = KeyedVectors.load(str(model_file))
-                try:
-                    # take a larger sample than we need, because we may need
-                    # to discard quite a few words not in the common vocabulary
-                    contexts[model_file.stem] = [word for word in model.most_similar(query, topn=1000) if
-                                                 word[0] in common_vocab][:num_words]
-                except KeyError:
-                    # query not in model for this interval - shouldn't happen...
-                    continue
-                model_vocab = set([word[0] for word in contexts[model_file.stem]])
-                relevant_vocab |= model_vocab
-                del model
-
-        if not relevant_vocab:
-            self.dataset.update_status(
-                "No neighbouring words found for query. The query may not occur in the dataset frequently enough.")
-            self.dataset.finish(0)
-            return
-
-        # take the most recent model as the one that determines the positions
-        # of all words once plotted
-        self.dataset.update_status("Reducing vector dimensions")
-        last_model_file = sorted(list(staging_area.glob("*.model")), reverse=True)[0]
-        model = KeyedVectors.load(str(last_model_file))
-        word_vectors = numpy.empty((0, model.vector_size))
-        plotted_words = []
-        for word in relevant_vocab:
-            word_vector = model[word]
-            plotted_words.append(word)
-            word_vectors = numpy.append(word_vectors, [word_vector], axis=0)
-
+        # initialise t-sne transformer
         # use t-SNE to reduce the vectors to two-dimensionality which then makes
         # them suitable for plotting
-        # learning rate 500 because else words overlap quite a lot and the plot
-        # becomes unreadable
-        tsne = TSNE(n_components=2, random_state=0, learning_rate=500)
-        positions = tsne.fit_transform(word_vectors)
+        # parameters taken from Hamilton et al.
+        # https://github.com/williamleif/histwords/blob/master/viz/common.py
+        tsne = TSNE(n_components=2, random_state=0, learning_rate=150, init="pca")
 
-        self.dataset.update_status("Plotting data to graph")
-        # find boundaries of two-dimensional values
-        min_x = min([position[0] for position in positions])
-        max_x = max([position[0] for position in positions])
-        min_y = min([position[1] for position in positions])
-        max_y = max([position[1] for position in positions])
+        # initial boundaries of 2D space (to be adjusted later based on t-sne
+        # outcome)
+        max_x = 0.0 - sys.float_info.max
+        max_y = 0.0 - sys.float_info.max
+        min_x = sys.float_info.max
+        min_y = sys.float_info.max
 
-        # normalize positions to always use positive coordinates
-        positions = [(position[0] - min_x, position[1] - min_y) for position in positions]
+        # for each model, find the words that should be plotted - these are the
+        # nearest neighbours for the given query words
+        plottable_words = {}
+        vectors = None
+
+        # the vectors need to be reduced all at once - but the vectors are
+        # grouped by model. To solve this, keep one numpy array of vectors,
+        # but also keep track of which indexes of this array belong to which
+        # model
+        vector_indexes_first = {}
+        vector_indexes_last = {}
+
+        # now process each model
+        for model_file in staging_area.glob("*.model"):
+            model = KeyedVectors.load(str(model_file))
+            model_name = model_file.stem
+
+            if vectors is None:
+                # can only be initialised here since now we know the vector size
+                vectors = numpy.empty((0, model.vector_size))
+
+            plottable_words[model_name] = []  # not a set, since order needs to be preserved
+            self.dataset.update_status("Finding similar words in model '%s'" % model_name)
+
+            vector_indexes_first[model_name] = len(vectors)
+            vector_indexes_last[model_name] = len(vectors)
+
+            for query in input_words:
+                if self.interrupted:
+                    shutil.rmtree(staging_area)
+                    raise ProcessorInterruptedException("Interrupted while finding similar words")
+
+                context = [word[0] for word in model.most_similar(query, topn=1000) if
+                           word[0] in common_vocab and word[1] >= threshold][:num_words]
+                context.append(query)
+
+                # add words not seen yet to the list of words and positions to
+                # plot for this model - so for all queries, all similar words
+                # needed are included exactly once
+                for word in context:
+                    if word not in plottable_words[model_name]:
+                        plottable_words[model_name].append(word)
+                        vectors = numpy.append(vectors, [model[word]], axis=0)
+                        vector_indexes_last[model_name] = len(vectors)
+
+        # reduce the vectors of all words to be plotted for this model to
+        # a two-dimensional coordinate with the previously initialised tsne
+        # transformer
+        # also keep track of the boundaries of our 2D space, so we can plot
+        # them properly later
+        vectors = tsne.fit_transform(vectors)
+        for position in vectors:
+            max_x = max(max_x, position[0])
+            max_y = max(max_y, position[1])
+            min_x = min(min_x, position[0])
+            min_y = min(min_y, position[1])
+
+        # now we know for each model which words should be plotted and at what
+        # position
+        # with this knowledge, we can normalize the positions, and start
+        # plotting them in a graph
+
+        # a palette generated with https://medialab.github.io/iwanthue/
+        colours = ["#698dcc", "#acb838", "#7665cc", "#5db645", "#c155ba", "#5bbe7d", "#cc4670", "#4ebdb0", "#d64f35",
+                   "#407c45", "#be73a8", "#96a151", "#a55538", "#d49837", "#e08f75", "#7f6c29"]
+        colour_index = 0
+
+        # make sure all coordinates are positive
         max_x -= min_x
         max_y -= min_y
 
-        # proportionally reposition within canvas space
-        width = 1000
+        # determine graph dimensions and proportions
+        width = 1000  # arbitrary
         height = width * (max_y / max_x)  # retain proportions
         scale = width / max_x
-        positions = [(pos[0] * scale, pos[1] * scale) for pos in positions]
 
+        # margin around the plot to give room for labels and to look better
         margin = width * 0.1
         width += 2 * margin
         height += 2 * margin
+
+        # normalize all known positions to fit within the graph
+        vectors = [(margin + ((position[0] - min_x) * scale), margin + ((position[1] - min_y) * scale)) for position in
+                   vectors]
+
+        # now all positions are finalised, we can determine the "journey" of
+        # each query - the sequence of positions in the graph it takes, so we
+        # can draw lines from position to position later
+        journeys = {}
+        for query in input_words:
+            journeys[query] = []
+            for model_name, words in plottable_words.items():
+                index = words.index(query)
+                journeys[query].append(vectors[vector_indexes_first[model_name] + index])
 
         # font sizes proportional to width (which is static and thus predictable)
         fontsize_large = width / 50
@@ -195,6 +237,15 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
         canvas = Drawing(str(self.dataset.get_results_path()),
                          size=(width, height),
                          style="font-family:monospace;font-size:%ipx" % fontsize_normal)
+
+        # use colour-coded backgrounds to distinguish the query words in the
+        # graph
+        for model_name in plottable_words:
+            solid = Filter(id="solid-%s" % model_name)
+            solid.feFlood(flood_color=colours[colour_index])
+            solid.feComposite(in_="SourceGraphic")
+            canvas.defs.add(solid)
+            colour_index += 1
 
         # draw border
         canvas.add(Rect(
@@ -210,7 +261,7 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
         header.add(Rect(insert=(0, 0), size=("100%", "100%"), fill="#000"))
         header.add(Text(
             insert=("50%", "50%"),
-            text="word2vec nearest neighbours - '%s'" % query,
+            text="word2vec nearest neighbours - '%s'" % ", ".join(input_words),
             dominant_baseline="middle",
             text_anchor="middle",
             fill="#FFF",
@@ -218,82 +269,65 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
         ))
         canvas.add(header)
 
-        # adjust word positions for margins
-        positions = [(position[0] + margin, position[1] + margin) for position in positions]
+        # now plot each word for each model
+        self.dataset.update_status("Plotting graph")
+        words = SVG(insert=(0, 0), size=(width, height))
+        last_model = max(list(plottable_words.keys()))
+        colour_index = 0
 
-        # plot each word
-        context_plot = SVG(insert=(0, 0), size=(width, height))
-        for index, word in enumerate(plotted_words):
-            position = positions[index]
+        for model_name, labels in plottable_words.items():
+            positions = vectors[vector_indexes_first[model_name]:vector_indexes_last[model_name]]
 
-            label_container = SVG(
-                insert=position,
-                size=(1, 1), overflow="visible")
-            label_container.add(Text(
-                insert=("50%", "50%"),
-                text=word,
-                dominant_baseline="middle",
-                text_anchor="middle"
-            ))
-            context_plot.add(label_container)
+            label_index = 0
+            print(labels)
+            for position in positions:
+                print(label_index)
+                word = labels[label_index]
+                label_index += 1
 
-        # plot the intervals (i.e. relative position of query over time)
-        named_positions = {word: positions[plotted_words.index(word)] for word in plotted_words}
-        journey = []
-        labels = SVG(insert=(0, 0), size=(width, height))
-        solid = Filter(id="solid")
-        solid.feFlood(flood_color="#000")
-        solid.feComposite(in_="SourceGraphic")
-        labels.defs.add(solid)
+                if not overlay and model_name != last_model and word not in input_words:
+                    # if we're only plotting the latest model, ignore words
+                    # from other models that aren't a query
+                    continue
 
-        for interval, context in contexts.items():
-            # calculate the position
-            # this is the weighted average of all similar words found earlier
-            # the average is weighted by the similarity - more similar words
-            # will "pull" the query in more strongly
-            x = 0
-            y = 0
-            combined_weight = 0
-            for word in context:
-                x += named_positions[word[0]][0] * word[1]
-                y += named_positions[word[0]][1] * word[1]
-                combined_weight += word[1]
+                filter = "none" if word not in input_words else "url(#solid-%s)" % model_name
+                colour = colours[colour_index] if word not in input_words else "#FFF"
+                fontsize = fontsize_small if word not in input_words else fontsize_normal
 
-            x /= combined_weight
-            y /= combined_weight
+                if word in input_words:
+                    word += " (" + model_name + ")"
 
-            # save positions sequentially so we can draw arrows later
-            journey.append((x, y))
+                label_container = SVG(
+                    insert=position,
+                    size=(1, 1), overflow="visible")
+                label_container.add(Text(
+                    insert=("50%", "50%"),
+                    text=word,
+                    dominant_baseline="middle",
+                    text_anchor="middle",
+                    style="fill:%s;font-size:%ipx" % (colour, fontsize),
+                    filter=filter
+                ))
 
-            # add label for interval to SVG
-            label_container = SVG(
-                insert=(x, y),
-                size=(1, 1), overflow="visible")
-            label_container.add(Text(
-                insert=("50%", "50%"),
-                text=interval,
-                dominant_baseline="middle",
-                text_anchor="middle",
-                style="fill:#FFF;font-size:%ipx" % fontsize_normal,
-                filter="url(#solid)"
-            ))
-            labels.add(label_container)
+                words.add(label_container)
 
-        # draw arrows between query positions
-        previous_position = None
-        arrows = SVG(insert=(0, 0), size=(width, height))
-        for position in journey:
-            if previous_position is None:
+            colour_index = 0 if colour_index >= len(colours) else colour_index + 1
+
+        # plot a line between positions for query words
+        lines = SVG(insert=(0, 0), size=(width, height))
+        for query, journey in journeys.items():
+            previous_position = None
+            for position in journey:
+                if previous_position is None:
+                    previous_position = position
+                    continue
+
+                lines.add(Line(start=previous_position, end=position,
+                               stroke="#CE1B28", stroke_width=2))
                 previous_position = position
-                continue
 
-            arrows.add(Line(start=previous_position, end=position,
-                            stroke="#CE1B28", stroke_width=2))
-            previous_position = position
-
-        canvas.add(arrows)
-        canvas.add(context_plot)
-        canvas.add(labels)
+        canvas.add(lines)
+        canvas.add(words)
 
         # 4cat logo
         label = "made with 4cat - 4cat.oilab.nl"
@@ -311,4 +345,5 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
         canvas.add(footer)
 
         canvas.save(pretty=True)
-        self.dataset.finish(len(journey))
+        shutil.rmtree(staging_area)
+        self.dataset.finish(len(journeys))
