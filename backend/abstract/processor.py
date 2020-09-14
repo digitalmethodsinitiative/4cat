@@ -124,6 +124,9 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 		if not self.dataset.is_finished():
 			self.dataset.finish()
 
+		if self.staging_area:
+			shutil.rmtree(self.staging_area)
+
 		# see if we have anything else lined up to run next
 		for next in self.parameters.get("next", []):
 			next_parameters = next.get("parameters", {})
