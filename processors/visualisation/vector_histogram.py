@@ -123,7 +123,7 @@ class SVGHistogramRenderer(BasicProcessor):
 				dominant_baseline="middle",
 				text_anchor="middle",
 				fill="#FFF",
-				style="font-size:%i" % header_fontsize
+				style="font-size:%ipx" % header_fontsize
 			))
 			canvas.add(header_container)
 
@@ -279,7 +279,7 @@ class SVGHistogramRenderer(BasicProcessor):
 			dominant_baseline="middle",
 			text_anchor="middle",
 			fill="#FFF",
-			style="font-size:%i" % fontsize_small
+			style="font-size:%ipx" % fontsize_small
 		))
 		canvas.add(footer)
 

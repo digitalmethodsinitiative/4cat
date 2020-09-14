@@ -299,13 +299,7 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
             colour_index += 1
 
         # draw border
-        canvas.add(Rect(
-            insert=(0, 0),
-            size=(width, height),
-            stroke="#000",
-            stroke_width=2,
-            fill="#FFF"
-        ))
+        canvas.add(Rect(insert=(0, 0), size=(width, height), stroke="#000", stroke_width=2, fill="#FFF"))
 
         # header
         header = SVG(insert=(0, 0), size=("100%", fontsize_large * 2))
@@ -316,14 +310,13 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
             dominant_baseline="middle",
             text_anchor="middle",
             fill="#FFF",
-            style="font-size:%i" % fontsize_large
+            style="font-size:%ipx" % fontsize_large
         ))
         canvas.add(header)
 
         # now plot each word for each model
         self.dataset.update_status("Plotting graph")
         words = SVG(insert=(0, 0), size=(width, height))
-        last_model = max(list(plottable_words.keys()))
         colour_index = 0
 
         for model_name, labels in plottable_words.items():
@@ -341,9 +334,7 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
                 if word in input_words:
                     word += " (" + model_name + ")"
 
-                label_container = SVG(
-                    insert=position,
-                    size=(1, 1), overflow="visible")
+                label_container = SVG(insert=position, size=(1, 1), overflow="visible")
                 label_container.add(Text(
                     insert=("50%", "50%"),
                     text=word,
@@ -380,7 +371,7 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
         footer.add(Rect(insert=(0, 0), size=("100%", "100%"), fill="#000"))
         footer.add(
             Text(insert=("50%", "50%"), text=label, dominant_baseline="middle", text_anchor="middle", fill="#FFF",
-                 style="font-size:%i" % fontsize_small))
+                 style="font-size:%ipx" % fontsize_small))
         canvas.add(footer)
 
         canvas.save(pretty=True)
