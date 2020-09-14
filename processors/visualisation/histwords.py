@@ -169,6 +169,11 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
             self.dataset.update_status("Finding similar words in model '%s'" % model_name)
 
             for query in input_words:
+                if query not in model.vocab:
+                    self.dataset.update_status("Query '%s' was not found in the data; cannot find nearest neighbours.", is_final=True)
+                    self.dataset.finish(0)
+                    return
+                
                 if self.interrupted:
                     shutil.rmtree(staging_area)
                     raise ProcessorInterruptedException("Interrupted while finding similar words")
