@@ -1,7 +1,6 @@
 """
 Generate multiple area graphs and project them isometrically
 """
-import itertools
 import shutil
 import numpy
 import csv
@@ -13,12 +12,11 @@ from sklearn.decomposition import PCA, TruncatedSVD
 from gensim.models import KeyedVectors
 
 from backend.abstract.processor import BasicProcessor
-from backend.lib.helpers import UserInput, convert_to_int
+from backend.lib.helpers import UserInput, convert_to_int, get_4cat_canvas
 from backend.lib.exceptions import ProcessorInterruptedException
 
-from svgwrite import Drawing
 from svgwrite.container import SVG
-from svgwrite.shapes import Line, Rect
+from svgwrite.shapes import Line
 from svgwrite.text import Text
 from svgwrite.filters import Filter
 
@@ -57,8 +55,8 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
     options = {
         "words": {
             "type": UserInput.OPTION_TEXT,
-            "help": "Query",
-            "tooltip": "The position of this word will be highlighted in the graph"
+            "help": "Word(s)",
+            "tooltip": "Nearest neighbours for these words will be charted, and the position of the words will be highlighted"
         },
         "method": {
             "type": UserInput.OPTION_CHOICE,
@@ -72,15 +70,16 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
         },
         "num-words": {
             "type": UserInput.OPTION_TEXT,
-            "help": "Amount of similar words",
+            "help": "Amount of nearest neighbours",
             "min": 1,
             "default": 15,
-            "max": 100
+            "max": 100,
+            "tooltip": "Amount of neighbours to chart per model, per queried word"
         },
         "threshold": {
             "type": UserInput.OPTION_TEXT,
             "help": "Similarity threshold",
-            "tooltip": "Decimal value between 0 and 1; only words with a higher similarity score than this will be included",
+            "tooltip": "Decimal value between 0 and 1; only neighbours with a higher similarity score than this will be included",
             "default": "0.3"
         },
         "overlay": {
@@ -89,20 +88,16 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
             "default": True,
             "tooltip": "Plot similar words for all models. If unchecked, only similar words for the most recent model will be plotted."
         },
-        # this option works, but the results are not intuitive, so this is
-        # disabled for now. the issue is that in most cases, the inclusion of
-        # all words for all models will make the plots quite uniform, and you
-        # end up with a plot that has all queries at exactly the same spot -
-        # which makes sense, but is not what you're looking for, probably
         "all-words": {
             "type": UserInput.OPTION_TOGGLE,
-            "help": "Always plot all words",
+            "help": "Always include all words",
             "default": False,
             "tooltip": "If checked, plot the union of all nearest neighbours for all models, even if a word is not a nearest neighbour for that particular model."
         }
     }
 
     def process(self):
+        # parse parameters
         input_words = self.parameters.get("words", "")
         if not input_words or not input_words.split(","):
             self.dataset.update_status("No input words provided, cannot look for similar words.", is_final=True)
@@ -111,23 +106,24 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
 
         input_words = input_words.split(",")
 
-        num_words = convert_to_int(self.parameters.get("num-words"), self.options["num-words"]["default"])
         try:
             threshold = float(self.parameters.get("threshold", self.options["threshold"]["default"]))
         except ValueError:
             threshold = float(self.options["threshold"]["default"])
 
         threshold = max(-1.0, min(1.0, threshold))
+        num_words = convert_to_int(self.parameters.get("num-words"), self.options["num-words"]["default"])
         overlay = self.parameters.get("overlay")
         reduction_method = self.parameters.get("method")
         all_words = self.parameters.get("all-words")
 
-        # retain words that are common to all models
+        # find words that are common to all models
         staging_area = self.unpack_archive_contents(self.source_file)
         common_vocab = None
-        models = {}
         vector_size = None
+        models = {}
         self.dataset.update_status("Determining cross-model common vocabulary")
+
         for model_file in staging_area.glob("*.model"):
             if self.interrupted:
                 shutil.rmtree(staging_area)
@@ -285,9 +281,11 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
         fontsize_small = width / 100
 
         # now we have the dimensions, the canvas can be instantiated
-        canvas = Drawing(str(self.dataset.get_results_path()),
-                         size=(width, height),
-                         style="font-family:monospace;font-size:%ipx" % fontsize_normal)
+        canvas = get_4cat_canvas(self.dataset.get_results_path(), width, height,
+                                 header="word2vec nearest neighbours - '%s'" % ",".join(input_words),
+                                 fontsize_normal=fontsize_normal,
+                                 fontsize_large=fontsize_large,
+                                 fontsize_small=fontsize_small)
 
         # use colour-coded backgrounds to distinguish the query words in the
         # graph
@@ -298,25 +296,10 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
             canvas.defs.add(solid)
             colour_index += 1
 
-        # draw border
-        canvas.add(Rect(insert=(0, 0), size=(width, height), stroke="#000", stroke_width=2, fill="#FFF"))
-
-        # header
-        header = SVG(insert=(0, 0), size=("100%", fontsize_large * 2))
-        header.add(Rect(insert=(0, 0), size=("100%", "100%"), fill="#000"))
-        header.add(Text(
-            insert=("50%", "50%"),
-            text="word2vec nearest neighbours - '%s'" % ", ".join(input_words),
-            dominant_baseline="middle",
-            text_anchor="middle",
-            fill="#FFF",
-            style="font-size:%ipx" % fontsize_large
-        ))
-        canvas.add(header)
-
         # now plot each word for each model
         self.dataset.update_status("Plotting graph")
         words = SVG(insert=(0, 0), size=(width, height))
+        queries = SVG(insert=(0, 0), size=(width, height))
         colour_index = 0
 
         for model_name, labels in plottable_words.items():
@@ -325,11 +308,12 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
             label_index = 0
             for position in positions:
                 word = labels[label_index]
+                is_query = word in input_words
                 label_index += 1
 
-                filter = "none" if word not in input_words else "url(#solid-%s)" % model_name
-                colour = colours[colour_index] if word not in input_words else "#FFF"
-                fontsize = fontsize_small if word not in input_words else fontsize_normal
+                filter = ("url(#solid-%s)" % model_name) if is_query else "none"
+                colour = "#FFF" if is_query else colours[colour_index]
+                fontsize = fontsize_normal if is_query else fontsize_small
 
                 if word in input_words:
                     word += " (" + model_name + ")"
@@ -344,7 +328,10 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
                     filter=filter
                 ))
 
-                words.add(label_container)
+                if is_query:
+                    queries.add(label_container)
+                else:
+                    words.add(label_container)
 
             colour_index = 0 if colour_index >= len(colours) else colour_index + 1
 
@@ -363,16 +350,7 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
 
         canvas.add(lines)
         canvas.add(words)
-
-        # 4cat logo
-        label = "made with 4cat - 4cat.oilab.nl"
-        footersize = (fontsize_small * len(label) * 0.7, fontsize_small * 2)
-        footer = SVG(insert=(width - footersize[0], height - footersize[1]), size=footersize)
-        footer.add(Rect(insert=(0, 0), size=("100%", "100%"), fill="#000"))
-        footer.add(
-            Text(insert=("50%", "50%"), text=label, dominant_baseline="middle", text_anchor="middle", fill="#FFF",
-                 style="font-size:%ipx" % fontsize_small))
-        canvas.add(footer)
+        canvas.add(queries)
 
         canvas.save(pretty=True)
         shutil.rmtree(staging_area)

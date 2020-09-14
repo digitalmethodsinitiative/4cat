@@ -6,14 +6,13 @@ import math
 from pathlib import Path
 from calendar import month_abbr
 
-from svgwrite import Drawing
 from svgwrite.container import SVG
-from svgwrite.shapes import Line, Rect
+from svgwrite.shapes import Line
 from svgwrite.path import Path
 from svgwrite.text import Text
 
 from backend.abstract.processor import BasicProcessor
-from backend.lib.helpers import UserInput, pad_interval
+from backend.lib.helpers import UserInput, pad_interval, get_4cat_canvas
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -78,54 +77,28 @@ class SVGHistogramRenderer(BasicProcessor):
 		x_margin_left = x_margin * 2
 		tick_width = 5
 
-		fontsize_normal = int(height / 40)
-		fontsize_small = int(height / 75)
+		fontsize_small = width / 100
+		fontsize_normal = width / 75
+		fontsize_large = width / 50
 
 		# better don't touch the following
 		line_width = round(width / 512)
-		y_margin_top = 150 if header else 50
+		y_margin_top = 50
+		if header:
+			y_margin_top += (2 * fontsize_large)
 		y_height = height - (y_margin + y_margin_top)
 		x_width = width - (x_margin + x_margin_left)
-		canvas = Drawing(filename=str(self.dataset.get_results_path()), size=(width, height),
-						 style="font-family:monospace;font-size:%ipx" % fontsize_normal)
 
 		# normalize the Y axis to a multiple of a power of 10
 		magnitude = pow(10, len(str(max_posts)) - 1)  # ew
 		max_neat = math.ceil(max_posts / magnitude) * magnitude
 		self.dataset.update_status("Max (normalized): %i (%i) (magnitude: %i)" % (max_posts, max_neat, magnitude))
 
-		# draw border
-		canvas.add(Rect(
-			insert=(0, 0),
-			size=(width, height),
-			stroke="#000",
-			stroke_width=line_width,
-			fill="#FFF"
-		))
-
-		# draw header on a black background if needed
-		if header:
-			if len(header) > 40:
-				header = header[:37] + "..."
-
-			header_rect_height = (y_margin_top / 1.5)
-			header_fontsize = (width / len(header))
-
-			header_container = SVG(insert=(0, 0), size=(width, header_rect_height))
-			header_container.add(Rect(
-				insert=(0, 0),
-				size=(width, header_rect_height),
-				fill="#000"
-			))
-			header_container.add(Text(
-				insert=("50%", "50%"),
-				text=header,
-				dominant_baseline="middle",
-				text_anchor="middle",
-				fill="#FFF",
-				style="font-size:%ipx" % header_fontsize
-			))
-			canvas.add(header_container)
+		canvas = get_4cat_canvas(self.dataset.get_results_path(), width, height,
+								 header=(header[:37] + "..." if len(header) > 40 else header),
+								 fontsize_small=fontsize_small,
+								 fontsize_large=fontsize_large,
+								 fontsize_normal=fontsize_normal)
 
 		# horizontal grid lines
 		for i in range(0, 10):
@@ -268,20 +241,6 @@ class SVGHistogramRenderer(BasicProcessor):
 					next = label_x + (label_width * 0.9)
 			label_x += item_width
 
-		# 4cat logo
-		label = "made with 4cat - 4cat.oilab.nl"
-		footersize = (fontsize_small * len(label) * 0.7, fontsize_small * 2)
-		footer = SVG(insert=(width - footersize[0], height - footersize[1]), size=footersize)
-		footer.add(Rect(insert=(0, 0), size=("100%", "100%"), fill="#000"))
-		footer.add(Text(
-			insert=("50%", "50%"),
-			text=label,
-			dominant_baseline="middle",
-			text_anchor="middle",
-			fill="#FFF",
-			style="font-size:%ipx" % fontsize_small
-		))
-		canvas.add(footer)
 
 		canvas.save(pretty=True)
 

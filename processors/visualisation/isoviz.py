@@ -5,14 +5,13 @@ import csv
 import re
 
 from backend.abstract.processor import BasicProcessor
-from backend.lib.helpers import UserInput, convert_to_int, pad_interval
+from backend.lib.helpers import UserInput, convert_to_int, pad_interval, get_4cat_canvas
 
 from calendar import month_abbr
 from math import sin, cos, tan, degrees, radians, copysign
 
-from svgwrite import Drawing
 from svgwrite.container import SVG
-from svgwrite.shapes import Line, Rect
+from svgwrite.shapes import Line
 from svgwrite.path import Path
 from svgwrite.text import Text
 
@@ -65,7 +64,8 @@ class IsometricMultigraphRenderer(BasicProcessor):
 		"complete": {
 			"type": UserInput.OPTION_TEXT,
 			"default": 0,
-			"help": "Data completeness required (at least this % of intervals should be present for an item to be graphed; 0 to disable)"
+			"help": "Data completeness required",
+			"tooltip": "At least this % of intervals should be present for an item to be graphed; 0 to disable"
 		},
 		"label": {
 			"type": UserInput.OPTION_TEXT,
@@ -188,7 +188,7 @@ class IsometricMultigraphRenderer(BasicProcessor):
 		# extended if at this minimum width each item does not have the
 		# minimum per-item width
 		min_full_width = 600
-		min_item_width = 1
+		min_item_width = 50
 		item_width = max(min_item_width, min_full_width / len(intervals))
 
 		# determine how much space each graph should get
@@ -198,7 +198,9 @@ class IsometricMultigraphRenderer(BasicProcessor):
 		item_height = max(min_item_height, min_full_height / len(graphs))
 
 		# margin - this should be enough for the text labels to fit in
-		margin = 75
+		margin_base = 50
+		margin_right = margin_base * 4
+		margin_top = margin_base * 3
 
 		# this determines the "flatness" of the isometric projection and an be
 		# tweaked for different looks - basically corresponds to how far the
@@ -220,18 +222,23 @@ class IsometricMultigraphRenderer(BasicProcessor):
 		y_axis_width = (sin(plane_angle / 2) * y_axis_length)
 		canvas_width = x_axis_width + y_axis_width
 
+		# leave room for graph header
+		if graph_label:
+			margin_top += (2 * (canvas_width / 50))
+
 		x_axis_height = (cos(plane_angle / 2) * x_axis_length)
 		y_axis_height = (cos(plane_angle / 2) * y_axis_length)
 		canvas_height = x_axis_height + y_axis_height
 
 		# now we have the dimensions, the canvas can be instantiated
-		canvas = Drawing(str(self.dataset.get_results_path()),
-						 size=(canvas_width + margin, canvas_height + (2 * margin)),
-						 style="font-family:monospace")
+		canvas = get_4cat_canvas(self.dataset.get_results_path(),
+								 width=(canvas_width + margin_base + margin_right),
+								 height=(canvas_height + margin_base + margin_top),
+								 header=graph_label)
 
 		# draw gridlines - vertical
-		gridline_x = y_axis_width
-		gridline_y = margin + canvas_height
+		gridline_x = y_axis_width + margin_base
+		gridline_y = margin_top + canvas_height
 
 		step_x_horizontal = sin(plane_angle / 2) * item_width
 		step_y_horizontal = cos(plane_angle / 2) * item_width
@@ -250,13 +257,13 @@ class IsometricMultigraphRenderer(BasicProcessor):
 				# element is needed
 				label1 = str(intervals[i])[0:4]
 				center = (gridline_x, gridline_y)
-				container = SVG(x=center[0] - 25, y=center[1], width="50", height="1.5em", overflow="visible")
+				container = SVG(x=center[0] - 25, y=center[1], width="50", height="1.5em", overflow="visible", style="font-size:0.8em;")
 				container.add(Text(
 					insert=("25%", "100%"),
 					text=label1,
 					transform="rotate(%f) skewX(%f)" % (-degrees(plane_obverse), degrees(plane_obverse)),
 					text_anchor="middle",
-					baseline_shift="-0.75em",
+					baseline_shift="-0.5em",
 					style="font-weight:bold;"
 				))
 
@@ -266,11 +273,11 @@ class IsometricMultigraphRenderer(BasicProcessor):
 						label2 += " %i" % int(intervals[i][8:10])
 
 					container.add(Text(
-						insert=("25%", "100%"),
+						insert=("25%", "150%"),
 						text=label2,
 						transform="rotate(%f) skewX(%f)" % (-degrees(plane_obverse), degrees(plane_obverse)),
 						text_anchor="middle",
-						baseline_shift="-1.75em"
+						baseline_shift="-0.5em"
 					))
 
 				canvas.add(container)
@@ -280,8 +287,8 @@ class IsometricMultigraphRenderer(BasicProcessor):
 
 		# draw graphs as filled beziers
 		top = step_y_vertical * 1.5
-		graph_start_x = y_axis_width
-		graph_start_y = margin + canvas_height
+		graph_start_x = y_axis_width + margin_base
+		graph_start_y = margin_top + canvas_height
 
 		# draw graphs in reverse order, so the bottom one is most in the
 		# foreground (in case of overlap)
@@ -361,8 +368,8 @@ class IsometricMultigraphRenderer(BasicProcessor):
 			graph_start_y -= step_y_vertical
 
 		# draw gridlines - horizontal
-		gridline_x = 0
-		gridline_y = margin + canvas_height - y_axis_height
+		gridline_x = margin_base
+		gridline_y = margin_top + canvas_height - y_axis_height
 		for graph in graphs:
 			gridline_x += step_x_vertical
 			gridline_y += step_y_vertical
@@ -371,19 +378,11 @@ class IsometricMultigraphRenderer(BasicProcessor):
 
 		# x axis
 		canvas.add(Line(
-			start=(y_axis_width, margin + canvas_height),
-			end=(canvas_width, margin + canvas_height - x_axis_height),
+			start=(margin_base + y_axis_width, margin_top + canvas_height),
+			end=(margin_base + canvas_width, margin_top + canvas_height - x_axis_height),
 			stroke="black",
 			stroke_width=2
 		))
-
-		if graph_label:
-			canvas.add(Text(
-				insert=((margin / 10), (margin / 2)),
-				text=graph_label,
-				style="font-size:2em;",
-				alignment_baseline="hanging"
-			))
 
 		# and finally save the SVG
 		canvas.save(pretty=True)

@@ -223,6 +223,64 @@ def get_yt_compatible_ids(yt_ids):
 	return ids
 
 
+def get_4cat_canvas(path, width, height, header=None, footer="made with 4cat - 4cat.oilab.nl", fontsize_normal=None,
+					fontsize_small=None, fontsize_large=None):
+	"""
+	Get a standard SVG canvas to draw 4CAT graphs to
+
+	Adds a border, footer, header, and some basic text styling
+
+	:param path:  The path where the SVG graph will be saved
+	:param width:  Width of the canvas
+	:param height:  Height of the canvas
+	:param header:  Header, if necessary to draw
+	:param footer:  Footer text, if necessary to draw. Defaults to shameless
+	4CAT advertisement.
+	:param fontsize_normal:  Font size of normal text
+	:param fontsize_small:  Font size of small text (e.g. footer)
+	:param fontsize_large:  Font size of large text (e.g. header)
+	:return SVG:  SVG canvas (via svgwrite) that can be drawn to
+	"""
+	from svgwrite.container import SVG
+	from svgwrite.drawing import Drawing
+	from svgwrite.shapes import Rect
+	from svgwrite.text import Text
+
+	if fontsize_normal is None:
+		fontsize_normal = width / 75
+
+	if fontsize_small is None:
+		fontsize_small = width / 100
+
+	if fontsize_large is None:
+		fontsize_large = width / 50
+
+	# instantiate with border and white background
+	canvas = Drawing(str(path), size=(width, height), style="font-family:monospace;font-size:%ipx" % fontsize_normal)
+	canvas.add(Rect(insert=(0, 0), size=(width, height), stroke="#000", stroke_width=2, fill="#FFF"))
+
+	# header
+	if header:
+		header_shape = SVG(insert=(0, 0), size=("100%", fontsize_large * 2))
+		header_shape.add(Rect(insert=(0, 0), size=("100%", "100%"), fill="#000"))
+		header_shape.add(
+			Text(insert=("50%", "50%"), text=header, dominant_baseline="middle", text_anchor="middle", fill="#FFF",
+				 style="font-size:%ipx" % fontsize_large))
+		canvas.add(header_shape)
+
+	# footer (i.e. 4cat banner)
+	if footer:
+		footersize = (fontsize_small * len(footer) * 0.7, fontsize_small * 2)
+		footer_shape = SVG(insert=(width - footersize[0], height - footersize[1]), size=footersize)
+		footer_shape.add(Rect(insert=(0, 0), size=("100%", "100%"), fill="#000"))
+		footer_shape.add(
+			Text(insert=("50%", "50%"), text=footer, dominant_baseline="middle", text_anchor="middle", fill="#FFF",
+				 style="font-size:%ipx" % fontsize_small))
+		canvas.add(footer_shape)
+
+	return canvas
+
+
 def call_api(action, payload=None):
 	"""
 	Send message to server

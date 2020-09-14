@@ -5,9 +5,8 @@ import colorsys
 import csv
 
 from backend.abstract.processor import BasicProcessor
-from backend.lib.helpers import UserInput, convert_to_int
+from backend.lib.helpers import UserInput, convert_to_int, get_4cat_canvas
 
-from svgwrite import Drawing
 from svgwrite.shapes import Rect
 from svgwrite.path import Path
 from svgwrite.text import Text
@@ -82,9 +81,11 @@ class RankFlowRenderer(BasicProcessor):
 		# visualise outlying items in the data
 		changes = {}
 		max_change = 1
+		max_item_length = 0
 		for period in items:
 			changes[period] = {}
 			for item in items[period]:
+				max_item_length = max(len(item), max_item_length)
 				now = items[period][item]
 				then = -1
 				for previous_period in items:
@@ -102,14 +103,17 @@ class RankFlowRenderer(BasicProcessor):
 					changes[period][item] = 1
 
 		# some sizing parameters for the chart - experiment with those
-		box_width = 12
-		box_height = 10  # boxes will never be smaller than this
-		box_max_height = 100
-		box_gap_x = 90
+		fontsize_normal = 12
+		fontsize_small = 8
+		box_width = fontsize_normal
+		box_height = fontsize_normal * 1.25  # boxes will never be smaller than this
+		box_max_height = box_height * 10
+		box_gap_x = max_item_length * fontsize_normal * 0.75
 		box_gap_y = 5
+		margin = 25
 
 		# don't change this - initial X value for top left box
-		box_start_x = 0
+		box_start_x = margin
 
 		# we use this to know if and where to draw the flow curve between a box
 		# and its previous counterpart
@@ -132,7 +136,7 @@ class RankFlowRenderer(BasicProcessor):
 		# go through all periods and draw boxes and flows
 		for period in items:
 			# reset Y coordinate, i.e. start at top
-			box_start_y = 0
+			box_start_y = margin
 
 			for item in items[period]:
 				# determine weight (and thereby height) of this particular item
@@ -228,8 +232,11 @@ class RankFlowRenderer(BasicProcessor):
 			box_start_x += (box_gap_x + box_width)
 
 		# generate SVG canvas to add elements to
-		canvas = Drawing(self.dataset.get_results_path(), size=(len(items) * (box_width + box_gap_x), max_y),
-						 style="font-family:monospace;font-size:8px;")
+		canvas = get_4cat_canvas(self.dataset.get_results_path(),
+								 width=(margin * 2) + (len(items) * (box_width + box_gap_x)),
+								 height=max_y + (margin * 2),
+								 fontsize_normal=fontsize_normal,
+								 fontsize_small=fontsize_small)
 
 		# now add the various shapes and paths. We only do this here rather than
 		# as we go because only at this point can the canvas be instantiated, as
