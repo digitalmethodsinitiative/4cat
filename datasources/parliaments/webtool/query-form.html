@@ -1,0 +1,43 @@
+<fieldset class="basic-options">
+    <p class="form-intro">Parliament speech data is retrieved via <a href="https://penelope.vub.be">PENELOPE</a>. It
+        covers speeches from the Bundestag (the German national parliament) starting from <a
+                href="https://en.wikipedia.org/wiki/2017_German_federal_election">Period 19</a>, as well as speeches
+        from the British House of Commons starting from January 2016. Both datasets end in October 2019. The data has
+        been collected by the <a
+                href="https://www.mis.mpg.de/">MIS Institute at MPG Leipzig</a>.</p>
+
+    <p>Results are formatted as one 'thread' per distinct debate, with each individual contribution to that debate as a
+        'post' in the thread.</p>
+
+    <div class="form-element">
+        <label for="corpus-input">Corpus to search:</label>
+        <div>
+            <select name="corpus" id="corpus-input">
+                <option value="gbr">House of Commons (Great Britain)</option>
+                <option value="deu">Bundestag (Germany)</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="form-element">
+        <label for="body-input">Content contains:</label>
+        <div>
+            <input name="body_match" id="body-input" type="text">
+        </div>
+    </div>
+</fieldset>
+
+<fieldset class="date-options">
+    <div class="form-element">
+        <label>Publication date:</label>
+        <div class="filter-parameters">
+            <input name="min_date_proxy" id="input-min-time" class="input-time" type="date"
+                   placeholder="dd-mm-yyyy"> to
+            <input name="max_date_proxy" id="input-max-time" class="input-time" type="date"
+                   placeholder="dd-mm-yyyy"> <span class="red"></span>
+
+            <input name="min_date" type="hidden" value="0">
+            <input name="max_date" type="hidden" value="0">
+        </div>
+    </div>
+</fieldset>
