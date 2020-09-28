@@ -142,6 +142,7 @@ def inject_now():
 	announcement_file = Path(config.PATH_ROOT, "ANNOUNCEMENT.md")
 
 	return {
+		"__datasources_config": config.DATASOURCES,
 		"__has_https": config.FlaskConfig.SERVER_HTTPS,
 		"__datenow": datetime.datetime.utcnow(),
 		"__tool_name": config.TOOL_NAME,

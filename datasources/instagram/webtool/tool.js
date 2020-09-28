@@ -16,6 +16,10 @@ $(document).ready(function () {
 
     $('#query-form.instagram').on('submit', function (e) {
         e.preventDefault();
+        if($('#instagram-username').length == 0) {
+            // all good, let's start the actual query
+            return query.start();
+        }
 
         let username = $('#instagram-username').val();
         let password = $('#instagram-password').val();

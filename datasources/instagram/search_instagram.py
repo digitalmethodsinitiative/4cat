@@ -46,12 +46,6 @@ class SearchInstagram(Search):
 		hashtag = re.compile(r"#([^\s,.+=-]+)")
 		mention = re.compile(r"@([a-zA-Z0-9_]+)")
 
-		# this is mostly unused given our instaloader settings, but reserve a
-		# folder for temporary downloaded data
-		working_directory = self.dataset.get_temporary_path()
-		working_directory.mkdir()
-		os.chdir(working_directory)
-
 		instagram = instaloader.Instaloader(
 			quiet=True,
 			download_pictures=False,
@@ -70,32 +64,33 @@ class SearchInstagram(Search):
 
 		# log in, because else Instagram gets really annoying with rate
 		# limits
-		if not parameters.get("login", None):
-			self.dataset.update_status(
-				"No Instagram login provided. Create a new dataset and provide your login details to scrape.",
-				is_final=True)
-			return []
-		key = SearchInstagram.salt_to_fernet_key()
-		fernet = Fernet(key)
-		login = json.loads(fernet.decrypt(parameters.get("login").encode("utf-8")))
+		if config.DATASOURCES.get("instagram", {}).get("require_login", False):
+			if not parameters.get("login", None):
+				self.dataset.update_status(
+					"No Instagram login provided. Create a new dataset and provide your login details to scrape.",
+					is_final=True)
+				return []
+			key = SearchInstagram.salt_to_fernet_key()
+			fernet = Fernet(key)
+			login = json.loads(fernet.decrypt(parameters.get("login").encode("utf-8")))
 
-		# we have the login in memory now, get rid of the login info stored in
-		# the database
+			try:
+				instagram.login(login[0], login[1])
+			except instaloader.TwoFactorAuthRequiredException:
+				self.dataset.update_status(
+					"Two-factor authentication with Instagram is not available via 4CAT at this time. Disable it for your Instagram account and try again.",
+					is_final=True)
+				return []
+			except (instaloader.InvalidArgumentException, instaloader.BadCredentialsException):
+				self.dataset.update_status("Invalid Instagram username or password", is_final=True)
+				return []
+			except instaloader.ConnectionException:
+				self.dataset.update_status("Could not connect to Instagram to log in.", is_final=True)
+				return []
+
+		# if we have the login in memory now, get rid of the login info stored
+		# in the database
 		self.dataset.delete_parameter("login")
-
-		try:
-			instagram.login(login[0], login[1])
-		except instaloader.TwoFactorAuthRequiredException:
-			self.dataset.update_status(
-				"Two-factor authentication with Instagram is not available via 4CAT at this time. Disable it for your Instagram account and try again.",
-				is_final=True)
-			return []
-		except (instaloader.InvalidArgumentException, instaloader.BadCredentialsException):
-			self.dataset.update_status("Invalid Instagram username or password", is_final=True)
-			return []
-		except instaloader.ConnectionException:
-			self.dataset.update_status("Could not connect to Instagram to log in.", is_final=True)
-			return []
 
 		posts = []
 		max_posts = self.dataset.parameters.get("items", 500)
@@ -226,7 +221,6 @@ class SearchInstagram(Search):
 				pass
 
 		# remove temporary fetched data and return posts
-		shutil.rmtree(working_directory)
 		return results
 
 	def validate_query(query, request, user):
@@ -250,31 +244,35 @@ class SearchInstagram(Search):
 		if not query.get("query", "").strip():
 			raise QueryParametersException("You must provide a search query.")
 
-		if not query.get("username", None).strip() or not query.get("password", None).strip():
-			raise QueryParametersException("You need to provide a username and password")
+		# test if login is valid, if that is needed
+		if config.DATASOURCES.get("instagram", {}).get("require_login", False):
+			if not query.get("username", "").strip() or not query.get("password", "").strip():
+				raise QueryParametersException("You need to provide a username and password")
 
-		username = query.get("username")
-		password = query.get("password")
-		login_tester = instaloader.Instaloader()
-		try:
-			login_tester.login(username, password)
-		except instaloader.TwoFactorAuthRequiredException:
-			raise QueryParametersException(
-				"Two-factor authentication with Instagram is not available via 4CAT at this time. Disable it for your Instagram account and try again.")
-		except (instaloader.InvalidArgumentException, instaloader.BadCredentialsException):
-			raise QueryParametersException("Invalid Instagram username or password.")
+			username = query.get("username")
+			password = query.get("password")
+			login_tester = instaloader.Instaloader()
+			try:
+				login_tester.login(username, password)
+			except instaloader.TwoFactorAuthRequiredException:
+				raise QueryParametersException(
+					"Two-factor authentication with Instagram is not available via 4CAT at this time. Disable it for your Instagram account and try again.")
+			except (instaloader.InvalidArgumentException, instaloader.BadCredentialsException):
+				raise QueryParametersException("Invalid Instagram username or password.")
 
-		# there are some fundamental limits to how safe we can make this, but
-		# we can at least encrypt it so that if someone has access to the
-		# database but not the 4CAT config file, they cannot use the login
-		# details
-		# we use the 4CAT anyonymisation salt (which *should* be a long,
-		# random string)
-		# making sure the 4CAT config file is kept safe is left as an exercise
-		# for the reader...
-		key = SearchInstagram.salt_to_fernet_key()
-		fernet = Fernet(key)
-		obfuscated_login = fernet.encrypt(json.dumps([username, password]).encode("utf-8"))
+			# there are some fundamental limits to how safe we can make this, but
+			# we can at least encrypt it so that if someone has access to the
+			# database but not the 4CAT config file, they cannot use the login
+			# details
+			# we use the 4CAT anyonymisation salt (which *should* be a long,
+			# random string)
+			# making sure the 4CAT config file is kept safe is left as an exercise
+			# for the reader...
+			key = SearchInstagram.salt_to_fernet_key()
+			fernet = Fernet(key)
+			obfuscated_login = fernet.encrypt(json.dumps([username, password]).encode("utf-8")).decode("utf-8")
+		else:
+			obfuscated_login = ""
 
 		# 500 is mostly arbitrary - may need tweaking
 		max_posts = 2500
@@ -293,7 +291,7 @@ class SearchInstagram(Search):
 
 		# simple!
 		return {
-			"login": obfuscated_login.decode("utf-8"),
+			"login": obfuscated_login,
 			"items": max_posts,
 			"query": items,
 			"board": query.get("search_scope") + "s",  # used in web interface

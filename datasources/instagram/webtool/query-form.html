@@ -36,6 +36,7 @@
         <input name="max_posts" id="max-posts" min="0" max="2500" placeholder="Max: 500" value="10" type="number">
     </div>
 
+    {% if __datasources_config.instagram.require_login %}
     <p class="form-intro">Due to recent changes to Instagram's website, it is now necessary to provide login details
         to succesfully scrape the platform. These login details <strong>will be sent to the 4CAT server</strong>
         {% if __has_https %} (using an encrypted connection){% endif %} where they will be deleted immediately after
@@ -55,9 +56,12 @@
             <input type="password" name="password" id="instagram-password">
         </div>
     </div>
+    {% endif %}
 </fieldset>
 
+{% if __datasources_config.instagram.require_login %}
 <fieldset id="instagram-checkpoint" class="optional-form-element hidden">
     <p class="form-intro"><strong>Instagram needs you to verify your account</strong>. Go to <a href="#" id="instagram-checkpoint-link" target="_blank">this page</a> to verify your
         account and resubmit your query here.</p>
 </fieldset>
+{% endif %}
