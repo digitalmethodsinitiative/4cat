@@ -30,6 +30,10 @@ class ImportFromExternalTool(BasicWorker):
 			"\ufeffAccount", "User Name", "Followers at Posting", "Created", "Type", "Likes", "Comments", "Views",
 			"URL", "Link",
 			"Photo", "Title", "Description"),
+		"instagram-scraper": (
+			"id", "thread_id", "parent_id", "body", "author", "timestamp", "type", "url", "thumbnail_url", "hashtags",
+			"usertags", "mentioned", "num_likes", "num_comments", "subject"
+		),
 		"tiktok": (
 			"id", "text", "createTime", "authorMeta.name", "authorMeta.id", "musicMeta.musicId", "musicMeta.musicName",
 			"musicMeta.musicAuthor", "imageUrl", "videoUrl", "diggCount", "shareCount", "playCount", "commentCount",
@@ -167,6 +171,15 @@ class ImportFromExternalTool(BasicWorker):
 						"num_comments": item["Comments"],
 						"subject": item["Title"]}
 					)
+
+		elif dataset.parameters.get("platform") == "instagram-scraper":
+			with dataset.get_results_path().open("w", encoding="utf-8") as output_csv:
+				wrapped_upload = io.TextIOWrapper(file, encoding="utf-8")
+				while True:
+					chunk = wrapped_upload.read(1024)
+					if chunk == "":
+						break
+					output_csv.write(chunk)
 
 		elif platform == "tiktok":
 			with dataset.get_results_path().open("w", encoding="utf-8", newline="") as output_csv:
