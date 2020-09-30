@@ -26,11 +26,11 @@ class ImportFromExternalTool(BasicWorker):
 	max_workers = 1
 
 	required_columns = {
-		"instagram": (
+		"instagram-crowdtangle": (
 			"\ufeffAccount", "User Name", "Followers at Posting", "Created", "Type", "Likes", "Comments", "Views",
 			"URL", "Link",
 			"Photo", "Title", "Description"),
-		"instagram-scraper": (
+		"instagram-dmi-scraper": (
 			"id", "thread_id", "parent_id", "body", "author", "timestamp", "type", "url", "thumbnail_url", "hashtags",
 			"usertags", "mentioned", "num_likes", "num_comments", "subject"
 		),
@@ -94,6 +94,7 @@ class ImportFromExternalTool(BasicWorker):
 				missing.append(field)
 
 		if missing:
+			wrapped_upload.detach()
 			raise QueryParametersException(
 				"The following required columns are not present in the csv file: %s" % ", ".join(missing))
 
@@ -121,14 +122,22 @@ class ImportFromExternalTool(BasicWorker):
 
 		file = request.files["data_upload"]
 		platform = dataset.parameters.get("platform")
-		dataset.type = "%s-search" % platform
-		dataset.datasource = platform
+
+		# this is a bit hacky, but sometimes we have multiple tools that can
+		# all serve as input for the same datasource (e.g. CrowdTangle and
+		# the DMI Instagram Scraper would both go to the 'instagram'
+		# datasource), so just assume the datasource ID has no dashes in it
+		# and ignore everything after a dash for the purposes of determining
+		# what datasource to assign to the dataset
+		datasource = platform.split("-")[0]
+		dataset.type = "%s-search" % datasource
+		dataset.datasource = datasource
 
 		file.seek(0)
 		done = 0
 
 		# With validated csvs, save as is but make sure the raw file is sorted
-		if dataset.parameters.get("platform") == "instagram":
+		if dataset.parameters.get("platform") == "instagram-crowdtangle":
 			with dataset.get_results_path().open("w", encoding="utf-8", newline="") as output_csv:
 				wrapped_upload = io.TextIOWrapper(file, encoding="utf-8")
 				reader = csv.DictReader(wrapped_upload)
@@ -172,14 +181,19 @@ class ImportFromExternalTool(BasicWorker):
 						"subject": item["Title"]}
 					)
 
-		elif dataset.parameters.get("platform") == "instagram-scraper":
+		elif dataset.parameters.get("platform") == "instagram-dmi-scraper":
+			# in principe, this csv file should be good to go
+			# however, we still need to know how many rows are in it, so we
+			# nevertheless copy it line by line rather than in one go
+			# as a bonus this also ensures it uses the right csv dialect
 			with dataset.get_results_path().open("w", encoding="utf-8") as output_csv:
 				wrapped_upload = io.TextIOWrapper(file, encoding="utf-8")
-				while True:
-					chunk = wrapped_upload.read(1024)
-					if chunk == "":
-						break
-					output_csv.write(chunk)
+				reader = csv.DictReader(wrapped_upload)
+				writer = csv.DictWriter(output_csv, fieldnames=reader.fieldnames)
+				writer.writeheader()
+				for row in reader:
+					done += 1
+					writer.writerow(row)
 
 		elif platform == "tiktok":
 			with dataset.get_results_path().open("w", encoding="utf-8", newline="") as output_csv:
