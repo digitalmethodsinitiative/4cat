@@ -28,6 +28,7 @@ class ModuleCollector:
 	processors and workers (processors being a specific kind of worker).
 	"""
 	ignore = []
+	missing_modules = {}
 
 	PROCESSOR = 1
 	WORKER = 2
@@ -98,8 +99,13 @@ class ModuleCollector:
 				try:
 					module = importlib.import_module(module_name)
 				except ImportError as e:
-					self.ignore.append(module_name)
-					# this is fine, just ignore this
+					# this is fine, just ignore this data source and give a heads up
+					module_name_short = module_name.split(".")[-1]
+					self.ignore.append(module_name_short)
+					if e.name not in self.missing_modules:
+						self.missing_modules[e.name] = [module_name_short]
+					else:
+						self.missing_modules[e.name].append(module_name_short)
 					continue
 
 				# see if module contains the right type of content by looping
@@ -184,6 +190,14 @@ class ModuleCollector:
 			collapse_flat_list(self.processors[processor])
 			self.processors[processor]["further_flat"] = flat_further
 
+		# Give a heads-up if not all modules were installed properly.
+		if self.missing_modules:
+			print_msg = "Warning: Not all modules could be found, which might cause data sources and modules to not function.\nMissing modules:\n"
+			for missing_module, processor_list in self.missing_modules.items():
+				print_msg += "\t%s (for processors %s)\n" % (missing_module, ", ".join(processor_list))
+
+			print(print_msg, file=sys.stderr)
+
 		# Cache data
 		self.cache()
 
@@ -215,6 +229,7 @@ class ModuleCollector:
 			if datasource_id not in config.DATASOURCES:
 				# not configured, so we're going to just ignore it
 				continue
+
 
 			self.datasources[datasource_id] = {
 				"expire-datasets": config.DATASOURCES[datasource_id].get("expire-datasets", None),
