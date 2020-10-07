@@ -190,11 +190,13 @@ class ModuleCollector:
 			collapse_flat_list(self.processors[processor])
 			self.processors[processor]["further_flat"] = flat_further
 
-		# Give a heads-up if not all modules were installed
+		# Give a heads-up if not all modules were installed properly.
 		if self.missing_modules:
-			print("Warning: Not all modules could be found, which might cause data sources and modules to not function.\nMissing modules:")
+			print_msg = "Warning: Not all modules could be found, which might cause data sources and modules to not function.\nMissing modules:\n"
 			for missing_module, processor_list in self.missing_modules.items():
-				print("\t%s (for processors %s)" % (missing_module, ", ".join(processor_list)))
+				print_msg += "\t%s (for processors %s)\n" % (missing_module, ", ".join(processor_list))
+
+			print(print_msg, file=sys.stderr)
 
 		# Cache data
 		self.cache()
