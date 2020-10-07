@@ -18,7 +18,7 @@ DATASOURCES = {
 	"4chan": {  # should correspond to DATASOURCE in the data source's __init__.py
 		"interval": 60,  # scrape interval for boards
 		"boards": ["pol", "v"], # boards to scrape (and generally make available)
-        "autoscrape": True  # automatically start scraping when 4CAT is started
+		"autoscrape": True  # automatically start scraping when 4CAT is started
 	}
 }
 ```
@@ -26,13 +26,14 @@ DATASOURCES = {
 ## Full-text search
 This data source also requires a full-text search engine to allow for keyword
 search. It is currently compatible with the [Sphinx](https://sphinxsearch.com)
-full-text search engine. You should make sure a Sphinx instance is running 
-locally before enabling this data source. `sphinx.conf` contains the relevant
-index and source definitions for Sphinx; copy it to `sphinx.conf` and change 
-the file paths and login details as required.
-
-You can use `generate_sphinx.py` in the `/helper-scripts` folder to generate
-a Sphinx configuration file that should work.
+full-text search engine. We recommend using version 3.1.1 downloadable [here](sphinxsearch.com/downloads/current). 
+You should make sure this Sphinx instance is running locally before enabling this data source.
+Make sure to have gone through these steps:
+1. [Download the Sphinx 3.1.1 source code (note: so not 3.3.1)](sphinxsearch.com/downloads/current).
+2. Create a sphinx directory somewhere, e.g. 4CAT instance `4cat/sphinx/`. In it, paste all the unzipped contents of the sphinx-3.1.1 file you just downloaded (so that it's filled with the directories `api`, `bin`, etc.). In the Sphinx direcotry, also create a folder called `data`, and in this `data` directory, one called `binlog`.
+3. Add a configuration file. You can generate one by running the `generate_sphinx_config.py` script in the folder `helper-scripts.py`. After running it, a file called `sphinx.conf` will appear in the `helper-scripts` directory. Copy-paste this file to the `bin` folder in your sphinx directory (with the example above: `4cat/sphinx/bin/sphinx.conf`).
+4. Generate indexes for the posts that you already collected (if you haven't run any scrape yet, you can do this later). Generating indexes means sphinx will create fast lookup tables so words can be searched quickly. In your command line interface, navigate to the `bin` directory of your Sphinx installation and run the command `indexer.exe --all`. This should generate the indexes.
+5. Finally, before executing any searches, make sure Sphinx is active by running `searchd.exe` in your command line interface (once again within the `bin` folder).
 
 ## Importing 4chan data from elsewhere
 If you want to import 4chan data from elsewhere rather than (or in addition to)
