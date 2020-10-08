@@ -35,11 +35,6 @@ PATH_IMAGES = ""  # if left empty or pointing to a non-existent folder, no image
 PATH_DATA = ""  # search results will be stored here as CSV files
 PATH_LOCKFILE = "backend"  # the daemon lockfile will be saved in this folder. Probably no need to change!
 
-# Path to sphinx data folder. This is used by the script that generates the
-# sphinx configuration file for you, for data sources that use Sphinx's FTS
-# capabilities
-SPHINX_PATH = "/opt/sphinx/data"
-
 # The following two options should be set to ensure that every analysis step can
 # be traced to a specific version of 4CAT. This allows for reproducible
 # research. You can however leave them empty with no ill effect. The version ID
