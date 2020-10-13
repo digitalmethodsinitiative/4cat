@@ -173,7 +173,7 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
 
             for query in input_words:
                 if query not in model.vocab:
-                    self.dataset.update_status("Query '%s' was not found in the data; cannot find nearest neighbours.", is_final=True)
+                    self.dataset.update_status("Query '%s' was not found in model %s; cannot find nearest neighbours." % (query, model_name), is_final=True)
                     self.dataset.finish(0)
                     return
 

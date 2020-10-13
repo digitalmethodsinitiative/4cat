@@ -50,14 +50,21 @@ class RankFlowRenderer(BasicProcessor):
 			"options": {"weight": "Occurence", "none": "None"},
 			"default": "change",
 			"help": "Size according to"
+		},
+		"show_value": {
+			"type": UserInput.OPTION_TOGGLE,
+			"default": True,
+			"help": "Include value in label"
 		}
 	}
 
 	def process(self):
 		items = {}
 		max_weight = 1
-		colour_property = self.options.get("colour_property", self.options["colour_property"]["default"])
-		size_property = self.options.get("size_property", self.options["size_property"]["default"])
+		colour_property = self.parameters.get("colour_property", self.options["colour_property"]["default"])
+		size_property = self.parameters.get("size_property", self.options["size_property"]["default"])
+		include_value = self.parameters.get("show_value", False)
+		print(include_value)
 
 		# first create a map with the ranks for each period
 		with self.source_file.open() as input:
@@ -72,7 +79,11 @@ class RankFlowRenderer(BasicProcessor):
 				if row[date_attribute] not in items:
 					items[row[date_attribute]] = {}
 
-				weight = convert_to_int(row[weight_attribute], 1) if weighted else 1
+				try:
+					weight = float(row[weight_attribute]) if weighted else 1
+				except ValueError:
+					weight = 1
+
 				items[row[date_attribute]][row[item_attribute]] = weight
 				max_weight = max(max_weight, weight)
 
@@ -162,8 +173,9 @@ class RankFlowRenderer(BasicProcessor):
 
 				# then the text label
 				label_y = (box_start_y + (height / 2)) + 3
+				label_value = "" if not include_value else (" (%s)" % weight if weight != 1 else "")
 				label = Text(
-					text=(item + (" (%s)" % weight if weight != 1 else "")),
+					text=(item + label_value),
 					insert=(box_start_x + box_width + box_gap_y, label_y)
 				)
 				labels.append(label)
