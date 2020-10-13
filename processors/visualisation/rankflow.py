@@ -64,7 +64,6 @@ class RankFlowRenderer(BasicProcessor):
 		colour_property = self.parameters.get("colour_property", self.options["colour_property"]["default"])
 		size_property = self.parameters.get("size_property", self.options["size_property"]["default"])
 		include_value = self.parameters.get("show_value", False)
-		print(include_value)
 
 		# first create a map with the ranks for each period
 		with self.source_file.open() as input:
