@@ -23,7 +23,7 @@ class CorpusStats(BasicWorker):
 				"last": 0
 			}
 		}
-		
+
 		for datasource in config.DATASOURCES:
 			if "interval" not in config.DATASOURCES[datasource]:
 				continue
@@ -56,8 +56,9 @@ class CorpusStats(BasicWorker):
 				stats[datasource]["boards"][board] = {
 					"first": int(self.db.fetchone(
 							"SELECT MIN(timestamp) AS num FROM threads_" + datasource + " WHERE is_sticky = FALSE AND timestamp > 0 AND board = '" + board +"'")["num"]),
-					"last": int(self.db.fetchone(
-							"SELECT MAX(timestamp_modified) AS num FROM threads_" + datasource + " WHERE is_sticky = FALSE AND timestamp > 0 AND board = '" + board +"'")["num"]),
+					"last": int(self.db.fetchone("SELECT MAX(timestamp_modified) AS num FROM threads_" + datasource + " WHERE is_sticky = FALSE AND timestamp > 0 AND board = '" + board +"'")["num"]),
+					"posts": int(self.db.fetchone("SELECT count_estimate('SELECT id FROM posts_" + datasource + " WHERE board = ''" + board + "''') AS num;")["num"]), # Note: double single quotes!
+					"threads": int(self.db.fetchone("SELECT count_estimate('SELECT id FROM threads_" + datasource + " WHERE board = ''" + board + "''') AS num;")["num"])
 				}
 
 

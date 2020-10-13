@@ -80,3 +80,13 @@ CREATE UNIQUE INDEX IF NOT EXISTS unique_favourite
     name,
     key
   );
+
+-- used to quickly update table counts
+CREATE FUNCTION count_estimate(query text) RETURNS bigint AS $$
+  DECLARE
+    rec record;
+  BEGIN
+    EXECUTE 'EXPLAIN (FORMAT json) ' || query INTO rec;
+    RETURN rec."QUERY PLAN"->0->'Plan'->'Plan Rows';
+  END;
+  $$ LANGUAGE plpgsql VOLATILE STRICT;
