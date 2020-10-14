@@ -46,6 +46,7 @@ CREATE TABLE IF NOT EXISTS posts_4chan (
   country_code      text,
   country_name      text,
   image_file        text,
+  image_url         text,
   image_4chan       text,
   image_md5         text,
   image_dimensions  text,
