@@ -17,6 +17,7 @@ import time
 
 from datetime import datetime, timezone
 from pathlib import Path
+from psycopg2.errors import UniqueViolation
 
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)) + "/..")
 from backend.lib.database import Database
@@ -189,13 +190,18 @@ for post in c:
 
 	post_data = {k: str(v).replace("\x00", "") for k, v in post_data.items()}
 
-	new_id = db.insert("posts_4chan", post_data, commit=False, safe=False, return_field="id_seq")
-	
+	try:
+		new_id = db.insert("posts_4chan", post_data, commit=False, safe=False, return_field="id_seq")
+	except UniqueViolation:
+		print("Duplicate post with id %s in the SQLite dump, skipping." % post_data["id"])
+		db.rollback()
+		post_data = {}
+		continue
 
-	if count > 0 and count % 1000 == 0:
-		print("Committing post %i - %i)" % (count - 1000, count))
+	# Add to the database!
+	if count > 0 and count % 10000 == 0:
+		print("Committing post %i - %i)" % (count - 10000, count))
 		db.commit()
-	
 	count += 1
 
 db.commit()
@@ -204,7 +210,7 @@ nthreads = 0
 for thread in threads.values():
 	db.insert("threads_4chan", data=thread, commit=False, safe=False)
 	if nthreads > 0 and nthreads % 10000 == 0:
-		print("Committing threads %i - %i" % (posts - 10000, posts))
+		print("Committing threads %i - %i" % (nthreads - 10000, nthreads))
 		db.commit()
 	nthreads += 1
 
