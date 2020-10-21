@@ -223,7 +223,7 @@ def get_yt_compatible_ids(yt_ids):
 	return ids
 
 
-def get_4cat_canvas(path, width, height, header=None, footer="made with 4cat - 4cat.oilab.nl", fontsize_normal=None,
+def get_4cat_canvas(path, width, height, header=None, footer="made with 4CAT", fontsize_normal=None,
 					fontsize_small=None, fontsize_large=None):
 	"""
 	Get a standard SVG canvas to draw 4CAT graphs to

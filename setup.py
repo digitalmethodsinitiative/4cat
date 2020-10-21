@@ -72,7 +72,7 @@ setup(
 	long_description=readme,
 	author="Open Intelligence Lab",
 	author_email="4cat@oilab.eu",
-	url="https://4cat.oilab.nl",
+	url="https://oilab.eu",
 	packages=['backend', 'webtool', 'datasources'],
 	install_requires=libraries
 )

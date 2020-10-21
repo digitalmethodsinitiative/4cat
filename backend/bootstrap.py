@@ -26,7 +26,7 @@ def run(as_daemon=True):
 		print(indent + "|                    VP   `Y88P' YP   YP    YP                  |")
 		print(indent + "|                                                               |")
 		print(indent + "|               4CAT: Capture and Analysis Toolkit              |")
-		print(indent + "|                         4cat.oilab.nl                         |")
+		print(indent + "|                                                               |")
 		print(indent + "|                                                               |")
 		print(indent + "+---------------------------------------------------------------+")
 		print(indent + "|                  press q + enter to shut down                 |")
