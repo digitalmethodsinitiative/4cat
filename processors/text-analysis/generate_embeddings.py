@@ -164,6 +164,7 @@ class GenerateWordEmbeddings(BasicProcessor):
 			self.dataset.update_status("Not enough data in source file to train %s models." % model_builder.__name__)
 			shutil.rmtree(staging_area)
 			self.dataset.finish(0)
+			return
 
 		# create another archive with all model files in it
 		self.dataset.update_status("%s model(s) saved." % model_builder.__name__)
