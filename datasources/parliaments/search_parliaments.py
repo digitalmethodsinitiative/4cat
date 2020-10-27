@@ -1,6 +1,7 @@
 """
 Search Parliament Speeches corpus
 """
+import urllib.parse
 import requests
 import datetime
 import re
@@ -34,11 +35,9 @@ class SearchParliamentSpeeches(Search):
         :param dict query:  Query parameters, as part of the DataSet object
         :return list:  Posts, sorted by thread and post ID, in ascending order
         """
-        self.log.info("RUNNING SIMPLE QUERY")
         start = datetime.datetime.utcfromtimestamp(query["min_date"]).strftime("%Y-%m-%d")
         end = datetime.datetime.utcfromtimestamp(query["max_date"]).strftime("%Y-%m-%d")
 
-        url = "https://penelope.vub.be/parliament-data/get-speeches-agg"
         regex = query["body_match"].replace("*", ".+")
         corpus = query["corpus"]
 
@@ -50,7 +49,7 @@ class SearchParliamentSpeeches(Search):
         }
 
         self.dataset.update_status("Querying PENELOPE API")
-        all_contributions = self.call_penelope_api(url, parameters)
+        all_contributions = self.call_penelope_api(parameters)
         posts = [self.item_to_4cat(item) for item in all_contributions]
 
         return sorted(posts, key=lambda item: (item["timestamp"], item["thread_id"], item["id"]))
@@ -124,22 +123,32 @@ class SearchParliamentSpeeches(Search):
             "period": post.get("period", "")
         }
 
-    def call_penelope_api(self, url, params, *args, **kwargs):
+    def call_penelope_api(self, params, *args, **kwargs):
         """
         Call PENELOPE API and don't crash (immediately) if it fails
 
-        :param endpoint: Endpoint to call relative to HTTP root
+        :param params: Call parameters
         :param args:
         :param kwargs:
         :return: Response, or `None`
         """
+        #https://penelope.vub.be/parliament-data/get-speeches/<search_query>/<dataset_name>/<start_date>/<end_date>/<max_number>
+        url = "https://penelope.vub.be/parliament-data/get-speeches/%s/%s/%s/%s/"
+        url = url % (
+            urllib.parse.quote(params["dataset_name"]),
+            urllib.parse.quote(params["start_date"]),
+            urllib.parse.quote(params["end_date"]),
+            urllib.parse.quote(params["search_query"])
+
+        )
+
         retries = 0
         while retries < self.max_retries:
             if self.interrupted:
                 raise ProcessorInterruptedException("Interrupted while fetching data from the Penelope API")
 
             try:
-                response = requests.post(url, json=params, *args, **kwargs)
+                response = requests.get(url, *args, **kwargs)
                 break
             except requests.RequestException as e:
                 self.log.info("Error %s while querying PENELOPE Parliament Speeches API - retrying..." % e)
