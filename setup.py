@@ -18,7 +18,7 @@ libraries = [
 	"youtube_dl==2019.1.2",
 	"pyahocorasick==1.4.0",
 	"html2text==2018.1.9",
-	"cryptography==2.6.1",
+	"cryptography==3.2",
 	"instaloader==4.5.3",
 	"setuptools==40.8.0",
 	"APScheduler==3.5.3",
