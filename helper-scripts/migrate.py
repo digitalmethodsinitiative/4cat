@@ -138,10 +138,10 @@ for file in migrate_to_run:
 # ---------------------------------------------
 print("WARNING: Migration can take quite a while. 4CAT will not be available during migration.")
 print("If 4CAT is still running, it will be shut down now.")
-print("  Do you want to continue [y/n]? ", end="")
-
-if not args.yes and input("").lower() != "y":
-	exit(0)
+# print("  Do you want to continue [y/n]? ", end="")
+#
+# if not args.yes and input("").lower() != "y":
+# 	exit(0)
 
 print("- Making sure 4CAT is stopped... ", end="")
 result = subprocess.run([interpreter, "4cat-daemon.py", "--no-version-check", "stop"], stdout=subprocess.PIPE,

@@ -94,7 +94,6 @@ def start():
 	if lockfile.is_file():
 		with lockfile.open() as file:
 			pid = int(file.read().strip())
-
 		if pid in psutil.pids():
 			print("...error: the 4CAT Backend Daemon is already running.")
 			return False
