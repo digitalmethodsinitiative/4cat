@@ -3,6 +3,7 @@ Extract most-used images from corpus
 """
 import hashlib
 import base64
+import config
 
 from backend.abstract.processor import BasicProcessor
 
