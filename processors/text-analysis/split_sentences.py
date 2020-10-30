@@ -42,7 +42,7 @@ class SplitSentences(BasicProcessor):
 				"italian": "Italian",
 				"norwegian": "Norwegian",
 				"polish": "Polish",
-				"portugese": "Portugese",
+				"portuguese": "Portuguese",
 				"russian": "Russian",
 				"slovene": "Slovene",
 				"spanish": "Spanish",
