@@ -298,7 +298,6 @@ class SearchTumblr(Search):
 					#self.dataset.update_status("ALERT - DATES LIKELY SKIPPED")
 					#self.dataset.update_status([post["timestamp"] for post in posts])
 
-
 			if len(all_posts) >= self.max_posts:
 				self.max_posts_reached = True
 				break
@@ -570,7 +569,7 @@ class SearchTumblr(Search):
 				"post_url": post["post_url"],
 				"post_slug": post["slug"],
 				"thread_id": post["reblog_key"],
-				"body": text,
+				"body": text.replace("\x00", ""),
 				"tags": post.get("tags"),
 				"notes": post["note_count"],
 				"urls": post.get("link_url"),
