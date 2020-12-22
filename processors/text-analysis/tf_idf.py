@@ -119,15 +119,20 @@ class TfIdf(BasicProcessor):
 			# we support both pickle and json dumps of vectors
 			token_unpacker = pickle if token_file.suffix == "pb" else json
 
-			with token_file.open("rb") as binary_tokens:
-				# these were saved as pickle dumps so we need the binary mode
-				post_tokens = token_unpacker.load(binary_tokens)
+			try:
+				with token_file.open("rb") as binary_tokens:
+					# these were saved as pickle dumps so we need the binary mode
+					post_tokens = token_unpacker.load(binary_tokens)
 
-				# Flatten the list of list of tokens - we're treating the whole time series as one document.
-				post_tokens = list(itertools.chain.from_iterable(post_tokens))
+					# Flatten the list of list of tokens - we're treating the whole time series as one document.
+					post_tokens = list(itertools.chain.from_iterable(post_tokens))
 
-				# Add to all date's tokens
-				tokens.append(post_tokens)
+					# Add to all date's tokens
+					tokens.append(post_tokens)
+			except UnicodeDecodeError:
+				self.dataset.update_status("Error reading input data. If it was imported from outside 4CAT, make sure it is encoded as UTF-8.", is_final=True)
+				self.dataset.finish(0)
+				return
 
 		# Make sure `min_occurrences` and `max_occurrences` are valid
 		if min_occurrences > len(tokens):
