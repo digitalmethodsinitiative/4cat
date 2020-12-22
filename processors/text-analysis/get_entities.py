@@ -7,8 +7,7 @@ Extract nouns from SpaCy NLP docs.
 import csv
 import pickle
 import shutil
-
-import en_core_web_sm
+import spacy
 
 from collections import Counter
 from spacy.tokens import Doc, DocBin
@@ -99,7 +98,7 @@ class ExtractNouns(BasicProcessor):  #TEMPORARILY DISABLED
 		
 			# Store all the entities in this list		
 			li_entities = []
-			nlp = en_core_web_sm.load()  # Load model
+			nlp = spacy.load("en_core_web_sm")  # Load model
 
 			for doc_file in self.iterate_archive_contents(self.source_file):
 				with doc_file.open("rb") as pickle_file:

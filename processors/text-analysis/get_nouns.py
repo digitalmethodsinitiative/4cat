@@ -7,7 +7,7 @@ Extract nouns from SpaCy NLP docs.
 import csv
 import pickle
 import shutil
-import en_core_web_sm
+import spacy
 
 from collections import Counter
 from spacy.tokens import Doc, DocBin
@@ -67,22 +67,21 @@ class ExtractNouns(BasicProcessor):
 			self.dataset.finish(0)
 
 		# Check dependency parsing if nouns and compouns nouns is selected
-		elif noun_type == "nouns_and_compounds" and "parser" not in self.parent.parameters["enable"]:
-			self.dataset.update_status("Enable \"Part-of-speech tagging\" and \"Dependency parsing\" for compound nouns in previous module")
+		elif (noun_type == "nouns_and_compounds" or noun_type == "noun_chunks") and "parser" not in self.parent.parameters["enable"]:
+			self.dataset.update_status("Enable \"Part-of-speech tagging\" and \"Dependency parsing\" for compound nouns/noun chunks in previous module")
 			self.dataset.finish(0)
 
 		# Valid parameters
 		else:
 
-
 			# Extract the SpaCy docs first
 			self.dataset.update_status("Unzipping SpaCy docs")
-		
 			self.dataset.update_status("Extracting nouns")
 
 			# Store all the nouns in this list		
 			li_nouns = []
-			nlp = en_core_web_sm.load()  # Load model
+			nlp = spacy.load("en_core_web_sm")  # Load model
+			spacy.load("en_core_web_sm")
 
 			for doc_file in self.iterate_archive_contents(self.source_file):
 				with doc_file.open("rb") as pickle_file:
@@ -97,12 +96,22 @@ class ExtractNouns(BasicProcessor):
 					post_nouns = []
 					post_nouns += [token.text for token in doc if token.pos_ == "NOUN"]
 					li_nouns.append(post_nouns)
+
 			# Use SpaCy's noun chunk detection
 			elif noun_type == "noun_chunks":
+
 				for doc in docs:
+
+					# Note: this is a workaround for now.
+					# Serialization of the SpaCy docs does not
+					# work well with dependency parsing after
+					# loading. Quick fix: parse again.
+					
+					new_doc = nlp(doc.text)
 					post_nouns = []
-					for chunk in doc.noun_chunks:
+					for chunk in new_doc.noun_chunks:
 						post_nouns.append(chunk.text)
+
 					li_nouns.append(post_nouns)
 
 			# Use a custom script to get single nouns and compound nouns
@@ -129,6 +138,7 @@ class ExtractNouns(BasicProcessor):
 					li_nouns.append(post_nouns)
 
 			results = []
+
 			if li_nouns:
 
 				# Also add the data to the original csv file, if indicated.
