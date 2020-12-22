@@ -126,30 +126,38 @@ class GenerateWordEmbeddings(BasicProcessor):
 			token_set_name = temp_file.name
 			self.dataset.update_status("Extracting bigrams from token set %s..." % token_set_name)
 
-			if detect_bigrams:
-				bigram_transformer = Phrases(self.tokens_from_file(temp_file, staging_area))
-				bigram_transformer = Phraser(bigram_transformer)
-			else:
-				bigram_transformer = None
-
-			self.dataset.update_status("Training %s model for token set %s..." % (model_builder.__name__, token_set_name))
 			try:
-				model = model_builder(negative=use_negative, size=dimensionality, sg=use_skipgram, window=window, workers=3, min_count=min_count)
-
-				# we do not simply pass a sentences argument to model builder
-				# because we are using a generator, which exhausts, while
-				# Word2Vec needs to iterate over the sentences twice
-				# https://stackoverflow.com/a/57632747
-				model.build_vocab(self.tokens_from_file(temp_file, staging_area, phraser=bigram_transformer))
-				model.train(self.tokens_from_file(temp_file, staging_area, phraser=bigram_transformer), epochs=model.iter, total_examples=model.corpus_count)
-
-			except RuntimeError as e:
-				if "you must first build vocabulary before training the model" in str(e):
-					# not enough data. Skip - if this happens for all models
-					# an error will be generated later
-					continue
+				if detect_bigrams:
+					bigram_transformer = Phrases(self.tokens_from_file(temp_file, staging_area))
+					bigram_transformer = Phraser(bigram_transformer)
 				else:
-					raise e
+					bigram_transformer = None
+
+				self.dataset.update_status("Training %s model for token set %s..." % (model_builder.__name__, token_set_name))
+				try:
+					model = model_builder(negative=use_negative, size=dimensionality, sg=use_skipgram, window=window, workers=3, min_count=min_count)
+
+					# we do not simply pass a sentences argument to model builder
+					# because we are using a generator, which exhausts, while
+					# Word2Vec needs to iterate over the sentences twice
+					# https://stackoverflow.com/a/57632747
+					model.build_vocab(self.tokens_from_file(temp_file, staging_area, phraser=bigram_transformer))
+					model.train(self.tokens_from_file(temp_file, staging_area, phraser=bigram_transformer), epochs=model.iter, total_examples=model.corpus_count)
+
+				except RuntimeError as e:
+					if "you must first build vocabulary before training the model" in str(e):
+						# not enough data. Skip - if this happens for all models
+						# an error will be generated later
+						continue
+					else:
+						raise e
+
+			except UnicodeDecodeError:
+				self.dataset.update_status(
+					"Error reading input data. If it was imported from outside 4CAT, make sure it is encoded as UTF-8.",
+					is_final=True)
+				self.dataset.finish(0)
+				return
 
 			# save - we only save the KeyedVectors for the model, this
 			# saves space and we don't need to re-train the model later

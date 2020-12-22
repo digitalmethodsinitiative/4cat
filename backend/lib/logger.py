@@ -77,7 +77,7 @@ class Logger:
 		This sends an e-mail to a pre-defined address when a log message of at least
 		level WARNING is logged.
 		"""
-		mailer = SMTPHandler("localhost", "backend@4cat.oilab.eu", config.WARN_EMAILS, "4CAT Backend logger")
+		mailer = SMTPHandler("localhost", config.NOREPLY_EMAIL, config.WARN_EMAILS, "4CAT Backend logger")
 		mailer.setLevel(logging.WARNING)
 
 		self.logger.addHandler(mailer)

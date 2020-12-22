@@ -29,9 +29,9 @@ if len(sys.argv) > 1 and sys.argv[1] == "config":
 	sys.exit(0)
 
 try:
-	queries = get_api("datasets")
-	queries = json.loads(queries)["response"]
-	print("datasetsd.value %i" % queries["1d"])
+	datasets = get_api("datasets")
+	datasets = json.loads(datasets)["response"]
+	print("datasetsd.value %i" % datasets["1d"])
 except (KeyError, json.JSONDecodeError, ConnectionError) as e:
 	print(e)
 	print("datasetsd.value 0")

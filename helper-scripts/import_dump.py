@@ -17,6 +17,7 @@ cli = argparse.ArgumentParser()
 cli.add_argument("-i", "--input", required=True, help="File to read from, containing a CSV dump")
 cli.add_argument("-d", "--datasource", type=str, required=True, help="Datasource ID")
 cli.add_argument("-b", "--board", type=str, required=True, help="Board name")
+cli.add_argument("-o", "--offset", type=int, required=False, help="How many rows to skip")
 args = cli.parse_args()
 
 if not Path(args.input).exists() or not Path(args.input).is_file():
@@ -32,11 +33,17 @@ seen_post_ids = set()
 with open(args.input, encoding="utf-8") as inputfile:
     fieldnames = ("num", "subnum", "thread_num", "op", "timestamp", "timestamp_expired", "preview_orig", "preview_w", "preview_h", "media_filename", "media_w", "media_h", "media_size", "media_hash", "media_orig", "spoiler", "deleted", "capcode", "email", "name", "trip", "title", "comment", "sticky", "locked", "poster_hash", "poster_country", "exif")
     reader = csv.DictReader(inputfile, fieldnames=fieldnames, doublequote=False, escapechar="\\", strict=True)
-
+    
     posts = 0
     threads = {}
     duplicates = 0
+
+    # Skip rows if needed. Can be useful when importing didn't go correctly.
+    if args.offset:
+        [next(reader, None) for item in range(args.offset)]
+
     for post in reader:
+
         post = {k: csvnone.sub("", post[k]) if post[k] else None for k in post}
 
         posts += 1

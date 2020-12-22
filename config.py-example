@@ -64,6 +64,7 @@ WARN_SLACK_URL = ""  # A Slack callback URL may be entered here; any warnings eq
 WARN_EMAILS = []  # e-mail addresses to send warning reports to
 ADMIN_EMAILS = []  # e-mail of admins, to send account requests etc to
 MAILHOST = "localhost"  # SMTP server to connect to for sending e-mail alerts
+NOREPLY_EMAIL = "noreply@localhost"
 
 # Scrape settings for data sources that contain their own scrapers
 SCRAPE_TIMEOUT = 5  # how long to wait for a scrape request to finish?

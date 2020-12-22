@@ -206,7 +206,7 @@ def request_access():
 		else:
 			html_parser = html2text.HTML2Text()
 
-			sender = "4cat@oilab.nl"
+			sender = config.NOREPLY_EMAIL
 			message = MIMEMultipart("alternative")
 			message["Subject"] = "Account request"
 			message["From"] = sender
@@ -225,7 +225,7 @@ def request_access():
 
 			try:
 				with smtplib.SMTP("localhost") as smtp:
-					smtp.sendmail("4cat@oilab.nl", config.ADMIN_EMAILS, message.as_string())
+					smtp.sendmail(config.NOREPLY_EMAIL, config.ADMIN_EMAILS, message.as_string())
 				return render_template("error.html", title="Thank you",
 									   message="Your request has been submitted; we'll try to answer it as soon as possible.")
 			except (smtplib.SMTPException, ConnectionRefusedError):
