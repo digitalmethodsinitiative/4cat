@@ -313,7 +313,7 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 
 				file_name = archived_file.split("/")[-1]
 				temp_file = staging_area.joinpath(file_name)
-				archive_file.extract(file_name, staging_area)
+				archive_file.extract(archived_file, staging_area)
 				paths.append(temp_file)
 
 		return staging_area
