@@ -5,6 +5,8 @@ import shutil
 import praw, praw.exceptions
 import csv
 
+from prawcore.exceptions import Forbidden
+
 from backend.abstract.processor import BasicProcessor
 from backend.lib.exceptions import ProcessorInterruptedException
 
@@ -83,6 +85,10 @@ class RedditVoteChecker(BasicProcessor):
 					post_scores[comment.id] = comment.score
 			except praw.exceptions.PRAWException:
 				self.dataset.update_status("Error while communicating with Reddit.")
+				self.dataset.finish(0)
+				return
+			except Forbidden:
+				self.dataset.update_status("Got error 403 while getting data from Reddit. Reddit may have blocked 4CAT.", is_final=True)
 				self.dataset.finish(0)
 				return
 
