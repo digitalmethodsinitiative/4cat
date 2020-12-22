@@ -30,7 +30,7 @@ with open(input) as i:
 	reader = csv.DictReader(i)
 	rows = 0
 	for row in reader:
-		row += 1
+		rows += 1
 
 required = ("id", "thread_id", "subject", "author", "timestamp", "body")
 for field in required:
@@ -41,7 +41,7 @@ for field in required:
 logger = Logger()
 new_set = DataSet(
 	parameters={"user": "autologin", "filename": input.name, "time": int(time.time()), "datasource": "custom",
-				"board": "upload"},
+				"board": "upload"}, type="custom",
 	db=Database(logger=logger))
 
 shutil.copyfile(input, new_set.get_results_path())
