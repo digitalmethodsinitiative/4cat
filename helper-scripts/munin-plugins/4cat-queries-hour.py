@@ -22,7 +22,7 @@ def get_api(type):
 if len(sys.argv) > 1 and sys.argv[1] == "config":
 	print("graph_title Datasets created per hour")
 	print("graph_args -l 0")
-	print("graph_vlabel queries")
+	print("graph_vlabel datasets")
 	print("graph_category 4cat")
 	print("graph_info The number of datasets created over the past hour")
 	print("datasetsh.warning 1250")
@@ -31,9 +31,9 @@ if len(sys.argv) > 1 and sys.argv[1] == "config":
 	sys.exit(0)
 
 try:
-	queries = get_api("datasets")
-	queries = json.loads(queries)["response"]
-	print("datasetsh.value %i" % queries["1h"])
+	datasets = get_api("datasets")
+	datasets = json.loads(datasets)["response"]
+	print("datasetsh.value %i" % datasets["1h"])
 except (KeyError, json.JSONDecodeError, ConnectionError) as e:
 	print(e)
 	print("datasetsh.value 0")
