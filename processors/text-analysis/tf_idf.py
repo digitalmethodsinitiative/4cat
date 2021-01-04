@@ -55,22 +55,23 @@ class TfIdf(BasicProcessor):
 			"default": "",
 			"min": 1,
 			"max": 10000,
-			"help": "[scikit-learn] Ignore terms that appear in less than this amount of token sets",
-			"tooltip": "Useful for filtering out very sporadic terms."
+			"help": "[scikit-learn] Ignore terms that appear in less than this amount of documents",
+			"tooltip": "Useful for filtering out very sporadic terms. For instance, a value of 3 means that terms must appear in at least three documents (e.g. weekly data)."
 		},
 		"max_occurrences": {
 			"type": UserInput.OPTION_TEXT,
 			"default": "",
 			"min": 1,
 			"max": 10000,
-			"help": "[scikit-learn] Ignore terms that appear in more than this amount of token sets",
-			"tooltip": "Useful for getting rarer terms not consistent troughout the dataset. Leave empty if terms may appear in all sets."
+			"help": "[scikit-learn] Ignore terms that appear in more than this amount of documents",
+			"tooltip": "Useful for getting more specific terms per document. Leaving empty means terms may appear in all documents. For instance, if you have 12 monthly documents and insert 10 here, terms may not appear in 11 or 12 months."
 		},
 		"n_size": {
 			"type": UserInput.OPTION_CHOICE,
 			"default": "",
-			"options": {"1": 1, "2": 2},
-			"help": "[scikit-learn] Amount of words to return (1 = unigrams, 2 = bigrams)"
+			"options": {"1":"unigrams (1)", "2": "bigrams (2)", "3": "trigrams", "1-2": "uni- and bigrams (1-2)", "1-3": "uni-, bi-, and trigrams (1-3)"},
+			"help": "[scikit-learn] Amount of words to return",
+			"tooltip":  "Selecting a range can be useful to e.g. extract multi-word nouns like names.",
 		},
 		"smartirs": {
 			"type": UserInput.OPTION_TEXT,
@@ -97,9 +98,16 @@ class TfIdf(BasicProcessor):
 		Unzips and appends tokens to fetch and write a tf-idf matrix
 		"""
 
-		# Validate and process user inputs - parse to int
+		# Validate and process user inputs
 		library = self.parameters.get("library", "gensim")
-		n_size = convert_to_int(self.parameters.get("n_size", 1), 1)
+
+		if "-" not in self.parameters.get("n_size"):
+			n_size = convert_to_int(self.parameters.get("n_size", 1), 1) 
+			n_size = (n_size, n_size) # needs to be a tuple for sklearn.
+		else:
+			n_size_split = self.parameters.get("n_size").split("-")
+			n_size = (convert_to_int(n_size_split[0]), convert_to_int(n_size_split[1]))
+		
 		min_occurrences = convert_to_int(self.parameters.get("min_occurrences", 1), 1)
 		max_occurrences = convert_to_int(self.parameters.get("min_occurrences", -1), -1)
 		max_output = convert_to_int(self.parameters.get("max_output", 10), 10)
@@ -129,6 +137,7 @@ class TfIdf(BasicProcessor):
 
 					# Add to all date's tokens
 					tokens.append(post_tokens)
+
 			except UnicodeDecodeError:
 				self.dataset.update_status("Error reading input data. If it was imported from outside 4CAT, make sure it is encoded as UTF-8.", is_final=True)
 				self.dataset.finish(0)
@@ -212,7 +221,7 @@ class TfIdf(BasicProcessor):
 
 		return results
 
-	def get_tfidf_sklearn(self, tokens, dates, ngram_range=1, min_occurrences=0, max_occurrences=0, top_n=25):
+	def get_tfidf_sklearn(self, tokens, dates, ngram_range=(1, 1), min_occurrences=0, max_occurrences=0, top_n=25):
 		"""
 		Creates a csv with the top n highest scoring tf-idf words using sklearn's TfIdfVectoriser.
 
@@ -225,9 +234,6 @@ class TfIdf(BasicProcessor):
 
 		:returns dict, results
 		"""
-
-		# Convert to tuple
-		ngram_range = (int(ngram_range), int(ngram_range))
 		
 		# Vectorise
 		self.dataset.update_status("Vectorizing")
@@ -239,7 +245,7 @@ class TfIdf(BasicProcessor):
 		tfidf_sorting = np.argsort(tfidf_matrix.toarray()).flatten()[::-1]
 
 		# Print and store top n highest scoring tf-idf scores
-		top_words = feature_array[tfidf_sorting][:top_n]
+		top_words = feature_array[tfidf_sorting[:top_n]]
 		weights = np.asarray(tfidf_matrix.mean(axis=0)).ravel().tolist()
 		df_weights = pd.DataFrame({"term": tfidf_vectorizer.get_feature_names(), "weight": weights})
 		df_weights = df_weights.sort_values(by="weight", ascending=False).head(100)
@@ -266,4 +272,5 @@ class TfIdf(BasicProcessor):
 				result["value"] = df_tim[document].values[i].tolist()
 				result["date"] = document
 				results.append(result)
+
 		return results
