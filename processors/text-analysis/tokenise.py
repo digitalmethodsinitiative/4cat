@@ -37,11 +37,11 @@ class Tokenise(BasicProcessor):
 	output = "zip"
 
 	options = {
-		"timeframe": {
+		"docs_per": {
 			"type": UserInput.OPTION_CHOICE,
 			"default": "all",
-			"options": {"all": "Overall", "year": "Year", "month": "Month", "week": "Week", "day": "Day"},
-			"help": "Produce files per"
+			"options": {"all": "Overall", "year": "Year", "month": "Month", "week": "Week", "day": "Day", "thread": "Thread"},
+			"help": "Produce documents per"
 		},
 		"tokenizer_type": {
 			"type": UserInput.OPTION_CHOICE,
@@ -105,6 +105,12 @@ class Tokenise(BasicProcessor):
 				#"wordlist-unknown-dutch": "Dutch word list (unknown origin, larger than OpenTaal)"
 			},
 			"help": "Word lists to exclude (i.e. not tokenise). It is highly recommended to exclude stop words. Note that choosing more word lists increases processing time"
+		},
+		"only_unique": {
+			"type": UserInput.OPTION_TOGGLE,
+			"default": False,
+			"help": "Only keep unique words per post",
+			"tooltip": "Can be useful to filter out spam."
 		}
 	}
 
@@ -185,26 +191,33 @@ class Tokenise(BasicProcessor):
 		if self.parameters.get("lemmatise", self.options["lemmatise"]["default"]):
 			lemmatizer = WordNetLemmatizer()
 
+		# Only keep unique words?
+		only_unique = self.parameters.get("only_unique", self.options["only_unique"]["default"])
+
 		# prepare staging area
 		staging_area = self.dataset.get_staging_area()
 
 		# process posts
 		self.dataset.update_status("Processing posts")
-		timeframe = self.parameters.get("timeframe", self.options["timeframe"]["default"])
+		docs_per = self.parameters.get("docs_per", self.options["docs_per"]["default"])
 		grouping = "post" if self.parameters.get("grouping-per", "") == "post" else "sentence"
+
 
 		# this is how we'll keep track of the subsets of tokens
 		output_files = {}
 		current_output_path = None
 		output_file_handle = None
 
-		date_descriptor = "overall"
+		document_descriptor = "overall"
 		for post in self.iterate_csv_items(self.source_file):
 			if not post["body"]:
 				continue
 				
 			# determine what output unit this post belongs to
-			date_descriptor = get_interval_descriptor(post, timeframe)
+			if docs_per != "thread":
+				document_descriptor = get_interval_descriptor(post, docs_per)
+			else:
+				document_descriptor = post["thread_id"] if post["thread_id"] else "undefined"
 
 			# if told so, first split the post into separate sentences
 			if grouping == "sentence":
@@ -244,11 +257,16 @@ class Tokenise(BasicProcessor):
 				# this writes lists of json lists, with the outer list serialised
 				# 'manually' and the token lists serialised by the json library
 				if post_tokens:
-					output_file = staging_area.joinpath(date_descriptor + ".json")
+
+					# Only keep unique words, if desired
+					if only_unique:
+						post_tokens = list(set(post_tokens))
+
+					output_file = staging_area.joinpath(document_descriptor + ".json")
 					output_path = str(output_file)
 
 					if current_output_path != output_path:
-						self.dataset.update_status("Processing posts (%s)" % date_descriptor)
+						self.dataset.update_status("Processing posts (%s)" % document_descriptor)
 						if output_file_handle:
 							output_file_handle.close()
 						output_file_handle = output_file.open("a")
