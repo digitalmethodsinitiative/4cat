@@ -44,7 +44,9 @@ class AttributeRanker(BasicProcessor):
 				"image_file": "Image (filename, for 4chan and 8chan datasets)",
 				"country_code": "Country code (for 4chan datasets)",
 				"subreddit": "Subreddit (for Reddit datasets)",
-				"search_entity": "Entity (for Telegram datasets)"
+				"search_entity": "Entity (for Telegram datasets)",
+				"hashtags": "Hashtag (for datasets with a 'hashtags' column)",
+				"mentions": "Mentions (for datasets with a 'mentions' column)"
 			},
 			"help": "Attribute to aggregate",
 			"tooltip": "When choosing 'Regular expression', any value in a post matching the regular expression will be saved as a separate value."
@@ -196,10 +198,21 @@ class AttributeRanker(BasicProcessor):
 				# as a separate attribute
 				post_links.append(post["url"])
 
+			if "urls" in post and link_regex.match(post["urls"]):
+				# some datasources may provide a specific URL per post
+				# as a separate attribute
+				for url in post["urls"].split(","):
+					if url.strip():
+						post_links.append(post["url"])
+
 			if attribute == "hostname":
 				values = [www_regex.sub("", link.split("/")[2]) for link in post_links]
 			else:
 				values = post_links
+		elif attribute == "hashtags":
+			values = [item for item in post.get("hashtags", "").split(",") if item.strip()]
+		elif attribute == "mentions":
+			values = [item for item in post.get("mentions", "").split(",") if item.strip()]
 		else:
 			# simply copy the CSV column
 			values = [post.get(attribute, "")]
