@@ -5,6 +5,7 @@ Scrape Bitchute videos via the Bitchute web API
 """
 import dateparser
 import requests
+import json
 import time
 import re
 
@@ -49,7 +50,8 @@ class SearchBitChute(Search):
         session = requests.Session()
         session.headers["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:84.0) Gecko/20100101 Firefox/84.0"
         request = session.get("https://www.bitchute.com/search")
-        csrftoken = BeautifulSoup(request.text, 'html.parser').findAll("input", {"name": "csrfmiddlewaretoken"})[0].get("value")
+        csrftoken = BeautifulSoup(request.text, 'html.parser').findAll("input", {"name": "csrfmiddlewaretoken"})[0].get(
+            "value")
         time.sleep(1)
 
         for query in queries:
@@ -66,8 +68,15 @@ class SearchBitChute(Search):
                 post_data = {"csrfmiddlewaretoken": csrftoken, "query": query, "kind": "video", "duration": "",
                              "sort": "", "page": str(page)}
                 headers = {'Referer': "https://www.bitchute.com/search", 'Origin': "https://www.bitchute.com/search"}
-                request = session.post("https://www.bitchute.com/api/search/list/", data=post_data, headers=headers)
-                response = request.json()
+                try:
+                    request = session.post("https://www.bitchute.com/api/search/list/", data=post_data, headers=headers)
+                    if request.status_code != 200:
+                        raise ConnectionError()
+                    response = request.json()
+                except (json.JSONDecodeError, requests.RequestException, ConnectionError):
+                    self.dataset.update_status("Error while interacting with BitChute - try again later.",
+                                               is_final=True)
+                    return
 
                 if response["count"] == 0 or num_results >= max_items:
                     break
@@ -96,28 +105,35 @@ class SearchBitChute(Search):
                         # to get more details per video, we need to request the actual video detail page
                         # start a new session, to not interfer with the CSRF token from the search session
                         video_session = requests.session()
-                        video_page = video_session.get(video["url"])
-                        soup = BeautifulSoup(video_page.text, 'html.parser')
-                        video_csfrtoken = soup.findAll("input", {"name": "csrfmiddlewaretoken"})[0].get("value")
+
+                        try:
+                            video_page = video_session.get(video["url"])
+                            soup = BeautifulSoup(video_page.text, 'html.parser')
+                            video_csfrtoken = soup.findAll("input", {"name": "csrfmiddlewaretoken"})[0].get("value")
+
+                            # we need *two more requests* to get the comment count and like/dislike counts
+                            # this seems to be because bitchute uses a third-party comment widget
+                            video_session.headers = {'Referer': video["url"], 'Origin': video["url"]}
+                            counts = video_session.post("https://www.bitchute.com/video/%s/counts/" % video["id"],
+                                                        data={"csrfmiddlewaretoken": video_csfrtoken}).json()
+                            comment_count = video_session.post(
+                                "https://commentfreely.bitchute.com/api/get_comment_count/",
+                                data={"csrfmiddlewaretoken": video_csfrtoken, "cf_thread": "bc_" + video["id"]}).json()
+
+                        except (json.JSONDecodeError, requests.RequestException, ConnectionError, IndexError):
+                            self.dataset.update_status("Error while interacting with BitChute - try again later.",
+                                                       is_final=True)
+                            return
 
                         # again, no structured info available for the publication date, but at least we can extract the
                         # exact day it was uploaded
                         published = dateparser.parse(
                             soup.find(class_="video-publish-date").text.split("published at")[1].strip()[:1])
-                        category = re.findall(r'<a href="/category/([^/]+)/"', video_page.text)[0]
-
-                        # we need *two more requests* to get the comment count and like/dislike counts
-                        # this seems to be because bitchute uses a third-party comment widget
-                        video_session.headers = {'Referer': video["url"], 'Origin': video["url"]}
-                        counts = video_session.post("https://www.bitchute.com/video/%s/counts/" % video["id"],
-                                              data={"csrfmiddlewaretoken": video_csfrtoken}).json()
-                        comment_count = video_session.post("https://commentfreely.bitchute.com/api/get_comment_count/",
-                                                    data={"csrfmiddlewaretoken": video_csfrtoken, "cf_thread": "bc_" + video["id"]}).json()
 
                         # merge data
                         video = {
                             **video,
-                            "category": category,
+                            "category": re.findall(r'<a href="/category/([^/]+)/"', video_page.text)[0],
                             "likes": counts["like_count"],
                             "dislikes": counts["dislike_count"],
                             "channel_subscribers": counts["subscriber_count"],
