@@ -79,6 +79,12 @@ class YouTubeMetadata(BasicProcessor):
 
 		"""
 
+		# First check if there's a YouTube Developer API key in config
+		if not config.YOUTUBE_DEVELOPER_KEY:
+			self.dataset.update_status("No API key found")
+			self.dataset.finish(0)
+			return
+
 		datasource = self.parent.parameters.get("datasource")
 
 		# Use a dict with post IDs as keys
