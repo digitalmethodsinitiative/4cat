@@ -2,11 +2,21 @@
     <p class="form-intro">Videos are scraped in the order they are returned by
         <a href="https://bitchute.com">BitChute</a>'s search function.</p>
 
-    <p class="form-intro">You can scrape results for up to <strong>fifteen</strong> queries at a time. Separate the items
-        with commas or blank lines.</p>
+    <p class="form-intro">You can scrape results for up to <strong>fifteen</strong> items at a time. Separate the items
+        with commas or blank lines. When searching for usernames, there is no need to include @ in front.</p>
 
     <div class="form-element">
-        <label for="query-input">Search queries:</label>
+        <label for="search-type">Search by:</label>
+        <div>
+            <select name="search_type" id="search-type">
+                <option value="user">Username</option>
+                <option value="search">Search query</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="form-element">
+        <label for="query-input">Queries:</label>
         <div>
             <textarea id="query-input" name="query" placeholder="Separate with commas or new lines."></textarea>
         </div>
@@ -18,7 +28,7 @@
     </div>
 
     <p class="form-intro">You can optionally scrape more details - exact publication date, likes, dislikes, category,
-        comment count and channel subscriber count - for each video. Note that this takes about one second per video
+        comment count and channel subscriber count - for each video. Note that this takes a couple of seconds per video
         (which can add up!). Consider doing a basic query first and then repeating it with more details only if
         necessary.</p>
 
@@ -28,6 +38,7 @@
             <select name="search_scope" id="search-scope">
                 <option value="basic">Basic</option>
                 <option value="detail">Detailed</option>
+                <option value="comments">Detailed, also scrape video comments</option>
             </select>
         </div>
     </div>

@@ -203,7 +203,7 @@ class AttributeRanker(BasicProcessor):
 				# as a separate attribute
 				for url in post["urls"].split(","):
 					if url.strip():
-						post_links.append(post["url"])
+						post_links.append(url)
 
 			if attribute == "hostname":
 				values = [www_regex.sub("", link.split("/")[2]) for link in post_links]
