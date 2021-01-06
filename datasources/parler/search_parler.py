@@ -83,14 +83,14 @@ class SearchParler(Search):
                 try:
                     chunk_posts = session.get(url, params=params)
 
-                    if chunk_posts.status_code == 404:
+                    if chunk_posts.status_code in (404, 400):
                         # no results
                         break
 
                     if chunk_posts.status_code != 200:
-                        # this can happen when the login is incorrect
+                        # no results
                         self.dataset.update_status(
-                            "Error scraping %s. Are the JST and MST values correct? Does the query exist?" % query,
+                            "Got unexpected status from Parler API (%i) - cannot parse data, halting." % chunk_posts.status_code,
                             is_final=True)
                         return
 
@@ -139,6 +139,8 @@ class SearchParler(Search):
                     time.sleep(1.5)
                 else:
                     break
+
+            time.sleep(1)
 
     def expand_number(self, num_str):
         """
