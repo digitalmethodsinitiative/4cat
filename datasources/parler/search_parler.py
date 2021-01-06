@@ -97,8 +97,6 @@ class SearchParler(Search):
                     self.dataset.update_status("Error connecting to Parler - halting.", is_final=True)
                     return
 
-
-
                 for post in chunk_posts["posts"]:
                     # fairly straighforward - most of the API response maps 1-on-1 to 4CAT data fields
                     num_posts += 1
@@ -110,29 +108,45 @@ class SearchParler(Search):
                         "body": post["body"],
                         "author": query,
                         "timestamp": dt.timestamp(),
-                        "comments": post["comments"],
+                        "comments": self.expand_number(post["comments"]),
                         "urls": ",".join([("https://api.parler.com/l/" + link) for link in post["links"]]),
                         "hashtags": ",".join(post["hashtags"]),
-                        "impressions": post["impressions"],
-                        "reposts": post["reposts"],
-                        "upvotes": post["upvotes"],
+                        "impressions": self.expand_number(post["impressions"]),
+                        "reposts": self.expand_number(post["reposts"]),
+                        "upvotes": self.expand_number(post["upvotes"]),
                         "permalink": post.get("shareLink", "")
                     }
 
                     yield post
 
                     if num_posts >= max_posts:
-                        return
+                        break
 
                 self.dataset.update_status(
                     "Retrieved %i posts for query '%s' (%i/%i)" % (num_posts, query, num_query, len(queries)))
 
                 # paginate, if needed
-                if not chunk_posts["last"]:
+                if num_posts < max_posts and not chunk_posts["last"]:
                     cursor = chunk_posts["next"]
                     time.sleep(1.5)
                 else:
                     break
+
+    def expand_number(self, num_str):
+        """
+        Expand '3.3k' to 3300, etc
+
+        :param str num_str:  Number string
+        :return int:  Expanded number
+        """
+        if "k" in num_str:
+            num_str = float(num_str.replace("k", "")) * 1000
+        if "m" in num_str:
+            num_str = float(num_str.replace("k", "")) * 1000000
+        if "b" in num_str:
+            num_str = float(num_str.replace("k", "")) * 1000000000
+        else:
+            return int(num_str)
 
     def validate_query(query, request, user):
         """
