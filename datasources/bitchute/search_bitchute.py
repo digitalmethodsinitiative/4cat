@@ -9,6 +9,7 @@ import json
 import time
 import re
 
+from itertools import chain
 from bs4 import BeautifulSoup
 
 from backend.abstract.search import Search
@@ -58,14 +59,17 @@ class SearchBitChute(Search):
         time.sleep(1)
 
         self.dataset.update_status("Querying BitChute")
+        results = []
         for query in queries:
             num_query += 1
             query = query.strip()
 
             if query_type == "search":
-                return self.get_videos_query(session, query, csrftoken, detail)
+                results.append(self.get_videos_query(session, query, csrftoken, detail))
             else:
-                return self.get_videos_user(session, query, csrftoken, detail)
+                results.append(self.get_videos_user(session, query, csrftoken, detail))
+
+        return chain(*results)
 
     def get_videos_user(self, session, user, csrftoken, detail):
         """
@@ -100,8 +104,8 @@ class SearchBitChute(Search):
                 if request.status_code != 200:
                     raise ConnectionError()
                 response = request.json()
-            except (json.JSONDecodeError, requests.RequestException, ConnectionError):
-                self.dataset.update_status("Error while interacting with BitChute - try again later.", is_final=True)
+            except (json.JSONDecodeError, requests.RequestException, ConnectionError) as e:
+                self.dataset.update_status("Error while interacting with BitChute (%s) - try again later." % e, is_final=True)
                 return
 
             soup = BeautifulSoup(response["html"], 'html.parser')
@@ -172,14 +176,7 @@ class SearchBitChute(Search):
             post_data = {"csrfmiddlewaretoken": csrftoken, "query": query, "kind": "video", "duration": "",
                          "sort": "", "page": str(page)}
             headers = {'Referer': "https://www.bitchute.com/search", 'Origin': "https://www.bitchute.com/search"}
-            try:
-                request = session.post("https://www.bitchute.com/api/search/list/", data=post_data, headers=headers)
-                if request.status_code != 200:
-                    raise ConnectionError()
-                response = request.json()
-            except (json.JSONDecodeError, requests.RequestException, ConnectionError):
-                self.dataset.update_status("Error while interacting with BitChute - try again later.", is_final=True)
-                return
+            response = self.request_from_bitchute(session, "POST", "https://www.bitchute.com/api/search/list/", headers, post_data)
 
             if not response["success"] or response["count"] == 0 or num_items >= self.max_items:
                 break
@@ -236,7 +233,6 @@ class SearchBitChute(Search):
         """
         comments = []
         try:
-            print(video["url"])
             # to get more details per video, we need to request the actual video detail page
             # start a new session, to not interfer with the CSRF token from the search session
             video_session = requests.session()
@@ -250,6 +246,19 @@ class SearchBitChute(Search):
                     "dislikes": "",
                     "channel_subscribers": "",
                     "comments": "",
+                    "hashtags": "",
+                    "parent_id": "",
+                }
+                return (video, [])
+            elif video_page.status_code != 200:
+                video = {
+                    **video,
+                    "category": "error-%i" % video_page.status_code,
+                    "likes": "",
+                    "dislikes": "",
+                    "channel_subscribers": "",
+                    "comments": "",
+                    "hashtags": "",
                     "parent_id": "",
                 }
                 return (video, [])
@@ -257,12 +266,11 @@ class SearchBitChute(Search):
             soup = BeautifulSoup(video_page.text, 'html.parser')
             video_csfrtoken = soup.findAll("input", {"name": "csrfmiddlewaretoken"})[0].get("value")
 
+
             # we need *two more requests* to get the comment count and like/dislike counts
             # this seems to be because bitchute uses a third-party comment widget
             video_session.headers = {'Referer': video["url"], 'Origin': video["url"]}
-            counts = video_session.post("https://www.bitchute.com/video/%s/counts/" % video["id"],
-                                        data={"csrfmiddlewaretoken": video_csfrtoken})
-            counts = counts.json()
+            counts = self.request_from_bitchute(video_session, "POST", "https://www.bitchute.com/video/%s/counts/" % video["id"], data={"csrfmiddlewaretoken": video_csfrtoken})
 
             if detail == "comments":
                 # if comments are also to be scraped, this is anothe request to make, which returns
@@ -283,9 +291,7 @@ class SearchBitChute(Search):
                     comment_count = 0
                     url = comment_script.split("'")[1]
                     comment_csrf = comment_script.split("'")[3]
-                    comments_request = video_session.post(url + "/api/get_comments/",
-                                                          data={"cf_auth": comment_csrf, "commentCount": 0})
-                    comments_data = comments_request.json()
+                    comments_data = self.request_from_bitchute(video_session, "POST", url + "/api/get_comments/", data={"cf_auth": comment_csrf, "commentCount": 0})
 
                     for comment in comments_data:
                         comment_count += 1
@@ -300,6 +306,7 @@ class SearchBitChute(Search):
                             "url": "",
                             "views": "",
                             "length": "",
+                            "hashtags": "",
                             "thumbnail": url + comment["profile_picture_url"],
                             "likes": comment["upvote_count"],
                             "category": "comment",
@@ -312,15 +319,15 @@ class SearchBitChute(Search):
             else:
                 # if we don't need the full comments, we still need another request to get the *amount*
                 # of comments,
-                comment_count = video_session.post(
+                comment_count = self.request_from_bitchute(video_session, "POST",
                     "https://commentfreely.bitchute.com/api/get_comment_count/",
                     data={"csrfmiddlewaretoken": video_csfrtoken,
-                          "cf_thread": "bc_" + video["id"]}).json()["commentCount"]
+                          "cf_thread": "bc_" + video["id"]})["commentCount"]
 
-        except (json.JSONDecodeError, requests.RequestException, ConnectionError, IndexError):
+        except RuntimeError as e:
             # we wrap this in one big try-catch because doing it for each request separarely is tedious
             # hm... maybe this should be in a helper function
-            self.dataset.update_status("Error while interacting with BitChute - try again later.",
+            self.dataset.update_status("Error while interacting with BitChute (%s) - try again later." % e,
                                        is_final=True)
             return (None, None)
 
@@ -342,6 +349,7 @@ class SearchBitChute(Search):
             "channel_subscribers": counts["subscriber_count"],
             "comments": comment_count,
             "parent_id": "",
+            "hashtags": ",".join([tag.text for tag in soup.select("#video-hashtags li a")]),
             "views": counts["view_count"]
         }
 
@@ -351,6 +359,49 @@ class SearchBitChute(Search):
         # may need to be increased? bitchute doesn't seem particularly strict
         time.sleep(0.5)
         return (video, comments)
+
+    def request_from_bitchute(self, session, method, url, headers=None, data=None):
+        """
+        Request something via the BitChute API (or non-API)
+
+        To avoid having to write the same error-checking everywhere, this takes
+        care of retrying on failure, et cetera
+
+        :param session:  Requests session
+        :param str method: GET or POST
+        :param str url:  URL to fetch
+        :param dict header:  Headers to pass with the request
+        :param dict data:  Data/params to send with the request
+
+        :return:  Requests response
+        """
+        retries = 0
+        response = None
+        while retries < 3:
+            try:
+                if method.lower() == "post":
+                    request = session.post(url, headers=headers, data=data)
+                elif method.lower() == "get":
+                    request = session.get(url, headers=headers, params=data)
+                else:
+                    raise NotImplemented()
+
+                response = request.json()
+                return response
+
+            except (ConnectionResetError, requests.RequestException) as e:
+                retries += 1
+                time.sleep(retries * 2)
+
+            except json.JSONDecodeError as e:
+                self.log.warning("Error decoding JSON: %s\n\n%s" % (e, request.text))
+
+        if not response:
+            self.log.warning("Failed BitChute request to %s %i times, aborting" % (url, retries))
+            raise RuntimeError()
+
+        return response
+
 
     def validate_query(query, request, user):
         """
