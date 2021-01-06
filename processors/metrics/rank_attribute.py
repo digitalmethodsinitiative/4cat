@@ -107,7 +107,7 @@ class AttributeRanker(BasicProcessor):
 		# per-period ranking, we need to do a first pass in which all posts are
 		# inspected to determine those overall top-scoring items
 		overall_top = {}
-		if rank_style == "overall":
+		if rank_style == "all":
 			self.dataset.update_status("Determining overall top-%i items" % cutoff)
 			for post in self.iterate_csv_items(self.source_file):
 				values = self.get_values(post, attribute, filter)
@@ -132,7 +132,7 @@ class AttributeRanker(BasicProcessor):
 
 			# keep track of occurrences of found items per relevant time period
 			for value in values:
-				if rank_style == "overall" and value not in overall_top:
+				if rank_style == "all" and value not in overall_top:
 					continue
 
 				if value not in items[time_unit]:
