@@ -62,7 +62,11 @@ class SearchParler(Search):
             else:
                 # for user queries, we need the user ID, which is *not* the username and can only be obtained
                 # via the API
-                user_id = session.get("https://api.parler.com/v1/profile", params={"username": query}).json()["_id"]
+                try:
+                    user_id = session.get("https://api.parler.com/v1/profile", params={"username": query}).json()["_id"]
+                except KeyError:
+                    # user does not exist or no results
+                    continue
                 params = {"id": user_id, "limit": 100}
                 url = "https://api.parler.com/v1/post/creator"
 
@@ -79,8 +83,12 @@ class SearchParler(Search):
                 try:
                     chunk_posts = session.get(url, params=params)
 
+                    if chunk_posts.status_code == 404:
+                        # no results
+                        break
+
                     if chunk_posts.status_code != 200:
-                        # this can happen when the login is incorrect, or a 404 is returned
+                        # this can happen when the login is incorrect
                         self.dataset.update_status(
                             "Error scraping %s. Are the JST and MST values correct? Does the query exist?" % query,
                             is_final=True)
