@@ -334,7 +334,7 @@ def get_interval_descriptor(item, interval):
 	:return str:  Interval descriptor, e.g. "overall", "2020", "2020-08",
 	"2020-43", "2020-08-01"
 	"""
-	if interval == "overall":
+	if interval in ("all", "overall"):
 		return interval
 
 	if "timestamp" not in item:
