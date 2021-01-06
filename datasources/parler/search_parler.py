@@ -139,6 +139,7 @@ class SearchParler(Search):
         :param str num_str:  Number string
         :return int:  Expanded number
         """
+        num_str = str(num_str)
         if "k" in num_str:
             num_str = float(num_str.replace("k", "")) * 1000
         if "m" in num_str:
