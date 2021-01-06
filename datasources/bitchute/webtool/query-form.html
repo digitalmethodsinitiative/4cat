@@ -1,0 +1,34 @@
+<fieldset class="basic-options">
+    <p class="form-intro">Videos are scraped in the order they are returned by
+        <a href="https://bitchute.com">BitChute</a>'s search function.</p>
+
+    <p class="form-intro">You can scrape results for up to <strong>fifteen</strong> queries at a time. Separate the items
+        with commas or blank lines.</p>
+
+    <div class="form-element">
+        <label for="query-input">Search queries:</label>
+        <div>
+            <textarea id="query-input" name="query" placeholder="Separate with commas or new lines."></textarea>
+        </div>
+    </div>
+
+    <div class="form-element country-element">
+        <label for="max-posts">Videos per item:</label>
+        <input name="max_posts" id="max-posts" min="0" max="2500" placeholder="Max: 500" value="10" type="number">
+    </div>
+
+    <p class="form-intro">You can optionally scrape more details - exact publication date, likes, dislikes, category,
+        comment count and channel subscriber count - for each video. Note that this takes about one second per video
+        (which can add up!). Consider doing a basic query first and then repeating it with more details only if
+        necessary.</p>
+
+    <div class="form-element">
+        <label for="search-scope">Detail level:</label>
+        <div>
+            <select name="search_scope" id="search-scope">
+                <option value="basic">Basic</option>
+                <option value="detail">Detailed</option>
+            </select>
+        </div>
+    </div>
+</fieldset>
