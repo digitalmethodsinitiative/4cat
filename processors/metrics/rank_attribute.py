@@ -206,7 +206,11 @@ class AttributeRanker(BasicProcessor):
 						post_links.append(url)
 
 			if attribute == "hostname":
-				values = [www_regex.sub("", link.split("/")[2]) for link in post_links]
+				values = []
+				for urlbits in post_links:
+					urlbits = urlbits.split("/")
+					if len(urlbits) >= 3:
+						values.append(www_regex.sub("", urlbits[2]))
 			else:
 				values = post_links
 		elif attribute == "hashtags":
