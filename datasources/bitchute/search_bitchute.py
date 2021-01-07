@@ -335,8 +335,9 @@ class SearchBitChute(Search):
         # exact day it was uploaded
         try:
             published = dateparser.parse(
-                soup.find(class_="video-publish-date").text.split("published at")[1].strip()[:1])
-        except AttributeError:
+                soup.find(class_="video-publish-date").text.split("published at")[1].strip()[:-1])
+        except AttributeError as e:
+            print(soup.find(class_="video-publish-date"))
             # publication date not on page?
             published = None
 
