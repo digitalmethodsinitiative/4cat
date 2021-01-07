@@ -23,7 +23,7 @@ class CoTagger(BasicProcessor):
 				  "weighted by the frequency of the tag."  # description displayed in UI
 	extension = "gdf"  # extension of result file, used internally and in UI
 
-	datasources = ["instagram", "tumblr", "tiktok", "usenet"]
+	datasources = ["instagram", "tumblr", "tiktok", "usenet", "parler"]
 
 	input = "csv:tags|hashtags|groups"
 	output = "gdf"

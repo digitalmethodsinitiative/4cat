@@ -22,7 +22,7 @@ class HashtagUserBipartiteGrapher(BasicProcessor):
 	description = "Produces a bipartite graph based on co-occurence of (hash)tags and people. If someone wrote a post with a certain tag, there will be a link between that person and the tag. The more often they appear together, the stronger the link."  # description displayed in UI
 	extension = "gdf"  # extension of result file, used internally and in UI
 
-	datasources = ["instagram", "tumblr", "tiktok", "usenet"]
+	datasources = ["instagram", "tumblr", "tiktok", "usenet", "parler"]
 
 	input = "csv:tags|hashtags|groups"
 	output = "gdf"
