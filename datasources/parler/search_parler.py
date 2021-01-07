@@ -51,7 +51,12 @@ class SearchParler(Search):
         session.cookies.set("jst", parameters.get("jst", ""))
         session.headers["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:84.0) Gecko/20100101 Firefox/84.0"
 
+        user_map = {}
+
         for query in queries:
+            if not query.strip():
+                continue
+
             num_query += 1
             query = query.strip()
             is_hashtag = (query[0] == "#")
@@ -82,6 +87,7 @@ class SearchParler(Search):
 
                 try:
                     chunk_posts = session.get(url, params=params)
+                    print(chunk_posts.status_code)
 
                     if chunk_posts.status_code in (404, 400):
                         # no results
@@ -105,6 +111,13 @@ class SearchParler(Search):
                     self.dataset.update_status("Error connecting to Parler - halting.", is_final=True)
                     return
 
+                if "posts" not in chunk_posts:
+                    self.log.warning(repr(chunk_posts))
+                    break
+
+                for user in chunk_posts.get("users", {}):
+                    user_map[user["id"]] = user["username"]
+
                 for post in chunk_posts["posts"]:
                     # fairly straighforward - most of the API response maps 1-on-1 to 4CAT data fields
                     num_posts += 1
@@ -114,7 +127,7 @@ class SearchParler(Search):
                         "thread_id": post["_id"],
                         "subject": "",
                         "body": post["body"],
-                        "author": query,
+                        "author": user_map.get(post["creator"], ""),
                         "timestamp": dt.timestamp(),
                         "comments": self.expand_number(post["comments"]),
                         "urls": ",".join([("https://api.parler.com/l/" + link) for link in post["links"]]),
