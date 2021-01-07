@@ -75,6 +75,16 @@ class HashtagUserBipartiteGrapher(BasicProcessor):
 					continue
 
 				tags = post.get("groups", "").split(",")
+			else:
+				tags = []
+				if not tag_field:
+					tag_field = "tags" if "tags" in post else "hashtags"
+					if tag_field not in post:
+						self.dataset.update_status("Dataset has no 'hashtags' or 'tags' column, cannot analyse tag usage", is_final=True)
+						return
+
+				for tag in post.get(tag_field, "").split(","):
+					tags.append(tag.strip())
 
 			# just in case
 			tags = [tag.strip().replace(",", "").replace("\"", "'") for tag in tags]
