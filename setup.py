@@ -49,7 +49,7 @@ libraries = [
 	"scipy==1.1.0",
 	"Flask==1.1.0",
 	"spacy==2.2.4",
-	"lxml==4.5.1",
+	"lxml==4.6.2",
 	"praw==6.5.1",
 	"nltk==3.4.5",
 	"mpld3==0.3",
