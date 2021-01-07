@@ -129,9 +129,9 @@ class HashtagUserBipartiteGrapher(BasicProcessor):
 			for user in all_users:
 				results.write("'" + user + "',user,%i\n" % all_users[user])
 
-			results.write("edgedef>tag VARCHAR, user VARCHAR, weight INTEGER\n")
+			results.write("edgedef>tag VARCHAR, user VARCHAR, weight INTEGER,directed BOOLEAN\n")
 			for pair in pairs:
 				results.write(
-					"'" + pair.split("-_-")[0] + "','" + pair.split("-_-")[1] + "',%i\n" % pairs[pair])
+					"'" + pair.split("-_-")[0] + "','" + pair.split("-_-")[1] + "',%i,TRUE\n" % pairs[pair])
 
 		self.dataset.finish(len(pairs))
