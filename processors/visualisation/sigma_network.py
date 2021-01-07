@@ -34,7 +34,7 @@ class SigmaNetwork(BasicProcessor):
 	title = "Sigma js network"  # title displayed in UI
 	description = "Visualise a network in the browser with sigma js."  # description displayed in UI
 	extension = "html"  # extension of result file, used internally and in UI
-	accepts = ["word-embeddings-neighbours", "url-network", "cotag-network", "quote-network", "wiki-category-network", "collocations"]  # query types this post-processor accepts as input
+	accepts = ["bipartite-user-tag-network", "word-embeddings-neighbours", "url-network", "cotag-network", "quote-network", "wiki-category-network", "collocations"]  # query types this post-processor accepts as input
 	preview_allowed = False # Will slow down the page too much
 
 	input = "csv"
