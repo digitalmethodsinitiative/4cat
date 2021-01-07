@@ -166,9 +166,9 @@ class SearchParler(Search):
         if "k" in num_str:
             return float(num_str.replace("k", "")) * 1000
         if "m" in num_str:
-            return float(num_str.replace("k", "")) * 1000000
+            return float(num_str.replace("m", "")) * 1000000
         if "b" in num_str:
-            return float(num_str.replace("k", "")) * 1000000000
+            return float(num_str.replace("b", "")) * 1000000000
         else:
             return int(num_str)
 
