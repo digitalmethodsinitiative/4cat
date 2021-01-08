@@ -39,6 +39,8 @@ class SearchParler(Search):
         # ready our parameters
         parameters = self.dataset.get_parameters()
         max_posts = parameters.get("items", 100)
+        min_timestamp = parameters.get("min_date", 0)
+        max_timestamp = parameters.get("max_date", time.time())
         queries = [query.strip() for query in parameters.get("query", "").split(",")]
         num_query = 0
 
@@ -118,6 +120,7 @@ class SearchParler(Search):
                 for user in chunk_posts.get("users", {}):
                     user_map[user["id"]] = user["username"]
 
+                done = False
                 for post in chunk_posts["posts"]:
                     # fairly straighforward - most of the API response maps 1-on-1 to 4CAT data fields
                     num_posts += 1
@@ -138,6 +141,13 @@ class SearchParler(Search):
                         "permalink": post.get("shareLink", "")
                     }
 
+                    if dt.timestamp() < min_timestamp:
+                        done = True
+                        break
+
+                    if dt.timestamp() >= max_timestamp:
+                        continue
+
                     yield post
 
                     if num_posts >= max_posts:
@@ -147,7 +157,7 @@ class SearchParler(Search):
                     "Retrieved %i posts for query '%s' (%i/%i)" % (num_posts, query, num_query, len(queries)))
 
                 # paginate, if needed
-                if num_posts < max_posts and not chunk_posts["last"]:
+                if not done and num_posts < max_posts and not chunk_posts["last"]:
                     cursor = chunk_posts["next"]
                     time.sleep(1.5)
                 else:
@@ -203,10 +213,26 @@ class SearchParler(Search):
         if len(items.split(",")) > 15:
             raise QueryParametersException("You cannot query more than 15 items at a time.")
 
+        if query.get("min_date", None) and query.get("max_date", None):
+            try:
+                before = int(query.get("max_date", ""))
+                after = int(query.get("min_date", ""))
+            except ValueError:
+                raise QueryParametersException("Please provide valid dates for the date range.")
+
+            if before < after:
+                raise QueryParametersException(
+                    "Please provide a valid date range where the start is before the end of the range.")
+
+            query["min_date"] = after
+            query["max_date"] = before
+
         # simple!
         return {
             "items": max_posts,
             "query": items,
+            "min_date": query.get("min_date", None),
+            "max_date": query.get("max_date", None),
             "jst": query.get("jst"),
             "mst": query.get("mst")
         }

@@ -35,4 +35,19 @@
             <input type="text" name="mst" id="parler-mst">
         </div>
     </div>
+
+    <fieldset class="date-options">
+        <div class="form-element">
+            <label>Date range:</label>
+            <div class="filter-parameters">
+                <input name="min_date_proxy" id="input-min-time" class="input-time" type="date"
+                       placeholder="dd-mm-yyyy"> to
+                <input name="max_date_proxy" id="input-max-time" class="input-time" type="date"
+                       placeholder="dd-mm-yyyy"> <span class="red"></span>
+
+                <input name="min_date" type="hidden" value="0">
+                <input name="max_date" type="hidden" value="0">
+            </div>
+        </div>
+    </fieldset>
 </fieldset>
