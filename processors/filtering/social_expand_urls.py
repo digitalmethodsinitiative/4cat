@@ -27,7 +27,7 @@ class ParlerURLExpander(BasicProcessor):
     description = "Expand Twitter and Parler redirect URLs. By default Parler replaces all links in posts with a parler-owned redirect URL. This processor expands those URLs so they refer to the original URL. Not recommended for very large (10,000+ posts) datasets."  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
 
-    datasources = ["parler"]
+    datasources = ["parler", "custom"]
 
     input = "csv:body"
     output = "csv"
