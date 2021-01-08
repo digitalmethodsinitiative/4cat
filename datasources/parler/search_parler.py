@@ -42,6 +42,7 @@ class SearchParler(Search):
         min_timestamp = parameters.get("min_date", 0)
         max_timestamp = parameters.get("max_date", time.time())
         queries = [query.strip() for query in parameters.get("query", "").split(",")]
+        scrape_echoes = parameters.get("scrape_echoes", False)
         num_query = 0
 
         # start a HTTP session. Parler uses two session 'cookies' that are required on each request, else no response
@@ -54,6 +55,7 @@ class SearchParler(Search):
         session.headers["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:84.0) Gecko/20100101 Firefox/84.0"
 
         user_map = {}
+        ref_map = {}
 
         for query in queries:
             if not query.strip():
@@ -120,34 +122,50 @@ class SearchParler(Search):
                 for user in chunk_posts.get("users", {}):
                     user_map[user["id"]] = user["username"]
 
+                for ref in chunk_posts.get("postRefs", {}):
+                    ref_map[ref["_id"]] = ref
+
+
                 done = False
                 for post in chunk_posts["posts"]:
                     # fairly straighforward - most of the API response maps 1-on-1 to 4CAT data fields
-                    num_posts += 1
+                    # in case of reposts (echoes), use the original data and mark it as a repost
+                    if post.get("parent") and int(post.get("depth", 0)) == 1:
+                        if not scrape_echoes:
+                            continue
+
+                        reposted_by = user_map.get(post["creator"])
+                        post_src = ref_map[post.get("parent")]
+                    else:
+                        reposted_by = ""
+                        post_src = post
+
                     dt = datetime.datetime.strptime(post["createdAt"], "%Y%m%d%H%M%S")
                     post = {
-                        "id": post["_id"],
-                        "thread_id": post["_id"],
+                        "id": post_src["_id"],
+                        "thread_id": post_src["_id"],
                         "subject": "",
-                        "body": post["body"],
-                        "author": user_map.get(post["creator"], ""),
+                        "body": post_src["body"],
+                        "author": user_map.get(post_src["creator"], ""),
                         "timestamp": dt.timestamp(),
-                        "comments": self.expand_number(post["comments"]),
-                        "urls": ",".join([("https://api.parler.com/l/" + link) for link in post["links"]]),
-                        "hashtags": ",".join(post["hashtags"]),
-                        "impressions": self.expand_number(post["impressions"]),
-                        "reposts": self.expand_number(post["reposts"]),
-                        "upvotes": self.expand_number(post["upvotes"]),
-                        "permalink": post.get("shareLink", "")
+                        "comments": self.expand_number(post_src["comments"]),
+                        "urls": ",".join([("https://api.parler.com/l/" + link) for link in post_src["links"]]),
+                        "hashtags": ",".join(post_src["hashtags"]),
+                        "impressions": self.expand_number(post_src["impressions"]),
+                        "reposts": self.expand_number(post_src["reposts"]),
+                        "upvotes": self.expand_number(post_src["upvotes"]),
+                        "permalink": post_src.get("shareLink", ""),
+                        "reposted_by": reposted_by
                     }
 
-                    if dt.timestamp() < min_timestamp:
+                    if min_timestamp > 0 and dt.timestamp() < min_timestamp:
                         done = True
                         break
 
-                    if dt.timestamp() >= max_timestamp:
+                    if min_timestamp > 0 and dt.timestamp() >= max_timestamp:
                         continue
 
+                    num_posts += 1
                     yield post
 
                     if num_posts >= max_posts:
@@ -234,7 +252,8 @@ class SearchParler(Search):
             "min_date": query.get("min_date", None),
             "max_date": query.get("max_date", None),
             "jst": query.get("jst"),
-            "mst": query.get("mst")
+            "mst": query.get("mst"),
+            "scrape_echoes": bool(query.get("scrape_echoes", False))
         }
 
     def get_search_mode(self, query):
