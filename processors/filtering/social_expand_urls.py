@@ -5,6 +5,7 @@ import requests
 import shutil
 import time
 import csv
+import re
 
 from backend.abstract.processor import BasicProcessor
 
@@ -20,10 +21,10 @@ class ParlerURLExpander(BasicProcessor):
     """
     Expand Parler URL redirects
     """
-    type = "expand-parler-urls"  # job type ID
+    type = "expand-social-urls"  # job type ID
     category = "Filtering"  # category
-    title = "Expand Parler URLs"  # title displayed in UI
-    description = "Expand Parler redirect URLs. By default Parler replaces all links in posts with a parler-owned redirect URL. This processor expands those URLs so they refer to the original URL. Not recommended for very large (10,000+ posts) datasets."  # description displayed in UI
+    title = "Expand Social Media Redirect URLs"  # title displayed in UI
+    description = "Expand Twitter and Parler redirect URLs. By default Parler replaces all links in posts with a parler-owned redirect URL. This processor expands those URLs so they refer to the original URL. Not recommended for very large (10,000+ posts) datasets."  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
 
     datasources = ["parler"]
@@ -45,6 +46,24 @@ class ParlerURLExpander(BasicProcessor):
             fieldnames = reader.fieldnames
 
         self.dataset.update_status("Processing posts")
+
+        def replace_url(url):
+            if hasattr(url, "group"):
+                url = url.group(0)
+
+            if not "api.parler.com/l" in url and not "t.co" in url:
+                # skip non-redirects
+                return url
+
+            try:
+                headers = requests.head(url).headers
+                time.sleep(0.25)
+            except (requests.RequestException, ConnectionError):
+                # bummer, but best to just leave as-is in this case
+                return url
+
+            return headers.get("Location", url)
+
         # write a new file with the updated links
         with self.dataset.get_results_path().open("w", encoding="utf-8", newline="") as output:
             writer = csv.DictWriter(output, fieldnames=fieldnames)
@@ -54,29 +73,19 @@ class ParlerURLExpander(BasicProcessor):
             for post in self.iterate_csv_items(self.source_file):
                 expanded_urls = []
 
+                post["body"] = re.sub(r"https?://[^\s]+", replace_url, post["body"])
+
                 # go through links and do a HEAD request for all of them to figure out the redirect location
-                if post["urls"]:
+                if post.get("urls"):
                     for url in post["urls"].split(","):
-                        if not "api.parler.com/l" in url:
-                            # skip non-redirects
-                            expanded_urls.append(url)
-                            continue
-
-                        try:
-                            headers = requests.head(url).headers
-                        except (requests.RequestException, ConnectionError):
-                            # bummer, but best to just leave as-is in this case
-                            pass
-
-                        expanded_urls.append(headers.get("Location", url))
+                        expanded_urls.append(replace_url(url))
 
                     post["urls"] = ",".join(expanded_urls)
-                    time.sleep(0.25)  # is this needed in this case? is it big enough?
 
                 writer.writerow(post)
                 processed += 1
                 if processed % 25 == 0:
-                    self.dataset.update_status("Processed %i Parler posts" % processed)
+                    self.dataset.update_status("Processed %i posts" % processed)
 
         # now comes the big trick - replace original dataset with updated one
         parent = self.dataset.get_genealogy()[0]
