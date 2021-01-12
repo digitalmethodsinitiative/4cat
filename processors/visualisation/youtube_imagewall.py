@@ -151,7 +151,6 @@ class YouTubeImageWall(BasicProcessor):
 
 		# prepare staging area
 		results_path = self.dataset.get_staging_area()
-		results_path.mkdir()
 
 		# Loop through images and copy them onto the wall
 		for file in files:
