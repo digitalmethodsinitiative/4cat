@@ -246,6 +246,18 @@ class IsometricMultigraphRenderer(BasicProcessor):
 		step_y_vertical = cos(plane_angle / 2) * item_height
 
 		# labels for x axis
+		# month and week both follow the same pattern
+		# it's not always possible to distinguish between them but we will try
+		# by looking for months greater than 12 in which case we are dealing
+		# with weeks
+		# we need to know this because for months there is an extra row in the
+		# label with the full month
+		is_week = False
+		for i in range(0, len(intervals)):
+			if re.match(r"^[0-9]{4}-[0-9]{2}", intervals[i]) and int(intervals[i].split("-")[1]) > 12:
+				is_week = True
+				break
+
 		skip = max(1, int(len(intervals) / max_gridlines))
 		for i in range(0, len(intervals)):
 			if i % skip == 0:
@@ -267,7 +279,7 @@ class IsometricMultigraphRenderer(BasicProcessor):
 					style="font-weight:bold;"
 				))
 
-				if re.match(r"^[0-9]{4}-[0-9]{2}", intervals[i]):
+				if re.match(r"^[0-9]{4}-[0-9]{2}", intervals[i]) and not is_week:
 					label2 = month_abbr[int(str(intervals[i])[5:7])]
 					if re.match(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}", intervals[i]):
 						label2 += " %i" % int(intervals[i][8:10])
