@@ -26,6 +26,7 @@ libraries = [
 	"matplotlib==3.1.1",
 	"adjustText==0.7.3",
 	"selenium==3.141.0",
+	"dateparser==1.0.0",
 	"werkzeug==0.15.5",
 	"cssselect==1.0.3",
 	"requests==2.20.0",
