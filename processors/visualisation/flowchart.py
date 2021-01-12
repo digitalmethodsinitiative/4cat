@@ -122,7 +122,7 @@ class FlowChart(BasicProcessor):
 						time_format = "%Y-%m-%d"
 
 				# Make a bucket when a new timestamp appears
-				if post[date_key] == "overall":
+				if post[date_key] in ("all", "overall"):
 					timestamp = "overall"
 				else:
 					timestamp = int(datetime.datetime.strptime(post[date_key], time_format).timestamp())
