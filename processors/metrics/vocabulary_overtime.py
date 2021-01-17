@@ -30,6 +30,10 @@ class OvertimeAnalysis(BasicProcessor):
 	input = "csv:body"
 	output = "csv:time,item,frequency"
 
+	references = [
+		"[\"Salvaging the Internet Hate Machine: Using the discourse of radical online subcultures to identify emergent extreme speech\" - Unblished paper detailing the OILab extreme speech lexigon](https://oilab.eu/texts/4CAT_Hate_Speech_WebSci_paper.pdf)",
+		]
+
 	# the following determines the options available to the user via the 4CAT
 	# interface.
 	options = {
@@ -66,7 +70,7 @@ class OvertimeAnalysis(BasicProcessor):
 				"oilab-extreme-sexual": "OILab Extreme Speech Lexicon (sexual)",
 				"wildcard": "Match everything (useful as comparison, only has effect when tracking separately)"
 			},
-			"help": "Vocabularies to detect"
+			"help": "Vocabularies to detect. For explanation, see hatebase.org for the hatebase lexicon and the references of this module for the OILab extreme speech lexicon"
 		},
 		"vocabulary-custom": {
 			"type": UserInput.OPTION_TEXT,
