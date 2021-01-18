@@ -15,7 +15,7 @@ from PIL import Image, ImageFile, ImageOps, UnidentifiedImageError
 
 from lxml import etree
 from lxml.cssselect import CSSSelector as css
-from io import StringIO
+from io import StringIO, BytesIO
 
 import config
 from backend.lib.helpers import UserInput
@@ -283,10 +283,14 @@ class ImageDownloader(BasicProcessor):
 		if image.status_code != 200 or image.headers["content-type"][:5] != "image":
 			raise FileNotFoundError
 		
+		# Try opening the image in multiple ways
 		try:
-			picture = Image.open(image.raw)
+			picture = Image.open(BytesIO(image.content))
 		except UnidentifiedImageError:
-			raise FileNotFoundError
+			try:
+				picture = Image.open(image.raw)
+			except UnidentifiedImageError:
+				raise FileNotFoundError
 
 		return picture, image_name
 

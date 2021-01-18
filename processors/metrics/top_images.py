@@ -150,7 +150,7 @@ class TopImageCounter(BasicProcessor):
 					img_links += post_img_links
 
 			# OrderedDict for Counter, since we need to URLs ordered from most- to to least-linked to.
-			img_ranked = OrderedDict(Counter(img_links))
+			img_ranked = OrderedDict(Counter(img_links).most_common())
 			
 			results = [{
 				"img_url": k,
