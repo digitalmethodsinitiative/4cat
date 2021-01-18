@@ -147,7 +147,7 @@ class ImageDownloader(BasicProcessor):
 					picture = self.get_4chan_image(path, rate_limit=rate_limit)
 				else:
 					picture, image_name = self.get_image(path)
-			
+
 			except (requests.RequestException, IndexError, FileNotFoundError) as e:
 				continue
 
@@ -172,7 +172,7 @@ class ImageDownloader(BasicProcessor):
 					hash = path.stem
 
 				# determine file name and where to save
-				image_name = hash + "." extensions[path]
+				image_name = hash + "." + extensions[path]
 				imagepath = str(results_path.joinpath(image_name))
 
 			# For other data sources, we take the imagename it already had.
