@@ -269,8 +269,11 @@ class ImageDownloader(BasicProcessor):
 		
 		# Use this for local saving.
 		image_name = image_url.split("/")[-1]
+		# Some URLs have parameters after extention. Remove if this is the case.
+		if "?" in image_name:
+			image_name = image_name.split("?")[0]
 
-		# Check if we succeededimage.headers["content-type"]
+		# Check if we succeeded; content type should be an image
 		if image.status_code != 200 or image.headers["content-type"][:5] != "image":
 			raise FileNotFoundError
 		
