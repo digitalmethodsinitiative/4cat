@@ -8,7 +8,7 @@ import config
 import csv
 import shutil
 
-from collections import Counter
+from collections import Counter, OrderedDict
 from backend.abstract.processor import BasicProcessor
 from backend.lib.helpers import UserInput
 
@@ -109,19 +109,27 @@ class TopImageCounter(BasicProcessor):
 
 				post_img_links = []
 
-				if "url" in post and (img_link_regex.match(post["url"]) or img_domain_regex.match(post["url"])):
-					# some datasources may provide a specific URL per post
-					# as a separate attribute.
-					post_img_links.append(post["url"])
+				if "url" in post:
+					if img_link_regex.match(post["url"]) or img_domain_regex.match(post["url"]):
+						# some datasources may provide a specific URL per post
+						# as a separate attribute.
+						post_img_links.append(post["url"])
 
-				if "urls" in post and (img_link_regex.search(post["urls"]) or img_domain_regex.search(post["url"])):
-					
-					# some datasources may provide a specific URL per post
-					# as a separate attribute.
-					urls = post["urls"].split(",")
-					urls = list(set(urls)) # to prevent spamming
-					for url in urls:
-						if url.strip() and (img_link_regex.match(post["urls"]) or img_domain_regex.match(post["url"])):
+				if "urls" in post:
+					if img_link_regex.search(post["urls"]) or img_domain_regex.search(post["urls"]):
+						# some datasources may provide a specific URL per post
+						# as a separate attribute.
+						urls = post["urls"].split(",")
+						urls = list(set(urls)) # to prevent spamming
+						for url in urls:
+							if url.strip() and (img_link_regex.match(post["urls"]) or img_domain_regex.match(post["urls"])):
+								post_img_links.append(url)
+
+				# Image links are contained in the image column for Tumblr datasets
+				if "images" in post:
+					if img_link_regex.search(post["images"]) or img_domain_regex.search(post["images"]):
+						urls = post["images"][2:-2].split("',\n'") # Formatted as a list with newlines.
+						for url in urls:
 							post_img_links.append(url)
 
 				# We also take into account urls in the text body itself.
@@ -141,7 +149,8 @@ class TopImageCounter(BasicProcessor):
 				if post_img_links:
 					img_links += post_img_links
 
-			img_ranked = Counter(img_links)
+			# OrderedDict for Counter, since we need to URLs ordered from most- to to least-linked to.
+			img_ranked = OrderedDict(Counter(img_links))
 			
 			results = [{
 				"img_url": k,
