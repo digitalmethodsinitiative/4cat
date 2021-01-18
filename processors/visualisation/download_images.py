@@ -138,8 +138,8 @@ class ImageDownloader(BasicProcessor):
 				raise ProcessorInterruptedException("Interrupted while downloading images.")
 
 			counter += 1
-			self.dataset.update_status("Downloading image %i of %i" % (counter, len(urls)))
 			success.append({"download_status": "failed", "img_name": ""})
+			self.dataset.update_status("Downloading image %i of %i" % (counter, len(urls)))
 
 			# acquire and resize image
 			try:
@@ -147,30 +147,36 @@ class ImageDownloader(BasicProcessor):
 					picture = self.get_4chan_image(path, rate_limit=rate_limit)
 				else:
 					picture, image_name = self.get_image(path)
+			
 			except (requests.RequestException, IndexError, FileNotFoundError) as e:
 				continue
 
-			# hash needs to be hexified if it's a 4chan hash
-			if not isinstance(path, Path) and path[-2:] == "==":
-				md5 = hashlib.md5()
-				b64hash = base64.b64decode(path.split("/")[-1].split(".")[0].replace("_", "/"))
+			# Again, some different processing for 4chan
+			if datasource == "4chan":
+
+				# hash needs to be hexified if it's a 4chan hash
+				if not isinstance(path, Path) and path[-2:] == "==":
+					md5 = hashlib.md5()
+					b64hash = base64.b64decode(path.split("/")[-1].split(".")[0].replace("_", "/"))
+					
+					try:
+						md5.update(b64hash)
+					except binascii.Error:
+						self.log.warning("Invalid base64 hash %s, skipping" % b64hash)
+						continue
+
+					hash = md5.hexdigest()
 				
-				try:
-					md5.update(b64hash)
-				except binascii.Error:
-					self.log.warning("Invalid base64 hash %s, skipping" % b64hash)
-					continue
-
-				file_id = md5.hexdigest()
-				
-				# determine file name
-				image_name = file_id + "." + extensions[path]
-
-				# determine where to save
-				imagepath = str(results_path.joinpath(file_id)) + "." + extensions[path]
-
-			else:
 				# if we're using an already-saved image the image filename is good as it is
+				else:
+					hash = path.stem
+
+				# determine file name and where to save
+				image_name = hash + "." extensions[path]
+				imagepath = str(results_path.joinpath(image_name))
+
+			# For other data sources, we take the imagename it already had.
+			else:
 				imagepath = str(results_path.joinpath(image_name))
 
 			# save file
@@ -181,7 +187,7 @@ class ImageDownloader(BasicProcessor):
 				continue
 
 			# If this all succeeded, we update the download status and the filename.
-			success[counter - 1]["download_status"] = "succeeeded"
+			success[counter - 1]["download_status"] = "succeeded"
 			success[counter - 1]["img_name"] = image_name
 
 		# Also add the data to the original csv file, if indicated.
