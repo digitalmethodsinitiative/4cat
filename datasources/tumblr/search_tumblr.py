@@ -98,7 +98,6 @@ class SearchTumblr(Search):
 
 				# Loop through and add the text reblogs that came with the results.
 				for post_notes in all_notes:
-					print(post_notes)
 					for post_note in post_notes:
 						for note in post_note:
 							if note["type"] == "reblog":
@@ -120,8 +119,9 @@ class SearchTumblr(Search):
 					self.dataset.update_status("Got %i/%i text reblogs" % (i, len(text_reblogs)))
 					for key, value in text_reblog.items():
 						reblog_post = self.get_post_by_id(key, value)
-						reblog_post = self.parse_tumblr_posts([reblog_post], reblog=True)
-						results.append(reblog_post[0])
+						if reblog_post:
+							reblog_post = self.parse_tumblr_posts([reblog_post], reblog=True)
+							results.append(reblog_post[0])
 
 		self.job.finish()
 		return results
@@ -390,6 +390,11 @@ class SearchTumblr(Search):
 		# Request the specific post.
 		post = client.posts(blog_name, id=post_id)
 
+		# Tumblr API can sometimes return with this kind of error:
+		# {'meta': {'status': 500, 'msg': 'Server Error'}, 'response': {'error': 'Malformed JSON or HTML was returned.'}}
+		if "posts" not in post:
+			return None
+
 		# Get the first element of the list - it's always one post.
 		result = post["posts"][0]
 
@@ -442,8 +447,6 @@ class SearchTumblr(Search):
 		items = query.get("query").replace("\n", ",").replace("#","").replace("\r", ",")
 		items = items.split(",")
 		items = [item.lstrip().rstrip() for item in items if item]
-
-		print(query.get("max_date"), query.get("min_date"))
 
 		# Set dates, if given.
 		if query.get("max_date") or query.get("min_date"):
