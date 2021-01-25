@@ -52,14 +52,24 @@ class TopImageCounter(BasicProcessor):
 
 		restuls = None
 
+		all_links = [] # Used for overwrite
+
 		# 4chan data has specific columns for image information, so treat this a bit differently.
 		if self.parent.parameters["datasource"] == "4chan":
 			
 			self.dataset.update_status("Extracting image links from source file")
 			
+			# Variables used for overwriting source file
+			board = self.parent.parameters["board"]
+			boards_4plebs = ["pol", "lgbt", "adv", "f", "o", "sp", "tg", "trv", "tv", "x"]
+			boards_fireden = ["cm", "co", "ic", "sci", "v", "vip", "y"]
+			
 			for post in self.iterate_csv_items(self.source_file):
 
+				post_img_links = []
+
 				if not post["image_file"]:
+					all_links.append([])
 					continue
 
 				if post["image_md5"] not in images:
@@ -73,7 +83,24 @@ class TopImageCounter(BasicProcessor):
 						"hash": post["image_md5"],
 						"count": 0
 					}
+				
+				# If we need to add image links to the source csv,
+				# link to archives - we can't assume 4CAT has it saved.
+				if self.parameters.get("overwrite"):
 
+					# 4plebs boards
+					if board in boards_4plebs:
+						post_img_links.append("https://archive.4plebs.org/_/search/image/" + post["image_md5"].replace("/", "_"))
+
+					# Fireden boards
+					elif board in boards_fireden:
+						post_img_links.append("https://boards.fireden.net/_/search/image/" + post["image_md5"].replace("/", "_"))
+
+					# Else, assume archived.moe has it
+					else:
+						post_img_links.append("https://archived.moe/_/search/image/" + post["image_md5"].replace("/", "_"))
+				
+				all_links.append(post_img_links)
 				images[post["image_md5"]]["count"] += 1
 
 			top_images = {id: images[id] for id in sorted(images, key=lambda id: images[id]["count"], reverse=True)}
@@ -85,7 +112,8 @@ class TopImageCounter(BasicProcessor):
 				"url_4cat": ("s" if config.FlaskConfig.SERVER_HTTPS else "") + "://" + config.FlaskConfig.SERVER_NAME + "/api/image/" + images[id]["md5"] + "." + images[id]["filename"].split(".")[
 					-1],
 				"url_4plebs": "https://archive.4plebs.org/_/search/image/" + images[id]["hash"].replace("/", "_"),
-				"url_fireden": "https://boards.fireden.net/_/search/image/" + images[id]["hash"].replace("/", "_")
+				"url_fireden": "https://boards.fireden.net/_/search/image/" + images[id]["hash"].replace("/", "_"),
+				"url_archivedmoe": "https://archived.moe/_/search/image/" + images[id]["hash"].replace("/", "_")
 			} for id in top_images]
 
 		else:
@@ -102,7 +130,6 @@ class TopImageCounter(BasicProcessor):
 
 			self.dataset.update_status("Extracting image links from source file")
 			
-			all_links = [] # Used for overwrite
 			img_links = []
 			
 			for post in self.iterate_csv_items(self.source_file):
@@ -173,7 +200,7 @@ class TopImageCounter(BasicProcessor):
 
 		"""
 
-		self.dataset.update_status("Adding image urls to the source file")
+		self.dataset.update_status("Adding image URLs to the source file")
 
 		# Get the source file data path
 		genealogy = self.dataset.get_genealogy()
@@ -193,7 +220,7 @@ class TopImageCounter(BasicProcessor):
 			fieldnames.append("img_url")
 
 		# Iterate through the original dataset and add values to a new img_link column
-		self.dataset.update_status("Writing csv with nouns.")
+		self.dataset.update_status("Writing new source file with image URLs.")
 		with tmp_file_path.open("w", encoding="utf-8", newline="") as output:
 
 			writer = csv.DictWriter(output, fieldnames=fieldnames)
