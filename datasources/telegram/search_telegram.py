@@ -117,6 +117,11 @@ class SearchTelegram(Search):
 
 					if i % 500 == 0:
 						self.dataset.update_status("Retrieved %i posts for entity '%s'" % (len(query_posts) + len(posts), query))
+
+					if message.action is not None:
+						# e.g. someone joins the channel - not an actual message
+						continue
+
 					parsed_message = self.import_message(client, message, query, get_full_userinfo=userinfo)
 					query_posts.append(parsed_message)
 
@@ -157,12 +162,10 @@ class SearchTelegram(Search):
 		# has a username. If no username is available, try the first and
 		# last name someone has supplied
 		if hasattr(message, "sender") and hasattr(message.sender, "username"):
-			if message.sender.username:
-				username = message.sender.username
-			else:
-				username = message.sender.first_name if message.sender.first_name else ""
-				if message.sender.last_name:
-					username += " " + message.sender.last_name
+			username = message.sender.username if message.sender.username else ""
+			fullname = message.sender.first_name if message.sender.first_name else ""
+			if message.sender.last_name:
+					fullname += " " + message.sender.last_name
 			user_id = message.sender.id
 			user_is_bot = message.sender.bot
 		elif message.from_id:
@@ -285,7 +288,8 @@ class SearchTelegram(Search):
 			"thread_id": thread_id,
 			"search_entity": entity,
 			"author": user_id,
-			"author_name": username,
+			"author_username": username,
+			"author_name": fullname,
 			"author_is_bot": user_is_bot,
 			"author_forwarded_from": forwarded,
 			"subject": "",
