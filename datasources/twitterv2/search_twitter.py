@@ -78,12 +78,10 @@ class SearchWithTwitterAPIv2(Search):
                 continue
 
             elif api_response.status_code == 400:
-                print(api_response.text)
                 self.dataset.update_status("Response 400 from the Twitter API. Some of your parameters (e.g. date range) may be invalid.")
                 return
 
             elif api_response.status_code != 200:
-                print(api_response.text)
                 self.dataset.update_status("Unexpected HTTP status %i. Halting tweet collection." % api_response.status_code, is_final=True)
                 return
 
