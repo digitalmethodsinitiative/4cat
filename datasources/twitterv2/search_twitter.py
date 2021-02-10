@@ -1,0 +1,274 @@
+"""
+Twitter keyword search via the Twitter API v2
+"""
+import requests
+import datetime
+import time
+import re
+
+from backend.abstract.search import Search
+from backend.lib.exceptions import QueryParametersException, ProcessorInterruptedException
+from backend.lib.helpers import convert_to_int
+
+
+class SearchWithTwitterAPIv2(Search):
+    """
+    Get Tweets via the Twitter API
+
+    This only allows for historical search - use f.ex. TCAT for more advanced
+    queries.
+    """
+    type = "twitterv2-search"  # job ID
+
+    def get_posts_simple(self, query):
+        """
+        Use the Twitter v2 API historical search to get tweets
+
+        :param query:
+        :return:
+        """
+        # this is pretty sensitive so delete it immediately after storing in
+        # memory
+        bearer_token = self.parameters.get("auth.bearer_token")
+        self.dataset.delete_parameter("bearer_token")
+        auth = {"Authorization": "Bearer %s" % bearer_token}
+
+        endpoint = "https://api.twitter.com/2/tweets/search/all"
+
+        # these are all expansions and fields available at the time of writing
+        # since it does not cost anything extra in terms of rate limiting, go
+        # for as much data per tweet as possible...
+        tweet_fields = ("attachments", "author_id", "context_annotations", "conversation_id", "created_at", "entities", "geo", "id", "in_reply_to_user_id", "lang", "public_metrics", "possibly_sensitive", "referenced_tweets", "reply_settings", "source", "text", "withheld")
+        user_fields = ("created_at", "description", "entities", "id", "location", "name", "pinned_tweet_id", "profile_image_url", "protected", "public_metrics", "url", "username", "verified", "withheld")
+        place_fields = ("contained_within", "country", "country_code", "full_name", "geo", "id", "name", "place_type")
+        poll_fields = ("duration_minutes", "end_datetime", "id", "options", "voting_status")
+        expansions = ("attachments.poll_ids", "attachments.media_keys", "author_id", "entities.mentions.username", "geo.place_id", "in_reply_to_user_id", "referenced_tweets.id", "referenced_tweets.id.author_id")
+        amount = convert_to_int(self.parameters.get("amount"), 10)
+
+        params = {
+            "query": self.parameters.get("query", ""),
+            "expansions": ",".join(expansions),
+            "tweet.fields": ",".join(tweet_fields),
+            "user.fields": ",".join(user_fields),
+            "poll.fields": ",".join(poll_fields),
+            "place.fields": ",".join(place_fields),
+            "max_results": min(amount, 500),  # 500 = upper limit
+        }
+
+        if self.parameters.get("min_date"):
+            params["start_time"] = datetime.datetime.fromtimestamp(self.parameters["min_date"]).strftime("%Y/%m/%dT%H:%M:%SZ")
+
+        if self.parameters.get("max_date"):
+            params["end_time"] = datetime.datetime.fromtimestamp(self.parameters["min_date"]).strftime("%Y/%m/%dT%H:%M:%SZ")
+
+        tweets = 0
+        while True:
+            if self.interrupted:
+                raise ProcessorInterruptedException("Interrupted while getting tweets from the Twitter API")
+            api_response = requests.get(endpoint, headers=auth, params=params)
+
+            if api_response.status_code == 429:
+                resume_at = convert_to_int(api_response.headers["x-rate-limit-reset"]) + 1
+                resume_at_str = datetime.datetime.fromtimestamp(int(resume_at)).strftime("%c")
+                self.dataset.update_status("Hit Twitter rate limit - waiting until %s to continue." % resume_at_str)
+                while time.time() <= resume_at:
+                    time.sleep(0.5)
+                continue
+
+            if api_response.status_code != 200:
+                self.dataset.update_status("Unexpected HTTP status %i. Halting tweet collection." % api_response.status_code, is_final=True)
+                return
+
+            api_response = api_response.json()
+
+            users = {user["id"]: user for user in api_response.get("includes", {}).get("users", {})}
+            for tweet in api_response.get("data", []):
+                if amount >= 0 and tweets >= amount:
+                    break
+
+                tweet["author_username"] = users.get(tweet["author_id"])["username"]
+                tweet["author_fullname"] = users.get(tweet["author_id"])["name"]
+                tweet["author_verified"] = users.get(tweet["author_id"])["verified"]
+
+                tweets += 1
+                yield tweet
+
+            # paginate
+            if (amount <= 0 or tweets < amount) and api_response.get("meta") and "next_token" in api_response["meta"]:
+                params["next_token"] = api_response["meta"]["next_token"]
+            else:
+                break
+
+    def get_search_mode(self, query):
+        """
+        Twitter searches are always simple
+
+        :return str:
+        """
+        return "simple"
+
+    def get_posts_complex(self, query):
+        """
+        Complex post fetching is not used by the Twitter datasource
+
+        :param query:
+        :return:
+        """
+        pass
+
+    def fetch_posts(self, post_ids, where=None, replacements=None):
+        """
+        Posts are fetched via TCAT for this datasource
+        :param post_ids:
+        :param where:
+        :param replacements:
+        :return:
+        """
+        pass
+
+    def fetch_threads(self, thread_ids):
+        """
+        Thread filtering is not a toggle for Twitter datasets
+
+        :param thread_ids:
+        :return:
+        """
+        pass
+
+    def get_thread_sizes(self, thread_ids, min_length):
+        """
+        Thread filtering is not a toggle for Twitter datasets
+
+        :param tuple thread_ids:
+        :param int min_length:
+        results
+        :return dict:
+        """
+        pass
+
+    @staticmethod
+    def validate_query(query, request, user):
+        """
+        Validate input for a dataset query on the 4chan data source.
+
+        Will raise a QueryParametersException if invalid parameters are
+        encountered. Mutually exclusive parameters may also be sanitised by
+        ignoring either of the mutually exclusive options.
+
+        :param dict query:  Query parameters, from client-side.
+        :param request:  Flask request
+        :param User user:  User object of user who has submitted the query
+        :return dict:  Safe query parameters
+        """
+
+        # this is the bare minimum, else we can't narrow down the full data set
+        if not user.is_admin() and not user.get_value("4chan.can_query_without_keyword", False) and not query.get(
+                "body_match", None) and not query.get("subject_match", None) and query.get("search_scope",
+                                                                                           "") != "random-sample":
+            raise QueryParametersException("Please provide a body query, subject query or random sample size.")
+
+        # Make sure to accept only a body or subject match.
+        if not query.get("body_match", None) and query.get("subject_match", None):
+            query["body_match"] = ""
+        elif query.get("body_match", None) and not query.get("subject_match", None):
+            query["subject_match"] = ""
+
+        # body query and full threads are incompatible, returning too many posts
+        # in most cases
+        if query.get("body_match", None):
+            if "full_threads" in query:
+                del query["full_threads"]
+
+        # random sample requires a sample size, and is additionally incompatible
+        # with full threads
+        if query.get("search_scope", "") == "random-sample":
+            try:
+                sample_size = int(query.get("random_amount", 0))
+            except ValueError:
+                raise QueryParametersException("Please provide a valid numerical sample size.")
+
+            if sample_size < 1 or sample_size > 100000:
+                raise QueryParametersException("Please provide a sample size between 1 and 100000.")
+
+            if "full_threads" in query:
+                del query["full_threads"]
+        elif "random_amount" in query:
+            del query["random_amount"]
+
+        # only one of two dense threads options may be chosen at the same time, and
+        # it requires valid density and length parameters. full threads is implied,
+        # so it is otherwise left alone here
+        if query.get("search_scope", "") == "dense-threads":
+            try:
+                dense_density = int(query.get("scope_density", ""))
+            except ValueError:
+                raise QueryParametersException("Please provide a valid numerical density percentage.")
+
+            if dense_density < 15 or dense_density > 100:
+                raise QueryParametersException("Please provide a density percentage between 15 and 100.")
+
+            try:
+                dense_length = int(query.get("scope_length", ""))
+            except ValueError:
+                raise QueryParametersException("Please provide a valid numerical dense thread length.")
+
+            if dense_length < 30:
+                raise QueryParametersException("Please provide a dense thread length of at least 30.")
+
+        # both dates need to be set, or none
+        if query.get("min_date", None) and not query.get("max_date", None):
+            raise QueryParametersException(
+                "When setting a date range, please provide both an upper and lower limit.")
+
+        # the dates need to make sense as a range to search within
+        if query.get("min_date", None) and query.get("max_date", None):
+            try:
+                before = int(query.get("max_date", ""))
+                after = int(query.get("min_date", ""))
+            except ValueError:
+                raise QueryParametersException("Please provide valid dates for the date range.")
+
+            if before < after:
+                raise QueryParametersException(
+                    "Please provide a valid date range where the start is before the end of the range.")
+
+            query["min_date"] = after
+            query["max_date"] = before
+
+        is_placeholder = re.compile("_proxy$")
+        filtered_query = {}
+        for field in query:
+            if not is_placeholder.search(field):
+                filtered_query[field] = query[field]
+
+        # if we made it this far, the query can be executed
+        return filtered_query
+
+
+
+    @staticmethod
+    def map_item(tweet):
+        """
+        Map a nested Tweet object to a flat dictionary
+
+        Tweet objects are quite rich but 4CAT expects flat dictionaries per
+        item in many cases. Since it would be a shame to not store the data
+        retrieved from Twitter that cannot be stored in a flat file, we store
+        the full objects and only map them to a flat dictionary when needed.
+        This has a speed (and disk space) penalty, but makes sure we don't
+        throw away valuable data and allows for later changes that e.g. store
+        the tweets more efficiently as a MongoDB collection.
+
+        :param tweet:  Tweet object as originally returned by the Twitter API
+        :return dict:  Dictionary in the format expected by 4CAT
+        """
+        return {
+            "id": tweet["id"],
+            "thread_id": tweet.get("conversation_id", tweet["id"]),
+            "timestamp": int(datetime.datetime.strptime(tweet["created_at"], "%Y-%m-%dT%H:%M:%S.000Z").timestamp()),
+            "subject": "",
+            "body": tweet["text"],
+            "author": tweet["author_username"],
+            "author_fullname": tweet["author_fullname"],
+            "author_id": tweet["author"]
+        }

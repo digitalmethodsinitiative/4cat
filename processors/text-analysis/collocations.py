@@ -173,7 +173,7 @@ class GetCollocations(BasicProcessor):
 				for i in range(output):
 					results.append({
 						"item": sorted_results[i][0],
-						"frequency": sorted_results[i][1],
+						"value": sorted_results[i][1],
 						"date": date_string
 					})
 

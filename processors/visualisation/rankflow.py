@@ -66,25 +66,17 @@ class RankFlowRenderer(BasicProcessor):
 		include_value = self.parameters.get("show_value", False)
 
 		# first create a map with the ranks for each period
-		with self.source_file.open() as input:
-			reader = csv.DictReader(input)
+		for row in self.iterate_items(self.source_file):
+			if row["date"] not in items:
+				items[row["date"]] = {}
 
-			weight_attribute = "value" if "value" in reader.fieldnames else "frequency"
-			item_attribute = "item" if "item" in reader.fieldnames else "text"
-			date_attribute = "date" if "date" in reader.fieldnames else "time"
+			try:
+				weight = float(row["value"])
+			except (KeyError, ValueError):
+				weight = 1
 
-			weighted = (weight_attribute in reader.fieldnames)
-			for row in reader:
-				if row[date_attribute] not in items:
-					items[row[date_attribute]] = {}
-
-				try:
-					weight = float(row[weight_attribute]) if weighted else 1
-				except ValueError:
-					weight = 1
-
-				items[row[date_attribute]][row[item_attribute]] = weight
-				max_weight = max(max_weight, weight)
+			items[row["date"]][row["item"]] = weight
+			max_weight = max(max_weight, weight)
 
 		# determine per-period changes
 		# this is used for determining what colour to give to nodes, and

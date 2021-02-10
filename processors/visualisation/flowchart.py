@@ -74,74 +74,67 @@ class FlowChart(BasicProcessor):
 		labels = []
 		timestamps = []
 
-		with self.source_file.open() as input:
-			reader = csv.DictReader(input)
+		# Make sure we know what time format we're dealing with.
+		time_format = False
+		guess_time_format = False
+		if "timeframe" in self.parent.parameters:
+			time_format = self.parent.parameters["timeframe"]
 
-			item_key = "text" if "text" in reader.fieldnames else "item"
-			date_key = "time" if "time" in reader.fieldnames else "date"
-			value_key = "value" if "value" in reader.fieldnames else "frequency"
+		if not time_format:
+			guess_time_format = True
+		elif time_format.startswith("year"):
+			time_format = "%Y"
+		elif time_format.startswith("month"):
+			time_format = "%Y-%m"
+		elif time_format.startswith("week"):
+			time_format = "%Y-%U"
+		elif time_format.startswith("day"):
+			time_format = "%Y-%m-%d"
+		else:
+			guess_time_format = True
 
-			# Make sure we know what time format we're dealing with.
-			time_format = False
-			guess_time_format = False
-			if "timeframe" in self.parent.parameters:
-				time_format = self.parent.parameters["timeframe"]
-
-			if not time_format:
-				guess_time_format = True
-			elif time_format.startswith("year"):
-				time_format = "%Y"
-			elif time_format.startswith("month"):
-				time_format = "%Y-%m"
-			elif time_format.startswith("week"):
-				time_format = "%Y-%U"
-			elif time_format.startswith("day"):
-				time_format = "%Y-%m-%d"
+		for post in self.iterate_items(self.source_file):
+			# Set label names
+			if post["item"] not in labels:
+				labels.append(post["item"])
+				label_key = str(len(result["labels"]))
+				result["labels"][label_key] = {
+					"n": post["item"]
+				}
 			else:
-				guess_time_format = True
+				label_key = labels.index(post["item"])
 
-			for post in self.iterate_csv_items(self.source_file):
-				# Set label names
-				if post[item_key] not in labels:
-					labels.append(post[item_key])
-					label_key = str(len(result["labels"]))
-					result["labels"][label_key] = {
-						"n": post[item_key]
-					}
-				else:
-					label_key = labels.index(post[item_key])
+			# If the parent dataset has no valid date parameter,
+			# we're going to guess what time format we're dealing with.
+			if guess_time_format:
+				if len(post["date"]) == 4:  # years
+					time_format = "%Y"
+				elif 6 <= len(post["date"]) <= 7:  # Assume months (2018-1 or 2018-01)
+					time_format = "%Y-%m"
+				elif 8 <= len(post["date"]) <= 10:  # days (2018-1-1, 2018-01-1, 2018-1-01 or 2018-01-01)
+					time_format = "%Y-%m-%d"
 
-				# If the parent dataset has no valid date parameter,
-				# we're going to guess what time format we're dealing with.
-				if guess_time_format:
-					if len(post[date_key]) == 4:  # years
-						time_format = "%Y"
-					elif 6 <= len(post[date_key]) <= 7:  # Assume months (2018-1 or 2018-01)
-						time_format = "%Y-%m"
-					elif 8 <= len(post[date_key]) <= 10:  # days (2018-1-1, 2018-01-1, 2018-1-01 or 2018-01-01)
-						time_format = "%Y-%m-%d"
+			# Make a bucket when a new timestamp appears
+			if post["date"] in ("all", "overall"):
+				timestamp = "overall"
+			else:
+				timestamp = int(datetime.datetime.strptime(post[date_key], time_format).timestamp())
 
-				# Make a bucket when a new timestamp appears
-				if post[date_key] in ("all", "overall"):
-					timestamp = "overall"
-				else:
-					timestamp = int(datetime.datetime.strptime(post[date_key], time_format).timestamp())
+			# Multiply small floats so they can be converted to ints (necessary for tf-idf scores)
+			value = float(post.get("value"))
+			if value % 1 != 0:
+				value = value * 100
+			value = int(value)
 
-				# Multiply small floats so they can be converted to ints (necessary for tf-idf scores)
-				value = float(post.get(value_key))
-				if value % 1 != 0:
-					value = value * 100
-				value = int(value)
+			# Add values to results dict
+			if timestamp not in timestamps:
+				result["buckets"].append({"d": timestamp, "i": [[label_key, value]]})
+				timestamps.append(timestamp)
+			else:
+				result["buckets"][len(result["buckets"]) - 1]["i"].append([label_key, value])
 
-				# Add values to results dict
-				if timestamp not in timestamps:
-					result["buckets"].append({"d": timestamp, "i": [[label_key, value]]})
-					timestamps.append(timestamp)
-				else:
-					result["buckets"][len(result["buckets"]) - 1]["i"].append([label_key, value])
-
-				# Set max value
-				if value > result["max"]:
-					result["max"] = value
+			# Set max value
+			if value > result["max"]:
+				result["max"] = value
 
 		return result

@@ -41,9 +41,7 @@ class ParlerURLExpander(BasicProcessor):
         """
 
         # get field names
-        with self.source_file.open() as input:
-            reader = csv.DictReader(input)
-            fieldnames = reader.fieldnames
+        fieldnames = self.get_item_keys(self.source_file)
 
         self.dataset.update_status("Processing posts")
 
@@ -70,7 +68,7 @@ class ParlerURLExpander(BasicProcessor):
             writer.writeheader()
             processed = 0
 
-            for post in self.iterate_csv_items(self.source_file):
+            for post in self.iterate_items(self.source_file):
                 expanded_urls = []
 
                 post["body"] = re.sub(r"https?://[^\s]+", replace_url, post["body"])

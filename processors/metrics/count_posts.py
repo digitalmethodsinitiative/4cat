@@ -60,7 +60,7 @@ class CountPosts(BasicProcessor):
 		with self.dataset.get_results_path().open("w") as results:
 			counter = 0
 
-			for post in self.iterate_csv_items(self.source_file):
+			for post in self.iterate_items(self.source_file):
 				date = get_interval_descriptor(post, timeframe)
 
 				# Add a count for the respective timeframe
@@ -83,12 +83,12 @@ class CountPosts(BasicProcessor):
 				missing, intervals = pad_interval(intervals, first_interval, last_interval)
 
 			# Write to csv
-			csv_writer = csv.DictWriter(results, fieldnames=("date", "item", "frequency"))
+			csv_writer = csv.DictWriter(results, fieldnames=("date", "item", "value"))
 			csv_writer.writeheader()
 			for interval in intervals:
 				csv_writer.writerow({
 					"date": interval,
 					"item": "activity",
-					"frequency": intervals[interval]})
+					"value": intervals[interval]})
 
 		self.dataset.finish(len(intervals))

@@ -209,7 +209,7 @@ class Tokenise(BasicProcessor):
 		output_file_handle = None
 
 		document_descriptor = "overall"
-		for post in self.iterate_csv_items(self.source_file):
+		for post in self.iterate_items(self.source_file):
 			if not post["body"]:
 				continue
 				

@@ -1,5 +1,5 @@
 """
-Initialize Instagram data source
+Initialize Twitter API v2 data source
 """
 
 # An init_datasource function is expected to be available to initialize this
@@ -8,5 +8,5 @@ Initialize Instagram data source
 from backend.lib.helpers import init_datasource
 
 # Internal identifier for this data source
-DATASOURCE = "instagram"
-NAME = "Instagram"
+DATASOURCE = "twitterv2"
+NAME = "Twitter APIv2 (Academic Track)"
