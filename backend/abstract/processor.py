@@ -244,9 +244,10 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 		item_mapper = None
 		if hasattr(self, "parent") and self.parent:
 			parent_processor = self.all_modules.processors.get(self.parent.type)
-			parent_processor = self.all_modules.load_worker_class(parent_processor)
-			if parent_processor and hasattr(parent_processor, "map_item"):
-				item_mapper = parent_processor.map_item
+			if parent_processor:
+				parent_processor = self.all_modules.load_worker_class(parent_processor)
+				if hasattr(parent_processor, "map_item"):
+					item_mapper = parent_processor.map_item
 
 		# go through items one by one, optionally mapping them
 		if path.suffix.lower() == ".csv":
