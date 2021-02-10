@@ -118,7 +118,7 @@ class FlowChart(BasicProcessor):
 			if post["date"] in ("all", "overall"):
 				timestamp = "overall"
 			else:
-				timestamp = int(datetime.datetime.strptime(post[date_key], time_format).timestamp())
+				timestamp = int(datetime.datetime.strptime(post["date"], time_format).timestamp())
 
 			# Multiply small floats so they can be converted to ints (necessary for tf-idf scores)
 			value = float(post.get("value"))
