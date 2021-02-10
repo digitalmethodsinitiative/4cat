@@ -7,7 +7,8 @@
         <a href="https://developer.twitter.com/en/docs/twitter-api/tweets/search/introduction">Twitter API
             documentation</a> for more information about this API endpoint and the syntax you can use in
         your search query. Note that any tweets retrieved with 4CAT will count towards your monthly Tweet
-        retrieval cap.</p>
+        retrieval cap. Also note that results are saved as <a href="http://ndjson.org/">NDJSON</a>, not
+        CSV.</p>
 
     <div class="form-element">
         <label for="search-scope">Query:</label>
@@ -17,14 +18,32 @@
     </div>
 
     <div class="form-element">
-        <label for="twitter-amount">Max tweets to retrieve (0=unlimited):</label>
+        <label for="twitter-amount">Tweets to retrieve:</label>
         <input name="amount" id="twitter-amount" min="0" value="10" type="number">
+        <span>(0 = unlimited)</span>
     </div>
+</fieldset>
 
+<fieldset class="date-options">
     <div class="form-element">
-        <label for="twitter-auth.bearer_token">API Bearer token</label>
+        <label>Date range:</label>
+        <div class="filter-parameters">
+            <input name="min_date_proxy" id="input-min-time" class="input-time" type="date"
+                   placeholder="dd-mm-yyyy"> to
+            <input name="max_date_proxy" id="input-max-time" class="input-time" type="date"
+                   placeholder="dd-mm-yyyy"> <span class="red"></span>
+
+            <input name="min_date" type="hidden" value="0">
+            <input name="max_date" type="hidden" value="0">
+        </div>
+    </div>
+</fieldset>
+
+<fieldset class="auth-options">
+    <div class="form-element">
+        <label for="twitter-api_bearer_token">API Bearer token</label>
         <div>
-            <input type="text" name="auth.bearer_token" id="twitter-auth.bearer_token">
+            <input type="text" name="api_bearer_token" id="twitter-api_bearer_token">
         </div>
     </div>
 </fieldset>

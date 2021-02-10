@@ -239,14 +239,17 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 		"""
 
 		# see if an item mapping function has been defined
-		parent_processor = self.all_modules.processor.get(self.dataset.parent.type)
-		if parent_processor and hasattr(parent_processor, "map_item"):
-			item_mapper = parent_processor.map_item
-		else:
-			item_mapper = None
+		# open question if 'parent' shouldn't be an attribute of the dataset
+		# instead of the processor...
+		item_mapper = None
+		if hasattr(self, "parent") and self.parent:
+			parent_processor = self.all_modules.processors.get(self.parent.type)
+			parent_processor = self.all_modules.load_worker_class(parent_processor)
+			if parent_processor and hasattr(parent_processor, "map_item"):
+				item_mapper = parent_processor.map_item
 
 		# go through items one by one, optionally mapping them
-		if path.suffix.lower() == "csv":
+		if path.suffix.lower() == ".csv":
 			with path.open(encoding="utf-8") as input:
 				reader = csv.DictReader(input)
 
@@ -259,7 +262,7 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 
 					yield item
 
-		elif path.suffix.lower() == "ndjson":
+		elif path.suffix.lower() == ".ndjson":
 			# in this format each line in the file is a self-contained JSON
 			# file
 			with path.open(encoding="utf-8") as input:
@@ -267,10 +270,11 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 					if self.interrupted:
 						raise ProcessorInterruptedException("Processor interrupted while iterating throug NDJSON file")
 
+					item = json.loads(line)
 					if item_mapper:
 						item = item_mapper(item)
 
-					yield json.loads(line)
+					yield item
 
 		else:
 			raise NotImplementedError("Cannot iterate through %s file" % path.suffix)

@@ -19,6 +19,7 @@ class SearchWithTwitterAPIv2(Search):
     queries.
     """
     type = "twitterv2-search"  # job ID
+    extension = "ndjson"
 
     def get_posts_simple(self, query):
         """
@@ -29,7 +30,7 @@ class SearchWithTwitterAPIv2(Search):
         """
         # this is pretty sensitive so delete it immediately after storing in
         # memory
-        bearer_token = self.parameters.get("auth.bearer_token")
+        bearer_token = self.parameters.get("api_bearer_token")
         self.dataset.delete_parameter("bearer_token")
         auth = {"Authorization": "Bearer %s" % bearer_token}
 
@@ -52,16 +53,17 @@ class SearchWithTwitterAPIv2(Search):
             "user.fields": ",".join(user_fields),
             "poll.fields": ",".join(poll_fields),
             "place.fields": ",".join(place_fields),
-            "max_results": min(amount, 500),  # 500 = upper limit
+            "max_results": min(amount, 500),  # 500 = upper limit, 10 = lower
         }
 
         if self.parameters.get("min_date"):
-            params["start_time"] = datetime.datetime.fromtimestamp(self.parameters["min_date"]).strftime("%Y/%m/%dT%H:%M:%SZ")
+            params["start_time"] = datetime.datetime.fromtimestamp(self.parameters["min_date"]).strftime("%Y-%m-%dT%H:%M:%SZ")
 
         if self.parameters.get("max_date"):
-            params["end_time"] = datetime.datetime.fromtimestamp(self.parameters["min_date"]).strftime("%Y/%m/%dT%H:%M:%SZ")
+            params["end_time"] = datetime.datetime.fromtimestamp(self.parameters["max_date"]).strftime("%Y-%m-%dT%H:%M:%SZ")
 
         tweets = 0
+        self.dataset.log("Search parameters: %s" % repr(params))
         while True:
             if self.interrupted:
                 raise ProcessorInterruptedException("Interrupted while getting tweets from the Twitter API")
@@ -75,7 +77,13 @@ class SearchWithTwitterAPIv2(Search):
                     time.sleep(0.5)
                 continue
 
-            if api_response.status_code != 200:
+            elif api_response.status_code == 400:
+                print(api_response.text)
+                self.dataset.update_status("Response 400 from the Twitter API. Some of your parameters (e.g. date range) may be invalid.")
+                return
+
+            elif api_response.status_code != 200:
+                print(api_response.text)
                 self.dataset.update_status("Unexpected HTTP status %i. Halting tweet collection." % api_response.status_code, is_final=True)
                 return
 
@@ -162,58 +170,11 @@ class SearchWithTwitterAPIv2(Search):
         """
 
         # this is the bare minimum, else we can't narrow down the full data set
-        if not user.is_admin() and not user.get_value("4chan.can_query_without_keyword", False) and not query.get(
-                "body_match", None) and not query.get("subject_match", None) and query.get("search_scope",
-                                                                                           "") != "random-sample":
-            raise QueryParametersException("Please provide a body query, subject query or random sample size.")
+        if not query.get("query", None):
+            raise QueryParametersException("Please provide a query.")
 
-        # Make sure to accept only a body or subject match.
-        if not query.get("body_match", None) and query.get("subject_match", None):
-            query["body_match"] = ""
-        elif query.get("body_match", None) and not query.get("subject_match", None):
-            query["subject_match"] = ""
-
-        # body query and full threads are incompatible, returning too many posts
-        # in most cases
-        if query.get("body_match", None):
-            if "full_threads" in query:
-                del query["full_threads"]
-
-        # random sample requires a sample size, and is additionally incompatible
-        # with full threads
-        if query.get("search_scope", "") == "random-sample":
-            try:
-                sample_size = int(query.get("random_amount", 0))
-            except ValueError:
-                raise QueryParametersException("Please provide a valid numerical sample size.")
-
-            if sample_size < 1 or sample_size > 100000:
-                raise QueryParametersException("Please provide a sample size between 1 and 100000.")
-
-            if "full_threads" in query:
-                del query["full_threads"]
-        elif "random_amount" in query:
-            del query["random_amount"]
-
-        # only one of two dense threads options may be chosen at the same time, and
-        # it requires valid density and length parameters. full threads is implied,
-        # so it is otherwise left alone here
-        if query.get("search_scope", "") == "dense-threads":
-            try:
-                dense_density = int(query.get("scope_density", ""))
-            except ValueError:
-                raise QueryParametersException("Please provide a valid numerical density percentage.")
-
-            if dense_density < 15 or dense_density > 100:
-                raise QueryParametersException("Please provide a density percentage between 15 and 100.")
-
-            try:
-                dense_length = int(query.get("scope_length", ""))
-            except ValueError:
-                raise QueryParametersException("Please provide a valid numerical dense thread length.")
-
-            if dense_length < 30:
-                raise QueryParametersException("Please provide a dense thread length of at least 30.")
+        if not query.get("api_bearer_token", None):
+            raise QueryParametersException("Please provide a valid bearer token.")
 
         # both dates need to be set, or none
         if query.get("min_date", None) and not query.get("max_date", None):
@@ -242,9 +203,13 @@ class SearchWithTwitterAPIv2(Search):
                 filtered_query[field] = query[field]
 
         # if we made it this far, the query can be executed
-        return filtered_query
-
-
+        return {
+            "query": query.get("query"),
+            "api_bearer_token": query.get("api_bearer_token"),
+            "min_date": query.get("min_date"),
+            "max_date": query.get("max_date"),
+            "amount": max(0, convert_to_int(query.get("amount"), 10))
+        }
 
     @staticmethod
     def map_item(tweet):
@@ -270,5 +235,5 @@ class SearchWithTwitterAPIv2(Search):
             "body": tweet["text"],
             "author": tweet["author_username"],
             "author_fullname": tweet["author_fullname"],
-            "author_id": tweet["author"]
+            "author_id": tweet["author_id"]
         }

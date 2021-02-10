@@ -1,4 +1,5 @@
 import collections
+import datetime
 import hashlib
 import random
 import shutil
@@ -158,7 +159,7 @@ class DataSet:
 
 		:return Path:  A path to the log file
 		"""
-		return self.get_results_path().with_suffix("log")
+		return self.get_results_path().with_suffix(".log")
 
 	def clear_log(self):
 		"""
@@ -211,7 +212,7 @@ class DataSet:
 			return
 
 		with log_path.open(encoding="utf-8") as infile:
-			for line in log:
+			for line in infile:
 				logtime = line.split(":")[0]
 				logmsg = ":".join(line.split(":")[1:])
 				yield (logtime, logmsg)
