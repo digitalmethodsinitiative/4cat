@@ -182,11 +182,9 @@ class ExtractNouns(BasicProcessor):
 		count = 0
 
 		# Get field names
-		with parent_path.open(encoding="utf-8") as input:
-			reader = csv.DictReader(input)
-			fieldnames = reader.fieldnames
-			if noun_type not in fieldnames:
-				fieldnames.append(noun_type)
+		fieldnames = self.get_item_keys(parent_path)
+		if noun_type not in fieldnames:
+			fieldnames.append(noun_type)
 
 		# Iterate through the original dataset and add values to a new noun column
 		self.dataset.update_status("Writing csv with nouns.")
@@ -195,7 +193,7 @@ class ExtractNouns(BasicProcessor):
 			writer = csv.DictWriter(output, fieldnames=fieldnames)
 			writer.writeheader()
 
-			for post in self.iterate_csv_items(parent_path):
+			for post in self.iterate_items(parent_path):
 
 				# Format like "Apple ORG, Gates PERSON, ..." and add to the row
 				noun_tags = ", ".join([post_noun.lower() for post_noun in li_nouns[count] if len(post_noun) > 1])

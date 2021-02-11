@@ -35,7 +35,7 @@ class IsometricMultigraphRenderer(BasicProcessor):
 	description = "Generate area graphs showing prevalence per item over time and project these side-by-side on an isometric plane for easy comparison."  # description displayed in UI
 	extension = "svg"  # extension of result file, used internally and in UI
 
-	input = "csv:item,time,frequency"
+	input = "csv:item,date,value"
 	output = "svg"
 
 	accepts = ["overtime-hateful", "vector-ranker", "preset-neologisms", "tfidf", "collocations",
@@ -96,19 +96,12 @@ class IsometricMultigraphRenderer(BasicProcessor):
 		first_date = "9999-99-99"
 		last_date = "0000-00-00"
 
-		with self.source_file.open() as input:
-			reader = csv.DictReader(input)
-
-			item_key = "text" if "text" in reader.fieldnames else "item"
-			date_key = "time" if "time" in reader.fieldnames else "date"
-			value_key = "value" if "value" in reader.fieldnames else "frequency"
-
-		for row in self.iterate_csv_items(self.source_file):
-			if row[item_key] not in graphs:
-				graphs[row[item_key]] = {}
+		for row in self.iterate_items(self.source_file):
+			if row["item"] not in graphs:
+				graphs[row["item"]] = {}
 
 			# make sure the months and days are zero-padded
-			interval = row.get(date_key, "")
+			interval = row.get("date", "")
 			interval = "-".join([str(bit).zfill(2 if len(bit) != 4 else 4) for bit in interval.split("-")])
 			first_date = min(first_date, interval)
 			last_date = max(last_date, interval)
@@ -116,10 +109,10 @@ class IsometricMultigraphRenderer(BasicProcessor):
 			if interval not in intervals:
 				intervals.append(interval)
 
-			if interval not in graphs[row[item_key]]:
-				graphs[row[item_key]][interval] = 0
+			if interval not in graphs[row["item"]]:
+				graphs[row["item"]][interval] = 0
 
-			graphs[row[item_key]][interval] += float(row.get(value_key, 0))
+			graphs[row["item"]][interval] += float(row.get("value", 0))
 
 		# first make sure we actually have something to render
 		intervals = sorted(intervals)

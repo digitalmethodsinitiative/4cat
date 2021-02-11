@@ -29,7 +29,7 @@ class HatebaseRanker(BasicProcessor):
 	accepts = ["hatebase-data"]
 
 	input = "csv:body,author"
-	output = "csv:time,item,frequency"
+	output = "csv:date,item,value"
 
 	# the following determines the options available to the user via the 4CAT
 	# interface.
@@ -85,7 +85,7 @@ class HatebaseRanker(BasicProcessor):
 		overall_top = {}
 		interval_top = {}
 
-		for post in self.iterate_csv_items(self.source_file):
+		for post in self.iterate_items(self.source_file):
 			# determine where to put this data
 			if timeframe == "all":
 				time_unit = "overall"
@@ -157,7 +157,7 @@ class HatebaseRanker(BasicProcessor):
 				rows.append({
 					"date": interval,
 					"item": term,
-					"frequency": interval_top[interval][term]
+					"value": interval_top[interval][term]
 				})
 
 		# write as csv

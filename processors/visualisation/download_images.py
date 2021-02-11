@@ -89,7 +89,7 @@ class ImageDownloader(BasicProcessor):
 			rate_limit = 1 if external == "fireden" else 16
 
 
-			for post in self.iterate_csv_items(self.source_file):
+			for post in self.iterate_items(self.source_file):
 				# stop processing if worker has been asked to stop
 				if self.interrupted:
 					raise ProcessorInterruptedException("Interrupted while extracting image URLs")
@@ -113,7 +113,7 @@ class ImageDownloader(BasicProcessor):
 
 		# With other sources, just use the generic set of image URLs.
 		else:
-			for row in self.iterate_csv_items(self.source_file):
+			for row in self.iterate_items(self.source_file):
 
 				if len(urls) >= amount:
 					break
@@ -390,10 +390,8 @@ class ImageDownloader(BasicProcessor):
 		count = 0
 
 		# Get field names
-		with parent_path.open(encoding="utf-8") as input:
-			reader = csv.DictReader(input)
-			fieldnames = reader.fieldnames
-			fieldnames += ["download_status", "img_name"]
+		fieldnames = self.get_item_keys(parent_path)
+		fieldnames += ["download_status", "img_name"]
 
 		# Iterate through the original dataset and add values to a new img_link column
 		self.dataset.update_status("Writing download status to Top images csv.")
@@ -402,7 +400,7 @@ class ImageDownloader(BasicProcessor):
 			writer = csv.DictWriter(output, fieldnames=fieldnames)
 			writer.writeheader()
 
-			for post in self.iterate_csv_items(parent_path):
+			for post in self.iterate_items(parent_path):
 		
 				if count < len(success):
 					post["download_status"] = success[count]["download_status"]

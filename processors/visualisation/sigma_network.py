@@ -235,7 +235,7 @@ class SigmaNetwork(BasicProcessor):
 		elif self.parent.data["type"] == "collocations":
 			source_column = "item" # For collocations, it's only one column that we have to split later
 			target_column = "item"
-			weight_column = "frequency"
+			weight_column = "value"
 
 		networks = {}
 
@@ -257,7 +257,7 @@ class SigmaNetwork(BasicProcessor):
 			highlight_nodes = [highlight_node for highlight_node in str(highlight_nodes).split(",")]
 
 		# Go through the source csv
-		for row in self.iterate_csv_items(self.source_file):
+		for row in self.iterate_items(self.source_file):
 			
 			# Check if this is a new date, and if so, add it as a new list
 			if row["date"] != current_date:

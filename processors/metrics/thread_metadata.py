@@ -42,7 +42,7 @@ class ThreadMetadata(BasicProcessor):
 		threads = {}
 
 		self.dataset.update_status("Reading source file")
-		for post in self.iterate_csv_items(self.source_file):
+		for post in self.iterate_items(self.source_file):
 			if post["thread_id"] not in threads:
 				threads[post["thread_id"]] = {
 					"subject": post["subject"],

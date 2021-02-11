@@ -74,6 +74,12 @@ class AttributeRanker(BasicProcessor):
 			"default": "",
 			"help": "Item filter",
 			"tooltip": "Only items matching this will be included in the result. You can use Python regular expressions here."
+		},
+		"weigh": {
+			"type": UserInput.OPTION_TEXT,
+			"default": "",
+			"help": "Weigh frequencies by column",
+			"tooltip": "Frequencies will be multiplied by the value in this column (e.g. 'views'). If the column does not exist or contains a non-numeric value, multiply with 1."
 		}
 	}
 
@@ -88,6 +94,7 @@ class AttributeRanker(BasicProcessor):
 		attribute = self.parameters.get("attribute", self.options["attribute"]["default"])
 		rank_style = self.parameters.get("top-style", self.options["top-style"]["default"])
 		cutoff = convert_to_int(self.parameters.get("top", self.options["top"]["default"]))
+		weighby = self.parameters.get("weigh", self.options["weigh"]["default"])
 
 		try:
 			filter = re.compile(self.parameters.get("regex", None))
@@ -109,8 +116,8 @@ class AttributeRanker(BasicProcessor):
 		overall_top = {}
 		if rank_style == "overall":
 			self.dataset.update_status("Determining overall top-%i items" % cutoff)
-			for post in self.iterate_csv_items(self.source_file):
-				values = self.get_values(post, attribute, filter)
+			for post in self.iterate_items(self.source_file):
+				values = self.get_values(post, attribute, filter, weighby)
 				for value in values:
 					if value not in overall_top:
 						overall_top[value] = 0
@@ -121,14 +128,14 @@ class AttributeRanker(BasicProcessor):
 
 		# now for the real deal
 		self.dataset.update_status("Reading source file")
-		for post in self.iterate_csv_items(self.source_file):
+		for post in self.iterate_items(self.source_file):
 			# determine where to put this data
 			time_unit = get_interval_descriptor(post, timeframe)
 			if time_unit not in items:
 				items[time_unit] = OrderedDict()
 
 			# get values from post
-			values = self.get_values(post, attribute, filter)
+			values = self.get_values(post, attribute, filter, weighby)
 
 			# keep track of occurrences of found items per relevant time period
 			for value in values:
@@ -162,7 +169,7 @@ class AttributeRanker(BasicProcessor):
 				row = {
 					"date": time_unit,
 					"item": item,
-					"frequency": sorted_items[time_unit][item]
+					"value": sorted_items[time_unit][item]
 				}
 
 				rows.append(row)
@@ -174,7 +181,7 @@ class AttributeRanker(BasicProcessor):
 			self.dataset.update_status("No posts contain the requested attributes.")
 			self.dataset.finish(0)
 
-	def get_values(self, post, attribute, filter):
+	def get_values(self, post, attribute, filter, weighby=None):
 		"""
 		Get relevant values for attribute per post
 

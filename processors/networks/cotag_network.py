@@ -52,7 +52,7 @@ class CoTagger(BasicProcessor):
 		posts = 1
 		tag_field = None
 
-		for post in self.iterate_csv_items(self.source_file):
+		for post in self.iterate_items(self.source_file):
 			self.dataset.update_status("Reading post %i..." % posts)
 			posts += 1
 

@@ -73,17 +73,15 @@ class HatebaseAnalyser(BasicProcessor):
 
 		processed = 0
 		with self.dataset.get_results_path().open("w") as output:
-			with self.source_file.open() as input:
-				reader = csv.DictReader(input)
-				fieldnames = reader.fieldnames
-				fieldnames += ("hatebase_num", "hatebase_num_ambiguous", "hatebase_num_unambiguous",
+			fieldnames = self.get_item_keys()
+			fieldnames += ("hatebase_num", "hatebase_num_ambiguous", "hatebase_num_unambiguous",
 					"hatebase_terms", "hatebase_terms_ambiguous", "hatebase_terms_unambiguous",
 					"hatebase_offensiveness_avg")
 
-				writer = csv.DictWriter(output, fieldnames=fieldnames)
-				writer.writeheader()
+			writer = csv.DictWriter(output, fieldnames=fieldnames)
+			writer.writeheader()
 
-			for post in self.iterate_csv_items(self.source_file):
+			for post in self.iterate_items(self.source_file):
 				# stop processing if worker has been asked to stop
 				if self.interrupted:
 					raise ProcessorInterruptedException("Interrupted while processing posts")

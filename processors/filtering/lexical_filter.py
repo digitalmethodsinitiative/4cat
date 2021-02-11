@@ -111,9 +111,7 @@ class LexicalFilter(BasicProcessor):
 
 		with self.dataset.get_results_path().open("w", encoding="utf-8") as output:
 			# get header row, we need to copy it for the output
-			with self.source_file.open(encoding="utf-8") as input:
-				reader = csv.DictReader(input)
-				fieldnames = reader.fieldnames
+			fieldnames = self.get_item_keys(self.source_file)
 
 			# start the output file
 			fieldnames.append("matching_lexicons")
@@ -121,7 +119,7 @@ class LexicalFilter(BasicProcessor):
 			writer.writeheader()
 
 			# iterate through posts and see if they match
-			for post in self.iterate_csv_items(self.source_file):
+			for post in self.iterate_items(self.source_file):
 				if not post.get("body", None):
 					continue
 

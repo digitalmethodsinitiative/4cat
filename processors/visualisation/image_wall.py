@@ -106,16 +106,14 @@ class ImageWallGenerator(BasicProcessor):
 		if not tmp_path.exists():
 			tmp_path.mkdir()
 
-		with open(self.source_file) as source:
-			csvfile = csv.DictReader(source)
-			for post in csvfile:
-				if len(urls) >= amount:
-					break
+		for post in self.iterate_items(self.source_file):
+			if len(urls) >= amount:
+				break
 
-				for field in column_attempt:
-					if field in post:
-						urls.append(post[field])
-						break
+			for field in column_attempt:
+				if field in post:
+					urls.append(post[field])
+					break
 
 		# randomize it
 		random.shuffle(urls)

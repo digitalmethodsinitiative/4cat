@@ -1,6 +1,7 @@
 import hashlib
 import shutil
 import random
+import json
 import math
 import csv
 
@@ -60,7 +61,13 @@ class Search(BasicProcessor, ABC):
 		num_posts = 0
 		if posts:
 			self.dataset.update_status("Writing posts to result file")
-			num_posts = self.posts_to_csv(posts, results_file)
+			if not hasattr(self, "extension") or self.extension == "csv":
+				num_posts = self.posts_to_csv(posts, results_file)
+			elif self.extension == "ndjson":
+				num_posts = self.posts_to_ndjson(posts, results_file)
+			else:
+				raise NotImplementedError("Datasource query cannot be saved as %s file" % self.extension)
+
 			self.dataset.update_status("Query finished, results are available.")
 		elif posts is not None:
 			self.dataset.update_status("Query finished, no results found.")
@@ -282,6 +289,34 @@ class Search(BasicProcessor, ABC):
 						row[author_field] = hash_cache[row[author_field]]
 
 				writer.writerow(row)
+
+		return processed
+
+	def posts_to_ndjson(self, items, filepath):
+		"""
+		Save retrieved items as an ndjson file
+
+		NDJSON is a file with one valid JSON value per line, in this case each
+		of these JSON values represents a retrieved item. This is useful if the
+		retrieved data cannot easily be completely stored as a flat CSV file
+		and we want to leave the choice of how to flatten it to the user. Note
+		that no conversion (e.g. html stripping or pseudonymisation) is done
+		here - the items are saved as-is.
+
+		:param Iterator items:  Items to save
+		:param Path filepath:  Location to save results file
+		"""
+		if not filepath:
+			raise ResourceWarning("No valid results path supplied")
+
+		processed = 0
+		with filepath.open("w", encoding="utf-8", newline="") as outfile:
+			for item in items:
+				if self.interrupted:
+					raise ProcessorInterruptedException("Interrupted while writing results to file")
+
+				outfile.write(json.dumps(item) + "\n")
+				processed += 1
 
 		return processed
 

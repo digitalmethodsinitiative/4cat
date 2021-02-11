@@ -1,4 +1,5 @@
 import collections
+import datetime
 import hashlib
 import random
 import shutil
@@ -147,6 +148,74 @@ class DataSet:
 		:return Path:  A path to the results file
 		"""
 		return self.folder.joinpath(self.data["result_file"])
+
+	def get_log_path(self):
+		"""
+		Get path to dataset log file
+
+		Each dataset has a single log file that documents its creation. This
+		method returns the path to that file. It is identical to the path of
+		the dataset result file, with 'log' as its extension instead.
+
+		:return Path:  A path to the log file
+		"""
+		return self.get_results_path().with_suffix(".log")
+
+	def clear_log(self):
+		"""
+		Clears the dataset log file
+
+		If the log file does not exist, it is created empty. The log file will
+		have the same file name as the dataset result file, with the 'log'
+		extension.
+		"""
+		log_path = self.get_log_path()
+		with log_path.open("w") as outfile:
+			pass
+
+	def has_log_file(self):
+		"""
+		Check if a log file exists for this dataset
+
+		This should be the case, but datasets created before status logging was
+		added may not have one, so we need to be able to check this.
+
+		:return bool:  Does a log file exist?
+		"""
+		return self.get_log_path().exists()
+
+	def log(self, log):
+		"""
+		Write log message to file
+
+		Writes the log message to the log file on a new line, including a
+		timestamp at the start of the line. Note that this assumes the log file
+		already exists - it should have been created/cleared with clear_log()
+		prior to calling this.
+
+		:param str log:  Log message to write
+		"""
+		log_path = self.get_log_path()
+		with log_path.open("a", encoding="utf-8") as outfile:
+			outfile.write("%s: %s\n" % (datetime.datetime.now().strftime("%c"), log))
+
+	def get_log_iterator(self):
+		"""
+		Return an iterator with a (time, message) tuple per line in the log
+
+		Just a convenience function!
+
+		:return iterator:  (time, message) per log message
+		"""
+		log_path = self.get_log_path()
+		if not log_path.exists():
+			return
+
+		with log_path.open(encoding="utf-8") as infile:
+			for line in infile:
+				logtime = line.split(":")[0]
+				logmsg = ":".join(line.split(":")[1:])
+				yield (logtime, logmsg)
 
 	def get_staging_area(self):
 		"""
@@ -417,6 +486,8 @@ class DataSet:
 		of earlier dataset statuses; the current status is overwritten when
 		updated.
 
+		Statuses are also written to the dataset log file.
+
 		:param string status:  Dataset status
 		:param bool is_final:  If this is `True`, subsequent calls to this
 		method while the object is instantiated will not update the dataset
@@ -431,6 +502,8 @@ class DataSet:
 
 		if is_final:
 			self.no_status_updates = True
+
+		self.log(status)
 
 		return updated > 0
 

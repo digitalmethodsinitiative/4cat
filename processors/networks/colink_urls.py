@@ -66,7 +66,7 @@ class URLCoLinker(BasicProcessor):
 		colink = {}
 		urls = set()
 		links = {}
-		for post in self.iterate_csv_items(self.source_file):
+		for post in self.iterate_items(self.source_file):
 			if not post["body"]:
 				continue
 

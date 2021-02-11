@@ -28,7 +28,7 @@ class OvertimeAnalysis(BasicProcessor):
 	extension = "csv"  # extension of result file, used internally and in UI
 
 	input = "csv:body"
-	output = "csv:time,item,frequency"
+	output = "csv:time,item,value"
 
 	references = [
 		"[\"Salvaging the Internet Hate Machine: Using the discourse of radical online subcultures to identify emergent extreme speech\" - Unblished paper detailing the OILab extreme speech lexigon](https://oilab.eu/texts/4CAT_Hate_Speech_WebSci_paper.pdf)",
@@ -97,7 +97,7 @@ class OvertimeAnalysis(BasicProcessor):
 				continue
 
 			if not partition:
-				vocabulary_id = "frequency"
+				vocabulary_id = "value"
 
 			if vocabulary_id not in vocabularies:
 				vocabularies[vocabulary_id] = set()
@@ -108,7 +108,7 @@ class OvertimeAnalysis(BasicProcessor):
 		# add user-defined words
 		custom_vocabulary = set([word.strip() for word in self.parameters.get("vocabulary-custom", "").split(",") if word.strip()])
 		if custom_vocabulary:
-			custom_id = "user-defined" if partition else "frequency"
+			custom_id = "user-defined" if partition else "value"
 			if custom_id not in vocabularies:
 				vocabularies[custom_id] = set()
 
@@ -137,7 +137,7 @@ class OvertimeAnalysis(BasicProcessor):
 		intervals = set()
 
 		processed = 0
-		for post in self.iterate_csv_items(self.source_file):
+		for post in self.iterate_items(self.source_file):
 			if not post["body"]:
 				post["body"] = ""
 				
@@ -174,7 +174,7 @@ class OvertimeAnalysis(BasicProcessor):
 				rows.append({
 					"date": interval,
 					"item": vocabulary_id,
-					"frequency": activity.get(vocabulary_id, {}).get(interval, 0)
+					"value": activity.get(vocabulary_id, {}).get(interval, 0)
 				})
 
 		# write as csv

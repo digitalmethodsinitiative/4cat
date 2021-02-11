@@ -64,7 +64,7 @@ class TopImageCounter(BasicProcessor):
 			boards_4plebs = ["pol", "lgbt", "adv", "f", "o", "sp", "tg", "trv", "tv", "x"]
 			boards_fireden = ["cm", "co", "ic", "sci", "v", "vip", "y"]
 			
-			for post in self.iterate_csv_items(self.source_file):
+			for post in self.iterate_items(self.source_file):
 
 				post_img_links = []
 
@@ -132,7 +132,7 @@ class TopImageCounter(BasicProcessor):
 			
 			img_links = []
 			
-			for post in self.iterate_csv_items(self.source_file):
+			for post in self.iterate_items(self.source_file):
 
 				post_img_links = []
 
@@ -214,10 +214,8 @@ class TopImageCounter(BasicProcessor):
 		count = 0
 
 		# Get field names
-		with parent_path.open(encoding="utf-8") as input:
-			reader = csv.DictReader(input)
-			fieldnames = reader.fieldnames
-			fieldnames.append("img_url")
+		fieldnames = self.get_item_keys(parent_path)
+		fieldnames.append("img_url")
 
 		# Iterate through the original dataset and add values to a new img_link column
 		self.dataset.update_status("Writing new source file with image URLs.")
@@ -228,7 +226,7 @@ class TopImageCounter(BasicProcessor):
 
 			count = 0
 
-			for post in self.iterate_csv_items(parent_path):
+			for post in self.iterate_items(parent_path):
 				post["img_url"] = ", ".join(li_urls[count])
 				writer.writerow(post)
 				count += 1

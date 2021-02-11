@@ -37,7 +37,7 @@ class QuoteNetworkGrapher(BasicProcessor):
 		link = re.compile(r">>([0-9]+)")
 
 		self.dataset.update_status("Reading source file")
-		for post in self.iterate_csv_items(self.source_file):
+		for post in self.iterate_items(self.source_file):
 			quotes = link.findall(post["body"])
 			if quotes:
 				if post["id"] not in nodes:

@@ -54,7 +54,7 @@ class WikipediaCatgegoryNetwork(BasicProcessor):
 
 		# find all links in post bodies
 		self.dataset.update_status("Reading source file")
-		for post in self.iterate_csv_items(self.source_file):
+		for post in self.iterate_items(self.source_file):
 			wiki_links = link_regex.findall(post["body"])
 			wiki_links = [trailing_comma.sub("", link) for link in wiki_links]
 
