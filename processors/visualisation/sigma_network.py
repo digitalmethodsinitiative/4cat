@@ -188,10 +188,17 @@ class SigmaNetwork(BasicProcessor):
 						edge_item = self.sanitise(edge_item)
 
 						# Loop through the types of nodes we've encountered before
+						# Ambiguous edges
 						if edge_types[i].startswith("node1 "):
 							edge["source"] = edge_item
 							edges_added.append(edge_item)
 						elif edge_types[i].startswith("node2 "):
+							edge["target"] = edge_item
+
+						# Tag -> user edges
+						elif edge_types[i].startswith("tag "):
+							edge["source"] = edge_item
+						elif edge_types[i].startswith("user "):
 							edge["target"] = edge_item
 
 						elif edge_types[i].startswith("weight "):
