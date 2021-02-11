@@ -66,12 +66,14 @@ class RankFlowRenderer(BasicProcessor):
 		include_value = self.parameters.get("show_value", False)
 
 		# first create a map with the ranks for each period
+		weighted = False
 		for row in self.iterate_items(self.source_file):
 			if row["date"] not in items:
 				items[row["date"]] = {}
 
 			try:
 				weight = float(row["value"])
+				weighted = True
 			except (KeyError, ValueError):
 				weight = 1
 
