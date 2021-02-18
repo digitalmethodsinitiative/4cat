@@ -123,8 +123,6 @@ class GoogleVisionAPIFetcher(BasicProcessor):
         self.dataset.update_status("Annotations retrieved for %i images" % done)
         self.dataset.finish(done)
 
-
-
     def annotate_image(self, image_file, api_key, features):
         """
         Get annotations from the Google Vision API
@@ -134,10 +132,10 @@ class GoogleVisionAPIFetcher(BasicProcessor):
         :param list features:  Features to request
         :return dict:  Lists of detected features, one key for each feature
         """
-        endpoint = "https://vision.googleapis.com/v1/images:annotate?key=" % api_key
+        endpoint = "https://vision.googleapis.com/v1/images:annotate?key=%s" % api_key
 
         with image_file.open("rb") as infile:
-            base64_image = base64.b64encode(infile.read())
+            base64_image = base64.b64encode(infile.read()).decode("ascii")
 
         api_params = {
             "requests": {
@@ -147,7 +145,7 @@ class GoogleVisionAPIFetcher(BasicProcessor):
         }
 
         try:
-            api_request = requests.post(endpoint, json=api_params, headers=headers)
+            api_request = requests.post(endpoint, json=api_params)
         except (requests.RequestException, ConnectionError) as e:
             self.dataset.update_status("Skipping image %s due to %s (%s)" % (image_file.name, e.__name__, str(e)))
             return None
