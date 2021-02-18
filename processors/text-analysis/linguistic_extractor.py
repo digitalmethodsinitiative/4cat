@@ -108,20 +108,19 @@ class LinguisticFeatures(BasicProcessor):
 		doc_bin = DocBin(attrs=attrs)
 
 		# Start the processing!
-		for i, doc in enumerate(nlp.pipe(posts, disable=disable)):
-			try:
+		try:
+			for i, doc in enumerate(nlp.pipe(posts, disable=disable)):
 				doc_bin.add(doc)
-			except MemoryError:
-				self.dataset.update_status("Out of memory while parsing data. Try again with a smaller dataset.",
-										   is_final=True)
-				return
 
-			# It's quite a heavy process, so make sure it can be interrupted
-			if self.interrupted:
-				raise ProcessorInterruptedException("Processor interrupted while iterating through CSV file")
+				# It's quite a heavy process, so make sure it can be interrupted
+				if self.interrupted:
+					raise ProcessorInterruptedException("Processor interrupted while iterating through CSV file")
 
-			if i % 1000 == 0:
-				self.dataset.update_status("Done with post %s out of %s" % (i, len(posts)))
+				if i % 1000 == 0:
+					self.dataset.update_status("Done with post %s out of %s" % (i, len(posts)))
+		except MemoryError:
+			self.dataset.update_status("Out of memory. The dataset may be too large to process. Try again with a smaller dataset.", is_final=True)
+			return
 
 		self.dataset.update_status("Serializing results - this will take a while")
 
