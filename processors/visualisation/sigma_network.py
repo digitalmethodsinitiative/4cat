@@ -34,7 +34,7 @@ class SigmaNetwork(BasicProcessor):
 	title = "Sigma js network"  # title displayed in UI
 	description = "Visualise a network in the browser with sigma js."  # description displayed in UI
 	extension = "html"  # extension of result file, used internally and in UI
-	accepts = ["bipartite-user-tag-network", "word-embeddings-neighbours", "url-network", "cotag-network", "quote-network", "wiki-category-network", "collocations"]  # query types this post-processor accepts as input
+	accepts = ["vision-label-network", "bipartite-user-tag-network", "word-embeddings-neighbours", "url-network", "cotag-network", "quote-network", "wiki-category-network", "collocations"]  # query types this post-processor accepts as input
 	preview_allowed = False # Will slow down the page too much
 
 	input = "csv"
@@ -189,10 +189,10 @@ class SigmaNetwork(BasicProcessor):
 
 						# Loop through the types of nodes we've encountered before
 						# Ambiguous edges
-						if edge_types[i].startswith("node1 "):
+						if edge_types[i].startswith("node1 ") or edge_types[i].startswith("from ") or edge_types[i].startswith("source "):
 							edge["source"] = edge_item
 							edges_added.append(edge_item)
-						elif edge_types[i].startswith("node2 "):
+						elif edge_types[i].startswith("node2 ") or edge_types[i].startswith("to ") or edge_types[i].startswith("target "):
 							edge["target"] = edge_item
 
 						# Tag -> user edges

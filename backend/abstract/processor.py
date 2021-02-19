@@ -147,6 +147,8 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 				next_analysis = DataSet(parameters=next_parameters, type=next_type, db=self.db, parent=self.dataset.key,
 										extension=available_processors[next_type]["extension"])
 				self.queue.add_job(next_type, remote_id=next_analysis.key)
+			else:
+				self.log.warning("Dataset %s (of type %s) wants to run processor %s next, but it is incompatible" % (self.dataset.key, self.type, next_type))
 
 		# see if we need to register the result somewhere
 		if "copy_to" in self.parameters:

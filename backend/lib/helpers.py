@@ -446,3 +446,12 @@ def pad_interval(intervals, first_interval=None, last_interval=None):
 	intervals = {key: intervals[key] for key in sorted(intervals)}
 
 	return missing, intervals
+
+def gdf_escape(string):
+	"""
+	Escape string for usage in GDF file
+
+	:param str string:  String to escape
+	:return str:  Escaped string
+	"""
+	return "'" + string.replace("'", "\\'") + "'"

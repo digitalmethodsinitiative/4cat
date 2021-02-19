@@ -114,7 +114,7 @@
                 </li>
                 {% endif %}
             {% for option in item.parameters %}
-                {% if item.type in processors and "options" in processors[item.type] and option in processors[item.type].options and item.parameters[option] != "" and option not in ("custom-key") %}
+                {% if item.type in processors and "options" in processors[item.type] and option in processors[item.type].options and item.parameters[option] != "" and option not in ("custom-key") and option[0:4] != "api_" %}
                 {% if processors[item.type].options[option].type == "toggle" %}
                     {% if item.parameters[option] %}<li><span class="property-badge">{{ option }}</span></li>{% endif %}
                 {% else %}
