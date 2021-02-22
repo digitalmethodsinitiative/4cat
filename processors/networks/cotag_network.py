@@ -69,11 +69,8 @@ class CoTagger(BasicProcessor):
 					continue
 
 				# Convert string of list to actual list
-				tags = post.get("tags", "").split("', '")
-				# Remove list brackets
-				tags[0] = tags[0][2:]
-				tags[-1] = tags[-1][:-2]
-				
+				tags = post.get("tags", "").split(",")
+
 				if not tags:
 					tags = []
 			elif self.parent.parameters["datasource"] == "usenet":
