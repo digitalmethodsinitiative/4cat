@@ -87,7 +87,12 @@ class SigmaNetwork(BasicProcessor):
 
 		self.dataset.update_status("Generating HTML file")
 
-		html_file = self.get_html_page(data)
+		try:
+			html_file = self.get_html_page(data)
+		except MemoryError:
+			self.dataset.update_status("Out of memory while processing network. Try downloading and visualising locally instead.", is_final=True)
+			self.dataset.finish(0)
+			return
 
 		# Write HTML file
 		with self.dataset.get_results_path().open("w", encoding="utf-8") as output_file:
