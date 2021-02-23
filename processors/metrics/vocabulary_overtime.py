@@ -92,7 +92,7 @@ class OvertimeAnalysis(BasicProcessor):
 		# load vocabularies from word lists
 		vocabularies = {}
 		for vocabulary_id in self.parameters.get("vocabulary", []):
-			vocabulary_file = Path(config.PATH_ROOT, "backend/assets/wordlists/%s.pb" % vocabulary_id)
+			vocabulary_file = Path(config.PATH_ROOT, "backend/assets/wordlists/%s.txt" % vocabulary_id)
 			if not vocabulary_file.exists():
 				continue
 
@@ -102,8 +102,8 @@ class OvertimeAnalysis(BasicProcessor):
 			if vocabulary_id not in vocabularies:
 				vocabularies[vocabulary_id] = set()
 
-			with open(vocabulary_file, "rb") as vocabulary_handle:
-				vocabularies[vocabulary_id] |= pickle.load(vocabulary_handle)
+			with open(vocabulary_file, encoding="utf-8") as vocabulary_handle:
+				vocabularies[vocabulary_id] |= set(vocabulary_handle.read().splitlines())
 
 		# add user-defined words
 		custom_vocabulary = set([word.strip() for word in self.parameters.get("vocabulary-custom", "").split(",") if word.strip()])

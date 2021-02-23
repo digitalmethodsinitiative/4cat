@@ -3,7 +3,6 @@ Tokenize post bodies
 """
 import ahocorasick
 import datetime
-import pickle
 import json
 import re
 
@@ -159,8 +158,8 @@ class Tokenise(BasicProcessor):
 		# load word filters - words to exclude from tokenisation
 		word_filter = set()
 		for wordlist in self.parameters.get("filter", self.options["filter"]["default"]):
-			with open(config.PATH_ROOT + "/backend/assets/wordlists/%s.pb" % wordlist, "rb") as input:
-				word_filter = set.union(word_filter, pickle.load(input))
+			with open(config.PATH_ROOT + "/backend/assets/wordlists/%s.txt" % wordlist, "utf-8") as input:
+				word_filter = set.union(word_filter, input.read().splitlines())
 
 		# Extend or limit the word filter with optionally added words
 		# Remove accepted words from filter
