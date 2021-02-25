@@ -688,6 +688,10 @@ article section li p, article aside li p {
     color: var(--accent-alternate);
 }
 
+.inline-query {
+    overflow-wrap: anywhere;
+}
+
 .property-badge {
     font-size: 0.6em;
     display: inline;
