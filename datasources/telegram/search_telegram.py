@@ -161,6 +161,7 @@ class SearchTelegram(Search):
 		# complicate things further not everyone is a user and not everyone
 		# has a username. If no username is available, try the first and
 		# last name someone has supplied
+		fullname = ""
 		if hasattr(message, "sender") and hasattr(message.sender, "username"):
 			username = message.sender.username if message.sender.username else ""
 			fullname = message.sender.first_name if hasattr(message.sender, "first_name") and message.sender.first_name else ""
