@@ -165,7 +165,7 @@ class SearchTelegram(Search):
 		if hasattr(message, "sender") and hasattr(message.sender, "username"):
 			username = message.sender.username if message.sender.username else ""
 			fullname = message.sender.first_name if hasattr(message.sender, "first_name") and message.sender.first_name else ""
-			if message.sender.last_name:
+			if hasattr(message.sender, "last_name") and message.sender.last_name:
 					fullname += " " + message.sender.last_name
 			user_id = message.sender.id
 			user_is_bot = message.sender.bot
