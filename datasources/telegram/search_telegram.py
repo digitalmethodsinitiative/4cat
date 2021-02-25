@@ -168,7 +168,7 @@ class SearchTelegram(Search):
 			if hasattr(message.sender, "last_name") and message.sender.last_name:
 					fullname += " " + message.sender.last_name
 			user_id = message.sender.id
-			user_is_bot = message.sender.bot
+			user_is_bot = message.sender.bot if hasattr(message.sender, "bot") else False
 		elif message.from_id:
 			user_id = message.from_id
 			username = None
@@ -250,14 +250,6 @@ class SearchTelegram(Search):
 					"votes": -1
 				} for option in options]
 			})
-
-		elif attachment_type == "venue":
-			# weird
-			attachment = message.venue
-			attachment_data = json.dumps({**{"geo": "%s %s" % (attachment.geo.lat, attachment.geo.long)}, **{
-				{property: attachment[property] for property in
-				 ("title", "address", "provider", "venue_id", "venue_type")}
-			}})
 
 		elif attachment_type == "url":
 			# easy!
