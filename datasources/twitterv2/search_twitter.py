@@ -53,7 +53,7 @@ class SearchWithTwitterAPIv2(Search):
             "user.fields": ",".join(user_fields),
             "poll.fields": ",".join(poll_fields),
             "place.fields": ",".join(place_fields),
-            "max_results": min(amount, 500),  # 500 = upper limit, 10 = lower
+            "max_results": max(10, min(amount, 500)),  # 500 = upper limit, 10 = lower
         }
 
         if self.parameters.get("min_date"):
@@ -78,7 +78,7 @@ class SearchWithTwitterAPIv2(Search):
                 continue
 
             elif api_response.status_code == 400:
-                self.dataset.update_status("Response 400 from the Twitter API. Some of your parameters (e.g. date range) may be invalid.")
+                self.dataset.update_status("Response 400 from the Twitter API. Some of your parameters (e.g. date range) may be invalid.", is_final=True)
                 return
 
             elif api_response.status_code != 200:
@@ -87,6 +87,10 @@ class SearchWithTwitterAPIv2(Search):
 
             api_response = api_response.json()
 
+            # only the user ID is given per tweet - usernames etc are returned
+            # separately, presumably to save space when there are many tweets
+            # by the same author. Here we add the relevant data per tweet, so
+            # we don't need anything else than the tweet object later
             users = {user["id"]: user for user in api_response.get("includes", {}).get("users", {})}
             for tweet in api_response.get("data", []):
                 if amount >= 0 and tweets >= amount:
