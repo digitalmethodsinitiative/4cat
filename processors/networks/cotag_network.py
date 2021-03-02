@@ -13,7 +13,7 @@ __email__ = "4cat@oilab.eu"
 
 class CoTagger(BasicProcessor):
 	"""
-	Generate URL co-link network
+	Generate co-tag network
 	"""
 	type = "cotag-network"  # job type ID
 	category = "Networks"  # category
