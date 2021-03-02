@@ -171,11 +171,17 @@ class GetCollocations(BasicProcessor):
 					output = len(sorted_results)
 
 				for i in range(output):
-					results.append({
-						"item": sorted_results[i][0],
-						"value": sorted_results[i][1],
-						"date": date_string
-					})
+
+					# Write each word to a separate key
+					# so they will become separate columns.
+					result = {}
+					li_collocation = sorted_results[i][0].split(" ")
+					for n in range(n_size):
+						result["word_" + str(n + 1)] = li_collocation[n]
+					result["value"] = sorted_results[i][1]
+					result["date"] = date_string
+
+					results.append(result)
 
 				max_output = max_output
 
