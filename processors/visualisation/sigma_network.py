@@ -34,7 +34,7 @@ class SigmaNetwork(BasicProcessor):
 	title = "Sigma js network"  # title displayed in UI
 	description = "Visualise a network in the browser with sigma js."  # description displayed in UI
 	extension = "html"  # extension of result file, used internally and in UI
-	accepts = ["vision-label-network", "bipartite-user-tag-network", "word-embeddings-neighbours", "url-network", "cotag-network", "quote-network", "wiki-category-network", "collocations"]  # query types this post-processor accepts as input
+	accepts = ["vision-label-network", "bipartite-user-tag-network", "word-embeddings-neighbours", "url-network", "cotag-network", "quote-network", "wiki-category-network", "coword-network", "collocations"]  # query types this post-processor accepts as input
 	preview_allowed = False # Will slow down the page too much
 
 	input = "csv"
@@ -238,8 +238,8 @@ class SigmaNetwork(BasicProcessor):
 			weight_column = "cosine_similarity"
 
 		elif self.parent.data["type"] == "collocations":
-			source_column = "item" # For collocations, it's only one column that we have to split later
-			target_column = "item"
+			source_column = "word_1"
+			target_column = "word_2"
 			weight_column = "value"
 
 		networks = {}
@@ -278,30 +278,12 @@ class SigmaNetwork(BasicProcessor):
 
 				current_date = row["date"]
 
-			# Set the source and target word
-			# If they're the same, split the values in the column
-			# and use these as inputs
-			if source_column == target_column:
-
-				# Split the values on a space
-				split_values = row[source_column].split(" ")
-				split_values = [value.strip() for value in split_values]
-
-				# If there's more than two values, something is going wrong.
-				if len(split_values) > 2:
-					return "Too many values to unpack in column %s for values %s" % (s, row[source_column])
-				
-				# Set the source and target words as the first and second split values
-				source_word = split_values[0]
-				target_word = split_values[1]
-
-			# Usually we just want to use the source and target columns
-			else:
-				source_word = row[source_column]
-				target_word = row[target_column]
+			# Set the source and target nodes
+			source_node = row[source_column]
+			target_node = row[target_column]
 
 			# Use this to loop through both words
-			source_and_target = [source_word, target_word]
+			source_and_target = [source_node, target_node]
 
 			# Used for edge weights
 			weight = row.get(weight_column)
@@ -341,7 +323,7 @@ class SigmaNetwork(BasicProcessor):
 
 			# Add edges, if not already added
 			# Assume its undirectional, for now, so sort the words
-			edge_label = "-".join(sorted([source_word,target_word]))
+			edge_label = "-".join(sorted([source_node, target_node]))
 
 			if edge_label not in edges_added:
 
