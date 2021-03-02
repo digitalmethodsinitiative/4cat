@@ -8,6 +8,7 @@ import re
 
 from pathlib import Path
 from html.parser import HTMLParser
+from werkzeug.datastructures import FileStorage
 from calendar import monthrange
 
 import config
@@ -62,6 +63,27 @@ def strip_tags(html, convert_newlines=True):
 	stripper = HTMLStripper()
 	stripper.feed(html)
 	return stripper.get_data()
+
+
+def sniff_encoding(file):
+	"""
+	Determine encoding from raw file bytes
+
+	Currently only distinguishes UTF-8 and UTF-8 with BOM
+
+	:param FileStorage file:
+	:return:
+	"""
+	if hasattr(file, "getbuffer"):
+		buffer = file.getbuffer()
+		maybe_bom = buffer[:3].tobytes()
+	elif hasattr(file, "peek"):
+		buffer = file.peek(32)
+		maybe_bom = buffer[:3]
+	else:
+		maybe_bom = False
+
+	return "utf-8-sig" if maybe_bom == b"\xef\xbb\xbf" else "utf-8"
 
 
 def get_software_version():

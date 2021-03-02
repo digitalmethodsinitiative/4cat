@@ -12,7 +12,7 @@ from werkzeug.datastructures import FileStorage
 
 from backend.abstract.worker import BasicWorker
 from backend.lib.exceptions import QueryParametersException
-from backend.lib.helpers import get_software_version, strip_tags
+from backend.lib.helpers import get_software_version, strip_tags, sniff_encoding
 
 
 class SearchCustom(BasicWorker):
@@ -125,7 +125,7 @@ class SearchCustom(BasicWorker):
 		file.seek(0)
 
 		# detect encoding - UTF-8 with or without BOM
-		encoding = SearchCustom.sniff_encoding(file)
+		encoding = sniff_encoding(file)
 
 		wrapped_file = io.TextIOWrapper(file, encoding=encoding)
 		sample = wrapped_file.read(1024 * 1024)
@@ -174,21 +174,3 @@ class SearchCustom(BasicWorker):
 			dataset.update_status("Result processed")
 
 		dataset.update_version(get_software_version())
-
-	def sniff_encoding(file):
-		"""
-		Determine encoding from raw file bytes
-
-		Currently only distinguishes UTF-8 and UTF-8 with BOM
-
-		:param FileStorage file:
-		:return:
-		"""
-		if hasattr(file, "getbuffer"):
-			buffer = file.getbuffer()
-			maybe_bom = buffer[:3].tobytes()
-		elif type(file) is FileStorage:
-			buffer = file.peek(32)
-			maybe_bom = buffer[:3]
-
-		return "utf-8-sig" if maybe_bom == b"\xef\xbb\xbf" else "utf-8"
