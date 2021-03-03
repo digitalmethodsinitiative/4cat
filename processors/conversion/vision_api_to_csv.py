@@ -43,6 +43,11 @@ class ConvertVisionOutputToCSV(BasicProcessor):
         done = 0
         self.dataset.update_status("Converting posts")
 
+        if not self.source_file.exists():
+            self.dataset.update_status("No data was returned by the Google Vision API, so none can be converted.", is_final=True)
+            self.dataset.finish(0)
+            return
+
         # recreate CSV file with the new dialect
         for annotations in self.iterate_items(self.source_file):
             if self.interrupted:
