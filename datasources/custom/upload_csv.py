@@ -58,7 +58,7 @@ class SearchCustom(BasicWorker):
 		if not file:
 			raise QueryParametersException("No file was offered for upload.")
 
-		encoding = SearchCustom.sniff_encoding(file)
+		encoding = sniff_encoding(file)
 
 		wrapped_file = io.TextIOWrapper(file, encoding=encoding)
 		sample = wrapped_file.read(1024 * 1024)
