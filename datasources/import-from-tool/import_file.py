@@ -35,7 +35,7 @@ class ImportFromExternalTool(BasicWorker):
 			"usertags", "mentioned", "num_likes", "num_comments", "subject"
 		),
 		"facebook-crowdtangle": (
-			"Page Name", "User Name", "Facebook Id", "Likes at Posting", "Followers at Posting", "Created", "Type",
+			"User Name", "Facebook Id", "Likes at Posting", "Followers at Posting", "Created", "Type",
 			"Likes", "Comments", "Shares", "Love", "Wow", "Haha", "Sad", "Angry", "Care", "Video Share Status",
 			"Post Views", "Total Views", "Total Views For All Crossposts", "Video Length", "URL", "Message", "Link",
 			"Final Link", "Image Text", "Link Text", "Description", "Sponsor Id", "Sponsor Name", "Total Interactions"
@@ -204,6 +204,9 @@ class ImportFromExternalTool(BasicWorker):
 			with dataset.get_results_path().open("w", encoding="utf-8", newline="") as output_csv:
 				wrapped_upload = io.TextIOWrapper(file, encoding=encoding)
 				reader = csv.DictReader(wrapped_upload)
+
+				entity_name = "Page Name" if "Page Name" in reader.fieldnames else "Group Name"
+
 				writer = csv.DictWriter(output_csv, fieldnames=(
 					"id", "thread_id", "body", "author", "timestamp", "page_id", "page_name", "page_likes",
 					"page_followers", "page_shared_from", "type", "interactions", "likes", "comments", "shares",
@@ -231,13 +234,13 @@ class ImportFromExternalTool(BasicWorker):
 						"body": item["Message"],
 						"author": item["User Name"],
 						"timestamp": int(date.timestamp()),
-						"page_name": item["Page Name"],
+						"page_name": item[entity_name],
 						"page_likes": item["Likes at Posting"],
 						"page_id": item["Facebook Id"],
 						"page_followers": item["Followers at Posting"],
 						"page_shared_from": shared_page,
 						"type": item["Type"],
-						"interactions": int(re.sub(r"[^0-9]", "", item["Total Interactions"])),
+						"interactions": int(re.sub(r"[^0-9]", "", item["Total Interactions"])) if item["Total Interactions"] else 0,
 						"comments": item["Comments"],
 						"shares": item["Shares"],
 						"likes": item["Likes"],
