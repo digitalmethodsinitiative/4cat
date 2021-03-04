@@ -77,12 +77,25 @@ class SearchWithTwitterAPIv2(Search):
                     time.sleep(0.5)
                 continue
 
+            # this usually means the query is too long or otherwise contains
+            # a syntax error
             elif api_response.status_code == 400:
-                self.dataset.update_status("Response 400 from the Twitter API. Some of your parameters (e.g. date range) may be invalid.", is_final=True)
+                msg = "Response 400 from the Twitter API;"
+                try:
+                    api_response = api_response.json()
+                    msg += api_response.get("title", "")
+                    if "detail" in api_response:
+                        msg += api_response.get("detail", "")
+                except (json.JSONDecodeError, TypeError):
+                    msg += "Some of your parameters (e.g. date range) may be invalid."
+
+                self.dataset.update_status(msg, is_final=True)
                 return
 
+            # haven't seen one yet, but they probably exist
             elif api_response.status_code != 200:
                 self.dataset.update_status("Unexpected HTTP status %i. Halting tweet collection." % api_response.status_code, is_final=True)
+                self.log.warning("Twitter API v2 responded with status code %i. Response body: %s" % (api_response.status_code, api_response.text))
                 return
 
             api_response = api_response.json()
