@@ -4,6 +4,7 @@ Twitter keyword search via the Twitter API v2
 import requests
 import datetime
 import time
+import json
 import re
 
 from backend.abstract.search import Search
@@ -20,6 +21,8 @@ class SearchWithTwitterAPIv2(Search):
     """
     type = "twitterv2-search"  # job ID
     extension = "ndjson"
+
+    previous_request = 0
 
     def get_posts_simple(self, query):
         """
@@ -53,7 +56,7 @@ class SearchWithTwitterAPIv2(Search):
             "user.fields": ",".join(user_fields),
             "poll.fields": ",".join(poll_fields),
             "place.fields": ",".join(place_fields),
-            "max_results": max(10, min(amount, 500)),  # 500 = upper limit, 10 = lower
+            "max_results": max(10, min(amount, 500)) if amount > 0 else 500,  # 500 = upper limit, 10 = lower
         }
 
         if self.parameters.get("min_date"):
@@ -67,8 +70,35 @@ class SearchWithTwitterAPIv2(Search):
         while True:
             if self.interrupted:
                 raise ProcessorInterruptedException("Interrupted while getting tweets from the Twitter API")
-            api_response = requests.get(endpoint, headers=auth, params=params)
 
+            # there is a limit of one request per second, so stay on the safe side of this
+            while self.previous_request == int(time.time()):
+                time.sleep(0.1)
+            time.sleep(0.05)
+            self.previous_request = int(time.time())
+
+            # now send the request, allowing for at least 5 replies if the connection seems unstable
+            retries = 5
+            api_response = None
+            while retries > 0:
+                try:
+                    api_response = requests.get(endpoint, headers=auth, params=params)
+                    break
+                except (ConnectionError, requests.exceptions.RequestException) as e:
+                    retries -= 1
+                    wait_time = (5 - retries) * 10
+                    self.dataset.update_status("Got %s, waiting %i seconds before retrying" % (e.__name__, wait_time))
+                    time.sleep(wait_time)
+
+            # if at this point we still have no good response, give up
+            if not api_response:
+                self.dataset.update_status("Could not connect to Twitter. Cancelling.", is_final=True)
+                return
+
+            # rate limited - the limit at time of writing is 300 reqs per 15
+            # minutes
+            # usually you don't hit this when requesting batches of 500 at
+            # 1/second
             if api_response.status_code == 429:
                 resume_at = convert_to_int(api_response.headers["x-rate-limit-reset"]) + 1
                 resume_at_str = datetime.datetime.fromtimestamp(int(resume_at)).strftime("%c")
@@ -191,6 +221,9 @@ class SearchWithTwitterAPIv2(Search):
         if not query.get("api_bearer_token", None):
             raise QueryParametersException("Please provide a valid bearer token.")
 
+        if len(query.get("query")) > 1024:
+            raise QueryParametersException("Twitter API queries cannot be longer than 1024 characters.")
+
         # both dates need to be set, or none
         if query.get("min_date", None) and not query.get("max_date", None):
             raise QueryParametersException(
@@ -250,5 +283,21 @@ class SearchWithTwitterAPIv2(Search):
             "body": tweet["text"],
             "author": tweet["author_username"],
             "author_fullname": tweet["author_fullname"],
-            "author_id": tweet["author_id"]
+            "author_id": tweet["author_id"],
+            "source": tweet.get("source"),
+            "language_guess": tweet.get("lang"),
+            "possibly_sensitive": "yes" if tweet.get("possibly_sensitive") else "no",
+            **tweet["public_metrics"],
+            "is_retweet": "yes" if any(
+                [ref["type"] == "retweeted" for ref in tweet.get("referenced_tweets", [])]) else "no",
+            "is_quote_tweet": "yes" if any(
+                [ref["type"] == "quoted" for ref in tweet.get("referenced_tweets", [])]) else "no",
+            "is_reply": "yes" if any(
+                [ref["type"] == "replied_to" for ref in tweet.get("referenced_tweets", [])]) else "no",
+            "hashtags": ",".join([tag["tag"] for tag in tweet.get("entities", {}).get("hashtags", [])]),
+            "urls": ",".join([tag["expanded_url"] for tag in tweet.get("entities", {}).get("urls", [])]),
+            "mentions": ",".join([tag["username"] for tag in tweet.get("entities", {}).get("mentions", [])]),
+            "reply_to": "".join(
+                [mention["username"] for mention in tweet.get("entities", {}).get("mentions", [])[:1]]) if any(
+                [ref["type"] == "replied_to" for ref in tweet.get("referenced_tweets", [])]) else ""
         }
