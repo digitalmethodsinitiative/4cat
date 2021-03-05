@@ -109,6 +109,9 @@ class GenerateWordEmbeddings(BasicProcessor):
 		detect_bigrams = self.parameters.get("detect-bigrams")
 		model_type = self.parameters.get("model-type")
 
+		if not model_type:
+			model_type = self.options["model-type"]["default"]
+
 		staging_area = self.dataset.get_staging_area()
 		model_builder = {
 			"Word2Vec": Word2Vec,
