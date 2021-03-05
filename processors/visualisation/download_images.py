@@ -280,7 +280,7 @@ class ImageDownloader(BasicProcessor):
 			image_name = image_name.split("?")[0]
 
 		# Check if we succeeded; content type should be an image
-		if image.status_code != 200 or image.headers["content-type"][:5] != "image":
+		if image.status_code != 200 or image.headers.get("content-type", "")[:5] != "image":
 			raise FileNotFoundError
 		
 		# Try opening the image in multiple ways
