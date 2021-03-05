@@ -100,7 +100,7 @@ class VisionTagNetworker(BasicProcessor):
         # write GDF file
         self.dataset.update_status("Writing to Gephi-compatible file")
         with self.dataset.get_results_path().open("w", encoding="utf-8") as results:
-            results.write("nodedef>id VARCHAR,name VARCHAR,category VARCHAR\n")
+            results.write("nodedef>name VARCHAR,label VARCHAR,category VARCHAR\n")
             for node_id, node in nodes.items():
                 results.write("%s,%s,%s\n" % (gdf_escape(node_id), gdf_escape(node["label"]), gdf_escape(node["type"])))
 
