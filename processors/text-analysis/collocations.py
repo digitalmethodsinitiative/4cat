@@ -36,8 +36,8 @@ class GetCollocations(BasicProcessor):
 		},
 		"window_size": {
 			"type": UserInput.OPTION_CHOICE,
-			"default": "3",
-			"options": {"3": "3", "4": "4", "5": "5", "6": "6"},
+			"default": "2",
+			"options": {"2": "2", "3": "3", "4": "4", "5": "5", "6": "6"},
 			"help": "Window size"
 		},
 		"query_string": {
@@ -80,9 +80,9 @@ class GetCollocations(BasicProcessor):
 			n_size = 2
 
 		try:
-			window_size = int(self.parameters.get("window_size", 3))
+			window_size = int(self.parameters.get("window_size", 2))
 		except (ValueError, TypeError) as e:
-			window_size = 3
+			window_size = 2
 
 		try:
 			max_output = int(self.parameters.get("max_output", 0))
