@@ -113,7 +113,7 @@ class ImageWallGenerator(BasicProcessor):
 		image_colours = {}
 		dimensions = {}  # used to calculate optimal tile size later
 		index = 0
-		random_values = list(range(0, len(self.parent.num_rows)))
+		random_values = list(range(0, self.parent.num_rows))
 		random.shuffle(random_values)
 
 		for path in self.iterate_archive_contents(self.source_file, staging_area):
@@ -126,7 +126,7 @@ class ImageWallGenerator(BasicProcessor):
 				self.dataset.update_status("Image %s could not be parsed. Skipping." % path)
 				continue
 
-			self.dataset.update_status("Analyzing %s" % path.filename)
+			self.dataset.update_status("Analysing %s (%i/%i)" % (path.name, len(dimensions), self.parent.num_rows))
 
 			# these calculations can take ages for huge images, so resize if it is
 			# larger than the threshold
@@ -296,7 +296,7 @@ class ImageWallGenerator(BasicProcessor):
 		self.dataset.update_status("Rendering %i images to wall" % len(sorted_image_files))
 		for path in sorted_image_files:
 			counter += 1
-			picture = Image.open("temp-images/%s" % path)
+			picture = Image.open(str(staging_area.joinpath(path)))
 
 			if tile_x == -1:
 				picture_x = int(picture.width * (tile_y / picture.height))
@@ -314,7 +314,7 @@ class ImageWallGenerator(BasicProcessor):
 			# images we hadn't accounted for. In that case, simply enlarge the
 			# canvas.
 			if offset_y + picture.height > wall.height:
-				new_wall = Image.new("RGBA", wall.width, offset_y + picture.height)
+				new_wall = Image.new("RGBA", (wall.width, offset_y + picture.height))
 				ImageDraw.floodfill(new_wall, (0, 0), (255, 255, 255, 0))  # transparent background
 				new_wall.paste(wall, (0, 0))
 				wall = new_wall
