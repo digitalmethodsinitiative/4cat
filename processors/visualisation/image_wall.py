@@ -213,6 +213,8 @@ class ImageWallGenerator(BasicProcessor):
 			sum([k[0] for k in dimensions.values()]) / len(dimensions),
 			sum([k[1] for k in dimensions.values()]) / len(dimensions))
 
+		self.dataset.update_status("Determining canvas and image sizes")
+
 		# calculate 'tile sizes' (a tile is an image) and also the size of the
 		# canvas we will need to fit them all. The canvas can never be larger than
 		# this:
