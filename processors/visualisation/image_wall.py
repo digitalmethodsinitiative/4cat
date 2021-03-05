@@ -38,10 +38,10 @@ class ImageWallGenerator(BasicProcessor):
 	options = {
 		"amount": {
 			"type": UserInput.OPTION_TEXT,
-			"help": "No. of images (max 200)",
+			"help": "No. of images (max 1000)",
 			"default": 112,
 			"min": 0,
-			"max": 200
+			"max": 1000
 		},
 		"tile_size": {
 			"type": UserInput.OPTION_CHOICE,
