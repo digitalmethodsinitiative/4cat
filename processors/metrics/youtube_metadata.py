@@ -91,56 +91,50 @@ class YouTubeMetadata(BasicProcessor):
 		# and a list of YouTube URLs referenced as value
 		urls = {}
 
-		self.dataset.update_status("Reading source file")
-		with open(self.source_file, encoding="utf-8") as source:
+		self.dataset.update_status("Extracting YouTube links")
 
-			# Read source file
-			csvfile = csv.DictReader(source)
+		link_regex = re.compile(r"https?://[^\s]+")
+		www_regex = re.compile(r"^www\.")
 
-			self.dataset.update_status("Extracting YouTube links")
+		for post in self.iterate_items(self.source_file):
 
-			link_regex = re.compile(r"https?://[^\s]+")
-			www_regex = re.compile(r"^www\.")
+			post_urls = []
 
-			for post in csvfile:
+			# Reddit posts have a dedicated URL column.
+			# Start with these and then append URLs from the OP text and commments.
+			if datasource == "reddit":
+				if "youtu.be" in post.get("domain") or "youtube.com" in post.get("domain"):
+					post_urls.append(post["url"])
 
-				post_urls = []
+			# Extract more YouTube urls from the post body
+			if "youtu" in post["body"]:  # If statement to speed things up
+				post_links = link_regex.findall(post["body"])
+				if post_links:
+					for link in post_links:
+						# Only keep YouTube links. These two should be all options.
+						if "youtu.be" in link or "youtube.com" in link:
+							post_urls.append(link)
 
-				# Reddit posts have a dedicated URL column.
-				# Start with these and then append URLs from the OP text and commments.
-				if datasource == "reddit":
-					if "youtu.be" in post.get("domain") or "youtube.com" in post.get("domain"):
-						post_urls.append(post["url"])
-				
-				# Extract more YouTube urls from the post body		
-				if "youtu" in post["body"]: # If statement to speed things up
-					post_links = link_regex.findall(post["body"])
-					if post_links:
-						for link in post_links:
-							# Only keep YouTube links. These two should be all options.
-							if "youtu.be" in link or "youtube.com" in link:
-								post_urls.append(link)
+			# Store the URLs as values with the post ID as a key
+			if post_urls:
+				for post_url in post_urls:
 
-				# Store the URLs as values with the post ID as a key
-				if post_urls:
-					for post_url in post_urls:
+					# Sometimes markdown links appear,
+					# like https://streamlink.ou](https://www.youtube.com/watch?v=PHgc8Q6qTjc)
+					# Split and keep the last containing a YT link
+					if "](" in post_url:
+						post_url = post_url.split("](")
+						for post_url_single in post_url:
+							if "youtu" in post_url_single:
+								post_url = post_url_single
 
-						# Sometimes markdown links appear,
-						# like https://streamlink.ou](https://www.youtube.com/watch?v=PHgc8Q6qTjc)
-						# Split and keep the last containing a YT link
-						if "](" in post_url:
-							post_url = post_url.split("](")
-							for post_url_single in post_url:
-								if "youtu" in post_url_single:
-									post_url = post_url_single
+					# Get rid of unwanted (often trailing) characters
+					post_url = re.sub(r"[(),|]", "", post_url)
 
-						# Get rid of unwanted (often trailing) characters
-						post_url = re.sub(r"[(),|]", "", post_url)
-
-						if post_url in urls:
-							urls[post_url].append(post["id"])
-						else:
-							urls[post_url] = [post["id"]]
+					if post_url in urls:
+						urls[post_url].append(post["id"])
+					else:
+						urls[post_url] = [post["id"]]
 
 		# Return if there's no YouTube URLs
 		if not urls:

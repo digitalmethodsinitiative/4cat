@@ -169,11 +169,9 @@ class ExtractNouns(BasicProcessor):  #TEMPORARILY DISABLED
 		count = 0
 
 		# Get field names
-		with parent_path.open(encoding="utf-8") as input:
-			reader = csv.DictReader(input)
-			fieldnames = reader.fieldnames
-			if "entities" not in fieldnames:
-				fieldnames.append("entities")
+		fieldnames = self.get_item_keys(parent_path)
+		if "entities" not in fieldnames:
+			fieldnames.append("entities")
 
 		# Iterate through the original dataset and add values to a new "entities" column
 		self.dataset.update_status("Writing csv with entities.")
@@ -182,7 +180,7 @@ class ExtractNouns(BasicProcessor):  #TEMPORARILY DISABLED
 			writer = csv.DictWriter(output, fieldnames=fieldnames)
 			writer.writeheader()
 
-			for post in self.iterate_csv_items(parent_path):
+			for post in self.iterate_items(parent_path):
 
 				# Format like "Apple ORG, Gates PERSON, ..." and add to the row
 				pos_tags = ", ".join([":".join(post_entities) for post_entities in li_entities[count]])

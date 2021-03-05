@@ -32,7 +32,7 @@ class OvertimeAnalysis(BasicProcessor):
 	datasource = ["telegram", "instagram", "reddit"]
 
 	input = "csv:body,author"
-	output = "csv:time,item,frequency"
+	output = "csv:date,item,value"
 
 	# the following determines the options available to the user via the 4CAT
 	# interface.
@@ -94,18 +94,17 @@ class OvertimeAnalysis(BasicProcessor):
 		views = {}
 		intervals = set()
 
-		with self.source_file.open() as input:
-			reader = csv.DictReader(input)
-			if "views" in reader.fieldnames:
-				engagement_field = "views"
-			elif "score" in reader.fieldnames:
-				engagement_field = "score"
-			elif "likes" in reader.fieldnames:
-				engagement_field = "likes"
-			else:
-				self.dataset.update_status("No engagement metric available for dataset, cannot chart over-time engagement.")
-				self.dataset.finish(0)
-				return
+		fieldnames = self.get_item_keys(self.source_file)
+		if "views" in fieldnames:
+			engagement_field = "views"
+		elif "score" in fieldnames:
+			engagement_field = "score"
+		elif "likes" in fieldnames:
+			engagement_field = "likes"
+		else:
+			self.dataset.update_status("No engagement metric available for dataset, cannot chart over-time engagement.")
+			self.dataset.finish(0)
+			return
 
 		with open(config.PATH_ROOT + "/backend/assets/hatebase/hatebase-%s.json" % language) as hatebasedata:
 			hatebase = json.loads(hatebasedata.read())
@@ -113,67 +112,62 @@ class OvertimeAnalysis(BasicProcessor):
 		hatebase = {term.lower(): hatebase[term] for term in hatebase}
 		hatebase_regex = re.compile(r"\b(" + "|".join([re.escape(term) for term in hatebase if not min_offensive or (hatebase[term]["average_offensiveness"] and hatebase[term]["average_offensiveness"] > min_offensive)]) + r")\b")
 
-		with open(self.source_file, encoding='utf-8') as source:
-			csvfile = csv.DictReader(source)
-			for post in csvfile:
-				if self.interrupted:
-					raise ProcessorInterruptedException("Interrupted while reading input")
+		for post in self.iterate_items(self.source_file):
+			time_unit = get_interval_descriptor(post, timeframe)
 
-				time_unit = get_interval_descriptor(post, timeframe)
+			# determine where to put this data
+			if time_unit not in activity:
+				activity[time_unit] = 0
 
-				# determine where to put this data
-				if time_unit not in activity:
-					activity[time_unit] = 0
+			if time_unit not in hateful:
+				hateful[time_unit] = 0
 
-				if time_unit not in hateful:
-					hateful[time_unit] = 0
+			if time_unit not in views:
+				views[time_unit] = 0
 
-				if time_unit not in views:
-					views[time_unit] = 0
+			intervals.add(time_unit)
 
-				intervals.add(time_unit)
+			activity[time_unit] += 1
+			try:
+				views[time_unit] += int(post[engagement_field])
+			except (ValueError, TypeError):
+				pass
 
-				activity[time_unit] += 1
-				try:
-					views[time_unit] += int(post[engagement_field])
-				except (ValueError, TypeError):
-					pass
-
-				terms = []
-				for term in hatebase_regex.findall(post["body"].lower()):
-					if not term:
+			terms = []
+			for term in hatebase_regex.findall(post["body"].lower()):
+				if not term:
+					continue
+				if "plural_of" in hatebase[term] and hatebase[term]["plural_of"]:
+					if hatebase[term]["plural_of"] in terms:
 						continue
-					if "plural_of" in hatebase[term] and hatebase[term]["plural_of"]:
-						if hatebase[term]["plural_of"] in terms:
-							continue
-						elif hatebase[term]["plural_of"] in hatebase:
-							term = hatebase[term]["plural_of"]
+					elif hatebase[term]["plural_of"] in hatebase:
+						term = hatebase[term]["plural_of"]
 
-						if scope == "ambiguous" and not hatebase[term]["is_unambiguous"]:
-							terms.append(term)
-						elif scope == "unambiguous" and hatebase[term]["is_unambiguous"]:
-							terms.append(term)
-						elif scope == "all":
-							terms.append(term)
+					if scope == "ambiguous" and not hatebase[term]["is_unambiguous"]:
+						terms.append(term)
+					elif scope == "unambiguous" and hatebase[term]["is_unambiguous"]:
+						terms.append(term)
+					elif scope == "all":
+						terms.append(term)
 
-				hateful[time_unit] += len(terms)
+			hateful[time_unit] += len(terms)
 
 		rows = []
 		for interval in sorted(intervals):
 			rows.append({
 				"date": interval,
 				"item": "offensive language",
-				"frequency": hateful[interval]
+				"value": hateful[interval]
 			})
 			rows.append({
 				"date": interval,
 				"item": "messages",
-				"frequency": activity[interval]
+				"value": activity[interval]
 			})
 			rows.append({
 				"date": interval,
 				"item": engagement_field,
-				"frequency": views[interval]
+				"value": views[interval]
 			})
 
 		# write as csv

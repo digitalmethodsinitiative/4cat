@@ -132,7 +132,7 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
                 shutil.rmtree(staging_area)
                 raise ProcessorInterruptedException("Interrupted while processing word embedding models")
 
-            model = KeyedVectors.load(str(model_file))
+            model = KeyedVectors.load(str(model_file)).wv
             models[model_file.stem] = model
             if vector_size is None:
                 vector_size = model.vector_size  # needed later for dimensionality reduction

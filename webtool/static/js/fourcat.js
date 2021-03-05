@@ -170,7 +170,7 @@ processor = {
 
                     if (response.html.length > 0) {
                         let new_element = $(response.html);
-                        let container_id = response.container + ' .child-list';
+                        let container_id = response.container + ' > .child-list';
 
                         let parent_list = $(container_id);
 

@@ -147,7 +147,7 @@ class MakeWordtree(BasicProcessor):
 
 		# find matching posts
 		processed = 0
-		for post in self.iterate_csv_items(self.source_file):
+		for post in self.iterate_items(self.source_file):
 			processed += 1
 			if processed % 500 == 0:
 				self.dataset.update_status("Processing and tokenising post %i" % processed)

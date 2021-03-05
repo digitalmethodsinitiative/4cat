@@ -54,9 +54,9 @@ class SVGHistogramRenderer(BasicProcessor):
 
 		# collect post numbers per month
 		intervals = {}
-		for post in self.iterate_csv_items(self.source_file):
-			intervals[post["date"]] = int(post["frequency"])
-			max_posts = max(max_posts, int(post["frequency"]))
+		for post in self.iterate_items(self.source_file):
+			intervals[post["date"]] = int(post["value"])
+			max_posts = max(max_posts, int(post["value"]))
 
 		if len(intervals) <= 1:
 			self.dataset.update_status("Not enough data available for a histogram; need more than one time series.")

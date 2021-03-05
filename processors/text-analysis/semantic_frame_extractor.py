@@ -57,66 +57,65 @@ class SemanticFrameExtractor(BasicProcessor):
 		with self.dataset.get_results_path().open("w") as output:
 			writer = csv.DictWriter(output, fieldnames=("sentence", "utterance", "frameEvokingElement", "cause", "effect"))
 			writer.writeheader()
-			with self.source_file.open("r") as input:
-				reader = csv.DictReader(input)
+			reader = self.iterate_items(self.source_file)
+			while True:
+				# the API can't handle too many sentences at once, so send
+				# them in chunks
+				self.dataset.update_status("%i sentences processed via PENELOPE API..." % processed)
+				if self.interrupted:
+					raise ProcessorInterruptedException("Interrupted while interfacing with PENELOPE API")
 
-				while True:
-					# the API can't handle too many sentences at once, so send
-					# them in chunks
-					self.dataset.update_status("%i sentences processed via PENELOPE API..." % processed)
-					if self.interrupted:
-						raise ProcessorInterruptedException("Interrupted while interfacing with PENELOPE API")
+				end_of_the_line = False
+				try:
+					post = reader.__next__()
+					sentence = non_alpha.sub("", post["sentence"])
+					processed += 1
+					if not sentence:
+						# could be that it's just symbols, no text
+						continue
 
-					end_of_the_line = False
-					try:
-						post = reader.__next__()
-						sentence = non_alpha.sub("", post["sentence"])
-						processed += 1
-						if not sentence:
-							# could be that it's just symbols, no text
+					chunk.append(sentence)
+				except StopIteration:
+					end_of_the_line = True
+
+				if len(chunk) == chunk_size or end_of_the_line:
+					payload = {"texts": chunk, "frames": ["Causation"]}
+					response = requests.post("https://penelope.vub.be/semantic-frame-extractor/texts-extract-frames",
+											 data=json.dumps(payload), headers={"Content-type": "application/json"})
+
+					if response.status_code != 200:
+						self.log.warning("PENELOPE Semantic Frame API crashed for chunk %s" % repr(chunk))
+						self.dataset.update_status("PENELOPE API response could not be parsed.")
+						entities = 0
+						break
+
+					# filter response to only include those sentences that
+					# actually contained any semantic frames
+					for frameset_list in response.json().get("frameSets", []):
+						if not frameset_list:
 							continue
 
-						chunk.append(sentence)
-					except StopIteration:
-						end_of_the_line = True
-
-					if len(chunk) == chunk_size or end_of_the_line:
-						payload = {"texts": chunk, "frames": ["Causation"]}
-						response = requests.post("https://penelope.vub.be/semantic-frame-extractor/texts-extract-frames", data=json.dumps(payload), headers={"Content-type": "application/json"})
-
-						if response.status_code != 200:
-							self.log.warning("PENELOPE Semantic Frame API crashed for chunk %s" % repr(chunk))
-							self.dataset.update_status("PENELOPE API response could not be parsed.")
-							entities = 0
-							break
-
-						# filter response to only include those sentences that
-						# actually contained any semantic frames
-						for frameset_list in response.json().get("frameSets", []):
-							if not frameset_list:
+						for frameset in frameset_list:
+							if not frameset.get("entities", None):
 								continue
 
-							for frameset in frameset_list:
-								if not frameset.get("entities", None):
-									continue
+							for entity in frameset.get("entities"):
+								entities += 1
+								writer.writerow({
+									"sentence": frameset["utterance"],
+									"utterance": entity.get("utterance", ""),
+									"frameEvokingElement": entity.get("frameEvokingElement", ""),
+									"cause": entity.get("cause", ""),
+									"effect": entity.get("effect", "")
+								})
 
-								for entity in frameset.get("entities"):
-									entities += 1
-									writer.writerow({
-										"sentence": frameset["utterance"],
-										"utterance": entity.get("utterance", ""),
-										"frameEvokingElement": entity.get("frameEvokingElement", ""),
-										"cause": entity.get("cause", ""),
-										"effect": entity.get("effect", "")
-									})
+					chunk = []
 
-						chunk = []
-
-					if end_of_the_line:
-						self.dataset.update_status("Finished")
-						break
-					else:
-						# let 'em breathe
-						time.sleep(1)
+				if end_of_the_line:
+					self.dataset.update_status("Finished")
+					break
+				else:
+					# let 'em breathe
+					time.sleep(1)
 
 		self.dataset.finish(entities)

@@ -80,43 +80,37 @@ class LinguisticFeatures(BasicProcessor):
 
 		disable = [option for option in options if option not in enable]
 
-		with open(self.source_file, encoding="utf-8") as source:
+		# Get all ze text first so we can process it in batches
+		posts = [post["body"] if post["body"] else "" for post in self.iterate_items(self.source_file)]
 
-			# Get all ze text first so we can process it in batches
-			csv_reader = csv.DictReader(source)
-			posts = [post["body"] if post["body"] else "" for post in csv_reader]
+		# Process the text in batches
+		if len(posts) < 100000:
+			self.dataset.update_status("Extracting linguistic features")
+		else:
+			self.dataset.update_status(
+				"Extracting linguistic features is currently only available for datasets with less than 100.000 items.")
+			self.dataset.finish(0)
+			return
 
-			# Process the text in batches
-			if len(posts) < 100000:
-				self.dataset.update_status("Extracting linguistic features")
-			else:
-				self.dataset.update_status(
-					"Extracting linguistic features is currently only available for datasets with less than 100.000 items.")
-				self.dataset.finish(0)
-				return
+		# Make sure only the needed information is extracted.
+		attrs = []
+		if "tagger" not in disable:
+			attrs.append("POS")
+		if "parser" not in disable:
+			attrs.append("DEP")
+		if "ner":
+			attrs.append("ENT_IOB")
+			attrs.append("ENT_TYPE")
+			attrs.append("ENT_ID")
+			attrs.append("ENT_KB_ID")
 
-			# Make sure only the needed information is extracted.
-			attrs = []
-			if "tagger" not in disable:
-				attrs.append("POS")
-			if "parser" not in disable:
-				attrs.append("DEP")
-			if "ner":
-				attrs.append("ENT_IOB")
-				attrs.append("ENT_TYPE")
-				attrs.append("ENT_ID")
-				attrs.append("ENT_KB_ID")
+		# DocBin for quick saving
+		doc_bin = DocBin(attrs=attrs)
 
-			# DocBin for quick saving
-			doc_bin = DocBin(attrs=attrs)
-
-			# Start the processing!
+		# Start the processing!
+		try:
 			for i, doc in enumerate(nlp.pipe(posts, disable=disable)):
-				try:
-					doc_bin.add(doc)
-				except MemoryError:
-					self.dataset.update_status("Out of memory while parsing data. Try again with a smaller dataset.", is_final=True)
-					return
+				doc_bin.add(doc)
 
 				# It's quite a heavy process, so make sure it can be interrupted
 				if self.interrupted:
@@ -124,11 +118,14 @@ class LinguisticFeatures(BasicProcessor):
 
 				if i % 1000 == 0:
 					self.dataset.update_status("Done with post %s out of %s" % (i, len(posts)))
+		except MemoryError:
+			self.dataset.update_status("Out of memory. The dataset may be too large to process. Try again with a smaller dataset.", is_final=True)
+			return
 
-			self.dataset.update_status("Serializing results - this will take a while")
+		self.dataset.update_status("Serializing results - this will take a while")
 
-			# Then serialize the NLP docs and the vocab
-			doc_bytes = doc_bin.to_bytes()
+		# Then serialize the NLP docs and the vocab
+		doc_bytes = doc_bin.to_bytes()
 
 		# Dump ze data in a temporary folder
 		with staging_area.joinpath("spacy_docs.pb").open("wb") as outputfile:

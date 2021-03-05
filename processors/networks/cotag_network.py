@@ -13,7 +13,7 @@ __email__ = "4cat@oilab.eu"
 
 class CoTagger(BasicProcessor):
 	"""
-	Generate URL co-link network
+	Generate co-tag network
 	"""
 	type = "cotag-network"  # job type ID
 	category = "Networks"  # category
@@ -52,7 +52,7 @@ class CoTagger(BasicProcessor):
 		posts = 1
 		tag_field = None
 
-		for post in self.iterate_csv_items(self.source_file):
+		for post in self.iterate_items(self.source_file):
 			self.dataset.update_status("Reading post %i..." % posts)
 			posts += 1
 
@@ -69,11 +69,8 @@ class CoTagger(BasicProcessor):
 					continue
 
 				# Convert string of list to actual list
-				tags = post.get("tags", "").split("', '")
-				# Remove list brackets
-				tags[0] = tags[0][2:]
-				tags[-1] = tags[-1][:-2]
-				
+				tags = post.get("tags", "").split(",")
+
 				if not tags:
 					tags = []
 			elif self.parent.parameters["datasource"] == "usenet":

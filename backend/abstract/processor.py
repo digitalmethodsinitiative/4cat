@@ -5,6 +5,7 @@ import traceback
 import zipfile
 import typing
 import shutil
+import json
 import abc
 import csv
 import os
@@ -83,20 +84,28 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 
 		self.log.info("Running processor %s on dataset %s" % (self.type, self.job.data["remote_id"]))
 
+		processor_name = self.title if hasattr(self, "title") else self.type
+		self.dataset.clear_log()
+		self.dataset.log("Processing '%s' started for dataset %s" % (processor_name, self.dataset.key))
+
+		# start log file
 		self.parameters = self.dataset.parameters
 		self.dataset.update_status("Processing data")
 		self.dataset.update_version(get_software_version())
 
 		if self.interrupted:
+			self.dataset.log("Processing interrupted, trying again later")
 			return self.abort()
 
 		if not self.dataset.is_finished():
 			try:
 				self.process()
 				self.after_process()
-			except WorkerInterruptedException:
+			except WorkerInterruptedException as e:
+				self.dataset.log("Processing interrupted (%s), trying again later" % str(e))
 				self.abort()
 			except Exception as e:
+				self.dataset.log("Processor crashed (%s), trying again later" % str(e))
 				frames = traceback.extract_tb(e.__traceback__)
 				frames = [frame.filename.split("/").pop() + ":" + str(frame.lineno) for frame in frames[1:]]
 				location = "->".join(frames)
@@ -138,6 +147,8 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 				next_analysis = DataSet(parameters=next_parameters, type=next_type, db=self.db, parent=self.dataset.key,
 										extension=available_processors[next_type]["extension"])
 				self.queue.add_job(next_type, remote_id=next_analysis.key)
+			else:
+				self.log.warning("Dataset %s (of type %s) wants to run processor %s next, but it is incompatible" % (self.dataset.key, self.type, next_type))
 
 		# see if we need to register the result somewhere
 		if "copy_to" in self.parameters:
@@ -204,27 +215,101 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 			# cancel job
 			self.job.finish()
 
-	def iterate_csv_items(self, path):
+	def iterate_items(self, path):
 		"""
-		A generator that iterates through a CSV file
+		A generator that iterates through a CSV or NDJSON file
 
 		With every iteration, the processor's 'interrupted' flag is checked,
 		and if set a ProcessorInterruptedException is raised, which by default
 		is caught and subsequently stops execution gracefully.
 
-		:param Path path: 	Path to csv file to read
-		:return:
+		Processors can define a method called `map_item` that can be used to
+		map an item from the dataset file before it is processed any further
+		this is slower than storing the data file in the right format to begin
+		with but not all data sources allow for easy 'flat' mapping of items,
+		e.g. tweets are nested objects when retrieved from the twitter API
+		that are easier to store as a JSON file than as a flat CSV file, and
+		it would be a shame to throw away that data
+
+		There are two file types that can be iterated (currently): CSV files
+		and NDJSON (newline-delimited JSON) files. In the future, one could
+		envision adding a pathway to retrieve items from e.g. a MongoDB
+		collection directly instead of from a static file
+
+		:param Path path: 	Path to file to read
+		:return Generator:  A generator that yields each item as a dictionary
 		"""
 
-		with path.open(encoding="utf-8") as input:
+		# see if an item mapping function has been defined
+		# open question if 'parent' shouldn't be an attribute of the dataset
+		# instead of the processor...
+		item_mapper = None
+		if hasattr(self, "parent") and self.parent:
+			parent_processor = self.all_modules.processors.get(self.parent.type)
+			if parent_processor:
+				parent_processor = self.all_modules.load_worker_class(parent_processor)
+				if hasattr(parent_processor, "map_item"):
+					item_mapper = parent_processor.map_item
 
-			reader = csv.DictReader(input)
+		# go through items one by one, optionally mapping them
+		if path.suffix.lower() == ".csv":
+			with path.open(encoding="utf-8") as input:
+				reader = csv.DictReader(input)
 
-			for item in reader:
-				if self.interrupted:
-					raise ProcessorInterruptedException("Processor interrupted while iterating through CSV file")
+				for item in reader:
+					if self.interrupted:
+						raise ProcessorInterruptedException("Processor interrupted while iterating through CSV file")
 
-				yield item
+					if item_mapper:
+						item = item_mapper(item)
+
+					yield item
+
+		elif path.suffix.lower() == ".ndjson":
+			# in this format each line in the file is a self-contained JSON
+			# file
+			with path.open(encoding="utf-8") as input:
+				for line in input:
+					if self.interrupted:
+						raise ProcessorInterruptedException("Processor interrupted while iterating throug NDJSON file")
+
+					item = json.loads(line)
+					if item_mapper:
+						item = item_mapper(item)
+
+					yield item
+
+		else:
+			raise NotImplementedError("Cannot iterate through %s file" % path.suffix)
+
+	def get_item_keys(self, path=None):
+		"""
+		Get item attribute names
+
+		It can be useful to know what attributes an item in the dataset is
+		stored with, e.g. when one wants to produce a new dataset identical
+		to the parent one but with extra attributes. This method provides
+		these, as a list.
+
+		:param Path path:  Path to the dataset file; if left empty, use the
+		processor's own dataset's path
+		:return list:  List of keys, may be empty if there are no items in the
+		dataset
+
+		:todo: Figure out if this makes more sense as a Dataset method
+		"""
+		if not path:
+			path = self.dataset.get_results_path()
+
+		items = self.iterate_items(path)
+		try:
+			keys = list(items.__next__().keys())
+		except StopIteration:
+			return []
+		finally:
+			del items
+
+		return keys
 
 	def iterate_archive_contents(self, path, staging_area=None):
 		"""

@@ -49,8 +49,7 @@ class WorkerManager:
 		# queue a job for the api handler so it will be run
 		self.queue.add_job("api", remote_id="localhost")
 
-		# queue corpus stats and snapshot generators for a daily run
-		self.queue.add_job("corpus-stats", remote_id="localhost", interval=86400)
+		# queue worker that deletes expired datasets every so often
 		self.queue.add_job("expire-datasets", remote_id="localhost", interval=300)
 
 		# it's time

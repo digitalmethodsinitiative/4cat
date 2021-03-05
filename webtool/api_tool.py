@@ -235,7 +235,8 @@ def queue_dataset():
 
 	sanitised_query["pseudonymise"] = bool(request.form.to_dict().get("pseudonymise", False))
 
-	dataset = DataSet(parameters=sanitised_query, db=db, type=search_worker_id)
+	extension = worker_class.extension if hasattr(worker_class, "extension") else "csv"
+	dataset = DataSet(parameters=sanitised_query, db=db, type=search_worker_id, extension=extension)
 
 	if hasattr(worker_class, "after_create"):
 		worker_class.after_create(sanitised_query, dataset, request)
@@ -286,16 +287,13 @@ def check_dataset():
 		dataset_data = dataset.data
 		dataset_data["parameters"] = json.loads(dataset_data["parameters"])
 		path = False
-		preview = ""
 	elif results:
 		# Return absolute folder when using localhost for debugging
 		path = results.name
 		dataset_data = dataset.data
 		dataset_data["parameters"] = json.loads(dataset_data["parameters"])
-		preview = render_template("posts-preview.html", query=dataset_data, preview=get_preview(dataset))
 	else:
 		path = ""
-		preview = ""
 
 	status = {
 		"status": dataset.get_status(),
@@ -305,7 +303,6 @@ def check_dataset():
 		"rows": dataset.data["num_rows"],
 		"key": dataset_key,
 		"done": True if dataset.is_finished() else False,
-		"preview": preview,
 		"path": path,
 		"empty": (dataset.data["num_rows"] == 0),
 		"is_favourite": (db.fetchone("SELECT COUNT(*) AS num FROM users_favourites WHERE name = %s AND key = %s",

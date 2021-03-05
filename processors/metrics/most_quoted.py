@@ -40,7 +40,7 @@ class QuoteRanker(BasicProcessor):
 		link = re.compile(r">>([0-9]+)")
 
 		self.dataset.update_status("Reading source file")
-		for post in self.iterate_csv_items(self.source_file):
+		for post in self.iterate_items(self.source_file):
 			quotes = re.findall(link, post["body"])
 			if quotes:
 				if quotes[0] not in quoted:

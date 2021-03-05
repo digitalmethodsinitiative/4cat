@@ -44,7 +44,7 @@ class YouTubeThumbnails(BasicProcessor):
 		"""
 		self.dataset.update_status("Extracting YouTube links")
 		video_ids = set()
-		for youtube_video in self.iterate_csv_items(self.source_file):
+		for youtube_video in self.iterate_items(self.source_file):
 			video_ids.add(youtube_video["id"])
 
 		self.dataset.update_status("Downloading thumbnails")

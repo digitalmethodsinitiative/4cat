@@ -117,6 +117,11 @@ class SearchTelegram(Search):
 
 					if i % 500 == 0:
 						self.dataset.update_status("Retrieved %i posts for entity '%s'" % (len(query_posts) + len(posts), query))
+
+					if message.action is not None:
+						# e.g. someone joins the channel - not an actual message
+						continue
+
 					parsed_message = self.import_message(client, message, query, get_full_userinfo=userinfo)
 					query_posts.append(parsed_message)
 
@@ -156,33 +161,18 @@ class SearchTelegram(Search):
 		# complicate things further not everyone is a user and not everyone
 		# has a username. If no username is available, try the first and
 		# last name someone has supplied
-		if message.from_id and not get_full_userinfo:
+		fullname = ""
+		if hasattr(message, "sender") and hasattr(message.sender, "username"):
+			username = message.sender.username if message.sender.username else ""
+			fullname = message.sender.first_name if hasattr(message.sender, "first_name") and message.sender.first_name else ""
+			if hasattr(message.sender, "last_name") and message.sender.last_name:
+					fullname += " " + message.sender.last_name
+			user_id = message.sender.id
+			user_is_bot = message.sender.bot if hasattr(message.sender, "bot") else False
+		elif message.from_id:
 			user_id = message.from_id
 			username = None
 			user_is_bot = None
-		elif message.from_id:
-			# this is broken
-			if message.from_id not in self.usermap:
-				user = User(message.from_id)
-				full = client.loop.run_until_complete(GetFullUserRequest(message.from_id))
-				if full.user.username:
-					self.usermap[message.from_id] = full.user.username
-				elif full.user.first_name:
-					self.usermap[message.from_id] = full.user.first_name
-					if full.user.last_name:
-						self.usermap[message.from_id] += " " + full.user.last_name
-				else:
-					self.usermap[message.from_id] = None
-
-				self.botmap[message.from_id] = full.user.bot
-
-			user_id = message.from_id
-			username = self.usermap[message.from_id]
-			user_is_bot = self.botmap[message.from_id]
-		elif message.post_author:
-			user_id = message.post_author
-			username = message.post_author
-			user_is_bot = False
 		else:
 			user_id = "stream"
 			username = None
@@ -204,7 +194,15 @@ class SearchTelegram(Search):
 			# This could add a separate routine for videos to make them a
 			# separate type, which could then be scraped later, etc
 			attachment_type = message.media.document.mime_type.split("/")[0]
-			attachment_data = ""
+			if attachment_type == "video":
+				attachment = message.document
+				attachment_data = json.dumps({
+					"id": attachment.id,
+					"dc_id": attachment.dc_id,
+					"file_reference": attachment.file_reference.hex(),
+				})
+			else:
+				attachment_data = ""
 
 		elif attachment_type == "game":
 			# there is far more data in the API response for games but this
@@ -228,7 +226,12 @@ class SearchTelegram(Search):
 			# little of the metadata attached is of interest. Instead, the
 			# actual photos may be downloaded via a processor that is run on the
 			# search results
-			attachment_data = ""
+			attachment = message.photo
+			attachment_data = json.dumps({
+				"id": attachment.id,
+				"dc_id": attachment.dc_id,
+				"file_reference": attachment.file_reference.hex(),
+			})
 
 		elif attachment_type == "poll":
 			# unfortunately poll results are only available when someone has
@@ -247,14 +250,6 @@ class SearchTelegram(Search):
 					"votes": -1
 				} for option in options]
 			})
-
-		elif attachment_type == "venue":
-			# weird
-			attachment = message.venue
-			attachment_data = json.dumps({**{"geo": "%s %s" % (attachment.geo.lat, attachment.geo.long)}, **{
-				{property: attachment[property] for property in
-				 ("title", "address", "provider", "venue_id", "venue_type")}
-			}})
 
 		elif attachment_type == "url":
 			# easy!
@@ -286,7 +281,8 @@ class SearchTelegram(Search):
 			"thread_id": thread_id,
 			"search_entity": entity,
 			"author": user_id,
-			"author_name": username,
+			"author_username": username,
+			"author_name": fullname,
 			"author_is_bot": user_is_bot,
 			"author_forwarded_from": forwarded,
 			"subject": "",
@@ -301,9 +297,9 @@ class SearchTelegram(Search):
 			"attachment_data": attachment_data
 		}
 
-		if not get_full_userinfo:
-			del msg["author_name"]
-			del msg["author_is_bot"]
+		#if not get_full_userinfo:
+		#	del msg["author_name"]
+		#	del msg["author_is_bot"]
 
 		return msg
 
