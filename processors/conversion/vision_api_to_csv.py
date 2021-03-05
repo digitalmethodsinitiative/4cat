@@ -54,6 +54,16 @@ class ConvertVisionOutputToCSV(BasicProcessor):
                 raise ProcessorInterruptedException("Interrupted while converting Vision API output")
 
             file_result = {}
+
+            # special case format
+            if "webDetection" in annotations and annotations["webDetection"]:
+                file_result["labelGuess"] = [l["label"] for l in annotations["webDetection"].get("bestGuessLabels", [])]
+                file_result["webEntities"] = [e["description"] for e in annotations["webDetection"].get("webEntities", []) if "description" in e]
+                file_result["urlsPagesWithMatchingImages"] = [u["url"] for u in annotations["webDetection"].get("pagesWithMatchingImages", [])]
+                file_result["urlsMatchingImages"] = [u["url"] for u in annotations["webDetection"].get("fullMatchingImages", [])]
+                file_result["urlsPartialMatchingImages"] = [u["url"] for u in annotations["webDetection"].get("partialMatchingImages", [])]
+
+            # shared format
             for annotation_type, tags in annotations.items():
                 if annotation_type not in ("landmarkAnnotations", "logoAnnotations", "labelAnnotations",
                                            "fullTextAnnotation", "localizedObjectAnnotations"):
