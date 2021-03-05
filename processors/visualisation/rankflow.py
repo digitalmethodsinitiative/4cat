@@ -77,7 +77,18 @@ class RankFlowRenderer(BasicProcessor):
 			except (KeyError, ValueError):
 				weight = 1
 
-			items[row["date"]][row["item"]] = weight
+			# Handle collocations a bit differently
+			if "word_1" in row:
+				# Trigrams
+				if "word_3" in row:
+					label = row["word_1"] + " " + row["word_2"] + " " + row["word_3"]
+				# Bigrams
+				else:
+					label = row["word_1"] + " " + row["word_2"]
+			else:
+				label = row["item"]
+
+			items[row["date"]][label] = weight
 			max_weight = max(max_weight, weight)
 
 		# determine per-period changes
