@@ -118,7 +118,7 @@ class ImageWallGenerator(BasicProcessor):
 		image_colours = {}
 		dimensions = {}  # used to calculate optimal tile size later
 		index = 0
-		random_values = list(range(0, self.parent.num_rows))
+		random_values = list(range(0, self.source_dataset.num_rows))
 		random.shuffle(random_values)
 
 		for path in self.iterate_archive_contents(self.source_file, staging_area):
@@ -131,7 +131,7 @@ class ImageWallGenerator(BasicProcessor):
 				self.dataset.update_status("Image %s could not be parsed. Skipping." % path)
 				continue
 
-			self.dataset.update_status("Analysing %s (%i/%i)" % (path.name, len(dimensions), self.parent.num_rows))
+			self.dataset.update_status("Analysing %s (%i/%i)" % (path.name, len(dimensions), self.source_dataset.num_rows))
 
 			# these calculations can take ages for huge images, so resize if it is
 			# larger than the threshold

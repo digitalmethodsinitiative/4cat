@@ -35,6 +35,7 @@ class DataSet:
 	children = []
 	processors = {}
 	genealogy = []
+	preset_parent = None
 	parameters = {}
 
 	db = None
@@ -103,12 +104,10 @@ class DataSet:
 				"is_finished": False,
 				"software_version": get_software_version(),
 				"software_file": "",
-				"num_rows": 0
+				"num_rows": 0,
+				"key_parent": parent
 			}
 			self.parameters = parameters
-
-			if parent:
-				self.data["key_parent"] = parent
 
 			self.db.insert("datasets", data=self.data)
 			self.reserve_result_file(parameters, extension)
@@ -497,6 +496,13 @@ class DataSet:
 		if self.no_status_updates:
 			return
 
+		# for presets, copy the updated status to the preset
+		if self.preset_parent is None:
+			self.preset_parent = [parent for parent in self.get_genealogy() if parent.type.find("preset-") == 0 and parent.key != self.key][:1]
+
+		if self.preset_parent:
+			self.preset_parent[0].update_status(status)
+
 		self.data["status"] = status
 		updated = self.db.update("datasets", where={"key": self.data["key"]}, data={"status": status})
 
@@ -560,7 +566,7 @@ class DataSet:
 		Get key of root dataset
 
 		Traverses the tree of datasets this one is part of until it finds one
-		with no parent dataset, then returns that dataset's key.
+		with no source_dataset dataset, then returns that dataset's key.
 
 		Not to be confused with top kek.
 
@@ -709,7 +715,7 @@ class DataSet:
 
 	def link_parent(self, key_parent):
 		"""
-		Set parent key for this dataset
+		Set source_dataset key for this dataset
 
 		:param key_parent:  Parent key. Not checked for validity
 		"""
@@ -717,7 +723,7 @@ class DataSet:
 
 	def detach(self):
 		"""
-		Makes the datasets standalone, i.e. not having any parent dataset
+		Makes the datasets standalone, i.e. not having any source_dataset dataset
 		"""
 		self.link_parent("")
 

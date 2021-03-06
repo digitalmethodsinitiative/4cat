@@ -62,12 +62,12 @@ class ExtractNouns(BasicProcessor):
 		
 		# Validate whether the user enabled the right parameters.
 		# Check part of speech tagging
-		if "tagger" not in self.parent.parameters["enable"]:
+		if "tagger" not in self.source_dataset.parameters["enable"]:
 			self.dataset.update_status("Enable \"Part-of-speech tagging\" in previous module")
 			self.dataset.finish(0)
 
 		# Check dependency parsing if nouns and compouns nouns is selected
-		elif (noun_type == "nouns_and_compounds" or noun_type == "noun_chunks") and "parser" not in self.parent.parameters["enable"]:
+		elif (noun_type == "nouns_and_compounds" or noun_type == "noun_chunks") and "parser" not in self.source_dataset.parameters["enable"]:
 			self.dataset.update_status("Enable \"Part-of-speech tagging\" and \"Dependency parsing\" for compound nouns/noun chunks in previous module")
 			self.dataset.finish(0)
 
@@ -171,9 +171,7 @@ class ExtractNouns(BasicProcessor):
 		self.dataset.update_status("Adding nouns the source file")
 
 		# Get the source file data path
-		genealogy = self.dataset.get_genealogy()
-		parent = genealogy[0]
-		parent_path = parent.get_results_path()
+		parent_path = self.source_dataset.get_results_path()
 
 		# Get a temporary path where we can store the data
 		tmp_path = self.dataset.get_staging_area()

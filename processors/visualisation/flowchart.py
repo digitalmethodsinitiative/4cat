@@ -77,8 +77,8 @@ class FlowChart(BasicProcessor):
 		# Make sure we know what time format we're dealing with.
 		time_format = False
 		guess_time_format = False
-		if "timeframe" in self.parent.parameters:
-			time_format = self.parent.parameters["timeframe"]
+		if "timeframe" in self.source_dataset.parameters:
+			time_format = self.source_dataset.parameters["timeframe"]
 
 		if not time_format:
 			guess_time_format = True
@@ -117,7 +117,7 @@ class FlowChart(BasicProcessor):
 			else:
 				label_key = labels.index(label)
 
-			# If the parent dataset has no valid date parameter,
+			# If the source_dataset dataset has no valid date parameter,
 			# we're going to guess what time format we're dealing with.
 			if guess_time_format:
 				if len(post["date"]) == 4:  # years

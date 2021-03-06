@@ -110,7 +110,7 @@ class GetCollocations(BasicProcessor):
 
 		# Get token sets
 		self.dataset.update_status("Processing token sets")
-		dirname = Path(self.dataset.get_results_path().parent, self.dataset.get_results_path().name.replace(".", ""))
+		dirname = Path(self.dataset.get_results_path().source_dataset, self.dataset.get_results_path().name.replace(".", ""))
 
 		# Dictionary to save queries from
 		results = []

@@ -70,9 +70,7 @@ class ImageDownloader(BasicProcessor):
 		urls = []
 
 		# Get the source file data path
-		genealogy = self.dataset.get_genealogy()
-		parent = genealogy[0]
-		datasource = parent.parameters["datasource"]
+		datasource = self.source_dataset.parameters["datasource"]
 
 		try:
 			amount = max(0, min(1000, int(self.parameters.get("amount", 0))))
@@ -84,8 +82,7 @@ class ImageDownloader(BasicProcessor):
 		# 4chan is the odd one out (images are traced to and scraped from archives), so treat differently.
 		if datasource == "4chan":
 			self.dataset.update_status("Reading source file")
-			parent = self.dataset.get_genealogy()[0]
-			external = "fireden" if parent.parameters["board"] == "v" else "4plebs"
+			external = "fireden" if self.source_dataset.parameters["board"] == "v" else "4plebs"
 			rate_limit = 1 if external == "fireden" else 16
 
 
@@ -352,7 +349,7 @@ class ImageDownloader(BasicProcessor):
 			delete_after = False
 		else:
 			query_result = self.dataset.get_results_path()
-			local_path = Path(query_result.parent, query_result.name + "-temp")
+			local_path = Path(query_result.source_dataset, query_result.name + "-temp")
 			delete_after = True
 
 		# save file, somewhere
@@ -379,9 +376,7 @@ class ImageDownloader(BasicProcessor):
 		self.dataset.update_status("Adding image urls to the source file")
 
 		# Get the source file data path
-		genealogy = self.dataset.get_genealogy()
-		parent = genealogy[1]
-		parent_path = parent.get_results_path()
+		parent_path = self.source_dataset.get_results_path()
 
 		# Get a temporary path where we can store the data
 		tmp_path = self.dataset.get_staging_area()

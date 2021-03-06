@@ -58,11 +58,11 @@ class HashtagUserBipartiteGrapher(BasicProcessor):
 			posts += 1
 
 			# create a list of tags
-			if self.parent.parameters["datasource"] in ("instagram", "tiktok"):
+			if self.source_dataset.parameters["datasource"] in ("instagram", "tiktok"):
 				tags = post.get("tags", "").split(",")
 				tags += [leading_hash.sub("", tag) for tag in post.get("hashtags", "").split(",")]
 
-			elif self.parent.parameters["datasource"] == "tumblr":
+			elif self.source_dataset.parameters["datasource"] == "tumblr":
 				# Convert string of list to actual list
 				tags = post.get("tags", None)
 				if tags:
@@ -71,7 +71,7 @@ class HashtagUserBipartiteGrapher(BasicProcessor):
 				else:
 					tags = []
 
-			elif self.parent.parameters["datasource"] == "usenet":
+			elif self.source_dataset.parameters["datasource"] == "usenet":
 				if not post.get("groups"):
 					continue
 

@@ -85,7 +85,7 @@ class YouTubeMetadata(BasicProcessor):
 			self.dataset.finish(0)
 			return
 
-		datasource = self.parent.parameters.get("datasource")
+		datasource = self.source_dataset.parameters.get("datasource")
 
 		# Use a dict with post IDs as keys
 		# and a list of YouTube URLs referenced as value

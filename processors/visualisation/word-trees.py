@@ -411,7 +411,7 @@ class MakeWordtree(BasicProcessor):
 				x += text_width
 				block_position = (block_position[0] + text_width, block_position[1])
 
-			# draw the line connecting this node to the parent node
+			# draw the line connecting this node to the source_dataset node
 			if origin:
 				destination = (x - self.step, y + text_offset_y)
 
@@ -448,21 +448,21 @@ class MakeWordtree(BasicProcessor):
 
 	def merge_upwards(self, node):
 		"""
-		Merge a node with the parent node if it has no siblings
+		Merge a node with the source_dataset node if it has no siblings
 
 		Used to string together tokens into one longer text string
 
 		:param Node node:
 		"""
-		if not node or not node.parent:
+		if not node or not node.source_dataset:
 			return
 
-		parent = node.parent
+		parent = node.source_dataset
 		if len(node.siblings) == 0:
-			node.parent.name += " " + node.name
+			node.source_dataset.name += " " + node.name
 			# we need a reference because after the next line the node will
-			# have no parent
-			node.parent.children = node.children
+			# have no source_dataset
+			node.source_dataset.children = node.children
 
 		self.merge_upwards(parent)
 

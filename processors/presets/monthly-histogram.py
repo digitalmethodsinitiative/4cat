@@ -20,7 +20,7 @@ class MonthlyHistogramCreator(ProcessorPreset):
 		activity.
 		"""
 
-		header = "'" + self.parent.data["query"] + "': Posts per month"
+		header = "'" + self.source_dataset.data["query"] + "': Posts per month"
 		if len(header) > 40:
 			header = "Posts per month"
 

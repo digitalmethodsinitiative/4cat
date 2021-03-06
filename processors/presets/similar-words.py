@@ -62,7 +62,9 @@ class SimilarWords(ProcessorPreset):
 			# then, generate word2vec models
 			{
 				"type": "generate-embeddings",
-				"parameters": {}
+				"parameters": {
+					"model-type": "Word2Vec"
+				}
 			},
 			# finally, run the similar words analysis
 			{
