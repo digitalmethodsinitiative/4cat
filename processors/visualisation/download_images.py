@@ -70,7 +70,8 @@ class ImageDownloader(BasicProcessor):
 		urls = []
 
 		# Get the source file data path
-		datasource = self.source_dataset.parameters["datasource"]
+		top_parent = self.dataset.get_genealogy()[0]
+		datasource = top_parent.parameters["datasource"]
 
 		try:
 			amount = max(0, min(1000, int(self.parameters.get("amount", 0))))

@@ -42,6 +42,8 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 	options = {}  # configurable options for this processor
 	parameters = {}  # values for the processor's configurable options
 
+	is_running_in_preset = False  # is this processor running 'within' a preset processor?
+
 	def work(self):
 		"""
 		Process a dataset
@@ -58,6 +60,7 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 			self.job.finish()
 			return
 
+		is_running_in_preset = False
 		if self.dataset.data.get("key_parent", None):
 			# search workers never have parents (for now), so we don't need to
 			# find out what the source_dataset dataset is if it's a search worker
@@ -68,6 +71,7 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 				# since that is where any underlying processors should get
 				# their data from
 				if self.source_dataset.type.find("preset-") == 0:
+					self.is_running_in_preset = True
 					self.source_dataset = self.source_dataset.get_genealogy()[0]
 
 			except TypeError:
@@ -78,14 +82,12 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 				self.job.finish()
 				return
 
-			if not self.source_dataset.is_finished() and self.source_dataset.type.find("preset-") != 0:
+			if not self.source_dataset.is_finished() and not self.is_running_in_preset:
 				# not finished yet - retry after a while
 				# exception for presets, since these *should* be unfinished
 				# until underlying processors are done
 				self.job.release(delay=30)
 				return
-
-			self.source_dataset = DataSet(key=self.dataset.data["key_parent"], db=self.db)
 
 			self.source_file = self.source_dataset.get_results_path()
 			if not self.source_file.exists():
@@ -181,9 +183,6 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 
 				if self.dataset.get_results_path().exists():
 					shutil.copyfile(str(self.dataset.get_results_path()), str(surrogate.get_results_path()))
-
-				top_parent = self.dataset.get_genealogy()[1]
-				top_parent.link_parent(surrogate.key)
 
 				try:
 					surrogate.finish(self.dataset.data["num_rows"])
