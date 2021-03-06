@@ -39,9 +39,10 @@ class ImageWallGenerator(BasicProcessor):
 		"amount": {
 			"type": UserInput.OPTION_TEXT,
 			"help": "No. of images (max 1000)",
-			"default": 112,
+			"default": 100,
 			"min": 0,
-			"max": 1000
+			"max": 1000,
+			"tooltip": "'0' uses as many images as available in the source image archive (up to 1000)"
 		},
 		"tile_size": {
 			"type": UserInput.OPTION_CHOICE,
@@ -86,7 +87,7 @@ class ImageWallGenerator(BasicProcessor):
 
 		# prepare
 		ImageFile.LOAD_TRUNCATED_IMAGES = True
-		sample_max = 75
+		sample_max = 75  # image size for colour sampling
 
 		def numpy_to_rgb(numpy_array):
 			"""
@@ -96,7 +97,7 @@ class ImageWallGenerator(BasicProcessor):
 			"""
 			return ",".join([str(int(value)) for value in numpy_array])
 
-		max_images = convert_to_int(self.parameters.get("amount"), 12)
+		max_images = convert_to_int(self.parameters.get("amount"), 100)
 		sizing_mode = self.parameters.get("tile_size", self.options["tile_size"]["default"])
 		sort_mode = self.parameters.get("sort_mode")
 
@@ -136,7 +137,7 @@ class ImageWallGenerator(BasicProcessor):
 				sample_height = int(sample_max * picture.height / max(picture.width, picture.height))
 				picture = ImageOps.fit(picture, (sample_width, sample_height))
 
-			if sort_mode not in ("random"):
+			if sort_mode not in ("", "random"):
 				# ensure we get RGB values for pixels
 				picture = picture.convert("RGB")
 
@@ -201,6 +202,9 @@ class ImageWallGenerator(BasicProcessor):
 					value[1] /= len(clusters.labels_)
 					value[2] /= len(clusters.labels_)
 
+			else:
+				value = (0, 0, 0)
+
 			# converted to HSV, because RGB does not sort nicely
 			image_colours[path.name] = colorsys.rgb_to_hsv(*value)
 			index += 1
@@ -224,27 +228,26 @@ class ImageWallGenerator(BasicProcessor):
 			# assuming every image has the overall average height, how wide would
 			# the canvas need to be (if everything is on a single row)?
 			full_width = 0
+			tile_y = average_size[1]
 			for dimension in dimensions.values():
 				# ideally, we make everything the average height
 				optimal_ratio = average_size[1] / dimension[1]
 				full_width += dimension[0] * optimal_ratio
 
 			# now we can calculate the total amount of pixels needed
-			fitted_pixels = full_width * average_size[1]
+			fitted_pixels = full_width * tile_y
 			if fitted_pixels > max_pixels:
 				# try again with a lower height
-				optimal_height = math.floor(average_size[1] * math.sqrt(max_pixels / fitted_pixels))
+				area_ratio = max_pixels / fitted_pixels
+				tile_y = int(tile_y * math.sqrt(area_ratio))
 				fitted_pixels = max_pixels
-			else:
-				optimal_height = average_size[1]
 
 			# find the canvas size that can fit this amount of pixels at the
 			# required proportions, provided that y = multiple of avg height
 			ideal_height = math.sqrt(fitted_pixels / (self.TARGET_WIDTH / self.TARGET_HEIGHT))
-			size_y = math.ceil(ideal_height / optimal_height) * optimal_height
+			size_y = math.ceil(ideal_height / tile_y) * tile_y
 			size_x = fitted_pixels / size_y
 
-			tile_y = optimal_height
 			tile_x = -1  # varies
 
 		elif sizing_mode == "square":
@@ -273,9 +276,9 @@ class ImageWallGenerator(BasicProcessor):
 
 			fitted_pixels = tile_x * tile_y * len(sorted_image_files)
 			if fitted_pixels > max_pixels:
-				surplus = fitted_pixels - max_pixels
-				tile_x -= int(math.sqrt(surplus))
-				tile_y -= int(math.sqrt(surplus))
+				area_ratio = max_pixels / fitted_pixels
+				tile_x = int(tile_x * math.sqrt(area_ratio))
+				tile_y = int(tile_y * math.sqrt(area_ratio))
 				fitted_pixels = tile_x * tile_y * len(sorted_image_files)
 
 			ideal_width = math.sqrt(fitted_pixels / (self.TARGET_HEIGHT / self.TARGET_WIDTH))
@@ -285,6 +288,7 @@ class ImageWallGenerator(BasicProcessor):
 		else:
 			raise NotImplementedError("Sizing mode '%s' not implemented" % sizing_mode)
 
+		self.dataset.log("Canvas size is %ix%i" % (size_x, size_y))
 		wall = Image.new("RGBA", (int(size_x), int(size_y)))
 		ImageDraw.floodfill(wall, (0, 0), (255, 255, 255, 0))  # transparent background
 		counter = 0
@@ -295,13 +299,13 @@ class ImageWallGenerator(BasicProcessor):
 		tile_y = int(tile_y)
 
 		# now actually putting the images on a wall is relatively trivial
-		self.dataset.update_status("Rendering %i images to wall" % len(sorted_image_files))
 		for path in sorted_image_files:
 			counter += 1
+			self.dataset.update_status("Rendering %s (%i/%i) to image wall" % (path, counter, len(sorted_image_files)))
 			picture = Image.open(str(staging_area.joinpath(path)))
 
 			if tile_x == -1:
-				picture_x = int(picture.width * (tile_y / picture.height))
+				picture_x = max(1, int(picture.width * (tile_y / picture.height)))
 				picture = ImageOps.fit(picture, (picture_x, tile_y), method=Image.BILINEAR)
 			else:
 				picture = ImageOps.fit(picture, (tile_x, tile_y), method=Image.BILINEAR)
