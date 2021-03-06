@@ -271,7 +271,7 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 			with path.open(encoding="utf-8") as input:
 				for line in input:
 					if self.interrupted:
-						raise ProcessorInterruptedException("Processor interrupted while iterating throug NDJSON file")
+						raise ProcessorInterruptedException("Processor interrupted while iterating through NDJSON file")
 
 					item = json.loads(line)
 					if item_mapper:
@@ -334,10 +334,9 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 		if staging_area and (not staging_area.exists() or not staging_area.is_dir()):
 			raise RuntimeError("Staging area %s is not a valid folder")
 		else:
-			if not hasattr(self, "staging_area"):
+			if not hasattr(self, "staging_area") and not staging_area:
 				self.staging_area = self.dataset.get_staging_area()
-
-			staging_area = self.staging_area
+				staging_area = self.staging_area
 
 		with zipfile.ZipFile(path, "r") as archive_file:
 			archive_contents = sorted(archive_file.namelist())
@@ -353,7 +352,8 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 				archive_file.extract(file_name, staging_area)
 
 				yield temp_file
-				temp_file.unlink()
+				if hasattr(self, "staging_area"):
+					temp_file.unlink()
 
 		if hasattr(self, "staging_area"):
 			shutil.rmtree(self.staging_area)
