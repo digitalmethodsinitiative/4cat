@@ -44,7 +44,7 @@ class ImageWallGenerator(BasicProcessor):
 			"max": 1000,
 			"tooltip": "'0' uses as many images as available in the source image archive (up to 1000)"
 		},
-		"tile_size": {
+		"tile-size": {
 			"type": UserInput.OPTION_CHOICE,
 			"options": {
 				"square": "Square",
@@ -55,7 +55,7 @@ class ImageWallGenerator(BasicProcessor):
 			"help": "Image tile size",
 			"tooltip": "'Fit height' retains image ratios but resizes them all to be the same height"
 		},
-		"sort_mode": {
+		"sort-mode": {
 			"type": UserInput.OPTION_CHOICE,
 			"help": "Sort images by",
 			"options": {
@@ -98,8 +98,12 @@ class ImageWallGenerator(BasicProcessor):
 			return ",".join([str(int(value)) for value in numpy_array])
 
 		max_images = convert_to_int(self.parameters.get("amount"), 100)
-		sizing_mode = self.parameters.get("tile_size", self.options["tile_size"]["default"])
-		sort_mode = self.parameters.get("sort_mode")
+		sizing_mode = self.parameters.get("tile-size", self.options["tile-size"]["default"])
+		sort_mode = self.parameters.get("sort-mode")
+
+		# 0 = use as many images as in the archive, up to the max
+		if max_images == 0:
+			max_images = self.options["amount"]["max"]
 
 		# we loop through the images twice - once to reduce them to a value
 		# that can be sorted, and another time to actually copy them to the
