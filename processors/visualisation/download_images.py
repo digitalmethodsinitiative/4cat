@@ -69,6 +69,12 @@ class ImageDownloader(BasicProcessor):
 
 		urls = []
 
+		# is there anything for us to download?
+		if self.source_dataset.num_rows == 0:
+			self.dataset.update_status("No images to download.", is_final=True)
+			self.dataset.finish(0)
+			return
+
 		# Get the source file data path
 		top_parent = self.dataset.get_genealogy()[0]
 		datasource = top_parent.parameters["datasource"]
@@ -83,7 +89,7 @@ class ImageDownloader(BasicProcessor):
 		# 4chan is the odd one out (images are traced to and scraped from archives), so treat differently.
 		if datasource == "4chan":
 			self.dataset.update_status("Reading source file")
-			external = "fireden" if self.source_dataset.parameters["board"] == "v" else "4plebs"
+			external = "fireden" if top_parent.parameters.get("board") == "v" else "4plebs"
 			rate_limit = 1 if external == "fireden" else 16
 
 

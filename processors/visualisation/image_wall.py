@@ -101,6 +101,12 @@ class ImageWallGenerator(BasicProcessor):
 		sizing_mode = self.parameters.get("tile-size", self.options["tile-size"]["default"])
 		sort_mode = self.parameters.get("sort-mode")
 
+		# is there anything to put on a wall?
+		if self.source_dataset.num_rows == 0:
+			self.dataset.update_status("No images available to render to image wall.", is_final=True)
+			self.dataset.finish(0)
+			return
+
 		# 0 = use as many images as in the archive, up to the max
 		if max_images == 0:
 			max_images = self.options["amount"]["max"]

@@ -591,7 +591,7 @@ class DataSet:
 		key_parent = self.key_parent
 		genealogy = []
 
-		while True:
+		while key_parent:
 			try:
 				parent = DataSet(key=key_parent, db=self.db)
 			except TypeError:
