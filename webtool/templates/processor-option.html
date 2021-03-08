@@ -18,7 +18,7 @@
         <div class="multichoice-wrapper">
             <select name="option-{{ option }}" multiple="multiple">
             {% for choice in processor.options[option].options %}
-                <option value="{{ choice }}"{% if choice == processor.options[option].default %} selected="selected"{% endif %}>{{ processor.options[option].options[choice] }}</option>
+                <option value="{{ choice }}"{% if choice in processor.options[option].default %} selected="selected"{% endif %}>{{ processor.options[option].options[choice] }}</option>
             {% endfor %}
             </select>
         </div>
