@@ -90,11 +90,6 @@ class SearchWithTwitterAPIv2(Search):
                     self.dataset.update_status("Got %s, waiting %i seconds before retrying" % (e.__name__, wait_time))
                     time.sleep(wait_time)
 
-            # if at this point we still have no good response, give up
-            if not api_response:
-                self.dataset.update_status("Could not connect to Twitter. Cancelling.", is_final=True)
-                return
-
             # rate limited - the limit at time of writing is 300 reqs per 15
             # minutes
             # usually you don't hit this when requesting batches of 500 at
@@ -126,6 +121,10 @@ class SearchWithTwitterAPIv2(Search):
             elif api_response.status_code != 200:
                 self.dataset.update_status("Unexpected HTTP status %i. Halting tweet collection." % api_response.status_code, is_final=True)
                 self.log.warning("Twitter API v2 responded with status code %i. Response body: %s" % (api_response.status_code, api_response.text))
+                return
+
+            elif not api_response:
+                self.dataset.update_status("Could not connect to Twitter. Cancelling.", is_final=True)
                 return
 
             api_response = api_response.json()
