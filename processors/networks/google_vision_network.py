@@ -35,6 +35,19 @@ class VisionTagNetworker(BasicProcessor):
             "tooltip": "Value between 0 and 1; confidence required before the annotation is included. Note that the" \
                        "confidence is not known for all annotation types (these will be included with confidence '-1'" \
                        "in the output file)"
+        },
+        "include": {
+            "type": UserInput.OPTION_MULTI,
+            "options": {
+                "labelAnnotations": "Label Detection",
+                "landmarkAnnotations": "Landmark Detection",
+                "logoAnnotations": "Logo Detection",
+                "webDetection": "Web Detection",
+                "localizedObjectAnnotations": "Object Localization"
+            },
+            "default": ["labelAnnotations", "landmarkAnnotations", "logoAnnotations", "webDetection", "localizedObjectAnnotations"],
+            "help": "Features to map",
+            "tooltip": "Note that only those features that were in the original API response can be mapped"
         }
     }
 
@@ -42,6 +55,8 @@ class VisionTagNetworker(BasicProcessor):
         """
         Generates a GDF co-annotation graph.
         """
+        include = [*self.parameters.get("include", []), "file_name"]
+        print(include)
         pair_separator = ":::::"
         nodes = {}
         edges = {}
@@ -54,6 +69,10 @@ class VisionTagNetworker(BasicProcessor):
         for annotations in self.iterate_items(self.source_file):
             file_annotations = []
 
+            annotations = {atype: annotations[atype] for atype in include if atype in annotations}
+            if not annotations:
+                continue
+
             for annotation_type, tags in annotations.items():
                 if self.interrupted:
                     raise ProcessorInterruptedException("Interrupted while processing Google Vision API output")
@@ -61,19 +80,23 @@ class VisionTagNetworker(BasicProcessor):
                 if annotation_type == "file_name":
                     continue
 
-                if annotation_type not in ("landmarkAnnotations", "logoAnnotations", "labelAnnotations",
-                                           "localizedObjectAnnotations"):
-                    # annotations that don't make sense to include in a network
-                    continue
-
-                short_type = annotation_type.split("Annotation")[0]
-                label_field = "name" if annotation_type == "localizedObjectAnnotations" else "description"
-                for tag in tags:
-                    if min_confidence and "score" in tag and tag["score"] < min_confidence:
-                        # skip if we're not so sure of the accuracy
-                        continue
-                    file_annotations.append(
-                        {"type": short_type, "label": tag["description"], "confidence": float(tag.get("score", -1))})
+                if annotation_type == "webDetection":
+                    # handle web entities separately, since they're structured a bit
+                    # differently
+                    for entity in [e["description"] for e in tags.get("webEntities", []) if "description" in e]:
+                        file_annotations.append({"type"
+                                                 : "webEntity", "label": entity, "confidence": -1})
+                else:
+                    # handle the other features here, since they all have a similar
+                    # structure
+                    short_type = annotation_type.split("Annotation")[0]
+                    label_field = "name" if annotation_type == "localizedObjectAnnotations" else "description"
+                    for tag in tags:
+                        if min_confidence and "score" in tag and tag["score"] < min_confidence:
+                            # skip if we're not so sure of the accuracy
+                            continue
+                        file_annotations.append(
+                            {"type": short_type, "label": tag[label_field], "confidence": float(tag.get("score", -1))})
 
             # save with a label of the format 'landmark:Eiffel Tower'
             for annotation in file_annotations:
