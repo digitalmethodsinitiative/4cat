@@ -69,8 +69,10 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 
 				# for presets, transparently use the *top* dataset as a source_dataset
 				# since that is where any underlying processors should get
-				# their data from
-				if self.source_dataset.type.find("preset-") == 0:
+				# their data from. However, this should only be done as long as the
+				# preset is not finished yet, because after that there may be processors
+				# that run on the final preset result
+				if self.source_dataset.type.find("preset-") == 0 and not self.source_dataset.is_finished():
 					self.is_running_in_preset = True
 					self.source_dataset = self.source_dataset.get_genealogy()[0]
 
