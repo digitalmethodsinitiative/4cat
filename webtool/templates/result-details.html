@@ -20,7 +20,10 @@
         <dl class="metadata-wrapper">
         {% if timestamp_expires %}
             <div class="fullwidth notice">
-                <strong>Note:</strong> this dataset will no longer be available after {{ timestamp_expires|datetime("%d %b %Y, %H:%M") }} per the data source's configuration.
+                <strong>Note:</strong> this dataset will no longer be available after {{ timestamp_expires|datetime("%d %b %Y, %H:%M") }}
+                {% if dataset.parameters.datasource and not datasources[dataset.parameters.datasources]["expire-datasets"] %}
+                    <a href="/results/{{ dataset.key }}/keep/" class="button-like">Do not delete this dataset automatically</a>
+                {% endif %}
             </div>
         {% endif %}
         {% if "copied_from" in dataset.parameters %}
