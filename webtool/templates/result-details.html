@@ -40,6 +40,13 @@
                 <dd>{{ dataset.timestamp|datetime(fmt="%d %b %Y, %H:%M") }}</dd>
             </div>
 
+        {% if current_user.is_authenticated and current_user.is_admin() and dataset.parameters.user %}
+            <div class="fullwidth">
+                <dt>Queued by</dt>
+                <dd>{{ dataset.parameters.user }}</dd>
+            </div>
+        {% endif %}
+
             <div class="fullwidth">
                 <dt>Parameters</dt>
                 <dd>{% include 'result-metadata.html' %}</dd>
