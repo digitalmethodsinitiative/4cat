@@ -153,19 +153,22 @@ class SigmaNetwork(BasicProcessor):
 
 						# Do some string cleaning
 						node_item = self.sanitise(node_item)
+						label = node_item
+						if len(label) > 30:
+							label = label[:27] + "..."
 
 						# Mandatory nodes
 						# Use the "name" info to write mandatory data
 						if node_types[i].startswith("name "):
 							node["id"] = node_item
-							node["label"] = node_item
+							node["label"] = label
 							node["x"] = random.randrange(1, 20)
 							node["y"] = random.randrange(1, 20)
 							if highlight_nodes and node_item in highlight_nodes:
 								node["color"] = "#19B0A3"
 
 						elif node_types[i].startswith("label "):
-							node["label"] = node_item
+							node["label"] = label
 
 						elif node_types[i].startswith("weight "):
 							node["size"] = float(node_item)
@@ -304,10 +307,14 @@ class SigmaNetwork(BasicProcessor):
 
 				if node_item not in nodes_added:
 
+					label = node_item
+					if len(label) > 30:
+						label = label[:27] + "..."
+					
 					# Node attributes
 					node = {}
 					node["id"] = node_item # We're using the node_item as an ID here
-					node["label"] = node_item
+					node["label"] = label
 					node["x"] = random.randrange(1, 20)
 					node["y"] = random.randrange(1, 20)
 
@@ -333,7 +340,7 @@ class SigmaNetwork(BasicProcessor):
 				edge["source"] =  edge_label.split("-")[0]
 				edge["target"] = edge_label.split("-")[1]
 				edge["size"] = weight
-				edge["label"] = edge_label # Unused by sigma but useful here
+				edge["label"] = edge_label # Unused by sigma but adding just in case
 				
 				# Add that edge
 				date_network["edges"].append(edge)
@@ -627,8 +634,8 @@ class SigmaNetwork(BasicProcessor):
 			self.dataset.update_status("Invalid JSON - encountered %s" % str(invalid_str))
 			raise Exception(e)
 
-		# Split if the string is very long.
-		# Else it will throw JavaScript errors
+		# Split if the string is very long,
+		# else it will throw JavaScript errors.
 		max_len = 100000
 
 		# This occurs sometimes with URLs
@@ -638,13 +645,24 @@ class SigmaNetwork(BasicProcessor):
 			self.dataset.update_status("Splitting JSON string into chunks")
 			split_json_str = ""
 			prev_i = 0
+
 			for i in range(len(json_str)):
 
 				if i > 0 and i % max_len == 0:
-					json_slice = json_str[prev_i:i]
+
+					# Make sure we're splitting on a whitespace.
+					# Splitting on a unicode character will give errors.
+					split_i = i
+					while True:
+						if json_str[split_i] == " ":
+							break
+						else:
+							split_i -= 1
+
+					json_slice = json_str[prev_i:split_i]
 
 					split_json_str += json_slice + "'+\n'"
-					prev_i = i
+					prev_i = split_i
 
 			# Also add at the very end
 			json_slice = json_str[prev_i:len(json_str)]

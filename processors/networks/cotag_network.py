@@ -89,21 +89,20 @@ class CoTagger(BasicProcessor):
 				for tag in post.get(tag_field, "").split(","):
 					tags.append(tag.strip())
 
-			# just in case
-			tags = [tag.strip().replace(",","").replace("\"","'") for tag in tags]
-
-			# To lowercase if so desired
-			if self.parameters.get("to_lowercase"):
-				tags = [tag.lower() for tag in tags]
+			# Clean up the tags
+			to_lowercase = self.parameters.get("to_lowercase")
+			tags = [self.sanitise(tag, to_lowercase=to_lowercase) for tag in tags]
 
 			for tag in tags:
+
 				# ignore empty tags
 				if not tag:
 					continue
 
-				if tag not in all_tags:
-					all_tags[tag] = 0
-				all_tags[tag] += 1
+				if tag not in list(all_tags.keys()):
+					all_tags[tag] = 1
+				else:
+					all_tags[tag] += 1
 
 				for co_tag in tags:
 					
@@ -114,16 +113,16 @@ class CoTagger(BasicProcessor):
 					pair_key = "-_-".join(pair)
 
 					if pair_key not in pairs:
-						pairs[pair_key] = 0
-
-					pairs[pair_key] += 1
+						pairs[pair_key] = 1
+					else:
+						pairs[pair_key] += 1
 
 		# write GDF file
 		self.dataset.update_status("Writing to Gephi-compatible file")
 		with self.dataset.get_results_path().open("w", encoding="utf-8") as results:
 			results.write("nodedef>name VARCHAR,weight INTEGER\n")
-			for tag in all_tags:
-				results.write("'" + tag + "',%i\n" % all_tags[tag])
+			for tag_name, tag_value in all_tags.items():
+				results.write("'" + tag_name + "',%i\n" % tag_value)
 
 			results.write("edgedef>node1 VARCHAR, node2 VARCHAR, weight INTEGER\n")
 			for pair in pairs:
@@ -131,3 +130,26 @@ class CoTagger(BasicProcessor):
 					"'" + pair.split("-_-")[0] + "','" + pair.split("-_-")[1] + "',%i\n" % pairs[pair])
 
 		self.dataset.finish(len(pairs))
+
+	def sanitise(self, tag, to_lowercase):
+		"""
+		Do some conversion of a tag.
+		Mostly to evade encoding issues.
+
+		:param tag, str:			The tag string to sanitise.
+		:param to_lowercase, bool:	Whether to convert the tag to lowercase.
+
+		"""
+
+		tag = tag.strip()
+		tag = tag.replace(",","")
+		
+		# ' quote chars gan give encoding issues in the case of sigma JS.
+		# So convert to the safer ’
+		tag = tag.replace("\"","”")
+		tag = tag.replace("\'","’")
+		
+		if to_lowercase:
+			tag = tag.lower()
+
+		return tag
