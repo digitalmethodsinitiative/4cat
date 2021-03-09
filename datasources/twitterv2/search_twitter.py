@@ -102,6 +102,17 @@ class SearchWithTwitterAPIv2(Search):
                     time.sleep(0.5)
                 continue
 
+            # sometimes twitter says '503 service unavailable' for unclear
+            # reasons - in that case just wait a while and try again
+            elif api_response.status_code in (502, 503, 504):
+                resume_at = time.time() + 60
+                resume_at_str = datetime.datetime.fromtimestamp(int(resume_at)).strftime("%c")
+                self.dataset.update_status("Twitter unavailable (status %i) - waiting until %s to continue." % (api_response.status_code, resume_at_str))
+                while time.time() <= resume_at:
+                    time.sleep(0.5)
+                continue
+
+
             # this usually means the query is too long or otherwise contains
             # a syntax error
             elif api_response.status_code == 400:
