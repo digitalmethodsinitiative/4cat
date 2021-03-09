@@ -148,6 +148,9 @@ class SearchWithTwitterAPIv2(Search):
                 tweet["author_verified"] = users.get(tweet["author_id"])["verified"]
 
                 tweets += 1
+                if tweets % 500 == 0:
+                    self.dataset.update_status("Received %i tweets from Twitter API" % tweets)
+                    
                 yield tweet
 
             # paginate
