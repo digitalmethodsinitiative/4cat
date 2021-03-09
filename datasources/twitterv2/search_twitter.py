@@ -105,7 +105,7 @@ class SearchWithTwitterAPIv2(Search):
             # this usually means the query is too long or otherwise contains
             # a syntax error
             elif api_response.status_code == 400:
-                msg = "Response %i from the Twitter API; "
+                msg = "Response %i from the Twitter API; " % api_response.status_code
                 try:
                     api_response = api_response.json()
                     msg += api_response.get("title", "")
@@ -150,7 +150,7 @@ class SearchWithTwitterAPIv2(Search):
                 tweets += 1
                 if tweets % 500 == 0:
                     self.dataset.update_status("Received %i tweets from Twitter API" % tweets)
-                    
+
                 yield tweet
 
             # paginate
