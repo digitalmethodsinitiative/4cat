@@ -105,7 +105,7 @@ class SearchWithTwitterAPIv2(Search):
             # this usually means the query is too long or otherwise contains
             # a syntax error
             elif api_response.status_code == 400:
-                msg = "Response 400 from the Twitter API; "
+                msg = "Response %i from the Twitter API; "
                 try:
                     api_response = api_response.json()
                     msg += api_response.get("title", "")
@@ -115,6 +115,11 @@ class SearchWithTwitterAPIv2(Search):
                     msg += "Some of your parameters (e.g. date range) may be invalid."
 
                 self.dataset.update_status(msg, is_final=True)
+                return
+
+            # invalid API key
+            elif api_response.status_code == 401:
+                self.dataset.update_status("Invalid API key - could not connect to Twitter API", is_final=True)
                 return
 
             # haven't seen one yet, but they probably exist
