@@ -34,13 +34,18 @@ which such platforms - often described as amorphous, volatile, or ephemeral -
 may be analysed from various epistemological perspectives.
 
 ## Install
-  We use 4CAT for our own purposes at the Universtiy of Amsterdam but
-you can (and are encouraged to!) [You can find detailled install instructions in our wiki:](https://github.com/stijn-uva/4cat/wiki/Installing-4CAT).
+We use 4CAT for our own purposes at the Universtiy of Amsterdam but
+you can (and are encouraged to!) run your own instance.
+[You can find detailled install instructions in our wiki:](https://github.com/stijn-uva/4cat/wiki/Installing-4CAT).
 
-Install using [docker-compose](https://docs.docker.com/compose/install/) simply by running:
+Support for Docker is work-in-progress. You can install using 
+[docker-compose](https://docs.docker.com/compose/install/) by running:
 ```
 docker-compose up
 ```
+
+But this may currently not work in all environments. We hope to rectify this in 
+the future (pull requests are very welcome).
 
 ## Components
 4CAT consists of several components, each in a separate folder:
