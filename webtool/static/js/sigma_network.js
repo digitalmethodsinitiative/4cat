@@ -9,7 +9,9 @@ var sigmaconfig = {
 	maxEdgeSize: 1,
 	minNodeSize: 2,
 	maxNodeSize: 20,
-	labelThreshold: 1,
+	labelSize: "proportional",
+	labelSizeRatio: 1,
+	labelThreshold: 3,
 	verbose: true
 };
 
@@ -28,13 +30,18 @@ var fa2config = {
 var animation_running = false;
 var graph_manipulation_disabled = false;
 
+var current_json;
+
 function init_network(core_json) {
 
 	create_slider(Object.keys(core_json).length);
-	render_new_network(core_json[Object.keys(core_json)[0]]);
+
+	key = Object.keys(core_json)[0]
+
+	render_new_network(core_json[key]);
 
 	// Notify what model is visualised here
-	$("#network-name-box").text(Object.keys(core_json)[0]);
+	$("#network-name-box").text(key);
 }
 
 function render_new_network(json) {
@@ -47,28 +54,19 @@ function render_new_network(json) {
 		settings: sigmaconfig
 	});
 
-	// Start the ForceAtlas2 algorithm on a new graph start
-	/*$("#start-force").addClass("running");
-	$("#start-force > .button-text").text("Stop ForceAtlas2");
-	$("#start-force > i").removeClass("invisible");
-	s.startForceAtlas2(fa2config);*/
-
 	// To render everything
 	s.refresh();
 
 }
 
-function change_network(new_json) {
+function change_network(update_json) {
 	/*
 	Changes the network layout without rendering an entirely new graph.
 	Also makes for nice transitions so graphs can be "animated".
 	*/
 
 	// Get data that's already in the graph
-	var existing_nodes = s.graph.nodes();
-	var existing_edges = s.graph.edges();
-	var existing_nodes_ids = existing_nodes.map(value => value.id);
-	var existing_edges_ids = existing_edges.map(value => value.id);
+	var existing_nodes_ids = s.graph.nodes().map(value => value.id);
 
 	// Keep track of the edges and nodes added to know what to remove afterwards
 	var nodes_added = [];
@@ -84,14 +82,13 @@ function change_network(new_json) {
 	s.killForceAtlas2();
 
 	// Loop through new nodes
-	for (var i = 0; i < new_json["nodes"].length; i++) {
+	for (var i = 0; i < update_json["nodes"].length; i++) {
 
-		node = new_json["nodes"][i];
+		node = update_json["nodes"][i];
 		nodes_added.push(node["id"]);
 
 		// If the node is not in the graph yet, add it!
 		if (! existing_nodes_ids.includes(node["id"])) {
-			
 			s.graph.addNode({
 				id: node["id"],
 				size: node["size"],
@@ -107,10 +104,20 @@ function change_network(new_json) {
 		}
 	}
 
-	// Loop through new edges
-	for (var i = 0; i < new_json["edges"].length; i++) {
+	// Clean nodes and edges that are not in the new network
+	for (node_id of existing_nodes_ids) {
+		if (! nodes_added.includes(node_id)) {
+			delete_node_ids.push(node_id)
+			s.graph.dropNode(node_id); // also removes edges!
+		}
+	}
 
-		edge = new_json["edges"][i];
+	// Loop through new edges
+	var existing_edges_ids = s.graph.edges().map(value => value.id);
+
+	for (var i = 0; i < update_json["edges"].length; i++) {
+
+		edge = update_json["edges"][i];
 		edges_added.push(edge["id"]);
 
 		// If the edge is not in the graph yet, add it!
@@ -129,19 +136,77 @@ function change_network(new_json) {
 			s.graph.edges(edge["id"]).size = parseFloat(edge["size"]);
 		}
 	}
-
-	// Clean nodes and edges that are not in the new network
-	for (node_id of existing_nodes_ids) {
-		if (! nodes_added.includes(node_id)) {
-			s.graph.dropNode(node_id); // also removes edges!
-		}
-	}
-
+	
 	s.refresh();
 
 	if (restart_fa2) {
 		start_force_atlas();
 	}
+}
+
+function min_degree_filter(min_degree) {
+	/*
+	Filters the json of the network for a minimum degree range
+	(where degree refers to the amount of edges a node has)
+	*/
+
+	// FA2 will have to be killed if we're changing the graph's nodes and edges
+	if (s.isForceAtlas2Running) {
+		var restart_fa2 = true;
+		stop_force_atlas();
+	}
+	s.killForceAtlas2();
+
+
+	var min_degree = parseInt(min_degree);
+
+	var index = $("#time-slider").val() - 1;
+	var key = Object.keys(core_json)[index];
+	var root_json = JSON.parse(JSON.stringify(core_json[key])); // Important: deep copy!
+	
+	// First we need to re-add the nodes and edges to know their original degree values.
+	// e.g. necessary if we want to go from a min degree range of 20 to 3.
+	var nodes_there = s.graph.nodes().map(value => value.id);
+	var edges_there = s.graph.edges().map(value => value.id);
+	for (n of root_json["nodes"]) {
+		if (!nodes_there.includes(n.id)) {
+			s.graph.addNode({
+				id: n["id"],
+				size: n["size"],
+				label: n["label"],
+				x: (Math.random() * 20),
+				y: (Math.random() * 20)
+			});
+		}
+	}
+	for (e of root_json["edges"]) {
+		if (!edges_there.includes(e.id)) {
+			s.graph.addEdge({
+				id: e["id"],
+				label: e["label"],
+				size: e["size"],
+				source: e["source"],
+				target: e["target"]
+			});
+		}
+	}
+
+	var nodes_to_drop = Array();
+
+	s.graph.nodes().forEach(function(node){
+
+		// Node is a reference to your node in the graph
+		degree = s.graph.degree(node.id);
+		
+		if (degree < min_degree) {
+			nodes_to_drop.push(node.id)
+		}
+	});
+
+	for (node_id of nodes_to_drop) {
+		s.graph.dropNode(node_id);
+	}
+	s.refresh();
 }
 
 function create_slider(length) {
@@ -306,8 +371,36 @@ function change_graph_settings(e) {
 		fa2config["slowDown"] = e_value;
 		
 		/* Visual settings */
+
+		/* labels */
 		case "show-labels":
 		s.settings("drawLabels", e.checked);
+		break;
+
+		case "label-size":
+		s.settings("labelSizeRatio", e.value);
+		break;
+
+		case "label-size-type":
+		if (e.checked) {
+			s.settings("labelSize", "proportional");
+		}
+		else {
+			s.settings("labelSize", "fixed");
+		}
+		break;
+
+		case "label-threshold":
+		s.settings("labelThreshold", e.value);
+		break;
+
+		case "label-colour":
+		s.settings("defaultLabelColor", e.value);
+		break;
+
+		/* nodes and edges */
+		case "min-degree":
+		min_degree_filter(e.value)
 		break;
 
 		case "min-node-size":
@@ -334,15 +427,9 @@ function change_graph_settings(e) {
 		s.settings("defaultEdgeColor", e.value);
 		break;
 
-		case "label-colour":
-		s.settings("defaultLabelColor", e.value);
-		break;
-
 		default:
 	}
-
-	console.log(fa2config)
-
+	
 	// Re-initialise
 	s.configForceAtlas2(fa2config);
 	s.refresh();

@@ -182,7 +182,18 @@ button:hover, .button-like:not(.inactive):hover {
 
 .graph-manipulation-box-header {
     color: var(--contrast-dark);
+}
+
+h2.graph-manipulation-box-header {
     font-weight: bold;
+    font-size: 23px;
+    margin-bottom: 10px;
+}
+
+h3.graph-manipulation-box-header {
+    font-size: 16px;
+    font-style: italic;
+    color: var(--accent);
 }
 
 .graph-manipulation-subbox {

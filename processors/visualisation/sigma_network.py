@@ -449,6 +449,7 @@ class SigmaNetwork(BasicProcessor):
 			<script src="**server**/static/js/sigma.js-1.2.1/plugins/sigma.layout.forceAtlas2/worker.js"></script>
 			<script src="**server**/static/js/sigma.js-1.2.1/plugins/sigma.layout.forceAtlas2/supervisor.js"></script>
 			<script src="**server**/static/js/sigma.js-1.2.1/plugins/sigma.exporters.svg/sigma.exporters.svg.js"></script>
+			<script src="**server**/static/js/sigma.js-1.2.1/plugins/sigma.plugins.filter/sigma.plugins.filter.js"></script>
 
 			<!-- END SIGMA IMPORTS -->
 
@@ -487,7 +488,7 @@ class SigmaNetwork(BasicProcessor):
 					<!-- Settings ForceAtlas2 / gravity -->
 					<div class="graph-manipulation-box" id="network-settings">
 						<h2 class="graph-manipulation-box-header">Network settings</h2>
-						<p>See the <a href="https://github.com/jacomyal/sigma.js/tree/master/plugins/sigma.layout.forceAtlas2" target="__blank">documentation</a> for parameter information.</p>
+						<p>See the <a href="https://github.com/jacomyal/sigma.js/tree/master/plugins/sigma.layout.forceAtlas2" target="__blank">sigma js documentation</a> for parameter explanations.</p>
 
 						<!-- Start / stop ForceAtlas2 -->
 						<div class="graph-manipulation-subbox" id="start-force-container">
@@ -539,6 +540,11 @@ class SigmaNetwork(BasicProcessor):
 								<input class="parameter-input" id="slow-down" name="slow-down" type="number" value="10">
 							</p>
 						</div>
+						<div class="graph-manipulation-subbox">
+							<p><label for="min-degree">Minimum degree: </label>
+								<input class="parameter-input" id="min-degree" name="min-degree" type="number" value="1">
+							</p>
+						</div>
 
 					</div>
 					<hr>
@@ -546,17 +552,31 @@ class SigmaNetwork(BasicProcessor):
 					<!-- Visual settings -->
 					<div class="graph-manipulation-box" id="visual-settings"></div>
 						<h2 class="graph-manipulation-box-header">Visual</h2>
+						<h3 class="graph-manipulation-box-header">Labels</h3>
 						<div class="graph-manipulation-subbox">
 							<p><label for="show-labels">Show labels: </label>
 								<input class="parameter-input" id="show-labels" name="show-labels" type="checkbox" checked>
 							</p>
+							<p><label for="label-size">Label size: </label>
+								<input class="parameter-input" id="label-size" name="label-size" type="number" min="1" value="18">
+							</p>
+							<p><label for="label-size-type">Size labels by node size: </label>
+								<input class="parameter-input" id="label-size-type" name="label-size-type" type="checkbox" checked>
+							</p>
+							<p><label for="label-threshold">Label threshold: </label>
+								<input class="parameter-input" id="label-threshold" name="label-threshold" type="number" min="1" value="3">
+							</p>
+							<p><label for="label-colour">Label colour: </label>
+								<input class="parameter-input" id="label-colour" name="label-colour" type="color" value="#00000">
+							</p>
 						</div>
+						<h3 class="graph-manipulation-box-header">Nodes and edges</h3>
 						<div class="graph-manipulation-subbox">
 							<p><label for="min-node-size">Min node size: </label>
 								<input class="parameter-input" id="min-node-size" name="min-node-size" type="number" min="0.1" value="2">
 							</p>
 							<p><label for="max-node-size">Max node size: </label>
-								<input class="parameter-input" id="max-node-size" name="max-node-size" type="number" min="0.1" value="20">
+								<input class="parameter-input" id="max-node-size" name="max-node-size" type="number" min="0.1" value="5">
 							</p>
 						</div>
 						<div class="graph-manipulation-subbox">
@@ -573,9 +593,6 @@ class SigmaNetwork(BasicProcessor):
 							</p>
 							<p><label for="edge-colour">Edge colour: </label>
 								<input class="parameter-input" id="edge-colour" name="edge-colour" type="color" value="#FFA5AC">
-							</p>
-							<p><label for="label-colour">Label colour: </label>
-								<input class="parameter-input" id="label-colour" name="label-colour" type="color" value="#00000">
 							</p>
 						</div>
 					</div>
