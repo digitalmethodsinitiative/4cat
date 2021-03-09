@@ -43,12 +43,27 @@ class ConvertVisionOutputToCSV(BasicProcessor):
         done = 0
         self.dataset.update_status("Converting posts")
 
+        if not self.source_file.exists():
+            self.dataset.update_status("No data was returned by the Google Vision API, so none can be converted.", is_final=True)
+            self.dataset.finish(0)
+            return
+
         # recreate CSV file with the new dialect
         for annotations in self.iterate_items(self.source_file):
             if self.interrupted:
                 raise ProcessorInterruptedException("Interrupted while converting Vision API output")
 
             file_result = {}
+
+            # special case format
+            if "webDetection" in annotations and annotations["webDetection"]:
+                file_result["labelGuess"] = [l["label"] for l in annotations["webDetection"].get("bestGuessLabels", [])]
+                file_result["webEntities"] = [e["description"] for e in annotations["webDetection"].get("webEntities", []) if "description" in e]
+                file_result["urlsPagesWithMatchingImages"] = [u["url"] for u in annotations["webDetection"].get("pagesWithMatchingImages", [])]
+                file_result["urlsMatchingImages"] = [u["url"] for u in annotations["webDetection"].get("fullMatchingImages", [])]
+                file_result["urlsPartialMatchingImages"] = [u["url"] for u in annotations["webDetection"].get("partialMatchingImages", [])]
+
+            # shared format
             for annotation_type, tags in annotations.items():
                 if annotation_type not in ("landmarkAnnotations", "logoAnnotations", "labelAnnotations",
                                            "fullTextAnnotation", "localizedObjectAnnotations"):
@@ -80,7 +95,7 @@ class ConvertVisionOutputToCSV(BasicProcessor):
 
             done += 1
             if done % 25 == 0:
-                self.dataset.update_status("Processed %i/%i image files" % (done, self.parent.num_rows))
+                self.dataset.update_status("Processed %i/%i image files" % (done, self.source_dataset.num_rows))
 
         for index, value in enumerate(result):
             result[index] = {**{annotation_type: "" for annotation_type in annotation_types}, **value}

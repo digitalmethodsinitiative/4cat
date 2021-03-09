@@ -104,7 +104,7 @@ class AttributeRanker(BasicProcessor):
 			return
 
 		# This is needed to check for URLs in the "domain" and "url" columns for Reddit submissions
-		datasource = self.parent.parameters.get("datasource")
+		datasource = self.source_dataset.parameters.get("datasource")
 
 		# we need to be able to order the values later, chronologically, so use
 		# and OrderedDict; all frequencies go into this variable

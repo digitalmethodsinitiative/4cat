@@ -52,7 +52,7 @@ class RedditVoteChecker(BasicProcessor):
 
 		# reddit has rate limits and it's easy to pass them, so limit this
 		# processor to smaller datasets
-		if self.dataset.get_genealogy()[0].num_rows > 5000:
+		if self.source_dataset.num_rows > 5000:
 			self.dataset.update_status("Reddit score updating is only available for datasets smaller than 5.000 items.")
 			self.dataset.finish(-1)
 			return
@@ -98,7 +98,9 @@ class RedditVoteChecker(BasicProcessor):
 
 		# now write a new CSV with the updated scores
 		# get field names
-		fieldnames = self.get_item_keys(self.source_file)
+		fieldnames = [self.get_item_keys(self.source_file)]
+		if "score" not in fieldnames:
+			fieldnames.append("score")
 
 		self.dataset.update_status("Writing results to file")
 		with self.dataset.get_results_path().open("w") as output:
@@ -117,8 +119,7 @@ class RedditVoteChecker(BasicProcessor):
 				processed += 1
 
 		# now comes the big trick - replace original dataset with updated one
-		parent = self.dataset.genealogy[0]
-		shutil.move(self.dataset.get_results_path(), parent.get_results_path())
+		shutil.move(self.dataset.get_results_path(), self.source_dataset.get_results_path())
 
 		self.dataset.update_status("Parent dataset updated.")
 		self.dataset.finish(processed)

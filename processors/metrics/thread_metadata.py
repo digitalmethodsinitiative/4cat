@@ -93,7 +93,7 @@ class ThreadMetadata(BasicProcessor):
 					"num_images": threads[thread_id]["images"],
 					"image_md5": threads[thread_id]["image_md5"],
 					"country_code": threads[thread_id]["country_code"],
-				} if self.parent.type in ("4chan", "8chan", "8kun") else {}
+				} if self.source_dataset.type in ("4chan", "8chan", "8kun") else {}
 			)
 		} for thread_id in threads]
 

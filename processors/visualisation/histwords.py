@@ -293,7 +293,7 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
         fontsize_small = width / 100
 
         # now we have the dimensions, the canvas can be instantiated
-        model_type = self.parent.parameters.get("model-type", "word2vec")
+        model_type = self.source_dataset.parameters.get("model-type", "word2vec")
         canvas = get_4cat_canvas(self.dataset.get_results_path(), width, height,
                                  header="%s nearest neighbours (fitting: %s) - '%s'" % (model_type, reduction_method, ",".join(input_words)),
                                  fontsize_normal=fontsize_normal,

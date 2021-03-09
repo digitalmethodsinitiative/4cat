@@ -100,7 +100,8 @@ function init() {
         let input = $('<input type="hidden" name="' + name + '">');
         wrapper.append(input);
         select.find('option').each(function() {
-            checkbox_choice = $('<label><input type="checkbox" name="' + name + ':' + $(this).attr('value') + '"> ' + $(this).text() + '</label>');
+            let selected = $(this).is(':selected');
+            let checkbox_choice = $('<label><input type="checkbox" name="' + name + ':' + $(this).attr('value') + '"' + (selected?' checked="checked"':'') + '> ' + $(this).text() + '</label>');
             checkbox_choice.find('input').on('change', function() {
                let checked = wrapper.find('input:checked').map(function() {
                   return $(this).attr('name').split(':')[1];
@@ -170,15 +171,17 @@ processor = {
 
                     if (response.html.length > 0) {
                         let new_element = $(response.html);
-                        let container_id = response.container + ' > .child-list';
+                        let container_id = response.container + ' .child-list';
 
-                        let parent_list = $(container_id);
+                        let parent_list = $($(container_id)[0]);
+                        console.log(container_id);
+                        console.log(parent_list);
 
                         // this is hardcoded, see next comment
 
                         let targetHeight = 68;
                         // the position of the newly inserted element is always 0 for some reason
-                        // so we use the fact that it's inserted at the bottom of the parent to
+                        // so we use the fact that it's inserted at the bottom of the source_dataset to
                         // infer it
                         let position = parent_list.offset().top + parent_list.height() - (targetHeight * 2);
 

@@ -1,5 +1,5 @@
 """
-Convert a CSV file to MacOS Excel-compatible CSV
+Convert a CSV file to Excel-compatible CSV
 """
 import csv
 
@@ -15,12 +15,12 @@ csv.field_size_limit(1024 * 1024 * 1024)
 
 class ConvertCSVToMacExcel(BasicProcessor):
 	"""
-	Convert a CSV file to MacOS Excel-compatible CSV
+	Convert a CSV file to Excel-compatible CSV
 	"""
-	type = "convert-csv-excel-mac"  # job type ID
+	type = "convert-csv-excel"  # job type ID
 	category = "Conversion"  # category
-	title = "Convert to MacOS Excel-compatible CSV"  # title displayed in UI
-	description = "Convert a CSV file to a format that is compatible with Microsoft Excel for MacOS."  # description displayed in UI
+	title = "Convert to Excel-compatible CSV"  # title displayed in UI
+	description = "Convert a CSV file to a format that is compatible with Microsoft Excel."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
 	# all post-processors with CSV output

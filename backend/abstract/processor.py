@@ -33,7 +33,7 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 	db = None  # database handler
 	dataset = None  # Dataset object representing the dataset to be created
 	job = None  # Job object that requests the execution of this processor
-	parent = None  # Dataset object to be processed, if applicable
+	source_dataset = None  # Dataset object to be processed, if applicable
 	source_file = None  # path to dataset to be processed, if applicable
 
 	description = "No description available"  # processor description, shown in web front-end
@@ -41,6 +41,8 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 	extension = "csv"  # extension of files created by this processor
 	options = {}  # configurable options for this processor
 	parameters = {}  # values for the processor's configurable options
+
+	is_running_in_preset = False  # is this processor running 'within' a preset processor?
 
 	def work(self):
 		"""
@@ -58,27 +60,38 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 			self.job.finish()
 			return
 
+		is_running_in_preset = False
 		if self.dataset.data.get("key_parent", None):
 			# search workers never have parents (for now), so we don't need to
-			# find out what the parent dataset is if it's a search worker
+			# find out what the source_dataset dataset is if it's a search worker
 			try:
-				self.parent = DataSet(key=self.dataset.data["key_parent"], db=self.db)
+				self.source_dataset = DataSet(key=self.dataset.data["key_parent"], db=self.db)
+
+				# for presets, transparently use the *top* dataset as a source_dataset
+				# since that is where any underlying processors should get
+				# their data from. However, this should only be done as long as the
+				# preset is not finished yet, because after that there may be processors
+				# that run on the final preset result
+				if self.source_dataset.type.find("preset-") == 0 and not self.source_dataset.is_finished():
+					self.is_running_in_preset = True
+					self.source_dataset = self.source_dataset.get_genealogy()[0]
+
 			except TypeError:
-				# we need to know what the parent dataset was to properly handle the
+				# we need to know what the source_dataset dataset was to properly handle the
 				# analysis
 				self.log.warning("Processor %s queued for orphan query %s: cannot run, cancelling job" % (
 					self.type, self.dataset.key))
 				self.job.finish()
 				return
 
-			if not self.parent.is_finished():
+			if not self.source_dataset.is_finished() and not self.is_running_in_preset:
 				# not finished yet - retry after a while
+				# exception for presets, since these *should* be unfinished
+				# until underlying processors are done
 				self.job.release(delay=30)
 				return
 
-			self.parent = DataSet(key=self.dataset.data["key_parent"], db=self.db)
-
-			self.source_file = self.parent.get_results_path()
+			self.source_file = self.source_dataset.get_results_path()
 			if not self.source_file.exists():
 				self.dataset.update_status("Finished, no input data found.")
 
@@ -110,7 +123,7 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 				frames = [frame.filename.split("/").pop() + ":" + str(frame.lineno) for frame in frames[1:]]
 				location = "->".join(frames)
 				
-				# Not all datasets have parent keys
+				# Not all datasets have source_dataset keys
 				if len(self.dataset.get_genealogy()) > 1:
 					parent_key = " (via " + self.dataset.get_genealogy()[0].key + ")"
 				else:
@@ -172,9 +185,6 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 
 				if self.dataset.get_results_path().exists():
 					shutil.copyfile(str(self.dataset.get_results_path()), str(surrogate.get_results_path()))
-
-				top_parent = self.dataset.get_genealogy()[1]
-				top_parent.link_parent(surrogate.key)
 
 				try:
 					surrogate.finish(self.dataset.data["num_rows"])
@@ -241,11 +251,11 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 		"""
 
 		# see if an item mapping function has been defined
-		# open question if 'parent' shouldn't be an attribute of the dataset
+		# open question if 'source_dataset' shouldn't be an attribute of the dataset
 		# instead of the processor...
 		item_mapper = None
-		if hasattr(self, "parent") and self.parent:
-			parent_processor = self.all_modules.processors.get(self.parent.type)
+		if hasattr(self, "source_dataset") and self.source_dataset:
+			parent_processor = self.all_modules.processors.get(self.source_dataset.type)
 			if parent_processor:
 				parent_processor = self.all_modules.load_worker_class(parent_processor)
 				if hasattr(parent_processor, "map_item"):
@@ -271,7 +281,7 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 			with path.open(encoding="utf-8") as input:
 				for line in input:
 					if self.interrupted:
-						raise ProcessorInterruptedException("Processor interrupted while iterating throug NDJSON file")
+						raise ProcessorInterruptedException("Processor interrupted while iterating through NDJSON file")
 
 					item = json.loads(line)
 					if item_mapper:
@@ -288,7 +298,7 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 
 		It can be useful to know what attributes an item in the dataset is
 		stored with, e.g. when one wants to produce a new dataset identical
-		to the parent one but with extra attributes. This method provides
+		to the source_dataset one but with extra attributes. This method provides
 		these, as a list.
 
 		:param Path path:  Path to the dataset file; if left empty, use the
@@ -334,10 +344,9 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 		if staging_area and (not staging_area.exists() or not staging_area.is_dir()):
 			raise RuntimeError("Staging area %s is not a valid folder")
 		else:
-			if not hasattr(self, "staging_area"):
+			if not hasattr(self, "staging_area") and not staging_area:
 				self.staging_area = self.dataset.get_staging_area()
-
-			staging_area = self.staging_area
+				staging_area = self.staging_area
 
 		with zipfile.ZipFile(path, "r") as archive_file:
 			archive_contents = sorted(archive_file.namelist())
@@ -353,7 +362,8 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 				archive_file.extract(file_name, staging_area)
 
 				yield temp_file
-				temp_file.unlink()
+				if hasattr(self, "staging_area"):
+					temp_file.unlink()
 
 		if hasattr(self, "staging_area"):
 			shutil.rmtree(self.staging_area)
@@ -479,7 +489,7 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 		"""
 		Is this processor a filter?
 
-		Filters do not produce their own dataset but replace the parent dataset
+		Filters do not produce their own dataset but replace the source_dataset dataset
 		instead.
 
 		:todo: Make this a bit more robust than sniffing the processor category

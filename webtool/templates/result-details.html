@@ -20,7 +20,7 @@
         <dl class="metadata-wrapper">
         {% if timestamp_expires %}
             <div class="fullwidth notice">
-                <strong>Note:</strong> this dataset will no longer be available after {{ timestamp_expires|datetime("%d %b %Y, %H:%M") }} per the data source's configuration.
+                <strong>Note:</strong> this dataset will no longer be available after {{ timestamp_expires|datetime("%d %b %Y, %H:%M") }}
             </div>
         {% endif %}
         {% if "copied_from" in dataset.parameters %}
@@ -39,6 +39,13 @@
                 <dt>Queued at</dt>
                 <dd>{{ dataset.timestamp|datetime(fmt="%d %b %Y, %H:%M") }}</dd>
             </div>
+
+        {% if current_user.is_authenticated and current_user.is_admin() and dataset.parameters.user %}
+            <div class="fullwidth">
+                <dt>Queued by</dt>
+                <dd>{{ dataset.parameters.user }}</dd>
+            </div>
+        {% endif %}
 
             <div class="fullwidth">
                 <dt>Parameters</dt>

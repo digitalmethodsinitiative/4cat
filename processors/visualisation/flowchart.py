@@ -77,8 +77,8 @@ class FlowChart(BasicProcessor):
 		# Make sure we know what time format we're dealing with.
 		time_format = False
 		guess_time_format = False
-		if "timeframe" in self.parent.parameters:
-			time_format = self.parent.parameters["timeframe"]
+		if "timeframe" in self.source_dataset.parameters:
+			time_format = self.source_dataset.parameters["timeframe"]
 
 		if not time_format:
 			guess_time_format = True
@@ -94,17 +94,30 @@ class FlowChart(BasicProcessor):
 			guess_time_format = True
 
 		for post in self.iterate_items(self.source_file):
+			
 			# Set label names
-			if post["item"] not in labels:
-				labels.append(post["item"])
+			if "item" in post:
+				label = post["item"]
+
+			# Different labels for collocations
+			elif "word_1" in post:
+				# Trigrams
+				if "word_3" in post:
+					label = post["word_1"] + " " + post["word_2"] + " " + post["word_3"]
+				# Bigrams
+				else:
+					label = post["word_1"] + " " + post["word_2"]
+
+			if label not in labels:
+				labels.append(label)
 				label_key = str(len(result["labels"]))
 				result["labels"][label_key] = {
-					"n": post["item"]
+					"n": label
 				}
 			else:
-				label_key = labels.index(post["item"])
+				label_key = labels.index(label)
 
-			# If the parent dataset has no valid date parameter,
+			# If the source_dataset dataset has no valid date parameter,
 			# we're going to guess what time format we're dealing with.
 			if guess_time_format:
 				if len(post["date"]) == 4:  # years

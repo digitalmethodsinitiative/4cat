@@ -47,6 +47,7 @@ class SearchReddit(Search):
 		:param dict query:  Query parameters, as part of the DataSet object
 		:return list:  Posts, sorted by thread and post ID, in ascending order
 		"""
+		scope = query.get("search_scope")
 
 		# first, build the request parameters
 		post_parameters = {
@@ -172,7 +173,7 @@ class SearchReddit(Search):
 		# only query for individual posts if no subject keyword is given
 		# since individual posts don't have subjects so if there is a subject
 		# query no results should be returned
-		do_body_query = not bool(query["subject_match"].strip())
+		do_body_query = not bool(query["subject_match"].strip()) and scope != "op-only"
 
 		while do_body_query:
 			if self.interrupted:

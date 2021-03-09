@@ -210,7 +210,7 @@ class SVGHistogramRenderer(BasicProcessor):
 		label_y = height - y_margin + (tick_width * 2)
 		next = 0
 
-		interval_type = self.parent.parameters.get("timeframe", "overall")
+		interval_type = self.source_dataset.parameters.get("timeframe", "overall")
 		for interval in intervals:
 			if len(interval) == 7:
 				if interval_type == "month":

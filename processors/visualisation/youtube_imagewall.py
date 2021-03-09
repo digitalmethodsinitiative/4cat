@@ -59,7 +59,7 @@ class YouTubeImageWall(BasicProcessor):
 
 		"""
 		results_path = self.dataset.get_results_path()
-		dirname = Path(results_path.parent, results_path.name.replace(".", ""))
+		dirname = Path(results_path.source_dataset, results_path.name.replace(".", ""))
 
 		# Get the required parameters
 		# path to the YouTube csv data that was the source of the thumbnails

@@ -55,12 +55,12 @@ class TopImageCounter(BasicProcessor):
 		all_links = [] # Used for overwrite
 
 		# 4chan data has specific columns for image information, so treat this a bit differently.
-		if self.parent.parameters["datasource"] == "4chan":
+		if self.source_dataset.parameters["datasource"] == "4chan":
 			
 			self.dataset.update_status("Extracting image links from source file")
 			
 			# Variables used for overwriting source file
-			board = self.parent.parameters["board"]
+			board = self.source_dataset.parameters["board"]
 			boards_4plebs = ["pol", "lgbt", "adv", "f", "o", "sp", "tg", "trv", "tv", "x"]
 			boards_fireden = ["cm", "co", "ic", "sci", "v", "vip", "y"]
 			
@@ -203,9 +203,7 @@ class TopImageCounter(BasicProcessor):
 		self.dataset.update_status("Adding image URLs to the source file")
 
 		# Get the source file data path
-		genealogy = self.dataset.get_genealogy()
-		parent = genealogy[0]
-		parent_path = parent.get_results_path()
+		parent_path = self.source_dataset.get_results_path()
 
 		# Get a temporary path where we can store the data
 		tmp_path = self.dataset.get_staging_area()

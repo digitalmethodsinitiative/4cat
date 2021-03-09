@@ -54,8 +54,6 @@ class HatebaseAnalyser(BasicProcessor):
 		derived from the hatebase database, e.g. number of matching items,
 		how ambiguous the hatefulness is and the average 'offensiveness'.
 		"""
-		processed = 0
-		parent = self.dataset.get_genealogy()[-2]
 
 		# determine what vocabulary to use
 		language = self.parameters.get("language", "")

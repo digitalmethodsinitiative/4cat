@@ -69,10 +69,15 @@ class ImageDownloader(BasicProcessor):
 
 		urls = []
 
+		# is there anything for us to download?
+		if self.source_dataset.num_rows == 0:
+			self.dataset.update_status("No images to download.", is_final=True)
+			self.dataset.finish(0)
+			return
+
 		# Get the source file data path
-		genealogy = self.dataset.get_genealogy()
-		parent = genealogy[0]
-		datasource = parent.parameters["datasource"]
+		top_parent = self.dataset.get_genealogy()[0]
+		datasource = top_parent.parameters["datasource"]
 
 		try:
 			amount = max(0, min(1000, int(self.parameters.get("amount", 0))))
@@ -84,8 +89,7 @@ class ImageDownloader(BasicProcessor):
 		# 4chan is the odd one out (images are traced to and scraped from archives), so treat differently.
 		if datasource == "4chan":
 			self.dataset.update_status("Reading source file")
-			parent = self.dataset.get_genealogy()[0]
-			external = "fireden" if parent.parameters["board"] == "v" else "4plebs"
+			external = "fireden" if top_parent.parameters.get("board") == "v" else "4plebs"
 			rate_limit = 1 if external == "fireden" else 16
 
 
@@ -280,7 +284,7 @@ class ImageDownloader(BasicProcessor):
 			image_name = image_name.split("?")[0]
 
 		# Check if we succeeded; content type should be an image
-		if image.status_code != 200 or image.headers["content-type"][:5] != "image":
+		if image.status_code != 200 or image.headers.get("content-type", "")[:5] != "image":
 			raise FileNotFoundError
 		
 		# Try opening the image in multiple ways
@@ -352,7 +356,7 @@ class ImageDownloader(BasicProcessor):
 			delete_after = False
 		else:
 			query_result = self.dataset.get_results_path()
-			local_path = Path(query_result.parent, query_result.name + "-temp")
+			local_path = Path(query_result.source_dataset, query_result.name + "-temp")
 			delete_after = True
 
 		# save file, somewhere
@@ -379,9 +383,7 @@ class ImageDownloader(BasicProcessor):
 		self.dataset.update_status("Adding image urls to the source file")
 
 		# Get the source file data path
-		genealogy = self.dataset.get_genealogy()
-		parent = genealogy[1]
-		parent_path = parent.get_results_path()
+		parent_path = self.source_dataset.get_results_path()
 
 		# Get a temporary path where we can store the data
 		tmp_path = self.dataset.get_staging_area()

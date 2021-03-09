@@ -160,7 +160,7 @@ class LexicalFilter(BasicProcessor):
 		# copy this dataset - the filtered version - and make that copy standalone
 		# this has the benefit of allowing for all analyses that can be run on
 		# full datasets on the new, filtered copy as well
-		top_parent = self.dataset.get_genealogy()[0]
+		top_parent = self.source_dataset
 
 		standalone = self.dataset.copy(shallow=False)
 		standalone.body_match = "(Filtered) " + top_parent.query

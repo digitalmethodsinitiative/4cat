@@ -53,7 +53,7 @@ class SigmaNetwork(BasicProcessor):
 
 	def process(self):
 		"""
-		Create a HTML file with a network derived from a parent dataset.
+		Create a HTML file with a network derived from a source_dataset dataset.
 
 		"""
 		# Get json data to use in the graph.
@@ -62,9 +62,9 @@ class SigmaNetwork(BasicProcessor):
 		self.dataset.update_status("Generating graph data")
 
 		# If collocations, make sure n_size is 2 (bigrams)
-		if self.parent.data["type"] == "collocations":
+		if self.source_dataset.data["type"] == "collocations":
 
-			parent_parameters = json.loads(self.parent.data["parameters"])
+			parent_parameters = json.loads(self.source_dataset.data["parameters"])
 
 			if int(parent_parameters["n_size"]) != 2:
 				self.dataset.update_status("Co-word networks can only be generated for bigrams (n_size: 2)")
@@ -235,12 +235,12 @@ class SigmaNetwork(BasicProcessor):
 		"""
 
 		# Set the right column names
-		if self.parent.data["type"] == "word-embeddings-neighbours":
+		if self.source_dataset.data["type"] == "word-embeddings-neighbours":
 			source_column = "source_word"
 			target_column = "nearest_neighbour"
 			weight_column = "cosine_similarity"
 
-		elif self.parent.data["type"] == "collocations":
+		elif self.source_dataset.data["type"] == "collocations":
 			source_column = "word_1"
 			target_column = "word_2"
 			weight_column = "value"

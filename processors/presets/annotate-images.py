@@ -13,7 +13,9 @@ class AnnotateImages(ProcessorPreset):
     type = "preset-annotate-images"  # job type ID
     category = "Presets"  # category. 'Presets' are always listed first in the UI.
     title = "Annotate images with Google Vision API"  # title displayed in UI
-    description = "Use the Google Vision API to annotate images linked to in the dataset. Note that the Google Vision API is a paid service and using this processor will count towards your Google API credit!"
+    description = "Use the Google Vision API to annotate images linked to in the dataset the most often. Note that " \
+                  "the Google Vision API is a paid service and using this processor will count towards your Google " \
+                  "API credit!"
     extension = "csv"
 
     references = [

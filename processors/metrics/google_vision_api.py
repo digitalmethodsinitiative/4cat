@@ -93,7 +93,7 @@ class GoogleVisionAPIFetcher(BasicProcessor):
             return
 
         max_images = convert_to_int(self.parameters.get("amount", 0), 100)
-        total = self.parent.num_rows if not max_images else min(max_images, self.parent.num_rows)
+        total = self.source_dataset.num_rows if not max_images else min(max_images, self.source_dataset.num_rows)
         done = 0
 
         for image_file in self.iterate_archive_contents(self.source_file):
@@ -152,7 +152,12 @@ class GoogleVisionAPIFetcher(BasicProcessor):
 
         if api_request.status_code == 401:
             self.dataset.update_status("Invalid API key or reached API quota, halting", is_final=True)
-            raise RuntimeError()
+            raise RuntimeError()  # not recoverable
+
+        elif api_request.status_code == 400 and "BILLING_DISABLED" in api_request.text:
+            self.dataset.update_status("Billing is not enabled for your API key. You need to enable billing to use "
+                                       "the Google Vision API.", is_final=True)
+            raise RuntimeError()  # not recoverable
 
         elif api_request.status_code != 200:
             self.dataset.update_status("Got response code %i from Google Vision API for image %s, skipping" % (api_request.status_code, image_file.name))

@@ -82,12 +82,12 @@ class ExtractNouns(BasicProcessor):  #TEMPORARILY DISABLED
 		"""
 		
 		# Validate whether the user enabled the right parameters.
-		if "ner" not in self.parent.parameters["enable"]:
+		if "ner" not in self.source_dataset.parameters["enable"]:
 			self.dataset.update_status("Enable \"Named entity recognition\" in previous module")
 			self.dataset.finish(0)
 			return
 
-		if self.dataset.get_genealogy()[0].num_rows > 25000:
+		if self.source_dataset.num_rows > 25000:
 			self.dataset.update_status("Named entity recognition is only available for datasets smaller than 25.000 items.")
 			self.dataset.finish(0)
 			return
@@ -158,9 +158,8 @@ class ExtractNouns(BasicProcessor):  #TEMPORARILY DISABLED
 
 		self.dataset.update_status("Adding entities the source file")
 
-		# Get the parent data path
-		parent = self.dataset.genealogy[0]
-		parent_path = parent.get_results_path()
+		# Get the source_dataset data path
+		parent_path = self.source_dataset.get_results_path()
 
 		# Get a temporary path where we can store the data
 		tmp_path = self.dataset.get_staging_area()
