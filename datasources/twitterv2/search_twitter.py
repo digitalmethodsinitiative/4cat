@@ -297,7 +297,7 @@ class SearchWithTwitterAPIv2(Search):
             "id": tweet["id"],
             "thread_id": tweet.get("conversation_id", tweet["id"]),
             "timestamp": tweet["created_at"].replace("T", " ").replace(".000Z", ""),
-            "timestamp_unix": int(datetime.datetime.strptime(tweet["created_at"], "%Y-%m-%dT%H:%M:%S.000Z").timestamp()),
+            "unix_timestamp": int(datetime.datetime.strptime(tweet["created_at"], "%Y-%m-%dT%H:%M:%S.000Z").timestamp()),
             "subject": "",
             "body": tweet["text"],
             "author": tweet["author_username"],
