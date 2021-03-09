@@ -87,7 +87,7 @@ class SearchWithTwitterAPIv2(Search):
                 except (ConnectionError, requests.exceptions.RequestException) as e:
                     retries -= 1
                     wait_time = (5 - retries) * 10
-                    self.dataset.update_status("Got %s, waiting %i seconds before retrying" % (e.__name__, wait_time))
+                    self.dataset.update_status("Got %s, waiting %i seconds before retrying" % (str(e), wait_time))
                     time.sleep(wait_time)
 
             # rate limited - the limit at time of writing is 300 reqs per 15
@@ -102,10 +102,21 @@ class SearchWithTwitterAPIv2(Search):
                     time.sleep(0.5)
                 continue
 
+            # sometimes twitter says '503 service unavailable' for unclear
+            # reasons - in that case just wait a while and try again
+            elif api_response.status_code in (502, 503, 504):
+                resume_at = time.time() + 60
+                resume_at_str = datetime.datetime.fromtimestamp(int(resume_at)).strftime("%c")
+                self.dataset.update_status("Twitter unavailable (status %i) - waiting until %s to continue." % (api_response.status_code, resume_at_str))
+                while time.time() <= resume_at:
+                    time.sleep(0.5)
+                continue
+
+
             # this usually means the query is too long or otherwise contains
             # a syntax error
             elif api_response.status_code == 400:
-                msg = "Response %i from the Twitter API; "
+                msg = "Response %i from the Twitter API; " % api_response.status_code
                 try:
                     api_response = api_response.json()
                     msg += api_response.get("title", "")
@@ -148,6 +159,9 @@ class SearchWithTwitterAPIv2(Search):
                 tweet["author_verified"] = users.get(tweet["author_id"])["verified"]
 
                 tweets += 1
+                if tweets % 500 == 0:
+                    self.dataset.update_status("Received %i tweets from Twitter API" % tweets)
+
                 yield tweet
 
             # paginate
@@ -283,7 +297,7 @@ class SearchWithTwitterAPIv2(Search):
             "id": tweet["id"],
             "thread_id": tweet.get("conversation_id", tweet["id"]),
             "timestamp": tweet["created_at"].replace("T", " ").replace(".000Z", ""),
-            "timestamp_unix": int(datetime.datetime.strptime(tweet["created_at"], "%Y-%m-%dT%H:%M:%S.000Z").timestamp()),
+            "unix_timestamp": int(datetime.datetime.strptime(tweet["created_at"], "%Y-%m-%dT%H:%M:%S.000Z").timestamp()),
             "subject": "",
             "body": tweet["text"],
             "author": tweet["author_username"],
