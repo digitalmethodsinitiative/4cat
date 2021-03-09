@@ -23,7 +23,7 @@ actively:
 * Parler
 * Reddit
 * Telegram
-* Twitter API (Academic Track)
+* Twitter API (Academic Track, full-archive search)
 
 The following platforms are supported through other tools, from which you can 
 import data into 4CAT for analysis:
