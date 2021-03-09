@@ -87,7 +87,7 @@ class SearchWithTwitterAPIv2(Search):
                 except (ConnectionError, requests.exceptions.RequestException) as e:
                     retries -= 1
                     wait_time = (5 - retries) * 10
-                    self.dataset.update_status("Got %s, waiting %i seconds before retrying" % (e.__name__, wait_time))
+                    self.dataset.update_status("Got %s, waiting %i seconds before retrying" % (str(e), wait_time))
                     time.sleep(wait_time)
 
             # rate limited - the limit at time of writing is 300 reqs per 15
