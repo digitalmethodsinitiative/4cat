@@ -105,12 +105,12 @@ class SearchWithTwitterAPIv2(Search):
             # this usually means the query is too long or otherwise contains
             # a syntax error
             elif api_response.status_code == 400:
-                msg = "Response 400 from the Twitter API;"
+                msg = "Response 400 from the Twitter API; "
                 try:
                     api_response = api_response.json()
                     msg += api_response.get("title", "")
                     if "detail" in api_response:
-                        msg += api_response.get("detail", "")
+                        msg += ": " + api_response.get("detail", "")
                 except (json.JSONDecodeError, TypeError):
                     msg += "Some of your parameters (e.g. date range) may be invalid."
 
@@ -135,7 +135,7 @@ class SearchWithTwitterAPIv2(Search):
             # we don't need anything else than the tweet object later
             users = {user["id"]: user for user in api_response.get("includes", {}).get("users", {})}
             for tweet in api_response.get("data", []):
-                if amount >= 0 and tweets >= amount:
+                if amount > 0 and tweets >= amount:
                     break
 
                 tweet["author_username"] = users.get(tweet["author_id"])["username"]
