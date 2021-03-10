@@ -122,66 +122,36 @@ class TopImageCounter(BasicProcessor):
 			# Makes sure that it gets "http://site.com/img.jpg", but also
 			# more complicated ones like
 			# https://preview.redd.it/3thfhsrsykb61.gif?format=mp4&s=afc1e4568789d2a0095bd1c91c5010860ff76834
-			img_link_regex = re.compile(r"(?:www\.|https?:\/\/)[^\s\(\)\]\[]*\.(?:png|jpg|jpeg|gif|gifv)[^\s\(\)\]\[]*", re.IGNORECASE)
+			img_link_regex = re.compile(r"(?:www\.|https?:\/\/)[^\s\(\)\]\[,']*\.(?:png|jpg|jpeg|gif|gifv)[^\s\(\)\]\[,']*", re.IGNORECASE)
 
-			# Imgur and gfycat links that do not end in an extention are also accepted.
-			# These can later be downloaded by adding an extention.
-			img_domain_regex = re.compile(r"(?:https:\/\/gfycat\.com\/|https:\/\/imgur\.com\/)[^\s\(\)\]\[]*", re.IGNORECASE)
+			# Imgur and gfycat links that do not end in an extension are also accepted.
+			# These can later be downloaded by adding an extension.
+			img_domain_regex = re.compile(r"(?:https:\/\/gfycat\.com\/|https:\/\/imgur\.com\/)[^\s\(\)\]\[,']*", re.IGNORECASE)
 
 			self.dataset.update_status("Extracting image links from source file")
 			
-			img_links = []
+			img_links = list()
 			
 			for post in self.iterate_items(self.source_file):
-
-				post_img_links = []
-
-				if "url" in post:
-					if img_link_regex.match(post["url"]) or img_domain_regex.match(post["url"]):
-						# some datasources may provide a specific URL per post
-						# as a separate attribute.
-						post_img_links.append(post["url"])
-
-				if "urls" in post:
-					if img_link_regex.search(post["urls"]) or img_domain_regex.search(post["urls"]):
-						# some datasources may provide a specific URL per post
-						# as a separate attribute.
-						urls = post["urls"].split(",")
-						urls = list(set(urls)) # to prevent spamming
-						for url in urls:
-							if url.strip() and (img_link_regex.match(post["urls"]) or img_domain_regex.match(post["urls"])):
-								post_img_links.append(url)
-
-				# Image links are contained in the image column for Tumblr datasets
-				if "images" in post:
-					if img_link_regex.search(post["images"]) or img_domain_regex.search(post["images"]):
-						urls = post["images"][2:-2].split("',\n'") # Formatted as a list with newlines.
-						for url in urls:
-							post_img_links.append(url)
-
-				# We also take into account urls in the text body itself.
-				# URLs need some processing because there may be multiple per post.
-				body_links = img_link_regex.findall(post["body"]) + img_domain_regex.findall(post["body"])
-				
-				if body_links:
-					post_img_links += body_links
-
-				# Only keep unique links per post, to prevent spamming.
-				post_img_links = list(set(post_img_links))
+				post_img_links = set()  # set to only count images once per post
+				for field, value in post.items():
+					if field == "body" or "url" in field.lower() or "image" in field.lower():
+						post_img_links |= set(img_link_regex.findall(value))
+						post_img_links |= set(img_domain_regex.findall(value))
 
 				# Always add to all_links, so we can easily add to the source file if needed.
 				all_links.append(post_img_links)
 				
 				# Only add valid links to img_links.
-				if post_img_links:
-					img_links += post_img_links
+				img_links += post_img_links
 
 			# OrderedDict for Counter, since we need to URLs ordered from most- to to least-linked to.
 			img_ranked = OrderedDict(Counter(img_links).most_common())
 			
 			results = [{
-				"img_url": k,
-				"num_posts": v
+				"date": "all",
+				"item": k,
+				"value": v
 			} for k, v in img_ranked.items()]
 
 		if not results:

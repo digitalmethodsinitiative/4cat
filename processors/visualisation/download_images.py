@@ -122,7 +122,7 @@ class ImageDownloader(BasicProcessor):
 				if len(urls) >= amount:
 					break
 
-				img_url = row["img_url"]
+				img_url = row["item"]
 				extension = img_url.split(".")[-1].lower()
 				extensions[img_url] = extension
 				urls.append(img_url)
