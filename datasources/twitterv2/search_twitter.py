@@ -47,6 +47,7 @@ class SearchWithTwitterAPIv2(Search):
         place_fields = ("contained_within", "country", "country_code", "full_name", "geo", "id", "name", "place_type")
         poll_fields = ("duration_minutes", "end_datetime", "id", "options", "voting_status")
         expansions = ("attachments.poll_ids", "attachments.media_keys", "author_id", "entities.mentions.username", "geo.place_id", "in_reply_to_user_id", "referenced_tweets.id", "referenced_tweets.id.author_id")
+        media_fields = ("duration_ms", "height", "media_key", "non_public_metrics", "organic_metrics", "preview_image_url", "promoted_metrics", "public_metrics", "type", "url", "width")
         amount = convert_to_int(self.parameters.get("amount"), 10)
 
         params = {
@@ -56,6 +57,7 @@ class SearchWithTwitterAPIv2(Search):
             "user.fields": ",".join(user_fields),
             "poll.fields": ",".join(poll_fields),
             "place.fields": ",".join(place_fields),
+            "media.fields": ",".join(media_fields),
             "max_results": max(10, min(amount, 500)) if amount > 0 else 500,  # 500 = upper limit, 10 = lower
         }
 
@@ -145,18 +147,21 @@ class SearchWithTwitterAPIv2(Search):
 
             api_response = api_response.json()
 
-            # only the user ID is given per tweet - usernames etc are returned
-            # separately, presumably to save space when there are many tweets
-            # by the same author. Here we add the relevant data per tweet, so
-            # we don't need anything else than the tweet object later
-            users = {user["id"]: user for user in api_response.get("includes", {}).get("users", {})}
+            # The API response contains tweets (of course) and 'includes',
+            # objects that can be referenced in tweets. Later we will splice
+            # this data into the tweets themselves to make them easier to
+            # process. So extract them first...
+            included_users = api_response.get("includes", {}).get("users", {})
+            included_media = api_response.get("includes", {}).get("media", {})
+            included_polls = api_response.get("includes", {}).get("polls", {})
+            included_tweets = api_response.get("includes", {}).get("tweets", {})
+
             for tweet in api_response.get("data", []):
-                if amount > 0 and tweets >= amount:
+                if 0 < amount <= tweets:
                     break
 
-                tweet["author_username"] = users.get(tweet["author_id"])["username"]
-                tweet["author_fullname"] = users.get(tweet["author_id"])["name"]
-                tweet["author_verified"] = users.get(tweet["author_id"])["verified"]
+                # splice referenced data back in
+                tweet = self.enrich_tweet(tweet, included_users, included_media, included_polls, included_tweets)
 
                 tweets += 1
                 if tweets % 500 == 0:
@@ -169,6 +174,71 @@ class SearchWithTwitterAPIv2(Search):
                 params["next_token"] = api_response["meta"]["next_token"]
             else:
                 break
+
+    def enrich_tweet(self, tweet, users, media, polls, referenced_tweets):
+        """
+        Enrich tweet with user and attachment metadata
+
+        Twitter API returns some of the tweet's metadata separately, as
+        'includes' that can be cross-referenced with a user ID or media key.
+        This makes sense to conserve bandwidth, but also means tweets are not
+        'standalone' objects as originally returned.
+
+        However, for processing, making them standalone greatly reduces
+        complexity, as we can simply read one single tweet object and process
+        that data without worrying about having to get other data from
+        elsewhere. So this method takes the metadata and the original tweet,
+        splices the metadata into it where appropriate, and returns the
+        enriched object.
+
+        /!\ This is not an efficient way to store things /!\ but it is more
+        convenient.
+
+        :param dict tweet:  The tweet object
+        :param list users:  User metadata, as a list of user objects
+        :param list media:  Media metadata, as a list of media objects
+        :param list polls:  Poll metadata, as a list of poll objects
+        :param list referenced_tweets:  Tweets referenced in the tweet, as a
+        list of tweet objects. These will be enriched in turn.
+
+        :return dict:  Enriched tweet object
+        """
+        # first create temporary mappings so we can easily find the relevant
+        # object later
+        users_by_id = {user["id"]: user for user in users}
+        users_by_name = {user["username"]: user for user in users}
+        media_by_key = {item["media_key"]: item for item in media}
+        polls_by_id = {poll["id"]: poll for poll in polls}
+
+        # add tweet author metadata
+        tweet["author_user"] = users_by_id.get(tweet["author_id"])
+
+        # add user metadata for mentioned users
+        for index, mention in enumerate(tweet.get("entities", {}).get("mentions", [])):
+            tweet["entities"]["mentions"][index] = {**tweet["entities"]["mentions"][index], **users_by_name[mention["username"]]}
+
+        # add poll metadata
+        for index, poll in enumerate(tweet.get("attachments", {}).get("poll_ids", [])):
+            tweet["attachments"]["poll_ids"][index] = polls_by_id[poll["id"]]
+
+        # add media metadata - seems to be just the media type, the media URL
+        # etc is stored in the 'entities' attribute instead
+        for index, media_key in enumerate(tweet.get("attachments", {}).get("media_keys", [])):
+            tweet["attachments"]["media_keys"][index] = media_by_key[media_key]
+
+        # replied-to user metadata
+        if "in_reply_to_user_id" in tweet:
+            tweet["in_reply_to_user"] = users_by_id[tweet["in_reply_to_user_id"]]
+
+        # enrich referenced tweets. Even though there should be no recursion -
+        # since tweets cannot be edited - we do not recursively enrich
+        # referenced tweets (should we?)
+        if referenced_tweets:
+            referenced_tweets = {ref["id"]: self.enrich_tweet(ref, users, media, polls, []) for ref in referenced_tweets}
+            for index, reference in enumerate(tweet.get("referenced_tweets", [])):
+                tweet["referenced_tweets"][index] = {**tweet["referenced_tweets"][index], **referenced_tweets.get(reference["id"], {})}
+
+        return tweet
 
     def get_search_mode(self, query):
         """
@@ -300,8 +370,8 @@ class SearchWithTwitterAPIv2(Search):
             "unix_timestamp": int(datetime.datetime.strptime(tweet["created_at"], "%Y-%m-%dT%H:%M:%S.000Z").timestamp()),
             "subject": "",
             "body": tweet["text"],
-            "author": tweet["author_username"],
-            "author_fullname": tweet["author_fullname"],
+            "author": tweet["author_user"]["username"],
+            "author_fullname": tweet["author_user"]["name"],
             "author_id": tweet["author_id"],
             "source": tweet.get("source"),
             "language_guess": tweet.get("lang"),
@@ -315,6 +385,7 @@ class SearchWithTwitterAPIv2(Search):
                 [ref["type"] == "replied_to" for ref in tweet.get("referenced_tweets", [])]) else "no",
             "hashtags": ",".join([tag["tag"] for tag in tweet.get("entities", {}).get("hashtags", [])]),
             "urls": ",".join([tag["expanded_url"] for tag in tweet.get("entities", {}).get("urls", [])]),
+            "images": ",".join(item["url"] for item in tweet.get("attachments", {}).get("media_keys", []) if item["type"] == "photo"),
             "mentions": ",".join([tag["username"] for tag in tweet.get("entities", {}).get("mentions", [])]),
             "reply_to": "".join(
                 [mention["username"] for mention in tweet.get("entities", {}).get("mentions", [])[:1]]) if any(
