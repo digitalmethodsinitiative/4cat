@@ -3,6 +3,7 @@ Twitter keyword search via the Twitter API v2
 """
 import requests
 import datetime
+import copy
 import time
 import json
 import re
@@ -161,7 +162,9 @@ class SearchWithTwitterAPIv2(Search):
                     break
 
                 # splice referenced data back in
-                tweet = self.enrich_tweet(tweet, included_users, included_media, included_polls, included_tweets)
+                # we use copy.deepcopy here because else we run into a
+                # pass-by-reference quagmire
+                tweet = self.enrich_tweet(tweet, included_users, included_media, included_polls, copy.deepcopy(included_tweets))
 
                 tweets += 1
                 if tweets % 500 == 0:
@@ -209,34 +212,34 @@ class SearchWithTwitterAPIv2(Search):
         users_by_name = {user["username"]: user for user in users}
         media_by_key = {item["media_key"]: item for item in media}
         polls_by_id = {poll["id"]: poll for poll in polls}
+        tweets_by_id = {ref["id"]: ref.copy() for ref in referenced_tweets}
 
         # add tweet author metadata
         tweet["author_user"] = users_by_id.get(tweet["author_id"])
 
         # add user metadata for mentioned users
         for index, mention in enumerate(tweet.get("entities", {}).get("mentions", [])):
-            tweet["entities"]["mentions"][index] = {**tweet["entities"]["mentions"][index], **users_by_name[mention["username"]]}
+            tweet["entities"]["mentions"][index] = {**tweet["entities"]["mentions"][index], **users_by_name.get(mention["username"], {})}
 
         # add poll metadata
-        for index, poll in enumerate(tweet.get("attachments", {}).get("poll_ids", [])):
-            tweet["attachments"]["poll_ids"][index] = polls_by_id[poll["id"]]
+        for index, poll_id in enumerate(tweet.get("attachments", {}).get("poll_ids", [])):
+            tweet["attachments"]["poll_ids"][index] = polls_by_id[poll_id] if poll_id in polls_by_id else poll_id
 
         # add media metadata - seems to be just the media type, the media URL
         # etc is stored in the 'entities' attribute instead
         for index, media_key in enumerate(tweet.get("attachments", {}).get("media_keys", [])):
-            tweet["attachments"]["media_keys"][index] = media_by_key[media_key]
+            tweet["attachments"]["media_keys"][index] = media_by_key[media_key] if media_key in media_by_key else media_key
 
         # replied-to user metadata
         if "in_reply_to_user_id" in tweet:
-            tweet["in_reply_to_user"] = users_by_id[tweet["in_reply_to_user_id"]]
+            tweet["in_reply_to_user"] = users_by_id[tweet["in_reply_to_user_id"]] if tweet["in_reply_to_user_id"] in users_by_id else {}
 
         # enrich referenced tweets. Even though there should be no recursion -
         # since tweets cannot be edited - we do not recursively enrich
         # referenced tweets (should we?)
-        if referenced_tweets:
-            referenced_tweets = {ref["id"]: self.enrich_tweet(ref, users, media, polls, []) for ref in referenced_tweets}
-            for index, reference in enumerate(tweet.get("referenced_tweets", [])):
-                tweet["referenced_tweets"][index] = {**tweet["referenced_tweets"][index], **referenced_tweets.get(reference["id"], {})}
+        for index, reference in enumerate(tweet.get("referenced_tweets", [])):
+            if reference["id"] in tweets_by_id:
+                tweet["referenced_tweets"][index] = {**reference, **self.enrich_tweet(tweets_by_id[reference["id"]], users, media, polls, [])}
 
         return tweet
 
@@ -290,11 +293,10 @@ class SearchWithTwitterAPIv2(Search):
     @staticmethod
     def validate_query(query, request, user):
         """
-        Validate input for a dataset query on the 4chan data source.
+        Validate input for a dataset query on the Twitter data source.
 
         Will raise a QueryParametersException if invalid parameters are
-        encountered. Mutually exclusive parameters may also be sanitised by
-        ignoring either of the mutually exclusive options.
+        encountered. Parameters are additionally sanitised.
 
         :param dict query:  Query parameters, from client-side.
         :param request:  Flask request
@@ -312,25 +314,26 @@ class SearchWithTwitterAPIv2(Search):
         if len(query.get("query")) > 1024:
             raise QueryParametersException("Twitter API queries cannot be longer than 1024 characters.")
 
-        # both dates need to be set, or none
-        if query.get("min_date", None) and not query.get("max_date", None):
-            raise QueryParametersException(
-                "When setting a date range, please provide both an upper and lower limit.")
-
         # the dates need to make sense as a range to search within
-        if query.get("min_date", None) and query.get("max_date", None):
+        # but, on Twitter, you can also specify before *or* after only
+        before = None
+        after = None
+        if query.get("min_date", None):
             try:
-                before = int(query.get("max_date", ""))
                 after = int(query.get("min_date", ""))
+                query["min_date"] = after
             except ValueError:
                 raise QueryParametersException("Please provide valid dates for the date range.")
 
-            if before < after:
-                raise QueryParametersException(
-                    "Please provide a valid date range where the start is before the end of the range.")
+        if query.get("max_date", None):
+            try:
+                before = int(query.get("max_date", ""))
+                query["max_date"] = after
+            except ValueError:
+                raise QueryParametersException("Please provide valid dates for the date range.")
 
-            query["min_date"] = after
-            query["max_date"] = before
+        if before and after and before < after:
+            raise QueryParametersException("Date range must start before it ends")
 
         is_placeholder = re.compile("_proxy$")
         filtered_query = {}
@@ -342,8 +345,8 @@ class SearchWithTwitterAPIv2(Search):
         return {
             "query": query.get("query"),
             "api_bearer_token": query.get("api_bearer_token"),
-            "min_date": query.get("min_date"),
-            "max_date": query.get("max_date"),
+            "min_date": after,
+            "max_date": before,
             "amount": max(0, convert_to_int(query.get("amount"), 10))
         }
 
@@ -385,7 +388,7 @@ class SearchWithTwitterAPIv2(Search):
                 [ref["type"] == "replied_to" for ref in tweet.get("referenced_tweets", [])]) else "no",
             "hashtags": ",".join([tag["tag"] for tag in tweet.get("entities", {}).get("hashtags", [])]),
             "urls": ",".join([tag["expanded_url"] for tag in tweet.get("entities", {}).get("urls", [])]),
-            "images": ",".join(item["url"] for item in tweet.get("attachments", {}).get("media_keys", []) if item["type"] == "photo"),
+            "images": ",".join(item["url"] for item in tweet.get("attachments", {}).get("media_keys", []) if type(item) is dict and item["type"] == "photo"),
             "mentions": ",".join([tag["username"] for tag in tweet.get("entities", {}).get("mentions", [])]),
             "reply_to": "".join(
                 [mention["username"] for mention in tweet.get("entities", {}).get("mentions", [])[:1]]) if any(
