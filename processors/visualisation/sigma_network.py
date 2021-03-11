@@ -537,7 +537,7 @@ class SigmaNetwork(BasicProcessor):
 						</div>
 						<div class="graph-manipulation-subbox">
 							<p><label for="slow-down">Slow down: </label>
-								<input class="parameter-input" id="slow-down" name="slow-down" type="number" value="10">
+								<input class="parameter-input" id="slow-down" name="slow-down" type="number" value="1">
 							</p>
 						</div>
 						<div class="graph-manipulation-subbox">
@@ -564,7 +564,7 @@ class SigmaNetwork(BasicProcessor):
 								<input class="parameter-input" id="label-size-type" name="label-size-type" type="checkbox" checked>
 							</p>
 							<p><label for="label-threshold">Label threshold: </label>
-								<input class="parameter-input" id="label-threshold" name="label-threshold" type="number" min="1" value="3">
+								<input class="parameter-input" id="label-threshold" name="label-threshold" type="number" min="0.1" value="1">
 							</p>
 							<p><label for="label-colour">Label colour: </label>
 								<input class="parameter-input" id="label-colour" name="label-colour" type="color" value="#00000">
@@ -573,10 +573,10 @@ class SigmaNetwork(BasicProcessor):
 						<h3 class="graph-manipulation-box-header">Nodes and edges</h3>
 						<div class="graph-manipulation-subbox">
 							<p><label for="min-node-size">Min node size: </label>
-								<input class="parameter-input" id="min-node-size" name="min-node-size" type="number" min="0.1" value="2">
+								<input class="parameter-input" id="min-node-size" name="min-node-size" type="number" min="0.1" value="1">
 							</p>
 							<p><label for="max-node-size">Max node size: </label>
-								<input class="parameter-input" id="max-node-size" name="max-node-size" type="number" min="0.1" value="5">
+								<input class="parameter-input" id="max-node-size" name="max-node-size" type="number" min="0.1" value="2">
 							</p>
 						</div>
 						<div class="graph-manipulation-subbox">
