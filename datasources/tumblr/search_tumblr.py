@@ -184,7 +184,7 @@ class SearchTumblr(Search):
 				posts = self.parse_tumblr_posts(posts)
 
 				# Get the lowest timestamp
-				before = sorted([post["timestamp"] for post in posts])[-1]
+				before = sorted([post["timestamp"] for post in posts])[0]
 
 				# manually check if we've reached the `after` already (not natively supported by Tumblr)
 				if after:
