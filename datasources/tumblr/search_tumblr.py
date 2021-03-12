@@ -9,7 +9,7 @@ import os
 import re
 import time
 import pytumblr
-import datetime
+from datetime import datetime
 
 import config
 
@@ -53,7 +53,7 @@ class SearchTumblr(Search):
 		# ready our parameters
 		parameters = self.dataset.get_parameters()
 		scope = parameters.get("search_scope", "")
-		queries = parameters.get("query")
+		queries = parameters.get("query").split(", ")
 
 		# Store all info here
 		results = []
@@ -62,18 +62,26 @@ class SearchTumblr(Search):
 		all_notes = []
 
 		# Get date parameters
-		after = parameters.get("after", None)
-		before = parameters.get("before", None)
+		min_date = parameters.get("min_date", None)
+		max_date = parameters.get("max_date", None)
+
+		if min_date:
+			min_date = int(min_date)
+		if max_date:
+			max_date = int(max_date)
+		else:
+			max_date = int(time.time())
 
 		# for each tag or blog, get post
 		for query in queries:
 
 				# Get posts per tag
 				if scope == "tag":
-					new_results = self.get_posts_by_tag(query, before=before, after=after)
+					new_results = self.get_posts_by_tag(query, max_date=max_date, min_date=min_date)
+
 				# Get posts per blog
 				elif scope == "blog":
-					new_results, notes = self.get_posts_by_blog(query, before=before, after=after)
+					new_results, notes = self.get_posts_by_blog(query, max_date=max_date, min_date=min_date)
 					all_notes.append(notes)
 				else:
 					self.dataset.update_status("Invalid scope")
@@ -126,20 +134,17 @@ class SearchTumblr(Search):
 		self.job.finish()
 		return results
 
-	def get_posts_by_tag(self, tag, before=None, after=None):
+	def get_posts_by_tag(self, tag, max_date=None, min_date=None):
 		"""
 		Get Tumblr posts posts with a certain tag
 		:param tag, str: the tag you want to look for
-		:param after: a unix timestamp, indicates posts should be after this date.
-	    :param before: a unix timestamp, indicates posts should be before this date.
+		:param min_date: a unix timestamp, indicates posts should be min_date this date.
+	    :param max_date: a unix timestamp, indicates posts should be max_date this date.
 
 	    :returns: a dict created from the JSON response
 		"""
 
 		client = self.connect_to_tumblr()
-
-		if not before:
-			before = int(time.time())
 
 		# Store all posts in here
 		all_posts = []
@@ -160,51 +165,48 @@ class SearchTumblr(Search):
 
 			try:
 				# Use the pytumblr library to make the API call
-				posts = client.tagged(tag, before=before, limit=20, filter="raw")
-
-				#if (before - posts[0]["timestamp"]) > 500000:
+				posts = client.tagged(tag, before=max_date, limit=20, filter="raw")
+				
+				#if (max_date - posts[0]["timestamp"]) > 500000:
 					#self.dataset.update_status("ALERT - DATES LIKELY SKIPPED")
 					#self.dataset.update_status([post["timestamp"] for post in posts])
 
 			except Exception as e:
 
-				self.dataset.update_status("Reached the limit of the Tumblr API. Last timestamp: %s" % str(before))
+				self.dataset.update_status("Reached the limit of the Tumblr API. Last timestamp: %s" % str(max_date))
 				self.api_limit_reached = True
 				break
 
 			# Make sure the Tumblr API doesn't magically stop at an earlier date
 			if not posts or isinstance(posts, str):
 				retries += 1
-				before -= 3600 # Decrease by an hour
-				self.dataset.update_status("No posts - querying again but an hour earlier (retry %s/48)" % str(retries))
+				max_date -= 3600 # Decrease by an hour
+				self.dataset.update_status("No posts returned by Tumblr - checking whether this is really all (retry %s/48)" % str(retries))
 				continue
 
 			# Append posts to main list
 			else:
 				posts = self.parse_tumblr_posts(posts)
 
-				# Get the lowest timestamp
-				before = sorted([post["timestamp"] for post in posts])[0]
+				# Get the lowest date
+				max_date = sorted([post["timestamp"] for post in posts])[0]
 
-				# manually check if we've reached the `after` already (not natively supported by Tumblr)
-				if after:
-
-					if before <= after:
-
-						# Get rid of all the posts that are earlier than the before timestamp
-						posts = [post for post in posts if post["timestamp"] > after]
-
+				# Manually check if we have a lower date than the lowest allowed date already (min date).
+				# This functonality is not natively supported by Tumblr.
+				if min_date:
+					if max_date < min_date:
+						# Get rid of all the posts that are earlier than the max_date timestamp
+						posts = [post for post in posts if post["timestamp"] >= min_date]
+						
 						if posts:
 							all_posts += posts
 						break
 
-				all_posts += posts
 				retries = 0
 
-				#if (before - posts[len(posts) - 1]["timestamp"]) > 500000:
+				#if (max_date - posts[len(posts) - 1]["timestamp"]) > 500000:
 					#self.dataset.update_status("ALERT - DATES LIKELY SKIPPED")
 					#self.dataset.update_status([post["timestamp"] for post in posts])
-
 
 			if len(all_posts) >= self.max_posts:
 				self.max_posts_reached = True
@@ -214,12 +216,12 @@ class SearchTumblr(Search):
 
 		return all_posts
 
-	def get_posts_by_blog(self, blog, before=None, after=None):
+	def get_posts_by_blog(self, blog, max_date=None, min_date=None):
 		"""
 		Get Tumblr posts posts with a certain blog
 		:param tag, str: the name of the blog you want to look for
-		:param after: a unix timestamp, indicates posts should be after this date.
-	    :param before: a unix timestamp, indicates posts should be before this date.
+		:param min_date: a unix timestamp, indicates posts should be min_date this date.
+	    :param max_date: a unix timestamp, indicates posts should be max_date this date.
 
 	    :returns: a dict created from the JSON response
 		"""
@@ -227,8 +229,8 @@ class SearchTumblr(Search):
 		blog = blog + ".tumblr.com"
 		client = self.connect_to_tumblr()
 
-		if not before:
-			before = int(time.time())
+		if not max_date:
+			max_date = int(time.time())
 
 		# Store all posts in here
 		all_posts = []
@@ -245,31 +247,31 @@ class SearchTumblr(Search):
 			if self.interrupted:
 				raise ProcessorInterruptedException("Interrupted while fetching blog posts from Tumblr")
 
-			# Stop after 20 retries
+			# Stop min_date 20 retries
 			if retries >= max_retries:
 				self.dataset.update_status("No more posts")
 				break
 
 			try:
 				# Use the pytumblr library to make the API call
-				posts = client.posts(blog, before=before, limit=20, reblog_info=True, notes_info=True, filter="raw")
+				posts = client.posts(blog, before=max_date, limit=20, reblog_info=True, notes_info=True, filter="raw")
 				posts = posts["posts"]
 
-				#if (before - posts[0]["timestamp"]) > 500000:
+				#if (max_date - posts[0]["timestamp"]) > 500000:
 					#self.dataset.update_status("ALERT - DATES LIKELY SKIPPED")
 					#self.dataset.update_status([post["timestamp"] for post in posts])
 
 			except Exception as e:
 
-				self.dataset.update_status("Reached the limit of the Tumblr API. Last timestamp: %s" % str(before))
+				self.dataset.update_status("Reached the limit of the Tumblr API. Last timestamp: %s" % str(max_date))
 				self.api_limit_reached = True
 				break
 
 			# Make sure the Tumblr API doesn't magically stop at an earlier date
 			if not posts or isinstance(posts, str):
 				retries += 1
-				before -= 3600 # Decrease by an hour
-				self.dataset.update_status("No posts - querying again but an hour earlier (retry %s/48)" % str(retries))
+				max_date -= 3600 # Decrease by an hour
+				self.dataset.update_status("No posts returned by Tumblr - checking whether this is really all (retry %s/48)" % str(retries))
 				continue
 
 			# Append posts to main list
@@ -282,22 +284,26 @@ class SearchTumblr(Search):
 
 				posts = self.parse_tumblr_posts(posts)
 
-				before = posts[len(posts) - 1]["timestamp"]
+				# Get the lowest date
+				max_date = sorted([post["timestamp"] for post in posts])[0]
 
-				# manually check if we've reached the `after` already (not natively supported by Tumblr)
-				if after:
-					if before <= after:
-						# Get rid of all the posts that are earlier than the before timestamp
-						posts = [post for post in posts if post["timestamp"] > after]
+				# Manually check if we have a lower date than the min date (`min_date`) already.
+				# This functonality is not natively supported by Tumblr.
+				if min_date:
+					if max_date < min_date:
+
+						# Get rid of all the posts that are earlier than the max_date timestamp
+						posts = [post for post in posts if post["timestamp"] >= min_date]
 
 						if posts:
 							all_posts += posts
 						break
 
-				all_posts += posts
 				retries = 0
 
-				#if (before - posts[len(posts) - 1]["timestamp"]) > 500000:
+				all_posts += posts
+
+				#if (max_date - posts[len(posts) - 1]["timestamp"]) > 500000:
 					#self.dataset.update_status("ALERT - DATES LIKELY SKIPPED")
 					#self.dataset.update_status([post["timestamp"] for post in posts])
 
@@ -321,7 +327,7 @@ class SearchTumblr(Search):
 		# List of dict to get reblogs. Items are: [{"blog_name": post_id}]
 		text_reblogs = []
 
-		before = None
+		max_date = None
 
 		# Do some counting
 		len_blogs = len(di_blogs_ids)
@@ -343,7 +349,7 @@ class SearchTumblr(Search):
 			while True:
 
 				# Requests a post's notes
-				notes = client.notes(key, id=value, before_timestamp=before)
+				notes = client.notes(key, id=value, before_timestamp=max_date)
 
 				if only_text_reblogs:
 
@@ -357,7 +363,7 @@ class SearchTumblr(Search):
 									text_reblogs.append({note["blog_name"]: note["post_id"]})
 
 						if notes.get("_links"):
-							before = notes["_links"]["next"]["query_params"]["before_timestamp"]
+							max_date = notes["_links"]["next"]["query_params"]["before_timestamp"]
 
 						# If there's no `_links` key, that's all.
 						else:
@@ -449,57 +455,50 @@ class SearchTumblr(Search):
 		# reformat queries to be a comma-separated list
 		items = query.get("query").replace("\n", ",").replace("#","").replace("\r", ",")
 		items = items.split(",")
-		items = [item.lstrip().rstrip() for item in items if item]
 
-		# Set dates, if given.
-		if query.get("max_date") or query.get("min_date"):
-
-			# On some OSes, the date is submitted as dd-mm-yyyy. Make sure to also fetch these.
-			ddmmyyyy = r"^([0-2][0-9]|(3)[0-1])(-)(((0)[0-9])|((1)[0-2]))(-)\d{4}$"
-			date_format = "%Y-%m-%d"
-
-			# Before
-			if query.get("max_date"):
-				try:
-					if re.match(ddmmyyyy, query.get("max_date","")):
-						date_format = "%d-%m-%Y"
-					before = int(datetime.datetime.strptime(query.get("max_date", ""), date_format).timestamp())
-				except ValueError:
-					raise QueryParametersException("Invalid value for max date %s " % str(query.get("max_date")))
-			else:
-				before = None
-
-			# After
-			if query.get("min_date"):
-				date_format = "%Y-%m-%d"
-				try:
-					if re.match(ddmmyyyy, query.get("min_date","")):
-						date_format = "%d-%m-%Y"
-					after = int(datetime.datetime.strptime(query.get("min_date", ""), date_format).timestamp())
-				except ValueError:
-					raise QueryParametersException("Invalid value for min date %s " % str(query.get("min_date")))
-			else:
-				after = None
-		else:
-			before = None
-			after = None
-
-		# Not more than 5 plox
-		if len(items) > 5:
+		# Not more than 10 plox
+		if len(items) > 10:
 			raise QueryParametersException("Only query for five or less tags or blogs.")
 		# no query 4 u
 		if not items:
 			raise QueryParametersException("Invalid search search query.")
 
-		# simple!
-		return {
-			"query": items,
-			"board": query.get("search_scope") + "s",  # used in web interface
-			"search_scope": query.get("search_scope"),
-			"fetch_reblogs": bool(query.get("fetch_reblogs", False)),
-			"before": before,
-			"after": after
-		}
+		# So it shows nicely in the frontend.
+		items = ", ".join([item.lstrip().rstrip() for item in items if item])
+		
+		# both dates need to be set, or none
+		if query.get("min_date", None) and not query.get("max_date", None):
+			raise QueryParametersException("When setting a date range, please provide both an upper and lower limit.")
+
+		# the dates need to make sense as a range to search within
+		if query.get("min_date", None) and query.get("max_date", None):
+			try:
+				min_date = int(query.get("min_date", ""))
+				max_date = int(query.get("max_date", ""))
+			except ValueError:
+				raise QueryParametersException("Please provide valid dates for the date range.")
+
+			if max_date < min_date:
+				raise QueryParametersException(
+					"Please provide a valid date range where the start is before the end of the range.")
+
+			query["min_date"] = min_date
+			query["max_date"] = max_date
+
+		query["query"] = items
+		query["board"] = query.get("search_scope") + "s" # used in web interface
+		query["search_scope"] = query.get("search_scope")
+		query["fetch_reblogs"] = bool(query.get("fetch_reblogs", False))
+
+		is_placeholder = re.compile("_proxy$")
+		filtered_query = {}
+		for field in query:
+			if not is_placeholder.search(field):
+				filtered_query[field] = query[field]
+
+		# if we made it this far, the query can be executed
+		return filtered_query
+
 
 	def parse_tumblr_posts(self, posts, reblog=False):
 		"""
