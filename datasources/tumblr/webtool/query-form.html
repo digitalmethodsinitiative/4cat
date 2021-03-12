@@ -27,7 +27,7 @@
             <input type="checkbox" name="fetch_reblogs" id="query-reblogs">
         </div>
     </div>
-    <p><strong>Note:</strong> The <a href="https://api.tumblr.com" target="_blank">Tumblr API</a> currently has an odd bug: when fetching sporadically used tags, it may return zero posts, even though older posts exist. To mitigate this, 4CAT decreases the date parameter (<code>before</code>) with an hour and sends the query again. This often successfully returns older, un-fetched posts. If it didn't find new data after 48 retries (2 days), it assumes the dataset is complete. Check the oldest post in your dataset to see if it this is indeed the case.</p>
+    <p><strong>Note:</strong> The <a href="https://api.tumblr.com" target="_blank">Tumblr API</a> currently has an odd bug: when fetching sporadically used tags, it may return zero posts, even though older posts exist. To mitigate this, 4CAT decreases the date parameter (<code>before</code>) with an hour and sends the query again. This often successfully returns older, un-fetched posts. If it didn't find new data after 96 retries (4 days), it assumes the dataset is complete. Check the oldest post in your dataset to see if it this is indeed the case.</p>
 
 </fieldset>
 

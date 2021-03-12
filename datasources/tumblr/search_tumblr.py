@@ -146,7 +146,7 @@ class SearchTumblr(Search):
 
 		# Some retries to make sure the Tumblr API actually returns everything
 		retries = 0
-		max_retries = 48 # 2 days
+		max_retries = 96 # 4 days
 
 		# Get Tumblr posts until there's no more left.
 		while True:
@@ -183,11 +183,14 @@ class SearchTumblr(Search):
 			else:
 				posts = self.parse_tumblr_posts(posts)
 
-				before = posts[len(posts) - 1]["timestamp"]
+				# Get the lowest timestamp
+				before = sorted([post["timestamp"] for post in posts])[-1]
 
 				# manually check if we've reached the `after` already (not natively supported by Tumblr)
 				if after:
+
 					if before <= after:
+
 						# Get rid of all the posts that are earlier than the before timestamp
 						posts = [post for post in posts if post["timestamp"] > after]
 
