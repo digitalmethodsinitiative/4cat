@@ -149,8 +149,11 @@ class SearchTumblr(Search):
 		# Store all posts in here
 		all_posts = []
 
-		# Some retries to make sure the Tumblr API actually returns everything
+		# Some retries to make sure the Tumblr API actually returns everything.
 		retries = 0
+
+		# We're gonna change max_date, so store a copy for reference.
+		max_date_original = max_date
 
 		# We use the averag time difference between posts to spot possible gaps in the data.
 		all_time_difs = []
@@ -174,16 +177,23 @@ class SearchTumblr(Search):
 			# preventing Tumblr API shenanigans or double posts because of
 			# time reductions. Make sure it's no error string, though.
 			unseen_posts = []
+			error_strs = ["meta", "response", "errors"]
 			for check_post in posts:
-				try:
+				if check_post in error_strs:
+					self.dataset.update_status("Couldnt add post ", check_post)
+				else:
 					if check_post["id"] not in self.seen_ids:
 						unseen_posts.append(check_post)
-				except TypeError as e:
-					self.dataset.update_status("Couldnt add post ", check_post)
-					continue
 
 			posts = unseen_posts
 
+			# For no clear reason, the Tumblr API sometimes provides posts with a higher timestamp than requested.
+			# So we have to prevent this manually.
+			if max_date_original:
+				posts = [post for post in posts if post["timestamp"] <= max_date_original]
+
+			max_date_str = datetime.fromtimestamp(max_date).strftime("%Y-%m-%d %H:%M:%S")
+			
 			# except Exception as e:
 			# 	print(e)
 			# 	self.dataset.update_status("Reached the limit of the Tumblr API. Last timestamp: %s" % str(max_date))
@@ -199,7 +209,6 @@ class SearchTumblr(Search):
 				# If that didn't result in any new posts, also dedicate 12 retries
 				# with reductions of six months, just to be sure there's no data from
 				# years earlier missing.
-				max_date_str = datetime.fromtimestamp(max_date).strftime("%Y-%m-%d %H:%M:%S")
 
 				if retries < 96:
 					max_date -= 21600 # Decrease by six hours
@@ -208,6 +217,10 @@ class SearchTumblr(Search):
 					max_date -= 604800 # Decrease by one week
 					retry_str = str(retries - 96)
 					self.dataset.update_status("Collected %s posts for tag %s, but no new posts returned - no new posts found with decreasing by 6 hours, decreasing with a week to %s instead (retry %s/150)" % (str(len(all_posts)), tag, max_date_str, str(retry_str),))
+
+				# We can stop when the max date drops below the min date.
+				if max_date <= min_date:
+					break
 
 				continue
 
@@ -266,9 +279,8 @@ class SearchTumblr(Search):
 					if max_date < min_date:
 					
 						# Get rid of all the posts that are earlier than the max_date timestamp
-						posts = [post for post in posts if post["timestamp"] >= min_date]
+						posts = [post for post in posts if post["timestamp"] >= min_date and post["timestamp"] <= max_date_original]
 						
-
 						if posts:
 							all_posts += posts
 							self.seen_ids.update([post["id"] for post in posts])
@@ -291,14 +303,15 @@ class SearchTumblr(Search):
 				# Delete the first 100 posts every hundred or so items.
 				if (len(all_time_difs) - time_difs_len) > 100:
 					all_time_difs = all_time_difs[time_difs_len:]
-				time_difs_len = len(all_time_difs)
-				avg_time_dif = sum(all_time_difs) / len(all_time_difs)
+				if all_time_difs:
+					time_difs_len = len(all_time_difs)
+					avg_time_dif = sum(all_time_difs) / len(all_time_difs)
 
 			if len(all_posts) >= self.max_posts:
 				self.max_posts_reached = True
 				break
 
-			self.dataset.update_status("Collected %s posts for tag %s" % (str(len(all_posts)), tag,))
+			self.dataset.update_status("Collected %s posts for tag %s, now looking for posts before %s" % (str(len(all_posts)), tag, max_date_str,))
 
 		return all_posts
 
@@ -512,7 +525,7 @@ class SearchTumblr(Search):
 		if client_info.get("meta"):
 			if client_info["meta"].get("status") == 429:
 				self.log.info("Tumblr API timed out during query %s" % self.dataset.key)
-				self.dataset.update_status("Tumblr API timed out during query '%s', try again in 24 hours." % query)
+				self.dataset.update_status("Tumblr API timed out during query '%s', try again in 24 hours." % self.dataset.key)
 				raise ConnectionRefusedError("Tumblr API timed out during query %s" % self.dataset.key)
 
 		return client
