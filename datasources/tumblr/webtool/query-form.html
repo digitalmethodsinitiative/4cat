@@ -11,8 +11,8 @@
         </div>
     </div>
 
-    <p class="form-intro">Insert tags or names of blogs separated with commas or blank lines. You may insert up to ten tags or blogs.</p>
-    <p class="form-intro">Tumblr tags may include whitespace. A <code>#</code> before the tag is optional. Commas not allowed.</p>
+    <p class="form-intro">Insert tags or names of blogs, one on each line. You may insert up to ten tags or blogs.</p>
+    <p class="form-intro">Tumblr tags may include whitespace and commas. A <code>#</code> before the tag is optional.</p>
     <p class="form-intro">Tag search only get posts explicitly associated with the exact tag you insert here. Querying <code>gogh</code> will thus not get posts only tagged with <code>van gogh</code>. Keyword search is unfortunately not allowed by the <a href="https://api.tumblr.com" target="_blank">Tumblr API</a>.</p>
     <div class="form-element">
         <label for="query-input">Tags/blogs:</label>
@@ -27,7 +27,7 @@
             <input type="checkbox" name="fetch_reblogs" id="query-reblogs">
         </div>
     </div>
-    <p><strong>Note:</strong> The <a href="https://api.tumblr.com" target="_blank">Tumblr API</a> currently has an odd bug: when fetching sporadically used tags, it may return zero posts, even though older posts exist. To mitigate this, 4CAT decreases the date parameter (<code>before</code>) with an hour and sends the query again. This often successfully returns older, un-fetched posts. If it didn't find new data after 96 retries (4 days), it assumes the dataset is complete. Check the oldest post in your dataset to see if it this is indeed the case.</p>
+    <p><strong>Note:</strong> The <a href="https://api.tumblr.com" target="_blank">Tumblr API</a> is volatile: when fetching sporadically used tags, it may return zero posts, even though older posts exist. To mitigate this, 4CAT decreases the date parameter (<code>before</code>) with six hours and sends the query again. This often successfully returns older, un-fetched posts. If it didn't find new data after 96 retries (24 days), it checks for data up to six years before the last date, decreasing 12 times by 6 months. If that also results in nothing, it assumes the dataset is complete. Check the oldest post in your dataset to see if it this is indeed the case and whether any odd time gaps exists.</p>
 
 </fieldset>
 

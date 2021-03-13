@@ -34,14 +34,14 @@ class SearchTumblr(Search):
 	# not available as a processor for existing datasets
 	accepts = [None]
 
-	# let's not get rate limited
 	max_workers = 1
-	max_retries = 3
+	max_retries = 96 + 150 # 96 time retries of -6 hours (24 days), plus 150 extra for 150 weeks (~3 years)
 	max_posts = 1000000
 
 	max_posts_reached = False
 	api_limit_reached = False
 
+	seen_ids = set()
 	failed_notes = []
 
 	def get_posts_simple(self, query):
@@ -130,7 +130,7 @@ class SearchTumblr(Search):
 						if reblog_post:
 							reblog_post = self.parse_tumblr_posts([reblog_post], reblog=True)
 							results.append(reblog_post[0])
-
+		
 		self.job.finish()
 		return results
 
@@ -151,68 +151,154 @@ class SearchTumblr(Search):
 
 		# Some retries to make sure the Tumblr API actually returns everything
 		retries = 0
-		max_retries = 96 # 4 days
+
+		# We use the averag time difference between posts to spot possible gaps in the data.
+		all_time_difs = []
+		avg_time_dif = 0
+		time_difs_len = 0
 
 		# Get Tumblr posts until there's no more left.
 		while True:
 			if self.interrupted:
 				raise ProcessorInterruptedException("Interrupted while fetching tag posts from Tumblr")
 
-			# Stop after 20 retries
-			if retries >= max_retries:
+			# Stop after max retries
+			if retries >= self.max_retries:
 				self.dataset.update_status("No more posts")
 				break
 
-			try:
-				# Use the pytumblr library to make the API call
-				posts = client.tagged(tag, before=max_date, limit=20, filter="raw")
-				
-				#if (max_date - posts[0]["timestamp"]) > 500000:
-					#self.dataset.update_status("ALERT - DATES LIKELY SKIPPED")
-					#self.dataset.update_status([post["timestamp"] for post in posts])
+			# Use the pytumblr library to make the API call
+			posts = client.tagged(tag, before=max_date, limit=20, filter="raw")
 
-			except Exception as e:
+			# Get rid of posts that we already enountered,
+			# preventing Tumblr API shenanigans or double posts because of
+			# time reductions. Make sure it's no error string, though.
+			unseen_posts = []
+			for check_post in posts:
+				try:
+					if check_post["id"] not in self.seen_ids:
+						unseen_posts.append(check_post)
+				except TypeError as e:
+					self.dataset.update_status("Couldnt add post ", check_post)
+					continue
 
-				self.dataset.update_status("Reached the limit of the Tumblr API. Last timestamp: %s" % str(max_date))
-				self.api_limit_reached = True
-				break
+			posts = unseen_posts
+
+			# except Exception as e:
+			# 	print(e)
+			# 	self.dataset.update_status("Reached the limit of the Tumblr API. Last timestamp: %s" % str(max_date))
+			# 	self.api_limit_reached = True
+			# 	break
 
 			# Make sure the Tumblr API doesn't magically stop at an earlier date
-			if not posts or isinstance(posts, str):
+			if not posts:
 				retries += 1
-				max_date -= 3600 # Decrease by an hour
-				self.dataset.update_status("No posts returned by Tumblr - checking whether this is really all (retry %s/48)" % str(retries))
+
+				# We're first gonna check carefully if there's small timegaps by
+				# decreasing by six hours.
+				# If that didn't result in any new posts, also dedicate 12 retries
+				# with reductions of six months, just to be sure there's no data from
+				# years earlier missing.
+				max_date_str = datetime.fromtimestamp(max_date).strftime("%Y-%m-%d %H:%M:%S")
+
+				if retries < 96:
+					max_date -= 21600 # Decrease by six hours
+					self.dataset.update_status("Collected %s posts for tag %s, but no new posts returned - decreasing time search with 6 hours to %s to make sure this is really it (retry %s/96)" % (str(len(all_posts)), tag, max_date_str, str(retries),))
+				elif retries <= self.max_retries:
+					max_date -= 604800 # Decrease by one week
+					retry_str = str(retries - 96)
+					self.dataset.update_status("Collected %s posts for tag %s, but no new posts returned - no new posts found with decreasing by 6 hours, decreasing with a week to %s instead (retry %s/150)" % (str(len(all_posts)), tag, max_date_str, str(retry_str),))
+
 				continue
 
 			# Append posts to main list
 			else:
-				posts = self.parse_tumblr_posts(posts)
 
-				# Get the lowest date
-				max_date = sorted([post["timestamp"] for post in posts])[0]
+				posts = self.parse_tumblr_posts(posts)
+				
+				# Get all timestamps and sort them.
+				post_dates = sorted([post["timestamp"] for post in posts])
+				
+				# Get the lowest date and use it as the next "before" parameter.
+				max_date = post_dates[0]
+
+				# Tumblr's API is volatile - it doesn't neatly sort posts by date,
+				# so it can happen that there's suddenly huge jumps in time.
+				# Check if this is happening by extracting the difference between all consecutive dates.
+				time_difs = list()
+				post_dates.reverse()
+
+				for i, date in enumerate(post_dates):
+
+					if i == (len(post_dates) - 1):
+						break
+
+					# Calculate and add time differences
+					time_dif = date - post_dates[i + 1]
+
+					# After having collected 250 posts, check whether the time
+					# difference between posts far exceeds the average time difference
+					# between posts. If it's more than five times this amount,
+					# restart the query with the timestamp just before the gap, minus the 
+					# average time difference up to this point - something might be up with Tumblr's API.
+					if len(all_posts) >= 250 and time_dif > (avg_time_dif * 5):
+
+						time_str = datetime.fromtimestamp(date).strftime("%Y-%m-%d %H:%M:%S")
+						self.dataset.update_status("Time difference of %s spotted, restarting query at %s" % (str(time_dif), time_str,))
+
+						self.seen_ids.update([post["id"] for post in posts])
+						posts = [post for post in posts if post["timestamp"] >= date]
+						if posts:
+							all_posts += posts
+						
+						max_date = date
+						break
+
+					time_difs.append(time_dif)
+				
+				# To start a new query
+				if not posts:
+					break
 
 				# Manually check if we have a lower date than the lowest allowed date already (min date).
 				# This functonality is not natively supported by Tumblr.
 				if min_date:
 					if max_date < min_date:
+					
 						# Get rid of all the posts that are earlier than the max_date timestamp
 						posts = [post for post in posts if post["timestamp"] >= min_date]
 						
+
 						if posts:
 							all_posts += posts
+							self.seen_ids.update([post["id"] for post in posts])
 						break
 
+				# We got a new post, so we can reset the retry count.
 				retries = 0
 
-				#if (max_date - posts[len(posts) - 1]["timestamp"]) > 500000:
-					#self.dataset.update_status("ALERT - DATES LIKELY SKIPPED")
-					#self.dataset.update_status([post["timestamp"] for post in posts])
+				# Add retrieved posts top the main list
+				all_posts += posts
+
+				# Add to seen ids
+				self.seen_ids.update([post["id"] for post in posts])
+				
+				# Add time differences and calculate new average time difference
+				all_time_difs += time_difs
+
+				# Make the average time difference a moving average,
+				# to be flexible with faster and slower post paces.
+				# Delete the first 100 posts every hundred or so items.
+				if (len(all_time_difs) - time_difs_len) > 100:
+					all_time_difs = all_time_difs[time_difs_len:]
+				time_difs_len = len(all_time_difs)
+				avg_time_dif = sum(all_time_difs) / len(all_time_difs)
 
 			if len(all_posts) >= self.max_posts:
 				self.max_posts_reached = True
 				break
 
-			self.dataset.update_status("Collected %s posts" % str(len(all_posts)))
+			self.dataset.update_status("Collected %s posts for tag %s" % (str(len(all_posts)), tag,))
 
 		return all_posts
 
@@ -240,7 +326,7 @@ class SearchTumblr(Search):
 
 		# Some retries to make sure the Tumblr API actually returns everything
 		retries = 0
-		max_retries = 48 # 2 days
+		self.max_retries = 48 # 2 days
 
 		# Get Tumblr posts until there's no more left.
 		while True:
@@ -248,7 +334,7 @@ class SearchTumblr(Search):
 				raise ProcessorInterruptedException("Interrupted while fetching blog posts from Tumblr")
 
 			# Stop min_date 20 retries
-			if retries >= max_retries:
+			if retries >= self.max_retries:
 				self.dataset.update_status("No more posts")
 				break
 
@@ -439,9 +525,9 @@ class SearchTumblr(Search):
 		some metadata.
 
 		:param dict query:  Query parameters, from client-side.
-		:param request:  Flask request
-		:param User user:  User object of user who has submitted the query
-		:return dict:  Safe query parameters
+		:param request:  	Flask request
+		:param User user:  	User object of user who has submitted the query
+		:return dict:  		Safe query parameters
 		"""
 
 		# 'location' would be possible as well but apparently requires a login
@@ -453,12 +539,12 @@ class SearchTumblr(Search):
 			raise QueryParametersException("You must provide a search query.")
 
 		# reformat queries to be a comma-separated list
-		items = query.get("query").replace("\n", ",").replace("#","").replace("\r", ",")
-		items = items.split(",")
+		items = query.get("query").replace("#","")
+		items = items.split("\n")
 
 		# Not more than 10 plox
 		if len(items) > 10:
-			raise QueryParametersException("Only query for five or less tags or blogs.")
+			raise QueryParametersException("Only query for ten or less tags or blogs." + str(len(items)))
 		# no query 4 u
 		if not items:
 			raise QueryParametersException("Invalid search search query.")
@@ -557,7 +643,6 @@ class SearchTumblr(Search):
 			processed_post = {
 				# General columns
 				"type": post_type,
-				"timestamp_full": post["date"],
 				"timestamp": post["timestamp"],
 				"is_reblog": reblog,
 
