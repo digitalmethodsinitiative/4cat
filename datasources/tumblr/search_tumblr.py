@@ -9,6 +9,7 @@ import os
 import re
 import time
 import pytumblr
+from requests.exceptions import ConnectionError
 from datetime import datetime
 
 import config
@@ -35,7 +36,8 @@ class SearchTumblr(Search):
 	accepts = [None]
 
 	max_workers = 1
-	max_retries = 96 + 150 # 96 time retries of -6 hours (24 days), plus 150 extra for 150 weeks (~3 years)
+	max_retries = 3 # For API and connection retries.
+	max_date_retries = 96 + 150 # For checking dates. 96 time retries of -6 hours (24 days), plus 150 extra for 150 weeks (~3 years).
 	max_posts = 1000000
 
 	max_posts_reached = False
@@ -151,6 +153,7 @@ class SearchTumblr(Search):
 
 		# Some retries to make sure the Tumblr API actually returns everything.
 		retries = 0
+		date_retries = 0
 
 		# We're gonna change max_date, so store a copy for reference.
 		max_date_original = max_date
@@ -165,26 +168,39 @@ class SearchTumblr(Search):
 			if self.interrupted:
 				raise ProcessorInterruptedException("Interrupted while fetching tag posts from Tumblr")
 
-			# Stop after max retries
+			# Stop after max for date reductions
+			if date_retries >= self.max_date_retries:
+				self.dataset.update_status("No more posts in this date range")
+				break
+
+			# Stop after max retries for API/connection stuff
 			if retries >= self.max_retries:
 				self.dataset.update_status("No more posts")
 				break
 
-			# Use the pytumblr library to make the API call
-			posts = client.tagged(tag, before=max_date, limit=20, filter="raw")
+			try:
+				# Use the pytumblr library to make the API call
+				posts = client.tagged(tag, before=max_date, limit=20, filter="raw")
+			except ConnectionError:
+				self.update_status("Encountered a connection error, waiting 10 seconds.")
+				time.sleep(10)
+				retries += 1
+				continue
 
 			# Get rid of posts that we already enountered,
 			# preventing Tumblr API shenanigans or double posts because of
-			# time reductions. Make sure it's no error string, though.
+			# time reductions. Make sure it's no odd error string, though.
 			unseen_posts = []
-			error_strs = ["meta", "response", "errors"]
 			for check_post in posts:
-				if check_post in error_strs:
-					self.dataset.update_status("Couldnt add post ", check_post)
+				# Sometimes the API repsonds just with "meta", "response", or "errors".
+				if isinstance(check_post, str):
+					self.dataset.update_status("Couldnt add post:", check_post)
+					retries += 1
+					break
 				else:
+					retries = 0
 					if check_post["id"] not in self.seen_ids:
 						unseen_posts.append(check_post)
-
 			posts = unseen_posts
 
 			# For no clear reason, the Tumblr API sometimes provides posts with a higher timestamp than requested.
@@ -202,20 +218,21 @@ class SearchTumblr(Search):
 
 			# Make sure the Tumblr API doesn't magically stop at an earlier date
 			if not posts:
-				retries += 1
+
+				date_retries += 1
 
 				# We're first gonna check carefully if there's small timegaps by
 				# decreasing by six hours.
-				# If that didn't result in any new posts, also dedicate 12 retries
+				# If that didn't result in any new posts, also dedicate 12 date_retries
 				# with reductions of six months, just to be sure there's no data from
 				# years earlier missing.
 
-				if retries < 96:
+				if date_retries < 96:
 					max_date -= 21600 # Decrease by six hours
-					self.dataset.update_status("Collected %s posts for tag %s, but no new posts returned - decreasing time search with 6 hours to %s to make sure this is really it (retry %s/96)" % (str(len(all_posts)), tag, max_date_str, str(retries),))
-				elif retries <= self.max_retries:
+					self.dataset.update_status("Collected %s posts for tag %s, but no new posts returned - decreasing time search with 6 hours to %s to make sure this is really it (retry %s/96)" % (str(len(all_posts)), tag, max_date_str, str(date_retries),))
+				elif date_retries <= self.max_date_retries:
 					max_date -= 604800 # Decrease by one week
-					retry_str = str(retries - 96)
+					retry_str = str(date_retries - 96)
 					self.dataset.update_status("Collected %s posts for tag %s, but no new posts returned - no new posts found with decreasing by 6 hours, decreasing with a week to %s instead (retry %s/150)" % (str(len(all_posts)), tag, max_date_str, str(retry_str),))
 
 				# We can stop when the max date drops below the min date.
@@ -286,7 +303,8 @@ class SearchTumblr(Search):
 							self.seen_ids.update([post["id"] for post in posts])
 						break
 
-				# We got a new post, so we can reset the retry count.
+				# We got a new post, so we can reset the retry counts.
+				date_retries = 0
 				retries = 0
 
 				# Add retrieved posts top the main list
