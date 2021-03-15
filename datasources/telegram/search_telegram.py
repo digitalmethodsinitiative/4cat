@@ -10,10 +10,10 @@ from pathlib import Path
 
 from backend.abstract.search import Search
 from backend.lib.exceptions import QueryParametersException, ProcessorInterruptedException
-from backend.lib.helpers import convert_to_int
+from backend.lib.helpers import convert_to_int, UserInput
 
 from telethon.sync import TelegramClient
-from telethon.tl.functions.users import GetFullUserRequest
+from telethon.errors.rpcerrorlist import UsernameInvalidError
 from telethon.tl.types import User, Message, PeerChannel, PeerChat, PeerUser
 
 
@@ -128,7 +128,7 @@ class SearchTelegram(Search):
 					i += 1
 					if i > max_items:
 						break
-			except ValueError as e:
+			except (ValueError, UsernameInvalidError) as e:
 				self.dataset.update_status("Could not scrape entity '%s'" % query)
 
 			posts += list(reversed(query_posts))
