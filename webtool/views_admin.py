@@ -141,8 +141,8 @@ def reject_user():
 	try:
 		html_message = markdown.markdown(form_message)
 
-		email.attach(MIMEText(html_message, "plain"))
-		email.attach(MIMEText(form_message, "html"))
+		email.attach(MIMEText(form_message, "plain"))
+		email.attach(MIMEText(html_message, "html"))
 
 		with smtplib.SMTP(config.MAILHOST) as smtp:
 			smtp.sendmail(config.NOREPLY_EMAIL, [email_address], email.as_string())
