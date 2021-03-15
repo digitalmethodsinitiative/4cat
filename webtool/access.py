@@ -216,9 +216,13 @@ def request_access():
 			for field in required:
 				mail += "<p><b>" + field + "</b>: " + request.form.get(field, "") + " </p>\n"
 
-			approve_url = "https" if config.FlaskConfig.SERVER_HTTPS else "http"
-			approve_url += "://%s/admin/add-user/?format=html&email=%s" % (config.FlaskConfig.SERVER_NAME, request.form.get("email", ""))
+			root_url = "https" if config.FlaskConfig.SERVER_HTTPS else "http"
+			root_url += "://%s/admin/" % config.FlaskConfig.SERVER_NAME
+			approve_url = root_url + "add-user/?format=html&email=%s" % request.form.get("email", "")
+			reject_url = root_url + "reject-user/?name=%s&email=%s" % (request.form.get("name", ""), request.form.get("email", ""))
 			mail += "<p>Use <a href=\"%s\">this link</a> to approve this request and send a password reset e-mail.</p>" % approve_url
+			mail += "<p>Use <a href=\"%s\">this link</a> to send a message to this person about why their request was " \
+					"rejected.</p>" % reject_url
 
 			message.attach(MIMEText(html_parser.handle(mail), "plain"))
 			message.attach(MIMEText(mail, "html"))

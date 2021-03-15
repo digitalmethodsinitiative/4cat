@@ -3,9 +3,16 @@
 """
 import re
 import time
+import smtplib
 import psycopg2
+import markdown
 
 import backend
+import config
+
+from pathlib import Path
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 
 from flask import render_template, jsonify, request
 from flask_login import login_required, current_user
@@ -89,3 +96,58 @@ def add_user():
 							   title=("New account created" if response["success"] else "Error"))
 	else:
 		return jsonify(response)
+
+
+@app.route("/admin/reject-user/", methods=["GET", "POST"])
+@login_required
+def reject_user():
+	"""
+	(Politely) reject an account request
+
+	Sometimes, account requests need to be rejected. If you want to let the
+	requester know of the rejection, this is the route to use :-)
+
+	:return: HTML form, or message containing the e-mail send status
+	"""
+	if not current_user.is_authenticated or not current_user.is_admin():
+		return error(403, message="This page is off-limits to you.")
+
+	email_address = request.form.get("email", request.args.get("email", "")).strip()
+	name = request.form.get("name", request.args.get("name", "")).strip()
+	form_message = request.form.get("message", request.args.get("message", "")).strip()
+
+	incomplete = []
+	if not email_address:
+		incomplete.append("email")
+
+	if not name:
+		incomplete.append(name)
+
+	if not form_message:
+		incomplete.append(form_message)
+
+	if incomplete:
+		if not form_message:
+			form_answer = Path(config.PATH_ROOT, "webtool/templates/account/reject-template.html")
+			form_message = "" if not form_answer.exists() else render_template("account/reject-template.html", email=email_address, name=name)
+
+		return render_template("account/reject.html", email=email_address, name=name, message=form_message, incomplete=incomplete)
+
+	email = MIMEMultipart("alternative")
+	email["From"] = config.NOREPLY_EMAIL
+	email["To"] = email_address
+	email["Subject"] = "Your %s account request" % config.TOOL_NAME
+
+	try:
+		html_message = markdown.markdown(form_message)
+
+		email.attach(MIMEText(html_message, "plain"))
+		email.attach(MIMEText(form_message, "html"))
+
+		with smtplib.SMTP(config.MAILHOST) as smtp:
+			smtp.sendmail(config.NOREPLY_EMAIL, [email_address], email.as_string())
+	except (smtplib.SMTPException, ConnectionRefusedError) as e:
+		return render_template("error.html", message="Could not send e-mail to %s: %s" % (email_address, e),
+						title="Error sending rejection")
+
+	return render_template("error.html", message="Rejection sent to %s." % email_address, title="Rejection sent")

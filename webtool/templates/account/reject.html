@@ -1,0 +1,36 @@
+{% extends "layout.html" %}
+
+{% block title %}Reject account request{% endblock %}
+{% block body_class %}plain-page markdown-page {{ body_class }}{% endblock %}
+
+{% block body %}
+    <article class="small">
+        <section>
+            <h2><span>Reject account request</span></h2>
+            <p>Use this form to send a rejection to an account request for {{ __tool_name }}.</p>
+
+            <form action="/admin/reject-user/" method="POST" class="wide">
+                {% for notice in flashes %}
+                    <p class="form-notice">{{ notice }}</p>
+                {% endfor %}
+                <div class="form-element{% if "name" in incomplete %} missing{% endif %}">
+                    <label for="request-name">Name</label>
+                    <input type="text" name="name" id="request-name" value="{{ name }}">
+                </div>
+                <div class="form-element{% if "email" in incomplete %} missing{% endif %}">
+                    <label for="request-email">E-mail</label>
+                    <input type="text" name="email" id="request-email" value="{{ email }}">
+                </div>
+                <div class="form-element{% if "message" in incomplete %} missing{% endif %}">
+                    <label for="request-message">Message</label>
+                    <textarea rows="10" cols="50" name="message" id="request-message">{{ message }}</textarea>
+                </div>
+                <div class="submit-container">
+                    <button>Send rejection</button>
+                </div>
+            </form>
+
+            {% include "form-footer.html" %}
+        </section>
+    </article>
+{% endblock %}
