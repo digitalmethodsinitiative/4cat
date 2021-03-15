@@ -215,14 +215,14 @@ class Search(BasicProcessor, ABC):
 		"""
 		return "complex" if query.get("body_match", None) or query.get("subject_match", None) else "simple"
 
-	def posts_to_csv(self, sql_results, filepath):
+	def posts_to_csv(self, results, filepath):
 		"""
 		Takes a dictionary of results, converts it to a csv, and writes it to the
 		given location. This is mostly a generic dictionary-to-CSV processor but
 		some specific processing is done on the "body" key to strip HTML from it,
 		and a human-readable timestamp is provided next to the UNIX timestamp.
 
-		:param sql_results:		List with results derived with db.fetchall()
+		:param results:			List of dict rows from data source.
 		:param filepath:    	Filepath for the resulting csv
 
 		:return int:  Amount of posts that were processed
@@ -252,7 +252,7 @@ class Search(BasicProcessor, ABC):
 		with filepath.open("w", encoding="utf-8") as csvfile:
 			# Parsing: remove the HTML tags, but keep the <br> as a newline
 			# Takes around 1.5 times longer
-			for row in sql_results:
+			for row in results:
 				if self.interrupted:
 					raise ProcessorInterruptedException("Interrupted while writing results to file")
 
@@ -264,13 +264,34 @@ class Search(BasicProcessor, ABC):
 					header_written = True
 
 				processed += 1
+
 				# Create human dates from timestamp
-				from datetime import datetime
+				from datetime import datetime, timezone
+				
 				if "timestamp" in row:
-					row["unix_timestamp"] = row["timestamp"]
-					row["timestamp"] = datetime.utcfromtimestamp(row["timestamp"]).strftime('%Y-%m-%d %H:%M:%S')
+					# Data sources should have "timestamp" as a unix epoch integer,
+					# but do some conversion if this is not the case.
+					timestamp = row["timestamp"]
+					if not isinstance(timestamp, int):
+						if isinstance(timestamp, str) and "-" not in timestamp: # String representation of epoch timestamp
+							timestamp = int(timestamp)
+						elif isinstance(timestamp, str) and "-" in timestamp: # Date string
+							try:
+								timestamp = datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc).timestamp()
+							except ValueError:
+								timestamp = "undefined"
+						else:
+							timestamp = "undefined"
+
+					# Add a human-readable date format as well, if we have a valid timestamp.
+					row["unix_timestamp"] = timestamp
+					if timestamp is not "undefined":
+						row["timestamp"] = datetime.utcfromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M:%S')
+					else:
+						row["timestamp"] = timestamp
 				else:
 					row["timestamp"] = "undefined"
+
 				# Parse html to text
 				if row["body"]:
 					row["body"] = strip_tags(row["body"])

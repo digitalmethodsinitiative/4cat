@@ -24,7 +24,7 @@ var fa2config = {
 	startingIterations: 10,
 	iterationsPerRender: 10,
 	strongGravityMode: false,
-	slowDown: 10,
+	slowDown: 1,
 };
 
 var animation_running = false;
@@ -157,55 +157,22 @@ function min_degree_filter(min_degree) {
 	}
 	s.killForceAtlas2();
 
-
 	var min_degree = parseInt(min_degree);
 
-	var index = $("#time-slider").val() - 1;
-	var key = Object.keys(core_json)[index];
-	var root_json = JSON.parse(JSON.stringify(core_json[key])); // Important: deep copy!
-	
-	// First we need to re-add the nodes and edges to know their original degree values.
-	// e.g. necessary if we want to go from a min degree range of 20 to 3.
-	var nodes_there = s.graph.nodes().map(value => value.id);
-	var edges_there = s.graph.edges().map(value => value.id);
-	for (n of root_json["nodes"]) {
-		if (!nodes_there.includes(n.id)) {
-			s.graph.addNode({
-				id: n["id"],
-				size: n["size"],
-				label: n["label"],
-				x: (Math.random() * 20),
-				y: (Math.random() * 20)
-			});
-		}
-	}
-	for (e of root_json["edges"]) {
-		if (!edges_there.includes(e.id)) {
-			s.graph.addEdge({
-				id: e["id"],
-				label: e["label"],
-				size: e["size"],
-				source: e["source"],
-				target: e["target"]
-			});
-		}
-	}
-
-	var nodes_to_drop = Array();
-
+	// Loop through nodes
 	s.graph.nodes().forEach(function(node){
 
 		// Node is a reference to your node in the graph
 		degree = s.graph.degree(node.id);
 		
 		if (degree < min_degree) {
-			nodes_to_drop.push(node.id)
+			node.hidden = true;
+		}
+		else {
+			node.hidden = false;
 		}
 	});
 
-	for (node_id of nodes_to_drop) {
-		s.graph.dropNode(node_id);
-	}
 	s.refresh();
 }
 
