@@ -82,12 +82,13 @@ class Logger:
 
 		self.logger.addHandler(mailer)
 
-	def log(self, message, level=logging.INFO):
+	def log(self, message, level=logging.INFO, slack_alert=True):
 		"""
 		Log message
 
 		:param message:  Message to log
 		:param level:  Severity level, should be a logger.* constant
+		:param bool slack_alert:  If configured, send a log alert to slack webhook
 		"""
 		if self.print_logs and level > logging.DEBUG:
 			print("LOG: %s" % message)
@@ -151,7 +152,9 @@ class Logger:
 			try:
 				e = requests.post(config.WARN_SLACK_URL, json.dumps(message))
 			except requests.RequestException as e:
-				self.warning("Could not send log alerts to Slack webhook (%s)" % e)
+				# do not use self.warning because it will trigger an infinite
+				# loop of trying to send something to Slack
+				self.log(self.levels["WARNING"], "Could not send log alerts to Slack webhook (%s)" % e, False)
 
 		# every 10 minutes, collect and send warnings etc
 		if config.WARN_EMAILS and self.previous_report < time.time() - config.WARN_INTERVAL:
