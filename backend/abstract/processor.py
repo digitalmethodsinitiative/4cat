@@ -122,7 +122,7 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 				frames = traceback.extract_tb(e.__traceback__)
 				frames = [frame.filename.split("/").pop() + ":" + str(frame.lineno) for frame in frames[1:]]
 				location = "->".join(frames)
-				
+
 				# Not all datasets have source_dataset keys
 				if len(self.dataset.get_genealogy()) > 1:
 					parent_key = " (via " + self.dataset.get_genealogy()[0].key + ")"
@@ -225,7 +225,7 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 			# cancel job
 			self.job.finish()
 
-	def iterate_items(self, path):
+	def iterate_items(self, path, bypass_map_item=False):
 		"""
 		A generator that iterates through a CSV or NDJSON file
 
@@ -254,7 +254,7 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 		# open question if 'source_dataset' shouldn't be an attribute of the dataset
 		# instead of the processor...
 		item_mapper = None
-		if hasattr(self, "source_dataset") and self.source_dataset:
+		if hasattr(self, "source_dataset") and self.source_dataset and not bypass_map_item:
 			parent_processor = self.all_modules.processors.get(self.source_dataset.type)
 			if parent_processor:
 				parent_processor = self.all_modules.load_worker_class(parent_processor)
