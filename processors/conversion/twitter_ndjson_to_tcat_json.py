@@ -43,9 +43,13 @@ class ConvertNDJSONToJSON(BasicProcessor):
 
                 post = self.map_to_TCAT(post)
 
-                # NDJSON file is expected by TCAT
-                output.write(json.dumps(post, ensure_ascii=False))
-                output.write('\n')
+                # TCAT has a check on line 62 of /import/import-jsondump.php
+                # that rejects strings large than 40960
+                #https://github.com/digitalmethodsinitiative/dmi-tcat/blob/9654fe3ff489fd3b0efc6ddcf7c19adf8ed7726d/import/import-jsondump.php#L62
+                if len(json.dumps(tweet)) < 40960:
+                    output.write(json.dumps(post, ensure_ascii=False))
+                    # NDJSON file is expected by TCAT
+                    output.write('\n')
 
         self.dataset.update_status("Finished.")
         self.dataset.finish(num_rows=posts)
@@ -131,8 +135,7 @@ class ConvertNDJSONToJSON(BasicProcessor):
 
                     # Geo data currently has option of place_id and place_id's can have coordinates
                     'place' : {'id' : tweet.get('geo', {}).get('place_id')},
-                    'geo' : tweet.get('geo', {}).get('coordinates', {}).get('coordinates') if tweet.get('geo', {}).get('coordinates') else None,
-
+                    'geo' : tweet.get('geo', {}).get('coordinates'),
                     # Reply
                     'in_reply_to_user_id_str' : tweet.get('in_reply_to_user_id'),
                     'in_reply_to_screen_name' : tweet.get('in_reply_to_user', {}).get('username'),
