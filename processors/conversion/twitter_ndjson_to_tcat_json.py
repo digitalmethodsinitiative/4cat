@@ -44,7 +44,7 @@ class ConvertNDJSONToJSON(BasicProcessor):
         # once, since else we risk having to keep a lot of data in memory,
         # and this buffers one row at most
         with self.dataset.get_results_path().open("w") as output:
-            output.write("[")
+            # output.write("[")
             for post in self.iterate_items(self.source_file, bypass_map_item=True):
                 # stop processing if worker has been asked to stop
                 if self.interrupted:
@@ -52,13 +52,14 @@ class ConvertNDJSONToJSON(BasicProcessor):
 
                 posts += 1
 
-                if posts > 1:
-                    output.write(",")
+                # if posts > 1:
+                #     output.write(",")
 
                 post = self.map_to_TCAT(post)
 
-                output.write(json.dumps(post))
-            output.write("]")
+                output.write(json.dumps(post, ensure_ascii=False))
+                output.write('\n')
+            # output.write("]")
 
         self.dataset.update_status("Finished.")
         self.dataset.finish(num_rows=posts)
@@ -66,6 +67,23 @@ class ConvertNDJSONToJSON(BasicProcessor):
     def map_to_TCAT(self, tweet):
         """
         Map a the ndjson Tweet object to expected TCAT input
+
+        The following are requested by TCAT, but not in APIv2:
+        #TCAT Requires
+        ['user']['lang']
+        ['user']['utc_offset']
+        ['user']['time_zone']
+        ['user']['favourites_count']
+        ['media']['expanded_url']
+        ['media']['media_url_https']
+        ['media']['large']['resize'] #Only requires if photo information present
+        #TCAT checks for existance
+        ['user']['withheld_scope']
+        ['withheld_scope']
+        ['filter_level']
+        ['media']['indicies']
+
+
 
         :param tweet:  Tweet object as originally returned by the Twitter API
         :return dict:  Dictionary/JSON in the format expected by TCAT's import-jsondump.php
@@ -94,6 +112,11 @@ class ConvertNDJSONToJSON(BasicProcessor):
                               'pinned_tweet_id' : tweet.get('author_user').get('pinned_tweet_id'),
                               'entities' : tweet.get('author_user').get('entities'),
 
+                              # Required by TCAT, but not in APIv2
+                              'lang' : None,
+                              'utc_offset': None,
+                              'time_zone' : None,
+                              'favourites_count' : None,
                              },
                     'source' : tweet['source'],
                     'lang' : tweet.get('lang'),
@@ -106,8 +129,8 @@ class ConvertNDJSONToJSON(BasicProcessor):
                     'text': tweet['text'],
 
                     'entities' : {
-                                  'user_mentions' : tweet.get('entities', {}).get('mentions') if tweet.get('entities') else None,
-                                  'hashtags' : tweet.get('entities', {}).get('hashtags'),
+                                  'user_mentions' : self.user_mentions_item(tweet.get('entities', {}).get('mentions')) if tweet.get('entities', {}).get('mentions') else [],
+                                  'hashtags' : self.hashtag_item(tweet.get('entities', {}).get('hashtags')) if tweet.get('entities', {}).get('hashtags') else [],
                                   'urls' : tweet.get('entities', {}).get('urls', []),
 
                                   # Not used by TCAT
@@ -149,6 +172,11 @@ class ConvertNDJSONToJSON(BasicProcessor):
         if any([ref["type"] == "retweeted" for ref in tweet.get("referenced_tweets", [])]):
             new_tweet['retweeted_status'] = self.reformat_retweet(next(retweet for retweet in tweet.get('referenced_tweets') if retweet.get('type') == 'retweeted'))
 
+            # Also adding user to user_mentions in first position for TCAT
+            # TCAT will add this user to the retweet user_mentions
+            # See https://github.com/digitalmethodsinitiative/dmi-tcat/blob/9654fe3ff489fd3b0efc6ddcf7c19adf8ed7726d/capture/common/functions.php#L1683
+            new_tweet["entities"]["user_mentions"].insert(0, new_tweet['user'])
+
         return new_tweet
 
     def reformat_retweet(self, retweet):
@@ -161,12 +189,12 @@ class ConvertNDJSONToJSON(BasicProcessor):
                 'id_str' : retweet.get('id'),
                 'user' : {'screen_name' : retweet.get('username')},
                 'entities' : {
-                              'user_mentions' : retweet.get('entities', {}).get('mentions'),
-                              'hashtags' : retweet.get('entities', {}).get('hashtags'),
-                              'urls' : retweet.get('entities', {}).get('urls'),
+                              'user_mentions' : self.user_mentions_item(retweet.get('entities', {}).get('mentions')) if retweet.get('entities', {}).get('mentions') else [],
+                              'hashtags' : self.hashtag_item(retweet.get('entities', {}).get('hashtags')) if retweet.get('entities', {}).get('hashtags') else [],
+                              'urls' : retweet.get('entities', {}).get('urls', []),
 
                               # Media is stored in attachements with APIv2
-                              'media' : retweet.get('attachments', {}).get('media_keys') if retweet.get('attachments') else None,
+                              'media' : self.media_item(retweet.get('attachments', {}).get('media_keys')) if retweet.get('attachments', {}).get('media_keys') else None,
 
                               # Not used by TCAT
                               'cashtags' : retweet.get('entities', {}).get('cashtags'),
@@ -188,12 +216,43 @@ class ConvertNDJSONToJSON(BasicProcessor):
                 new_list.append({
                     'id_str' : media.get('media_key'),
                     'url' : media.get('url') if media.get('url') else media.get('preview_image_url'),
+                    'type' : media.get('type'),
+                    'sizes' : {'large' : {'w' : media.get('width'),
+                                          'h' : media.get('height'),
+                    #TCAT Requires
+                                          'resize' : None}
+                               },
                     'expanded_url' : None,
                     'media_url_https' : None,
-                    'type' : media.get('type'),
-                    'sizes' : {'large' : {'w' : media.get('width'), 'h' : media.get('height'), 'resize' : None}}
                     })
             else:
                 # Media Key only
                 new_list.append({'id_str' : media, 'url' : None, 'expanded_url' : None, 'media_url_https' : None, 'type' : None})
         return new_list
+
+    def user_mentions_item(self, mentions):
+        """
+        Creating mention keys expected by TCAT.
+
+        NOTE: Some mentions of users are abbreviated and only contain username/screen_name
+        This includes users that have been suspended by Twitter, but also in some retweets
+        for currently unknown reasons.
+        """
+        modified_mentions = []
+        for mention in mentions:
+            mention['screen_name'] = mention.get('username')
+            if mention.get('id', None):
+                mention['id_str'] = mention.get('id')
+            else:
+                mention['id_str'] = None
+            modified_mentions.append(mention)
+        return modified_mentions
+
+    def hashtag_item(self, hashtags):
+        """
+        """
+        modified_hashtags = []
+        for hashtag in hashtags:
+            hashtag['text'] = hashtag.get('tag')
+            modified_hashtags.append(hashtag)
+        return modified_hashtags
