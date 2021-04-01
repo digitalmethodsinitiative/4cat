@@ -22,14 +22,6 @@ class ConvertNDJSONToJSON(BasicProcessor):
     description = "Convert a NDJSON Twitter file to TCAT JSON format"  # description displayed in UI
     extension = "json"  # extension of result file, used internally and in UI
 
-    # TODO: Unsure what the following is for
-    # all post-processors with CSV output
-    # accepts = ["search", "collocations", "count-posts", "debate_metrics", "get-entities",
-    # 		   "extract-nouns", "hatebase-data", "penelope-semanticframe", "quote-ranker",
-    # 		   "tfidf", "thread-metadata", "sentence-split", "hatebase-frequencies",
-    # 		   "count-countries", "top-images", "url-extractor", "extract-usernames", "vector-ranker",
-    # 		   "count-words", "youtube-metadata", "attribute-frequencies", "count-posts"]
-
     input = "ndjson"
     output = "json"
 
@@ -40,11 +32,8 @@ class ConvertNDJSONToJSON(BasicProcessor):
         posts = 0
         self.dataset.update_status("Converting posts")
 
-        # we write to file per row, instead of json.dumps()ing all of it at
-        # once, since else we risk having to keep a lot of data in memory,
-        # and this buffers one row at most
+        # This handles and writes one Tweet at a time
         with self.dataset.get_results_path().open("w") as output:
-            # output.write("[")
             for post in self.iterate_items(self.source_file, bypass_map_item=True):
                 # stop processing if worker has been asked to stop
                 if self.interrupted:
@@ -52,23 +41,24 @@ class ConvertNDJSONToJSON(BasicProcessor):
 
                 posts += 1
 
-                # if posts > 1:
-                #     output.write(",")
-
                 post = self.map_to_TCAT(post)
 
+                # NDJSON file is expected by TCAT
                 output.write(json.dumps(post, ensure_ascii=False))
                 output.write('\n')
-            # output.write("]")
 
         self.dataset.update_status("Finished.")
         self.dataset.finish(num_rows=posts)
 
     def map_to_TCAT(self, tweet):
         """
-        Map a the ndjson Tweet object to expected TCAT input
+        Map a the ndjson Tweet object from Twitter's APIv2 to expected TCAT input
+        for the import-jsondump.php file.
 
-        The following are requested by TCAT, but not in APIv2:
+        Additional information that is currently unused by TCAT is still included
+        in output to allow for later changes if TCAT wishes to use this data.
+
+        The following are requested by TCAT, but not in APIv2 and are set to None:
         #TCAT Requires
         ['user']['lang']
         ['user']['utc_offset']
@@ -76,16 +66,14 @@ class ConvertNDJSONToJSON(BasicProcessor):
         ['user']['favourites_count']
         ['media']['expanded_url']
         ['media']['media_url_https']
-        ['media']['large']['resize'] #Only requires if photo information present
-        #TCAT checks for existance
+        ['media']['large']['resize'] #Only required if photo information present
+        #TCAT checks for existance of the following are not included
         ['user']['withheld_scope']
         ['withheld_scope']
         ['filter_level']
         ['media']['indicies']
 
-
-
-        :param tweet:  Tweet object as originally returned by the Twitter API
+        :param tweet:  Tweet object as originally returned by the Twitter APIv2
         :return dict:  Dictionary/JSON in the format expected by TCAT's import-jsondump.php
         """
         new_tweet = {
@@ -137,7 +125,7 @@ class ConvertNDJSONToJSON(BasicProcessor):
                                   'cashtags' : tweet.get('entities', {}).get('cashtags'),
                                   'annotations' : tweet.get('entities', {}).get('annotations'),
 
-                                  # Media is stored in attachements with APIv2
+                                  # Media is stored in attachements with APIv2 but TCAT expect in entities
                                   'media' : self.media_item(tweet.get('attachments', {}).get('media_keys')) if tweet.get('attachments', {}).get('media_keys') else None,
                                  },
 
@@ -168,6 +156,7 @@ class ConvertNDJSONToJSON(BasicProcessor):
                     }
 
         # Retweet - TCAT checks existance of 'retweeted_status' as key to determine if tweet is a retweet
+        # We instead search for a referenced_tweets with type 'retweeted'
         # This assumes only one retweet in reference tweets (which has proven true in testing)
         if any([ref["type"] == "retweeted" for ref in tweet.get("referenced_tweets", [])]):
             new_tweet['retweeted_status'] = self.reformat_retweet(next(retweet for retweet in tweet.get('referenced_tweets') if retweet.get('type') == 'retweeted'))
@@ -182,7 +171,7 @@ class ConvertNDJSONToJSON(BasicProcessor):
     def reformat_retweet(self, retweet):
         """
         TCAT handles retweets in a few different ways. This mimics the extended context
-        query that import-jsondump.php expect. Full retweet is stored as referenced_tweets.
+        query that import-jsondump.php expect. Full retweet is stored in referenced_tweets.
         """
         return {
                 'full_text' : retweet.get('text'),
@@ -203,8 +192,10 @@ class ConvertNDJSONToJSON(BasicProcessor):
                 }
     def media_item(self, tweet_media):
         """
-        Some media items return only a string while others return more robust items.
-        The string appears to be a key referencing a videos.
+        Some media items return only a string while others return more robust objects.
+        The string appears to be a key referencing a video. Twitter APIv2 returns
+        media objects in a second output, but it appears TCAT does not store much
+        information about media.
 
         Twitter APIv2 does not have media_url_https, url_expanded, resize (under sizes->large), or indices
         as requested by TCAT.
@@ -235,12 +226,13 @@ class ConvertNDJSONToJSON(BasicProcessor):
         Creating mention keys expected by TCAT.
 
         NOTE: Some mentions of users are abbreviated and only contain username/screen_name
-        This includes users that have been suspended by Twitter, but also in some retweets
-        for currently unknown reasons.
+        This occurs with users that have been suspended by Twitter, but also in some retweets
+        for unknown reasons.
         """
         modified_mentions = []
         for mention in mentions:
             mention['screen_name'] = mention.get('username')
+            # Check to see if id was included
             if mention.get('id', None):
                 mention['id_str'] = mention.get('id')
             else:
@@ -250,6 +242,7 @@ class ConvertNDJSONToJSON(BasicProcessor):
 
     def hashtag_item(self, hashtags):
         """
+        Create hashtag key expected by TCAT.
         """
         modified_hashtags = []
         for hashtag in hashtags:
