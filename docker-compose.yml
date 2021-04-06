@@ -2,19 +2,16 @@ version: '3.6'
 
 services:
   db:
-    environment:
-      POSTGRES_USER: test
-      POSTGRES_PASSWORD: test
-      POSTGRES_DB: 4cat
-      POSTGRES_HOST_AUTH_METHOD: trust
     image: postgres:latest
-    networks:
-      - default
     ports:
       - 5432:5432
-    restart: always
+    environment:
+      POSTGRES_USER: fourcat
+      POSTGRES_PASSWORD: supers3cr3t
+      POSTGRES_DB: fourcat
+      POSTGRES_HOST_AUTH_METHOD: trust
     volumes:
-      - ./postgres-data:/var/lib/postgresql/data
+      - 4cat_data:/var/lib/postgresql/data/
 
   api:
     build: .
@@ -23,7 +20,7 @@ services:
       - db
     environment:
       STAGE: test
-      SQLALCHEMY_DATABASE_URI: postgresql+psycopg2://test:test@db/test
+      SQLALCHEMY_DATABASE_URI: postgresql+psycopg2://fourcat:supers3cr3t@db/fourcat
     networks:
       - default
     ports:
@@ -31,5 +28,6 @@ services:
     volumes:
       - ./app:/usr/src/app/app
       - ./migrations:/usr/src/app/migrations
-    restart: always
 
+volumes:
+  4cat_data: {}
