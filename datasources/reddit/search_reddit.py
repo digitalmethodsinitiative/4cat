@@ -3,11 +3,12 @@ import json
 import time
 import re
 
-from backend.abstract.search import Search
+from backend.abstract.search import SearchWithScope
 from backend.lib.exceptions import QueryParametersException, ProcessorInterruptedException
+from backend.lib.helpers import UserInput
 
 
-class SearchReddit(Search):
+class SearchReddit(SearchWithScope):
 	"""
 	Search Reddit
 
@@ -28,16 +29,88 @@ class SearchReddit(Search):
 	rate_limit = 0
 	request_timestamps = []
 
-	def get_posts_simple(self, query):
+	options = {
+		"wildcard-warning": {
+			"type": UserInput.OPTION_INFO,
+			"help": "The requirement for searching by keyword has been lifted for your account; you can search by "
+					"date range only. This can potentially return hundreds of millions of posts, so **please be "
+					"careful** when using this privilege.",
+			"requires": "reddit.can_query_without_keyword"
+		},
+		"board": {
+			"type": UserInput.OPTION_TEXT,
+			"help": "Board",
+			"tooltip": "Comma-separated"
+		},
+		"divider": {
+			"type": UserInput.OPTION_DIVIDER
+		},
+		"intro": {
+			"type": UserInput.OPTION_INFO,
+			"help": "Reddit data is retrieved from [Pushshift](https://pushshift.io). [This "
+					"paper](https://arxiv.org/abs/2001.08435) details the dataset. Cite them if you use this data for "
+					"your research. Check the [Pushshift API](https://github.com/pushshift/api) reference for "
+					"documentation on query syntax, e.g. on how to format keyword queries.\n\n**Note:** post scores "
+					"are usually inaccurate. Pushshift archives most posts as soon as they are posted, and scores are "
+					"not re-checked at a later moment."
+		},
+		"body_match": {
+			"type": UserInput.OPTION_TEXT,
+			"help": "Message search"
+		},
+		"subject_match": {
+			"type": UserInput.OPTION_TEXT,
+			"help": "Subject search"
+		},
+		"subject_url": {
+			"type": UserInput.OPTION_TEXT,
+			"help": "Thread link URL"
+		},
+		"divider-2": {
+			"type": UserInput.OPTION_DIVIDER
+		},
+		"daterange": {
+			"type": UserInput.OPTION_DATERANGE,
+			"help": "Date range"
+		},
+		"search_scope": {
+			"type": UserInput.OPTION_CHOICE,
+			"help": "Search scope",
+			"options": {
+				"op-only": "Opening posts only (no replies/comments)",
+				"posts-only": "All matching posts",
+				"full-threads": "All posts in threads with matching posts (full threads)",
+				"dense-threads": "All posts in threads in which at least x% of posts match (dense threads)"
+			},
+			"default": "posts-only"
+		},
+		"scope_density": {
+			"type": UserInput.OPTION_TEXT,
+			"help": "Min. density %",
+			"min": 0,
+			"max": 100,
+			"default": 15,
+			"tooltip": "At least this many % of posts in the thread must match the query"
+		},
+		"scope_length": {
+			"type": UserInput.OPTION_TEXT,
+			"help": "Min. dense thread length",
+			"min": 30,
+			"default": 30,
+			"tooltip": "A thread must at least be this many posts long to qualify as a 'dense thread'"
+		}
+	}
+
+	def get_items_simple(self, query):
 		"""
 		In the case of Reddit, there is no need for multiple pathways, so we
 		can route it all to the one post query method.
 		:param query:
 		:return:
 		"""
-		return self.get_posts_complex(query)
+		return self.get_items_complex(query)
 
-	def get_posts_complex(self, query):
+	def get_items_complex(self, query):
 		"""
 		Execute a query; get post data for given parameters
 
@@ -449,56 +522,24 @@ class SearchReddit(Search):
 
 		# Make sure no body or subject searches starting with just a minus sign are possible, e.g. "-Trump"
 		if query.get("body_match", None) or query.get("subject_match", None):
-
 			queries_to_check = []
+
 			if query.get("body_match", None):
 				queries_to_check += [body_query.strip() for body_query in query["body_match"].split(" ")]
+
 			if query.get("subject_match", None):
 				queries_to_check += [subject_query.strip() for subject_query in query["subject_match"].split(" ")]
+
 			startswith_minus = [query_check.startswith("-") for query_check in queries_to_check]
 			if all(startswith_minus):
 				raise QueryParametersException("Please provide body queries that do not start with a minus sign.")
-
-		# only one of two dense threads options may be chosen at the same time, and
-		# it requires valid density and length parameters. full threads is implied,
-		# so it is otherwise left alone here
-		if query.get("search_scope", "") == "dense-threads":
-			try:
-				dense_density = int(query.get("scope_density", ""))
-			except ValueError:
-				raise QueryParametersException("Please provide a valid numerical density percentage.")
-
-			if dense_density < 15 or dense_density > 100:
-				raise QueryParametersException("Please provide a density percentage between 15 and 100.")
-
-			try:
-				dense_length = int(query.get("scope_length", ""))
-			except ValueError:
-				raise QueryParametersException("Please provide a valid numerical dense thread length.")
-
-			if dense_length < 30:
-				raise QueryParametersException("Please provide a dense thread length of at least 30.")
 
 		# both dates need to be set, or none
 		if query.get("min_date", None) and not query.get("max_date", None):
 			raise QueryParametersException("When setting a date range, please provide both an upper and lower limit.")
 
 		# the dates need to make sense as a range to search within
-		if query.get("min_date", None) and query.get("max_date", None):
-			try:
-				before = int(query.get("max_date", ""))
-				after = int(query.get("min_date", ""))
-			except ValueError:
-				raise QueryParametersException("Please provide valid dates for the date range.")
-
-			if before < after:
-				raise QueryParametersException(
-					"Please provide a valid date range where the start is before the end of the range.")
-
-			query["min_date"] = after
-			query["max_date"] = before
-
-
+		query["min_date"], query["max_date"] = query.get("daterange")
 
 		if "*" in query.get("body_match", "") and not user.get_value("reddit.can_query_without_keyword", False):
 			raise QueryParametersException("Wildcard queries are not allowed as they typically return too many results to properly process.")
@@ -506,12 +547,11 @@ class SearchReddit(Search):
 		if "*" in query.get("board", "") and not user.get_value("reddit.can_query_without_keyword", False):
 			raise QueryParametersException("Wildcards are not allowed for boards as this typically returns too many results to properly process.")
 
-		is_placeholder = re.compile("_proxy$")
-		filtered_query = {}
-		for field in query:
-			if not is_placeholder.search(field):
-				filtered_query[field] = query[field]
+		del query["daterange"]
+		if query.get("search_scope") not in ("dense-threads",):
+			del query["scope_density"]
+			del query["scope_length"]
 
 		# if we made it this far, the query can be executed
-		return filtered_query
+		return query
 

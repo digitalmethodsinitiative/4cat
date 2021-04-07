@@ -102,9 +102,17 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 		self.dataset.log("Processing '%s' started for dataset %s" % (processor_name, self.dataset.key))
 
 		# start log file
-		self.parameters = self.dataset.parameters
+		self.parameters = self.dataset.parameters.copy()
 		self.dataset.update_status("Processing data")
 		self.dataset.update_version(get_software_version())
+
+		# now the parameters have been loaded into memory, clear any sensitive
+		# ones. This has a side-effect that a processor may not run again
+		# without starting from scratch, but this is the price of progress
+		if hasattr(self, "options"):
+			for option in self.options:
+				if self.options[option].get("sensitive"):
+					self.dataset.delete_parameter(option)
 
 		if self.interrupted:
 			self.dataset.log("Processing interrupted, trying again later")
@@ -207,7 +215,7 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 		"""
 		# remove any result files that have been created so far
 		if self.dataset.get_results_path().exists():
-			os.unlink(str(self.dataset.get_results_path()))
+			self.dataset.get_results_path().unlink(missing_ok=True)
 
 		if self.dataset.get_staging_area().exists():
 			shutil.rmtree(str(self.dataset.get_staging_area()))

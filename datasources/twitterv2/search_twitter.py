@@ -6,11 +6,10 @@ import datetime
 import copy
 import time
 import json
-import re
 
 from backend.abstract.search import Search
 from backend.lib.exceptions import QueryParametersException, ProcessorInterruptedException
-from backend.lib.helpers import convert_to_int
+from backend.lib.helpers import convert_to_int, UserInput
 
 
 class SearchWithTwitterAPIv2(Search):
@@ -25,7 +24,52 @@ class SearchWithTwitterAPIv2(Search):
 
     previous_request = 0
 
-    def get_posts_simple(self, query):
+    options = {
+        "intro-1": {
+            "type": UserInput.OPTION_INFO,
+            "help": "This data source uses the full-archive search endpoint of the Twitter API, v2. To use this "
+                    "endpoint, you must have access to the Academic Research track of the Twitter API, and provide a "
+                    "valid [bearer token](https://developer.twitter.com/en/docs/authentication/oauth-2-0). The bearer "
+                    "token **will be sent to the 4CAT server**, where it will be deleted after the scrape has started. "
+                    "\n\nPlease refer to the [Twitter API documentation]("
+                    "https://developer.twitter.com/en/docs/twitter-api/tweets/search/quick-start/full-archive-search) "
+                    "documentation for more information about this API endpoint and the syntax you can use in your "
+                    "search query. Note that any tweets retrieved with 4CAT will count towards your monthly Tweet "
+                    "retrieval cap. Also note that results are saved as [NDJSON](http://ndjson.org/), not CSV. "
+        },
+        "query": {
+            "type": UserInput.OPTION_TEXT_LARGE,
+            "help": "Query"
+        },
+        "amount": {
+            "type": UserInput.OPTION_TEXT,
+            "help": "Tweets to retrieve",
+            "tooltip": "0 = unlimited",
+            "min": 0,
+            "max": 10000000,
+            "default": 10
+        },
+        "divider-2": {
+            "type": UserInput.OPTION_DIVIDER
+        },
+        "daterange-info": {
+            "type": UserInput.OPTION_INFO,
+            "help": "By default, Twitter returns tweets up til 30 days ago. If you want to go back further, you need "
+                    "to explicitly set a date range."
+        },
+        "daterange": {
+            "type": UserInput.OPTION_DATERANGE,
+            "help": "Date range"
+        },
+        "api_bearer_token": {
+            "type": UserInput.OPTION_TEXT,
+            "sensitive": True,
+            "cache": True,
+            "help": "API Bearer Token"
+        }
+    }
+
+    def get_items(self, query):
         """
         Use the Twitter v2 API historical search to get tweets
 
@@ -35,7 +79,6 @@ class SearchWithTwitterAPIv2(Search):
         # this is pretty sensitive so delete it immediately after storing in
         # memory
         bearer_token = self.parameters.get("api_bearer_token")
-        self.dataset.delete_parameter("bearer_token")
         auth = {"Authorization": "Bearer %s" % bearer_token}
 
         endpoint = "https://api.twitter.com/2/tweets/search/all"
@@ -43,12 +86,21 @@ class SearchWithTwitterAPIv2(Search):
         # these are all expansions and fields available at the time of writing
         # since it does not cost anything extra in terms of rate limiting, go
         # for as much data per tweet as possible...
-        tweet_fields = ("attachments", "author_id", "context_annotations", "conversation_id", "created_at", "entities", "geo", "id", "in_reply_to_user_id", "lang", "public_metrics", "possibly_sensitive", "referenced_tweets", "reply_settings", "source", "text", "withheld")
-        user_fields = ("created_at", "description", "entities", "id", "location", "name", "pinned_tweet_id", "profile_image_url", "protected", "public_metrics", "url", "username", "verified", "withheld")
+        tweet_fields = (
+        "attachments", "author_id", "context_annotations", "conversation_id", "created_at", "entities", "geo", "id",
+        "in_reply_to_user_id", "lang", "public_metrics", "possibly_sensitive", "referenced_tweets", "reply_settings",
+        "source", "text", "withheld")
+        user_fields = (
+        "created_at", "description", "entities", "id", "location", "name", "pinned_tweet_id", "profile_image_url",
+        "protected", "public_metrics", "url", "username", "verified", "withheld")
         place_fields = ("contained_within", "country", "country_code", "full_name", "geo", "id", "name", "place_type")
         poll_fields = ("duration_minutes", "end_datetime", "id", "options", "voting_status")
-        expansions = ("attachments.poll_ids", "attachments.media_keys", "author_id", "entities.mentions.username", "geo.place_id", "in_reply_to_user_id", "referenced_tweets.id", "referenced_tweets.id.author_id")
-        media_fields = ("duration_ms", "height", "media_key", "non_public_metrics", "organic_metrics", "preview_image_url", "promoted_metrics", "public_metrics", "type", "url", "width")
+        expansions = (
+        "attachments.poll_ids", "attachments.media_keys", "author_id", "entities.mentions.username", "geo.place_id",
+        "in_reply_to_user_id", "referenced_tweets.id", "referenced_tweets.id.author_id")
+        media_fields = (
+        "duration_ms", "height", "media_key", "non_public_metrics", "organic_metrics", "preview_image_url",
+        "promoted_metrics", "public_metrics", "type", "url", "width")
         amount = convert_to_int(self.parameters.get("amount"), 10)
 
         params = {
@@ -63,10 +115,12 @@ class SearchWithTwitterAPIv2(Search):
         }
 
         if self.parameters.get("min_date"):
-            params["start_time"] = datetime.datetime.fromtimestamp(self.parameters["min_date"]).strftime("%Y-%m-%dT%H:%M:%SZ")
+            params["start_time"] = datetime.datetime.fromtimestamp(self.parameters["min_date"]).strftime(
+                "%Y-%m-%dT%H:%M:%SZ")
 
         if self.parameters.get("max_date"):
-            params["end_time"] = datetime.datetime.fromtimestamp(self.parameters["max_date"]).strftime("%Y-%m-%dT%H:%M:%SZ")
+            params["end_time"] = datetime.datetime.fromtimestamp(self.parameters["max_date"]).strftime(
+                "%Y-%m-%dT%H:%M:%SZ")
 
         tweets = 0
         self.dataset.log("Search parameters: %s" % repr(params))
@@ -93,6 +147,8 @@ class SearchWithTwitterAPIv2(Search):
                     self.dataset.update_status("Got %s, waiting %i seconds before retrying" % (str(e), wait_time))
                     time.sleep(wait_time)
 
+            print(api_response.text)
+
             # rate limited - the limit at time of writing is 300 reqs per 15
             # minutes
             # usually you don't hit this when requesting batches of 500 at
@@ -105,16 +161,29 @@ class SearchWithTwitterAPIv2(Search):
                     time.sleep(0.5)
                 continue
 
+            # API keys that are valid but don't have access or haven't been
+            # activated properly get a 403
+            elif api_response.status_code == 403:
+                try:
+                    structured_response = api_response.json()
+                    self.dataset.update_status("'Forbidden' error from Twitter API. Could not connect to Twitter API "
+                                               "with this API key. %s" % structured_response.get("detail", ""), is_final=True)
+                except (json.JSONDecodeError, ValueError):
+                    self.dataset.update_status("'Forbidden' error from Twitter API. Your key may not have access to "
+                                               "the full-archive search endpoint.", is_final=True)
+                finally:
+                    return
+
             # sometimes twitter says '503 service unavailable' for unclear
             # reasons - in that case just wait a while and try again
             elif api_response.status_code in (502, 503, 504):
                 resume_at = time.time() + 60
                 resume_at_str = datetime.datetime.fromtimestamp(int(resume_at)).strftime("%c")
-                self.dataset.update_status("Twitter unavailable (status %i) - waiting until %s to continue." % (api_response.status_code, resume_at_str))
+                self.dataset.update_status("Twitter unavailable (status %i) - waiting until %s to continue." % (
+                api_response.status_code, resume_at_str))
                 while time.time() <= resume_at:
                     time.sleep(0.5)
                 continue
-
 
             # this usually means the query is too long or otherwise contains
             # a syntax error
@@ -138,8 +207,10 @@ class SearchWithTwitterAPIv2(Search):
 
             # haven't seen one yet, but they probably exist
             elif api_response.status_code != 200:
-                self.dataset.update_status("Unexpected HTTP status %i. Halting tweet collection." % api_response.status_code, is_final=True)
-                self.log.warning("Twitter API v2 responded with status code %i. Response body: %s" % (api_response.status_code, api_response.text))
+                self.dataset.update_status(
+                    "Unexpected HTTP status %i. Halting tweet collection." % api_response.status_code, is_final=True)
+                self.log.warning("Twitter API v2 responded with status code %i. Response body: %s" % (
+                api_response.status_code, api_response.text))
                 return
 
             elif not api_response:
@@ -164,7 +235,8 @@ class SearchWithTwitterAPIv2(Search):
                 # splice referenced data back in
                 # we use copy.deepcopy here because else we run into a
                 # pass-by-reference quagmire
-                tweet = self.enrich_tweet(tweet, included_users, included_media, included_polls, copy.deepcopy(included_tweets))
+                tweet = self.enrich_tweet(tweet, included_users, included_media, included_polls,
+                                          copy.deepcopy(included_tweets))
 
                 tweets += 1
                 if tweets % 500 == 0:
@@ -219,7 +291,8 @@ class SearchWithTwitterAPIv2(Search):
 
         # add user metadata for mentioned users
         for index, mention in enumerate(tweet.get("entities", {}).get("mentions", [])):
-            tweet["entities"]["mentions"][index] = {**tweet["entities"]["mentions"][index], **users_by_name.get(mention["username"], {})}
+            tweet["entities"]["mentions"][index] = {**tweet["entities"]["mentions"][index],
+                                                    **users_by_name.get(mention["username"], {})}
 
         # add poll metadata
         for index, poll_id in enumerate(tweet.get("attachments", {}).get("poll_ids", [])):
@@ -228,67 +301,24 @@ class SearchWithTwitterAPIv2(Search):
         # add media metadata - seems to be just the media type, the media URL
         # etc is stored in the 'entities' attribute instead
         for index, media_key in enumerate(tweet.get("attachments", {}).get("media_keys", [])):
-            tweet["attachments"]["media_keys"][index] = media_by_key[media_key] if media_key in media_by_key else media_key
+            tweet["attachments"]["media_keys"][index] = media_by_key[
+                media_key] if media_key in media_by_key else media_key
 
         # replied-to user metadata
         if "in_reply_to_user_id" in tweet:
-            tweet["in_reply_to_user"] = users_by_id[tweet["in_reply_to_user_id"]] if tweet["in_reply_to_user_id"] in users_by_id else {}
+            tweet["in_reply_to_user"] = users_by_id[tweet["in_reply_to_user_id"]] if tweet[
+                                                                                         "in_reply_to_user_id"] in users_by_id else {}
 
         # enrich referenced tweets. Even though there should be no recursion -
         # since tweets cannot be edited - we do not recursively enrich
         # referenced tweets (should we?)
         for index, reference in enumerate(tweet.get("referenced_tweets", [])):
             if reference["id"] in tweets_by_id:
-                tweet["referenced_tweets"][index] = {**reference, **self.enrich_tweet(tweets_by_id[reference["id"]], users, media, polls, [])}
+                tweet["referenced_tweets"][index] = {**reference,
+                                                     **self.enrich_tweet(tweets_by_id[reference["id"]], users, media,
+                                                                         polls, [])}
 
         return tweet
-
-    def get_search_mode(self, query):
-        """
-        Twitter searches are always simple
-
-        :return str:
-        """
-        return "simple"
-
-    def get_posts_complex(self, query):
-        """
-        Complex post fetching is not used by the Twitter datasource
-
-        :param query:
-        :return:
-        """
-        pass
-
-    def fetch_posts(self, post_ids, where=None, replacements=None):
-        """
-        Posts are fetched via TCAT for this datasource
-        :param post_ids:
-        :param where:
-        :param replacements:
-        :return:
-        """
-        pass
-
-    def fetch_threads(self, thread_ids):
-        """
-        Thread filtering is not a toggle for Twitter datasets
-
-        :param thread_ids:
-        :return:
-        """
-        pass
-
-    def get_thread_sizes(self, thread_ids, min_length):
-        """
-        Thread filtering is not a toggle for Twitter datasets
-
-        :param tuple thread_ids:
-        :param int min_length:
-        results
-        :return dict:
-        """
-        pass
 
     @staticmethod
     def validate_query(query, request, user):
@@ -316,30 +346,9 @@ class SearchWithTwitterAPIv2(Search):
 
         # the dates need to make sense as a range to search within
         # but, on Twitter, you can also specify before *or* after only
-        before = None
-        after = None
-        if query.get("min_date", None):
-            try:
-                after = int(query.get("min_date", ""))
-                query["min_date"] = after
-            except ValueError:
-                raise QueryParametersException("Please provide valid dates for the date range.")
-
-        if query.get("max_date", None):
-            try:
-                before = int(query.get("max_date", ""))
-                query["max_date"] = after
-            except ValueError:
-                raise QueryParametersException("Please provide valid dates for the date range.")
-
+        after, before = query.get("daterange")
         if before and after and before < after:
             raise QueryParametersException("Date range must start before it ends")
-
-        is_placeholder = re.compile("_proxy$")
-        filtered_query = {}
-        for field in query:
-            if not is_placeholder.search(field):
-                filtered_query[field] = query[field]
 
         # if we made it this far, the query can be executed
         return {
@@ -347,7 +356,7 @@ class SearchWithTwitterAPIv2(Search):
             "api_bearer_token": query.get("api_bearer_token"),
             "min_date": after,
             "max_date": before,
-            "amount": max(0, convert_to_int(query.get("amount"), 10))
+            "amount": query.get("amount")
         }
 
     @staticmethod
@@ -370,7 +379,8 @@ class SearchWithTwitterAPIv2(Search):
             "id": tweet["id"],
             "thread_id": tweet.get("conversation_id", tweet["id"]),
             "timestamp": tweet["created_at"].replace("T", " ").replace(".000Z", ""),
-            "unix_timestamp": int(datetime.datetime.strptime(tweet["created_at"], "%Y-%m-%dT%H:%M:%S.000Z").timestamp()),
+            "unix_timestamp": int(
+                datetime.datetime.strptime(tweet["created_at"], "%Y-%m-%dT%H:%M:%S.000Z").timestamp()),
             "subject": "",
             "body": tweet["text"],
             "author": tweet["author_user"]["username"],
@@ -388,7 +398,8 @@ class SearchWithTwitterAPIv2(Search):
                 [ref["type"] == "replied_to" for ref in tweet.get("referenced_tweets", [])]) else "no",
             "hashtags": ",".join([tag["tag"] for tag in tweet.get("entities", {}).get("hashtags", [])]),
             "urls": ",".join([tag["expanded_url"] for tag in tweet.get("entities", {}).get("urls", [])]),
-            "images": ",".join(item["url"] for item in tweet.get("attachments", {}).get("media_keys", []) if type(item) is dict and item["type"] == "photo"),
+            "images": ",".join(item["url"] for item in tweet.get("attachments", {}).get("media_keys", []) if
+                               type(item) is dict and item["type"] == "photo"),
             "mentions": ",".join([tag["username"] for tag in tweet.get("entities", {}).get("mentions", [])]),
             "reply_to": "".join(
                 [mention["username"] for mention in tweet.get("entities", {}).get("mentions", [])[:1]]) if any(

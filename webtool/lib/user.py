@@ -167,6 +167,9 @@ class User:
 		"""
 		return self.data["is_admin"]
 
+	def get_attribute(self, attribute):
+		return json.loads(self.data["userdata"]).get(attribute, None)
+
 	def email_token(self, new=False):
 		"""
 		Send user an e-mail with a password reset link

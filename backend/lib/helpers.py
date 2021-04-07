@@ -13,6 +13,8 @@ from calendar import monthrange
 
 import config
 
+from backend.lib.user_input import UserInput
+
 
 def init_datasource(database, logger, queue, name):
 	"""
@@ -148,70 +150,6 @@ def expand_short_number(text):
 			raise ValueError("Unknown multiplier '%s' in number '%s'" % (multiplier_bit, text))
 
 
-class UserInput:
-	"""
-	Class for handling user input
-
-	Particularly for post-processors, it is important that user input is within
-	parameters set by the post-processor, or post-processor behaviour may be
-	undefined. This class offers a set of pre-defined form elements that can
-	easily be parsed.
-	"""
-	OPTION_TOGGLE = "toggle"  # boolean toggle (checkbox)
-	OPTION_CHOICE = "choice"  # one choice out of a list (select)
-	OPTION_TEXT = "string"  # simple string or integer (input text)
-	OPTION_MULTI = "multi"  # multiple values out of a list (select multiple)
-
-	def parse(settings, choice):
-		"""
-		Filter user input
-
-		Makes sure user input for post-processors is valid and within the
-		parameters specified by the post-processor
-
-		:param obj settings:  Settings, including defaults and valid options
-		:param choice:  The chosen option, to be parsed
-		:return:  Validated and parsed input
-		"""
-		type = settings.get("type", "")
-		if type == UserInput.OPTION_TOGGLE:
-			# simple boolean toggle
-			return choice is not None
-		elif type == UserInput.OPTION_MULTI:
-			# any number of values out of a list of possible values
-			# comma-separated during input, returned as a list of valid options
-			if not choice:
-				return []
-
-			chosen = choice.split(",")
-			return [item for item in chosen if item in settings.get("options", [])]
-		elif type == UserInput.OPTION_CHOICE:
-			# select box
-			# one out of multiple options
-			# return option if valid, or default
-			return choice if choice in settings.get("options", []) else settings.get("default", "")
-		elif type == UserInput.OPTION_TEXT:
-			# text string
-			# optionally clamp it as an integer; return default if not a valid
-			# integer
-			if "max" in settings:
-				try:
-					choice = min(settings["max"], int(choice))
-				except (ValueError, TypeError) as e:
-					choice = settings.get("default")
-
-			if "min" in settings:
-				try:
-					choice = max(settings["min"], int(choice))
-				except (ValueError, TypeError) as e:
-					choice = settings.get("default")
-
-			return choice or settings.get("default")
-		else:
-			# no filtering
-			return choice
-
-
 def get_yt_compatible_ids(yt_ids):
 	"""
 	:param yt_ids list, a list of strings
@@ -223,7 +161,7 @@ def get_yt_compatible_ids(yt_ids):
 	max fifty results.
 	"""
 
-	# If there's only one item, return a single list item 
+	# If there's only one item, return a single list item
 	if isinstance(yt_ids, str):
 		return [yt_ids]
 
@@ -351,8 +289,8 @@ def get_interval_descriptor(item, interval):
 
 	:param dict item:  Item to generate descriptor for, should have a
 	"timestamp" key
-	:param str interval:  Interval, one of "overall", "year", "month",
-	"week", "day"
+	:param str interval:  Interval, one of "all", "overall", "year",
+	"month", "week", "day"
 	:return str:  Interval descriptor, e.g. "overall", "2020", "2020-08",
 	"2020-43", "2020-08-01"
 	"""

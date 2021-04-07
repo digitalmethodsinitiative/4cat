@@ -15,6 +15,7 @@ from datetime import datetime
 import config
 
 from backend.abstract.search import Search
+from backend.lib.helpers import UserInput
 from backend.lib.exceptions import QueryParametersException, ProcessorInterruptedException
 
 __author__ = "Sal Hagen"
@@ -46,7 +47,55 @@ class SearchTumblr(Search):
 	seen_ids = set()
 	failed_notes = []
 
-	def get_posts_simple(self, query):
+	options = {
+		"intro": {
+			"type": UserInput.OPTION_INFO,
+			"help": "Retrieve any kind of Tumblr posts with specific tags or from specific blogs. Gets 100.000 posts "
+					"at max. Insert tags or names of blogs, one on each line. You may insert up to ten tags or "
+					"blogs.\n\nTumblr tags may include whitespace and commas. A `#` before the tag is optional.\n\n"
+					"Tag search only get posts explicitly associated with the exact tag you insert here. Querying "
+					"`gogh` will thus not get posts only tagged with `van gogh`. Keyword search is unfortunately not "
+					"allowed by the [Tumblr API](https://api.tumblr.com).\n\nIf 4CAT reached its Tumblr API rate "
+					"limit, try again 24 hours later."
+		},
+		"search_scope": {
+			"type": UserInput.OPTION_CHOICE,
+			"help": "Search by",
+			"options": {
+				"tag": "Tag",
+				"blog": "Blog"
+			},
+			"default": "tag"
+		},
+		"query": {
+			"type": UserInput.OPTION_TEXT_LARGE,
+			"help": "Tags/blogs",
+			"tooltip": "Separate with commas or new lines."
+		},
+		"fetch_reblogs": {
+			"type": UserInput.OPTION_TOGGLE,
+			"help": "Also fetch reblogs with text? (warning: slow)"
+		},
+		"divider": {
+			"type": UserInput.OPTION_DIVIDER
+		},
+		"date-intro": {
+			"type": UserInput.OPTION_INFO,
+			"help": "**Note:** The [Tumblr API](https://api.tumblr.com) is volatile: when fetching sporadically used "
+					"tags, it may return zero posts, even though older posts exist. To mitigate this, 4CAT decreases "
+					"the date parameter (<code>before</code>) with six hours and sends the query again. This often "
+					"successfully returns older, un-fetched posts. If it didn't find new data after 96 retries (24 "
+					"days), it checks for data up to six years before the last date, decreasing 12 times by 6 months. "
+					"If that also results in nothing, it assumes the dataset is complete. Check the oldest post in "
+					"your dataset to see if it this is indeed the case and whether any odd time gaps exists."
+		},
+		"daterange": {
+			"type": UserInput.OPTION_DATERANGE,
+			"help": "Date range"
+		}
+	}
+
+	def get_items(self, query):
 		"""
 		Fetches data from Tumblr via its API.
 
@@ -560,11 +609,6 @@ class SearchTumblr(Search):
 		:param User user:  	User object of user who has submitted the query
 		:return dict:  		Safe query parameters
 		"""
-
-		# 'location' would be possible as well but apparently requires a login
-		if query.get("search_scope", "") not in ("tag", "blog"):
-			raise QueryParametersException("Invalid search scope: must be tag or blog")
-
 		# no query 4 u
 		if not query.get("query", "").strip():
 			raise QueryParametersException("You must provide a search query.")
@@ -576,46 +620,26 @@ class SearchTumblr(Search):
 		# Not more than 10 plox
 		if len(items) > 10:
 			raise QueryParametersException("Only query for ten or less tags or blogs." + str(len(items)))
+
 		# no query 4 u
 		if not items:
-			raise QueryParametersException("Invalid search search query.")
+			raise QueryParametersException("Search query cannot be empty.")
 
 		# So it shows nicely in the frontend.
 		items = ", ".join([item.lstrip().rstrip() for item in items if item])
 		
-		# both dates need to be set, or none
-		if query.get("min_date", None) and not query.get("max_date", None):
-			raise QueryParametersException("When setting a date range, please provide both an upper and lower limit.")
-
 		# the dates need to make sense as a range to search within
-		if query.get("min_date", None) and query.get("max_date", None):
-			try:
-				min_date = int(query.get("min_date", ""))
-				max_date = int(query.get("max_date", ""))
-			except ValueError:
-				raise QueryParametersException("Please provide valid dates for the date range.")
+		query["min_date"], query["max_date"] = query.get("daterange")
+		if any(query.get("daterange")) and not all(query.get("daterange")):
+			raise QueryParametersException("When providing a date range, set both an upper and lower limit.")
 
-			if max_date < min_date:
-				raise QueryParametersException(
-					"Please provide a valid date range where the start is before the end of the range.")
-
-			query["min_date"] = min_date
-			query["max_date"] = max_date
+		del query["daterange"]
 
 		query["query"] = items
-		query["board"] = query.get("search_scope") + "s" # used in web interface
-		query["search_scope"] = query.get("search_scope")
-		query["fetch_reblogs"] = bool(query.get("fetch_reblogs", False))
-
-		is_placeholder = re.compile("_proxy$")
-		filtered_query = {}
-		for field in query:
-			if not is_placeholder.search(field):
-				filtered_query[field] = query[field]
+		query["board"] = query.get("search_scope") + "s"  # used in web interface
 
 		# if we made it this far, the query can be executed
-		return filtered_query
-
+		return query
 
 	def parse_tumblr_posts(self, posts, reblog=False):
 		"""
@@ -726,53 +750,6 @@ class SearchTumblr(Search):
 			processed_posts.append(processed_post)
 
 		return processed_posts
-
-	def get_search_mode(self, query):
-		"""
-		Tumblr searches are always simple
-
-		:return str:
-		"""
-		return "simple"
-
-	def get_posts_complex(self, query):
-		"""
-		Complex post fetching is not used by the Tumblr datasource
-
-		:param query:
-		:return:
-		"""
-		pass
-
-	def fetch_posts(self, post_ids, where=None, replacements=None):
-		"""
-		Posts are fetched via instaloader for this datasource
-		:param post_ids:
-		:param where:
-		:param replacements:
-		:return:
-		"""
-		pass
-
-	def fetch_threads(self, thread_ids):
-		"""
-		Thread filtering is not a toggle for Tumblr datasets
-
-		:param thread_ids:
-		:return:
-		"""
-		pass
-
-	def get_thread_sizes(self, thread_ids, min_length):
-		"""
-		Thread filtering is not a toggle for Tumblr datasets
-
-		:param tuple thread_ids:
-		:param int min_length:
-		results
-		:return dict:
-		"""
-		pass
 
 	def after_process(self):
 		"""

@@ -139,11 +139,6 @@ p.form-notice {
     color: var(--accent-alternate);
 }
 
-.form-element textarea {
-    min-width: 25em;
-    min-height: 6em;
-}
-
 .form-element {
     display: flex;
     align-items: center;
@@ -161,9 +156,14 @@ article.small .form-element {
     grid-template-columns: 34% 66%;
 }
 
-.form-element > * {
+.form-element > *:not(input, select, button) {
     min-width: 11em;
-    max-width: 80%;
+    max-width: 75%;
+}
+
+.form-element > textarea {
+    min-width: 25em;
+    min-height: 6em;
 }
 
 article.small .form-element > * {
@@ -173,6 +173,14 @@ article.small .form-element > * {
 .form-element label {
     text-align: right;
     padding-right: 1em;
+}
+
+.form-element .option-help {
+    padding-top: 0.5em;
+}
+
+.form-element button.tooltip-trigger {
+    margin-left: 0.5em;
 }
 
 .submit-container {
@@ -214,6 +222,7 @@ button:hover, .button-like:not(.inactive):hover {
   Utility classes -> Lists
   * --------------------- */
 .hidden {
+    min-height: 0;
     max-height: 0;
     overflow: hidden;
     box-sizing: border-box;

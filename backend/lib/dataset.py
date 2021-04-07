@@ -356,7 +356,7 @@ class DataSet:
 		Check if dataset is finished
 		:return bool:
 		"""
-		return self.data["is_finished"] is True
+		return self.data["is_finished"] == True
 
 	def get_parameters(self):
 		"""
@@ -496,12 +496,14 @@ class DataSet:
 		if self.no_status_updates:
 			return
 
-		# for presets, copy the updated status to the preset
+		# for presets, copy the updated status to the preset(s) this is part of
 		if self.preset_parent is None:
 			self.preset_parent = [parent for parent in self.get_genealogy() if parent.type.find("preset-") == 0 and parent.key != self.key][:1]
 
 		if self.preset_parent:
-			self.preset_parent[0].update_status(status)
+			for preset_parent in self.preset_parent:
+				if not preset_parent.is_finished():
+					preset_parent.update_status(status)
 
 		self.data["status"] = status
 		updated = self.db.update("datasets", where={"key": self.data["key"]}, data={"status": status})

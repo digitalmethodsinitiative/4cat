@@ -6,11 +6,12 @@ import requests
 import datetime
 import re
 
-from backend.abstract.search import Search
+from backend.abstract.search import SearchWithScope
+from backend.lib.helpers import UserInput
 from backend.lib.exceptions import QueryParametersException, ProcessorInterruptedException
 
 
-class SearchGuardian(Search):
+class SearchGuardian(SearchWithScope):
 	"""
 	Search The Guardian climate change corpus
 
@@ -28,16 +29,57 @@ class SearchGuardian(Search):
 	max_workers = 1
 	max_retries = 3
 
-	def get_posts_simple(self, query):
+	options = {
+		"intro": {
+			"type": UserInput.OPTION_INFO,
+			"help": "The Guardian data is retrieved via [PENELOPE](https://penelope.vub.be). It covers *The Guardian* "
+					"articles related to climate change and also the comments on those articles."
+		},
+		"body_match": {
+			"type": UserInput.OPTION_TEXT,
+			"help": "Content contains"
+		},
+		"daterange": {
+			"type": UserInput.OPTION_DATERANGE,
+			"help": "Publication date"
+		},
+		"search_scope": {
+			"type": UserInput.OPTION_CHOICE,
+			"help": "Search scope",
+			"options": {
+				"posts-only": "All matching posts",
+				"full-threads": "All posts in threads with matching posts (full threads)",
+				"dense-threads": "All posts in threads in which at least x% of posts match (dense threads)"
+			},
+			"default": "posts-only"
+		},
+		"scope_density": {
+			"type": UserInput.OPTION_TEXT,
+			"help": "Min. density %",
+			"min": 0,
+			"max": 100,
+			"default": 15,
+			"tooltip": "At least this many % of posts in the thread must match the query"
+		},
+		"scope_length": {
+			"type": UserInput.OPTION_TEXT,
+			"help": "Min. dense thread length",
+			"min": 30,
+			"default": 30,
+			"tooltip": "A thread must at least be this many posts long to qualify as a 'dense thread'"
+		}
+	}
+
+	def get_items_simple(self, query):
 		"""
 		In the case of The Guardian, there is no need for multiple pathways, so we
 		can route it all to the one post query method.
 		:param query:
 		:return:
 		"""
-		return self.get_posts_complex(query)
+		return self.get_items_complex(query)
 
-	def get_posts_complex(self, query):
+	def get_items_complex(self, query):
 		"""
 		Execute a query; get post data for given parameters
 
@@ -259,7 +301,7 @@ class SearchGuardian(Search):
 
 	def validate_query(query, request, user):
 		"""
-		Validate input for a dataset query on the 4chan data source.
+		Validate input for a dataset query on the Guardian data source.
 
 		Will raise a QueryParametersException if invalid parameters are
 		encountered. Mutually exclusive parameters may also be sanitised by
@@ -294,38 +336,15 @@ class SearchGuardian(Search):
 			if dense_length < 30:
 				raise QueryParametersException("Please provide a dense thread length of at least 30.")
 
-		# both dates need to be set, or none
-		if query.get("min_date", None) and not query.get("max_date", None):
-			raise QueryParametersException("When setting a date range, please provide both an upper and lower limit.")
-
 		# the dates need to make sense as a range to search within
-		if query.get("min_date", None) and query.get("max_date", None):
-			try:
-				before = int(query.get("max_date", ""))
-				after = int(query.get("min_date", ""))
-			except ValueError:
-				raise QueryParametersException("Please provide valid dates for the date range.")
+		if not all(query.get("daterange")):
+			raise QueryParametersException("You must provide a date range")
 
-			if after < 946684800:
-				raise QueryParametersException("Please provide valid dates for the date range.")
+		query["min_date"], query["max_date"] = query.get("daterange")
+		del query["daterange"]
 
-			if before < after:
-				raise QueryParametersException(
-					"Please provide a valid date range where the start is before the end of the range.")
-
-			if after - before > (6 * 86400 * 30.25):
-				raise QueryParametersException("The date range for this query can span 6 months at most.")
-
-			query["min_date"] = after
-			query["max_date"] = before
-		else:
-			raise QueryParametersException("You need to provide a date range for your query")
-
-		is_placeholder = re.compile("_proxy$")
-		filtered_query = {}
-		for field in query:
-			if not is_placeholder.search(field):
-				filtered_query[field] = query[field]
+		if query["max_date"] and (query["max_date"] - query["min_date"]) > (86400 * 31 * 6):
+			raise QueryParametersException("Date range may span 6 months at most")
 
 		# if we made it this far, the query can be executed
-		return filtered_query
+		return query

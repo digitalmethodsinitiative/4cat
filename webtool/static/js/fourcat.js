@@ -41,6 +41,10 @@ function init() {
     $('#datasource-select').on('change', query.update_form);
     $('#datasource-select').trigger('change');
 
+    // Special cases in dataset entry form
+    $('#datasource-form').on('change', 'input[type=date]', query.proxy_dates);
+    $('#datasource-form').on('change', '#forminput-search_scope', query.handle_density);
+
     // Controls to change which results show up in overview
     $('.view-controls button').hide();
     $('.view-controls input, .view-controls select, .view-controls textarea').on('change', function () {
@@ -174,8 +178,6 @@ processor = {
                         let container_id = response.container + ' .child-list';
 
                         let parent_list = $($(container_id)[0]);
-                        console.log(container_id);
-                        console.log(parent_list);
 
                         // this is hardcoded, see next comment
 
@@ -279,6 +281,13 @@ query = {
 
         let form = $('#query-form');
         let formdata = new FormData(form[0]);
+
+        // Cache cacheable values
+        let datasource = form.attr('class');
+        form.find('.cacheable input').each(function() {
+            let item_name = datasource + '.' + $(this).attr('name');
+            let s = localStorage.setItem(item_name, $(this).val());
+        })
         
         // Disable form
         query.disable_form();
@@ -636,12 +645,73 @@ query = {
                 if(data.has_javascript) {
                     $('<script id="query-form-script">').attr('src', '/api/datasource-script/' + data.datasource + '/').appendTo('body');
                 }
+                //automatically fill in cached parameters
+                $('#datasource-form .cacheable input').each(function() {
+                   let item_name = datasource + '.' + $(this).attr('name');
+                   let cached_value = localStorage.getItem(item_name);
+                   if (typeof cached_value != 'undefined' && cached_value !== 'undefined') {
+                       $(this).val(cached_value);
+                   }
+                });
+
+                query.handle_density();
             },
             'error': function() {
                 $('#datasource-select').parents('form').trigger('reset');
                 alert('Invalid datasource selected.');
             }
         });
+    },
+
+    handle_density: function() {
+        // datasources may offer 'dense thread' options
+        // these are sufficiently generalised that they can be handled in this
+        // main script...
+        let scope = $('#query-form #forminput-search_scope').val()
+
+        let dense_toggle = (scope === 'dense-threads');
+        $('#query-form #forminput-scope_density').prop('disabled', !dense_toggle);
+        $('#query-form #forminput-scope_density').parent().toggle(dense_toggle);
+        $('#query-form #forminput-scope_length').prop('disabled', !dense_toggle);
+        $('#query-form #forminput-scope_length').parent().toggle(dense_toggle);
+
+        let ids_toggle = (scope === 'match-ids')
+        $('#query-form #forminput-valid_ids').prop('disabled', !ids_toggle);
+        $('#query-form #forminput-valid_ids').parent().toggle(ids_toggle);
+    },
+
+    proxy_dates: function() {
+        // convert date to unix timestamp
+        // should this be done server-side instead...?
+        let date = $(this).val().replace(/\//g, '-').split('-'); //allow both slashes and dashes
+        let input_id = 'input[name=' + $(this).attr('name').split('_').slice(0, -1).join('_') + ']';
+
+        if (date.length !== 3) {
+            // need exactly 3 elements, else it's not a valid date
+            $(input_id).val(0);
+            $(this).val(null);
+            return;
+        }
+
+        // can be either yyyy-mm-dd or dd-mm-yyyy
+        if (date[0].length === 4) {
+            date = date.reverse();
+            $(this).val(date[2] + '-' + date[1] + '-' + date[0]);
+        } else {
+            $(this).val(date[0] + '-' + date[1] + '-' + date[2]);
+        }
+
+        // store timestamp in hidden 'actual' input field
+        let date_obj = new Date(parseInt(date[2]), parseInt(date[1]) - 1, parseInt(date[0]));
+        let timestamp = Math.floor(date_obj.getTime() / 1000);
+
+        if (isNaN(timestamp)) {
+            // invalid date
+            $(this).val(null);
+            $(input_id).val(0);
+        } else {
+            $(input_id).val(timestamp);
+        }
     }
 };
 
@@ -834,19 +904,6 @@ dynamic_container = {
         });
     }
 };
-
-/**
- * Resets the form with correct checks and disablings
- */
-function reset_form() {
-    $('#body-input').val('').text('').attr('disabled', false).trigger('input');
-    $('#subject-input').val('').text('').attr('disabled', false);
-    $('#check-keyword-dense').prop('checked', false).attr('disabled', true);
-    $('#dense-percentage').attr('disabled', true);
-    $('#dense-length').attr('disabled', true);
-    $('#check-random-sample').prop('checked', false).attr('disabled', false);
-    $('#check-country-flag').prop('checked', false).attr('disabled', false);
-}
 
 /** General-purpose toggle buttons **/
 function toggleButton(e, force_close=false) {

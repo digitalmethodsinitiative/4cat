@@ -7,6 +7,7 @@ import datetime
 import re
 
 from backend.abstract.search import Search
+from backend.lib.helpers import UserInput
 from backend.lib.exceptions import QueryParametersException, ProcessorInterruptedException
 
 
@@ -28,7 +29,37 @@ class SearchParliamentSpeeches(Search):
     max_workers = 1
     max_retries = 3
 
-    def get_posts_simple(self, query):
+    options = {
+        "intro": {
+            "type":  UserInput.OPTION_INFO,
+            "help": "Parliament speech data is retrieved via [PENELOPE](https://penelope.vub.be). It covers speeches "
+                    "from the Bundestag (the German national parliament) starting from [Period "
+                    "19](https://en.wikipedia.org/wiki/2017_German_federal_election), as well as speeches from the "
+                    "British House of Commons starting from January 2016. Both datasets end in October 2019. The data "
+                    "has been collected by the [MIS Institute at MPG Leipzig](https://www.mis.mpg.de/).\n\nResults "
+                    "are formatted as one 'thread' per distinct debate, with each individual contribution to that "
+                    "debate as a 'post' in the thread"
+        },
+        "corpus": {
+            "type": UserInput.OPTION_CHOICE,
+            "options": {
+                "gbr": "House of Commons (Great Britain)",
+                "deu": "Bundestag (Germany)"
+            },
+            "default": "gbr",
+            "help": "Corpus to search"
+        },
+        "body_match": {
+            "type": UserInput.OPTION_TEXT,
+            "help": "Content contains"
+        },
+        "daterange": {
+            "type": UserInput.OPTION_DATERANGE,
+            "help": "Publication date"
+        }
+    }
+
+    def get_items(self, query):
         """
         Execute a query; get post data for given parameters
 
@@ -53,53 +84,6 @@ class SearchParliamentSpeeches(Search):
         posts = [self.item_to_4cat(item) for item in all_contributions]
 
         return sorted(posts, key=lambda item: (item["timestamp"], item["thread_id"], item["id"]))
-
-    def get_search_mode(self, query):
-        """
-        Parliament speech searches are always simple
-
-        :return str:
-        """
-        return "simple"
-
-    def get_posts_complex(self, query):
-        """
-        Complex post fetching is not used by this datasource
-
-        :param query:
-        :return:
-        """
-        return self.get_posts_simple(query)
-
-    def fetch_posts(self, post_ids, where=None, replacements=None):
-        """
-        Posts are fetched via instaloader for this datasource
-        :param post_ids:
-        :param where:
-        :param replacements:
-        :return:
-        """
-        pass
-
-    def fetch_threads(self, thread_ids):
-        """
-        Thread filtering is not a toggle for Instagram datasets
-
-        :param thread_ids:
-        :return:
-        """
-        pass
-
-    def get_thread_sizes(self, thread_ids, min_length):
-        """
-        Thread filtering is not a toggle for Instagram datasets
-
-        :param tuple thread_ids:
-        :param int min_length:
-        results
-        :return dict:
-        """
-        pass
 
     def item_to_4cat(self, post):
         """
@@ -175,44 +159,15 @@ class SearchParliamentSpeeches(Search):
         :return dict:  Safe query parameters
         """
         # this is the bare minimum, else we can't narrow down the full data set
-        if not query.get("body_match", None) and not query.get("subject_match", None):
+        if not query.get("body_match", None):
             raise QueryParametersException("Please provide a search query")
 
-        if query.get("corpus") not in ("deu", "gbr"):
-            raise QueryParametersException("Please choose a valid corpus to search within")
+        # the dates need to make sense as a range to search within
+        query["min_date"], query["max_date"] = query["daterange"]
+        del query["daterange"]
 
         # both dates need to be set, or none
         if query.get("min_date", None) and not query.get("max_date", None):
             raise QueryParametersException("When setting a date range, please provide both an upper and lower limit.")
 
-        # the dates need to make sense as a range to search within
-        if query.get("min_date", None) and query.get("max_date", None):
-            try:
-                before = int(query.get("max_date", ""))
-                after = int(query.get("min_date", ""))
-            except ValueError:
-                raise QueryParametersException("Please provide valid dates for the date range.")
-
-            if after < 946684800:
-                raise QueryParametersException("Please provide valid dates for the date range.")
-
-            if before < after:
-                raise QueryParametersException(
-                    "Please provide a valid date range where the start is before the end of the range.")
-
-            if after - before > (6 * 86400 * 30.25):
-                raise QueryParametersException("The date range for this query can span 6 months at most.")
-
-            query["min_date"] = after
-            query["max_date"] = before
-        else:
-            raise QueryParametersException("You need to provide a date range for your query")
-
-        is_placeholder = re.compile("_proxy$")
-        filtered_query = {}
-        for field in query:
-            if not is_placeholder.search(field):
-                filtered_query[field] = query[field]
-
-        # if we made it this far, the query can be executed
-        return filtered_query
+        return query

@@ -16,6 +16,7 @@ from cryptography.fernet import Fernet
 
 import config
 from backend.abstract.search import Search
+from backend.lib.helpers import UserInput
 from backend.lib.exceptions import QueryParametersException, ProcessorInterruptedException
 
 
@@ -35,7 +36,41 @@ class SearchInstagram(Search):
 	# let's not get rate limited
 	max_workers = 1
 
-	def get_posts_simple(self, query):
+	options = {
+		"intro": {
+			"type": UserInput.OPTION_INFO,
+			"help": "Posts are scraped in reverse chronological order; the most recent post for a given query will be "
+					"scraped first. In addition to posts, comments are also scraped. Note that this may take a long "
+					"time for popular accounts or hashtags.\n\nYou can scrape up to **five** items at a time. Separate "
+					"the items with commas or blank lines. Including `#` in hashtags is optional."
+		},
+		"search_scope": {
+			"type": UserInput.OPTION_CHOICE,
+			"help": "Search by",
+			"options": {
+				"hashtag": "Hashtag",
+				"username": "Username"
+			},
+			"default": "hashtag"
+		},
+		"query": {
+			"type": UserInput.OPTION_TEXT_LARGE,
+			"help": "Items to scrape",
+			"tooltip": "Separate with commas or new lines."
+		},
+		"scrape_comments": {
+			"type": UserInput.OPTION_TOGGLE,
+			"help": "Scrape comments?"
+		},
+		"max_posts": {
+			"type": UserInput.OPTION_TEXT,
+			"min": 1,
+			"max": 500,
+			"help": "Posts per item"
+		}
+	}
+
+	def get_items(self, query):
 		"""
 		Run custom search
 
@@ -61,36 +96,6 @@ class SearchInstagram(Search):
 		parameters = self.dataset.get_parameters()
 		scope = parameters.get("search_scope", "")
 		queries = [query.strip() for query in parameters.get("query", "").split(",")]
-
-		# log in, because else Instagram gets really annoying with rate
-		# limits
-		if config.DATASOURCES.get("instagram", {}).get("require_login", False):
-			if not parameters.get("login", None):
-				self.dataset.update_status(
-					"No Instagram login provided. Create a new dataset and provide your login details to scrape.",
-					is_final=True)
-				return []
-			key = SearchInstagram.salt_to_fernet_key()
-			fernet = Fernet(key)
-			login = json.loads(fernet.decrypt(parameters.get("login").encode("utf-8")))
-
-			try:
-				instagram.login(login[0], login[1])
-			except instaloader.TwoFactorAuthRequiredException:
-				self.dataset.update_status(
-					"Two-factor authentication with Instagram is not available via 4CAT at this time. Disable it for your Instagram account and try again.",
-					is_final=True)
-				return []
-			except (instaloader.InvalidArgumentException, instaloader.BadCredentialsException):
-				self.dataset.update_status("Invalid Instagram username or password", is_final=True)
-				return []
-			except instaloader.ConnectionException:
-				self.dataset.update_status("Could not connect to Instagram to log in.", is_final=True)
-				return []
-
-		# if we have the login in memory now, get rid of the login info stored
-		# in the database
-		self.dataset.delete_parameter("login")
 
 		posts = []
 		max_posts = self.dataset.parameters.get("items", 500)
@@ -235,52 +240,9 @@ class SearchInstagram(Search):
 		:param User user:  User object of user who has submitted the query
 		:return dict:  Safe query parameters
 		"""
-
-		# 'location' would be possible as well but apparently requires a login
-		if query.get("search_scope", "") not in ("hashtag", "username"):
-			raise QueryParametersException("Invalid search scope: must be hashtag or username")
-
 		# no query 4 u
 		if not query.get("query", "").strip():
 			raise QueryParametersException("You must provide a search query.")
-
-		# test if login is valid, if that is needed
-		if config.DATASOURCES.get("instagram", {}).get("require_login", False):
-			if not query.get("username", "").strip() or not query.get("password", "").strip():
-				raise QueryParametersException("You need to provide a username and password")
-
-			username = query.get("username")
-			password = query.get("password")
-			login_tester = instaloader.Instaloader()
-			try:
-				login_tester.login(username, password)
-			except instaloader.TwoFactorAuthRequiredException:
-				raise QueryParametersException(
-					"Two-factor authentication with Instagram is not available via 4CAT at this time. Disable it for your Instagram account and try again.")
-			except (instaloader.InvalidArgumentException, instaloader.BadCredentialsException):
-				raise QueryParametersException("Invalid Instagram username or password.")
-
-			# there are some fundamental limits to how safe we can make this, but
-			# we can at least encrypt it so that if someone has access to the
-			# database but not the 4CAT config file, they cannot use the login
-			# details
-			# we use the 4CAT anyonymisation salt (which *should* be a long,
-			# random string)
-			# making sure the 4CAT config file is kept safe is left as an exercise
-			# for the reader...
-			key = SearchInstagram.salt_to_fernet_key()
-			fernet = Fernet(key)
-			obfuscated_login = fernet.encrypt(json.dumps([username, password]).encode("utf-8")).decode("utf-8")
-		else:
-			obfuscated_login = ""
-
-		# 500 is mostly arbitrary - may need tweaking
-		max_posts = 2500
-		if query.get("max_posts", ""):
-			try:
-				max_posts = min(abs(int(query.get("max_posts"))), max_posts)
-			except TypeError:
-				raise QueryParametersException("Provide a valid number of posts to query.")
 
 		# reformat queries to be a comma-separated list with no wrapping
 		# whitespace
@@ -291,60 +253,12 @@ class SearchInstagram(Search):
 
 		# simple!
 		return {
-			"login": obfuscated_login,
-			"items": max_posts,
+			"items": query.get("max_posts"),
 			"query": items,
 			"board": query.get("search_scope") + "s",  # used in web interface
 			"search_scope": query.get("search_scope"),
-			"scrape_comments": bool(query.get("scrape_comments", False))
+			"scrape_comments": query.get("scrape_comments")
 		}
-
-	def get_search_mode(self, query):
-		"""
-		Instagram searches are always simple
-
-		:return str:
-		"""
-		return "simple"
-
-	def get_posts_complex(self, query):
-		"""
-		Complex post fetching is not used by the Instagram datasource
-
-		:param query:
-		:return:
-		"""
-		pass
-
-	def fetch_posts(self, post_ids, where=None, replacements=None):
-		"""
-		Posts are fetched via instaloader for this datasource
-		:param post_ids:
-		:param where:
-		:param replacements:
-		:return:
-		"""
-		pass
-
-	def fetch_threads(self, thread_ids):
-		"""
-		Thread filtering is not a toggle for Instagram datasets
-
-		:param thread_ids:
-		:return:
-		"""
-		pass
-
-	def get_thread_sizes(self, thread_ids, min_length):
-		"""
-		Thread filtering is not a toggle for Instagram datasets
-
-		:param tuple thread_ids:
-		:param int min_length:
-		results
-		:return dict:
-		"""
-		pass
 
 	@staticmethod
 	def salt_to_fernet_key():

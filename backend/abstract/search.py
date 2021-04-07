@@ -62,9 +62,9 @@ class Search(BasicProcessor, ABC):
 		if posts:
 			self.dataset.update_status("Writing posts to result file")
 			if not hasattr(self, "extension") or self.extension == "csv":
-				num_posts = self.posts_to_csv(posts, results_file)
+				num_posts = self.items_to_csv(posts, results_file)
 			elif self.extension == "ndjson":
-				num_posts = self.posts_to_ndjson(posts, results_file)
+				num_posts = self.items_to_ndjson(posts, results_file)
 			else:
 				raise NotImplementedError("Datasource query cannot be saved as %s file" % self.extension)
 
@@ -101,14 +101,197 @@ class Search(BasicProcessor, ABC):
 		self.dataset.finish(num_rows=num_posts)
 
 	def search(self, query):
+		"""
+		Search for items matching the given query
+
+		The real work is done by the get_posts() method of the descending
+		class. This method just provides some scaffolding and post-processing
+		of results via `after_search()`, if it is defined.
+
+		:param dict query:  Query parameters
+		:return:  Iterable of matching items, or None if there are no results.
+		"""
+		posts = self.get_items(query)
+
+		if not posts:
+			return None
+
+		# search workers may define an 'after_search' hook that is called after
+		# the query is first completed
+		if hasattr(self, "after_search") and callable(self.after_search):
+			posts = self.after_search(posts)
+
+		return posts
+
+	@abstractmethod
+	def get_items(self, query):
+		"""
+		Method to fetch items with for a given query
+
+		To be implemented by descending classes!
+		"""
+		pass
+
+	def items_to_csv(self, results, filepath):
+		"""
+		Takes a dictionary of results, converts it to a csv, and writes it to the
+		given location. This is mostly a generic dictionary-to-CSV processor but
+		some specific processing is done on the "body" key to strip HTML from it,
+		and a human-readable timestamp is provided next to the UNIX timestamp.
+
+		:param results:			List of dict rows from data source.
+		:param filepath:    	Filepath for the resulting csv
+
+		:return int:  Amount of posts that were processed
+
+		"""
+		if not filepath:
+			raise ResourceWarning("No result file for query")
+
+		# write the dictionary to a csv
+		if not isinstance(filepath, Path):
+			filepath = Path(filepath)
+
+		# cache hashed author names, so the hashing function (which is
+		# relatively expensive) is not run too often
+		pseudonymise_author = bool(self.parameters.get("pseudonymise", None))
+		hash_cache = {}
+
+		# prepare hasher (which we may or may not need)
+		# we use BLAKE2	for its (so far!) resistance against cryptanalysis and
+		# speed, since we will potentially need to calculate a large amount of
+		# hashes
+		hasher = hashlib.blake2b(digest_size=24)
+		hasher.update(str(config.ANONYMISATION_SALT).encode("utf-8"))
+
+		processed = 0
+		header_written = False
+		with filepath.open("w", encoding="utf-8") as csvfile:
+			# Parsing: remove the HTML tags, but keep the <br> as a newline
+			# Takes around 1.5 times longer
+			for row in results:
+				if self.interrupted:
+					raise ProcessorInterruptedException("Interrupted while writing results to file")
+
+				if not header_written:
+					fieldnames = list(row.keys())
+					fieldnames.append("unix_timestamp")
+					writer = csv.DictWriter(csvfile, fieldnames=fieldnames, lineterminator='\n')
+					writer.writeheader()
+					header_written = True
+
+				processed += 1
+
+				# Create human dates from timestamp
+				from datetime import datetime, timezone
+
+				if "timestamp" in row:
+					# Data sources should have "timestamp" as a unix epoch integer,
+					# but do some conversion if this is not the case.
+					timestamp = row["timestamp"]
+					if not isinstance(timestamp, int):
+						if isinstance(timestamp,
+									  str) and "-" not in timestamp:  # String representation of epoch timestamp
+							timestamp = int(timestamp)
+						elif isinstance(timestamp, str) and "-" in timestamp:  # Date string
+							try:
+								timestamp = datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S").replace(
+									tzinfo=timezone.utc).timestamp()
+							except ValueError:
+								timestamp = "undefined"
+						else:
+							timestamp = "undefined"
+
+					# Add a human-readable date format as well, if we have a valid timestamp.
+					row["unix_timestamp"] = timestamp
+					if timestamp != "undefined":
+						row["timestamp"] = datetime.utcfromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M:%S')
+					else:
+						row["timestamp"] = timestamp
+				else:
+					row["timestamp"] = "undefined"
+
+				# Parse html to text
+				if row["body"]:
+					row["body"] = strip_tags(row["body"])
+
+				# replace author column with salted hash of the author name, if
+				# pseudonymisation is enabled
+				if pseudonymise_author:
+					author_fields = [field for field in row.keys() if "author" in field]
+					for author_field in author_fields:
+						if row[author_field] not in hash_cache:
+							author_hasher = hasher.copy()
+							author_hasher.update(str(row[author_field]).encode("utf-8"))
+							hash_cache[row[author_field]] = author_hasher.hexdigest()
+							del author_hasher
+
+						row[author_field] = hash_cache[row[author_field]]
+
+				writer.writerow(row)
+
+		return processed
+
+	def items_to_ndjson(self, items, filepath):
+		"""
+		Save retrieved items as an ndjson file
+
+		NDJSON is a file with one valid JSON value per line, in this case each
+		of these JSON values represents a retrieved item. This is useful if the
+		retrieved data cannot easily be completely stored as a flat CSV file
+		and we want to leave the choice of how to flatten it to the user. Note
+		that no conversion (e.g. html stripping or pseudonymisation) is done
+		here - the items are saved as-is.
+
+		:param Iterator items:  Items to save
+		:param Path filepath:  Location to save results file
+		"""
+		if not filepath:
+			raise ResourceWarning("No valid results path supplied")
+
+		processed = 0
+		with filepath.open("w", encoding="utf-8", newline="") as outfile:
+			for item in items:
+				if self.interrupted:
+					raise ProcessorInterruptedException("Interrupted while writing results to file")
+
+				outfile.write(json.dumps(item) + "\n")
+				processed += 1
+
+		return processed
+
+
+class SearchWithScope(Search, ABC):
+	"""
+	Search class with more complex search pathways
+
+	Some datasources may afford more complex search modes besides simply
+	returning all items matching a given set of parameters. In particular,
+	they may allow for expanding the search scope to the thread in which a
+	given matching item occurs. This subclass allows for the following
+	additional search modes:
+
+	- All posts in a thread containing a matching post
+	- All posts in a thread containing at least x% matching posts
+	"""
+
+	def search(self, query):
+		"""
+		Complex search
+
+		Allows for two separate search pathways, one of which is chosen based
+		on the search query. Additionally, extra items are added to the results
+		if a wider search scope is requested.
+
+		:param dict query:  Query parameters
+		:return:  Matching items, as iterable, or None if no items match.
+		"""
 		mode = self.get_search_mode(query)
 
-		if query.get("body_match", None) or query.get("subject_match", None):
-			mode = "complex"
-			posts = self.get_posts_complex(query)
+		if mode == "simple":
+			posts = self.get_items_simple(query)
 		else:
-			mode = "simple"
-			posts = self.get_posts_simple(query)
+			posts = self.get_items_complex(query)
 
 		if not posts:
 			return None
@@ -202,151 +385,34 @@ class Search(BasicProcessor, ABC):
 
 		return posts
 
+	def get_items(self, query):
+		"""
+		Not available in this subclass
+		"""
+		raise NotImplementedError("Cannot use get_items() directly in SearchWithScope")
+
 	def get_search_mode(self, query):
 		"""
-		Determine search mode
+		Determine what search mode to use
 
-		By default this looks for body/subject match parameters, which would
-		necessitate complex search for most datasources, but this can be
-		overridden by descending classes.
+		Can be overridden by child classes!
 
 		:param dict query:  Query parameters
-		:return str:  `complex` or `simple`
+		:return str:  'simple' or 'complex'
 		"""
-		return "complex" if query.get("body_match", None) or query.get("subject_match", None) else "simple"
+		if query.get("body_match", None) or query.get("subject_match", None):
+			mode = "complex"
+		else:
+			mode = "simple"
 
-	def posts_to_csv(self, results, filepath):
-		"""
-		Takes a dictionary of results, converts it to a csv, and writes it to the
-		given location. This is mostly a generic dictionary-to-CSV processor but
-		some specific processing is done on the "body" key to strip HTML from it,
-		and a human-readable timestamp is provided next to the UNIX timestamp.
-
-		:param results:			List of dict rows from data source.
-		:param filepath:    	Filepath for the resulting csv
-
-		:return int:  Amount of posts that were processed
-
-		"""
-		if not filepath:
-			raise ResourceWarning("No result file for query")
-
-		# write the dictionary to a csv
-		if not isinstance(filepath, Path):
-			filepath = Path(filepath)
-
-		# cache hashed author names, so the hashing function (which is
-		# relatively expensive) is not run too often
-		pseudonymise_author = bool(self.parameters.get("pseudonymise", None))
-		hash_cache = {}
-
-		# prepare hasher (which we may or may not need)
-		# we use BLAKE2	for its (so far!) resistance against cryptanalysis and
-		# speed, since we will potentially need to calculate a large amount of
-		# hashes
-		hasher = hashlib.blake2b(digest_size=24)
-		hasher.update(str(config.ANONYMISATION_SALT).encode("utf-8"))
-
-		processed = 0
-		header_written = False
-		with filepath.open("w", encoding="utf-8") as csvfile:
-			# Parsing: remove the HTML tags, but keep the <br> as a newline
-			# Takes around 1.5 times longer
-			for row in results:
-				if self.interrupted:
-					raise ProcessorInterruptedException("Interrupted while writing results to file")
-
-				if not header_written:
-					fieldnames = list(row.keys())
-					fieldnames.append("unix_timestamp")
-					writer = csv.DictWriter(csvfile, fieldnames=fieldnames, lineterminator='\n')
-					writer.writeheader()
-					header_written = True
-
-				processed += 1
-
-				# Create human dates from timestamp
-				from datetime import datetime, timezone
-				
-				if "timestamp" in row:
-					# Data sources should have "timestamp" as a unix epoch integer,
-					# but do some conversion if this is not the case.
-					timestamp = row["timestamp"]
-					if not isinstance(timestamp, int):
-						if isinstance(timestamp, str) and "-" not in timestamp: # String representation of epoch timestamp
-							timestamp = int(timestamp)
-						elif isinstance(timestamp, str) and "-" in timestamp: # Date string
-							try:
-								timestamp = datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc).timestamp()
-							except ValueError:
-								timestamp = "undefined"
-						else:
-							timestamp = "undefined"
-
-					# Add a human-readable date format as well, if we have a valid timestamp.
-					row["unix_timestamp"] = timestamp
-					if timestamp is not "undefined":
-						row["timestamp"] = datetime.utcfromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M:%S')
-					else:
-						row["timestamp"] = timestamp
-				else:
-					row["timestamp"] = "undefined"
-
-				# Parse html to text
-				if row["body"]:
-					row["body"] = strip_tags(row["body"])
-
-				# replace author column with salted hash of the author name, if
-				# pseudonymisation is enabled
-				if pseudonymise_author:
-					author_fields = [field for field in row.keys() if "author" in field]
-					for author_field in author_fields:
-						if row[author_field] not in hash_cache:
-							author_hasher = hasher.copy()
-							author_hasher.update(str(row[author_field]).encode("utf-8"))
-							hash_cache[row[author_field]] = author_hasher.hexdigest()
-							del author_hasher
-
-						row[author_field] = hash_cache[row[author_field]]
-
-				writer.writerow(row)
-
-		return processed
-
-	def posts_to_ndjson(self, items, filepath):
-		"""
-		Save retrieved items as an ndjson file
-
-		NDJSON is a file with one valid JSON value per line, in this case each
-		of these JSON values represents a retrieved item. This is useful if the
-		retrieved data cannot easily be completely stored as a flat CSV file
-		and we want to leave the choice of how to flatten it to the user. Note
-		that no conversion (e.g. html stripping or pseudonymisation) is done
-		here - the items are saved as-is.
-
-		:param Iterator items:  Items to save
-		:param Path filepath:  Location to save results file
-		"""
-		if not filepath:
-			raise ResourceWarning("No valid results path supplied")
-
-		processed = 0
-		with filepath.open("w", encoding="utf-8", newline="") as outfile:
-			for item in items:
-				if self.interrupted:
-					raise ProcessorInterruptedException("Interrupted while writing results to file")
-
-				outfile.write(json.dumps(item) + "\n")
-				processed += 1
-
-		return processed
+		return mode
 
 	@abstractmethod
-	def get_posts_simple(self, query):
+	def get_items_simple(self, query):
 		pass
 
 	@abstractmethod
-	def get_posts_complex(self, query):
+	def get_items_complex(self, query):
 		pass
 
 	@abstractmethod

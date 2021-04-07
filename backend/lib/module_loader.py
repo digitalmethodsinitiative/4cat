@@ -64,6 +64,16 @@ class ModuleCollector:
 		self.load_modules()
 		self.cache()
 
+	@staticmethod
+	def is_4cat_class(object):
+		"""
+		Determine if a module member is a Search class we can use
+		"""
+		return inspect.isclass(object) and \
+			   issubclass(object, BasicWorker) and \
+			   object is not BasicWorker and \
+			   not inspect.isabstract(object)
+
 	def load_modules(self):
 		"""
 		Load modules
@@ -79,17 +89,14 @@ class ModuleCollector:
 				 *[self.datasources[datasource]["path"] for datasource in self.datasources]]
 
 		root_match = re.compile(r"^%s" % re.escape(config.PATH_ROOT))
+		root_path = Path(config.PATH_ROOT)
 
 		for folder in paths:
 			# loop through folders, and files in those folders, recursively
 			for file in folder.rglob("*.py"):
 				# determine module name for file
 				# reduce path to be relative to 4CAT root
-				module_name = file.parts[:-1]
-				for part in Path(config.PATH_ROOT).parts:
-					module_name = module_name[1:]
-
-				module_name = ".".join(list(module_name) + [file.stem])
+				module_name = ".".join(file.parts[len(root_path.parts):-1] + (file.stem,))
 
 				# check if we've already loaded this module
 				if module_name in sys.modules or module_name in self.ignore:
@@ -100,29 +107,19 @@ class ModuleCollector:
 					module = importlib.import_module(module_name)
 				except ImportError as e:
 					# this is fine, just ignore this data source and give a heads up
-					module_name_short = module_name.split(".")[-1]
-					self.ignore.append(module_name_short)
+					self.ignore.append(module_name)
 					if e.name not in self.missing_modules:
-						self.missing_modules[e.name] = [module_name_short]
+						self.missing_modules[e.name] = [module_name]
 					else:
-						self.missing_modules[e.name].append(module_name_short)
+						self.missing_modules[e.name].append(module_name)
 					continue
 
 				# see if module contains the right type of content by looping
 				# through all of its members
-				components = inspect.getmembers(module)
+				components = inspect.getmembers(module, predicate=self.is_4cat_class)
 				for component in components:
-					# check if found object qualifies as a worker class
-					is_4cat_module = False
-
-					if component[0][0:2] != "__" \
-							and inspect.isclass(component[1]) \
-							and (issubclass(component[1], BasicWorker) or issubclass(component[1], BasicProcessor)) \
-							and not inspect.isabstract(component[1]):
-						is_4cat_module = True
-
-					# nope? ignore it in the future
-					if not is_4cat_module:
+					if component[1].type in self.workers:
+						# already indexed
 						continue
 
 					# extract data that is useful for the scheduler and other
@@ -176,14 +173,12 @@ class ModuleCollector:
 
 		self.processors = categorised_processors
 
-
 		flat_further = set()
 		def collapse_flat_list(processor):
 			for further_processor in processor["further"]:
 				if further_processor not in flat_further:
 					collapse_flat_list(self.processors[further_processor])
 					flat_further.add(further_processor)
-
 
 		for processor in self.processors:
 			flat_further = set()
@@ -218,7 +213,7 @@ class ModuleCollector:
 			module_name = "datasources." + folder_name
 			try:
 				datasource = importlib.import_module(module_name)
-			except ImportError:
+			except ImportError as e:
 				continue
 
 			if not hasattr(datasource, "init_datasource") or not hasattr(datasource, "DATASOURCE"):
@@ -229,7 +224,6 @@ class ModuleCollector:
 			if datasource_id not in config.DATASOURCES:
 				# not configured, so we're going to just ignore it
 				continue
-
 
 			self.datasources[datasource_id] = {
 				"expire-datasets": config.DATASOURCES[datasource_id].get("expire-datasets", None),

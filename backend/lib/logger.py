@@ -108,7 +108,7 @@ class Logger:
 					break
 				frame_index += 1
 
-			file_location = frames[-1].f_code.co_filename.split("/").pop() + ":" + str(frames[-1].f_lineno)
+			file_location = frames[0].f_code.co_filename.split("/").pop() + ":" + str(frames[-1].f_lineno)
 			message = "(" + file_location + ")" + ": " + message
 		except AttributeError:
 			# the _getframe method may not be available
@@ -149,12 +149,13 @@ class Logger:
 			}
 
 			# call the Slack web hook
-			try:
-				e = requests.post(config.WARN_SLACK_URL, json.dumps(message))
-			except requests.RequestException as e:
-				# do not use self.warning because it will trigger an infinite
-				# loop of trying to send something to Slack
-				self.log(self.levels["WARNING"], "Could not send log alerts to Slack webhook (%s)" % e, False)
+			if slack_alert:
+				try:
+					e = requests.post(config.WARN_SLACK_URL, json.dumps(message))
+				except requests.RequestException as e:
+					# do not use self.warning because it will trigger an infinite
+					# loop of trying to send something to Slack
+					self.log(self.levels["WARNING"], "Could not send log alerts to Slack webhook (%s)" % e, False)
 
 		# every 10 minutes, collect and send warnings etc
 		if config.WARN_EMAILS and self.previous_report < time.time() - config.WARN_INTERVAL:

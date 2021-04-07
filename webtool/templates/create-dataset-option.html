@@ -1,0 +1,94 @@
+{% set fieldset = namespace(open=false) %}
+{% for option in options %}
+    {% set settings = options[option] %}
+    {% if not settings.requires or (current_user.is_authenticated and current_user.is_admin()) or current_user.get_attribute(settings.requires) %}
+    {% if not fieldset.open %}<fieldset>{% set fieldset.open = True %}{% endif %}
+    {% if settings.type == "divider" %}
+        </fieldset>
+        {% set fieldset.open = False %}
+    {% elif settings.type == "info" %}
+        <p class="form-intro">{{ settings.help|markdown|safe }}</p>
+    {% else %}
+        <div class="form-element{% if settings.cache %} cacheable{% endif %}">
+            <label for="forminput-{{ option }}">{{ settings.help }}</label>
+        {% if settings.type == "toggle" %}
+            <input name="option-{{ option }}" id="forminput-{{ option }}" type="checkbox" {% if settings.default %} checked{% endif %}>
+            {% if "tooltip" in settings %}<p class="option-help">{{ settings.tooltip }}</p>{% endif %}
+        {% elif settings.type == "file" %}
+            <input name="option-{{ option }}" id="forminput-{{ option }}" type="file">
+            {% if "tooltip" in settings %}
+                <button class="tooltip-trigger" aria-controls="tooltip-option-{{ option }}" aria-label="Extended help for option">?</button>
+    	        <p role="tooltip" id="tooltip-option-{{ option }}">
+                    {{ settings.tooltip }}
+                </p>
+            {% endif %}
+        {% elif settings.type == "string" %}
+            <input name="option-{{ option }}" id="forminput-{{ option }}"{% if settings.min %} min="{{ settings.min }}"{% endif %}{% if settings.max %} max="{{ settings.max }}"{% endif %} type="{% if settings.min or settings.max %}number{% else %}text{% endif %}" value="{{ settings.default }}">
+            {% if "tooltip" in settings %}
+                <button class="tooltip-trigger" aria-controls="tooltip-option-{{ option }}" aria-label="Extended help for option">?</button>
+    	        <p role="tooltip" id="tooltip-option-{{ option }}">
+                    {{ settings.tooltip }}
+                </p>
+            {% endif %}
+        {% elif settings.type == "date" %}
+            <input name="option-{{ option }}_proxy" id="forminput-{{ option }}" type="date" value="{{ settings.default }}">
+            <input name="option-{{ option }}" type="hidden" value="-1">
+            {% if "tooltip" in settings %}
+                <button class="tooltip-trigger" aria-controls="tooltip-option-{{ option }}" aria-label="Extended help for option">?</button>
+    	        <p role="tooltip" id="tooltip-option-{{ option }}">
+                    {{ settings.tooltip }}
+                </p>
+            {% endif %}
+        {% elif settings.type == "daterange" %}
+            <div class="daterange-wrapper">
+                <input name="option-{{ option }}-min_proxy" id="forminput-{{ option }}" class="input-time" type="date"
+                       placeholder="dd-mm-yyyy"> to
+                <input name="option-{{ option }}-max_proxy" class="input-time" type="date"
+                       placeholder="dd-mm-yyyy"> <span class="red"></span>
+
+                <input name="option-{{ option }}-min" type="hidden" value="-1">
+                <input name="option-{{ option }}-max" type="hidden" value="-1">
+            </div>
+            {% if "tooltip" in settings %}
+                <button class="tooltip-trigger" aria-controls="tooltip-option-{{ option }}" aria-label="Extended help for option">?</button>
+    	        <p role="tooltip" id="tooltip-option-{{ option }}">
+                    {{ settings.tooltip }}
+                </p>
+            {% endif %}
+        {% elif settings.type == "textarea" %}
+            <textarea name="option-{{ option }}" id="forminput-{{ option }}"
+                      placeholder="{{ settings.tooltip }}">{{ settings.default }}</textarea>
+        {% elif settings.type == "choice" %}
+            <select name="option-{{ option }}" id="forminput-{{ option }}">
+            {% for value, label in settings.options.items() %}
+                <option value="{{ value }}"{% if value == settings.default %} selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+            </select>
+            {% if "tooltip" in settings %}
+                <button class="tooltip-trigger" aria-controls="tooltip-option-{{ option }}" aria-label="Extended help for option">?</button>
+    	        <p role="tooltip" id="tooltip-option-{{ option }}">
+                    {{ settings.tooltip }}
+                </p>
+            {% endif %}
+        {% elif settings.type == "multi" %}
+            <div class="multichoice-wrapper">
+                <select name="option-{{ option }}" id="forminput-{{ option }}" multiple="multiple">
+            {% for choice in settings.options %}
+                    <option value="{{ choice }}"{% if choice in settings.default %} selected="selected"{% endif %}>{{ settings.options[choice] }}</option>
+            {% endfor %}
+                </select>
+            {% if "tooltip" in settings %}
+                <button class="tooltip-trigger" aria-controls="tooltip-option-{{ option }}" aria-label="Extended help for option">?</button>
+    	        <p role="tooltip" id="tooltip-option-{{ option }}">
+                    {{ settings.tooltip }}
+                </p>
+            {% endif %}
+            </div>
+        {% endif %}
+        </div>
+    {% endif %}
+    {% endif %}
+{% endfor %}
+{% if fieldset_open %}
+</fieldset>
+{% endif %}
