@@ -46,7 +46,8 @@ class ConvertNDJSONToJSON(BasicProcessor):
                 # TCAT has a check on line 62 of /import/import-jsondump.php
                 # that rejects strings large than 40960
                 #https://github.com/digitalmethodsinitiative/dmi-tcat/blob/9654fe3ff489fd3b0efc6ddcf7c19adf8ed7726d/import/import-jsondump.php#L62
-                if len(json.dumps(tweet)) < 40960:
+                # We are obviously dropping some tweets because of this
+                if len(json.dumps(post)) < 40960:
                     output.write(json.dumps(post, ensure_ascii=False))
                     # NDJSON file is expected by TCAT
                     output.write('\n')
@@ -156,7 +157,10 @@ class ConvertNDJSONToJSON(BasicProcessor):
                     'in_reply_to_user' : tweet.get('in_reply_to_user'),
                     # Storing the full referenced tweets (retweets, quotes, and replies)
                     'referenced_tweets' : tweet.get('referenced_tweets'),
+                    # Storing full place object
+                    'geo_full' : tweet.get('geo'),
                     }
+
 
         # Retweet - TCAT checks existance of 'retweeted_status' as key to determine if tweet is a retweet
         # We instead search for a referenced_tweets with type 'retweeted'
