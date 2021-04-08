@@ -18,7 +18,7 @@ packages = [
 	"Flask_Limiter==1.0.1",
 	"pyahocorasick==1.4.0",
 	"html2text==2018.1.9",
-	"cryptography==2.6.1",
+	"cryptography==3.3.2",
 	"instaloader==4.5.3",
 	"Flask_Login==0.4.1",
 	"selenium==3.141.0",
