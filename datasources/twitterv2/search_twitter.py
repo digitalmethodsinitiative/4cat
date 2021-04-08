@@ -227,6 +227,7 @@ class SearchWithTwitterAPIv2(Search):
             included_media = api_response.get("includes", {}).get("media", {})
             included_polls = api_response.get("includes", {}).get("polls", {})
             included_tweets = api_response.get("includes", {}).get("tweets", {})
+            included_places = api_response.get("includes", {}).get("places", {})
 
             for tweet in api_response.get("data", []):
                 if 0 < amount <= tweets:
@@ -235,8 +236,7 @@ class SearchWithTwitterAPIv2(Search):
                 # splice referenced data back in
                 # we use copy.deepcopy here because else we run into a
                 # pass-by-reference quagmire
-                tweet = self.enrich_tweet(tweet, included_users, included_media, included_polls,
-                                          copy.deepcopy(included_tweets))
+                tweet = self.enrich_tweet(tweet, included_users, included_media, included_polls, included_places, copy.deepcopy(included_tweets))
 
                 tweets += 1
                 if tweets % 500 == 0:
@@ -250,7 +250,7 @@ class SearchWithTwitterAPIv2(Search):
             else:
                 break
 
-    def enrich_tweet(self, tweet, users, media, polls, referenced_tweets):
+    def enrich_tweet(self, tweet, users, media, polls, places, referenced_tweets):
         """
         Enrich tweet with user and attachment metadata
 
@@ -273,6 +273,7 @@ class SearchWithTwitterAPIv2(Search):
         :param list users:  User metadata, as a list of user objects
         :param list media:  Media metadata, as a list of media objects
         :param list polls:  Poll metadata, as a list of poll objects
+        :param list places:  Place metadata, as a list of place objects
         :param list referenced_tweets:  Tweets referenced in the tweet, as a
         list of tweet objects. These will be enriched in turn.
 
@@ -284,10 +285,16 @@ class SearchWithTwitterAPIv2(Search):
         users_by_name = {user["username"]: user for user in users}
         media_by_key = {item["media_key"]: item for item in media}
         polls_by_id = {poll["id"]: poll for poll in polls}
+        places_by_id = {place["id"]: place for place in places}
         tweets_by_id = {ref["id"]: ref.copy() for ref in referenced_tweets}
 
         # add tweet author metadata
         tweet["author_user"] = users_by_id.get(tweet["author_id"])
+
+        # add place to geo metadata
+        # referenced_tweets also contain place_id, but these places may not included in the place objects
+        if 'place_id' in tweet.get('geo', {}) and tweet.get("geo").get("place_id") in places_by_id.keys():
+            tweet["geo"]["place"] = places_by_id[tweet.get("geo").get("place_id")]
 
         # add user metadata for mentioned users
         for index, mention in enumerate(tweet.get("entities", {}).get("mentions", [])):
@@ -314,9 +321,8 @@ class SearchWithTwitterAPIv2(Search):
         # referenced tweets (should we?)
         for index, reference in enumerate(tweet.get("referenced_tweets", [])):
             if reference["id"] in tweets_by_id:
-                tweet["referenced_tweets"][index] = {**reference,
-                                                     **self.enrich_tweet(tweets_by_id[reference["id"]], users, media,
-                                                                         polls, [])}
+                tweet["referenced_tweets"][index] = {**reference, **self.enrich_tweet(tweets_by_id[reference["id"]], users, media, polls, places, [])}
+
 
         return tweet
 
