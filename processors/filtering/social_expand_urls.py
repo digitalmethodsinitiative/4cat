@@ -56,7 +56,7 @@ class ParlerURLExpander(BasicProcessor):
             try:
                 headers = requests.head(url).headers
                 time.sleep(0.25)
-            except (requests.RequestException, ConnectionError):
+            except (requests.RequestException, ConnectionError, ValueError):
                 # bummer, but best to just leave as-is in this case
                 return url
 
