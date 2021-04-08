@@ -131,7 +131,11 @@ class FlowChart(BasicProcessor):
 			if post["date"] in ("all", "overall"):
 				timestamp = "overall"
 			else:
-				timestamp = int(datetime.datetime.strptime(post["date"], time_format).timestamp())
+				try:
+					timestamp = int(datetime.datetime.strptime(post["date"], time_format).timestamp())
+				except ValueError:
+					self.dataset.update_status("Encountered invalid date value '%s' in dataset, cannot process" % str(post["date"]), is_final=True)
+					return None
 
 			# Multiply small floats so they can be converted to ints (necessary for tf-idf scores)
 			value = float(post.get("value"))
