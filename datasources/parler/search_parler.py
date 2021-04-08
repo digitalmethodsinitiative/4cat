@@ -11,6 +11,7 @@ import re
 
 from backend.abstract.search import Search
 from backend.lib.exceptions import QueryParametersException, ProcessorInterruptedException
+from backend.lib.helpers import UserInput
 
 
 class SearchParler(Search):
@@ -29,7 +30,59 @@ class SearchParler(Search):
     # let's not get rate limited
     max_workers = 1
 
-    def get_posts_simple(self, query):
+    options = {
+        "intro": {
+            "type": UserInput.OPTION_INFO,
+            "help": "Posts are scraped in reverse chronological order; the most recent post for a given query will be "
+                    "scraped first. Note that you will need a Parler account to use this data source.\n\nYou can "
+                    "scrape up to **fifteen** items at a time. Separate the items with commas or blank lines. Enter "
+                    "hashtags and/or user names; make sure to include the `#` prefix for hashtags!"
+        },
+        "query": {
+            "type": UserInput.OPTION_TEXT_LARGE,
+            "help": "Items to scrape",
+            "tooltip": "Separate with commas or new lines."
+        },
+        "max_posts": {
+            "type": UserInput.OPTION_TEXT,
+            "help": "Posts per item",
+            "min": 1,
+            "max": 2500,
+            "default": 10
+        },
+        "scrape_echoes": {
+            "type": UserInput.OPTION_TOGGLE,
+            "help": "Include echoes",
+            "tooltip": "Echoes are Parler's equivalent to Twitter's retweets",
+            "default": False
+        },
+        "daterange": {
+            "type": UserInput.OPTION_DATERANGE,
+            "help": "Date range"
+        },
+        "divider": {
+            "type": UserInput.OPTION_DIVIDER
+        },
+        "intro-jst-mst": {
+            "type": UserInput.OPTION_INFO,
+            "help": "The following values can be obtained by logging in on Parler, then (in Chrome or Firefox) "
+                    "right-clicking on the page, and choosing 'Inspect Element'. In the panel that pops up, navigate "
+                    "to the 'Storage' tab. You will find 'jst' and 'mst' listed there; copy their values below."
+        },
+        "jst": {
+            "type": UserInput.OPTION_TEXT,
+            "help": "JST",
+            "cache": True
+        },
+        "mst": {
+            "type": UserInput.OPTION_TEXT,
+            "help": "MST",
+            "cache": True
+        },
+
+    }
+
+    def get_items(self, query):
         """
         Run custom search
 
@@ -72,9 +125,13 @@ class SearchParler(Search):
                 # for user queries, we need the user ID, which is *not* the username and can only be obtained
                 # via the API
                 try:
-                    user_id = session.get("https://api.parler.com/v1/profile", params={"username": query}).json()["_id"]
+                    user_id_src = self.request_from_parler(session, "GET", "https://api.parler.com/v1/profile", data={"username": query})
+                    user_id = user_id_src["_id"]
                 except KeyError:
                     # user does not exist or no results
+                    continue
+                except json.JSONDecodeError as e:
+                    self.log.warning("%s:\n\n%s" % (e, user_id_src.text))
                     continue
                 params = {"id": user_id, "limit": 100}
                 url = "https://api.parler.com/v1/post/creator"
@@ -90,8 +147,7 @@ class SearchParler(Search):
                     params["startkey"] = cursor
 
                 try:
-                    chunk_posts = session.get(url, params=params)
-                    print(chunk_posts.status_code)
+                    chunk_posts = self.request_from_parler(session, "GET", url, data=params)
 
                     if chunk_posts.status_code in (404, 400):
                         # no results
@@ -130,12 +186,12 @@ class SearchParler(Search):
                 for post in chunk_posts["posts"]:
                     # fairly straighforward - most of the API response maps 1-on-1 to 4CAT data fields
                     # in case of reposts (echoes), use the original data and mark it as a repost
-                    if post.get("parent") and int(post.get("depth", 0)) == 1:
+                    if post.get("source_dataset") and int(post.get("depth", 0)) == 1:
                         if not scrape_echoes:
                             continue
 
                         reposted_by = user_map.get(post["creator"])
-                        post_src = ref_map[post.get("parent")]
+                        post_src = ref_map[post.get("source_dataset")]
                     else:
                         reposted_by = ""
                         post_src = post
@@ -158,11 +214,11 @@ class SearchParler(Search):
                         "reposted_by": reposted_by
                     }
 
-                    if min_timestamp > 0 and dt.timestamp() < min_timestamp:
+                    if min_timestamp and dt.timestamp() < min_timestamp:
                         done = True
                         break
 
-                    if min_timestamp > 0 and dt.timestamp() >= max_timestamp:
+                    if max_timestamp and dt.timestamp() >= max_timestamp:
                         continue
 
                     num_posts += 1
@@ -231,19 +287,12 @@ class SearchParler(Search):
         if len(items.split(",")) > 15:
             raise QueryParametersException("You cannot query more than 15 items at a time.")
 
-        if query.get("min_date", None) and query.get("max_date", None):
-            try:
-                before = int(query.get("max_date", ""))
-                after = int(query.get("min_date", ""))
-            except ValueError:
-                raise QueryParametersException("Please provide valid dates for the date range.")
+        # the dates need to make sense as a range to search within
+        after, before = query.get("daterange")
+        if before and after and before < after:
+            raise QueryParametersException("Date range must start before it ends")
 
-            if before < after:
-                raise QueryParametersException(
-                    "Please provide a valid date range where the start is before the end of the range.")
-
-            query["min_date"] = after
-            query["max_date"] = before
+        query["min_date"], query["max_date"] = (after, before)
 
         # simple!
         return {
@@ -256,49 +305,47 @@ class SearchParler(Search):
             "scrape_echoes": bool(query.get("scrape_echoes", False))
         }
 
-    def get_search_mode(self, query):
+    def request_from_parler(self, session, method, url, headers=None, data=None):
         """
-        Parler searches are always simple
+        Request something via the BitChute API (or non-API)
 
-        :return str:
-        """
-        return "simple"
+        To avoid having to write the same error-checking everywhere, this takes
+        care of retrying on failure, et cetera
 
-    def get_posts_complex(self, query):
-        """
-        Complex post fetching is not used by the Parler datasource
+        :param session:  Requests session
+        :param str method: GET or POST
+        :param str url:  URL to fetch
+        :param dict header:  Headers to pass with the request
+        :param dict data:  Data/params to send with the request
 
-        :param query:
-        :return:
+        :return:  Requests response
         """
-        pass
+        retries = 0
+        response = None
+        while retries < 3:
+            try:
+                if method.lower() == "post":
+                    request = session.post(url, headers=headers, data=data)
+                elif method.lower() == "get":
+                    request = session.get(url, headers=headers, params=data)
+                else:
+                    raise NotImplemented()
 
-    def fetch_posts(self, post_ids, where=None, replacements=None):
-        """
-        Posts are fetched via the Parler API for this datasource
-        :param post_ids:
-        :param where:
-        :param replacements:
-        :return:
-        """
-        pass
+                if request.status_code >= 500:
+                    raise ConnectionError()
 
-    def fetch_threads(self, thread_ids):
-        """
-        Thread filtering is not a toggle for Parler datasets
+                response = request.json()
+                return response
 
-        :param thread_ids:
-        :return:
-        """
-        pass
+            except (ConnectionError, requests.RequestException) as e:
+                retries += 1
+                time.sleep(retries * 3)
 
-    def get_thread_sizes(self, thread_ids, min_length):
-        """
-        Thread filtering is not a toggle for Parler datasets
+            except json.JSONDecodeError as e:
+                self.log.warning("Error decoding JSON: %s\n\n%s" % (e, request.text))
 
-        :param tuple thread_ids:
-        :param int min_length:
-        results
-        :return dict:
-        """
-        pass
+        if not response:
+            self.log.warning("Failed Parler request to %s %i times, aborting" % (url, retries))
+            raise RuntimeError()
+
+        return response

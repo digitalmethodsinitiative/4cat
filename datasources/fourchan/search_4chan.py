@@ -10,11 +10,12 @@ from pymysql.err import Warning as SphinxWarning
 
 import config
 from backend.lib.database_mysql import MySQLDatabase
-from backend.abstract.search import Search
+from backend.lib.helpers import UserInput
+from backend.abstract.search import SearchWithScope
 from backend.lib.exceptions import QueryParametersException, ProcessorInterruptedException
 
 
-class Search4Chan(Search):
+class Search4Chan(SearchWithScope):
 	"""
 	Search 4chan corpus
 
@@ -32,16 +33,229 @@ class Search4Chan(Search):
 	# umbrella
 	eu_countries = (
 		"GB", "DE", "NL", "RU", "FI", "FR", "RO", "PL", "SE", "NO", "ES", "IE", "IT", "SI", "RS", "DK", "HR", "GR",
-		"BG",
-		"BE", "AT", "HU", "CH", "PT", "LT", "CZ", "EE", "UY", "LV", "SK", "MK", "UA", "IS", "BA", "CY", "GE", "LU",
-		"ME",
-		"AL", "MD", "IM", "EU", "BY", "MC", "AX", "KZ", "AM", "GG", "JE", "MT", "FO", "AZ", "LI", "AD")
+		"BG", "BE", "AT", "HU", "CH", "PT", "LT", "CZ", "EE", "UY", "LV", "SK", "MK", "UA", "IS", "BA", "CY", "GE",
+		"LU", "ME", "AL", "MD", "IM", "EU", "BY", "MC", "AX", "KZ", "AM", "GG", "JE", "MT", "FO", "AZ", "LI", "AD")
 
 	# before running a sphinx query, store it here so it can be cancelled via
 	# request_abort() later
 	running_query = ""
 
-	def get_posts_simple(self, query):
+	options = {
+		"intro": {
+			"type": UserInput.OPTION_INFO,
+			"help": "Results are limited to 5 million items maximum. Be sure to read the [query "
+					"syntax](/page/query-syntax/) for local data sources first - your query design will "
+					"significantly impact the results. Note that large queries can take a long time to complete!"
+		},
+		"board": {
+			"type": UserInput.OPTION_CHOICE,
+			"options": {b: b for b in config.DATASOURCES[prefix].get("boards", [])},
+			"help": "Board",
+			"default": config.DATASOURCES[prefix].get("boards", [""])[0]
+		},
+		"body_match": {
+			"type": UserInput.OPTION_TEXT,
+			"help": "Post contains"
+		},
+		"subject_match": {
+			"type": UserInput.OPTION_TEXT,
+			"help": "Subject contains"
+		},
+		"country_code": {
+			"type": UserInput.OPTION_CHOICE,
+			"help": "Poster country",
+			"options": {
+				"all": "All countries",
+				"europe": "All European countries",
+				"US": "United States",
+				"GB": "United Kingdom",
+				"CA": "Canada",
+				"AU": "Australia",
+				"DE": "Germany",
+				"NL": "Netherlands",
+				"RU": "Russian Federation",
+				"FI": "Finland",
+				"FR": "France",
+				"BR": "Brazil",
+				"RO": "Romania",
+				"PL": "Poland",
+				"SE": "Sweden",
+				"NO": "Norway",
+				"XX": "Unknown",
+				"NZ": "New Zealand",
+				"ES": "Spain",
+				"IE": "Ireland",
+				"IT": "Italy",
+				"SI": "Slovenia",
+				"RS": "Serbia",
+				"IN": "India",
+				"DK": "Denmark",
+				"MX": "Mexico",
+				"HR": "Croatia",
+				"GR": "Greece",
+				"JP": "Japan",
+				"BG": "Bulgaria",
+				"AR": "Argentina",
+				"IL": "Israel",
+				"BE": "Belgium",
+				"AT": "Austria",
+				"HU": "Hungary",
+				"CH": "Switzerland",
+				"PT": "Portugal",
+				"LT": "Lithuania",
+				"CZ": "Czech Republic",
+				"EE": "Estonia",
+				"UY": "Uruguay",
+				"ZA": "South Africa",
+				"LV": "Latvia",
+				"SK": "Slovakia",
+				"MK": "Macedonia",
+				"VN": "Vietnam",
+				"CL": "Chile",
+				"UA": "Ukraine",
+				"PH": "Philippines",
+				"SA": "Saudi Arabia",
+				"KR": "South Korea",
+				"DO": "Dominican Republic",
+				"DZ": "Algeria",
+				"SG": "Singapore",
+				"MY": "Malaysia",
+				"IS": "Iceland",
+				"BA": "Bosnia and Herzegovina",
+				"JO": "Jordan",
+				"TH": "Thailand",
+				"HK": "Hong Kong",
+				"CY": "Cyprus",
+				"PE": "Peru",
+				"PR": "Puerto Rico",
+				"LB": "Lebanon",
+				"PK": "Pakistan",
+				"CO": "Colombia",
+				"IQ": "Iraq",
+				"CR": "Costa Rica",
+				"BD": "Bangladesh",
+				"GE": "Georgia",
+				"LU": "Luxembourg",
+				"EG": "Egypt",
+				"TW": "Taiwan",
+				"ME": "Montenegro",
+				"AL": "Albania",
+				"VE": "Venezuela",
+				"AE": "United Arab Emirates",
+				"NP": "Nepal",
+				"TR": "Turkey",
+				"MD": "Moldova",
+				"NG": "Nigeria",
+				"PA": "Panama",
+				"BZ": "Belize",
+				"TN": "Tunisia",
+				"TT": "Trinidad and Tobago",
+				"IM": "Isle of Man",
+				"KG": "Kyrgyzstan",
+				"GT": "Guatemala",
+				"BM": "Bermuda",
+				"ID": "Indonesia",
+				"BW": "Botswana",
+				"BO": "Bolivia",
+				"PY": "Paraguay",
+				"MU": "Mauritius",
+				"CN": "China",
+				"KE": "Kenya",
+				"KW": "Kuwait",
+				"EU": "Europe",
+				"MW": "Malawi",
+				"BY": "Belarus",
+				"MN": "Mongolia",
+				"EC": "Ecuador",
+				"MC": "Monaco",
+				"AF": "Afghanistan",
+				"AX": "Aland",
+				"CW": "Curaçao",
+				"VC": "Saint Vincent and the Grenadines",
+				"MR": "Mauritania",
+				"CU": "Cuba",
+				"KZ": "Kazakhstan",
+				"AM": "Armenia",
+				"GG": "Guernsey",
+				"BS": "Bahamas",
+				"JE": "Jersey",
+				"AW": "Aruba",
+				"SV": "El Salvador",
+				"HN": "Honduras",
+				"LK": "Sri Lanka",
+				"MT": "Malta",
+				"FO": "Faroe Islands",
+				"NC": "New Caledonia",
+				"KH": "Cambodia",
+				"MA": "Morocco",
+				"FJ": "Fiji Islands",
+				"BT": "Bhutan",
+				"AO": "Angola",
+				"QA": "Qatar",
+				"BB": "Barbados",
+				"AZ": "Azerbaijan",
+				"LI": "Liechtenstein",
+				"RE": "Réunion",
+				"CM": "Cameroon",
+				"JM": "Jamaica",
+				"UG": "Uganda",
+				"KY": "Cayman Islands",
+				"AD": "Andorra",
+				"IR": "Iran",
+				"GU": "Guam",
+				"MZ": "Mozambique",
+				"MO": "Macao",
+				"DJ": "Djibouti",
+				"LY": "Libya",
+				"MM": "Myanmar",
+				"VI": "U.S. Virgin Islands",
+				"SC": "Seychelles",
+				"ET": "Ethiopia",
+				"PS": "Palestine",
+				"TZ": "Tanzania"
+			},
+			"default": "all"
+		},
+		"divider": {
+			"type": UserInput.OPTION_DIVIDER
+		},
+		"daterange": {
+			"type": UserInput.OPTION_DATERANGE,
+			"help": "Date range"
+		},
+		"search_scope": {
+			"type": UserInput.OPTION_CHOICE,
+			"help": "Search scope",
+			"options": {
+				"posts-only": "All matching posts",
+				"full-threads": "All posts in threads with matching posts (full threads)",
+				"dense-threads": "All posts in threads in which at least x% of posts match (dense threads)",
+				"match-ids": "Only posts matching the given post IDs"
+			},
+			"default": "posts-only"
+		},
+		"scope_density": {
+			"type": UserInput.OPTION_TEXT,
+			"help": "Min. density %",
+			"min": 0,
+			"max": 100,
+			"default": 15,
+			"tooltip": "At least this many % of posts in the thread must match the query"
+		},
+		"scope_length": {
+			"type": UserInput.OPTION_TEXT,
+			"help": "Min. dense thread length",
+			"min": 30,
+			"default": 30,
+			"tooltip": "A thread must at least be this many posts long to qualify as a 'dense thread'"
+		},
+		"valid_ids": {
+			"type": UserInput.OPTION_TEXT,
+			"help": "Post IDs (comma-separated)"
+		}
+	}
+
+	def get_items_simple(self, query):
 		"""
 		Fast-lane for simpler queries that don't need the intermediate step
 		where Sphinx is queried
@@ -85,18 +299,7 @@ class Search4Chan(Search):
 		if where:
 			sql_query += " AND " + " AND ".join(where)
 
-		if query.get("search_scope", None) == "random-sample":
-
-			try:
-				sample_size = int(query.get("sample_size", 5000))
-				sql_query = "SELECT * FROM (" + sql_query + " ORDER BY RANDOM() LIMIT " + str(
-					int(query.get("random_amount", 0))) + ") AS full_table ORDER BY full_table.timestamp ASC"
-
-			except ValueError:
-				pass
-
-		elif query.get("search_scope", None) == "match-ids":
-
+		if query.get("search_scope", None) == "match-ids":
 			try:
 				query_ids = query.get("valid_ids", None)
 
@@ -135,7 +338,7 @@ class Search4Chan(Search):
 
 		return self.db.fetchall_interruptable(self.queue, sql_query, replacements)
 
-	def get_posts_complex(self, query):
+	def get_items_complex(self, query):
 		"""
 		Complex queries that require full-text search capabilities
 
@@ -239,7 +442,7 @@ class Search4Chan(Search):
 		"""
 		SphinxQL has a couple of special characters that should be escaped if
 		they are part of a query, but no native function is available to
-		provide this functionality. This method does.
+		provide this functionality. This method provides it.
 
 		Thanks: https://stackoverflow.com/a/6288301
 
@@ -402,83 +605,19 @@ class Search4Chan(Search):
 
 		# this is the bare minimum, else we can't narrow down the full data set
 		if not user.is_admin() and not user.get_value("4chan.can_query_without_keyword", False) and not query.get("body_match", None) and not query.get("subject_match", None) and query.get("search_scope",	"") != "random-sample":
-			raise QueryParametersException("Please provide a body query, subject query or random sample size.")
+			raise QueryParametersException("Please provide a message or subject search query")
 
-		# Make sure to accept only a body or subject match.
-		if not query.get("body_match", None) and query.get("subject_match", None):
-			query["body_match"] = ""
-		elif query.get("body_match", None) and not query.get("subject_match", None):
-			query["subject_match"] = ""
+		query["min_date"], query["max_date"] = query["daterange"]
 
-		# body query and full threads are incompatible, returning too many posts
-		# in most cases
-		if query.get("body_match", None):
-			if "full_threads" in query:
-				del query["full_threads"]
+		del query["daterange"]
+		if query.get("search_scope") not in ("dense-threads",):
+			del query["scope_density"]
+			del query["scope_length"]
 
-		# random sample requires a sample size, and is additionally incompatible
-		# with full threads
-		if query.get("search_scope", "") == "random-sample":
-			try:
-				sample_size = int(query.get("random_amount", 0))
-			except ValueError:
-				raise QueryParametersException("Please provide a valid numerical sample size.")
+		if query.get("search_scope") not in ("match-ids",):
+			del query["valid_ids"]
 
-			if sample_size < 1 or sample_size > 100000:
-				raise QueryParametersException("Please provide a sample size between 1 and 100000.")
-
-			if "full_threads" in query:
-				del query["full_threads"]
-		elif "random_amount" in query:
-			del query["random_amount"]
-
-		# only one of two dense threads options may be chosen at the same time, and
-		# it requires valid density and length parameters. full threads is implied,
-		# so it is otherwise left alone here
-		if query.get("search_scope", "") == "dense-threads":
-			try:
-				dense_density = int(query.get("scope_density", ""))
-			except ValueError:
-				raise QueryParametersException("Please provide a valid numerical density percentage.")
-
-			if dense_density < 15 or dense_density > 100:
-				raise QueryParametersException("Please provide a density percentage between 15 and 100.")
-
-			try:
-				dense_length = int(query.get("scope_length", ""))
-			except ValueError:
-				raise QueryParametersException("Please provide a valid numerical dense thread length.")
-
-			if dense_length < 30:
-				raise QueryParametersException("Please provide a dense thread length of at least 30.")
-
-		# both dates need to be set, or none
-		if query.get("min_date", None) and not query.get("max_date", None):
-			raise QueryParametersException("When setting a date range, please provide both an upper and lower limit.")
-
-		# the dates need to make sense as a range to search within
-		if query.get("min_date", None) and query.get("max_date", None):
-			try:
-				before = int(query.get("max_date", ""))
-				after = int(query.get("min_date", ""))
-			except ValueError:
-				raise QueryParametersException("Please provide valid dates for the date range.")
-
-			if before < after:
-				raise QueryParametersException(
-					"Please provide a valid date range where the start is before the end of the range.")
-
-			query["min_date"] = after
-			query["max_date"] = before
-
-		is_placeholder = re.compile("_proxy$")
-		filtered_query = {}
-		for field in query:
-			if not is_placeholder.search(field):
-				filtered_query[field] = query[field]
-
-		# if we made it this far, the query can be executed
-		return filtered_query
+		return query
 
 	def request_interrupt(self, level=1):
 		"""

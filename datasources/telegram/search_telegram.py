@@ -2,6 +2,7 @@
 Search Telegram via API
 """
 import traceback
+import hashlib
 import asyncio
 import json
 import re
@@ -12,9 +13,9 @@ from backend.abstract.search import Search
 from backend.lib.exceptions import QueryParametersException, ProcessorInterruptedException
 from backend.lib.helpers import convert_to_int, UserInput
 
-from telethon.sync import TelegramClient
+from telethon import TelegramClient
 from telethon.errors.rpcerrorlist import UsernameInvalidError
-from telethon.tl.types import User, Message, PeerChannel, PeerChat, PeerUser
+from telethon.tl.types import User, PeerChannel, PeerChat, PeerUser
 
 
 class SearchTelegram(Search):
@@ -38,35 +39,123 @@ class SearchTelegram(Search):
 	max_workers = 1
 	max_retries = 3
 
-	def get_posts_simple(self, query):
-		"""
-		In the case of Telegram, there is no need for multiple pathways, so we
-		can route it all to the one post query method.
-		:param query:
-		:return:
-		"""
-		return self.get_posts_complex(query)
+	options = {
+		"intro": {
+			"type": UserInput.OPTION_INFO,
+			"help": "Messages are scraped in reverse chronological order: the most recent message for a given entity "
+					"(e.g. a group) will be scraped first.\n\nTo query the Telegram API, you need to supply your [API "
+					"credentials](https://my.telegram.org/apps). These **will be sent to the 4CAT server** and will be "
+					"stored there while data is fetched. After the dataset has been created your credentials will be "
+					"deleted from the server. 4CAT at this time does not support two-factor authentication for "
+					"Telegram."
+		},
+		"api_id": {
+			"type": UserInput.OPTION_TEXT,
+			"help": "API ID",
+			"sensitive": True,
+			"cache": True,
+		},
+		"api_hash": {
+			"type": UserInput.OPTION_TEXT,
+			"help": "API Hash",
+			"sensitive": True,
+			"cache": True,
+		},
+		"api_phone": {
+			"type": UserInput.OPTION_TEXT,
+			"help": "Phone number",
+			"sensitive": True,
+			"cache": True,
+			"default": "+xxxxxxxxxx"
+		},
+		"security-code": {
+			"type": UserInput.OPTION_TEXT,
+			"help": "Security code",
+			"sensitive": True
+		},
+		"divider": {
+			"type": UserInput.OPTION_DIVIDER
+		},
+		"query-intro": {
+			"type": UserInput.OPTION_INFO,
+			"help": "You can scrape up to **25** items at a time. Separate the items with commas or line breaks."
+		},
+		"query": {
+			"type": UserInput.OPTION_TEXT_LARGE,
+			"help": "Entities to scrape",
+			"tooltip": "Separate with commas or line breaks."
+		},
+		"max_posts": {
+			"type": UserInput.OPTION_TEXT,
+			"help": "Messages per group",
+			"min": 1,
+			"max": 50000,
+			"default": 10
+		}
+	}
 
-	def get_posts_complex(self, query):
+	def get_items(self, query):
 		"""
 		Execute a query; get messages for given parameters
+
+		Basically a wrapper around execute_queries() to call it with asyncio.
 
 		:param dict query:  Query parameters, as part of the DataSet object
 		:return list:  Posts, sorted by thread and post ID, in ascending order
 		"""
-		self.eventloop = asyncio.new_event_loop()
-		session_path = Path(__file__).parent.joinpath("sessions", self.dataset.parameters.get("session"))
+		if "api_phone" not in query or "api_hash" not in query or "api_id" not in query:
+			self.dataset.update_status("Could not create dataset since the Telegram API Hash and ID are missing. Try "
+									   "creating it again from scratch.", is_final=True)
+			return None
+
+		results = asyncio.run(self.execute_queries())
+		return results
+
+	async def execute_queries(self):
+		"""
+		Get messages for queries
+
+		This is basically what would be done in get_items(), except due to
+		Telethon's architecture this needs to be called in an async method,
+		which is this one.
+		"""
+		# session file has been created earlier, and we can re-use it here in
+		# order to avoid having to re-enter the security code
+		query = self.parameters
+
+		hash_base = query["api_phone"].replace("+", "") + query["api_id"] + query["api_hash"]
+		session_id = hashlib.blake2b(hash_base.encode("ascii")).hexdigest()
+		session_path = Path(__file__).parent.joinpath("sessions", session_id + ".session")
 
 		client = None
+
+		def cancel_start():
+			"""
+			Replace interactive phone number input in Telethon
+
+			By default, if Telethon cannot use the given session file to
+			authenticate, it will interactively prompt the user for a phone
+			number on the command line. That is not useful here, so instead
+			raise a RuntimeError. This will be caught below and the user will
+			be told they need to re-authenticate via 4CAT.
+			"""
+			raise RuntimeError("Connection cancelled")
+
 		try:
-			client = TelegramClient(str(session_path), self.dataset.parameters.get("api_id"),
-								self.dataset.parameters.get("api_hash"), loop=self.eventloop)
-			client.start()
+			client = TelegramClient(str(session_path), int(query.get("api_id")), query.get("api_hash"), loop=self.eventloop)
+			await client.start(phone=cancel_start)
+		except RuntimeError:
+			# session is no longer useable, delete file so user will be asked
+			# for security code again
+			self.dataset.update_status("Session is not authenticated: login security code may have expired. You need to re-enter the security code.", is_final=True)
+			session_path.unlink(missing_ok=True)
+			if client and hasattr(client, "disconnect"):
+				await client.disconnect()
+			return None
 		except Exception as e:
 			self.dataset.update_status("Error connecting to the Telegram API with provided credentials.", is_final=True)
-			self.dataset.finish()
 			if client and hasattr(client, "disconnect"):
-				client.disconnect()
+				await client.disconnect()
 			return None
 
 		# ready our parameters
@@ -74,44 +163,33 @@ class SearchTelegram(Search):
 		queries = [query.strip() for query in parameters.get("query", "").split(",")]
 		max_items = convert_to_int(parameters.get("items", 10), 10)
 
-		# userinfo needs some work before it can be retrieved, something with
-		# async method calls
-		userinfo = False  # bool(parameters.get("scrape-userinfo", False))
-
 		try:
-			posts = self.gather_posts(client, queries, max_items, userinfo)
+			posts = await self.gather_posts(client, queries, max_items)
 		except Exception as e:
 			self.dataset.update_status("Error scraping posts from Telegram")
 			self.log.error("Telegram scraping error: %s" % traceback.format_exc())
 			posts = None
 		finally:
-			client.disconnect()
-
-		# delete personal data from parameters. We still have a Telegram
-		# session saved to disk, but it's useless without this information.
-		self.dataset.delete_parameter("api_id")
-		self.dataset.delete_parameter("api_hash")
-		self.dataset.delete_parameter("api_phone")
+			await client.disconnect()
 
 		return posts
 
-	def gather_posts(self, client, queries, max_items, userinfo):
+	async def gather_posts(self, client, queries, max_items):
 		"""
 		Gather messages for each entity for which messages are requested
 
 		:param TelegramClient client:  Telegram Client
 		:param list queries:  List of entities to query (as string)
 		:param int max_items:  Messages to scrape per entity
-		:param bool userinfo:  Whether to scrape detailed user information
-		rather than just the ID
 		:return list:  List of messages, each message a dictionary.
 		"""
 		posts = []
 		for query in queries:
+			self.dataset.update_status("Fetching messages for entity '%s'" % query)
 			query_posts = []
 			i = 0
 			try:
-				for message in client.iter_messages(entity=query):
+				async for message in client.iter_messages(entity=query):
 					if self.interrupted:
 						raise ProcessorInterruptedException("Interrupted while fetching message data from the Telegram API")
 
@@ -122,7 +200,7 @@ class SearchTelegram(Search):
 						# e.g. someone joins the channel - not an actual message
 						continue
 
-					parsed_message = self.import_message(client, message, query, get_full_userinfo=userinfo)
+					parsed_message = self.import_message(message, query)
 					query_posts.append(parsed_message)
 
 					i += 1
@@ -135,13 +213,12 @@ class SearchTelegram(Search):
 
 		return posts
 
-	def import_message(self, client, message, entity, get_full_userinfo=False):
+	def import_message(self, message, entity):
 		"""
 		Convert Message object to 4CAT-ready data object
 
-		:param TelegramClient client:  Telethon TelegramClient instance
 		:param Message message:  Message to parse
-		:param bool get_full_userinfo:  Whether to get user info for users. Takes an extra request, so it's slow.
+		:param str entity:  Entity this message was imported from
 		:return dict:  4CAT-compatible item object
 		"""
 		thread = message.to_id
@@ -204,22 +281,9 @@ class SearchTelegram(Search):
 			else:
 				attachment_data = ""
 
-		elif attachment_type == "game":
-			# there is far more data in the API response for games but this
-			# seems like a reasonable number of items to include
-			attachment = message.game
-			attachment_data = json.dumps(
-				{property: attachment[property] for property in ("id", "short_name", "title", "description")})
-
 		elif attachment_type in ("geo", "geo_live"):
 			# untested whether geo_live is significantly different from geo
 			attachment_data = "%s %s" % (message.geo.lat, message.geo.long)
-
-		elif attachment_type == "invoice":
-			# unclear when and where this would be used
-			attachment = message.invoice
-			attachment_data = json.dumps(
-				{property: attachment[property] for property in ("title", "description", "currency", "total_amount")})
 
 		elif attachment_type == "photo":
 			# we don't actually store any metadata about the photo, since very
@@ -342,22 +406,8 @@ class SearchTelegram(Search):
 		if not query.get("query", "").strip():
 			raise QueryParametersException("You must provide a search query.")
 
-		if not query.get("session", "").strip():
-			raise QueryParametersException("You need to authenticate with the Telegram API first.")
-
-		if not query.get("api_id", None) or not query.get("api_hash", None):
+		if not query.get("api_id", None) or not query.get("api_hash", None) or not query.get("api_phone", None):
 			raise QueryParametersException("You need to provide valid Telegram API credentials first.")
-
-		if "api_phone" in query:
-			del query["api_phone"]
-
-		# 5000 is mostly arbitrary - may need tweaking
-		max_posts = 50000
-		if query.get("max_posts", ""):
-			try:
-				max_posts = min(abs(int(query.get("max_posts"))), max_posts)
-			except TypeError:
-				raise QueryParametersException("Provide a valid number of messages to query.")
 
 		# reformat queries to be a comma-separated list with no wrapping
 		# whitespace
@@ -371,29 +421,10 @@ class SearchTelegram(Search):
 
 		# simple!
 		return {
-			"items": max_posts,
+			"items": query.get("max_posts"),
 			"query": items,
 			"board": "",  # needed for web interface
-			"scrape-userinfo": bool(query.get("scrape-userinfo", False)),
-			"session": query.get("session"),
 			"api_id": query.get("api_id"),
-			"api_hash": query.get("api_hash")
+			"api_hash": query.get("api_hash"),
+			"api_phone": query.get("api_phone")
 		}
-
-	def fetch_posts(self, post_ids, where=None, replacements=None):
-		"""
-		Not used by Telegram scraper
-		"""
-		pass
-
-	def fetch_threads(self, thread_ids):
-		"""
-		Not used by Telegram scraper
-		"""
-		pass
-
-	def get_thread_sizes(self, thread_ids, min_length):
-		"""
-		Not used by Telegram scraper
-		"""
-		pass

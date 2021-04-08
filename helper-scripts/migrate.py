@@ -123,15 +123,14 @@ for file in migrate_files:
 		migrate_to_run.append(file)
 
 if not migrate_to_run:
-	print("No migration scripts to run. You're good to go.")
-	exit(0)
+	print("No migration scripts to run.")
+else:
+	# oldest versions first
+	migrate_to_run = sorted(migrate_to_run, key=lambda x: make_version_comparable(x.stem.split("-")[1]))
 
-# oldest versions first
-migrate_to_run = sorted(migrate_to_run, key=lambda x: make_version_comparable(x.stem.split("-")[1]))
-
-print("The following migration scripts will be run:")
-for file in migrate_to_run:
-	print("  %s" % file.name)
+	print("The following migration scripts will be run:")
+	for file in migrate_to_run:
+		print("  %s" % file.name)
 
 # ---------------------------------------------
 #      Try to stop 4CAT if it is running
@@ -166,8 +165,9 @@ print("  ...done")
 # ---------------------------------------------
 #       Run individual migration scripts
 # ---------------------------------------------
-print("\n- Starting migration...")
-print("  %i scripts will be run." % len(migrate_to_run))
+if migrate_to_run:
+	print("\n- Starting migration...")
+	print("  %i scripts will be run." % len(migrate_to_run))
 
 for file in migrate_to_run:
 	file_target = file.stem.split("-")[2]

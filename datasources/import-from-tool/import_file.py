@@ -10,7 +10,7 @@ import io
 
 from backend.abstract.worker import BasicWorker
 from backend.lib.exceptions import QueryParametersException
-from backend.lib.helpers import get_software_version, sniff_encoding
+from backend.lib.helpers import get_software_version, sniff_encoding, UserInput
 
 
 class ImportFromExternalTool(BasicWorker):
@@ -24,6 +24,24 @@ class ImportFromExternalTool(BasicWorker):
 	accepts = [None]
 
 	max_workers = 1
+
+	options = {
+		"platform": {
+			"type": UserInput.OPTION_CHOICE,
+			"help": "Platform",
+			"options": {
+				"instagram-crowdtangle": "Instagram (CrowdTangle export)",
+				"facebook-crowdtangle": "Facebook (CrowdTangle export)",
+				"instagram-dmi-scraper": "Instagram (DMI Instagram scraper)",
+				"tiktok": "TikTok (drawrowfly/tiktok-scraper)"
+			},
+			"default": "instagram-crowdtangle"
+		},
+		"data_upload": {
+			"type": UserInput.OPTION_FILE,
+			"help": "File"
+		}
+	}
 
 	required_columns = {
 		"instagram-crowdtangle": (
@@ -78,14 +96,14 @@ class ImportFromExternalTool(BasicWorker):
 		"""
 
 		# do we have an uploaded file?
-		if "data_upload" not in request.files:
+		if "option-data_upload" not in request.files:
 			raise QueryParametersException("No file was offered for upload.")
 
 		platform = query.get("platform", "")
 		if platform not in ImportFromExternalTool.required_columns:
 			raise QueryParametersException("Invalid platform")
 
-		file = request.files["data_upload"]
+		file = request.files["option-data_upload"]
 		if not file:
 			raise QueryParametersException("No file was offered for upload.")
 
@@ -137,7 +155,7 @@ class ImportFromExternalTool(BasicWorker):
 		hashtag = re.compile(r"#([^\s,.+=-]+)")
 		usertag = re.compile(r"@([^\s,.+=-]+)")
 
-		file = request.files["data_upload"]
+		file = request.files["option-data_upload"]
 		platform = dataset.parameters.get("platform")
 
 		# this is a bit hacky, but sometimes we have multiple tools that can

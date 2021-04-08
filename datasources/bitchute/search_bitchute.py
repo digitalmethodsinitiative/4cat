@@ -12,6 +12,7 @@ import re
 from itertools import chain
 from bs4 import BeautifulSoup
 
+from backend.lib.helpers import UserInput
 from backend.abstract.search import Search
 from backend.lib.exceptions import QueryParametersException, ProcessorInterruptedException
 
@@ -35,7 +36,57 @@ class SearchBitChute(Search):
     # scraping happens in one or the other method, so keep track of this internally
     max_items = 0
 
-    def get_posts_simple(self, query):
+    options = {
+        "intro": {
+            "type": UserInput.OPTION_INFO,
+            "help": "Videos are scraped in the order they are returned by [BitChute](https://bitchute.com)'s search "
+                    "function.\n\nYou can scrape results for up to **fifteen** items at a time. Separate the items "
+                    "with commas or blank lines. When searching for usernames, there is no need to include @ in front."
+        },
+        "search_type": {
+            "type": UserInput.OPTION_CHOICE,
+            "help": "Search by",
+            "options": {
+                "search": "Search query",
+                "user": "Username"
+            },
+            "default": "search"
+        },
+        "query": {
+            "type": UserInput.OPTION_TEXT_LARGE,
+            "help": "Query"
+        },
+        "max_posts": {
+            "type": UserInput.OPTION_TEXT,
+            "help": "Videos per item",
+            "min": 0,
+            "max": 2500,
+            "default": 10
+        },
+        "divider": {
+            "type": UserInput.OPTION_DIVIDER
+        },
+        "enrichment-info": {
+            "type": UserInput.OPTION_INFO,
+            "help": "You can optionally scrape more details - exact publication date, likes, dislikes, category, "
+                    "comment count and channel subscriber count - for each video. Note that this takes a couple of "
+                    "seconds per video (which can add up!). Consider doing a basic query first and then repeating it "
+                    "with more details only if necessary."
+        },
+        "search_scope": {
+            "type": UserInput.OPTION_CHOICE,
+            "help": "Search scope",
+            "options": {
+                "basic": "Basic",
+                "detail": "Detailed",
+                "comments": "Detailed, also scrape video comments"
+            },
+            "default": "basic"
+        }
+
+    }
+
+    def get_items(self, query):
         """
         Run custom search
 
@@ -279,7 +330,7 @@ class SearchBitChute(Search):
                 # javascript on the page
                 comment_script = None
                 for line in video_page.text.split("\n"):
-                    if line.strip().find("initComments") == 0:
+                    if "initComments(" in line:
                         comment_script = line.split("initComments(")[1]
                         break
 
@@ -417,77 +468,16 @@ class SearchBitChute(Search):
         if not query.get("query", "").strip():
             raise QueryParametersException("You must provide a search query.")
 
-        if query.get("search_scope", "") not in ("basic", "detail", "comments"):
-            raise QueryParametersException("Invalid search scope: must be basic or detail")
-
-        if query.get("search_type", "") not in ("user", "search"):
-            raise QueryParametersException("Invalid search type: must be user or search")
-
-        # 500 is mostly arbitrary - may need tweaking
-        max_posts = 2500
-        if query.get("max_posts", ""):
-            try:
-                max_posts = min(abs(int(query.get("max_posts"))), max_posts)
-            except TypeError:
-                raise QueryParametersException("Provide a valid number of videos to query.")
-
         # reformat queries to be a comma-separated list with no wrapping
         # whitespace
         items = query.get("query").replace("\n", ",")
         if len(items.split(",")) > 15:
-            raise QueryParametersException("You cannot query more than 10 items at a time.")
+            raise QueryParametersException("You cannot query more than 15 items at a time.")
 
         # simple!
         return {
-            "items": max_posts,
+            "items": query.get("max_posts"),
             "query": items,
             "scope": query.get("search_scope"),
             "item_type": query.get("search_type")
         }
-
-    def get_search_mode(self, query):
-        """
-        BitChute searches are always simple
-
-        :return str:
-        """
-        return "simple"
-
-    def get_posts_complex(self, query):
-        """
-        Complex post fetching is not used by the BitChute datasource
-
-        :param query:
-        :return:
-        """
-        pass
-
-    def fetch_posts(self, post_ids, where=None, replacements=None):
-        """
-        Posts are fetched via the BitChute API for this datasource
-        :param post_ids:
-        :param where:
-        :param replacements:
-        :return:
-        """
-        pass
-
-    def fetch_threads(self, thread_ids):
-        """
-        Thread filtering is not a toggle for BitChute datasets
-
-        :param thread_ids:
-        :return:
-        """
-        pass
-
-    def get_thread_sizes(self, thread_ids, min_length):
-        """
-        Thread filtering is not a toggle for BitChute datasets
-
-        :param tuple thread_ids:
-        :param int min_length:
-        results
-        :return dict:
-        """
-        pass

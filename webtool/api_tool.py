@@ -113,17 +113,19 @@ def datasource_form(datasource_id):
 	The data source needs to have been loaded as a module with a
 	`ModuleCollector`, and also needs to be present in `config.py`. If so, this
 	endpoint returns the HTML form configured by the template in the
-	data source's folder, or a default tool template if that one is not
-	available.
+	data source's folder.
 
 	If a file `tool.js` is available in the data source's `webtool` folder, the
 	response will indicate that a javascript file is available for this data
 	source.
 
+	If the data source has no search worker or its search worker does not have
+	any parameters defined, this returns a 404 Not Found status.
+
 	:param datasource_id:  Data source ID, as specified in the data source and
 						   config.py
 	:return: A JSON object with the `html` of the template,
-	         a boolean `javascript` determining whether javascript should be
+	         a boolean `has_javascript` determining whether javascript should be
 	         loaded for this template, a `status` code and the `datasource` ID.
 
 	:return-error 404: If the datasource does not exist.
@@ -135,18 +137,21 @@ def datasource_form(datasource_id):
 		return error(404, message="Datasource '%s' does not exist" % datasource_id)
 
 	datasource = backend.all_modules.datasources[datasource_id]
-	template_path = datasource["path"].joinpath("webtool", "query-form.html")
+	worker = backend.all_modules.workers.get(datasource_id + "-search")
 
-	if not template_path.exists():
-		template_path = Path("tool_default.html")
+	if not worker:
+		return error(404, message="Datasource '%s' has no search worker" % datasource_id)
 
+	worker_class = backend.all_modules.load_worker_class(worker)
+
+	if not hasattr(worker_class, "options"):
+		return error(404, message="Datasource '%s' has no dataset parameter options defined" % datasource_id)
+
+	form = render_template("create-dataset-option.html", options=worker_class.options)
 	javascript_path = datasource["path"].joinpath("webtool", "tool.js")
 	has_javascript = javascript_path.exists()
 
-	if not template_path.exists():
-		return error(404, message="No interface exists for datasource '%s'" % datasource_id)
-
-	html = render_template_string(template_path.read_text(), datasource_id=datasource_id,
+	html = render_template_string(form, datasource_id=datasource_id,
 								  datasource_config=config.DATASOURCES[datasource_id], datasource=datasource)
 
 	return jsonify({"status": "success", "datasource": datasource_id, "has_javascript": has_javascript, "html": html})
@@ -223,11 +228,15 @@ def queue_dataset():
 
 	if hasattr(worker_class, "validate_query"):
 		try:
-			sanitised_query = worker_class.validate_query(request.form.to_dict(), request, current_user)
+			# first sanitise values
+			sanitised_query = UserInput.parse_all(worker_class.options, request.form.to_dict(), silently_correct=False)
+
+			# then validate for this particular datasource
+			sanitised_query = worker_class.validate_query(sanitised_query, request, current_user)
 		except QueryParametersException as e:
 			return "Invalid query. %s" % e
 	else:
-		sanitised_query = request.form.to_dict()
+		raise NotImplementedError("Data sources MUST sanitise input values with validate_query")
 
 	sanitised_query["user"] = current_user.get_id()
 	sanitised_query["datasource"] = datasource_id

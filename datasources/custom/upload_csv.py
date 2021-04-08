@@ -12,7 +12,7 @@ from werkzeug.datastructures import FileStorage
 
 from backend.abstract.worker import BasicWorker
 from backend.lib.exceptions import QueryParametersException
-from backend.lib.helpers import get_software_version, strip_tags, sniff_encoding
+from backend.lib.helpers import get_software_version, strip_tags, sniff_encoding, UserInput
 
 
 class SearchCustom(BasicWorker):
@@ -26,6 +26,24 @@ class SearchCustom(BasicWorker):
 	accepts = [None]
 
 	max_workers = 1
+	options = {
+		"intro": {
+			"type": UserInput.OPTION_INFO,
+			"help": "You can upload a CSV or TAB file here that, after upload, will be available for further analysis "
+					"and processing. Files need to be utf-8 encoded and must contain a header row with at least the "
+					"following columns: `id`, `thread_id`, `author`, `body`, `subject`, `timestamp`.\n\nThe "
+					"`timestamp` column should be formatted `YYYY-mm-dd HH:MM:SS`."
+		},
+		"data_upload": {
+			"type": UserInput.OPTION_FILE,
+			"help": "File"
+		},
+		"strip_html": {
+			"type": UserInput.OPTION_TOGGLE,
+			"help": "Strip HTML tags from item text?",
+			"ddefault": False
+		}
+	}
 
 	def work(self):
 		"""
@@ -51,10 +69,10 @@ class SearchCustom(BasicWorker):
 		"""
 
 		# do we have an uploaded file?
-		if "data_upload" not in request.files:
+		if "option-data_upload" not in request.files:
 			raise QueryParametersException("No file was offered for upload.")
 
-		file = request.files["data_upload"]
+		file = request.files["option-data_upload"]
 		if not file:
 			raise QueryParametersException("No file was offered for upload.")
 
@@ -120,7 +138,7 @@ class SearchCustom(BasicWorker):
 
 		strip_html = query.get("strip_html")
 
-		file = request.files["data_upload"]
+		file = request.files["option-data_upload"]
 
 		file.seek(0)
 

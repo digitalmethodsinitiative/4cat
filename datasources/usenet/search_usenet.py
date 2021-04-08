@@ -2,8 +2,8 @@
 Usenet Search via Sphinx
 """
 import time
-import re
 
+from backend.lib.helpers import UserInput
 from backend.lib.exceptions import QueryParametersException, ProcessorInterruptedException
 from datasources.fourchan.search_4chan import Search4Chan
 
@@ -25,7 +25,65 @@ class SearchUsenet(Search4Chan):
 	# request_abort() later
 	running_query = ""
 
-	def get_posts_simple(self, query):
+	options = {
+		"intro": {
+			"type": UserInput.OPTION_INFO,
+			"help": "Be sure to read the [query syntax](/page/query-syntax/) for local data sources first - your "
+					"query design will significantly impact the results. Note that large queries can take a long time "
+					"to complete!"
+		},
+		"body_match": {
+			"type": UserInput.OPTION_TEXT,
+			"help": "Message contains"
+		},
+		"subject_match": {
+			"type": UserInput.OPTION_TEXT,
+			"help": "Subject contains"
+		},
+		"group-help": {
+			"type": UserInput.OPTION_INFO,
+			"help": "You can enter multiple newsgroups, separate with commas. Trailing wildcards can be used to "
+					"select all posts in a given hierarchy (e.g. `alt.fan.*`)."
+		},
+		"group_match": {
+			"type": UserInput.OPTION_TEXT,
+			"help": "Newsgroup(s)"
+		},
+		"divider": {
+			"type": UserInput.OPTION_DIVIDER
+		},
+		"daterange": {
+			"type": UserInput.OPTION_DATERANGE,
+			"help": "Date range"
+		},
+		"search_scope": {
+			"type": UserInput.OPTION_CHOICE,
+			"help": "Search scope",
+			"options": {
+				"posts-only": "All matching messages",
+				"full-threads": "All messages in threads with matching messages (full threads)",
+				"dense-threads": "All messages in threads in which at least x% of messages match (dense threads)"
+			},
+			"default": "posts-only"
+		},
+		"scope_density": {
+			"type": UserInput.OPTION_TEXT,
+			"help": "Min. density %",
+			"min": 0,
+			"max": 100,
+			"default": 15,
+			"tooltip": "At least this many % of messages in the thread must match the query"
+		},
+		"scope_length": {
+			"type": UserInput.OPTION_TEXT,
+			"help": "Min. dense thread length",
+			"min": 30,
+			"default": 30,
+			"tooltip": "A thread must at least be this many messages long to qualify as a 'dense thread'"
+		}
+	}
+
+	def get_items_simple(self, query):
 		"""
 		Fast-lane for simpler queries that don't need the intermediate step
 		where Sphinx is queried
@@ -62,7 +120,7 @@ class SearchUsenet(Search4Chan):
 
 		return self.db.fetchall_interruptable(self.queue, sql_query, replacements)
 
-	def get_posts_complex(self, query):
+	def get_items_complex(self, query):
 		"""
 		Complex queries that require full-text search capabilities
 
@@ -185,62 +243,12 @@ class SearchUsenet(Search4Chan):
 		if not user.is_admin() and not user.get_value("usenet.can_query_without_keyword", False) and not query.get("body_match", None) and not query.get("subject_match", None) and query.get("search_scope",	"") != "random-sample":
 			raise QueryParametersException("Please provide a body query, subject query or random sample size.")
 
-		# Make sure to accept only a body or subject match.
-		if not query.get("body_match", None) and query.get("subject_match", None):
-			query["body_match"] = ""
-		elif query.get("body_match", None) and not query.get("subject_match", None):
-			query["subject_match"] = ""
-
-		# body query and full threads are incompatible, returning too many posts
-		# in most cases
-		if query.get("body_match", None):
-			if "full_threads" in query:
-				del query["full_threads"]
-
-		# only one of two dense threads options may be chosen at the same time, and
-		# it requires valid density and length parameters. full threads is implied,
-		# so it is otherwise left alone here
-		if query.get("search_scope", "") == "dense-threads":
-			try:
-				dense_density = int(query.get("scope_density", ""))
-			except ValueError:
-				raise QueryParametersException("Please provide a valid numerical density percentage.")
-
-			if dense_density < 15 or dense_density > 100:
-				raise QueryParametersException("Please provide a density percentage between 15 and 100.")
-
-			try:
-				dense_length = int(query.get("scope_length", ""))
-			except ValueError:
-				raise QueryParametersException("Please provide a valid numerical dense thread length.")
-
-			if dense_length < 30:
-				raise QueryParametersException("Please provide a dense thread length of at least 30.")
-
-		# both dates need to be set, or none
-		if query.get("min_date", None) and not query.get("max_date", None):
-			raise QueryParametersException("When setting a date range, please provide both an upper and lower limit.")
-
 		# the dates need to make sense as a range to search within
-		if query.get("min_date", None) and query.get("max_date", None):
-			try:
-				before = int(query.get("max_date", ""))
-				after = int(query.get("min_date", ""))
-			except ValueError:
-				raise QueryParametersException("Please provide valid dates for the date range.")
+		query["min_date"], query["max_date"] = query.get("daterange")
+		if any(query.get("daterange")) and not all(query.get("daterange")):
+			raise QueryParametersException("When providing a date range, set both an upper and lower limit.")
 
-			if before < after:
-				raise QueryParametersException(
-					"Please provide a valid date range where the start is before the end of the range.")
-
-			query["min_date"] = after
-			query["max_date"] = before
-
-		is_placeholder = re.compile("_proxy$")
-		filtered_query = {}
-		for field in query:
-			if not is_placeholder.search(field):
-				filtered_query[field] = query[field]
+		del query["daterange"]
 
 		# if we made it this far, the query can be executed
-		return filtered_query
+		return query

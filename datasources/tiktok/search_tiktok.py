@@ -16,6 +16,7 @@ from selenium.webdriver.chrome.options import Options
 from selenium.common.exceptions import JavascriptException
 
 from backend.abstract.search import Search
+from backend.lib.helpers import UserInput
 from backend.lib.exceptions import QueryParametersException, ProcessorInterruptedException
 
 
@@ -43,7 +44,45 @@ class SearchTikTok(Search):
 	# let's not get rate limited
 	max_workers = 1
 
-	def get_posts_simple(self, parameters):
+	options = {
+		"intro": {
+			"type": UserInput.OPTION_INFO,
+			"help": "Note that TikTok is a predominantly video-based platform, and videos cannot currently be "
+					"downloaded via 4CAT. As such 4CAT will be of limited use processing and analysing the data; "
+					"nevertheless you can use this scraper to get a quick list of URLs and metadata for posts for a "
+					"given username or hashtag. The dataset will contain links to all videos scraped.\n\nPosts are "
+					"scraped in reverse chronological order; the most recent post for a given query will be scraped "
+					"first. Unfortunately comments cannot be scraped at this time."
+		},
+		"search_scope": {
+			"type": UserInput.OPTION_CHOICE,
+			"options": {
+				"hashtag": "Hashtag",
+				"username": "Username",
+				"music": "Music"
+			},
+			"help": "Search by"
+		},
+		"syntax-intro": {
+			"type": UserInput.OPTION_INFO,
+			"help": "You can scrape up to **five** items at a time. Separate the items with commas or blank lines. "
+					"Including `#` in hashtags is optional. For *music* queries, insert the music URL or ID (e.g. "
+					"https://www.tiktok.com/music/`sonido-original-6815021149295069958`)"
+		},
+		"query": {
+			"type": UserInput.OPTION_TEXT_LARGE,
+			"help": "Items to scrape",
+			"tooltip": "Separate with commas or new lines."
+		},
+		"max_posts": {
+			"type": UserInput.OPTION_TEXT,
+			"help": "Posts per item",
+			"min": 1,
+			"max": 100
+		}
+	}
+
+	def get_items(self, parameters):
 		"""
 		Run custom search
 
@@ -359,54 +398,6 @@ class SearchTikTok(Search):
 
 		return result[:limit]
 
-	def get_search_mode(self, query):
-		"""
-		TikTok searches are always simple
-
-		:return str:
-		"""
-		return "simple"
-
-	def get_posts_complex(self, query):
-		"""
-		Complex post fetching is not used by the TikTok datasource
-
-		:param query:
-		:return:
-		"""
-		pass
-
-	def fetch_posts(self, post_ids, where=None, replacements=None):
-		"""
-		Posts are fetched via URL instead of ID for this datasource
-
-		:param post_ids:
-		:param where:
-		:param replacements:
-		:return:
-		"""
-		pass
-
-	def fetch_threads(self, thread_ids):
-		"""
-		Thread filtering is not a toggle for TikTok datasets
-
-		:param thread_ids:
-		:return:
-		"""
-		pass
-
-	def get_thread_sizes(self, thread_ids, min_length):
-		"""
-		Thread filtering is not a toggle for TikTok datasets
-
-		:param tuple thread_ids:
-		:param int min_length:
-		results
-		:return dict:
-		"""
-		pass
-
 	def stealthify_browser(self, browser):
 		"""
 		Stealth scripts to hide that we're headless
@@ -701,22 +692,9 @@ class SearchTikTok(Search):
 		:param User user:  User object of user who has submitted the query
 		:return dict:  Safe query parameters
 		"""
-
-		# 'location' would be possible as well but apparently requires a login
-		if query.get("search_scope", "") not in ("hashtag", "username", "music"):
-			raise QueryParametersException("Invalid search scope: must be hashtag, username or music")
-
 		# no query 4 u
 		if not query.get("query", "").strip():
 			raise QueryParametersException("You must provide a search query.")
-
-		# 100 is mostly arbitrary - may need tweaking
-		max_posts = 100 if not user.get_value("tiktok.allow_more_posts", False) and not user.is_admin() else 1000
-		if query.get("max_posts", ""):
-			try:
-				max_posts = min(abs(int(query.get("max_posts"))), max_posts)
-			except TypeError:
-				raise QueryParametersException("Provide a valid number of posts to query.")
 
 		# reformat queries to be a comma-separated list with no wrapping
 		# whitespace
@@ -731,7 +709,7 @@ class SearchTikTok(Search):
 
 		# simple!
 		return {
-			"items": max_posts,
+			"items": query.get("max_posts"),
 			"query": items,
 			"board": query.get("search_scope"),  # used in web interface
 			"search_scope": query.get("search_scope")

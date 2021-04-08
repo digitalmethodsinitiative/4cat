@@ -8,10 +8,8 @@ import re
 
 from bs4 import BeautifulSoup
 
-import config
-
 from backend.abstract.search import Search
-from backend.lib.helpers import convert_to_int, strip_tags
+from backend.lib.helpers import convert_to_int, strip_tags, UserInput
 from backend.lib.exceptions import QueryParametersException, ProcessorInterruptedException
 
 
@@ -32,7 +30,50 @@ class SearchDouban(Search):
 
     max_workers = 1
 
-    def get_posts_simple(self, query):
+    options = {
+        "intro": {
+            "type": UserInput.OPTION_INFO,
+            "help": "You can enter the groups to scrape as group IDs (e.g. `687802`) or URLs (e.g. "
+                    "`https://www.douban.com/group/687802/`. Separate multiple groups with commas or new lines. If "
+                    "you enter more than 25 groups, only the first 25 will be scraped."
+        },
+        "groups": {
+            "type": UserInput.OPTION_TEXT_LARGE,
+            "help": "Groups",
+            "tooltip": "Enter group IDs or URLs, separate with commas or new lines"
+        },
+        "divider": {
+            "type": UserInput.OPTION_DIVIDER
+        },
+        "amount": {
+            "type": UserInput.OPTION_TEXT,
+            "help": "Threads per group",
+            "min": 1,
+            "max": 200,
+            "default": 10
+        },
+        "strip": {
+            "type": UserInput.OPTION_TOGGLE,
+            "help": "Strip HTML?",
+            "default": True
+        },
+        "divider-2": {
+            "type": UserInput.OPTION_DIVIDER
+        },
+        "daterange-info": {
+            "type": UserInput.OPTION_INFO,
+            "help": "Note that Douban severely limits the retrieval of older content. Therefore this data source "
+                    "can only scrape the most recent topics in a given group. You can optionally limit the scraped "
+                    "topics to a given date range, but note that typically only the 500 or so most recent topics in a "
+                    "group will be available for scraping."
+        },
+        "daterange": {
+            "type": UserInput.OPTION_DATERANGE,
+            "help": "Last post between"
+        }
+    }
+
+    def get_items(self, query):
         """
         Get Douban posts
 
@@ -76,7 +117,6 @@ class SearchDouban(Search):
 
                 # parse the HTML and get links to individual topics, as well as group name
                 overview_page = BeautifulSoup(request.text, 'html.parser')
-                print(request.text)
                 group_name = overview_page.select_one(".group-item .title a").text
 
                 for topic in overview_page.select("table.olt tr:not(.th)"):
@@ -183,49 +223,12 @@ class SearchDouban(Search):
         :param str url:  URL to request
         :return:  Response object
         """
+        if url[0:2] == "//":
+            url = "https:" + url
+        elif url[0] == "/":
+            url = "https://douban.com" + url
+
         return requests.get(url, **kwargs)
-
-    def get_posts_complex(self, query):
-        """
-        Not relevant for Douban data source
-
-        :param dict query:  Query parameters, as part of the DataSet object
-        :return list:  Posts, sorted by thread and post ID, in ascending order
-        """
-        pass
-
-    def fetch_posts(self, post_ids, where=None, replacements=None, keep_comments=False):
-        """
-        Not relevant for Douban data source
-
-        :param tuple|list post_ids:  List of post IDs to return data for
-        :param list where:  Unused
-        :param list replacements:  Unused
-        :param bool keep_comments:  Include all comments on matching posts in
-        the results
-        :return list: List of posts, with a dictionary representing the record for each post
-        """
-        pass
-
-    def fetch_threads(self, thread_ids):
-        """
-        Not relevant for Douban data source
-
-        :param tuple thread_ids:  Thread IDs to fetch posts for.
-        :return list:  A list of posts, as dictionaries.
-        """
-        pass
-
-    def get_thread_sizes(self, thread_ids, min_length):
-        """
-        Not relevant for Douban data source
-
-        :param tuple thread_ids:  List of thread IDs to fetch lengths for
-        :param int min_length:  Min length for a thread to be included in the
-        results
-        :return dict:  Threads sizes, with thread IDs as keys
-        """
-        pass
 
     def validate_query(query, request, user):
         """
@@ -239,8 +242,11 @@ class SearchDouban(Search):
         filtered_query = {}
 
         # the dates need to make sense as a range to search within
-        for field in ("min_date", "max_date"):
-            filtered_query[field] = convert_to_int(query.get(field, None), None)
+        after, before = query.get("daterange")
+        if before and after and before < after:
+            raise QueryParametersException("Date range must start before it ends")
+
+        filtered_query["min_date"], filtered_query["max_date"] = (after, before)
 
         # normalize groups to just their IDs, even if a URL was provided, and
         # limit to 25
