@@ -123,25 +123,24 @@ for file in migrate_files:
 		migrate_to_run.append(file)
 
 if not migrate_to_run:
-	print("No migration scripts to run. You're good to go.")
-	exit(0)
+	print("No migration scripts to run.")
+else:
+	# oldest versions first
+	migrate_to_run = sorted(migrate_to_run, key=lambda x: make_version_comparable(x.stem.split("-")[1]))
 
-# oldest versions first
-migrate_to_run = sorted(migrate_to_run, key=lambda x: make_version_comparable(x.stem.split("-")[1]))
-
-print("The following migration scripts will be run:")
-for file in migrate_to_run:
-	print("  %s" % file.name)
+	print("The following migration scripts will be run:")
+	for file in migrate_to_run:
+		print("  %s" % file.name)
 
 # ---------------------------------------------
 #      Try to stop 4CAT if it is running
 # ---------------------------------------------
 print("WARNING: Migration can take quite a while. 4CAT will not be available during migration.")
 print("If 4CAT is still running, it will be shut down now.")
-# print("  Do you want to continue [y/n]? ", end="")
-#
-# if not args.yes and input("").lower() != "y":
-# 	exit(0)
+print("  Do you want to continue [y/n]? ", end="")
+
+if not args.yes and input("").lower() != "y":
+	exit(0)
 
 print("- Making sure 4CAT is stopped... ", end="")
 result = subprocess.run([interpreter, "4cat-daemon.py", "--no-version-check", "stop"], stdout=subprocess.PIPE,
@@ -166,8 +165,9 @@ print("  ...done")
 # ---------------------------------------------
 #       Run individual migration scripts
 # ---------------------------------------------
-print("\n- Starting migration...")
-print("  %i scripts will be run." % len(migrate_to_run))
+if migrate_to_run:
+	print("\n- Starting migration...")
+	print("  %i scripts will be run." % len(migrate_to_run))
 
 for file in migrate_to_run:
 	file_target = file.stem.split("-")[2]
