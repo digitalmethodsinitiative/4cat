@@ -96,6 +96,9 @@ class GetCollocations(BasicProcessor):
 			min_frequency = 0
 		 
 		query_string = self.parameters.get("query_string", "").replace(" ", "")
+
+		# n_size smaller than window_size does not make sense
+		n_size = min(n_size, window_size)
 		
 		if query_string != "":
 			query_string = query_string.lower().split(',')
