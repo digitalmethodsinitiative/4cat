@@ -25,7 +25,7 @@ packages = [
 	"dateparser==1.0.0",
 	"Werkzeug==0.15.5",
 	"ImageHash==4.2.0",
-	"requests==2.20.0",
+	"requests==2.25.1",
 	"Telethon==1.10.6",
 	"psycopg2==2.8.6",
 	"Markdown==3.0.1",
