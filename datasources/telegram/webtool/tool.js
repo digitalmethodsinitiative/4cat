@@ -32,7 +32,7 @@ $(document).ready(function () {
 
                     } else if (!data['data']['authenticated']) {
                         alert('A security code has been sent to phone number ' + api_phone + '. Enter it to continue.');
-                        $('#telegram-security').removeClass('hidden');
+                        $('#forminput-security-code').parent().removeClass('hidden');
 
                     } else {
                         // all good, let's start the actual query

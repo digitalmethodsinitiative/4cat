@@ -42,7 +42,7 @@ def authenticate(request, user, **kwargs):
 
 	# store session ID for user so it can be found again for later queries
 	user.set_value("telegram.session", session_id)
-	session_path = Path(__file__).parent.joinpath("..", "sessions", session_id)
+	session_path = Path(__file__).parent.joinpath("..", "sessions", session_id + ".session")
 
 	client = None
 
@@ -93,12 +93,12 @@ def authenticate(request, user, **kwargs):
 		# wrong phone number
 		result = {"error": "auth",
 				  "error-message": "The phone number provided is not a valid phone number for these credentials."}
-#	except Exception as e:
-#		# ?
-#		result = {"error": "other",
-#				  "error-message": "An unexpected error (%s) occurred and your authentication could not be verified." % e,
-#				  "error-trace": traceback.format_exc()}
-#		pass
+	except Exception as e:
+		# ?
+		result = {"error": "other",
+				  "error-message": "An unexpected error (%s) occurred and your authentication could not be verified." % e,
+				  "error-trace": traceback.format_exc()}
+		pass
 	finally:
 		if client:
 			client.disconnect()
