@@ -152,24 +152,28 @@ class SearchDouban(Search):
                     topics_processed += 1
 
                     # include original post as the first item
-                    first_post = {
-                        "id": topic_id,
-                        "group_id": group,
-                        "thread_id": topic_id,
-                        "group_name": group_name,
-                        "subject": topic_page.select_one("h1").text.strip(),
-                        "body": topic_page.select_one(".topic-richtext").decode_contents(formatter="html").strip(),
-                        "author": topic.select_one(".user-face img").get("alt"),
-                        "author_id": topic.select_one(".user-face a").get("href").split("/people/").pop().split("/")[0],
-                        "author_avatar": topic.select_one(".user-face img").get("src").replace("/u", "/ul"),
-                        "timestamp": int(datetime.datetime.strptime(topic.select_one(".create-time").text,
-                                                                    "%Y-%m-%d %H:%M:%S").timestamp()),
-                        "likes": 0,
-                        "is_highlighted": "no",
-                        "is_reply": "no",
-                        "is_topic_elite": topic_is_elite,
-                        "image_urls": ",".join([img.get("src") for img in topic.select(".topic-richtext img")])
-                    }
+                    try:
+                        first_post = {
+                            "id": topic_id,
+                            "group_id": group,
+                            "thread_id": topic_id,
+                            "group_name": group_name,
+                            "subject": topic_page.select_one("h1").text.strip(),
+                            "body": topic_page.select_one(".topic-richtext").decode_contents(formatter="html").strip(),
+                            "author": topic.select_one(".user-face img").get("alt"),
+                            "author_id": topic.select_one(".user-face a").get("href").split("/people/").pop().split("/")[0],
+                            "author_avatar": topic.select_one(".user-face img").get("src").replace("/u", "/ul"),
+                            "timestamp": int(datetime.datetime.strptime(topic.select_one(".create-time").text,
+                                                                        "%Y-%m-%d %H:%M:%S").timestamp()),
+                            "likes": 0,
+                            "is_highlighted": "no",
+                            "is_reply": "no",
+                            "is_topic_elite": topic_is_elite,
+                            "image_urls": ",".join([img.get("src") for img in topic.select(".topic-richtext img")])
+                        }
+                    except (AttributeError, ValueError):
+                        self.dataset.log("Unexpected data format when parsing topic %s/%s, skipping" % (group_name, topic_id))
+                        continue
 
                     if strip:
                         first_post["body"] = strip_tags(first_post["body"])
