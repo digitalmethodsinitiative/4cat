@@ -77,6 +77,11 @@ class UserInput:
 
                 parsed_input[option] = (after, before)
 
+            elif settings.get("type") == UserInput.OPTION_TOGGLE:
+                # special case too, since if a checkbox is unchecked, it simply
+                # does not show up in the input
+                parsed_input[option] = option in input
+
             elif option not in input:
                 # not provided? use default
                 parsed_input[option] = settings.get("default", None)
