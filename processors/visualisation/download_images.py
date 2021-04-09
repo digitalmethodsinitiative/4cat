@@ -5,6 +5,7 @@ import requests
 import binascii
 import hashlib
 import base64
+import json
 import time
 import re
 import csv
@@ -185,7 +186,7 @@ class ImageDownloader(BasicProcessor):
 
 			# save file
 			try:
-				picture.save(imagepath)
+				picture.save(imagepath, format="png")
 			except (OSError, ValueError):
 				self.log.warning("Could not save image %s to disk - invalid format" % path)
 				continue
@@ -250,7 +251,11 @@ class ImageDownloader(BasicProcessor):
 					path += ".json"
 					page = requests.get(path)
 					imgur_images = []
-					imgur_data = page.json()
+					try:
+						imgur_data = page.json()
+					except json.JSONDecodeError:
+						self.dataset.log("Error loading gallery for image %s, skipping")
+						raise FileNotFoundError
 					
 					try:
 						image = imgur_data["data"]["image"]["album_images"]["images"][0]
