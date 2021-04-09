@@ -4,7 +4,7 @@ Generate co-link network of URLs in posts
 import re
 
 from backend.abstract.processor import BasicProcessor
-from backend.lib.helpers import UserInput
+from backend.lib.helpers import UserInput, gdf_escape
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -51,6 +51,7 @@ class CoTagger(BasicProcessor):
 		pairs = {}
 		posts = 1
 		tag_field = None
+		pair_sep = "!@!@!@!"
 
 		for post in self.iterate_items(self.source_file):
 			self.dataset.update_status("Reading post %i..." % posts)
@@ -110,7 +111,7 @@ class CoTagger(BasicProcessor):
 						continue
 
 					pair = sorted((tag, co_tag))
-					pair_key = "-_-".join(pair)
+					pair_key = pair_sep.join(pair)
 
 					if pair_key not in pairs:
 						pairs[pair_key] = 1
@@ -122,12 +123,12 @@ class CoTagger(BasicProcessor):
 		with self.dataset.get_results_path().open("w", encoding="utf-8") as results:
 			results.write("nodedef>name VARCHAR,weight INTEGER\n")
 			for tag_name, tag_value in all_tags.items():
-				results.write("'" + tag_name + "',%i\n" % tag_value)
+				results.write("%s,%i\n" % (gdf_escape(tag_name), tag_value))
 
-			results.write("edgedef>node1 VARCHAR, node2 VARCHAR, weight INTEGER\n")
-			for pair in pairs:
-				results.write(
-					"'" + pair.split("-_-")[0] + "','" + pair.split("-_-")[1] + "',%i\n" % pairs[pair])
+			results.write("edgedef>node1 VARCHAR,node2 VARCHAR,weight INTEGER\n")
+			for pair, weight in pairs.items():
+				pair = pair.split(pair_sep)
+				results.write("%s,%s,%i\n" % (gdf_escape(pair[0]), gdf_escape(pair[1]), weight))
 
 		self.dataset.finish(len(pairs))
 

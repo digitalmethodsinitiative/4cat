@@ -414,4 +414,4 @@ def gdf_escape(string):
 	:param str string:  String to escape
 	:return str:  Escaped string
 	"""
-	return "'" + string.replace("'", "\\'") + "'"
+	return "'" + string.replace("'", "\\'").replace("\n", "\\n") + "'"
