@@ -49,14 +49,15 @@ class ParlerURLExpander(BasicProcessor):
             if hasattr(url, "group"):
                 url = url.group(0)
 
-            if not "api.parler.com/l" in url and not "t.co" in url:
+            if "api.parler.com/l" not in url and "/t.co" not in url:
                 # skip non-redirects
                 return url
 
             try:
-                headers = requests.head(url).headers
+                print(url)
+                headers = requests.head(url, timeout=5).headers
                 time.sleep(0.25)
-            except (requests.RequestException, ConnectionError, ValueError):
+            except (requests.RequestException, ConnectionError, ValueError, TimeoutError):
                 # bummer, but best to just leave as-is in this case
                 return url
 
