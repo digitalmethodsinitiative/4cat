@@ -45,9 +45,8 @@ class ImportFromExternalTool(BasicWorker):
 
 	required_columns = {
 		"instagram-crowdtangle": (
-			"\ufeffAccount", "User Name", "Followers at Posting", "Created", "Type", "Likes", "Comments", "Views",
-			"URL", "Link",
-			"Photo", "Title", "Description"),
+			"Account", "User Name", "Followers at Posting", "Post Created", "Type", "Likes", "Comments", "Views",
+			"URL", "Link", "Photo", "Title", "Description"),
 		"instagram-dmi-scraper": (
 			"id", "thread_id", "parent_id", "body", "author", "timestamp", "type", "url", "thumbnail_url", "hashtags",
 			"usertags", "mentioned", "num_likes", "num_comments", "subject"
@@ -184,7 +183,7 @@ class ImportFromExternalTool(BasicWorker):
 				writer.writeheader()
 
 				dataset.update_status("Sorting by date...")
-				posts = sorted(reader, key=lambda x: x["Created"])
+				posts = sorted(reader, key=lambda x: x["Post Created"])
 
 				dataset.update_status("Processing posts...")
 				for item in posts:
@@ -197,7 +196,7 @@ class ImportFromExternalTool(BasicWorker):
 					hashtags = hashtag.findall(caption)
 					usertags = usertag.findall(caption)
 
-					datestamp = " ".join(item["Created"].split(" ")[:-1])
+					datestamp = " ".join(item["Post Created"].split(" ")[:-1])
 					date = datetime.datetime.strptime(datestamp, "%Y-%m-%d %H:%M:%S")
 
 					writer.writerow({
