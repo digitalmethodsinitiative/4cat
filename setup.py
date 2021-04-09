@@ -27,6 +27,7 @@ packages = [
 	"ImageHash==4.2.0",
 	"requests==2.25.1",
 	"Telethon==1.10.6",
+	"cssselect>=1.1.0",
 	"psycopg2==2.8.6",
 	"Markdown==3.0.1",
 	"svgwrite==1.3.1",
