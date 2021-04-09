@@ -491,12 +491,7 @@ def queue_processor(key=None, processor=None):
 		return jsonify({"error": "This processor is not available for this dataset or has already been run."})
 
 	# create a dataset now
-	options = {}
-	for option in dataset.processors[processor]["options"]:
-		settings = dataset.processors[processor]["options"][option]
-		choice = request.values.get("option-" + option, None)
-		options[option] = UserInput.parse(settings, choice)
-
+	options = UserInput.parse_all(dataset.processors[processor]["options"], request.form.to_dict(), silently_correct=False)
 	options["user"] = current_user.get_id()
 
 	analysis = DataSet(parent=dataset.key, parameters=options, db=db,
