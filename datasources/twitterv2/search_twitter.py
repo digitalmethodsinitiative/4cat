@@ -147,8 +147,6 @@ class SearchWithTwitterAPIv2(Search):
                     self.dataset.update_status("Got %s, waiting %i seconds before retrying" % (str(e), wait_time))
                     time.sleep(wait_time)
 
-            print(api_response.text)
-
             # rate limited - the limit at time of writing is 300 reqs per 15
             # minutes
             # usually you don't hit this when requesting batches of 500 at
