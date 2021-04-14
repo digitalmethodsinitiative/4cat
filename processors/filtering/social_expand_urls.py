@@ -8,6 +8,8 @@ import csv
 import re
 
 from backend.abstract.processor import BasicProcessor
+from backend.lib.helpers import UserInput
+from backend.lib.exceptions import ProcessorInterruptedException
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -21,19 +23,26 @@ class UrlUnshortener(BasicProcessor):
     """
     Expand URL shorteners
     """
-    type = "expand-social-urls"  # job type ID
+    type = "expand-url-shorteners"  # job type ID
     category = "Filtering"  # category
-    title = "Expand Social Media Redirect URLs"  # title displayed in UI
+    title = "Expand shortened URLs"  # title displayed in UI
     description = "Expand shortened URLs. Replaces any URL in the dataset that is recognised as a shortened URL with " \
                   "the URL it redirects to. URLs are resolved recursively up to a depth of 5 links. This can take a " \
                   "long time for large datasets, and it is not recommended to run this processor on datasets larger " \
-                  "than 10,000. Overwrites URLs in the original dataset!"
+                  "than 10,000."
     extension = "csv"  # extension of result file, used internally and in UI
 
-    datasources = ["parler", "custom"]
-
     input = "csv:body"
-    output = "csv"
+    output = "dataset"
+
+    options = {
+        "overwrite": {
+            "type": UserInput.OPTION_TOGGLE,
+            "help": "Overwrite URLs in original dataset",
+            "default": True,
+            "tooltip": "If unchecked, this creates a *new* dataset with any URLs replaced with the URL they redirect to."
+        }
+    }
 
     # taken from https://github.com/timleland/url-shorteners
     # current as of 9 April 2021
@@ -147,26 +156,23 @@ class UrlUnshortener(BasicProcessor):
         self.dataset.update_status("Processing items")
 
         def resolve_redirect(url, depth=0):
+            if self.interrupted:
+                raise ProcessorInterruptedException("Interrupted while expanding URL")
+
             if hasattr(url, "group"):
                 url = url.group(0)
-
-            if depth == 0:
-                print(url, end="")
 
             # get host name to compare to list of shorteners
             host_name = re.sub(r"^[a-z]*://", "", url).split("/")[0].lower()
 
             if depth >= 10:
-                print("")
                 return url
 
             elif "api.parler.com/l" not in url and host_name not in self.redirect_domains:
                 # skip non-redirects
-                print("")
                 return url
 
             elif url in cache:
-                print(" -> " + cache[url])
                 return cache[url]
 
             # to avoid infinite recursion, do not go deeper than 5 loops and
@@ -179,9 +185,9 @@ class UrlUnshortener(BasicProcessor):
                 url = url.replace("http://", "https://")
 
             try:
+                time.sleep(0.1)
                 head_request = requests.head(url, timeout=5)
             except (requests.RequestException, ConnectionError, ValueError, TimeoutError) as e:
-                print("")
                 return url
 
             # if the returned page's status code is in the 'valid request'
@@ -189,13 +195,11 @@ class UrlUnshortener(BasicProcessor):
             # url, recursively resolve the page it redirects to up to a given
             # depth - infinite recursion is prevented by using a cache
             if 200 <= head_request.status_code < 400:
-                redirected_to = head_request.headers.get("Location", url, timeout=5)
+                redirected_to = head_request.headers.get("Location", url)
                 if redirected_to != url:
                     cache[url] = redirected_to
-                    print(" -> " + redirected_to, end="")
                     return resolve_redirect(redirected_to, depth)
 
-            print("")
             return url
 
         # write a new file with the updated links
@@ -205,6 +209,9 @@ class UrlUnshortener(BasicProcessor):
             processed = 0
 
             for post in self.iterate_items(self.source_file):
+                if self.interrupted:
+                    raise ProcessorInterruptedException("Interrupted while iterating through items")
+
                 expanded_urls = []
 
                 post["body"] = re.sub(r"https?://[^\s]+", resolve_redirect, post["body"])
@@ -222,7 +229,40 @@ class UrlUnshortener(BasicProcessor):
                     self.dataset.update_status("Processed %i items" % processed)
 
         # now comes the big trick - replace original dataset with updated one
-        shutil.move(self.dataset.get_results_path(), self.source_dataset.get_results_path())
+        if not self.parameters.get("overwrite", False):
+            shutil.move(self.dataset.get_results_path(), self.source_dataset.get_results_path())
+            self.dataset.update_status("Parent dataset updated.")
 
-        self.dataset.update_status("Parent dataset updated.")
         self.dataset.finish(processed)
+
+    def after_process(self):
+        super().after_process()
+
+        if not self.parameters.get("overwrite", False):
+            return
+
+        # copy this dataset - the filtered version - and make that copy standalone
+        # this has the benefit of allowing for all analyses that can be run on
+        # full datasets on the new, filtered copy as well
+        top_parent = self.source_dataset
+
+        standalone = self.dataset.copy(shallow=False)
+        standalone.body_match = "(Filtered) " + self.source_dataset.query
+        standalone.datasource = self.source_dataset.parameters.get("datasource", "custom")
+
+        try:
+            standalone.board = self.source_dataset.board
+        except KeyError:
+            standalone.board = self.type
+
+        standalone.type = "search"
+
+        standalone.detach()
+        standalone.delete_parameter("key_parent")
+
+        self.dataset.copied_to = standalone.key
+
+        # we don't need this file anymore - it has been copied to the new
+        # standalone dataset, and this one is not accessible via the interface
+        # except as a link to the copied standalone dataset
+        self.dataset.get_results_path().unlink(missing_ok=True)
