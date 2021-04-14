@@ -46,6 +46,9 @@ class UserInput:
         """
         parsed_input = {}
 
+        # all parameters are submitted as option-[parameter ID], this is an 
+        # artifact of how the web interface works and we can simply remove the
+        # prefix
         input = {re.sub(r"^option-", "", field): input[field] for field in input}
 
         for option, settings in options.items():
@@ -173,7 +176,7 @@ class UserInput:
 
                     choice = settings.get("default")
 
-            if not choice:
+            if choice is None or choice == "":
                 choice = settings.get("default")
 
             if choice is None:
