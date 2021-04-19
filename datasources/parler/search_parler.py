@@ -72,12 +72,14 @@ class SearchParler(Search):
         "jst": {
             "type": UserInput.OPTION_TEXT,
             "help": "JST",
-            "cache": True
+            "cache": True,
+            "sensitive": True
         },
         "mst": {
             "type": UserInput.OPTION_TEXT,
             "help": "MST",
-            "cache": True
+            "cache": True,
+            "sensitive": True
         },
 
     }
@@ -203,7 +205,7 @@ class SearchParler(Search):
                         "subject": "",
                         "body": post_src["body"],
                         "author": user_map.get(post_src["creator"], ""),
-                        "timestamp": dt.timestamp(),
+                        "timestamp": int(dt.timestamp()),
                         "comments": self.expand_number(post_src["comments"]),
                         "urls": ",".join([("https://api.parler.com/l/" + link) for link in post_src["links"]]),
                         "hashtags": ",".join(post_src["hashtags"]),
@@ -307,7 +309,7 @@ class SearchParler(Search):
 
     def request_from_parler(self, session, method, url, headers=None, data=None):
         """
-        Request something via the BitChute API (or non-API)
+        Request something via the Parler API (or non-API)
 
         To avoid having to write the same error-checking everywhere, this takes
         care of retrying on failure, et cetera
@@ -334,8 +336,7 @@ class SearchParler(Search):
                 if request.status_code >= 500:
                     raise ConnectionError()
 
-                response = request.json()
-                return response
+                return request
 
             except (ConnectionError, requests.RequestException) as e:
                 retries += 1
