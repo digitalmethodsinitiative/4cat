@@ -111,6 +111,7 @@ class SearchParler(Search):
 
         user_map = {}
         ref_map = {}
+        seen_parleys = set()
 
         for query in queries:
             if not query.strip():
@@ -197,6 +198,14 @@ class SearchParler(Search):
                     else:
                         reposted_by = ""
                         post_src = post
+
+                    if post_src["_id"] in seen_parleys:
+                        # items may be scraped twice e.g. when querying two
+                        # separate hashtags that are both used in a single
+                        # parley - so keep track of seen parleys and skip
+                        continue
+
+                    seen_parleys.add(post_src["_id"])
 
                     dt = datetime.datetime.strptime(post["createdAt"], "%Y%m%d%H%M%S")
                     post = {
