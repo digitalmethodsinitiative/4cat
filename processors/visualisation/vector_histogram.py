@@ -234,9 +234,9 @@ class SVGHistogramRenderer(BasicProcessor):
 						text=line,
 						dominant_baseline="middle",
 						text_anchor="middle",
-						baseline_shift=-shift
+						dy=[shift]
 					))
-					shift += fontsize_small * 2
+					shift += fontsize_small * 1.5
 					canvas.add(label_container)
 					next = label_x + (label_width * 0.9)
 			label_x += item_width
