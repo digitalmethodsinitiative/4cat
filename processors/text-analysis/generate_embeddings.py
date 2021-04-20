@@ -81,6 +81,13 @@ class GenerateWordEmbeddings(BasicProcessor):
 			"help": "Minimum word occurrence",
 			"tooltip": "How often a word should occur in the corpus to be included"
 		},
+		"max_words": {
+			"type": UserInput.OPTION_TEXT,
+			"default": 0,
+			"min": 0,
+			"help": "Retain top n words",
+			"tooltip": "'0' retains all words, other values will discard less frequent words"
+		},
 		"negative": {
 			"type": UserInput.OPTION_TOGGLE,
 			"default": True,
@@ -108,6 +115,11 @@ class GenerateWordEmbeddings(BasicProcessor):
 		dimensionality = convert_to_int(self.parameters.get("dimensionality"), 100)
 		detect_bigrams = self.parameters.get("detect-bigrams")
 		model_type = self.parameters.get("model-type")
+		max_words = convert_to_int(self.parameters.get("max_words"))
+
+		if max_words == 0:
+			# unlimited amount of words in model
+			max_words = None
 
 		if not model_type:
 			model_type = self.options["model-type"]["default"]
@@ -138,7 +150,7 @@ class GenerateWordEmbeddings(BasicProcessor):
 
 				self.dataset.update_status("Training %s model for token set %s..." % (model_builder.__name__, token_set_name))
 				try:
-					model = model_builder(negative=use_negative, size=dimensionality, sg=use_skipgram, window=window, workers=3, min_count=min_count)
+					model = model_builder(negative=use_negative, size=dimensionality, sg=use_skipgram, window=window, workers=3, min_count=min_count, max_final_vocab=max_words)
 
 					# we do not simply pass a sentences argument to model builder
 					# because we are using a generator, which exhausts, while
