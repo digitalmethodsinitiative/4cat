@@ -379,12 +379,22 @@ class SearchWithTwitterAPIv2(Search):
         :param tweet:  Tweet object as originally returned by the Twitter API
         :return dict:  Dictionary in the format expected by 4CAT
         """
+        tweet_time = datetime.datetime.strptime(tweet["created_at"], "%Y-%m-%dT%H:%M:%S.000Z")
+
+        # by default, the text of retweets is returned as "RT [excerpt of
+        # retweeted tweet]". Since we have the full tweet text, we can complete
+        # the excerpt:
+        is_retweet = any([ref.get("type") == "retweeted" for ref in tweet.get("referenced_tweets", [])])
+        if is_retweet:
+            retweeted_tweet = [t for t in tweet["referenced_tweets"] if t.get("type") == "retweeted"][0]
+            retweeted_body = retweeted_tweet["text"]
+            tweet["text"] = "RT @" + retweeted_tweet["author_user"]["username"] + ": " + retweeted_body
+
         return {
             "id": tweet["id"],
             "thread_id": tweet.get("conversation_id", tweet["id"]),
-            "timestamp": tweet["created_at"].replace("T", " ").replace(".000Z", ""),
-            "unix_timestamp": int(
-                datetime.datetime.strptime(tweet["created_at"], "%Y-%m-%dT%H:%M:%S.000Z").timestamp()),
+            "timestamp": tweet_time.strftime("%Y-%m-%d %H:%M:%S"),
+            "unix_timestamp": int(tweet_time.timestamp()),
             "subject": "",
             "body": tweet["text"],
             "author": tweet["author_user"]["username"],
@@ -394,18 +404,17 @@ class SearchWithTwitterAPIv2(Search):
             "language_guess": tweet.get("lang"),
             "possibly_sensitive": "yes" if tweet.get("possibly_sensitive") else "no",
             **tweet["public_metrics"],
-            "is_retweet": "yes" if any(
-                [ref["type"] == "retweeted" for ref in tweet.get("referenced_tweets", [])]) else "no",
+            "is_retweet": "yes" if is_retweet else "no",
             "is_quote_tweet": "yes" if any(
-                [ref["type"] == "quoted" for ref in tweet.get("referenced_tweets", [])]) else "no",
+                [ref.get("type") == "quoted" for ref in tweet.get("referenced_tweets", [])]) else "no",
             "is_reply": "yes" if any(
-                [ref["type"] == "replied_to" for ref in tweet.get("referenced_tweets", [])]) else "no",
+                [ref.get("type") == "replied_to" for ref in tweet.get("referenced_tweets", [])]) else "no",
             "hashtags": ",".join([tag["tag"] for tag in tweet.get("entities", {}).get("hashtags", [])]),
             "urls": ",".join([tag["expanded_url"] for tag in tweet.get("entities", {}).get("urls", [])]),
             "images": ",".join(item["url"] for item in tweet.get("attachments", {}).get("media_keys", []) if
-                               type(item) is dict and item["type"] == "photo"),
+                               type(item) is dict and item.get("type") == "photo"),
             "mentions": ",".join([tag["username"] for tag in tweet.get("entities", {}).get("mentions", [])]),
             "reply_to": "".join(
                 [mention["username"] for mention in tweet.get("entities", {}).get("mentions", [])[:1]]) if any(
-                [ref["type"] == "replied_to" for ref in tweet.get("referenced_tweets", [])]) else ""
+                [ref.get("type") == "replied_to" for ref in tweet.get("referenced_tweets", [])]) else ""
         }
