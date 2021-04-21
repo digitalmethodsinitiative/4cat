@@ -32,6 +32,7 @@ class ImportFromExternalTool(BasicWorker):
 			"options": {
 				"instagram-crowdtangle": "Instagram (CrowdTangle export)",
 				"facebook-crowdtangle": "Facebook (CrowdTangle export)",
+				"facebook-crowdtangle-old": "Facebook (CrowdTangle export, old format)",
 				"instagram-dmi-scraper": "Instagram (DMI Instagram scraper)",
 				"tiktok": "TikTok (drawrowfly/tiktok-scraper)"
 			},
@@ -51,11 +52,20 @@ class ImportFromExternalTool(BasicWorker):
 			"id", "thread_id", "parent_id", "body", "author", "timestamp", "type", "url", "thumbnail_url", "hashtags",
 			"usertags", "mentioned", "num_likes", "num_comments", "subject"
 		),
-		"facebook-crowdtangle": (
+		# todo: remove this one somewhere past june 2021
+		"facebook-crowdtangle-old": (
 			"User Name", "Facebook Id", "Likes at Posting", "Followers at Posting", "Created", "Type",
 			"Likes", "Comments", "Shares", "Love", "Wow", "Haha", "Sad", "Angry", "Care", "Video Share Status",
 			"Post Views", "Total Views", "Total Views For All Crossposts", "Video Length", "URL", "Message", "Link",
 			"Final Link", "Image Text", "Link Text", "Description", "Sponsor Id", "Sponsor Name", "Total Interactions"
+		),
+		"facebook-crowdtangle": (
+			"Page Name", "User Name", "Facebook Id", "Page Category", "Page Admin Top Country", "Page Description",
+			"Page Created", "Likes at Posting", "Followers at Posting", "Post Created", "Post Created Date",
+			"Post Created Time", "Type", "Total Interactions", "Likes", "Comments", "Shares", "Love", "Wow", "Haha",
+			"Sad", "Angry", "Care", "Video Share Status", "Is Video Owner?", "Post Views", "Total Views",
+			"Total Views For All Crossposts", "Video Length", "URL", "Message", "Link", "Final Link", "Image Text",
+			"Link Text", "Description", "Sponsor Id", "Sponsor Name", "Sponsor Category"
 		),
 		"tiktok": (
 			"id", "text", "createTime", "authorMeta.name", "authorMeta.id", "musicMeta.musicId", "musicMeta.musicName",
@@ -127,8 +137,6 @@ class ImportFromExternalTool(BasicWorker):
 
 		if missing:
 			wrapped_upload.detach()
-			print(missing)
-			print(reader.fieldnames)
 			raise QueryParametersException(
 				"The following required columns are not present in the csv file: %s. Provided field names: %s" % (", ".join(missing), ", ".join(reader.fieldnames)))
 
@@ -217,7 +225,8 @@ class ImportFromExternalTool(BasicWorker):
 						"subject": item["Title"]}
 					)
 
-		elif platform == "facebook-crowdtangle":
+		elif platform == "facebook-crowdtangle-old":
+			# todo: remove this one somewhere after june 2021
 			with dataset.get_results_path().open("w", encoding="utf-8", newline="") as output_csv:
 				wrapped_upload = io.TextIOWrapper(file, encoding=encoding)
 				reader = csv.DictReader(wrapped_upload)
@@ -280,6 +289,88 @@ class ImportFromExternalTool(BasicWorker):
 						"body_description": item["Description"],
 						"sponsor_id": item["Sponsor Id"],
 						"sponsor_name": item["Sponsor Name"]
+					})
+
+		elif platform == "facebook-crowdtangle":
+			with dataset.get_results_path().open("w", encoding="utf-8", newline="") as output_csv:
+				wrapped_upload = io.TextIOWrapper(file, encoding=encoding)
+				reader = csv.DictReader(wrapped_upload)
+
+				entity_name = "Page Name" if "Page Name" in reader.fieldnames else "Group Name"
+
+				writer = csv.DictWriter(output_csv, fieldnames=(
+					"id", "thread_id", "body", "author", "timestamp", "page_id", "page_name", "page_category",
+					"page_top_country", "page_description", "page_created", "page_likes", "page_followers",
+					"page_shared_from", "type", "interactions", "likes", "comments", "shares", "likes_love",
+					"likes_wow", "likes_haha", "likes_sad", "likes_angry", "likes_care", "views_post", "views_total",
+					"views_total_crossposts", "overperforming_score", "video_length", "video_status", "video_own",
+					"url", "url_original", "body_image", "body_link", "body_description", "hashtags", "sponsor_id",
+					"sponsor_name", "sponsor_category"))
+				writer.writeheader()
+
+				dataset.update_status("Sorting by date...")
+				posts = sorted(reader, key=lambda x: x["Post Created"])
+				overperforming_column = None
+
+				dataset.update_status("Processing posts...")
+				for item in posts:
+					done += 1
+					hashtags = hashtag.findall(item["Message"])
+
+					date = datetime.datetime.strptime(" ".join(item["Post Created"].split(" ")[:2]), "%Y-%m-%d %H:%M:%S")
+
+					is_from_elsewhere = item["Link"].find("https://www.facebook.com/" + item["User Name"]) < 0
+					shared_page = item["Link"].split("/")[3] if is_from_elsewhere and item["Link"].find("https://www.facebook.com/") == 0 else ""
+
+					# this one is a handful
+					# unicode in csv column names is no fun
+					if not overperforming_column:
+						overperforming_column = [c for c in item.keys() if "Overperforming" in c][0]
+
+					overperforming = item.get(overperforming_column, "")
+
+					writer.writerow({
+						"id": item["URL"].split("/")[-1],
+						"thread_id": item["URL"].split("/")[-1],
+						"body": item["Message"],
+						"author": item["User Name"],
+						"timestamp": int(date.timestamp()),
+						"page_name": item[entity_name],
+						"page_category": item["Page Category"],
+						"page_top_country": item["Page Admin Top Country"],
+						"page_description": item["Page Description"],
+						"page_created": item["Page Created"],
+						"page_likes": item["Likes at Posting"],
+						"page_id": item["Facebook Id"],
+						"page_followers": item["Followers at Posting"],
+						"page_shared_from": shared_page,
+						"type": item["Type"],
+						"interactions": int(re.sub(r"[^0-9]", "", item["Total Interactions"])) if item["Total Interactions"] else 0,
+						"comments": item["Comments"],
+						"shares": item["Shares"],
+						"likes": item["Likes"],
+						"likes_love": item["Love"],
+						"likes_wow": item["Wow"],
+						"likes_haha": item["Haha"],
+						"likes_sad": item["Sad"],
+						"likes_angry": item["Angry"],
+						"likes_care": item["Care"],
+						"views_post": item["Post Views"],
+						"views_total": item["Total Views"],
+						"views_total_crossposts": item["Total Views For All Crossposts"],
+						"overperforming_score": overperforming,
+						"video_length": "" if item["Video Length"] == "N/A" else item["Video Length"],
+						"video_status": item["Video Share Status"],
+						"video_own": "yes" if item["Is Video Owner?"] == "Yes" else "no",
+						"url": item["URL"],
+						"hashtags": ",".join(hashtags),
+						"url_original": item["Final Link"] if item["Final Link"] else item["Link"],
+						"body_image": item["Image Text"],
+						"body_link": item["Link Text"],
+						"body_description": item["Description"],
+						"sponsor_id": item["Sponsor Id"],
+						"sponsor_name": item["Sponsor Name"],
+						"sponsor_category": item["Sponsor Category"]
 					})
 
 		elif platform == "instagram-dmi-scraper":
