@@ -2,6 +2,7 @@ version: '3.6'
 
 services:
   db:
+    container_name: db
     image: postgres:latest
     ports:
       - 5432:5432

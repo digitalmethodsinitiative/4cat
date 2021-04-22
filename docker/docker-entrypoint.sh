@@ -11,6 +11,19 @@ done
 
 echo "PostgreSQL started"
 
+# Set config.py variables for Docker
+# Note: we could use a .env file for Docker variables
+# and configparser for python config.ini files
+cd /usr/src/app
+sed -i 's/DB_HOST = .*/DB_HOST = "db"/' config.py
+sed -i 's/DB_PORT = .*/DB_PORT = 5432/' config.py
+sed -i 's/DB_USER = .*/DB_USER = "fourcat"/' config.py
+sed -i 's/DB_NAME = .*/DB_NAME = "fourcat"/' config.py
+sed -i 's/DB_PASSWORD = .*/DB_PASSWORD = "supers3cr3t"/' config.py
+
+grep -q 'ANONYMISATION_SALT = "REPLACE_THIS"' config.py && sed -i 's/ANONYMISATION_SALT = "REPLACE_THIS".*/ANONYMISATION_SALT = "'$(openssl rand -base64 12)'"/' config.py
+grep -q 'SECRET_KEY = "REPLACE_THIS"' config.py && sed -i 's/SECRET_KEY = "REPLACE_THIS".*/SECRET_KEY = "'$(openssl rand -base64 12)'"/' config.py
+
 #seed db
 if psql --host=db --port=5432 --user=fourcat --dbname=fourcat -tAc "SELECT 1 FROM users WHERE name='admin@admin.com'"; then echo 'Seed present'; else
 echo 'Generating admin user'
@@ -56,10 +69,6 @@ fi
 
 python3 4cat-daemon.py start
 
+echo "App running at http://localhost:5000/"
+
 gunicorn --reload --bind 0.0.0.0:5000 webtool:app
-
-
-
-
-
-
