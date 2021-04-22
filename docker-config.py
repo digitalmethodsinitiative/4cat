@@ -78,7 +78,7 @@ WARN_SLACK_URL = ""  # A Slack callback URL may be entered here; any warnings eq
 
 # E-mail settings
 WARN_EMAILS = []  # e-mail addresses to send warning reports to
-ADMIN_EMAILS = ["g.a.jansen@uva.nl"]  # e-mail of admins, to send account requests etc to
+ADMIN_EMAILS = [""]  # e-mail of admins, to send account requests etc to
 MAILHOST = "localhost"  # SMTP server to connect to for sending e-mail alerts
 
 # Scrape settings for data sources that contain their own scrapers
