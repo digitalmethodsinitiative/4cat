@@ -51,7 +51,7 @@ if [ "$(version "$CURRENT")" -ge "$(version "$TARGET")" ]; then
     echo "Version is up to date"
 else
     echo "Running migrations"
-    python3 helper-scripts/migrate.py
+    python3 helper-scripts/migrate.py --yes
 fi
 
 python3 4cat-daemon.py start

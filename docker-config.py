@@ -3,15 +3,31 @@ import os
 
 # Data source configuration
 DATASOURCES = {
-	"reddit": {
-		"boards": ["europe", "politics"]
-	},
-	"tumblr": {
-		"expire-datasets": 255600 # Delete all data after three days - required by the Tumblr API
-	},
-	"instagram": {},
-	"telegram": {},
-	"custom": {}
+	    "4chan": {  # should correspond to PLATFORM in the data source's __init__.py
+                "interval": 60,  # scrape interval for boards
+                "boards": ["pol", "v", "lgbt", "k"],  # boards to scrape (and genernally make available)
+        },
+        "8chan": {
+                "interval": 60,
+                "boards": ["pol", "v", "leftypol", "brit"],
+        },
+        "reddit": {
+                "boards": "*",
+        },
+        "tumblr": {
+                "expire-datasets": 255600 # Three days - required by the Tumblr API
+        },
+        "breitbart": {},
+#       "tiktok": {},
+        "theguardian": {},
+        "parliaments": {},
+        # "instagram": {},
+        "customimport": {},
+        "custom": {},
+        "telegram": {},
+        "8kun": {"boards": ["pnd", "v", "brit", "qresearch", "qpatriotresearch", "qresearch2gen"], "interval": 300},
+        "twitterv2": {},
+        "douban": {}
 }
 
 # Configure how the tool is to be named in its web interface. The backend will
@@ -41,7 +57,7 @@ PATH_LOCKFILE = "backend"  # the daemon lockfile will be saved in this folder. P
 # should be a commit hash, which will be combined with the Github URL to offer
 # links to the exact version of 4CAT code that produced an analysis result.
 PATH_VERSION = ""  # file containing a commit ID (everything after the first whitespace found is ignored)
-GITHUB_URL = "https://github.com/guidoajansen/4cat"  # URL to the github repository for this 4CAT instance
+GITHUB_URL = "https://github.com/digitalmethodsinitiative/4cat"  # URL to the github repository for this 4CAT instance
 
 # 4CAT has an API (available from localhost) that can be used for monitoring
 # and will listen for requests on the following port. "0" disables the API.
