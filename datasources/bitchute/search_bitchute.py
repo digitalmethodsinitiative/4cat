@@ -188,7 +188,7 @@ class SearchBitChute(Search):
                     "url": "https://www.bitchute.com" + link["href"],
                     "views": video_element.select_one(".video-views").text.strip(),
                     "length": video_element.select_one(".video-duration").text.strip(),
-                    "thumbnail": video_element.select_one(".channel-videos-image img")["src"],
+                    "thumbnail_image": video_element.select_one(".channel-videos-image img")["src"],
                 }
 
                 if detail != "basic":
@@ -254,7 +254,7 @@ class SearchBitChute(Search):
                     "url": "https://www.bitchute.com" + video_data["path"],
                     "views": video_data["views"],
                     "length": video_data["duration"],
-                    "thumbnail": video_data["images"]["thumbnail"]
+                    "thumbnail_image": video_data["images"]["thumbnail"]
                 }
 
                 if detail != "basic":
@@ -283,6 +283,17 @@ class SearchBitChute(Search):
         :return dict:  Tuple, first item: updated video data, second: list of comments
         """
         comments = []
+
+        video = {
+            **video,
+            "likes": "",
+            "dislikes": "",
+            "channel_subscribers": "",
+            "comments": "",
+            "hashtags": "",
+            "parent_id": "",
+        }
+
         try:
             # to get more details per video, we need to request the actual video detail page
             # start a new session, to not interfer with the CSRF token from the search session
@@ -290,17 +301,13 @@ class SearchBitChute(Search):
 
             video_page = video_session.get(video["url"])
             if "This video is unavailable as the contents have been deemed potentially illegal" in video_page.text:
-                video = {
-                    **video,
-                    "category": "moderated-illegal",
-                    "likes": "",
-                    "dislikes": "",
-                    "channel_subscribers": "",
-                    "comments": "",
-                    "hashtags": "",
-                    "parent_id": "",
-                }
+                video["category"] = "moderated-illegal"
                 return (video, [])
+
+            elif "Viewing of this video is restricted, as it has been marked as Not Safe For Life" in video_page.text:
+                video["category"] = "moderated-nsfl"
+                return (video, [])
+
             elif video_page.status_code != 200:
                 video = {
                     **video,
@@ -358,7 +365,7 @@ class SearchBitChute(Search):
                             "views": "",
                             "length": "",
                             "hashtags": "",
-                            "thumbnail": url + comment["profile_picture_url"],
+                            "thumbnail_image": url + comment["profile_picture_url"],
                             "likes": comment["upvote_count"],
                             "category": "comment",
                             "dislikes": "",
