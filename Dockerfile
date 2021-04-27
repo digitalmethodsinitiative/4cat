@@ -46,6 +46,9 @@ RUN export PGPASSWORD=supers3cr3t
 # copy project
 COPY . /usr/src/app/
 
+# Run docker_setup.py to modify config variables
+RUN python3 docker/docker_setup.py
+
 EXPOSE 5000
 
 ENTRYPOINT ["docker/docker-entrypoint.sh"]
