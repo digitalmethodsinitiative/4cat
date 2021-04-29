@@ -3,6 +3,14 @@ set -e
 
 version() { echo "$@" | awk -F. '{ printf("%d%03d%03d%03d\n", $1,$2,$3,$4); }'; }
 
+exit_backend() {
+  echo "Exiting backend"
+  python3 4cat-daemon.py stop
+  exit 0
+}
+
+trap exit_backend INT TERM
+
 echo "Waiting for postgres..."
 
 while ! nc -z db 5432; do
@@ -12,6 +20,7 @@ done
 echo "PostgreSQL started"
 
 #seed db
+# This seems SUPER weird. It returns true as long as DB exists; doesn't matter if admin@admin.com does.
 if psql --host=db --port=5432 --user=fourcat --dbname=fourcat -tAc "SELECT 1 FROM users WHERE name='admin@admin.com'"; then echo 'Seed present'; else
 echo 'Generating admin user'
 
@@ -54,8 +63,12 @@ else
     python3 helper-scripts/migrate.py --yes
 fi
 
+# pid remains if backend killed
+rm -f ./backend/4cat.pid
+
 python3 4cat-daemon.py start
 
-echo "App running at http://localhost:5000/"
-
-gunicorn --reload --bind 0.0.0.0:5000 webtool:app
+# hang out until SIGTERM
+while true; do
+    sleep 1
+done

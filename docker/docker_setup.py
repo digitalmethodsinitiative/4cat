@@ -1,6 +1,7 @@
 import os
 import configparser
 import bcrypt
+from pathlib import Path
 
 DOCKER_CONFIG_FILE = 'docker/docker_config.ini'
 
@@ -19,3 +20,25 @@ if os.path.exists(DOCKER_CONFIG_FILE):
 
     with open(DOCKER_CONFIG_FILE, 'w') as configfile:
         config.write(configfile)
+
+    # Ensure filepaths exist
+    import config
+    if Path(config.PATH_ROOT, config.PATH_DATA).is_dir():
+        pass
+    else:
+        os.makedirs(Path(config.PATH_ROOT, config.PATH_DATA))
+
+    if Path(config.PATH_ROOT, config.PATH_IMAGES).is_dir():
+        pass
+    else:
+        os.makedirs(Path(config.PATH_ROOT, config.PATH_IMAGES))
+
+    if Path(config.PATH_ROOT, config.PATH_LOGS).is_dir():
+        pass
+    else:
+        os.makedirs(Path(config.PATH_ROOT, config.PATH_LOGS))
+
+    if Path(config.PATH_ROOT, config.PATH_LOCKFILE).is_dir():
+        pass
+    else:
+        os.makedirs(Path(config.PATH_ROOT, config.PATH_LOCKFILE))

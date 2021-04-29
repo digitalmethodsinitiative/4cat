@@ -12,11 +12,11 @@ services:
       POSTGRES_DB: fourcat
       POSTGRES_HOST_AUTH_METHOD: trust
     volumes:
-      - 4cat_data:/var/lib/postgresql/data/
+      - 4cat_db:/var/lib/postgresql/data/
 
-  api:
+  backend:
     build: .
-    container_name: api
+    container_name: 4cat_backend
     depends_on:
       - db
     environment:
@@ -24,11 +24,26 @@ services:
       SQLALCHEMY_DATABASE_URI: postgresql+psycopg2://fourcat:supers3cr3t@db/fourcat
     networks:
       - default
+    # ports:
+    #   - 5000:5000
+    volumes:
+      - 4cat_data:/usr/src/app/docker/
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile_frontend
+    container_name: 4cat_frontend
+    depends_on:
+      - db
+      - backend
+    networks:
+      - default
     ports:
       - 5000:5000
     volumes:
-      - ./app:/usr/src/app/app
-      - ./migrations:/usr/src/app/migrations
+      - 4cat_data:/usr/src/app/docker/
 
 volumes:
+  4cat_db: {}
   4cat_data: {}

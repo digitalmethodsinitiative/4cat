@@ -1,3 +1,5 @@
+# Copied from existing Dockerfile; likely could be greatly reduced
+# but unsure what frontend actually requires at this time
 FROM debian:buster
 
 RUN apt-get update && apt install -y \
@@ -15,18 +17,7 @@ RUN apt-get update && apt install -y \
 
 WORKDIR /usr/src/app
 
-# Install google chrome
-RUN wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
-RUN dpkg -i google-chrome-stable_current_amd64.deb; apt-get -fy install
-
-ENV DISPLAY=:99
-ENV CHROME_BIN=/usr/bin/google-chrome
-
-# install chromedriver
-RUN wget -O /tmp/chromedriver.zip http://chromedriver.storage.googleapis.com/`curl -sS chromedriver.storage.googleapis.com/LATEST_RELEASE`/chromedriver_linux64.zip
-RUN unzip /tmp/chromedriver.zip chromedriver -d /usr/local/bin/
-
-# install dependencies
+# Install dependencies that may or may not be needed
 RUN pip3 install --upgrade pip
 COPY ./requirements.txt /usr/src/app/requirements.txt
 COPY ./setup.py /usr/src/app/setup.py
@@ -37,11 +28,13 @@ RUN mkdir /usr/src/app/webtool
 RUN mkdir /usr/src/app/datasources
 RUN pip3 install -r requirements.txt
 
+# Definitely needs this though
+RUN pip3 install gunicorn
+
 # copy project
 COPY . /usr/src/app/
 COPY ./config.py-example /usr/src/app/config.py
 
-# Run docker_setup.py to modify config variables (docker folder is shared volume)
-RUN python3 docker/docker_setup.py
+EXPOSE 5000
 
-ENTRYPOINT ["docker/docker-entrypoint.sh"]
+ENTRYPOINT exec gunicorn --reload --bind 0.0.0.0:5000 webtool:app
