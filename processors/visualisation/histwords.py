@@ -308,12 +308,9 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
             solid.feComposite(in_="SourceGraphic")
             canvas.defs.add(solid)
 
-            if colour_index < len(colours) - 1:
-                colour_index += 1
-            else:
-                # this is kind of confusing, but you shouldn't be using this
-                # with so many separate models anyway
-                colour_index = 0
+            # this can get kind of confusing, but you shouldn't be using this
+            # with more than 16 models anyway
+            colour_index = 0 if colour_index >= len(colours) - 1 else colour_index + 1
 
         # now plot each word for each model
         self.dataset.update_status("Plotting graph")
@@ -354,7 +351,7 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
                 else:
                     words.add(label_container)
 
-            colour_index = 0 if colour_index >= len(colours) else colour_index + 1
+            colour_index = 0 if colour_index >= len(colours) - 1 else colour_index + 1
 
         # plot a line between positions for query words
         lines = SVG(insert=(0, 0), size=(width, height))
