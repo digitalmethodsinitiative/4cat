@@ -307,7 +307,13 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
             solid.feFlood(flood_color=colours[colour_index])
             solid.feComposite(in_="SourceGraphic")
             canvas.defs.add(solid)
-            colour_index += 1
+
+            if colour_index < len(colours) - 1:
+                colour_index += 1
+            else:
+                # this is kind of confusing, but you shouldn't be using this
+                # with so many separate models anyway
+                colour_index = 0
 
         # now plot each word for each model
         self.dataset.update_status("Plotting graph")
