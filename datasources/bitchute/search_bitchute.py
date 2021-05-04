@@ -239,6 +239,11 @@ class SearchBitChute(Search):
                 else:
                     num_items += 1
 
+                # note: deleted videos will have a published date of 'None'. To
+                # avoid crashing the backend the easiest way is to set it to something
+                # that is obviously not a valid date in this context.
+                if video_data["published"] is None:
+                    video_data["published"] = "1970-01-01"
                 # this is only included as '5 months ago' and so forth, not exact date
                 # so use dateparser to at least approximate the date
                 dt = dateparser.parse(video_data["published"])
@@ -300,6 +305,10 @@ class SearchBitChute(Search):
             video_session = requests.session()
 
             video_page = video_session.get(video["url"])
+
+            if "404 - Page not found" in video_page.text:
+                video["category"] = "deleted"
+                return (video, [])
             if "This video is unavailable as the contents have been deemed potentially illegal" in video_page.text:
                 video["category"] = "moderated-illegal"
                 return (video, [])
