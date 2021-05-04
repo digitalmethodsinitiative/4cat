@@ -306,9 +306,6 @@ class SearchBitChute(Search):
 
             video_page = video_session.get(video["url"])
 
-            if "404 - Page not found" in video_page.text:
-                video["category"] = "deleted"
-                return (video, [])
             if "This video is unavailable as the contents have been deemed potentially illegal" in video_page.text:
                 video["category"] = "moderated-illegal"
                 return (video, [])
