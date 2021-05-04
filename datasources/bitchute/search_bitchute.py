@@ -107,7 +107,7 @@ class SearchBitChute(Search):
         request = session.get("https://www.bitchute.com/search")
         csrftoken = BeautifulSoup(request.text, 'html.parser').findAll("input", {"name": "csrfmiddlewaretoken"})[0].get(
             "value")
-        time.sleep(1)
+        time.sleep(0.25)
 
         self.dataset.update_status("Querying BitChute")
         results = []
@@ -151,6 +151,7 @@ class SearchBitChute(Search):
             post_data = {"csrfmiddlewaretoken": csrftoken, "name": "", "offset": str(offset)}
 
             try:
+                self.dataset.log("Fetching data for BitChute video %s" % url)
                 request = session.post(url, data=post_data, headers=headers)
                 if request.status_code != 200:
                     raise ConnectionError()
@@ -353,6 +354,12 @@ class SearchBitChute(Search):
 
                     for comment in comments_data:
                         comment_count += 1
+
+                        if comment.get("profile_picture_url", None):
+                            thumbnail_image = url + comment.get("profile_picture_url")
+                        else:
+                            thumbnail_image = ""
+
                         comments.append({
                             "id": comment["id"],
                             "thread_id": video["id"],
@@ -365,7 +372,7 @@ class SearchBitChute(Search):
                             "views": "",
                             "length": "",
                             "hashtags": "",
-                            "thumbnail_image": url + comment["profile_picture_url"],
+                            "thumbnail_image": thumbnail_image,
                             "likes": comment["upvote_count"],
                             "category": "comment",
                             "dislikes": "",
@@ -395,7 +402,6 @@ class SearchBitChute(Search):
             published = dateparser.parse(
                 soup.find(class_="video-publish-date").text.split("published at")[1].strip()[:-1])
         except AttributeError as e:
-            print(soup.find(class_="video-publish-date"))
             # publication date not on page?
             published = None
 
@@ -416,7 +422,7 @@ class SearchBitChute(Search):
             video["timestamp"] = int(published.timestamp())
 
         # may need to be increased? bitchute doesn't seem particularly strict
-        time.sleep(0.5)
+        time.sleep(0.25)
         return (video, comments)
 
     def request_from_bitchute(self, session, method, url, headers=None, data=None):
