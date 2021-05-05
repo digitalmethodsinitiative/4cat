@@ -3,7 +3,7 @@ import configparser
 import bcrypt
 from pathlib import Path
 
-DOCKER_CONFIG_FILE = 'docker/docker_config.ini'
+DOCKER_CONFIG_FILE = 'docker/shared/docker_config.ini'
 
 if os.path.exists(DOCKER_CONFIG_FILE):
     config = configparser.ConfigParser()

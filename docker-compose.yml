@@ -15,35 +15,31 @@ services:
       - 4cat_db:/var/lib/postgresql/data/
 
   backend:
-    build: .
+    build:
+      context: .
+      dockerfile: docker/Dockerfile_backend
     container_name: 4cat_backend
     depends_on:
       - db
-    environment:
-      STAGE: test
-      SQLALCHEMY_DATABASE_URI: postgresql+psycopg2://fourcat:supers3cr3t@db/fourcat
-    networks:
-      - default
-    # ports:
-    #   - 5000:5000
     volumes:
-      - 4cat_data:/usr/src/app/docker/
+      - 4cat_data:/usr/src/app/data/
+      - 4cat_share:/usr/src/app/docker/shared/
 
   frontend:
     build:
       context: .
-      dockerfile: Dockerfile_frontend
+      dockerfile: docker/Dockerfile_frontend
     container_name: 4cat_frontend
     depends_on:
       - db
       - backend
-    networks:
-      - default
     ports:
       - 5000:5000
     volumes:
-      - 4cat_data:/usr/src/app/docker/
+      - 4cat_data:/usr/src/app/data/
+      - 4cat_share:/usr/src/app/docker/shared/
 
 volumes:
   4cat_db: {}
   4cat_data: {}
+  4cat_share: {}

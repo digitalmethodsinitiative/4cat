@@ -19,6 +19,7 @@ done
 
 echo "PostgreSQL started"
 
+user_created=false
 #seed db
 # This seems SUPER weird. It returns true as long as DB exists; doesn't matter if admin@admin.com does.
 if psql --host=db --port=5432 --user=fourcat --dbname=fourcat -tAc "SELECT 1 FROM users WHERE name='admin@admin.com'"; then echo 'Seed present'; else
@@ -35,6 +36,7 @@ cd /usr/src/app && psql --host=db --port=5432 --user=fourcat --dbname=fourcat < 
 
 python3 /usr/src/app/helper-scripts/create_user.py -u admin@admin.com -p "$admin_password"
 echo "$admin_password" > /usr/src/app/.tcat_created
+user_created=true
 
 fi
 
@@ -61,6 +63,14 @@ if [ "$(version "$CURRENT")" -ge "$(version "$TARGET")" ]; then
 else
     echo "Running migrations"
     python3 helper-scripts/migrate.py --yes
+fi
+
+if [ $user_created = true ] ; then
+  echo 'Your admin username:'
+  echo 'admin@admin.com'
+  echo 'Your admin password:'
+  echo "$admin_password"
+  echo ""
 fi
 
 # pid remains if backend killed

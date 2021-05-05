@@ -2,7 +2,7 @@
 import os
 import configparser
 
-DOCKER_CONFIG_FILE = 'docker/docker_config.ini'
+DOCKER_CONFIG_FILE = 'docker/shared/docker_config.ini'
 
 # Data source configuration
 DATASOURCES = {
