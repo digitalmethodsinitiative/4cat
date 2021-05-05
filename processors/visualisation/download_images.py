@@ -87,20 +87,18 @@ class ImageDownloader(BasicProcessor):
 
 		extensions = {}
 		
-		# 4chan is the odd one out (images are traced to and scraped from archives), so treat differently.
+		# 4chan is the odd one out (images are traced to and scraped from
+		# external archives rather than 4chan itself) so here we collect the
+		# relevant archive URLs for any 4chan images we encounter
 		if datasource == "4chan":
 			self.dataset.update_status("Reading source file")
 			external = "fireden" if top_parent.parameters.get("board") == "v" else "4plebs"
 			rate_limit = 1 if external == "fireden" else 16
 
-
 			for post in self.iterate_items(self.source_file):
 				# stop processing if worker has been asked to stop
 				if self.interrupted:
 					raise ProcessorInterruptedException("Interrupted while extracting image URLs")
-
-				if len(urls) >= amount:
-					break
 
 				extension = post["filename"].split(".")[1].lower()
 				if extension not in ("jpg", "jpeg", "png", "gif"):
@@ -116,12 +114,10 @@ class ImageDownloader(BasicProcessor):
 				urls.append(url)
 				extensions[url] = extension
 
-		# With other sources, just use the generic set of image URLs.
+		# With other sources, simply take the URLs as they are provided by the
+		# parent dataset
 		else:
 			for row in self.iterate_items(self.source_file):
-
-				if len(urls) >= amount:
-					break
 
 				img_url = row["item"]
 				extension = img_url.split(".")[-1].lower()
@@ -131,12 +127,17 @@ class ImageDownloader(BasicProcessor):
 		# prepare staging area
 		results_path = self.dataset.get_staging_area()
 		counter = 0
+		downloaded_images = 0
 
 		# Used to overwrite top-images csv file with download status
 		success = []
 
-		# loop through images and copy them onto the wall
+		# loop through images and download them - until we have as many images
+		# as required. Note that images that cannot be downloaded or parsed do
+		# not count towards that limit
 		for path in urls:
+			if downloaded_images >= amount:
+				break
 
 			# stop processing if worker has been asked to stop
 			if self.interrupted:
@@ -187,6 +188,7 @@ class ImageDownloader(BasicProcessor):
 			# save file
 			try:
 				picture.save(imagepath, format="png")
+				downloaded_images += 1
 			except (OSError, ValueError):
 				self.log.warning("Could not save image %s to disk - invalid format" % path)
 				continue

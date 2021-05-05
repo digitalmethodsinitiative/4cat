@@ -158,7 +158,7 @@ class RankFlowRenderer(BasicProcessor):
 				weight = items[period][item]
 				weight_factor = weight / max_weight
 				height = int(
-					max(box_height, box_max_height * weight_factor)) if size_property and weighted else box_height
+					max(box_height, box_max_height * weight_factor)) if size_property != "none" and weighted else box_height
 
 				# colour ranges from blue to red
 				change = changes[period][item]

@@ -24,6 +24,7 @@ webtool/fourcat/static/data/word_embeddings/
 *.session
 data/
 webtool/fourcat/static/boards.json
+webtool/pages/reject-template.md
 stats.json
 news.json
 ANNOUNCEMENT.md
@@ -34,6 +35,7 @@ build/
 dist/
 fourcat.egg-info/
 webtool/venv/
+.idea
 
 # do not ignore interface images
 !webtool/static/img/*.png

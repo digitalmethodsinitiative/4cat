@@ -67,6 +67,8 @@ def add_user():
 	response = {"success": False}
 
 	email = request.form.get("email", request.args.get("email", "")).strip()
+	fmt = request.form.get("format", request.args.get("format", "")).strip()
+	force = request.form.get("force", request.args.get("force", None))
 
 	if not email or not re.match(r"[^@]+\@.*?\.[a-zA-Z]+", email):
 		response = {**response, **{"message": "Please provide a valid e-mail address."}}
@@ -89,9 +91,25 @@ def add_user():
 						"message": "User was created but the registration e-mail could not be sent to them (%s)." % e}}
 		except psycopg2.IntegrityError:
 			db.rollback()
-			response = {**response, **{"message": "Error: User %s already exists." % username}}
+			if not force:
+				response = {**response, **{"message": 'Error: User %s already exists. If you want to re-create the user and re-send the registration e-mail, use [this link](/admin/add-user?email=%s&force=1&format=%s).' % (username, username, fmt)}}
+			else:
+				# if a user does not use their token in time, maybe you want to
+				# be a benevolent admin and give them another change, without
+				# having them go through the whole signup again
+				user = User.get_by_name(username)
+				db.update("users", data={"timestamp_token": int(time.time())}, where={"name": username})
 
-	if request.args.get("format", None) == "html":
+				try:
+					user.email_token(new=True)
+					response["success"] = True
+					response = {**response, **{
+						"message": "A new registration e-mail has been sent to %s." % username}}
+				except RuntimeError as e:
+					response = {**response, **{
+						"message": "Token was reset registration e-mail could not be sent to them (%s)." % e}}
+
+	if fmt == "html":
 		return render_template("error.html", message=response["message"],
 							   title=("New account created" if response["success"] else "Error"))
 	else:
@@ -128,8 +146,13 @@ def reject_user():
 
 	if incomplete:
 		if not form_message:
-			form_answer = Path(config.PATH_ROOT, "webtool/templates/account/reject-template.html")
-			form_message = "" if not form_answer.exists() else render_template("account/reject-template.html", email=email_address, name=name)
+			form_answer = Path(config.PATH_ROOT, "webtool/pages/reject-template.md")
+			if not form_answer.exists():
+				form_message = "No %s 4 u" % config.TOOL_NAME
+			else:
+				form_message = form_answer.read_text(encoding="utf-8")
+				form_message = form_message.replace("{{ name }}", name)
+				form_message = form_message.replace("{{ email }}", email_address)
 
 		return render_template("account/reject.html", email=email_address, name=name, message=form_message, incomplete=incomplete)
 

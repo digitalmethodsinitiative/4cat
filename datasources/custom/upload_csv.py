@@ -172,8 +172,10 @@ class SearchCustom(BasicWorker):
 					sanitised_time = parse_datetime(row["timestamp"])
 					row["timestamp"] = sanitised_time.strftime("%Y-%m-%d %H:%I:%S")
 					row["unix_timestamp"] = sanitised_time.timestamp()
-				except (TypeError, ValueError):
+				except (TypeError, ValueError, OverflowError):
 					# bad format, skip
+					# an OverflowError occurs if for whatever reason the field contains a huge
+					# number?
 					continue
 
 				if strip_html:

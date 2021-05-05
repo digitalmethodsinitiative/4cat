@@ -19,6 +19,8 @@ from pathlib import Path
 
 cli = argparse.ArgumentParser()
 cli.add_argument("-i", "--input", required=True, help="csv to import")
+cli.add_argument("-u", "--user", default="autologin", help="Username to assign the dataset to")
+cli.add_argument("-d", "--datasource", default="custom", help="Datasource to assign to dataset")
 args = cli.parse_args()
 
 input = Path(args.input)
@@ -40,8 +42,8 @@ for field in required:
 
 logger = Logger()
 new_set = DataSet(
-	parameters={"user": "autologin", "filename": input.name, "time": int(time.time()), "datasource": "custom",
-				"board": "upload"}, type="custom",
+	parameters={"user": args.user, "filename": input.name, "time": int(time.time()), "datasource": args.datasource,
+				"board": "upload"}, type="%s-search" % args.datasource,
 	db=Database(logger=logger))
 
 shutil.copyfile(input, new_set.get_results_path())
