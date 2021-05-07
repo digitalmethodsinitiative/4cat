@@ -1,5 +1,7 @@
 # 4CAT: Capture and Analysis Toolkit
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.4742623.svg)](https://doi.org/10.5281/zenodo.4742623)
+
 4CAT is a tool that can be used to analyse and process data from online social
 platforms. Its goal is to make the capture and analysis of data from these 
 platforms accessible to people through a web interface, without requiring any
