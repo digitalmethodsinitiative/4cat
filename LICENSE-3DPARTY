@@ -1,6 +1,6 @@
 -------------------------------------------------------------------------------
 Incorporates the Dutch word list of the OpenTaal project
-    - at /backend/assets/wordlists/wordlist-opentaal-dutch.{txt,pb}
+    - at /common/assets/wordlists/wordlist-opentaal-dutch.txt
     - from https://www.opentaal.org/
 
     Copyright <YEAR> <COPYRIGHT HOLDER>
@@ -28,7 +28,7 @@ Incorporates the Dutch word list of the OpenTaal project
 
 -------------------------------------------------------------------------------
 Incorporates the cracklib word list
-    - at /backend/assets/wordlist/wordlist-cracklib-english.{txt,pb}
+    - at /common/assets/wordlist/wordlist-cracklib-english.txt
     - from https://github.com/cracklib/cracklib
 
                       GNU LESSER GENERAL PUBLIC LICENSE
@@ -494,7 +494,7 @@ Incorporates the cracklib word list
 
 -------------------------------------------------------------------------------
 Incorporates the English stop word list of the Terrier IR Platform
-    - at /backend/assets/wordlists/stopwords-terrier-english.{txt,pb}
+    - at /common/assets/wordlists/stopwords-terrier-english.txt
     - from http://terrier.org
 
     The contents of this file are subject to the Mozilla Public License
@@ -529,7 +529,7 @@ Incorporates the English stop word list of the Terrier IR Platform
 
 -------------------------------------------------------------------------------
 Incorporates stopword lists from the stopwords-iso project
-    - at /backend/assets/wordlists/stopwords-iso-{*}.{txt,pb}
+    - at /common/assets/wordlists/stopwords-iso-{*}.txt
     - from https://github.com/stopwords-iso/stopwords-iso
 
     The MIT License (MIT)
@@ -636,7 +636,7 @@ Incorporates the jQuery library
 
 -------------------------------------------------------------------------------
 Incorporates the Inconsolata font
-    - at /backend/assets/Inconsolata-{Bold,Regular}.ttf
+    - at /common/assets/Inconsolata-{Bold,Regular}.ttf
 
     Copyright 2006 The Inconsolata Project Authors
 

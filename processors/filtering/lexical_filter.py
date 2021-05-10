@@ -74,15 +74,15 @@ class LexicalFilter(BasicProcessor):
 		# load lexicons from word lists
 		lexicons = {}
 		for lexicon_id in self.parameters.get("lexicon", []):
-			lexicon_file = Path(config.PATH_ROOT, "backend/assets/wordlists/%s.pb" % lexicon_id)
+			lexicon_file = Path(config.PATH_ROOT, "common/assets/wordlists/%s.txt" % lexicon_id)
 			if not lexicon_file.exists():
 				continue
 
 			if lexicon_id not in lexicons:
 				lexicons[lexicon_id] = set()
 
-			with open(lexicon_file, "rb") as lexicon_handle:
-				lexicons[lexicon_id] |= pickle.load(lexicon_handle)
+			with open(lexicon_file, encoding="utf-8") as lexicon_handle:
+				lexicons[lexicon_file] |= set(lexicon_handle.read().splitlines())
 
 		# add user-defined words
 		custom_id = "user-defined"
