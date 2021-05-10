@@ -9,7 +9,7 @@ from lxml.cssselect import CSSSelector as css
 from io import StringIO
 
 from backend.abstract.processor import BasicProcessor
-from backend.lib.exceptions import ProcessorInterruptedException
+from common.lib.exceptions import ProcessorInterruptedException
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]

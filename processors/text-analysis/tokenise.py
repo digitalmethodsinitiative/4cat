@@ -2,17 +2,14 @@
 Tokenize post bodies
 """
 import ahocorasick
-import datetime
 import json
 import re
-
-from pathlib import Path
 
 from nltk.stem.snowball import SnowballStemmer
 from nltk.stem import WordNetLemmatizer
 from nltk.tokenize import word_tokenize, TweetTokenizer, sent_tokenize
 
-from backend.lib.helpers import UserInput, get_interval_descriptor
+from common.lib.helpers import UserInput, get_interval_descriptor
 from backend.abstract.processor import BasicProcessor
 
 import config

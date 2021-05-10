@@ -8,8 +8,8 @@ import time
 import json
 
 from backend.abstract.search import Search
-from backend.lib.exceptions import QueryParametersException, ProcessorInterruptedException
-from backend.lib.helpers import convert_to_int, UserInput
+from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException
+from common.lib.helpers import convert_to_int, UserInput
 
 
 class SearchWithTwitterAPIv2(Search):

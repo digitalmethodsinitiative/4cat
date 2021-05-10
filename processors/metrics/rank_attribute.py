@@ -1,14 +1,13 @@
 """
 Generate ranking per post attribute
 """
-import datetime
 import re
 
 from collections import OrderedDict
 from itertools import islice
 
 from backend.abstract.processor import BasicProcessor
-from backend.lib.helpers import UserInput, convert_to_int, get_interval_descriptor
+from common.lib.helpers import UserInput, convert_to_int, get_interval_descriptor
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]

@@ -3,8 +3,8 @@ Usenet Search via Sphinx
 """
 import time
 
-from backend.lib.helpers import UserInput
-from backend.lib.exceptions import QueryParametersException, ProcessorInterruptedException
+from common.lib.helpers import UserInput
+from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException
 from datasources.fourchan.search_4chan import Search4Chan
 
 

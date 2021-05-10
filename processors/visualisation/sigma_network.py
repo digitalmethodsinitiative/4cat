@@ -6,17 +6,12 @@ The corresponding CSS file is found in webtool/static/css.
 
 """
 import json
-import re
 import unicodedata
 import random
-import requests
-import ast
 
 import config
 
-from pathlib import Path
-
-from backend.lib.helpers import UserInput
+from common.lib.helpers import UserInput
 from backend.abstract.processor import BasicProcessor
 
 __author__ = "Sal Hagen"

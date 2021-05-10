@@ -1,9 +1,8 @@
 # update database structure for chan tables to save post deletion timestamp
 # separately from main table
-from backend.lib.database import Database
-from backend.lib.logger import Logger
+from common.lib.database import Database
+from common.lib.logger import Logger
 
-import psycopg2
 import config
 
 log = Logger(output=True)

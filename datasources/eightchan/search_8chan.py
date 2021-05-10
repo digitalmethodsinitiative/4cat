@@ -4,7 +4,7 @@
 from datasources.fourchan.search_4chan import Search4Chan
 
 import config
-from backend.lib.helpers import UserInput
+from common.lib.helpers import UserInput
 
 
 class Search8Chan(Search4Chan):

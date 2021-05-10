@@ -3,7 +3,7 @@
 """
 
 from backend.abstract.scraper import BasicJSONScraper
-from backend.lib.exceptions import JobAlreadyExistsException
+from common.lib.exceptions import JobAlreadyExistsException
 
 
 class BoardScraper4chan(BasicJSONScraper):

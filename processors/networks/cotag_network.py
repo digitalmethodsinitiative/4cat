@@ -4,7 +4,7 @@ Generate co-link network of URLs in posts
 import re
 
 from backend.abstract.processor import BasicProcessor
-from backend.lib.helpers import UserInput, gdf_escape
+from common.lib.helpers import UserInput, gdf_escape
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]

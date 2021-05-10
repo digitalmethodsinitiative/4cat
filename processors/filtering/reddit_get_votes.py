@@ -8,7 +8,7 @@ import csv
 from prawcore.exceptions import Forbidden
 
 from backend.abstract.processor import BasicProcessor
-from backend.lib.exceptions import ProcessorInterruptedException
+from common.lib.exceptions import ProcessorInterruptedException
 
 import config
 

@@ -4,7 +4,7 @@ Split posts into separate sentences
 import csv
 from nltk.tokenize import sent_tokenize, word_tokenize
 
-from backend.lib.helpers import UserInput
+from common.lib.helpers import UserInput
 from backend.abstract.processor import BasicProcessor
 
 __author__ = "Stijn Peeters"

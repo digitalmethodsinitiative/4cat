@@ -1,14 +1,12 @@
 """
 Over-time trends
 """
-import datetime
 import json
 import csv
 import re
 
 from backend.abstract.processor import BasicProcessor
-from backend.lib.helpers import UserInput, get_interval_descriptor
-from backend.lib.exceptions import ProcessorInterruptedException
+from common.lib.helpers import UserInput, get_interval_descriptor
 
 import config
 

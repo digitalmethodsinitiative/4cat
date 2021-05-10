@@ -3,10 +3,10 @@
 """
 import shutil
 
-from backend.lib.queue import JobQueue
-from backend.lib.database import Database
+from common.lib.queue import JobQueue
+from common.lib.database import Database
 from backend.lib.manager import WorkerManager
-from backend.lib.logger import Logger
+from common.lib.logger import Logger
 
 
 def run(as_daemon=True):

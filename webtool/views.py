@@ -18,12 +18,12 @@ from flask import render_template, jsonify, abort, request, redirect, send_from_
 from flask_login import login_required, current_user
 
 from webtool import app, db, log
-from webtool.lib.helpers import Pagination, get_preview, error
+from webtool.lib.helpers import Pagination, error
 
 from webtool.api_tool import delete_dataset, toggle_favourite, queue_processor
 
-from backend.lib.dataset import DataSet
-from backend.lib.queue import JobQueue
+from common.lib.dataset import DataSet
+from common.lib.queue import JobQueue
 
 csv.field_size_limit(1024 * 1024 * 1024)
 

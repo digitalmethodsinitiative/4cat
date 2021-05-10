@@ -9,9 +9,9 @@ from gensim.models import Word2Vec, FastText
 from gensim.models.phrases import Phrases, Phraser
 from pathlib import Path
 
-from backend.lib.helpers import UserInput, convert_to_int
+from common.lib.helpers import UserInput, convert_to_int
 from backend.abstract.processor import BasicProcessor
-from backend.lib.exceptions import ProcessorInterruptedException
+from common.lib.exceptions import ProcessorInterruptedException
 
 __author__ = "Sal Hagen"
 __credits__ = ["Sal Hagen", "Stijn Peeters", "Tom Willaert"]

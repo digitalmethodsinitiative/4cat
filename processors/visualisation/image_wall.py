@@ -5,14 +5,13 @@ import colorsys
 import random
 import shutil
 import math
-import csv
 
 from PIL import Image, ImageFile, ImageOps, ImageDraw, UnidentifiedImageError
 from sklearn.cluster import KMeans
 
-from backend.lib.helpers import UserInput, convert_to_int
+from common.lib.helpers import UserInput, convert_to_int
 from backend.abstract.processor import BasicProcessor
-from backend.lib.exceptions import ProcessorInterruptedException
+from common.lib.exceptions import ProcessorInterruptedException
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]

@@ -10,10 +10,10 @@ import shutil
 import spacy
 
 from collections import Counter
-from spacy.tokens import Doc, DocBin
-from backend.lib.helpers import UserInput
+from spacy.tokens import DocBin
+from common.lib.helpers import UserInput
 from backend.abstract.processor import BasicProcessor
-from backend.lib.exceptions import ProcessorInterruptedException
+from common.lib.exceptions import ProcessorInterruptedException
 
 __author__ = "Sal Hagen"
 __credits__ = ["Sal Hagen"]

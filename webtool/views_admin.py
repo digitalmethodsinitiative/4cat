@@ -21,7 +21,7 @@ from webtool import app, db
 from webtool.lib.helpers import admin_required, error
 from webtool.lib.user import User
 
-from backend.lib.helpers import call_api
+from common.lib.helpers import call_api
 
 
 @app.route("/admin/")

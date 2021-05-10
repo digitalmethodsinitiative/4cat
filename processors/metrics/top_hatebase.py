@@ -4,7 +4,7 @@ Generate ranking per hateful word
 import datetime
 
 from backend.abstract.processor import BasicProcessor
-from backend.lib.helpers import UserInput, convert_to_int
+from common.lib.helpers import UserInput, convert_to_int
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters", "hatebase.org"]

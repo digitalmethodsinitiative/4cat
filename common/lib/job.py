@@ -5,7 +5,7 @@ Class that represents a job in the job queue
 import time
 import json
 import math
-from backend.lib.exceptions import JobClaimedException, JobNotFoundException
+from common.lib.exceptions import JobClaimedException, JobNotFoundException
 
 
 class Job:

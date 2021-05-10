@@ -11,8 +11,8 @@ from pathlib import Path
 
 import config
 import backend
-from backend.lib.job import Job, JobNotFoundException
-from backend.lib.helpers import get_software_version
+from common.lib.job import Job, JobNotFoundException
+from common.lib.helpers import get_software_version
 
 
 class DataSet:

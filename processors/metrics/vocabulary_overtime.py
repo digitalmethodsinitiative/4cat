@@ -1,13 +1,12 @@
 """
 Over-time trends
 """
-import pickle
 import re
 
 from pathlib import Path
 
 from backend.abstract.processor import BasicProcessor
-from backend.lib.helpers import UserInput, get_interval_descriptor
+from common.lib.helpers import UserInput, get_interval_descriptor
 
 import config
 

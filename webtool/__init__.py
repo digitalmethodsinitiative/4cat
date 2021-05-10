@@ -5,9 +5,9 @@ from flask_limiter.util import get_remote_address
 
 import config
 
-from backend.lib.database import Database
-from backend.lib.logger import Logger
-from backend.lib.queue import JobQueue
+from common.lib.database import Database
+from common.lib.logger import Logger
+from common.lib.queue import JobQueue
 
 database_name = config.DB_NAME_TEST if hasattr(config.FlaskConfig, "DEBUG") and config.FlaskConfig.DEBUG == "Test" else config.DB_NAME
 login_manager = LoginManager()

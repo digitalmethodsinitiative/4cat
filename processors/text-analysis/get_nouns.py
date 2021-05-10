@@ -10,8 +10,8 @@ import shutil
 import spacy
 
 from collections import Counter
-from spacy.tokens import Doc, DocBin
-from backend.lib.helpers import UserInput
+from spacy.tokens import DocBin
+from common.lib.helpers import UserInput
 from backend.abstract.processor import BasicProcessor
 
 __author__ = "Sal Hagen"
