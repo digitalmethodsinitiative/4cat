@@ -1,6 +1,8 @@
-# 4CAT: Capture and Analysis Toolkit
+# ![](https://github.com/digitalmethodsinitiative/4cat/tree/master/common/assets/logo_readme.png) 4CAT: Capture and Analysis Toolkit
 
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.4742623.svg)](https://doi.org/10.5281/zenodo.4742623)
+[![DOI: 10.5281/zenodo.4742623](https://zenodo.org/badge/DOI/10.5281/zenodo.4742623.svg)](https://doi.org/10.5281/zenodo.4742623)
+[![License: MPL 2.0](https://img.shields.io/badge/license-MPL--2.0-informational)](https://github.com/digitalmethodsinitiative/4cat/blob/master/LICENSE)
+![Requires Python 3.7](https://img.shields.io/badge/python-v3.8-blue)
 
 4CAT is a tool that can be used to analyse and process data from online social
 platforms. Its goal is to make the capture and analysis of data from these 
@@ -15,7 +17,7 @@ such as the generation and visualisation of word embedding models.
 
 4CAT has a (growing) number of supported data sources corresponding to popular 
 platforms that are part of the tool, but you can also [add additional data 
-sources](https://github.com/digitalmethodinitiative/4cat/wiki/Data-sources) 
+sources](https://github.com/digitalmethodsinitiative/4cat/wiki/How-to-make-a-data-source) 
 using 4CAT's Python API. The following data sources are currently supported 
 actively:
 
@@ -41,9 +43,9 @@ in the GitHub repository.
 
 ## Install
 We use 4CAT for our own purposes at the University of Amsterdam but you can
-(and are encouraged to!) run your own instance. [You can find detailled 
+(and are encouraged to!) run your own instance. [You can find detailed 
 installation instructions in our 
-wiki](https://github.com/stijn-uva/4cat/wiki/Installing-4CAT).
+wiki](https://github.com/digitalmethodsinitiative/4cat/wiki/Installing-4CAT).
 
 Support for Docker is work-in-progress. You can install using 
 [docker-compose](https://docs.docker.com/compose/install/) by running:
@@ -65,14 +67,11 @@ the future (pull requests are very welcome).
 - `datasources`: Data source definitions. This is a set of configuration 
   options, database definitions and python scripts to process this data with.
   If you want to set up your own data sources, refer to the
-  [wiki](https://github.com/stijn-uva/4cat/wiki/Data-sources).
+  [wiki](https://github.com/digitalmethodsinitiative/4cat/wiki/How-to-make-a-data-source).
 - `processors`: A collection of data processing scripts that can plug into
   4CAT and manipulate or process datasets created with 4CAT. There is an API
   you can use to [make your own 
   processors](https://github.com/digitalmethodsinitiative/4cat/wiki/How-to-make-a-processor).
-
-## Contributing
-This section yet to be written!
 
 ## Credits & License
 4CAT was created by [OILab](https://oilab.eu) and the 
