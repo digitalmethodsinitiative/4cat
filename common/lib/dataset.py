@@ -373,24 +373,35 @@ class DataSet:
 			return {}
 
 	def get_label(self, parameters=None, default="Query"):
+		"""
+		Generate a readable label for the dataset
+
+		:param dict parameters:  Parameters of the dataset
+		:param str default:  Label to use if it cannot be inferred from the
+		parameters
+
+		:return str:  Label
+		"""
 		if not parameters:
 			parameters = self.parameters
 
-		if "body_query" in parameters and parameters["body_query"] and parameters["body_query"] != "empty":
+		if parameters.get("label"):
+			return parameters["label"]
+		elif parameters.get("body_query") and parameters["body_query"] != "empty":
 			return parameters["body_query"]
-		elif "body_match" in parameters and parameters["body_match"] and parameters["body_match"] != "empty":
+		elif parameters.get("body_match") and parameters["body_match"] != "empty":
 			return parameters["body_match"]
-		elif "subject_query" in parameters and parameters["subject_query"] and parameters["subject_query"] != "empty":
+		elif parameters.get("subject_query") and parameters["subject_query"] != "empty":
 			return parameters["subject_query"]
-		elif "subject_match" in parameters and parameters["subject_match"] and parameters["subject_match"] != "empty":
+		elif parameters.get("subject_match") and parameters["subject_match"] != "empty":
 			return parameters["subject_match"]
-		elif "country_flag" in parameters and parameters["country_flag"] and parameters["country_flag"] != "all":
+		elif parameters.get("country_flag") and parameters["country_flag"] != "all":
 			return "Flag: %s" % parameters["country_flag"]
-		elif "country_code" in parameters and parameters["country_code"] and parameters["country_code"] != "all":
+		elif parameters.get("country_code") and parameters["country_code"] != "all":
 			return "Country: %s" % parameters["country_code"]
-		elif "filename" in parameters and parameters["filename"]:
+		elif parameters.get("filename"):
 			return parameters["filename"]
-		elif "board" in parameters and parameters["board"] and "datasource" in parameters:
+		elif parameters.get("board") and "datasource" in parameters:
 			return parameters["datasource"] + "/" + parameters["board"]
 		else:
 			return default
