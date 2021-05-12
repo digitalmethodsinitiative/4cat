@@ -395,6 +395,10 @@ class DataSet:
 			return parameters["subject_query"]
 		elif parameters.get("subject_match") and parameters["subject_match"] != "empty":
 			return parameters["subject_match"]
+		elif parameters.get("query"):
+			label = parameters["query"] if len(parameters["query"]) < 30 else parameters["query"][:25] + "..."
+			label = label.strip().replace("\n", ", ")
+			return label
 		elif parameters.get("country_flag") and parameters["country_flag"] != "all":
 			return "Flag: %s" % parameters["country_flag"]
 		elif parameters.get("country_code") and parameters["country_code"] != "all":
@@ -639,7 +643,6 @@ class DataSet:
 				results += child.get_all_children(recursive)
 
 		return results
-
 
 	def get_breadcrumbs(self):
 		"""
