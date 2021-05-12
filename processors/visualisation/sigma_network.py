@@ -29,7 +29,7 @@ class SigmaNetwork(BasicProcessor):
 	title = "Sigma js network"  # title displayed in UI
 	description = "Visualise a network in the browser with sigma js."  # description displayed in UI
 	extension = "html"  # extension of result file, used internally and in UI
-	accepts = ["vision-label-network", "bipartite-user-tag-network", "word-embeddings-neighbours", "url-network", "cotag-network", "quote-network", "wiki-category-network", "coword-network", "collocations"]  # query types this post-processor accepts as input
+	accepts = ["vision-label-network", "word-embeddings-neighbours", "url-network", "cotag-network", "quote-network", "wiki-category-network", "coword-network", "collocations"]  # query types this post-processor accepts as input
 	preview_allowed = False # Will slow down the page too much
 
 	input = "csv"
@@ -202,6 +202,12 @@ class SigmaNetwork(BasicProcessor):
 						elif edge_types[i].startswith("tag "):
 							edge["source"] = edge_item
 						elif edge_types[i].startswith("user "):
+							edge["target"] = edge_item
+
+						# Tag -> user edges
+						elif edge_types[i].startswith("name "):
+							edge["source"] = edge_item
+						elif edge_types[i].startswith("category "):
 							edge["target"] = edge_item
 
 						elif edge_types[i].startswith("weight "):
