@@ -17,6 +17,9 @@ from telethon import TelegramClient
 from telethon.errors.rpcerrorlist import UsernameInvalidError
 from telethon.tl.types import User, PeerChannel, PeerChat, PeerUser
 
+import logging
+logging.basicConfig(format='[%(levelname) 5s/%(asctime)s] %(name)s: %(message)s',
+                    level=logging.WARNING)
 
 class SearchTelegram(Search):
 	"""
@@ -148,11 +151,19 @@ class SearchTelegram(Search):
 			# session is no longer useable, delete file so user will be asked
 			# for security code again
 			self.dataset.update_status("Session is not authenticated: login security code may have expired. You need to re-enter the security code.", is_final=True)
-			session_path.unlink(missing_ok=True)
+			session_path.unlink(missing_ok=True) # only works python 3.8
+			# try:
+			# 	session_path.unlink()
+			# except FileNotFoundError:
+			# 	pass
 			if client and hasattr(client, "disconnect"):
 				await client.disconnect()
 			return None
 		except Exception as e:
+			# print(e)
+			# with open(config.PATH_ROOT + 'dale_log.txt', 'a') as file:
+			# 	file.write(e + '\n______________________________\n')
+
 			self.dataset.update_status("Error connecting to the Telegram API with provided credentials.", is_final=True)
 			if client and hasattr(client, "disconnect"):
 				await client.disconnect()
