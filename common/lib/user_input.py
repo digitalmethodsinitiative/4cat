@@ -1,5 +1,5 @@
 from dateutil.parser import parse as parse_datetime
-from backend.lib.exceptions import QueryParametersException
+from common.lib.exceptions import QueryParametersException
 
 import re
 

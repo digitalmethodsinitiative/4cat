@@ -6,7 +6,7 @@ import numpy
 from gensim.models import word2vec, KeyedVectors
 
 from backend.abstract.processor import BasicProcessor
-from backend.lib.exceptions import ProcessorInterruptedException
+from common.lib.exceptions import ProcessorInterruptedException
 
 import shutil
 

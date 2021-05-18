@@ -10,10 +10,10 @@ from abc import ABC, abstractmethod
 
 import config
 
-from backend.lib.dataset import DataSet
+from common.lib.dataset import DataSet
 from backend.abstract.processor import BasicProcessor
-from backend.lib.helpers import strip_tags
-from backend.lib.exceptions import WorkerInterruptedException, ProcessorInterruptedException
+from common.lib.helpers import strip_tags
+from common.lib.exceptions import WorkerInterruptedException, ProcessorInterruptedException
 
 
 class Search(BasicProcessor, ABC):

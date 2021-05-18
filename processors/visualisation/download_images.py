@@ -12,16 +12,16 @@ import csv
 import shutil
 
 from pathlib import Path
-from PIL import Image, ImageFile, ImageOps, UnidentifiedImageError
+from PIL import Image, UnidentifiedImageError
 
 from lxml import etree
 from lxml.cssselect import CSSSelector as css
 from io import StringIO, BytesIO
 
 import config
-from backend.lib.helpers import UserInput
+from common.lib.helpers import UserInput
 from backend.abstract.processor import BasicProcessor
-from backend.lib.exceptions import ProcessorInterruptedException
+from common.lib.exceptions import ProcessorInterruptedException
 
 __author__ = "Stijn Peeters, Sal Hagen"
 __credits__ = ["Stijn Peeters, Sal Hagen"]

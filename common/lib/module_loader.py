@@ -23,7 +23,7 @@ class ModuleCollector:
 	stored for later access.
 
 	Datasources are found in the "datasources" folder in root. Workers are
-	found in datasource folders or the default "backend/processors" and
+	found in datasource folders or the default "processors" and
 	"backend/workers" folder. All these folders are scanned for both
 	processors and workers (processors being a specific kind of worker).
 	"""
@@ -293,7 +293,7 @@ class ModuleCollector:
 
 		:return Path:  Path object to cache file
 		"""
-		return Path(config.PATH_ROOT, "backend", "module_cache.pb")
+		return Path(config.PATH_ROOT, "common", "module_cache.pb")
 
 	@staticmethod
 	def invalidate_cache():

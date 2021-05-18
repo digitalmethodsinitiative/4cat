@@ -1,18 +1,16 @@
 """
 Custom data upload to create bespoke datasets
 """
-import datetime
 import time
 import csv
 import re
 import io
 
 from dateutil.parser import parse as parse_datetime
-from werkzeug.datastructures import FileStorage
 
 from backend.abstract.worker import BasicWorker
-from backend.lib.exceptions import QueryParametersException
-from backend.lib.helpers import get_software_version, strip_tags, sniff_encoding, UserInput
+from common.lib.exceptions import QueryParametersException
+from common.lib.helpers import get_software_version, strip_tags, sniff_encoding, UserInput
 
 
 class SearchCustom(BasicWorker):
@@ -33,6 +31,7 @@ class SearchCustom(BasicWorker):
 					"and processing. Files need to be utf-8 encoded and must contain a header row with at least the "
 					"following columns: `id`, `thread_id`, `author`, `body`, `subject`, `timestamp`.\n\nThe "
 					"`timestamp` column should be formatted `YYYY-mm-dd HH:MM:SS`."
+					"If your file contains hashtags, name the column `tags` or `hashtags` and make sure they are comma-separated."
 		},
 		"data_upload": {
 			"type": UserInput.OPTION_FILE,

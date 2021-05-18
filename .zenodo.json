@@ -1,0 +1,27 @@
+{
+  "language": "eng",
+  "license": "MPL-2.0",
+  "title": "4CAT Capture and Analysis Toolkit",
+  "upload_type": "software",
+  "version": "v1.18",
+  "keywords": [
+    "webmining",
+    "scraping",
+    "nlp",
+    "fair-data"
+  ],
+  "creators": [
+    {
+      "orcid": "0000-0002-0161-8019",
+      "affiliation": "University of Amsterdam",
+      "name": "Stijn Peeters"
+    },
+    {
+      "orcid": "0000-0002-1669-2377",
+      "affiliation": "University of Amsterdam",
+      "name": "Sal Hagen"
+    }
+  ],
+  "access_right": "open",
+  "description": "<p>4CAT is a tool that can be used to analyse and process data from online social platforms. Its goal is to make the capture and analysis of data from these platforms accessible to people through a web interface, without requiring any programming or web scraping skills.</p><p>This Zenodo record serves as a static, archived version of the 4CAT git repository as it is tagged for release. For the latest version of the code, visit the <a href='https://github.com/digitalmethodsinitiative/4cat'>GitHub repository</a>."
+}

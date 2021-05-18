@@ -10,7 +10,7 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
 from backend.abstract.processor import BasicProcessor
-from backend.lib.helpers import UserInput, get_yt_compatible_ids
+from common.lib.helpers import UserInput, get_yt_compatible_ids
 
 import config
 

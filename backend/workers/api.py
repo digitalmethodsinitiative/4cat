@@ -3,7 +3,6 @@ import time
 import json
 
 import config
-from backend.lib.dataset import DataSet
 from backend.abstract.worker import BasicWorker
 
 

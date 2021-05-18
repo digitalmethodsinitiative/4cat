@@ -3,16 +3,15 @@
 """
 import warnings
 import time
-import re
 
-from pymysql import OperationalError, ProgrammingError, Error
+from pymysql import OperationalError, ProgrammingError
 from pymysql.err import Warning as SphinxWarning
 
 import config
 from backend.lib.database_mysql import MySQLDatabase
-from backend.lib.helpers import UserInput
+from common.lib.helpers import UserInput
 from backend.abstract.search import SearchWithScope
-from backend.lib.exceptions import QueryParametersException, ProcessorInterruptedException
+from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException
 
 
 class Search4Chan(SearchWithScope):

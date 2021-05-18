@@ -32,8 +32,8 @@ import six
 from pathlib import Path
 
 from backend.abstract.scraper import BasicJSONScraper
-from backend.lib.exceptions import JobAlreadyExistsException
-from backend.lib.helpers import strip_tags
+from common.lib.exceptions import JobAlreadyExistsException
+from common.lib.helpers import strip_tags
 
 import config
 

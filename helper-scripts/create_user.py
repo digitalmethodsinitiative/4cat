@@ -10,8 +10,8 @@ import os
 
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)) + "/..")
 
-from backend.lib.database import Database
-from backend.lib.logger import Logger
+from common.lib.database import Database
+from common.lib.logger import Logger
 from webtool.lib.user import User
 
 log = Logger()

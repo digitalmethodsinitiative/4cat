@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 import itertools
 
-from backend.lib.helpers import UserInput, convert_to_int
+from common.lib.helpers import UserInput, convert_to_int
 from backend.abstract.processor import BasicProcessor
 
 from sklearn.feature_extraction.text import TfidfVectorizer

@@ -10,10 +10,10 @@ import shutil
 import spacy
 
 from collections import Counter
-from spacy.tokens import Doc, DocBin
-from backend.lib.helpers import UserInput
+from spacy.tokens import DocBin
+from common.lib.helpers import UserInput
 from backend.abstract.processor import BasicProcessor
-from backend.lib.exceptions import ProcessorInterruptedException
+from common.lib.exceptions import ProcessorInterruptedException
 
 __author__ = "Sal Hagen"
 __credits__ = ["Sal Hagen"]
@@ -158,17 +158,18 @@ class ExtractNouns(BasicProcessor):  #TEMPORARILY DISABLED
 
 		self.dataset.update_status("Adding entities the source file")
 
-		# Get the source_dataset data path
-		parent_path = self.source_dataset.get_results_path()
-
+		# Get the initial dataset path
+		top_dataset = self.dataset.get_genealogy()[0]
+		top_path = top_dataset.get_results_path()
+		
 		# Get a temporary path where we can store the data
 		tmp_path = self.dataset.get_staging_area()
-		tmp_file_path = tmp_path.joinpath(parent_path.name)
+		tmp_file_path = tmp_path.joinpath(top_path.name)
 
 		count = 0
 
 		# Get field names
-		fieldnames = self.get_item_keys(parent_path)
+		fieldnames = self.get_item_keys(top_path)
 		if "entities" not in fieldnames:
 			fieldnames.append("entities")
 
@@ -179,7 +180,7 @@ class ExtractNouns(BasicProcessor):  #TEMPORARILY DISABLED
 			writer = csv.DictWriter(output, fieldnames=fieldnames)
 			writer.writeheader()
 
-			for post in self.iterate_items(parent_path):
+			for post in self.iterate_items(top_path):
 
 				# Format like "Apple ORG, Gates PERSON, ..." and add to the row
 				pos_tags = ", ".join([":".join(post_entities) for post_entities in li_entities[count]])
@@ -188,7 +189,7 @@ class ExtractNouns(BasicProcessor):  #TEMPORARILY DISABLED
 				count += 1
 
 		# Replace the source file path with the new file
-		shutil.copy(str(tmp_file_path), str(parent_path))
+		shutil.copy(str(tmp_file_path), str(top_path))
 
 		# delete temporary files and folder
 		shutil.rmtree(tmp_path)

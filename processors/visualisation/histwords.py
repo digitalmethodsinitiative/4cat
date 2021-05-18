@@ -12,8 +12,8 @@ from sklearn.decomposition import PCA, TruncatedSVD
 from gensim.models import KeyedVectors
 
 from backend.abstract.processor import BasicProcessor
-from backend.lib.helpers import UserInput, convert_to_int, get_4cat_canvas
-from backend.lib.exceptions import ProcessorInterruptedException
+from common.lib.helpers import UserInput, convert_to_int, get_4cat_canvas
+from common.lib.exceptions import ProcessorInterruptedException
 
 from svgwrite.container import SVG
 from svgwrite.shapes import Line

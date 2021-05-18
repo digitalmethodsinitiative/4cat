@@ -11,9 +11,8 @@ from html.parser import HTMLParser
 from werkzeug.datastructures import FileStorage
 from calendar import monthrange
 
+from common.lib.user_input import UserInput
 import config
-
-from backend.lib.user_input import UserInput
 
 
 def init_datasource(database, logger, queue, name):

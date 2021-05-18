@@ -4,30 +4,22 @@ create a 4CAT data set, et cetera. Primarily intended to allow easier use of
 4CAT within the PENELOPE framework.
 """
 
-import hashlib
-import psutil
-import config
 import json
 import time
 import csv
-import os
-
-from pathlib import Path
 
 import backend
 
-from flask import jsonify, abort, request, render_template, render_template_string, redirect, send_file, url_for, after_this_request
+from flask import jsonify, request, send_file, after_this_request
 from flask_login import login_required, current_user
-from werkzeug.utils import secure_filename
 
-from webtool import app, db, log, openapi, limiter, queue
-from webtool.views import queue_processor
-from webtool.lib.helpers import string_to_timestamp, get_preview, error
+from webtool import app, db, log, openapi, limiter
+from webtool.lib.helpers import error
 
-from backend.lib.exceptions import JobNotFoundException
-from backend.lib.queue import JobQueue
-from backend.lib.job import Job
-from backend.lib.dataset import DataSet
+from common.lib.exceptions import JobNotFoundException
+from common.lib.queue import JobQueue
+from common.lib.job import Job
+from common.lib.dataset import DataSet
 
 api_ratelimit = limiter.shared_limit("45 per minute", scope="api")
 

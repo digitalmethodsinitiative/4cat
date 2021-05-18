@@ -2,9 +2,9 @@
 Delete and cancel a dataset
 """
 from backend.abstract.worker import BasicWorker
-from backend.lib.exceptions import JobNotFoundException
-from backend.lib.dataset import DataSet
-from backend.lib.job import Job
+from common.lib.exceptions import JobNotFoundException
+from common.lib.dataset import DataSet
+from common.lib.job import Job
 
 
 class DatasetCanceller(BasicWorker):

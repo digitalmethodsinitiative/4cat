@@ -5,7 +5,7 @@ import csv
 import re
 
 from backend.abstract.processor import BasicProcessor
-from backend.lib.helpers import UserInput, convert_to_int, pad_interval, get_4cat_canvas
+from common.lib.helpers import UserInput, convert_to_int, pad_interval, get_4cat_canvas
 
 from calendar import month_abbr
 from math import sin, cos, tan, degrees, radians, copysign

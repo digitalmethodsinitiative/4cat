@@ -4,8 +4,8 @@ import time
 import re
 
 from backend.abstract.search import SearchWithScope
-from backend.lib.exceptions import QueryParametersException, ProcessorInterruptedException
-from backend.lib.helpers import UserInput
+from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException
+from common.lib.helpers import UserInput
 
 
 class SearchReddit(SearchWithScope):

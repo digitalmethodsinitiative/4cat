@@ -9,8 +9,8 @@ import config
 from apiclient.discovery import build
 
 from backend.abstract.processor import BasicProcessor
-from backend.lib.exceptions import ProcessorInterruptedException
-from backend.lib.helpers import UserInput, convert_to_int, get_yt_compatible_ids
+from common.lib.exceptions import ProcessorInterruptedException
+from common.lib.helpers import get_yt_compatible_ids
 
 __author__ = "Sal Hagen"
 __credits__ = ["Sal Hagen"]

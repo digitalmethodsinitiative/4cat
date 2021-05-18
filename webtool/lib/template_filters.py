@@ -9,7 +9,7 @@ from pathlib import Path
 from urllib.parse import urlencode
 from webtool import app
 
-from backend.lib.helpers import strip_tags
+from common.lib.helpers import strip_tags
 
 import config
 
