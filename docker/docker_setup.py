@@ -23,22 +23,13 @@ if os.path.exists(DOCKER_CONFIG_FILE):
 
     # Ensure filepaths exist
     import config
-    if Path(config.PATH_ROOT, config.PATH_DATA).is_dir():
-        pass
-    else:
-        os.makedirs(Path(config.PATH_ROOT, config.PATH_DATA))
-
-    if Path(config.PATH_ROOT, config.PATH_IMAGES).is_dir():
-        pass
-    else:
-        os.makedirs(Path(config.PATH_ROOT, config.PATH_IMAGES))
-
-    if Path(config.PATH_ROOT, config.PATH_LOGS).is_dir():
-        pass
-    else:
-        os.makedirs(Path(config.PATH_ROOT, config.PATH_LOGS))
-
-    if Path(config.PATH_ROOT, config.PATH_LOCKFILE).is_dir():
-        pass
-    else:
-        os.makedirs(Path(config.PATH_ROOT, config.PATH_LOCKFILE))
+    for path in [config.PATH_DATA,
+                 config.PATH_IMAGES,
+                 config.PATH_LOGS,
+                 config.PATH_LOCKFILE,
+                 config.PATH_SESSIONS,
+                 ]:
+        if Path(config.PATH_ROOT, path).is_dir():
+            pass
+        else:
+            os.makedirs(Path(config.PATH_ROOT, path))

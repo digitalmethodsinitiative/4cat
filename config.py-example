@@ -38,6 +38,7 @@ PATH_LOGS = ""  # store logs here - empty means the 4CAT root folder
 PATH_IMAGES = ""  # if left empty or pointing to a non-existent folder, no images will be saved
 PATH_DATA = ""  # search results will be stored here as CSV files
 PATH_LOCKFILE = "backend"  # the daemon lockfile will be saved in this folder. Probably no need to change!
+PATH_SESSIONS = "sessions" # folder where API session data is stored (e.g., Telegram)
 
 # The following two options should be set to ensure that every analysis step can
 # be traced to a specific version of 4CAT. This allows for reproducible
@@ -112,6 +113,7 @@ if os.path.exists(DOCKER_CONFIG_FILE):
         PATH_IMAGES = config['PATHS'].get('path_images', "")
         PATH_DATA = config['PATHS'].get('path_data', "")
         PATH_LOCKFILE = config['PATHS'].get('path_lockfile', "")
+        PATH_SESSIONS = config['PATHS'].get('path_sessions', "")
 
         ANONYMISATION_SALT = config['GENERATE'].get('anonymisation_salt')
 
