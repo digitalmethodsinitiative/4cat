@@ -36,6 +36,8 @@ dist/
 fourcat.egg-info/
 webtool/venv/
 .idea
+.env/
+*.ipynb
 
 # do not ignore interface images
 !webtool/static/img/*.png

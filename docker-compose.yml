@@ -21,6 +21,8 @@ services:
     container_name: 4cat_backend
     depends_on:
       - db
+    ports:
+      - 4444:4444
     volumes:
       - 4cat_data:/usr/src/app/data/
       - 4cat_share:/usr/src/app/docker/shared/
