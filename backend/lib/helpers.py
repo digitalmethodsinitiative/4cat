@@ -254,7 +254,7 @@ def call_api(action, payload=None):
 	"""
 	connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 	connection.settimeout(15)
-	connection.connect(("localhost", config.API_PORT))
+	connection.connect((config.API_HOST, config.API_PORT))
 
 	msg = json.dumps({"request": action, "payload": payload})
 	connection.sendall(msg.encode("ascii", "ignore"))
