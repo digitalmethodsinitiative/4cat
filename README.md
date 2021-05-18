@@ -1,3 +1,5 @@
+![example workflow](https://github.com/digitalmethodsinitiative/4cat/actions/workflows/main.yml/badge.svg)
+
 # 4CAT: Capture and Analysis Toolkit
 
 4CAT is a tool that can be used to analyse and process data from online social
