@@ -49,6 +49,7 @@ GITHUB_URL = "https://github.com/digitalmethodsinitiative/4cat"  # URL to the gi
 
 # 4CAT has an API (available from localhost) that can be used for monitoring
 # and will listen for requests on the following port. "0" disables the API.
+API_HOST = "localhost"
 API_PORT = 4444
 
 # 4CAT can anonymise author names in results and does so using a hashed version
@@ -102,6 +103,9 @@ if os.path.exists(DOCKER_CONFIG_FILE):
         DB_USER = config['DATABASE'].get('db_user')
         DB_NAME = config['DATABASE'].get('db_name')
         DB_PASSWORD = config['DATABASE'].get('db_password')
+
+        API_HOST = config['API'].get('api_host')
+        API_PORT = config['API'].getint('api_port')
 
         PATH_ROOT = os.path.abspath(os.path.dirname(__file__))  # better don't change this
         PATH_LOGS = config['PATHS'].get('path_logs', "")

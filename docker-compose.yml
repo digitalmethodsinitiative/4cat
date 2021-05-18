@@ -34,6 +34,7 @@ services:
       - db
       - backend
     ports:
+      - 443:443
       - 5000:5000
     volumes:
       - 4cat_data:/usr/src/app/data/

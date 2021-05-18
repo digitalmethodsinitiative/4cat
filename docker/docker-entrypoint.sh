@@ -71,6 +71,11 @@ if [ $user_created = true ] ; then
   echo 'Your admin password:'
   echo "$admin_password"
   echo ""
+
+  echo 'Your admin username:' >> login.txt
+  echo 'admin@admin.com' >> login.txt
+  echo 'Your admin password:' >> login.txt
+  echo "$admin_password" >> login.txt
 fi
 
 # pid remains if backend killed
