@@ -19,10 +19,6 @@ from telethon.tl.types import User, PeerChannel, PeerChat, PeerUser
 
 import config
 
-import logging
-logging.basicConfig(format='[%(levelname) 5s/%(asctime)s] %(name)s: %(message)s',
-                    level=logging.WARNING)
-
 class SearchTelegram(Search):
 	"""
 	Search Telegram via API
