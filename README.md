@@ -4,6 +4,7 @@
 [![License: MPL 2.0](https://img.shields.io/badge/license-MPL--2.0-informational)](https://github.com/digitalmethodsinitiative/4cat/blob/master/LICENSE)
 ![Requires Python 3.7](https://img.shields.io/badge/python-v3.8-blue)
 
+
 [![Actions Status](https://github.com/digitalmethodsinitiative/4cat/workflows/Docker%20Image%20CI/badge.svg)](https://github.com/digitalmethodsinitiative/4cat/actions)
 
 4CAT is a tool that can be used to analyse and process data from online social
