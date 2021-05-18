@@ -1,4 +1,4 @@
-![Docker Test](https://github.com/digitalmethodsinitiative/4cat/.github/workflows/dockerimage.yml/badge.svg)
+[![Actions Status](https://github.com/digitalmethodsinitiative/4cat/workflows/Docker%20Image%20CI/badge.svg)](https://github.com/digitalmethodsinitiative/4cat/actions)
 
 # 4CAT: Capture and Analysis Toolkit
 
