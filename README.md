@@ -1,4 +1,4 @@
-![example workflow](https://github.com/digitalmethodsinitiative/4cat/actions/workflows/main.yml/badge.svg)
+![example workflow](https://github.com/digitalmethodsinitiative/4cat/actions/workflows/dockerimage.yml/badge.svg)
 
 # 4CAT: Capture and Analysis Toolkit
 
