@@ -1,6 +1,9 @@
 #!/bin/sh
 set -e
 
+POSTGRES_DB=$1
+POSTGRES_USER=$2
+
 version() { echo "$@" | awk -F. '{ printf("%d%03d%03d%03d\n", $1,$2,$3,$4); }'; }
 
 exit_backend() {
@@ -22,7 +25,7 @@ echo "PostgreSQL started"
 user_created=false
 #seed db
 # This seems SUPER weird. It returns true as long as DB exists; doesn't matter if admin does.
-if psql --host=db --port=5432 --user=fourcat --dbname=fourcat -tAc "SELECT 1 FROM users WHERE name='admin'"; then echo 'Seed present'; else
+if psql --host=db --port=5432 --user=$POSTGRES_USER --dbname=$POSTGRES_DB -tAc "SELECT 1 FROM users WHERE name='admin'"; then echo 'Seed present'; else
 echo 'Generating admin user'
 
 #generate password for admin user
@@ -32,10 +35,13 @@ echo 'Your admin password:'
 echo "$admin_password"
 
 #seed db
-cd /usr/src/app && psql --host=db --port=5432 --user=fourcat --dbname=fourcat < backend/database.sql
+cd /usr/src/app && psql --host=db --port=5432 --user=$POSTGRES_USER --dbname=$POSTGRES_DB < backend/database.sql
 
-python3 /usr/src/app/helper-scripts/create_user.py -u admin -p "$admin_password"
-echo "$admin_password" > /usr/src/app/.tcat_created
+python3 /usr/src/app/helper-scripts/create_user.py -u admin -e -p "$admin_password"
+echo 'Your admin username:' >> login.txt
+echo 'admin' >> login.txt
+echo 'Your admin password:' >> login.txt
+echo "$admin_password" >> login.txt
 user_created=true
 
 fi
@@ -66,16 +72,14 @@ else
 fi
 
 if [ $user_created = true ] ; then
+  echo 'TCAT account information:'
   echo 'Your admin username:'
   echo 'admin'
   echo 'Your admin password:'
   echo "$admin_password"
-  echo ""
-
-  echo 'Your admin username:' >> login.txt
-  echo 'admin' >> login.txt
-  echo 'Your admin password:' >> login.txt
-  echo "$admin_password" >> login.txt
+  echo 'This information has been saved in your Docker 4cat_backend container'
+  echo 'as login.txt'
+  echo ''
 fi
 
 # pid remains if backend killed

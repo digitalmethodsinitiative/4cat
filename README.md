@@ -4,7 +4,6 @@
 [![License: MPL 2.0](https://img.shields.io/badge/license-MPL--2.0-informational)](https://github.com/digitalmethodsinitiative/4cat/blob/master/LICENSE)
 ![Requires Python 3.7](https://img.shields.io/badge/python-v3.8-blue)
 
-
 [![Actions Status](https://github.com/digitalmethodsinitiative/4cat/workflows/Docker%20Image%20CI/badge.svg)](https://github.com/digitalmethodsinitiative/4cat/actions)
 
 4CAT is a tool that can be used to analyse and process data from online social
@@ -51,13 +50,14 @@ installation instructions in our
 wiki](https://github.com/digitalmethodsinitiative/4cat/wiki/Installing-4CAT).
 
 Support for Docker is work-in-progress. You can install using
-[docker-compose](https://docs.docker.com/compose/install/) by running:
+[docker-compose](https://docs.docker.com/compose/install/) by cloning the repository and running:
 ```
 docker-compose up
 ```
 
-But this may currently not work in all environments. We hope to rectify this in
-the future (pull requests are very welcome).
+Your admin username and password will appear at the end of the installation and are saved as login.txt in the Docker 4cat_backend container (you should delete this afterwards; `docker exec -it 4cat_backend /bin/bash` to access container). You may also want to change your SQL database information by updating the .env file *prior* to using Docker compose.
+
+Please check our [issues](https://github.com/digitalmethodsinitiative/4cat/issues) and create one if you experience any problems (pull requests are also very welcome).
 
 ## Components
 4CAT consists of several components, each in a separate folder:
