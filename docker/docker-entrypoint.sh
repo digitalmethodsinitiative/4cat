@@ -72,7 +72,7 @@ else
 fi
 
 if [ $user_created = true ] ; then
-  echo 'TCAT account information:'
+  echo '4CAT account information:'
   echo 'Your admin username:'
   echo 'admin'
   echo 'Your admin password:'
