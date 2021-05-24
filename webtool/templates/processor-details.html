@@ -1,5 +1,5 @@
 <li{% if inline %} class="inline"{% endif %}>
-    <form action="/results/{{ dataset.key }}/processors/queue/{{ processor.id }}/" data-async-action="/api/queue-processor/" method="POST" class="processor-child-wrapper child-wrapper">
+    <form action="{{ url_for('show_results') }}/{{ dataset.key }}/processors/queue/{{ processor.id }}/" data-async-action="{{ url_for('queue_processor') }}" method="POST" class="processor-child-wrapper child-wrapper">
 
     {# The button for this processor #}
     <div class="button-wrap processor-result-indicator">
