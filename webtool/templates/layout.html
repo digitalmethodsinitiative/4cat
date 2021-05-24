@@ -32,7 +32,7 @@
 			<li><a href="{{ url_for('show_index') }}">Create dataset</a></li>
 			<li><a href="{{ url_for('show_results') }}">Past results</a></li>
 			<li><a href="{{ url_for('show_frontpage') }}">About</a></li>
-            <li><a href="/page/faq/"><abbr title="Frequently Asked Questions">FAQ</abbr></a></li>
+                        <li><a href="{{ url_for('show_page', page='faq') }}"><abbr title="Frequently Asked Questions">FAQ</abbr></a></li>
             {% if current_user.is_authenticated and not current_user.is_special() %}
                 <li><a href="{{ url_for('show_access_tokens') }}">API Access</a></li>
             {% endif %}
@@ -55,8 +55,8 @@
 		{% if current_user.is_authenticated %}
 			<li>Logged in {% if not current_user.is_special() %} as {{ current_user.get_name() }} (<a href="{{ url_for('logout') }}">Log out</a>){% else %} via {{ current_user.get_name() }}{% endif %}</li>
 		{% endif %}
-		  <li><a href="/page/citing">How to cite</a></li>
-		  <li><a href="/page/issues">Report issues</a></li>
+		  <li><a href="{{ url_for('show_page', page='citing') }}">How to cite</a></li>
+		  <li><a href="{{ url_for('show_page', page='issues') }}">Report issues</a></li>
 		  <li><a href="https://www.oilab.eu">Open Intelligence Lab</a>, 2018 &ndash; {{ __datenow.year }}</li>
 		</ul>
 	</nav>
