@@ -80,8 +80,10 @@ def show_frontpage():
 	else:
 		news = None
 
+	datasources = backend.all_modules.datasources
 
-	return render_template("frontpage.html", stats=stats, news=news, datasources=config.DATASOURCES)
+
+	return render_template("frontpage.html", stats=stats, news=news, datasources=datasources)
 
 
 @app.route("/overview/")
