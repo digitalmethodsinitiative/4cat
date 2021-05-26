@@ -249,16 +249,78 @@ class Search(BasicProcessor, ABC):
 		if not filepath:
 			raise ResourceWarning("No valid results path supplied")
 
+		# cache hashed author names, so the hashing function (which is
+		# relatively expensive) is not run too often
+		pseudonymise_author = bool(self.parameters.get("pseudonymise", None))
+		if pseudonymise_author:
+			hash_cache = {}
+			hasher = hashlib.blake2b(digest_size=24)
+			hasher.update(str(config.ANONYMISATION_SALT).encode("utf-8"))
+
 		processed = 0
 		with filepath.open("w", encoding="utf-8", newline="") as outfile:
 			for item in items:
 				if self.interrupted:
 					raise ProcessorInterruptedException("Interrupted while writing results to file")
 
+				# replace author column with salted hash of the author name, if
+				# pseudonymisation is enabled
+				if pseudonymise_author:
+
+					check_cashe = CheckCashe(hash_cache, hasher)
+					self.search_and_update(item, 'author', check_cashe.update_cache)
+
 				outfile.write(json.dumps(item) + "\n")
 				processed += 1
 
 		return processed
+
+	def search_and_update(self, d_or_l, matching_key, change_funcion):
+	    """
+	    Function loops through a dictionary or list and compares dictionary keys to the string defined by matching_key.
+	    It then applies whatever function is passed as change_function.
+
+		This is a comprehensive (and expensive) approach to updating a dictionary.
+		It runs on every item since not all dictionaries have the same keys/structure.
+		IF a dictionary structure is known, a better solution would be to update using specific keys.
+
+	    :param Dict/List d_or_l:  dictionary/list/json to loop through
+	    :param String matching_key:  string to find in dictionary keys to be changed
+	    :param Function change_function:  function to modify the value cooresponding value of any key matching the matrching key
+	    """
+	    if isinstance(d_or_l, dict):
+	        for k, v in iter(d_or_l.items()):
+	            if isinstance(v, (list, dict)):
+	                search_and_update(d_or_l[k], matching_key, change_funcion)
+	            elif matching_key in k:
+					# Magic happens here
+	                d_or_l[k] = change_funcion(d_or_l[k])
+	    elif isinstance(d_or_l, list):
+	        for n, i in enumerate(d_or_l):
+	            if isinstance(i, (list, dict)):
+	                search_and_update(d_or_l[n], matching_key, change_funcion)
+	    else:
+	        raise Exception('Must pass list or dictionary')
+
+class CheckCashe():
+	"""
+	Handler for the hasher
+	"""
+	def __init__(self, hash_cache, hasher):
+		self.hash_cache = hash_cache
+		self.hasher = hasher
+
+	def update_cache(self, value):
+		"""
+		Checks the hash_cache to see if the value has been cached previously,
+		updates the hash_cache if needed, and returns the hashed value.
+		"""
+		if value not in self.hash_cache:
+			 author_hasher = self.hasher.copy()
+			 author_hasher.update(str(value).encode("utf-8"))
+			 self.hash_cache[value] = author_hasher.hexdigest()
+			 del author_hasher
+		return self.hash_cache[value]
 
 
 class SearchWithScope(Search, ABC):
