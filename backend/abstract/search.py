@@ -271,21 +271,21 @@ class Search(BasicProcessor, ABC):
 	def search_and_update(self, d_or_l, match_terms, change_funcion):
 		"""
 		Function loops through a dictionary or list and compares dictionary keys to the strings defined by match_terms.
-		It then applies whatever function is passed as change_function.
+		It then applies the change_function to cooresponding values.
 
 		Note: if a matching term is found, all nested values will have the function applied to them. e.g.,
 		all these values would be changed even with not_key_match:
 		{'key_match' : 'changed',
 		'also_key_match' : {'not_key_match' : 'but_value_still_changed'},
-		'another_key_match': ['this_is_changed', 'and_this', {'not_key_match' : 'but_even_this_is_changed'}]}
+		'another_key_match': ['this_is_changed', 'and_this', {'not_key_match' : 'even_this_is_changed'}]}
 
 
 		This is a comprehensive (and expensive) approach to updating a dictionary.
 		IF a dictionary structure is known, a better solution would be to update using specific keys.
 
 		:param Dict/List d_or_l:  dictionary/list/json to loop through
-		:param String match_terms:  list of strings to find in dictionary keys to be changed
-		:param Function change_function:  function to modify the value cooresponding value of any key matching the matrching key
+		:param String match_terms:  list of strings that will be matched to dictionary keys
+		:param Function change_function:  function appled to all values of any items nested under a matching key 
 		"""
 		if isinstance(d_or_l, dict):
 		    # Iterate through dictionary
