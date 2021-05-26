@@ -246,7 +246,6 @@ class Search(BasicProcessor, ABC):
 		# cache hashed author names, so the hashing function (which is
 		# relatively expensive) is not run too often
 		pseudonymise_author = bool(self.parameters.get("pseudonymise", None))
-		print('processsing ndjson!')
 		if pseudonymise_author:
 			hash_cache = {}
 			hasher = hashlib.blake2b(digest_size=24)
@@ -261,8 +260,6 @@ class Search(BasicProcessor, ABC):
 				# replace author column with salted hash of the author name, if
 				# pseudonymisation is enabled
 				if pseudonymise_author:
-					print('pseudonymising authors')
-
 					check_cashe = CheckCashe(hash_cache, hasher)
 					self.search_and_update(item, ['author'], check_cashe.update_cache)
 
