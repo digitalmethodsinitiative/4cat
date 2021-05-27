@@ -47,6 +47,7 @@ packages = [
 	"spacy==3.0.5",
 	"svgwrite==1.3.1",
 	"Telethon==1.10.6",
+	"tensorflow==2.5.0",
 	"Werkzeug==0.15.5",
 ]
 
