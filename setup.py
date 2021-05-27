@@ -43,7 +43,7 @@ packages = [
 	"numpy>=1.19.2",
 	"Pillow>=8.1.2",
 	"Flask==1.1.0",
-	"spacy==3.0.5",
+	"spacy==3.0.6",
 	"six==1.15.0",
 	"lxml==4.6.3",
 	"praw==6.5.1",
