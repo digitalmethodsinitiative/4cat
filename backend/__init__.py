@@ -1,7 +1,7 @@
 import sys
 import os
 
-from backend.lib.module_loader import ModuleCollector
+from common.lib.module_loader import ModuleCollector
 
 # load modules
 all_modules = ModuleCollector()

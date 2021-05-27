@@ -3,11 +3,10 @@ The heart of the app - manages jobs and workers
 """
 import signal
 import time
-import sys
 
 from backend import all_modules
 from backend.lib.keyboard import KeyPoller
-from backend.lib.exceptions import JobClaimedException
+from common.lib.exceptions import JobClaimedException
 
 
 class WorkerManager:

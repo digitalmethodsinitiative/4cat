@@ -8,8 +8,8 @@ import csv
 import re
 
 from backend.abstract.processor import BasicProcessor
-from backend.lib.helpers import UserInput
-from backend.lib.exceptions import ProcessorInterruptedException
+from common.lib.helpers import UserInput
+from common.lib.exceptions import ProcessorInterruptedException
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]

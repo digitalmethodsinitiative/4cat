@@ -10,13 +10,14 @@ import re
 from pathlib import Path
 
 from backend.abstract.search import Search
-from backend.lib.exceptions import QueryParametersException, ProcessorInterruptedException
-from backend.lib.helpers import convert_to_int, UserInput
+from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException
+from common.lib.helpers import convert_to_int, UserInput
 
 from telethon import TelegramClient
 from telethon.errors.rpcerrorlist import UsernameInvalidError
 from telethon.tl.types import User, PeerChannel, PeerChat, PeerUser
 
+import config
 
 class SearchTelegram(Search):
 	"""
@@ -125,7 +126,7 @@ class SearchTelegram(Search):
 
 		hash_base = query["api_phone"].replace("+", "") + query["api_id"] + query["api_hash"]
 		session_id = hashlib.blake2b(hash_base.encode("ascii")).hexdigest()
-		session_path = Path(__file__).parent.joinpath("sessions", session_id + ".session")
+		session_path = Path(config.PATH_ROOT).joinpath(config.PATH_SESSIONS, session_id + ".session")
 
 		client = None
 

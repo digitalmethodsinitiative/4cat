@@ -1,14 +1,12 @@
 """
 Over-time trends
 """
-import datetime
 import json
 import csv
 import re
 
 from backend.abstract.processor import BasicProcessor
-from backend.lib.helpers import UserInput, get_interval_descriptor
-from backend.lib.exceptions import ProcessorInterruptedException
+from common.lib.helpers import UserInput, get_interval_descriptor
 
 import config
 
@@ -106,7 +104,7 @@ class OvertimeAnalysis(BasicProcessor):
 			self.dataset.finish(0)
 			return
 
-		with open(config.PATH_ROOT + "/backend/assets/hatebase/hatebase-%s.json" % language) as hatebasedata:
+		with open(config.PATH_ROOT + "/common/assets/hatebase/hatebase-%s.json" % language) as hatebasedata:
 			hatebase = json.loads(hatebasedata.read())
 
 		hatebase = {term.lower(): hatebase[term] for term in hatebase}

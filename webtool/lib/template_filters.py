@@ -9,7 +9,7 @@ from pathlib import Path
 from urllib.parse import urlencode
 from webtool import app
 
-from backend.lib.helpers import strip_tags
+from common.lib.helpers import strip_tags
 
 import config
 
@@ -76,7 +76,9 @@ def _jinja2_filter_httpquery(data):
 
 @app.template_filter('markdown')
 def _jinja2_filter_markdown(text):
-	return markdown.markdown(strip_tags(text))
+	text = "<p>" + text + "</p>"
+	val = markdown.markdown(strip_tags(text))
+	return val
 
 
 @app.template_filter('isbool')

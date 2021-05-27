@@ -4,8 +4,8 @@ import time
 import re
 
 from backend.abstract.search import SearchWithScope
-from backend.lib.exceptions import QueryParametersException, ProcessorInterruptedException
-from backend.lib.helpers import UserInput
+from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException
+from common.lib.helpers import UserInput
 
 
 class SearchReddit(SearchWithScope):
@@ -502,7 +502,7 @@ class SearchReddit(SearchWithScope):
 		"""
 		# we need a board!
 		r_prefix = re.compile(r"^/?r/")
-		boards = [r_prefix.sub("", board) for board in query.get("board", "").split(",") if board.strip()]
+		boards = [r_prefix.sub("", board).strip() for board in query.get("board", "").split(",") if board.strip()]
 
 		if not boards:
 			raise QueryParametersException("Please provide a board or a comma-separated list of boards to query.")

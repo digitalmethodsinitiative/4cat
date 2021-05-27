@@ -20,10 +20,9 @@ from pathlib import Path
 from psycopg2.errors import UniqueViolation
 
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)) + "/..")
-from backend.lib.database import Database
-from backend.lib.logger import Logger
+from common.lib.database import Database
+from common.lib.logger import Logger
 
-import pandas as pd
 # parse parameters
 cli = argparse.ArgumentParser()
 cli.add_argument("-i", "--input", required=True, help="File to read from, containing a SQLite archive")

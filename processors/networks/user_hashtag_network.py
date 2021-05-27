@@ -4,7 +4,7 @@ Generate bipartite user-hashtag graph of posts
 import re
 
 from backend.abstract.processor import BasicProcessor
-from backend.lib.helpers import UserInput
+from common.lib.helpers import UserInput, gdf_escape
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -19,7 +19,7 @@ class HashtagUserBipartiteGrapher(BasicProcessor):
 	type = "bipartite-user-tag-network"  # job type ID
 	category = "Networks"  # category
 	title = "Bipartite Author-tag Network"  # title displayed in UI
-	description = "Produces a bipartite graph based on co-occurence of (hash)tags and people. If someone wrote a post with a certain tag, there will be a link between that person and the tag. The more often they appear together, the stronger the link."  # description displayed in UI
+	description = "Produces a bipartite graph based on co-occurence of (hash)tags and people. If someone wrote a post with a certain tag, there will be a link between that person and the tag. The more often they appear together, the stronger the link. Tag nodes are weighed on how often they occur. User nodes are weighed on how many posts they've made."  # description displayed in UI
 	extension = "gdf"  # extension of result file, used internally and in UI
 
 	datasources = ["instagram", "tumblr", "tiktok", "usenet", "parler", "custom"]
@@ -58,18 +58,9 @@ class HashtagUserBipartiteGrapher(BasicProcessor):
 			posts += 1
 
 			# create a list of tags
-			if self.source_dataset.parameters["datasource"] in ("instagram", "tiktok"):
+			if self.source_dataset.parameters["datasource"] in ("instagram", "tiktok", "tumblr"):
 				tags = post.get("tags", "").split(",")
 				tags += [leading_hash.sub("", tag) for tag in post.get("hashtags", "").split(",")]
-
-			elif self.source_dataset.parameters["datasource"] == "tumblr":
-				# Convert string of list to actual list
-				tags = post.get("tags", None)
-				if tags:
-					# original format is ['tag1', 'tag2', ..., 'tagn'], so ignore brackets and '
-					tags = [tag.strip()[1:-1] for tag in tags[1:-1].split(",")]
-				else:
-					tags = []
 
 			elif self.source_dataset.parameters["datasource"] == "usenet":
 				if not post.get("groups"):
@@ -97,6 +88,12 @@ class HashtagUserBipartiteGrapher(BasicProcessor):
 			user = post.get("author")
 			if not user:
 				continue
+			
+			# Weigh users on the amount of posts they've made
+			if user not in all_users:
+				all_users[user] = 1
+			else:
+				all_users[user] += 1
 
 			for tag in tags:
 				# ignore empty tags
@@ -104,34 +101,33 @@ class HashtagUserBipartiteGrapher(BasicProcessor):
 					continue
 
 				if tag not in all_tags:
-					all_tags[tag] = 0
-				all_tags[tag] += 1
+					all_tags[tag] = 1
+				else:
+					all_tags[tag] += 1
 
-				if user not in all_users:
-					all_users[user] = 0
-				all_users[user] += 1
-
-				pair = sorted((tag, user))
+				pair = [user, tag]
 				pair_key = "-_-".join(pair)
 
 				if pair_key not in pairs:
-					pairs[pair_key] = 0
-
-				pairs[pair_key] += 1
+					pairs[pair_key] = 1
+				else:
+					pairs[pair_key] += 1
 
 		# write GDF file
 		self.dataset.update_status("Writing to Gephi-compatible file")
 		with self.dataset.get_results_path().open("w", encoding="utf-8") as results:
 			results.write("nodedef>name VARCHAR,category VARCHAR,weight INTEGER\n")
 			for tag in all_tags:
-				results.write("'" + tag + "',hashtag,%i\n" % all_tags[tag])
+				results.write(gdf_escape(tag) + ",hashtag,%i\n" % all_tags[tag])
 
 			for user in all_users:
-				results.write("'" + user + "',user,%i\n" % all_users[user])
+				results.write(gdf_escape(user) + ",user,%i\n" % all_users[user])
 
-			results.write("edgedef>tag VARCHAR, user VARCHAR, weight INTEGER,directed BOOLEAN\n")
+			results.write("edgedef>user VARCHAR, tag VARCHAR, weight INTEGER, directed BOOLEAN\n")
 			for pair in pairs:
+				pair_weight = pairs[pair]
+				pair = pair.split("-_-")
 				results.write(
-					"'" + pair.split("-_-")[0] + "','" + pair.split("-_-")[1] + "',%i,TRUE\n" % pairs[pair])
+					gdf_escape(pair[0]) + "," + gdf_escape(pair[1]) + ",%i,TRUE\n" % pair_weight)
 
 		self.dataset.finish(len(pairs))

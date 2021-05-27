@@ -5,7 +5,7 @@ import pickle
 import csv
 import json
 
-from backend.lib.helpers import UserInput, convert_to_int
+from common.lib.helpers import UserInput, convert_to_int
 from backend.abstract.processor import BasicProcessor
 
 __author__ = "Stijn Peeters"

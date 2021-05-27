@@ -4,11 +4,10 @@ Search Parliament Speeches corpus
 import urllib.parse
 import requests
 import datetime
-import re
 
 from backend.abstract.search import Search
-from backend.lib.helpers import UserInput
-from backend.lib.exceptions import QueryParametersException, ProcessorInterruptedException
+from common.lib.helpers import UserInput
+from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException
 
 
 class SearchParliamentSpeeches(Search):

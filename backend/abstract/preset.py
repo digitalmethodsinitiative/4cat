@@ -4,7 +4,7 @@ Queue a series of processors at once via a preset
 import abc
 from backend.abstract.processor import BasicProcessor
 
-from backend.lib.dataset import DataSet
+from common.lib.dataset import DataSet
 
 
 class ProcessorPreset(BasicProcessor):

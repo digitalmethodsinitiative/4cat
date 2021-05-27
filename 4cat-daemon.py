@@ -8,7 +8,7 @@ from pathlib import Path
 
 import config
 
-from backend.lib.helpers import call_api
+from common.lib.helpers import call_api
 
 cli = argparse.ArgumentParser()
 cli.add_argument("--interactive", "-i", default=False, help="Run 4CAT in interactive mode (not in the background).",

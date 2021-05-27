@@ -4,7 +4,7 @@ Generate word tree from dataset
 import re
 
 from backend.abstract.processor import BasicProcessor
-from backend.lib.helpers import UserInput, convert_to_int
+from common.lib.helpers import UserInput, convert_to_int
 
 from nltk.tokenize import word_tokenize
 

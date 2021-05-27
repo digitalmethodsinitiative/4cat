@@ -4,16 +4,15 @@ Extract linguistic features from text using SpaCy.
 """
 import zipfile
 import pickle
-import csv
 import re
 
 import spacy
 from spacy.tokens import DocBin
 from spacy.tokenizer import Tokenizer
-from spacy.util import compile_prefix_regex, compile_infix_regex, compile_suffix_regex
+from spacy.util import compile_prefix_regex, compile_suffix_regex
 
-from backend.lib.helpers import UserInput
-from backend.lib.exceptions import ProcessorInterruptedException
+from common.lib.helpers import UserInput
+from common.lib.exceptions import ProcessorInterruptedException
 from backend.abstract.processor import BasicProcessor
 
 __author__ = "Sal Hagen"

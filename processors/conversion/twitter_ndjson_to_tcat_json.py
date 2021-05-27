@@ -2,10 +2,9 @@
 Convert a Twitter NDJSON file to be importable by TCAT's import-jsondump.php
 """
 import json
-import datetime
 
 from backend.abstract.processor import BasicProcessor
-from backend.lib.exceptions import ProcessorInterruptedException
+from common.lib.exceptions import ProcessorInterruptedException
 
 __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl"]

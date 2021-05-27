@@ -3,7 +3,7 @@ Annotate top images
 """
 from backend.abstract.preset import ProcessorPreset
 
-from backend.lib.helpers import UserInput, convert_to_int
+from common.lib.helpers import UserInput, convert_to_int
 
 
 class AnnotateImages(ProcessorPreset):

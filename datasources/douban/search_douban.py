@@ -9,8 +9,8 @@ import re
 from bs4 import BeautifulSoup
 
 from backend.abstract.search import Search
-from backend.lib.helpers import convert_to_int, strip_tags, UserInput
-from backend.lib.exceptions import QueryParametersException, ProcessorInterruptedException
+from common.lib.helpers import convert_to_int, strip_tags, UserInput
+from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException
 
 
 class SearchDouban(Search):

@@ -9,8 +9,8 @@ import re
 from pathlib import Path
 
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)) + "/..")
-from backend.lib.database import Database
-from backend.lib.logger import Logger
+from common.lib.database import Database
+from common.lib.logger import Logger
 
 # parse parameters
 cli = argparse.ArgumentParser()

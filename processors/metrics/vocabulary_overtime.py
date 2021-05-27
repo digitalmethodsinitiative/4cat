@@ -1,13 +1,12 @@
 """
 Over-time trends
 """
-import pickle
 import re
 
 from pathlib import Path
 
 from backend.abstract.processor import BasicProcessor
-from backend.lib.helpers import UserInput, get_interval_descriptor
+from common.lib.helpers import UserInput, get_interval_descriptor
 
 import config
 
@@ -92,7 +91,7 @@ class OvertimeAnalysis(BasicProcessor):
 		# load vocabularies from word lists
 		vocabularies = {}
 		for vocabulary_id in self.parameters.get("vocabulary", []):
-			vocabulary_file = Path(config.PATH_ROOT, "backend/assets/wordlists/%s.txt" % vocabulary_id)
+			vocabulary_file = Path(config.PATH_ROOT, "common/assets/wordlists/%s.txt" % vocabulary_id)
 			if not vocabulary_file.exists():
 				continue
 

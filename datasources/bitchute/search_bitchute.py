@@ -12,9 +12,9 @@ import re
 from itertools import chain
 from bs4 import BeautifulSoup
 
-from backend.lib.helpers import UserInput
+from common.lib.helpers import UserInput
 from backend.abstract.search import Search
-from backend.lib.exceptions import QueryParametersException, ProcessorInterruptedException
+from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException
 
 
 class SearchBitChute(Search):

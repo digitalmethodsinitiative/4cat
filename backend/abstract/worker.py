@@ -6,9 +6,9 @@ import threading
 import time
 import abc
 
-from backend.lib.queue import JobQueue
-from backend.lib.database import Database
-from backend.lib.exceptions import WorkerInterruptedException, ProcessorException
+from common.lib.queue import JobQueue
+from common.lib.database import Database
+from common.lib.exceptions import WorkerInterruptedException, ProcessorException
 
 
 class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):

@@ -1,10 +1,9 @@
 """
 Collapse post bodies into one long string
 """
-import datetime
 import csv
 
-from backend.lib.helpers import UserInput, pad_interval, get_interval_descriptor
+from common.lib.helpers import UserInput, pad_interval, get_interval_descriptor
 from backend.abstract.processor import BasicProcessor
 
 __author__ = "Stijn Peeters"

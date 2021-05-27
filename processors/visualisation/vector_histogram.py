@@ -12,7 +12,7 @@ from svgwrite.path import Path
 from svgwrite.text import Text
 
 from backend.abstract.processor import BasicProcessor
-from backend.lib.helpers import UserInput, pad_interval, get_4cat_canvas
+from common.lib.helpers import UserInput, pad_interval, get_4cat_canvas
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]

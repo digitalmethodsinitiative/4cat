@@ -9,7 +9,7 @@ from pathlib import Path
 import operator
 from nltk.collocations import *
 
-from backend.lib.helpers import UserInput
+from common.lib.helpers import UserInput
 from backend.abstract.processor import BasicProcessor
 
 class GetCollocations(BasicProcessor):

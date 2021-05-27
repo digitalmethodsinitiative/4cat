@@ -9,7 +9,7 @@ import time
 from psycopg2 import sql
 from psycopg2.extras import execute_values
 
-from backend.lib.exceptions import DatabaseQueryInterruptedException
+from common.lib.exceptions import DatabaseQueryInterruptedException
 
 
 import config

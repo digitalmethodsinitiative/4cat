@@ -5,7 +5,7 @@ from nltk.stem.snowball import SnowballStemmer
 
 from backend.abstract.preset import ProcessorPreset
 
-from backend.lib.helpers import UserInput
+from common.lib.helpers import UserInput
 
 
 class SimilarWords(ProcessorPreset):

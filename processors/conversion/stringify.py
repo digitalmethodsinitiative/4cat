@@ -4,7 +4,7 @@ Collapse post bodies into one long string
 import re
 
 from backend.abstract.processor import BasicProcessor
-from backend.lib.helpers import UserInput
+from common.lib.helpers import UserInput
 
 __author__ = "Sal Hagen"
 __credits__ = ["Sal Hagen"]

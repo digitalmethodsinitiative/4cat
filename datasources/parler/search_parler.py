@@ -10,8 +10,8 @@ import time
 import re
 
 from backend.abstract.search import Search
-from backend.lib.exceptions import QueryParametersException, ProcessorInterruptedException
-from backend.lib.helpers import UserInput
+from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException
+from common.lib.helpers import UserInput
 
 
 class SearchParler(Search):

@@ -4,9 +4,6 @@ Search Tumblr via its API
 Can fetch posts from specific blogs or with specific hashtags
 """
 
-import shutil
-import os
-import re
 import time
 import pytumblr
 from requests.exceptions import ConnectionError
@@ -15,8 +12,8 @@ from datetime import datetime
 import config
 
 from backend.abstract.search import Search
-from backend.lib.helpers import UserInput
-from backend.lib.exceptions import QueryParametersException, ProcessorInterruptedException
+from common.lib.helpers import UserInput
+from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException
 
 __author__ = "Sal Hagen"
 __credits__ = ["Sal Hagen", "Tumblr API (api.tumblr.com)"]

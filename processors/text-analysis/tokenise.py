@@ -2,17 +2,14 @@
 Tokenize post bodies
 """
 import ahocorasick
-import datetime
 import json
 import re
-
-from pathlib import Path
 
 from nltk.stem.snowball import SnowballStemmer
 from nltk.stem import WordNetLemmatizer
 from nltk.tokenize import word_tokenize, TweetTokenizer, sent_tokenize
 
-from backend.lib.helpers import UserInput, get_interval_descriptor
+from common.lib.helpers import UserInput, get_interval_descriptor
 from backend.abstract.processor import BasicProcessor
 
 import config
@@ -158,7 +155,7 @@ class Tokenise(BasicProcessor):
 		# load word filters - words to exclude from tokenisation
 		word_filter = set()
 		for wordlist in self.parameters.get("filter", self.options["filter"]["default"]):
-			with open(config.PATH_ROOT + "/backend/assets/wordlists/%s.txt" % wordlist, encoding="utf-8") as input:
+			with open(config.PATH_ROOT + "/common/assets/wordlists/%s.txt" % wordlist, encoding="utf-8") as input:
 				word_filter = set.union(word_filter, input.read().splitlines())
 
 		# Extend or limit the word filter with optionally added words

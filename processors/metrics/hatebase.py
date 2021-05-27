@@ -6,8 +6,8 @@ import csv
 import re
 
 from backend.abstract.processor import BasicProcessor
-from backend.lib.helpers import UserInput
-from backend.lib.exceptions import ProcessorInterruptedException
+from common.lib.helpers import UserInput
+from common.lib.exceptions import ProcessorInterruptedException
 
 import config
 
@@ -62,7 +62,7 @@ class HatebaseAnalyser(BasicProcessor):
 
 
 		# read and convert to a way we can easily match whether any word occurs
-		with open(config.PATH_ROOT + "/backend/assets/hatebase/hatebase-%s.json" % language) as hatebasedata:
+		with open(config.PATH_ROOT + "/common/assets/hatebase/hatebase-%s.json" % language) as hatebasedata:
 			hatebase = json.loads(hatebasedata.read())
 
 		hatebase = {term.lower(): hatebase[term] for term in hatebase}

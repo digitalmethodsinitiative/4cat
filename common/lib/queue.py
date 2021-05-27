@@ -4,7 +4,7 @@ A job queue, to divide work over the workers
 import time
 import json
 
-from backend.lib.job import Job
+from common.lib.job import Job
 import psycopg2
 
 

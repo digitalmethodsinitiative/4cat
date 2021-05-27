@@ -16,8 +16,8 @@ from selenium.webdriver.chrome.options import Options
 from selenium.common.exceptions import JavascriptException
 
 from backend.abstract.search import Search
-from backend.lib.helpers import UserInput
-from backend.lib.exceptions import QueryParametersException, ProcessorInterruptedException
+from common.lib.helpers import UserInput
+from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException
 
 
 class SearchTikTok(Search):

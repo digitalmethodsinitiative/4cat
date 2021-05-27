@@ -6,18 +6,13 @@ other people reply (though they can't post images in response). So this
 datasource uses this affordance to retrieve instagram data for 4CAT.
 """
 import instaloader
-import shutil
 import base64
-import json
-import os
 import re
-
-from cryptography.fernet import Fernet
 
 import config
 from backend.abstract.search import Search
-from backend.lib.helpers import UserInput
-from backend.lib.exceptions import QueryParametersException, ProcessorInterruptedException
+from common.lib.helpers import UserInput
+from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException
 
 
 class SearchInstagram(Search):

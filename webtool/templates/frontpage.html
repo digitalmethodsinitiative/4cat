@@ -55,16 +55,7 @@
                     {% endif %}{% endfor %}
                 {% else %}
                     {% for datasource in datasources %}
-                        {% if "boards" in datasources[datasource] and datasources[datasource]["boards"] %}
-                            <li>
-                                {{ datasources[datasource].name if "name" in datasources[datasource] else datasource }}
-                                <ul>
-                                    {% for board in datasources[datasource]["boards"] %}
-                                        <li>{{ board }}</li>
-                                    {% endfor %}
-                                </ul>
-                            </li>
-                        {% endif %}
+                        <li>{{ datasources[datasource].name if "name" in datasources[datasource] else datasource }}</li>
                     {% endfor %}
                 {% endif %}
             </ul>

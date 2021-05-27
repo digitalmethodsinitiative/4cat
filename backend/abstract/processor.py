@@ -8,14 +8,13 @@ import shutil
 import json
 import abc
 import csv
-import os
 
 from pathlib import Path, PurePath
 
 from backend.abstract.worker import BasicWorker
-from backend.lib.dataset import DataSet
-from backend.lib.helpers import get_software_version
-from backend.lib.exceptions import WorkerInterruptedException, ProcessorInterruptedException, ProcessorException
+from common.lib.dataset import DataSet
+from common.lib.helpers import get_software_version
+from common.lib.exceptions import WorkerInterruptedException, ProcessorInterruptedException, ProcessorException
 
 csv.field_size_limit(1024 * 1024 * 1024)
 

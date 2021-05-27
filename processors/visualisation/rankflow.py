@@ -5,7 +5,7 @@ import colorsys
 import csv
 
 from backend.abstract.processor import BasicProcessor
-from backend.lib.helpers import UserInput, convert_to_int, get_4cat_canvas
+from common.lib.helpers import UserInput, get_4cat_canvas
 
 from svgwrite.shapes import Rect
 from svgwrite.path import Path

@@ -13,12 +13,13 @@
 *.stderr
 *.stdout
 *.git-*
+.DS_Store
 
 # actual files that are part of 4CAT but should not be included
 .current-version
 config.py
 deploy.sh
-backend/module_cache.pb
+module_cache.pb
 webtool/fourcat/js/jquery-csv-master/
 webtool/fourcat/static/data/word_embeddings/
 *.session
@@ -35,7 +36,11 @@ build/
 dist/
 fourcat.egg-info/
 webtool/venv/
+.4cat_env/
+.vscode*
 .idea
+.env/
+*.ipynb
 
 # do not ignore interface images
 !webtool/static/img/*.png

@@ -2,8 +2,8 @@
 Google Vision API co-label network
 """
 from backend.abstract.processor import BasicProcessor
-from backend.lib.helpers import UserInput, gdf_escape
-from backend.lib.exceptions import ProcessorInterruptedException
+from common.lib.helpers import UserInput, gdf_escape
+from common.lib.exceptions import ProcessorInterruptedException
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
