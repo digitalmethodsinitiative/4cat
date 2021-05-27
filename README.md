@@ -57,6 +57,8 @@ docker-compose up
 
 Your admin username and password will appear at the end of the installation and are saved as login.txt in the Docker 4cat_backend container (you should delete this afterwards; `docker exec -it 4cat_backend /bin/bash` to access container). You may also want to change your SQL database information by updating the .env file *prior* to using Docker compose.
 
+Note for Windows: You may need to ensure that WSL (Windows Subsystem for Linux) is enable in Docker. You can find this Docker setting in Settings -> Resources-> WSL Integration -> Enable integration with required distros.
+
 Please check our [issues](https://github.com/digitalmethodsinitiative/4cat/issues) and create one if you experience any problems (pull requests are also very welcome).
 
 ## Components
