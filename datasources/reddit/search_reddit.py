@@ -20,6 +20,10 @@ class SearchReddit(SearchWithScope):
 	description = "Query the Pushshift API to retrieve Reddit posts and threads matching the search parameters"  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
+	references = [
+		"[Baumgartner, J., Zannettou, S., Keegan, B., Squire, M., & Blackburn, J. (2020). The Pushshift Reddit Dataset. *Proceedings of the International AAAI Conference on Web and Social Media*, 14(1), 830-839.](https://ojs.aaai.org/index.php/ICWSM/article/view/7347)"
+	]
+
 	# not available as a processor for existing datasets
 	accepts = [None]
 
@@ -47,12 +51,12 @@ class SearchReddit(SearchWithScope):
 		},
 		"intro": {
 			"type": UserInput.OPTION_INFO,
-			"help": "Reddit data is retrieved from [Pushshift](https://pushshift.io). [This "
-					"paper](https://arxiv.org/abs/2001.08435) details the dataset. Cite them if you use this data for "
-					"your research. Check the [Pushshift API](https://github.com/pushshift/api) reference for "
-					"documentation on query syntax, e.g. on how to format keyword queries.\n\n**Note:** post scores "
-					"are usually inaccurate. Pushshift archives most posts as soon as they are posted, and scores are "
-					"not re-checked at a later moment."
+			"help": "Reddit data is retrieved from [Pushshift](https://pushshift.io) (see also [this "
+					"paper](https://ojs.aaai.org/index.php/ICWSM/article/view/7347)). Note that Pushshift's dataset "
+					"*may not be complete* depending on the parameters used, and post scores will not be up to date. "
+					"Double-check manually or via the official Reddit API if completeness is a concern. Check the "
+					"[Pushshift API](https://github.com/pushshift/api) reference for documentation on query syntax, "
+					"e.g. on how to format keyword queries."
 		},
 		"body_match": {
 			"type": UserInput.OPTION_TEXT,
