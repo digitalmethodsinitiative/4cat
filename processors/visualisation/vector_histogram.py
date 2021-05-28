@@ -219,7 +219,7 @@ class SVGHistogramRenderer(BasicProcessor):
 					label = interval[0:4] + "\nW" + interval[5:7]
 
 			elif len(interval) == 10:
-				label = str(int(interval[8:10])) + month_abbr[int(interval[5:7])] + "\n" + interval[0:4]
+				label = str(int(interval[8:10])) + " " + month_abbr[int(interval[5:7])] + "\n" + interval[0:4]
 			else:
 				label = interval.replace("-", "\n")
 
