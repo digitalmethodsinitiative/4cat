@@ -485,7 +485,6 @@ class SearchReddit(SearchWithScope):
 			try:
 				self.wait_until_window()
 				response = requests.get(*args, **kwargs)
-				print(response.url)
 				self.request_timestamps.append(time.time())
 				if response.status_code == 200:
 					break
