@@ -30,7 +30,7 @@ class SearchCustom(BasicWorker):
 			"help": "You can upload a CSV or TAB file here that, after upload, will be available for further analysis "
 					"and processing. Files need to be utf-8 encoded and must contain a header row with at least the "
 					"following columns: `id`, `thread_id`, `author`, `body`, `subject`, `timestamp`.\n\nThe "
-					"`timestamp` column should be formatted `YYYY-mm-dd HH:MM:SS`."
+					"`timestamp` column should be formatted `YYYY-mm-dd HH:MM:SS`. "
 					"If your file contains hashtags, name the column `tags` or `hashtags` and make sure they are comma-separated."
 		},
 		"data_upload": {
