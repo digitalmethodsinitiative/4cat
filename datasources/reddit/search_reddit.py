@@ -328,20 +328,55 @@ class SearchReddit(SearchWithScope):
 		:return list:  A list of posts, as dictionaries.
 		"""
 		posts = []
+		seen_posts = set()
+		expected_results_per_page = 100  # max results per page in API
 
 		# search threads in chunks
 		offset = 0
 		for thread_id in thread_ids:
 			offset += 1
 			self.dataset.update_status("Retrieving posts for thread %i of %i" % (offset, len(thread_ids)))
-			response = self.call_pushshift_api("https://api.pushshift.io/reddit/comment/search",
-											   params={"link_id": thread_id})
-			if response is None:
-				break
 
-			posts_raw = response.json()["data"]
-			for post in posts_raw:
-				posts.append(self.post_to_4cat(post))
+			thread_params = {"link_id": thread_id, "size": expected_results_per_page, "sort": "asc", "sort_type": "created_utc"}
+			while True:
+				# can't get all posts in one request, so loop until thread is
+				# exhausted
+				response = self.call_pushshift_api("https://api.pushshift.io/reddit/search/comment/",
+												   params=thread_params)
+				if response is None:
+					# error or empty response
+					break
+
+				posts_raw = response.json()["data"]
+				latest_timestamp = 0
+				first_timestamp = time.time()
+
+				for post in posts_raw:
+					if post["id"] in seen_posts:
+						# pagination by timestamp may lead to duplicate results
+						continue
+
+					seen_posts.add(post["id"])
+					posts.append(self.post_to_4cat(post))
+					latest_timestamp = max(latest_timestamp, post["created_utc"])
+					first_timestamp = min(post["created_utc"], first_timestamp)
+
+				if len(posts_raw) < expected_results_per_page:
+					# no results beyond this response
+					break
+
+				# get all posts after the latest in the set - there is no
+				# explicit pagination in Pushshift's API
+				# we can only paginate by increasing the 'after timestamp'
+				# parameter, but *if* there are 100 posts at the same second
+				# which is unlikely but possible, this will fail, so if all
+				# posts have the same timestamp, allow a one-second gap
+				# this might miss posts but there is no better way with this
+				# API since 'after_id' does not work
+				if latest_timestamp == first_timestamp:
+					latest_timestamp += 1
+
+				thread_params["after"] = latest_timestamp
 
 		return posts
 
@@ -450,6 +485,7 @@ class SearchReddit(SearchWithScope):
 			try:
 				self.wait_until_window()
 				response = requests.get(*args, **kwargs)
+				print(response.url)
 				self.request_timestamps.append(time.time())
 				if response.status_code == 200:
 					break
@@ -465,8 +501,6 @@ class SearchReddit(SearchWithScope):
 			return None
 
 		return response
-
-
 
 	def wait_until_window(self):
 		"""
