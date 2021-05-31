@@ -36,7 +36,11 @@ build/
 dist/
 fourcat.egg-info/
 webtool/venv/
+.4cat_env/
+.vscode*
 .idea
+.env/
+*.ipynb
 
 # do not ignore interface images
 !webtool/static/img/*.png

@@ -2,32 +2,52 @@ version: '3.6'
 
 services:
   db:
+    container_name: db
     image: postgres:latest
     ports:
       - 5432:5432
     environment:
-      POSTGRES_USER: fourcat
-      POSTGRES_PASSWORD: supers3cr3t
-      POSTGRES_DB: fourcat
-      POSTGRES_HOST_AUTH_METHOD: trust
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_HOST_AUTH_METHOD=${POSTGRES_HOST_AUTH_METHOD}
     volumes:
-      - 4cat_data:/var/lib/postgresql/data/
+      - 4cat_db:/var/lib/postgresql/data/
 
-  api:
-    build: .
-    container_name: api
+  backend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile_backend
+      args:
+        - POSTGRES_USER=${POSTGRES_USER}
+        - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+        - POSTGRES_DB=${POSTGRES_DB}
+    container_name: 4cat_backend
     depends_on:
       - db
-    environment:
-      STAGE: test
-      SQLALCHEMY_DATABASE_URI: postgresql+psycopg2://fourcat:supers3cr3t@db/fourcat
-    networks:
-      - default
     ports:
+      - 4444:4444
+    command: ${POSTGRES_DB} ${POSTGRES_USER}
+    volumes:
+      - 4cat_data:/usr/src/app/data/
+      - 4cat_share:/usr/src/app/docker/shared/
+
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile_frontend
+    container_name: 4cat_frontend
+    depends_on:
+      - db
+      - backend
+    ports:
+      - 443:443
       - 5000:5000
     volumes:
-      - ./app:/usr/src/app/app
-      - ./migrations:/usr/src/app/migrations
+      - 4cat_data:/usr/src/app/data/
+      - 4cat_share:/usr/src/app/docker/shared/
 
 volumes:
+  4cat_db: {}
   4cat_data: {}
+  4cat_share: {}

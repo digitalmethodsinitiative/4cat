@@ -20,6 +20,10 @@ class SearchReddit(SearchWithScope):
 	description = "Query the Pushshift API to retrieve Reddit posts and threads matching the search parameters"  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
+	references = [
+		"[Baumgartner, J., Zannettou, S., Keegan, B., Squire, M., & Blackburn, J. (2020). The Pushshift Reddit Dataset. *Proceedings of the International AAAI Conference on Web and Social Media*, 14(1), 830-839.](https://ojs.aaai.org/index.php/ICWSM/article/view/7347)"
+	]
+
 	# not available as a processor for existing datasets
 	accepts = [None]
 
@@ -47,12 +51,12 @@ class SearchReddit(SearchWithScope):
 		},
 		"intro": {
 			"type": UserInput.OPTION_INFO,
-			"help": "Reddit data is retrieved from [Pushshift](https://pushshift.io). [This "
-					"paper](https://arxiv.org/abs/2001.08435) details the dataset. Cite them if you use this data for "
-					"your research. Check the [Pushshift API](https://github.com/pushshift/api) reference for "
-					"documentation on query syntax, e.g. on how to format keyword queries.\n\n**Note:** post scores "
-					"are usually inaccurate. Pushshift archives most posts as soon as they are posted, and scores are "
-					"not re-checked at a later moment."
+			"help": "Reddit data is retrieved from [Pushshift](https://pushshift.io) (see also [this "
+					"paper](https://ojs.aaai.org/index.php/ICWSM/article/view/7347)). Note that Pushshift's dataset "
+					"*may not be complete* depending on the parameters used, and post scores will not be up to date. "
+					"Double-check manually or via the official Reddit API if completeness is a concern. Check the "
+					"[Pushshift API](https://github.com/pushshift/api) reference for documentation on query syntax, "
+					"e.g. on how to format keyword queries."
 		},
 		"body_match": {
 			"type": UserInput.OPTION_TEXT,
@@ -328,20 +332,55 @@ class SearchReddit(SearchWithScope):
 		:return list:  A list of posts, as dictionaries.
 		"""
 		posts = []
+		seen_posts = set()
+		expected_results_per_page = 100  # max results per page in API
 
 		# search threads in chunks
 		offset = 0
 		for thread_id in thread_ids:
 			offset += 1
 			self.dataset.update_status("Retrieving posts for thread %i of %i" % (offset, len(thread_ids)))
-			response = self.call_pushshift_api("https://api.pushshift.io/reddit/comment/search",
-											   params={"link_id": thread_id})
-			if response is None:
-				break
 
-			posts_raw = response.json()["data"]
-			for post in posts_raw:
-				posts.append(self.post_to_4cat(post))
+			thread_params = {"link_id": thread_id, "size": expected_results_per_page, "sort": "asc", "sort_type": "created_utc"}
+			while True:
+				# can't get all posts in one request, so loop until thread is
+				# exhausted
+				response = self.call_pushshift_api("https://api.pushshift.io/reddit/search/comment/",
+												   params=thread_params)
+				if response is None:
+					# error or empty response
+					break
+
+				posts_raw = response.json()["data"]
+				latest_timestamp = 0
+				first_timestamp = time.time()
+
+				for post in posts_raw:
+					if post["id"] in seen_posts:
+						# pagination by timestamp may lead to duplicate results
+						continue
+
+					seen_posts.add(post["id"])
+					posts.append(self.post_to_4cat(post))
+					latest_timestamp = max(latest_timestamp, post["created_utc"])
+					first_timestamp = min(post["created_utc"], first_timestamp)
+
+				if len(posts_raw) < expected_results_per_page:
+					# no results beyond this response
+					break
+
+				# get all posts after the latest in the set - there is no
+				# explicit pagination in Pushshift's API
+				# we can only paginate by increasing the 'after timestamp'
+				# parameter, but *if* there are 100 posts at the same second
+				# which is unlikely but possible, this will fail, so if all
+				# posts have the same timestamp, allow a one-second gap
+				# this might miss posts but there is no better way with this
+				# API since 'after_id' does not work
+				if latest_timestamp == first_timestamp:
+					latest_timestamp += 1
+
+				thread_params["after"] = latest_timestamp
 
 		return posts
 
@@ -466,8 +505,6 @@ class SearchReddit(SearchWithScope):
 
 		return response
 
-
-
 	def wait_until_window(self):
 		"""
 		Wait until a request can be made outside of the rate limit
@@ -502,7 +539,7 @@ class SearchReddit(SearchWithScope):
 		"""
 		# we need a board!
 		r_prefix = re.compile(r"^/?r/")
-		boards = [r_prefix.sub("", board) for board in query.get("board", "").split(",") if board.strip()]
+		boards = [r_prefix.sub("", board).strip() for board in query.get("board", "").split(",") if board.strip()]
 
 		if not boards:
 			raise QueryParametersException("Please provide a board or a comma-separated list of boards to query.")
