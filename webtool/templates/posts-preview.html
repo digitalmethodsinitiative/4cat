@@ -7,7 +7,7 @@
     <ol>
     {% for post in preview %}
         <li id="post-{{ post.id }}">
-            <p class="byline"><span class="author">{{ post.id }}/{{ post.author }}</span> at <time>{{ post.timestamp }}</time> in <a class="thread" href="/api/{{ query.parameters.datasource }}/{{ query.parameters.board }}/thread/{{ post.thread_id }}.json?format=html#post-{{ post.id }}">{{ post.thread_id }}</a></span></p>
+            <p class="byline"><span class="author">{{ post.id }}/{{ post.author }}</span> at <time>{{ post.timestamp }}</time> in <a class="thread" href="{{ url_for('openapi_overview') }}/{{ query.parameters.datasource }}/{{ query.parameters.board }}/thread/{{ post.thread_id }}.json?format=html#post-{{ post.id }}">{{ post.thread_id }}</a></span></p>
             <div class="body">
                 <p>{{ post.body|replace("\n", "<br>\n")|safe }}</p>
             </div>

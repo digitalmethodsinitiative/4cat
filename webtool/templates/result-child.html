@@ -91,7 +91,7 @@
                 {% endif %}
                 {% if current_user.is_authenticated and (current_user.get_id() == dataset.parameters.user or current_user.is_admin() or item.parameters.user == current_user.get_id()) %}
                 <li>
-                    <a class="property-badge delete-link tooltip-trigger" data-key="{{ item.key }}" aria-controls="tooltip-delete-{{ item.key }}" href="{{ get_url('show_results') }}/{{ item.key }}/delete"><i class="fa fa-fw fa-times" aria-hidden="true"></i> <span class="sr-only">Delete this analysis</span></a>
+                    <a class="property-badge delete-link tooltip-trigger" data-key="{{ item.key }}" aria-controls="tooltip-delete-{{ item.key }}" href="{{ url_for('show_results') }}/{{ item.key }}/delete"><i class="fa fa-fw fa-times" aria-hidden="true"></i> <span class="sr-only">Delete this analysis</span></a>
                     <p role="tooltip" id="tooltip-delete-{{ item.key }}" aria-hidden="true">{% if not item.is_finished %}Cancel and d{% else %}D{% endif %}elete this analysis and any underlying analyses</p>
                 </li>
                 {% endif %}
