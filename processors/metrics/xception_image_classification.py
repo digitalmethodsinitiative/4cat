@@ -5,8 +5,6 @@ import json
 import csv
 
 from tensorflow.keras.preprocessing import image
-from tensorflow.keras.applications import Xception
-from tensorflow.keras.applications.xception import preprocess_input, decode_predictions
 import numpy as np
 
 from common.lib.helpers import UserInput, convert_to_int
@@ -53,24 +51,15 @@ class XceptionImageClassifier(BasicProcessor):
             "help": "Images to process (0 = all)",
             "default": 0
         },
-        "features": {
-            "type": UserInput.OPTION_MULTI,
-            "help": "Features",
-            "options": {
-                "LABEL_DETECTION": "Label Detection",
-                "TEXT_DETECTION": "Text Detection",
-                "DOCUMENT_TEXT_DETECTION": "Document Text Detection",
-                "SAFE_SEARCH_DETECTION": "Safe Search Detection",
-                "FACE_DETECTION": "Facial Detection",
-                "LANDMARK_DETECTION": "Landmark Detection",
-                "LOGO_DETECTION": "Logo Detection",
-                "IMAGE_PROPERTIES": "Image Properties",
-                "CROP_HINTS": "Crop Hints",
-                "WEB_DETECTION": "Web Detection",
-                "OBJECT_LOCALIZATION": "Object Localization"
-            },
-            "default": ["LABEL_DETECTION"]
-        }
+        "model": {
+			"type": UserInput.OPTION_CHOICE,
+			"default": "xception",
+			"options": {
+				"xception": "1000 ImageNet categories Xception model",
+				"pepe_v1": "Pepe detection"
+			},
+			"help": "Choose which model to use for image predictions"
+		},
     }
 
     def process(self):
@@ -79,11 +68,17 @@ class XceptionImageClassifier(BasicProcessor):
         with one column with image hashes, one with the first file name used
         for the image, and one with the amount of times the image was used
         """
-        features = self.parameters.get("features")
-        features = [{"type": feature} for feature in features]
+        # determine which model to use
+		model_type = self.parameters.get("model", "")
+		if model_type not in self.options["model"]["options"]:
+			model_type = self.options["model"]["default"]
 
         # Load in model
-        model = Xception(include_top=True,
+        if model_type == 'xception':
+            from tensorflow.keras.applications import Xception
+            from tensorflow.keras.applications.xception import preprocess_input, decode_predictions
+
+            model = Xception(include_top=True,
                          weights="imagenet",
                          input_tensor=None,
                          input_shape=None,
@@ -91,7 +86,12 @@ class XceptionImageClassifier(BasicProcessor):
                          classes=1000,
                          classifier_activation="softmax",
                          )
+        elif model_type == 'pepe_v1':
+            from tensorflow import keras
 
+            model = keras.models.load_model('models/simple_model_V2')
+        else:
+            raise 'No model type detected'
 
         max_images = convert_to_int(self.parameters.get("amount", 0), 100)
         total = self.source_dataset.num_rows if not max_images else min(max_images, self.source_dataset.num_rows)
@@ -104,7 +104,7 @@ class XceptionImageClassifier(BasicProcessor):
             done += 1
             self.dataset.update_status("Annotating image %i/%i" % (done, total))
 
-            annotations = self.annotate_image(image_file, model, features)
+            annotations = self.annotate_image(image_file, model, model_type)
 
             if not annotations:
                 continue
@@ -120,7 +120,7 @@ class XceptionImageClassifier(BasicProcessor):
         self.dataset.update_status("Annotations retrieved for %i images" % done)
         self.dataset.finish(done)
 
-    def annotate_image(self, image_file, model, features):
+    def annotate_image(self, image_file, model, model_type):
         """
         Get labels from the Xception Image Classifier
 
@@ -129,16 +129,28 @@ class XceptionImageClassifier(BasicProcessor):
         :param list features:  Features to request
         :return dict:  Lists of detected features, one key for each feature
         """
-        # Preprocess image
-        img1 = image.load_img(image_file, target_size=(299, 299))
-        x = image.img_to_array(img1)
-        x = np.expand_dims(x, axis=0)
-        x = preprocess_input(x)
 
-        # Use model to make predictions
-        preds = model.predict(x)
-        # Decode predictions into labels
-        preds = decode_predictions(preds, top=5)[0]
+        if model_type == 'xception':
+            # Preprocess image
+            img1 = image.load_img(image_file, target_size=(299, 299))
+            x = np.expand_dims(x, axis=0)
+            x = preprocess_input(x)
 
-        # Return as dict
-        return {'predictions' : [{'class' : prediction[0], 'description' : prediction[1], 'probability' : prediction[2]} for prediction in preds]}
+            # Use model to make predictions
+            preds = model.predict(x)
+            # Decode predictions into labels
+            preds = decode_predictions(preds, top=5)[0]
+
+            # Return as dict
+            return {'predictions' : [{'class' : prediction[0], 'description' : prediction[1], 'probability' : prediction[2]} for prediction in preds]}
+
+        elif model_type == 'pepe_v1':
+            img1 = image.load_img(image_file, target_size=(64, 64))
+            x = img_to_array(img1, data_format=None, dtype=None)
+            x = np.expand_dims(x, axis=0)
+            prediction = model.predict(x)
+            return {'prediction' : 'pepe' if  (prediction > 0.5).astype("int32") else 'not_pepe',
+            'probability_of_pepe' : prediction}
+
+        else:
+            raise 'No model type detected'
