@@ -69,9 +69,9 @@ class XceptionImageClassifier(BasicProcessor):
         for the image, and one with the amount of times the image was used
         """
         # determine which model to use
-		model_type = self.parameters.get("model", "")
-		if model_type not in self.options["model"]["options"]:
-			model_type = self.options["model"]["default"]
+        model_type = self.parameters.get("model", "")
+        if model_type not in self.options["model"]["options"]:
+            model_type = self.options["model"]["default"]
 
         # Load in model
         if model_type == 'xception':
@@ -146,7 +146,7 @@ class XceptionImageClassifier(BasicProcessor):
 
         elif model_type == 'pepe_v1':
             img1 = image.load_img(image_file, target_size=(64, 64))
-            x = img_to_array(img1, data_format=None, dtype=None)
+            x = image.img_to_array(img1, data_format=None, dtype=None)
             x = np.expand_dims(x, axis=0)
             prediction = model.predict(x)
             return {'prediction' : 'pepe' if  (prediction > 0.5).astype("int32") else 'not_pepe',
