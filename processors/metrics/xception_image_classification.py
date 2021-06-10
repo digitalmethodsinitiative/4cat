@@ -64,9 +64,10 @@ class XceptionImageClassifier(BasicProcessor):
 
     def process(self):
         """
-        This takes a 4CAT results file as input, and outputs a new CSV file
-        with one column with image hashes, one with the first file name used
-        for the image, and one with the amount of times the image was used
+        This takes a 4CAT image directory, runs each image through a image
+        classification model, and returns the top predicted categories and their
+        probabilities. In instances of bianary classification, it returns only
+        one category and the probability of being in that category (0.0 to 1.0).
         """
         # determine which model to use
         model_type = self.parameters.get("model", "")
@@ -125,9 +126,9 @@ class XceptionImageClassifier(BasicProcessor):
         Get labels from the Xception Image Classifier
 
         :param Path image_file:  Path to file to annotate
-        :param str api_key:  API Bearer Token
-        :param list features:  Features to request
-        :return dict:  Lists of detected features, one key for each feature
+        :param keras.model model:  Model to run images through
+        :param str model_type:  Lists of detected features, one key for each feature
+        :return dict: Dict of predictions
         """
 
         if model_type == 'xception':
