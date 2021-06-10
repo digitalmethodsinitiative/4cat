@@ -61,8 +61,8 @@ class RankFlowRenderer(BasicProcessor):
 	def process(self):
 		items = {}
 		max_weight = 1
-		colour_property = self.parameters.get("colour_property", self.options["colour_property"]["default"])
-		size_property = self.parameters.get("size_property", self.options["size_property"]["default"])
+		colour_property = self.parameters.get("colour_property")
+		size_property = self.parameters.get("size_property")
 		include_value = self.parameters.get("show_value", False)
 
 		# first create a map with the ranks for each period

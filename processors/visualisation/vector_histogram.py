@@ -49,7 +49,7 @@ class SVGHistogramRenderer(BasicProcessor):
 		as input.
 		"""
 		self.dataset.update_status("Reading source file")
-		header = self.parameters.get("header", self.options["header"]["default"])
+		header = self.parameters.get("header")
 		max_posts = 0
 
 		# collect post numbers per month

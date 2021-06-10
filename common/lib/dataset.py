@@ -542,7 +542,7 @@ class DataSet:
 		self.data["software_version"] = version
 		updated = self.db.update("datasets", where={"key": self.data["key"]}, data={
 			"software_version": version,
-			"software_file": backend.all_modules.processors.get(self.data["type"], {"path": ""})["path"]
+			"software_file": backend.all_modules.processors.get(self.data["type"]).filepath
 		})
 
 		return updated > 0
@@ -670,14 +670,25 @@ class DataSet:
 		"""
 		processors = backend.all_modules.processors
 
-		available = collections.OrderedDict()
+		available = {}
 		is_search = re.match(r".*search$", self.data["type"])
-		for processor in processors.values():
-			if ((is_search and (not processor["accepts"] or "search" in processor["accepts"])) or
-					self.data["type"] in processor["accepts"]) and (
-					not processor["datasources"] or self.parameters.get("datasource", None) in processor[
-				"datasources"]):
-				available[processor["id"]] = processor
+		for processor_type, processor in processors.items():
+			is_compatible = False
+
+			if is_search and (not hasattr(processor, "accepts") or "search" in processor.accepts):
+				is_compatible = True
+
+			if hasattr(processor, "accepts") and self.data["type"] in processor.accepts:
+				is_compatible = True
+
+			if hasattr(processor, "datasources") and self.data["datasource"] not in processor.datasources:
+				is_compatible = False
+
+			if hasattr(processor, "is_compatible") and not processor.is_compatible_with(self):
+				is_compatible = False
+
+			if is_compatible:
+				available[processor_type] = processor
 
 		return available
 
@@ -698,7 +709,7 @@ class DataSet:
 			if analysis.type not in processors:
 				continue
 
-			if not processors[analysis.type]["options"]:
+			if not processors[analysis.type].get_options():
 				del processors[analysis.type]
 
 		return processors
@@ -737,11 +748,20 @@ class DataSet:
 		"""
 		self.db.update("datasets", where={"key": self.key}, data={"key_parent": key_parent})
 
+	def get_parent(self):
+		"""
+		Get parent dataset
+
+		:return DataSet:  Parent dataset, or `None` if not applicable
+		"""
+		return DataSet(self.key_parent) if self.key_parent else None
+
 	def detach(self):
 		"""
 		Makes the datasets standalone, i.e. not having any source_dataset dataset
 		"""
 		self.link_parent("")
+
 
 	def __getattr__(self, attr):
 		"""

@@ -56,10 +56,7 @@ class HatebaseAnalyser(BasicProcessor):
 		"""
 
 		# determine what vocabulary to use
-		language = self.parameters.get("language", "")
-		if language not in self.options["language"]["options"]:
-			language = self.options["language"]["default"]
-
+		language = self.parameters.get("language")
 
 		# read and convert to a way we can easily match whether any word occurs
 		with open(config.PATH_ROOT + "/common/assets/hatebase/hatebase-%s.json" % language) as hatebasedata:

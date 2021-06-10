@@ -108,12 +108,12 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
         input_words = input_words.split(",")
 
         try:
-            threshold = float(self.parameters.get("threshold", self.options["threshold"]["default"]))
+            threshold = float(self.parameters.get("threshold"))
         except ValueError:
-            threshold = float(self.options["threshold"]["default"])
+            threshold = float(self.get_options()["threshold"]["default"])
 
         threshold = max(-1.0, min(1.0, threshold))
-        num_words = convert_to_int(self.parameters.get("num-words"), self.options["num-words"]["default"])
+        num_words = convert_to_int(self.parameters.get("num-words"))
         overlay = self.parameters.get("overlay")
         reduction_method = self.parameters.get("method")
         all_words = self.parameters.get("all-words")

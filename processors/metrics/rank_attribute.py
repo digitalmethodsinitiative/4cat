@@ -89,11 +89,11 @@ class AttributeRanker(BasicProcessor):
 		"""
 
 		# convenience variables
-		timeframe = self.parameters.get("timeframe", self.options["timeframe"]["default"])
-		attribute = self.parameters.get("attribute", self.options["attribute"]["default"])
-		rank_style = self.parameters.get("top-style", self.options["top-style"]["default"])
-		cutoff = convert_to_int(self.parameters.get("top", self.options["top"]["default"]))
-		weighby = self.parameters.get("weigh", self.options["weigh"]["default"])
+		timeframe = self.parameters.get("timeframe")
+		attribute = self.parameters.get("attribute")
+		rank_style = self.parameters.get("top-style")
+		cutoff = convert_to_int(self.parameters.get("top"), 15)
+		weighby = self.parameters.get("weigh")
 
 		try:
 			filter = re.compile(self.parameters.get("regex", None))

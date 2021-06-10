@@ -69,8 +69,8 @@ class VectorRanker(BasicProcessor):
 		results = []
 
 		# truncate results as needed
-		rank_style = self.parameters.get("top-style", self.options["top-style"]["default"])
-		cutoff = convert_to_int(self.parameters.get("top", self.options["top"]["default"]), self.options["top"]["default"])
+		rank_style = self.parameters.get("top-style")
+		cutoff = convert_to_int(self.parameters.get("top"))
 
 		# now rank the vectors by most prevalent per "file" (i.e. interval)
 		overall_top = {}

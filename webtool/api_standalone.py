@@ -54,14 +54,14 @@ def get_standalone_processors():
 	available_processors = {}
 
 	for processor in backend.all_modules.processors:
-		if not backend.all_modules.processors[processor]["datasources"] and not backend.all_modules.processors[processor]["accepts"]:
+		if not backend.all_modules.processors[processor].hasattr("datasources") and not hasattr(backend.all_modules.processors[processor], "accepts"):
 			available_processors[processor] = backend.all_modules.processors[processor]
 
 	return jsonify({processor: {
-		"name": available_processors[processor]["name"],
-		"category": available_processors[processor]["category"],
-		"description": available_processors[processor]["description"],
-		"extension": available_processors[processor]["extension"]
+		"name": available_processors[processor].name,
+		"category": available_processors[processor].category,
+		"description": available_processors[processor].description,
+		"extension": available_processors[processor].extension
 	} for processor in available_processors})
 
 @app.route("/api/process/<processor>/", methods=["POST"])

@@ -76,14 +76,12 @@ class OvertimeAnalysis(BasicProcessor):
 		"""
 
 		# convenience variables
-		timeframe = self.parameters.get("timeframe", self.options["timeframe"]["default"])
-		scope = self.parameters.get("scope", self.options["scope"]["default"])
-		min_offensive = self.parameters.get("hatefulness-score", self.options["hatefulness-score"]["default"])
+		timeframe = self.parameters.get("timeframe")
+		scope = self.parameters.get("scope")
+		min_offensive = self.parameters.get("hatefulness-score")
 
 		# determine what vocabulary to use
-		language = self.parameters.get("language", "")
-		if language not in self.options["language"]["options"]:
-			language = self.options["language"]["default"]
+		language = self.parameters.get("language")
 
 		# now for the real deal
 		self.dataset.update_status("Reading source file")

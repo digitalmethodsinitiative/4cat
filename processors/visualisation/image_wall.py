@@ -97,7 +97,7 @@ class ImageWallGenerator(BasicProcessor):
 			return ",".join([str(int(value)) for value in numpy_array])
 
 		max_images = convert_to_int(self.parameters.get("amount"), 100)
-		sizing_mode = self.parameters.get("tile-size", self.options["tile-size"]["default"])
+		sizing_mode = self.parameters.get("tile-size")
 		sort_mode = self.parameters.get("sort-mode")
 
 		# is there anything to put on a wall?
@@ -108,7 +108,7 @@ class ImageWallGenerator(BasicProcessor):
 
 		# 0 = use as many images as in the archive, up to the max
 		if max_images == 0:
-			max_images = self.options["amount"]["max"]
+			max_images = self.get_options()["amount"]["max"]
 
 		# we loop through the images twice - once to reduce them to a value
 		# that can be sorted, and another time to actually copy them to the

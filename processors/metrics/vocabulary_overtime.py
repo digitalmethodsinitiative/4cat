@@ -85,8 +85,8 @@ class OvertimeAnalysis(BasicProcessor):
 		"""
 
 		# convenience variables
-		timeframe = self.parameters.get("timeframe", self.options["timeframe"]["default"])
-		partition = bool(self.parameters.get("partition", self.options["partition"]["default"]))
+		timeframe = self.parameters.get("timeframe")
+		partition = bool(self.parameters.get("partition"))
 
 		# load vocabularies from word lists
 		vocabularies = {}

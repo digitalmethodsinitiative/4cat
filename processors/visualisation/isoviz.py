@@ -84,11 +84,11 @@ class IsometricMultigraphRenderer(BasicProcessor):
 		graphs = {}
 		intervals = []
 
-		smooth = self.parameters.get("smooth", self.options["smooth"]["default"])
-		normalise_values = self.parameters.get("normalise", self.options["normalise"]["default"])
-		completeness = convert_to_int(self.parameters.get("complete", self.options["complete"]["default"]), 0)
-		graph_label = self.parameters.get("label", self.options["label"]["default"])
-		top = convert_to_int(self.parameters.get("top", self.options["top"]["default"]), 10)
+		smooth = self.parameters.get("smooth")
+		normalise_values = self.parameters.get("normalise")
+		completeness = convert_to_int(self.parameters.get("complete"), 0)
+		graph_label = self.parameters.get("label")
+		top = convert_to_int(self.parameters.get("top"), 10)
 
 		# first gather graph data: each distinct item gets its own graph and
 		# for each graph we have a sequence of intervals, each interval with

@@ -40,7 +40,7 @@ class DownloadImagesAndMakeImageWall(ProcessorPreset):
         the archive, and finally they are put into the image wall sorted by
         their representative colour.
         """
-        sort_mode = self.parameters.get("sort-mode", self.options["sort-mode"]["default"])
+        sort_mode = self.parameters.get("sort-mode")
 
         pipeline = [
             # first, extract top images

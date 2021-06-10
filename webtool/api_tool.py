@@ -137,17 +137,15 @@ def datasource_form(datasource_id):
 		return error(404, message="Datasource '%s' does not exist" % datasource_id)
 
 	datasource = backend.all_modules.datasources[datasource_id]
-	worker = backend.all_modules.workers.get(datasource_id + "-search")
+	worker_class = backend.all_modules.workers.get(datasource_id + "-search")
 
-	if not worker:
+	if not worker_class:
 		return error(404, message="Datasource '%s' has no search worker" % datasource_id)
 
-	worker_class = backend.all_modules.load_worker_class(worker)
-
-	if not hasattr(worker_class, "options"):
+	if not worker_class.get_options():
 		return error(404, message="Datasource '%s' has no dataset parameter options defined" % datasource_id)
 
-	form = render_template("create-dataset-option.html", options=worker_class.options)
+	form = render_template("create-dataset-option.html", options=worker_class.get_options())
 	javascript_path = datasource["path"].joinpath("webtool", "tool.js")
 	has_javascript = javascript_path.exists()
 
@@ -224,15 +222,14 @@ def queue_dataset():
 		return error(404, message="Datasource '%s' has no search interface" % datasource_id)
 
 	search_worker = backend.all_modules.workers[search_worker_id]
-	worker_class = backend.all_modules.load_worker_class(search_worker)
 
-	if hasattr(worker_class, "validate_query"):
+	if hasattr(search_worker, "validate_query"):
 		try:
 			# first sanitise values
-			sanitised_query = UserInput.parse_all(worker_class.options, request.form.to_dict(), silently_correct=False)
+			sanitised_query = UserInput.parse_all(search_worker.get_options(), request.form.to_dict(), silently_correct=False)
 
 			# then validate for this particular datasource
-			sanitised_query = worker_class.validate_query(sanitised_query, request, current_user)
+			sanitised_query = search_worker.validate_query(sanitised_query, request, current_user)
 		except QueryParametersException as e:
 			return "Invalid query. %s" % e
 	else:
@@ -244,11 +241,11 @@ def queue_dataset():
 
 	sanitised_query["pseudonymise"] = bool(request.form.to_dict().get("pseudonymise", False))
 
-	extension = worker_class.extension if hasattr(worker_class, "extension") else "csv"
+	extension = search_worker.extension if hasattr(search_worker, "extension") else "csv"
 	dataset = DataSet(parameters=sanitised_query, db=db, type=search_worker_id, extension=extension)
 
-	if hasattr(worker_class, "after_create"):
-		worker_class.after_create(sanitised_query, dataset, request)
+	if hasattr(search_worker, "after_create"):
+		search_worker.after_create(sanitised_query, dataset, request)
 
 	queue.add_job(jobtype=search_worker_id, remote_id=dataset.key)
 
@@ -515,46 +512,6 @@ def queue_processor(key=None, processor=None):
 		"messages": get_flashed_messages(),
 		"is_filter": dataset.processors[processor]["is_filter"]
 	})
-
-
-@app.route("/api/get-available-processors/")
-@login_required
-@api_ratelimit
-@openapi.endpoint("tool")
-def available_processors():
-	"""
-	Get processors available for a dataset
-
-	:request-param string key:  Dataset key to get processors for
-	:return: An object containing the `error` if the request failed, or a list
-	         of processors, each with a `name`, a `type` ID, a
-	         `description` of what it does, the `extension` of the file it
-	         produces, a `category` name, what types of datasets it `accepts`,
-	         and a list of `options`, if applicable.
-
-	:return-schema: {type=array,items={type=object,properties={
-		name={type=string},
-		type={type=string},
-		description={type=string},
-		extension={type=string},
-		category={type=string},
-		accepts={type=array,items={type=string}}
-	}}}
-
-	:return-error 404:  If the dataset does not exist.
-	"""
-	try:
-		dataset = DataSet(key=request.args.get("key"), db=db)
-	except TypeError:
-		return error(404, error="Dataset does not exist.")
-
-	# Class type is not JSON serialisable
-	processors = dataset.get_available_processors()
-	for key, value in processors.items():
-		if "class" in value:
-			del value["class"]
-
-	return jsonify(processors)
 
 
 @app.route('/api/check-processors/')

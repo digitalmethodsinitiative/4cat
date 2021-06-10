@@ -64,7 +64,7 @@ class SimilarWord2VecWords(BasicProcessor):
 		"""
 		self.dataset.update_status("Processing sentences")
 
-		depth = max(1, min(3, convert_to_int(self.parameters.get("crawl_depth", self.options["crawl_depth"]["default"]), self.options["crawl_depth"]["default"])))
+		depth = max(1, min(3, convert_to_int(self.parameters.get("crawl_depth"))))
 		input_words = self.parameters.get("words", "")
 		if not input_words or not input_words.split(","):
 			self.dataset.update_status("No input words provided, cannot look for similar words.", is_final=True)
@@ -73,11 +73,11 @@ class SimilarWord2VecWords(BasicProcessor):
 
 		input_words = input_words.split(",")
 
-		num_words = convert_to_int(self.parameters.get("num-words"), self.options["num-words"]["default"])
+		num_words = convert_to_int(self.parameters.get("num-words"))
 		try:
-			threshold = float(self.parameters.get("threshold", self.options["threshold"]["default"]))
+			threshold = float(self.parameters.get("threshold"))
 		except ValueError:
-			threshold = float(self.options["threshold"]["default"])
+			threshold = float(self.get_options()["threshold"]["default"])
 
 		threshold = max(-1.0, min(1.0, threshold))
 

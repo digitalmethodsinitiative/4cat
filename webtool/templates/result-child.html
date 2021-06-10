@@ -59,7 +59,7 @@
     {# Processor header, showing title, status, and a tooltip with a description #}
     <div class="processor-header">
         <header>
-            <h4>{{ processors[item.type].name if not deprecated else "(Deprecated analysis) " + item.type }}</h4>
+            <h4>{{ processors[item.type].title if not deprecated else "(Deprecated analysis) " + item.type }}</h4>
             <button class="tooltip-trigger" aria-controls="tooltip-processor-result-{{ item.key }}" aria-label="Post-processor details">?</button>
             <p role="tooltip" id="tooltip-processor-result-{{ item.key }}">{{ processors[item.type].description if not deprecated else "This analysis module has been deprecated but you can still download the result." }}</p>
         </header>
@@ -79,12 +79,12 @@
                 {% if item.type in processors %}
                 {% if processors[item.type]["references"] %}
                 <li>
-                    {% set ref_name = processors[item.type].name %}{% set ref_refs = processors[item.type]["references"] %}{% set ref_id = item.key %}{% include "processor-references.html" %}
+                    {% set ref_name = processors[item.type].title %}{% set ref_refs = processors[item.type]["references"] %}{% set ref_id = item.key %}{% include "processor-references.html" %}
                 </li>
                 {% endif %}
-                {% if item.get_version_url("backend/processors/" + processors[item.type].file) %}
+                {% if item.get_version_url("backend/processors/" + processors[item.type].filepath) %}
                 <li rel="external">
-                    <a class="property-badge permalink tooltip-trigger" aria-controls="tooltip-code-{{ item.key }}" href="{{ item.get_version_url("backend/processors/" + processors[item.type].file) }}" rel="external" target="_blank"><i class="fab fa-fw fa-github" aria-hidden="true"></i> <span class="sr-only">Review the code that generated this result</span></a>
+                    <a class="property-badge permalink tooltip-trigger" aria-controls="tooltip-code-{{ item.key }}" href="{{ item.get_version_url("backend/processors/" + processors[item.type].filepath) }}" rel="external" target="_blank"><i class="fab fa-fw fa-github" aria-hidden="true"></i> <span class="sr-only">Review the code that generated this result</span></a>
                     <p role="tooltip" id="tooltip-code-{{ item.key }}" aria-hidden="true">Review the code that generated this result</p>
                 </li>
                 {% endif %}
@@ -113,9 +113,10 @@
                     </div>
                 </li>
                 {% endif %}
+            {% set processor_options = processors[item.type].get_options() %}
             {% for option in item.parameters %}
-                {% if item.type in processors and "options" in processors[item.type] and option in processors[item.type].options and item.parameters[option] != "" and option not in ("custom-key") and option[0:4] != "api_" %}
-                {% if processors[item.type].options[option].type == "toggle" %}
+                {% if item.type in processors and option in processor_options and item.parameters[option] != "" and not processor_options[option].get("sensitive") %}
+                {% if processor_options[option].type == "toggle" %}
                     {% if item.parameters[option] %}<li><span class="property-badge">{{ option }}</span></li>{% endif %}
                 {% else %}
                     <li><span class="property-badge">{{ option }}=<!--
@@ -162,7 +163,7 @@
         <ol class="children-processors">
             {% for processor in item.processors.values() %}
 
-                {% set git_url = item.get_version_url("backend/processors/" + processor.file)%}
+                {% set git_url = item.get_version_url("backend/processors/" + processor.filepath)%}
                 {% set dataset = item %}
                 {% set inline = true %}
                 {% include "processor-details.html" %}

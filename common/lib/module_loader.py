@@ -125,67 +125,47 @@ class ModuleCollector:
 					# extract data that is useful for the scheduler and other
 					# parts of 4CAT
 					relative_path = root_match.sub("", str(file))
-					metadata = {
-						"file": file.name,
-						"path": relative_path,
-						"module": relative_path[1:-3].replace(os.sep, "."),
-						"id": component[1].type,
-						"name": component[0],
-						"class_name": component[0],
-						"max": component[1].max_workers
-					}
 
-					# processors have some extra metadata that is useful to store
+					self.workers[component[1].type] = component[1]
+					self.workers[component[1].type].filepath = relative_path
+
 					if issubclass(component[1], BasicProcessor):
-						metadata = {**metadata, **{
-							"description": component[1].description,
-							"name": component[1].title if hasattr(component[1], "title") else component[0],
-							"extension": component[1].extension,
-							"category": component[1].category if hasattr(component[1], "category") else "other",
-							"accepts": component[1].accepts if hasattr(component[1], "accepts") else [],
-							"options": component[1].options if hasattr(component[1], "options") else {},
-							"datasources": component[1].datasources if hasattr(component[1], "datasources") else [],
-							"references": component[1].references if hasattr(component[1], "references") else [],
-							"is_filter": hasattr(component[1], "category") and "filter" in component[1].category.lower(),
-							"further": [],
-							"further_flat": set()
-						}}
-
 						# maintain a separate cache of processors
-						self.processors[metadata["id"]] = metadata
+						self.processors[component[1].type] = self.workers[component[1].type]
 
-					self.workers[metadata["id"]] = metadata
-
+		# sort by category for more convenient display in interfaces
 		sorted_processors = {id: self.processors[id] for id in
-						   sorted(self.processors, key=lambda item: self.processors[item]["name"])}
+						sorted(self.processors)}
 		categorised_processors = {id: sorted_processors[id] for id in
-						   sorted(sorted_processors, key=lambda item: "0" if sorted_processors[item]["category"] == "Presets" else sorted_processors[item]["category"])}
+						sorted(sorted_processors, key=lambda item: "0" if sorted_processors[item].category == "Presets" else sorted_processors[item].category)}
 
 		# determine what processors are available as a follow-up for each
 		# processor. This can only be done here because we need to know all
 		# possible processors before we can inspect mutual compatibilities
 		backup = categorised_processors.copy()
-		for type in categorised_processors:
-			categorised_processors[type]["further"] = []
+		for processor_id in categorised_processors:
+			categorised_processors[processor_id].followups = []
 			for possible_child in backup:
-				if type in backup[possible_child]["accepts"]:
-					categorised_processors[type]["further"].append(possible_child)
+				if hasattr(backup[possible_child], "accepts") and processor_id in backup[possible_child].accepts:
+					categorised_processors[processor_id].followups.append(possible_child)
 
 		self.processors = categorised_processors
+		flat_followups = set()
 
-		flat_further = set()
+		# it is convenient to have a non-nested version of the followup list,
+		# so we can easily see what possibilities we have with this one
 		def collapse_flat_list(processor):
-			for further_processor in processor["further"]:
-				if further_processor not in flat_further:
-					collapse_flat_list(self.processors[further_processor])
-					flat_further.add(further_processor)
+			for followup_processor in processor.followups:
+				if followup_processor not in flat_followups:
+					flat_followups.add(followup_processor)
+					collapse_flat_list(self.processors[followup_processor])
 
 		for processor in self.processors:
-			flat_further = set()
+			flat_followups = set()
 			collapse_flat_list(self.processors[processor])
-			self.processors[processor]["further_flat"] = flat_further
+			self.processors[processor].followups = flat_followups
 
-		# Give a heads-up if not all modules were installed properly.
+		# Give a heads-up if not all modules were installed properly
 		if self.missing_modules:
 			print_msg = "Warning: Not all modules could be found, which might cause data sources and modules to not function.\nMissing modules:\n"
 			for missing_module, processor_list in self.missing_modules.items():

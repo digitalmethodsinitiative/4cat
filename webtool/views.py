@@ -294,7 +294,6 @@ def show_results(page):
 
 	pagination = Pagination(page, page_size, num_datasets)
 	filtered = []
-	processors = backend.all_modules.processors
 
 	for dataset in datasets:
 		filtered.append(DataSet(key=dataset["key"], db=db))
