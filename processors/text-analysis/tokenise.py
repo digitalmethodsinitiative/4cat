@@ -29,9 +29,6 @@ class Tokenise(BasicProcessor):
 	description = "Tokenises post bodies, producing corpus data that may be used for further processing by e.g. NLP. The output is a serialized list of lists, each list representing either all tokens in a post or all tokens in a sentence in a post."  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
 
-	input = "csv:body"
-	output = "zip"
-
 	options = {
 		"docs_per": {
 			"type": UserInput.OPTION_CHOICE,

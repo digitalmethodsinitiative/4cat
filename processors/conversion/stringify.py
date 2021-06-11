@@ -29,9 +29,6 @@ class Stringify(BasicProcessor):
 		}
 	}
 
-	input = "csv:body"
-	output = "txt"
-
 	def process(self):
 		"""
 		This takes a 4CAT results file as input, and outputs a plain text file

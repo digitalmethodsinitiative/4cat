@@ -26,10 +26,14 @@ class FlowChart(BasicProcessor):
 	description = "Create a flow chart of elements over time."  # description displayed in UI
 	extension = "html"  # extension of result file, used internally and in UI
 
-	accepts = ["vector-ranker", "preset-neologisms", "tfidf", "collocations", "similar-word2vec"]  # query types this post-processor accepts as input
+	@classmethod
+	def is_compatible_with(cls, dataset=None):
+		"""
+		Allow processor on rankable items
 
-	input = "csv:text,date,value"
-	output = "html"
+		:param DataSet dataset:  Dataset to determine compatibility with
+		"""
+		return dataset.is_rankable()
 
 	def process(self):
 

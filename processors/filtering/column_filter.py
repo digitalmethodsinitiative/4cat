@@ -27,9 +27,6 @@ class LexicalFilter(BasicProcessor):
                   "configured way. This creates a new, separate dataset you can run analyses on."
     extension = "csv"  # extension of result file, used internally and in UI
 
-    input = "csv:body"
-    output = "dataset"
-
     options = {
         "column": {
             "type": UserInput.OPTION_TEXT,

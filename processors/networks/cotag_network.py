@@ -2,6 +2,7 @@
 Generate co-link network of URLs in posts
 """
 import re
+import csv
 
 from backend.abstract.processor import BasicProcessor
 from common.lib.helpers import UserInput, gdf_escape
@@ -23,11 +24,6 @@ class CoTagger(BasicProcessor):
 				  "weighted by the frequency of the tag."  # description displayed in UI
 	extension = "gdf"  # extension of result file, used internally and in UI
 
-	datasources = ["instagram", "tumblr", "tiktok", "usenet", "parler", "custom"]
-
-	input = "csv:tags|hashtags|groups"
-	output = "gdf"
-
 	options = {
 		"to_lowercase": {
 			"type": UserInput.OPTION_TOGGLE,
@@ -36,6 +32,27 @@ class CoTagger(BasicProcessor):
 			"tooltip": "Converting the tags to lowercase can help in removing duplicate edges between nodes"
 		}
 	}
+
+	@classmethod
+	def is_compatible_with(cls, dataset=None):
+		"""
+		Allow processor on datasets containing a tags column
+
+		:param DataSet dataset:  Dataset to determine compatibility with
+		"""
+		if dataset.type == "twitterv2-search":
+			# ndjson, difficult to sniff
+			return True
+		elif dataset.get_results_path().suffix == ".csv" and dataset.get_results_path().exists():
+			# csv can just be sniffed for the presence of a column
+			with dataset.get_results_path().open(encoding="utf-8") as infile:
+				reader = csv.DictReader(infile)
+				try:
+					return bool(set(reader.fieldnames) & {"tags", "hashtags", "groups"})
+				except TypeError:
+					return False
+		else:
+			return False
 
 	def process(self):
 		"""

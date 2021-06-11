@@ -5,6 +5,7 @@ import random
 import shutil
 import json
 import time
+import csv
 import re
 
 from pathlib import Path
@@ -110,6 +111,7 @@ class DataSet:
 			self.parameters = parameters
 
 			self.db.insert("datasets", data=self.data)
+			print("Adding dataset of type %s" % type)
 			self.reserve_result_file(parameters, extension)
 
 		# retrieve analyses and processors that may be run for this dataset
@@ -357,6 +359,25 @@ class DataSet:
 		:return bool:
 		"""
 		return self.data["is_finished"] == True
+
+	def is_rankable(self):
+		"""
+		Determine if a dataset is rankable
+
+		Rankable means that it is a CSV file with 'date' and 'value' columns
+		as well as one or more item label columns
+
+		:return bool:  Whether the dataset is rankable or not
+		"""
+		if self.get_results_path().suffix != ".csv" or not self.get_results_path().exists():
+			return False
+
+		with self.get_results_path().open(encoding="utf-8") as infile:
+			reader = csv.DictReader(infile)
+			try:
+				return len(set(reader.fieldnames) & {"date", "value", "item", "word_1"}) >= 3
+			except TypeError:
+				return False
 
 	def get_parameters(self):
 		"""
@@ -662,32 +683,24 @@ class DataSet:
 		Get list of processors compatible with this dataset
 
 		Checks whether this dataset type is one that is listed as being accepted
-		by the processor, for each known type: if the processor does
-		not specify accepted types (via the `accepts` attribute of the class),
-		it is assumed it accepts 'search' datasets as an input.
+		by the processor, for each known type: if the processor does not
+		specify accepted types (via the `is_compatible_with` method), it is
+		assumed it accepts any top-level datasets
 
-		:return dict:  Compatible processors, `name => properties` mapping
+		:return dict:  Compatible processors, `name => class` mapping
 		"""
 		processors = backend.all_modules.processors
 
 		available = {}
-		is_search = re.match(r".*search$", self.data["type"])
 		for processor_type, processor in processors.items():
-			is_compatible = False
+			if processor_type.endswith("-search"):
+				continue
 
-			if is_search and (not hasattr(processor, "accepts") or "search" in processor.accepts):
-				is_compatible = True
-
-			if hasattr(processor, "accepts") and self.data["type"] in processor.accepts:
-				is_compatible = True
-
-			if hasattr(processor, "datasources") and self.data["datasource"] not in processor.datasources:
-				is_compatible = False
-
-			if hasattr(processor, "is_compatible") and not processor.is_compatible_with(self):
-				is_compatible = False
-
-			if is_compatible:
+			# consider a processor compatible if its is_compatible_with
+			# method returns True *or* if it has no explicit compatibility
+			# check and this dataset is top-level (i.e. has no parent)
+			if (not hasattr(processor, "is_compatible_with") and not self.key_parent) \
+					or (hasattr(processor, "is_compatible_with") and processor.is_compatible_with(self)):
 				available[processor_type] = processor
 
 		return available
@@ -754,7 +767,7 @@ class DataSet:
 
 		:return DataSet:  Parent dataset, or `None` if not applicable
 		"""
-		return DataSet(self.key_parent) if self.key_parent else None
+		return DataSet(key=self.key_parent, db=self.db) if self.key_parent else None
 
 	def detach(self):
 		"""

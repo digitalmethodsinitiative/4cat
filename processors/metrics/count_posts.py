@@ -23,9 +23,6 @@ class CountPosts(BasicProcessor):
 	description = "Counts how many posts are in the query overall or per timeframe."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
-	input = "csv:timestamp"
-	output = "csv"
-
 	options = {
 		"timeframe": {
 			"type": UserInput.OPTION_CHOICE,

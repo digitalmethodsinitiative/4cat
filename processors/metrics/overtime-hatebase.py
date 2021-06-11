@@ -17,7 +17,8 @@ __email__ = "4cat@oilab.eu"
 
 csv.field_size_limit(1024 * 1024 * 1024)
 
-class OvertimeAnalysis(BasicProcessor):
+
+class OvertimeHatefulAnalysis(BasicProcessor):
 	"""
 	Show overall activity levels for Telegram datasets
 	"""
@@ -27,10 +28,16 @@ class OvertimeAnalysis(BasicProcessor):
 	description = "Shows activity, engagement (e.g. views or score) and offensiveness trends over-time. Offensiveness is measured as the amount of words listed on Hatebase that occur in the dataset."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
-	datasource = ["telegram", "instagram", "reddit"]
+	@classmethod
+	def is_compatible_with(cls, dataset=None):
+		"""
+		Allow processor on Telegram, Instagram and Reddit datasets
 
-	input = "csv:body,author"
-	output = "csv:date,item,value"
+		Don't quite remember why these three...
+
+		:param DataSet dataset:  Dataset to determine compatibility with
+		"""
+		return dataset.parameters.get("datasource") in ("telegram", "instagram", "reddit")
 
 	# the following determines the options available to the user via the 4CAT
 	# interface.

@@ -1,6 +1,7 @@
 """
 Generate bipartite user-hashtag graph of posts
 """
+import csv
 import re
 
 from backend.abstract.processor import BasicProcessor
@@ -22,11 +23,6 @@ class HashtagUserBipartiteGrapher(BasicProcessor):
 	description = "Produces a bipartite graph based on co-occurence of (hash)tags and people. If someone wrote a post with a certain tag, there will be a link between that person and the tag. The more often they appear together, the stronger the link. Tag nodes are weighed on how often they occur. User nodes are weighed on how many posts they've made."  # description displayed in UI
 	extension = "gdf"  # extension of result file, used internally and in UI
 
-	datasources = ["instagram", "tumblr", "tiktok", "usenet", "parler", "custom"]
-
-	input = "csv:tags|hashtags|groups"
-	output = "gdf"
-
 	options = {
 		"to_lowercase": {
 			"type": UserInput.OPTION_TOGGLE,
@@ -35,6 +31,27 @@ class HashtagUserBipartiteGrapher(BasicProcessor):
 			"tooltip": "Converting the tags to lowercase can help in removing duplicate edges between nodes"
 		}
 	}
+
+	@classmethod
+	def is_compatible_with(cls, dataset=None):
+		"""
+		Allow processor on datasets containing a tags column
+
+		:param DataSet dataset:  Dataset to determine compatibility with
+		"""
+		if dataset.type == "twitterv2-search":
+			# ndjson, difficult to sniff
+			return True
+		elif dataset.get_results_path().suffix == ".csv" and dataset.get_results_path().exists():
+			# csv can just be sniffed for the presence of a column
+			with dataset.get_results_path().open(encoding="utf-8") as infile:
+				reader = csv.DictReader(infile)
+				try:
+					return bool(set(reader.fieldnames) & {"tags", "hashtags", "groups"})
+				except TypeError:
+					return False
+		else:
+			return False
 
 	def process(self):
 		"""

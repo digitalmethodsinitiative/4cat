@@ -43,10 +43,9 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 
 	is_running_in_preset = False  # is this processor running 'within' a preset processor?
 
-	# the following two will be defined automatically upon loading the processor
-	# there is no need to override them manually
+	# the following will be defined automatically upon loading the processor
+	# there is no need to override manually
 	filepath = None  # do not override
-	followups = None  # do not override
 
 	def work(self):
 		"""
@@ -269,7 +268,6 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 		if hasattr(self, "source_dataset") and self.source_dataset and not bypass_map_item:
 			parent_processor = self.all_modules.processors.get(self.source_dataset.type)
 			if parent_processor:
-				parent_processor = self.all_modules.load_worker_class(parent_processor)
 				if hasattr(parent_processor, "map_item"):
 					item_mapper = parent_processor.map_item
 
@@ -497,7 +495,8 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 
 		self.dataset.finish(num_items)
 
-	def is_filter(self):
+	@classmethod
+	def is_filter(cls):
 		"""
 		Is this processor a filter?
 
@@ -507,7 +506,7 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 		:todo: Make this a bit more robust than sniffing the processor category
 		:return bool:
 		"""
-		return hasattr(self, "category") and self.category and "filter" in self.category.lower()
+		return hasattr(cls, "category") and cls.category and "filter" in cls.category.lower()
 
 	@classmethod
 	def get_options(cls, parent_dataset=None):
@@ -523,29 +522,6 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 		the processor would be run on
 		"""
 		return cls.options if hasattr(cls, "options") else {}
-
-	@staticmethod
-	def is_compatible_with(dataset=None):
-		"""
-		Determine if processor is compatible with dataset
-
-		Always returns `True` by default. If this returns `False`, it overrides
-		the `accepts` property, and will not allow running this processor on the
-		dataset. This can be defined by individual processors
-
-		This should be used sparingly, but can be used if the parent processor
-		e.g. allows a user to select features, and this processor can only run
-		if a certain feature was selected.
-
-		                                 /!\
-		Generalised compatibility via the `accepts` and `datasources`
-		properties is always recommended because otherwise it can be quite
-		confusing to the user when a processor is or is not compatible!
-		                                 /!\
-
-		:param DataSet dataset:  Dataset to determine compatibility with
-		"""
-		return True
 
 	@abc.abstractmethod
 	def process(self):

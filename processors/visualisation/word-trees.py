@@ -90,9 +90,6 @@ class MakeWordtree(BasicProcessor):
 		}
 	}
 
-	input = "csv:body"
-	output = "svg"
-
 	# determines how close the nodes are displayed to each other (min. 1)
 	whitespace = 2
 

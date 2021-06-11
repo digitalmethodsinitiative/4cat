@@ -30,9 +30,6 @@ class TopImageCounter(BasicProcessor):
 	description = "Collect all images used in the data set, and sort by most used. Contains URLs through which the images may be downloaded."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
-	input = "csv"
-	output = "csv"
-
 	options = {
 		"overwrite": {
 			"type": UserInput.OPTION_TOGGLE,

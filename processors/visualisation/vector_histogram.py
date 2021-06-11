@@ -27,12 +27,6 @@ class SVGHistogramRenderer(BasicProcessor):
 	category = "Visual"  # category
 	title = "Histogram"  # title displayed in UI
 	description = "Generates a histogram (bar graph) from a previous frequency analysis."  # description displayed in UI
-	extension = "svg"  # extension of result file, used internally and in UI
-
-	accepts = ["count-posts"]
-
-	input = "csv:timestamp"
-	output = "png"
 
 	options = {
 		"header": {
@@ -42,6 +36,15 @@ class SVGHistogramRenderer(BasicProcessor):
 			"tooltip": "The header may be truncated if it is too large to fit"
 		}
 	}
+
+	@classmethod
+	def is_compatible_with(cls, dataset=None):
+		"""
+		Allow processor on rankable items
+
+		:param DataSet dataset:  Dataset to determine compatibility with
+		"""
+		return dataset.is_rankable()
 
 	def process(self):
 		"""

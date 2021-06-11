@@ -22,9 +22,6 @@ class SplitSentences(BasicProcessor):
 	description = "Split a body of posts into discrete sentences. Output file has one row per sentence, containing the sentence and post ID."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
-	input = "csv:id,body"
-	output = "csv:post_id,sentence"
-
 	options = {
 		"language": {
 			"type": UserInput.OPTION_CHOICE,

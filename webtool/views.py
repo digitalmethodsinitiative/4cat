@@ -346,6 +346,7 @@ def show_result(key):
 	# to be retrieved via XHR
 	standalone = "processors" not in request.url
 	template = "result.html" if standalone else "result-details.html"
+
 	return render_template(template, dataset=dataset, parent_key=dataset.key, processors=backend.all_modules.processors,
 						   is_processor_running=is_processor_running, messages=get_flashed_messages(),
 						   is_favourite=is_favourite, timestamp_expires=timestamp_expires)

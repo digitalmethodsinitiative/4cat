@@ -29,10 +29,14 @@ class RedditVoteChecker(BasicProcessor):
 	description = "Updates the scores for each post to more accurately reflect the real score. Can only be used on datasets with < 5,000 posts due to the heavy usage of the API this requires."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
-	datasources = ["reddit"]
+	@classmethod
+	def is_compatible_with(cls, dataset=None):
+		"""
+		Allow processor if dataset is a Reddit dataset
 
-	input = "csv:body"
-	output = "csv"
+		:param DataSet dataset:  Dataset to determine compatibility with
+		"""
+		return not dataset.key_parent and dataset.type == "reddit-search"
 
 	def process(self):
 		"""

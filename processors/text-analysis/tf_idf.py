@@ -30,10 +30,6 @@ class TfIdf(BasicProcessor):
 	title = "Tf-idf"  # title displayed in UI
 	description = "Get the tf-idf values of tokenised text. Works better with more documents (e.g. day-separated)."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
-	accepts = ["tokenise-posts"]  # query types this post-processor accepts as input
-
-	input = "zip"
-	output = "csv:text,value,date"
 
 	options = {
 		"library": {
@@ -92,6 +88,14 @@ class TfIdf(BasicProcessor):
 		"[SMART Information Retrieval System](https://en.wikipedia.org/wiki/SMART_Information_Retrieval_System)"
 	]
 
+	@classmethod
+	def is_compatible_with(cls, dataset=None):
+		"""
+		Allow processor on token sets
+
+		:param DataSet dataset:  Dataset to determine compatibility with
+		"""
+		return dataset.type == "tokenise-posts"
 
 	def process(self):
 		"""

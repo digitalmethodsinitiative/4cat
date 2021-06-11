@@ -30,11 +30,6 @@ class ExtractNouns(BasicProcessor):  #TEMPORARILY DISABLED
 	description = "Get the prediction of various named entities from a text, ranked on frequency. Be sure to have selected \"Named Entity Recognition\" in the previous module. Currently only available for datasets with less than 25.000 items."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
-	accepts = ["linguistic-features"]
-
-	input = "zip"
-	output = "csv"
-
 	options = {
 		"overwrite": {
 			"type": UserInput.OPTION_TOGGLE,
@@ -73,6 +68,15 @@ class ExtractNouns(BasicProcessor):  #TEMPORARILY DISABLED
 	references = [
 		"[SpaCy named entities list](https://spacy.io/api/annotation#named-entities)"
 	]
+
+	@classmethod
+	def is_compatible_with(cls, dataset=None):
+		"""
+		Allow processor on linguistic feature data
+
+		:param DataSet dataset:  Dataset to determine compatibility with
+		"""
+		return dataset.type == "linguistic-features"
 
 
 	def process(self):

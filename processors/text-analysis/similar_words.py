@@ -25,11 +25,6 @@ class SimilarWord2VecWords(BasicProcessor):
 	description = "Uses a Word2Vec model to find words used in a similar context"  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
-	accepts = ["generate-embeddings"]
-
-	input = "zip"
-	output = "csv:time,input,item,value"
-
 	options = {
 		"words": {
 			"type": UserInput.OPTION_TEXT,
@@ -56,6 +51,15 @@ class SimilarWord2VecWords(BasicProcessor):
 			"help": "The crawl depth. 1 only gets the neighbours of the input word(s), 2 also their neighbours, etc."
 		}
 	}
+
+	@classmethod
+	def is_compatible_with(cls, dataset=None):
+		"""
+		Allow processor on word embedding models
+
+		:param DataSet dataset:  Dataset to determine compatibility with
+		"""
+		return dataset.type == "generate-embeddings"
 
 	def process(self):
 		"""

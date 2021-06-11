@@ -41,10 +41,6 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
     description = "Visualise nearest neighbours of a given query across all models and show the closest neighbours per model in one combined graph. Based on the 'HistWords' algorithm by Hamilton et al."  # description displayed in UI
     extension = "svg"  # extension of result file, used internally and in UI
 
-    input = "zip"
-    output = "svg"
-
-    accepts = ["generate-embeddings"]
     references = [
         "HistWords: [Hamilton, W. L., Leskovec, J., & Jurafsky, D. (2016). Diachronic word embeddings reveal statistical laws of semantic change. *arXiv preprint** arXiv:1605.09096.](https://arxiv.org/pdf/1605.09096.pdf)",
         "HistWords: [William L. Hamilton, Jure Leskovec, and Dan Jurafsky. HistWords: Word Embeddings for Historical Text](https://nlp.stanford.edu/projects/histwords/)",
@@ -96,6 +92,15 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
             "tooltip": "If checked, plot the union of all nearest neighbours for all models, even if a word is not a nearest neighbour for that particular model."
         }
     }
+
+    @classmethod
+    def is_compatible_with(cls, dataset=None):
+        """
+        Allow processor on token sets
+
+        :param DataSet dataset:  Dataset to determine compatibility with
+        """
+        return dataset.type == "tokenise-posts"
 
     def process(self):
         # parse parameters

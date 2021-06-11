@@ -18,6 +18,7 @@ __email__ = "4cat@oilab.eu"
 
 csv.field_size_limit(1024 * 1024 * 1024)
 
+
 class HatebaseAnalyser(BasicProcessor):
 	"""
 	Identify hatebase-listed words in posts

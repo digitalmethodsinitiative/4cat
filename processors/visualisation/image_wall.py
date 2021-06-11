@@ -29,10 +29,6 @@ class ImageWallGenerator(BasicProcessor):
 	title = "Image wall"  # title displayed in UI
 	description = "Put all images in an archive into a single combined image, optionally sorting and resizing them"
 	extension = "png"  # extension of result file, used internally and in UI
-	accepts = ["image-downloader"]  # query types this post-processor accepts as input
-
-	input = "zip"
-	output = "png"
 
 	options = {
 		"amount": {
@@ -75,6 +71,16 @@ class ImageWallGenerator(BasicProcessor):
 	# note that image aspect ratio may not allow for a precise fit
 	TARGET_WIDTH = 2560
 	TARGET_HEIGHT = 1440
+
+
+	@classmethod
+	def is_compatible_with(cls, dataset=None):
+		"""
+		Allow processor on token sets
+
+		:param DataSet dataset:  Dataset to determine compatibility with
+		"""
+		return dataset.type == "image-downloader"
 
 	def process(self):
 		"""

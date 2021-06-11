@@ -44,9 +44,7 @@
             <p><i class="fa fa-arrow-alt-from-left" aria-hidden="true"></i> Allows for:</p>
             <ul>
                 {% for processor_name in processor.followups %}
-                    {% if processors[processor_name].category != "Conversion" %}
                     <li>{{ processors[processor_name].title }}</li>
-                    {% endif %}
                 {% endfor %}
             </ul>
         </div>

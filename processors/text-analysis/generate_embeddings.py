@@ -29,11 +29,6 @@ class GenerateWordEmbeddings(BasicProcessor):
 	description = "Generates Word2Vec or FastText word embedding models for the sentences, per chosen time interval. These can then be used to analyse semantic word associations within the corpus. Note that good models require large(r) datasets."  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
 
-	accepts = ["tokenise-posts"]
-
-	input = "zip"
-	output = "zip"
-
 	references = [
 		"Word2Vec: [Mikolov, Tomas, Ilya Sutskever, Kai Chen, Greg Corrado, and Jeffrey Dean. 2013. “Distributed Representations of Words and Phrases and Their Compositionality.” 8Advances in Neural Information Processing Systems*, 2013: 3111-3119.](https://papers.nips.cc/paper/5021-distributed-representations-of-words-and-phrases-and-their-compositionality.pdf)",
 		"Word2Vec: [Mikolov, Tomas, Kai Chen, Greg Corrado, and Jeffrey Dean. 2013. “Efficient Estimation of Word Representations in Vector Space.” *ICLR Workshop Papers*, 2013: 1-12.](https://arxiv.org/pdf/1301.3781.pdf)",
@@ -100,6 +95,15 @@ class GenerateWordEmbeddings(BasicProcessor):
 			"tooltip": "If checked, commonly occurring word combinations ('New York') will be replaced with a single-word combination ('New_York')"
 		}
 	}
+
+	@classmethod
+	def is_compatible_with(cls, dataset=None):
+		"""
+		Allow processor on token sets
+
+		:param DataSet dataset:  Dataset to determine compatibility with
+		"""
+		return dataset.type == "tokenise-posts"
 
 	def process(self):
 		"""

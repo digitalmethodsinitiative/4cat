@@ -35,12 +35,6 @@ class IsometricMultigraphRenderer(BasicProcessor):
 	description = "Generate area graphs showing prevalence per item over time and project these side-by-side on an isometric plane for easy comparison."  # description displayed in UI
 	extension = "svg"  # extension of result file, used internally and in UI
 
-	input = "csv:item,date,value"
-	output = "svg"
-
-	accepts = ["overtime-hateful", "vector-ranker", "preset-neologisms", "tfidf", "attribute-frequencies",
-			   "hatebase-frequencies", "overtime-vocabulary", "similar-word2vec"]
-
 	options = {
 		"smooth": {
 			"type": UserInput.OPTION_TOGGLE,
@@ -79,6 +73,15 @@ class IsometricMultigraphRenderer(BasicProcessor):
 			   "#00cb3a", "#b200c7", "#d8fd5d", "#a058ff", "#b90fd4", "#6fb300",
 			   "#ff40b5", "#9eff3b", "#022bc3"]
 	colour_index = 0
+
+	@classmethod
+	def is_compatible_with(cls, dataset=None):
+		"""
+		Allow processor on rankable items
+
+		:param DataSet dataset:  Dataset to determine compatibility with
+		"""
+		return dataset.is_rankable()
 
 	def process(self):
 		graphs = {}
