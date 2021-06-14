@@ -36,7 +36,7 @@ class RedditVoteChecker(BasicProcessor):
 
 		:param DataSet dataset:  Dataset to determine compatibility with
 		"""
-		return not dataset.key_parent and dataset.type == "reddit-search"
+		return not dataset.key_parent and dataset.type == "reddit-search" and dataset.num_rows <= 5000
 
 	def process(self):
 		"""
@@ -52,13 +52,6 @@ class RedditVoteChecker(BasicProcessor):
 			# unclear what kind of expression gets thrown here
 			self.dataset.update_status("Could not connect to Reddit. 4CAT may be configured wrong.")
 			self.dataset.finish(0)
-			return
-
-		# reddit has rate limits and it's easy to pass them, so limit this
-		# processor to smaller datasets
-		if self.source_dataset.num_rows > 5000:
-			self.dataset.update_status("Reddit score updating is only available for datasets smaller than 5.000 items.")
-			self.dataset.finish(-1)
 			return
 
 		# get thread IDs
