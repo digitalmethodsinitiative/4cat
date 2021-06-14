@@ -49,7 +49,7 @@ class CoTagger(BasicProcessor):
 				reader = csv.DictReader(infile)
 				try:
 					return bool(set(reader.fieldnames) & {"tags", "hashtags", "groups"})
-				except TypeError:
+				except (TypeError, ValueError):
 					return False
 		else:
 			return False
