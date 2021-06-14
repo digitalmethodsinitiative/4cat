@@ -131,6 +131,8 @@ class ModuleCollector:
 
 			print(print_msg, file=sys.stderr)
 
+		self.processors = categorised_processors
+
 	def load_datasources(self):
 		"""
 		Load datasources
