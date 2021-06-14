@@ -20,9 +20,6 @@ class SearchCustom(BasicWorker):
 	description = "Upload your own CSV file to be used as a dataset"  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
-	# not available as a processor for existing datasets
-	accepts = [None]
-
 	max_workers = 1
 	options = {
 		"intro": {
@@ -193,3 +190,18 @@ class SearchCustom(BasicWorker):
 			dataset.update_status("Result processed")
 
 		dataset.update_version(get_software_version())
+
+	@classmethod
+	def get_options(cls, parent_dataset=None):
+		"""
+		Get processor options
+
+		This method by default returns the class's "options" attribute, or an
+		empty dictionary. It can be redefined by processors that need more
+		fine-grained options, e.g. in cases where the availability of options
+		is partially determined by the parent dataset's parameters.
+
+		:param DataSet parent_dataset:  An object representing the dataset that
+		the processor would be run on
+		"""
+		return cls.options if hasattr(cls, "options") else {}
