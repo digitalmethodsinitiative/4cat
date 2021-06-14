@@ -376,7 +376,7 @@ class DataSet:
 			reader = csv.DictReader(infile)
 			try:
 				return len(set(reader.fieldnames) & {"date", "value", "item", "word_1"}) >= 3
-			except TypeError:
+			except (TypeError, ValueError):
 				return False
 
 	def get_parameters(self):
