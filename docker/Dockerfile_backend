@@ -45,6 +45,7 @@ COPY . /usr/src/app/
 ARG POSTGRES_DB
 ARG POSTGRES_USER
 ARG POSTGRES_PASSWORD
+ARG DB_PORT
 
 # Run docker_setup.py to modify config variables (docker folder is shared volume)
 RUN python3 docker/docker_setup.py ${POSTGRES_DB} ${POSTGRES_USER} $POSTGRES_PASSWORD $DB_PORT
