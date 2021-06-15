@@ -5,6 +5,7 @@ import json
 import csv
 
 from tensorflow.keras.preprocessing import image
+from tensorflow.keras.applications.xception import preprocess_input, decode_predictions
 import numpy as np
 
 from common.lib.helpers import UserInput, convert_to_int
@@ -77,7 +78,6 @@ class XceptionImageClassifier(BasicProcessor):
         # Load in model
         if model_type == 'xception':
             from tensorflow.keras.applications import Xception
-            from tensorflow.keras.applications.xception import preprocess_input, decode_predictions
 
             model = Xception(include_top=True,
                          weights="imagenet",
@@ -134,7 +134,7 @@ class XceptionImageClassifier(BasicProcessor):
         if model_type == 'xception':
             # Preprocess image
             img1 = image.load_img(image_file, target_size=(299, 299))
-            x = np.expand_dims(x, axis=0)
+            x = np.expand_dims(img1, axis=0)
             x = preprocess_input(x)
 
             # Use model to make predictions
