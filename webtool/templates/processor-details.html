@@ -41,7 +41,7 @@
 
         {% if processor.followups %}
         <div class="processor-further">
-            <p><i class="fa fa-arrow-alt-from-left" aria-hidden="true"></i> Allows for:</p>
+            <p><i class="fa fa-arrow-alt-from-left" aria-hidden="true"></i> Possible follow-ups:</p>
             <ul>
                 {% for processor_name in processor.followups %}
                     <li>{{ processors[processor_name].title }}</li>
