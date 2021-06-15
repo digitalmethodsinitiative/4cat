@@ -2,6 +2,9 @@
 Request tags and labels from the Google Vision API for a given set of images
 """
 import json
+import keras_ocr
+
+import traceback
 
 from common.lib.helpers import UserInput, convert_to_int
 from backend.abstract.processor import BasicProcessor
@@ -12,7 +15,7 @@ __credits__ = ["Dale Wahl"]
 __maintainer__ = "Dale Wahl"
 __email__ = "4cat@oilab.eu"
 
-class XceptionImageClassifier(BasicProcessor):
+class ImageTextDetector(BasicProcessor):
     """
     Image Text Detection
 
@@ -74,7 +77,6 @@ class XceptionImageClassifier(BasicProcessor):
         """
 
         # Load models
-        import keras_ocr
         # keras-ocr will automatically download pretrained
         # weights for the detector and recognizer.
         pipeline = keras_ocr.pipeline.Pipeline()
@@ -85,7 +87,7 @@ class XceptionImageClassifier(BasicProcessor):
 
         for image_file in self.iterate_archive_contents(self.source_file):
             if self.interrupted:
-                raise ProcessorInterruptedException("Interrupted while processing Xception Image Classifications")
+                raise ProcessorInterruptedException("Interrupted while processing Image Text Detector")
 
             done += 1
             self.dataset.update_status("Annotating image %i/%i" % (done, total))
@@ -123,8 +125,9 @@ class XceptionImageClassifier(BasicProcessor):
             return text_groups
         except Exception as e:
             # Certain image filetypes will not process; collecting types of errors to review
-            self.log.error(e)
-            raise "Unable to process image"
+            self.log.error(str(e))
+            self.log.error(traceback.print_tb(e.__traceback__))
+            pass
 
     def create_text_groups(self, text_from_image):
         """
