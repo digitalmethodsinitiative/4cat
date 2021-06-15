@@ -8,12 +8,12 @@ import io
 
 from dateutil.parser import parse as parse_datetime
 
-from backend.abstract.worker import BasicWorker
+from backend.abstract.processor import BasicProcessor
 from common.lib.exceptions import QueryParametersException
 from common.lib.helpers import get_software_version, strip_tags, sniff_encoding, UserInput
 
 
-class SearchCustom(BasicWorker):
+class SearchCustom(BasicProcessor):
 	type = "custom-search"  # job ID
 	category = "Search"  # category
 	title = "Custom Dataset Upload"  # title displayed in UI
@@ -41,7 +41,7 @@ class SearchCustom(BasicWorker):
 		}
 	}
 
-	def work(self):
+	def process(self):
 		"""
 		Run custom search
 
@@ -190,18 +190,3 @@ class SearchCustom(BasicWorker):
 			dataset.update_status("Result processed")
 
 		dataset.update_version(get_software_version())
-
-	@classmethod
-	def get_options(cls, parent_dataset=None):
-		"""
-		Get processor options
-
-		This method by default returns the class's "options" attribute, or an
-		empty dictionary. It can be redefined by processors that need more
-		fine-grained options, e.g. in cases where the availability of options
-		is partially determined by the parent dataset's parameters.
-
-		:param DataSet parent_dataset:  An object representing the dataset that
-		the processor would be run on
-		"""
-		return cls.options if hasattr(cls, "options") else {}
