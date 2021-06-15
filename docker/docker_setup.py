@@ -23,6 +23,7 @@ if os.path.exists(DOCKER_CONFIG_FILE):
     docker_config['DATABASE']['db_name'] = sys.argv[1]
     docker_config['DATABASE']['db_user'] = sys.argv[2]
     docker_config['DATABASE']['db_password'] = sys.argv[3]
+    docker_config['DATABASE']['db_port'] = sys.argv[4]
 
     # Save config file
     with open(DOCKER_CONFIG_FILE, 'w') as configfile:

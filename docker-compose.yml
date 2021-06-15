@@ -5,7 +5,7 @@ services:
     container_name: db
     image: postgres:latest
     ports:
-      - 5432:5432
+      - ${DB_PORT}:${DB_PORT}
     environment:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
@@ -22,6 +22,7 @@ services:
         - POSTGRES_USER=${POSTGRES_USER}
         - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
         - POSTGRES_DB=${POSTGRES_DB}
+        - DB_PORT=${DB_PORT}
     container_name: 4cat_backend
     depends_on:
       - db
