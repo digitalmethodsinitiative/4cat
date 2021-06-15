@@ -25,7 +25,7 @@ packages = [
 	"html2text==2018.1.9",
 	"ImageHash==4.2.0",
 	"instaloader==4.5.3",
-	"keras-ocr==0.8.6"
+	"keras-ocr==0.8.6",
 	"lxml==4.6.3",
 	"Markdown==3.0.1",
 	"nltk==3.5",
