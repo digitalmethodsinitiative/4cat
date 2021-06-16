@@ -51,12 +51,12 @@ class ImageDownloader(BasicWorker):
 		if image.status_code != 200:
 			# try again in 30 seconds
 			if self.job.data["attempts"] > 2:
-				self.log.error("Could not download image %s after 2 retries (last response code %s), aborting",
+				self.log.error("Could not download image %s after 2 retries (last response code %i), aborting" %
 								 (url, image.status_code))
 				self.job.finish()
 			else:
 				self.log.info(
-					"Got response code %s while trying to download image %s, retrying later" % (image.status_code, url))
+					"Got response code %i while trying to download image %s, retrying later" % (image.status_code, url))
 				self.job.release(delay=random.choice(range(5, 35)))
 
 			return

@@ -29,11 +29,6 @@ class ExtractNouns(BasicProcessor):
 	description = "Get the prediction of nouns from your text corpus, as annotated by SpaCy's part-of-speech tagging. Make sure to have selected \"Part of Speech\" in the previous module, as well as \"Dependency parsing\" if you want to extract compound nouns. The output is a csv with the most-used nouns ranked."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
-	accepts = ["linguistic-features"]
-
-	input = "zip"
-	output = "csv"
-
 	options = {
 		"type": {
 			"type": UserInput.OPTION_CHOICE,
@@ -52,6 +47,15 @@ class ExtractNouns(BasicProcessor):
 			"tooltip": "Will add a column (\"nouns\", \"nouns_and_compounds\", or \"noun_chunks\"), and the found nouns in the post row."
 		}
 	}
+
+	@classmethod
+	def is_compatible_with(cls, dataset=None):
+		"""
+		Allow processor on linguistic feature data
+
+		:param DataSet dataset:  Dataset to determine compatibility with
+		"""
+		return dataset.type == "linguistic-features"
 
 	def process(self):
 		"""

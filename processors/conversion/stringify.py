@@ -29,9 +29,6 @@ class Stringify(BasicProcessor):
 		}
 	}
 
-	input = "csv:body"
-	output = "txt"
-
 	def process(self):
 		"""
 		This takes a 4CAT results file as input, and outputs a plain text file
@@ -41,7 +38,7 @@ class Stringify(BasicProcessor):
 		link_regex = re.compile(r"https?://[^\s]+")
 		delete_regex = re.compile(r"[^a-zA-Z)(.,\n -]")
 
-		strip_urls = self.parameters.get("strip-urls", self.options["strip-urls"]["default"])
+		strip_urls = self.parameters.get("strip-urls")
 
 		posts = 0
 		self.dataset.update_status("Processing posts")

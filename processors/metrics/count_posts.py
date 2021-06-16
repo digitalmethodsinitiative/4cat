@@ -23,9 +23,6 @@ class CountPosts(BasicProcessor):
 	description = "Counts how many posts are in the query overall or per timeframe."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
-	input = "csv:timestamp"
-	output = "csv"
-
 	options = {
 		"timeframe": {
 			"type": UserInput.OPTION_CHOICE,
@@ -50,7 +47,7 @@ class CountPosts(BasicProcessor):
 		# OrderedDict because dates and headers should have order
 		intervals = {}
 
-		timeframe = self.parameters.get("timeframe", self.options["timeframe"]["default"])
+		timeframe = self.parameters.get("timeframe")
 
 		first_interval = "9999"
 		last_interval = "0000"
@@ -78,7 +75,7 @@ class CountPosts(BasicProcessor):
 
 			# pad interval if needed, this is useful if the result is to be
 			# visualised as a histogram, for example
-			if self.parameters.get("pad", self.options["pad"].get("default", True)) and timeframe != "all":
+			if self.parameters.get("pad") and timeframe != "all":
 				missing, intervals = pad_interval(intervals, first_interval, last_interval)
 
 			# Write to csv

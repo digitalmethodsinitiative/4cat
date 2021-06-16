@@ -33,7 +33,7 @@ class NeologismExtractor(ProcessorPreset):
 		dataset through Van Soest (2019)'s protocol. The resulting top vector
 		ranking is used as the result of this processor, once available.
 		"""
-		timeframe = self.parameters.get("timeframe", self.options["timeframe"]["default"])
+		timeframe = self.parameters.get("timeframe")
 
 		pipeline = [
 			# first, tokenise the posts, excluding all common words

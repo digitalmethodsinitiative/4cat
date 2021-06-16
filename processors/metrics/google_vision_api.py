@@ -33,15 +33,20 @@ class GoogleVisionAPIFetcher(BasicProcessor):
                   "One request will be made per image per annotation type. Note that this is NOT a free service and " \
                   "requests will be credited by Google to the owner of the API token you provide!"# description displayed in UI
     extension = "ndjson"  # extension of result file, used internally and in UI
-    accepts = ["image-downloader"]  # query types this post-processor accepts as input
 
     references = [
         "[Google Vision API Documentation](https://cloud.google.com/vision/docs)",
         "[Google Vision API Pricing & Free Usage Limits](https://cloud.google.com/vision/pricing)"
     ]
 
-    input = "zip"
-    output = "ndjson"
+    @classmethod
+    def is_compatible_with(cls, dataset=None):
+        """
+        Allow processor on image sets
+
+        :param DataSet dataset:  Dataset to determine compatibility with
+        """
+        return dataset.type == "image-downloader"
 
     options = {
         "amount": {

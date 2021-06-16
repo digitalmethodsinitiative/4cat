@@ -35,10 +35,6 @@ class YouTubeMetadata(BasicProcessor):
 	title = "YouTube URL metadata"  # title displayed in UI
 	description = "Extract information from YouTube links to videos and channels"  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
-	datasources = ["4chan", "8chan", "reddit", "breitbart","custom"]
-
-	input = "csv:id,body"
-	output = "csv:id,channel_id,channel_title"
 
 	max_retries = 3
 	sleep_time = 20
@@ -68,6 +64,15 @@ class YouTubeMetadata(BasicProcessor):
 			"help": "Optional: A custom YouTube API key. Leave empty for 4CAT's API key."
 		}
 	}
+
+	@classmethod
+	def is_compatible_with(cls, dataset=None):
+		"""
+		Allow processor on datasets probably containing youtube links
+
+		:param DataSet dataset:  Dataset to determine compatibility with
+		"""
+		return dataset.parameters.get("datasource") in ("4chan", "8chan", "8kun", "reddit", "custom")
 
 	def process(self):
 		"""

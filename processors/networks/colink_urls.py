@@ -23,9 +23,6 @@ class URLCoLinker(BasicProcessor):
 				  "of co-links."  # description displayed in UI
 	extension = "gdf"  # extension of result file, used internally and in UI
 
-	input = "csv:body,thread_id,id"
-	output = "gdf"
-
 	options = {
 		"detail": {
 			"type": UserInput.OPTION_CHOICE,
@@ -77,7 +74,7 @@ class URLCoLinker(BasicProcessor):
 			if "url" in post and post["url"]:
 				post_links.append(post["url"])
 
-			if self.parameters.get("detail", self.options["detail"]["default"]) == "domain":
+			if self.parameters.get("detail") == "domain":
 				try:
 					post_links = [www_regex.sub("", link.split("/")[2]) for link in post_links]
 				except IndexError:
@@ -94,7 +91,7 @@ class URLCoLinker(BasicProcessor):
 			# co-link set, but if we're doing this on a thread level, we
 			# add all the links we found to one pool per thread, and then
 			# create co-link pairs from that in the next for loop
-			if self.parameters.get("level", self.options["level"]["default"]) == "post":
+			if self.parameters.get("level") == "post":
 				unit_id = post["id"]
 			else:
 				unit_id = post["thread_id"]

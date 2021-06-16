@@ -55,7 +55,7 @@
                     {% endif %}{% endfor %}
                 {% else %}
                     {% for datasource in datasources %}
-                        <li>{{ datasources[datasource].name if "name" in datasources[datasource] else datasource }}</li>
+                        <li>{{ datasources[datasource].name }}</li>
                     {% endfor %}
                 {% endif %}
             </ul>
