@@ -2,7 +2,6 @@ import os
 import configparser
 import bcrypt
 from pathlib import Path
-import sys
 
 DOCKER_CONFIG_FILE = 'docker/shared/docker_config.ini'
 
@@ -20,9 +19,12 @@ if os.path.exists(DOCKER_CONFIG_FILE):
         docker_config['GENERATE']['secret_key'] = bcrypt.gensalt().decode('utf-8')
 
     # Database configuration
-    docker_config['DATABASE']['db_name'] = sys.argv[1]
-    docker_config['DATABASE']['db_user'] = sys.argv[2]
-    docker_config['DATABASE']['db_password'] = sys.argv[3]
+    docker_config['DATABASE']['db_name'] = os.environ['POSTGRES_DB']
+    docker_config['DATABASE']['db_user'] = os.environ['POSTGRES_USER']
+    docker_config['DATABASE']['db_password'] = os.environ['POSTGRES_PASSWORD']
+
+    # Ensure Flask knows public port
+    docker_config['SERVER']['public_port'] = os.environ['PUBLIC_PORT']
 
     # Save config file
     with open(DOCKER_CONFIG_FILE, 'w') as configfile:

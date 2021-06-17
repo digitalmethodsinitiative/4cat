@@ -4,8 +4,6 @@ services:
   db:
     container_name: db
     image: postgres:latest
-    ports:
-      - ${DB_PORT}:5432
     environment:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
@@ -18,16 +16,13 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile_backend
-      args:
-        - POSTGRES_USER=${POSTGRES_USER}
-        - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-        - POSTGRES_DB=${POSTGRES_DB}
     container_name: 4cat_backend
+    env_file:
+      - .env
     depends_on:
       - db
     ports:
       - 4444:4444
-    command: ${POSTGRES_DB} ${POSTGRES_USER}
     volumes:
       - 4cat_data:/usr/src/app/data/
       - 4cat_share:/usr/src/app/docker/shared/
@@ -42,7 +37,7 @@ services:
       - backend
     ports:
       - 443:443
-      - 5000:5000
+      - ${PUBLIC_PORT}:5000
     volumes:
       - 4cat_data:/usr/src/app/data/
       - 4cat_share:/usr/src/app/docker/shared/

@@ -38,4 +38,4 @@ COPY . /usr/src/app/
 
 EXPOSE 5000
 
-ENTRYPOINT exec gunicorn --reload --bind 0.0.0.0:5000 webtool:app
+ENTRYPOINT exec gunicorn --worker-tmp-dir /dev/shm --workers=2 --threads=4 --worker-class=gthread --reload --bind 0.0.0.0:5000 webtool:app
