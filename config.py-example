@@ -116,7 +116,7 @@ if os.path.exists(DOCKER_CONFIG_FILE):
   config.read(DOCKER_CONFIG_FILE)
   if config['DOCKER'].getboolean('use_docker_config'):
       # can be your server url or ip
-      your_server = 'localhost'
+      your_server = config['SERVER'].get('server_name', 'localhost')
 
       DB_HOST = config['DATABASE'].get('db_host')
       DB_PORT = config['DATABASE'].getint('db_port')

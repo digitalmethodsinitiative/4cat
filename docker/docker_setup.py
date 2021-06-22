@@ -23,7 +23,8 @@ if os.path.exists(DOCKER_CONFIG_FILE):
     docker_config['DATABASE']['db_user'] = os.environ['POSTGRES_USER']
     docker_config['DATABASE']['db_password'] = os.environ['POSTGRES_PASSWORD']
 
-    # Ensure Flask knows public port
+    # Ensure Flask knows public host and port
+    docker_config['SERVER']['server_name'] = os.environ['SERVER_NAME']
     docker_config['SERVER']['public_port'] = os.environ['PUBLIC_PORT']
 
     # Save config file
