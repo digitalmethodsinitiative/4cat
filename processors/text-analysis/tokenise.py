@@ -29,9 +29,6 @@ class Tokenise(BasicProcessor):
 	description = "Tokenises post bodies, producing corpus data that may be used for further processing by e.g. NLP. The output is a serialized list of lists, each list representing either all tokens in a post or all tokens in a sentence in a post."  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
 
-	input = "csv:body"
-	output = "zip"
-
 	options = {
 		"docs_per": {
 			"type": UserInput.OPTION_CHOICE,
@@ -154,20 +151,20 @@ class Tokenise(BasicProcessor):
 
 		# load word filters - words to exclude from tokenisation
 		word_filter = set()
-		for wordlist in self.parameters.get("filter", self.options["filter"]["default"]):
+		for wordlist in self.parameters.get("filter"):
 			with open(config.PATH_ROOT + "/common/assets/wordlists/%s.txt" % wordlist, encoding="utf-8") as input:
 				word_filter = set.union(word_filter, input.read().splitlines())
 
 		# Extend or limit the word filter with optionally added words
 		# Remove accepted words from filter
-		if self.parameters.get("accept_words", self.options["accept_words"]["default"]):
+		if self.parameters.get("accept_words"):
 			accept_words = [str(word).strip() for word in self.parameters["accept_words"].split(",")]
 			for accept_word in accept_words:
 				if accept_word in word_filter:
 					word_filter.remove(accept_word)
 
 		# Add rejected words to filter
-		if self.parameters.get("reject_words", self.options["reject_words"]["default"]):
+		if self.parameters.get("reject_words"):
 			reject_words = [str(word).strip() for word in self.parameters["reject_words"].split(",")]
 			word_filter.update(reject_words)
 
@@ -181,21 +178,21 @@ class Tokenise(BasicProcessor):
 				automaton.add_word(word, 1)
 
 		# initialise pre-processors if needed
-		if self.parameters.get("stem", self.options["stem"]["default"]):
+		if self.parameters.get("stem"):
 			stemmer = SnowballStemmer(language)
 
-		if self.parameters.get("lemmatise", self.options["lemmatise"]["default"]):
+		if self.parameters.get("lemmatise"):
 			lemmatizer = WordNetLemmatizer()
 
 		# Only keep unique words?
-		only_unique = self.parameters.get("only_unique", self.options["only_unique"]["default"])
+		only_unique = self.parameters.get("only_unique")
 
 		# prepare staging area
 		staging_area = self.dataset.get_staging_area()
 
 		# process posts
 		self.dataset.update_status("Processing posts")
-		docs_per = self.parameters.get("docs_per", self.options["docs_per"]["default"])
+		docs_per = self.parameters.get("docs_per")
 		grouping = "post" if self.parameters.get("grouping-per", "") == "post" else "sentence"
 
 

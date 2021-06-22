@@ -43,6 +43,10 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 
 	is_running_in_preset = False  # is this processor running 'within' a preset processor?
 
+	# the following will be defined automatically upon loading the processor
+	# there is no need to override manually
+	filepath = None  # do not override
+
 	def work(self):
 		"""
 		Process a dataset
@@ -108,10 +112,10 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 		# now the parameters have been loaded into memory, clear any sensitive
 		# ones. This has a side-effect that a processor may not run again
 		# without starting from scratch, but this is the price of progress
-		if hasattr(self, "options"):
-			for option in self.options:
-				if self.options[option].get("sensitive"):
-					self.dataset.delete_parameter(option)
+		options = self.get_options(self.dataset.get_parent())
+		for option, option_settings in options.items():
+			if option_settings.get("sensitive"):
+				self.dataset.delete_parameter(option)
 
 		if self.interrupted:
 			self.dataset.log("Processing interrupted, trying again later")
@@ -165,7 +169,7 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 			# run it only if the post-processor is actually available for this query
 			if next_type in available_processors:
 				next_analysis = DataSet(parameters=next_parameters, type=next_type, db=self.db, parent=self.dataset.key,
-										extension=available_processors[next_type]["extension"])
+										extension=available_processors[next_type].extension)
 				self.queue.add_job(next_type, remote_id=next_analysis.key)
 			else:
 				self.log.warning("Dataset %s (of type %s) wants to run processor %s next, but it is incompatible" % (self.dataset.key, self.type, next_type))
@@ -264,7 +268,6 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 		if hasattr(self, "source_dataset") and self.source_dataset and not bypass_map_item:
 			parent_processor = self.all_modules.processors.get(self.source_dataset.type)
 			if parent_processor:
-				parent_processor = self.all_modules.load_worker_class(parent_processor)
 				if hasattr(parent_processor, "map_item"):
 					item_mapper = parent_processor.map_item
 
@@ -492,7 +495,8 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 
 		self.dataset.finish(num_items)
 
-	def is_filter(self):
+	@classmethod
+	def is_filter(cls):
 		"""
 		Is this processor a filter?
 
@@ -502,7 +506,22 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 		:todo: Make this a bit more robust than sniffing the processor category
 		:return bool:
 		"""
-		return hasattr(self, "category") and self.category and "filter" in self.category.lower()
+		return hasattr(cls, "category") and cls.category and "filter" in cls.category.lower()
+
+	@classmethod
+	def get_options(cls, parent_dataset=None):
+		"""
+		Get processor options
+
+		This method by default returns the class's "options" attribute, or an
+		empty dictionary. It can be redefined by processors that need more
+		fine-grained options, e.g. in cases where the availability of options
+		is partially determined by the parent dataset's parameters.
+
+		:param DataSet parent_dataset:  An object representing the dataset that
+		the processor would be run on
+		"""
+		return cls.options if hasattr(cls, "options") else {}
 
 	@abc.abstractmethod
 	def process(self):

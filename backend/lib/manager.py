@@ -81,17 +81,16 @@ class WorkerManager:
 			jobtype = job.data["jobtype"]
 
 			if jobtype in all_modules.workers:
-				worker_info = all_modules.workers[jobtype]
+				worker_class = all_modules.workers[jobtype]
 				if jobtype not in self.worker_pool:
 					self.worker_pool[jobtype] = []
 
 				# if a job is of a known type, and that job type has open
 				# worker slots, start a new worker to run it
-				if len(self.worker_pool[jobtype]) < worker_info["max"]:
+				if len(self.worker_pool[jobtype]) < worker_class.max_workers:
 					try:
 						self.log.debug("Starting new worker for job %s" % jobtype)
 						job.claim()
-						worker_class = all_modules.load_worker_class(worker_info)
 						worker = worker_class(logger=self.log, manager=self, job=job, modules=all_modules)
 						worker.start()
 						self.worker_pool[jobtype].append(worker)

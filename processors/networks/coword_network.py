@@ -21,10 +21,14 @@ class CowordNetworker(BasicProcessor):
 				  "amount of co-word occurrences."  # description displayed in UI
 	extension = "gdf"  # extension of result file, used internally and in UI
 
-	accepts = ["collocations"]
+	@classmethod
+	def is_compatible_with(cls, dataset=None):
+		"""
+		Allow processor to run on collocations
 
-	input = "csv:word1|word2|value"
-	output = "gdf"
+		:param DataSet dataset:  Dataset to determine compatibility with
+		"""
+		return dataset.type == "collocations"
 
 	def process(self):
 		"""

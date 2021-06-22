@@ -30,9 +30,6 @@ class LexicalFilter(BasicProcessor):
 	description = "Copies the dataset, retaining only posts that match any selected lexicon of words or phrases. This creates a new, separate dataset you can run analyses on."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
-	input = "csv:body"
-	output = "dataset"
-
 	# the following determines the options available to the user via the 4CAT
 	# interface.
 	options = {

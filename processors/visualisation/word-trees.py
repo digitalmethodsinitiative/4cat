@@ -90,9 +90,6 @@ class MakeWordtree(BasicProcessor):
 		}
 	}
 
-	input = "csv:body"
-	output = "svg"
-
 	# determines how close the nodes are displayed to each other (min. 1)
 	whitespace = 2
 
@@ -125,13 +122,13 @@ class MakeWordtree(BasicProcessor):
 		delete_regex = re.compile(r"[^a-zA-Z)(.,\n -]")
 
 		# settings
-		strip_urls = self.parameters.get("strip-urls", self.options["strip-urls"]["default"])
-		strip_symbols = self.parameters.get("strip-symbols", self.options["strip-symbols"]["default"])
-		sides = self.parameters.get("sides", self.options["sides"]["default"])
-		self.align = self.parameters.get("align", self.options["align"]["default"])
-		window = convert_to_int(self.parameters.get("window", self.options["window"]["default"]), 5) + 1
-		query = self.parameters.get("query", self.options["query"]["default"])
-		self.limit = convert_to_int(self.parameters.get("limit", self.options["limit"]["default"]), 100)
+		strip_urls = self.parameters.get("strip-urls")
+		strip_symbols = self.parameters.get("strip-symbols")
+		sides = self.parameters.get("sides")
+		self.align = self.parameters.get("align")
+		window = convert_to_int(self.parameters.get("window"), 5) + 1
+		query = self.parameters.get("query")
+		self.limit = convert_to_int(self.parameters.get("limit"), 100)
 
 		left_branches = []
 		right_branches = []
@@ -142,7 +139,7 @@ class MakeWordtree(BasicProcessor):
 			self.dataset.finish(0)
 			return
 
-		window = min(window, self.options["window"]["max"] + 1)
+		window = min(window, self.get_options()["window"]["max"] + 1)
 		window = max(1, window)
 
 		# find matching posts

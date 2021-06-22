@@ -32,10 +32,15 @@ class SemanticFrameExtractor(BasicProcessor):
 	title = "Semantic frames"  # title displayed in UI
 	description = "Extract semantic frames from text. This connects to the VUB's PENELOPE API to extract causal frames from the text using the framework developed by the Evolutionary and Hybrid AI (EHAI) group."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
-	accepts = ["sentence-split"]  # types of result this post-processor can run on
 
-	input = "csv:sentence"
-	output = "csv:sentence,utterance,frameEvokingElement,cause,effect"
+	@classmethod
+	def is_compatible_with(cls, dataset=None):
+		"""
+		Allow processor on sets of sentences
+
+		:param DataSet dataset:  Dataset to determine compatibility with
+		"""
+		return dataset.type == "sentence-split"
 
 	def process(self):
 		"""

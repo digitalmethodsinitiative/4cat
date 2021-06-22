@@ -23,11 +23,6 @@ class VectorRanker(BasicProcessor):
 	description = "Ranks most used tokens per token set. Reveals most-used words and/or most-used vernacular per time period. Limited to 100 most-used tokens."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
-	accepts = ["vectorise-tokens"]
-
-	input = "zip"
-	output = "csv:date,text,value"
-
 	options = {
 		"top": {
 			"type": UserInput.OPTION_TEXT,
@@ -42,6 +37,15 @@ class VectorRanker(BasicProcessor):
 			"tooltip": "'Overall' will first determine the most prevalent vectors across all intervals, then calculate top vectors per interval using this as a shortlist."
 		},
 	}
+
+	@classmethod
+	def is_compatible_with(cls, dataset=None):
+		"""
+		Allow processor on token vectors
+
+		:param DataSet dataset:  Dataset to determine compatibility with
+		"""
+		return dataset.type == "vectorise-tokens"
 
 	def process(self):
 		"""
@@ -69,8 +73,8 @@ class VectorRanker(BasicProcessor):
 		results = []
 
 		# truncate results as needed
-		rank_style = self.parameters.get("top-style", self.options["top-style"]["default"])
-		cutoff = convert_to_int(self.parameters.get("top", self.options["top"]["default"]), self.options["top"]["default"])
+		rank_style = self.parameters.get("top-style")
+		cutoff = convert_to_int(self.parameters.get("top"))
 
 		# now rank the vectors by most prevalent per "file" (i.e. interval)
 		overall_top = {}

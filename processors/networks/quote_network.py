@@ -21,10 +21,15 @@ class QuoteNetworkGrapher(BasicProcessor):
 	title = "Quote network"  # title displayed in UI
 	description = "Create a Gephi-compatible network of quoted posts, with each reference to another post creating an edge between those posts. Post IDs may be correlated and triangulated with the full results set."  # description displayed in UI
 	extension = "gdf"  # extension of result file, used internally and in UI
-	datasources = ["4chan","8chan"]
 
-	input = "csv:id,body"
-	output = "gdf"
+	@classmethod
+	def is_compatible_with(cls, dataset=None):
+		"""
+		Allow processor to run on chan datasets
+
+		:param DataSet dataset:  Dataset to determine compatibility with
+		"""
+		return dataset.parameters.get("datasource") in ("4chan", "8chan", "8kun")
 
 	def process(self):
 		"""

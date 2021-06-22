@@ -31,9 +31,6 @@ class LinguisticFeatures(BasicProcessor):
 	description = "Annotate your text with a variety of linguistic features, including part-of-speech tagging, depencency parsing, and named entity recognition. Subsequent modules can add identified tags and nouns to the original data file. Uses the SpaCy library and the en_core_web_sm model. Currently only available for datasets with less than 100.000 items."  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
 
-	input = "csv"
-	output = "zip"
-
 	references = [
 		"[SpaCy Linguistic Features - Documentation](https://spacy.io/usage/linguistic-features/)"
 	]

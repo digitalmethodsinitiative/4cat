@@ -2,8 +2,8 @@
 
 [![DOI: 10.5281/zenodo.4742623](https://zenodo.org/badge/DOI/10.5281/zenodo.4742623.svg)](https://doi.org/10.5281/zenodo.4742623)
 [![License: MPL 2.0](https://img.shields.io/badge/license-MPL--2.0-informational)](https://github.com/digitalmethodsinitiative/4cat/blob/master/LICENSE)
-![Requires Python 3.8](https://img.shields.io/badge/python-v3.8-blue)
-[![Docker Image CI Status](https://github.com/digitalmethodsinitiative/4cat/workflows/Docker%20Image%20CI/badge.svg)](https://github.com/digitalmethodsinitiative/4cat/actions)
+[![Requires Python 3.8](https://img.shields.io/badge/python-v3.8-blue)](https://www.python.org/)
+[![Docker Image CI Status](https://github.com/digitalmethodsinitiative/4cat/workflows/Docker%20Image%20CI/badge.svg)](https://github.com/digitalmethodsinitiative/4cat/actions/workflows/dockerimage.yml)
 
 4CAT is a research tool that can be used to analyse and process data from 
 online  social platforms. Its goal is to make the capture and analysis of data 

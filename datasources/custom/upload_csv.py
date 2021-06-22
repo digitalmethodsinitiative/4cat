@@ -8,20 +8,17 @@ import io
 
 from dateutil.parser import parse as parse_datetime
 
-from backend.abstract.worker import BasicWorker
+from backend.abstract.processor import BasicProcessor
 from common.lib.exceptions import QueryParametersException
 from common.lib.helpers import get_software_version, strip_tags, sniff_encoding, UserInput
 
 
-class SearchCustom(BasicWorker):
+class SearchCustom(BasicProcessor):
 	type = "custom-search"  # job ID
 	category = "Search"  # category
 	title = "Custom Dataset Upload"  # title displayed in UI
 	description = "Upload your own CSV file to be used as a dataset"  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
-
-	# not available as a processor for existing datasets
-	accepts = [None]
 
 	max_workers = 1
 	options = {
@@ -30,7 +27,7 @@ class SearchCustom(BasicWorker):
 			"help": "You can upload a CSV or TAB file here that, after upload, will be available for further analysis "
 					"and processing. Files need to be utf-8 encoded and must contain a header row with at least the "
 					"following columns: `id`, `thread_id`, `author`, `body`, `subject`, `timestamp`.\n\nThe "
-					"`timestamp` column should be formatted `YYYY-mm-dd HH:MM:SS`."
+					"`timestamp` column should be formatted `YYYY-mm-dd HH:MM:SS`. "
 					"If your file contains hashtags, name the column `tags` or `hashtags` and make sure they are comma-separated."
 		},
 		"data_upload": {
@@ -44,7 +41,7 @@ class SearchCustom(BasicWorker):
 		}
 	}
 
-	def work(self):
+	def process(self):
 		"""
 		Run custom search
 

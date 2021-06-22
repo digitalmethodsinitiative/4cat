@@ -22,7 +22,14 @@ class GetCollocations(BasicProcessor):
 	description = "Extracts word collocations from a set of tokens."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
-	accepts = ["tokenise-posts"]  # query types this post-processor accepts as input
+	@classmethod
+	def is_compatible_with(cls, dataset=None):
+		"""
+		Allow processor on token sets
+
+		:param DataSet dataset:  Dataset to determine compatibility with
+		"""
+		return dataset.type == "tokenise-posts"
 
 	# Parameters
 	options = {

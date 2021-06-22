@@ -41,10 +41,6 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
     description = "Visualise nearest neighbours of a given query across all models and show the closest neighbours per model in one combined graph. Based on the 'HistWords' algorithm by Hamilton et al."  # description displayed in UI
     extension = "svg"  # extension of result file, used internally and in UI
 
-    input = "zip"
-    output = "svg"
-
-    accepts = ["generate-embeddings"]
     references = [
         "HistWords: [Hamilton, W. L., Leskovec, J., & Jurafsky, D. (2016). Diachronic word embeddings reveal statistical laws of semantic change. *arXiv preprint** arXiv:1605.09096.](https://arxiv.org/pdf/1605.09096.pdf)",
         "HistWords: [William L. Hamilton, Jure Leskovec, and Dan Jurafsky. HistWords: Word Embeddings for Historical Text](https://nlp.stanford.edu/projects/histwords/)",
@@ -97,6 +93,15 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
         }
     }
 
+    @classmethod
+    def is_compatible_with(cls, dataset=None):
+        """
+        Allow processor on token sets
+
+        :param DataSet dataset:  Dataset to determine compatibility with
+        """
+        return dataset.type == "tokenise-posts"
+
     def process(self):
         # parse parameters
         input_words = self.parameters.get("words", "")
@@ -108,12 +113,12 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
         input_words = input_words.split(",")
 
         try:
-            threshold = float(self.parameters.get("threshold", self.options["threshold"]["default"]))
+            threshold = float(self.parameters.get("threshold"))
         except ValueError:
-            threshold = float(self.options["threshold"]["default"])
+            threshold = float(self.get_options()["threshold"]["default"])
 
         threshold = max(-1.0, min(1.0, threshold))
-        num_words = convert_to_int(self.parameters.get("num-words"), self.options["num-words"]["default"])
+        num_words = convert_to_int(self.parameters.get("num-words"))
         overlay = self.parameters.get("overlay")
         reduction_method = self.parameters.get("method")
         all_words = self.parameters.get("all-words")

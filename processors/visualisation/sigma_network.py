@@ -29,11 +29,6 @@ class SigmaNetwork(BasicProcessor):
 	title = "Sigma js network"  # title displayed in UI
 	description = "Visualise a network in the browser with sigma js."  # description displayed in UI
 	extension = "html"  # extension of result file, used internally and in UI
-	accepts = ["vision-label-network", "word-embeddings-neighbours", "url-network", "cotag-network", "quote-network", "wiki-category-network", "coword-network", "collocations"]  # query types this post-processor accepts as input
-	preview_allowed = False # Will slow down the page too much
-
-	input = "csv"
-	output = "html"
 
 	options = {
 		"highlight": {
@@ -45,6 +40,15 @@ class SigmaNetwork(BasicProcessor):
 			"help": "Highlight these nodes in the network"
 		}
 	}
+
+	@classmethod
+	def is_compatible_with(cls, dataset=None):
+		"""
+		Allow processor on network files
+
+		:param DataSet dataset:  Dataset to determine compatibility with
+		"""
+		return dataset.get_results_path().suffix == ".gdf"
 
 	def process(self):
 		"""

@@ -22,9 +22,6 @@ class SplitSentences(BasicProcessor):
 	description = "Split a body of posts into discrete sentences. Output file has one row per sentence, containing the sentence and post ID."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
-	input = "csv:id,body"
-	output = "csv:post_id,sentence"
-
 	options = {
 		"language": {
 			"type": UserInput.OPTION_CHOICE,
@@ -69,8 +66,8 @@ class SplitSentences(BasicProcessor):
 
 		num_sentences = 0
 		num_posts = 1
-		min_length = self.parameters.get("min_length", self.options["min_length"]["default"])
-		language = self.parameters.get("language", self.options["language"]["default"])
+		min_length = self.parameters.get("min_length")
+		language = self.parameters.get("language")
 
 		with self.dataset.get_results_path().open("w", encoding="utf-8") as output:
 			writer = csv.DictWriter(output, fieldnames=("post_id", "sentence",))

@@ -5,6 +5,7 @@ import random
 import shutil
 import json
 import time
+import csv
 import re
 
 from pathlib import Path
@@ -110,6 +111,7 @@ class DataSet:
 			self.parameters = parameters
 
 			self.db.insert("datasets", data=self.data)
+			print("Adding dataset of type %s" % type)
 			self.reserve_result_file(parameters, extension)
 
 		# retrieve analyses and processors that may be run for this dataset
@@ -358,6 +360,25 @@ class DataSet:
 		"""
 		return self.data["is_finished"] == True
 
+	def is_rankable(self):
+		"""
+		Determine if a dataset is rankable
+
+		Rankable means that it is a CSV file with 'date' and 'value' columns
+		as well as one or more item label columns
+
+		:return bool:  Whether the dataset is rankable or not
+		"""
+		if self.get_results_path().suffix != ".csv" or not self.get_results_path().exists():
+			return False
+
+		with self.get_results_path().open(encoding="utf-8") as infile:
+			reader = csv.DictReader(infile)
+			try:
+				return len(set(reader.fieldnames) & {"date", "value", "item", "word_1"}) >= 3
+			except (TypeError, ValueError):
+				return False
+
 	def get_parameters(self):
 		"""
 		Get dataset parameters
@@ -542,7 +563,7 @@ class DataSet:
 		self.data["software_version"] = version
 		updated = self.db.update("datasets", where={"key": self.data["key"]}, data={
 			"software_version": version,
-			"software_file": backend.all_modules.processors.get(self.data["type"], {"path": ""})["path"]
+			"software_file": backend.all_modules.processors.get(self.data["type"]).filepath
 		})
 
 		return updated > 0
@@ -662,22 +683,25 @@ class DataSet:
 		Get list of processors compatible with this dataset
 
 		Checks whether this dataset type is one that is listed as being accepted
-		by the processor, for each known type: if the processor does
-		not specify accepted types (via the `accepts` attribute of the class),
-		it is assumed it accepts 'search' datasets as an input.
+		by the processor, for each known type: if the processor does not
+		specify accepted types (via the `is_compatible_with` method), it is
+		assumed it accepts any top-level datasets
 
-		:return dict:  Compatible processors, `name => properties` mapping
+		:return dict:  Compatible processors, `name => class` mapping
 		"""
 		processors = backend.all_modules.processors
 
-		available = collections.OrderedDict()
-		is_search = re.match(r".*search$", self.data["type"])
-		for processor in processors.values():
-			if ((is_search and (not processor["accepts"] or "search" in processor["accepts"])) or
-					self.data["type"] in processor["accepts"]) and (
-					not processor["datasources"] or self.parameters.get("datasource", None) in processor[
-				"datasources"]):
-				available[processor["id"]] = processor
+		available = {}
+		for processor_type, processor in processors.items():
+			if processor_type.endswith("-search"):
+				continue
+
+			# consider a processor compatible if its is_compatible_with
+			# method returns True *or* if it has no explicit compatibility
+			# check and this dataset is top-level (i.e. has no parent)
+			if (not hasattr(processor, "is_compatible_with") and not self.key_parent) \
+					or (hasattr(processor, "is_compatible_with") and processor.is_compatible_with(self)):
+				available[processor_type] = processor
 
 		return available
 
@@ -698,7 +722,7 @@ class DataSet:
 			if analysis.type not in processors:
 				continue
 
-			if not processors[analysis.type]["options"]:
+			if not processors[analysis.type].get_options():
 				del processors[analysis.type]
 
 		return processors
@@ -737,11 +761,20 @@ class DataSet:
 		"""
 		self.db.update("datasets", where={"key": self.key}, data={"key_parent": key_parent})
 
+	def get_parent(self):
+		"""
+		Get parent dataset
+
+		:return DataSet:  Parent dataset, or `None` if not applicable
+		"""
+		return DataSet(key=self.key_parent, db=self.db) if self.key_parent else None
+
 	def detach(self):
 		"""
 		Makes the datasets standalone, i.e. not having any source_dataset dataset
 		"""
 		self.link_parent("")
+
 
 	def __getattr__(self, attr):
 		"""

@@ -32,9 +32,6 @@ class UrlUnshortener(BasicProcessor):
                   "than 10,000."
     extension = "csv"  # extension of result file, used internally and in UI
 
-    input = "csv:body"
-    output = "dataset"
-
     options = {
         "overwrite": {
             "type": UserInput.OPTION_TOGGLE,

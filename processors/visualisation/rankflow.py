@@ -33,11 +33,6 @@ class RankFlowRenderer(BasicProcessor):
 	description = "Create a diagram showing changes in prevalence over time for sequential ranked lists (following Bernhard Rieder's RankFlow grapher)."  # description displayed in UI
 	extension = "svg"  # extension of result file, used internally and in UI
 
-	accepts = ["vector-ranker", "preset-neologisms", "tfidf", "collocations", "attribute-frequencies", "hatebase-frequencies", "similar-word2vec"]
-
-	input = "csv:item,time,value"
-	output = "svg"
-
 	options = {
 		"colour_property": {
 			"type": UserInput.OPTION_CHOICE,
@@ -58,11 +53,20 @@ class RankFlowRenderer(BasicProcessor):
 		}
 	}
 
+	@classmethod
+	def is_compatible_with(cls, dataset=None):
+		"""
+		Allow processor on rankable items
+
+		:param DataSet dataset:  Dataset to determine compatibility with
+		"""
+		return dataset.is_rankable()
+
 	def process(self):
 		items = {}
 		max_weight = 1
-		colour_property = self.parameters.get("colour_property", self.options["colour_property"]["default"])
-		size_property = self.parameters.get("size_property", self.options["size_property"]["default"])
+		colour_property = self.parameters.get("colour_property")
+		size_property = self.parameters.get("size_property")
 		include_value = self.parameters.get("show_value", False)
 
 		# first create a map with the ranks for each period
