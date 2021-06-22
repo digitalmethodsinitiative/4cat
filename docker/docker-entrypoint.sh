@@ -82,6 +82,10 @@ if [ $user_created = true ] ; then
   echo ''
 fi
 
+echo "4CAT is accessible at:"
+echo "http://localhost:$PUBLIC_PORT"
+echo ''
+
 # If backend did not close in time, PID lockfile remains; Remove lockfile
 rm -f ./backend/4cat.pid
 
