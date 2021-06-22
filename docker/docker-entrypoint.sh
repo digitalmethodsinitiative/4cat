@@ -35,10 +35,10 @@ admin_password=$(openssl rand -base64 12)
 cd /usr/src/app && psql --host=db --port=5432 --user=$POSTGRES_USER --dbname=$POSTGRES_DB < backend/database.sql
 
 python3 /usr/src/app/helper-scripts/create_user.py -u admin -e -p "$admin_password"
-echo 'Your admin username:' >> login.txt
+echo 'Your admin username:' >> docker/shared/login.txt
 echo 'admin' >> login.txt
-echo 'Your admin password:' >> login.txt
-echo "$admin_password" >> login.txt
+echo 'Your admin password:' >> docker/shared/login.txt
+echo "$admin_password" >> docker/shared/login.txt
 user_created=true
 
 fi
