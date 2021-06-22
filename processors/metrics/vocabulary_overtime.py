@@ -26,9 +26,6 @@ class OvertimeAnalysis(BasicProcessor):
 	description = "Determines the presence over time of a particular vocabulary in the dataset. Counts how many posts match at least one word in the provided vocabularies."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
-	input = "csv:body"
-	output = "csv:time,item,value"
-
 	references = [
 		"[\"Salvaging the Internet Hate Machine: Using the discourse of radical online subcultures to identify emergent extreme speech\" - Unblished paper detailing the OILab extreme speech lexigon](https://oilab.eu/texts/4CAT_Hate_Speech_WebSci_paper.pdf)",
 		]
@@ -85,8 +82,8 @@ class OvertimeAnalysis(BasicProcessor):
 		"""
 
 		# convenience variables
-		timeframe = self.parameters.get("timeframe", self.options["timeframe"]["default"])
-		partition = bool(self.parameters.get("partition", self.options["partition"]["default"]))
+		timeframe = self.parameters.get("timeframe")
+		partition = bool(self.parameters.get("partition"))
 
 		# load vocabularies from word lists
 		vocabularies = {}

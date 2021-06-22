@@ -22,10 +22,14 @@ class Vectorise(BasicProcessor):
 	description = "Creates word vectors for a token set. Token lists are transformed into word => frequency counts."  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
 
-	input = "zip"
-	output = "zip"
+	@classmethod
+	def is_compatible_with(cls, dataset=None):
+		"""
+		Allow processor on token sets
 
-	accepts = ["tokenise-posts"]  # query types this post-processor accepts as input
+		:param DataSet dataset:  Dataset to determine compatibility with
+		"""
+		return dataset.type == "tokenise-posts"
 
 	def process(self):
 		"""

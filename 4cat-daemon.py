@@ -109,12 +109,6 @@ def start():
 				pidfile=pidfile.TimeoutPIDLockFile(str(lockfile)),
 				detach_process=True
 		) as context:
-			# clear module cache first so it will be regenerated
-			# ideally we'd do this in ModuleLoader, but we need to do this
-			# before that class is loaded...
-			module_cache = Path(config.PATH_ROOT, "backend", "module_cache.pb")
-			if module_cache.exists():
-				module_cache.unlink()
 			import backend.bootstrap as bootstrap
 			bootstrap.run(as_daemon=True)
 		sys.exit(0)

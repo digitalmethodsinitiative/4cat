@@ -21,10 +21,14 @@ class ConvertNDJSONToJSON(BasicProcessor):
     description = "Convert a NDJSON Twitter file to TCAT JSON format. Can be imported with TCAT's import-jsondump.php script."  # description displayed in UI
     extension = "json"  # extension of result file, used internally and in UI
 
-    accepts = ["twitterv2-search"]
+    @classmethod
+    def is_compatible_with(cls, dataset=None):
+        """
+        Determine if processor is compatible with dataset
 
-    input = "ndjson"
-    output = "json"
+        :param DataSet dataset:  Dataset to determine compatibility with
+        """
+        return dataset.type == "twitterv2-search"
 
     def process(self):
         """

@@ -26,10 +26,14 @@ class HatebaseRanker(BasicProcessor):
 	description = "Count frequencies for hateful words and phrases found in the dataset and aggregate the results, sorted by most-occurring value. Optionally results may be counted per period."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
-	accepts = ["hatebase-data"]
+	@classmethod
+	def is_compatible_with(cls, dataset=None):
+		"""
+		Allow processor on previous Hatebase analyses
 
-	input = "csv:body,author"
-	output = "csv:date,item,value"
+		:param DataSet dataset:  Dataset to determine compatibility with
+		"""
+		return dataset.type == "hatebase-data"
 
 	# the following determines the options available to the user via the 4CAT
 	# interface.
@@ -72,10 +76,10 @@ class HatebaseRanker(BasicProcessor):
 		"""
 
 		# convenience variables
-		timeframe = self.parameters.get("timeframe", self.options["timeframe"]["default"])
-		scope = self.parameters.get("scope", self.options["scope"]["default"])
-		rank_style = self.parameters.get("top-style", self.options["top-style"]["default"])
-		cutoff = convert_to_int(self.parameters.get("top", self.options["top"]["default"]))
+		timeframe = self.parameters.get("timeframe")
+		scope = self.parameters.get("scope")
+		rank_style = self.parameters.get("top-style")
+		cutoff = convert_to_int(self.parameters.get("top"), 15)
 
 		# This is needed to check for URLs in the "domain" and "url" columns for Reddit submissions
 		datasource = self.source_dataset.parameters.get("datasource")

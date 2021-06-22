@@ -21,15 +21,14 @@ class ConvertCSVToJSON(BasicProcessor):
 	description = "Convert a CSV file to JSON"  # description displayed in UI
 	extension = "json"  # extension of result file, used internally and in UI
 
-	# all post-processors with CSV output
-	accepts = ["search", "collocations", "count-posts", "debate_metrics", "get-entities",
-			   "extract-nouns", "hatebase-data", "penelope-semanticframe", "quote-ranker",
-			   "tfidf", "thread-metadata", "sentence-split", "hatebase-frequencies",
-			   "count-countries", "top-images", "url-extractor", "extract-usernames", "vector-ranker",
-			   "count-words", "youtube-metadata", "attribute-frequencies", "count-posts"]
+	@classmethod
+	def is_compatible_with(cls, dataset=None):
+		"""
+		Determine if processor is compatible with dataset
 
-	input = "csv"
-	output = "json"
+		:param DataSet dataset:  Dataset to determine compatibility with
+		"""
+		return dataset.get_results_path().suffix == ".csv"
 
 	def process(self):
 		"""
