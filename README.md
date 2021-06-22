@@ -5,21 +5,12 @@
 [![Requires Python 3.8](https://img.shields.io/badge/python-v3.8-blue)](https://www.python.org/)
 [![Docker Image CI Status](https://github.com/digitalmethodsinitiative/4cat/workflows/Docker%20Image%20CI/badge.svg)](https://github.com/digitalmethodsinitiative/4cat/actions/workflows/dockerimage.yml)
 
-<<<<<<< HEAD
-[![Actions Status](https://github.com/digitalmethodsinitiative/4cat/workflows/Docker%20Image%20CI/badge.svg)](https://github.com/digitalmethodsinitiative/4cat/actions)
-
-4CAT is a tool that can be used to analyse and process data from online social
-platforms. Its goal is to make the capture and analysis of data from these
-platforms accessible to people through a web interface, without requiring any
-programming or web scraping skills.
-=======
-4CAT is a research tool that can be used to analyse and process data from 
-online  social platforms. Its goal is to make the capture and analysis of data 
-from these  platforms accessible to people through a web interface, without 
-requiring any programming or web scraping skills. Our target audience is 
+4CAT is a research tool that can be used to analyse and process data from
+online  social platforms. Its goal is to make the capture and analysis of data
+from these  platforms accessible to people through a web interface, without
+requiring any programming or web scraping skills. Our target audience is
 researchers, students and journalists interested using Digital Methods in their
 work.
->>>>>>> master
 
 In 4CAT, you create a dataset from a given platform according to a given set of
 parameters; the result of this (usually a CSV file containing matching items)
@@ -54,48 +45,26 @@ sources](https://github.com/digitalmethodsinitiative/4cat/tree/master/datasource
 in the GitHub repository.
 
 ## Install
-<<<<<<< HEAD
-We use 4CAT for our own purposes at the University of Amsterdam but you can
-(and are encouraged to!) run your own instance. [You can find detailed
-installation instructions in our
-wiki](https://github.com/digitalmethodsinitiative/4cat/wiki/Installing-4CAT).
-
-Support for Docker is work-in-progress. You can install using
-[docker-compose](https://docs.docker.com/compose/install/) by cloning the repository and running:
-=======
 You can install 4CAT locally or on a server via Docker or manually. The usual
 
->>>>>>> master
 ```
 docker-compose up
 ```
 
-<<<<<<< HEAD
-Your admin username and password will appear at the end of the installation and are saved as login.txt in the Docker 4cat_backend container (you should delete this afterwards; `docker exec -it 4cat_backend /bin/bash` to access container). You may also want to change your SQL database information by updating the .env file *prior* to using Docker compose.
-=======
-will work, but detailed and alternative installation 
+will work, but detailed and alternative installation
 instructions are available [in our
 wiki](https://github.com/digitalmethodsinitiative/4cat/wiki/Installing-4CAT).
->>>>>>> master
 
 Please check our [issues](https://github.com/digitalmethodsinitiative/4cat/issues) and create one if you experience any problems (pull requests are also very welcome).
 
 ## Components
 4CAT consists of several components, each in a separate folder:
 
-<<<<<<< HEAD
-- `backend`: A standalone Python 3 app that scrapes defined data sources,
-  downloads and stores the relevant data and performs searches and analyses as
-  queued by the front-end.
-- `webtool`: A Flask app that provides a web front-end to search and analyze
-  the stored data with.
-=======
 - `backend`: A standalone daemon that collects and processes data, as queued via
   the tool's web interface or API.
 - `webtool`: A Flask app that provides a web front-end to search and analyze
   the stored data with.
 - `common`: Assets and libraries.
->>>>>>> master
 - `datasources`: Data source definitions. This is a set of configuration
   options, database definitions and python scripts to process this data with.
   If you want to set up your own data sources, refer to the
