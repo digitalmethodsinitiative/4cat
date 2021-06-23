@@ -7,7 +7,7 @@
     <article class="small">
         <section class="login-form">
             <h2><span>Log in</span></h2>
-                <p>Please log in to access {{ __tool_name }}. If you do not have an account, you can <a href="/request-access/">request one</a>.</p>
+                <p>Please log in to access {{ __tool_name }}. If you do not have an account, you can <a href="{{ url_for('request_access') }}">request one</a>.</p>
                 <p>You can also install your own 4CAT instance. See the <a href="https://github.com/digitalmethodsinitiative/4cat/wiki/Installing-4CAT">installation page on the GitHub wiki</a>.</p>
                 {% for notice in flashes %}
                 <p class="form-notice">{{notice}}</p>
@@ -28,9 +28,9 @@
             <footer class="form-footer">
                 <nav>
                     <ul class="flat">
-                        <li><a href="/request-access/">Request access</a></li>
-                        <li><a href="/request-password">Recover password</a></li>
-                        <li><a href="/page/data-policy">Data policy</a></li>
+                        <li><a href="{{ url_for('request_access') }}">Request access</a></li>
+                        <li><a href="{{ url_for('request_password') }}">Recover password</a></li>
+                        <li><a href="{{ url_for('show_page', page='data-policy') }}">Data policy</a></li>
                     </ul>
                 </nav>
             </footer>

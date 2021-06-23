@@ -282,8 +282,9 @@ class SearchTumblr(Search):
 					self.dataset.update_status("Collected %s posts for tag %s, but no new posts returned - no new posts found with decreasing by 6 hours, decreasing with a week to %s instead (retry %s/150)" % (str(len(all_posts)), tag, max_date_str, str(retry_str),))
 
 				# We can stop when the max date drops below the min date.
-				if max_date <= min_date:
-					break
+				if min_date:
+					if max_date <= min_date:
+						break
 
 				continue
 

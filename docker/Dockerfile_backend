@@ -42,11 +42,4 @@ RUN pip3 install -r requirements.txt
 COPY ./config.py-example /usr/src/app/config.py
 COPY . /usr/src/app/
 
-ARG POSTGRES_DB
-ARG POSTGRES_USER
-ARG POSTGRES_PASSWORD
-
-# Run docker_setup.py to modify config variables (docker folder is shared volume)
-RUN python3 docker/docker_setup.py ${POSTGRES_DB} ${POSTGRES_USER} $POSTGRES_PASSWORD
-
 ENTRYPOINT ["docker/docker-entrypoint.sh"]
