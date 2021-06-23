@@ -5,10 +5,10 @@
 [![Requires Python 3.8](https://img.shields.io/badge/python-v3.8-blue)](https://www.python.org/)
 [![Docker Image CI Status](https://github.com/digitalmethodsinitiative/4cat/workflows/Docker%20Image%20CI/badge.svg)](https://github.com/digitalmethodsinitiative/4cat/actions/workflows/dockerimage.yml)
 
-4CAT is a research tool that can be used to analyse and process data from 
-online  social platforms. Its goal is to make the capture and analysis of data 
-from these  platforms accessible to people through a web interface, without 
-requiring any programming or web scraping skills. Our target audience is 
+4CAT is a research tool that can be used to analyse and process data from
+online  social platforms. Its goal is to make the capture and analysis of data
+from these  platforms accessible to people through a web interface, without
+requiring any programming or web scraping skills. Our target audience is
 researchers, students and journalists interested using Digital Methods in their
 work.
 
@@ -51,7 +51,7 @@ You can install 4CAT locally or on a server via Docker or manually. The usual
 docker-compose up
 ```
 
-will work, but detailed and alternative installation 
+will work, but detailed and alternative installation
 instructions are available [in our
 wiki](https://github.com/digitalmethodsinitiative/4cat/wiki/Installing-4CAT).
 
