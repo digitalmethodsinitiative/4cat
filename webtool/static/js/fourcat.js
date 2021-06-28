@@ -430,7 +430,7 @@ query = {
         });
 
         $.get({
-            url: "../api/check-processors/",
+            url: "/api/check-processors/",
             data: {subqueries: JSON.stringify(keys)},
             success: function (json) {
                 json.forEach(child => {

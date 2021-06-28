@@ -1,2 +1,2 @@
 <dt>Result file</dt>
-                <dd id="dataset-{{ dataset.key }}-result-count" data-num-results="{{ dataset.num_rows }}"><a href="{{ url_for('show_result') }}/{{ dataset.result_file }}"><i class="fas fa-download" aria-hidden="false"></i> Download {{ dataset.result_file.split(".")[-1] }} ({{ "{:,}".format(dataset.num_rows) }} items, {{ dataset.get_results_path()|filesize }})</a></dd>
+                <dd id="dataset-{{ dataset.key }}-result-count" data-num-results="{{ dataset.num_rows }}"><a href="/result/{{ dataset.result_file }}"><i class="fas fa-download" aria-hidden="false"></i> Download {{ dataset.result_file.split(".")[-1] }} ({{ "{:,}".format(dataset.num_rows) }} items, {{ dataset.get_results_path()|filesize }})</a></dd>
