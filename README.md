@@ -56,6 +56,7 @@ docker-compose up
 will work, but detailed and alternative installation 
 instructions are available [in our
 wiki](https://github.com/digitalmethodsinitiative/4cat/wiki/Installing-4CAT).
+Currently 4chan, 8chan, and 8kun require additional steps; please see the wiki.
 
 Please check our [issues](https://github.com/digitalmethodsinitiative/4cat/issues) and create one if you experience any problems (pull requests are also very welcome).
 
