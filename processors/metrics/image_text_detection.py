@@ -3,6 +3,8 @@ Request tags and labels from the Google Vision API for a given set of images
 """
 import json
 import keras_ocr
+import threading
+import time
 
 import traceback
 
@@ -47,6 +49,14 @@ class ImageTextDetector(BasicProcessor):
         "[CRAFT text detection model](https://github.com/clovaai/CRAFT-pytorch)",
         "[Keras CRNN text recognition model](https://github.com/kurapan/CRNN)"
     ]
+    @classmethod
+    def is_compatible_with(cls, dataset=None):
+        """
+        Allow processor on image sets
+
+        :param DataSet dataset:  Dataset to determine compatibility with
+        """
+        return dataset.type == "image-downloader"
 
     input = "zip"
     output = "ndjson"
@@ -91,6 +101,7 @@ class ImageTextDetector(BasicProcessor):
 
             done += 1
             self.dataset.update_status("Annotating image %i/%i" % (done, total))
+            self.log.info(f"Filename: {image_file.name}")
 
             annotations = self.annotate_image(image_file, pipeline)
 
@@ -100,6 +111,7 @@ class ImageTextDetector(BasicProcessor):
             annotations = {"file_name": image_file.name, **annotations}
 
             with self.dataset.get_results_path().open("a", encoding="utf-8") as outfile:
+                self.log.info("Writing to file")
                 outfile.write(json.dumps(str(annotations)) + "\n")
 
             if max_images and done >= max_images:
@@ -118,16 +130,54 @@ class ImageTextDetector(BasicProcessor):
         """
 
         try:
-            img = keras_ocr.tools.read(image_file)
-            predictions = pipeline.recognize([img])
-            text_groups = self.create_text_groups(predictions)
-            text_groups = self.remove_positional_information(text_groups)
-            return text_groups
+            self.log.info("Reading image")
+            img = keras_ocr.tools.read(str(image_file))
+
+            # All this for one damn timeout...
+            prediction_holder = PredictionHolder(pipeline, self.log)
+            self.log.info("Create thread")
+            x = threading.Thread(target=prediction_holder.make_predictions, args=(img,))#, daemon=True)
+            self.log.info("Start thread")
+            x.start()
+
+            # # JOIN WILL NOT WORK!
+            # # program hangs and seems to ignore the timeout=60.0
+            # self.log.info("Join thread")
+            # x.join(60.0)
+
+            # old school wait
+            for i in range(60):
+                if x.is_alive():
+                    self.log.info(f"Waiting: {i}")
+                    time.sleep(1)
+                else:
+                    self.log.info("Thread completed successfully")
+                    break
+
+            if x.is_alive():
+                self.log.warning("Thread still running...")
+                # By running as a daemon, if this process ends, the thread will also cease to exist
+                # We could use threading.Event to tell it to terminate, but there is no loop or anything.
+                # The thread starts keras_ocr.pipeline.recognize and that's all.
+            # else:
+            #     self.log.info("Thread completed successfully")
+
+            if prediction_holder.predictions:
+                self.log.info("Grouping text")
+                text_groups = self.create_text_groups(prediction_holder.predictions)
+                self.log.info("Removing position information")
+                text = self.remove_positional_information(text_groups)
+                return {'text' : text}
+            else:
+                self.log.info("No predictions returned")
+                # No predictions made
+                return False
+
         except Exception as e:
             # Certain image filetypes will not process; collecting types of errors to review
+            self.log.info("Error")
             self.log.error(str(e))
-            self.log.error(traceback.print_tb(e.__traceback__))
-            pass
+            return False
 
     def create_text_groups(self, text_from_image):
         """
@@ -141,7 +191,7 @@ class ImageTextDetector(BasicProcessor):
         Through testing, using the height of a word seems to generally allow for
         accurate groupings however the size of text does not always correspond
         so neatly with the spacing between words and lines. Also of note: this
-        method of grouping will not with with non horizontal words/rows.
+        method of grouping will not work with non horizontal words/rows.
         """
         texts = [SimpleBox(text) for text in text_from_image]
         # could sort texts by finding min of right bottom point (x + y) or, like, pythagorean theorem
@@ -152,7 +202,7 @@ class ImageTextDetector(BasicProcessor):
             text = texts[0]
 
             # collect all text on same "line"
-            temp_row = [j for j in texts if abs(text.bottom - j.bottom) < text.height/2]
+            temp_row = [j for j in texts if abs(text.bottom - j.bottom) <= text.height/2]
 
            # sort the list in place in order of left to right
             temp_row.sort(key=lambda x: x.left, reverse=False)
@@ -177,6 +227,7 @@ class ImageTextDetector(BasicProcessor):
         rows = [BigBox(row) for row in row_groups]
 
         text_groups = []
+
         while rows:
             matching_row = rows[0]
 
@@ -195,23 +246,17 @@ class ImageTextDetector(BasicProcessor):
 
         return text_groups
 
-    def remove_positional_information(self, text_group):
+    def remove_positional_information(self, text_groups):
         """
         Takes the result from create_text_groups and returns only the text.
 
         TODO: build this object in the create_text_groups function to prevent
         this double loop.
         """
-        just_the_text = []
-        for group in text_groups:
-            new_group = []
-            for row in group:
-                new_row = []
-                for word in row:
-                    new_row.append(word.word)
-                new_group.append(new_row)
-            just_the_text.append(new_group)
-        return just_the_text
+        text = {}
+        text['groupings'] = [[[word.word for word in line.original] for line in group] for group in text_groups]
+        text['raw_text'] = '\n\n'.join(['\n'.join([' '.join([word.word for word in line.original]) for line in group]) for group in text_groups])
+        return text
 
 class SimpleBox():
     """
@@ -237,3 +282,18 @@ class BigBox():
         self.right = max([i.right for i in list_of_simple_boxes])
         self.height = self.bottom - self.top
         self.center = ((self.right - self.left)/2) + self.left
+
+class PredictionHolder():
+    """
+    To pass to thread for prediction. A new holder should be created for each
+    prediction.
+    """
+    def __init__(self, pipeline, log):
+        self.predictions = None
+        self.pipeline = pipeline
+        self.log = log
+
+    def make_predictions(self, img):
+        self.log.debug("Making predictions")
+        self.predictions = self.pipeline.recognize([img])[0]
+        self.log.debug("Predictions complete")
