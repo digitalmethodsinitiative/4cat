@@ -43,8 +43,8 @@ class SimilarWords(ProcessorPreset):
 		This queues a series of post-processors to calculate word similarities
 		with the Word2Vec (Mikolov et al.) algorithm.
 		"""
-		timeframe = self.parameters.get("timeframe", self.options["timeframe"]["default"])
-		language = self.parameters.get("language", self.options["language"]["default"])
+		timeframe = self.parameters.get("timeframe")
+		language = self.parameters.get("language")
 		words = self.parameters.get("words", "")
 
 		pipeline = [

@@ -2,8 +2,10 @@
 
 [![DOI: 10.5281/zenodo.4742623](https://zenodo.org/badge/DOI/10.5281/zenodo.4742623.svg)](https://doi.org/10.5281/zenodo.4742623)
 [![License: MPL 2.0](https://img.shields.io/badge/license-MPL--2.0-informational)](https://github.com/digitalmethodsinitiative/4cat/blob/master/LICENSE)
-![Requires Python 3.8](https://img.shields.io/badge/python-v3.8-blue)
-[![Docker Image CI Status](https://github.com/digitalmethodsinitiative/4cat/workflows/Docker%20Image%20CI/badge.svg)](https://github.com/digitalmethodsinitiative/4cat/actions)
+[![Requires Python 3.8](https://img.shields.io/badge/python-v3.8-blue)](https://www.python.org/)
+[![Docker Image CI Status](https://github.com/digitalmethodsinitiative/4cat/workflows/Docker%20Image%20CI/badge.svg)](https://github.com/digitalmethodsinitiative/4cat/actions/workflows/dockerimage.yml)
+
+<p align="center"><img alt="A screenshot of 4CAT, displaying its 'Create Dataset' interface" src="common/assets/screenshot1.png"><img alt="A screenshot of 4CAT, displaying a network visualisation of a dataset" src="common/assets/screenshot2.png"></p>
 
 4CAT is a research tool that can be used to analyse and process data from 
 online  social platforms. Its goal is to make the capture and analysis of data 
@@ -54,6 +56,7 @@ docker-compose up
 will work, but detailed and alternative installation 
 instructions are available [in our
 wiki](https://github.com/digitalmethodsinitiative/4cat/wiki/Installing-4CAT).
+Currently 4chan, 8chan, and 8kun require additional steps; please see the wiki.
 
 Please check our [issues](https://github.com/digitalmethodsinitiative/4cat/issues) and create one if you experience any problems (pull requests are also very welcome).
 

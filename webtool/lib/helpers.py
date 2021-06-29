@@ -120,62 +120,6 @@ def string_to_timestamp(string):
 	return int(date.timestamp())
 
 
-def load_postprocessors():
-	"""
-	See what post-processors are available
-
-	Looks for python files in the PP folder, then looks for classes that
-	are a subclass of BasicPostProcessor that are available in those files, and
-	not an abstract class themselves. Classes that meet those criteria are
-	added to a list of available types.
-	"""
-	pp_folder = os.path.abspath(os.path.dirname(__file__)) + "/../../backend/postprocessors"
-	os.chdir(pp_folder)
-	postprocessors = {}
-
-	# check for worker files
-	for file in glob.glob("*.py"):
-		module = "backend.postprocessors." + file[:-3]
-		if module not in sys.modules:
-			importlib.import_module(module)
-
-		members = inspect.getmembers(sys.modules[module])
-
-		for member in members:
-			if inspect.isclass(member[1]) and issubclass(member[1], BasicProcessor) and not inspect.isabstract(
-					member[1]):
-				postprocessors[member[1].type] = {
-					"type": member[1].type,
-					"category": member[1].category,
-					"description": member[1].description,
-					"name": member[1].title,
-					"extension": member[1].extension,
-					"class": member[0],
-					"options": member[1].options if hasattr(member[1], "options") else {}
-				}
-
-	return postprocessors
-
-
-def get_available_postprocessors(query):
-	"""
-	Get available post-processors for a given query
-
-	:param DataSet query:  Query to load available postprocessors for
-	:return dict: Post processors, {id => settings} mapping
-	"""
-	postprocessors = query.get_compatible_processors()
-	available = postprocessors.copy()
-	analyses = query.get_analyses()
-
-	for subquery in analyses:
-		type = subquery.type
-		if type in available and not available[type].get("options", {}):
-			del available[type]
-
-	return available
-
-
 def get_preview(query):
 	"""
 	Generate a data preview of 25 rows of a results csv

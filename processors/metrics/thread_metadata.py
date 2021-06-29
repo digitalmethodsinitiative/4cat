@@ -30,9 +30,6 @@ class ThreadMetadata(BasicProcessor):
 	description = "Create an overview of the threads present in the dataset, containing thread IDs, subjects and post counts."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
-	input = "csv:id,thread_id,subject,author,body"
-	output = "csv:thread_id,timestamp,timestamp_lastpost,timestamp_unix,timestamp_lastpost_unix,subject,author,op_body,country_code,num_posts,num_images,image_md5,preview_url,thread_age,thread_age_friendly"
-
 	def process(self):
 		"""
 		This takes a 4CAT results file as input, and outputs a new CSV file

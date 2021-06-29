@@ -25,9 +25,6 @@ class AuthorInfoRemover(BasicProcessor):
     description = "Anonymises a dataset by removing content of any column starting with 'author'"
     extension = "csv"  # extension of result file, used internally and in UI
 
-    input = "csv:body"
-    output = "dataset"
-
     def process(self):
         """
         Reads a CSV file, removing content from all columns starting with "author"

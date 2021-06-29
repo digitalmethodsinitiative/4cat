@@ -16,7 +16,7 @@ __credits__ = ["Stijn Peeters"]
 __maintainer__ = "Stijn Peeters"
 __email__ = "4cat@oilab.eu"
 
-class WikipediaCatgegoryNetwork(BasicProcessor):
+class WikipediaCategoryNetwork(BasicProcessor):
 	"""
 	Generate Wikipedia network
 	"""
@@ -25,9 +25,6 @@ class WikipediaCatgegoryNetwork(BasicProcessor):
 	title = "Wikipedia category network"  # title displayed in UI
 	description = "Create a Gephi-compatible network comprised of wikipedia pages linked in the data set, linked to the categories they are part of. English Wikipedia only."  # description displayed in UI
 	extension = "gdf"  # extension of result file, used internally and in UI
-
-	input = "csv:body"
-	output = "gdf"
 
 	def process(self):
 		"""

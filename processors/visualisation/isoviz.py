@@ -35,12 +35,6 @@ class IsometricMultigraphRenderer(BasicProcessor):
 	description = "Generate area graphs showing prevalence per item over time and project these side-by-side on an isometric plane for easy comparison."  # description displayed in UI
 	extension = "svg"  # extension of result file, used internally and in UI
 
-	input = "csv:item,date,value"
-	output = "svg"
-
-	accepts = ["overtime-hateful", "vector-ranker", "preset-neologisms", "tfidf", "attribute-frequencies",
-			   "hatebase-frequencies", "overtime-vocabulary", "similar-word2vec"]
-
 	options = {
 		"smooth": {
 			"type": UserInput.OPTION_TOGGLE,
@@ -80,15 +74,24 @@ class IsometricMultigraphRenderer(BasicProcessor):
 			   "#ff40b5", "#9eff3b", "#022bc3"]
 	colour_index = 0
 
+	@classmethod
+	def is_compatible_with(cls, dataset=None):
+		"""
+		Allow processor on rankable items
+
+		:param DataSet dataset:  Dataset to determine compatibility with
+		"""
+		return dataset.is_rankable()
+
 	def process(self):
 		graphs = {}
 		intervals = []
 
-		smooth = self.parameters.get("smooth", self.options["smooth"]["default"])
-		normalise_values = self.parameters.get("normalise", self.options["normalise"]["default"])
-		completeness = convert_to_int(self.parameters.get("complete", self.options["complete"]["default"]), 0)
-		graph_label = self.parameters.get("label", self.options["label"]["default"])
-		top = convert_to_int(self.parameters.get("top", self.options["top"]["default"]), 10)
+		smooth = self.parameters.get("smooth")
+		normalise_values = self.parameters.get("normalise")
+		completeness = convert_to_int(self.parameters.get("complete"), 0)
+		graph_label = self.parameters.get("label")
+		top = convert_to_int(self.parameters.get("top"), 10)
 
 		# first gather graph data: each distinct item gets its own graph and
 		# for each graph we have a sequence of intervals, each interval with

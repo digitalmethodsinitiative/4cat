@@ -294,7 +294,6 @@ def show_results(page):
 
 	pagination = Pagination(page, page_size, num_datasets)
 	filtered = []
-	processors = backend.all_modules.processors
 
 	for dataset in datasets:
 		filtered.append(DataSet(key=dataset["key"], db=db))
@@ -306,8 +305,8 @@ def show_results(page):
 						   pagination=pagination, favourites=favourites)
 
 
-@app.route('/results/<string:key>/')
 @app.route('/results/<string:key>/processors/')
+@app.route('/results/<string:key>/')
 def show_result(key):
 	"""
 	Show result page
@@ -347,6 +346,7 @@ def show_result(key):
 	# to be retrieved via XHR
 	standalone = "processors" not in request.url
 	template = "result.html" if standalone else "result-details.html"
+
 	return render_template(template, dataset=dataset, parent_key=dataset.key, processors=backend.all_modules.processors,
 						   is_processor_running=is_processor_running, messages=get_flashed_messages(),
 						   is_favourite=is_favourite, timestamp_expires=timestamp_expires)
@@ -464,12 +464,24 @@ def delete_dataset_interactive(key):
 	:param str key:  Dataset key
 	:return:
 	"""
+	try:
+		dataset = DataSet(key=key, db=db)
+	except TypeError:
+		return error(404, message="Dataset not found.")
+	
+	top_key = dataset.top_key()
+
 	success = delete_dataset(key)
+
 	if not success.is_json:
 		return success
 	else:
-		flash("Dataset deleted.")
-		return redirect(url_for('show_results'))
+		# If it's a child processor, refresh the page.
+		# Else go to the results overview page.
+		if key == top_key:
+			return redirect(url_for('show_results'))
+		else:
+			return redirect(url_for('show_result', key=top_key))
 
 
 @app.route('/results/<string:key>/processors/queue/<string:processor>/', methods=["GET", "POST"])

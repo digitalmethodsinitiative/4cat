@@ -218,16 +218,10 @@ class Search(BasicProcessor, ABC):
 				# replace author column with salted hash of the author name, if
 				# pseudonymisation is enabled
 				if pseudonymise_author:
+					check_cashe = CheckCashe(hash_cache, hasher)
 					author_fields = [field for field in row.keys() if "author" in field]
 					for author_field in author_fields:
-						if row[author_field] not in hash_cache:
-							author_hasher = hasher.copy()
-							author_hasher.update(str(row[author_field]).encode("utf-8"))
-							hash_cache[row[author_field]] = author_hasher.hexdigest()
-							del author_hasher
-
-						row[author_field] = hash_cache[row[author_field]]
-
+						row[author_field] = check_cashe.update_cache(row[author_field])
 				writer.writerow(row)
 
 		return processed
@@ -249,16 +243,96 @@ class Search(BasicProcessor, ABC):
 		if not filepath:
 			raise ResourceWarning("No valid results path supplied")
 
+		# cache hashed author names, so the hashing function (which is
+		# relatively expensive) is not run too often
+		pseudonymise_author = bool(self.parameters.get("pseudonymise", None))
+		if pseudonymise_author:
+			hash_cache = {}
+			hasher = hashlib.blake2b(digest_size=24)
+			hasher.update(str(config.ANONYMISATION_SALT).encode("utf-8"))
+
 		processed = 0
 		with filepath.open("w", encoding="utf-8", newline="") as outfile:
 			for item in items:
 				if self.interrupted:
 					raise ProcessorInterruptedException("Interrupted while writing results to file")
 
+				# replace author column with salted hash of the author name, if
+				# pseudonymisation is enabled
+				if pseudonymise_author:
+					check_cashe = CheckCashe(hash_cache, hasher)
+					self.search_and_update(item, ['author'], check_cashe.update_cache)
+
 				outfile.write(json.dumps(item) + "\n")
 				processed += 1
 
 		return processed
+
+	def search_and_update(self, d_or_l, match_terms, change_funcion):
+		"""
+		Function loops through a dictionary or list and compares dictionary keys to the strings defined by match_terms.
+		It then applies the change_function to cooresponding values.
+
+		Note: if a matching term is found, all nested values will have the function applied to them. e.g.,
+		all these values would be changed even with not_key_match:
+		{'key_match' : 'changed',
+		'also_key_match' : {'not_key_match' : 'but_value_still_changed'},
+		'another_key_match': ['this_is_changed', 'and_this', {'not_key_match' : 'even_this_is_changed'}]}
+
+
+		This is a comprehensive (and expensive) approach to updating a dictionary.
+		IF a dictionary structure is known, a better solution would be to update using specific keys.
+
+		:param Dict/List d_or_l:  dictionary/list/json to loop through
+		:param String match_terms:  list of strings that will be matched to dictionary keys
+		:param Function change_function:  function appled to all values of any items nested under a matching key 
+		"""
+		if isinstance(d_or_l, dict):
+		    # Iterate through dictionary
+		    for key, value in iter(d_or_l.items()):
+		        if match_terms == True or any([match in key for match in match_terms]):
+		            # Match found; apply function to all items and subitems
+		            if isinstance(value, (list, dict)):
+		                # Pass item through again with match_terms = True
+		                self.search_and_update(d_or_l[key], True, change_funcion)
+		            else:
+		                # Update the value
+		                d_or_l[key] = change_funcion(d_or_l[key])
+		        elif isinstance(value, (list, dict)):
+		            # Continue search
+		            self.search_and_update(d_or_l[key], match_terms, change_funcion)
+		elif isinstance(d_or_l, list):
+		    # Iterate through list
+		    for n, i in enumerate(d_or_l):
+		        if isinstance(i, (list, dict)):
+		            # Continue search
+		            self.search_and_update(d_or_l[n], match_terms, change_funcion)
+		        elif match_terms == True:
+		            # List item nested in matching
+		            d_or_l[n] = change_funcion(d_or_l[n])
+		else:
+		    raise Exception('Must pass list or dictionary')
+
+class CheckCashe():
+	"""
+	Handler for the hasher
+	"""
+	def __init__(self, hash_cache, hasher):
+		self.hash_cache = hash_cache
+		self.hasher = hasher
+
+	def update_cache(self, value):
+		"""
+		Checks the hash_cache to see if the value has been cached previously,
+		updates the hash_cache if needed, and returns the hashed value.
+		"""
+		value = str(value)
+		if value not in self.hash_cache:
+			author_hasher = self.hasher.copy()
+			author_hasher.update(str(value).encode("utf-8"))
+			self.hash_cache[value] = author_hasher.hexdigest()
+			del author_hasher
+		return self.hash_cache[value]
 
 
 class SearchWithScope(Search, ABC):

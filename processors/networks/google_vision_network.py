@@ -22,10 +22,6 @@ class VisionTagNetworker(BasicProcessor):
                   "Google Vision API. Labels returned by the API are nodes; labels occurring on the same image form" \
                   "edges, weighted by the amount of co-tag occurrences."
     extension = "gdf"  # extension of result file, used internally and in UI
-    accepts = ["google-vision-api"]
-
-    input = "ndjson"
-    output = "gdf"
 
     options = {
         "min_confidence": {
@@ -50,6 +46,15 @@ class VisionTagNetworker(BasicProcessor):
             "tooltip": "Note that only those features that were in the original API response can be mapped"
         }
     }
+
+    @classmethod
+    def is_compatible_with(cls, dataset=None):
+        """
+        Allow processor to run on Google Vision API data
+
+        :param DataSet dataset:  Dataset to determine compatibility with
+        """
+        return dataset.type == "google-vision-api"
 
     def process(self):
         """

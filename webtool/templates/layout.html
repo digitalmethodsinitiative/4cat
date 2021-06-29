@@ -3,10 +3,10 @@
 	<title>{% block title %}{{ __tool_name_long }}{% endblock %} &bull; {{ __tool_name }}</title>
 
 	<link rel="stylesheet" type="text/css" href="{{url_for('static', filename='css/stylesheet.css')}}">
-    <link href="{{ url_for("static", filename="fontawesome/css/fontawesome.css") }}" rel="stylesheet">
-    <link href="{{ url_for("static", filename="fontawesome/css/regular.css") }}" rel="stylesheet">
-    <link href="{{ url_for("static", filename="fontawesome/css/solid.css") }}" rel="stylesheet">
-    <link href="{{ url_for("static", filename="fontawesome/css/brands.css") }}" rel="stylesheet">
+        <link href="{{ url_for("static", filename="fontawesome/css/fontawesome.css") }}" rel="stylesheet">
+        <link href="{{ url_for("static", filename="fontawesome/css/regular.css") }}" rel="stylesheet">
+        <link href="{{ url_for("static", filename="fontawesome/css/solid.css") }}" rel="stylesheet">
+        <link href="{{ url_for("static", filename="fontawesome/css/brands.css") }}" rel="stylesheet">
 
 	<script type="text/javascript" src="{{url_for('static', filename='js/jquery-3.3.1.min.js')}}"></script>
 	<script type="text/javascript" src="{{url_for('static', filename='js/svg-pan-zoom.min.js')}}"></script>
@@ -26,18 +26,18 @@
 
 </head>
 <body class="{% block body_class%}{% endblock %} style-{{ "default"|config_override("STYLE") }}">
-	<h1><span><a href="/">{% block site_header %}{{ __tool_name_long }}{% endblock %}</a></span></h1>
+	<h1><span><a href="{{ url_for('show_frontpage') }}">{% block site_header %}{{ __tool_name_long }}{% endblock %}</a></span></h1>
 	<nav class="main-nav">
 		<ul>
-			<li><a href="/create-dataset/">Create dataset</a></li>
-			<li><a href="/results/">Past results</a></li>
-			<li><a href="/">About</a></li>
-            <li><a href="/page/faq/"><abbr title="Frequently Asked Questions">FAQ</abbr></a></li>
+			<li><a href="{{ url_for('show_index') }}">Create dataset</a></li>
+			<li><a href="{{ url_for('show_results') }}">Past results</a></li>
+			<li><a href="{{ url_for('show_frontpage') }}">About</a></li>
+                        <li><a href="{{ url_for('show_page', page='faq') }}"><abbr title="Frequently Asked Questions">FAQ</abbr></a></li>
             {% if current_user.is_authenticated and not current_user.is_special() %}
-                <li><a href="/access-tokens">API Access</a></li>
+                <li><a href="{{ url_for('show_access_tokens') }}">API Access</a></li>
             {% endif %}
             {% if current_user.is_authenticated and current_user.is_admin() %}
-                <li><a href="/admin/">Control Panel</a></li>
+                <li><a href="{{ url_for('admin_frontpage') }}">Control Panel</a></li>
             {% endif %}
 		</ul>
     {% if __announcement %}
@@ -53,10 +53,10 @@
 	<nav>
 		<ul class="flat">
 		{% if current_user.is_authenticated %}
-			<li>Logged in {% if not current_user.is_special() %} as {{ current_user.get_name() }} (<a href="/logout">Log out</a>){% else %} via {{ current_user.get_name() }}{% endif %}</li>
+			<li>Logged in {% if not current_user.is_special() %} as {{ current_user.get_name() }} (<a href="{{ url_for('logout') }}">Log out</a>){% else %} via {{ current_user.get_name() }}{% endif %}</li>
 		{% endif %}
-		  <li><a href="/page/citing">How to cite</a></li>
-		  <li><a href="/page/issues">Report issues</a></li>
+		  <li><a href="{{ url_for('show_page', page='citing') }}">How to cite</a></li>
+		  <li><a href="{{ url_for('show_page', page='issues') }}">Report issues</a></li>
 		  <li><a href="https://www.oilab.eu">Open Intelligence Lab</a>, 2018 &ndash; {{ __datenow.year }}</li>
 		</ul>
 	</nav>

@@ -31,11 +31,15 @@ class DebateMetrics(BasicProcessor):
 	title = "Debate metrics"  # title displayed in UI
 	description = "Returns a csv with meta-metrics per thread."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
-	datasources = ["4chan","8chan"]
 
-	input = "csv:id,thread_id,timestamp"
-	output = "csv"
+	@classmethod
+	def is_compatible_with(cls, dataset=None):
+		"""
+		Allow processor if dataset is a 'top level' dataset
 
+		:param DataSet dataset:  Dataset to determine compatibility with
+		"""
+		return dataset.parameters.get("datasource") in ("4chan", "8chan", "8kun")
 
 	def process(self):
 		"""

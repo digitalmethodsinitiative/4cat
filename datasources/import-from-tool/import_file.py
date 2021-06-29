@@ -8,12 +8,12 @@ import csv
 import re
 import io
 
-from backend.abstract.worker import BasicWorker
+from backend.abstract.processor import BasicProcessor
 from common.lib.exceptions import QueryParametersException
 from common.lib.helpers import get_software_version, sniff_encoding, UserInput
 
 
-class ImportFromExternalTool(BasicWorker):
+class ImportFromExternalTool(BasicProcessor):
 	type = "customimport-search"  # job ID
 	category = "Search"  # category
 	title = "Custom Dataset Upload"  # title displayed in UI
@@ -81,7 +81,7 @@ class ImportFromExternalTool(BasicWorker):
 		)
 	}
 
-	def work(self):
+	def process(self):
 		"""
 		Run custom search
 
