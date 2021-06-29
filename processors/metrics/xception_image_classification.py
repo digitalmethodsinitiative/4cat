@@ -43,6 +43,15 @@ class XceptionImageClassifier(BasicProcessor):
         "[Keras Application Xception Documentation](https://keras.io/api/applications/xception/)",
     ]
 
+    @classmethod
+    def is_compatible_with(cls, dataset=None):
+        """
+        Allow processor on image sets
+
+        :param DataSet dataset:  Dataset to determine compatibility with
+        """
+        return dataset.type == "image-downloader"
+
     input = "zip"
     output = "ndjson"
 
