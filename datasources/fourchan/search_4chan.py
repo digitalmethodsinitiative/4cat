@@ -613,7 +613,7 @@ class Search4Chan(SearchWithScope):
 			del query["scope_density"]
 			del query["scope_length"]
 
-		if query.get("search_scope") not in ("match-ids",):
+		if query.get("search_scope") not in ("match-ids",) and "valid_ids" in query.keys():
 			del query["valid_ids"]
 
 		return query
