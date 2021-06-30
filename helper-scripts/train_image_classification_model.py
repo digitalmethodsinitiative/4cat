@@ -13,9 +13,10 @@ Class B will be the "target" class represented by a 1, while A will be a 0.
 
 The script will then create a temporary folder structure and train/test split.
 
-It will then save a model and print and save the evaluation results. You will
-then need to add the model the models folder and update
-processors/metrics/xception_image_classification.py appropriately
+It will then save a model and print and save the evaluation results.
+
+processors/metrics/xception_image_classification.py can be modified to use this
+model to make predictions. The pepe_v1 model was created in this way.
 
 # Addtional information on how the model works
 
