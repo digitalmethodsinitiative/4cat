@@ -12,12 +12,12 @@
 
         <aside>
             <h2><span>Active workers</span></h2>
-            <div class="content-container" data-source="/admin/worker-status/" data-interval="5">
+            <div class="content-container" data-source="{{ url_for('get_worker_status') }}" data-interval="5">
                 <p class="content-placeholder">Loading worker status...</p>
             </div>
 
             <h2><span>Worker queue</span></h2>
-            <div class="content-container" data-source="/admin/queue-status/" data-interval="5">
+            <div class="content-container" data-source="{{ url_for('get_queue_status') }}" data-interval="5">
                 <p class="content-placeholder">Loading worker status...</p>
             </div>
         </aside>
