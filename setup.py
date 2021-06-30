@@ -33,7 +33,7 @@ packages = [
 	"Pillow>=8.1.2",
 	"praw==6.5.1",
 	"prawcore==1.5.0",
-	"psutil==5.6.6",
+	"psutil==5.6.7",
 	"psycopg2==2.8.6",
 	"pyahocorasick==1.4.0",
 	"PyMySQL==0.9.2",
