@@ -3,6 +3,13 @@ This script builds Convolutional Neural Networks (CNNs) to compare to sets of
 images and attempts to use features found unique in either set to classify
 future images.
 
+This script will randomly create training and test sets. This means results may
+vary when reviewing the scores (the training set may lack features found only
+in the test set). That is reflection of the varity in data and could be improved
+with more images representing your classes. The evaluation score can only
+approximate real world results in so far as training data is representative of
+the images the model will enounter.
+
 You will need to separate your images into a folder structure as follows:
 
 - main_dir
@@ -125,6 +132,12 @@ model.compile(loss = 'binary_crossentropy',
 ##########################
 # Import training images #
 ##########################
+
+# TODO: look at cross validation vs train/test. Cross validation does have the
+# possible downside of overfitting a model to the training data while giving the
+# impression of artificially high evaluation scores. Depending on the method of
+# cross validation (whether or not it is used to retrain a model or only
+# validate)
 
 # TODO: Swap out keras preprocessing that expects images separated into
 # directories so we can skip all the temporary files stuff!
