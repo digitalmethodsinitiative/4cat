@@ -25,7 +25,7 @@
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 </head>
-<body class="{% block body_class%}{% endblock %} style-{{ "default"|config_override("STYLE") }}">
+<body class="{% block body_class%}{% endblock %} style-{{ "default"|config_override("STYLE") }}" data-url-root="{{ url_for("show_frontpage") }}">
 	<h1><span><a href="{{ url_for('show_frontpage') }}">{% block site_header %}{{ __tool_name_long }}{% endblock %}</a></span></h1>
 	<nav class="main-nav">
 		<ul>
