@@ -229,7 +229,7 @@ processor = {
             return;
         }
 
-        $.ajax('/api/delete-query/', {
+        $.ajax(getRelativeURL('api/delete-query/'), {
             method: 'DELETE',
             data: {key: $(this).attr('data-key')},
             success: function(json) {
@@ -341,7 +341,7 @@ query = {
         Polls server to check whether there's a result for query
         */
         $.getJSON({
-            url: '/api/check-query/',
+            url: getRelativeURL('api/check-query/'),
             data: {key: query_key},
             success: function (json) {
                 query.check_search_queue();
@@ -388,7 +388,7 @@ query = {
         $('.dataset-unfinished').each(function() {
             let container = $(this);
             $.getJSON({
-                url: '/api/check-query/',
+                url: getRelativeURL('api/check-query/'),
                 data: {key: $(this).attr('data-key')},
                 success: function (json) {
                     if (json.done) {
@@ -430,7 +430,7 @@ query = {
         });
 
         $.get({
-            url: "/api/check-processors/",
+            url: getRelativeURL('api/check-processors/'),
             data: {subqueries: JSON.stringify(keys)},
             success: function (json) {
                 json.forEach(child => {
@@ -463,7 +463,7 @@ query = {
         }
 
         $.getJSON({
-            url: '/api/check-search-queue/',
+            url: getRelativeURL('api/check-search-queue/'),
             success: function (json) {
 
                 // Update the query status box with the queue status
@@ -509,7 +509,7 @@ query = {
         }
         
         $.getJSON({
-            url: '/api/status.json',
+            url: getRelativeURL('api/status.json'),
             success: function (json) {
 
                 // Remove previous notices
@@ -636,14 +636,14 @@ query = {
     update_form: function() {
         datasource = $('#datasource-select').val();
         $.get({
-            'url': '/api/datasource-form/' + datasource + '/',
+            'url': getRelativeURL('api/datasource-form/' + datasource + '/'),
             'success': function(data) {
                 $('#query-form-script').remove();
                 $('#query-form').removeClass();
                 $('#query-form').addClass(datasource);
                 $('#datasource-form').html(data.html);
                 if(data.has_javascript) {
-                    $('<script id="query-form-script">').attr('src', '/api/datasource-script/' + data.datasource + '/').appendTo('body');
+                    $('<script id="query-form-script">').attr('src', getRelativeURL('api/datasource-script/' + data.datasource + '/')).appendTo('body');
                 }
                 //automatically fill in cached parameters
                 $('#datasource-form .cacheable input').each(function() {
@@ -973,4 +973,20 @@ function stringToTimestamp(str) {
         timestamp = (new Date(year, (month - 1), day).getTime() / 1000);
     }
     return timestamp;
+}
+
+/**
+ * Get absolute API URL to call
+ *
+ * Determines proper URL to call
+ *
+ * @param endpoint Relative URL to call (/api/endpoint)
+ * @returns  Absolute URL
+ */
+function getRelativeURL(endpoint) {
+    let root = $("body").attr("data-url-root");
+    if(!root) {
+        root = '/';
+    }
+    return root + endpoint;
 }
