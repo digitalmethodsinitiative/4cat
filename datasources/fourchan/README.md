@@ -67,3 +67,4 @@ scraping it yourself, two helper scripts are included in `/helper-scripts`:
 * `import_4plebs.py` can be used to import a data dump from 
   [4plebs](http://4plebs.org), a 4chan archive that publishes semi-annual data
   dumps for a number of large boards. 
+* `import_dump.py` can be used to import csv [files dumped by the 4chan archive archived.moe](https://archive.org/details/archivedmoe_db_201908).
