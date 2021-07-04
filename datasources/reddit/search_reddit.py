@@ -43,7 +43,7 @@ class SearchReddit(SearchWithScope):
 		},
 		"board": {
 			"type": UserInput.OPTION_TEXT,
-			"help": "Board",
+			"help": "Subreddit(s)",
 			"tooltip": "Comma-separated"
 		},
 		"divider": {
