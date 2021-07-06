@@ -111,7 +111,7 @@ class SearchWithTwitterAPIv2(Search):
             "poll.fields": ",".join(poll_fields),
             "place.fields": ",".join(place_fields),
             "media.fields": ",".join(media_fields),
-            "max_results": max(10, min(amount, 500)) if amount > 0 else 500,  # 500 = upper limit, 10 = lower
+            "max_results": max(10, min(amount, 100)) if amount > 0 else 100,  # 100 = upper limit, 10 = lower
         }
 
         if self.parameters.get("min_date"):
