@@ -19,7 +19,7 @@
             <nav class="tabs">
                 <ul>
                     <li{% if depth == "all" %} class="current"{% endif %}><a href="{{ url_for('show_results') }}?{{ filter|http_query }}&amp;depth=all">All datasets</a></li>
-                    <li{% if not depth or depth == "own" %} class="current"{% endif %}><a href="{{ url_for('show_results') }}?{{ filter|http_query }}&amp;depth=own">My own datasets</a></li>
+                    <li{% if not depth or depth == "own" %} class="current"{% endif %}><a href="{{ url_for('show_results') }}?{{ filter|http_query }}&amp;depth=own">My own datasets</a></li>
                     <li{% if depth == "favourites" %} class="current"{% endif %}><a href="{{ url_for('show_results') }}?{{ filter|http_query }}&amp;depth=favourites">Favourites only</a></li>
                 </ul>
             </nav>
@@ -45,7 +45,7 @@
                         {% if not dataset.is_finished() or dataset.num_rows == 0 %}
                             <p class="button-like inactive"><span class="dataset-status">{% include "result-status.html" %}</span></p>
                         {% else %}
-                            <a class="button-like" href="{{ url_for('get_result', query_file=dataset.result_file) }}"><i class="fas fa-download" aria-hidden="true"></i> {{ dataset.get_results_path()|filesize }}, {{ dataset.result_file.split(".")[-1] }}</a>
+                            <a class="button-like" href="{{ url_for('get_result', query_file=dataset.result_file)[:-1] }}"><i class="fas fa-download" aria-hidden="true"></i> {{ dataset.get_results_path()|filesize }}, {{ dataset.result_file.split(".")[-1] }}</a>
                         {% endif %}
                         </div>
 
