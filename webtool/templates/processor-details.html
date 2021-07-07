@@ -55,7 +55,7 @@
 
 
         {# Processor configuration #}
-        {% if processor.get_options() %}
+        {% if processor.get_options(dataset) %}
         <div class="processor-options-wrap" aria-expanded="false" id="processor-options-{{ dataset.key }}-{{ processor.type }}">
             <fieldset class="processor-options">
                 {% for option in processor.get_options() %}

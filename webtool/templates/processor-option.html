@@ -1,34 +1,34 @@
-{% set settings = processor.get_options()[option] %}
+{% set option_settings = processor.get_options(dataset)[option] %}
 <div class="processor-option-wrap">
-    <label class="option-type-{{ settings.type }}">
-        {% if settings.type == "toggle" %}
-            <input type="checkbox" name="option-{{ option }}"{% if settings.default %} checked="checked"{% endif %}>
+    <label class="option-type-{{ option_settings.type }}">
+        {% if option_settings.type == "toggle" %}
+            <input type="checkbox" name="option-{{ option }}"{% if option_settings.default %} checked="checked"{% endif %}>
         {% endif %}
-        {{ settings.help }}
+        {{ option_settings.help }}
     </label>
 
-    {% if settings.type == "string" %}
-        <input{% if settings.min or settings.max %} class="numeric"{% endif %} name="option-{{ option }}" value="{{ settings.default }}">
-    {% elif settings.type == "choice" %}
+    {% if option_settings.type == "string" %}
+        <input{% if option_settings.min or option_settings.max %} class="numeric"{% endif %} name="option-{{ option }}" value="{{ option_settings.default }}">
+    {% elif option_settings.type == "choice" %}
         <select name="option-{{ option }}">
-        {% for choice in settings.options %}
-            <option value="{{ choice }}"{% if choice == settings.default %} selected="selected"{% endif %}>{{ settings.options[choice] }}</option>
+        {% for choice in option_settings.options %}
+            <option value="{{ choice }}"{% if choice == option_settings.default %} selected="selected"{% endif %}>{{ option_settings.options[choice] }}</option>
         {% endfor %}
         </select>
-    {% elif settings.type == "multi" %}
+    {% elif option_settings.type == "multi" %}
         <div class="multichoice-wrapper">
             <select name="option-{{ option }}" multiple="multiple">
-            {% for choice in settings.options %}
-                <option value="{{ choice }}"{% if choice in settings.default %} selected="selected"{% endif %}>{{ settings.options[choice] }}</option>
+            {% for choice in option_settings.options %}
+                <option value="{{ choice }}"{% if choice in option_settings.default %} selected="selected"{% endif %}>{{ option_settings.options[choice] }}</option>
             {% endfor %}
             </select>
         </div>
     {% endif %}
-    {% if "tooltip" in settings %}
+    {% if "tooltip" in option_settings %}
         {% set pid = uniqid() %}
         <button class="tooltip-trigger" aria-controls="tooltip-option-{{ pid }}" aria-label="Post-processor option details">?</button>
     	<p role="tooltip" id="tooltip-option-{{ pid }}">
-            {{ settings.tooltip }}
+            {{ option_settings.tooltip }}
         </p>
     {% endif %}
 </div>

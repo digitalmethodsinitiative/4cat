@@ -599,19 +599,17 @@ class DataSet:
 
 		return config.GITHUB_URL + "/blob/" + self.data["software_version"] + self.data.get("software_file", "")
 
-	def top_key(self):
+	def top_parent(self):
 		"""
-		Get key of root dataset
+		Get root dataset
 
 		Traverses the tree of datasets this one is part of until it finds one
-		with no source_dataset dataset, then returns that dataset's key.
+		with no source_dataset dataset, then returns that dataset.
 
-		Not to be confused with top kek.
-
-		:return str: Parent key.
+		:return Dataset: Parent dataset
 		"""
 		genealogy = self.get_genealogy()
-		return genealogy[0].key
+		return genealogy[0]
 
 	def get_genealogy(self):
 		"""
