@@ -30,15 +30,6 @@ class TopImageCounter(BasicProcessor):
 	description = "Collect all images used in the data set, and sort by most used. Contains URLs through which the images may be downloaded."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
-	options = {
-		"overwrite": {
-			"type": UserInput.OPTION_TOGGLE,
-			"default": False,
-			"help": "Add extracted image URLs to source csv",
-			"tooltip": "This will add a new column, \"img_url\", to the dataset's csv file."
-		}
-	}
-
 	def process(self):
 		"""
 		This takes a 4CAT results file as input, and outputs a new CSV file
@@ -46,8 +37,6 @@ class TopImageCounter(BasicProcessor):
 		for the image, and one with the amount of times the image was used
 		"""
 		images = {}
-
-		restuls = None
 
 		all_links = [] # Used for overwrite
 
@@ -203,3 +192,27 @@ class TopImageCounter(BasicProcessor):
 		shutil.rmtree(tmp_path)
 
 		self.dataset.update_status("Parent dataset updated.")
+
+	@classmethod
+	def get_options(cls, parent_dataset=None):
+		"""
+		Get processor options
+
+		The feature of this processor that overwrites the parent dataset can
+		only work properly on csv datasets so check the extension before
+		showing it.
+
+		:param parent_dataset:  Dataset to get options for
+		:return dict:
+		"""
+		if parent_dataset and parent_dataset.get_results_path().suffix != ".csv":
+			return {}
+
+		return {
+			"overwrite": {
+				"type": UserInput.OPTION_TOGGLE,
+				"default": False,
+				"help": "Add extracted image URLs to dataset file",
+				"tooltip": "This will add a new column, \"img_url\", to the dataset's csv file."
+			}
+		}

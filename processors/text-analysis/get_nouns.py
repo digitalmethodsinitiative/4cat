@@ -39,12 +39,6 @@ class ExtractNouns(BasicProcessor):
 				"noun_chunks": "Noun chunks"
 			},
 			"help": "Whether to only get 1) separate words indicated as nouns, 2) nouns and compound nouns (nouns with multiple words, e.g.\"United States\") using a custom parser, or 3) noun chunks: nouns plus the words describing them, e.g. \"the old grandpa\". See https://spacy.io/usage/linguistic-features#noun-chunks."
-		},
-		"overwrite": {
-			"type": UserInput.OPTION_TOGGLE,
-			"default": False,
-			"help": "Add extracted nouns to source csv",
-			"tooltip": "Will add a column (\"nouns\", \"nouns_and_compounds\", or \"noun_chunks\"), and the found nouns in the post row."
 		}
 	}
 
@@ -175,8 +169,7 @@ class ExtractNouns(BasicProcessor):
 		self.dataset.update_status("Adding nouns the source file")
 
 		# Get the initial dataset path
-		top_dataset = self.dataset.get_genealogy()[0]
-		top_path = top_dataset.get_results_path()
+		top_path = self.dataset.top_parent().get_results_path()
 
 		# Get a temporary path where we can store the data
 		tmp_path = self.dataset.get_staging_area()
@@ -211,3 +204,26 @@ class ExtractNouns(BasicProcessor):
 		shutil.rmtree(tmp_path)
 
 		self.dataset.update_status("Parent dataset updated.")
+
+	@classmethod
+	def get_options(cls, parent_dataset=None):
+		"""
+		Get processor options
+
+		The feature of this processor that overwrites the parent dataset can
+		only work properly on csv datasets so check the extension before
+		showing it.
+
+		:param parent_dataset:  Dataset to get options for
+		:return dict:
+		"""
+		options = cls.options
+		if parent_dataset and parent_dataset.top_parent().get_results_path().suffix == ".csv":
+			options["overwrite"] = {
+				"type": UserInput.OPTION_TOGGLE,
+				"default": False,
+				"help": "Add extracted nouns to source csv",
+				"tooltip": "Will add a column (\"nouns\", \"nouns_and_compounds\", or \"noun_chunks\"), and the found nouns in the post row."
+			}
+
+		return options

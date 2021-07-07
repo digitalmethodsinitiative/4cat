@@ -31,12 +31,6 @@ class ExtractNouns(BasicProcessor):  #TEMPORARILY DISABLED
 	extension = "csv"  # extension of result file, used internally and in UI
 
 	options = {
-		"overwrite": {
-			"type": UserInput.OPTION_TOGGLE,
-			"default": False,
-			"help": "Add extracted entities to source csv",
-			"tooltip": "Will add the column \"entities\" to the source file with the found entities per post row."
-		},
 		"entities": {
 			"type": UserInput.OPTION_MULTI,
 			"default": [],
@@ -163,8 +157,7 @@ class ExtractNouns(BasicProcessor):  #TEMPORARILY DISABLED
 		self.dataset.update_status("Adding entities the source file")
 
 		# Get the initial dataset path
-		top_dataset = self.dataset.get_genealogy()[0]
-		top_path = top_dataset.get_results_path()
+		top_path = self.dataset.top_parent().get_results_path()
 		
 		# Get a temporary path where we can store the data
 		tmp_path = self.dataset.get_staging_area()
@@ -199,3 +192,26 @@ class ExtractNouns(BasicProcessor):  #TEMPORARILY DISABLED
 		shutil.rmtree(tmp_path)
 
 		self.dataset.update_status("Parent dataset updated.")
+
+	@classmethod
+	def get_options(cls, parent_dataset=None):
+		"""
+		Get processor options
+
+		The feature of this processor that overwrites the parent dataset can
+		only work properly on csv datasets so check the extension before
+		showing it.
+
+		:param parent_dataset:  Dataset to get options for
+		:return dict:
+		"""
+		options = cls.options
+		if parent_dataset and parent_dataset.top_parent().get_results_path().suffix == ".csv":
+			options["overwrite"] = {
+				"type": UserInput.OPTION_TOGGLE,
+				"default": False,
+				"help": "Add extracted nouns to source csv",
+				"tooltip": "Will add a column (\"nouns\", \"nouns_and_compounds\", or \"noun_chunks\"), and the found nouns in the post row."
+			}
+
+		return options
