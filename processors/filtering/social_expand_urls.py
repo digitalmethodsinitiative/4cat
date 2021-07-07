@@ -136,6 +136,15 @@ class UrlUnshortener(BasicProcessor):
     "api.parler.com", "trib.al"
     )
 
+    @classmethod
+    def is_compatible_with(cls, dataset=None):
+        """
+        Allow processor on CSV files
+
+        :param DataSet dataset:  Dataset to determine compatibility with
+        """
+        return dataset.get_results_path().suffix == ".csv"
+
     def process(self):
         """
         Expand URLs from URL shorteners
