@@ -63,7 +63,12 @@ class URLCoLinker(BasicProcessor):
 		colink = {}
 		urls = set()
 		links = {}
+		processed = 0
 		for post in self.iterate_items(self.source_file):
+			processed += 1
+			if processed % 50:
+				self.dataset.update_status("Extracting URLs from item %i" %)
+
 			if not post["body"]:
 				continue
 
@@ -104,6 +109,7 @@ class URLCoLinker(BasicProcessor):
 			links[unit_id] = [*post_links, *links[unit_id]]
 
 		# create co-link pairs from all links per co-link unit (thread or post)
+		self.dataset.update_status("Finding common URLs")
 		for unit_id in links:
 			post_links = links[unit_id]
 
@@ -136,6 +142,7 @@ class URLCoLinker(BasicProcessor):
 				colink[pair] += 1
 
 		# write GDF file
+		self.dataset.update_status("Writing network file")
 		with self.dataset.get_results_path().open("w", encoding="utf-8") as results:
 			results.write("nodedef>name VARCHAR\n")
 			for url in urls:
