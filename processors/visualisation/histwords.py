@@ -147,6 +147,10 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
             else:
                 common_vocab &= set(model.vocab.keys())  # intersect
 
+        if not common_vocab:
+            self.dataset.update_status("No vocabulary common across all models, cannot diachronically chart words", is_final=True)
+            return
+
         # sort common vocabulary by combined frequency across all models
         # this should make filtering for common words a bit faster further down
         self.dataset.update_status("Sorting vocabulary")
