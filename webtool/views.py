@@ -469,7 +469,7 @@ def delete_dataset_interactive(key):
 	except TypeError:
 		return error(404, message="Dataset not found.")
 	
-	top_key = dataset.top_key()
+	top_key = dataset.top_parent().key
 
 	success = delete_dataset(key)
 
