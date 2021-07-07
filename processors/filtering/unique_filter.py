@@ -2,7 +2,7 @@
 Filter by unique posts
 """
 import hashlib
-
+import os
 import csv
 
 from backend.abstract.processor import BasicProcessor
@@ -68,7 +68,7 @@ class UniqueFilter(BasicProcessor):
 				if not post.get("body", None):
 					continue
 
-				body = post["body"]
+				body = post["body"].strip()
 				if not self.parameters.get("case_sensitive", False):
 					body = body.lower()
 
