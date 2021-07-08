@@ -92,7 +92,10 @@ class HashtagUserBipartiteGrapher(BasicProcessor):
 						self.dataset.update_status("Dataset has no 'hashtags' or 'tags' column, cannot analyse tag usage", is_final=True)
 						return
 
-				for tag in post.get(tag_field, "").split(","):
+				if not post.get(tag_field):
+					continue
+
+				for tag in post.get(tag_field).split(","):
 					tags.append(tag.strip())
 
 			# just in case
