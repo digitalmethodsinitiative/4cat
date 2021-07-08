@@ -32,7 +32,7 @@
 
                         <div class="property-container">
                             <p class="result">
-                                <a href="{{ url_for('show_result', key=dataset.key) }}"><i class="fas fa-link" aria-label="Permalink" title="Permalink"></i></a>
+                                <a href="{{ url_for('show_result', key=dataset.key) }}"><i class="fas fa-link" aria-label="Permalink" title="Permalink"></i><span class="sr-only">show result</span></a>
                                 <span class="property-badge">{{ dataset.parameters.datasource if "datasource" in dataset.parameters else "4chan" }}{% if "board" in dataset.parameters and dataset.parameters.board %}/{{ dataset.parameters.board }}/{% endif %}</span>
                                 {% include 'result-metadata.html' %}
                             </p>
