@@ -77,9 +77,9 @@ class SimilarWord2VecWords(BasicProcessor):
 
 		input_words = input_words.split(",")
 
-		num_words = convert_to_int(self.parameters.get("num-words"))
+		num_words = convert_to_int(self.parameters.get("num-words", 10))
 		try:
-			threshold = float(self.parameters.get("threshold"))
+			threshold = float(self.parameters.get("threshold", 0.25))
 		except ValueError:
 			threshold = float(self.get_options()["threshold"]["default"])
 

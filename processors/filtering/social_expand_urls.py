@@ -139,11 +139,18 @@ class UrlUnshortener(BasicProcessor):
     @classmethod
     def is_compatible_with(cls, dataset=None):
         """
-        Allow processor on CSV files
+        Allow processor on datasets containing a tags column
 
         :param DataSet dataset:  Dataset to determine compatibility with
         """
-        return dataset.get_results_path().suffix == ".csv"
+        if dataset.get_results_path().suffix == ".csv" and dataset.get_results_path().exists():
+            # csv can just be sniffed for the presence of a column
+            with dataset.get_results_path().open(encoding="utf-8") as infile:
+                reader = csv.DictReader(infile)
+                return "body" in reader.fieldnames
+        else:
+            return False
+
 
     def process(self):
         """

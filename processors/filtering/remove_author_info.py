@@ -32,7 +32,7 @@ class AuthorInfoRemover(BasicProcessor):
 
         :param DataSet dataset:  Dataset to determine compatibility with
         """
-        return dataset.get_results_path().suffix == ".csv"
+        return dataset.get_results_path().suffix == ".csv" and dataset.get_results_path().exists()
 
     def process(self):
         """
