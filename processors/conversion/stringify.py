@@ -26,6 +26,16 @@ class Stringify(BasicProcessor):
 			"type": UserInput.OPTION_TOGGLE,
 			"default": True,
 			"help": "Remove URLs"
+		},
+		"strip-numbers": {
+			"type": UserInput.OPTION_TOGGLE,
+			"default": False,
+			"help": "Remove numbers"
+		},
+		"to-lowercase": {
+			"type": UserInput.OPTION_TOGGLE,
+			"default": True,
+			"help": "Convert text to lowercase"
 		}
 	}
 
@@ -35,10 +45,16 @@ class Stringify(BasicProcessor):
 		containing all post bodies as one continuous string, sanitized.
 		"""
 
-		link_regex = re.compile(r"https?://[^\s]+")
-		delete_regex = re.compile(r"[^a-zA-Z)(.,\n -]")
-
 		strip_urls = self.parameters.get("strip-urls")
+		strip_numbers = self.parameters.get("strip-numbers")
+		to_lowercase = self.parameters.get("to-lowercase")
+
+		link_regex = re.compile(r"https?://[^\s]+")\
+
+		if strip_numbers:
+			delete_regex = re.compile(r"[^a-zA-Z)(.,\n -]")
+		else:
+			delete_regex = re.compile(r"[^a-zA-Z0-9)(.,\n -]")
 
 		posts = 0
 		self.dataset.update_status("Processing posts")
@@ -50,8 +66,14 @@ class Stringify(BasicProcessor):
 
 				if strip_urls:
 					post["body"] = link_regex.sub("", post["body"])
-				results.write(re.sub(r"\s+", " ", delete_regex.sub(" ", post["body"])).strip() + " ")
 
+				if to_lowercase:
+					post["body"] = post["body"].lower()
+
+				# Keeps words like "isn't" intact
+				post["body"] = post["body"].replace("'", "")
+
+				results.write(re.sub(r"\s+", " ", delete_regex.sub(" ", post["body"])).strip() + " ")
 
 		self.dataset.update_status("Finished")
 		self.dataset.finish(posts)
