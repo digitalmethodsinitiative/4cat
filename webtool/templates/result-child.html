@@ -10,10 +10,10 @@
 
     <div class="button-object">
 
-    {% if item.is_finished() and not is_filtered %}<a href="{{ url_for('get_result', query_file=item.result_file) }}">{% endif %}
+    {% if item.is_finished() and not is_filtered %}<a href="{{ url_for('get_result', query_file=item.result_file)[:-1] }}">{% endif %}
         <span class="headline">
-            {% if item.is_finished() and not is_filtered %}<a href="{{ url_for('get_result', query_file=item.result_file) }}">{% endif %}
-            {% if item.is_finished() and is_filtered and "copied_to" in item.parameters %}<a href="{{ url_for('show_results') }}//{{ item.parameters.copied_to }}/">{% endif %}
+            {% if item.is_finished() and not is_filtered %}<a href="{{ url_for('get_result', query_file=item.result_file)[:-1] }}">{% endif %}
+            {% if item.is_finished() and is_filtered and "copied_to" in item.parameters %}<a href="{{ url_for('show_results') }}/{{ item.parameters.copied_to }}/">{% endif %}
             {% if is_filtered %}
             <i class="fa fa-filter" aria-hidden="true"></i> <span class="sr-only">Filter</span>
             {% elif item.is_finished() and item.num_rows > 0 %}
