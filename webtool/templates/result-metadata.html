@@ -35,7 +35,7 @@
     <span class="property-badge second-tier">dense threads ({{ dataset.parameters.scope_density }}%/&gt; {{ dataset.parameters.scope_length }})</span>
 {% endif %}
 
-{% if (dataset.parameters.min_date or dataset.parameters.max_date) and (dataset.parameters.min_date > 0 or dataset.parameters.max_date > 0) %}
+{% if (dataset.parameters.min_date and dataset.parameters.min_date > 0) or (dataset.parameters.max_date and dataset.parameters.max_date > 0) %}
     {% if dataset.parameters.min_date and dataset.parameters.min_date > 0 %}
         <span class="property-badge">From</span>
         <span class="inline-query">{{ dataset.parameters.min_date|datetime }}</span>
