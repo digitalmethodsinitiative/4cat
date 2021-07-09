@@ -149,7 +149,7 @@ class UrlUnshortener(BasicProcessor):
                 reader = csv.DictReader(infile)
                 try:
                     return "body" in reader.fieldnames
-                except ValueError:
+                except (TypeError, ValueError):
                     # invalid csv file
                     return False
         else:
