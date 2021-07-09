@@ -68,7 +68,12 @@ class SVGHistogramRenderer(BasicProcessor):
 			return
 
 		self.dataset.update_status("Cleaning up data")
-		(missing, intervals) = pad_interval(intervals)
+		try:
+			(missing, intervals) = pad_interval(intervals)
+		except ValueError:
+			self.dataset.update_status("Some of the items in the dataset contain invalid dates; cannot count frequencies per interval.", is_final=True)
+			self.dataset.finish(0)
+			return
 
 		# create histogram
 		self.dataset.update_status("Drawing histogram")

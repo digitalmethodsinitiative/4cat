@@ -39,7 +39,7 @@ class CowordNetworker(BasicProcessor):
 
 		# Since there's no suitable way to show time 
 		# This processor only works on overall collocations.
-		date_value = self.dataset.get_genealogy()[-3].parameters["docs_per"]
+		date_value = self.dataset.get_genealogy()[-3].parameters.get("docs_per", "overall")
 
 		if date_value != "all":
 			self.dataset.update_status("To use this module, \"Produce documents per\" in the tokeniser should be set to \"Overall\".")

@@ -360,22 +360,29 @@ class DataSet:
 		"""
 		return self.data["is_finished"] == True
 
-	def is_rankable(self):
+	def is_rankable(self, multiple_items=True):
 		"""
 		Determine if a dataset is rankable
 
 		Rankable means that it is a CSV file with 'date' and 'value' columns
 		as well as one or more item label columns
 
+		:param bool multiple_items:  Consider datasets with multiple items per
+		item (e.g. word_1, word_2, etc)?
+
 		:return bool:  Whether the dataset is rankable or not
 		"""
 		if self.get_results_path().suffix != ".csv" or not self.get_results_path().exists():
 			return False
 
+		column_options = {"date", "value", "item"}
+		if multiple_items:
+			column_options.add("word_1")
+
 		with self.get_results_path().open(encoding="utf-8") as infile:
 			reader = csv.DictReader(infile)
 			try:
-				return len(set(reader.fieldnames) & {"date", "value", "item", "word_1"}) >= 3
+				return len(set(reader.fieldnames) & column_options) >= 3
 			except (TypeError, ValueError):
 				return False
 

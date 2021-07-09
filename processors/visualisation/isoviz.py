@@ -81,7 +81,7 @@ class IsometricMultigraphRenderer(BasicProcessor):
 
 		:param DataSet dataset:  Dataset to determine compatibility with
 		"""
-		return dataset.is_rankable()
+		return dataset.is_rankable(multiple_items=False)
 
 	def process(self):
 		graphs = {}
