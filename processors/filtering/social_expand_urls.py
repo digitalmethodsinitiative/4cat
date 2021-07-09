@@ -147,7 +147,11 @@ class UrlUnshortener(BasicProcessor):
             # csv can just be sniffed for the presence of a column
             with dataset.get_results_path().open(encoding="utf-8") as infile:
                 reader = csv.DictReader(infile)
-                return "body" in reader.fieldnames
+                try:
+                    return "body" in reader.fieldnames
+                except ValueError:
+                    # invalid csv file
+                    return False
         else:
             return False
 
