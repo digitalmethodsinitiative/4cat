@@ -72,6 +72,7 @@ function init() {
     // dataset label edit
     $('.result-page .card h2').each(query.label.init);
     $(document).on('click', '.edit-dataset-label', query.label.handle);
+    $(document).on('keydown', '#new-dataset-label', query.label.handle);
 
     //allow opening given analysis path via anchor links
     navpath = window.location.hash.substr(1);
@@ -745,10 +746,13 @@ query = {
         },
 
         handle: function(e) {
-            if($(this).find('i').hasClass('fa-check')) {
-                query.label.save(e, this);
+            let button = $(this).parents('div').find('button');
+            if(e.type == 'keydown' && e.keyCode != 13) { return; }
+
+            if(button.find('i').hasClass('fa-check')) {
+                query.label.save(e, button);
             } else {
-                query.label.edit(e, this);
+                query.label.edit(e, button);
             }
         },
 
