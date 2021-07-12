@@ -37,6 +37,15 @@ class SearchWithTwitterAPIv2(Search):
                     "search query. Note that any tweets retrieved with 4CAT will count towards your monthly Tweet "
                     "retrieval cap. Also note that results are saved as [NDJSON](http://ndjson.org/), not CSV. "
         },
+        "api_type": {
+            "type": UserInput.OPTION_CHOICE,
+            "help": "API type",
+            "options": {
+                "all": "Academic: Full-archive search",
+                "recent": "Standard: Recent search (Tweets published in last 7 days)",
+            },
+            "default": "all"
+        },
         "query": {
             "type": UserInput.OPTION_TEXT_LARGE,
             "help": "Query"
@@ -81,7 +90,7 @@ class SearchWithTwitterAPIv2(Search):
         bearer_token = self.parameters.get("api_bearer_token")
         auth = {"Authorization": "Bearer %s" % bearer_token}
 
-        endpoint = "https://api.twitter.com/2/tweets/search/all"
+        endpoint = "https://api.twitter.com/2/tweets/search/" + query.get("api_type")
 
         # these are all expansions and fields available at the time of writing
         # since it does not cost anything extra in terms of rate limiting, go
@@ -358,6 +367,7 @@ class SearchWithTwitterAPIv2(Search):
         return {
             "query": query.get("query"),
             "api_bearer_token": query.get("api_bearer_token"),
+            "api_type": query.get("api_type"),
             "min_date": after,
             "max_date": before,
             "amount": query.get("amount")
@@ -418,3 +428,4 @@ class SearchWithTwitterAPIv2(Search):
                 [mention["username"] for mention in tweet.get("entities", {}).get("mentions", [])[:1]]) if any(
                 [ref.get("type") == "replied_to" for ref in tweet.get("referenced_tweets", [])]) else ""
         }
+

@@ -4,6 +4,7 @@ import random
 import json
 import math
 import csv
+import copy
 
 from pathlib import Path
 from abc import ABC, abstractmethod
@@ -140,7 +141,7 @@ class Search(BasicProcessor, ABC):
 		and a human-readable timestamp is provided next to the UNIX timestamp.
 
 		:param results:			List of dict rows from data source.
-		:param filepath:    	Filepath for the resulting csv
+		:param filepath:		Filepath for the resulting csv
 
 		:return int:  Amount of posts that were processed
 
@@ -250,6 +251,7 @@ class Search(BasicProcessor, ABC):
 			hash_cache = {}
 			hasher = hashlib.blake2b(digest_size=24)
 			hasher.update(str(config.ANONYMISATION_SALT).encode("utf-8"))
+			check_cashe = CheckCashe(hash_cache, hasher)
 
 		processed = 0
 		with filepath.open("w", encoding="utf-8", newline="") as outfile:
@@ -260,8 +262,9 @@ class Search(BasicProcessor, ABC):
 				# replace author column with salted hash of the author name, if
 				# pseudonymisation is enabled
 				if pseudonymise_author:
-					check_cashe = CheckCashe(hash_cache, hasher)
-					self.search_and_update(item, ['author'], check_cashe.update_cache)
+					temp_item = copy.deepcopy(item)
+					self.search_and_update(temp_item, ['author'], check_cashe.update_cache)
+					item = temp_item
 
 				outfile.write(json.dumps(item) + "\n")
 				processed += 1
@@ -285,33 +288,35 @@ class Search(BasicProcessor, ABC):
 
 		:param Dict/List d_or_l:  dictionary/list/json to loop through
 		:param String match_terms:  list of strings that will be matched to dictionary keys
-		:param Function change_function:  function appled to all values of any items nested under a matching key 
+		:param Function change_function:  function appled to all values of any items nested under a matching key
 		"""
 		if isinstance(d_or_l, dict):
-		    # Iterate through dictionary
-		    for key, value in iter(d_or_l.items()):
-		        if match_terms == True or any([match in key for match in match_terms]):
-		            # Match found; apply function to all items and subitems
-		            if isinstance(value, (list, dict)):
-		                # Pass item through again with match_terms = True
-		                self.search_and_update(d_or_l[key], True, change_funcion)
-		            else:
-		                # Update the value
-		                d_or_l[key] = change_funcion(d_or_l[key])
-		        elif isinstance(value, (list, dict)):
-		            # Continue search
-		            self.search_and_update(d_or_l[key], match_terms, change_funcion)
+			# Iterate through dictionary
+			for key, value in iter(d_or_l.items()):
+				if match_terms == True or any([match in key for match in match_terms]):
+					# Match found; apply function to all items and subitems
+					if isinstance(value, (list, dict)):
+						# Pass item through again with match_terms = True
+						self.search_and_update(value, True, change_funcion)
+					elif value is None:
+						pass
+					else:
+						# Update the value
+						d_or_l[key] = change_funcion(value)
+				elif isinstance(value, (list, dict)):
+					# Continue search
+					self.search_and_update(value, match_terms, change_funcion)
 		elif isinstance(d_or_l, list):
-		    # Iterate through list
-		    for n, i in enumerate(d_or_l):
-		        if isinstance(i, (list, dict)):
-		            # Continue search
-		            self.search_and_update(d_or_l[n], match_terms, change_funcion)
-		        elif match_terms == True:
-		            # List item nested in matching
-		            d_or_l[n] = change_funcion(d_or_l[n])
+			# Iterate through list
+			for n, value in enumerate(d_or_l):
+				if isinstance(value, (list, dict)):
+					# Continue search
+					self.search_and_update(value, match_terms, change_funcion)
+				elif match_terms == True:
+					# List item nested in matching
+					d_or_l[n] = change_funcion(value)
 		else:
-		    raise Exception('Must pass list or dictionary')
+			raise Exception('Must pass list or dictionary')
 
 class CheckCashe():
 	"""
@@ -326,7 +331,7 @@ class CheckCashe():
 		Checks the hash_cache to see if the value has been cached previously,
 		updates the hash_cache if needed, and returns the hashed value.
 		"""
-		value = str(value)
+		# value = str(value)
 		if value not in self.hash_cache:
 			author_hasher = self.hasher.copy()
 			author_hasher.update(str(value).encode("utf-8"))
