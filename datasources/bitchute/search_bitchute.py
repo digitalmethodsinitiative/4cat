@@ -129,10 +129,10 @@ class SearchBitChute(Search):
 
         return chain(*results)
 
-    def get_videos_id(self, session, id, csrftoken, detail):
+    def get_videos_id(self, session, video_id, csrftoken, detail):
         dummy_video = {
-            "id": id,
-            "thread_id": id,
+            "id": video_id,
+            "thread_id": video_id,
             "subject": "",
             "body": "",
             "author": "",
@@ -149,6 +149,8 @@ class SearchBitChute(Search):
         # get details for 'free'
         if detail == "basic":
             detail = "detail"
+
+        self.dataset.update_status("Getting details for video '%s'" % video_id)
 
         video, comments = self.append_details(dummy_video, detail)
         if not video:
