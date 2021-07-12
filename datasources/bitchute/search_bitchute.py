@@ -537,7 +537,7 @@ class SearchBitChute(Search):
         # reformat queries to be a comma-separated list with no wrapping
         # whitespace
         items = query.get("query").replace("\n", ",")
-        if len(items.split(",")) > 15:
+        if len(items.split(",")) > 15 and query.get("search_type") != "url":
             raise QueryParametersException("You cannot query more than 15 items at a time.")
 
         # simple!
