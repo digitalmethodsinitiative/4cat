@@ -317,6 +317,50 @@ def check_dataset():
 
 	return jsonify(status)
 
+@app.route("/api/edit-dataset-label/<string:key>/", methods=["POST"])
+@api_ratelimit
+@login_required
+@openapi.endpoint("tool")
+def edit_dataset_label(key):
+	"""
+	Change label for a dataset
+
+	Only allowed for dataset owner or admin!
+
+	:request-param str key:  ID of the dataset for which to change the label
+	:return: Label info, containing the dataset `key`, the dataset `url`,
+	         and the new `label`.
+
+	:return-schema: {
+		type=object,
+		properties={
+			key={type=string},
+			url={type=string},
+			label={type=string}
+		}
+	}
+
+	:return-error 404:  If the dataset does not exist.
+	:return-error 403:  If the user is not owner of the dataset or an admin
+	"""
+	dataset_key = request.form.get("key", "") if not key else key
+	label = request.form.get("label", "")
+
+	try:
+		dataset = DataSet(key=dataset_key, db=db)
+	except TypeError:
+		return error(404, error="Dataset does not exist.")
+
+	if not current_user.is_admin() and not current_user.get_id() == dataset.parameters.get("user"):
+		return error(403, message="Not allowed")
+
+	dataset.update_label(label)
+	return jsonify({
+		"key": dataset.key,
+		"url": url_for("show_result", key=dataset.key),
+		"label": dataset.get_label()
+	})
+
 
 @app.route("/api/delete-query/", methods=["DELETE", "POST"])
 @api_ratelimit

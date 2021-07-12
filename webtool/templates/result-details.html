@@ -2,7 +2,9 @@
 <section class="result-tree" data-dataset-key="{{ dataset.key }}">
     <div class="card query{% if not dataset.is_finished() %} unfinished{% endif %}">
 
-        <h2 class="blocktitle"><span><a href="{{ url_for('show_results', key=dataset.key) }}">{{ dataset.get_label() }}</a></span></h2>
+        <h2 class="blocktitle">
+            <span><a href="{{ url_for('show_results', key=dataset.key) }}">{{ dataset.get_label() }}</a></span>
+        </h2>
 
         {% if current_user.is_authenticated %}
             <nav class="dataset-toolbox" aria-label="Actions for dataset">

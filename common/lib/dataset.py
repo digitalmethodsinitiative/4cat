@@ -400,6 +400,18 @@ class DataSet:
 		except json.JSONDecodeError:
 			return {}
 
+	def update_label(self, label):
+		"""
+		Update label for this dataset
+
+		:param str label:  New label
+		:return str:  The new label, as returned by get_label
+		"""
+		self.parameters["label"] = label
+
+		self.db.update("datasets", data={"parameters": json.dumps(self.parameters)}, where={"key": self.key})
+		return self.get_label()
+
 	def get_label(self, parameters=None, default="Query"):
 		"""
 		Generate a readable label for the dataset

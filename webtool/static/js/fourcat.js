@@ -69,6 +69,10 @@ function init() {
     // dataset deletion
     $(document).on('click', '.delete-link', processor.delete);
 
+    // dataset label edit
+    $('.result-page .card h2').each(query.label.init);
+    $(document).on('click', '.edit-dataset-label', query.label.handle);
+
     //allow opening given analysis path via anchor links
     navpath = window.location.hash.substr(1);
     if (navpath.substring(0, 4) === 'nav=') {
@@ -131,6 +135,27 @@ function init() {
         } else {
             return true;
         }
+    });
+
+    //long texts with '...more' link
+    $(document).on('click', 'div.expandable a', function(e) {
+        e.preventDefault();
+
+        if($(this).text() == '...more') {
+            $(this).text('...less');
+            $(this).parent().find('.sr-only').removeClass('sr-only').addClass('expanded');
+        } else {
+            $(this).text('...more');
+            $(this).parent().find('.expanded').addClass('sr-only').removeClass('expanded');
+        }
+    });
+    $('.has-more').each(function() {
+        let max_length = parseInt($(this).attr('data-max-length'));
+        let full_value = $(this).text();
+        if(full_value.length < max_length) {
+            return;
+        }
+        $(this).replaceWith('<div class="expandable">' + full_value.substring(0, max_length) + '<span class="sr-only">' + full_value.substring(max_length) + '</span><a href="#">...more</a></div>');
     });
 }
 
@@ -711,6 +736,54 @@ query = {
             $(input_id).val(0);
         } else {
             $(input_id).val(timestamp);
+        }
+    },
+
+    label: {
+        init: function() {
+            $(this).append('<button class="edit-dataset-label"><i class="fa fa-edit"></i><span class="sr-only">Edit label</span></button>');
+        },
+
+        handle: function(e) {
+            if($(this).find('i').hasClass('fa-check')) {
+                query.label.save(e, this);
+            } else {
+                query.label.edit(e, this);
+            }
+        },
+
+        edit: function(e, self) {
+            e.preventDefault();
+            let current = $(self).parent().find('span a');
+            let field = $('<input id="new-dataset-label">');
+            field.val(current.text());
+            field.attr('data-url', current.attr('href'));
+            current.replaceWith(field);
+            field.focus().select();
+            $(self).parent().find('i.fa').removeClass('fa-edit').addClass('fa-check');
+        },
+
+        save: function(e, self) {
+            e.preventDefault();
+            let field = $(self).parent().find('input');
+            let new_label = field.val();
+            let dataset_key = $('section.result-tree').attr('data-dataset-key')
+
+            $.post({
+                dataType: "json",
+                url: '/api/edit-dataset-label/' + dataset_key + '/',
+                data: {label: new_label},
+                cache: false,
+
+                success: function (json) {
+                    let link = $('<a href="' + json.url + '">' + json.label + '</a>');
+                    field.replaceWith(link);
+                    $(self).parent().find('i.fa').removeClass('fa-check').addClass('fa-edit');
+                },
+                error: function (response) {
+                    alert('Oh no! ' +response.text);
+                }
+            });
         }
     }
 };

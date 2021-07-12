@@ -217,6 +217,12 @@ button:hover, .button-like:not(.inactive):hover {
     padding-bottom: 1em;
 }
 
+/** --------------------- *
+  Utility classes -> Lists
+  * --------------------- */
+.expandable {
+    display: inline;
+}
 
 /** --------------------- *
   Utility classes -> Lists
