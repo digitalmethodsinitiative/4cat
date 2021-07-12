@@ -244,6 +244,9 @@ def queue_dataset():
 	extension = search_worker.extension if hasattr(search_worker, "extension") else "csv"
 	dataset = DataSet(parameters=sanitised_query, db=db, type=search_worker_id, extension=extension)
 
+	if request.form.get("label"):
+		dataset.update_label(request.form.get("label"))
+
 	if hasattr(search_worker, "after_create"):
 		search_worker.after_create(sanitised_query, dataset, request)
 

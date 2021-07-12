@@ -754,6 +754,10 @@ article section li p, article aside li p {
     opacity: 1;
 }
 
+.result-list h4 {
+    display: inline-block;
+}
+
 ol.result-list li {
     display: grid;
     grid-template-columns: auto auto 10em;
