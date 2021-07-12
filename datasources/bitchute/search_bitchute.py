@@ -12,7 +12,7 @@ import re
 from itertools import chain
 from bs4 import BeautifulSoup
 
-from common.lib.helpers import UserInput
+from common.lib.helpers import UserInput, strip_tags
 from backend.abstract.search import Search
 from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException
 
@@ -48,7 +48,8 @@ class SearchBitChute(Search):
             "help": "Search by",
             "options": {
                 "search": "Search query",
-                "user": "Username"
+                "user": "Username",
+                "url": "Video URL or ID"
             },
             "default": "search"
         },
@@ -117,10 +118,48 @@ class SearchBitChute(Search):
 
             if query_type == "search":
                 results.append(self.get_videos_query(session, query, csrftoken, detail))
+            elif query_type == "url":
+                if "/video/" in query:
+                    query = query.split("/video/")[1].split("/")[0]
+                    # else assume bare ID
+
+                results.append(self.get_videos_id(session, query, csrftoken, detail))
             else:
                 results.append(self.get_videos_user(session, query, csrftoken, detail))
 
         return chain(*results)
+
+    def get_videos_id(self, session, id, csrftoken, detail):
+        dummy_video = {
+            "id": id,
+            "thread_id": id,
+            "subject": "",
+            "body": "",
+            "author": "",
+            "author_id": "",
+            "timestamp": None,
+            "url": "https://www.bitchute.com/video/" + id + "/",
+            "views": None,
+            "length": None,
+            "thumbnail_image": None,
+
+        }
+
+        # we can't use the BitChute search, so do one request per URL, and
+        # get details for 'free'
+        if detail == "basic":
+            detail = "detail"
+
+        video, comments = self.append_details(dummy_video, detail)
+        if not video:
+            # unrecoverable error while scraping details
+            return
+
+        yield video
+        for comment in comments:
+            # these need to be yielded *after* the video because else the result file will have the comments
+            # before the video, which is weird
+            yield comment
 
     def get_videos_user(self, session, user, csrftoken, detail):
         """
@@ -180,7 +219,7 @@ class SearchBitChute(Search):
                     "id": link["href"].split("/")[-2],
                     "thread_id": link["href"].split("/")[-2],
                     "subject": link.text,
-                    "body": video_element.select_one(".channel-videos-text").encode_contents().decode("utf-8").strip(),
+                    "body": strip_tags(video_element.select_one(".channel-videos-text").text),
                     "author": container_soup.select_one(".details .name a").text,
                     "author_id": container_soup.select_one(".details .name a")["href"].split("/")[2],
                     "timestamp": int(
@@ -298,6 +337,7 @@ class SearchBitChute(Search):
             "comments": "",
             "hashtags": "",
             "parent_id": "",
+            "video_url": ""
         }
 
         try:
@@ -325,12 +365,19 @@ class SearchBitChute(Search):
                     "comments": "",
                     "hashtags": "",
                     "parent_id": "",
+                    "video_url": ""
                 }
                 return (video, [])
 
             soup = BeautifulSoup(video_page.text, 'html.parser')
             video_csfrtoken = soup.findAll("input", {"name": "csrfmiddlewaretoken"})[0].get("value")
 
+            video["video_url"] = soup.select_one("video#player source").get("src")
+            video["thumbnail_image"] = soup.select_one("video#player").get("poster")
+            video["subject"] = soup.select_one("h1#video-title").text
+            video["author"] = soup.select_one("div.channel-banner p.name a").text
+            video["author_id"] = soup.select_one("div.channel-banner p.name a").get("href").split("/")[2]
+            video["body"] = soup.select_one("div#video-description").encode_contents().decode("utf-8").strip()
 
             # we need *two more requests* to get the comment count and like/dislike counts
             # this seems to be because bitchute uses a third-party comment widget
@@ -384,7 +431,7 @@ class SearchBitChute(Search):
                             "dislikes": "",
                             "channel_subscribers": "",
                             "comments": "",
-                            "parent_id": comment.get("parent", "") if "parent" in comment else video["id"]
+                            "parent_id": comment.get("parent", "") if "parent" in comment else video["id"],
                         })
 
             else:
