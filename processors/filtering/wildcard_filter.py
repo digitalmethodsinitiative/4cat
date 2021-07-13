@@ -71,6 +71,7 @@ class WildcardFilter(BasicProcessor):
 
             # iterate through posts and see if they match
             for post in self.iterate_items(self.source_file):
+                processed += 1
                 if not post.get("body", None):
                     continue
 
