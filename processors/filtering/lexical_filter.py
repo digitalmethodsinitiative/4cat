@@ -148,6 +148,8 @@ class LexicalFilter(BasicProcessor):
 				writer.writerow(post)
 
 				matching_items += 1
+
+		self.dataset.update_status("New dataset created with %i matching item(s)" % matching_items, is_final=True)
 		self.dataset.finish(matching_items)
 
 	def after_process(self):
