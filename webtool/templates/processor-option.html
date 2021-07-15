@@ -23,6 +23,14 @@
             {% endfor %}
             </select>
         </div>
+    {% elif option_settings.type == "multi_select" %}
+        <div class="multi-select-wrapper">
+            <select name="option-{{ option }}" multiple="multiple">
+            {% for choice in option_settings.options %}
+                <option value="{{ choice }}"{% if choice in option_settings.default %} selected="selected"{% endif %}>{{ option_settings.options[choice] }}</option>
+            {% endfor %}
+            </select>
+        </div>
     {% endif %}
     {% if "tooltip" in option_settings %}
         {% set pid = uniqid() %}

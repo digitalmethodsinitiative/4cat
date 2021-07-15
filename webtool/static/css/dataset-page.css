@@ -344,6 +344,41 @@ article.result > section:first-child {
     left: -.75em;
 }
 
+.multi-select-options {
+    position: relative;
+    display: inline-block;
+    max-height: 175px;
+    max-width: 20em;
+    overflow-y: scroll;
+    overflow-x: hidden;
+    background-color: var(--gray);
+}
+
+.multi-select-options div {
+    position: relative;
+    display: inline-block;
+    width: 100%;
+}
+
+.multi-select-options div label {
+    display: inline-block;
+    width: 100%;
+    text-align: left;
+    cursor: pointer;
+    user-select: none;
+}
+
+.multi-select-selected {
+    min-height: 30px;
+}
+
+.multi-select-selected .property-badge {
+    display: inline-block;
+    margin-right: 1px;
+    cursor: pointer;
+    user-select: none;
+}
+
 @keyframes child-blink {
     0% {
         color: var(--accent-alternate);
