@@ -24,13 +24,15 @@ class ConvertCSVToMacExcel(BasicProcessor):
 	extension = "csv"  # extension of result file, used internally and in UI
 
 	@classmethod
-	def is_compatible_with(cls, dataset=None):
+	def is_compatible_with(cls, module=None):
 		"""
 		Determine if processor is compatible with dataset
 
-		:param DataSet dataset:  Dataset to determine compatibility with
+		:param module: Dataset or processor to determine compatibility with
 		"""
-		return dataset.get_results_path().suffix in [".csv", ".ndjson"] and dataset.get_results_path().exists()
+		if module.is_dataset():
+			return module.get_results_path().suffix in [".csv", ".ndjson"] and module.get_results_path().exists()
+		return False
 
 	def process(self):
 		"""

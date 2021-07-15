@@ -794,6 +794,11 @@ class DataSet:
 		"""
 		self.link_parent("")
 
+	def is_dataset(self):
+		"""
+		Used for dataset compatibility
+		"""
+		return True
 
 	def __getattr__(self, attr):
 		"""

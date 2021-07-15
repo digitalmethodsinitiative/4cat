@@ -39,13 +39,13 @@ class VectorRanker(BasicProcessor):
 	}
 
 	@classmethod
-	def is_compatible_with(cls, dataset=None):
+	def is_compatible_with(cls, module=None):
 		"""
 		Allow processor on token vectors
 
-		:param DataSet dataset:  Dataset to determine compatibility with
+		:param module: Dataset or processor to determine compatibility with
 		"""
-		return dataset.type == "vectorise-tokens"
+		return module.type == "vectorise-tokens"
 
 	def process(self):
 		"""

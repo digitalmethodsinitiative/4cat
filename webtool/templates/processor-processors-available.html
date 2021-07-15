@@ -1,0 +1,13 @@
+<a class="property-badge popup-trigger tooltip-trigger" aria-controls="popup-available-{{ processor.type }} tooltip-available-{{ processor.type }}">
+    <i class="fa fa-sitemap" aria-hidden="true"></i> {{ processors_available|length }}
+</a>
+<p role="tooltip" id="tooltip-available-{{ processor.type }}" aria-hidden="true">What this processor allows for</p>
+
+<div role="dialog" id="popup-available-{{ processor.type }}">
+    <h2><i class="fa fa-sitemap" aria-hidden="true"></i> What this processor allows for</h2>
+    <ol>
+        {% for processor_available in processors_available %}
+            <li><strong>{{ processor_available.title }}:</strong> {{ processor_available.description }}</li>
+        {% endfor %}
+    </ol>
+</div>

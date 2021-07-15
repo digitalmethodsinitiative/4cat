@@ -11,6 +11,7 @@ import csv
 
 from pathlib import Path, PurePath
 
+import backend
 from backend.abstract.worker import BasicWorker
 from common.lib.dataset import DataSet
 from common.lib.helpers import get_software_version
@@ -521,6 +522,48 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 		the processor would be run on
 		"""
 		return cls.options if hasattr(cls, "options") else {}
+
+	@classmethod
+	def get_available_processors(cls, self):
+		"""
+		Get list of processors compatible with this processor
+
+		Checks whether this dataset type is one that is listed as being accepted
+		by the processor, for each known type: if the processor does not
+		specify accepted types (via the `is_compatible_with` method), it is
+		assumed it accepts any top-level datasets
+
+		:return dict:  Compatible processors, `name => class` mapping
+		"""
+		processors = backend.all_modules.processors
+
+		available = []
+		for processor_type, processor in processors.items():
+			if processor_type.endswith("-search"):
+				continue
+
+			# consider a processor compatible if its is_compatible_with
+			# method returns True *or* if it has no explicit compatibility
+			# check and this dataset is top-level (i.e. has no parent)
+			if hasattr(processor, "is_compatible_with"):
+				if processor.is_compatible_with(module=self):
+					available.append(processor)
+
+		return available
+
+	@classmethod
+	def is_dataset(cls):
+		"""
+		Used for processor compatibility
+		"""
+		return False
+
+	@classmethod
+	def is_rankable(cls):
+		"""
+		Used for processor compatibility
+		"""
+		return False
 
 	@abc.abstractmethod
 	def process(self):

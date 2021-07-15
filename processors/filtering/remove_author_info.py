@@ -26,13 +26,15 @@ class AuthorInfoRemover(BasicProcessor):
     extension = "csv"  # extension of result file, used internally and in UI
 
     @classmethod
-    def is_compatible_with(cls, dataset=None):
+    def is_compatible_with(cls, module=None):
         """
         Allow processor on CSV files
 
-        :param DataSet dataset:  Dataset to determine compatibility with
+        :param module: Dataset or processor to determine compatibility with
         """
-        return not dataset.key_parent and dataset.get_results_path().suffix == ".csv" and dataset.get_results_path().exists()
+        if module.is_dataset():
+            return not module.key_parent and module.get_results_path().suffix == ".csv" and module.get_results_path().exists()
+        return False
 
     def process(self):
         """

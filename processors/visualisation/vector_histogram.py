@@ -39,14 +39,16 @@ class SVGHistogramRenderer(BasicProcessor):
 	}
 
 	@classmethod
-	def is_compatible_with(cls, dataset=None):
+	def is_compatible_with(cls, module=None):
 		"""
 		Allow processor on rankable items
 
-		:param DataSet dataset:  Dataset to determine compatibility with
+		:param module: Dataset or processor to determine compatibility with
 		"""
-		return dataset.is_rankable()
-
+		if module.is_dataset():
+			return module.is_rankable()
+		return False
+		
 	def process(self):
 		"""
 		Render an SVG histogram/bar chart using a previous frequency analysis

@@ -24,23 +24,24 @@ class CoTaggerPreset(ProcessorPreset):
     extension = "gdf"  # extension of result file, used internally and in UI
 
     @classmethod
-    def is_compatible_with(cls, dataset=None):
+    def is_compatible_with(cls, module=None):
         """
         Allow processor on datasets containing a tags column
 
-        :param DataSet dataset:  Dataset to determine compatibility with
+        :param module: Dataset or processor to determine compatibility with
         """
-        if dataset.type == "twitterv2-search":
+        if module.type == "twitterv2-search":
             # ndjson, difficult to sniff
             return True
-        elif dataset.get_results_path().suffix == ".csv" and dataset.get_results_path().exists():
-            # csv can just be sniffed for the presence of a column
-            with dataset.get_results_path().open(encoding="utf-8") as infile:
-                reader = csv.DictReader(infile)
-                try:
-                    return bool(set(reader.fieldnames) & {"tags", "hashtags", "groups"})
-                except (TypeError, ValueError):
-                    return False
+        if module.is_dataset():
+            if module.get_results_path().suffix == ".csv" and module.get_results_path().exists():
+                # csv can just be sniffed for the presence of a column
+                with module.get_results_path().open(encoding="utf-8") as infile:
+                    reader = csv.DictReader(infile)
+                    try:
+                        return bool(set(reader.fieldnames) & {"tags", "hashtags", "groups"})
+                    except (TypeError, ValueError):
+                        return False
         else:
             return False
 

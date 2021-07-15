@@ -23,13 +23,15 @@ class ColumnNetworker(BasicProcessor):
     extension = "gdf"
 
     @classmethod
-    def is_compatible_with(cls, dataset=None):
+    def is_compatible_with(cls, module=None):
         """
         Allow processor to run on chan datasets
 
-        :param DataSet dataset:  Dataset to determine compatibility with
+        :param module: Dataset or processor to determine compatibility with
         """
-        return dataset.get_results_path().exists() and dataset.get_results_path().suffix in (".csv", ".ndjson")
+        if module.is_dataset():
+            return module.get_results_path().exists() and module.get_results_path().suffix in (".csv", ".ndjson")
+        return False
 
     options = {
         "column-a": {

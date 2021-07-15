@@ -23,14 +23,13 @@ class CowordNetworker(ProcessorPreset):
     extension = "gdf"  # extension of result file, used internally and in UI
 
     @classmethod
-    def is_compatible_with(cls, dataset=None):
+    def is_compatible_with(cls, module=None):
         """
         Allow processor to run on collocations
 
-        :param DataSet dataset:  Dataset to determine compatibility with
+        :param module: Dataset or processor to determine compatibility with
         """
-        return dataset.type == "collocations" and dataset.get_genealogy()[-2].parameters.get("docs_per",
-                                                                                             "overall") == "overall"
+        return module.type == "collocations"
 
     def get_processor_pipeline(self):
         """
