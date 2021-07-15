@@ -13,7 +13,7 @@
     {% if item.is_finished() and not is_filtered %}<a href="{{ url_for('get_result', query_file=item.result_file)[:-1] }}">{% endif %}
         <span class="headline">
             {% if item.is_finished() and not is_filtered %}<a href="{{ url_for('get_result', query_file=item.result_file)[:-1] }}">{% endif %}
-            {% if item.is_finished() and is_filtered and "copied_to" in item.parameters %}<a href="{{ url_for('show_results') }}/{{ item.parameters.copied_to }}/">{% endif %}
+            {% if item.is_finished() and is_filtered and "copied_to" in item.parameters %}<a href="{{ url_for('show_result', key=item.parameters.copied_to) }}">{% endif %}
             {% if is_filtered %}
             <i class="fa fa-filter" aria-hidden="true"></i> <span class="sr-only">Filter</span>
             {% elif item.is_finished() and item.num_rows > 0 %}
@@ -28,7 +28,7 @@
             {% if item.is_finished() and ("copied_to" in item.parameters or not is_filtered) %}</a>{% endif %}
         </span>
         <span class="byline">
-            {% if item.is_finished() and not is_filtered %}<a href="{{ url_for('show_results') }}/{{ item.result_file }}">{% endif %}
+            {% if item.is_finished() and not is_filtered %}<a href="{{ url_for('get_result', query_file=item.result_file)[:-1] }}">{% endif %}
             {% if item.is_finished() and is_filtered and "copied_to" in item.parameters %}<a href="{{ url_for('show_results') }}/{{ item.parameters.copied_to }}/">{% endif %}
             {% if item.is_finished() and item.num_rows >= 0 %}
                 {% if is_filtered and "copied_to" in item.parameters %}
@@ -102,13 +102,11 @@
                     <p role="tooltip" id="tooltip-preview-{{ item.key }}" aria-hidden="true">Preview this dataset</p>
                     <div role="dialog" id="popup-preview-{{ item.key }}">
                         {% if processors[child.type].extension == "html" %}
-                            <iframe class="query-result-iframe" src="/result/{{ child.result_file }}"></iframe>
+                            <iframe class="query-result-iframe" src="{{ url_for('get_result', query_file=child.result_file)[:-1] }}"></iframe>
                         {% elif processors[child.type].extension in ("png", "jpg", "jpeg", "gif") %}
-                            <a href="{{ url_for('show_results') }}/{{ child.result_file }}"><img class="details-only" src="/result/{{ child.result_file }}"></a>
-                        {% elif processors[child.type].extension == "csv" %}
-                            <iframe class="query-result-iframe csvfile" src="/preview-csv/{{ child.key }}/"></iframe>
+                            <a href="{{ url_for('get_result', query_file=child.result_file)[:-1] }}"><img class="details-only" src="{{ url_for('get_result', query_file=child.result_file)[:-1] }}"></a>
                         {% elif processors[child.type].extension == "svg" %}
-                            <embed class="query-result-svg details-only" type="image/svg+xml" src="/result/{{ child.result_file }}">
+                            <embed class="query-result-svg details-only" type="image/svg+xml" src="{{ url_for('get_result', query_file=child.result_file)[:-1] }}">
                         {% endif %}
                     </div>
                 </li>
