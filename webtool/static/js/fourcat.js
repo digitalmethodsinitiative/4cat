@@ -22,11 +22,11 @@ function init() {
     // Check search queue
     if($('#query-form').length > 0) {
         query.check_search_queue();
-        setInterval(query.check_search_queue, 8000);
+        setInterval(query.check_search_queue, 10000);
     }
 
     //regularly check for unfinished datasets
-    setInterval(query.check_resultpage, 4000);
+    setInterval(query.check_resultpage, 2000);
 
     // Update dynamic containers
     setInterval(dynamic_container.refresh, 2500);
