@@ -40,8 +40,7 @@ class UniqueFilter(BasicProcessor):
 
 	def process(self):
 		"""
-		Reads a CSV file, counts occurences of chosen values over all posts,
-		and aggregates the results per chosen time frame
+		Reads a CSV file, hashes the posts, and only keeps those it didn't encounter yet.
 		"""
 
 		# now for the real deal
