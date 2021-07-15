@@ -113,7 +113,7 @@
                     </div>
                 </li>
                 {% endif %}
-            {% set processor_options = processors[item.type].get_options() %}
+            {% if item.type in processors %}{% set processor_options = processors[item.type].get_options() %}{% endif %}
             {% for option in item.parameters %}
                 {% if item.type in processors and option in processor_options and item.parameters[option] != "" and not processor_options[option].get("sensitive") %}
                 {% if processor_options[option].type == "toggle" %}
