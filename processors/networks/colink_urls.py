@@ -66,7 +66,7 @@ class URLCoLinker(BasicProcessor):
 		processed = 0
 		for post in self.iterate_items(self.source_file):
 			processed += 1
-			if processed % 50:
+			if processed % 50 == 0:
 				self.dataset.update_status("Extracting URLs from item %i" % processed)
 
 			if not post["body"]:
