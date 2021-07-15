@@ -123,6 +123,7 @@ class SearchBitChute(Search):
                     query = query.split("/video/")[1].split("/")[0]
                     # else assume bare ID
 
+                self.dataset.update_status("Getting details for video '%s' (%i/%i)" % (query, num_query, len(queries)))
                 results.append(self.get_videos_id(session, query, csrftoken, detail))
             else:
                 results.append(self.get_videos_user(session, query, csrftoken, detail))
