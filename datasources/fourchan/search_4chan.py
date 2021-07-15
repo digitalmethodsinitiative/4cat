@@ -28,13 +28,6 @@ class Search4Chan(SearchWithScope):
 	return_cols = ['thread_id', 'id', 'timestamp', 'body', 'subject', 'author', 'image_file', 'image_md5',
 				   'country_name', 'country_code']
 
-	# codes for countries that can be selected under one "european countries"
-	# umbrella
-	eu_countries = (
-		"GB", "DE", "NL", "RU", "FI", "FR", "RO", "PL", "SE", "NO", "ES", "IE", "IT", "SI", "RS", "DK", "HR", "GR",
-		"BG", "BE", "AT", "HU", "CH", "PT", "LT", "CZ", "EE", "UY", "LV", "SK", "MK", "UA", "IS", "BA", "CY", "GE",
-		"LU", "ME", "AL", "MD", "IM", "EU", "BY", "MC", "AX", "KZ", "AM", "GG", "JE", "MT", "FO", "AZ", "LI", "AD")
-
 	# before running a sphinx query, store it here so it can be cancelled via
 	# request_abort() later
 	running_query = ""

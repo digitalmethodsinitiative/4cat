@@ -683,6 +683,13 @@ query = {
 				});
 
 				query.handle_density();
+				query.custom_board_options();
+                
+                // Render custom multiple choice fields
+                // should also be rendered dynamically if processor options are expanded.
+                if ($('.multichoice-wrapper').length || $('.multi-select-wrapper').length) {
+                    makeMultichoice();
+                }
 			},
 			'error': function() {
 				$('#datasource-select').parents('form').trigger('reset');
@@ -1071,7 +1078,6 @@ function makeMultichoice(){
 
 	// Multi-select choice menu requires some code.
 	$('.multi-select-wrapper').each(function() {
-
 		let wrapper = $(this);
 
 		// do nothing if already expanded
