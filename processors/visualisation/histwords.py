@@ -100,7 +100,7 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
 
         :param DataSet dataset:  Dataset to determine compatibility with
         """
-        return dataset.type == "tokenise-posts"
+        return dataset.type == "generate-embeddings"
 
     def process(self):
         # parse parameters
