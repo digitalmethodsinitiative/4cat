@@ -41,7 +41,7 @@ class AttributeRanker(BasicProcessor):
 				"wildcard": "Regular expression (match any filtered value in post)",
 				"image_md5": "Image (hash, for 4chan and 8chan datasets)",
 				"image_file": "Image (filename, for 4chan and 8chan datasets)",
-				"country_code": "Country code (for 4chan datasets)",
+				"country_name": "Flag country (for 4chan/pol/ datasets)",
 				"subreddit": "Subreddit (for Reddit datasets)",
 				"search_entity": "Entity (for Telegram datasets)",
 				"hashtags": "Hashtag (for datasets with a 'hashtags' column)",

@@ -429,8 +429,8 @@ class DataSet:
 			return label
 		elif parameters.get("country_flag") and parameters["country_flag"] != "all":
 			return "Flag: %s" % parameters["country_flag"]
-		elif parameters.get("country_code") and parameters["country_code"] != "all":
-			return "Country: %s" % parameters["country_code"]
+		elif parameters.get("country_name") and parameters["country_name"] != "all":
+			return "Country: %s" % parameters["country_name"]
 		elif parameters.get("filename"):
 			return parameters["filename"]
 		elif parameters.get("board") and "datasource" in parameters:

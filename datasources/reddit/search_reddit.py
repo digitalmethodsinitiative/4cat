@@ -436,7 +436,6 @@ class SearchReddit(SearchWithScope):
 			"url": "",
 			"image_file": "",
 			"image_md5": "",
-			"country_code": "",
 			"country_name": "",
 			"subreddit": post["subreddit"],
 			"parent": post["parent_id"],
@@ -465,8 +464,6 @@ class SearchReddit(SearchWithScope):
 			"domain": thread["domain"],
 			"url": thread["url"],
 			"image_md5": "",
-			"country_code": "",
-			"country_name": "",
 			"subreddit": thread["subreddit"],
 			"parent": "",
 			"score": thread.get("score", 0)
