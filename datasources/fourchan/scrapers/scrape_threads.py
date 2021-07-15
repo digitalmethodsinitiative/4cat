@@ -54,7 +54,7 @@ class ThreadScraper4chan(BasicJSONScraper):
 	# for new posts, any fields not in here will be saved in the "unsorted_data" column for that post as part of a
 	# JSONified dict
 	known_fields = ["no", "resto", "sticky", "closed", "archived", "archived_on", "now", "time", "name", "trip", "id",
-					"capcode", "country", "country_name", "sub", "com", "tim", "filename", "ext", "fsize", "md5", "w",
+					"capcode", "country", "country_name", "board_flag", "flag_name", "sub", "com", "tim", "filename", "ext", "fsize", "md5", "w",
 					"h", "tn_w", "tn_h", "filedeleted", "spoiler", "custom_spoiler", "omitted_posts", "omitted_images",
 					"replies", "images", "bumplimit", "imagelimit", "capcode_replies", "last_modified", "tag",
 					"semantic_url", "since4pass", "unique_ips", "tail_size"]
@@ -177,8 +177,8 @@ class ThreadScraper4chan(BasicJSONScraper):
 			"author_trip": post.get("trip", ""),
 			"author_type": post["id"] if "id" in post and self.type == "4chan-thread" else "",
 			"author_type_id": post.get("capcode", ""),
-			"country_code": post.get("country", ""),
-			"country_name": post.get("country_name", ""),
+			"country_code": post["country"] if post.get("country") else post.get("board_flag", ""),
+			"country_name": "",
 			"image_file": post["filename"] + post["ext"] if "filename" in post else "",
 			"image_4chan": str(post["tim"]) + post["ext"] if "filename" in post else "",
 			"image_md5": post.get("md5", ""),
