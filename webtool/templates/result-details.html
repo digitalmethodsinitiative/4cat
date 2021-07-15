@@ -78,7 +78,7 @@
     </ol>
 </section>
 
-{% if dataset.num_rows > 0 and dataset.processors|length > 0 and current_user.is_authenticated %}
+{% if dataset.num_rows > 0 and dataset.get_available_processors()|length > 0 and current_user.is_authenticated %}
     <section class="analysis-gallery">
 
         <h3 class="blocktitle section-subheader"><span>Analytical processors</span></h3>
@@ -92,7 +92,7 @@
             includes examples of several analyses you can run.</p>
     </div>
         {% set cat = namespace(egory='') %}
-        {% for processor in dataset.processors.values() %}
+        {% for processor in dataset.get_available_processors().values() %}
             {% if processor.category != cat.egory %}
                 {% if cat.egory != '' %}</ol>{% endif %}
                 {% set cat.egory = processor.category %}
