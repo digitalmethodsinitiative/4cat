@@ -100,7 +100,7 @@ class ColumnNetworker(BasicProcessor):
                 return
 
             processed += 1
-            if processed % 100:
+            if processed % 100 == 0:
                 self.dataset.update_status("Processed %i items (%i nodes found)" % (processed, len(nodes)))
 
             # both columns need to have a value for an edge to be possible
