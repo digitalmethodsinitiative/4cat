@@ -16,11 +16,11 @@ article.result > section:first-child {
     padding: 1em 0;
 }
 
-.result-tree h3 {
+.result-tree h3, .result-tree h2 {
     position: relative;
 }
 
-.result-tree h3 button {
+.result-tree h3 button, .result-tree h2 button {
     border: 0;
     border-radius: 0;
     position: absolute;
@@ -28,6 +28,18 @@ article.result > section:first-child {
     top: 0;
     margin: 0;
     padding: calc(0.5em + 1px);
+}
+
+.result-tree h2 button {
+    padding: calc(0.5em + 1px);
+    font-size: 0.8em;
+}
+
+.result-tree h2 input {
+    padding: 0;
+    border: 0;
+    height: 1em;
+    width: 75%;
 }
 
 .children-processors {

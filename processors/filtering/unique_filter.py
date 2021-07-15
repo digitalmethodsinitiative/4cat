@@ -85,6 +85,7 @@ class UniqueFilter(BasicProcessor):
 
 				processed += 1
 
+		self.dataset.update_status("New dataset created with %i matching item(s)" % unique, is_final=True)
 		self.dataset.finish(unique)
 
 	def after_process(self):

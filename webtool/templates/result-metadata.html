@@ -5,20 +5,18 @@
 
 {% for parameter in dataset.parameters %}
     {% if parameter == "body_match" and dataset.parameters[parameter] %}
-        <span class="inline-label">body:</span> <span class="inline-query">{{ dataset.parameters.body_match }}</span>
+        <span class="inline-label">body:</span>
+        <span class="inline-query has-more" data-max-length="75">{{ dataset.parameters.body_match }}</span>
     {% elif parameter == "subject_match" and dataset.parameters[parameter] %}
         <span class="inline-label">subject:</span>
-        <span class="inline-query">{{ dataset.parameters.subject_match }}</span>
-    {% elif parameter == "filename" and dataset.parameters[parameter] %}
-        <span class="inline-label">filename:</span>
-        <span class="inline-query">{{ dataset.parameters.filename }}</span>
-    {% elif parameter == "country_name" and dataset.parameters[parameter] != "all" %}
+        <span class="inline-query has-more" data-max-length="75">{{ dataset.parameters.subject_match }}</span>
+    {% elif parameter == "country_code" and dataset.parameters[parameter] != "all" %}
         <span class="inline-label">country:</span>
         <span class="inline-query">{{ dataset.parameters.country_name|join(', ') }}</span>
-    {% elif dataset.parameters[parameter] and parameter[0:4] != "api_" and parameter not in ("jst", "mst", "copied_from", "copied_at", "pseudonymise", "user", "time", "search-scope", "search_scope", "random_amount", "scope_length", "scope_density", "country_name", "min_date", "max_date", "board", "datasource", "type") %}
+    {% elif dataset.parameters[parameter] and parameter[0:4] != "api_" and parameter not in ("jst", "mst", "copied_from", "copied_at", "pseudonymise", "user", "time", "search-scope", "search_scope", "random_amount", "scope_length", "scope_density", "country_name", "min_date", "max_date", "board", "datasource", "type", "label") %}
         {% if not dataset.parameters[parameter]|isbool and dataset.parameters[parameter] %}
         <span class="inline-label">{{ parameter }}:</span>
-        <span class="inline-query">{{ dataset.parameters[parameter] }}</span>
+        <span class="inline-query has-more" data-max-length="75">{{ dataset.parameters[parameter]|string }}</span>
         {% elif dataset.parameters[parameter] %}
         <span class="property-badge">{{ parameter }}</span>
         {% endif %}

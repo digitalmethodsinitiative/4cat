@@ -6,9 +6,10 @@ var poll_interval;
 /**
  * Page init
  */
- $(init);
 
- function init() {
+$(init);
+
+function init() {
 	// Check status of query
 	if($('body.result-page').length > 0) {
 		query.update_status();
@@ -22,11 +23,11 @@ var poll_interval;
 	// Check search queue
 	if($('#query-form').length > 0) {
 		query.check_search_queue();
-		setInterval(query.check_search_queue, 8000);
+		setInterval(query.check_search_queue, 10000);
 	}
 
 	//regularly check for unfinished datasets
-	setInterval(query.check_resultpage, 4000);
+	setInterval(query.check_resultpage, 2000);
 
 	// Update dynamic containers
 	setInterval(dynamic_container.refresh, 2500);
@@ -69,6 +70,11 @@ var poll_interval;
 
 	// dataset deletion
 	$(document).on('click', '.delete-link', processor.delete);
+
+	// dataset label edit
+	$('.result-page .card h2').each(query.label.init);
+	$(document).on('click', '.edit-dataset-label', query.label.handle);
+	$(document).on('keydown', '#new-dataset-label', query.label.handle);
 
 	//allow opening given analysis path via anchor links
 	navpath = window.location.hash.substr(1);
@@ -118,7 +124,7 @@ var poll_interval;
 
 		$(this).remove();
 	});
-	
+
 	//confirm links
 	$(document).on('click', '.confirm-first', function(e) {
 		let action = 'do this';
@@ -134,6 +140,27 @@ var poll_interval;
 			return true;
 		}
 	});
+
+	//long texts with '...more' link
+	$(document).on('click', 'div.expandable a', function(e) {
+		e.preventDefault();
+
+		if($(this).text() == '...more') {
+			$(this).text('...less');
+			$(this).parent().find('.sr-only').removeClass('sr-only').addClass('expanded');
+		} else {
+			$(this).text('...more');
+			$(this).parent().find('.expanded').addClass('sr-only').removeClass('expanded');
+		}
+	});
+	$('.has-more').each(function() {
+		let max_length = parseInt($(this).attr('data-max-length'));
+		let full_value = $(this).text();
+		if(full_value.length < max_length) {
+			return;
+		}
+		$(this).replaceWith('<div class="expandable">' + full_value.substring(0, max_length) + '<span class="sr-only">' + full_value.substring(max_length) + '</span><a href="#">...more</a></div>');
+	});
 }
 
 /**
@@ -148,11 +175,11 @@ var poll_interval;
 	 * @param e  Event that triggered queueing
 	 */
 	 queue: function (e) {
-	 	e.preventDefault();
+		e.preventDefault();
 
-	 	if ($(this).text().includes('Run')) {
-	 		let form = $(this).parents('form');
-	 		let position = form.position().top + parseInt(form.height());
+		if ($(this).text().includes('Run')) {
+			let form = $(this).parents('form');
+			let position = form.position().top + parseInt(form.height());
 
 			// if it's a big dataset, ask if the user is *really* sure
 			let parent = $(this).parents('li.child-wrapper');
@@ -248,30 +275,30 @@ var poll_interval;
 /**
  * Query queueing and updating
  */
- query = {
+query = {
 	/**
 	 * Enable query form, so settings may be changed
 	 */
-	 enable_form: function() {
-	 	$('#query-status .delete-link').remove();
-	 	$('#query-status .status_message .dots').html('');
-	 	$('#query-status .message').html('Waiting for input...');
-	 	$('#query-form fieldset').prop('disabled', false);
-	 	$('#query-status').removeClass('active');
-	 },
+	enable_form: function() {
+		$('#query-status .delete-link').remove();
+		$('#query-status .status_message .dots').html('');
+		$('#query-status .message').html('Waiting for input...');
+		$('#query-form fieldset').prop('disabled', false);
+		$('#query-status').removeClass('active');
+	},
 
 	/**
 	 * Disable query form, while query is active
 	 */
-	 disable_form: function() {
-	 	$('#query-form fieldset').prop('disabled', true);
-	 	$('#query-status').addClass('active');
-	 },
+	disable_form: function() {
+		$('#query-form fieldset').prop('disabled', true);
+		$('#query-status').addClass('active');
+	},
 
 	/**
 	 * Tool window: start a query, submit it to the backend
 	 */
-	 start: function () {
+	start: function () {
 
 		//check form input
 		if (!query.validate()) {
@@ -338,7 +365,7 @@ var poll_interval;
 	 * After starting query, periodically check its status and link to result when available
 	 * @param query_key  Key of started query
 	 */
-	 check: function (query_key) {
+	check: function (query_key) {
 		/*
 		Polls server to check whether there's a result for query
 		*/
@@ -408,15 +435,14 @@ var poll_interval;
 		});
 	},
 
-
 	/**
 	 * Fancy live-updating child dataset status
 	 *
 	 * Checks if running subqueries have finished, updates their status, and re-enabled further
 	 * analyses if all subqueries have finished
 	 */
-	 update_status: function () {
-	 	if(!document.hasFocus()) {
+	update_status: function () {
+		if(!document.hasFocus()) {
 			//don't hammer the server while user is looking at something else
 			return;
 		}
@@ -551,7 +577,7 @@ var poll_interval;
 	 *
 	 * @returns {boolean}  Whether the form is ready for submission
 	 */
-	 validate: function () {
+	validate: function () {
 		/*
 		Checks validity of input; this is just a preliminary check, further checks are
 		done server-side.
@@ -635,44 +661,37 @@ var poll_interval;
 	/**
 	 * Update board select list for chosen datasource
 	 */
-	 update_form: function() {
-	 	datasource = $('#datasource-select').val();
-	 	$.get({
-	 		'url': getRelativeURL('api/datasource-form/' + datasource + '/'),
-	 		'success': function(data) {
-	 			$('#query-form-script').remove();
-	 			$('#query-form').removeClass();
-	 			$('#query-form').addClass(datasource);
-	 			$('#datasource-form').html(data.html);
-	 			if(data.has_javascript) {
-	 				$('<script id="query-form-script">').attr('src', getRelativeURL('api/datasource-script/' + data.datasource + '/')).appendTo('body');
-	 			}
+	update_form: function() {
+		datasource = $('#datasource-select').val();
+		$.get({
+			'url': getRelativeURL('api/datasource-form/' + datasource + '/'),
+			'success': function(data) {
+				$('#query-form-script').remove();
+				$('#query-form').removeClass();
+				$('#query-form').addClass(datasource);
+				$('#datasource-form').html(data.html);
+				if(data.has_javascript) {
+					$('<script id="query-form-script">').attr('src', getRelativeURL('api/datasource-script/' + data.datasource + '/')).appendTo('body');
+				}
 				//automatically fill in cached parameters
 				$('#datasource-form .cacheable input').each(function() {
-					let item_name = datasource + '.' + $(this).attr('name');
-					let cached_value = localStorage.getItem(item_name);
-					if (typeof cached_value != 'undefined' && cached_value !== 'undefined') {
-						$(this).val(cached_value);
-					}
+				   let item_name = datasource + '.' + $(this).attr('name');
+				   let cached_value = localStorage.getItem(item_name);
+				   if (typeof cached_value != 'undefined' && cached_value !== 'undefined') {
+					   $(this).val(cached_value);
+				   }
 				});
 
 				query.handle_density();
-				query.custom_board_options();
-				
-				// Render custom multiple choice fields
-				// should also be rendered dynamically if processor options are expanded.
-				if ($('.multichoice-wrapper').length || $('.multi-select-wrapper').length) {
-					makeMultichoice();
-				}
 			},
 			'error': function() {
 				$('#datasource-select').parents('form').trigger('reset');
 				alert('Invalid datasource selected.');
 			}
 		});
-	 },
+	},
 
-	 handle_density: function() {
+	handle_density: function() {
 		// datasources may offer 'dense thread' options
 		// these are sufficiently generalised that they can be handled in this
 		// main script...
@@ -690,9 +709,9 @@ var poll_interval;
 	},
 
 	custom_board_options: function() {
-		// Some boards/subforums for datasources could have differing options.
-		// Use this function to update these dynamically.
-		// Board-specific fields can be added with `board_specific` in the datasource's Python configuration.
+	// Some boards/subforums for datasources could have differing options.
+	// Use this function to update these dynamically.
+	// Board-specific fields can be added with `board_specific` in the datasource's Python configuration.
 
 		let board = $('#forminput-board').val();
 		let board_specific = '.form-element[data-board-specific]'
@@ -740,6 +759,57 @@ var poll_interval;
 		} else {
 			$(input_id).val(timestamp);
 		}
+	},
+
+	label: {
+		init: function() {
+			$(this).append('<button class="edit-dataset-label"><i class="fa fa-edit"></i><span class="sr-only">Edit label</span></button>');
+		},
+
+		handle: function(e) {
+			let button = $(this).parents('div').find('button');
+			if(e.type == 'keydown' && e.keyCode != 13) { return; }
+
+			if(button.find('i').hasClass('fa-check')) {
+				query.label.save(e, button);
+			} else {
+				query.label.edit(e, button);
+			}
+		},
+
+		edit: function(e, self) {
+			e.preventDefault();
+			let current = $(self).parent().find('span a');
+			let field = $('<input id="new-dataset-label">');
+			field.val(current.text());
+			field.attr('data-url', current.attr('href'));
+			current.replaceWith(field);
+			field.focus().select();
+			$(self).parent().find('i.fa').removeClass('fa-edit').addClass('fa-check');
+		},
+
+		save: function(e, self) {
+			e.preventDefault();
+			let field = $(self).parent().find('input');
+			let new_label = field.val();
+			let dataset_key = $('section.result-tree').attr('data-dataset-key')
+
+			$.post({
+				dataType: "json",
+				url: '/api/edit-dataset-label/' + dataset_key + '/',
+				data: {label: new_label},
+				cache: false,
+
+				success: function (json) {
+					let link = $('<a href="' + json.url + '">' + json.label + '</a>');
+					field.replaceWith(link);
+					$(self).parent().find('i.fa').removeClass('fa-check').addClass('fa-edit');
+				},
+				error: function (response) {
+					alert('Oh no! ' +response.text);
+				}
+			});
+		}
 	}
 };
 
@@ -755,12 +825,12 @@ var poll_interval;
 	 * @param parent  Element the toolip describes
 	 */
 	 show: function (e, parent = false) {
-	 	if (e) {
-	 		e.preventDefault();
-	 	}
-	 	if (!parent) {
-	 		parent = this;
-	 	}
+		if (e) {
+			e.preventDefault();
+		}
+		if (!parent) {
+			parent = this;
+		}
 
 		//determine target - last aria-controls value starting with 'tooltip-'
 		let targets = $(parent).attr('aria-controls').split(' ');
@@ -820,7 +890,7 @@ var poll_interval;
 	 * @param e  Event that triggered the toggle
 	 */
 	 toggle: function (e) {
-	 	if(this.tagName.toLowerCase() !== 'a') {
+		if(this.tagName.toLowerCase() !== 'a') {
 			// Allow links to have tooltips and still work
 			e.preventDefault();
 		}
@@ -843,10 +913,10 @@ var poll_interval;
 	 */
 	 is_initialised: false,
 	 init: function() {
-	 	$('<div id="blur"></div>').appendTo('body');
-	 	$('<div id="popup"><div class="content"></div><button id="popup-close"><i class="fa fa-times" aria-hidden="true"></i> <span class="sr-only">Close popup</span></button></div>').appendTo('body');
-	 	$('body').on('click', '#blur, #popup-close', popup.hide);
-	 	popup.is_initialised = true;
+		$('<div id="blur"></div>').appendTo('body');
+		$('<div id="popup"><div class="content"></div><button id="popup-close"><i class="fa fa-times" aria-hidden="true"></i> <span class="sr-only">Close popup</span></button></div>').appendTo('body');
+		$('body').on('click', '#blur, #popup-close', popup.hide);
+		popup.is_initialised = true;
 	 },
 	/**
 	 * Show popup, using the content of a designated container
@@ -855,17 +925,17 @@ var poll_interval;
 	 * @param parent  Parent, i.e. the button controlling the popup
 	 */
 	 show: function(e, parent) {
-	 	if(!popup.is_initialised) {
-	 		popup.init();
-	 	}
+		if(!popup.is_initialised) {
+			popup.init();
+		}
 
-	 	if (!parent) {
-	 		parent = this;
-	 	}
+		if (!parent) {
+			parent = this;
+		}
 
-	 	if(e) {
-	 		e.preventDefault();
-	 	}
+		if(e) {
+			e.preventDefault();
+		}
 
 		//determine target - last aria-controls value starting with 'popup-'
 		let targets = $(parent).attr('aria-controls').split(' ');
@@ -892,9 +962,9 @@ var poll_interval;
 	 * @param e  Event
 	 */
 	 hide: function(e) {
-	 	$('#popup .content').html('');
-	 	$('#blur').attr('aria-expanded', false);
-	 	$('#popup').attr('aria-expanded', false);
+		$('#popup .content').html('');
+		$('#blur').attr('aria-expanded', false);
+		$('#popup').attr('aria-expanded', false);
 	 }
 	};
 
@@ -902,8 +972,8 @@ var poll_interval;
  * Dynamic panels
  */
  dynamic_container = {
- 	refresh: function() {
- 		if(!document.hasFocus()) {
+	refresh: function() {
+		if(!document.hasFocus()) {
 			//don't hammer the server while user is looking at something else
 			return;
 		}
@@ -1097,9 +1167,9 @@ function makeMultichoice(){
  * @returns  Absolute URL
  */
  function getRelativeURL(endpoint) {
- 	let root = $("body").attr("data-url-root");
- 	if(!root) {
- 		root = '/';
- 	}
- 	return root + endpoint;
+	let root = $("body").attr("data-url-root");
+	if(!root) {
+		root = '/';
+	}
+	return root + endpoint;
  }

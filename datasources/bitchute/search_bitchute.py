@@ -129,16 +129,16 @@ class SearchBitChute(Search):
 
         return chain(*results)
 
-    def get_videos_id(self, session, id, csrftoken, detail):
+    def get_videos_id(self, session, video_id, csrftoken, detail):
         dummy_video = {
-            "id": id,
-            "thread_id": id,
+            "id": video_id,
+            "thread_id": video_id,
             "subject": "",
             "body": "",
             "author": "",
             "author_id": "",
             "timestamp": None,
-            "url": "https://www.bitchute.com/video/" + id + "/",
+            "url": "https://www.bitchute.com/video/" + video_id + "/",
             "views": None,
             "length": None,
             "thumbnail_image": None,
@@ -342,18 +342,31 @@ class SearchBitChute(Search):
 
         try:
             # to get more details per video, we need to request the actual video detail page
-            # start a new session, to not interfer with the CSRF token from the search session
+            # start a new session, to not interfere with the CSRF token from the search session
             video_session = requests.session()
-
             video_page = video_session.get(video["url"])
 
-            if "This video is unavailable as the contents have been deemed potentially illegal" in video_page.text:
-                video["category"] = "moderated-illegal"
-                return (video, [])
+            if "<h1 class=\"page-title\">Video Restricted</h1>" in video_page.text or "<h1 class=\"page-title\">Video Blocked</h1>" in video_page.text:
+                if "This video is unavailable as the contents have been deemed potentially illegal" in video_page.text:
+                    video["category"] = "moderated-illegal"
+                    return (video, [])
 
-            elif "Viewing of this video is restricted, as it has been marked as Not Safe For Life" in video_page.text:
-                video["category"] = "moderated-nsfl"
-                return (video, [])
+                elif "Viewing of this video is restricted, as it has been marked as Not Safe For Life" in video_page.text:
+                    video["category"] = "moderated-nsfl"
+                    return (video, [])
+
+                elif "Contains Incitement to Hatred" in video_page.text:
+                    video["category"] = "moderated-incitement"
+                    return (video, [])
+
+                elif "Platform Misuse" in video_page.text:
+                    video["category"] = "moderated-misuse"
+                    return (video, [])
+
+                else:
+                    video["category"] = "moderated-other"
+                    self.log.warning("Unknown moderated reason for BitChute video %s" % video["id"])
+                    return (video, [])
 
             elif video_page.status_code != 200:
                 video = {
@@ -537,7 +550,7 @@ class SearchBitChute(Search):
         # reformat queries to be a comma-separated list with no wrapping
         # whitespace
         items = query.get("query").replace("\n", ",")
-        if len(items.split(",")) > 15:
+        if len(items.split(",")) > 15 and query.get("search_type") != "url":
             raise QueryParametersException("You cannot query more than 15 items at a time.")
 
         # simple!

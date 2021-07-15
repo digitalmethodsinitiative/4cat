@@ -244,6 +244,9 @@ def queue_dataset():
 	extension = search_worker.extension if hasattr(search_worker, "extension") else "csv"
 	dataset = DataSet(parameters=sanitised_query, db=db, type=search_worker_id, extension=extension)
 
+	if request.form.get("label"):
+		dataset.update_label(request.form.get("label"))
+
 	if hasattr(search_worker, "after_create"):
 		search_worker.after_create(sanitised_query, dataset, request)
 
@@ -316,6 +319,50 @@ def check_dataset():
 	}
 
 	return jsonify(status)
+
+@app.route("/api/edit-dataset-label/<string:key>/", methods=["POST"])
+@api_ratelimit
+@login_required
+@openapi.endpoint("tool")
+def edit_dataset_label(key):
+	"""
+	Change label for a dataset
+
+	Only allowed for dataset owner or admin!
+
+	:request-param str key:  ID of the dataset for which to change the label
+	:return: Label info, containing the dataset `key`, the dataset `url`,
+	         and the new `label`.
+
+	:return-schema: {
+		type=object,
+		properties={
+			key={type=string},
+			url={type=string},
+			label={type=string}
+		}
+	}
+
+	:return-error 404:  If the dataset does not exist.
+	:return-error 403:  If the user is not owner of the dataset or an admin
+	"""
+	dataset_key = request.form.get("key", "") if not key else key
+	label = request.form.get("label", "")
+
+	try:
+		dataset = DataSet(key=dataset_key, db=db)
+	except TypeError:
+		return error(404, error="Dataset does not exist.")
+
+	if not current_user.is_admin() and not current_user.get_id() == dataset.parameters.get("user"):
+		return error(403, message="Not allowed")
+
+	dataset.update_label(label)
+	return jsonify({
+		"key": dataset.key,
+		"url": url_for("show_result", key=dataset.key),
+		"label": dataset.get_label()
+	})
 
 
 @app.route("/api/delete-query/", methods=["DELETE", "POST"])
@@ -484,15 +531,16 @@ def queue_processor(key=None, processor=None):
 		return jsonify({"error": "Not a valid dataset key."})
 
 	# check if processor is available for this dataset
-	if processor not in dataset.processors:
+	available_processors = dataset.get_available_processors()
+	if processor not in available_processors:
 		return jsonify({"error": "This processor is not available for this dataset or has already been run."})
 
 	# create a dataset now
-	options = UserInput.parse_all(dataset.processors[processor].get_options(dataset), request.form.to_dict(), silently_correct=False)
+	options = UserInput.parse_all(available_processors[processor].get_options(dataset), request.form.to_dict(), silently_correct=False)
 	options["user"] = current_user.get_id()
 
 	analysis = DataSet(parent=dataset.key, parameters=options, db=db,
-					   extension=dataset.processors[processor].extension, type=processor)
+					   extension=available_processors[processor].extension, type=processor)
 	if analysis.is_new:
 		# analysis has not been run or queued before - queue a job to run it
 		queue.add_job(jobtype=processor, remote_id=analysis.key)
@@ -501,7 +549,7 @@ def queue_processor(key=None, processor=None):
 		analysis.update_status("Queued")
 	else:
 		flash("This analysis (%s) is currently queued or has already been run with these parameters." %
-			  dataset.processors[processor].title)
+			  available_processors[processor].title)
 
 	return jsonify({
 		"status": "success",
@@ -510,7 +558,7 @@ def queue_processor(key=None, processor=None):
 		"html": render_template("result-child.html", child=analysis, dataset=dataset, parent_key=dataset.key,
 								processors=backend.all_modules.processors) if analysis.is_new else "",
 		"messages": get_flashed_messages(),
-		"is_filter": dataset.processors[processor].is_filter()
+		"is_filter": available_processors[processor].is_filter()
 	})
 
 

@@ -2,7 +2,9 @@
 <section class="result-tree" data-dataset-key="{{ dataset.key }}">
     <div class="card query{% if not dataset.is_finished() %} unfinished{% endif %}">
 
-        <h2 class="blocktitle"><span><a href="{{ url_for('show_results', key=dataset.key) }}">{{ dataset.get_label() }}</a></span></h2>
+        <h2 class="blocktitle">
+            <span><a href="{{ url_for('show_results', key=dataset.key) }}">{{ dataset.get_label() }}</a></span>
+        </h2>
 
         {% if current_user.is_authenticated %}
             <nav class="dataset-toolbox" aria-label="Actions for dataset">
@@ -25,7 +27,7 @@
         {% endif %}
         {% if "copied_from" in dataset.parameters %}
             <div class="fullwidth notice">
-                This dataset was generated from <a href="{{ url_for('show_result', key=dataset.parameters.copied_from) }}/">another dataset</a>.
+                This dataset was generated from <a href="{{ url_for('show_result', key=dataset.parameters.copied_from) }}">another dataset</a>.
             </div>
         {% endif %}
             <div>
@@ -76,7 +78,7 @@
     </ol>
 </section>
 
-{% if dataset.num_rows > 0 and dataset.processors|length > 0 and current_user.is_authenticated %}
+{% if dataset.num_rows > 0 and dataset.get_available_processors()|length > 0 and current_user.is_authenticated %}
     <section class="analysis-gallery">
 
         <h3 class="blocktitle section-subheader"><span>Analytical processors</span></h3>
@@ -90,7 +92,7 @@
             includes examples of several analyses you can run.</p>
     </div>
         {% set cat = namespace(egory='') %}
-        {% for processor in dataset.processors.values() %}
+        {% for processor in dataset.get_available_processors().values() %}
             {% if processor.category != cat.egory %}
                 {% if cat.egory != '' %}</ol>{% endif %}
                 {% set cat.egory = processor.category %}

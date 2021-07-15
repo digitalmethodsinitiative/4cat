@@ -63,7 +63,6 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 			self.job.finish()
 			return
 
-		is_running_in_preset = False
 		if self.dataset.data.get("key_parent", None):
 			# search workers never have parents (for now), so we don't need to
 			# find out what the source_dataset dataset is if it's a search worker
