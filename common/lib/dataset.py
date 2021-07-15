@@ -34,7 +34,7 @@ class DataSet:
 	key = ""
 
 	children = []
-	processors = {}
+	available_processors = {}
 	genealogy = []
 	preset_parent = None
 	parameters = {}
@@ -111,14 +111,12 @@ class DataSet:
 			self.parameters = parameters
 
 			self.db.insert("datasets", data=self.data)
-			print("Adding dataset of type %s" % type)
 			self.reserve_result_file(parameters, extension)
 
 		# retrieve analyses and processors that may be run for this dataset
 		analyses = self.db.fetchall("SELECT * FROM datasets WHERE key_parent = %s ORDER BY timestamp ASC", (self.key,))
 		self.children = sorted([DataSet(data=analysis, db=self.db) for analysis in analyses],
 							   key=lambda dataset: dataset.is_finished(), reverse=True)
-		self.processors = self.get_available_processors()
 
 	def check_dataset_finished(self):
 		"""
@@ -733,6 +731,9 @@ class DataSet:
 
 		:return dict:  Available processors, `name => properties` mapping
 		"""
+		if self.available_processors:
+			return self.available_processors
+
 		processors = self.get_compatible_processors()
 
 		for analysis in self.children:
@@ -742,6 +743,7 @@ class DataSet:
 			if not processors[analysis.type].get_options():
 				del processors[analysis.type]
 
+		self.available_processors = processors
 		return processors
 
 	def link_job(self, job):

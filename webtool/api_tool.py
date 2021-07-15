@@ -531,15 +531,16 @@ def queue_processor(key=None, processor=None):
 		return jsonify({"error": "Not a valid dataset key."})
 
 	# check if processor is available for this dataset
-	if processor not in dataset.processors:
+	available_processors = dataset.get_available_processors()
+	if processor not in available_processors:
 		return jsonify({"error": "This processor is not available for this dataset or has already been run."})
 
 	# create a dataset now
-	options = UserInput.parse_all(dataset.processors[processor].get_options(dataset), request.form.to_dict(), silently_correct=False)
+	options = UserInput.parse_all(available_processors[processor].get_options(dataset), request.form.to_dict(), silently_correct=False)
 	options["user"] = current_user.get_id()
 
 	analysis = DataSet(parent=dataset.key, parameters=options, db=db,
-					   extension=dataset.processors[processor].extension, type=processor)
+					   extension=available_processors[processor].extension, type=processor)
 	if analysis.is_new:
 		# analysis has not been run or queued before - queue a job to run it
 		queue.add_job(jobtype=processor, remote_id=analysis.key)
@@ -548,7 +549,7 @@ def queue_processor(key=None, processor=None):
 		analysis.update_status("Queued")
 	else:
 		flash("This analysis (%s) is currently queued or has already been run with these parameters." %
-			  dataset.processors[processor].title)
+			  available_processors[processor].title)
 
 	return jsonify({
 		"status": "success",
@@ -557,7 +558,7 @@ def queue_processor(key=None, processor=None):
 		"html": render_template("result-child.html", child=analysis, dataset=dataset, parent_key=dataset.key,
 								processors=backend.all_modules.processors) if analysis.is_new else "",
 		"messages": get_flashed_messages(),
-		"is_filter": dataset.processors[processor].is_filter()
+		"is_filter": available_processors[processor].is_filter()
 	})
 
 
