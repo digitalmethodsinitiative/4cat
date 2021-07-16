@@ -48,10 +48,7 @@ class SigmaNetwork(BasicProcessor):
 
 		:param module: Dataset or processor to determine compatibility with
 		"""
-		if module.is_dataset():
-			return module.get_results_path().suffix == ".gdf"
-		else:
-			return module.extension == "gdf"
+		return module.get_extension() == "gdf"
 
 	def process(self):
 		"""

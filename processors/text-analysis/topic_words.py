@@ -42,7 +42,7 @@ class TopicModelWordExtractor(BasicProcessor):
 
         :param module: Dataset or processor to determine compatibility with
         """
-        return module.type == "topic-modeler"
+        return module.type == "topic-modeller"
 
     def process(self):
         """

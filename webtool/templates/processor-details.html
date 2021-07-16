@@ -32,7 +32,7 @@
 
             {# 'Allows for' area to preview further analysis #}
             {% set processors_available = processor.get_available_processors(processor) %}
-            {% if processors_available %}
+            {% if processors_available and processor not in processors_available %}
             <span>
                 <ul>
                     <li>

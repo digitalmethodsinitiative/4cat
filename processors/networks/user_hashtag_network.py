@@ -32,7 +32,7 @@ class HashtagUserBipartiteGrapherPreset(ProcessorPreset):
             # ndjson, difficult to sniff
             return True
         elif module.is_dataset():
-            if module.get_results_path().suffix == ".csv" and module.get_results_path().exists():
+            if module.get_extension() == "csv":
                 # csv can just be sniffed for the presence of a column
                 with module.get_results_path().open(encoding="utf-8") as infile:
                     reader = csv.DictReader(infile)

@@ -34,11 +34,8 @@ class FlowChart(BasicProcessor):
 		:param DataSet module:  Dataset or processor to determine compatibility with
 		"""
 
-		if module.is_dataset():
-			return module.is_rankable()
-		else:
-			return None
-
+		return module.is_rankable()
+		
 	def process(self):
 
 		# Get json data to use in a graph

@@ -45,9 +45,7 @@ class SVGHistogramRenderer(BasicProcessor):
 
 		:param module: Dataset or processor to determine compatibility with
 		"""
-		if module.is_dataset():
-			return module.is_rankable()
-		return False
+		return module.is_rankable()
 		
 	def process(self):
 		"""

@@ -554,9 +554,29 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 	@classmethod
 	def is_dataset(cls):
 		"""
+		Confirm this is *not* a dataset, but a processor.
 		Used for processor compatibility
 		"""
 		return False
+
+	@classmethod
+	def is_top_dataset(cls):
+		"""
+		Confirm this is *not* a top dataset, but a processor.
+		Used for processor compatibility
+		"""
+		return False
+
+	@classmethod
+	def get_extension(self):
+		"""
+		Return the extension of 
+		Used for processor compatibility
+		"""
+
+		if self.extension and not self.is_filter():
+			return self.extension 
+		return None
 
 	@classmethod
 	def is_rankable(cls):

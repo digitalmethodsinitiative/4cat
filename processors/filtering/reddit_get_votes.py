@@ -37,7 +37,7 @@ class RedditVoteChecker(BasicProcessor):
 		:param module: Dataset or processor to determine compatibility with
 		"""
 		if module.is_dataset():
-			return not module.key_parent and module.type == "reddit-search" and module.num_rows <= 5000
+			return module.is_top_dataset() and module.type == "reddit-search" and module.num_rows <= 5000
 		return False
 
 	def process(self):

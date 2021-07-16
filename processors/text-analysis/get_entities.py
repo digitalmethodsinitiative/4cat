@@ -70,7 +70,7 @@ class ExtractNouns(BasicProcessor):  #TEMPORARILY DISABLED
 
 		:param module: Dataset or processor to determine compatibility with
 		"""
-		print(module.type)
+		
 		return module.type == "linguistic-features"
 		
 	def process(self):
