@@ -48,6 +48,7 @@ webtool/venv/
 !webtool/static/img/*.jpg
 !webtool/static/img/favicon/*.ico
 !webtool/static/img/flags/*.png
+!common/assets/github-screenshots/*.png
 
 # data files
 results
