@@ -30,8 +30,8 @@ if os.path.exists(DOCKER_CONFIG_FILE):
 
     # Install specific packages
     if docker_config['DOCKER'].getboolean('new_installation'):
-        import nltk
         # NLTK resources
+        import nltk
         nltk.download("wordnet")
         nltk.download("punkt")
 
