@@ -100,8 +100,13 @@ class IsometricMultigraphRenderer(BasicProcessor):
 		last_date = "0000-00-00"
 
 		for row in self.iterate_items(self.source_file):
-			if row["item"] not in graphs:
-				graphs[row["item"]] = {}
+			if [k for k in row if k.startswith("word_")]:
+				item = " ".join([row[k] for k in row if k.startswith("word_")])
+			else:
+				item = row["item"]
+
+			if item not in graphs:
+				graphs[item] = {}
 
 			# make sure the months and days are zero-padded
 			interval = row.get("date", "")
@@ -112,10 +117,10 @@ class IsometricMultigraphRenderer(BasicProcessor):
 			if interval not in intervals:
 				intervals.append(interval)
 
-			if interval not in graphs[row["item"]]:
-				graphs[row["item"]][interval] = 0
+			if interval not in graphs[item]:
+				graphs[item][interval] = 0
 
-			graphs[row["item"]][interval] += float(row.get("value", 0))
+			graphs[item][interval] += float(row.get("value", 0))
 
 		# first make sure we actually have something to render
 		intervals = sorted(intervals)
