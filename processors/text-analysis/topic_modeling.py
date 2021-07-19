@@ -46,14 +46,6 @@ class TopicModeler(BasicProcessor):
             "help": "Number of topics",
             "tooltip": "Topics will be divided in this many clusters. Should be between 2 and 50."
         },
-        "topic_size": {
-            "type": UserInput.OPTION_TEXT,
-            "min": 1,
-            "max": 100,
-            "default": 10,
-            "help": "Tokens per topic",
-            "tooltip": "This many of the most relevant tokens will be retained per topic"
-        },
         "min_df": {
             "type": UserInput.OPTION_TEXT,
             "min": 0,
