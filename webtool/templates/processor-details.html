@@ -30,29 +30,29 @@
             </span>
             {% endif %}
 
+            {# 'Allows for' area to preview further analysis #}
+            {% set processors_available = processor.get_available_processors(processor) %}
+            {% if processors_available and processor not in processors_available %}
+            <span>
+                <ul>
+                    <li>
+                    {% include "processor-processors-available.html" %}
+                    </li>
+                </ul>
+            </span>
+            {% endif %}
+
             {% if not inline %}
                 <p>{{ processor.description }}</p>
             {% endif %}
             {% if inline %}
-                <button class="tooltip-trigger" aria-controls="tooltip-processor-{{ dataset.key }}-{{ processor.type }}" aria-label="Post-processor details">?</button>
+                <button class="property-badge tooltip-trigger" aria-controls="tooltip-processor-{{ dataset.key }}-{{ processor.type }}" aria-label="Post-processor details">?</button>
                 <p role="tooltip" id="tooltip-processor-{{ dataset.key }}-{{ processor.type }}">{{ processor.description }}</p>
             {% endif %}
         </header>
 
-        {% if processor.followups %}
-        <div class="processor-further">
-            <p><i class="fa fa-arrow-alt-from-left" aria-hidden="true"></i> Possible follow-ups:</p>
-            <ul>
-                {% for processor_name in processor.followups %}
-                    <li>{{ processors[processor_name].title }}</li>
-                {% endfor %}
-            </ul>
-        </div>
-        {% endif %}
-
         <input type="hidden" name="key" value="{{ dataset.key }}">
         <input type="hidden" name="processor" value="{{ processor.type }}">
-
 
         {# Processor configuration #}
         {% if processor.get_options(dataset) %}
@@ -65,5 +65,7 @@
         </div>
         {% endif %}
     </div>
+
+
     </form>
 </li>

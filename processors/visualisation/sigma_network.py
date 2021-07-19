@@ -42,13 +42,13 @@ class SigmaNetwork(BasicProcessor):
 	}
 
 	@classmethod
-	def is_compatible_with(cls, dataset=None):
+	def is_compatible_with(cls, module=None):
 		"""
 		Allow processor on network files
 
-		:param DataSet dataset:  Dataset to determine compatibility with
+		:param module: Dataset or processor to determine compatibility with
 		"""
-		return dataset.get_results_path().suffix == ".gdf"
+		return module.get_extension() == "gdf"
 
 	def process(self):
 		"""

@@ -48,13 +48,13 @@ class VisionTagNetworker(BasicProcessor):
     }
 
     @classmethod
-    def is_compatible_with(cls, dataset=None):
+    def is_compatible_with(cls, module=None):
         """
         Allow processor to run on Google Vision API data
 
-        :param DataSet dataset:  Dataset to determine compatibility with
+        :param module: Dataset or processor to determine compatibility with
         """
-        return dataset.type == "google-vision-api"
+        return module.type == "google-vision-api"
 
     def process(self):
         """

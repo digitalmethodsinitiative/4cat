@@ -137,21 +137,22 @@ class UrlUnshortener(BasicProcessor):
     )
 
     @classmethod
-    def is_compatible_with(cls, dataset=None):
+    def is_compatible_with(cls, module=None):
         """
         Allow processor on datasets containing a tags column
 
-        :param DataSet dataset:  Dataset to determine compatibility with
+        :param module: Dataset or processor to determine compatibility with
         """
-        if dataset.get_results_path().suffix == ".csv" and dataset.get_results_path().exists():
-            # csv can just be sniffed for the presence of a column
-            with dataset.get_results_path().open(encoding="utf-8") as infile:
-                reader = csv.DictReader(infile)
-                try:
-                    return "body" in reader.fieldnames
-                except (TypeError, ValueError):
-                    # invalid csv file
-                    return False
+        if module.is_dataset():
+            if module.get_extension() == "csv":
+                # csv can just be sniffed for the presence of a column
+                with module.get_results_path().open(encoding="utf-8") as infile:
+                    reader = csv.DictReader(infile)
+                    try:
+                        return "body" in reader.fieldnames
+                    except (TypeError, ValueError):
+                        # invalid csv file
+                        return False
         else:
             return False
 

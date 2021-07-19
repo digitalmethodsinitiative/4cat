@@ -74,13 +74,13 @@ class ImageWallGenerator(BasicProcessor):
 
 
 	@classmethod
-	def is_compatible_with(cls, dataset=None):
+	def is_compatible_with(cls, module=None):
 		"""
 		Allow processor on token sets
 
-		:param DataSet dataset:  Dataset to determine compatibility with
+		:param module: Dataset or processor to determine compatibility with
 		"""
-		return dataset.type == "image-downloader"
+		return module.type == "image-downloader"
 
 	def process(self):
 		"""

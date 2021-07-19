@@ -324,6 +324,21 @@ article.result > section:first-child {
     content: ', ';
 }
 
+.processors-available {
+    position: absolute;
+    top: 0;
+    right: 0;
+    padding-top: 5px;
+    padding-right: 10px;
+    text-align: center;
+    font-size: 0.8em;
+    cursor: pointer;
+}
+
+.processors-available a:hover {
+    text-decoration: none;
+}
+
 /* processor configuration options */
 .processor-options-wrap {
     display: inline-block;

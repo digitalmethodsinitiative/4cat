@@ -54,14 +54,14 @@ class RankFlowRenderer(BasicProcessor):
 	}
 
 	@classmethod
-	def is_compatible_with(cls, dataset=None):
+	def is_compatible_with(cls, module=None):
 		"""
 		Allow processor on rankable items
 
-		:param DataSet dataset:  Dataset to determine compatibility with
+		:param module: Dataset or processor to determine compatibility with
 		"""
-		return dataset.is_rankable()
-
+		return module.is_rankable()
+		
 	def process(self):
 		items = {}
 		max_weight = 1

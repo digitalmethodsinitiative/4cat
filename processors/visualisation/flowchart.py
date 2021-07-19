@@ -27,14 +27,15 @@ class FlowChart(BasicProcessor):
 	extension = "html"  # extension of result file, used internally and in UI
 
 	@classmethod
-	def is_compatible_with(cls, dataset=None):
+	def is_compatible_with(cls, module=None):
 		"""
 		Allow processor on rankable items
 
-		:param DataSet dataset:  Dataset to determine compatibility with
+		:param DataSet module:  Dataset or processor to determine compatibility with
 		"""
-		return dataset.is_rankable()
 
+		return module.is_rankable()
+		
 	def process(self):
 
 		# Get json data to use in a graph

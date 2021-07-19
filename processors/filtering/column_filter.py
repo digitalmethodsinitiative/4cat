@@ -72,13 +72,13 @@ class LexicalFilter(BasicProcessor):
     }
 
     @classmethod
-    def is_compatible_with(cls, dataset=None):
+    def is_compatible_with(cls, module=None):
         """
         Allow processor on CSV files
 
-        :param DataSet dataset:  Dataset to determine compatibility with
+        :param module: Dataset or processor to determine compatibility with
         """
-        return not dataset.key_parent and dataset.get_results_path().suffix == ".csv" and dataset.get_results_path().exists()
+        return module.is_top_dataset() and module.get_extension() == "csv"
 
     def process(self):
         """

@@ -36,13 +36,13 @@ class TopicModelWordExtractor(BasicProcessor):
     }
 
     @classmethod
-    def is_compatible_with(cls, dataset=None):
+    def is_compatible_with(cls, module=None):
         """
         Allow processor on topic models
 
-        :param DataSet dataset:  Dataset to determine compatibility with
+        :param module: Dataset or processor to determine compatibility with
         """
-        return dataset.type == "topic-modeler"
+        return module.type == "topic-modeller"
 
     def process(self):
         """

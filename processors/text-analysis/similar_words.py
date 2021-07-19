@@ -53,13 +53,13 @@ class SimilarWord2VecWords(BasicProcessor):
 	}
 
 	@classmethod
-	def is_compatible_with(cls, dataset=None):
+	def is_compatible_with(cls, module=None):
 		"""
 		Allow processor on word embedding models
 
-		:param DataSet dataset:  Dataset to determine compatibility with
+		:param module: Dataset or processor to determine compatibility with
 		"""
-		return dataset.type == "generate-embeddings"
+		return module.type == "generate-embeddings"
 
 	def process(self):
 		"""

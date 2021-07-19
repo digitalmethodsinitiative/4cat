@@ -795,6 +795,35 @@ class DataSet(FourcatModule):
 		"""
 		self.link_parent("")
 
+	def is_dataset(self):
+		"""
+		Easy way to confirm this is a dataset.
+		Used for checking processor and dataset compatibility,
+		which needs to handle both processors and datasets.
+		"""
+		return True
+
+	def is_top_dataset(self):
+		"""
+		Easy way to confirm this is a top dataset.
+		Used for checking processor and dataset compatibility,
+		which needs to handle both processors and datasets.
+		"""
+		if self.get_parent():
+			return False
+		return True
+
+	def get_extension(self):
+		"""
+		Gets the file extention this dataset produces.
+		Also checks whether the results file exists.
+		Used for checking processor and dataset compatibility.
+
+		"""
+
+		if self.get_results_path().exists():
+			return self.get_results_path().suffix[1:]
+		return False
 
 	def __getattr__(self, attr):
 		"""

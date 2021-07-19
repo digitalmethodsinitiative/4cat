@@ -43,13 +43,13 @@ class ExtractNouns(BasicProcessor):
 	}
 
 	@classmethod
-	def is_compatible_with(cls, dataset=None):
+	def is_compatible_with(cls, module=None):
 		"""
 		Allow processor on linguistic feature data
 
-		:param DataSet dataset:  Dataset to determine compatibility with
+		:param module: Dataset or processor to determine compatibility with
 		"""
-		return dataset.type == "linguistic-features"
+		return module.type == "linguistic-features"
 
 	def process(self):
 		"""
