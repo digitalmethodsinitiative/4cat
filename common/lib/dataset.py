@@ -14,9 +14,10 @@ import config
 import backend
 from common.lib.job import Job, JobNotFoundException
 from common.lib.helpers import get_software_version
+from common.lib.fourcat_module import FourcatModule
 
 
-class DataSet:
+class DataSet(FourcatModule):
 	"""
 	Provide interface to safely register and run operations on a dataset
 

@@ -13,13 +13,14 @@ from pathlib import Path, PurePath
 
 from backend.abstract.worker import BasicWorker
 from common.lib.dataset import DataSet
+from common.lib.fourcat_module import FourcatModule
 from common.lib.helpers import get_software_version
 from common.lib.exceptions import WorkerInterruptedException, ProcessorInterruptedException, ProcessorException
 
 csv.field_size_limit(1024 * 1024 * 1024)
 
 
-class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
+class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 	"""
 	Abstract post-processor class
 
