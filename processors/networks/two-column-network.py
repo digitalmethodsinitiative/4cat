@@ -29,9 +29,7 @@ class ColumnNetworker(BasicProcessor):
 
         :param module: Dataset or processor to determine compatibility with
         """
-        if module.is_dataset():
-            return module.get_results_path().exists() and module.get_results_path().suffix in (".csv", ".ndjson")
-        return False
+        return module.get_extension() in ("csv", "ndjson")
 
     options = {
         "column-a": {

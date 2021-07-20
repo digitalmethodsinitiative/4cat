@@ -30,9 +30,8 @@ class ConvertCSVToMacExcel(BasicProcessor):
 
 		:param module: Dataset or processor to determine compatibility with
 		"""
-		if module.is_dataset():
-			return module.get_results_path().suffix in [".csv", ".ndjson"] and module.get_results_path().exists()
-		return False
+		
+		return module.get_extension() in ["csv", "ndjson"]
 
 	def process(self):
 		"""

@@ -14,13 +14,14 @@ from pathlib import Path, PurePath
 import backend
 from backend.abstract.worker import BasicWorker
 from common.lib.dataset import DataSet
+from common.lib.fourcat_module import FourcatModule
 from common.lib.helpers import get_software_version
 from common.lib.exceptions import WorkerInterruptedException, ProcessorInterruptedException, ProcessorException
 
 csv.field_size_limit(1024 * 1024 * 1024)
 
 
-class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
+class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 	"""
 	Abstract post-processor class
 
@@ -554,9 +555,29 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 	@classmethod
 	def is_dataset(cls):
 		"""
+		Confirm this is *not* a dataset, but a processor.
 		Used for processor compatibility
 		"""
 		return False
+
+	@classmethod
+	def is_top_dataset(cls):
+		"""
+		Confirm this is *not* a top dataset, but a processor.
+		Used for processor compatibility
+		"""
+		return False
+
+	@classmethod
+	def get_extension(self):
+		"""
+		Return the extension of 
+		Used for processor compatibility
+		"""
+
+		if self.extension and not self.is_filter():
+			return self.extension 
+		return None
 
 	@classmethod
 	def is_rankable(cls):

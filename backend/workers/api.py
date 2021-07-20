@@ -38,7 +38,7 @@ class InternalAPI(BasicWorker):
 		# set up the socket
 		server = socket.socket()
 		server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-		server.settimeout(5)  # should be plenty
+		server.settimeout(2)  # should be plenty
 
 		has_time = True
 		start_trying = int(time.time())

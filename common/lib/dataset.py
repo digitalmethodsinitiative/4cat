@@ -14,9 +14,10 @@ import config
 import backend
 from common.lib.job import Job, JobNotFoundException
 from common.lib.helpers import get_software_version
+from common.lib.fourcat_module import FourcatModule
 
 
-class DataSet:
+class DataSet(FourcatModule):
 	"""
 	Provide interface to safely register and run operations on a dataset
 
@@ -796,9 +797,33 @@ class DataSet:
 
 	def is_dataset(self):
 		"""
-		Used for dataset compatibility
+		Easy way to confirm this is a dataset.
+		Used for checking processor and dataset compatibility,
+		which needs to handle both processors and datasets.
 		"""
 		return True
+
+	def is_top_dataset(self):
+		"""
+		Easy way to confirm this is a top dataset.
+		Used for checking processor and dataset compatibility,
+		which needs to handle both processors and datasets.
+		"""
+		if self.get_parent():
+			return False
+		return True
+
+	def get_extension(self):
+		"""
+		Gets the file extention this dataset produces.
+		Also checks whether the results file exists.
+		Used for checking processor and dataset compatibility.
+
+		"""
+
+		if self.get_results_path().exists():
+			return self.get_results_path().suffix[1:]
+		return False
 
 	def __getattr__(self, attr):
 		"""

@@ -73,9 +73,7 @@ class YouTubeMetadata(BasicProcessor):
 		:param module: Dataset or processor to determine compatibility with
 		"""
 		# Compatible with every top-level dataset.
-		if module.is_dataset() and module.parameters.get("datasource"):
-			return True
-		return False
+		return module.is_top_dataset()
 
 	def process(self):
 		"""

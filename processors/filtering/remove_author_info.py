@@ -32,9 +32,7 @@ class AuthorInfoRemover(BasicProcessor):
 
         :param module: Dataset or processor to determine compatibility with
         """
-        if module.is_dataset():
-            return not module.key_parent and module.get_results_path().suffix == ".csv" and module.get_results_path().exists()
-        return False
+        return module.is_top_dataset() and module.get_extension() == "csv"
 
     def process(self):
         """

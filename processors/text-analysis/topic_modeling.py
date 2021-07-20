@@ -21,7 +21,7 @@ class TopicModeler(BasicProcessor):
     """
     Generate topic models
     """
-    type = "topic-modeler"  # job type ID
+    type = "topic-modeller"  # job type ID
     category = "Text analysis"  # category
     title = "Generate topic models"  # title displayed in UI
     description = "Creates topic models per token set using Latent Dirichlet Allocation (LDA). For a given number of topics, tokens are assigned a relevance weight per topic, which can be used to find clusters of related words."  # description displayed in UI
@@ -45,14 +45,6 @@ class TopicModeler(BasicProcessor):
             "default": 10,
             "help": "Number of topics",
             "tooltip": "Topics will be divided in this many clusters. Should be between 2 and 50."
-        },
-        "topic_size": {
-            "type": UserInput.OPTION_TEXT,
-            "min": 1,
-            "max": 100,
-            "default": 10,
-            "help": "Tokens per topic",
-            "tooltip": "This many of the most relevant tokens will be retained per topic"
         },
         "min_df": {
             "type": UserInput.OPTION_TEXT,
