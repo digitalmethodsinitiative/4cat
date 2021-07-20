@@ -69,7 +69,7 @@ class HatebaseAnalyser(BasicProcessor):
 
 		processed = 0
 		with self.dataset.get_results_path().open("w") as output:
-			fieldnames = self.get_item_keys()
+			fieldnames = self.get_item_keys(self.source_file)
 			fieldnames += ("hatebase_num", "hatebase_num_ambiguous", "hatebase_num_unambiguous",
 					"hatebase_terms", "hatebase_terms_ambiguous", "hatebase_terms_unambiguous",
 					"hatebase_offensiveness_avg")
@@ -126,7 +126,8 @@ class HatebaseAnalyser(BasicProcessor):
 
 				try:
 					writer.writerow(row)
-				except ValueError:
+				except ValueError as e:
+					self.log.error(str(e))
 					self.dataset.update_status("Cannot write results. Your input file may contain invalid CSV data.")
 					self.dataset.finish(0)
 					return
