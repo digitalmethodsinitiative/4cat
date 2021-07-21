@@ -22,13 +22,14 @@ class ConvertCSVToJSON(BasicProcessor):
 	extension = "json"  # extension of result file, used internally and in UI
 
 	@classmethod
-	def is_compatible_with(cls, dataset=None):
+	def is_compatible_with(cls, module=None):
 		"""
-		Determine if processor is compatible with dataset
+		Determine if processor is compatible with a dataset or processor
 
-		:param DataSet dataset:  Dataset to determine compatibility with
+		:param module: Dataset or processor to determine compatibility with
 		"""
-		return dataset.get_results_path().suffix == ".csv"
+		
+		return module.get_extension() == ".csv"
 
 	def process(self):
 		"""

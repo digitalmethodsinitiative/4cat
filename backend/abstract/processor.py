@@ -11,15 +11,17 @@ import csv
 
 from pathlib import Path, PurePath
 
+import backend
 from backend.abstract.worker import BasicWorker
 from common.lib.dataset import DataSet
+from common.lib.fourcat_module import FourcatModule
 from common.lib.helpers import get_software_version
 from common.lib.exceptions import WorkerInterruptedException, ProcessorInterruptedException, ProcessorException
 
 csv.field_size_limit(1024 * 1024 * 1024)
 
 
-class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
+class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 	"""
 	Abstract post-processor class
 
@@ -63,7 +65,6 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 			self.job.finish()
 			return
 
-		is_running_in_preset = False
 		if self.dataset.data.get("key_parent", None):
 			# search workers never have parents (for now), so we don't need to
 			# find out what the source_dataset dataset is if it's a search worker
@@ -509,7 +510,7 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 		return hasattr(cls, "category") and cls.category and "filter" in cls.category.lower()
 
 	@classmethod
-	def get_options(cls, parent_dataset=None):
+	def get_options(cls, parent_dataset=None, user=None):
 		"""
 		Get processor options
 
@@ -520,8 +521,73 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 
 		:param DataSet parent_dataset:  An object representing the dataset that
 		the processor would be run on
+		:param User user:  Flask user the options will be displayed for, in
+		case they are requested for display in the 4CAT web interface. This can
+		be used to show some options only to privileges users.
 		"""
 		return cls.options if hasattr(cls, "options") else {}
+
+	@classmethod
+	def get_available_processors(cls, self):
+		"""
+		Get list of processors compatible with this processor
+
+		Checks whether this dataset type is one that is listed as being accepted
+		by the processor, for each known type: if the processor does not
+		specify accepted types (via the `is_compatible_with` method), it is
+		assumed it accepts any top-level datasets
+
+		:return dict:  Compatible processors, `name => class` mapping
+		"""
+		processors = backend.all_modules.processors
+
+		available = []
+		for processor_type, processor in processors.items():
+			if processor_type.endswith("-search"):
+				continue
+
+			# consider a processor compatible if its is_compatible_with
+			# method returns True *or* if it has no explicit compatibility
+			# check and this dataset is top-level (i.e. has no parent)
+			if hasattr(processor, "is_compatible_with"):
+				if processor.is_compatible_with(module=self):
+					available.append(processor)
+
+		return available
+
+	@classmethod
+	def is_dataset(cls):
+		"""
+		Confirm this is *not* a dataset, but a processor.
+		Used for processor compatibility
+		"""
+		return False
+
+	@classmethod
+	def is_top_dataset(cls):
+		"""
+		Confirm this is *not* a top dataset, but a processor.
+		Used for processor compatibility
+		"""
+		return False
+
+	@classmethod
+	def get_extension(self):
+		"""
+		Return the extension of 
+		Used for processor compatibility
+		"""
+
+		if self.extension and not self.is_filter():
+			return self.extension 
+		return None
+
+	@classmethod
+	def is_rankable(cls):
+		"""
+		Used for processor compatibility
+		"""
+		return False
 
 	@abc.abstractmethod
 	def process(self):

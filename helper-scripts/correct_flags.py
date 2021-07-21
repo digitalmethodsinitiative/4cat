@@ -15,7 +15,6 @@ PATH_TO_TROLL_FLAG_IDS = None
 if not PATH_TO_TROLL_FLAG_IDS:
 	print("You must provide a path to a json file with post ID: troll_code key/value pairs.")
 	exit()
-
 logger = Logger()
 db = Database(logger=logger, appname="queue-dump")
 

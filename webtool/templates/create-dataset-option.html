@@ -9,7 +9,7 @@
     {% elif settings.type == "info" %}
         <p class="form-intro">{{ settings.help|markdown|safe }}</p>
     {% else %}
-        <div class="form-element{% if settings.cache %} cacheable{% endif %}">
+        <div class="form-element{% if settings.cache %} cacheable{% endif %}"{% if settings.board_specific %} data-board-specific="{{ settings.board_specific|join('-') }}"{% endif %}>
             <label for="forminput-{{ option }}">{{ settings.help }}</label>
         {% if settings.type == "toggle" %}
             <input name="option-{{ option }}" id="forminput-{{ option }}" type="checkbox" {% if settings.default %} checked{% endif %}>
@@ -80,6 +80,20 @@
             {% if "tooltip" in settings %}
                 <button class="tooltip-trigger" aria-controls="tooltip-option-{{ option }}" aria-label="Extended help for option">?</button>
     	        <p role="tooltip" id="tooltip-option-{{ option }}">
+                    {{ settings.tooltip }}
+                </p>
+            {% endif %}
+            </div>
+        {% elif settings.type == "multi_select" %}
+            <div class="multi-select-wrapper">
+                <select name="option-{{ option }}" id="forminput-{{ option }}" multiple="multiple">
+                {% for choice in settings.options %}
+                    <option value="{{ choice }}"{% if choice in settings.default %} selected="selected"{% endif %}>{{ settings.options[choice] }}</option>
+                {% endfor %}
+                </select>
+            {% if "tooltip" in settings %}
+                <button class="tooltip-trigger" aria-controls="tooltip-option-{{ option }}" aria-label="Extended help for option">?</button>
+                <p role="tooltip" id="tooltip-option-{{ option }}">
                     {{ settings.tooltip }}
                 </p>
             {% endif %}

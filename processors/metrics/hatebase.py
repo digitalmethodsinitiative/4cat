@@ -45,7 +45,17 @@ class HatebaseAnalyser(BasicProcessor):
 				"it": "Italian"
 			},
 			"help": "Language"
-		}
+		},
+		"search_columns": {
+			"type": UserInput.OPTION_CHOICE,
+			"default": "both",
+			"options": {
+				"both": "Body and Subject",
+				"body": "Body only",
+				'subject' : "Subject only"
+			},
+			"help": "Columns to search"
+		},
 	}
 
 	def process(self):
@@ -58,6 +68,11 @@ class HatebaseAnalyser(BasicProcessor):
 
 		# determine what vocabulary to use
 		language = self.parameters.get("language")
+		# columns to search for hate text
+		if self.parameters.get("search_columns") == 'both':
+			columns = ['body', 'subject']
+		else:
+			columns = [self.parameters.get("search_columns")]
 
 		# read and convert to a way we can easily match whether any word occurs
 		with open(config.PATH_ROOT + "/common/assets/hatebase/hatebase-%s.json" % language) as hatebasedata:
@@ -69,7 +84,7 @@ class HatebaseAnalyser(BasicProcessor):
 
 		processed = 0
 		with self.dataset.get_results_path().open("w") as output:
-			fieldnames = self.get_item_keys()
+			fieldnames = self.get_item_keys(self.source_file)
 			fieldnames += ("hatebase_num", "hatebase_num_ambiguous", "hatebase_num_unambiguous",
 					"hatebase_terms", "hatebase_terms_ambiguous", "hatebase_terms_unambiguous",
 					"hatebase_offensiveness_avg")
@@ -98,7 +113,9 @@ class HatebaseAnalyser(BasicProcessor):
 				terms = []
 				terms_ambig = []
 				terms_unambig = []
-				for term in hatebase_regex.findall(post["body"].lower()):
+
+				post_text = ' '.join([post[x].lower() for x in columns])
+				for term in hatebase_regex.findall(post_text):
 					if hatebase[term]["plural_of"]:
 						if hatebase[term]["plural_of"] in terms:
 							continue
@@ -126,7 +143,8 @@ class HatebaseAnalyser(BasicProcessor):
 
 				try:
 					writer.writerow(row)
-				except ValueError:
+				except ValueError as e:
+					self.log.error(str(e))
 					self.dataset.update_status("Cannot write results. Your input file may contain invalid CSV data.")
 					self.dataset.finish(0)
 					return

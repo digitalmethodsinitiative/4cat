@@ -26,14 +26,7 @@ class Search4Chan(SearchWithScope):
 
 	# Columns to return in csv
 	return_cols = ['thread_id', 'id', 'timestamp', 'body', 'subject', 'author', 'image_file', 'image_md5',
-				   'country_code', 'country_name']
-
-	# codes for countries that can be selected under one "european countries"
-	# umbrella
-	eu_countries = (
-		"GB", "DE", "NL", "RU", "FI", "FR", "RO", "PL", "SE", "NO", "ES", "IE", "IT", "SI", "RS", "DK", "HR", "GR",
-		"BG", "BE", "AT", "HU", "CH", "PT", "LT", "CZ", "EE", "UY", "LV", "SK", "MK", "UA", "IS", "BA", "CY", "GE",
-		"LU", "ME", "AL", "MD", "IM", "EU", "BY", "MC", "AX", "KZ", "AM", "GG", "JE", "MT", "FO", "AZ", "LI", "AD")
+				   'country_name', 'country_code']
 
 	# before running a sphinx query, store it here so it can be cancelled via
 	# request_abort() later
@@ -60,160 +53,189 @@ class Search4Chan(SearchWithScope):
 			"type": UserInput.OPTION_TEXT,
 			"help": "Subject contains"
 		},
-		"country_code": {
-			"type": UserInput.OPTION_CHOICE,
+		"country_name": {
+			"type": UserInput.OPTION_MULTI_SELECT,
 			"help": "Poster country",
+			"board_specific": ["pol", "sp", "int"],
+			"tooltip": "The IP-derived flag attached to posts. Can be an actual country or \"meme flag\". Leave empty for all.", 
 			"options": {
-				"all": "All countries",
-				"europe": "All European countries",
-				"US": "United States",
-				"GB": "United Kingdom",
-				"CA": "Canada",
-				"AU": "Australia",
-				"DE": "Germany",
-				"NL": "Netherlands",
-				"RU": "Russian Federation",
-				"FI": "Finland",
-				"FR": "France",
-				"BR": "Brazil",
-				"RO": "Romania",
-				"PL": "Poland",
-				"SE": "Sweden",
-				"NO": "Norway",
-				"XX": "Unknown",
-				"NZ": "New Zealand",
-				"ES": "Spain",
-				"IE": "Ireland",
-				"IT": "Italy",
-				"SI": "Slovenia",
-				"RS": "Serbia",
-				"IN": "India",
-				"DK": "Denmark",
-				"MX": "Mexico",
-				"HR": "Croatia",
-				"GR": "Greece",
-				"JP": "Japan",
-				"BG": "Bulgaria",
-				"AR": "Argentina",
-				"IL": "Israel",
-				"BE": "Belgium",
-				"AT": "Austria",
-				"HU": "Hungary",
-				"CH": "Switzerland",
-				"PT": "Portugal",
-				"LT": "Lithuania",
-				"CZ": "Czech Republic",
-				"EE": "Estonia",
-				"UY": "Uruguay",
-				"ZA": "South Africa",
-				"LV": "Latvia",
-				"SK": "Slovakia",
-				"MK": "Macedonia",
-				"VN": "Vietnam",
-				"CL": "Chile",
-				"UA": "Ukraine",
-				"PH": "Philippines",
-				"SA": "Saudi Arabia",
-				"KR": "South Korea",
-				"DO": "Dominican Republic",
-				"DZ": "Algeria",
-				"SG": "Singapore",
-				"MY": "Malaysia",
-				"IS": "Iceland",
-				"BA": "Bosnia and Herzegovina",
-				"JO": "Jordan",
-				"TH": "Thailand",
-				"HK": "Hong Kong",
-				"CY": "Cyprus",
-				"PE": "Peru",
-				"PR": "Puerto Rico",
-				"LB": "Lebanon",
-				"PK": "Pakistan",
-				"CO": "Colombia",
-				"IQ": "Iraq",
-				"CR": "Costa Rica",
-				"BD": "Bangladesh",
-				"GE": "Georgia",
-				"LU": "Luxembourg",
-				"EG": "Egypt",
-				"TW": "Taiwan",
-				"ME": "Montenegro",
-				"AL": "Albania",
-				"VE": "Venezuela",
-				"AE": "United Arab Emirates",
-				"NP": "Nepal",
-				"TR": "Turkey",
-				"MD": "Moldova",
-				"NG": "Nigeria",
-				"PA": "Panama",
-				"BZ": "Belize",
-				"TN": "Tunisia",
-				"TT": "Trinidad and Tobago",
-				"IM": "Isle of Man",
-				"KG": "Kyrgyzstan",
-				"GT": "Guatemala",
-				"BM": "Bermuda",
-				"ID": "Indonesia",
-				"BW": "Botswana",
-				"BO": "Bolivia",
-				"PY": "Paraguay",
-				"MU": "Mauritius",
-				"CN": "China",
-				"KE": "Kenya",
-				"KW": "Kuwait",
-				"EU": "Europe",
-				"MW": "Malawi",
-				"BY": "Belarus",
-				"MN": "Mongolia",
-				"EC": "Ecuador",
-				"MC": "Monaco",
-				"AF": "Afghanistan",
-				"AX": "Aland",
-				"CW": "Curaçao",
-				"VC": "Saint Vincent and the Grenadines",
-				"MR": "Mauritania",
-				"CU": "Cuba",
-				"KZ": "Kazakhstan",
-				"AM": "Armenia",
-				"GG": "Guernsey",
-				"BS": "Bahamas",
-				"JE": "Jersey",
-				"AW": "Aruba",
-				"SV": "El Salvador",
-				"HN": "Honduras",
-				"LK": "Sri Lanka",
-				"MT": "Malta",
-				"FO": "Faroe Islands",
-				"NC": "New Caledonia",
-				"KH": "Cambodia",
-				"MA": "Morocco",
-				"FJ": "Fiji Islands",
-				"BT": "Bhutan",
-				"AO": "Angola",
-				"QA": "Qatar",
-				"BB": "Barbados",
-				"AZ": "Azerbaijan",
-				"LI": "Liechtenstein",
-				"RE": "Réunion",
-				"CM": "Cameroon",
-				"JM": "Jamaica",
-				"UG": "Uganda",
-				"KY": "Cayman Islands",
-				"AD": "Andorra",
-				"IR": "Iran",
-				"GU": "Guam",
-				"MZ": "Mozambique",
-				"MO": "Macao",
-				"DJ": "Djibouti",
-				"LY": "Libya",
-				"MM": "Myanmar",
-				"VI": "U.S. Virgin Islands",
-				"SC": "Seychelles",
-				"ET": "Ethiopia",
-				"PS": "Palestine",
-				"TZ": "Tanzania"
-			},
-			"default": "all"
+				"Armenia|Albania|Andorra|Austria|Belarus|Belgium|Bosnia and Herzegovina|Bulgaria|Croatia|Cyprus|Czech Republic|Denmark|Estonia|Finland|France|Germany|Greece|Hungary|Iceland|Republic of Ireland|Italy|Kosovo|Latvia|Liechtenstein|Lithuania|Luxembourg|Republic of Macedonia|North Macedonia|Macedonia|Malta|Moldova|Monaco|Montenegro|Netherlands|The Netherlands|Norway|Poland|Portugal|Romania|Russia|San Marino|Serbia|Slovakia|Slovenia|Spain|Sweden|Switzerland|Turkey|Ukraine|United Kingdom|Vatican City": "European countries",
+				"Afghanistan": "<span class='flag flag-af' title='Afghanistan'></span> Afghanistan",
+				"Aland": "<span class='flag flag-ax' title='Aland'></span> Aland",
+				"Albania": "<span class='flag flag-al' title='Albania'></span> Albania",
+				"Algeria": "<span class='flag flag-dz' title='Algeria'></span> Algeria",
+				"Andorra": "<span class='flag flag-ad' title='Andorra'></span> Andorra",
+				"Angola": "<span class='flag flag-ao' title='Angola'></span> Angola",
+				"Argentina": "<span class='flag flag-ar' title='Argentina'></span> Argentina",
+				"Armenia": "<span class='flag flag-am' title='Armenia'></span> Armenia",
+				"Aruba": "<span class='flag flag-aw' title='Aruba'></span> Aruba",
+				"Australia": "<span class='flag flag-au' title='Australia'></span> Australia",
+				"Austria": "<span class='flag flag-at' title='Austria'></span> Austria",
+				"Azerbaijan": "<span class='flag flag-az' title='Azerbaijan'></span> Azerbaijan",
+				"Bahamas": "<span class='flag flag-bs' title='Bahamas'></span> Bahamas",
+				"Bangladesh": "<span class='flag flag-bd' title='Bangladesh'></span> Bangladesh",
+				"Barbados": "<span class='flag flag-bb' title='Barbados'></span> Barbados",
+				"Belarus": "<span class='flag flag-by' title='Belarus'></span> Belarus",
+				"Belgium": "<span class='flag flag-be' title='Belgium'></span> Belgium",
+				"Belize": "<span class='flag flag-bz' title='Belize'></span> Belize",
+				"Bermuda": "<span class='flag flag-bm' title='Bermuda'></span> Bermuda",
+				"Bhutan": "<span class='flag flag-bt' title='Bhutan'></span> Bhutan",
+				"Bolivia": "<span class='flag flag-bo' title='Bolivia'></span> Bolivia",
+				"Bosnia and Herzegovina": "<span class='flag flag-ba' title='Bosnia and Herzegovina'></span> Bosnia and Herzegovina",
+				"Botswana": "<span class='flag flag-bw' title='Botswana'></span> Botswana",
+				"Brazil": "<span class='flag flag-br' title='Brazil'></span> Brazil",
+				"Bulgaria": "<span class='flag flag-bg' title='Bulgaria'></span> Bulgaria",
+				"Cambodia": "<span class='flag flag-kh' title='Cambodia'></span> Cambodia",
+				"Cameroon": "<span class='flag flag-cm' title='Cameroon'></span> Cameroon",
+				"Canada": "<span class='flag flag-ca' title='Canada'></span> Canada",
+				"Cayman Islands": "<span class='flag flag-ky' title='Cayman Islands'></span> Cayman Islands",
+				"Chile": "<span class='flag flag-cl' title='Chile'></span> Chile",
+				"China": "<span class='flag flag-cn' title='China'></span> China",
+				"Colombia": "<span class='flag flag-co' title='Colombia'></span> Colombia",
+				"Costa Rica": "<span class='flag flag-cr' title='Costa Rica'></span> Costa Rica",
+				"Croatia": "<span class='flag flag-hr' title='Croatia'></span> Croatia",
+				"Cuba": "<span class='flag flag-cu' title='Cuba'></span> Cuba",
+				"Curaçao": "<span class='flag flag-cw' title='Curaçao'></span> Curaçao",
+				"Cyprus": "<span class='flag flag-cy' title='Cyprus'></span> Cyprus",
+				"Czech Republic": "<span class='flag flag-cz' title='Czech Republic'></span> Czech Republic",
+				"Denmark": "<span class='flag flag-dk' title='Denmark'></span> Denmark",
+				"Djibouti": "<span class='flag flag-dj' title='Djibouti'></span> Djibouti",
+				"Dominican Republic": "<span class='flag flag-do' title='Dominican Republic'></span> Dominican Republic",
+				"Ecuador": "<span class='flag flag-ec' title='Ecuador'></span> Ecuador",
+				"Egypt": "<span class='flag flag-eg' title='Egypt'></span> Egypt",
+				"El Salvador": "<span class='flag flag-sv' title='El Salvador'></span> El Salvador",
+				"Estonia": "<span class='flag flag-ee' title='Estonia'></span> Estonia",
+				"Ethiopia": "<span class='flag flag-et' title='Ethiopia'></span> Ethiopia",
+				"Europe": "<span class='flag flag-eu' title='Europe'></span> Europe",
+				"Faroe Islands": "<span class='flag flag-fo' title='Faroe Islands'></span> Faroe Islands",
+				"Fiji Islands": "<span class='flag flag-fj' title='Fiji Islands'></span> Fiji Islands",
+				"Finland": "<span class='flag flag-fi' title='Finland'></span> Finland",
+				"France": "<span class='flag flag-fr' title='France'></span> France",
+				"Georgia": "<span class='flag flag-ge' title='Georgia'></span> Georgia",
+				"Germany": "<span class='flag flag-de' title='Germany'></span> Germany",
+				"Greece": "<span class='flag flag-gr' title='Greece'></span> Greece",
+				"Guam": "<span class='flag flag-gu' title='Guam'></span> Guam",
+				"Guatemala": "<span class='flag flag-gt' title='Guatemala'></span> Guatemala",
+				"Guernsey": "<span class='flag flag-gg' title='Guernsey'></span> Guernsey",
+				"Honduras": "<span class='flag flag-hn' title='Honduras'></span> Honduras",
+				"Hong Kong": "<span class='flag flag-hk' title='Hong Kong'></span> Hong Kong",
+				"Hungary": "<span class='flag flag-hu' title='Hungary'></span> Hungary",
+				"Iceland": "<span class='flag flag-is' title='Iceland'></span> Iceland",
+				"India": "<span class='flag flag-in' title='India'></span> India",
+				"Indonesia": "<span class='flag flag-id' title='Indonesia'></span> Indonesia",
+				"Iran": "<span class='flag flag-ir' title='Iran'></span> Iran",
+				"Iraq": "<span class='flag flag-iq' title='Iraq'></span> Iraq",
+				"Ireland": "<span class='flag flag-ie' title='Ireland'></span> Ireland",
+				"Isle of Man": "<span class='flag flag-im' title='Isle of Man'></span> Isle of Man",
+				"Israel": "<span class='flag flag-il' title='Israel'></span> Israel",
+				"Italy": "<span class='flag flag-it' title='Italy'></span> Italy",
+				"Jamaica": "<span class='flag flag-jm' title='Jamaica'></span> Jamaica",
+				"Japan": "<span class='flag flag-jp' title='Japan'></span> Japan",
+				"Jersey": "<span class='flag flag-je' title='Jersey'></span> Jersey",
+				"Jordan": "<span class='flag flag-jo' title='Jordan'></span> Jordan",
+				"Kazakhstan": "<span class='flag flag-kz' title='Kazakhstan'></span> Kazakhstan",
+				"Kenya": "<span class='flag flag-ke' title='Kenya'></span> Kenya",
+				"Kuwait": "<span class='flag flag-kw' title='Kuwait'></span> Kuwait",
+				"Kyrgyzstan": "<span class='flag flag-kg' title='Kyrgyzstan'></span> Kyrgyzstan",
+				"Latvia": "<span class='flag flag-lv' title='Latvia'></span> Latvia",
+				"Lebanon": "<span class='flag flag-lb' title='Lebanon'></span> Lebanon",
+				"Libya": "<span class='flag flag-ly' title='Libya'></span> Libya",
+				"Liechtenstein": "<span class='flag flag-li' title='Liechtenstein'></span> Liechtenstein",
+				"Lithuania": "<span class='flag flag-lt' title='Lithuania'></span> Lithuania",
+				"Luxembourg": "<span class='flag flag-lu' title='Luxembourg'></span> Luxembourg",
+				"Macao": "<span class='flag flag-mo' title='Macao'></span> Macao",
+				"Macedonia": "<span class='flag flag-mk' title='Macedonia'></span> Macedonia",
+				"Malawi": "<span class='flag flag-mw' title='Malawi'></span> Malawi",
+				"Malaysia": "<span class='flag flag-my' title='Malaysia'></span> Malaysia",
+				"Malta": "<span class='flag flag-mt' title='Malta'></span> Malta",
+				"Mauritania": "<span class='flag flag-mr' title='Mauritania'></span> Mauritania",
+				"Mauritius": "<span class='flag flag-mu' title='Mauritius'></span> Mauritius",
+				"Mexico": "<span class='flag flag-mx' title='Mexico'></span> Mexico",
+				"Moldova": "<span class='flag flag-md' title='Moldova'></span> Moldova",
+				"Monaco": "<span class='flag flag-mc' title='Monaco'></span> Monaco",
+				"Mongolia": "<span class='flag flag-mn' title='Mongolia'></span> Mongolia",
+				"Montenegro": "<span class='flag flag-me' title='Montenegro'></span> Montenegro",
+				"Morocco": "<span class='flag flag-ma' title='Morocco'></span> Morocco",
+				"Mozambique": "<span class='flag flag-mz' title='Mozambique'></span> Mozambique",
+				"Myanmar": "<span class='flag flag-mm' title='Myanmar'></span> Myanmar",
+				"Nepal": "<span class='flag flag-np' title='Nepal'></span> Nepal",
+				"Netherlands": "<span class='flag flag-nl' title='Netherlands'></span> Netherlands",
+				"New Caledonia": "<span class='flag flag-nc' title='New Caledonia'></span> New Caledonia",
+				"New Zealand": "<span class='flag flag-nz' title='New Zealand'></span> New Zealand",
+				"Nigeria": "<span class='flag flag-ng' title='Nigeria'></span> Nigeria",
+				"Norway": "<span class='flag flag-no' title='Norway'></span> Norway",
+				"Pakistan": "<span class='flag flag-pk' title='Pakistan'></span> Pakistan",
+				"Palestine": "<span class='flag flag-ps' title='Palestine'></span> Palestine",
+				"Panama": "<span class='flag flag-pa' title='Panama'></span> Panama",
+				"Paraguay": "<span class='flag flag-py' title='Paraguay'></span> Paraguay",
+				"Peru": "<span class='flag flag-pe' title='Peru'></span> Peru",
+				"Philippines": "<span class='flag flag-ph' title='Philippines'></span> Philippines",
+				"Poland": "<span class='flag flag-pl' title='Poland'></span> Poland",
+				"Portugal": "<span class='flag flag-pt' title='Portugal'></span> Portugal",
+				"Puerto Rico": "<span class='flag flag-pr' title='Puerto Rico'></span> Puerto Rico",
+				"Qatar": "<span class='flag flag-qa' title='Qatar'></span> Qatar",
+				"Romania": "<span class='flag flag-ro' title='Romania'></span> Romania",
+				"Russian Federation": "<span class='flag flag-ru' title='Russian Federation'></span> Russian Federation",
+				"Réunion": "<span class='flag flag-re' title='Réunion'></span> Réunion",
+				"Saint Vincent and the Grenadines": "<span class='flag flag-vc' title='Saint Vincent and the Grenadines'></span> Saint Vincent and the Grenadines",
+				"Saudi Arabia": "<span class='flag flag-sa' title='Saudi Arabia'></span> Saudi Arabia",
+				"Serbia": "<span class='flag flag-rs' title='Serbia'></span> Serbia",
+				"Seychelles": "<span class='flag flag-sc' title='Seychelles'></span> Seychelles",
+				"Singapore": "<span class='flag flag-sg' title='Singapore'></span> Singapore",
+				"Slovakia": "<span class='flag flag-sk' title='Slovakia'></span> Slovakia",
+				"Slovenia": "<span class='flag flag-si' title='Slovenia'></span> Slovenia",
+				"South Africa": "<span class='flag flag-za' title='South Africa'></span> South Africa",
+				"South Korea": "<span class='flag flag-kr' title='South Korea'></span> South Korea",
+				"Spain": "<span class='flag flag-es' title='Spain'></span> Spain",
+				"Sri Lanka": "<span class='flag flag-lk' title='Sri Lanka'></span> Sri Lanka",
+				"Sweden": "<span class='flag flag-se' title='Sweden'></span> Sweden",
+				"Switzerland": "<span class='flag flag-ch' title='Switzerland'></span> Switzerland",
+				"Taiwan": "<span class='flag flag-tw' title='Taiwan'></span> Taiwan",
+				"Tanzania": "<span class='flag flag-tz' title='Tanzani'></span> Tanzania",
+				"Thailand": "<span class='flag flag-th' title='Thailand'></span> Thailand",
+				"Trinidad and Tobago": "<span class='flag flag-tt' title='Trinidad and Tobago'></span> Trinidad and Tobago",
+				"Tunisia": "<span class='flag flag-tn' title='Tunisia'></span> Tunisia",
+				"Turkey": "<span class='flag flag-tr' title='Turkey'></span> Turkey",
+				"U.S. Virgin Islands": "<span class='flag flag-vi' title='U.S. Virgin Islands'></span> U.S. Virgin Islands",
+				"Uganda": "<span class='flag flag-ug' title='Uganda'></span> Uganda",
+				"Ukraine": "<span class='flag flag-ua' title='Ukraine'></span> Ukraine",
+				"United Arab Emirates": "<span class='flag flag-ae' title='United Arab Emirates'></span> United Arab Emirates",
+				"United Kingdom": "<span class='flag flag-gb' title='United Kingdom'></span> United Kingdom",
+				"United States": "<span class='flag flag-us' title='United States'></span> United States",
+				"Unknown": "<span class='flag flag-xx' title='Unknown'></span> Unknown",
+				"Uruguay": "<span class='flag flag-uy' title='Uruguay'></span> Uruguay",
+				"Venezuela": "<span class='flag flag-ve' title='Venezuela'></span> Venezuela",
+				"Vietnam": "<span class='flag flag-vn' title='Vietnam'></span> Vietnam",
+				"Anarchist": "<span class='trollflag trollflag-an' title='Anarchist'></span> Anarchist",
+				"Anarcho-Capitalist": "<span class='trollflag trollflag-ac' title='Anarcho-Capitalist'></span> Anarcho-Capitalist",
+				"Black Nationalist|Black Lives Matter": "<span class='trollflag trollflag-bl' title='Black Nationalist'></span> Black Nationalist / Black Lives Matter",
+				"Catalonia": "<span class='trollflag trollflag-ct' title='Catalonia'></span> Catalonia",
+				"Commie|Communist": "<span class='trollflag trollflag-cm' title='Commie'></span> Commie / Communist",
+				"Confederate": "<span class='trollflag trollflag-cf' title='Confederate'></span> Confederate",
+				"Democrat": "<span class='trollflag trollflag-dm' title='Democrat'></span> Democrat",
+				"Templar|DEUS VULT": "Templar / DEUS VULT",
+				"Europe|European": "<span class='trollflag trollflag-eu' title='European'></span> Europe / European",
+				"Fascist": "<span class='trollflag trollflag-fc' title='Fascist'></span> Fascist",
+				"Gadsden": "<span class='trollflag trollflag-gn' title='Gadsden'></span> Gadsden",
+				"Gay|LGBT": "<span class='trollflag trollflag-gy' title='Gay'></span> Gay / LGBT",
+				"Hippie": "<span class='trollflag trollflag-pc' title='Hippie'></span> Hippie",
+				"Jihadi": "<span class='trollflag trollflag-jh' title='Jihadi'></span> Jihadi",
+				"Kekistani": "<span class='trollflag trollflag-kn' title='Kekistani'></span> Kekistani",
+				"Muslim": "<span class='trollflag trollflag-mf' title='Muslim'></span> Muslim",
+				"National Bolshevik": "<span class='trollflag trollflag-nb' title='National Bolshevik'></span> National Bolshevik",
+				"Nazi": "<span class='trollflag trollflag-nz' title='Nazi'></span> Nazi",
+				"North Korea": "North Korea",
+				"Obama": "Obama",
+				"Pirate": "<span class='trollflag trollflag-pr' title='Pirate'></span> Pirate",
+				"Rebel": "Rebel",
+				"Republican": "<span class='trollflag trollflag-re' title='Republican'></span> Republican",
+				"Templar": "<span class='trollflag trollflag-tm' title='Templar'></span> Templar",
+				"Texan": "Texan",
+				"Tree Hugger": "<span class='trollflag trollflag-tr' title='Tree Hugger'></span> Tree Hugger",
+				"United Nations": "<span class='trollflag trollflag-un' title='United Nations'></span> United Nations",
+				"White Supremacist": "<span class='trollflag trollflag-wp' title='White Supremacist'></span> White Supremacist",
+				},
+			"default": ""
 		},
 		"divider": {
 			"type": UserInput.OPTION_DIVIDER
@@ -281,13 +303,18 @@ class Search4Chan(SearchWithScope):
 			except ValueError:
 				pass
 
-		if query.get("country_code", None) and query.get("country_code") != "all":
-			if query.get("p.country_code") == "eu":
-				where.append("country_code IN %s")
-				replacements.append(self.eu_countries)
-			else:
-				where.append("p.country_code = %s")
-				replacements.append(query.get("country_code"))
+		if query.get("country_name", None):
+
+			# Separate merged names
+			country_names = []
+			for country_name in query["country_names"]:
+				country_name = country_name.split("|")
+				for c in country_name:
+					country_names.append(c)
+
+			where.append("p.country_name IN (%s)")
+
+			replacements.append(country_names)
 
 		sql_query = ("SELECT p.*, t.board " \
 					 "FROM posts_" + self.prefix + " AS p " \
@@ -383,15 +410,14 @@ class Search4Chan(SearchWithScope):
 		if query.get("subject_match", None):
 			match.append("@subject " + self.convert_for_sphinx(query["subject_match"]))
 
-		# handle country codes through sphinx if not looking for density
-		if query.get("country_code", None) and not query.get("check_dense_country", None) and query.get(
-				"country_code") != "all":
-			if query.get("country_code", "") == "eu":
-				where.append("country_code IN %s")
+		# handle country names through sphinx
+		if query.get("country_name", None) and not query.get("check_dense_country", None):
+			if query.get("country_name", "") == "eu":
+				where.append("country_name IN %s")
 				replacements.append(self.eu_countries)
 			else:
-				where.append("country_code = %s")
-				replacements.append(query.get("country_code"))
+				where.append("country_name IN %s")
+				replacements.append(query.get("country_name"))
 
 		# both possible FTS parameters go in one MATCH() operation
 		if match:
@@ -401,8 +427,8 @@ class Search4Chan(SearchWithScope):
 		# query Sphinx
 		self.dataset.update_status("Searching for matches")
 		where = " AND ".join(where)
-
 		posts = self.fetch_sphinx(where, replacements)
+
 		if posts is None:
 			return posts
 		elif len(posts) == 0:
@@ -418,14 +444,6 @@ class Search4Chan(SearchWithScope):
 
 		postgres_where = []
 		postgres_replacements = []
-
-		if query.get("country_code", None) and not query.get("country_code") == "all":
-			if query.get("country_code") == "eu":
-				postgres_where.append("country_code IN %s")
-				postgres_replacements.append(self.eu_countries)
-			else:
-				postgres_where.append("country_code = %s")
-				postgres_replacements.append(query.get("country_code"))
 
 		# postgres_where.append("board = %s")
 		# postgres_replacements.append(query.get("board"))

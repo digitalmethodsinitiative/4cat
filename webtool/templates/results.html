@@ -19,7 +19,7 @@
             <nav class="tabs">
                 <ul>
                     <li{% if depth == "all" %} class="current"{% endif %}><a href="{{ url_for('show_results') }}?{{ filter|http_query }}&amp;depth=all">All datasets</a></li>
-                    <li{% if not depth or depth == "own" %} class="current"{% endif %}><a href="{{ url_for('show_results') }}?{{ filter|http_query }}&amp;depth=own">My own datasets</a></li>
+                    <li{% if not depth or depth == "own" %} class="current"{% endif %}><a href="{{ url_for('show_results') }}?{{ filter|http_query }}&amp;depth=own">My own datasets</a></li>
                     <li{% if depth == "favourites" %} class="current"{% endif %}><a href="{{ url_for('show_results') }}?{{ filter|http_query }}&amp;depth=favourites">Favourites only</a></li>
                 </ul>
             </nav>
@@ -31,21 +31,22 @@
                         data-numrows="{{ dataset.num_rows }}" data-key="{{ dataset.key }}">
 
                         <div class="property-container">
-                            <p class="result">
-                                <a href="{{ dataset.key }}/"><i class="fas fa-link" aria-label="Permalink" title="Permalink"></i></a>
+                            <div class="result">
+                                <a href="{{ url_for('show_result', key=dataset.key) }}"><i class="fas fa-link" aria-label="Permalink" title="Permalink"></i><span class="sr-only">show result</span></a>
                                 <span class="property-badge">{{ dataset.parameters.datasource if "datasource" in dataset.parameters else "4chan" }}{% if "board" in dataset.parameters and dataset.parameters.board %}/{{ dataset.parameters.board }}/{% endif %}</span>
-                                {% include 'result-metadata.html' %}
-                            </p>
-                        {% if dataset.is_finished() %}
-                            <p class="result">{{ "{:,}".format(dataset.num_rows) }} item{% if dataset.num_rows != 1 %}s{% endif %}</p>
-                        {% endif %}
+                                <h4>{{ dataset.get_label() }}</h4>
+                                {% if dataset.is_finished() %}
+                                    <span class="result">({{ "{:,}".format(dataset.num_rows) }} item{% if dataset.num_rows != 1 %}s{% endif %})</span>
+                                {% endif %}
+                            </div>
+                            <div>{% include 'result-metadata.html' %}</div>
                         </div>
 
                         <div class="property-container status">
                         {% if not dataset.is_finished() or dataset.num_rows == 0 %}
                             <p class="button-like inactive"><span class="dataset-status">{% include "result-status.html" %}</span></p>
                         {% else %}
-                            <a class="button-like" href="{{ url_for('get_result', query_file=dataset.result_file) }}"><i class="fas fa-download" aria-hidden="true"></i> {{ dataset.get_results_path()|filesize }}, {{ dataset.result_file.split(".")[-1] }}</a>
+                            <a class="button-like" href="{{ url_for('get_result', query_file=dataset.result_file)[:-1] }}"><i class="fas fa-download" aria-hidden="true"></i> {{ dataset.get_results_path()|filesize }}, {{ dataset.result_file.split(".")[-1] }}</a>
                         {% endif %}
                         </div>
 
@@ -67,12 +68,12 @@
     <nav class="pagination">
         <ol>
             {% if pagination.has_prev %}
-                    <li><a href="/results/page/{{ pagination.page - 1 }}/?{{ filter|http_query }}&amp;depth={{ depth }}">&laquo; Previous</a></li>
+                    <li><a href="{{ url_for("show_results", page=(pagination.page - 1)) }}?{{ filter|http_query }}&amp;depth={{ depth }}">&laquo; Previous</a></li>
             {% endif %}
             {%- for page in pagination.iter_pages() %}
                 {% if page %}
                     {% if page != pagination.page %}
-                        <li class="page"><a href="{{ url_for('show_results', page=page) }}/?{{ filter|http_query }}&amp;depth={{ depth }}">{{ page }}</a></li>
+                        <li class="page"><a href="{{ url_for("show_results", page=page) }}?{{ filter|http_query }}&amp;depth={{ depth }}">{{ page }}</a></li>
                     {% else %}
                         <li class="page"><strong class="current">{{ page }}</strong></li>
                     {% endif %}
@@ -81,7 +82,7 @@
                 {% endif %}
             {%- endfor %}
             {% if pagination.has_next %}
-                    <li><a href="/results/page/{{ pagination.page + 1 }}/?{{ filter|http_query }}&amp;depth={{ depth }}">Next &raquo;</a></li>
+                    <li><a href="{{ url_for("show_results", page=(pagination.page + 1)) }}?{{ filter|http_query }}&amp;depth={{ depth }}">Next &raquo;</a></li>
             {% endif %}
         </ol>
     </nav>

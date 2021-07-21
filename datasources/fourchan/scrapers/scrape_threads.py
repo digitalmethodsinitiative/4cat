@@ -54,7 +54,7 @@ class ThreadScraper4chan(BasicJSONScraper):
 	# for new posts, any fields not in here will be saved in the "unsorted_data" column for that post as part of a
 	# JSONified dict
 	known_fields = ["no", "resto", "sticky", "closed", "archived", "archived_on", "now", "time", "name", "trip", "id",
-					"capcode", "country", "country_name", "sub", "com", "tim", "filename", "ext", "fsize", "md5", "w",
+					"capcode", "country", "country_name", "board_flag", "flag_name", "sub", "com", "tim", "filename", "ext", "fsize", "md5", "w",
 					"h", "tn_w", "tn_h", "filedeleted", "spoiler", "custom_spoiler", "omitted_posts", "omitted_images",
 					"replies", "images", "bumplimit", "imagelimit", "capcode_replies", "last_modified", "tag",
 					"semantic_url", "since4pass", "unique_ips", "tail_size"]

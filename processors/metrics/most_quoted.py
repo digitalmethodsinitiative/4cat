@@ -24,13 +24,15 @@ class QuoteRanker(BasicProcessor):
 	extension = "csv"  # extension of result file, used internally and in UI
 
 	@classmethod
-	def is_compatible_with(cls, dataset=None):
+	def is_compatible_with(cls, module=None):
 		"""
 		Allow processor on chan datasets
 
-		:param DataSet dataset:  Dataset to determine compatibility with
+		:param module: Dataset or processor to determine compatibility with
 		"""
-		return dataset.parameters.get("datasource") in ("4chan", "8chan", "8kun")
+		if module.is_dataset():
+			return module.parameters.get("datasource") in ("4chan", "8chan", "8kun")
+		return False
 
 
 	def process(self):

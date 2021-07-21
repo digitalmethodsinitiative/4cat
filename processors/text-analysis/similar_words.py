@@ -53,13 +53,13 @@ class SimilarWord2VecWords(BasicProcessor):
 	}
 
 	@classmethod
-	def is_compatible_with(cls, dataset=None):
+	def is_compatible_with(cls, module=None):
 		"""
 		Allow processor on word embedding models
 
-		:param DataSet dataset:  Dataset to determine compatibility with
+		:param module: Dataset or processor to determine compatibility with
 		"""
-		return dataset.type == "generate-embeddings"
+		return module.type == "generate-embeddings"
 
 	def process(self):
 		"""
@@ -77,9 +77,9 @@ class SimilarWord2VecWords(BasicProcessor):
 
 		input_words = input_words.split(",")
 
-		num_words = convert_to_int(self.parameters.get("num-words"))
+		num_words = convert_to_int(self.parameters.get("num-words", 10))
 		try:
-			threshold = float(self.parameters.get("threshold"))
+			threshold = float(self.parameters.get("threshold", 0.25))
 		except ValueError:
 			threshold = float(self.get_options()["threshold"]["default"])
 

@@ -34,13 +34,13 @@ class YouTubeThumbnails(BasicProcessor):
 	sleep_time = 10
 
 	@classmethod
-	def is_compatible_with(cls, dataset=None):
+	def is_compatible_with(cls, module=None):
 		"""
 		Allow processor on YouTube metadata sets
 
-		:param DataSet dataset:  Dataset to determine compatibility with
+		:param module: Dataset or processor to determine compatibility with
 		"""
-		return dataset.type == "youtube-metadata"
+		return module.type == "youtube-metadata"
 
 	def process(self):
 		"""

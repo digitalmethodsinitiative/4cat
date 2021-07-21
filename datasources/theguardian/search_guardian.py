@@ -34,6 +34,7 @@ class SearchGuardian(SearchWithScope):
 			"type": UserInput.OPTION_INFO,
 			"help": "The Guardian data is retrieved via [PENELOPE](https://penelope.vub.be). It covers *The Guardian* "
 					"articles related to climate change and also the comments on those articles."
+					"Data was collected by PENELOPE until April 24th, 2019."
 		},
 		"body_match": {
 			"type": UserInput.OPTION_TEXT,

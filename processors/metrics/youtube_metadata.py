@@ -66,13 +66,14 @@ class YouTubeMetadata(BasicProcessor):
 	}
 
 	@classmethod
-	def is_compatible_with(cls, dataset=None):
+	def is_compatible_with(cls, module=None):
 		"""
 		Allow processor on datasets probably containing youtube links
 
-		:param DataSet dataset:  Dataset to determine compatibility with
+		:param module: Dataset or processor to determine compatibility with
 		"""
-		return dataset.parameters.get("datasource") in ("4chan", "8chan", "8kun", "reddit", "custom")
+		# Compatible with every top-level dataset.
+		return module.is_top_dataset()
 
 	def process(self):
 		"""

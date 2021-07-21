@@ -30,13 +30,15 @@ class RedditVoteChecker(BasicProcessor):
 	extension = "csv"  # extension of result file, used internally and in UI
 
 	@classmethod
-	def is_compatible_with(cls, dataset=None):
+	def is_compatible_with(cls, module=None):
 		"""
 		Allow processor if dataset is a Reddit dataset
 
-		:param DataSet dataset:  Dataset to determine compatibility with
+		:param module: Dataset or processor to determine compatibility with
 		"""
-		return not dataset.key_parent and dataset.type == "reddit-search" and dataset.num_rows <= 5000
+		if module.is_dataset():
+			return module.is_top_dataset() and module.type == "reddit-search" and module.num_rows <= 5000
+		return False
 
 	def process(self):
 		"""

@@ -25,6 +25,15 @@ class AuthorInfoRemover(BasicProcessor):
     description = "Anonymises a dataset by removing content of any column starting with 'author'"
     extension = "csv"  # extension of result file, used internally and in UI
 
+    @classmethod
+    def is_compatible_with(cls, module=None):
+        """
+        Allow processor on CSV files
+
+        :param module: Dataset or processor to determine compatibility with
+        """
+        return module.is_top_dataset() and module.get_extension() == "csv"
+
     def process(self):
         """
         Reads a CSV file, removing content from all columns starting with "author"

@@ -47,9 +47,8 @@ webtool/venv/
 !webtool/static/img/*.gif
 !webtool/static/img/*.jpg
 !webtool/static/img/favicon/*.ico
-
-# font awesome requires a commercial license and can't be included in the repository
-webtool/static/fontawesome
+!webtool/static/img/flags/*.png
+!common/assets/github-screenshots/*.png
 
 # data files
 results
@@ -57,5 +56,6 @@ snapshots
 sql-queries.txt
 cheat-sheet.txt
 helper-scripts/threads.p
-webtool/static/js/sigma.js-1.2.1/
 keys/
+images/
+sphinx-3.3.1/

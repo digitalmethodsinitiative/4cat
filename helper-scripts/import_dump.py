@@ -80,6 +80,7 @@ with open(args.input, encoding="utf-8") as inputfile:
             "author_trip": post.get("trip", ""),
             "author_type": post["id"] if "id" in post else "",
             "author_type_id": post["capcode"] if post["capcode"] != "" else "N",
+            "country_name": "",
             "country_code": post.get("poster_country", ""),
             "image_file": post["media_filename"],
             "image_4chan": post["media_orig"],

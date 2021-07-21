@@ -38,7 +38,7 @@ class InternalAPI(BasicWorker):
 		# set up the socket
 		server = socket.socket()
 		server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-		server.settimeout(5)  # should be plenty
+		server.settimeout(2)  # should be plenty
 
 		has_time = True
 		start_trying = int(time.time())
@@ -240,7 +240,7 @@ class InternalAPI(BasicWorker):
 						"is_maybe_crashed": job["timestamp_claimed"] > 0 and not worker,
 						"dataset_key": worker.dataset.key if hasattr(worker, "dataset") else None,
 						"dataset_user": worker.dataset.parameters.get("user", None) if hasattr(worker, "dataset") else None,
-						"dataset_parent_key": worker.dataset.top_key() if hasattr(worker, "dataset") else None,
+						"dataset_parent_key": worker.dataset.top_parent().key if hasattr(worker, "dataset") else None,
 						"timestamp_queued": job["timestamp"],
 						"timestamp_claimed": job["timestamp_lastclaimed"]
 					})

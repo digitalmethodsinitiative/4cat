@@ -16,6 +16,7 @@ class UserInput:
     OPTION_CHOICE = "choice"  # one choice out of a list (select)
     OPTION_TEXT = "string"  # simple string or integer (input text)
     OPTION_MULTI = "multi"  # multiple values out of a list (select multiple)
+    OPTION_MULTI_SELECT = "multi_select"  # multiple values out of a dropdown list (select multiple)
     OPTION_INFO = "info"  # just a bit of text, not actual input
     OPTION_TEXT_LARGE = "textarea"  # longer text
     OPTION_DATE = "date"  # a single date
@@ -135,6 +136,15 @@ class UserInput:
 
         elif input_type == UserInput.OPTION_MULTI:
             # any number of values out of a list of possible values
+            # comma-separated during input, returned as a list of valid options
+            if not choice:
+                return settings.get("default", [])
+
+            chosen = choice.split(",")
+            return [item for item in chosen if item in settings.get("options", [])]
+
+        elif input_type == UserInput.OPTION_MULTI_SELECT:
+            # multiple number of values out of a dropdown list of possible values
             # comma-separated during input, returned as a list of valid options
             if not choice:
                 return settings.get("default", [])
