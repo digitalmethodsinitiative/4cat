@@ -48,12 +48,18 @@ packages = [
 	"svgwrite==1.3.1",
 	"Telethon==1.10.6",
 	"Werkzeug==0.15.5",
+	"en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.0.0/en_core_web_sm-3.0.0.tar.gz#egg=en_core_web_sm"
 ]
 
 # Some packages don't run on Windows
 unix_packages = [
 	"python-daemon==2.3.0"
 ]
+
+# # Dependency urls
+# dependency_links=[
+#         "https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.0.0/en_core_web_sm-3.0.0.tar.gz#egg=en_core_web_sm",
+#     ]
 
 if os.name != "nt":
 	packages = packages + unix_packages
@@ -69,5 +75,6 @@ setup(
 	url="https://oilab.eu",
 	packages=['backend', 'webtool', 'datasources'],
 	python_requires='>=3.7',
-	install_requires=packages
+	install_requires=packages,
+	# dependency_links=dependency_links,
 )

@@ -213,12 +213,12 @@ try:
 except LookupError:
 	nltk.download("wordnet")
 
-# Spacy 
-import spacy
-try:
-	spacy.load('en_core_web_sm')
-except IOError:
-	spacy.cli.download('en_core_web_sm')
+# # Spacy
+# import spacy
+# try:
+# 	spacy.load('en_core_web_sm')
+# except IOError:
+# 	spacy.cli.download('en_core_web_sm')
 
 print("\nMigration scripts finished.")
 print("It is recommended to re-generate your Sphinx configuration and index files to account for database updates.")
