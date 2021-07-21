@@ -213,13 +213,6 @@ try:
 except LookupError:
 	nltk.download("wordnet")
 
-# # Spacy
-# import spacy
-# try:
-# 	spacy.load('en_core_web_sm')
-# except IOError:
-# 	spacy.cli.download('en_core_web_sm')
-
 print("\nMigration scripts finished.")
 print("It is recommended to re-generate your Sphinx configuration and index files to account for database updates.")
 print("You can now safely restart 4CAT.\n")

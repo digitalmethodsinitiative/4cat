@@ -56,11 +56,6 @@ unix_packages = [
 	"python-daemon==2.3.0"
 ]
 
-# # Dependency urls
-# dependency_links=[
-#         "https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.0.0/en_core_web_sm-3.0.0.tar.gz#egg=en_core_web_sm",
-#     ]
-
 if os.name != "nt":
 	packages = packages + unix_packages
 
@@ -76,5 +71,4 @@ setup(
 	packages=['backend', 'webtool', 'datasources'],
 	python_requires='>=3.7',
 	install_requires=packages,
-	# dependency_links=dependency_links,
 )

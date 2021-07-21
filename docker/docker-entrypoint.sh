@@ -67,7 +67,7 @@ if [ "$(version "$CURRENT")" -ge "$(version "$TARGET")" ]; then
     echo "Version is up to date"
 else
     echo "Running migrations"
-  #  python3 helper-scripts/migrate.py --yes
+    python3 helper-scripts/migrate.py --yes
 fi
 
 # Inform user of admin password if created
