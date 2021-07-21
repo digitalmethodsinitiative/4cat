@@ -1,4 +1,4 @@
-{% set option_settings = processor.get_options(dataset)[option] %}
+{% set option_settings = processor.get_options(dataset, current_user)[option] %}
 <div class="processor-option-wrap">
     <label class="option-type-{{ option_settings.type }}">
         {% if option_settings.type == "toggle" %}

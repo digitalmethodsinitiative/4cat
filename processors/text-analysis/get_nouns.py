@@ -206,17 +206,18 @@ class ExtractNouns(BasicProcessor):
 		self.dataset.update_status("Parent dataset updated.")
 
 	@classmethod
-	def get_options(cls, parent_dataset=None):
-		"""
-		Get processor options
+	def get_options(cls, parent_dataset=None, user=None):
+        """
+        Get processor options
 
-		The feature of this processor that overwrites the parent dataset can
-		only work properly on csv datasets so check the extension before
-		showing it.
+        The feature of this processor that overwrites the parent dataset can
+        only work properly on csv datasets so check the extension before
+        showing it.
 
-		:param parent_dataset:  Dataset to get options for
-		:return dict:
-		"""
+        :param user:
+        :param parent_dataset:  Dataset to get options for
+        :return dict:
+        """
 		options = cls.options
 		if parent_dataset and parent_dataset.top_parent().get_results_path().suffix == ".csv":
 			options["overwrite"] = {

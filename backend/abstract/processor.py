@@ -510,7 +510,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		return hasattr(cls, "category") and cls.category and "filter" in cls.category.lower()
 
 	@classmethod
-	def get_options(cls, parent_dataset=None):
+	def get_options(cls, parent_dataset=None, user=None):
 		"""
 		Get processor options
 
@@ -521,6 +521,9 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
 		:param DataSet parent_dataset:  An object representing the dataset that
 		the processor would be run on
+		:param User user:  Flask user the options will be displayed for, in
+		case they are requested for display in the 4CAT web interface. This can
+		be used to show some options only to privileges users.
 		"""
 		return cls.options if hasattr(cls, "options") else {}
 

@@ -142,10 +142,11 @@ def datasource_form(datasource_id):
 	if not worker_class:
 		return error(404, message="Datasource '%s' has no search worker" % datasource_id)
 
-	if not worker_class.get_options():
+	worker_options = worker_class.get_options(None, current_user)
+	if not worker_options:
 		return error(404, message="Datasource '%s' has no dataset parameter options defined" % datasource_id)
 
-	form = render_template("create-dataset-option.html", options=worker_class.get_options())
+	form = render_template("create-dataset-option.html", options=worker_options)
 	javascript_path = datasource["path"].joinpath("webtool", "tool.js")
 	has_javascript = javascript_path.exists()
 
@@ -226,7 +227,7 @@ def queue_dataset():
 	if hasattr(search_worker, "validate_query"):
 		try:
 			# first sanitise values
-			sanitised_query = UserInput.parse_all(search_worker.get_options(), request.form.to_dict(), silently_correct=False)
+			sanitised_query = UserInput.parse_all(search_worker.get_options(None, current_user), request.form.to_dict(), silently_correct=False)
 
 			# then validate for this particular datasource
 			sanitised_query = search_worker.validate_query(sanitised_query, request, current_user)
@@ -536,7 +537,7 @@ def queue_processor(key=None, processor=None):
 		return jsonify({"error": "This processor is not available for this dataset or has already been run."})
 
 	# create a dataset now
-	options = UserInput.parse_all(available_processors[processor].get_options(dataset), request.form.to_dict(), silently_correct=False)
+	options = UserInput.parse_all(available_processors[processor].get_options(dataset, current_user), request.form.to_dict(), silently_correct=False)
 	options["user"] = current_user.get_id()
 
 	analysis = DataSet(parent=dataset.key, parameters=options, db=db,
