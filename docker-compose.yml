@@ -16,11 +16,7 @@ services:
     image: 4cat
     build:
       context: .
-<<<<<<< HEAD
-      dockerfile: docker/Dockerfile_backend
-=======
       dockerfile: docker/Dockerfile
->>>>>>> master
     container_name: 4cat_backend
     env_file:
       - .env

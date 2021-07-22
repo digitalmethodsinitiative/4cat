@@ -45,8 +45,3 @@ RUN pip3 install gunicorn
 COPY ./config.py-example /usr/src/app/config.py
 COPY ./VERSION /usr/src/app/.current-version
 COPY . /usr/src/app/
-<<<<<<< HEAD:docker/Dockerfile_backend
-
-ENTRYPOINT ["docker/docker-entrypoint.sh"]
-=======
->>>>>>> master:docker/Dockerfile
