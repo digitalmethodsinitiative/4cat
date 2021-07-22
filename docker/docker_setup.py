@@ -10,6 +10,7 @@ if os.path.exists(DOCKER_CONFIG_FILE):
     docker_config.read(DOCKER_CONFIG_FILE)
 
     # Change config to use docker variables
+    # This tells config.py that we are set up for Docker
     docker_config['DOCKER']['use_docker_config'] = 'True'
 
     # Generate salt and secret_key if they do not exist
@@ -26,6 +27,23 @@ if os.path.exists(DOCKER_CONFIG_FILE):
     # Ensure Flask knows public host and port
     docker_config['SERVER']['server_name'] = os.environ['SERVER_NAME']
     docker_config['SERVER']['public_port'] = os.environ['PUBLIC_PORT']
+<<<<<<< HEAD
+=======
+
+    # Install specific packages
+    if docker_config['DOCKER'].getboolean('new_installation'):
+        # NLTK resources
+        import nltk
+        nltk.download("wordnet")
+        nltk.download("punkt")
+
+        # Spacy lexicon
+        import spacy
+        spacy.cli.download('en_core_web_sm')
+
+        # Update config to skip this on future runs
+        docker_config['DOCKER']['new_installation'] = 'False'
+>>>>>>> master
 
     # Save config file
     with open(DOCKER_CONFIG_FILE, 'w') as configfile:

@@ -36,7 +36,11 @@ cd /usr/src/app && psql --host=db --port=5432 --user=$POSTGRES_USER --dbname=$PO
 
 python3 /usr/src/app/helper-scripts/create_user.py -u admin -e -p "$admin_password"
 echo 'Your admin username:' >> docker/shared/login.txt
+<<<<<<< HEAD
 echo 'admin' >> login.txt
+=======
+echo 'admin' >> docker/shared/login.txt
+>>>>>>> master
 echo 'Your admin password:' >> docker/shared/login.txt
 echo "$admin_password" >> docker/shared/login.txt
 user_created=true

@@ -94,13 +94,13 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
     }
 
     @classmethod
-    def is_compatible_with(cls, dataset=None):
+    def is_compatible_with(cls, module=None):
         """
         Allow processor on token sets
 
-        :param DataSet dataset:  Dataset to determine compatibility with
+        :param module: Dataset or processor to determine compatibility with
         """
-        return dataset.type == "tokenise-posts"
+        return module.type == "generate-embeddings"
 
     def process(self):
         # parse parameters
@@ -146,6 +146,10 @@ class HistWordsVectorSpaceVisualiser(BasicProcessor):
                 common_vocab = set(model.vocab.keys())
             else:
                 common_vocab &= set(model.vocab.keys())  # intersect
+
+        if not common_vocab:
+            self.dataset.update_status("No vocabulary common across all models, cannot diachronically chart words", is_final=True)
+            return
 
         # sort common vocabulary by combined frequency across all models
         # this should make filtering for common words a bit faster further down

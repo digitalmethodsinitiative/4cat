@@ -14,9 +14,10 @@ import config
 import backend
 from common.lib.job import Job, JobNotFoundException
 from common.lib.helpers import get_software_version
+from common.lib.fourcat_module import FourcatModule
 
 
-class DataSet:
+class DataSet(FourcatModule):
 	"""
 	Provide interface to safely register and run operations on a dataset
 
@@ -34,7 +35,7 @@ class DataSet:
 	key = ""
 
 	children = []
-	processors = {}
+	available_processors = {}
 	genealogy = []
 	preset_parent = None
 	parameters = {}
@@ -111,14 +112,12 @@ class DataSet:
 			self.parameters = parameters
 
 			self.db.insert("datasets", data=self.data)
-			print("Adding dataset of type %s" % type)
 			self.reserve_result_file(parameters, extension)
 
 		# retrieve analyses and processors that may be run for this dataset
 		analyses = self.db.fetchall("SELECT * FROM datasets WHERE key_parent = %s ORDER BY timestamp ASC", (self.key,))
 		self.children = sorted([DataSet(data=analysis, db=self.db) for analysis in analyses],
 							   key=lambda dataset: dataset.is_finished(), reverse=True)
-		self.processors = self.get_available_processors()
 
 	def check_dataset_finished(self):
 		"""
@@ -360,22 +359,29 @@ class DataSet:
 		"""
 		return self.data["is_finished"] == True
 
-	def is_rankable(self):
+	def is_rankable(self, multiple_items=True):
 		"""
 		Determine if a dataset is rankable
 
 		Rankable means that it is a CSV file with 'date' and 'value' columns
 		as well as one or more item label columns
 
+		:param bool multiple_items:  Consider datasets with multiple items per
+		item (e.g. word_1, word_2, etc)?
+
 		:return bool:  Whether the dataset is rankable or not
 		"""
 		if self.get_results_path().suffix != ".csv" or not self.get_results_path().exists():
 			return False
 
+		column_options = {"date", "value", "item"}
+		if multiple_items:
+			column_options.add("word_1")
+
 		with self.get_results_path().open(encoding="utf-8") as infile:
 			reader = csv.DictReader(infile)
 			try:
-				return len(set(reader.fieldnames) & {"date", "value", "item", "word_1"}) >= 3
+				return len(set(reader.fieldnames) & column_options) >= 3
 			except (TypeError, ValueError):
 				return False
 
@@ -392,6 +398,18 @@ class DataSet:
 			return json.loads(self.data["parameters"])
 		except json.JSONDecodeError:
 			return {}
+
+	def update_label(self, label):
+		"""
+		Update label for this dataset
+
+		:param str label:  New label
+		:return str:  The new label, as returned by get_label
+		"""
+		self.parameters["label"] = label
+
+		self.db.update("datasets", data={"parameters": json.dumps(self.parameters)}, where={"key": self.key})
+		return self.get_label()
 
 	def get_label(self, parameters=None, default="Query"):
 		"""
@@ -422,8 +440,8 @@ class DataSet:
 			return label
 		elif parameters.get("country_flag") and parameters["country_flag"] != "all":
 			return "Flag: %s" % parameters["country_flag"]
-		elif parameters.get("country_code") and parameters["country_code"] != "all":
-			return "Country: %s" % parameters["country_code"]
+		elif parameters.get("country_name") and parameters["country_name"] != "all":
+			return "Country: %s" % parameters["country_name"]
 		elif parameters.get("filename"):
 			return parameters["filename"]
 		elif parameters.get("board") and "datasource" in parameters:
@@ -599,19 +617,17 @@ class DataSet:
 
 		return config.GITHUB_URL + "/blob/" + self.data["software_version"] + self.data.get("software_file", "")
 
-	def top_key(self):
+	def top_parent(self):
 		"""
-		Get key of root dataset
+		Get root dataset
 
 		Traverses the tree of datasets this one is part of until it finds one
-		with no source_dataset dataset, then returns that dataset's key.
+		with no source_dataset dataset, then returns that dataset.
 
-		Not to be confused with top kek.
-
-		:return str: Parent key.
+		:return Dataset: Parent dataset
 		"""
 		genealogy = self.get_genealogy()
-		return genealogy[0].key
+		return genealogy[0]
 
 	def get_genealogy(self):
 		"""
@@ -716,6 +732,9 @@ class DataSet:
 
 		:return dict:  Available processors, `name => properties` mapping
 		"""
+		if self.available_processors:
+			return self.available_processors
+
 		processors = self.get_compatible_processors()
 
 		for analysis in self.children:
@@ -725,6 +744,7 @@ class DataSet:
 			if not processors[analysis.type].get_options():
 				del processors[analysis.type]
 
+		self.available_processors = processors
 		return processors
 
 	def link_job(self, job):
@@ -775,6 +795,35 @@ class DataSet:
 		"""
 		self.link_parent("")
 
+	def is_dataset(self):
+		"""
+		Easy way to confirm this is a dataset.
+		Used for checking processor and dataset compatibility,
+		which needs to handle both processors and datasets.
+		"""
+		return True
+
+	def is_top_dataset(self):
+		"""
+		Easy way to confirm this is a top dataset.
+		Used for checking processor and dataset compatibility,
+		which needs to handle both processors and datasets.
+		"""
+		if self.get_parent():
+			return False
+		return True
+
+	def get_extension(self):
+		"""
+		Gets the file extention this dataset produces.
+		Also checks whether the results file exists.
+		Used for checking processor and dataset compatibility.
+
+		"""
+
+		if self.get_results_path().exists():
+			return self.get_results_path().suffix[1:]
+		return False
 
 	def __getattr__(self, attr):
 		"""

@@ -29,15 +29,17 @@ class OvertimeHatefulAnalysis(BasicProcessor):
 	extension = "csv"  # extension of result file, used internally and in UI
 
 	@classmethod
-	def is_compatible_with(cls, dataset=None):
+	def is_compatible_with(cls, module=None):
 		"""
 		Allow processor on Telegram, Instagram and Reddit datasets
 
 		Don't quite remember why these three...
 
-		:param DataSet dataset:  Dataset to determine compatibility with
+		:param module: Dataset or processor to determine compatibility with
 		"""
-		return dataset.parameters.get("datasource") in ("telegram", "instagram", "reddit")
+		if module.is_dataset():
+			return module.parameters.get("datasource") in ("telegram", "instagram", "reddit")
+		return False
 
 	# the following determines the options available to the user via the 4CAT
 	# interface.

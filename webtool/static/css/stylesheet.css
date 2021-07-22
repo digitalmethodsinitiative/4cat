@@ -217,6 +217,12 @@ button:hover, .button-like:not(.inactive):hover {
     padding-bottom: 1em;
 }
 
+/** --------------------- *
+  Utility classes -> Lists
+  * --------------------- */
+.expandable {
+    display: inline;
+}
 
 /** --------------------- *
   Utility classes -> Lists
@@ -746,6 +752,10 @@ article section li p, article aside li p {
 
 .result-list .no_results:hover p {
     opacity: 1;
+}
+
+.result-list h4 {
+    display: inline-block;
 }
 
 ol.result-list li {

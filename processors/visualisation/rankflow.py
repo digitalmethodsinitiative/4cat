@@ -54,14 +54,14 @@ class RankFlowRenderer(BasicProcessor):
 	}
 
 	@classmethod
-	def is_compatible_with(cls, dataset=None):
+	def is_compatible_with(cls, module=None):
 		"""
 		Allow processor on rankable items
 
-		:param DataSet dataset:  Dataset to determine compatibility with
+		:param module: Dataset or processor to determine compatibility with
 		"""
-		return dataset.is_rankable()
-
+		return module.is_rankable()
+		
 	def process(self):
 		items = {}
 		max_weight = 1
@@ -82,13 +82,8 @@ class RankFlowRenderer(BasicProcessor):
 				weight = 1
 
 			# Handle collocations a bit differently
-			if "word_1" in row:
-				# Trigrams
-				if "word_3" in row:
-					label = row["word_1"] + " " + row["word_2"] + " " + row["word_3"]
-				# Bigrams
-				else:
-					label = row["word_1"] + " " + row["word_2"]
+			if [k for k in row if k.startswith("word_")]:
+				label = " ".join([row[k] for k in row if k.startswith("word_")])
 			else:
 				label = row["item"]
 

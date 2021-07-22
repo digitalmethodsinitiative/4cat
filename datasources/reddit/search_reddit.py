@@ -43,7 +43,7 @@ class SearchReddit(SearchWithScope):
 		},
 		"board": {
 			"type": UserInput.OPTION_TEXT,
-			"help": "Board",
+			"help": "Subreddit(s)",
 			"tooltip": "Comma-separated"
 		},
 		"divider": {
@@ -436,8 +436,6 @@ class SearchReddit(SearchWithScope):
 			"url": "",
 			"image_file": "",
 			"image_md5": "",
-			"country_code": "",
-			"country_name": "",
 			"subreddit": post["subreddit"],
 			"parent": post["parent_id"],
 			# this is missing sometimes, but upon manual inspection
@@ -465,8 +463,6 @@ class SearchReddit(SearchWithScope):
 			"domain": thread["domain"],
 			"url": thread["url"],
 			"image_md5": "",
-			"country_code": "",
-			"country_name": "",
 			"subreddit": thread["subreddit"],
 			"parent": "",
 			"score": thread.get("score", 0)

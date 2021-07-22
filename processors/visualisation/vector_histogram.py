@@ -27,6 +27,7 @@ class SVGHistogramRenderer(BasicProcessor):
 	category = "Visual"  # category
 	title = "Histogram"  # title displayed in UI
 	description = "Generates a histogram (bar graph) from a previous frequency analysis."  # description displayed in UI
+	extension = "svg"
 
 	options = {
 		"header": {
@@ -38,14 +39,14 @@ class SVGHistogramRenderer(BasicProcessor):
 	}
 
 	@classmethod
-	def is_compatible_with(cls, dataset=None):
+	def is_compatible_with(cls, module=None):
 		"""
 		Allow processor on rankable items
 
-		:param DataSet dataset:  Dataset to determine compatibility with
+		:param module: Dataset or processor to determine compatibility with
 		"""
-		return dataset.is_rankable()
-
+		return module.is_rankable()
+		
 	def process(self):
 		"""
 		Render an SVG histogram/bar chart using a previous frequency analysis
@@ -67,7 +68,12 @@ class SVGHistogramRenderer(BasicProcessor):
 			return
 
 		self.dataset.update_status("Cleaning up data")
-		(missing, intervals) = pad_interval(intervals)
+		try:
+			(missing, intervals) = pad_interval(intervals)
+		except ValueError:
+			self.dataset.update_status("Some of the items in the dataset contain invalid dates; cannot count frequencies per interval.", is_final=True)
+			self.dataset.finish(0)
+			return
 
 		# create histogram
 		self.dataset.update_status("Drawing histogram")

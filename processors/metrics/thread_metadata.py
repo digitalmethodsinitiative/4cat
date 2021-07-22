@@ -45,7 +45,7 @@ class ThreadMetadata(BasicProcessor):
 					"subject": post["subject"],
 					"first_post": int(time.time()),
 					"image_md5": "",  # only relevant for the chans
-					"country_code": "",  # only relevant for the chans
+					"country_name": "",  # only relevant for the chans
 					"op_body": "",
 					"author": "",
 					"last_post": 0,
@@ -61,7 +61,7 @@ class ThreadMetadata(BasicProcessor):
 
 			if post["id"] == post["thread_id"]:
 				threads[post["thread_id"]]["author"] = post["author"]
-				threads[post["thread_id"]]["country_code"] = post.get("country_code", "N/A")
+				threads[post["thread_id"]]["country_name"] = post.get("country_name", "N/A")
 				threads[post["thread_id"]]["image_md5"] = post.get("image_md5", "N/A")
 				threads[post["thread_id"]]["op_body"] = post["body"]
 

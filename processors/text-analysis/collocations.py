@@ -23,13 +23,13 @@ class GetCollocations(BasicProcessor):
 	extension = "csv"  # extension of result file, used internally and in UI
 
 	@classmethod
-	def is_compatible_with(cls, dataset=None):
+	def is_compatible_with(cls, module=None):
 		"""
 		Allow processor on token sets
 
-		:param DataSet dataset:  Dataset to determine compatibility with
+		:param module: Dataset or processor to determine compatibility with
 		"""
-		return dataset.type == "tokenise-posts"
+		return module.type == "tokenise-posts"
 
 	# Parameters
 	options = {

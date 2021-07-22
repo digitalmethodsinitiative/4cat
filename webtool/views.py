@@ -305,8 +305,8 @@ def show_results(page):
 						   pagination=pagination, favourites=favourites)
 
 
-@app.route('/results/<string:key>/')
 @app.route('/results/<string:key>/processors/')
+@app.route('/results/<string:key>/')
 def show_result(key):
 	"""
 	Show result page
@@ -464,12 +464,24 @@ def delete_dataset_interactive(key):
 	:param str key:  Dataset key
 	:return:
 	"""
+	try:
+		dataset = DataSet(key=key, db=db)
+	except TypeError:
+		return error(404, message="Dataset not found.")
+	
+	top_key = dataset.top_parent().key
+
 	success = delete_dataset(key)
+
 	if not success.is_json:
 		return success
 	else:
-		flash("Dataset deleted.")
-		return redirect(url_for('show_results'))
+		# If it's a child processor, refresh the page.
+		# Else go to the results overview page.
+		if key == top_key:
+			return redirect(url_for('show_results'))
+		else:
+			return redirect(url_for('show_result', key=top_key))
 
 
 @app.route('/results/<string:key>/processors/queue/<string:processor>/', methods=["GET", "POST"])
