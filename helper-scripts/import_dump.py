@@ -17,6 +17,7 @@ cli = argparse.ArgumentParser()
 cli.add_argument("-i", "--input", required=True, help="File to read from, containing a CSV dump")
 cli.add_argument("-d", "--datasource", type=str, required=True, help="Datasource ID")
 cli.add_argument("-b", "--board", type=str, required=True, help="Board name")
+cli.add_argument("-s", "--skip_duplicates", type=str, required=True, help="If duplicate posts should be skipped (useful if there's already data in the table)")
 cli.add_argument("-o", "--offset", type=int, required=False, help="How many rows to skip")
 args = cli.parse_args()
 
@@ -28,6 +29,11 @@ logger = Logger()
 db = Database(logger=logger, appname="queue-dump")
 
 csvnone = re.compile(r"^N$")
+
+if args.skip_duplicates:
+    db_ids = db.fetchall("SELECT id FROM posts_4chan WHERE board ='%s';" % args.board)
+    added_ids = [[v for k, v in added_id.items()][0] for added_id in db_ids]
+    print(len(added_ids), "posts for %s already added" % args.board)
 
 seen_post_ids = set()
 with open(args.input, encoding="utf-8") as inputfile:
@@ -44,6 +50,7 @@ with open(args.input, encoding="utf-8") as inputfile:
 
     for post in reader:
 
+
         post = {k: csvnone.sub("", post[k]) if post[k] else None for k in post}
 
         posts += 1
@@ -55,6 +62,11 @@ with open(args.input, encoding="utf-8") as inputfile:
         if post["subnum"] != "0":
             # ghost post
             continue
+
+        # Duplicate posts
+        if args.skip_duplicates:
+            if int(post["num"]) in added_ids:
+                continue
 
         seen_post_ids.add(post["num"])
         post_data = {
@@ -68,6 +80,7 @@ with open(args.input, encoding="utf-8") as inputfile:
             "author_trip": post.get("trip", ""),
             "author_type": post["id"] if "id" in post else "",
             "author_type_id": post["capcode"] if post["capcode"] != "" else "N",
+            "country_name": "",
             "country_code": post.get("poster_country", ""),
             "image_file": post["media_filename"],
             "image_4chan": post["media_orig"],

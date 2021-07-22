@@ -25,11 +25,6 @@ class SimilarWord2VecWords(BasicProcessor):
 	description = "Uses a Word2Vec model to find words used in a similar context"  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
-	accepts = ["generate-embeddings"]
-
-	input = "zip"
-	output = "csv:time,input,item,value"
-
 	options = {
 		"words": {
 			"type": UserInput.OPTION_TEXT,
@@ -57,6 +52,15 @@ class SimilarWord2VecWords(BasicProcessor):
 		}
 	}
 
+	@classmethod
+	def is_compatible_with(cls, module=None):
+		"""
+		Allow processor on word embedding models
+
+		:param module: Dataset or processor to determine compatibility with
+		"""
+		return module.type == "generate-embeddings"
+
 	def process(self):
 		"""
 		This takes previously generated Word2Vec models and uses them to find
@@ -64,7 +68,7 @@ class SimilarWord2VecWords(BasicProcessor):
 		"""
 		self.dataset.update_status("Processing sentences")
 
-		depth = max(1, min(3, convert_to_int(self.parameters.get("crawl_depth", self.options["crawl_depth"]["default"]), self.options["crawl_depth"]["default"])))
+		depth = max(1, min(3, convert_to_int(self.parameters.get("crawl_depth"))))
 		input_words = self.parameters.get("words", "")
 		if not input_words or not input_words.split(","):
 			self.dataset.update_status("No input words provided, cannot look for similar words.", is_final=True)
@@ -73,11 +77,11 @@ class SimilarWord2VecWords(BasicProcessor):
 
 		input_words = input_words.split(",")
 
-		num_words = convert_to_int(self.parameters.get("num-words"), self.options["num-words"]["default"])
+		num_words = convert_to_int(self.parameters.get("num-words", 10))
 		try:
-			threshold = float(self.parameters.get("threshold", self.options["threshold"]["default"]))
+			threshold = float(self.parameters.get("threshold", 0.25))
 		except ValueError:
-			threshold = float(self.options["threshold"]["default"])
+			threshold = float(self.get_options()["threshold"]["default"])
 
 		threshold = max(-1.0, min(1.0, threshold))
 

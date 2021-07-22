@@ -2,8 +2,9 @@
 Filter posts by a given column
 """
 import os
-
+import re
 import csv
+import datetime
 
 from backend.abstract.processor import BasicProcessor
 from common.lib.helpers import UserInput
@@ -27,9 +28,6 @@ class LexicalFilter(BasicProcessor):
                   "configured way. This creates a new, separate dataset you can run analyses on."
     extension = "csv"  # extension of result file, used internally and in UI
 
-    input = "csv:body"
-    output = "dataset"
-
     options = {
         "column": {
             "type": UserInput.OPTION_TEXT,
@@ -47,7 +45,9 @@ class LexicalFilter(BasicProcessor):
                 "contains": "contains",
                 "contains-not": "does not contain",
                 "less-than": "is less than (numerical values only)",
-                "greater-than": "is greater than (numerical values only)"
+                "greater-than": "is greater than (numerical values only)",
+                "before": "is before (dates only)",
+                "after": "is after (dates only)",
             },
             "default": "exact"
         },
@@ -71,6 +71,15 @@ class LexicalFilter(BasicProcessor):
         }
     }
 
+    @classmethod
+    def is_compatible_with(cls, module=None):
+        """
+        Allow processor on CSV files
+
+        :param module: Dataset or processor to determine compatibility with
+        """
+        return module.is_top_dataset() and module.get_extension() == "csv"
+
     def process(self):
         """
         Reads a CSV file, filtering items that match in the required way, and
@@ -90,8 +99,28 @@ class LexicalFilter(BasicProcessor):
                 self.dataset.finish(0)
                 return
 
+        # pre-process dates to compare to
+        elif match_style in ("after", "before"):
+            # this is a little inefficient, but we need to make sure the values
+            # can actually be interpreted as dates, either via a timestamp or a
+            # unix epoch offset
+            ok_format = all(
+                [re.match(r"[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}", value) for value in match_values])
+            if not ok_format:
+                try:
+                    match_values = [int(value) for value in match_values]
+                except (ValueError, TypeError):
+                    self.dataset.update_status("Cannot do '%s' comparison with value(s) that are not dates",
+                                               is_final=True)
+                    self.dataset.finish(0)
+                    return
+            else:
+                match_values = [datetime.datetime.strptime(value, "%Y-%m-%d %H:%M:%S").timestamp() for value in
+                                match_values]
+
         matching_items = 0
         processed_items = 0
+        date_compare = None
         with self.dataset.get_results_path().open("w", encoding="utf-8") as outfile:
             writer = None
 
@@ -114,6 +143,21 @@ class LexicalFilter(BasicProcessor):
                 if processed_items % 500 == 0:
                     self.dataset.update_status("Processed %i items (%i matching)" % (processed_items, matching_items))
 
+                # comparing dates is allowed on both unix timestamps and
+                # 'human' timestamps. For that reason, if we *are* indeed
+                # comparing dates, do some pre-processing to make sure we can
+                # actually compare the value properly.
+                if match_style in ("before", "after"):
+                    if re.match(r"[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}", item.get(column)):
+                        date_compare = datetime.datetime.strptime(item.get(column), "%Y-%m-%d %H:%M:%S").timestamp()
+                    else:
+                        try:
+                            date_compare = int(item.get(column))
+                        except ValueError:
+                            self.dataset.update_status("Invalid date value '%s', cannot determine if before or after" % item.get(column), is_final=True)
+                            self.dataset.finish(0)
+                            return
+
                 # depending on match type, mark as matching or not one way or
                 # another. This could be greatly optimised for some cases, e.g.
                 # when there is only a single value to compare to, and
@@ -126,6 +170,10 @@ class LexicalFilter(BasicProcessor):
                 elif match_style == "contains" and match_function([value in item.get(column) for value in match_values]):
                     matches = True
                 elif match_style == "contains-not" and match_function([value not in item.get(column) for value in match_values]):
+                    matches = True
+                elif match_style == "after" and match_function([value <= date_compare for value in match_values]):
+                    matches = True
+                elif match_style == "before" and match_function([value >= date_compare for value in match_values]):
                     matches = True
                 else:
                     # wrap this in a try-catch because we cannot be sure that

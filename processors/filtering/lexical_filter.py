@@ -30,9 +30,6 @@ class LexicalFilter(BasicProcessor):
 	description = "Copies the dataset, retaining only posts that match any selected lexicon of words or phrases. This creates a new, separate dataset you can run analyses on."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
-	input = "csv:body"
-	output = "dataset"
-
 	# the following determines the options available to the user via the 4CAT
 	# interface.
 	options = {
@@ -42,19 +39,6 @@ class LexicalFilter(BasicProcessor):
 			"options": {
 				"hatebase-en-unambiguous": "Hatebase.org hate speech list (English, unambiguous terms)",
 				"hatebase-en-ambiguous": "Hatebase.org hate speech list (English, ambiguous terms)",
-				"hatebase-it-unambiguous": "Hatebase.org hate speech list (Italian, unambiguous terms)",
-				"hatebase-it-ambiguous": "Hatebase.org hate speech list (italian, ambiguous terms)",
-				"oilab-extreme-other": "OILab Extreme Speech Lexicon (other)",
-				"oilab-extreme-anticon": "OILab Extreme Speech Lexicon (anti-conservative)",
-				"oilab-extreme-antileft": "OILab Extreme Speech Lexicon (anti-left)",
-				"oilab-extreme-antilowerclass": "OILab Extreme Speech Lexicon (anti-lowerclass)",
-				"oilab-extreme-antisemitism": "OILab Extreme Speech Lexicon (antisemitic)",
-				"oilab-extreme-antidisability": "OILab Extreme Speech Lexicon (anti-disability)",
-				"oilab-extreme-homophobia": "OILab Extreme Speech Lexicon (homophobic)",
-				"oilab-extreme-islamophobia": "OILab Extreme Speech Lexicon (islamophobic)",
-				"oilab-extreme-misogyny": "OILab Extreme Speech Lexicon (misogynistic)",
-				"oilab-extreme-racism": "OILab Extreme Speech Lexicon (racist)",
-				"oilab-extreme-sexual": "OILab Extreme Speech Lexicon (sexual)"
 			},
 			"help": "Filter items containing words in these lexicons"
 		},
@@ -62,6 +46,12 @@ class LexicalFilter(BasicProcessor):
 			"type": UserInput.OPTION_TEXT,
 			"default": "",
 			"help": "Custom lexicon (separate with commas)"
+		},
+		"as_regex": {
+			"type": UserInput.OPTION_TOGGLE,
+			"default": False,
+			"help": "Interpret custom lexicon as regular expression",
+			"tooltip": "Regular expressions are parsed with Python's dialect"
 		}
 	}
 
@@ -98,8 +88,14 @@ class LexicalFilter(BasicProcessor):
 		for lexicon_id in lexicons:
 			if not lexicons[lexicon_id]:
 				continue
+
+			if self.parameters.get("as_regex"):
+				phrases = [re.escape(term) for term in lexicons[lexicon_id] if term]
+			else:
+				phrases = [term for term in lexicons[lexicon_id] if term]
+
 			lexicon_regexes[lexicon_id] = re.compile(
-				r"\b(" + "|".join([re.escape(term) for term in lexicons[lexicon_id] if term]) + r")\b",
+				r"\b(" + "|".join(phrases) + r")\b",
 				flags=re.IGNORECASE)
 
 		# now for the real deal
@@ -152,6 +148,8 @@ class LexicalFilter(BasicProcessor):
 				writer.writerow(post)
 
 				matching_items += 1
+
+		self.dataset.update_status("New dataset created with %i matching item(s)" % matching_items, is_final=True)
 		self.dataset.finish(matching_items)
 
 	def after_process(self):

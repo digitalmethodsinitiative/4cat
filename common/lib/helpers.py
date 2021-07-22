@@ -4,6 +4,7 @@ Miscellaneous helper functions for the 4CAT backend
 import datetime
 import socket
 import json
+import csv
 import re
 
 from pathlib import Path
@@ -253,7 +254,7 @@ def call_api(action, payload=None):
 	"""
 	connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 	connection.settimeout(15)
-	connection.connect(("localhost", config.API_PORT))
+	connection.connect((config.API_HOST, config.API_PORT))
 
 	msg = json.dumps({"request": action, "payload": payload})
 	connection.sendall(msg.encode("ascii", "ignore"))
@@ -405,6 +406,24 @@ def pad_interval(intervals, first_interval=None, last_interval=None):
 	intervals = {key: intervals[key] for key in sorted(intervals)}
 
 	return missing, intervals
+
+
+def is_rankable(dataset):
+	"""
+	Determine if a dataset is rankable
+
+	:todo:  Should this be part of the DataSet class?
+
+	:param DataSet dataset:  Dataset to inspect
+	:return bool:  Whether the dataset is rankable or not
+	"""
+	if dataset.get_results_path().suffix != ".csv":
+		return False
+
+	with dataset.get_results_path().open(encoding="utf-8") as infile:
+		reader = csv.DictReader(infile)
+		return len(set(reader.fieldnames) & {"date", "value", "item", "word_1"}) >= 3
+
 
 def gdf_escape(string):
 	"""

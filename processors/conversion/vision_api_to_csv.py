@@ -28,11 +28,14 @@ class ConvertVisionOutputToCSV(BasicProcessor):
     description = "Convert the Vision API output to a simplified CSV file."  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
 
-    # all post-processors with CSV output
-    accepts = ["google-vision-api"]
+    @classmethod
+    def is_compatible_with(cls, module=None):
+        """
+        Determine if processor is compatible with dataset
 
-    input = "ndjson"
-    output = "csv"
+        :param module: Dataset or processor to determine compatibility with
+        """
+        return module.type == "google-vision-api"
 
     def process(self):
         """

@@ -29,10 +29,16 @@ class RedditVoteChecker(BasicProcessor):
 	description = "Updates the scores for each post to more accurately reflect the real score. Can only be used on datasets with < 5,000 posts due to the heavy usage of the API this requires."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
-	datasources = ["reddit"]
+	@classmethod
+	def is_compatible_with(cls, module=None):
+		"""
+		Allow processor if dataset is a Reddit dataset
 
-	input = "csv:body"
-	output = "csv"
+		:param module: Dataset or processor to determine compatibility with
+		"""
+		if module.is_dataset():
+			return module.is_top_dataset() and module.type == "reddit-search" and module.num_rows <= 5000
+		return False
 
 	def process(self):
 		"""
@@ -48,13 +54,6 @@ class RedditVoteChecker(BasicProcessor):
 			# unclear what kind of expression gets thrown here
 			self.dataset.update_status("Could not connect to Reddit. 4CAT may be configured wrong.")
 			self.dataset.finish(0)
-			return
-
-		# reddit has rate limits and it's easy to pass them, so limit this
-		# processor to smaller datasets
-		if self.source_dataset.num_rows > 5000:
-			self.dataset.update_status("Reddit score updating is only available for datasets smaller than 5.000 items.")
-			self.dataset.finish(-1)
 			return
 
 		# get thread IDs

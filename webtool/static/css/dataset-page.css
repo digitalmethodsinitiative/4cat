@@ -16,11 +16,11 @@ article.result > section:first-child {
     padding: 1em 0;
 }
 
-.result-tree h3 {
+.result-tree h3, .result-tree h2 {
     position: relative;
 }
 
-.result-tree h3 button {
+.result-tree h3 button, .result-tree h2 button {
     border: 0;
     border-radius: 0;
     position: absolute;
@@ -28,6 +28,18 @@ article.result > section:first-child {
     top: 0;
     margin: 0;
     padding: calc(0.5em + 1px);
+}
+
+.result-tree h2 button {
+    padding: calc(0.5em + 1px);
+    font-size: 0.8em;
+}
+
+.result-tree h2 input {
+    padding: 0;
+    border: 0;
+    height: 1em;
+    width: 75%;
 }
 
 .children-processors {
@@ -312,6 +324,21 @@ article.result > section:first-child {
     content: ', ';
 }
 
+.processors-available {
+    position: absolute;
+    top: 0;
+    right: 0;
+    padding-top: 5px;
+    padding-right: 10px;
+    text-align: center;
+    font-size: 0.8em;
+    cursor: pointer;
+}
+
+.processors-available a:hover {
+    text-decoration: none;
+}
+
 /* processor configuration options */
 .processor-options-wrap {
     display: inline-block;
@@ -342,6 +369,41 @@ article.result > section:first-child {
     content: '\2022';
     position: absolute;
     left: -.75em;
+}
+
+.multi-select-options {
+    position: relative;
+    display: inline-block;
+    max-height: 175px;
+    max-width: 20em;
+    overflow-y: scroll;
+    overflow-x: hidden;
+    background-color: var(--gray);
+}
+
+.multi-select-options div {
+    position: relative;
+    display: inline-block;
+    width: 100%;
+}
+
+.multi-select-options div label {
+    display: inline-block;
+    width: 100%;
+    text-align: left;
+    cursor: pointer;
+    user-select: none;
+}
+
+.multi-select-selected {
+    min-height: 30px;
+}
+
+.multi-select-selected .property-badge {
+    display: inline-block;
+    margin-right: 1px;
+    cursor: pointer;
+    user-select: none;
 }
 
 @keyframes child-blink {

@@ -29,13 +29,18 @@ class YouTubeThumbnails(BasicProcessor):
 	title = "Download YouTube thumbnails"  # title displayed in UI
 	description = "Download YouTube video thumbnails."  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
-
-	input = "csv:id"
-	output = "zip"
 	
 	max_retries = 3
 	sleep_time = 10
-	accepts = ["youtube-metadata"]
+
+	@classmethod
+	def is_compatible_with(cls, module=None):
+		"""
+		Allow processor on YouTube metadata sets
+
+		:param module: Dataset or processor to determine compatibility with
+		"""
+		return module.type == "youtube-metadata"
 
 	def process(self):
 		"""

@@ -38,10 +38,9 @@ class AttributeRanker(BasicProcessor):
 				"author": "Username",
 				"url": "URLs (in post body)",
 				"hostname": "Host names (in post body)",
-				"wildcard": "Regular expression (match any filtered value in post)",
 				"image_md5": "Image (hash, for 4chan and 8chan datasets)",
 				"image_file": "Image (filename, for 4chan and 8chan datasets)",
-				"country_code": "Country code (for 4chan datasets)",
+				"country_name": "Flag country (for 4chan/pol/ datasets)",
 				"subreddit": "Subreddit (for Reddit datasets)",
 				"search_entity": "Entity (for Telegram datasets)",
 				"hashtags": "Hashtag (for datasets with a 'hashtags' column)",
@@ -68,7 +67,7 @@ class AttributeRanker(BasicProcessor):
 			"help": "Determine top items",
 			"tooltip": "'Overall' will first determine the most prevalent items across all intervals, then calculate top items per interval using this as a shortlist."
 		},
-		"regex": {
+		"filter": {
 			"type": UserInput.OPTION_TEXT,
 			"default": "",
 			"help": "Item filter",
@@ -89,14 +88,17 @@ class AttributeRanker(BasicProcessor):
 		"""
 
 		# convenience variables
-		timeframe = self.parameters.get("timeframe", self.options["timeframe"]["default"])
-		attribute = self.parameters.get("attribute", self.options["attribute"]["default"])
-		rank_style = self.parameters.get("top-style", self.options["top-style"]["default"])
-		cutoff = convert_to_int(self.parameters.get("top", self.options["top"]["default"]))
-		weighby = self.parameters.get("weigh", self.options["weigh"]["default"])
+		timeframe = self.parameters.get("timeframe")
+		attribute = self.parameters.get("attribute")
+		rank_style = self.parameters.get("top-style")
+		cutoff = convert_to_int(self.parameters.get("top"), 15)
+		weighby = self.parameters.get("weigh")
 
 		try:
-			filter = re.compile(self.parameters.get("regex", None))
+			if self.parameters.get("filter"):
+				filter = re.compile(".*" + self.parameters.get("filter") + ".*")
+			else:
+				filter = None
 		except (TypeError, re.error):
 			self.dataset.update_status("Could not complete: regular expression invalid")
 			self.dataset.finish(0)
@@ -193,9 +195,7 @@ class AttributeRanker(BasicProcessor):
 		link_regex = re.compile(r"https?://[^\s\]()]+")
 		www_regex = re.compile(r"^www\.")
 
-		if attribute == "wildcard":
-			return filter.findall(post["body"])
-		elif attribute in ("url", "hostname"):
+		if attribute in ("url", "hostname"):
 			# URLs need some processing because there may be multiple per post
 			post_links = link_regex.findall(post["body"])
 

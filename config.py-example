@@ -1,5 +1,8 @@
 """ 4CAT configuration """
 import os
+import configparser
+
+DOCKER_CONFIG_FILE = 'docker/shared/docker_config.ini'
 
 # Data source configuration
 DATASOURCES = {
@@ -8,7 +11,9 @@ DATASOURCES = {
     "douban": {},
     "customimport": {},
     "parler": {},
-    "reddit": {},
+    "reddit": {
+							"boards": "*",
+		},
     "telegram": {},
     "twitterv2": {}
 }
@@ -33,6 +38,7 @@ PATH_LOGS = ""  # store logs here - empty means the 4CAT root folder
 PATH_IMAGES = ""  # if left empty or pointing to a non-existent folder, no images will be saved
 PATH_DATA = ""  # search results will be stored here as CSV files
 PATH_LOCKFILE = "backend"  # the daemon lockfile will be saved in this folder. Probably no need to change!
+PATH_SESSIONS = "sessions" # folder where API session data is stored (e.g., Telegram)
 
 # The following two options should be set to ensure that every analysis step can
 # be traced to a specific version of 4CAT. This allows for reproducible
@@ -44,6 +50,7 @@ GITHUB_URL = "https://github.com/digitalmethodsinitiative/4cat"  # URL to the gi
 
 # 4CAT has an API (available from localhost) that can be used for monitoring
 # and will listen for requests on the following port. "0" disables the API.
+API_HOST = "localhost"
 API_PORT = 4444
 
 # 4CAT can anonymise author names in results and does so using a hashed version
@@ -87,10 +94,56 @@ REDDIT_API_SECRET = ""
 
 # Web tool settings
 class FlaskConfig:
-	FLASK_APP = 'webtool/fourcat'
-	SECRET_KEY = "REPLACE_THIS"
-	SERVER_NAME = 'localhost:5000'
-	SERVER_HTTPS = False  # set to true to make 4CAT use "https" in absolute URLs
-	HOSTNAME_WHITELIST = ["localhost"]  # only these may access the web tool; "*" or an empty list matches everything
-	HOSTNAME_WHITELIST_API = ["localhost"]  # hostnames matching these are exempt from rate limiting
-	HOSTNAME_WHITELIST_NAME = "Automatic login"
+    FLASK_APP = 'webtool/fourcat'
+    SECRET_KEY = "REPLACE_THIS"
+    SERVER_NAME = 'localhost:5000' # if using a port other than 80, change to localhost:specific_port
+    SERVER_HTTPS = False  # set to true to make 4CAT use "https" in absolute URLs
+    HOSTNAME_WHITELIST = ["localhost"]  # only these may access the web tool; "*" or an empty list matches everything
+    HOSTNAME_WHITELIST_API = ["localhost"]  # hostnames matching these are exempt from rate limiting
+    HOSTNAME_WHITELIST_NAME = "Automatic login"
+
+
+##########
+# DOCKER #
+##########
+# Docker setup requires matching configuration for the following values
+
+# These values will overwrite anything set previously in this config and
+# originate from the .env file or the docker_config.ini file
+
+if os.path.exists(DOCKER_CONFIG_FILE):
+  config = configparser.ConfigParser()
+  config.read(DOCKER_CONFIG_FILE)
+  if config['DOCKER'].getboolean('use_docker_config'):
+      # can be your server url or ip
+      your_server = config['SERVER'].get('server_name', 'localhost')
+
+      DB_HOST = config['DATABASE'].get('db_host')
+      DB_PORT = config['DATABASE'].getint('db_port')
+      DB_USER = config['DATABASE'].get('db_user')
+      DB_NAME = config['DATABASE'].get('db_name')
+      DB_PASSWORD = config['DATABASE'].get('db_password')
+
+      API_HOST = config['API'].get('api_host')
+      API_PORT = config['API'].getint('api_port')
+
+      PATH_ROOT = os.path.abspath(os.path.dirname(__file__))  # better don't change this
+      PATH_LOGS = config['PATHS'].get('path_logs', "")
+      PATH_IMAGES = config['PATHS'].get('path_images', "")
+      PATH_DATA = config['PATHS'].get('path_data', "")
+      PATH_LOCKFILE = config['PATHS'].get('path_lockfile', "")
+      PATH_SESSIONS = config['PATHS'].get('path_sessions', "")
+
+      ANONYMISATION_SALT = config['GENERATE'].get('anonymisation_salt')
+
+      class FlaskConfig:
+          FLASK_APP = 'webtool/fourcat'
+          SECRET_KEY = config['GENERATE'].get('secret_key')
+          if config['SERVER'].getint('public_port') == 80:
+              SERVER_NAME = your_server
+          else:
+              SERVER_NAME = f"{your_server}:{config['SERVER'].get('public_port')}"
+          SERVER_HTTPS = False  # set to true to make 4CAT use "https" in absolute URLs; DOES NOT CURRENTLY WORK WITH DOCKER SETUP
+          HOSTNAME_WHITELIST = ["localhost", your_server]  # only these may access the web tool; "*" or an empty list matches everything
+          HOSTNAME_WHITELIST_API = ["localhost", your_server]  # hostnames matching these are exempt from rate limiting
+          HOSTNAME_WHITELIST_NAME = "Automatic login"

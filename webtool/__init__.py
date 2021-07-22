@@ -46,4 +46,4 @@ import webtool.lib.template_filters
 # run it
 if __name__ == "__main__":
 	print('Starting server...')
-	app.run(debug=True)
+	app.run(host='0.0.0.0', debug=True)

@@ -76,7 +76,7 @@ def commit(posts, post_fields, db, datasource, fast=False):
 # set up
 link_regex = re.compile(">>([0-9]+)")
 post_fields = ("id", "timestamp", "timestamp_deleted", "thread_id", "body", "author",
-			   "author_type_id", "author_trip", "subject", "country_code", "image_file",
+			   "author_type_id", "author_trip", "subject", "country_name", "country_code", "image_file",
 			   "image_4chan", "image_md5", "image_dimensions", "image_filesize",
 			   "semantic_url", "unsorted_data")
 

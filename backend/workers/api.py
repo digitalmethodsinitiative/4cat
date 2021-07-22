@@ -13,6 +13,7 @@ class InternalAPI(BasicWorker):
 	type = "api"
 	max_workers = 1
 
+	host = config.API_HOST
 	port = config.API_PORT
 
 	def work(self):
@@ -21,7 +22,7 @@ class InternalAPI(BasicWorker):
 
 		Opens a socket that continuously listens for requests, and passes a
 		client object on to a handling method if a connection is established
-		
+
 		:return:
 		"""
 		if self.port == 0:
@@ -37,14 +38,14 @@ class InternalAPI(BasicWorker):
 		# set up the socket
 		server = socket.socket()
 		server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-		server.settimeout(5)  # should be plenty
+		server.settimeout(2)  # should be plenty
 
 		has_time = True
 		start_trying = int(time.time())
 		while has_time:
 			has_time = start_trying > time.time() - 300  # stop trying after 5 minutes
 			try:
-				server.bind(("localhost", self.port))
+				server.bind((self.host, self.port))
 				break
 			except OSError as e:
 				if has_time and not self.interrupted:
@@ -59,7 +60,7 @@ class InternalAPI(BasicWorker):
 
 		server.listen(5)
 		server.settimeout(5)
-		self.manager.log.info("Local API listening for requests at localhost:%s" % self.port)
+		self.manager.log.info("Local API listening for requests at %s:%s" % (self.host, self.port))
 
 		# continually listen for new connections
 		while not self.interrupted:
@@ -239,7 +240,7 @@ class InternalAPI(BasicWorker):
 						"is_maybe_crashed": job["timestamp_claimed"] > 0 and not worker,
 						"dataset_key": worker.dataset.key if hasattr(worker, "dataset") else None,
 						"dataset_user": worker.dataset.parameters.get("user", None) if hasattr(worker, "dataset") else None,
-						"dataset_parent_key": worker.dataset.top_key() if hasattr(worker, "dataset") else None,
+						"dataset_parent_key": worker.dataset.top_parent().key if hasattr(worker, "dataset") else None,
 						"timestamp_queued": job["timestamp"],
 						"timestamp_claimed": job["timestamp_lastclaimed"]
 					})

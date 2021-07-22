@@ -29,11 +29,6 @@ class GenerateWordEmbeddings(BasicProcessor):
 	description = "Generates Word2Vec or FastText word embedding models for the sentences, per chosen time interval. These can then be used to analyse semantic word associations within the corpus. Note that good models require large(r) datasets."  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
 
-	accepts = ["tokenise-posts"]
-
-	input = "zip"
-	output = "zip"
-
 	references = [
 		"Word2Vec: [Mikolov, Tomas, Ilya Sutskever, Kai Chen, Greg Corrado, and Jeffrey Dean. 2013. “Distributed Representations of Words and Phrases and Their Compositionality.” 8Advances in Neural Information Processing Systems*, 2013: 3111-3119.](https://papers.nips.cc/paper/5021-distributed-representations-of-words-and-phrases-and-their-compositionality.pdf)",
 		"Word2Vec: [Mikolov, Tomas, Kai Chen, Greg Corrado, and Jeffrey Dean. 2013. “Efficient Estimation of Word Representations in Vector Space.” *ICLR Workshop Papers*, 2013: 1-12.](https://arxiv.org/pdf/1301.3781.pdf)",
@@ -101,6 +96,15 @@ class GenerateWordEmbeddings(BasicProcessor):
 		}
 	}
 
+	@classmethod
+	def is_compatible_with(cls, module=None):
+		"""
+		Allow processor on token sets
+
+		:param module: Dataset or processor to determine compatibility with
+		"""
+		return module.type == "tokenise-posts"
+
 	def process(self):
 		"""
 		This takes a 4CAT results file as input, and outputs a number of files containing
@@ -109,9 +113,9 @@ class GenerateWordEmbeddings(BasicProcessor):
 		self.dataset.update_status("Processing sentences")
 
 		use_skipgram = 1 if self.parameters.get("algorithm") == "skipgram" else 0
-		window = min(10, max(1, convert_to_int(self.parameters.get("window"), int(self.options["window"]["default"]))))
+		window = min(10, max(1, convert_to_int(self.parameters.get("window"))))
 		use_negative = 5 if self.parameters.get("negative") else 0
-		min_count = max(1, convert_to_int(self.parameters.get("min_count"), self.options["min_count"]["default"]))
+		min_count = max(1, convert_to_int(self.parameters.get("min_count")))
 		dimensionality = convert_to_int(self.parameters.get("dimensionality"), 100)
 		detect_bigrams = self.parameters.get("detect-bigrams")
 		model_type = self.parameters.get("model-type")
@@ -120,9 +124,6 @@ class GenerateWordEmbeddings(BasicProcessor):
 		if max_words == 0:
 			# unlimited amount of words in model
 			max_words = None
-
-		if not model_type:
-			model_type = self.options["model-type"]["default"]
 
 		staging_area = self.dataset.get_staging_area()
 		model_builder = {

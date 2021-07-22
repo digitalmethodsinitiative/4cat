@@ -23,9 +23,6 @@ class URLCoLinker(BasicProcessor):
 				  "of co-links."  # description displayed in UI
 	extension = "gdf"  # extension of result file, used internally and in UI
 
-	input = "csv:body,thread_id,id"
-	output = "gdf"
-
 	options = {
 		"detail": {
 			"type": UserInput.OPTION_CHOICE,
@@ -66,7 +63,12 @@ class URLCoLinker(BasicProcessor):
 		colink = {}
 		urls = set()
 		links = {}
+		processed = 0
 		for post in self.iterate_items(self.source_file):
+			processed += 1
+			if processed % 50 == 0:
+				self.dataset.update_status("Extracting URLs from item %i" % processed)
+
 			if not post["body"]:
 				continue
 
@@ -77,7 +79,7 @@ class URLCoLinker(BasicProcessor):
 			if "url" in post and post["url"]:
 				post_links.append(post["url"])
 
-			if self.parameters.get("detail", self.options["detail"]["default"]) == "domain":
+			if self.parameters.get("detail") == "domain":
 				try:
 					post_links = [www_regex.sub("", link.split("/")[2]) for link in post_links]
 				except IndexError:
@@ -94,7 +96,7 @@ class URLCoLinker(BasicProcessor):
 			# co-link set, but if we're doing this on a thread level, we
 			# add all the links we found to one pool per thread, and then
 			# create co-link pairs from that in the next for loop
-			if self.parameters.get("level", self.options["level"]["default"]) == "post":
+			if self.parameters.get("level") == "post":
 				unit_id = post["id"]
 			else:
 				unit_id = post["thread_id"]
@@ -107,6 +109,7 @@ class URLCoLinker(BasicProcessor):
 			links[unit_id] = [*post_links, *links[unit_id]]
 
 		# create co-link pairs from all links per co-link unit (thread or post)
+		self.dataset.update_status("Finding common URLs")
 		for unit_id in links:
 			post_links = links[unit_id]
 
@@ -139,6 +142,7 @@ class URLCoLinker(BasicProcessor):
 				colink[pair] += 1
 
 		# write GDF file
+		self.dataset.update_status("Writing network file")
 		with self.dataset.get_results_path().open("w", encoding="utf-8") as results:
 			results.write("nodedef>name VARCHAR\n")
 			for url in urls:

@@ -35,12 +35,6 @@ class IsometricMultigraphRenderer(BasicProcessor):
 	description = "Generate area graphs showing prevalence per item over time and project these side-by-side on an isometric plane for easy comparison."  # description displayed in UI
 	extension = "svg"  # extension of result file, used internally and in UI
 
-	input = "csv:item,date,value"
-	output = "svg"
-
-	accepts = ["overtime-hateful", "vector-ranker", "preset-neologisms", "tfidf", "attribute-frequencies",
-			   "hatebase-frequencies", "overtime-vocabulary", "similar-word2vec"]
-
 	options = {
 		"smooth": {
 			"type": UserInput.OPTION_TOGGLE,
@@ -80,15 +74,26 @@ class IsometricMultigraphRenderer(BasicProcessor):
 			   "#ff40b5", "#9eff3b", "#022bc3"]
 	colour_index = 0
 
+	@classmethod
+	def is_compatible_with(cls, module=None):
+		"""
+		Allow processor on rankable items
+
+		:param module: Dataset or processor to determine compatibility with
+		"""
+		if module.is_dataset():
+			return module.is_rankable(multiple_items=False)
+		return False
+		
 	def process(self):
 		graphs = {}
 		intervals = []
 
-		smooth = self.parameters.get("smooth", self.options["smooth"]["default"])
-		normalise_values = self.parameters.get("normalise", self.options["normalise"]["default"])
-		completeness = convert_to_int(self.parameters.get("complete", self.options["complete"]["default"]), 0)
-		graph_label = self.parameters.get("label", self.options["label"]["default"])
-		top = convert_to_int(self.parameters.get("top", self.options["top"]["default"]), 10)
+		smooth = self.parameters.get("smooth")
+		normalise_values = self.parameters.get("normalise")
+		completeness = convert_to_int(self.parameters.get("complete"), 0)
+		graph_label = self.parameters.get("label")
+		top = convert_to_int(self.parameters.get("top"), 10)
 
 		# first gather graph data: each distinct item gets its own graph and
 		# for each graph we have a sequence of intervals, each interval with
@@ -97,8 +102,13 @@ class IsometricMultigraphRenderer(BasicProcessor):
 		last_date = "0000-00-00"
 
 		for row in self.iterate_items(self.source_file):
-			if row["item"] not in graphs:
-				graphs[row["item"]] = {}
+			if [k for k in row if k.startswith("word_")]:
+				item = " ".join([row[k] for k in row if k.startswith("word_")])
+			else:
+				item = row["item"]
+
+			if item not in graphs:
+				graphs[item] = {}
 
 			# make sure the months and days are zero-padded
 			interval = row.get("date", "")
@@ -109,10 +119,10 @@ class IsometricMultigraphRenderer(BasicProcessor):
 			if interval not in intervals:
 				intervals.append(interval)
 
-			if interval not in graphs[row["item"]]:
-				graphs[row["item"]][interval] = 0
+			if interval not in graphs[item]:
+				graphs[item][interval] = 0
 
-			graphs[row["item"]][interval] += float(row.get("value", 0))
+			graphs[item][interval] += float(row.get("value", 0))
 
 		# first make sure we actually have something to render
 		intervals = sorted(intervals)

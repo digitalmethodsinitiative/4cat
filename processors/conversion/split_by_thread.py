@@ -26,11 +26,18 @@ class ThreadSplitter(BasicProcessor):
 	title = "Split by thread"  # title displayed in UI
 	description = "Split the result over separate csv files per thread. The threads can then be downloaded as an archive containing the separate CSV files."  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
-	datasources = ["4chan","8chan","reddit","breitbart"]
 
-	input = "csv:id,thread_id,body,subject,author,timestamp"
-	output = "zip"
+	@classmethod
+	def is_compatible_with(cls, module=None):
+		"""
+		Determine if processor is compatible with dataset
 
+		:param module: Dataset or processor to determine compatibility with
+		"""
+		if module.is_dataset():
+			return module.parameters.get("datasource") in ("4chan", "8chan", "reddit", "breitbart")
+		return False
+		
 	def process(self):
 		"""
 		This takes a 4CAT results file as input, and outputs a new CSV file

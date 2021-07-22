@@ -29,10 +29,6 @@ class ImageWallGenerator(BasicProcessor):
 	title = "Image wall"  # title displayed in UI
 	description = "Put all images in an archive into a single combined image, optionally sorting and resizing them"
 	extension = "png"  # extension of result file, used internally and in UI
-	accepts = ["image-downloader"]  # query types this post-processor accepts as input
-
-	input = "zip"
-	output = "png"
 
 	options = {
 		"amount": {
@@ -76,6 +72,16 @@ class ImageWallGenerator(BasicProcessor):
 	TARGET_WIDTH = 2560
 	TARGET_HEIGHT = 1440
 
+
+	@classmethod
+	def is_compatible_with(cls, module=None):
+		"""
+		Allow processor on token sets
+
+		:param module: Dataset or processor to determine compatibility with
+		"""
+		return module.type == "image-downloader"
+
 	def process(self):
 		"""
 		This takes a 4CAT results file as input, and outputs a new CSV file
@@ -97,7 +103,7 @@ class ImageWallGenerator(BasicProcessor):
 			return ",".join([str(int(value)) for value in numpy_array])
 
 		max_images = convert_to_int(self.parameters.get("amount"), 100)
-		sizing_mode = self.parameters.get("tile-size", self.options["tile-size"]["default"])
+		sizing_mode = self.parameters.get("tile-size")
 		sort_mode = self.parameters.get("sort-mode")
 
 		# is there anything to put on a wall?
@@ -108,7 +114,7 @@ class ImageWallGenerator(BasicProcessor):
 
 		# 0 = use as many images as in the archive, up to the max
 		if max_images == 0:
-			max_images = self.options["amount"]["max"]
+			max_images = self.get_options()["amount"]["max"]
 
 		# we loop through the images twice - once to reduce them to a value
 		# that can be sorted, and another time to actually copy them to the

@@ -11,15 +11,17 @@ import csv
 
 from pathlib import Path, PurePath
 
+import backend
 from backend.abstract.worker import BasicWorker
 from common.lib.dataset import DataSet
+from common.lib.fourcat_module import FourcatModule
 from common.lib.helpers import get_software_version
 from common.lib.exceptions import WorkerInterruptedException, ProcessorInterruptedException, ProcessorException
 
 csv.field_size_limit(1024 * 1024 * 1024)
 
 
-class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
+class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 	"""
 	Abstract post-processor class
 
@@ -43,6 +45,10 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 
 	is_running_in_preset = False  # is this processor running 'within' a preset processor?
 
+	# the following will be defined automatically upon loading the processor
+	# there is no need to override manually
+	filepath = None  # do not override
+
 	def work(self):
 		"""
 		Process a dataset
@@ -59,7 +65,6 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 			self.job.finish()
 			return
 
-		is_running_in_preset = False
 		if self.dataset.data.get("key_parent", None):
 			# search workers never have parents (for now), so we don't need to
 			# find out what the source_dataset dataset is if it's a search worker
@@ -108,10 +113,10 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 		# now the parameters have been loaded into memory, clear any sensitive
 		# ones. This has a side-effect that a processor may not run again
 		# without starting from scratch, but this is the price of progress
-		if hasattr(self, "options"):
-			for option in self.options:
-				if self.options[option].get("sensitive"):
-					self.dataset.delete_parameter(option)
+		options = self.get_options(self.dataset.get_parent())
+		for option, option_settings in options.items():
+			if option_settings.get("sensitive"):
+				self.dataset.delete_parameter(option)
 
 		if self.interrupted:
 			self.dataset.log("Processing interrupted, trying again later")
@@ -165,7 +170,7 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 			# run it only if the post-processor is actually available for this query
 			if next_type in available_processors:
 				next_analysis = DataSet(parameters=next_parameters, type=next_type, db=self.db, parent=self.dataset.key,
-										extension=available_processors[next_type]["extension"])
+										extension=available_processors[next_type].extension)
 				self.queue.add_job(next_type, remote_id=next_analysis.key)
 			else:
 				self.log.warning("Dataset %s (of type %s) wants to run processor %s next, but it is incompatible" % (self.dataset.key, self.type, next_type))
@@ -264,7 +269,6 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 		if hasattr(self, "source_dataset") and self.source_dataset and not bypass_map_item:
 			parent_processor = self.all_modules.processors.get(self.source_dataset.type)
 			if parent_processor:
-				parent_processor = self.all_modules.load_worker_class(parent_processor)
 				if hasattr(parent_processor, "map_item"):
 					item_mapper = parent_processor.map_item
 
@@ -492,7 +496,8 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 
 		self.dataset.finish(num_items)
 
-	def is_filter(self):
+	@classmethod
+	def is_filter(cls):
 		"""
 		Is this processor a filter?
 
@@ -502,7 +507,87 @@ class BasicProcessor(BasicWorker, metaclass=abc.ABCMeta):
 		:todo: Make this a bit more robust than sniffing the processor category
 		:return bool:
 		"""
-		return hasattr(self, "category") and self.category and "filter" in self.category.lower()
+		return hasattr(cls, "category") and cls.category and "filter" in cls.category.lower()
+
+	@classmethod
+	def get_options(cls, parent_dataset=None, user=None):
+		"""
+		Get processor options
+
+		This method by default returns the class's "options" attribute, or an
+		empty dictionary. It can be redefined by processors that need more
+		fine-grained options, e.g. in cases where the availability of options
+		is partially determined by the parent dataset's parameters.
+
+		:param DataSet parent_dataset:  An object representing the dataset that
+		the processor would be run on
+		:param User user:  Flask user the options will be displayed for, in
+		case they are requested for display in the 4CAT web interface. This can
+		be used to show some options only to privileges users.
+		"""
+		return cls.options if hasattr(cls, "options") else {}
+
+	@classmethod
+	def get_available_processors(cls, self):
+		"""
+		Get list of processors compatible with this processor
+
+		Checks whether this dataset type is one that is listed as being accepted
+		by the processor, for each known type: if the processor does not
+		specify accepted types (via the `is_compatible_with` method), it is
+		assumed it accepts any top-level datasets
+
+		:return dict:  Compatible processors, `name => class` mapping
+		"""
+		processors = backend.all_modules.processors
+
+		available = []
+		for processor_type, processor in processors.items():
+			if processor_type.endswith("-search"):
+				continue
+
+			# consider a processor compatible if its is_compatible_with
+			# method returns True *or* if it has no explicit compatibility
+			# check and this dataset is top-level (i.e. has no parent)
+			if hasattr(processor, "is_compatible_with"):
+				if processor.is_compatible_with(module=self):
+					available.append(processor)
+
+		return available
+
+	@classmethod
+	def is_dataset(cls):
+		"""
+		Confirm this is *not* a dataset, but a processor.
+		Used for processor compatibility
+		"""
+		return False
+
+	@classmethod
+	def is_top_dataset(cls):
+		"""
+		Confirm this is *not* a top dataset, but a processor.
+		Used for processor compatibility
+		"""
+		return False
+
+	@classmethod
+	def get_extension(self):
+		"""
+		Return the extension of 
+		Used for processor compatibility
+		"""
+
+		if self.extension and not self.is_filter():
+			return self.extension 
+		return None
+
+	@classmethod
+	def is_rankable(cls):
+		"""
+		Used for processor compatibility
+		"""
+		return False
 
 	@abc.abstractmethod
 	def process(self):

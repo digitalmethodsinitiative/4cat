@@ -39,10 +39,6 @@ class ImageDownloader(BasicProcessor):
 	title = "Download images"  # title displayed in UI
 	description = "Download top images and compress as a zip file. May take a while to complete as images are sourced externally. Note that not always all images can be retrieved. For imgur galleries, only the first image is saved. For imgur gifv files, only the first frame is saved. Use the \"Add download status\" option to see what downloads succeeded"  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
-	accepts = ["top-images"]  # query types this post-processor accepts as input
-
-	input = "csv"
-	output = "zip"
 
 	options = {
 		"amount": {
@@ -59,6 +55,15 @@ class ImageDownloader(BasicProcessor):
 			"tooltip": "This will add two columns, \"download_status\" and \"img_name\", to above csv file so you can check whether downloading succeeded and what the image's filename is."
 		}
 	}
+
+	@classmethod
+	def is_compatible_with(cls, module=None):
+		"""
+		Allow processor on top image rankings
+
+		:param module: Dataset or processor to determine compatibility with
+		"""
+		return module.type == "top-images"
 
 	def process(self):
 		"""

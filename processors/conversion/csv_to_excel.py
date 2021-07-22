@@ -23,15 +23,15 @@ class ConvertCSVToMacExcel(BasicProcessor):
 	description = "Convert a CSV file to a format that is compatible with Microsoft Excel."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
-	# all post-processors with CSV output
-	accepts = ["search", "collocations", "count-posts", "debate_metrics", "get-entities",
-			   "extract-nouns", "hatebase-data", "penelope-semanticframe", "quote-ranker",
-			   "tfidf", "thread-metadata", "sentence-split", "hatebase-frequencies",
-			   "count-countries", "top-images", "url-extractor", "extract-usernames", "vector-ranker",
-			   "count-words", "youtube-metadata", "attribute-frequencies", "count-posts"]
+	@classmethod
+	def is_compatible_with(cls, module=None):
+		"""
+		Determine if processor is compatible with dataset
 
-	input = "csv"
-	output = "csv"
+		:param module: Dataset or processor to determine compatibility with
+		"""
+		
+		return module.get_extension() in ["csv", "ndjson"]
 
 	def process(self):
 		"""

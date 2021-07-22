@@ -137,17 +137,16 @@ def datasource_form(datasource_id):
 		return error(404, message="Datasource '%s' does not exist" % datasource_id)
 
 	datasource = backend.all_modules.datasources[datasource_id]
-	worker = backend.all_modules.workers.get(datasource_id + "-search")
+	worker_class = backend.all_modules.workers.get(datasource_id + "-search")
 
-	if not worker:
+	if not worker_class:
 		return error(404, message="Datasource '%s' has no search worker" % datasource_id)
 
-	worker_class = backend.all_modules.load_worker_class(worker)
-
-	if not hasattr(worker_class, "options"):
+	worker_options = worker_class.get_options(None, current_user)
+	if not worker_options:
 		return error(404, message="Datasource '%s' has no dataset parameter options defined" % datasource_id)
 
-	form = render_template("create-dataset-option.html", options=worker_class.options)
+	form = render_template("create-dataset-option.html", options=worker_options)
 	javascript_path = datasource["path"].joinpath("webtool", "tool.js")
 	has_javascript = javascript_path.exists()
 
@@ -224,15 +223,14 @@ def queue_dataset():
 		return error(404, message="Datasource '%s' has no search interface" % datasource_id)
 
 	search_worker = backend.all_modules.workers[search_worker_id]
-	worker_class = backend.all_modules.load_worker_class(search_worker)
 
-	if hasattr(worker_class, "validate_query"):
+	if hasattr(search_worker, "validate_query"):
 		try:
 			# first sanitise values
-			sanitised_query = UserInput.parse_all(worker_class.options, request.form.to_dict(), silently_correct=False)
+			sanitised_query = UserInput.parse_all(search_worker.get_options(None, current_user), request.form.to_dict(), silently_correct=False)
 
 			# then validate for this particular datasource
-			sanitised_query = worker_class.validate_query(sanitised_query, request, current_user)
+			sanitised_query = search_worker.validate_query(sanitised_query, request, current_user)
 		except QueryParametersException as e:
 			return "Invalid query. %s" % e
 	else:
@@ -244,11 +242,14 @@ def queue_dataset():
 
 	sanitised_query["pseudonymise"] = bool(request.form.to_dict().get("pseudonymise", False))
 
-	extension = worker_class.extension if hasattr(worker_class, "extension") else "csv"
+	extension = search_worker.extension if hasattr(search_worker, "extension") else "csv"
 	dataset = DataSet(parameters=sanitised_query, db=db, type=search_worker_id, extension=extension)
 
-	if hasattr(worker_class, "after_create"):
-		worker_class.after_create(sanitised_query, dataset, request)
+	if request.form.get("label"):
+		dataset.update_label(request.form.get("label"))
+
+	if hasattr(search_worker, "after_create"):
+		search_worker.after_create(sanitised_query, dataset, request)
 
 	queue.add_job(jobtype=search_worker_id, remote_id=dataset.key)
 
@@ -319,6 +320,50 @@ def check_dataset():
 	}
 
 	return jsonify(status)
+
+@app.route("/api/edit-dataset-label/<string:key>/", methods=["POST"])
+@api_ratelimit
+@login_required
+@openapi.endpoint("tool")
+def edit_dataset_label(key):
+	"""
+	Change label for a dataset
+
+	Only allowed for dataset owner or admin!
+
+	:request-param str key:  ID of the dataset for which to change the label
+	:return: Label info, containing the dataset `key`, the dataset `url`,
+	         and the new `label`.
+
+	:return-schema: {
+		type=object,
+		properties={
+			key={type=string},
+			url={type=string},
+			label={type=string}
+		}
+	}
+
+	:return-error 404:  If the dataset does not exist.
+	:return-error 403:  If the user is not owner of the dataset or an admin
+	"""
+	dataset_key = request.form.get("key", "") if not key else key
+	label = request.form.get("label", "")
+
+	try:
+		dataset = DataSet(key=dataset_key, db=db)
+	except TypeError:
+		return error(404, error="Dataset does not exist.")
+
+	if not current_user.is_admin() and not current_user.get_id() == dataset.parameters.get("user"):
+		return error(403, message="Not allowed")
+
+	dataset.update_label(label)
+	return jsonify({
+		"key": dataset.key,
+		"url": url_for("show_result", key=dataset.key),
+		"label": dataset.get_label()
+	})
 
 
 @app.route("/api/delete-query/", methods=["DELETE", "POST"])
@@ -487,15 +532,16 @@ def queue_processor(key=None, processor=None):
 		return jsonify({"error": "Not a valid dataset key."})
 
 	# check if processor is available for this dataset
-	if processor not in dataset.processors:
+	available_processors = dataset.get_available_processors()
+	if processor not in available_processors:
 		return jsonify({"error": "This processor is not available for this dataset or has already been run."})
 
 	# create a dataset now
-	options = UserInput.parse_all(dataset.processors[processor]["options"], request.form.to_dict(), silently_correct=False)
+	options = UserInput.parse_all(available_processors[processor].get_options(dataset, current_user), request.form.to_dict(), silently_correct=False)
 	options["user"] = current_user.get_id()
 
 	analysis = DataSet(parent=dataset.key, parameters=options, db=db,
-					   extension=dataset.processors[processor]["extension"], type=processor)
+					   extension=available_processors[processor].extension, type=processor)
 	if analysis.is_new:
 		# analysis has not been run or queued before - queue a job to run it
 		queue.add_job(jobtype=processor, remote_id=analysis.key)
@@ -504,7 +550,7 @@ def queue_processor(key=None, processor=None):
 		analysis.update_status("Queued")
 	else:
 		flash("This analysis (%s) is currently queued or has already been run with these parameters." %
-			  dataset.processors[processor]["name"])
+			  available_processors[processor].title)
 
 	return jsonify({
 		"status": "success",
@@ -513,48 +559,8 @@ def queue_processor(key=None, processor=None):
 		"html": render_template("result-child.html", child=analysis, dataset=dataset, parent_key=dataset.key,
 								processors=backend.all_modules.processors) if analysis.is_new else "",
 		"messages": get_flashed_messages(),
-		"is_filter": dataset.processors[processor]["is_filter"]
+		"is_filter": available_processors[processor].is_filter()
 	})
-
-
-@app.route("/api/get-available-processors/")
-@login_required
-@api_ratelimit
-@openapi.endpoint("tool")
-def available_processors():
-	"""
-	Get processors available for a dataset
-
-	:request-param string key:  Dataset key to get processors for
-	:return: An object containing the `error` if the request failed, or a list
-	         of processors, each with a `name`, a `type` ID, a
-	         `description` of what it does, the `extension` of the file it
-	         produces, a `category` name, what types of datasets it `accepts`,
-	         and a list of `options`, if applicable.
-
-	:return-schema: {type=array,items={type=object,properties={
-		name={type=string},
-		type={type=string},
-		description={type=string},
-		extension={type=string},
-		category={type=string},
-		accepts={type=array,items={type=string}}
-	}}}
-
-	:return-error 404:  If the dataset does not exist.
-	"""
-	try:
-		dataset = DataSet(key=request.args.get("key"), db=db)
-	except TypeError:
-		return error(404, error="Dataset does not exist.")
-
-	# Class type is not JSON serialisable
-	processors = dataset.get_available_processors()
-	for key, value in processors.items():
-		if "class" in value:
-			del value["class"]
-
-	return jsonify(processors)
 
 
 @app.route('/api/check-processors/')
