@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang='en'>
+  <head>
+    <link href='https://fonts.googleapis.com/css?family=Open+Sans:300,400,600' rel='stylesheet'>
+    <link rel='stylesheet' type='text/css' href='http://localhost/static/pixplot/assets/css/no-ui-slider.css'>
+    <link rel='stylesheet' type='text/css' href='http://localhost/static/pixplot/assets/css/style.css'>
+    <meta name='viewport' content='width=device-width, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no'>
+    <meta http-equiv='ScreenOrientation' content='autoRotate:disabled'>
+    <title>PixPlot | Visualizing Image Fields</title>
+    <meta charset='UTF-8'/>
+    <meta name='author' content='Yale Digital Humanities Lab'>
+  </head>
+  <body>
+    <!-- version: 0.0.109 -->
+    <script type='x-shader/x-vertex' id='vertex-shader'>
+    /**
+    * The vertex shader's main() function must define `gl_Position`,
+    * which describes the position of each vertex in screen coordinates.
+    *
+    * To do so, we can use the following variables defined by Three.js:
+    *   uniform mat4 projectionMatrix - maps camera space into screen space
+    *   uniform mat4 modelViewMatrix - combines:
+    *     model matrix: maps a point's local coordinate space into world space
+    *     view matrix: maps world space into camera space
+    *
+    * `attributes` can vary from vertex to vertex and are defined as arrays
+    *   with length equal to the number of vertices. Each index in the array
+    *   is an attribute for the corresponding vertex. Each attribute must
+    *   contain n_vertices * n_components, where n_components is the length
+    *   of the given datatype (e.g. for a vec2, n_components = 2; for a float,
+    *   n_components = 1)
+    * `uniforms` are constant across all vertices
+    * `varyings` are values passed from the vertex to the fragment shader
+    *
+    * For the full list of uniforms defined by three, see:
+    *   https://threejs.org/docs/#api/renderers/webgl/WebGLProgram
+    **/
+
+    #version 100
+    #define SHADER_NAME instancedVertex
+    #define SELECTING
+
+    // set float precision
+    precision mediump float;
+
+    uniform mat4 modelViewMatrix;
+    uniform mat4 projectionMatrix;
+    uniform vec3 cameraPosition;
+    uniform float scale;
+    uniform float targetScale;
+    uniform float scaleTransitionPercent;
+    uniform float transitionPercent;
+    uniform float borderWidth;
+    uniform float cellAtlasPxPerSide;
+    uniform float lodAtlasPxPerSide;
+
+    attribute vec2 uv;                // u v blueprint 0:1 in each axis
+    attribute vec3 position;          // x y z positional blueprint 0:1 in x, y axes
+    attribute vec3 translation;       // x y z position of point currently
+    attribute vec3 targetTranslation; // x y z position to which we're transitioning
+    attribute vec3 color;             // unique color for cell; used for raycasting
+    attribute float width;            // px width of cell in lod texture
+    attribute float height;           // px height of cell in lod texture
+    attribute vec2 offset;            // px offset in tex from left, top
+    attribute float opacity;          // opacity value for cell
+    attribute float selected;         // 1 if the cell is selected else 0
+    attribute float clusterSelected;  // 1 if the cell is cluster selected else 0
+    attribute float textureIndex;     // index of instance's texture among all textures
+
+    varying vec2 vUv;                 // u v blueprint 0:1 in each axis
+    varying vec3 vPosition;           // x y z blueprint 0:1 in x, y axes
+    varying vec3 vColor;              // cell color
+    varying vec2 vOffset;             // px of cell offset left, top in texture
+    varying float vWidth;             // px width of cell in lod texture
+    varying float vHeight;            // px height of cell in lod texture
+    varying float vOpacity;           // cell opacity
+    varying float vSelected;          // 1 if this cell is selected else 0
+    varying float vTextureIndex;      // cell texture idx (varyings can't be int)
+    varying float vClusterSelected;   // 1 if this cell is cluster selected else 0
+
+    void main() {
+      // pass varyings to fragment shader
+      vUv = uv;
+      vColor = color;
+      vWidth = width;
+      vHeight = height;
+      vOffset = offset;
+      vOpacity = opacity;
+      vSelected = selected;
+      vPosition = position;
+      vTextureIndex = textureIndex;
+      vClusterSelected = clusterSelected;
+
+      // determine the interpolation point in the current transition
+      float percent = clamp(transitionPercent, 0.0, 1.0);
+
+      // scale the blueprint unit vectors by this image's size
+      bool bordered = selected > 0.5 || clusterSelected > 0.5;
+      vec3 p = position - 0.5;
+      p.x *= bordered ? (width  + (2.0 * borderWidth * width )) : width;
+      p.y *= bordered ? (height + (2.0 * borderWidth * height)) : height;
+
+      p = p * mix(scale, targetScale, percent) * 0.00001;
+      vec3 p0 = p + translation; // current position
+      vec3 p1 = p + targetTranslation; // target position
+      vec3 pos = mix(p0, p1, percent);
+      vec4 world = modelViewMatrix * vec4(pos, 1.0);
+      gl_Position = projectionMatrix * world;
+    }
+    </script>
+
+    <script type='x-shader/x-fragment' id='fragment-shader'>
+    /**
+    * The fragment shader's main() function must define `gl_FragColor`,
+    * which describes the pixel color of each pixel on the screen.
+    *
+    * To do so, we can use uniforms passed into the shader and varyings
+    * passed from the vertex shader.
+    *
+    * Attempting to read a varying not generated by the vertex shader will
+    * throw a warning but won't prevent shader compiling.
+    **/
+
+    #version 100
+    #define SHADER_NAME instancedFragment
+    #define SELECTING
+
+    precision mediump float;
+
+    uniform float useColor;
+    uniform float cellAtlasPxPerSide;
+    uniform float lodAtlasPxPerSide;
+    uniform float cellPxHeight;
+    uniform float lodPxHeight;
+    uniform float borderWidth;
+    uniform vec3 yellowColor;
+    uniform float display;
+
+    varying vec2 vUv;               // u v texture blueprint scaled 0:1 in each axis
+    varying vec3 vPosition;         // x y z blueprint scaled 0:1 in x, y axes
+    varying vec3 vColor;            // cell's color (for gpu picking)
+    varying vec2 vOffset;           // cell's offset in px from left, top of tex
+    varying float vWidth;           // cell's width in lod tex in px
+    varying float vHeight;          // cell's height in lod tex in px
+    varying float vOpacity;         // cell's opacity
+    varying float vSelected;        // cell is selected if > 0.5
+    varying float vTextureIndex;    // cell's texture index
+    varying float vClusterSelected; // cell is cluster selected if > 0.5
+
+    #ifndef SELECTING
+      uniform sampler2D textures[N_TEXTURES]; // array of sampler2Ds
+      uniform sampler2D lodTexture; // single sampler2D
+    #endif
+
+    void main() {
+
+      // hide all points when rendering lines for poses
+      if (display < 0.5) {
+
+        discard;
+
+      } else {
+
+        // if this shader is using vColor attributes skip texture processing
+        if (int(useColor) == 1) {
+
+          gl_FragColor = vec4(vColor, 1.0);
+
+        // this cell should be textured
+        } else {
+
+          // determine if pixel is selected, cluster selected, & inside border
+          bool isSelected = vSelected > 0.5;
+          bool isClusterSelected = vClusterSelected > 0.5;
+          float borderW = borderWidth / 2.0;
+          bool isInBorder =
+            vPosition.x > 1.0 - borderW ||
+            vPosition.x < borderW ||
+            vPosition.y > 1.0 - borderW ||
+            vPosition.y < borderW;
+
+          // check if the current pointcoord position is within the border
+          if ((isSelected || isClusterSelected) && isInBorder) {
+
+            // draw a border around lasso'd cells
+            if (isSelected) gl_FragColor = vec4(yellowColor, 1.0);
+
+            if (isClusterSelected) gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);
+
+          // pixel is outside the border; paint with the provided texture
+          } else {
+
+            // find the width and height of this cell in its texture (in px)
+            bool isLod = vTextureIndex < -0.5;
+            float w = isLod ? vWidth : vWidth/vHeight*cellPxHeight;
+            float h = isLod ? vHeight : cellPxHeight;
+
+            // get the texture uv offsets
+            vec2 uv = vUv; // uv is unit uvs 0:1 in each axis
+            uv.y = 1.0 - uv.y; // flip the texture right side up
+            uv.x *= w; // scale the unit uvs to the size of this cell in px
+            uv.y *= h;
+
+            uv = vOffset + uv; // vOffset is a translation of the cell in px
+            float denom = isLod ? lodAtlasPxPerSide : cellAtlasPxPerSide;
+            vec2 scaledUv = uv / denom; // scale the uvs from px coords to 0:1
+
+            // get the index for the selected texture
+            int textureIndex = isLod ? -1 : int(vTextureIndex);
+
+            // target to be replaced by texture tree
+            TEXTURE_LOOKUP_TREE
+
+            gl_FragColor = mix(gl_FragColor, vec4(0.0), 1.0-vOpacity);
+            gl_FragColor.a = 1.0;
+
+            // add a yellow wash if the cell is selected
+            if (vSelected > 0.5) {
+              gl_FragColor = mix(gl_FragColor, vec4(yellowColor, 1.0), 0.15);
+            }
+
+            // add a white wash if the cell is cluster selected
+            if (vClusterSelected > 0.5) {
+              gl_FragColor = mix(gl_FragColor, vec4(1.0), 0.30);
+            }
+          }
+        }
+      }
+    }
+    </script>
+
+    <!-- Selection lasso -->
+    <script type='x-shader/x-vertex' id='dashed-vertex-shader'>
+    precision mediump float;
+
+    uniform mat4 modelViewMatrix;
+    uniform mat4 projectionMatrix;
+    uniform vec3 cameraPosition;
+
+    attribute vec3 position;
+    attribute float length;
+
+    varying float vLength;
+
+    void main() {
+      vLength = length;
+      vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+      gl_Position = projectionMatrix * mvPosition;
+    }
+    </script>
+
+    <script type='x-shader/x-fragment' id='dashed-fragment-shader'>
+    precision mediump float;
+
+    uniform vec3 cameraPosition;
+    uniform bool render;
+    uniform float time;
+
+    varying float vLength;
+
+    void main() {
+      if (!render) discard;
+      float dashSize = 0.01;
+      float gapSize = 0.005;
+      if (mod(vLength + time, dashSize + gapSize) > dashSize) discard;
+      gl_FragColor = vec4(0.9, 0.9, 0.9, 1.0);
+    }
+    </script>
+
+    <!-- Text sprites -->
+    <script type='x-shader/x-vertex' id='text-vertex-shader'>
+    precision mediump float;
+
+    uniform mat4 modelViewMatrix;
+    uniform mat4 projectionMatrix;
+    uniform vec3 cameraPosition;
+    uniform float scale;
+
+    attribute vec2 offset;
+    attribute vec3 position;
+
+    varying vec2 vOffset;
+
+    void main() {
+      vec4 world = modelViewMatrix * vec4(position, 1.0);
+      gl_Position = projectionMatrix * world;
+      gl_PointSize = scale / -world.z;
+      vOffset = offset;
+    }
+    </script>
+
+    <script type='x-shader/x-fragment' id='text-fragment-shader'>
+    precision mediump float;
+
+    uniform sampler2D texture;
+    uniform float render;
+    uniform float point;
+    uniform float canvas;
+
+    varying vec2 vOffset;
+
+    void main() {
+      vec2 uv = vec2(vOffset.x/point + gl_PointCoord.x, vOffset.y/point + gl_PointCoord.y);
+      uv *= point/canvas;
+      gl_FragColor = texture2D(texture, uv);
+      if (gl_FragColor.r < 0.1 || render < 0.5) discard;
+    }
+    </script>
+
+    <script type='x-shader/x-vertex' id='line-vertex-shader'>
+    precision highp float;
+
+    uniform mat4 modelViewMatrix;
+    uniform mat4 projectionMatrix;
+    uniform float transitionPercent;
+    uniform vec3 cameraPosition;
+    uniform float scale;
+    uniform float targetScale;
+
+    attribute vec3 position;
+    attribute vec3 targetPosition;
+    attribute vec2 midpoint;
+    attribute vec2 targetMidpoint;
+
+    void main() {
+      float percent = clamp(transitionPercent, 0.0, 1.0);
+      vec3 positionC = mix(position, targetPosition, percent);
+      vec2 midpointC = mix(midpoint, targetMidpoint, percent);
+      float scaleC = mix(scale, targetScale, percent);
+
+      // scale the pos
+      positionC.x -= ((midpointC.x - positionC.x) * scaleC * 0.2);
+      positionC.y -= ((midpointC.y - positionC.y) * scaleC * 0.2);
+
+      vec4 mvPos = modelViewMatrix * vec4(positionC, 1.0);
+      gl_Position = projectionMatrix * mvPos;
+    }
+    </script>
+
+    <script type='x-shader/x-fragment' id='line-fragment-shader'>
+    precision highp float;
+    uniform float display;
+
+    void main() {
+      if (display < 0.5) {
+        discard;
+      } else {
+        gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);
+      }
+    }
+    </script>
+
+    <!-- Header -->
+    <div id='header-container'>
+      <header id='header' class='no-highlight'></header>
+      <div id='header-brand'>
+        <a href='https://dhlab.yale.edu' target='_blank'>
+          <img id='logo' src='http://localhost/static/pixplot/assets/images/dhlab-logo.svg' alt='DHLab logo' />
+        </a>
+        <div id='app-name'>PixPlot</div>
+        <div class='tagline'>Image Fields in a Local Collection</div>
+      </div>
+      <div id='header-controls'>
+        <div id='header-controls-top' class='no-highlight'>
+          <div id='image-search-container'>
+            <input id='image-search' type='text' placeholder='Search for an image'>
+            <img id='image-search-icon' src='http://localhost/static/pixplot/assets/images/icons/search-icon.svg'>
+            <div id='typeahead-container'></div>
+          </div>
+          <div id='date-container'>
+            <div id='date-label' class='settings-label'>Date</div>
+            <div id='date-slider'></div>
+          </div>
+          <div id='filters-desktop'></div>
+          <div id='icons'>
+            <img class='layout-icon' id='layout-alphabetic' src='http://localhost/static/pixplot/assets/images/icons/az-layout.svg' />
+            <img class='layout-icon' id='layout-umap' src='http://localhost/static/pixplot/assets/images/icons/scatter-layout.svg' />
+            <img class='layout-icon' id='layout-grid' src='http://localhost/static/pixplot/assets/images/icons/grid-layout.svg' />
+            <img class='layout-icon' id='layout-date' src='http://localhost/static/pixplot/assets/images/icons/date-layout.svg' />
+            <img class='layout-icon' id='layout-categorical' src='http://localhost/static/pixplot/assets/images/icons/categorical-layout.svg' />
+            <img class='layout-icon' id='layout-pose' src='http://localhost/static/pixplot/assets/images/icons/pose-layout.svg' />
+            <img class='layout-icon' id='layout-geographic' src='http://localhost/static/pixplot/assets/images/icons/geographic-layout.svg' />
+            <img id='settings-icon' src='http://localhost/static/pixplot/assets/images/icons/gear-icon.svg' />
+          </div>
+        </div>
+        <div id='header-controls-bottom' class='no-highlight'>
+          <div id='layout-select-container' class='mobile-only'>
+            <div class='settings-label'>Layout</div>
+            <select id='layout-select'></select>
+          </div>
+          <div id='filters-mobile-wrap' class='mobile-only'>
+            <div id='filters-mobile-container'>
+              <div class='settings-label'>Category</div>
+              <div id='filters-mobile'></div>
+            </div>
+          </div>
+          <div id='pose-display-container'>
+            <div class='settings-label'>Display</div>
+            <select id='pose-display-select'>
+              <option default value='images'>Images</option>
+              <option value='poses'>Poses</option>
+            </select>
+          </div>
+          <div class='range-slider' id='min-dist-range-input-container'>
+            <div class='settings-label'>Minimum Distance</div>
+            <input id='min-dist-range-input' min='0' max='2' step='1' value='1' type='range' />
+          </div>
+          <div class='range-slider' id='n-neighbors-range-input-container'>
+            <div class='settings-label'>Number of Neighbors</div>
+            <input id='n-neighbors-range-input' min='0' max='2' step='1' value='1' type='range' />
+          </div>
+          <div class='range-slider'>
+            <div class='settings-label'>Border Width</div>
+            <input id='border-width-range-input' min='0' max='1' value='0.15' step='0.01' type='range' />
+          </div>
+          <div class='range-slider'>
+            <div class='settings-label'>Point Size</div>
+            <input id='pointsize-range-input' min='0' max='0.03' value='0' step='0.00001' type='range' />
+          </div>
+          <div id='jitter-container'>
+            <div class='settings-label'>Jitter</div>
+            <input type='checkbox' id='jitter-input'>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id='tooltip'></div>
+    <!-- Loader -->
+    <div id='loader-scene'>
+      <p class='welcome'>This page visualizes a large image collection within an interactive WebGL scene. Each image was processed with an <a href='https://arxiv.org/abs/1409.4842' target='_blank'>Inception</a> Convolutional Neural Network, trained on <a href='http://image-net.org/challenges/LSVRC/2012/' target='_blank'>ImageNet 2012</a>, and projected into a two-dimensional manifold with the <a href='https://github.com/lmcinnes/umap' target='_blank'>UMAP</a> algorithm such that similar images appear proximate to one another.</p>
+      <div class='loader-container'>
+        <div class='loader-icon'>
+          <div class='blocks'>
+            <div class='block'></div>
+            <div class='block'></div>
+            <div class='block'></div>
+            <div class='block'></div>
+            <div class='block'></div>
+            <div class='block'></div>
+            <div class='block'></div>
+            <div class='block'></div>
+            <div class='block'></div>
+          </div>
+        </div>
+        <div id='loader-text'>
+          <span id='progress'>0%</span>
+        </div>
+      </div>
+      <button id='enter-button'>Enter</button>
+    </div>
+    <!-- Canvas -->
+    <div id='canvas-container'>
+      <div id='canvas-target'>
+        <canvas id='pixplot-canvas'></canvas>
+      </div>
+    </div>
+    <!-- Hotspot Navigation -->
+    <nav>
+      <div id='nav-inner' class='no-highlight'>
+        <h2>Hotspots</h2>
+        <div id='hotspots'></div>
+        <script type='text/html' id='hotspot-template'>
+          <% _.forEach(hotspots, function(hotspot, idx) { %>
+            <div class='hotspot' id='hotspot-<%= idx %>' draggable='<%= isLocalhost %>'>
+              <% if (isLocalhost) { %>
+                <div class='hotspot-action remove-hotspot-x'>✕</div>
+                <div class='hotspot-action drag-hotspot'>...</div>
+                <img class='hotspot-action refresh-hotspot' src='http://localhost/static/pixplot/assets/images/icons/refresh.svg'>
+              <% } %>
+              <div class='hotspot-body'>
+                <img class='hotspot-image' src='http://localhost/static/pixplot/data/thumbs/<%= hotspot.img %>'>
+                <div class='hotspot-bar-container'>
+                  <div class='hotspot-bar-inner'></div>
+                </div>
+                <% if (isLocalhost) { %>
+                  <div class='hotspot-label' contenteditable='true' ><%= hotspot.label %></div>
+                <% } else { %>
+                  <div class='hotspot-label'><%= hotspot.label %></div>
+                <% } %>
+              </div>
+            </div>
+          <% }); %>
+        </script>
+      </div>
+    </nav>
+    <!-- Dismissible Tooltip: Hotspots -->
+    <div class='dismissible-tooltip' id='hotspots-tooltip'>
+      <b>Explore Image Clusters</b>
+      <p>Select a hotspot to explore visually similar clusters.</p>
+      <button id='hotspots-tooltip-button'>Got it</button>
+    </div>
+    <div id='hotspot-actions'>
+      <div id='save-hotspots' class='button hotspot-button'>Save Hotspots</div>
+      <div id='create-hotspot' class='no-highlight button hotspot-button'>Create Hotspot</div>
+    </div>
+    <!-- Image Picker: single image selection -->
+    <script type='text/html' id='selected-image-template'>
+      <div class='modal-content'>
+        <div class='modal-x'>✕</div>
+        <div class='modal-top'>
+          <div id='selected-image-parent' class='modal-top-content'>
+            <svg id='selected-image-svg' x='0' y='0' preserveAspectRatio='xMidYMid meet'>
+              <defs>
+                <filter id='blur-filter'>
+                  <feGaussianBlur stdDeviation='0.25' />
+                </filter>
+                <mask id='blur-mask'></mask>
+              </defs>
+              <rect x='0' y='0' width='100%' height='100%' fill='#000'></rect>
+              <image id='svg-image-filtered' x='0' y='0' width='100%' height='100%'></image>
+              <image id='svg-image-unfiltered' x='0' y='0' width='100%' height='100%'></image>
+            </svg>
+            <div class='icons'>
+              <% if (hasPose) { %>
+                <div id='pose-highlight-icon'>
+                  <img src='http://localhost/static/pixplot/assets/images/icons/pose-icon.svg' alt='eye icon' />
+                </div>
+              <% } %>
+              <a target='_blank' id='eye-icon' href='<%- meta.permalink || meta.src %>'>
+                <img src='http://localhost/static/pixplot/assets/images/icons/eye-icon.png' alt='eye icon' />
+              </a>
+              <a id='download-icon' href='<%- meta.src || "#" %>' download>
+                <img src='http://localhost/static/pixplot/assets/images/icons/download-icon.png' alt='download icon' />
+              </a>
+            </div>
+            <% if (multiImage) { %>
+              <img id='caret-left' class='image-caret' src='http://localhost/static/pixplot/assets/images/icons/chevron.png' onclick='modal.showPreviousCell()'>
+              <img id='caret-right' class='image-caret' src='http://localhost/static/pixplot/assets/images/icons/chevron.png' onclick='modal.showNextCell()'>
+            <% } %>
+          </div>
+        </div>
+        <div class='modal-bottom' id='selected-image-meta'>
+          <div class='modal-bottom-content'>
+            <div class='modal-text-left'>
+              <div id='image-title'><%- meta.filename ? decodeURIComponent(meta.filename) : decodeURIComponent(meta.src) %></div>
+              <span id='image-text'><%= meta.description ? decodeURIComponent(meta.description) : '' %></span>
+              <span id='image-date'><%- meta.date ? '(' + meta.date + ')' : '' %></span>
+            </div>
+            <div class='modal-text-right'>
+              <% if (meta.category || meta.tags) { %>
+                <div id='meta-category-container'>
+                  <% if (meta.category) { %>
+                    <div class='meta-category'><%- meta.category %></div>
+                  <% }; %>
+                  <% if (meta.tags) { %>
+                    <% _.forEach(meta.tags, function(tag) { %>
+                      <% if (tag != meta.category) { %>
+                        <div class='meta-tag'><%- meta.tag %></div>
+                      <% } %>
+                    <% }) %>
+                  <% } %>
+                </div>
+              <% } %>
+            </div>
+          </div>
+        </div>
+      </div>
+    </script>
+    <div id='selected-image-modal'></div>
+    <!-- Image Selection: multi-image selection -->
+    <div id='selection-icons' class='no-highlight'>
+      <img id='pan' src='http://localhost/static/pixplot/assets/images/icons/pan.svg' class='active' />
+      <img id='select' src='http://localhost/static/pixplot/assets/images/icons/lasso.png' class='' />
+      <!-- Dismissible Tooltip: Lasso -->
+      <div class='dismissible-tooltip' id='select-tooltip'>
+        <b>Selection Mode</b>
+        <p>Lasso to select. Shift + drag to edit selection.</p>
+        <button id='select-tooltip-button'>Got it</button>
+      </div>
+    </div>
+    <div id='view-selected-container'>
+      <div id='selected-images-count' class='no-highlight'>
+        <div id='selected-images-x'>✕</div>
+        <div id='count-target'>0</div>
+        <div>images selected</div>
+      </div>
+      <div id='view-selected' class='no-highlight button'>View Selected</div>
+    </div>
+    <div id='selected-images-modal'>
+      <div class='modal-content'>
+        <div class='modal-top'>
+          <script type='text/html' id='selected-images-template'>
+            <div class='modal-top-content'>
+              <h2>Selected Images</h2>
+              <p>You have selected <b id='n-images-selected'><%- images.length %></b> images</p>
+              <div id='selected-images-grid'>
+                <% _.forEach(images, function(image, idx) { %>
+                  <div class='selected-image'>
+                    <div class='toggle-selection'>✕</div>
+                    <div data-index='<%- idx %>' data-image='<%- image %>' class='background-image' style='background-image: url("http://localhost/static/pixplots/output_example/data/thumbs/<%- image %>");'></div>
+                  </div>
+                <% }); %>
+              </div>
+            </div>
+          </script>
+          <div id='selected-images-target'></div>
+        </div>
+        <div class='modal-bottom'>
+          <div class='modal-bottom-content'>
+            <div class='modal-text-left'>
+              <b>Help Guide</b>
+              <p>Click an image above for higher resolution, or click the button to the right to download a JSON file identifying selected images.</p>
+            </div>
+            <div class='modal-text-right'>
+              <div class='row'>
+                <input id='download-filename' type='text' placeholder='filename'>
+                <div id='download-link'>
+                  <button class='active'>Download Metadata</button>
+                </div>
+              </div>
+              <div id='download-as' class='row align-center'>
+                <span>Download as:</span>
+                <div class='filetype active' id='csv'>CSV</div>
+                <div class='filetype' id='json'>JSON</div>
+                <div class='filetype' id='zip'>ZIP</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- Webgl / Noscript Warnings -->
+    <div id='webgl-not-available'>
+      <div class='browser-message'>Sorry, your browser is not able to load a WebGL scene currently. Please check your browser settings and try again.</div>
+    </div>
+    <noscript>
+      <span class='browser-message'>Sorry, your browser is not able to load a WebGL scene currently. Please enable JavaScript and try again.</span>
+    </noscript>
+    <script src='http://localhost/static/pixplot/assets/vendor/dist/three.min.js'></script>
+    <script src='http://localhost/static/pixplot/assets/vendor/dist/lodash.min.js'></script>
+    <script src='http://localhost/static/pixplot/assets/js/object-assign-polyfill.js'></script>
+    <script src='http://localhost/static/pixplot/assets/vendor/dist/gsap.min.js'></script>
+    <script src='http://localhost/static/pixplot/assets/vendor/dist/trackball-controls.min.js'></script>
+    <script src='http://localhost/static/pixplot/assets/vendor/dist/stats.min.js'></script>
+    <script src='http://localhost/static/pixplot/assets/vendor/dist/gunzip.min.js'></script>
+    <script src='http://localhost/static/pixplot/assets/vendor/dist/papaparse.min.js'></script>
+    <script src='http://localhost/static/pixplot/assets/vendor/dist/no-ui-slider.min.js'></script>
+    <script src='http://localhost/static/pixplot/assets/vendor/dist/jszip.min.js'></script>
+    <script src='http://localhost/static/pixplot/assets/vendor/dist/d3.min.js'></script>
+    <script src='http://localhost/static/pixplot/assets/js/tsne.js'></script>
+    <script>
+      (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+      (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+      m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+      })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+      ga('create', 'UA-101732875-1', 'auto');
+      ga('send', 'pageview');
+    </script>
+  </body>
+</html>

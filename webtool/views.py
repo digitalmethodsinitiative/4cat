@@ -244,6 +244,17 @@ def get_result(query_file):
 	directory = config.PATH_ROOT + "/" + config.PATH_DATA
 	return send_from_directory(directory=directory, filename=query_file)
 
+@app.route('/pixplot/<string:page>/')
+def show_pixplot(page):
+	"""
+	Display a PixPlot page
+
+	:param page: ID of the pixplot to load, should correspond to a folder
+	in the static/pixplots/ folder
+	:return:  Rendered template
+	"""
+	directory = config.PATH_ROOT + "/" + 'webtool/static/pixplots/' + page + '/'
+	return send_from_directory(directory=directory, filename=page + '.html')
 
 @app.route('/results/', defaults={'page': 1})
 @app.route('/results/page/<int:page>/')
@@ -283,12 +294,12 @@ def show_results(page):
 	where = " AND ".join(where)
 
 	num_datasets = db.fetchone("SELECT COUNT(*) AS num FROM datasets WHERE " + where, tuple(replacements))["num"]
-	
+
 	replacements.append(page_size)
 	replacements.append(offset)
 	datasets = db.fetchall("SELECT key FROM datasets WHERE " + where + " ORDER BY timestamp DESC LIMIT %s OFFSET %s",
 						   tuple(replacements))
-	
+
 	if not datasets and page != 1:
 		abort(404)
 
@@ -468,7 +479,7 @@ def delete_dataset_interactive(key):
 		dataset = DataSet(key=key, db=db)
 	except TypeError:
 		return error(404, message="Dataset not found.")
-	
+
 	top_key = dataset.top_parent().key
 
 	success = delete_dataset(key)
