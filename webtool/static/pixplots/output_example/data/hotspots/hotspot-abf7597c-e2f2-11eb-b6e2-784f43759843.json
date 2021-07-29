@@ -1,0 +1,138 @@
+[
+    {
+        "images": [
+            2,
+            4,
+            8,
+            21,
+            22
+        ],
+        "centroid": [
+            0.7676540000000001,
+            0.296172
+        ],
+        "img": "200.gif",
+        "label": "Cluster 1"
+    },
+    {
+        "images": [
+            3,
+            17,
+            29,
+            38
+        ],
+        "centroid": [
+            0.8473849999999999,
+            -0.4870475
+        ],
+        "img": "capitol-set.jpg",
+        "label": "Cluster 2"
+    },
+    {
+        "images": [
+            6,
+            13,
+            28,
+            31
+        ],
+        "centroid": [
+            0.7978924999999999,
+            -0.15347249999999998
+        ],
+        "img": "c385dbf318a8435d845562eac64d1d50_md.jpg",
+        "label": "Cluster 3"
+    },
+    {
+        "images": [
+            16,
+            18,
+            34,
+            35
+        ],
+        "centroid": [
+            0.9172549999999999,
+            -0.370155
+        ],
+        "img": "homage-to-matisse.jpg",
+        "label": "Cluster 4"
+    },
+    {
+        "images": [
+            26,
+            27,
+            30,
+            32
+        ],
+        "centroid": [
+            0.9689825,
+            -0.9318249999999999
+        ],
+        "img": "ft_2020.01.17_demideology_01a.png",
+        "label": "Cluster 5"
+    },
+    {
+        "images": [
+            0,
+            14,
+            25
+        ],
+        "centroid": [
+            0.7293733333333333,
+            -0.2774733333333333
+        ],
+        "img": "0d3raxd.jpg",
+        "label": "Cluster 6"
+    },
+    {
+        "images": [
+            1,
+            19,
+            20
+        ],
+        "centroid": [
+            0.8525900000000001,
+            0.016976666666666668
+        ],
+        "img": "P4E04fs.png",
+        "label": "Cluster 7"
+    },
+    {
+        "images": [
+            5,
+            12,
+            15
+        ],
+        "centroid": [
+            0.96427,
+            -0.6818433333333332
+        ],
+        "img": "KPUFft.jpg",
+        "label": "Cluster 8"
+    },
+    {
+        "images": [
+            7,
+            37,
+            40
+        ],
+        "centroid": [
+            0.5158433333333333,
+            0.9720866666666668
+        ],
+        "img": "xKIS27D.jpg",
+        "label": "Cluster 9"
+    },
+    {
+        "images": [
+            9,
+            11,
+            33
+        ],
+        "centroid": [
+            -0.9894600000000001,
+            0.11497333333333333
+        ],
+        "img": "FzWZ3E5.jpg",
+        "label": "Cluster 10"
+    }
+]

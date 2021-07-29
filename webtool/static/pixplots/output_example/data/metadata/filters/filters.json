@@ -1,0 +1,11 @@
+[
+    {
+        "filter_name": "select",
+        "filter_values": [
+            "tab__D",
+            "tab__C",
+            "tab__B",
+            "tab__A"
+        ]
+    }
+]

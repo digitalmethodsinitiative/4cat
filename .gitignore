@@ -51,8 +51,9 @@ webtool/venv/
 !common/assets/github-screenshots/*.png
 
 # Do not ignore pixplot data
-!webtool/static/pixplot/assets/images/*
-!webtool/static/pixplots/*
+!webtool/static/pixplot/assets/images/**
+
+!webtool/static/pixplots/**
 
 # data files
 results
