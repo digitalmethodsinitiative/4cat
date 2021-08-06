@@ -244,18 +244,6 @@ def get_result(query_file):
 	directory = config.PATH_ROOT + "/" + config.PATH_DATA
 	return send_from_directory(directory=directory, filename=query_file)
 
-@app.route('/pixplot/<string:page>/')
-def show_pixplot(page):
-	"""
-	Display a PixPlot page
-
-	:param page: ID of the pixplot to load, should correspond to a folder
-	in the static/pixplots/ folder
-	:return:  Rendered template
-	"""
-	directory = config.PATH_ROOT + "/" + 'webtool/static/pixplots/' + page + '/'
-	return send_from_directory(directory=directory, filename=page + '.html')
-
 @app.route('/results/', defaults={'page': 1})
 @app.route('/results/page/<int:page>/')
 @login_required
