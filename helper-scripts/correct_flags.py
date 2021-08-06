@@ -10,10 +10,14 @@ sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)) + "/..")
 from common.lib.database import Database
 from common.lib.logger import Logger
 
-PATH_TO_TROLL_FLAG_IDS = None
+import csv
+import json
+
+PATH_TO_TROLL_FLAG_IDS = "C:/Users/Sal/surfdrive/methods/4chan_methods/data/troll_countries.json"
 
 if not PATH_TO_TROLL_FLAG_IDS:
 	print("You must provide a path to a json file with post ID: troll_code key/value pairs.")
+	quit()
 
 logger = Logger()
 db = Database(logger=logger, appname="queue-dump")
@@ -89,6 +93,7 @@ query_update_country_flags = """
 		UPDATE posts_4chan
 		SET country_name =
 		CASE
+			WHEN country_code = 'A2' THEN 'Satellite Provider'
 			WHEN country_code = 'AD' THEN 'Andorra'
 			WHEN country_code = 'AE' THEN 'United Arab Emirates'
 			WHEN country_code = 'AF' THEN 'Afghanistan'
@@ -97,12 +102,11 @@ query_update_country_flags = """
 			WHEN country_code = 'AL' THEN 'Albania'
 			WHEN country_code = 'AM' THEN 'Armenia'
 			WHEN country_code = 'AO' THEN 'Angola'
+			WHEN country_code = 'AP' THEN 'Asia/Pacific Region'
 			WHEN country_code = 'AQ' THEN 'Antarctica'
-			WHEN country_code = 'AR' THEN 'Argentina'
 			WHEN country_code = 'AS' THEN 'American Samoa''s'
 			WHEN country_code = 'AT' THEN 'Austria'
 			WHEN country_code = 'AU' THEN 'Australia'
-			WHEN country_code = 'AU' THEN 'Heard Island and McDonald Islands'
 			WHEN country_code = 'AU' THEN 'Norfolk Island'
 			WHEN country_code = 'AW' THEN 'Aruba'
 			WHEN country_code = 'AX' THEN 'Aland'
@@ -124,6 +128,7 @@ query_update_country_flags = """
 			WHEN country_code = 'BR' THEN 'Brazil'
 			WHEN country_code = 'BS' THEN 'Bahamas'
 			WHEN country_code = 'BT' THEN 'Bhutan'
+			WHEN country_code = 'BV' THEN 'Bouvet Island'
 			WHEN country_code = 'BW' THEN 'Botswana'
 			WHEN country_code = 'BY' THEN 'Belarus'
 			WHEN country_code = 'BZ' THEN 'Belize'
@@ -132,6 +137,7 @@ query_update_country_flags = """
 			WHEN country_code = 'CD' THEN 'Congo'
 			WHEN country_code = 'CD' THEN 'The Democratic Republic of the Congo'
 			WHEN country_code = 'CF' THEN 'Central African Republic'
+			WHEN country_code = 'CG' THEN 'Congo'
 			WHEN country_code = 'CH' THEN 'Switzerland'
 			WHEN country_code = 'CI' THEN 'Côte d''Ivoire'
 			WHEN country_code = 'CK' THEN 'Cook Islands'
@@ -142,7 +148,6 @@ query_update_country_flags = """
 			WHEN country_code = 'CR' THEN 'Costa Rica'
 			WHEN country_code = 'CU' THEN 'Cuba'
 			WHEN country_code = 'CV' THEN 'Cape Verde'
-			WHEN country_code = 'CW' THEN 'Curacao'
 			WHEN country_code = 'CW' THEN 'Curaçao'
 			WHEN country_code = 'CX' THEN 'Christmas Island'
 			WHEN country_code = 'CY' THEN 'Cyprus'
@@ -167,7 +172,6 @@ query_update_country_flags = """
 			WHEN country_code = 'FM' THEN 'Federated States of Micronesia'
 			WHEN country_code = 'FO' THEN 'Faroe Islands'
 			WHEN country_code = 'FR' THEN 'France'
-			WHEN country_code = 'FR' THEN 'Martinique'
 			WHEN country_code = 'GA' THEN 'Gabon'
 			WHEN country_code = 'GB' THEN 'United Kingdom'
 			WHEN country_code = 'GD' THEN 'Grenada'
@@ -238,8 +242,8 @@ query_update_country_flags = """
 			WHEN country_code = 'MM' THEN 'Myanmar'
 			WHEN country_code = 'MN' THEN 'Mongolia'
 			WHEN country_code = 'MO' THEN 'Macao'
-			WHEN country_code = 'MO' THEN 'Macao'
 			WHEN country_code = 'MP' THEN 'Northern Mariana Islands'
+			WHEN country_code = 'MQ' THEN 'Martinique'
 			WHEN country_code = 'MR' THEN 'Mauritania'
 			WHEN country_code = 'MS' THEN 'Montserrat'
 			WHEN country_code = 'MT' THEN 'Malta'
@@ -252,6 +256,7 @@ query_update_country_flags = """
 			WHEN country_code = 'NA' THEN 'Namibia'
 			WHEN country_code = 'NC' THEN 'New Caledonia'
 			WHEN country_code = 'NE' THEN 'Niger'
+			WHEN country_code = 'NF' THEN 'Norfolk Island'
 			WHEN country_code = 'NG' THEN 'Nigeria'
 			WHEN country_code = 'NI' THEN 'Nicaragua'
 			WHEN country_code = 'NL' THEN 'Netherlands'
@@ -290,7 +295,6 @@ query_update_country_flags = """
 			WHEN country_code = 'SG' THEN 'Singapore'
 			WHEN country_code = 'SH' THEN 'Saint Helena, Ascension, and Tristan da Cunha'
 			WHEN country_code = 'SI' THEN 'Slovenia'
-			WHEN country_code = 'SI' THEN 'Slovenia'
 			WHEN country_code = 'SJ' THEN 'Svalbard and Jan Mayen'
 			WHEN country_code = 'SK' THEN 'Slovakia'
 			WHEN country_code = 'SL' THEN 'Sierra Leone'
@@ -310,6 +314,7 @@ query_update_country_flags = """
 			WHEN country_code = 'TH' THEN 'Thailand'
 			WHEN country_code = 'TJ' THEN 'Tajikistan'
 			WHEN country_code = 'TK' THEN 'Tokelau'
+			WHEN country_code = 'TL' THEN 'Timor-Leste'
 			WHEN country_code = 'TM' THEN 'Turkmenistan'
 			WHEN country_code = 'TN' THEN 'Tunisia'
 			WHEN country_code = 'TO' THEN 'Tonga'
@@ -320,8 +325,10 @@ query_update_country_flags = """
 			WHEN country_code = 'TZ' THEN 'Tanzani'
 			WHEN country_code = 'UA' THEN 'Ukraine'
 			WHEN country_code = 'UG' THEN 'Uganda'
+			WHEN country_code = 'UM' THEN 'United States Minor Outlying Islands'
 			WHEN country_code = 'US' THEN 'United States'
 			WHEN country_code = 'UY' THEN 'Uruguay'
+			WHEN country_code = 'UZ' THEN 'Uzbekistan'
 			WHEN country_code = 'VA' THEN 'Holy See (Vatican City State)'
 			WHEN country_code = 'VC' THEN 'Saint Vincent and the Grenadines'
 			WHEN country_code = 'VE' THEN 'Venezuela'
@@ -329,8 +336,9 @@ query_update_country_flags = """
 			WHEN country_code = 'VI' THEN 'U.S. Virgin Islands'
 			WHEN country_code = 'VI' THEN 'Virgin Islands, U.S.'
 			WHEN country_code = 'VN' THEN 'Vietnam'
+			WHEN country_code = 'VU' THEN 'Vanuatu'
+			WHEN country_code = 'WF' THEN 'Wallis and Futuna'
 			WHEN country_code = 'WS' THEN 'Samoa'
-			WHEN country_code = 'WT' THEN 'Wallis and Futuna'
 			WHEN country_code = 'XK' THEN 'Kosovo'
 			WHEN country_code = 'XX' THEN 'Unknown'
 			WHEN country_code = 'YE' THEN 'Yemen'
@@ -358,6 +366,7 @@ query_update_country_names = """
 		UPDATE posts_4chan
 		SET country_name =
 		CASE
+			WHEN country_code = 'A2' THEN 'Satellite Provider'
 			WHEN country_code = 'AD' THEN 'Andorra'
 			WHEN country_code = 'AE' THEN 'United Arab Emirates'
 			WHEN country_code = 'AF' THEN 'Afghanistan'
@@ -366,12 +375,12 @@ query_update_country_names = """
 			WHEN country_code = 'AL' THEN 'Albania'
 			WHEN country_code = 'AM' THEN 'Armenia'
 			WHEN country_code = 'AO' THEN 'Angola'
+			WHEN country_code = 'AP' THEN 'Asia/Pacific Region'
 			WHEN country_code = 'AQ' THEN 'Antarctica'
 			WHEN country_code = 'AR' THEN 'Argentina'
 			WHEN country_code = 'AS' THEN 'American Samoa''s'
 			WHEN country_code = 'AT' THEN 'Austria'
 			WHEN country_code = 'AU' THEN 'Australia'
-			WHEN country_code = 'AU' THEN 'Norfolk Island'
 			WHEN country_code = 'AW' THEN 'Aruba'
 			WHEN country_code = 'AX' THEN 'Aland'
 			WHEN country_code = 'AZ' THEN 'Azerbaijan'
@@ -391,6 +400,7 @@ query_update_country_names = """
 			WHEN country_code = 'BR' THEN 'Brazil'
 			WHEN country_code = 'BS' THEN 'Bahamas'
 			WHEN country_code = 'BT' THEN 'Bhutan'
+			WHEN country_code = 'BV' THEN 'Bouvet Island'
 			WHEN country_code = 'BW' THEN 'Botswana'
 			WHEN country_code = 'BY' THEN 'Belarus'
 			WHEN country_code = 'BZ' THEN 'Belize'
@@ -399,6 +409,7 @@ query_update_country_names = """
 			WHEN country_code = 'CD' THEN 'Congo'
 			WHEN country_code = 'CD' THEN 'The Democratic Republic of the Congo'
 			WHEN country_code = 'CF' THEN 'Central African Republic'
+			WHEN country_code = 'CG' THEN 'Congo'
 			WHEN country_code = 'CH' THEN 'Switzerland'
 			WHEN country_code = 'CI' THEN 'Côte d''Ivoire'
 			WHEN country_code = 'CK' THEN 'Cook Islands'
@@ -432,11 +443,12 @@ query_update_country_names = """
 			WHEN country_code = 'FM' THEN 'Federated States of Micronesia'
 			WHEN country_code = 'FO' THEN 'Faroe Islands'
 			WHEN country_code = 'FR' THEN 'France'
-			WHEN country_code = 'FR' THEN 'Martinique'
 			WHEN country_code = 'GA' THEN 'Gabon'
 			WHEN country_code = 'GB' THEN 'United Kingdom'
 			WHEN country_code = 'GD' THEN 'Grenada'
 			WHEN country_code = 'GE' THEN 'Georgia'
+			WHEN country_code = 'GF' THEN 'French Guiana'
+			WHEN country_code = 'GF' THEN 'French Guiana'
 			WHEN country_code = 'GG' THEN 'Guernsey'
 			WHEN country_code = 'GH' THEN 'Ghana'
 			WHEN country_code = 'GI' THEN 'Gibraltar'
@@ -502,6 +514,7 @@ query_update_country_names = """
 			WHEN country_code = 'MO' THEN 'Macao'
 			WHEN country_code = 'MO' THEN 'Macao'
 			WHEN country_code = 'MP' THEN 'Northern Mariana Islands'
+			WHEN country_code = 'MQ' THEN 'Martinique'
 			WHEN country_code = 'MR' THEN 'Mauritania'
 			WHEN country_code = 'MS' THEN 'Montserrat'
 			WHEN country_code = 'MT' THEN 'Malta'
@@ -514,6 +527,7 @@ query_update_country_names = """
 			WHEN country_code = 'NA' THEN 'Namibia'
 			WHEN country_code = 'NC' THEN 'New Caledonia'
 			WHEN country_code = 'NE' THEN 'Niger'
+			WHEN country_code = 'NF' THEN 'Norfolk Island'
 			WHEN country_code = 'NG' THEN 'Nigeria'
 			WHEN country_code = 'NI' THEN 'Nicaragua'
 			WHEN country_code = 'NL' THEN 'Netherlands'
@@ -549,7 +563,6 @@ query_update_country_names = """
 			WHEN country_code = 'SG' THEN 'Singapore'
 			WHEN country_code = 'SH' THEN 'Saint Helena, Ascension, and Tristan da Cunha'
 			WHEN country_code = 'SI' THEN 'Slovenia'
-			WHEN country_code = 'SI' THEN 'Slovenia'
 			WHEN country_code = 'SJ' THEN 'Svalbard and Jan Mayen'
 			WHEN country_code = 'SK' THEN 'Slovakia'
 			WHEN country_code = 'SL' THEN 'Sierra Leone'
@@ -569,6 +582,7 @@ query_update_country_names = """
 			WHEN country_code = 'TH' THEN 'Thailand'
 			WHEN country_code = 'TJ' THEN 'Tajikistan'
 			WHEN country_code = 'TK' THEN 'Tokelau'
+			WHEN country_code = 'TL' THEN 'Timor-Leste'
 			WHEN country_code = 'TN' THEN 'Tunisia'
 			WHEN country_code = 'TO' THEN 'Tonga'
 			WHEN country_code = 'TT' THEN 'Trinidad and Tobago'
@@ -577,17 +591,19 @@ query_update_country_names = """
 			WHEN country_code = 'TZ' THEN 'Tanzani'
 			WHEN country_code = 'UA' THEN 'Ukraine'
 			WHEN country_code = 'UG' THEN 'Uganda'
+			WHEN country_code = 'UM' THEN 'United States Minor Outlying Islands'
 			WHEN country_code = 'US' THEN 'United States'
 			WHEN country_code = 'UY' THEN 'Uruguay'
+			WHEN country_code = 'UZ' THEN 'Uzbekistan'
 			WHEN country_code = 'VA' THEN 'Holy See (Vatican City State)'
 			WHEN country_code = 'VC' THEN 'Saint Vincent and the Grenadines'
 			WHEN country_code = 'VE' THEN 'Venezuela'
 			WHEN country_code = 'VG' THEN 'British Virgin Islands'
 			WHEN country_code = 'VI' THEN 'U.S. Virgin Islands'
-			WHEN country_code = 'VI' THEN 'Virgin Islands, U.S.'
 			WHEN country_code = 'VN' THEN 'Vietnam'
+			WHEN country_code = 'VU' THEN 'Vanuatu'
+			WHEN country_code = 'WF' THEN 'Wallis and Futuna'
 			WHEN country_code = 'WS' THEN 'Samoa'
-			WHEN country_code = 'WT' THEN 'Wallis and Futuna'
 			WHEN country_code = 'XK' THEN 'Kosovo'
 			WHEN country_code = 'XX' THEN 'Unknown'
 			WHEN country_code = 'YE' THEN 'Yemen'
@@ -614,7 +630,7 @@ query_update_country_names = """
 
 			ELSE country_name
 		END 
-		WHERE board='pol'
+		WHERE board = 'pol'
 		AND timestamp >= 1497312000
 		AND (country_name = '') IS NOT FALSE;
 		"""
@@ -627,6 +643,10 @@ db.commit()
 However, some of the `country_codes` and `board_flag` codes can conflict.
 Flags with potential conflicts:
 
+<<<<<<< HEAD
+=======
+- BL: Black Nationalist / San Barthélemy
+>>>>>>> 6aff55c1b7923d13386d245861459ff600f2f521
 - CF: Confederate / Central African Republic
 - CM: Communist / Cameroon
 - GN: Gadsden / Guinea
@@ -655,19 +675,40 @@ with open(PATH_TO_TROLL_FLAG_IDS, "r", encoding="utf-8") as in_json:
 	min_id = int(min(list(troll_flags.keys())))
 
 	troll_names = {
+<<<<<<< HEAD
 		"CF": "Confederate",
 		"CM": "Communist",
 		"DM": "Democrat"
 		"GN": "Gadsden"
 		"GY": "Gay",
 		"KN": "Kekistani",
+=======
+		"AC": "Anarcho-Capitalist",
+		"WP": "White Supremacist",
+>>>>>>> 6aff55c1b7923d13386d245861459ff600f2f521
 		"MF": "Muslim",
-		"NZ": "Nazi",
-		"PR": "Pirate",
 		"RE": "Republican",
 		"TM": "Templar",
+<<<<<<< HEAD
 		"TR": "Tree Hugger",
 		"BL": "Black Nationalist"
+=======
+		"CT": "Catalonia",
+		"CF": "Confederate",
+		"EU": "European",
+		"PR": "Pirate",
+		"GY": "Gay",
+		"GN": "Gadsden",
+		"KN": "Kekistani",
+		"PC": "Hippie",
+		"NB": "National Bolshevik",
+		"JH": "Jihadi",
+		"DM": "Democrat",
+		"AN": "Anarchist",
+		"UN": "United Nations",
+		"CM": "Communist",
+		"NZ": "Nazi"
+>>>>>>> 6aff55c1b7923d13386d245861459ff600f2f521
 	}
 
 	for troll_code, troll_name in troll_names.items():
@@ -690,6 +731,7 @@ query_update_leftovers = ("""
 		UPDATE posts_4chan
 		SET country_name =
 		CASE
+			WHEN country_code = 'BL' THEN 'Saint Barthélemy'
 			WHEN country_code = 'CM' THEN 'Cameroon'
 			WHEN country_code = 'CF' THEN 'Central African Republic'
 			WHEN country_code = 'DM' THEN 'Dominica'
@@ -721,6 +763,7 @@ query_update_troll_codes = """
 		UPDATE posts_4chan
 		SET country_code =
 		CASE
+<<<<<<< HEAD
 			WHEN country_name = 'Anarchist' THEN 't_AN'
 			WHEN country_name = 'Anarcho-Capitalist' THEN 't_AC'
 			WHEN country_name = 'Black Nationalist' THEN 't_BL'
@@ -759,6 +802,43 @@ query_update_troll_codes = """
 			ELSE country_code
 		END 
 		WHERE board = 'pol' AND country_name IN ('Anarchist','Anarcho-Capitalist','Black Nationalist','Black Lives Matter','Catalonia','Commie','Communist','Confederate','Democrat', 'DEUS VULT','European','Europe','Fascist','Gadsden','Gay','LGBT','Hippie','Jihadi','Kekistani','Libertarian','Muslim','National Bolshevik','Nazi','Obama','Pirate','Rebel','Republican','Tea Partier','Templar','Texan','Tree Hugger','United Nations','White Supremacist');
+=======
+			WHEN country_name = "Anarchist" THEN 't_AN'
+			WHEN country_name = "Anarcho-Capitalist" THEN 't_AC'
+			WHEN country_name = "Black Nationalist" THEN 't_BL'
+			WHEN country_name = "Black Lives Matter" THEN 't_BL'
+			WHEN country_name = "Commie" THEN 't_CM'
+			WHEN country_name = "Communist" THEN 't_CM'
+			WHEN country_name = "Confederate" THEN 't_CF'
+			WHEN country_name = "Democrat" THEN 't_DM'
+			WHEN country_name = "European" THEN 't_EU'
+			WHEN country_name = "Europe" THEN 't_EU'
+			WHEN country_name = "Gadsden" THEN 't_GN'
+			WHEN country_name = "Gay" THEN 't_GY'
+			WHEN country_name = "LGBT" THEN 't_GY'
+			WHEN country_name = "Hippie" THEN 't_PC'
+			WHEN country_name = "Israel" THEN 'IL'
+			WHEN country_name = "Jihadi" THEN 't_JH'
+			WHEN country_name = "Kekistani" THEN 't_KN'
+			WHEN country_name = "Libertarian" THEN 't_RP'
+			WHEN country_name = "Muslim" THEN 't_MF'
+			WHEN country_name = "National Bolshevik" THEN 't_NB'
+			WHEN country_name = "Nazi" THEN 't_NZ'
+			WHEN country_name = "North Korea" THEN 't_KP'
+			WHEN country_name = "Obama" THEN 't_OB'
+			WHEN country_name = "Pirate" THEN 't_PR'
+			WHEN country_name = "Rebel" THEN 't_RB'
+			WHEN country_name = "Republican" THEN 't_RE'
+			WHEN country_name = "Tea Partier" THEN 't_TP'
+			WHEN country_name = "Templar" THEN 't_TM'
+			WHEN country_name = "Texan" THEN 't_TX'
+			WHEN country_name = "Tree Hugger" THEN 't_TR'
+			WHEN country_name = "United Nations" THEN 't_UN'
+			WHEN country_name = "White Supremacist" THEN 't_WP'
+			ELSE country_code
+		END 
+		WHERE board = 'pol' AND country_name IN ('Anarchist','Anarcho-Capitalist','Black Nationalist','Black Lives Matter','Commie','Communist','Confederate','Democrat','European','Europe','Gadsden','Gay','LGBT','Hippie','Israel','Jihadi','Kekistani','Libertarian','Muslim','National Bolshevik','Nazi','North Korea','Obama','Pirate','Rebel','Republican','Tea Partier','Templar','Texan','Tree Hugger','United Nations','White Supremacist');
+>>>>>>> 6aff55c1b7923d13386d245861459ff600f2f521
 		"""
 
 db.execute(query_update_troll_codes)

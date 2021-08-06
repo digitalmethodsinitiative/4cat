@@ -1,5 +1,3 @@
-# Copied from existing Dockerfile; likely could be greatly reduced
-# but unsure what frontend actually requires at this time
 FROM debian:buster
 
 RUN apt-get update && apt install -y \
@@ -17,7 +15,18 @@ RUN apt-get update && apt install -y \
 
 WORKDIR /usr/src/app
 
-# Install dependencies that may or may not be needed
+# Install google chrome
+RUN wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+RUN dpkg -i google-chrome-stable_current_amd64.deb; apt-get -fy install
+
+ENV DISPLAY=:99
+ENV CHROME_BIN=/usr/bin/google-chrome
+
+# install chromedriver
+RUN wget -O /tmp/chromedriver.zip http://chromedriver.storage.googleapis.com/`curl -sS chromedriver.storage.googleapis.com/LATEST_RELEASE`/chromedriver_linux64.zip
+RUN unzip /tmp/chromedriver.zip chromedriver -d /usr/local/bin/
+
+# install dependencies
 RUN pip3 install --upgrade pip
 COPY ./requirements.txt /usr/src/app/requirements.txt
 COPY ./setup.py /usr/src/app/setup.py
@@ -28,14 +37,11 @@ RUN mkdir /usr/src/app/webtool
 RUN mkdir /usr/src/app/datasources
 RUN pip3 install -r requirements.txt
 
-# Definitely needs this though
+# Frontend requirements
 RUN pip3 install gunicorn
 
-# copy project
-# (copy example config first, if user has own config, it will replace this)
+# Copy project
+# (Copy example config first, if user has own config, it will replace this)
 COPY ./config.py-example /usr/src/app/config.py
+COPY ./VERSION /usr/src/app/.current-version
 COPY . /usr/src/app/
-
-EXPOSE 5000
-
-ENTRYPOINT exec gunicorn --worker-tmp-dir /dev/shm --workers=2 --threads=4 --worker-class=gthread --reload --bind 0.0.0.0:5000 webtool:app
