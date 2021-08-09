@@ -31,6 +31,16 @@
             {% endfor %}
             </select>
         </div>
+    {% elif option_settings.type == "daterange" %}
+        <div class="daterange-wrapper">
+            <input name="option-{{ option }}-min_proxy" id="forminput-{{ option }}" class="input-time" type="date"
+                   placeholder="dd-mm-yyyy"> to
+            <input name="option-{{ option }}-max_proxy" class="input-time" type="date"
+                   placeholder="dd-mm-yyyy"> <span class="red"></span>
+
+            <input name="option-{{ option }}-min" type="hidden" value="-1">
+            <input name="option-{{ option }}-max" type="hidden" value="-1">
+        </div>
     {% endif %}
     {% if "tooltip" in option_settings %}
         {% set pid = uniqid() %}
