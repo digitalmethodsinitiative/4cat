@@ -1,5 +1,5 @@
 {% set option_settings = processor.get_options(dataset, current_user)[option] %}
-<div class="processor-option-wrap">
+<div class="processor-option-wrap" style="display: flex; flex-wrap: wrap; margin: 0.25em;">
     <label class="option-type-{{ option_settings.type }}">
         {% if option_settings.type == "toggle" %}
             <input type="checkbox" name="option-{{ option }}"{% if option_settings.default %} checked="checked"{% endif %}>
@@ -16,7 +16,7 @@
         {% endfor %}
         </select>
     {% elif option_settings.type == "multi" %}
-        <div class="multichoice-wrapper">
+        <div class="multichoice-wrapper" style="flex-basis: 100%;">
             <select name="option-{{ option }}" multiple="multiple">
             {% for choice in option_settings.options %}
                 <option value="{{ choice }}"{% if choice in option_settings.default %} selected="selected"{% endif %}>{{ option_settings.options[choice] }}</option>

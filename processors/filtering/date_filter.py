@@ -1,7 +1,6 @@
 """
 Filter posts by a dates
 """
-import os
 import csv
 import dateutil.parser
 from datetime import datetime
@@ -9,9 +8,9 @@ from datetime import datetime
 from backend.abstract.processor import BasicProcessor
 from common.lib.helpers import UserInput
 
-__author__ = "Stijn Peeters"
-__credits__ = ["Stijn Peeters"]
-__maintainer__ = "Stijn Peeters"
+__author__ = "Dale Wahl"
+__credits__ = ["Dale Wahl"]
+__maintainer__ = "Dale Wahl"
 __email__ = "4cat@oilab.eu"
 
 csv.field_size_limit(1024 * 1024 * 1024)
@@ -24,14 +23,15 @@ class DateFilter(BasicProcessor):
     type = "date-filter"  # job type ID
     category = "Filtering"  # category
     title = "Filter by date"  # title displayed in UI
-    description = "Copies the dataset, retaining only posts between the given dates. This creates a new, separate dataset you can run analyses on."
+    description = "Copies the dataset, retaining only posts between the given dates. This creates a new, separate \
+                    dataset you can run analyses on."
     extension = "csv"  # extension of result file, used internally and in UI
 
     options = {
         "daterange": {
-			"type": UserInput.OPTION_DATERANGE,
-			"help": "Date range"
-		},
+            "type": UserInput.OPTION_DATERANGE,
+            "help": "Date range:",
+        },
         "parse_error": {
             "type": UserInput.OPTION_CHOICE,
             "help": "Invalid date formats:",
@@ -102,7 +102,9 @@ class DateFilter(BasicProcessor):
                 # Update 4CAT and user on status
                 processed_items += 1
                 if processed_items % 500 == 0:
-                    self.dataset.update_status("Processed %i items (%i matching, %i invalid dates)" % (processed_items, matching_items, invalid_dates))
+                    self.dataset.update_status("Processed %i items (%i matching, %i invalid dates)" % (processed_items,
+                                                                                                       matching_items,
+                                                                                                       invalid_dates))
 
                 # Attempt to parse timestamp
                 try:
@@ -139,30 +141,6 @@ class DateFilter(BasicProcessor):
 
     def after_process(self):
         super().after_process()
-        # COPIED from column_filter
 
-        # copy this dataset - the filtered version - and make that copy standalone
-        # this has the benefit of allowing for all analyses that can be run on
-        # full datasets on the new, filtered copy as well
-        top_parent = self.source_dataset
-
-        standalone = self.dataset.copy(shallow=False)
-        standalone.body_match = "(Filtered) " + top_parent.query
-        standalone.datasource = top_parent.parameters.get("datasource", "custom")
-
-        try:
-            standalone.board = top_parent.board
-        except KeyError:
-            standalone.board = self.type
-
-        standalone.type = "search"
-
-        standalone.detach()
-        standalone.delete_parameter("key_parent")
-
-        self.dataset.copied_to = standalone.key
-
-        # we don't need this file anymore - it has been copied to the new
-        # standalone dataset, and this one is not accessible via the interface
-        # except as a link to the copied standalone dataset
-        os.unlink(self.dataset.get_results_path())
+        # Request standalone
+        self.create_standalone()
