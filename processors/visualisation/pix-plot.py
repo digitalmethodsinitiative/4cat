@@ -75,7 +75,7 @@ class PixPlotGenerator(BasicProcessor):
 		data = {"args": ['--images', str(staging_area)+"/*.jpg", '--out_dir', output_directory]}
 		# need to make adaptable port
 		pixplot_api = "https" if config.FlaskConfig.SERVER_HTTPS else "http"
-		pixplot_api += '://4cat_pixplot_1' + ":" + "4000" + "/api/"
+		pixplot_api += '://4cat_pixplot' + ":" + "4000" + "/api/"
 
 		# Send request
 		self.dataset.update_status("Sending request and data to pixplot")
