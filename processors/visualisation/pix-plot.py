@@ -119,6 +119,9 @@ class PixPlotGenerator(BasicProcessor):
 		self.dataset.update_status("Finished")
 		self.dataset.finish(1)
 
+	def format_metadata():
+		# TODO: figure out how to properly retain image data from orignal source
+		return
 
 	def get_html_page(self, url):
 		"""
