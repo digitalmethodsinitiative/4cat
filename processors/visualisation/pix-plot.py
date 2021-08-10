@@ -108,7 +108,7 @@ class PixPlotGenerator(BasicProcessor):
 		# Create HTML file
 		url = "https" if config.FlaskConfig.SERVER_HTTPS else "http"
 		url += '://' + config.FlaskConfig.SERVER_NAME.split(':')[0] + ':' + '4000'
-		url += '/data/plots/' + self.dataset.key + '/index.html'
+		url += '/plots/' + self.dataset.key + '/index.html'
 		html_file = self.get_html_page(url)
 
 		# Write HTML file
