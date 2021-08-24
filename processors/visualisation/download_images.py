@@ -10,6 +10,7 @@ import time
 import re
 import csv
 import shutil
+import uuid
 
 from pathlib import Path
 from PIL import Image, UnidentifiedImageError
@@ -188,6 +189,9 @@ class ImageDownloader(BasicProcessor):
 
 			# For other data sources, we take the imagename it already had.
 			else:
+				if results_path.joinpath(image_name).exists():
+					# File exists; rename
+					image_name = uuid.uuid4().hex + image_name
 				imagepath = str(results_path.joinpath(image_name))
 
 			# save file
@@ -271,7 +275,17 @@ class ImageDownloader(BasicProcessor):
 
 					image_url = "https://imgur.com/" + image["hash"] + image["ext"]
 
-			elif "gfycat.com/" in path:
+				# Handle image preview page
+				# Two formats identified: https://imgur.com/randomid, https://imgur.com/randomid
+				else:
+					page = requests.get(path)
+					# This seems unlikely to last; could use BeautifulSoup for more dynamic capturing of url
+					image_url = page.content.decode('utf-8').split('<meta property="og:image"')[1].split('content="')[1].split(
+						'?fb">')[0]
+
+
+
+		elif "gfycat.com/" in path:
 
 				if not url_ext:
 					# For gfycat.com links, just add .gif and download
