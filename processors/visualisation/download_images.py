@@ -92,7 +92,7 @@ class ImageDownloader(BasicProcessor):
 			amount = 100
 
 		extensions = {}
-		
+
 		# 4chan is the odd one out (images are traced to and scraped from
 		# external archives rather than 4chan itself) so here we collect the
 		# relevant archive URLs for any 4chan images we encounter
@@ -170,7 +170,7 @@ class ImageDownloader(BasicProcessor):
 				if not isinstance(path, Path) and path[-2:] == "==":
 					md5 = hashlib.md5()
 					b64hash = base64.b64decode(path.split("/")[-1].split(".")[0].replace("_", "/"))
-					
+
 					try:
 						md5.update(b64hash)
 					except binascii.Error:
@@ -178,7 +178,7 @@ class ImageDownloader(BasicProcessor):
 						continue
 
 					hash = md5.hexdigest()
-				
+
 				# if we're using an already-saved image the image filename is good as it is
 				else:
 					hash = path.stem
@@ -217,7 +217,7 @@ class ImageDownloader(BasicProcessor):
 	def get_image(self, path):
 		"""
 		Get image from a generic URL.
-	
+
 		Images from URLs ending in image extensions are attempted to download.
 		For imgur and gfycat image URLs, which often do not end in an extension name,
 		we try to extrapolate the image file type and the corresponding URL directly to the image.
@@ -243,10 +243,10 @@ class ImageDownloader(BasicProcessor):
 
 			# Imgur images can appear in different formats, so we have to process this a bit.
 			if "imgur.com/" in path:
-				
+
 				# gifv files on imgur are actually small mp4 files.
 				# Since downloading videos complicates this and follow-up processors,
-				# just safe the first frame that imgur also hosts as a .gif file. 
+				# just safe the first frame that imgur also hosts as a .gif file.
 				if url_ext == "gifv":
 					image_url = path[:-1]
 
@@ -267,7 +267,7 @@ class ImageDownloader(BasicProcessor):
 					except json.JSONDecodeError:
 						self.dataset.log("Error loading gallery for image %s, skipping")
 						raise FileNotFoundError
-					
+
 					try:
 						image = imgur_data["data"]["image"]["album_images"]["images"][0]
 					except KeyError as e:
@@ -276,7 +276,7 @@ class ImageDownloader(BasicProcessor):
 					image_url = "https://imgur.com/" + image["hash"] + image["ext"]
 
 				# Handle image preview page
-				# Two formats identified: https://imgur.com/randomid, https://imgur.com/randomid
+				# Two formats identified: https://imgur.com/a/randomid, https://imgur.com/randomid
 				else:
 					page = requests.get(path)
 					# This seems unlikely to last; could use BeautifulSoup for more dynamic capturing of url
@@ -302,7 +302,7 @@ class ImageDownloader(BasicProcessor):
 			image = requests.get(image_url, stream=True, timeout=20, headers={"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/12.1.1 Safari/605.1.15"})
 		else:
 			raise FileNotFoundError
-		
+
 		# Use this for local saving.
 		image_name = image_url.split("/")[-1]
 		# Some URLs have parameters after extention. Remove if this is the case.
@@ -312,7 +312,7 @@ class ImageDownloader(BasicProcessor):
 		# Check if we succeeded; content type should be an image
 		if image.status_code != 200 or image.headers.get("content-type", "")[:5] != "image":
 			raise FileNotFoundError
-		
+
 		# Try opening the image in multiple ways
 		try:
 			picture = Image.open(BytesIO(image.content))
@@ -429,11 +429,11 @@ class ImageDownloader(BasicProcessor):
 			writer.writeheader()
 
 			for post in self.iterate_items(parent_path):
-		
+
 				if count < len(success):
 					post["download_status"] = success[count]["download_status"]
 					post["img_name"] = success[count]["img_name"]
-		
+
 				writer.writerow(post)
 				count += 1
 
