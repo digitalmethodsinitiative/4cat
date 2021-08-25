@@ -191,7 +191,7 @@ class ImageDownloader(BasicProcessor):
 			else:
 				if results_path.joinpath(image_name).exists():
 					# File exists; rename
-					image_name = uuid.uuid4().hex + image_name
+					image_name = uuid.uuid4().hex + "_" + image_name
 				imagepath = str(results_path.joinpath(image_name))
 
 			# save file
@@ -419,7 +419,9 @@ class ImageDownloader(BasicProcessor):
 
 		# Get field names
 		fieldnames = self.get_item_keys(parent_path)
-		fieldnames += ["download_status", "img_name"]
+		for fieldname in ["download_status", "img_name"]:
+			if fieldname not in fieldnames:
+				fieldnames += [fieldname]
 
 		# Iterate through the original dataset and add values to a new img_link column
 		self.dataset.update_status("Writing download status to Top images csv.")
