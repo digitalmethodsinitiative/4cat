@@ -45,9 +45,7 @@ services:
 
   pixplot:
     container_name: 4cat_pixplot
-    build:
-      context: ./pix-plot
-      dockerfile: Dockerfile
+    image: dalewahl/pix_plot:latest
     ports:
       - 4000:4000
     volumes:
