@@ -4,6 +4,9 @@ Create an PixPlot of downloaded images
 import shutil
 import requests
 import time
+import dateutil.parser
+import csv
+import os
 import config
 
 from common.lib.helpers import UserInput, convert_to_int
@@ -13,6 +16,7 @@ __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl"]
 __maintainer__ = "Dale Wahl"
 __email__ = "4cat@oilab.eu"
+
 
 class PixPlotGenerator(BasicProcessor):
 	"""
@@ -69,11 +73,17 @@ class PixPlotGenerator(BasicProcessor):
 		staging_area = self.unpack_archive_contents(self.source_file)
 		self.log.info('staging area: ' + str(staging_area))
 
+		# Gather metadata
+		self.dataset.update_status("Collecting metadata")
+		metadata_file_path = self.format_metadata(staging_area)
+
 		# Prep arguments for pixplot
-		# TODO:will need to add metadata somehow
 		output_directory = '/usr/src/app/data/plots/' + self.dataset.key
-		data = {"args": ['--images', str(staging_area)+"/*.jpg", '--out_dir', output_directory]}
-		# need to make adaptable port
+		# Delete directory if already exists (updating PixPlot)
+		if os.path.isdir(output_directory):
+			shutil.rmtree(output_directory)
+		data = {"args": ['--images', str(staging_area)+"/*.jpg", '--out_dir', output_directory, '--metadata', str(metadata_file_path)]}
+		#TODO need to make adaptable port
 		pixplot_api = "https" if config.FlaskConfig.SERVER_HTTPS else "http"
 		pixplot_api += '://4cat_pixplot' + ":" + "4000" + "/api/"
 
@@ -88,6 +98,7 @@ class PixPlotGenerator(BasicProcessor):
 		while True:
 			time.sleep(10)
 			result = requests.get(resp.json()['result_url'])
+			self.log.debug(str(result.json()))
 			if 'status' in result.json().keys() and result.json()['status'] == 'running':
 				# Still running
 				continue
@@ -99,7 +110,7 @@ class PixPlotGenerator(BasicProcessor):
 			else:
 				# Something botched
 				self.dataset.update_status("PixPlot Error")
-				self.log.info("PixPlot Error" + result.json()['report'].split('Error')[-1])
+				self.log.info("PixPlot Error: " + str(result.json()))
 				break
 
 		if staging_area:
@@ -119,9 +130,107 @@ class PixPlotGenerator(BasicProcessor):
 		self.dataset.update_status("Finished")
 		self.dataset.finish(1)
 
-	def format_metadata():
-		# TODO: figure out how to properly retain image data from orignal source
-		return
+	def format_metadata(self, temp_path):
+		"""
+		Returns metadata.csv file
+
+		Columns for PixPlot metadata can be:
+		filename |	the filename of the image
+		category |	a categorical label for the image
+		tags |	a pipe-delimited list of categorical tags for the image
+		description |	a plaintext description of the image's contents
+		permalink |	a link to the image hosted on another domain
+		year |	a year timestamp for the image (should be an integer)
+		label |	a categorical label used for supervised UMAP projection
+		lat |	the latitudinal position of the image
+		lng |	the longitudinal position of the image
+
+		We have a folder with image filenames, a top_downloads csv with filenames and post ids, and a source file with
+		the action information needed. Annoyingly the source file is by far the largest file so we do not want to hold
+		it in memory. Instead we will loop through it and build the metadata file as we go.
+
+		"""
+		parents = self.dataset.get_genealogy()
+		# Get the top_downloads file path which serves as the key to source file
+		top_downloads_path = parents[-3].get_results_path()
+		# Get source file path; should be the top parent
+		source_path = self.dataset.top_parent().get_results_path()
+		# Get path for metadata file
+		metadata_file_path = temp_path.joinpath('metadata.csv')
+		# Set fieldnames for metadata file
+		fieldnames = ['filename', 'description', 'permalink', 'year', 'tags', 'number_of_posts']
+
+		# Open metadata file and iterate through source file
+		with metadata_file_path.open("w", encoding="utf-8", newline="") as output:
+			# Our to-be metadata
+			images = {}
+
+			# Loop through top_downloads csv and build key
+			post_id_image_dictionary = {}
+			for post in self.iterate_items(top_downloads_path):
+
+				# Check if image successfully downloaded for image
+				if post["download_status"] == 'succeeded':
+					ids = post['ids'].split(',')
+					for post_id in ids:
+						# Add to key
+						if post_id in post_id_image_dictionary.keys():
+							post_id_image_dictionary[post_id].append(post['img_name'])
+						else:
+							post_id_image_dictionary[post_id] = [post['img_name']]
+
+					# Add to metadata
+					images[post['img_name']] = {'filename': post['img_name'],
+												'permalink': post['item'],
+												'description': '<b>Num of Post(s) w/ Image:</b> ' + str(post['value']),
+												'tags': '',
+												'number_of_posts': 0,
+												}
+			# Loop through source file
+			for post in self.iterate_items(source_path):
+				# Check if post contains one of the downloaded images
+				if post['id'] in post_id_image_dictionary.keys():
+					for img_name in post_id_image_dictionary[post['id']]:
+						image = images[img_name]
+
+						# Update description
+						image['number_of_posts'] += 1
+						image['description'] += '<br/><br/><b>Post ' + str(image['number_of_posts']) + '</b>'
+						for field in post.keys():
+							image['description'] += '<br/><br/><b>' + field + ':</b> ' + str(post[field])
+						# PixPlot has a field limit of 131072
+						image['description'] = image['description'][:131072]
+
+						# Add tags or hashtags
+						if image['tags']:
+							image['tags'] += '|'
+						if 'tags' in post.keys():
+							if type(post['tags']) == list:
+								image['tags'] += '|'.join(post['tags'])
+							else:
+								image['tags'] += '|'.join(post['tags'].split(','))
+						elif 'hashtags' in post.keys():
+							if type(post['hashtags']) == list:
+								image['tags'] += '|'.join(post['hashtags'])
+							else:
+								image['tags'] += '|'.join(post['hashtags'].split(','))
+
+						# Category could perhaps be a user inputed column...
+
+						# If images repeat this will overwrite prior value
+						# I really dislike that the download images is not a one to one with posts...
+						if 'timestamp' in post.keys():
+							image['year'] = dateutil.parser.parse(post['timestamp']).year
+
+			writer = csv.DictWriter(output, fieldnames=fieldnames)
+			writer.writeheader()
+
+			# Finally, write images to metadata.csv
+			for image in images:
+				writer.writerow(images[image])
+
+		self.dataset.update_status("Metadata.csv created")
+		return metadata_file_path
 
 	def get_html_page(self, url):
 		"""
