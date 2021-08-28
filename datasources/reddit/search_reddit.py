@@ -66,6 +66,10 @@ class SearchReddit(SearchWithScope):
 			"type": UserInput.OPTION_TEXT,
 			"help": "Subject search"
 		},
+		"author_match": {
+			"type": UserInput.OPTION_TEXT,
+			"help": "Author search"
+		},
 		"subject_url": {
 			"type": UserInput.OPTION_TEXT,
 			"help": "Thread link URL"
@@ -147,6 +151,9 @@ class SearchReddit(SearchWithScope):
 			post_parameters["q"] = query["body_match"]
 		else:
 			post_parameters["q"] = ""
+
+		if query["author_match"]:
+			post_parameters["author"] = query["author_match"]
 
 		# set up query
 		total_posts = 0
