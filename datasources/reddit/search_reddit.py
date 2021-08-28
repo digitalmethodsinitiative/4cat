@@ -46,6 +46,11 @@ class SearchReddit(SearchWithScope):
 			"help": "Subreddit(s)",
 			"tooltip": "Comma-separated"
 		},
+		"author": {
+			"type": UserInput.OPTION_TEXT,
+			"help": "Author(s)",
+			"tooltip": "Comma-separated"
+		},
 		"divider": {
 			"type": UserInput.OPTION_DIVIDER
 		},
@@ -65,10 +70,6 @@ class SearchReddit(SearchWithScope):
 		"subject_match": {
 			"type": UserInput.OPTION_TEXT,
 			"help": "Subject search"
-		},
-		"author_match": {
-			"type": UserInput.OPTION_TEXT,
-			"help": "Author search"
 		},
 		"subject_url": {
 			"type": UserInput.OPTION_TEXT,
@@ -152,8 +153,8 @@ class SearchReddit(SearchWithScope):
 		else:
 			post_parameters["q"] = ""
 
-		if query["author_match"]:
-			post_parameters["author"] = query["author_match"]
+		if query["author"]:
+			post_parameters["author"] = query["author"]
 
 		# set up query
 		total_posts = 0
