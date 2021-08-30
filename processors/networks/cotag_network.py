@@ -21,7 +21,7 @@ class CoTaggerPreset(ProcessorPreset):
     description = "Create a Gephi-compatible network comprised of all tags appearing in the dataset, with edges " \
                   "between all tags used together on an item. Edges are weighted by the amount of co-tag " \
                   "occurrences; nodes are weighted by the frequency of the tag."  # description displayed in UI
-    extension = "gdf"  # extension of result file, used internally and in UI
+    extension = "gexf"  # extension of result file, used internally and in UI
 
     @classmethod
     def is_compatible_with(cls, module=None):
