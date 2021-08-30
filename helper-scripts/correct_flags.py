@@ -13,14 +13,96 @@ from common.lib.logger import Logger
 import csv
 import json
 
-PATH_TO_TROLL_FLAG_IDS = "C:/Users/Sal/surfdrive/methods/4chan_methods/data/troll_countries.json"
+PATH_TO_4PLEBS_DUMP = None
 
-if not PATH_TO_TROLL_FLAG_IDS:
+if not PATH_TO_4PLEBS_DUMP:
 	print("You must provide a path to a json file with post ID: troll_code key/value pairs.")
 	quit()
 
+print("Extracting posts with a troll flag from the 4plebs dump.")
+troll_flags = {}
+troll_names = {
+	"AC": "Anarcho-Capitalist",
+	"AN": "Anarchist",
+	"BL": "Black Nationalist",
+	"CF": "Confederate",
+	"CT": "Catalonia",
+	"CM": "Communist",
+	"DM": "Democrat",
+	"EU": "European",
+	"FC": "Fascist",
+	"GN": "Gadsden",
+	"GY": "Gay",
+	"JH": "Jihadi",
+	"KP": "North Korea",
+	"KN": "Kekistani",
+	"MF": "Muslim",
+	"NB": "National Bolshevik",
+	"NZ": "Nazi",
+	"OB": "Obama",
+	"PC": "Hippie",
+	"PR": "Pirate",
+	"RB": "Rebel",
+	"RE": "Republican",
+	"RP": "Libertarian",
+	"TM": "Templar",
+	"TP": "Tea Partier",
+	"TR": "Tree Hugger",
+	"TX": "Texan",
+	"UN": "United Nations",
+	"WP": "White Supremacist"
+}
+
+with open(PATH_TO_4PLEBS_DUMP, encoding="utf-8") as in_csv:
+
+	fieldnames = ("num", "subnum", "thread_num", "op", "timestamp", "timestamp_expired", "preview_orig", "preview_w", "preview_h", "media_filename", "media_w", "media_h", "media_size", "media_hash", "media_orig", "spoiler", "deleted", "capcode", "email", "name", "trip", "title", "comment", "sticky", "locked", "poster_hash", "poster_country", "exif")
+
+	reader = csv.DictReader(in_csv, fieldnames=fieldnames, doublequote=False, escapechar="\\", strict=True)
+	count = 0
+
+	for post in reader:
+		count += 1
+		if "exif" in post:
+
+			if "troll_country" in post["exif"]:
+
+				troll_json = json.loads(post["exif"])
+				troll_code = troll_json["troll_country"]
+				troll_name = troll_conversion[troll_code]
+
+				if troll_name not in troll_flags:
+					troll_flags[troll_name] = []
+
+				troll_flags[troll_name].append(int(post["num"]))
+
+		if count % 100000 == 0:
+			for k, v in troll_flags.items():
+				print(k, str(len(v)))
+
+with open("troll_flags.json", "w", encoding="utf-8") as out_json:
+	json.dump(troll_flags, out_json)
+
+
 logger = Logger()
 db = Database(logger=logger, appname="queue-dump")
+
+# Loop through the troll country data from the 4plebs dump
+print("Updating ambiguous troll flags using the 4plebs dump.")
+for k, v in troll_flags.items():
+	
+	for troll_code, troll_name in troll_names.items():
+
+		troll_ids = tuple([int(k) for k, v in troll_flags.items() if v == troll_code])
+
+		query_update_ambiguous_troll_flag = ("""
+			UPDATE posts_4chan
+			SET country_name = '%s', country_code = '%s'
+			WHERE id IN %s
+			AND board = 'pol'
+			AND ((country_name IS NULL OR country_name = '') AND (country_code IS NULL OR country_code = ''));
+		""" % (troll_name, 't_' + troll_code, troll_ids))
+		db.execute(query_update_ambiguous_troll_flag)
+		db.commit()
 
 # First we have to fill in the empty troll country data.
 # These are stored in the `unsorted_data` columns, with
@@ -558,7 +640,6 @@ query_update_country_names = """
 			WHEN country_code = 'PM' THEN 'Saint Pierre and Miquelon'
 			WHEN country_code = 'PN' THEN 'Pitcairn'
 			WHEN country_code = 'PS' THEN 'Palestine'
-			WHEN country_code = 'PS' THEN 'Palestine'
 			WHEN country_code = 'PT' THEN 'Portugal'
 			WHEN country_code = 'PW' THEN 'Palau'
 			WHEN country_code = 'PY' THEN 'Paraguay'
@@ -683,26 +764,18 @@ with open(PATH_TO_TROLL_FLAG_IDS, "r", encoding="utf-8") as in_json:
 	troll_flags = json.load(in_json)
 
 	troll_names = {
-		"AC": "Anarcho-Capitalist",
-		"WP": "White Supremacist",
+		"BL": "Black Nationalist",
+		"CF": "Confederate",
+		"CM": "Communist",
+		"GN": "Gadsden",
+		"GY": "Gay",
+		"KN": "Kekistani",
 		"MF": "Muslim",
+		"NZ": "Nazi",
+		"PR": "Pirate",
 		"RE": "Republican",
 		"TM": "Templar",
-		"CT": "Catalonia",
-		"CF": "Confederate",
-		"EU": "European",
-		"PR": "Pirate",
-		"GY": "Gay",
-		"GN": "Gadsden",
-		"KN": "Kekistani",
-		"PC": "Hippie",
-		"NB": "National Bolshevik",
-		"JH": "Jihadi",
-		"DM": "Democrat",
-		"AN": "Anarchist",
-		"UN": "United Nations",
-		"CM": "Communist",
-		"NZ": "Nazi"
+		"TR": "Tree Hugger"
 	}
 
 	for troll_code, troll_name in troll_names.items():
@@ -762,6 +835,7 @@ query_update_troll_codes = """
 			WHEN country_name = "Democrat" THEN 't_DM'
 			WHEN country_name = "European" THEN 't_EU'
 			WHEN country_name = "Europe" THEN 't_EU'
+			WHEN country_name = "Fascist" THEN "t_FC"
 			WHEN country_name = "Gadsden" THEN 't_GN'
 			WHEN country_name = "Gay" THEN 't_GY'
 			WHEN country_name = "LGBT" THEN 't_GY'
@@ -786,7 +860,7 @@ query_update_troll_codes = """
 			WHEN country_name = "White Supremacist" THEN 't_WP'
 			ELSE country_code
 		END 
-		WHERE board = 'pol' AND country_name IN ('Anarchist','Anarcho-Capitalist','Black Nationalist','Black Lives Matter','Commie','Communist','Confederate','Democrat','European','Europe','Gadsden','Gay','LGBT','Hippie','Israel','Jihadi','Kekistani','Libertarian','Muslim','National Bolshevik','Nazi','North Korea','Obama','Pirate','Rebel','Republican','Tea Partier','Templar','Texan','Tree Hugger','United Nations','White Supremacist');
+		WHERE board = 'pol' AND country_name IN ('Anarchist','Anarcho-Capitalist','Black Nationalist','Black Lives Matter','Commie','Communist','Confederate','Democrat','European','Europe','Gadsden','Gay','Fascist','LGBT','Hippie','Israel','Jihadi','Kekistani','Libertarian','Muslim','National Bolshevik','Nazi','North Korea','Obama','Pirate','Rebel','Republican','Tea Partier','Templar','Texan','Tree Hugger','United Nations','White Supremacist');
 		"""
 
 db.execute(query_update_leftovers)

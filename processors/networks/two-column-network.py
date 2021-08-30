@@ -92,7 +92,16 @@ class ColumnNetworker(BasicProcessor):
         edge_separator = "_#_#_#_#_#_"
         processed = 0
 
-        for item in self.iterate_items(self.source_file):
+        # We're not sure where or when this processor is called, so we need to do some searching for the appropriate source file.
+        # If there's only two datasets in the genealogy, just get the source file.
+        if len(self.dataset.get_genealogy()) == 2:
+            source_file = self.source_file
+        # Else we're gonna pick the previous dataset relative to this one.
+        else:
+            source_file = self.dataset.get_genealogy()[-3].get_results_path()
+
+        for item in self.iterate_items(source_file):
+            
             if column_a not in item or column_b not in item:
                 missing = "'" + "' and '".join([c for c in (column_a, column_b) if c not in item]) + "'"
                 self.dataset.update_status("Column %s not found in dataset" % missing, is_final=True)
