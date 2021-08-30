@@ -583,9 +583,12 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		return None
 
 	@classmethod
-	def is_rankable(cls):
+	def is_rankable(cls, multiple_items=True):
 		"""
 		Used for processor compatibility
+
+		:param bool multiple_items:  Consider datasets with multiple items per
+		item (e.g. word_1, word_2, etc)? Included for compatibility
 		"""
 		return False
 
