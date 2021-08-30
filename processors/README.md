@@ -7,6 +7,7 @@ They are self-contained Python files using a common API. Refer to the
 source code (`backend/abstract/processor.py`) and the 
 [Wiki](https://github.com/digitalmethodsinitiative/4cat/wiki/How-to-make-a-processor)
 for more information on how to make a processor.
+Also see our [list of processors on the Wiki](https://github.com/digitalmethodsinitiative/4cat/wiki/Available-processors) for an overview.
 
 All python files contained in this folder can be used as processors via the
 4CAT web interface, provided they implement the proper methods and API. The
