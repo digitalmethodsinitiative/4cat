@@ -28,6 +28,7 @@ packages = [
 	"lxml==4.6.3",
 	"Markdown==3.0.1",
 	"nltk==3.5",
+	"networkx>=2.5.1",
 	"numpy>=1.19.2",
 	"pandas==1.2.3",
 	"Pillow>=8.1.2",
