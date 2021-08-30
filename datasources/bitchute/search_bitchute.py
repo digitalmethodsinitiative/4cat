@@ -388,8 +388,6 @@ class SearchBitChute(Search):
             soup = BeautifulSoup(video_page.text, 'html.parser')
             video_csfrtoken = soup.findAll("input", {"name": "csrfmiddlewaretoken"})[0].get("value")
 
-            print(video["url"])
-
             video["video_url"] = soup.select_one("video#player source").get("src")
             video["thumbnail_image"] = soup.select_one("video#player").get("poster")
             video["subject"] = soup.select_one("h1#video-title").text
