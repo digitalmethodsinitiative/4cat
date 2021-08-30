@@ -1,6 +1,6 @@
 # ![](https://github.com/digitalmethodsinitiative/4cat/tree/master/common/assets/logo_readme.png) 4CAT: Capture and Analysis Toolkit
 
-[![DOI: 10.5281/zenodo.4742623](https://zenodo.org/badge/DOI/10.5281/zenodo.4742623.svg)](https://doi.org/10.5281/zenodo.4742623)
+[![DOI: 10.5281/zenodo.4742622](https://zenodo.org/badge/DOI/10.5281/zenodo.4742622.svg)](https://doi.org/10.5281/zenodo.4742622)
 [![License: MPL 2.0](https://img.shields.io/badge/license-MPL--2.0-informational)](https://github.com/digitalmethodsinitiative/4cat/blob/master/LICENSE)
 [![Requires Python 3.8](https://img.shields.io/badge/python-v3.8-blue)](https://www.python.org/)
 [![Docker Image CI Status](https://github.com/digitalmethodsinitiative/4cat/workflows/Docker%20Image%20CI/badge.svg)](https://github.com/digitalmethodsinitiative/4cat/actions/workflows/dockerimage.yml)
@@ -32,7 +32,7 @@ actively:
 * Parler
 * Reddit
 * Telegram
-* Twitter API (Academic Track, full-archive search)
+* Twitter API (Academic and regular tracks)
 
 The following platforms are supported through other tools, from which you can
 import data into 4CAT for analysis:
@@ -78,7 +78,7 @@ Please check our [issues](https://github.com/digitalmethodsinitiative/4cat/issue
   processors](https://github.com/digitalmethodsinitiative/4cat/wiki/How-to-make-a-processor).
 
 ## Credits & License
-4CAT was created by [OILab](https://oilab.eu) and the
+4CAT was created at [OILab](https://oilab.eu) and the
 [Digital Methods Initiative](https://www.digitalmethods.net) at the University
 of Amsterdam. The tool was inspired by the
 [TCAT](https://wiki.digitalmethods.net/Dmi/ToolDmiTcat), a tool with comparable
@@ -88,7 +88,3 @@ functionality that can be used to scrape and analyse Twitter data.
 
 4CAT is licensed under the Mozilla Public License, 2.0. Refer to the `LICENSE`
 file for more information.
-
-## Links
-- [Open Intelligence Lab](https://www.oilab.eu)
-- [Digital Methods Initiative](https://www.digitalmethods.net)
