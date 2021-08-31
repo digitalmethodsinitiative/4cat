@@ -4,6 +4,7 @@ Miscellaneous helper functions for the 4CAT backend
 import subprocess
 import datetime
 import socket
+import copy
 import json
 import csv
 import re
@@ -454,3 +455,65 @@ def gdf_escape(string):
 	:return str:  Escaped string
 	"""
 	return "'" + string.replace("'", "\\'").replace("\n", "\\n") + "'"
+
+
+def dict_search_and_update(item, keyword_matches, function):
+	"""
+	Apply a function to every item and sub item of a dictionary if the key contains one of the provided match terms.
+
+	Function loops through a dictionary or list and compares dictionary keys to the strings defined by keyword_matches.
+	It then applies the change_function to corresponding values.
+
+	Note: if a matching term is found, all nested values will have the function applied to them. e.g.,
+	all these values would be changed even those with not_key_match:
+	{'key_match' : 'changed',
+	'also_key_match' : {'not_key_match' : 'but_value_still_changed'},
+	'another_key_match': ['this_is_changed', 'and_this', {'not_key_match' : 'even_this_is_changed'}]}
+
+	This is a comprehensive (and expensive) approach to updating a dictionary.
+	IF a dictionary structure is known, a better solution would be to update using specific keys.
+
+	:param Dict/List item:  dictionary/list/json to loop through
+	:param String keyword_matches:  list of strings that will be matched to dictionary keys
+	:param Function function:  function appled to all values of any items nested under a matching key
+	:return Dict/List: Copy of original item
+	"""
+	def loop_helper_function(d_or_l, match_terms, change_function):
+		"""
+		Recursive helper function that updates item in place
+		"""
+		if isinstance(d_or_l, dict):
+			# Iterate through dictionary
+			for key, value in iter(d_or_l.items()):
+				if match_terms == 'True' or any([match in key.lower() for match in match_terms]):
+					# Match found; apply function to all items and sub-items
+					if isinstance(value, (list, dict)):
+						# Pass item through again with match_terms = True
+						loop_helper_function(value, 'True', change_function)
+					elif value is None:
+						pass
+					else:
+						# Update the value
+						d_or_l[key] = change_function(value)
+				elif isinstance(value, (list, dict)):
+					# Continue search
+					loop_helper_function(value, match_terms, change_function)
+		elif isinstance(d_or_l, list):
+			# Iterate through list
+			for n, value in enumerate(d_or_l):
+				if isinstance(value, (list, dict)):
+					# Continue search
+					loop_helper_function(value, match_terms, change_function)
+				elif match_terms == 'True':
+					# List item nested in matching
+					d_or_l[n] = change_function(value)
+		else:
+			raise Exception('Must pass list or dictionary')
+
+	# Lowercase keyword_matches
+	keyword_matches = [keyword.lower() for keyword in keyword_matches]
+
+	# Create deepcopy and return new item
+	temp_item = copy.deepcopy(item)
+	loop_helper_function(temp_item, keyword_matches, function)
+	return temp_item
