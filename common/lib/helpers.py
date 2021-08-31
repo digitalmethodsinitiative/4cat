@@ -1,11 +1,13 @@
 """
 Miscellaneous helper functions for the 4CAT backend
 """
+import subprocess
 import datetime
 import socket
 import json
 import csv
 import re
+import os
 
 from pathlib import Path
 from html.parser import HTMLParser
@@ -95,12 +97,31 @@ def get_software_version():
 	Reads a given version file and returns the first string found in there
 	(up until the first space). On failure, return an empty string.
 
+	If no version file is available, run `git show` to test if there is a git
+	repository in the 4CAT root folder, and if so, what commit is currently
+	checked out in it.
+
 	:return str:  4CAT version
 	"""
 	versionpath = Path(config.PATH_ROOT, config.PATH_VERSION)
 
-	if not versionpath.exists() or not versionpath.is_file():
+	if versionpath.exists() and not versionpath.is_file():
 		return ""
+
+	if not versionpath.exists():
+		# try github command line within the 4CAT root folder
+		# if it is a checked-out git repository, it will tell us the hash of
+		# the currently checked-out commit
+		try:
+			cwd = os.getcwd()
+			os.chdir(config.PATH_ROOT)
+			show = subprocess.run(["git", "show"], stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+			os.chdir(cwd)
+			if show.returncode != 0:
+				raise ValueError()
+			return show.stdout.decode("utf-8").split("\n")[0].split(" ")[1]
+		except (subprocess.SubprocessError, IndexError, TypeError, ValueError):
+			return ""
 
 	try:
 		with versionpath.open("r") as versionfile:

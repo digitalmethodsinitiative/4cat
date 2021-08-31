@@ -2,6 +2,7 @@
 Tokenize post bodies
 """
 import ahocorasick
+import string
 import json
 import re
 
@@ -26,7 +27,9 @@ class Tokenise(BasicProcessor):
 	type = "tokenise-posts"  # job type ID
 	category = "Text analysis"  # category
 	title = "Tokenise"  # title displayed in UI
-	description = "Tokenises post bodies, producing corpus data that may be used for further processing by e.g. NLP. The output is a serialized list of lists, each list representing either all tokens in a post or all tokens in a sentence in a post."  # description displayed in UI
+	description = "Tokenises post bodies, producing corpus data that may be used for further processing by e.g. NLP. " \
+				  "The output is a serialized list of lists, each list representing either all tokens in a post or " \
+				  "all tokens in a sentence in a post."  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
 
 	options = {
@@ -141,7 +144,7 @@ class Tokenise(BasicProcessor):
 		self.dataset.update_status("Building filtering automaton")
 
 		link_regex = re.compile(r"https?://[^\s]+")
-		symbol = re.compile(r"[^a-zA-Z0-9]")
+		symbol = re.compile(r"[" + re.escape(string.punctuation) + "]")
 		numbers = re.compile(r"\b[0-9]+\b")
 
 		# Twitter tokenizer if indicated
