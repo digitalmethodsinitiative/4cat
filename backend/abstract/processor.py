@@ -121,7 +121,10 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		# if possible, fill defaults where parameters are not provided
 		given_parameters = self.dataset.parameters.copy()
 		all_parameters = self.get_options(self.dataset)
-		self.parameters = {param: given_parameters.get(param, all_parameters.get(param, {}).get("default")) for param in all_parameters}
+		self.parameters = {
+			param: given_parameters.get(param, all_parameters.get(param, {}).get("default"))
+			for param in [*all_parameters.keys(), *given_parameters.keys()]
+		}
 
 		# now the parameters have been loaded into memory, clear any sensitive
 		# ones. This has a side-effect that a processor may not run again
