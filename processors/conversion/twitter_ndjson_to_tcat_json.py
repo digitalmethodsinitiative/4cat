@@ -116,7 +116,7 @@ class ConvertNDJSONToJSON(BasicProcessor):
                               'time_zone' : None,
                               'favourites_count' : None,
                              },
-                    'source' : tweet['source'],
+                    'source' : tweet.get('source'),
                     'lang' : tweet.get('lang'),
                     'possibly_sensitive' : tweet.get('possibly_sensitive'),
                     'withheld_copyright' : tweet.get('withheld', {}).get('copyright') if tweet.get('withheld') else None,
