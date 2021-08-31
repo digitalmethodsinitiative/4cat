@@ -436,6 +436,9 @@ class DataSet(FourcatModule):
 			return parameters["subject_match"]
 		elif parameters.get("query"):
 			label = parameters["query"] if len(parameters["query"]) < 30 else parameters["query"][:25] + "..."
+			# Some legacy datasets have lists as query data
+			if isinstance(label, list):
+				label = ", ".join(label)
 			label = label.strip().replace("\n", ", ")
 			return label
 		elif parameters.get("country_flag") and parameters["country_flag"] != "all":
