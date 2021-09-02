@@ -592,7 +592,6 @@ query_update_country_names = """
 			WHEN country_code = 'MM' THEN 'Myanmar'
 			WHEN country_code = 'MN' THEN 'Mongolia'
 			WHEN country_code = 'MO' THEN 'Macao'
-			WHEN country_code = 'MO' THEN 'Macao'
 			WHEN country_code = 'MP' THEN 'Northern Mariana Islands'
 			WHEN country_code = 'MQ' THEN 'Martinique'
 			WHEN country_code = 'MR' THEN 'Mauritania'
