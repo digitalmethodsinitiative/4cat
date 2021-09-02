@@ -7,10 +7,10 @@
 
 <p align="center"><img alt="A screenshot of 4CAT, displaying its 'Create Dataset' interface" src="common/assets/screenshot1.png"><img alt="A screenshot of 4CAT, displaying a network visualisation of a dataset" src="common/assets/screenshot2.png"></p>
 
-4CAT is a research tool that can be used to analyse and process data from 
-online  social platforms. Its goal is to make the capture and analysis of data 
-from these  platforms accessible to people through a web interface, without 
-requiring any programming or web scraping skills. Our target audience is 
+4CAT is a research tool that can be used to analyse and process data from
+online  social platforms. Its goal is to make the capture and analysis of data
+from these  platforms accessible to people through a web interface, without
+requiring any programming or web scraping skills. Our target audience is
 researchers, students and journalists interested using Digital Methods in their
 work.
 
@@ -53,7 +53,7 @@ You can install 4CAT locally or on a server via Docker or manually. The usual
 docker-compose up
 ```
 
-will work, but detailed and alternative installation 
+will work, but detailed and alternative installation
 instructions are available [in our
 wiki](https://github.com/digitalmethodsinitiative/4cat/wiki/Installing-4CAT).
 Currently 4chan, 8chan, and 8kun require additional steps; please see the wiki.

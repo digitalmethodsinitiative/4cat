@@ -17,7 +17,7 @@ import config
 @app.template_filter('datetime')
 def _jinja2_filter_datetime(date, fmt=None):
 	date = datetime.datetime.utcfromtimestamp(date)
-	format = "%d-%m-%Y" if not fmt else fmt
+	format = "%d %b %Y" if not fmt else fmt
 	return date.strftime(format)
 
 
