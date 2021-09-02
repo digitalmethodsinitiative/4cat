@@ -48,7 +48,7 @@ class SigmaNetwork(BasicProcessor):
 
 		:param module: Dataset or processor to determine compatibility with
 		"""
-		return module.get_extension() in ("gexf")
+		return module.get_extension() in ["gexf"]
 
 	def process(self):
 		"""
