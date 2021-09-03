@@ -27,19 +27,8 @@ class SigmaNetwork(BasicProcessor):
 	type = "sigma-network"  # job type ID
 	category = "Visualisation"  # category
 	title = "Sigma js network"  # title displayed in UI
-	description = "Visualise a network in the browser with sigma js."  # description displayed in UI
+	description = "Visualise a gexf network in the browser with sigma js."  # description displayed in UI
 	extension = "html"  # extension of result file, used internally and in UI
-
-	options = {
-		"highlight": {
-			"type": UserInput.OPTION_TEXT,
-			"default": "",
-			"options": {
-				"highlight": ""
-			},
-			"help": "Highlight these nodes in the network"
-		}
-	}
 
 	@classmethod
 	def is_compatible_with(cls, module=None):
@@ -61,12 +50,13 @@ class SigmaNetwork(BasicProcessor):
 
 		self.dataset.update_status("Generating HTML file")
 
-		source_file = "/result/" + (str(self.source_file).split("\\")[-1]).replace("/", "")
+		# We first need to make some changes to the NetworkX-generated gexf file
+		# to make it compatible with sigma js. 
+		sigma_gexf = self.render_gexf_sigma_compatible()
 
-		self.render_gexf_sigma_compatible(source_file)
-
+		# Generat the HTML page
 		try:
-			html_file = self.get_html_page(source_file)
+			html_file = self.get_html_page(sigma_gexf)
 		except MemoryError:
 			self.dataset.update_status("Out of memory while processing network. Try downloading and visualising locally instead.", is_final=True)
 			self.dataset.finish(0)
@@ -80,7 +70,7 @@ class SigmaNetwork(BasicProcessor):
 		self.dataset.update_status("Finished")
 		self.dataset.finish(1)
 
-	def render_gexf_sigma_compatible(self, source_file):
+	def render_gexf_sigma_compatible(self):
 		"""
 		Unfortunately sigma js does not unequivocally accept any gexf file.
 		The gexf 1.2draft produced by networkx does not work by default./
@@ -95,41 +85,23 @@ class SigmaNetwork(BasicProcessor):
 			'<gexf xmlns="http://www.gexf.net/1.2draft" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.gexf.net/1.2draft http://www.gexf.net/1.2draft/gexf.xsd" version="1.2">',
 			'<gexf xmlns="http://www.gexf.net/1.3" version="1.3" xmlns:viz="http://www.gexf.net/1.3/viz" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.gexf.net/1.3 http://www.gexf.net/1.3/gexf.xsd">')
 
+		# To make the gexf file sigma compatible, we need to add these viz tags
 		file_str = file_str.replace("</node>", "<viz:size></viz:size>\n      <viz:position></viz:position>\n      </node>")
-		
+			
+		# Give the nodes a random position by hard-coding it into the XML
 		file_str = file_str.replace("{", "#!#_!#!").replace("}", "#@#_@#@")
 		file_str = file_str.replace('<viz:position>', '<viz:position x="{}" y="{}">')
 		position_count = file_str.count("{}")
-
-		# Give nodes a random position
 		file_str = file_str.format(*(random.randint(-200, 200) for _ in range(position_count)))
 		file_str = file_str.replace("#!#_!#!", "{").replace("#@#_@#@", "}")
 
-		with open(self.source_file, "w", encoding="utf-8") as f:
-			f.write(file_str)
+		# Write HTML file
+		sigma_gexf = self.dataset.get_results_path().with_suffix(".gexf")
 
-	def sanitise(self, string):
-		"""
-		Sanitises string labels
-		"""
+		with open(sigma_gexf, "w", encoding="utf-8") as output_file:
+			output_file.write(file_str)
 
-		string = string.strip()
-		if string.endswith("\n"):
-			string = string[:-2]
-		if string.startswith("'") or string.startswith("\""):
-			string = string[1:]
-		if string.endswith("'") or string.endswith("\""):
-			string = string[:-1]
-
-		# Happens sometimes
-		string = string.replace("\\\\","") # Not ideal for now, but it works
-		string = string.replace("'","’")
-
-		# This normalises special characters to one form
-		# e.g. variable width characters in Japanese signs
-		string = unicodedata.normalize("NFC", string)
-
-		return string
+		return sigma_gexf
 
 	def get_html_page(self, source_file):
 		"""
@@ -398,4 +370,9 @@ class SigmaNetwork(BasicProcessor):
 		if not server_url.endswith("/"):
 			server_url += "/"
 
+		# We need to ensure this is a relative path, else we'll get same-origin shenanigans
+		print(source_file)
+		print(type(source_file))
+		source_file = "/result/" + source_file.name
+		print(source_file)
 		return html_string.replace("**server**", server_url).replace("**source_file**", source_file)
