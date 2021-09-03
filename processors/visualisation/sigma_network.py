@@ -198,7 +198,7 @@ class SigmaNetwork(BasicProcessor):
 				<div id="main-alert-box" class="alert-box control-panel-notice"></div>
 
 				<!-- slider for manipulating networks -->
-				<div id="slider-container">
+				<!-- <div id="slider-container">
 					<div class="control-panel-notice">
 					Slide to change date.
 						<div>
@@ -209,6 +209,7 @@ class SigmaNetwork(BasicProcessor):
 						</div>
 					</div>
 				</div>
+				-->
 				<hr>
 
 				<div id="parameter-alert-box" class="alert-box"></div>
