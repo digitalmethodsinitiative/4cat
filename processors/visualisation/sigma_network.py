@@ -371,8 +371,5 @@ class SigmaNetwork(BasicProcessor):
 			server_url += "/"
 
 		# We need to ensure this is a relative path, else we'll get same-origin shenanigans
-		print(source_file)
-		print(type(source_file))
 		source_file = "/result/" + source_file.name
-		print(source_file)
 		return html_string.replace("**server**", server_url).replace("**source_file**", source_file)
