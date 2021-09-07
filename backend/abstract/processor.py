@@ -69,16 +69,24 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 			# search workers never have parents (for now), so we don't need to
 			# find out what the source_dataset dataset is if it's a search worker
 			try:
-				self.source_dataset = DataSet(key=self.dataset.data["key_parent"], db=self.db)
+				self.source_dataset = self.dataset.get_parent()
 
 				# for presets, transparently use the *top* dataset as a source_dataset
 				# since that is where any underlying processors should get
 				# their data from. However, this should only be done as long as the
 				# preset is not finished yet, because after that there may be processors
 				# that run on the final preset result
-				if self.source_dataset.type.find("preset-") == 0 and not self.source_dataset.is_finished():
+				while self.source_dataset.type.startswith("preset-"):
 					self.is_running_in_preset = True
-					self.source_dataset = self.source_dataset.get_genealogy()[0]
+					self.source_dataset = self.source_dataset.get_parent()
+					if self.source_dataset is None:
+						# this means there is no dataset that is *not* a preset anywhere
+						# above this dataset. This should never occur, but if it does, we
+						# cannot continue
+						self.log.error("Processor preset %s for dataset %s cannot find non-preset parent dataset",
+									   (self.type, self.dataset.key))
+						self.job.finish()
+						return
 
 			except TypeError:
 				# we need to know what the source_dataset dataset was to properly handle the
@@ -106,9 +114,14 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		self.dataset.log("Processing '%s' started for dataset %s" % (processor_name, self.dataset.key))
 
 		# start log file
-		self.parameters = self.dataset.parameters.copy()
 		self.dataset.update_status("Processing data")
 		self.dataset.update_version(get_software_version())
+
+		# get parameters
+		# if possible, fill defaults where parameters are not provided
+		given_parameters = self.dataset.parameters.copy()
+		all_parameters = self.get_options(self.dataset)
+		self.parameters = {param: given_parameters.get(param, all_parameters.get(param, {}).get("default")) for param in all_parameters}
 
 		# now the parameters have been loaded into memory, clear any sensitive
 		# ones. This has a side-effect that a processor may not run again
@@ -583,9 +596,12 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		return None
 
 	@classmethod
-	def is_rankable(cls):
+	def is_rankable(cls, multiple_items=True):
 		"""
 		Used for processor compatibility
+
+		:param bool multiple_items:  Consider datasets with multiple items per
+		item (e.g. word_1, word_2, etc)? Included for compatibility
 		"""
 		return False
 

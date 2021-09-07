@@ -347,7 +347,9 @@ class SearchBitChute(Search):
             video_session = requests.session()
             video_page = video_session.get(video["url"])
 
-            if "<h1 class=\"page-title\">Video Restricted</h1>" in video_page.text or "<h1 class=\"page-title\">Video Blocked</h1>" in video_page.text:
+            if "<h1 class=\"page-title\">Video Restricted</h1>" in video_page.text or \
+                    "<h1 class=\"page-title\">Video Blocked</h1>" in video_page.text or \
+                    "<h1 class=\"page-title\">Channel Restricted</h1>" in video_page.text:
                 if "This video is unavailable as the contents have been deemed potentially illegal" in video_page.text:
                     video["category"] = "moderated-illegal"
                     return (video, [])

@@ -616,7 +616,7 @@ class SigmaNetwork(BasicProcessor):
 			</div>
 
 			<div id="footer">
-				<p>Made with <a href='https://archive.4plebs.org' target='_blank'>4CAT</a> and <a href="https://github.com/jacomyal/sigma.js">sigma js</a>.</p>
+				<p>Made with <a href='https://github.com/digitalmethodsinitiative/4cat/' target='_blank'>4CAT</a> and <a href="https://github.com/jacomyal/sigma.js">sigma js</a>.</p>
 			</div>
 
 			<!-- Where the network graph will be -->

@@ -5,6 +5,8 @@ import re
 
 from backend.abstract.processor import BasicProcessor
 
+import networkx as nx
+
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
 __maintainer__ = "Stijn Peeters"
@@ -20,7 +22,7 @@ class QuoteNetworkGrapher(BasicProcessor):
 	category = "Networks"
 	title = "Quote network"  # title displayed in UI
 	description = "Create a Gephi-compatible network of quoted posts, with each reference to another post creating an edge between those posts. Post IDs may be correlated and triangulated with the full results set."  # description displayed in UI
-	extension = "gdf"  # extension of result file, used internally and in UI
+	extension = "gexf"  # extension of result file, used internally and in UI
 
 	@classmethod
 	def is_compatible_with(cls, module=None):
@@ -39,31 +41,22 @@ class QuoteNetworkGrapher(BasicProcessor):
 		with one column with image hashes, one with the first file name used
 		for the image, and one with the amount of times the image was used
 		"""
-		nodes = []
-		edges = []
 		link = re.compile(r">>([0-9]+)")
+
+		network = nx.Graph()
 
 		self.dataset.update_status("Reading source file")
 		for post in self.iterate_items(self.source_file):
 			quotes = link.findall(post["body"])
 			if quotes:
-				if post["id"] not in nodes:
-					nodes.append(post["id"])
+				if post["id"] not in network.nodes:
+					network.add_node(post["id"])
 
-				if quotes[0] not in nodes:
-					nodes.append(quotes[0])
+				if quotes[0] not in network.nodes:
+					network.add_node(quotes[0])
 
-				edges.append([post["id"], quotes[0]])
+				network.add_edge(post["id"], quotes[0])
 
-		self.dataset.update_status("Writing results file")
-		with self.dataset.get_results_path().open("w", encoding="utf-8") as results:
-			results.write("nodedef>name VARCHAR,label VARCHAR\n")
-			for node in nodes:
-				results.write("post-" + node.replace(",", "") + ',"' + node.replace(",", "") + '"\n')
-
-			results.write("edgedef>node1 VARCHAR, node2 VARCHAR\n")
-			for edge in edges:
-				results.write("post-" + edge[0].replace(",", "") + ",post-" + edge[1].replace(",", "") + "\n")
-
-		self.dataset.update_status("Finished")
-		self.dataset.finish(len(edges))
+		self.dataset.update_status("Writing network file")
+		nx.write_gexf(network, self.dataset.get_results_path())
+		self.dataset.finish(len(network.nodes))
