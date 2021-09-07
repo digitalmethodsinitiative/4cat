@@ -44,11 +44,12 @@ class PixPlotGenerator(BasicProcessor):
 	@classmethod
 	def is_compatible_with(cls, module=None):
 		"""
-		Allow processor on token sets
+		Allow processor on token sets;
+		Checks if PIXPLOT_SERVER set in config.py
 
 		:param module: Dataset or processor to determine compatibility with
 		"""
-		return module.type == "image-downloader"
+		return module.type == "image-downloader" and config.PIXPLOT_SERVER
 
 	def process(self):
 		"""
@@ -57,7 +58,7 @@ class PixPlotGenerator(BasicProcessor):
 		"""
 		self.dataset.update_status("Reading source file")
 
-		# is there anything to put on a wall?
+		# Are there any available images?
 		if self.source_dataset.num_rows == 0:
 			self.dataset.update_status("No images available to render to PixPlot.", is_final=True)
 			self.dataset.finish(0)
@@ -71,31 +72,50 @@ class PixPlotGenerator(BasicProcessor):
 		# Unpack the images into a staging_area
 		self.dataset.update_status("Unzipping images")
 		staging_area = self.unpack_archive_contents(self.source_file)
-		self.log.info('staging area: ' + str(staging_area))
+		self.log.info('PixPlot image staging area created: ' + str(staging_area))
 
 		# Gather metadata
 		self.dataset.update_status("Collecting metadata")
 		metadata_file_path = self.format_metadata(staging_area)
 
-		# Prep arguments for pixplot
-		output_directory = '/usr/src/app/data/plots/' + self.dataset.key
-		# Delete directory if already exists (updating PixPlot)
-		if os.path.isdir(output_directory):
-			shutil.rmtree(output_directory)
-		data = {"args": ['--images', str(staging_area)+"/*.jpg", '--out_dir', output_directory, '--metadata', str(metadata_file_path)]}
-		#TODO need to make adaptable port
-		pixplot_api = "https" if config.FlaskConfig.SERVER_HTTPS else "http"
-		pixplot_api += '://4cat_pixplot' + ":" + "4000" + "/api/"
+		# First send photos to PixPlot
+		# TODO: check if images have already been sent
+		self.dataset.update_status("Uploading images to PixPlot")
+		upload_url = config.PIXPLOT_SERVER.rstrip('/') + '/api/send_photos'
+		# Prep metadata
+		files = [('metadata', open(metadata_file_path, 'rb'))]
+		# Prep images
+		filenames = os.listdir(staging_area)
+		for i, filename in enumerate(filenames):
+			if i > max_images:
+				break
+			files.append(('images', open(os.path.join(staging_area, filename), 'rb')))
+		# Name of folder for images
+		data = {'folder_name': self.dataset.key}
+		response = requests.post(upload_url, files=files, data=data)
 
-		# Send request
-		self.dataset.update_status("Sending request and data to pixplot")
-		resp = requests.post(pixplot_api+"pixplot", json=data)
-		self.log.info('PixPlot request status: ' + str(resp.status_code))
+		# Request PixPlot server create PixPlot
+		self.dataset.update_status("Sending request to PixPlot")
+		create_plot_url = response.json()['create_pixplot_post_info']['url']
+		# All the options, which you can edit to add any additional options you want PixPlot to use during creation
+		json_data = response.json()['create_pixplot_post_info']['json']
+		# Send; receives response that process has started
+		resp = requests.post(create_plot_url, json=json_data)
+		if resp.status_code == 202:
+			# new request
+			new_request = True
+		elif 'already exists' in resp.json()['error']:
+			# repeat request
+			new_request = False
+		else:
+			self.log.error('PixPlot create response: ' + str(resp.status_code) + ': ' + str(resp.text))
+			if staging_area:
+				shutil.rmtree(staging_area)
+			raise RuntimeError("PixPlot unable to process request")
 
-		# Wait for pixplot to complete
-		# We just return the HTML, but something needs to clean up the staging_area
+		# Wait for PixPlot to complete
 		self.dataset.update_status("PixPlot generating results")
-		while True:
+		while new_request:
 			time.sleep(10)
 			result = requests.get(resp.json()['result_url'])
 			self.log.debug(str(result.json()))
@@ -105,22 +125,20 @@ class PixPlotGenerator(BasicProcessor):
 			elif 'report' in result.json().keys() and result.json()['report'][-6:-1] == 'Done!':
 				# Complete without error
 				self.dataset.update_status("PixPlot Completed!")
-				self.log.info('PixPlot saved to: ' + output_directory)
+				self.log.info('PixPlot saved on : ' + config.PIXPLOT_SERVER)
 				break
 			else:
 				# Something botched
 				self.dataset.update_status("PixPlot Error")
-				self.log.info("PixPlot Error: " + str(result.json()))
+				self.log.error("PixPlot Error: " + str(result.json()))
 				break
 
 		if staging_area:
 			shutil.rmtree(staging_area)
 
 		# Create HTML file
-		url = "https" if config.FlaskConfig.SERVER_HTTPS else "http"
-		url += '://' + config.FlaskConfig.SERVER_NAME.split(':')[0] + ':' + '4000'
-		url += '/plots/' + self.dataset.key + '/index.html'
-		html_file = self.get_html_page(url)
+		plot_url = config.PIXPLOT_SERVER.rstrip('/') + '/plots/' + self.dataset.key + '/index.html'
+		html_file = self.get_html_page(plot_url)
 
 		# Write HTML file
 		with self.dataset.get_results_path().open("w", encoding="utf-8") as output_file:

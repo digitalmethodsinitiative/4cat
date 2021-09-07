@@ -94,6 +94,11 @@ TUMBLR_API_SECRET_KEY = ""
 REDDIT_API_CLIENTID = ""
 REDDIT_API_SECRET = ""
 
+# PixPlot Server
+# If you host a version of https://github.com/digitalmethodsinitiative/dmi_pix_plot, you can use a processor to publish
+# downloaded images into a PixPlot there
+PIXPLOT_SERVER = ""
+
 # Web tool settings
 class FlaskConfig:
     FLASK_APP = 'webtool/fourcat'
