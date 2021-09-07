@@ -43,14 +43,6 @@ services:
       - 4cat_share:/usr/src/app/docker/shared/
     entrypoint: gunicorn --worker-tmp-dir /dev/shm --workers=2 --threads=4 --worker-class=gthread --reload --bind 0.0.0.0:5000 webtool:app
 
-  pixplot:
-    container_name: 4cat_pixplot
-    image: dalewahl/pix_plot:latest
-    ports:
-      - 4000:4000
-    volumes:
-      - 4cat_data:/usr/src/app/data/
-
 volumes:
   4cat_db: {}
   4cat_data: {}

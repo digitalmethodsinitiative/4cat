@@ -50,11 +50,6 @@ webtool/venv/
 !webtool/static/img/flags/*.png
 !common/assets/github-screenshots/*.png
 
-# Do not ignore pixplot data
-!webtool/static/pixplot/assets/images/**
-
-!webtool/static/pixplots/**
-
 # data files
 results
 snapshots
