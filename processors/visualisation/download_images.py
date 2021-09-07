@@ -191,11 +191,8 @@ class ImageDownloader(BasicProcessor):
 			else:
 				if results_path.joinpath(image_name).exists():
 					# File exists; rename
-<<<<<<< HEAD
 					image_name = uuid.uuid4().hex + "_" + image_name
-=======
-					image_name = uuid.uuid4().hex + image_name
->>>>>>> origin/master
+
 				imagepath = str(results_path.joinpath(image_name))
 
 			# save file
