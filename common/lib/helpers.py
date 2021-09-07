@@ -121,7 +121,7 @@ def get_software_version():
 			if show.returncode != 0:
 				raise ValueError()
 			return show.stdout.decode("utf-8").split("\n")[0].split(" ")[1]
-		except (subprocess.SubprocessError, IndexError, TypeError, ValueError):
+		except (subprocess.SubprocessError, IndexError, TypeError, ValueError, FileNotFoundError):
 			return ""
 
 	try:
