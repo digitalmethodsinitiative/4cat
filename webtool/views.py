@@ -1,6 +1,7 @@
 """
 4CAT Web Tool views - pages to be viewed by the user
 """
+import io
 import os
 import re
 import csv
@@ -14,7 +15,7 @@ from pathlib import Path
 import backend
 
 from flask import render_template, jsonify, abort, request, redirect, send_from_directory, flash, get_flashed_messages, \
-	url_for
+	url_for, stream_with_context
 from flask_login import login_required, current_user
 
 from webtool import app, db, log
@@ -244,6 +245,62 @@ def get_result(query_file):
 	directory = config.PATH_ROOT + "/" + config.PATH_DATA
 	return send_from_directory(directory=directory, filename=query_file)
 
+
+@app.route('/mapped-result/<string:key>/')
+@login_required
+def get_mapped_result(key):
+	"""
+	Get mapped result
+
+	Some result files are not CSV files. CSV is such a central file format that
+	it is worth having a generic 'download as CSV' function for these. If the
+	processor of the dataset has a method for mapping its data to CSV, then this
+	route uses that to convert the data to CSV on the fly and serve it as such.
+
+	:param str key:  Dataset key
+	"""
+	try:
+		dataset = DataSet(key=key, db=db)
+	except TypeError:
+		abort(404)
+
+	if dataset.get_extension() == ".csv":
+		# if it's already a csv, just return the existing file
+		return url_for(get_result, query_file=dataset.get_results_path().name)
+
+	if not hasattr(dataset.get_own_processor(), "map_item"):
+		# cannot map without a mapping method
+		abort(404)
+
+	mapper = dataset.get_own_processor().map_item
+
+	def map_response():
+		"""
+		Yield a CSV file line by line
+
+		Pythons built-in csv library, which we use, has no real concept of
+		this, so we cheat by using a StringIO buffer that we flush and clear
+		after each CSV line is written to it.
+		"""
+		writer = None
+		buffer = io.StringIO()
+		with dataset.get_results_path().open() as infile:
+			for line in infile:
+				mapped_item = mapper(json.loads(line))
+				if not writer:
+					writer = csv.DictWriter(buffer, fieldnames=tuple(mapped_item.keys()))
+					writer.writeheader()
+					yield buffer.getvalue()
+					buffer.truncate(0)
+					buffer.seek(0)
+
+				writer.writerow(mapped_item)
+				yield buffer.getvalue()
+				buffer.truncate(0)
+				buffer.seek(0)
+
+	disposition = 'attachment; filename="%s"' % dataset.get_results_path().with_suffix(".csv").name
+	return app.response_class(stream_with_context(map_response()), mimetype="text/csv", headers={"Content-Disposition": disposition})
 
 @app.route('/results/', defaults={'page': 1})
 @app.route('/results/page/<int:page>/')
