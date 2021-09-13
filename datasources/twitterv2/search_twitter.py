@@ -173,10 +173,10 @@ class SearchWithTwitterAPIv2(Search):
             elif api_response.status_code == 403:
                 try:
                     structured_response = api_response.json()
-                    self.dataset.update_status("'Forbidden' error from Twitter API. Could not connect to Twitter API "
+                    self.dataset.update_status("'Forbidden' error from the Twitter API. Could not connect to Twitter API "
                                                "with this API key. %s" % structured_response.get("detail", ""), is_final=True)
                 except (json.JSONDecodeError, ValueError):
-                    self.dataset.update_status("'Forbidden' error from Twitter API. Your key may not have access to "
+                    self.dataset.update_status("'Forbidden' error from the Twitter API. Your key may not have access to "
                                                "the full-archive search endpoint.", is_final=True)
                 finally:
                     return
@@ -247,7 +247,7 @@ class SearchWithTwitterAPIv2(Search):
 
                 tweets += 1
                 if tweets % 500 == 0:
-                    self.dataset.update_status("Received %i tweets from Twitter API" % tweets)
+                    self.dataset.update_status("Received %i tweets from the Twitter API" % tweets)
 
                 yield tweet
 
@@ -315,6 +315,11 @@ class SearchWithTwitterAPIv2(Search):
         # add media metadata - seems to be just the media type, the media URL
         # etc is stored in the 'entities' attribute instead
         for index, media_key in enumerate(tweet.get("attachments", {}).get("media_keys", [])):
+            if type(media_key) is dict:
+                # annoyingly, sometimes this is just a bare key, and
+                # sometimes an object?
+                media_key = media_key["media_key"]
+
             tweet["attachments"]["media_keys"][index] = media_by_key[
                 media_key] if media_key in media_by_key else media_key
 
