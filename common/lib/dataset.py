@@ -724,6 +724,15 @@ class DataSet(FourcatModule):
 
 		return available
 
+	def get_own_processor(self):
+		"""
+		Get the processor class that produced this dataset
+
+		:return:  Processor class, or `None` if not available.
+		"""
+		return backend.all_modules.processors.get(self.data.get("type"))
+
+
 	def get_available_processors(self):
 		"""
 		Get list of processors that may be run for this dataset
