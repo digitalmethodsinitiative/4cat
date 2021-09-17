@@ -5,7 +5,8 @@
 
 {% block body %}
     <nav class="view-controls block">
-        <form action="" method="GET">
+        <form action="{{ url_for("show_results") }}" method="GET">
+            <input type="hidden" name="depth" value="{{ depth }}">
             <ul>
                 <li><input aria-label="Query filter" placeholder="Filter queries..." name="filter"
                            value="{{ filter.filter }}"></li>

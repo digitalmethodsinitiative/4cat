@@ -28,10 +28,11 @@ class ColumnNetworker(BasicProcessor):
     @classmethod
     def is_compatible_with(cls, module=None):
         """
-        Allow processor to run on chan datasets
+        Allow processor to run on all csv and NDJSON datasets
 
         :param module: Dataset or processor to determine compatibility with
         """
+
         return module.get_extension() in ("csv", "ndjson")
 
     options = {
@@ -244,6 +245,7 @@ class ColumnNetworker(BasicProcessor):
                     del component[item]["intervals"]
 
         self.dataset.update_status("Writing network file")
+        
         nx.write_gexf(network, self.dataset.get_results_path())
         self.dataset.finish(len(network.nodes))
 

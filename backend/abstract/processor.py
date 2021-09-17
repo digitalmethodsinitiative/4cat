@@ -8,6 +8,7 @@ import shutil
 import json
 import abc
 import csv
+import os
 
 from pathlib import Path, PurePath
 
@@ -76,7 +77,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 				# their data from. However, this should only be done as long as the
 				# preset is not finished yet, because after that there may be processors
 				# that run on the final preset result
-				while self.source_dataset.type.startswith("preset-"):
+				while self.source_dataset.type.startswith("preset-") and not self.source_dataset.is_finished():
 					self.is_running_in_preset = True
 					self.source_dataset = self.source_dataset.get_parent()
 					if self.source_dataset is None:
@@ -121,7 +122,10 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		# if possible, fill defaults where parameters are not provided
 		given_parameters = self.dataset.parameters.copy()
 		all_parameters = self.get_options(self.dataset)
-		self.parameters = {param: given_parameters.get(param, all_parameters.get(param, {}).get("default")) for param in all_parameters}
+		self.parameters = {
+			param: given_parameters.get(param, all_parameters.get(param, {}).get("default"))
+			for param in [*all_parameters.keys(), *given_parameters.keys()]
+		}
 
 		# now the parameters have been loaded into memory, clear any sensitive
 		# ones. This has a side-effect that a processor may not run again
@@ -508,6 +512,33 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 			num_items = done
 
 		self.dataset.finish(num_items)
+
+	def create_standalone(self):
+		# copy this dataset - the filtered version - and make that copy standalone
+		# this has the benefit of allowing for all analyses that can be run on
+		# full datasets on the new, filtered copy as well
+		top_parent = self.source_dataset
+
+		standalone = self.dataset.copy(shallow=False)
+		standalone.body_match = "(Filtered) " + top_parent.query
+		standalone.datasource = top_parent.parameters.get("datasource", "custom")
+
+		try:
+			standalone.board = top_parent.board
+		except KeyError:
+			standalone.board = self.type
+
+		standalone.type = "search"
+
+		standalone.detach()
+		standalone.delete_parameter("key_parent")
+
+		self.dataset.copied_to = standalone.key
+
+		# we don't need this file anymore - it has been copied to the new
+		# standalone dataset, and this one is not accessible via the interface
+		# except as a link to the copied standalone dataset
+		os.unlink(self.dataset.get_results_path())
 
 	@classmethod
 	def is_filter(cls):
