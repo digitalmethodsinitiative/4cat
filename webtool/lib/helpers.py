@@ -25,17 +25,19 @@ class Pagination(object):
 	Provide pagination
 	"""
 
-	def __init__(self, page, per_page, total_count):
+	def __init__(self, page, per_page, total_count, route="show_results"):
 		"""
 		Set up pagination object
 
 		:param int page:  Current page
 		:param int per_page:  Items per page
 		:param int total_count:  Total number of items
+		:param str route:  Route to call url_for for to prepend to page links
 		"""
 		self.page = page
 		self.per_page = per_page
 		self.total_count = total_count
+		self.route = route
 
 	@property
 	def pages(self):

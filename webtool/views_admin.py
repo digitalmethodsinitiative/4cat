@@ -15,7 +15,7 @@ from pathlib import Path
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
-from flask import render_template, jsonify, request, abort, flash, get_flashed_messages
+from flask import render_template, jsonify, request, abort, flash, get_flashed_messages, url_for
 from flask_login import login_required, current_user
 
 from webtool import app, db
@@ -41,7 +41,7 @@ def admin_frontpage(page):
 
     num_users = db.fetchone("SELECT COUNT(*) FROM USERS " + filter_bit, replacements)["count"]
     users = db.fetchall("SELECT * FROM users " + filter_bit + "ORDER BY is_admin DESC, name ASC LIMIT 20 OFFSET %i" % offset, replacements)
-    pagination = Pagination(page, 20, num_users)
+    pagination = Pagination(page, 20, num_users, "admin_frontpage")
 
     return render_template("controlpanel/frontpage.html", users=users, filter=filter, pagination=pagination)
 
