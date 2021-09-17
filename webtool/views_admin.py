@@ -43,7 +43,7 @@ def admin_frontpage(page):
     users = db.fetchall("SELECT * FROM users " + filter_bit + "ORDER BY is_admin DESC, name ASC LIMIT 20 OFFSET %i" % offset, replacements)
     pagination = Pagination(page, 20, num_users, "admin_frontpage")
 
-    return render_template("controlpanel/frontpage.html", users=users, filter=filter, pagination=pagination)
+    return render_template("controlpanel/frontpage.html", users=users, filter={"filter": filter}, pagination=pagination)
 
 
 @app.route("/admin/worker-status/")
