@@ -286,6 +286,8 @@ class SearchWithTwitterAPIv2(Search):
 
         :return dict:  Enriched tweet object
         """
+        # Copy the tweet so that updating this tweet has no effect on others
+        tweet = copy.deepcopy(tweet)
         # first create temporary mappings so we can easily find the relevant
         # object later
         users_by_id = {user["id"]: user for user in users}
@@ -315,11 +317,6 @@ class SearchWithTwitterAPIv2(Search):
         # add media metadata - seems to be just the media type, the media URL
         # etc is stored in the 'entities' attribute instead
         for index, media_key in enumerate(tweet.get("attachments", {}).get("media_keys", [])):
-            if type(media_key) is dict:
-                # annoyingly, sometimes this is just a bare key, and
-                # sometimes an object?
-                media_key = media_key["media_key"]
-
             tweet["attachments"]["media_keys"][index] = media_by_key[
                 media_key] if media_key in media_by_key else media_key
 
@@ -433,4 +430,3 @@ class SearchWithTwitterAPIv2(Search):
                 [mention["username"] for mention in tweet.get("entities", {}).get("mentions", [])[:1]]) if any(
                 [ref.get("type") == "replied_to" for ref in tweet.get("referenced_tweets", [])]) else ""
         }
-
