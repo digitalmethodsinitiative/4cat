@@ -1,7 +1,6 @@
 """
 Filter posts by a given column
 """
-import os
 import re
 import csv
 import datetime
@@ -200,28 +199,5 @@ class LexicalFilter(BasicProcessor):
     def after_process(self):
         super().after_process()
 
-        # copy this dataset - the filtered version - and make that copy standalone
-        # this has the benefit of allowing for all analyses that can be run on
-        # full datasets on the new, filtered copy as well
-        top_parent = self.source_dataset
-
-        standalone = self.dataset.copy(shallow=False)
-        standalone.body_match = "(Filtered) " + top_parent.query
-        standalone.datasource = top_parent.parameters.get("datasource", "custom")
-
-        try:
-            standalone.board = top_parent.board
-        except KeyError:
-            standalone.board = self.type
-
-        standalone.type = "search"
-
-        standalone.detach()
-        standalone.delete_parameter("key_parent")
-
-        self.dataset.copied_to = standalone.key
-
-        # we don't need this file anymore - it has been copied to the new
-        # standalone dataset, and this one is not accessible via the interface
-        # except as a link to the copied standalone dataset
-        os.unlink(self.dataset.get_results_path())
+        # Request standalone
+        self.create_standalone()

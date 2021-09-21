@@ -333,7 +333,7 @@ class Search4Chan(SearchWithScope):
 				"Pirate": "<span class='trollflag trollflag-pr' title='Pirate'></span> Pirate",
 				"Rebel": "Rebel",
 				"Republican": "<span class='trollflag trollflag-re' title='Republican'></span> Republican",
-				"Templar|DEUS VULT": "<span class='trollflag trollflag-tm' title='Templar / DEUS VULT'></span> Templar",
+				"Templar|DEUS VULT": "<span class='trollflag trollflag-tm' title='Templar / DEUS VULT'></span> Templar / DEUS VULT",
 				"Texan": "Texan",
 				"Tree Hugger": "<span class='trollflag trollflag-tr' title='Tree Hugger'></span> Tree Hugger",
 				"United Nations": "<span class='trollflag trollflag-un' title='United Nations'></span> United Nations",
@@ -411,7 +411,7 @@ class Search4Chan(SearchWithScope):
 
 			# Separate merged names
 			country_names = []
-			for country_name in query["country_names"]:
+			for country_name in query["country_name"]:
 				country_name = country_name.split("|")
 				for c in country_name:
 					country_names.append(c)

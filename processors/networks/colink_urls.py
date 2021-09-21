@@ -6,6 +6,8 @@ import re
 from backend.abstract.processor import BasicProcessor
 from common.lib.helpers import UserInput
 
+import networkx as nx
+
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
 __maintainer__ = "Stijn Peeters"
@@ -18,10 +20,10 @@ class URLCoLinker(BasicProcessor):
 	type = "url-network"  # job type ID
 	category = "Networks"  # category
 	title = "URL co-link network"  # title displayed in UI
-	description = "Create a Gephi-compatible network comprised of all URLs appearing in a post with at least one other " \
-				  "URL. Appearing in the same post constitutes an edge between these nodes. Edges are weighted by amount " \
-				  "of co-links."  # description displayed in UI
-	extension = "gdf"  # extension of result file, used internally and in UI
+	description = "Create a Gephi-compatible GEXF network comprised of all URLs appearing in a post with at least " \
+				  "one other URL. Appearing in the same post constitutes an edge between these nodes. Edges are " \
+				  "weighted by amount of co-links."  # description displayed in UI
+	extension = "gexf"  # extension of result file, used internally and in UI
 
 	options = {
 		"detail": {
@@ -41,7 +43,8 @@ class URLCoLinker(BasicProcessor):
 				"post": "Post"
 			},
 			"default": "thread",
-			"tooltip": "If 'thread' is selected, URLs are considered to occur together if they appear within the same thread, even if they are in different posts."
+			"tooltip": "If 'thread' is selected, URLs are considered to occur together if they appear within the same "
+					   "thread, even if they are in different posts."
 		}
 	}
 
@@ -51,7 +54,6 @@ class URLCoLinker(BasicProcessor):
 		with all posts containing the original query exactly, ignoring any
 		* or " in the query
 		"""
-		months = {}
 
 		# we use these to extract URLs and host names if needed
 		link_regex = re.compile(r"https?://[^\s\]()]+")
@@ -60,10 +62,10 @@ class URLCoLinker(BasicProcessor):
 
 		self.dataset.update_status("Reading source file")
 
-		colink = {}
-		urls = set()
 		links = {}
 		processed = 0
+		network = nx.Graph()
+
 		for post in self.iterate_items(self.source_file):
 			processed += 1
 			if processed % 50 == 0:
@@ -123,35 +125,15 @@ class URLCoLinker(BasicProcessor):
 			for from_link in post_links:
 				# keep track of all URLs so we can easily write the node
 				# list later
-				urls.add(from_link)
+				if from_link not in network.nodes():
+					network.add_node(from_link)
 
 				for to_link in post_links:
-					if to_link == from_link:
-						continue
+					if to_link not in network.nodes():
+						network.add_node(to_link)
 
-					# "to" and "from" are actually meaningless here, so by
-					# sorting here we only include each pair of URLs in one
-					# version only
-					pair = sorted([from_link, to_link])
-					pairs.add(" ".join(pair))
+					network.add_edge(from_link, to_link)
 
-			# determine weight of edge by how often co-link occurs
-			for pair in pairs:
-				if pair not in colink:
-					colink[pair] = 0
-				colink[pair] += 1
-
-		# write GDF file
 		self.dataset.update_status("Writing network file")
-		with self.dataset.get_results_path().open("w", encoding="utf-8") as results:
-			results.write("nodedef>name VARCHAR\n")
-			for url in urls:
-				results.write("'" + url + "'\n")
-
-			results.write("edgedef>node1 VARCHAR, node2 VARCHAR, weight INTEGER\n")
-			for pair in colink:
-				results.write(
-					"'" + pair.split(" ")[0] +"','" + pair.split(" ")[1] + "'," + str(
-						colink[pair]) + "\n")
-
-		self.dataset.finish(len(colink))
+		nx.write_gexf(network, self.dataset.get_results_path())
+		self.dataset.finish(len(network.nodes))

@@ -45,7 +45,9 @@ PATH_SESSIONS = "sessions" # folder where API session data is stored (e.g., Tele
 # research. You can however leave them empty with no ill effect. The version ID
 # should be a commit hash, which will be combined with the Github URL to offer
 # links to the exact version of 4CAT code that produced an analysis result.
-PATH_VERSION = ""  # file containing a commit ID (everything after the first whitespace found is ignored)
+# If no version file is available, the output of "git show" in PATH_ROOT will be used
+# to determine the version, if possible.
+PATH_VERSION = ".git-checked-out"  # file containing a commit ID (everything after the first whitespace found is ignored)
 GITHUB_URL = "https://github.com/digitalmethodsinitiative/4cat"  # URL to the github repository for this 4CAT instance
 
 # 4CAT has an API (available from localhost) that can be used for monitoring
@@ -91,6 +93,11 @@ TUMBLR_API_SECRET_KEY = ""
 # Reddit API keys
 REDDIT_API_CLIENTID = ""
 REDDIT_API_SECRET = ""
+
+# PixPlot Server
+# If you host a version of https://github.com/digitalmethodsinitiative/dmi_pix_plot, you can use a processor to publish
+# downloaded images into a PixPlot there
+PIXPLOT_SERVER = ""
 
 # Web tool settings
 class FlaskConfig:

@@ -28,6 +28,7 @@ packages = [
 	"lxml==4.6.3",
 	"Markdown==3.0.1",
 	"nltk==3.5",
+	"networkx>=2.5.1",
 	"numpy>=1.19.2",
 	"pandas==1.2.3",
 	"Pillow>=8.1.2",
@@ -48,6 +49,7 @@ packages = [
 	"svgwrite==1.3.1",
 	"Telethon==1.10.6",
 	"Werkzeug==0.15.5",
+	"en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.0.0/en_core_web_sm-3.0.0.tar.gz#egg=en_core_web_sm"
 ]
 
 # Some packages don't run on Windows
@@ -69,5 +71,5 @@ setup(
 	url="https://oilab.eu",
 	packages=['backend', 'webtool', 'datasources'],
 	python_requires='>=3.7',
-	install_requires=packages
+	install_requires=packages,
 )

@@ -17,7 +17,7 @@ import config
 @app.template_filter('datetime')
 def _jinja2_filter_datetime(date, fmt=None):
 	date = datetime.datetime.utcfromtimestamp(date)
-	format = "%d-%m-%Y" if not fmt else fmt
+	format = "%d %b %Y" if not fmt else fmt
 	return date.strftime(format)
 
 
@@ -132,6 +132,10 @@ def _jinja2_filter_extension_to_noun(ext):
 		return "file"
 	else:
 		return "item"
+
+@app.template_filter('hasattr')
+def _jinja2_filter_hasattr(obj, attribute):
+	return hasattr(obj, attribute)
 
 @app.context_processor
 def inject_now():

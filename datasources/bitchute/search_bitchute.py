@@ -347,7 +347,9 @@ class SearchBitChute(Search):
             video_session = requests.session()
             video_page = video_session.get(video["url"])
 
-            if "<h1 class=\"page-title\">Video Restricted</h1>" in video_page.text or "<h1 class=\"page-title\">Video Blocked</h1>" in video_page.text:
+            if "<h1 class=\"page-title\">Video Restricted</h1>" in video_page.text or \
+                    "<h1 class=\"page-title\">Video Blocked</h1>" in video_page.text or \
+                    "<h1 class=\"page-title\">Channel Restricted</h1>" in video_page.text:
                 if "This video is unavailable as the contents have been deemed potentially illegal" in video_page.text:
                     video["category"] = "moderated-illegal"
                     return (video, [])
@@ -369,17 +371,22 @@ class SearchBitChute(Search):
                     self.log.warning("Unknown moderated reason for BitChute video %s" % video["id"])
                     return (video, [])
 
+            elif "<iframe class=\"rumble\"" in video_page.text:
+                # some videos are actually embeds from rumble?
+                # these are iframes, so at the moment we cannot simply extract
+                # their info from the page, so we skip them. In the future we
+                # could add an extra request to get the relevant info, but so
+                # far the only examples I've seen are actually 'video not found'
+                video = {
+                    **video,
+                    "category": "error-embed-from-rumble"
+                }
+                return (video, [])
+
             elif video_page.status_code != 200:
                 video = {
                     **video,
-                    "category": "error-%i" % video_page.status_code,
-                    "likes": "",
-                    "dislikes": "",
-                    "channel_subscribers": "",
-                    "comments": "",
-                    "hashtags": "",
-                    "parent_id": "",
-                    "video_url": ""
+                    "category": "error-%i" % video_page.status_code
                 }
                 return (video, [])
 

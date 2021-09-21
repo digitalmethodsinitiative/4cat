@@ -2,7 +2,7 @@
 {% for worker in queue %}
     <li>
     <h4>
-        {% if worker in worker_types %}{{ worker_types[worker].title }}{% else %}{{ worker }}{% endif %}
+        {% if worker in worker_types and worker_types[worker]|hasattr("title") %}{{ worker_types[worker]|attr("title") }}{% else %}{{ worker }}{% endif %}
     </h4>
     <p>x {{ queue[worker] }}</p>
     </li>

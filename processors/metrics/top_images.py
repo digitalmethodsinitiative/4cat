@@ -55,7 +55,7 @@ class TopImageCounter(BasicProcessor):
                 post_img_links = []
 
                 if not post["image_file"]:
-                    all_links.append([])
+                    all_links.append((post['id'], []))
                     continue
 
                 if post["image_md5"] not in images:
@@ -89,7 +89,7 @@ class TopImageCounter(BasicProcessor):
                         post_img_links.append(
                             "https://archived.moe/_/search/image/" + post["image_md5"].replace("/", "_"))
 
-                all_links.append(post_img_links)
+                all_links.append((post['id'], post_img_links))
                 images[post["image_md5"]]["count"] += 1
 
             top_images = {id: images[id] for id in sorted(images, key=lambda id: images[id]["count"], reverse=True)}
@@ -133,7 +133,7 @@ class TopImageCounter(BasicProcessor):
                         post_img_links |= set(img_domain_regex.findall(value))
 
                 # Always add to all_links, so we can easily add to the source file if needed.
-                all_links.append(post_img_links)
+                all_links.append((post['id'], post_img_links))
 
                 # Only add valid links to img_links.
                 img_links += post_img_links
@@ -144,7 +144,8 @@ class TopImageCounter(BasicProcessor):
             results = [{
                 "date": "all",
                 "item": k,
-                "value": v
+                "value": v,
+                'ids': ','.join([link[0] for link in all_links if k in link[1]]),
             } for k, v in img_ranked.items()]
 
         if not results:
@@ -187,7 +188,7 @@ class TopImageCounter(BasicProcessor):
             count = 0
 
             for post in self.iterate_items(parent_path):
-                post["img_url"] = ", ".join(li_urls[count])
+                post["img_url"] = ", ".join(li_urls[count][1])
                 writer.writerow(post)
                 count += 1
 

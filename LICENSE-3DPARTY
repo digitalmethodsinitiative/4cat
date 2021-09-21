@@ -497,35 +497,18 @@ Incorporates the English stop word list of the Terrier IR Platform
     - at /common/assets/wordlists/stopwords-terrier-english.txt
     - from http://terrier.org
 
-    The contents of this file are subject to the Mozilla Public License
-    Version 1.1 (the "License"); you may not use this file except in
-    compliance with the License. You may obtain a copy of the License at
-    http://www.mozilla.org/MPL/
+    The source and binary forms of Terrier are subject to the
+    Mozilla Public License Version 1.1 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at http://www.mozilla.org/MPL/.
 
-    Software distributed under the License is distributed on an "AS IS"
-    basis, WITHOUT WARRANTY OF ANY KIND, either express or implied. See the
-    License for the specific language governing rights and limitations
-    under the License.
+    Software distributed under the License is distributed on
+    an "AS IS" basis, WITHOUT WARRANTY OF ANY KIND, either
+    expressed or implied. See the License for the specific language
+    governing rights and limitations under the License.
 
-    The Original Code is ______________________________________.
-
-    The Initial Developer of the Original Code is ________________________.
-    Portions created by ______________________ are Copyright (C) ______
-    _______________________. All Rights Reserved.
-
-    Contributor(s): ______________________________________.
-
-    Alternatively, the contents of this file may be used under the terms
-    of the _____ license (the  "[___] License"), in which case the
-    provisions of [______] License are applicable instead of those
-    above.  If you wish to allow use of your version of this file only
-    under the terms of the [____] License and not to allow others to use
-    your version of this file under the MPL, indicate your decision by
-    deleting  the provisions above and replace  them with the notice and
-    other provisions required by the [___] License.  If you do not delete
-    the provisions above, a recipient may use your version of this file
-    under either the MPL or the [___] License.
-
+    Terrier is Copyright (C) 2004-2021 the University of Glasgow.
+    All Rights Reserved.
 
 -------------------------------------------------------------------------------
 Incorporates stopword lists from the stopwords-iso project
@@ -735,55 +718,62 @@ Incorporates the Font Awesome icon and font package
     - at /webtool/static/fontawesome/
     - from https://fontawesome.com/v5.15/how-to-use/on-the-web/setup/hosting-font-awesome-yourself
 
-Font Awesome Free License
--------------------------
+    Font Awesome Free License
+    -------------------------
 
-Font Awesome Free is free, open source, and GPL friendly. You can use it for
-commercial projects, open source projects, or really almost whatever you want.
-Full Font Awesome Free license: https://fontawesome.com/license/free.
+    Font Awesome Free is free, open source, and GPL friendly. You can use it for
+    commercial projects, open source projects, or really almost whatever you want.
+    Full Font Awesome Free license: https://fontawesome.com/license/free.
 
-# Icons: CC BY 4.0 License (https://creativecommons.org/licenses/by/4.0/)
-In the Font Awesome Free download, the CC BY 4.0 license applies to all icons
-packaged as SVG and JS file types.
+    # Icons: CC BY 4.0 License (https://creativecommons.org/licenses/by/4.0/)
+    In the Font Awesome Free download, the CC BY 4.0 license applies to all icons
+    packaged as SVG and JS file types.
 
-# Fonts: SIL OFL 1.1 License (https://scripts.sil.org/OFL)
-In the Font Awesome Free download, the SIL OFL license applies to all icons
-packaged as web and desktop font files.
+    # Fonts: SIL OFL 1.1 License (https://scripts.sil.org/OFL)
+    In the Font Awesome Free download, the SIL OFL license applies to all icons
+    packaged as web and desktop font files.
 
-# Code: MIT License (https://opensource.org/licenses/MIT)
-In the Font Awesome Free download, the MIT license applies to all non-font and
-non-icon files.
+    # Code: MIT License (https://opensource.org/licenses/MIT)
+    In the Font Awesome Free download, the MIT license applies to all non-font and
+    non-icon files.
 
-# Attribution
-Attribution is required by MIT, SIL OFL, and CC BY licenses. Downloaded Font
-Awesome Free files already contain embedded comments with sufficient
-attribution, so you shouldn't need to do anything additional when using these
-files normally.
+    # Attribution
+    Attribution is required by MIT, SIL OFL, and CC BY licenses. Downloaded Font
+    Awesome Free files already contain embedded comments with sufficient
+    attribution, so you shouldn't need to do anything additional when using these
+    files normally.
 
-We've kept attribution comments terse, so we ask that you do not actively work
-to remove them from files, especially code. They're a great way for folks to
-learn about Font Awesome.
+    We've kept attribution comments terse, so we ask that you do not actively work
+    to remove them from files, especially code. They're a great way for folks to
+    learn about Font Awesome.
 
-# Brand Icons
-All brand icons are trademarks of their respective owners. The use of these
-trademarks does not indicate endorsement of the trademark holder by Font
-Awesome, nor vice versa. **Please do not use brand logos for any purpose except
-to represent the company, product, or service to which they refer.**
+    # Brand Icons
+    All brand icons are trademarks of their respective owners. The use of these
+    trademarks does not indicate endorsement of the trademark holder by Font
+    Awesome, nor vice versa. **Please do not use brand logos for any purpose except
+    to represent the company, product, or service to which they refer.**
 
 -------------------------------------------------------------------------------
 Incorporates the SigmaJS graphic drawing library
     - at /webtool/static/js/sigma.js-1.2.1/
     - from http://sigmajs.org
 
-Copyright (C) 2013-2014, Alexis Jacomy, http://sigmajs.org
+    Copyright (C) 2013-2014, Alexis Jacomy, http://sigmajs.org
 
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"),
-to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+    Permission is hereby granted, free of charge, to any person obtaining a copy of
+    this software and associated documentation files (the "Software"), to deal in
+    the Software without restriction, including without limitation the rights to
+    use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+    of the Software, and to permit persons to whom the Software is furnished to do
+    so, subject to the following conditions:
 
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+    The above copyright notice and this permission notice shall be included in all
+    copies or substantial portions of the Software.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
-IN THE SOFTWARE.
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+    SOFTWARE.

@@ -45,7 +45,7 @@ class SVGHistogramRenderer(BasicProcessor):
 
 		:param module: Dataset or processor to determine compatibility with
 		"""
-		return module.is_rankable()
+		return module.is_rankable(multiple_items=False)
 		
 	def process(self):
 		"""
@@ -59,8 +59,9 @@ class SVGHistogramRenderer(BasicProcessor):
 		# collect post numbers per month
 		intervals = {}
 		for post in self.iterate_items(self.source_file):
-			intervals[post["date"]] = int(post["value"])
-			max_posts = max(max_posts, int(post["value"]))
+			value = int(float(post["value"]))
+			intervals[post["date"]] = value
+			max_posts = max(max_posts, value)
 
 		if len(intervals) <= 1:
 			self.dataset.update_status("Not enough data available for a histogram; need more than one time series.")
