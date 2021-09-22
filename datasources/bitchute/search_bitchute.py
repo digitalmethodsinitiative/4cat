@@ -349,6 +349,7 @@ class SearchBitChute(Search):
 
             if "<h1 class=\"page-title\">Video Restricted</h1>" in video_page.text or \
                     "<h1 class=\"page-title\">Video Blocked</h1>" in video_page.text or \
+                    "<h1 class=\"page-title\">Channel Blocked</h1>" in video_page.text or \
                     "<h1 class=\"page-title\">Channel Restricted</h1>" in video_page.text:
                 if "This video is unavailable as the contents have been deemed potentially illegal" in video_page.text:
                     video["category"] = "moderated-illegal"
@@ -364,6 +365,10 @@ class SearchBitChute(Search):
 
                 elif "Platform Misuse" in video_page.text:
                     video["category"] = "moderated-misuse"
+                    return (video, [])
+
+                elif "Terrorism &amp; Violent Extremism" in video_page.text:
+                    video["category"] = "moderated-terrorism-extremism"
                     return (video, [])
 
                 else:
