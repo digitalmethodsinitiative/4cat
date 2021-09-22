@@ -4,6 +4,7 @@ User class
 import html2text
 import hashlib
 import smtplib
+import socket
 import bcrypt
 import json
 import time
@@ -11,6 +12,7 @@ import os
 
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from common.lib.helpers import send_email
 
 from webtool import db, app, config
 
@@ -238,9 +240,8 @@ class User:
 
 		# try to send it
 		try:
-			with smtplib.SMTP(config.MAILHOST) as smtp:
-				smtp.sendmail("4cat@oilab.nl", [username], message.as_string())
-		except (smtplib.SMTPException, ConnectionRefusedError) as e:
+			send_email([username], message)
+		except (smtplib.SMTPException, ConnectionRefusedError, socket.timeout) as e:
 			raise RuntimeError("Could not send password reset e-mail: %s" % e)
 
 	def generate_token(self, username=None, regenerate=True):
