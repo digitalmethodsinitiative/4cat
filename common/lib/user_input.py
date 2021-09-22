@@ -167,22 +167,30 @@ class UserInput:
         elif input_type in (UserInput.OPTION_TEXT, UserInput.OPTION_TEXT_LARGE):
             # text string
             # optionally clamp it as an integer; return default if not a valid
-            # integer
+            # integer (or float; inferred from default or made explicit via the
+            # coerce_type setting)
+            if settings.get("coerce_type"):
+                value_type = settings["coerce_type"]
+            else:
+                value_type = type(settings.get("default"))
+                if value_type not in (int, float):
+                    value_type = int
+
             if "max" in settings:
                 try:
-                    choice = min(settings["max"], int(choice))
+                    choice = min(settings["max"], value_type(choice))
                 except (ValueError, TypeError) as e:
                     if not silently_correct:
-                        raise QueryParametersException("Provide a value of %i or lower." % settings["max"])
+                        raise QueryParametersException("Provide a value of %s or lower." % str(settings["max"]))
 
                     choice = settings.get("default")
 
             if "min" in settings:
                 try:
-                    choice = max(settings["min"], int(choice))
+                    choice = max(settings["min"], value_type(choice))
                 except (ValueError, TypeError) as e:
                     if not silently_correct:
-                        raise QueryParametersException("Provide a value of %i or more." % settings["min"])
+                        raise QueryParametersException("Provide a value of %s or more." % str(settings["min"]))
 
                     choice = settings.get("default")
 
@@ -192,7 +200,13 @@ class UserInput:
             if choice is None:
                 choice = 0 if "min" in settings or "max" in settings else ""
 
-            return choice
+            if settings.get("coerce_type"):
+                try:
+                    return value_type(choice)
+                except (ValueError, TypeError):
+                    return settings.get("default")
+            else:
+                return choice
 
         else:
             # no filtering

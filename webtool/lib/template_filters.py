@@ -133,6 +133,10 @@ def _jinja2_filter_extension_to_noun(ext):
 	else:
 		return "item"
 
+@app.template_filter('hasattr')
+def _jinja2_filter_hasattr(obj, attribute):
+	return hasattr(obj, attribute)
+
 @app.context_processor
 def inject_now():
 	def uniqid():

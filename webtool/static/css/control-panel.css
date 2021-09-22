@@ -5,3 +5,27 @@
 .worker-list li {
     padding: 0.75em 1em 0.5em 1em;
 }
+
+.user-panel {
+    padding: 1em;
+}
+
+table.fullwidth.user-table {
+    width: 100%;
+}
+
+.user-table .button-like {
+    padding: 0 0.5em;
+}
+
+table.user-table td {
+    padding: 0.25em;
+}
+
+table.user-table .actions {
+    width: 8em;
+}
+
+.user-table td:nth-child(2) {
+    text-align: center;
+}

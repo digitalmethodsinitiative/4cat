@@ -20,6 +20,7 @@ from flask_login import login_user, login_required, logout_user, current_user
 from webtool import app, login_manager, db
 from webtool.api_tool import limiter
 from webtool.lib.user import User
+from common.lib.helpers import send_email
 
 
 @login_manager.user_loader
@@ -228,11 +229,10 @@ def request_access():
 			message.attach(MIMEText(mail, "html"))
 
 			try:
-				with smtplib.SMTP("localhost") as smtp:
-					smtp.sendmail(config.NOREPLY_EMAIL, config.ADMIN_EMAILS, message.as_string())
+				send_email(config.ADMIN_EMAILS, message)
 				return render_template("error.html", title="Thank you",
 									   message="Your request has been submitted; we'll try to answer it as soon as possible.")
-			except (smtplib.SMTPException, ConnectionRefusedError):
+			except (smtplib.SMTPException, ConnectionRefusedError, socket.timeout) as e:
 				return render_template("error.html", title="Error",
 									   message="The form could not be submitted; the e-mail server is unreachable.")
 

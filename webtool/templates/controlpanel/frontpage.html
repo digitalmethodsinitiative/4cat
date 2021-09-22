@@ -5,10 +5,7 @@
 
 {% block body %}
     <article class="with-aside">
-        <section>
-            <h2><span>Welcome, welcome to the admin panel</span></h2>
-            <p>It's safer here</p>
-        </section>
+        {% include "controlpanel/users.html" %}
 
         <aside>
             <h2><span>Active workers</span></h2>

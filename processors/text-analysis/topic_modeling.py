@@ -48,16 +48,16 @@ class TopicModeler(BasicProcessor):
         },
         "min_df": {
             "type": UserInput.OPTION_TEXT,
-            "min": 0,
-            "max": 1,
+            "min": 0.0,
+            "max": 1.0,
             "default": 0.01,
             "help": "Minimum document frequency",
             "tooltip": "Tokens are ignored if they do not occur in at least this fraction (between 0 and 1) of all tokenised items."
         },
         "max_df": {
             "type": UserInput.OPTION_TEXT,
-            "min": 0,
-            "max": 1,
+            "min": 0.0,
+            "max": 1.0,
             "default": 0.8,
             "help": "Maximum document frequency",
             "tooltip": "Tokens are ignored if they  occur in more than this fraction (between 0 and 1) of all tokenised items."

@@ -3,6 +3,7 @@ Miscellaneous helper functions for the 4CAT backend
 """
 import subprocess
 import datetime
+import smtplib
 import socket
 import copy
 import json
@@ -121,7 +122,7 @@ def get_software_version():
 			if show.returncode != 0:
 				raise ValueError()
 			return show.stdout.decode("utf-8").split("\n")[0].split(" ")[1]
-		except (subprocess.SubprocessError, IndexError, TypeError, ValueError):
+		except (subprocess.SubprocessError, IndexError, TypeError, ValueError, FileNotFoundError):
 			return ""
 
 	try:
@@ -517,3 +518,23 @@ def dict_search_and_update(item, keyword_matches, function):
 	temp_item = copy.deepcopy(item)
 	loop_helper_function(temp_item, keyword_matches, function)
 	return temp_item
+
+
+def send_email(recipient, message):
+	"""
+	Send an e-mail using the configured SMTP settings
+
+	Just a thin wrapper around smtplib, so we don't have to repeat ourselves.
+	Exceptions are to be handled outside the function.
+
+	:param list recipient:  Recipient e-mail addresses
+	:param MIMEMultipart message:  Message to send
+	"""
+	connector = smtplib.SMTP_SSL if hasattr(config, "MAIL_SSL") and config.MAIL_SSL else smtplib.SMTP
+
+	with connector(config.MAILHOST) as smtp:
+		if hasattr(config, "MAIL_USERNAME") and hasattr(config, "MAIL_PASSWORD") and config.MAIL_USERNAME and config.MAIL_PASSWORD:
+			smtp.ehlo()
+			smtp.login(config.MAIL_USERNAME, config.MAIL_PASSWORD)
+
+		smtp.sendmail(config.NOREPLY_EMAIL, recipient, message.as_string())

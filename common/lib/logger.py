@@ -6,6 +6,7 @@ import datetime
 import platform
 import smtplib
 import logging
+import socket
 import time
 import json
 import sys
@@ -15,6 +16,7 @@ from collections import OrderedDict
 from pathlib import Path
 
 from logging.handlers import RotatingFileHandler, SMTPHandler
+from common.lib.helpers import send_email
 
 import config
 
@@ -292,7 +294,6 @@ class Logger:
 			mail += "This report was compiled at %s." % datetime.datetime.now().strftime('%d %B %Y %H:%M:%S')
 
 			try:
-				with smtplib.SMTP(config.MAILHOST) as smtp:
-					smtp.sendmail("4cat@%s" % platform.uname().node, config.WARN_EMAILS, mail)
-			except (smtplib.SMTPException, ConnectionRefusedError) as e:
+				send_email(config.WARN_EMAILS, mail)
+			except (smtplib.SMTPException, ConnectionRefusedError, socket.timeout) as e:
 				self.error("Could not send log alerts via e-mail (%s)" % e)
