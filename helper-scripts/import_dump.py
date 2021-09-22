@@ -40,6 +40,9 @@ with open(args.input, encoding="utf-8") as inputfile:
     fieldnames = ("num", "subnum", "thread_num", "op", "timestamp", "timestamp_expired", "preview_orig", "preview_w", "preview_h", "media_filename", "media_w", "media_h", "media_size", "media_hash", "media_orig", "spoiler", "deleted", "capcode", "email", "name", "trip", "title", "comment", "sticky", "locked", "poster_hash", "poster_country", "exif")
     reader = csv.DictReader(inputfile, fieldnames=fieldnames, doublequote=False, escapechar="\\", strict=True)
     
+    # Skip header
+    next(reader, None)
+
     posts = 0
     threads = {}
     duplicates = 0
@@ -68,7 +71,7 @@ with open(args.input, encoding="utf-8") as inputfile:
             if int(post["num"]) in added_ids:
                 continue
 
-        seen_post_ids.add(post["num"])
+        seen_post_ids.add(int(post["num"]))
         post_data = {
             "id": post["num"],
             "board": args.board,
