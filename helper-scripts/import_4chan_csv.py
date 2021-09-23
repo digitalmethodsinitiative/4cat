@@ -30,118 +30,119 @@ cli.add_argument("-o", "--offset", type=int, required=False, help="How many rows
 args = cli.parse_args()
 
 if not Path(args.input).exists() or not Path(args.input).is_file():
-    print("%s is not a valid folder name." % args.input)
-    sys.exit(1)
+	print("%s is not a valid folder name." % args.input)
+	sys.exit(1)
 
 logger = Logger()
 db = Database(logger=logger, appname="queue-dump")
 
 csvnone = re.compile(r"^N$")
 
+safe = False
 if args.skip_duplicates:
-    db_ids = db.fetchall("SELECT id FROM posts_4chan WHERE board ='%s';" % args.board)
-    added_ids = [[v for k, v in added_id.items()][0] for added_id in db_ids]
-    print(len(added_ids), "posts for %s already added" % args.board)
+	print("Skipping duplicate rows (ON CONFLICT DO NOTHING).")
+	safe = True
 
-seen_post_ids = set()
 with open(args.input, encoding="utf-8") as inputfile:
-    fieldnames = ("id", "thread_id", "timestamp", "subject", "body", "author", "author_type", "author_type_id", "author_trip", "country_code", "country_name", "image_file", "image_4chan", "image_md5", "image_dimensions", "image_filesize", "semantic_url", "unsorted_data", "id_seq", "board", "image_url")
+	fieldnames = ("id", "thread_id", "timestamp", "subject", "body", "author", "author_type", "author_type_id", "author_trip", "country_code", "country_name", "image_file", "image_4chan", "image_md5", "image_dimensions", "image_filesize", "semantic_url", "unsorted_data", "id_seq", "board", "image_url")
 
-    reader = csv.DictReader(inputfile, fieldnames=fieldnames)
-    
-    # Skip headers
-    next(reader, None)
+	reader = csv.DictReader(inputfile, fieldnames=fieldnames)
+	
+	# Skip headers
+	next(reader, None)
 
-    posts = 0
-    threads = {}
-    duplicates = 0
+	posts = 0
+	threads = {}
+	duplicates = 0
 
-    # Skip rows if needed. Can be useful when importing didn't go correctly.
-    if args.offset:
-        [next(reader, None) for item in range(args.offset)]
+	# Show status
+	if args.offset:
+		print("Skipping %s rows." % args.offset)
 
-    for post in reader:
+	for post in reader:
 
-        post = {k: csvnone.sub("", post[k]) if post[k] else None for k in post}
+		# We collect thread data first, even though we might skip this post
+		if post["thread_id"] not in threads:
+			threads[post["thread_id"]] = {
+				"id": post["thread_id"],
+				"board": args.board,
+				"timestamp": 0,
+				"timestamp_scraped": int(time.time()),
+				"timestamp_modified": 0,
+				"num_unique_ips": -1,
+				"num_images": 0,
+				"num_replies": 0,
+				"limit_bump": False,
+				"limit_image": False,
+				"is_sticky": False,
+				"is_closed": False,
+				"post_last": 0
+			}
 
-        posts += 1
+			if post["thread_id"] == post["id"]:
+				threads[post["thread_id"]]["timestamp"] = post["timestamp"]
+				threads[post["thread_id"]]["is_sticky"] = False
+				threads[post["thread_id"]]["is_closed"] = False
 
-        # Duplicate posts
-        if args.skip_duplicates:
-            if post["id"] in added_ids:
-                continue
+			if post["image_file"]:
+				threads[post["thread_id"]]["num_images"] += 1
 
-        seen_post_ids.add(post["id"])
+		threads[post["thread_id"]]["num_replies"] += 1
+		threads[post["thread_id"]]["post_last"] = post["id"]
+		threads[post["thread_id"]]["timestamp_modified"] = post["timestamp"]
 
-        post_data = {
-            "id": post["id"],
-            "id_seq": post.get("id_seq", ""),
-            "board": args.board,
-            "thread_id": post["thread_id"],
-            "timestamp": post.get("timestamp", ""),
-            "subject": post.get("subject", ""),
-            "body": post.get("body", ""),
-            "author": post.get("author", ""),
-            "author_type": post.get("author_type", ""),
-            "author_type_id": post.get("author_type_id", "N"),
-            "author_trip": post.get("author_trip", ""),
-            "country_code": post.get("country_code", ""),
-            "country_name": post.get("country_name", ""),
-            "image_file": post.get("image_file", ""),
-            "image_url": post.get("image_url", ""),
-            "image_4chan": post.get("image_4chan", ""),
-            "image_md5": post.get("image_md5", ""),
-            "image_dimensions": post.get("image_dimensions", ""),
-            "image_filesize": post.get("image_filesize", 0),
-            "semantic_url": post.get("semantic_url", ""),
-            "unsorted_data": post.get("unsorted_data", "")
-        }
+		posts += 1
 
-        if post["thread_id"] not in threads:
-            threads[post["thread_id"]] = {
-                "id": post["thread_id"],
-                "board": args.board,
-                "timestamp": 0,
-                "timestamp_scraped": int(time.time()),
-                "timestamp_modified": 0,
-                "num_unique_ips": -1,
-                "num_images": 0,
-                "num_replies": 0,
-                "limit_bump": False,
-                "limit_image": False,
-                "is_sticky": False,
-                "is_closed": False,
-                "post_last": 0
-            }
+		# Skip rows if needed. Can be useful when importing didn't go correctly.
+		if args.offset and posts < args.offset:
+			continue
 
-        if post["thread_id"] == post["id"]:
-            threads[post["thread_id"]]["timestamp"] = post["timestamp"]
-            threads[post["thread_id"]]["is_sticky"] = False
-            threads[post["thread_id"]]["is_closed"] = False
+		# Collect post data
+		post = {k: csvnone.sub("", post[k]) if post[k] else None for k in post}
 
-        if post["image_file"]:
-            threads[post["thread_id"]]["num_images"] += 1
+		post_data = {
+			"id": post["id"],
+			"id_seq": post.get("id_seq", ""),
+			"board": args.board,
+			"thread_id": post["thread_id"],
+			"timestamp": post.get("timestamp", ""),
+			"subject": post.get("subject", ""),
+			"body": post.get("body", ""),
+			"author": post.get("author", ""),
+			"author_type": post.get("author_type", ""),
+			"author_type_id": post.get("author_type_id", "N"),
+			"author_trip": post.get("author_trip", ""),
+			"country_code": post.get("country_code", ""),
+			"country_name": post.get("country_name", ""),
+			"image_file": post.get("image_file", ""),
+			"image_url": post.get("image_url", ""),
+			"image_4chan": post.get("image_4chan", ""),
+			"image_md5": post.get("image_md5", ""),
+			"image_dimensions": post.get("image_dimensions", ""),
+			"image_filesize": post.get("image_filesize", 0),
+			"semantic_url": post.get("semantic_url", ""),
+			"unsorted_data": post.get("unsorted_data", "")
+		}
 
-        threads[post["thread_id"]]["num_replies"] += 1
-        threads[post["thread_id"]]["post_last"] = post["id"]
-        threads[post["thread_id"]]["timestamp_modified"] = post["timestamp"]
+		db.insert("posts_4chan", post_data, commit=False, safe=safe)
 
-        new_id = db.insert("posts_4chan", post_data, commit=False, safe=False, return_field="id_seq")
+		if posts > 0 and posts % 10000 == 0:
+			print("Committing post %i - %i)" % (posts - 10000, posts))
+			db.commit()
 
-        if posts > 0 and posts % 10000 == 0:
-            print("Committing post %i - %i)" % (posts - 10000, posts))
-            db.commit()
+	db.commit()
 
-    db.commit()
+	# We're committing threads at the end.
+	# We can't assume how the data is sorted, so we wait until the last
+	# moment until assuming the thread data is complete. 
+	nthreads = 0
+	for thread in threads.values():
+		db.insert("threads_4chan", data=thread, commit=False, safe=safe)
+		if nthreads > 0 and nthreads % 10000 == 0:
+			print("Committing threads %i - %i" % (posts - 10000, posts))
+			db.commit()
+		nthreads += 1
 
-    nthreads = 0
-    for thread in threads.values():
-        db.insert("threads_4chan", data=thread, commit=False, safe=False)
-        if nthreads > 0 and nthreads % 10000 == 0:
-            print("Committing threads %i - %i" % (posts - 10000, posts))
-            db.commit()
-        nthreads += 1
-
-    db.commit()
+	db.commit()
 
 print("Done")
