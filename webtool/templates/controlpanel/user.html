@@ -18,7 +18,7 @@
                 </div>
                 <div class="form-element">
                     <label for="user-admin">Is admin?</label>
-                    <input type="radio"{% if user.is_admin %} checked="checked"{% endif %} id="user-admin" name="is_admin">
+                    <input type="checkbox"{% if user.is_admin %} checked="checked"{% endif %} id="user-admin" name="is_admin">
                 </div>
                 <div class="form-element{% if "userdata" in incomplete %} missing{% endif %}">
                     <label for="user-userdata">User data (JSON)</label>
