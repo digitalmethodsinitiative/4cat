@@ -73,6 +73,9 @@ def add_user():
     Sends the user an e-mail with a link through which they can set their
     password.
 
+    This route is used for the 'approve' link in the e-mail sent when people
+    request a new account.
+
     :return: Either an html page with a message, or a JSON response, depending
     on whether ?format == html
     """
@@ -194,9 +197,9 @@ def reject_user():
     return render_template("error.html", message="Rejection sent to %s." % email_address, title="Rejection sent")
 
 
-@app.route("/admin/edit-user/", methods=["GET", "POST"])
+@app.route("/admin/<string:mode>-user/", methods=["GET", "POST"])
 @login_required
-def edit_user():
+def manipulate_user(mode):
     if not current_user.is_authenticated or not current_user.is_admin():
         return error(403, message="This page is off-limits to you.")
 
@@ -204,34 +207,65 @@ def edit_user():
     if user_email in ("anonymous", "autologin"):
         return error(403, message="System users cannot be edited")
 
-    user = db.fetchone("SELECT * FROM users WHERE name = %s", (user_email,))
-
-    if not user:
-        return error(404, message="NOPE!")
+    user = db.fetchone("SELECT * FROM users WHERE name = %s", (user_email,)) if mode == "edit" else {}
 
     incomplete = []
     if request.method == "POST":
         if not request.form.get("name"):
             incomplete.append("name")
 
+        # userdata needs to be valid JSON, or empty
         if request.form.get("userdata"):
             try:
                 json.loads(request.form.get("userdata"))
             except ValueError:
                 incomplete.append("userdata")
 
+        # names cannot contain whitespace
+        if request.form.get("name") and re.findall(r"\s", request.form.get("name")):
+            flash("User name cannot contain whitespace.")
+            incomplete.append("name")
+
         if not incomplete:
-            db.update("users", where={"name": request.form.get("current-name")}, data={
+            user_data = {
                 "name": request.form.get("name"),
                 "is_admin": request.form.get("is_admin") == "on",
                 "userdata": request.form.get("userdata").strip()
-            })
-            user = request.form
-            flash("User data saved")
+            }
+            if not user_data["userdata"]:
+                # it's expected that this parses to a JSON object
+                user_data["userdata"] = "{}"
+
+            if mode == "edit":
+                db.update("users", where={"name": request.form.get("current-name")}, data=user_data)
+                user = request.form
+            else:
+                try:
+                    db.insert("users", user_data)
+                    user = User.get_by_name(user_data["name"])
+
+                    if request.form.get("password"):
+                        user.set_password(request.form.get("password"))
+                    else:
+                        token = user.generate_token(None, regenerate=True)
+                        link = url_for("reset_password", _external=True) + "?token=%s" % token
+                        flash('User created. %s can set a password via<br><a href="%s">%s</a>.' % (user_data["name"], link, link))
+
+                    # show the edit form for the user next
+                    mode = "edit"
+                    user = user.data
+
+                except psycopg2.IntegrityError:
+                    flash("A user with this e-mail address already exists.")
+                    incomplete.append("name")
+
+
+            if not incomplete:
+                flash("User data saved")
         else:
             flash("Pleasure ensure all fields contain a valid value.")
 
-    return render_template("controlpanel/user.html", user=user, incomplete=incomplete, flashes=get_flashed_messages())
+    return render_template("controlpanel/user.html", user=user, incomplete=incomplete, flashes=get_flashed_messages(), mode=mode)
 
 @app.route("/admin/delete-user")
 @login_required
