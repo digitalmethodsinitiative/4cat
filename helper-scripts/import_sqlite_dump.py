@@ -56,7 +56,9 @@ print("Connected to SQLite database.")
 count = 0
 skipped = 0
 threads_skipped = 0
-
+cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+python3 helper-scripts/import_sqlite_dump.py -i /home/sal-phd/4chan-dumps/4archive_dump-sqlite -d 4chan -b b
+print(cursor.fetchall())
 # To loop
 c = conn.cursor()
 
@@ -136,7 +138,8 @@ for post in c:
 		"author_trip": post.get("tripcode", ""),
 		"author_type": post["chan_id"] if "chan_id" in post else "",
 		"author_type_id": post["capcode"] if post["capcode"] != "" else "N",
-		"country_code": post.get("poster_country", ""),
+		"country_name": "", # Not available in this dump
+		"country_code": "", # Not available in this dump
 		"image_file": post["original_image_name"],
 		"image_4chan": post["chan_image_name"],
 		"image_url": post.get("image_url"),
