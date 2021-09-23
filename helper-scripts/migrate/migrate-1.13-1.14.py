@@ -1,5 +1,8 @@
 # update database structure for chan tables to save post deletion timestamp
 # separately from main table
+import sys
+import os
+sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)) + "'/../..")
 from common.lib.database import Database
 from common.lib.logger import Logger
 

@@ -1,4 +1,7 @@
 # this should have been done in the 1.9 -> 1.10 migration script, but alas...
+import sys
+import os
+sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)) + "'/../..")
 from common.lib.database import Database
 from common.lib.logger import Logger
 
