@@ -1,8 +1,8 @@
 -- 8kun
 -- threads
 CREATE TABLE IF NOT EXISTS threads_8kun (
-  id                 text PRIMARY KEY, -- matches 8kun thread ID
-  id_seq             SERIAL,  -- sequential ID for easier indexing
+  id                 text, -- matches 8kun thread ID
+  id_seq             SERIAL PRIMARY KEY,  -- sequential ID for easier indexing
   board              text,
   timestamp          integer DEFAULT 0, -- first known timestamp for this thread, i.e. timestamp of first post
   timestamp_archived integer DEFAULT 0,
@@ -20,6 +20,12 @@ CREATE TABLE IF NOT EXISTS threads_8kun (
   index_positions    text
 );
 
+CREATE UNIQUE INDEX IF NOT EXISTS threads_idboard_8kun
+  ON threads_8kun (
+    id,
+    board
+  );
+
 CREATE INDEX IF NOT EXISTS threads_timestamp_8kun
   ON threads_8kun (
     timestamp
@@ -32,8 +38,8 @@ CREATE INDEX IF NOT EXISTS threads_seq_8kun
 
 -- posts
 CREATE TABLE IF NOT EXISTS posts_8kun (
-  id                bigint PRIMARY KEY,  -- matches 8kun post ID
-  id_seq            SERIAL,  -- sequential ID for easier indexing
+  id                bigint,  -- matches 8kun post ID
+  id_seq            SERIAL PRIMARY KEY,  -- sequential ID for easier indexing
   thread_id         text,
   timestamp         integer,
   timestamp_deleted integer DEFAULT 0,

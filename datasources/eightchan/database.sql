@@ -1,8 +1,8 @@
 -- 8chan
 -- threads
 CREATE TABLE IF NOT EXISTS threads_8chan (
-  id                 text PRIMARY KEY, -- matches 8chan thread ID
-  id_seq             SERIAL,  -- sequential ID for easier indexing
+  id                 text, -- matches 8chan thread ID
+  id_seq             SERIAL PRIMARY KEY,  -- sequential ID for easier indexing
   board              text,
   timestamp          integer DEFAULT 0, -- first known timestamp for this thread, i.e. timestamp of first post
   timestamp_archived integer DEFAULT 0,
@@ -20,6 +20,12 @@ CREATE TABLE IF NOT EXISTS threads_8chan (
   index_positions    text
 );
 
+CREATE UNIQUE INDEX IF NOT EXISTS threads_idboard_8chan
+  ON threads_8chan (
+    id,
+    board
+  );
+
 CREATE INDEX IF NOT EXISTS threads_timestamp_8chan
   ON threads_8chan (
     timestamp
@@ -32,11 +38,12 @@ CREATE INDEX IF NOT EXISTS threads_seq_8chan
 
 -- posts
 CREATE TABLE IF NOT EXISTS posts_8chan (
-  id                bigint PRIMARY KEY,  -- matches 8chan post ID
-  id_seq            SERIAL,  -- sequential ID for easier indexing
+  id                bigint,  -- matches 8chan post ID
+  id_seq            SERIAL PRIMARY KEY,  -- sequential ID for easier indexing
   thread_id         text,
   timestamp         integer,
   timestamp_deleted integer DEFAULT 0,
+  board             text,
   subject           text,
   body              text,
   author            text,
@@ -70,8 +77,13 @@ CREATE INDEX IF NOT EXISTS posts_seq_8chan
     id_seq
   );
 
-CREATE TABLE posts_8chan_old () INHERITS (posts_8chan);
+CREATE UNIQUE INDEX IF NOT EXISTS posts_idboard_8chan
+  ON posts_8chan (
+    id,
+    board
+  );
 
+CREATE TABLE posts_8chan_old () INHERITS (posts_8chan);
 
 CREATE TABLE IF NOT EXISTS posts_8chan_deleted (
   id_seq            bigint PRIMARY KEY,
