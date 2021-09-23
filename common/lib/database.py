@@ -192,8 +192,8 @@ class Database:
 		:param string table:  Table to insert record into
 		:param dict data:   Data to insert
 		:param bool commit: Whether to commit after executing the query
-		:param bool safe: If set to `True`, "ON CONFLICT DO NOTHING" is added to the insert query, so that no error is
-						  thrown when the insert violates a unique index or other constraint
+		:param bool safe: If set to `True`, "ON CONFLICT DO NOTHING" is added to the insert query, so it does not
+						  insert the row and no error is thrown when the insert violates a unique index or other constraint
 		:param tuple constraints: If `safe` is `True`, this tuple may contain the columns that should be used as a
 								  constraint, e.g. ON CONFLICT (name, lastname) DO NOTHING
 		:param str return_field: If not empty or None, this makes the method
