@@ -202,7 +202,7 @@ class User:
 		register_token = self.generate_token(regenerate=True)
 
 		# prepare welcome e-mail
-		sender = "4cat@oilab.nl"
+		sender = config.NOREPLY_EMAIL
 		message = MIMEMultipart("alternative")
 		message["From"] = sender
 		message["To"] = username

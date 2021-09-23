@@ -229,11 +229,16 @@ def show_page(page):
 		page_parsed = markdown.markdown(page_raw)
 		page_parsed = re.sub(r"<h2>(.*)</h2>", r"<h2><span>\1</span></h2>", page_parsed)
 
+		if config.ADMIN_EMAILS:
+			# replace this one explicitly instead of doing a generic config
+			# filter, to avoid accidentally exposing config values
+			admin_email = config.ADMIN_EMAILS[0] if config.ADMIN_EMAILS else "4cat-admin@example.com"
+			page_parsed = page_parsed.replace("%%ADMIN_EMAIL%%", admin_email)
+
 	return render_template("page.html", body_content=page_parsed, body_class=page_class, page_name=page)
 
 
 @app.route('/result/<string:query_file>/')
-@login_required
 def get_result(query_file):
 	"""
 	Get dataset result file
