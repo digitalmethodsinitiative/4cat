@@ -29,3 +29,17 @@ table.user-table .actions {
 .user-table td:nth-child(2) {
     text-align: center;
 }
+
+.user-panel .view-controls form {
+    width: 100%;
+}
+
+.user-panel .view-controls ul {
+    display: grid;
+    grid-template-columns: 50% 50%;
+    margin: 0;
+}
+
+.user-panel .view-controls ul li:first-child {
+    text-align: left;
+}

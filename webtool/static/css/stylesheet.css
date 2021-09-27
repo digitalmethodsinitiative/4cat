@@ -134,7 +134,7 @@ input[type=date] {
     max-width: 10em;
 }
 
-input[type=radio] {
+input[type=radio], input[type=checkbox] {
     justify-self: start;
     min-width: 0;
 }

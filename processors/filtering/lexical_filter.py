@@ -70,7 +70,7 @@ class LexicalFilter(BasicProcessor):
 				lexicons[lexicon_id] = set()
 
 			with open(lexicon_file, encoding="utf-8") as lexicon_handle:
-				lexicons[lexicon_file] |= set(lexicon_handle.read().splitlines())
+				lexicons[lexicon_id] |= set(lexicon_handle.read().splitlines())
 
 		# add user-defined words
 		custom_id = "user-defined"
@@ -87,14 +87,19 @@ class LexicalFilter(BasicProcessor):
 			if not lexicons[lexicon_id]:
 				continue
 
-			if self.parameters.get("as_regex"):
+			if not self.parameters.get("as_regex"):
 				phrases = [re.escape(term) for term in lexicons[lexicon_id] if term]
 			else:
 				phrases = [term for term in lexicons[lexicon_id] if term]
 
-			lexicon_regexes[lexicon_id] = re.compile(
-				r"\b(" + "|".join(phrases) + r")\b",
-				flags=re.IGNORECASE)
+			try:
+				lexicon_regexes[lexicon_id] = re.compile(
+					r"\b(" + "|".join(phrases) + r")\b",
+					flags=re.IGNORECASE)
+			except re.error:
+				self.dataset.update_status("Invalid regular expression, cannot use as filter", is_final=True)
+				self.dataset.finish(0)
+				return
 
 		# now for the real deal
 		self.dataset.update_status("Reading source file")
@@ -147,7 +152,8 @@ class LexicalFilter(BasicProcessor):
 
 				matching_items += 1
 
-		self.dataset.update_status("New dataset created with %i matching item(s)" % matching_items, is_final=True)
+		if matching_items > 0:
+			self.dataset.update_status("New dataset created with %i matching item(s)" % matching_items, is_final=True)
 		self.dataset.finish(matching_items)
 
 	def after_process(self):

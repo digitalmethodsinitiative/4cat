@@ -5,11 +5,11 @@
 
 {% block body %}
     <nav class="view-controls block">
-        <form action="{{ url_for("admin_frontpage") }}" method="GET">
+        <form action="{{ url_for("show_results") }}" method="GET">
             <input type="hidden" name="depth" value="{{ depth }}">
             <ul>
                 <li><input aria-label="Query filter" placeholder="Filter queries..." name="filter"
-                           value="{{ filter }}"></li>
+                           value="{{ filter.filter }}"></li>
             </ul>
             <button>Filter</button>
         </form>

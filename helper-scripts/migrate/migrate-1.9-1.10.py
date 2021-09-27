@@ -11,6 +11,11 @@ import config
 log = Logger(output=True)
 db = Database(logger=log, dbname=config.DB_NAME, user=config.DB_USER, password=config.DB_PASSWORD, host=config.DB_HOST, port=config.DB_PORT, appname="4cat-migrate")
 
+print("  Making sure nltk packages are present...")
+import nltk
+nltk.download("punkt")
+nltk.download("wordnet")
+
 print("  Checking for 4chan database tables... ", end="")
 try:
 	test = db.fetchone("SELECT * FROM posts_4chan LIMIT 1")
@@ -31,8 +36,3 @@ db.execute("UPDATE posts_4chan SET board = ( SELECT board FROM threads_4chan WHE
 
 print("  Creating index")
 db.execute("CREATE UNIQUE INDEX IF NOT EXISTS posts_4chan_id ON posts_4chan ( id, board )")
-
-print("  Making sure nltk packages are present...")
-import nltk
-nltk.download("punkt")
-nltk.download("wordnet")
