@@ -19,25 +19,41 @@ for datasource in ("4chan", "8kun", "8chan"):
 		print("not available, nothing to upgrade!")
 		continue
 
+	# Remove and add unique key constraints for threads table
 	print("\n  Checking if id_seq is the primary threads key... ")
-	threads_primary_key_col, threads_contraint = [(row["column_name"], row["constraint_name"]) for row in db.fetchall("SELECT c.column_name, c.constraint_name FROM information_schema.key_column_usage AS c LEFT JOIN information_schema.table_constraints AS t ON t.constraint_name = c.constraint_name WHERE t.table_name = 'threads_%s' AND t.constraint_type = 'PRIMARY KEY';" % datasource)][0]
 
-	if threads_primary_key_col == "id_seq":
-		print("  id_seq already the primary key for threads %s" % datasource)
-	else:
-		print(" changing primary threads key from %s to id_seq" % threads_primary_key_col)
-		db.execute("ALTER TABLE threads_%s DROP CONSTRAINT %s" % (datasource, threads_contraint))
+	thread_constraints = [(row["column_name"], row["constraint_name"]) for row in db.fetchall("SELECT c.column_name, c.constraint_name FROM information_schema.key_column_usage AS c LEFT JOIN information_schema.table_constraints AS t ON t.constraint_name = c.constraint_name WHERE t.table_name = 'threads_%s' AND t.constraint_type = 'PRIMARY KEY';" % datasource)]
+
+	if not thread_constraints:
+		print("  No unique key detected for the threads table, adding a unique key constraint to the `id_seq` column.")
 		db.execute("ALTER TABLE threads_%s ADD PRIMARY KEY (id_seq)" % datasource)
-
-	print("  Checking if id_seq is the primary posts key... ")
-	posts_primary_key_col, posts_contraint = [(row["column_name"], row["constraint_name"]) for row in db.fetchall("SELECT c.column_name, c.constraint_name FROM information_schema.key_column_usage AS c LEFT JOIN information_schema.table_constraints AS t ON t.constraint_name = c.constraint_name WHERE t.table_name = 'posts_%s' AND t.constraint_type = 'PRIMARY KEY';" % datasource)][0]
-
-	if posts_primary_key_col == "id_seq":
-		print("  id_seq already the primary key for posts %s" % datasource)
 	else:
-		print("  Changing primary posts key from %s to id_seq" % posts_primary_key_col)
-		db.execute("ALTER TABLE posts_%s DROP CONSTRAINT %s" % (datasource, posts_constraint))
+		constraint_col, constraint_name = thread_constraints[0]
+		
+		if constraint_col == "id_seq":
+			print("  id_seq already the primary key for threads %s" % datasource)
+		else:
+			print(" changing primary threads key from %s to id_seq" % constraint_col)
+			db.execute("ALTER TABLE threads_%s DROP CONSTRAINT %s" % (datasource, constraint_name))
+			db.execute("ALTER TABLE threads_%s ADD PRIMARY KEY (id_seq)" % datasource)
+
+	# Remove and add unique key constraints for posts table
+	print("  Checking if id_seq is the primary posts key... ")
+
+	post_constraints = [(row["column_name"], row["constraint_name"]) for row in db.fetchall("SELECT c.column_name, c.constraint_name FROM information_schema.key_column_usage AS c LEFT JOIN information_schema.table_constraints AS t ON t.constraint_name = c.constraint_name WHERE t.table_name = 'posts_%s' AND t.constraint_type = 'PRIMARY KEY';" % datasource)]
+
+	if not post_constraints:
+		print("  No unique key detected for the posts table, adding a unique key constraint to the `id_seq` column.")
 		db.execute("ALTER TABLE posts_%s ADD PRIMARY KEY (id_seq)" % datasource)
+	else:
+		constraint_col, constraint_name = post_constraints[0]
+		
+		if constraint_col == "id_seq":
+			print("  id_seq already the primary key for posts %s" % datasource)
+		else:
+			print(" changing primary posts key from %s to id_seq" % constraint_col)
+			db.execute("ALTER TABLE posts_%s DROP CONSTRAINT %s" % (datasource, constraint_name))
+			db.execute("ALTER TABLE posts_%s ADD PRIMARY KEY (id_seq)" % datasource)
 
 	print("  Making indexes for post-board pairs")
 
