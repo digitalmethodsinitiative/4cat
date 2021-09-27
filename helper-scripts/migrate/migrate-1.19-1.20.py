@@ -20,21 +20,23 @@ for datasource in ("4chan", "8kun", "8chan"):
 		continue
 
 	print("\n  Checking if id_seq is the primary threads key... ")
-	threads_primary_key_col = [row["column_name"] for row in db.fetchall("SELECT c.column_name FROM information_schema.key_column_usage AS c LEFT JOIN information_schema.table_constraints AS t ON t.constraint_name = c.constraint_name WHERE t.table_name = 'threads_%s' AND t.constraint_type = 'PRIMARY KEY';" % datasource)][0]
+	threads_primary_key_col, threads_contraint = [(row["column_name"], row["constraint_name"]) for row in db.fetchall("SELECT c.column_name, c.constraint_name FROM information_schema.key_column_usage AS c LEFT JOIN information_schema.table_constraints AS t ON t.constraint_name = c.constraint_name WHERE t.table_name = 'threads_%s' AND t.constraint_type = 'PRIMARY KEY';" % datasource)][0]
+
 	if threads_primary_key_col == "id_seq":
 		print("  id_seq already the primary key for threads %s" % datasource)
 	else:
 		print(" changing primary threads key from %s to id_seq" % threads_primary_key_col)
-		db.execute("ALTER TABLE threads_%s DROP CONSTRAINT threads_%s_pkey" % (datasource, datasource))
+		db.execute("ALTER TABLE threads_%s DROP CONSTRAINT %s" % (datasource, threads_contraint))
 		db.execute("ALTER TABLE threads_%s ADD PRIMARY KEY (id_seq)" % datasource)
 
 	print("  Checking if id_seq is the primary posts key... ")
-	posts_primary_key_col = [row["column_name"] for row in db.fetchall("SELECT c.column_name FROM information_schema.key_column_usage AS c LEFT JOIN information_schema.table_constraints AS t ON t.constraint_name = c.constraint_name WHERE t.table_name = 'posts_%s' AND t.constraint_type = 'PRIMARY KEY';" % datasource)][0]
+	posts_primary_key_col, posts_contraint = [(row["column_name"], row["constraint_name"]) for row in db.fetchall("SELECT c.column_name, c.constraint_name FROM information_schema.key_column_usage AS c LEFT JOIN information_schema.table_constraints AS t ON t.constraint_name = c.constraint_name WHERE t.table_name = 'posts_%s' AND t.constraint_type = 'PRIMARY KEY';" % datasource)][0]
+
 	if posts_primary_key_col == "id_seq":
 		print("  id_seq already the primary key for posts %s" % datasource)
 	else:
-		print(" changing primary posts key from %s to id_seq" % posts_primary_key_col)
-		db.execute("ALTER TABLE posts_%s DROP CONSTRAINT posts_%s_pkey" % (datasource, datasource))
+		print("  Changing primary posts key from %s to id_seq" % posts_primary_key_col)
+		db.execute("ALTER TABLE posts_%s DROP CONSTRAINT %s" % (datasource, posts_constraint))
 		db.execute("ALTER TABLE posts_%s ADD PRIMARY KEY (id_seq)" % datasource)
 
 	print("  Making indexes for post-board pairs")
