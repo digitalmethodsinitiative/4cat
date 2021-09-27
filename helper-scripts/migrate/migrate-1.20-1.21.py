@@ -2,6 +2,9 @@
 # Also make sure there are indexes for id-board pairs for both the posts and threads tables.
 import sys
 import os
+
+from psycopg2.errors import UniqueViolation
+
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)) + "'/../..")
 from common.lib.database import Database
 from common.lib.logger import Logger
@@ -33,9 +36,14 @@ for datasource in ("4chan", "8kun", "8chan"):
 		if constraint_col == "id_seq":
 			print("  id_seq already the primary key for threads %s" % datasource)
 		else:
-			print(" changing primary threads key from %s to id_seq" % constraint_col)
+			print(" changing primary threads key from %s to id_seq (this might take a while)." % constraint_col)
 			db.execute("ALTER TABLE threads_%s DROP CONSTRAINT %s" % (datasource, constraint_name))
-			db.execute("ALTER TABLE threads_%s ADD PRIMARY KEY (id_seq)" % datasource)
+			try:
+				db.execute("ALTER TABLE threads_%s ADD PRIMARY KEY (id_seq)" % datasource)
+			except UniqueViolation:
+				print("  Encountered duplicate id_seq value, rebuilding the column.")
+				db.execute("ALTER TABLE threads_%s DROP COLUMN id_seq" % datasource)
+				db.execute("ALTER TABLE threads_%s ADD COLUMN id_seq SERIAL PRIMARY KEY" % datasource)
 
 	# Remove and add unique key constraints for posts table
 	print("  Checking if id_seq is the primary posts key... ")
@@ -51,9 +59,14 @@ for datasource in ("4chan", "8kun", "8chan"):
 		if constraint_col == "id_seq":
 			print("  id_seq already the primary key for posts %s" % datasource)
 		else:
-			print(" changing primary posts key from %s to id_seq" % constraint_col)
+			print(" changing primary posts key from %s to id_seq (this might take a while)." % constraint_col)
 			db.execute("ALTER TABLE posts_%s DROP CONSTRAINT %s" % (datasource, constraint_name))
-			db.execute("ALTER TABLE posts_%s ADD PRIMARY KEY (id_seq)" % datasource)
+			try:
+				db.execute("ALTER TABLE posts_%s ADD PRIMARY KEY (id_seq)" % datasource)
+			except UniqueViolation:
+				print("  Encountered duplicate id_seq value, rebuilding the entire column.")
+				db.execute("ALTER TABLE posts_%s DROP COLUMN id_seq" % datasource)
+				db.execute("ALTER TABLE posts_%s ADD COLUMN id_seq SERIAL PRIMARY KEY" % datasource)
 
 	print("  Making indexes for post-board pairs")
 
