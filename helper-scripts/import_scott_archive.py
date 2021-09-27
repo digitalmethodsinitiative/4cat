@@ -99,11 +99,10 @@ for f in os.listdir(args.input):
 	seen_ids.add(seen_id)
 print(len(seen_ids), "threads to process")
 
-added_ids = set()
+safe = False
 if args.skip_duplicates:
-    db_ids = db.fetchall("SELECT id FROM posts_4chan WHERE board ='b' and id < 107743745;")
-    added_ids = set([[int(v) for k, v in added_id.items()][0] for added_id in db_ids])
-    print(len(added_ids), "pre-2009 /b/ posts already added")
+	print("Skipping duplicate rows (ON CONFLICT DO NOTHING).")
+	safe = True
 
 threads = {}
 posts = 0
@@ -155,38 +154,35 @@ for html_doc in glob.iglob(os.path.join(args.input, "*.*")):
 		"post_last": interpolated_timestamp
 	}
 
-	# Skip already-inserted posts
-	if args.skip_duplicates and int(thread_id) in added_ids:
-		pass
-	else:
-		# OP is not formatted as the rest, so process this first
-		op_data = {
-				"thread_id": thread_id,
-				"id": post_id,
-				"board": "b",
-				"timestamp": interpolated_timestamp, # Same for entire thread
-				"subject": "",
-				"body": soup.find("blockquote").get_text("\n") if soup.find("blockquote") else "",
-				"author": soup.find("span", {"class": "postername"}).get_text() if soup.find("span", {"class": "postername"}) else "",
-				"author_type": "",
-				"author_type_id": "N",
-				"author_trip": "",
-				"country_code": "",
-				"country_name": "",
-				"image_file": "",
-				"image_url": "",
-				"image_4chan": "",
-				"image_md5": "",
-				"image_dimensions": "",
-				"image_filesize": 0,
-				"semantic_url": "",
-				"unsorted_data": json.dumps({"has_image": True if soup.find("span", {"class": "filesize"}) else False})
-				}
+	
+	# OP is not formatted as the rest, so process this first
+	op_data = {
+			"thread_id": thread_id,
+			"id": post_id,
+			"board": "b",
+			"timestamp": interpolated_timestamp, # Same for entire thread
+			"subject": "",
+			"body": soup.find("blockquote").get_text("\n") if soup.find("blockquote") else "",
+			"author": soup.find("span", {"class": "postername"}).get_text() if soup.find("span", {"class": "postername"}) else "",
+			"author_type": "",
+			"author_type_id": "N",
+			"author_trip": "",
+			"country_code": "",
+			"country_name": "",
+			"image_file": "",
+			"image_url": "",
+			"image_4chan": "",
+			"image_md5": "",
+			"image_dimensions": "",
+			"image_filesize": 0,
+			"semantic_url": "",
+			"unsorted_data": json.dumps({"has_image": True if soup.find("span", {"class": "filesize"}) else False})
+			}
 
-		# Insert OP post into database
-		new_id = db.insert("posts_4chan", op_data, commit=False, safe=False, return_field="id_seq")
+	# Insert OP post into database
+	db.insert("posts_4chan", op_data, commit=False, safe=safe)
 
-		posts += 1
+	posts += 1
 
 	# Loop through replies, if present
 	for text in soup.find_all("td", {"class": "reply"}):
@@ -210,37 +206,34 @@ for html_doc in glob.iglob(os.path.join(args.input, "*.*")):
 		if has_image:
 			threads[thread_id]["num_images"] += 1
 
-		# Skip already-inserted posts
-		if args.skip_duplicates and int(post_id) in added_ids:
-			pass
-		else:
-			post_data = {
-				"thread_id": thread_id,
-				"id": post_id,
-				"board": "b",
-				"timestamp": interpolated_timestamp, # Same for entire thread
-				"subject": "",
-				"body": text.blockquote.get_text("\n") if text.blockquote else "",
-				"author": text.find("span", {"class": "postername"}).get_text() if text.find("span", {"class": "postername"}) else "",
-				"author_type": "",
-				"author_type_id": "N",
-				"author_trip": "",
-				"country_code": "",
-				"country_name": "",
-				"image_file": "",
-				"image_url": "",
-				"image_4chan": "",
-				"image_md5": "",
-				"image_dimensions": "",
-				"image_filesize": 0,
-				"semantic_url": "",
-				"unsorted_data": json.dumps({"has_image": has_image})
-				}
+		
+		post_data = {
+		"thread_id": thread_id,
+		"id": post_id,
+		"board": "b",
+		"timestamp": interpolated_timestamp, # Same for entire thread
+		"subject": "",
+		"body": text.blockquote.get_text("\n") if text.blockquote else "",
+		"author": text.find("span", {"class": "postername"}).get_text() if text.find("span", {"class": "postername"}) else "",
+		"author_type": "",
+		"author_type_id": "N",
+		"author_trip": "",
+		"country_code": "",
+		"country_name": "",
+		"image_file": "",
+		"image_url": "",
+		"image_4chan": "",
+		"image_md5": "",
+		"image_dimensions": "",
+		"image_filesize": 0,
+		"semantic_url": "",
+		"unsorted_data": json.dumps({"has_image": has_image})
+		}
 
-			# Insert into database
-			new_id = db.insert("posts_4chan", post_data, commit=False, safe=False, return_field="id_seq")
+		# Insert into database
+		db.insert("posts_4chan", post_data, commit=False, safe=safe)
 
-			posts += 1
+		posts += 1
 
 		# Commit per 10000 posts
 		if posts > 0 and posts % 10000 == 0:
@@ -251,7 +244,7 @@ db.commit()
 
 nthreads = 0
 for thread in threads.values():
-	db.insert("threads_4chan", data=thread, commit=False, safe=True)
+	db.insert("threads_4chan", data=thread, commit=False, safe=safe)
 	if nthreads > 0 and nthreads % 10000 == 0:
 		print("Committing threads %i - %i" % (nthreads - 10000, nthreads))
 		db.commit()
