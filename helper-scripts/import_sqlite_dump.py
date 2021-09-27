@@ -2,7 +2,9 @@
 
 Script to add the 4archived SQLite dump to the 4CAT 4chan datasets.
 
-which contains old data (2014 and 2015) from:
+Downloadable here: https://archive.org/download/4archive/4archive_dump-sqlite.7z
+
+This contains old data (2014 and 2015) from:
 
 /b/ (21832 threads), /a/ (11260 threads), /v/ (5855 threads), /mu/ (4457 threads), /fa/ (2483 threads), /g/ (2188 threads), /pol/ (906 threads), /s/ (793 threads), /co/ (719 threads), /m/ (626 threads), /vg/ (567 threads), /x/ (448 threads), /fit/ (439 threads), /k/ (422 threads), /vp/ (368 threads), /int/ (327 threads), /mlp/ (321 threads), /d/ (286 threads), /tv/ (282 threads), /h/ (264 threads), /soc/ (222 threads), /tg/ (221 threads), /hc/ (195 threads), /trv/ (187 threads), /e/ (169 threads), /w/ (164 threads), /t/ (158 threads), /sp/ (158 threads), /lit/ (142 threads), /sci/ (126 threads), /hm/ (126 threads), /r/ (121 threads), /toy/ (110 threads), /jp/ (70 threads), /adv/ (63 threads), /o/ (57 threads), /out/ (54 threads), /lgbt/ (52 threads), /c/ (50 threads), /ck/ (46 threads), /y/ (45 threads), /ic/ (41 threads), /diy/ (39 threads), /u/ (35 threads), /qa/ (30 threads), /cgl/ (27 threads), /biz/ (26 threads), /vr/ (22 threads), /i/ (21 threads), /n/ (13 threads), /cm/ (12 threads), /asp/ (12 threads), /an/ (12 threads), and /po/ (5 threads).
 
@@ -56,9 +58,7 @@ print("Connected to SQLite database.")
 count = 0
 skipped = 0
 threads_skipped = 0
-cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
-python3 helper-scripts/import_sqlite_dump.py -i /home/sal-phd/4chan-dumps/4archive_dump-sqlite -d 4chan -b b
-print(cursor.fetchall())
+
 # To loop
 c = conn.cursor()
 

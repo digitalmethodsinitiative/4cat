@@ -127,21 +127,22 @@ with open(args.input, encoding="utf-8") as inputfile:
 		db.insert("posts_4chan", post_data, commit=False, safe=safe)
 
 		if posts > 0 and posts % 10000 == 0:
-			print("Committing post %i - %i)" % (posts - 10000, posts))
+			print("Committing %i - %i post " % (posts - 10000, posts), end="")
 			db.commit()
 
-	db.commit()
-
-	# We're committing threads at the end.
-	# We can't assume how the data is sorted, so we wait until the last
-	# moment until assuming the thread data is complete. 
-	nthreads = 0
-	for thread in threads.values():
-		db.insert("threads_4chan", data=thread, commit=False, safe=safe)
-		if nthreads > 0 and nthreads % 10000 == 0:
-			print("Committing threads %i - %i" % (posts - 10000, posts))
+			# Commit threads that are at least two months older than the last encountered post. We use this gap to ensure thread data is up-to-date, even if the archive is only roughly ordered by time.
+			# We do it this way to prevent RAM hogging.
+			threads_added = set()
+			for thread in threads.values():
+				if (int(post["timestamp"]) - int(thread["timestamp_modified"])) > 5259487:
+					db.insert("threads_4chan", data=thread, commit=False, safe=safe)
+					threads_added.add(thread["id"])
+			
+			print("and %i threads" % len(threads_added), end="")
+			for thread_added in threads_added:
+				threads.pop(thread_added)
+			print(" (%i threads waiting to commit)" % len(threads))
 			db.commit()
-		nthreads += 1
 
 	db.commit()
 

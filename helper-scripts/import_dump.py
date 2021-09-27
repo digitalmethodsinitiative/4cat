@@ -43,7 +43,12 @@ if args.skip_duplicates:
 	safe = True
 
 with open(args.input, encoding="utf-8") as inputfile:
-	fieldnames = ("num", "subnum", "thread_num", "op", "timestamp", "timestamp_expired", "preview_orig", "preview_w", "preview_h", "media_filename", "media_w", "media_h", "media_size", "media_hash", "media_orig", "spoiler", "deleted", "capcode", "email", "name", "trip", "title", "comment", "sticky", "locked", "poster_hash", "poster_country", "exif")
+
+	if args.board == "v":
+		# The /v/ dump has slightly different columns
+		fieldnames = ("doc_id", "media_id", "poster_ip", "num", "subnum", "thread_num", "op", "timestamp", "timestamp_expired", "preview_orig", "preview_w", "preview_h", "media_filename", "media_w", "media_h", "media_size", "media_hash", "media_orig", "spoiler", "deleted", "capcode", "email", "name", "trip", "title", "comment", "delpass", "sticky", "locked", "poster_hash", "poster_country", "exif")
+	else:
+		fieldnames = ("num", "subnum", "thread_num", "op", "timestamp", "timestamp_expired", "preview_orig", "preview_w", "preview_h", "media_filename", "media_w", "media_h", "media_size", "media_hash", "media_orig", "spoiler", "deleted", "capcode", "email", "name", "trip", "title", "comment", "sticky", "locked", "poster_hash", "poster_country", "exif")
 	reader = csv.DictReader(inputfile, fieldnames=fieldnames, doublequote=False, escapechar="\\", strict=True)
 	
 	# Skip header
@@ -58,6 +63,8 @@ with open(args.input, encoding="utf-8") as inputfile:
 		print("Skipping %s rows." % args.offset)
 
 	for post in reader:
+
+		post = {k: csvnone.sub("", post[k]) if post[k] else None for k in post}
 
 		# We collect thread data first, even though we might skip this post
 		if post["thread_num"] not in threads:
@@ -95,8 +102,7 @@ with open(args.input, encoding="utf-8") as inputfile:
 		if args.offset and posts < args.offset:
 			continue
 		
-		post = {k: csvnone.sub("", post[k]) if post[k] else None for k in post}
-
+		
 		if post["media_filename"] and len({"media_w", "media_h", "preview_h", "preview_w"} - set(post.keys())) == 0:
 			dimensions = {"w": post["media_w"], "h": post["media_h"], "tw": post["preview_w"], "th": post["preview_h"]}
 		else:
@@ -133,18 +139,21 @@ with open(args.input, encoding="utf-8") as inputfile:
 			db.insert("posts_4chan_deleted", {"id_seq": new_id, "timestamp_deleted": post["deleted"]})
 
 		if posts > 0 and posts % 10000 == 0:
-			print("Committing post %i - %i)" % (posts - 10000, posts))
+			print("Committing %i - %i post " % (posts - 10000, posts), end="")
 			db.commit()
 
-	db.commit()
-
-	nthreads = 0
-	for thread in threads.values():
-		db.insert("threads_4chan", data=thread, commit=False, safe=safe)
-		if nthreads > 0 and nthreads % 10000 == 0:
-			print("Committing threads %i - %i" % (posts - 10000, posts))
+			# Commit threads that are at least two months older than the last encountered post. We use this gap to ensure thread data is up-to-date, even if the archive is only roughly ordered by time.
+			# We do it this way to prevent RAM hogging.
+			threads_added = set()
+			for thread in threads.values():
+				if (int(post["timestamp"]) - int(thread["timestamp_modified"])) > 5259487:
+					db.insert("threads_4chan", data=thread, commit=False, safe=safe)
+					threads_added.add(thread["id"])
+			print("and %i threads" % len(threads_added), end="")
+			for thread_added in threads_added:
+				threads.pop(thread_added)
+			print(" (%i threads waiting to commit)" % len(threads))
 			db.commit()
-		nthreads += 1
 
 	db.commit()
 
