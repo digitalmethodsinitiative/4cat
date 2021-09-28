@@ -155,6 +155,11 @@ with open(args.input, encoding="utf-8") as inputfile:
 			print(" (%i threads waiting to commit)" % len(threads))
 			db.commit()
 
+	# Add the last threads as well
+	print("Adding leftover threads")
+	for thread in threads.values():
+		db.insert("threads_4chan", data=thread, commit=False, safe=safe)
+
 	db.commit()
 
 print("Done")
