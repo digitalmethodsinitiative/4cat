@@ -56,7 +56,7 @@ with open(args.input, encoding="utf-8") as inputfile:
 
 	posts = 0
 	threads = {}
-	duplicates = 0
+	threads_last_seen = {}
 
 	# Show status
 	if args.offset:
@@ -96,6 +96,12 @@ with open(args.input, encoding="utf-8") as inputfile:
 		threads[post["thread_num"]]["post_last"] = post["num"]
 		threads[post["thread_num"]]["timestamp_modified"] = post["timestamp"]
 
+		# We reset the count of when we last seen this thread to 1
+		# to prevent committing incomplete thread data.
+		# Increase the count for the other threads.
+		threads_last_seen[post["thread_id"]] = 0
+		for k, v in threads_last_seen.items():
+			threads_last_seen[k] += 1
 		posts += 1
 		
 		# Skip rows if needed. Can be useful when importing didn't go correctly.
@@ -138,25 +144,28 @@ with open(args.input, encoding="utf-8") as inputfile:
 		if post["deleted"] != "0":
 			db.insert("posts_4chan_deleted", {"id_seq": new_id, "timestamp_deleted": post["deleted"]})
 
+		# Insert per every 10000 posts
 		if posts > 0 and posts % 10000 == 0:
-			print("Committing %i - %i post " % (posts - 10000, posts), end="")
-			db.commit()
+			print("Committing %i - %i posts. " % (posts - 10000, posts), end="")
 
-			# Commit threads that are at least two months older than the last encountered post. We use this gap to ensure thread data is up-to-date, even if the archive is only roughly ordered by time.
-			# We do it this way to prevent RAM hogging.
-			threads_added = set()
-			for thread in threads.values():
-				if (int(post["timestamp"]) - int(thread["timestamp_modified"])) > 5259487:
-					db.insert("threads_4chan", data=thread, commit=False, safe=safe)
-					threads_added.add(thread["id"])
-			print("and %i threads" % len(threads_added), end="")
-			for thread_added in threads_added:
-				threads.pop(thread_added)
-			print(" (%i threads waiting to commit)" % len(threads))
+			# We're commiting the threads we didn't encounter in the last 100.000 posts. We're assuming they're complete and won't be seen in this archive anymore.
+			# This is semi-necessary to prevent RAM hogging.
+			threads_committed = 0
+			for thread_seen, last_seen in threads_last_seen.items():
+				if last_seen > 10000:
+					db.upsert("threads_4chan", data=threads[thread_seen], commit=False, constraints=["id", "board"])
+					threads.pop(thread_seen)
+					threads_committed += 1
+
+			# Remove committed threads from the last seen list
+			threads_last_seen = {k: v for k, v in threads_last_seen.items() if v < 10000}
+
+			print("Comitting %i threads (%i still updating)." % (threads_committed, len(threads)))
+			
 			db.commit()
 
 	# Add the last threads as well
-	print("Adding leftover threads")
+	print("Comitting leftover threads")
 	for thread in threads.values():
 		db.insert("threads_4chan", data=thread, commit=False, safe=safe)
 
