@@ -30,9 +30,8 @@ if "board" in columns:
 else:
 	print(" adding 'board' column to 4chan posts table")
 	db.execute("ALTER TABLE posts_4chan ADD COLUMN board TEXT DEFAULT ''")
-
-print("  Filling 'board' column")
-db.execute("UPDATE posts_4chan SET board = ( SELECT board FROM threads_4chan WHERE id = posts_4chan.thread_id )")
+	print("  Filling 'board' column")
+	db.execute("UPDATE posts_4chan SET board = ( SELECT board FROM threads_4chan WHERE id = posts_4chan.thread_id )")
 
 print("  Creating index")
-db.execute("CREATE UNIQUE INDEX IF NOT EXISTS posts_4chan_id ON posts_4chan ( id, board )")
+db.execute("CREATE UNIQUE INDEX IF NOT EXISTS posts_4chan_idboard ON posts_4chan ( id, board )")
