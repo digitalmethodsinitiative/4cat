@@ -1,3 +1,18 @@
+import subprocess
+import sys
+from pathlib import Path
+
+# first-run.py ensures everything is set up right when running 4CAT for the first time
+first_run = Path(__file__).parent.parent.joinpath("helper-scripts", "first-run.py")
+result = subprocess.run([sys.executable, str(first_run)], stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE)
+
+if result.returncode != 0:
+    print("Unexpected error while preparing 4CAT. You may need to re-install 4CAT.")
+    print("stdout:\n".join(["  " + line for line in result.stdout.decode("utf-8").split("\n")]))
+    print("stderr:\n".join(["  " + line for line in result.stderr.decode("utf-8").split("\n")]))
+    exit(1)
+
 from flask import Flask
 from flask_login import LoginManager
 from flask_limiter import Limiter

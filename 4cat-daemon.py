@@ -1,3 +1,4 @@
+import subprocess
 import argparse
 import time
 import sys
@@ -17,6 +18,20 @@ cli.add_argument("--no-version-check", "-n", default=False,
                  help="Skip version check that may prompt the user to migrate first.", action="store_true")
 cli.add_argument("command")
 args = cli.parse_args()
+
+# ---------------------------------------------
+#  first-run.py ensures everything is set up
+#  right when running 4CAT for the first time
+# ---------------------------------------------
+first_run = Path(__file__).parent.joinpath("helper-scripts", "first-run.py")
+result = subprocess.run([sys.executable, str(first_run)], stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE)
+
+if result.returncode != 0:
+    print("Unexpected error while preparing 4CAT. You may need to re-install 4CAT.")
+    print("stdout:\n".join(["  " + line for line in result.stdout.decode("utf-8").split("\n")]))
+    print("stderr:\n".join(["  " + line for line in result.stderr.decode("utf-8").split("\n")]))
+    exit(1)
 
 # ---------------------------------------------
 #     Do not start if migration is required
