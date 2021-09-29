@@ -7,10 +7,11 @@ var sigmaconfig = {
 	defaultLabelAlignment: "right",
 	minEdgeSize: 0.1,
 	maxEdgeSize: 1,
-	minNodeSize: 2,
+	minNodeSize: 5,
 	maxNodeSize: 20,
-	labelSize: "proportional",
-	labelSizeRatio: 1,
+	defaultLabelSize: 10,
+	labelSize: "fixed",
+	labelSizeRatio: 2,
 	labelThreshold: 3,
 	verbose: true
 };
@@ -29,38 +30,39 @@ var fa2config = {
 
 var animation_running = false;
 var graph_manipulation_disabled = false;
-
 var current_json;
 
-function init_network(core_json) {
+// Create an empty, global sigma instance
+var s = new sigma({
+	container: 'graph-container',
+	settings: sigmaconfig
+});
 
-	create_slider(Object.keys(core_json).length);
+function init_network(source_file) {
 
-	key = Object.keys(core_json)[0]
-
-	render_new_network(core_json[key]);
+	render_new_network(source_file);
 
 	// Notify what model is visualised here
-	$("#network-name-box").text(key);
+	$("#network-name-box").text(source_file.split("/").slice(-1));
+
 }
 
-function render_new_network(json) {
-
-	//console.log(json)
-
-	s = new sigma({
-		graph: json,
-		container: "graph-container",
-		settings: sigmaconfig
-	});
-
-	// To render everything
-	s.refresh();
-
+function render_new_network(source_file) {
+	
+	// Load the gexf file into the existing sigma instance
+	sigma.parsers.gexf(
+		source_file,
+		s,
+		function() {
+			s.refresh()
+		}
+	);
 }
 
 function change_network(update_json) {
 	/*
+	DEPRACATED: Dynamic changing of networks not supported at the moment.
+
 	Changes the network layout without rendering an entirely new graph.
 	Also makes for nice transitions so graphs can be "animated".
 	*/
@@ -224,6 +226,7 @@ function start_force_atlas() {
 
 function change_date(index) {
 	/*
+	DEPRACATED: Dynamic changing of networks not supported at the moment.
 	Change the nodes in the graph on the basis of a new object
 	*/
 
@@ -234,6 +237,7 @@ function change_date(index) {
 
 function start_animation(json, index) {
 	/*
+	DEPRACATED: Dynamic changing of networks not supported at the moment.
 	Animate networks over time
 	*/
 
@@ -266,6 +270,7 @@ function start_animation(json, index) {
 
 function stop_animation() {
 	/*
+	DEPRACATED: Dynamic changing of networks not supported at the moment.
 	Stop the network animation
 	*/
 

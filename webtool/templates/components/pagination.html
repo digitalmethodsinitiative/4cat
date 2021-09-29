@@ -1,0 +1,22 @@
+
+    <nav class="pagination">
+        <ol>
+            {% if pagination.has_prev %}
+                    <li><a href="{{ url_for(pagination.route, page=(pagination.page - 1)) }}?{{ filter|http_query }}&amp;depth={{ depth }}">&laquo; Previous</a></li>
+            {% endif %}
+            {%- for page in pagination.iter_pages() %}
+                {% if page %}
+                    {% if page != pagination.page %}
+                        <li class="page"><a href="{{ url_for(pagination.route, page=page) }}?{{ filter|http_query }}&amp;depth={{ depth }}">{{ page }}</a></li>
+                    {% else %}
+                        <li class="page"><strong class="current">{{ page }}</strong></li>
+                    {% endif %}
+                {% else %}
+                    <li class="ellipsis">…</li>
+                {% endif %}
+            {%- endfor %}
+            {% if pagination.has_next %}
+                    <li><a href="{{ url_for(pagination.route, page=(pagination.page + 1)) }}?{{ filter|http_query }}&amp;depth={{ depth }}">Next &raquo;</a></li>
+            {% endif %}
+        </ol>
+    </nav>

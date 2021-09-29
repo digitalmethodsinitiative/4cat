@@ -1,0 +1,50 @@
+{% extends "layout.html" %}
+
+{% block title %}{% if mode == "edit" %}Edit user '{{ user.name }}'{% else %}Create user{% endif %}{% endblock %}
+{% block body_class %}plain-page frontpage admin {{ body_class }}{% endblock %}
+
+{% block body %}
+    <article class="small">
+        <section>
+            <h2><span>{% if mode == "edit" %}Edit user '{{ user.name }}'{% else %}Create user{% endif %}</span></h2>
+            {% if mode != "edit" %}
+            <p>If you do not enter a password, after creating the account, a link will be generated through which the
+                password may be set by the user.</p>
+            {% endif %}
+
+            <form action="{{ url_for('manipulate_user', mode=mode) }}" method="POST" class="wide">
+                {% for notice in flashes %}
+                    <p class="form-notice">{{ notice|safe }}</p>
+                {% endfor %}
+                <div class="form-element{% if "name" in incomplete %} missing{% endif %}">
+                    <label for="user-name">Name (e-mail)</label>
+                    <input type="text" name="name" id="user-name" value="{{ user.name }}">
+                </div>
+                <div class="form-element">
+                    <label for="user-admin">Is admin?</label>
+                    <input type="checkbox"{% if user.is_admin %} checked="checked"{% endif %} id="user-admin" name="is_admin">
+                </div>
+                {% if mode != "edit" %}
+                <div class="form-element">
+                    <label for="user-password">Password</label>
+                    <input type="password" id="user-password" name="password">
+                </div>
+                {% endif %}
+                <div class="form-element{% if "userdata" in incomplete %} missing{% endif %}">
+                    <label for="user-userdata">User data (JSON)</label>
+                    <textarea rows="10" cols="50" id="user-userdata" name="userdata" data-validate-format="json" class="code">{{ user.userdata }}</textarea>
+                </div>
+                <div class="submit-container">
+                    <input type="hidden" name="current-name" value="{{ user.name }}">
+                    <button>
+                        {% if mode == "edit" %}
+                            <i class="fa fa-save" aria-hidden="true"></i> Save
+                        {% else %}
+                            <i class="fa fa-user-plus" aria-hidden="true"></i> Create
+                        {% endif %}
+                    </button>
+                </div>
+            </form>
+        </section>
+    </article>
+{% endblock %}

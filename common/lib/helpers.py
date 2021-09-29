@@ -1,11 +1,15 @@
 """
 Miscellaneous helper functions for the 4CAT backend
 """
+import subprocess
 import datetime
+import smtplib
 import socket
+import copy
 import json
 import csv
 import re
+import os
 
 from pathlib import Path
 from html.parser import HTMLParser
@@ -95,12 +99,31 @@ def get_software_version():
 	Reads a given version file and returns the first string found in there
 	(up until the first space). On failure, return an empty string.
 
+	If no version file is available, run `git show` to test if there is a git
+	repository in the 4CAT root folder, and if so, what commit is currently
+	checked out in it.
+
 	:return str:  4CAT version
 	"""
 	versionpath = Path(config.PATH_ROOT, config.PATH_VERSION)
 
-	if not versionpath.exists() or not versionpath.is_file():
+	if versionpath.exists() and not versionpath.is_file():
 		return ""
+
+	if not versionpath.exists():
+		# try github command line within the 4CAT root folder
+		# if it is a checked-out git repository, it will tell us the hash of
+		# the currently checked-out commit
+		try:
+			cwd = os.getcwd()
+			os.chdir(config.PATH_ROOT)
+			show = subprocess.run(["git", "show"], stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+			os.chdir(cwd)
+			if show.returncode != 0:
+				raise ValueError()
+			return show.stdout.decode("utf-8").split("\n")[0].split(" ")[1]
+		except (subprocess.SubprocessError, IndexError, TypeError, ValueError, FileNotFoundError):
+			return ""
 
 	try:
 		with versionpath.open("r") as versionfile:
@@ -433,3 +456,85 @@ def gdf_escape(string):
 	:return str:  Escaped string
 	"""
 	return "'" + string.replace("'", "\\'").replace("\n", "\\n") + "'"
+
+
+def dict_search_and_update(item, keyword_matches, function):
+	"""
+	Apply a function to every item and sub item of a dictionary if the key contains one of the provided match terms.
+
+	Function loops through a dictionary or list and compares dictionary keys to the strings defined by keyword_matches.
+	It then applies the change_function to corresponding values.
+
+	Note: if a matching term is found, all nested values will have the function applied to them. e.g.,
+	all these values would be changed even those with not_key_match:
+	{'key_match' : 'changed',
+	'also_key_match' : {'not_key_match' : 'but_value_still_changed'},
+	'another_key_match': ['this_is_changed', 'and_this', {'not_key_match' : 'even_this_is_changed'}]}
+
+	This is a comprehensive (and expensive) approach to updating a dictionary.
+	IF a dictionary structure is known, a better solution would be to update using specific keys.
+
+	:param Dict/List item:  dictionary/list/json to loop through
+	:param String keyword_matches:  list of strings that will be matched to dictionary keys
+	:param Function function:  function appled to all values of any items nested under a matching key
+	:return Dict/List: Copy of original item
+	"""
+	def loop_helper_function(d_or_l, match_terms, change_function):
+		"""
+		Recursive helper function that updates item in place
+		"""
+		if isinstance(d_or_l, dict):
+			# Iterate through dictionary
+			for key, value in iter(d_or_l.items()):
+				if match_terms == 'True' or any([match in key.lower() for match in match_terms]):
+					# Match found; apply function to all items and sub-items
+					if isinstance(value, (list, dict)):
+						# Pass item through again with match_terms = True
+						loop_helper_function(value, 'True', change_function)
+					elif value is None:
+						pass
+					else:
+						# Update the value
+						d_or_l[key] = change_function(value)
+				elif isinstance(value, (list, dict)):
+					# Continue search
+					loop_helper_function(value, match_terms, change_function)
+		elif isinstance(d_or_l, list):
+			# Iterate through list
+			for n, value in enumerate(d_or_l):
+				if isinstance(value, (list, dict)):
+					# Continue search
+					loop_helper_function(value, match_terms, change_function)
+				elif match_terms == 'True':
+					# List item nested in matching
+					d_or_l[n] = change_function(value)
+		else:
+			raise Exception('Must pass list or dictionary')
+
+	# Lowercase keyword_matches
+	keyword_matches = [keyword.lower() for keyword in keyword_matches]
+
+	# Create deepcopy and return new item
+	temp_item = copy.deepcopy(item)
+	loop_helper_function(temp_item, keyword_matches, function)
+	return temp_item
+
+
+def send_email(recipient, message):
+	"""
+	Send an e-mail using the configured SMTP settings
+
+	Just a thin wrapper around smtplib, so we don't have to repeat ourselves.
+	Exceptions are to be handled outside the function.
+
+	:param list recipient:  Recipient e-mail addresses
+	:param MIMEMultipart message:  Message to send
+	"""
+	connector = smtplib.SMTP_SSL if hasattr(config, "MAIL_SSL") and config.MAIL_SSL else smtplib.SMTP
+
+	with connector(config.MAILHOST) as smtp:
+		if hasattr(config, "MAIL_USERNAME") and hasattr(config, "MAIL_PASSWORD") and config.MAIL_USERNAME and config.MAIL_PASSWORD:
+			smtp.ehlo()
+			smtp.login(config.MAIL_USERNAME, config.MAIL_PASSWORD)
+
+		smtp.sendmail(config.NOREPLY_EMAIL, recipient, message.as_string())

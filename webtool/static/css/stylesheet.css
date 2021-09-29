@@ -96,6 +96,10 @@ table {
     border: 2px solid var(--contrast-dark);
 }
 
+table.fullwidth {
+    width: 100%;
+}
+
 table td, table th {
     font-size: inherit;
     padding: 0 0.5em;
@@ -130,6 +134,11 @@ input[type=date] {
     max-width: 10em;
 }
 
+input[type=radio], input[type=checkbox] {
+    justify-self: start;
+    min-width: 0;
+}
+
 fieldset {
     border-bottom: 1px dotted var(--contrast-dark);
 }
@@ -137,6 +146,7 @@ fieldset {
 p.form-notice {
     text-align: center;
     color: var(--accent-alternate);
+    margin-top: 0.5em;
 }
 
 .form-element {
@@ -166,13 +176,25 @@ article.small .form-element {
     min-height: 6em;
 }
 
-article.small .form-element > * {
+.form-element > textarea.code {
+    font-family: monospace;
+}
+
+article.small .form-element > *:not([type=radio], [type=checkbox]) {
     min-width: 5em;
 }
 
 .form-element label {
     text-align: right;
     padding-right: 1em;
+}
+
+.form-element.missing label {
+    color: var(--accent-error);
+}
+
+.form-element.missing input, .form-element.missing textarea {
+    border: 1px solid var(--accent-error);
 }
 
 .form-element .option-help {

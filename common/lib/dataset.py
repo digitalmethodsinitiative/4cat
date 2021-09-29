@@ -436,6 +436,9 @@ class DataSet(FourcatModule):
 			return parameters["subject_match"]
 		elif parameters.get("query"):
 			label = parameters["query"] if len(parameters["query"]) < 30 else parameters["query"][:25] + "..."
+			# Some legacy datasets have lists as query data
+			if isinstance(label, list):
+				label = ", ".join(label)
 			label = label.strip().replace("\n", ", ")
 			return label
 		elif parameters.get("country_flag") and parameters["country_flag"] != "all":
@@ -720,6 +723,15 @@ class DataSet(FourcatModule):
 				available[processor_type] = processor
 
 		return available
+
+	def get_own_processor(self):
+		"""
+		Get the processor class that produced this dataset
+
+		:return:  Processor class, or `None` if not available.
+		"""
+		return backend.all_modules.processors.get(self.data.get("type"))
+
 
 	def get_available_processors(self):
 		"""

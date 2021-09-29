@@ -21,6 +21,7 @@ cli = argparse.ArgumentParser()
 cli.add_argument("-u", "--username", required=True, help="Name of user (must be unique)")
 cli.add_argument("-p", "--password", help="Password (if left empty an e-mail will be sent to the user to reset it)")
 cli.add_argument("-e", "--noemail", help="Do not force an e-mail as username", action="store_true")
+cli.add_argument("-a", "--admin", help="Make this user an admin user", action="store_true")
 
 args = cli.parse_args()
 
@@ -32,7 +33,7 @@ if not args.noemail and not re.match(r"[^@]+\@.*?\.[a-zA-Z]+", args.username):
 	sys.exit(1)
 
 try:
-	db.insert("users", data={"name": args.username, "timestamp_token": int(time.time())})
+	db.insert("users", data={"name": args.username, "timestamp_token": int(time.time()), "is_admin": args.admin})
 except psycopg2.IntegrityError:
 	print("Error: User %s already exists." % args.username)
 	sys.exit(1)

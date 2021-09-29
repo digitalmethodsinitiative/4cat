@@ -491,7 +491,8 @@ class SearchReddit(SearchWithScope):
 				else:
 					raise RuntimeError("HTTP %s" % response.status_code)
 			except (RuntimeError, requests.RequestException) as e:
-				self.log.info("Error %s while querying Pushshift API - retrying..." % e)
+				self.log.info("Error %s while querying Pushshift API - waiting 15 seconds and retrying..." % e)
+				time.sleep(15)
 				retries += 1
 
 		if retries >= self.max_retries:

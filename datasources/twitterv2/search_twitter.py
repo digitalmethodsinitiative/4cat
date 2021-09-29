@@ -173,10 +173,10 @@ class SearchWithTwitterAPIv2(Search):
             elif api_response.status_code == 403:
                 try:
                     structured_response = api_response.json()
-                    self.dataset.update_status("'Forbidden' error from Twitter API. Could not connect to Twitter API "
+                    self.dataset.update_status("'Forbidden' error from the Twitter API. Could not connect to Twitter API "
                                                "with this API key. %s" % structured_response.get("detail", ""), is_final=True)
                 except (json.JSONDecodeError, ValueError):
-                    self.dataset.update_status("'Forbidden' error from Twitter API. Your key may not have access to "
+                    self.dataset.update_status("'Forbidden' error from the Twitter API. Your key may not have access to "
                                                "the full-archive search endpoint.", is_final=True)
                 finally:
                     return
@@ -247,7 +247,7 @@ class SearchWithTwitterAPIv2(Search):
 
                 tweets += 1
                 if tweets % 500 == 0:
-                    self.dataset.update_status("Received %i tweets from Twitter API" % tweets)
+                    self.dataset.update_status("Received %i tweets from the Twitter API" % tweets)
 
                 yield tweet
 
@@ -286,6 +286,8 @@ class SearchWithTwitterAPIv2(Search):
 
         :return dict:  Enriched tweet object
         """
+        # Copy the tweet so that updating this tweet has no effect on others
+        tweet = copy.deepcopy(tweet)
         # first create temporary mappings so we can easily find the relevant
         # object later
         users_by_id = {user["id"]: user for user in users}
@@ -428,4 +430,3 @@ class SearchWithTwitterAPIv2(Search):
                 [mention["username"] for mention in tweet.get("entities", {}).get("mentions", [])[:1]]) if any(
                 [ref.get("type") == "replied_to" for ref in tweet.get("referenced_tweets", [])]) else ""
         }
-

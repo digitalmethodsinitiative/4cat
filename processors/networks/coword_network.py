@@ -20,7 +20,7 @@ class CowordNetworker(ProcessorPreset):
     description = "Create a Gephi-compatible network comprised of co-words, with edges between " \
                   "words that appear close to each other. Edges and nodes are weighted by the " \
                   "amount of co-word occurrences."  # description displayed in UI
-    extension = "gdf"  # extension of result file, used internally and in UI
+    extension = "gexf"  # extension of result file, used internally and in UI
 
     @classmethod
     def is_compatible_with(cls, module=None):

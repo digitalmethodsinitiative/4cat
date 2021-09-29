@@ -1,13 +1,13 @@
 ## Data Policy
 
-We collect the following data:
+When you use this 4CAT instance, we collect the following data:
 
 - Your IP address and the URL through which you query our web tool will be 
   logged by our web server. This is required to monitor web server use, and 
   detect errors and abuse.
 
-If you use our web tool to query 4CAT, we additionally save the following 
-data:
+If you use the web interface to create datasets with 4CAT, we additionally 
+save the following data:
 
 - Any data provide as input for the 4CAT search tools. We need this to cache 
   results, perform your search queries more efficiently and reduce strain on 
@@ -34,15 +34,14 @@ following data:
   of our web tool. 
   
 - When you mark a dataset as 'favourite', that information is stored on our
-  servers, and may be viewed by 4CAT maintainers to monitor general usage 
-  patterns. Regular users cannot see your favourites.
+  servers, and may be viewed by 4CAT instance maintainers to monitor general 
+  usage patterns. Regular users cannot see your favourites.
   
 We do not share any of this data with anyone else. Anonymised data may be used 
-as part of research projects. All data is stored on a secure server and can 
-only be accessed by the two maintainers of 4CAT.
+as part of research projects. All data is stored on a secure server.
 
 If you want to see or remove your personal data, please contact us at 
-[4cat@oilab.eu](mailto:4cat@oilab.eu). Please allow up to four weeks for us to 
+[%%ADMIN_EMAIL%%](mailto:%%ADMIN_EMAIL%%). Please allow up to four weeks for us to 
 respond to you. We may ask you for further information to help us accurately 
 respond to your request. 
 

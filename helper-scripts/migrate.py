@@ -198,6 +198,21 @@ if current_version_file.exists():
 	current_version_file.unlink()
 shutil.copy(target_version_file, ".current-version")
 
+
+# ---------------------------------------------
+#        Check for and install packages
+# ---------------------------------------------
+# NLTK
+import nltk
+try:
+	nltk.data.find('tokenizers/punkt')
+except LookupError:
+	nltk.download('punkt')
+try:
+	nltk.data.find('corpora/wordnet')
+except LookupError:
+	nltk.download("wordnet")
+
 print("\nMigration scripts finished.")
 print("It is recommended to re-generate your Sphinx configuration and index files to account for database updates.")
 print("You can now safely restart 4CAT.\n")

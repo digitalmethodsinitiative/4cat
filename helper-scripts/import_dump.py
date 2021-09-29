@@ -1,3 +1,10 @@
+"""
+Import 4chan data from Archived.moe csv dumps.
+
+Several of these are downloadable here: https://archive.org/details/archivedmoe_db_201908
+
+"""
+
 import argparse
 import json
 import time
@@ -22,122 +29,146 @@ cli.add_argument("-o", "--offset", type=int, required=False, help="How many rows
 args = cli.parse_args()
 
 if not Path(args.input).exists() or not Path(args.input).is_file():
-    print("%s is not a valid folder name." % args.input)
-    sys.exit(1)
+	print("%s is not a valid folder name." % args.input)
+	sys.exit(1)
 
 logger = Logger()
 db = Database(logger=logger, appname="queue-dump")
 
 csvnone = re.compile(r"^N$")
 
+safe = False
 if args.skip_duplicates:
-    db_ids = db.fetchall("SELECT id FROM posts_4chan WHERE board ='%s';" % args.board)
-    added_ids = [[v for k, v in added_id.items()][0] for added_id in db_ids]
-    print(len(added_ids), "posts for %s already added" % args.board)
+	print("Skipping duplicate rows (ON CONFLICT DO NOTHING).")
+	safe = True
 
-seen_post_ids = set()
 with open(args.input, encoding="utf-8") as inputfile:
-    fieldnames = ("num", "subnum", "thread_num", "op", "timestamp", "timestamp_expired", "preview_orig", "preview_w", "preview_h", "media_filename", "media_w", "media_h", "media_size", "media_hash", "media_orig", "spoiler", "deleted", "capcode", "email", "name", "trip", "title", "comment", "sticky", "locked", "poster_hash", "poster_country", "exif")
-    reader = csv.DictReader(inputfile, fieldnames=fieldnames, doublequote=False, escapechar="\\", strict=True)
-    
-    posts = 0
-    threads = {}
-    duplicates = 0
 
-    # Skip rows if needed. Can be useful when importing didn't go correctly.
-    if args.offset:
-        [next(reader, None) for item in range(args.offset)]
+	if args.board == "v":
+		# The /v/ dump has slightly different columns
+		fieldnames = ("doc_id", "media_id", "poster_ip", "num", "subnum", "thread_num", "op", "timestamp", "timestamp_expired", "preview_orig", "preview_w", "preview_h", "media_filename", "media_w", "media_h", "media_size", "media_hash", "media_orig", "spoiler", "deleted", "capcode", "email", "name", "trip", "title", "comment", "delpass", "sticky", "locked", "poster_hash", "poster_country", "exif")
+	else:
+		fieldnames = ("num", "subnum", "thread_num", "op", "timestamp", "timestamp_expired", "preview_orig", "preview_w", "preview_h", "media_filename", "media_w", "media_h", "media_size", "media_hash", "media_orig", "spoiler", "deleted", "capcode", "email", "name", "trip", "title", "comment", "sticky", "locked", "poster_hash", "poster_country", "exif")
+	reader = csv.DictReader(inputfile, fieldnames=fieldnames, doublequote=False, escapechar="\\", strict=True)
+	
+	# Skip header
+	next(reader, None)
 
-    for post in reader:
+	posts = 0
+	threads = {}
+	threads_last_seen = {}
 
+	# Show status
+	if args.offset:
+		print("Skipping %s rows." % args.offset)
 
-        post = {k: csvnone.sub("", post[k]) if post[k] else None for k in post}
+	for post in reader:
 
-        posts += 1
-        if post["media_filename"] and len({"media_w", "media_h", "preview_h", "preview_w"} - set(post.keys())) == 0:
-            dimensions = {"w": post["media_w"], "h": post["media_h"], "tw": post["preview_w"], "th": post["preview_h"]}
-        else:
-            dimensions = {}
+		post = {k: csvnone.sub("", post[k]) if post[k] else None for k in post}
 
-        if post["subnum"] != "0":
-            # ghost post
-            continue
+		# We collect thread data first, even though we might skip this post
+		if post["thread_num"] not in threads:
+			threads[post["thread_num"]] = {
+				"id": post["thread_num"],
+				"board": args.board,
+				"timestamp": 0,
+				"timestamp_scraped": int(time.time()),
+				"timestamp_modified": 0,
+				"num_unique_ips": -1,
+				"num_images": 0,
+				"num_replies": 0,
+				"limit_bump": False,
+				"limit_image": False,
+				"is_sticky": False,
+				"is_closed": False,
+				"post_last": 0
+			}
+		
+		if post["op"] == "1":
+			threads[post["thread_num"]]["timestamp"] = post["timestamp"]
+			threads[post["thread_num"]]["is_sticky"] = post["sticky"] == "1"
+			threads[post["thread_num"]]["is_closed"] = post["locked"] == "1"
 
-        # Duplicate posts
-        if args.skip_duplicates:
-            if int(post["num"]) in added_ids:
-                continue
+		if post["media_filename"]:
+			threads[post["thread_num"]]["num_images"] += 1
 
-        seen_post_ids.add(post["num"])
-        post_data = {
-            "id": post["num"],
-            "board": args.board,
-            "thread_id": post["thread_num"],
-            "timestamp": post["timestamp"],
-            "subject": post.get("title", ""),
-            "body": post.get("comment", ""),
-            "author": post.get("name", ""),
-            "author_trip": post.get("trip", ""),
-            "author_type": post["id"] if "id" in post else "",
-            "author_type_id": post["capcode"] if post["capcode"] != "" else "N",
-            "country_name": "",
-            "country_code": post.get("poster_country", ""),
-            "image_file": post["media_filename"],
-            "image_4chan": post["media_orig"],
-            "image_md5": post.get("media_hash", ""),
-            "image_filesize": post.get("media_size", 0),
-            "image_dimensions": json.dumps(dimensions)
-        }
+		threads[post["thread_num"]]["num_replies"] += 1
+		threads[post["thread_num"]]["post_last"] = post["num"]
+		threads[post["thread_num"]]["timestamp_modified"] = post["timestamp"]
 
-        if post["thread_num"] not in threads:
-            threads[post["thread_num"]] = {
-                "id": post["thread_num"],
-                "board": args.board,
-                "timestamp": 0,
-                "timestamp_scraped": int(time.time()),
-                "timestamp_modified": 0,
-                "num_unique_ips": -1,
-                "num_images": 0,
-                "num_replies": 0,
-                "limit_bump": False,
-                "limit_image": False,
-                "is_sticky": False,
-                "is_closed": False,
-                "post_last": 0
-            }
+		# We reset the count of when we last seen this thread to 1
+		# to prevent committing incomplete thread data.
+		# Increase the count for the other threads.
+		threads_last_seen[post["thread_id"]] = 0
+		for k, v in threads_last_seen.items():
+			threads_last_seen[k] += 1
+		posts += 1
+		
+		# Skip rows if needed. Can be useful when importing didn't go correctly.
+		if args.offset and posts < args.offset:
+			continue
+		
+		
+		if post["media_filename"] and len({"media_w", "media_h", "preview_h", "preview_w"} - set(post.keys())) == 0:
+			dimensions = {"w": post["media_w"], "h": post["media_h"], "tw": post["preview_w"], "th": post["preview_h"]}
+		else:
+			dimensions = {}
 
-        if post["op"] == "1":
-            threads[post["thread_num"]]["timestamp"] = post["timestamp"]
-            threads[post["thread_num"]]["is_sticky"] = post["sticky"] == "1"
-            threads[post["thread_num"]]["is_closed"] = post["locked"] == "1"
+		if post["subnum"] != "0":
+			# ghost post
+			continue
 
-        if post["media_filename"]:
-            threads[post["thread_num"]]["num_images"] += 1
+		post_data = {
+			"id": post["num"],
+			"board": args.board,
+			"thread_id": post["thread_num"],
+			"timestamp": post["timestamp"],
+			"subject": post.get("title", ""),
+			"body": post.get("comment", ""),
+			"author": post.get("name", ""),
+			"author_trip": post.get("trip", ""),
+			"author_type": post["id"] if "id" in post else "",
+			"author_type_id": post["capcode"] if post["capcode"] != "" else "N",
+			"country_name": "",
+			"country_code": post.get("poster_country", ""),
+			"image_file": post["media_filename"],
+			"image_4chan": post["media_orig"],
+			"image_md5": post.get("media_hash", ""),
+			"image_filesize": post.get("media_size", 0),
+			"image_dimensions": json.dumps(dimensions)
+		}
 
-        threads[post["thread_num"]]["num_replies"] += 1
-        threads[post["thread_num"]]["post_last"] = post["num"]
-        threads[post["thread_num"]]["timestamp_modified"] = post["timestamp"]
+		post_data = {k: str(v).replace("\x00", "") for k, v in post_data.items()}
+		new_id = db.insert("posts_4chan", post_data, commit=False, safe=safe, return_field="id_seq")
 
-        post_data = {k: str(v).replace("\x00", "") for k, v in post_data.items()}
-        new_id = db.insert("posts_4chan", post_data, commit=False, safe=False, return_field="id_seq")
+		if post["deleted"] != "0":
+			db.insert("posts_4chan_deleted", {"id_seq": new_id, "timestamp_deleted": post["deleted"]})
 
-        if post["deleted"] != "0":
-            db.insert("posts_4chan_deleted", {"id_seq": new_id, "timestamp_deleted": post["deleted"]})
+		# Insert per every 10000 posts
+		if posts > 0 and posts % 10000 == 0:
+			print("Committing %i - %i posts. " % (posts - 10000, posts), end="")
 
-        if posts > 0 and posts % 10000 == 0:
-            print("Committing post %i - %i)" % (posts - 10000, posts))
-            db.commit()
+			# We're commiting the threads we didn't encounter in the last 100.000 posts. We're assuming they're complete and won't be seen in this archive anymore.
+			# This is semi-necessary to prevent RAM hogging.
+			threads_committed = 0
+			for thread_seen, last_seen in threads_last_seen.items():
+				if last_seen > 10000:
+					db.upsert("threads_4chan", data=threads[thread_seen], commit=False, constraints=["id", "board"])
+					threads.pop(thread_seen)
+					threads_committed += 1
 
-    db.commit()
+			# Remove committed threads from the last seen list
+			threads_last_seen = {k: v for k, v in threads_last_seen.items() if v < 10000}
 
-    nthreads = 0
-    for thread in threads.values():
-        db.insert("threads_4chan", data=thread, commit=False, safe=False)
-        if nthreads > 0 and nthreads % 10000 == 0:
-            print("Committing threads %i - %i" % (posts - 10000, posts))
-            db.commit()
-        nthreads += 1
+			print("Comitting %i threads (%i still updating)." % (threads_committed, len(threads)))
+			
+			db.commit()
 
-    db.commit()
+	# Add the last threads as well
+	print("Comitting leftover threads")
+	for thread in threads.values():
+		db.insert("threads_4chan", data=thread, commit=False, safe=safe)
+
+	db.commit()
 
 print("Done")

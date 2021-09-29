@@ -5,7 +5,8 @@
 
 {% block body %}
     <nav class="view-controls block">
-        <form action="" method="GET">
+        <form action="{{ url_for("show_results") }}" method="GET">
+            <input type="hidden" name="depth" value="{{ depth }}">
             <ul>
                 <li><input aria-label="Query filter" placeholder="Filter queries..." name="filter"
                            value="{{ filter.filter }}"></li>
@@ -64,26 +65,5 @@
         {% endif %}
         </section>
     </article>
-
-    <nav class="pagination">
-        <ol>
-            {% if pagination.has_prev %}
-                    <li><a href="{{ url_for("show_results", page=(pagination.page - 1)) }}?{{ filter|http_query }}&amp;depth={{ depth }}">&laquo; Previous</a></li>
-            {% endif %}
-            {%- for page in pagination.iter_pages() %}
-                {% if page %}
-                    {% if page != pagination.page %}
-                        <li class="page"><a href="{{ url_for("show_results", page=page) }}?{{ filter|http_query }}&amp;depth={{ depth }}">{{ page }}</a></li>
-                    {% else %}
-                        <li class="page"><strong class="current">{{ page }}</strong></li>
-                    {% endif %}
-                {% else %}
-                    <li class="ellipsis">…</li>
-                {% endif %}
-            {%- endfor %}
-            {% if pagination.has_next %}
-                    <li><a href="{{ url_for("show_results", page=(pagination.page + 1)) }}?{{ filter|http_query }}&amp;depth={{ depth }}">Next &raquo;</a></li>
-            {% endif %}
-        </ol>
-    </nav>
+    {% include "components/pagination.html" %}
 {% endblock %}

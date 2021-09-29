@@ -1,8 +1,8 @@
 -- 4chan
 -- threads
 CREATE TABLE IF NOT EXISTS threads_4chan (
-  id                 bigint PRIMARY KEY, -- matches 4chan thread ID
-  id_seq             SERIAL,  -- sequential ID for easier indexing
+  id                 bigint, -- matches 4chan thread ID
+  id_seq             SERIAL PRIMARY KEY,  -- sequential ID for easier indexing
   board              text,
   timestamp          integer DEFAULT 0, -- first known timestamp for this thread, i.e. timestamp of first post
   timestamp_archived integer DEFAULT 0,
@@ -20,6 +20,11 @@ CREATE TABLE IF NOT EXISTS threads_4chan (
   index_positions    text
 );
 
+CREATE UNIQUE INDEX IF NOT EXISTS threads_idboard
+  ON threads_4chan (
+    id, board
+  );
+
 CREATE INDEX IF NOT EXISTS threads_timestamp
   ON threads_4chan (
     timestamp
@@ -32,8 +37,8 @@ CREATE INDEX IF NOT EXISTS threads_seq
 
 -- posts
 CREATE TABLE IF NOT EXISTS posts_4chan (
-  id                bigint PRIMARY KEY,  -- matches 4chan post ID
-  id_seq            SERIAL,  -- sequential ID for easier indexing
+  id                bigint,  -- matches 4chan post ID
+  id_seq            SERIAL PRIMARY KEY,  -- sequential ID for easier indexing
   board             TEXT,
   thread_id         bigint,
   timestamp         integer,
@@ -55,7 +60,7 @@ CREATE TABLE IF NOT EXISTS posts_4chan (
   unsorted_data     text
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS posts_id
+CREATE UNIQUE INDEX IF NOT EXISTS posts_idboard
   ON posts_4chan (
     id, board
   );

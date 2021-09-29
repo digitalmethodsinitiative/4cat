@@ -19,7 +19,7 @@ class HashtagUserBipartiteGrapherPreset(ProcessorPreset):
     category = "Networks"  # category
     title = "Bipartite Author-tag Network"  # title displayed in UI
     description = "Produces a bipartite graph based on co-occurence of (hash)tags and people. If someone wrote a post with a certain tag, there will be a link between that person and the tag. The more often they appear together, the stronger the link. Tag nodes are weighed on how often they occur. User nodes are weighed on how many posts they've made."  # description displayed in UI
-    extension = "gdf"  # extension of result file, used internally and in UI
+    extension = "gexf"  # extension of result file, used internally and in UI
 
     @classmethod
     def is_compatible_with(cls, module=None):

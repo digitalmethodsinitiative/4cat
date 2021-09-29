@@ -1,0 +1,42 @@
+<section class="result-list">
+    <h2><span>Users</span></h2>
+    <div class="user-panel">
+        <nav class="view-controls block">
+            <form action="{{ url_for("admin_frontpage") }}" method="GET">
+                <ul>
+                    <li><a href="{{ url_for("manipulate_user", mode="create") }}" class="button-like"><i class="fa fa-user-plus" aria-hidden="true"></i> Create user</a></li>
+                    <li><input aria-label="User filter" placeholder="Filter users..." name="filter"
+                               value="{{ filter.filter }}"></li>
+                </ul>
+                <button>Filter</button>
+            </form>
+        </nav>
+        <table class="fullwidth user-table">
+            <colgroup>
+                <col class="name">
+                <col class="actions">
+            </colgroup>
+            <tr>
+                <th>Name</th>
+                <th>Actions</th>
+            </tr>
+            {% for user in users %}
+                <tr>
+                    <td>{{ user.name }}{% if user.is_admin %}
+                        <i class="fa fa-user-shield tooltip-trigger" aria-hidden="true"></i>
+                        <span class="sr-only"> (Admin user)</span>{% endif %}</td>
+                    <td>
+                        {% if user.name not in ("anonymous", "autologin") %}
+                            <a class="button-like" href="{{ url_for("manipulate_user", mode="edit") }}?name={{ user.name }}"><i
+                                    class="fa fa-edit" aria-hidden="true"></i><span class="sr-only">Edit user</span></a>
+                            <a class="button-like" href="{{ url_for("delete_user") }}?name={{ user.name }}"><i
+                                    class="fa fa-times" aria-hidden="true"></i><span class="sr-only">Delete user</span></a>
+                        {% endif %}
+                    </td>
+                </tr>
+            {% endfor %}
+        </table>
+
+        {% include "components/pagination.html" %}
+    </div>
+</section>
