@@ -28,12 +28,7 @@ if os.path.exists(DOCKER_CONFIG_FILE):
     docker_config['SERVER']['server_name'] = os.environ['SERVER_NAME']
     docker_config['SERVER']['public_port'] = os.environ['PUBLIC_PORT']
 
-    # Install specific packages
-    if docker_config['DOCKER'].getboolean('new_installation'):
-        # Update config to skip this on future runs
-        docker_config['DOCKER']['new_installation'] = 'False'
-
-    # Save config file
+        # Save config file
     with open(DOCKER_CONFIG_FILE, 'w') as configfile:
         docker_config.write(configfile)
 
