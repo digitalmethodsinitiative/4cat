@@ -17,8 +17,8 @@ db = Database(logger=log, dbname=config.DB_NAME, user=config.DB_USER, password=c
 for datasource in ("4chan", "8kun", "8chan"):
 	print("  Checking for %s database tables... " % datasource, end="")
 
-	test = db.fetchone("SELECT EXISTS ( SELECT FROM information_schema.tables WHERE table_schema = %s AND table_name = %s )", ("public", "posts_%s" % datasource))
-	if not test["exists"]:
+	table = db.fetchone("SELECT EXISTS ( SELECT FROM information_schema.tables WHERE table_schema = %s AND table_name = %s )", ("public", "posts_%s" % datasource))
+	if not table["exists"]:
 		print("not available, nothing to upgrade!")
 		continue
 
@@ -82,9 +82,11 @@ for datasource in ("4chan", "8kun", "8chan"):
 
 	print("  Creating unique index constraints for id-board pairs for posts table")
 	db.execute("DROP INDEX IF EXISTS posts_id")
+	db.execute("DROP INDEX IF EXISTS posts_%s_id" % datasource)
 	db.execute("CREATE UNIQUE INDEX IF NOT EXISTS posts_%s_idboard ON posts_%s ( id, board )" % (datasource, datasource))
 	print("  Creating unique index constraints for id-board pairs for threads table")
 	db.execute("DROP INDEX IF EXISTS threads_id")
+	db.execute("DROP INDEX IF EXISTS threads_%s_id" % datasource)
 	db.execute("CREATE UNIQUE INDEX IF NOT EXISTS threads_%s_idboard ON threads_%s ( id, board )" % (datasource, datasource))
 
 print("  Done!")
