@@ -43,5 +43,4 @@ RUN pip3 install gunicorn
 # Copy project
 # (Copy example config first, if user has own config, it will replace this)
 COPY ./config.py-example /usr/src/app/config.py
-COPY ./VERSION /usr/src/app/.current-version
 COPY . /usr/src/app/
