@@ -235,15 +235,15 @@ class ThreadScraper4chan(BasicJSONScraper):
 				post_data[field] = post_data[field].replace("\0", "")
 
 			return_value = self.db.insert("posts_" + self.prefix, post_data, return_field="id_seq")
-		except psycopg2.IntegrityError:
+		except psycopg2.IntegrityError as e:
 			self.db.rollback()
 			dupe = self.db.fetchone("SELECT * from posts_" + self.prefix + " WHERE id = %s" % (str(post["no"]),))
 			if dupe:
 				self.log.info("Post %s in thread %s/%s/%s (time: %s) scraped twice: first seen as %s in thread %s at %s" % (
 				 post["no"], self.datasource, thread["board"], thread["id"], post["time"], dupe["id"], dupe["thread_id"], dupe["timestamp"]))
 			else:
-				self.log.error("Post %s in thread %s/%s/%s hit database constraint but no dupe was found?" % (
-				post["no"], self.datasource, thread["board"], thread["id"]))
+				self.log.error("Post %s in thread %s/%s/%s hit database constraint (%s) but no dupe was found?" % (
+				post["no"], self.datasource, thread["board"], thread["id"], e))
 
 			return False
 		except ValueError as e:
