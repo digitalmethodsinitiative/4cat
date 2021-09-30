@@ -52,6 +52,7 @@ with open(args.input, encoding="utf-8") as inputfile:
 	next(reader, None)
 
 	posts = 0
+	threads_added = 0
 	threads = {}
 	threads_last_seen = {}
 
@@ -63,6 +64,7 @@ with open(args.input, encoding="utf-8") as inputfile:
 
 		# We collect thread data first, even though we might skip this post
 		if post["thread_id"] not in threads:
+			threads_added += 1
 			threads[post["thread_id"]] = {
 				"id": post["thread_id"],
 				"board": args.board,
@@ -136,7 +138,7 @@ with open(args.input, encoding="utf-8") as inputfile:
 		# Insert per every 10000 posts
 		if posts > 0 and posts % 10000 == 0:
 			
-			print("Committing posts  %i - %i. " % (posts - 10000, posts), end="")
+			print("Committing posts %i - %i. " % (posts - 10000, posts), end="")
 
 			# We're commiting the threads we didn't encounter in the last 100.000 posts. We're assuming they're complete and won't be seen in this archive anymore.
 			# This is semi-necessary to prevent RAM hogging.
@@ -150,7 +152,7 @@ with open(args.input, encoding="utf-8") as inputfile:
 			# Remove committed threads from the last seen list
 			threads_last_seen = {k: v for k, v in threads_last_seen.items() if v < 10000}
 
-			print("Committing %i threads (%i still updating)." % (threads_committed, len(threads)))
+			print("Committing threads %i - %i (%i still updating)." % (threads_added - threads_committed, threads_added, threads_committed, len(threads)))
 			
 			db.commit()
 

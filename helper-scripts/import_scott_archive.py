@@ -104,7 +104,7 @@ if args.skip_duplicates:
 	print("Skipping duplicate rows (ON CONFLICT DO NOTHING).")
 	safe = True
 
-threads = {}
+threads = 0
 posts = 0
 
 for html_doc in glob.iglob(os.path.join(args.input, "*.*")):
@@ -138,7 +138,7 @@ for html_doc in glob.iglob(os.path.join(args.input, "*.*")):
 
 	# Set thread data (or what little that's known of it)
 	thread_id = str(thread_id)
-	threads[thread_id] = {
+	thread = {
 		"id": thread_id,
 		"board": "b",
 		"timestamp": interpolated_timestamp,
@@ -201,11 +201,10 @@ for html_doc in glob.iglob(os.path.join(args.input, "*.*")):
 		has_image = True if text.find("span", {"class": "filesize"}) in text else False
 
 		# Edit some thread data
-		threads[thread_id]["num_replies"] += 1
-		threads[thread_id]["post_last"] = post_id
+		thread["num_replies"] += 1
+		thread["post_last"] = post_id
 		if has_image:
-			threads[thread_id]["num_images"] += 1
-
+			thread["num_images"] += 1
 		
 		post_data = {
 		"thread_id": thread_id,
@@ -235,21 +234,14 @@ for html_doc in glob.iglob(os.path.join(args.input, "*.*")):
 
 		posts += 1
 
-		# Commit per 10000 posts
-		if posts > 0 and posts % 10000 == 0:
-			print("Committing post %i - %i)" % (posts - 10000, posts))
-			db.commit()
-	
-db.commit()
+	db.upsert("threads_4chan", data=thread, commit=False, constraints=["id", "board"])
 
-nthreads = 0
-for thread in threads.values():
-	db.insert("threads_4chan", data=thread, commit=False, safe=safe)
-	if nthreads > 0 and nthreads % 10000 == 0:
-		print("Committing threads %i - %i" % (nthreads - 10000, nthreads))
+	threads += 1
+		
+	# Commit per 100 threads
+	if threads > 0 and threads % 100 == 0:
+		print("Committing threads %i - %i" % (threads - 100, threads))
 		db.commit()
-	nthreads += 1
 
 db.commit()
-
 print("Done")

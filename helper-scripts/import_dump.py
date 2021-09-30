@@ -167,7 +167,7 @@ with open(args.input, encoding="utf-8") as inputfile:
 	# Add the last threads as well
 	print("Comitting leftover threads")
 	for thread in threads.values():
-		db.insert("threads_4chan", data=thread, commit=False, safe=safe)
+		db.upsert("threads_4chan", data=thread, commit=False, constraints=["id", "board"])
 
 	db.commit()
 
