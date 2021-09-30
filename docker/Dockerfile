@@ -3,6 +3,7 @@ FROM debian:buster
 RUN apt-get update && apt install -y \
     python3-pip \
     gawk \
+    git \
     curl \
     libpq-dev \
     python3-dev \
@@ -41,6 +42,4 @@ RUN pip3 install -r requirements.txt
 RUN pip3 install gunicorn
 
 # Copy project
-# (Copy example config first, if user has own config, it will replace this)
-COPY ./config.py-example /usr/src/app/config.py
 COPY . /usr/src/app/

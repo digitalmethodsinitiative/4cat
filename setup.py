@@ -48,6 +48,7 @@ packages = [
 	"spacy==3.0.5",
 	"svgwrite==1.3.1",
 	"Telethon==1.10.6",
+	"pyYAML==5.4.1",
 	"Werkzeug==0.15.5",
 	"en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.0.0/en_core_web_sm-3.0.0.tar.gz#egg=en_core_web_sm"
 ]
