@@ -1,17 +1,18 @@
 FROM debian:buster
 
 RUN apt-get update && apt install -y \
-    python3-pip \
-    gawk \
     curl \
+    git \
+    gawk \
     libpq-dev \
-    python3-dev \
+    netcat \
+    postgresql-client \
     postgresql-server-dev-all \
+    python3-dev \
+    python3-pip \
     unzip \
     wget \
-    xvfb \
-    postgresql-client \
-    netcat
+    xvfb 
 
 WORKDIR /usr/src/app
 
