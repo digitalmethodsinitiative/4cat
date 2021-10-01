@@ -1,8 +1,6 @@
 #!/bin/sh
 set -e
 
-version() { echo "$@" | awk -F. '{ printf("%d%03d%03d%03d\n", $1,$2,$3,$4); }'; }
-
 exit_backend() {
   echo "Exiting backend"
   python3 4cat-daemon.py stop
@@ -40,35 +38,13 @@ echo 'admin' >> docker/shared/login.txt
 echo 'Your admin password:' >> docker/shared/login.txt
 echo "$admin_password" >> docker/shared/login.txt
 user_created=true
+# Make admin an actual admin user
+psql --host=db --port=5432 --user=$POSTGRES_USER --dbname=$POSTGRES_DB -tAc "UPDATE users SET is_admin='t' WHERE name='admin'";
 
 fi
 
 echo 'Starting app'
 cd /usr/src/app
-
-# Check for Migrations
-CURRENT="1.9"
-CURRENT_FILE=".current-version"
-
-if test -f "$CURRENT_FILE"; then
-    CURRENT=$(head -n 1 $CURRENT_FILE)
-fi
-
-TARGET="1.9"
-TARGET_FILE="VERSION"
-
-if test -f "$TARGET_FILE"; then
-    TARGET=$(head -n 1 $TARGET_FILE)
-fi
-
-# Run migrations if current version does not equal target
-# Could perhaps remove this... needs rethink
-if [ "$(version "$CURRENT")" -ge "$(version "$TARGET")" ]; then
-    echo "Version is up to date"
-else
-    echo "Running migrations"
-    python3 helper-scripts/migrate.py --yes
-fi
 
 # Inform user of admin password if created
 if [ $user_created = true ] ; then
