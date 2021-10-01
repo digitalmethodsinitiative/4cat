@@ -99,7 +99,7 @@ with open(args.input, encoding="utf-8") as inputfile:
 		# We reset the count of when we last seen this thread to 1
 		# to prevent committing incomplete thread data.
 		# Increase the count for the other threads.
-		threads_last_seen[post["thread_id"]] = 0
+		threads_last_seen[post["thread_num"]] = 0
 		for k, v in threads_last_seen.items():
 			threads_last_seen[k] += 1
 		posts += 1
@@ -139,10 +139,20 @@ with open(args.input, encoding="utf-8") as inputfile:
 		}
 
 		post_data = {k: str(v).replace("\x00", "") for k, v in post_data.items()}
-		new_id = db.insert("posts_4chan", post_data, commit=False, safe=safe, return_field="id_seq")
-
-		if post["deleted"] != "0":
-			db.insert("posts_4chan_deleted", {"id_seq": new_id, "timestamp_deleted": post["deleted"]})
+		
+		if post["deleted"] == "0":
+			db.insert("posts_4chan", post_data, commit=False, safe=safe)
+		else:
+			
+			# database.py throws a TypeError when the post already exists and we're not updating, since it didn't return a row. However, we need the id_seq field for deleted posts. In this case, catch the TypeError and simply retrieve the id_seq from the database.
+			try:
+				new_id = db.insert("posts_4chan", post_data, commit=False, safe=safe, return_field="id_seq")
+			except TypeError:
+				
+				r = db.fetchone("SELECT id_seq FROM posts_4chan WHERE board = '%s' AND id = %i;" % (args.board, int(post["num"])))
+				new_id = r["id_seq"] if r else None
+			if new_id:
+				db.insert("posts_4chan_deleted", {"id_seq": new_id, "timestamp_deleted": post["deleted"]}, safe=True)
 
 		# Insert per every 10000 posts
 		if posts > 0 and posts % 10000 == 0:
@@ -172,3 +182,4 @@ with open(args.input, encoding="utf-8") as inputfile:
 	db.commit()
 
 print("Done")
+
