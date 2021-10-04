@@ -33,7 +33,7 @@
             <div>
                 <dt>Data source</dt>
                 <dd>
-                    <span class="property-badge">{{ dataset.parameters.datasource if "datasource" in dataset.parameters else "4chan" }}{% if "board" in dataset.parameters and dataset.parameters.board %}/{{ dataset.parameters.board }}/{% endif %}</span>
+                    <span class="property-badge">{{ dataset.parameters.datasource }}{% if "board" in dataset.parameters and dataset.parameters.board %}/{{ dataset.parameters.board }}/{% endif %}</span>
                 </dd>
             </div>
 
