@@ -77,7 +77,7 @@ class ThreadScraper4chan(BasicJSONScraper):
 
 		if "posts" not in data or not data["posts"]:
 			self.log.warning(
-				"JSON response for 4chan thread %s/%s contained no posts, could not process" % (self.datasource, self.job.data["remote_id"]))
+				"JSON response for thread %s/%s contained no posts, could not process" % (self.datasource, self.job.data["remote_id"]))
 			return False
 
 		# determine OP id (8chan sequential threads are an exception here)
@@ -87,7 +87,7 @@ class ThreadScraper4chan(BasicJSONScraper):
 		# check if OP has all the required data
 		missing = set(self.required_fields_op) - set(first_post.keys())
 		if missing != set():
-			self.log.warning("4chan OP is missing required fields %s, ignoring" % repr(missing))
+			self.log.warning("OP in %s/%s is missing required fields %s, ignoring" % (self.datasource, self.job.data["remote_id"], repr(missing)))
 			return False
 
 		# check if thread exists and has new data
@@ -100,7 +100,7 @@ class ThreadScraper4chan(BasicJSONScraper):
 			return True
 
 		if thread["timestamp_deleted"] > 0:
-			self.log.info("4chan thread %s/%s/%s seems to have been undeleted, removing deletion timestamp %s" % (
+			self.log.info("Thread %s/%s/%s seems to have been undeleted, removing deletion timestamp %s" % (
 			self.datasource, self.job.details["board"], first_post["no"], thread["timestamp_deleted"]))
 			self.db.update("threads_" + self.prefix, where={"id": thread_db_id}, data={"timestamp_deleted": 0})
 
@@ -137,7 +137,7 @@ class ThreadScraper4chan(BasicJSONScraper):
 		self.update_thread(thread, first_post, last_reply, last_post, thread["num_replies"] + new_posts)
 
 		# save to database
-		self.log.info("Updating 4chan %s/%s/%s, new: %s, old: %s, deleted: %s, undeleted: %s" % (
+		self.log.info("Updating %s/%s/%s, new: %s, old: %s, deleted: %s, undeleted: %s" % (
 			self.datasource, self.job.details["board"], first_post["no"], new_posts, len(post_dict_db), len(deleted), undeleted))
 		self.db.commit()
 
@@ -156,7 +156,7 @@ class ThreadScraper4chan(BasicJSONScraper):
 		# check for data integrity
 		missing = set(self.required_fields) - set(post.keys())
 		if missing != set():
-			self.log.warning("Missing fields %s in scraped 4chan post, ignoring" % repr(missing))
+			self.log.warning("Missing fields %s in scraped post in %s/%s, ignoring" % (repr(missing), self.datasource, self.job.data["remote_id"]))
 			return False
 
 		# save dimensions as a dumpable dict - no need to make it indexable
@@ -218,7 +218,7 @@ class ThreadScraper4chan(BasicJSONScraper):
 
 				try:
 					requests.post(config.HIGHLIGHT_SLACKHOOK, json.dumps({
-						"text": "A post mentioning '%s' was just scraped from 4chan /%s/:" % (highlight, thread["board"]),
+						"text": "A post mentioning '%s' was just scraped from %s/%s/:" % (highlight, self.datasource, thread["board"]),
 						"attachments": attachments
 					}))
 				except requests.RequestException as e:
@@ -242,7 +242,7 @@ class ThreadScraper4chan(BasicJSONScraper):
 				self.log.info("Post %s in thread %s/%s/%s (time: %s) scraped twice: first seen as %s in thread %s at %s" % (
 				 post["no"], self.datasource, thread["board"], thread["id"], post["time"], dupe["id"], dupe["thread_id"], dupe["timestamp"]))
 			else:
-				self.log.error("Post %s in 4chan thread %s/%s/%s hit database constraint (%s) but no dupe was found?" % (
+				self.log.error("Post %s in thread %s/%s/%s hit database constraint (%s) but no dupe was found?" % (
 				post["no"], self.datasource, thread["board"], thread["id"], e))
 
 			return False
@@ -316,7 +316,7 @@ class ThreadScraper4chan(BasicJSONScraper):
 
 		if thread["num_replies"] == num_replies and num_replies != -1 and thread["timestamp_modified"] == last_reply:
 			# no updates, no need to check posts any further
-			self.log.debug("No new messages in 4chan thread %s" % first_post["no"])
+			self.log.debug("No new messages in thread %s/%s/%s" % (self.datasource, self.job.data["remote_id"], first_post["no"]))
 			return None
 		else:
 			return thread
@@ -393,7 +393,7 @@ class ThreadScraper4chan(BasicJSONScraper):
 		self.datasource = self.type.split("-")[0]
 		thread_db_id = self.job.data["remote_id"].split("/").pop()
 		self.log.info(
-			"4chan thread %s/%s/%s was deleted, marking as such" % (self.datasource, self.job.details["board"], self.job.data["remote_id"]))
+			"Thread %s/%s/%s was deleted, marking as such" % (self.datasource, self.job.details["board"], self.job.data["remote_id"]))
 		self.db.update("threads_" + self.prefix, data={"timestamp_deleted": self.init_time},
 					   where={"id": thread_db_id, "timestamp_deleted": 0})
 		self.job.finish()
