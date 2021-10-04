@@ -31,7 +31,7 @@ class BoardScraper4chan(BasicJSONScraper):
 		new_threads = 0
 
 		if not data:
-			self.log.error("No thread data from board scrape of %s/%s/" % (self.datasource, self.job.data["remote_id"]))
+			self.log.error("No thread data from 4chan board scrape of %s/%s/" % (self.datasource, self.job.data["remote_id"]))
 			return False
 
 		for page in data:
@@ -52,7 +52,7 @@ class BoardScraper4chan(BasicJSONScraper):
 		# check if we have everything we need
 		missing = set(self.required_fields) - set(thread.keys())
 		if missing != set():
-			self.log.warning("Missing fields %s in scraped thread, ignoring" % repr(missing))
+			self.log.warning("Missing fields %s in scraped 4chan thread %s, ignoring" % (repr(missing), thread.get("id", "")))
 			return False
 
 		board_id = self.job.data["remote_id"].split("/").pop()
