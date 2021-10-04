@@ -1,5 +1,4 @@
 {% set option_settings = processor.get_options(dataset, current_user)[option] %}
-{% if not option_settings.datasource_specific or dataset.parameters.datasource in  option_settings.datasource_specific %}
 <div class="processor-option-wrap" style="display: flex; flex-wrap: wrap; margin: 0.25em;">
     <label class="option-type-{{ option_settings.type }}">
         {% if option_settings.type == "toggle" %}
@@ -50,5 +49,4 @@
             {{ option_settings.tooltip }}
         </p>
     {% endif %}
-{% endif %}
 </div>
