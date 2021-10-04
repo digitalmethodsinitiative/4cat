@@ -51,7 +51,7 @@ class BoardScraper4chan(BasicJSONScraper):
 
 		# 8kun for some reason doesn't always include last_modified
 		# in that case the timeestamp will be 0
-		if self.datasource == "8kun":
+		if self.datasource == "8kun" and "last_modified" in self.required_fields:
 			self.required_fields.remove("last_modified")
 
 		# check if we have everything we need
