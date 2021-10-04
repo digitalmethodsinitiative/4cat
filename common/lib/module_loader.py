@@ -168,6 +168,7 @@ class ModuleCollector:
 				"name": datasource.NAME if hasattr(datasource, "NAME") else datasource_id,
 				"id": subdirectory.parts[-1],
 				"init": datasource.init_datasource,
+				"is_local": hasattr(datasource, "IS_LOCAL") and datasource.IS_LOCAL,
 				"is_static": hasattr(datasource, "IS_STATIC") and datasource.IS_STATIC
 			}
 
