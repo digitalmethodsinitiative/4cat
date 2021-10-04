@@ -49,6 +49,11 @@ class BoardScraper4chan(BasicJSONScraper):
 		:return int:  Number of new threads created (so 0 or 1)
 		"""
 
+		# 8kun for some reason doesn't always include last_modified
+		# in that case the timeestamp will be 0
+		if self.datasource == "8kun":
+			self.required_fields.remove("last_modified")
+
 		# check if we have everything we need
 		missing = set(self.required_fields) - set(thread.keys())
 		if missing != set():
@@ -82,7 +87,7 @@ class BoardScraper4chan(BasicJSONScraper):
 			self.db.insert("threads_" + self.prefix, thread_data)
 
 
-		replacements = [self.init_time, thread["last_modified"]]
+		replacements = [self.init_time, thread.get("last_modified", 0)]
 		if "4chan" in self.type:
 			# update timestamps and position, but only for 4chan
 			# other chans have different strategies and often have "infinite"
