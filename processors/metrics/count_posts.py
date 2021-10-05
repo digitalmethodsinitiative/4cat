@@ -1,7 +1,7 @@
 """
 Collapse post bodies into one long string
 """
-import csv
+import datetime
 
 from common.lib.helpers import UserInput, pad_interval, get_interval_descriptor
 from backend.abstract.processor import BasicProcessor
@@ -10,8 +10,6 @@ __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
 __maintainer__ = "Stijn Peeters"
 __email__ = "4cat@oilab.eu"
-
-csv.field_size_limit(1024 * 1024 * 1024)
 
 class CountPosts(BasicProcessor):
 	"""
@@ -38,6 +36,7 @@ class CountPosts(BasicProcessor):
 		}
 	}
 
+
 	def process(self):
 		"""
 		This takes a 4CAT results file as input, and outputs a plain text file
@@ -48,6 +47,7 @@ class CountPosts(BasicProcessor):
 		intervals = {}
 
 		timeframe = self.parameters.get("timeframe")
+		add_relative = self.parameters.get("add_relative", False)
 
 		first_interval = "9999"
 		last_interval = "0000"
@@ -61,9 +61,10 @@ class CountPosts(BasicProcessor):
 
 				# Add a count for the respective timeframe
 				if date not in intervals:
-					intervals[date] = 1
+					intervals[date] = {}
+					intervals[date]["absolute"] = 1
 				else:
-					intervals[date] += 1
+					intervals[date]["absolute"] += 1
 
 				first_interval = min(first_interval, date)
 				last_interval = max(last_interval, date)
@@ -78,13 +79,76 @@ class CountPosts(BasicProcessor):
 			if self.parameters.get("pad") and timeframe != "all":
 				missing, intervals = pad_interval(intervals, first_interval, last_interval)
 
-			# Write to csv
-			csv_writer = csv.DictWriter(results, fieldnames=("date", "item", "value"))
-			csv_writer.writeheader()
+			# Add relative counts, if needed
+			if add_relative:
+
+				self.dataset.update_status("Calculating relative counts.")
+
+				# Set a board, if used for this dataset
+				board = self.source_dataset.parameters["board"]
+				datasource = self.source_dataset.parameters["datasource"]
+				board_sql = "AND board = '" + board + "'" if board else ""
+
+				# Make sure we're using the same right date format.
+				time_sql = "date"
+				if timeframe != "overall":
+					if timeframe == "year":
+						time_format = "YYYY"
+					elif timeframe == "month":
+						time_format = "YYYY-MM"
+					elif timeframe == "week":
+						time_format = "YYYY-WW"
+					elif timeframe == "day":
+						time_format = "YYYY-MM-DD"
+					time_sql = "to_char(to_date(date, 'YYYY-MM-DD'), '%s') AS date" % time_format
+
+				# Fetch the total counts per timeframe for this datasource
+				total_counts = {row["date"]: row["count"] for row in self.db.fetchall(
+					"""
+					SELECT %s, SUM(count) as count FROM metrics
+					WHERE datasource = '%s' %s
+					GROUP BY date
+					"""
+					% (time_sql, datasource, board_sql))}
+
+				# Quick set to check what dates are in the metrics table
+				added_dates = set(total_counts.keys())
+				
+				# Add the relative counts
+				for interval in list(intervals.keys()):
+
+					# Calculate the relative counts if this date is also in teh metrics table. Else set the relative count to None.
+					intervals[interval]["relative"] = None
+					if interval in added_dates:
+						intervals[interval]["relative"] = intervals[interval]["absolute"] / total_counts[interval]
+
+			rows = []
 			for interval in intervals:
-				csv_writer.writerow({
+
+				row = {
 					"date": interval,
 					"item": "activity",
-					"value": intervals[interval]})
+					"value": intervals[interval]["absolute"]}
 
-		self.dataset.finish(len(intervals))
+				# Also add relative counts if needed
+				if add_relative:
+					row["value_relative"] = intervals[interval]["relative"]
+				rows.append(row)
+
+		self.write_csv_items_and_finish(rows)
+
+	@classmethod
+	def get_options(cls, parent_dataset=None, user=None):
+		
+		options = cls.options
+
+		# We give an option to add relative trends for local datasources
+		if parent_dataset and parent_dataset.parameters.get("datasource") in ("4chan", "8kun", "8chan", "parliaments", "usenet", "breitbart"):
+			options["add_relative"] = {
+				"type": UserInput.OPTION_TOGGLE,
+				"default": False,
+				"help": "Add relative counts",
+				"tooltip": "Divides the absolute count by the total amount of posts for this timeframe."
+			}
+		
+		return options
