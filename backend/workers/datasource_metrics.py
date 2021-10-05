@@ -28,8 +28,11 @@ class DatasourceMetrics(BasicWorker):
 		:return:
 		"""
 
+		# Get a list of all database tables
+		all_tables = [row["tablename"] for row in self.db.fetchall("SELECT tablename FROM pg_catalog.pg_tables WHERE schemaname != 'pg_catalog' AND schemaname != 'information_schema';")]
+
 		# Check if the metrics table is already present
-		metrics_exists = [v for k, v in self.db.fetchone("SELECT EXISTS ( SELECT FROM information_schema.tables WHERE table_name = 'metrics' )").items()][0]
+		metrics_exists = True if "metrics" in all_tables else False
 
 		# If not, make it.
 		if not metrics_exists:
@@ -50,13 +53,13 @@ class DatasourceMetrics(BasicWorker):
 
 			datasource = self.all_modules.datasources[datasource_id]
 
-			boards = config.DATASOURCES[datasource_id].get("boards")
-
-			if not boards:
-				boards = [""]
-
 			# Only update local datasources
 			if datasource.get("is_local"):
+
+				boards = config.DATASOURCES[datasource_id].get("boards")
+
+				if not boards:
+					boards = [""]
 				
 				# If a datasource is static (so not updated) and it
 				# is already present in the metrics table, we don't
@@ -68,6 +71,9 @@ class DatasourceMetrics(BasicWorker):
 					# -------------------------
 					#   Posts per day metric
 					# -------------------------
+
+					# Get the name of the posts table for this datasource
+					posts_table = datasource_id if "posts_" + datasource_id not in all_tables else "posts_" + datasource_id
 
 					# Count and update for every board individually
 					for board in boards:
@@ -83,7 +89,6 @@ class DatasourceMetrics(BasicWorker):
 						# We only count passed days
 						time_sql = "timestamp < " + str(midnight)
 
-
 						# If the datasource is dynamic, we also only update days
 						# that haven't been added yet - these are heavy queries.
 						if not datasource.get("is_static"):
@@ -97,7 +102,7 @@ class DatasourceMetrics(BasicWorker):
 
 								# If the last day added is today, there's no need to update yet
 								if last_day_added.date() == datetime.today().replace(tzinfo=timezone.utc).date():
-									#self.log.info("No new posts per day to count for %s%s" % (datasource_id, "/" + board))
+									self.log.info("No new posts per day to count for %s%s" % (datasource_id, "/" + board))
 									continue
 
 								# Change to UTC epoch timestamp for postgres query
@@ -107,13 +112,15 @@ class DatasourceMetrics(BasicWorker):
 						
 						self.log.info("Calculating metric posts_per_day for datasource %s%s" % (datasource_id, "/" + board))
 
+						# Get those counts
 						query = """
 							SELECT 'posts_per_day' AS metric, '%s' AS datasource, board, to_char(to_timestamp(timestamp), 'YYYY-MM-DD') AS date, count(*)COUNT
-							FROM posts_%s
+							FROM %s
 							WHERE %s AND %s
 							GROUP BY metric, datasource, board, date;
-							""" % (datasource_id, datasource_id, board_sql, time_sql)
+							""" % (datasource_id, posts_table, board_sql, time_sql)
 						
+						# Add to metrics table
 						rows = [dict(row) for row in self.db.fetchall(query)]
 						
 						if rows:

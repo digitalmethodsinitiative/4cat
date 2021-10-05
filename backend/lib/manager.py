@@ -54,7 +54,6 @@ class WorkerManager:
 		# queue worker that deletes expired datasets every so often
 		self.queue.add_job("datasource-metrics", remote_id="localhost", interval=86400)
 
-
 		# it's time
 		self.loop()
 
