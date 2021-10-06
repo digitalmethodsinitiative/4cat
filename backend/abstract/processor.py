@@ -572,6 +572,16 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		return cls.options if hasattr(cls, "options") else {}
 
 	@classmethod
+	def get_status(cls):
+		"""
+		Get processor status
+
+		Useful to 
+		:return list:	Statuses of this processor
+		"""
+		return cls.status if hasattr(cls, "status") else None
+
+	@classmethod
 	def get_available_processors(cls, self):
 		"""
 		Get list of processors compatible with this processor

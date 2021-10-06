@@ -32,6 +32,8 @@ class Search4Chan(SearchWithScope):
 	# request_abort() later
 	running_query = ""
 
+	status = "experimental"
+
 	options = {
 		"intro": {
 			"type": UserInput.OPTION_INFO,
