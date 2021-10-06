@@ -79,6 +79,11 @@ class CountPosts(BasicProcessor):
 			if self.parameters.get("pad") and timeframe != "all":
 				missing, intervals = pad_interval(intervals, first_interval, last_interval)
 
+				# Convert 0 values to dict
+				for k, v in intervals.items():
+					if isinstance(v, int):
+						intervals[k] = {"absolute": v}
+
 			# Add relative counts, if needed
 			if add_relative:
 
