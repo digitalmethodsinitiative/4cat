@@ -101,7 +101,7 @@ sphinxconf = sphinxconf.replace("%%DATADIR%%", "../data")
 
 sphinxconf = sphinxconf.replace("%%DBLOCATION%%", str(config.DB_HOST))
 sphinxconf = sphinxconf.replace("%%DBUSER%%", str(config.DB_USER))
-sphinxconf = sphinxconf.replace("%%DBPASS%%", str(config.DB_PASSWORD))
+sphinxconf = sphinxconf.replace("%%DBPASS%%", str(config.DB_PASSWORD.replace("#", "\\#")))
 sphinxconf = sphinxconf.replace("%%DBNAME%%", str(config.DB_NAME))
 sphinxconf = sphinxconf.replace("%%DBPORT%%", str(config.DB_PORT))
 
