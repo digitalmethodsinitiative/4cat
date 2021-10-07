@@ -146,7 +146,17 @@ def datasource_form(datasource_id):
 	if not worker_options:
 		return error(404, message="Datasource '%s' has no dataset parameter options defined" % datasource_id)
 
-	form = render_template("create-dataset-option.html", options=worker_options)
+	# Status labels to display in query form
+	labels = []
+	local_or_api = "local" if datasource.get("is_local") else "external api"
+	labels.append(local_or_api)
+	if datasource.get("is_static"):
+		labels.append("static")
+	status = worker_class.get_status()
+	if status:
+		labels.append(status)
+
+	form = render_template("create-dataset-option.html", options=worker_options, labels=labels)
 	javascript_path = datasource["path"].joinpath("webtool", "tool.js")
 	has_javascript = javascript_path.exists()
 

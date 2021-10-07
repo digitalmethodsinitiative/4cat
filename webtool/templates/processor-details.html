@@ -42,6 +42,16 @@
                 </ul>
             </span>
             {% endif %}
+            {# Processor status #}
+            {% if processor.status %}
+            <span>
+                <ul>
+                    <li class="property-badge status">
+                    {{ processor.status}}
+                    </li>
+                </ul>
+            </span>
+            {% endif %}
 
             {% if not inline %}
                 <p>{{ processor.description }}</p>

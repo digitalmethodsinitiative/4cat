@@ -79,6 +79,11 @@ class CountPosts(BasicProcessor):
 			if self.parameters.get("pad") and timeframe != "all":
 				missing, intervals = pad_interval(intervals, first_interval, last_interval)
 
+				# Convert 0 values to dict
+				for k, v in intervals.items():
+					if isinstance(v, int):
+						intervals[k] = {"absolute": v}
+
 			# Add relative counts, if needed
 			if add_relative:
 
@@ -90,8 +95,7 @@ class CountPosts(BasicProcessor):
 				board_sql = "AND board = '" + board + "'" if board else ""
 
 				# Make sure we're using the same right date format.
-				time_sql = "date"
-				if timeframe != "overall":
+				if timeframe != "all":
 					if timeframe == "year":
 						time_format = "YYYY"
 					elif timeframe == "month":
@@ -100,14 +104,16 @@ class CountPosts(BasicProcessor):
 						time_format = "YYYY-WW"
 					elif timeframe == "day":
 						time_format = "YYYY-MM-DD"
-					time_sql = "to_char(to_date(date, 'YYYY-MM-DD'), '%s') AS date" % time_format
+					time_sql = "to_char(to_date(date, 'YYYY-MM-DD'), '%s') AS date_str," % time_format
+				else:
+					time_sql = "'all' AS date_str,"
 
 				# Fetch the total counts per timeframe for this datasource
-				total_counts = {row["date"]: row["count"] for row in self.db.fetchall(
+				total_counts = {row["date_str"]: row["count"] for row in self.db.fetchall(
 					"""
-					SELECT %s, SUM(count) as count FROM metrics
+					SELECT %s SUM(count) as count FROM metrics
 					WHERE datasource = '%s' %s
-					GROUP BY date
+					GROUP BY date_str
 					"""
 					% (time_sql, datasource, board_sql))}
 

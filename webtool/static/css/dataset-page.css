@@ -305,6 +305,11 @@ article.result > section:first-child {
     background-repeat: repeat-y;
 }
 
+.child-list .processor-header .property-badge.status {
+    padding: 2px;
+    cursor: default;
+}
+
 /** "further options" **/
 .processor-further {
     font-size: 0.8em;
