@@ -110,6 +110,11 @@ function init() {
 		}
 	});
 
+	// Filter multichoice on search
+	$(document).on('input', '.multi-select-search > input', function(){
+		searchMultichoice($(this).parent().parent());
+	});
+
 	// Remove multichoice select labels and input when clicked
 	$(document).on('click', '.multi-select-selected > span', function(){
 
@@ -1087,7 +1092,8 @@ function makeMultichoice(){
 
 		let select = wrapper.find('select');
 		let name = select.attr('name');
-		let selected = $('<div class="multi-select-selected" name="' + name + '"></div>')
+		let search = $('<div class="multi-select-search"><input name="' + name + '" placeholder="Type to filter"></div>')
+		let selected = $('<div class="multi-select-selected" name="' + name + '">')
 		let input = $('<input class="multi-select-input" name="' + name + '" hidden>');
 
 		// Add hidden selection field and options field
@@ -1095,6 +1101,9 @@ function makeMultichoice(){
 		wrapper.append(selected);
 
 		let options = $('<div class="multi-select-options" name="' + name + '"></div>');
+
+		options.append("<div class='no-match'>No matches</div>");
+		$(options).find(".no-match").hide()
 
 		select.find('option').each(function() {
 
@@ -1129,9 +1138,40 @@ function makeMultichoice(){
 			options.append(checkbox_choice);
 		});
 
-		wrapper.prepend(options)
+		wrapper.prepend(options);
+		wrapper.prepend(search);
 		select.remove();
 	});
+}
+
+
+function searchMultichoice(e){
+	// Filter a multi-select upon searching.
+	let query = $(e).find(".multi-select-search > input").val().toLowerCase();
+	let wrapper = e;
+	let options = wrapper.find('.multi-select-options');
+	let no_match = options.find(".no-match")
+
+	no_match.hide();
+
+	let match = false
+	options.find('label').each(function() {
+		let label = $(this).text().toLowerCase()
+		if (!label.includes(query)) {
+			// Doing this in an obtuse way to prevent resizing
+			$(this).parent().css("visibility", "hidden");
+			$(this).parent().css("height", 0);
+		}
+		else {
+			match = true
+			$(this).parent().css("visibility", "visible");
+			$(this).parent().css("height", "auto");
+		}
+	});
+
+	if (!match) {
+		no_match.show()
+	}
 }
 
 /**

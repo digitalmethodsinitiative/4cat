@@ -46,6 +46,7 @@
     --accent-warning: #b05d13;
     --accent-error: #ff2231;
     --gray-dark: #DFDFDF;
+    --gray-darker: #6C6C6C;
     --gray: #E9E9E9;
     --gray-light: #EEE;
     --contrast-bright: #F5F5F5;
@@ -738,6 +739,11 @@ article section li p, article aside li p {
     position: relative;
     top: -1px;
 	vertical-align: baseline;
+    cursor: default;
+}
+
+a.property-badge {
+    cursor: pointer;
 }
 
 .second-tier {

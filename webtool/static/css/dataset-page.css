@@ -307,7 +307,6 @@ article.result > section:first-child {
 
 .child-list .processor-header .property-badge.status {
     padding: 2px;
-    cursor: default;
 }
 
 /** "further options" **/
@@ -376,28 +375,37 @@ article.result > section:first-child {
     left: -.75em;
 }
 
+
+.multi-select-search {
+    position: relative;
+    display: block;
+    width: 20em;
+    margin-bottom: 4px;
+}
+
 .multi-select-options {
     position: relative;
-    display: inline-block;
-    max-height: 175px;
-    max-width: 20em;
+    display: inline-flex;
+    flex-direction: column;
+    align-items: stretch;
+    height: 125px;
+    max-width: 40em;
     overflow-y: scroll;
     overflow-x: hidden;
     background-color: var(--gray);
 }
 
-.multi-select-options div {
-    position: relative;
-    display: inline-block;
-    width: 100%;
-}
-
-.multi-select-options div label {
-    display: inline-block;
-    width: 100%;
+.multi-select-options > label {
     text-align: left;
     cursor: pointer;
     user-select: none;
+}
+
+.multi-select-options .no-match {
+    font-style: italic;
+    padding: 7px;
+    color: var(--gray-darker);
+    cursor: default;
 }
 
 .multi-select-selected {
