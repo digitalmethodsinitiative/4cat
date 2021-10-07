@@ -248,7 +248,7 @@ class Database:
 
 		:param string table:  Table to upsert record into
 		:param dict data:   Data to upsert
-		:param bool commit: Whether to commit afxter executing the query
+		:param bool commit: Whether to commit after executing the query
 		:param tuple constraints: This tuple may contain the columns that should be used as a
 								  constraint, e.g. ON CONFLICT (name, lastname) DO UPDATE
 		:return int: Number of affected rows. Note that this may be unreliable if `commit` is `False`
