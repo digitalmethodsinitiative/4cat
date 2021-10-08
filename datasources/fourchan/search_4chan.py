@@ -377,10 +377,6 @@ class Search4Chan(SearchWithScope):
 		"valid_ids": {
 			"type": UserInput.OPTION_TEXT,
 			"help": "Post IDs (comma-separated)"
-		},
-		"use_sphinx": {
-			"type": UserInput.OPTION_TOGGLE,
-			"default": False,
 		}
 	}
 
