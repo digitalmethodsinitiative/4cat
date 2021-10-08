@@ -17,8 +17,9 @@ variable:
 DATASOURCES = {
 	"4chan": {  # should correspond to DATASOURCE in the data source's __init__.py
 		"interval": 60,  # scrape interval for boards
-		"boards": ["pol", "v"], # boards to scrape (and generally make available)
-		"autoscrape": True  # automatically start scraping when 4CAT is started
+		"boards": ["pol", "v"], # boards to scrape and query
+		"autoscrape": True,  # automatically start scraping when 4CAT is started
+    "no_scrape": ["v"] # add if you want a board to be queryable, but not scape new data from it
 	}
 }
 ```

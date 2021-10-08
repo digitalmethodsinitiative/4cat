@@ -377,6 +377,10 @@ class Search4Chan(SearchWithScope):
 		"valid_ids": {
 			"type": UserInput.OPTION_TEXT,
 			"help": "Post IDs (comma-separated)"
+		},
+		"use_sphinx": {
+			"type": UserInput.OPTION_TOGGLE,
+			"default": False,
 		}
 	}
 
@@ -487,6 +491,9 @@ class Search4Chan(SearchWithScope):
 		replacements = []
 		match = []
 
+		# Option wether to use sphinx for text searches
+		use_sphinx = config.DATASOURCES["4chan"].get("use_sphinx", True)
+
 		if query.get("min_date", None):
 			try:
 				if int(query.get("min_date")) > 0:
@@ -507,31 +514,46 @@ class Search4Chan(SearchWithScope):
 			where.append("board = %s")
 			replacements.append(query["board"])
 
-		# escape full text matches and convert quotes
-		if query.get("body_match", None):
-			match.append("@body " + self.convert_for_sphinx(query["body_match"]))
+		if use_sphinx:
+			# escape full text matches and convert quotes
+			if query.get("body_match", None):
+				match.append("@body " + self.convert_for_sphinx(query["body_match"]))
 
-		if query.get("subject_match", None):
-			match.append("@subject " + self.convert_for_sphinx(query["subject_match"]))
-
+			if query.get("subject_match", None):
+				match.append("@subject " + self.convert_for_sphinx(query["subject_match"]))
+		else:
+			if query.get("body_match", None):
+				where.append("lower(body) LIKE %s")
+				replacements.append("%" + query["body_match"] + "%")
+			if query.get("subject_match", None):
+				where.append("lower(subject) LIKE %s")
+				replacements.append("%" + query["subject_match"] + "%")
+		
 		# handle country names through sphinx
 		if query.get("country_name", None) and not query.get("check_dense_country", None):
-			if query.get("country_name", "") == "eu":
-				where.append("country_name IN %s")
-				replacements.append(self.eu_countries)
-			else:
-				where.append("country_name IN %s")
-				replacements.append(query.get("country_name"))
+			replacements.append(query.get("country_name"))
 
 		# both possible FTS parameters go in one MATCH() operation
-		if match:
+		if match and use_sphinx:
 			where.append("MATCH(%s)")
 			replacements.append(" ".join(match))
 
 		# query Sphinx
 		self.dataset.update_status("Searching for matches")
+
 		where = " AND ".join(where)
-		posts = self.fetch_sphinx(where, replacements)
+		
+		if use_sphinx:
+			posts = self.fetch_sphinx(where, replacements)
+		# Query the postgres table immediately if we're not using sphinx.
+		else:
+			columns = ", ".join(self.return_cols)
+			if self.interrupted:
+				raise ProcessorInterruptedException("Interrupted while fetching post data")
+			query = "SELECT " + columns + " FROM posts_" + self.prefix + " WHERE " + where + " ORDER BY id ASC"
+			print(query)
+			print(replacements)
+			posts = self.db.fetchall_interruptable(self.queue, query, replacements)
 
 		if posts is None:
 			return posts
@@ -539,6 +561,9 @@ class Search4Chan(SearchWithScope):
 			# no results
 			self.dataset.update_status("Query finished, but no results were found.")
 			return None
+
+		if not use_sphinx:
+			return posts
 
 		# query posts database
 		self.dataset.update_status("Found %i matches. Collecting post data" % len(posts))
