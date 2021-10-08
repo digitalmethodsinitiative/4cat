@@ -36,7 +36,9 @@ def init_datasource(database, logger, queue, name):
 
 	if config.DATASOURCES[name].get("autoscrape", False):
 		for board in config.DATASOURCES[name]["boards"]:
-			if board not in config.DATASOURCES[name].get("no_scrape"):
+			if config.DATASOURCES[name].get("no_scrape") and board in config.DATASOURCES[name].get("no_scrape"):
+				continue
+			else:
 				queue.add_job(name + "-board", {}, board, 0, interval)
 
 	base_init_datasource(database, logger, queue, name)
