@@ -60,8 +60,8 @@ class GetCollocations(BasicProcessor):
 		"sort_words": {
 			"type": UserInput.OPTION_TOGGLE,
 			"default": False,
-			"help": "Sort collocations alphabetically",
-			"tooltip": "Selecting this will sort words so that \"dog bark\" and \"bark dog\" will result in the latter, and be counted as one. Usually, word order is relevant data, so this is turned off by default."
+			"help": "Sort collocations",
+			"tooltip": "Sorts words alphabetically. If required words are given, these are also put in the first column.\nThis means \"dog bark\" and \"bark dog\" will result in the latter and be counted as one. Word order is often relevant data, so this is turned off by default."
 		},
 		"min_frequency": {
 			"type": UserInput.OPTION_TEXT,
@@ -107,7 +107,7 @@ class GetCollocations(BasicProcessor):
 		# n_size smaller than window_size does not make sense
 		n_size = min(n_size, window_size)
 		
-		if query_string != "":
+		if query_string:
 			query_string = query_string.lower().split(',')
 		else:
 			query_string = False
@@ -160,6 +160,14 @@ class GetCollocations(BasicProcessor):
 				if sort_words:
 					collocation = sorted(collocation)
 
+					# If a query string is indicated, we're putting this
+					# at the front of the list. This is handy when co-located
+					# words ought to be used for another processor, e.g. a word cloud.
+					if query_string:
+						for qs in query_string:
+							if qs in collocation:
+								collocation = list(collocation)
+								collocation.insert(0, collocation.pop(collocation.index(qs)))
 				collocation = " ".join(collocation)
 
 				# Check if this collocation already appeared
