@@ -49,9 +49,7 @@ known_timestamps = {
 	"13630584": "2006-10-01", # /b/’s third birthday
 	"14567756": "2006-10-20", # Jake Brahm’s bomb threat
 	"15494181": "2006-11-07", # 4chan goes down, admin post containing the words 'FIFTY BILLION YEARS'
-	"17150979": "2006-11-30", # Technical announcements involving Adbrite banner ads
-	"17262903": "2006-12-20", # Start of Hal Turner raids
-	"18229843": "2006-12-31", # Hal Turner ‘surrenders’ with the words 'short of my physical presence on this planet'
+	"18229843": "2006-12-31", # Hal Turner ‘surrenders’ after raids with the words 'short of my physical presence on this planet'
 	"18720601": "2007-01-09", # 'Interstitial ads' announcement by moot
 	"22687013": "2007-03-21", # Bestiality pictures posted on /b/
 	"23000000": "2007-03-26", # 23M GET
@@ -60,7 +58,6 @@ known_timestamps = {
 	"27079435": "2007-05-13", # Thread length shortened, css changed so everything in the interface had the same color.
 	"29000000": "2007-06-06", # 29M GET
 	"30000000": "2007-06-16", # 30M GET
-	"26143654": "2007-07-17", # Potterforums.com Raids
 	"34178570": "2007-07-26", # Fox News coverage of 4chan, labels anons as “hackers on steroids”
 	"39103157": "2007-09-11", # Trey Burba terrorism threat
 	"41430052": "2007-10-01", # 4chan’s fourth birthday
