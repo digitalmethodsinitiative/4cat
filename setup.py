@@ -20,6 +20,7 @@ packages = [
 	"Flask==1.1.0",
 	"Flask_Limiter==1.0.1",
 	"Flask_Login==0.4.1",
+	"fonttools==4.27.1",
 	"gensim==3.8.3",
 	"google_api_python_client==2.0.2",
 	"html2text==2018.1.9",
@@ -49,6 +50,7 @@ packages = [
 	"svgwrite==1.3.1",
 	"Telethon==1.10.6",
 	"Werkzeug==0.15.5",
+	"wordcloud==1.8.1",
 	"en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.0.0/en_core_web_sm-3.0.0.tar.gz#egg=en_core_web_sm"
 ]
 
