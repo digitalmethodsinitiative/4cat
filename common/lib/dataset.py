@@ -399,6 +399,24 @@ class DataSet(FourcatModule):
 		except json.JSONDecodeError:
 			return {}
 
+	def get_columns(self):
+		"""
+		Returns the dataset columns.
+		Useful for processor input forms.
+		
+		:return:  Set of dataset columns
+		"""
+
+		if self.get_results_path().suffix != ".csv" or not self.get_results_path().exists():
+			return False
+
+		with self.get_results_path().open(encoding="utf-8") as infile:
+			reader = csv.DictReader(infile)
+			try:
+				return set(reader.fieldnames)
+			except (TypeError, ValueError):
+				return False
+
 	def update_label(self, label):
 		"""
 		Update label for this dataset
