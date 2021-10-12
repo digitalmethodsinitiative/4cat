@@ -25,27 +25,7 @@ class ColumnNetworker(BasicProcessor):
                   "columns, if they are not empty. Nodes and edges are weighted by frequency."
     extension = "gexf"
 
-    @classmethod
-    def is_compatible_with(cls, module=None):
-        """
-        Allow processor to run on all csv and NDJSON datasets
-
-        :param module: Dataset or processor to determine compatibility with
-        """
-
-        return module.get_extension() in ("csv", "ndjson")
-
     options = {
-        "column-a": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "'From' column name",
-            "tooltip": "Name of the column of values from which edges originate"
-        },
-        "column-b": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "'To' column name",
-            "tooltip": "Name of the column of values at which edges terminate"
-        },
         "interval": {
             "type": UserInput.OPTION_CHOICE,
             "help": "Make network dynamic by",
@@ -92,6 +72,41 @@ class ColumnNetworker(BasicProcessor):
                        "value 'hello' from the column 'subject'. If disabled, they would be considered a single node."
         }
     }
+
+    @classmethod
+    def get_options(cls, parent_dataset=None, user=None):
+        
+        options = cls.options
+        if not parent_dataset:
+            return options
+        parent_columns = parent_dataset.get_columns()
+
+        if parent_columns:
+            parent_columns = {c: c for c in sorted(parent_columns)}
+            options["column-a"] = {
+                    "type": UserInput.OPTION_CHOICE,
+                    "options": parent_columns,
+                    "help": "'From' column name",
+                    "tooltip": "Name of the column of values from which edges originate"
+                }
+            options["column-b"] = {
+                    "type": UserInput.OPTION_CHOICE,
+                    "options": parent_columns,
+                    "help": "'To' column name",
+                    "tooltip": "Name of the column of values at which edges terminate"
+                }
+        
+        return options
+
+    @classmethod
+    def is_compatible_with(cls, module=None):
+        """
+        Allow processor to run on all csv and NDJSON datasets
+
+        :param module: Dataset or processor to determine compatibility with
+        """
+
+        return module.get_extension() in ("csv", "ndjson")
 
     def process(self):
         """
