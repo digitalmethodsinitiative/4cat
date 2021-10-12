@@ -151,8 +151,7 @@ class GetCollocations(BasicProcessor):
 
 			# The tokens are separated per posts, so we get collocations per post.
 			for post_tokens in tokens:
-				post_collocations = self.get_collocations(post_tokens, window_size, n_size, min_frequency=min_frequency,
-														  query_string=query_string, forbidden_words=forbidden_words, unique=unique)
+				post_collocations = self.get_collocations(post_tokens, window_size, n_size, query_string=query_string, forbidden_words=forbidden_words, unique=unique)
 				collocations += post_collocations
 
 			# Loop through the collocation per post, merge, and store in the results list
@@ -189,6 +188,10 @@ class GetCollocations(BasicProcessor):
 
 				sorted_results = sorted(tokenset_results.items(), key=operator.itemgetter(1), reverse=True)
 
+				# Filter out word pairs that appear less than the min frequency, if given.
+				if min_frequency:
+					sorted_results = [tpl for tpl in sorted_results if tpl[1] >= min_frequency]
+
 				# Save all results or just the most frequent ones.
 				# Also allow a smaller amount of results than the max.
 				output = max_output
@@ -217,12 +220,11 @@ class GetCollocations(BasicProcessor):
 		self.dataset.update_status("Writing to csv and finishing")
 		self.write_csv_items_and_finish(results)
 
-	def get_collocations(self, tokens, window_size, n_size, min_frequency=None, query_string=False, forbidden_words=False, unique=False):
+	def get_collocations(self, tokens, window_size, n_size, query_string=False, forbidden_words=False, unique=False):
 		""" Generates a tuple of word collocations (bigrams or trigrams).
 		:param li, tokens:				list of tokens
 		:param int, window_size: 		size of word window (context) to calculate the ngrams from
 		:param int, n_size:				n-gram size. 1=unigrams, 2=bigrams, 3=trigrams
-		:param int, min_frequency:			Frequency filter - only return collocations more than this value.
 		:param str, query_string:		if given, only return collocations with this word.
 										If emtpy, generates collocations for the overall corpus.
 		:param str, forbidden_words:	possible list of words to exclude from the results
@@ -266,10 +268,6 @@ class GetCollocations(BasicProcessor):
 
 		else:
 			return "n_size is not valid. Use 1 or 2"
-
-		# Filter out words appearing less than this
-		if min_frequency and min_frequency > 1:
-			finder.apply_freq_filter(min_frequency)
 
 		collocations = sorted(finder.ngram_fd.items(), key=operator.itemgetter(1), reverse=True)
 
