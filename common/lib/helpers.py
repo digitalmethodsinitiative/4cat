@@ -126,7 +126,7 @@ def get_software_version():
 			return ""
 
 	try:
-		with versionpath.open("r") as versionfile:
+		with open(versionpath, "r", encoding="utf-8"`, errors="ignore") as versionfile:
 			version = versionfile.readline().split(" ")[0]
 			return version
 	except OSError:
