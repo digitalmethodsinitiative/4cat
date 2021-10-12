@@ -28,13 +28,7 @@ class LexicalFilter(BasicProcessor):
     extension = "csv"  # extension of result file, used internally and in UI
 
     options = {
-        "column": {
-            "type": UserInput.OPTION_TEXT,
-            "default": "body",
-            "help": "Filter items on this column",
-            "tooltip": "The column must exist in the dataset when opened as a CSV file (for example: 'body', "
-                       "'timestamp' or 'thread_id')"
-        },
+        "column": {},
         "match-style": {
             "type": UserInput.OPTION_CHOICE,
             "help": "Match as",
@@ -78,6 +72,24 @@ class LexicalFilter(BasicProcessor):
         :param module: Dataset or processor to determine compatibility with
         """
         return module.is_top_dataset() and module.get_extension() == "csv"
+
+    @classmethod
+    def get_options(cls, parent_dataset=None, user=None):
+        
+        options = cls.options
+        if not parent_dataset:
+            return options
+        parent_columns = parent_dataset.get_columns()
+
+        if parent_columns:
+            parent_columns = {c: c for c in sorted(parent_columns)}
+            options["column"] = {
+                "type": UserInput.OPTION_CHOICE,
+                "options": parent_columns,
+                "help": "Filter items on this column"
+        }
+        
+        return options
 
     def process(self):
         """

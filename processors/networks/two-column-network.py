@@ -26,6 +26,8 @@ class ColumnNetworker(BasicProcessor):
     extension = "gexf"
 
     options = {
+        "column_a": {},
+        "column_b": {},
         "interval": {
             "type": UserInput.OPTION_CHOICE,
             "help": "Make network dynamic by",
@@ -95,7 +97,7 @@ class ColumnNetworker(BasicProcessor):
                     "help": "'To' column name",
                     "tooltip": "Name of the column of values at which edges terminate"
                 }
-        
+
         return options
 
     @classmethod
