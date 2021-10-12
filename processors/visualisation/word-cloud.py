@@ -98,7 +98,7 @@ class MakeWordCloud(BasicProcessor):
 				count = int(post[count_column])
 			except ValueError:
 				self.dataset.update_status("Couldn't convert value %s to an integer. Please set a valid count column." % post[count_column])
-				self.finish(0)
+				self.dataset.finish(0)
 				return
 
 			# Add to general dict
