@@ -57,15 +57,21 @@ class GetCollocations(BasicProcessor):
 			"default": "",
 			"help": "Words to exclude (comma-separated)"
 		},
+		"unique": {
+			"type": UserInput.OPTION_TOGGLE,
+			"default": True,
+			"help": "Only keep unique collocations per post",
+			"tooltip": "This is useful for filtering out collocations for spammy posts. For instance, for \"dog bark dog bark dog bark\" it will only count collocations for \"bark\" and \"dog\" once."
+		},
 		"sort_words": {
 			"type": UserInput.OPTION_TOGGLE,
 			"default": False,
 			"help": "Sort collocations",
-			"tooltip": "Sorts words alphabetically. If required words are given, these are also put in the first column.\nThis means \"dog bark\" and \"bark dog\" will result in the latter and be counted as one. Word order is often relevant data, so this is turned off by default."
+			"tooltip": "Sorts words alphabetically. This means \"dog bark\" and \"bark dog\" will result in the latter. If required words are given, these are also put in the first column (useful for e.g. word clouds). Word order can be relevant, so this is turned off by default."
 		},
 		"min_frequency": {
 			"type": UserInput.OPTION_TEXT,
-			"default": 0,
+			"default": 1,
 			"help": "Minimum frequency of words appearing together"
 		},
 		"max_output": {
@@ -116,6 +122,7 @@ class GetCollocations(BasicProcessor):
 		else:
 			forbidden_words = False
 
+		unique = self.parameters.get("unique", True)
 		sort_words = self.parameters.get("sort_words", False)
 
 		# Get token sets
@@ -145,7 +152,7 @@ class GetCollocations(BasicProcessor):
 			# The tokens are separated per posts, so we get collocations per post.
 			for post_tokens in tokens:
 				post_collocations = self.get_collocations(post_tokens, window_size, n_size, min_frequency=min_frequency,
-														  query_string=query_string, forbidden_words=forbidden_words)
+														  query_string=query_string, forbidden_words=forbidden_words, unique=unique)
 				collocations += post_collocations
 
 			# Loop through the collocation per post, merge, and store in the results list
@@ -210,7 +217,7 @@ class GetCollocations(BasicProcessor):
 		self.dataset.update_status("Writing to csv and finishing")
 		self.write_csv_items_and_finish(results)
 
-	def get_collocations(self, tokens, window_size, n_size, min_frequency=None, query_string=False, forbidden_words=False):
+	def get_collocations(self, tokens, window_size, n_size, min_frequency=None, query_string=False, forbidden_words=False, unique=False):
 		""" Generates a tuple of word collocations (bigrams or trigrams).
 		:param li, tokens:				list of tokens
 		:param int, window_size: 		size of word window (context) to calculate the ngrams from
@@ -219,6 +226,7 @@ class GetCollocations(BasicProcessor):
 		:param str, query_string:		if given, only return collocations with this word.
 										If emtpy, generates collocations for the overall corpus.
 		:param str, forbidden_words:	possible list of words to exclude from the results
+		:param bool, unique:			Whether to filter for unique collocations per post.
 
 		:return: list of tuples with collocations 
 		
@@ -263,5 +271,10 @@ class GetCollocations(BasicProcessor):
 		if min_frequency and min_frequency > 1:
 			finder.apply_freq_filter(min_frequency)
 
-		colocations = sorted(finder.ngram_fd.items(), key=operator.itemgetter(1), reverse=True)
-		return colocations
+		collocations = sorted(finder.ngram_fd.items(), key=operator.itemgetter(1), reverse=True)
+
+		# If indicated, only keep unique collocation sets and count them all as one.
+		if unique:
+			collocations = [(tpl[0], 1) for tpl in collocations]
+
+		return collocations
