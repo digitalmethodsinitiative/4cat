@@ -106,7 +106,15 @@ class TopicModeler(BasicProcessor):
 
             self.dataset.update_status("Vectorising token set '%s'" % token_file.stem)
             vectoriser = vectoriser_class(tokenizer=lambda token: token, lowercase=False, min_df=min_df, max_df=max_df)
-            vectors = vectoriser.fit_transform(tokens)
+
+            try:
+                vectors = vectoriser.fit_transform(tokens)
+            except ValueError as e:
+                # 'no words left' after pruning, so nothing to model with
+                self.dataset.update_status(e, is_final=True)
+                self.dataset.finish(0)
+                return
+
             features = vectoriser.get_feature_names()
 
             self.dataset.update_status("Fitting token clusters for token set '%s'" % token_file.stem)
