@@ -54,7 +54,10 @@ class Search(BasicProcessor, ABC):
 
 		# Execute the relevant query (string-based, random, countryflag-based)
 		try:
-			posts = self.search(query_parameters)
+			if query_parameters.get("file"):
+				posts = self.import_from_file(query_parameters.get("file"))
+			else:
+				posts = self.search(query_parameters)
 		except WorkerInterruptedException:
 			raise ProcessorInterruptedException("Interrupted while collecting data, trying again later.")
 
@@ -132,6 +135,34 @@ class Search(BasicProcessor, ABC):
 		To be implemented by descending classes!
 		"""
 		pass
+
+	def import_from_file(self, path):
+		"""
+		Import items from an external file
+
+		By default, this reads a file and parses each line as JSON, returning
+		the parsed object as an item. This works for NDJSON files. Data sources
+		that require importing from other or multiple file types can overwrite
+		this method.
+
+		The file is considered disposable and deleted after importing.
+
+		:param str path:  Path to read from
+		:return:  Yields all items in the file, item for item.
+		"""
+		path = Path(path)
+		if not path.exists():
+			return []
+
+		with path.open() as infile:
+			for line in infile:
+				if self.interrupted:
+					raise WorkerInterruptedException()
+
+				line = json.loads(line)
+				yield line
+
+		path.unlink()
 
 	def items_to_csv(self, results, filepath):
 		"""

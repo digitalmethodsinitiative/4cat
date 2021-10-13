@@ -1,278 +1,206 @@
 """
-Search instagram via instaloader
+Import scraped Instagram data
 
-Instagram is, after a fashion, an imageboard - people post images and then
-other people reply (though they can't post images in response). So this
-datasource uses this affordance to retrieve instagram data for 4CAT.
+It's prohibitively difficult to scrape data from Instagram within 4CAT itself
+due to its aggressive rate limiting. Instead, import data collected elsewhere.
 """
-import instaloader
-import base64
+from pathlib import Path
+import json
 import re
 
-import config
 from backend.abstract.search import Search
 from common.lib.helpers import UserInput
-from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException
+from common.lib.exceptions import WorkerInterruptedException
 
 
 class SearchInstagram(Search):
-	"""
-	Instagram scraper
-	"""
-	type = "instagram-search"  # job ID
-	category = "Search"  # category
-	title = "Search Instagram"  # title displayed in UI
-	description = "Retrieve Instagram posts by hashtag, user or location, in reverse chronological order."  # description displayed in UI
-	extension = "csv"  # extension of result file, used internally and in UI
+    """
+    Import scraped Instagram data
+    """
+    type = "instagram-search"  # job ID
+    category = "Search"  # category
+    title = "Import scraped Instagram data"  # title displayed in UI
+    description = "Import Instagram data collected with an external tool such as Zeeschuimer."  # description displayed in UI
+    extension = "csv"  # extension of result file, used internally and in UI
 
-	# not available as a processor for existing datasets
-	accepts = [None]
+    # not available as a processor for existing datasets
+    accepts = [None]
 
-	# let's not get rate limited
-	max_workers = 1
+    # some magic numbers instagram uses
+    MEDIA_TYPE_PHOTO = 1
+    MEDIA_TYPE_VIDEO = 2
+    MEDIA_TYPE_CAROUSEL = 8
 
-	options = {
-		"intro": {
-			"type": UserInput.OPTION_INFO,
-			"help": "Posts are scraped in reverse chronological order; the most recent post for a given query will be "
-					"scraped first. In addition to posts, comments are also scraped. Note that this may take a long "
-					"time for popular accounts or hashtags.\n\nYou can scrape up to **five** items at a time. Separate "
-					"the items with commas or blank lines. Including `#` in hashtags is optional."
-		},
-		"search_scope": {
-			"type": UserInput.OPTION_CHOICE,
-			"help": "Search by",
-			"options": {
-				"hashtag": "Hashtag",
-				"username": "Username"
-			},
-			"default": "hashtag"
-		},
-		"query": {
-			"type": UserInput.OPTION_TEXT_LARGE,
-			"help": "Items to scrape",
-			"tooltip": "Separate with commas or new lines."
-		},
-		"scrape_comments": {
-			"type": UserInput.OPTION_TOGGLE,
-			"help": "Scrape comments?"
-		},
-		"max_posts": {
-			"type": UserInput.OPTION_TEXT,
-			"min": 1,
-			"max": 500,
-			"help": "Posts per item"
-		}
-	}
+    def get_items(self, query):
+        """
+        Run custom search
 
-	def get_items(self, query):
-		"""
-		Run custom search
+        Not available for Instagram
+        """
+        raise NotImplementedError("Instagram datasets can only be created by importing data from elsewhere")
 
-		Fetches data from Instagram via instaloader.
-		"""
-		# this is useful to include in the results because researchers are
-		# always thirsty for them hashtags
-		hashtag = re.compile(r"#([^\s,.+=-]+)")
-		mention = re.compile(r"@([a-zA-Z0-9_]+)")
+    def import_from_file(self, path):
+        """
+        Import items from an external file
 
-		instagram = instaloader.Instaloader(
-			quiet=True,
-			download_pictures=False,
-			download_videos=False,
-			download_comments=True,
-			download_geotags=False,
-			download_video_thumbnails=False,
-			compress_json=False,
-			save_metadata=True
-		)
+        By default, this reads a file and parses each line as JSON, returning
+        the parsed object as an item. This works for NDJSON files. Data sources
+        that require importing from other or multiple file types can overwrite
+        this method.
 
-		# ready our parameters
-		parameters = self.dataset.get_parameters()
-		scope = parameters.get("search_scope", "")
-		queries = [query.strip() for query in parameters.get("query", "").split(",")]
+        The file is considered disposable and deleted after importing.
 
-		posts = []
-		max_posts = self.dataset.parameters.get("items", 500)
+        Instagram importing is a little bit roundabout since we can expect
+        input in two separate and not completely overlapping formats - an "edge
+        list" or an "item list", and posts are structured differently between
+        those, and do not contain the same data. So we find a middle ground
+        here... each format has its own handler function
 
-		# for each query, get items
-		for query in queries:
-			chunk_size = 0
-			self.dataset.update_status("Retrieving posts ('%s')" % query)
-			try:
-				if scope == "hashtag":
-					query = query.replace("#", "")
-					chunk = instagram.get_hashtag_posts(query)
-				elif scope == "username":
-					query = query.replace("@", "")
-					profile = instaloader.Profile.from_username(instagram.context, query)
-					chunk = profile.get_posts()
-				else:
-					self.log.warning("Invalid search scope for instagram scraper: %s" % repr(scope))
-					return []
+        :param str path:  Path to read from
+        :return:  Yields all items in the file, item for item.
+        """
+        path = Path(path)
+        if not path.exists():
+            return []
 
-				# "chunk" is a generator so actually retrieve the posts next
-				posts_processed = 0
-				for post in chunk:
-					if self.interrupted:
-						raise ProcessorInterruptedException("Interrupted while fetching posts from Instagram")
+        with path.open() as infile:
+            for line in infile:
+                if self.interrupted:
+                    raise WorkerInterruptedException()
 
-					chunk_size += 1
-					self.dataset.update_status("Retrieving posts ('%s', %i posts)" % (query, chunk_size))
-					if posts_processed >= max_posts:
-						break
-					try:
-						posts.append(chunk.__next__())
-						posts_processed += 1
-					except StopIteration:
-						break
-			except instaloader.InstaloaderException as e:
-				# should we abort here and return 0 posts?
-				self.log.warning("Instaloader exception during query %s: %s" % (self.dataset.key, e))
-				self.dataset.update_status("Error while retrieving posts for query '%s'" % query)
+                post = json.loads(line)
+                node = post["data"]
+                is_graph_response = "__typename" in node
 
-		# go through posts, and retrieve comments
-		results = []
-		posts_processed = 0
-		comments_bit = " and comments" if self.parameters.get("scrape_comments", False) else ""
+                if is_graph_response:
+                    yield self.parse_graph_item(node)
+                else:
+                    yield self.parse_itemlist_item(node)
 
-		for post in posts:
-			if self.interrupted:
-				raise ProcessorInterruptedException("Interrupted while fetching post metadata from Instagram")
+        path.unlink()
 
-			posts_processed += 1
-			self.dataset.update_status("Retrieving metadata%s for post %i" % (comments_bit, posts_processed))
+    def parse_graph_item(self, node):
+        """
+        Parse Instagram post in Graph format
 
-			thread_id = post.shortcode
+        :param node:  Data as received from Instagram
+        :return dict:  Mapped item
+        """
+        try:
+            caption = node["edge_media_to_caption"]["edges"][0]["node"]["text"]
+        except IndexError:
+            caption = ""
 
-			try:
-				results.append({
-					"id": thread_id,
-					"thread_id": thread_id,
-					"parent_id": thread_id,
-					"body": post.caption if post.caption is not None else "",
-					"author": post.owner_username,
-					"timestamp": int(post.date_utc.timestamp()),
-					"type": "video" if post.is_video else "picture",
-					"url": post.video_url if post.is_video else post.url,
-					"thumbnail_url": post.url,
-					"hashtags": ",".join(post.caption_hashtags),
-					"usertags": ",".join(post.tagged_users),
-					"mentioned": ",".join(mention.findall(post.caption) if post.caption else ""),
-					"num_likes": post.likes,
-					"num_comments": post.comments,
-					"subject": ""
-				})
-			except (instaloader.QueryReturnedNotFoundException, instaloader.ConnectionException):
-				pass
+        num_media = 1 if node["__typename"] != "GraphSidecar" else len(node["edge_sidecar_to_children"]["edges"])
 
-			if not self.parameters.get("scrape_comments", False):
-				continue
+        # get media url
+        # for carousels, get the first media item, for videos, get the video
+        # url, for photos, get the highest resolution
+        if node["__typename"] == "GraphSidecar":
+            media_node = node["edge_sidecar_to_children"]["edges"][0]["node"]
+        else:
+            media_node = node
 
-			try:
-				for comment in post.get_comments():
-					answers = [answer for answer in comment.answers]
+        if media_node["__typename"] == "GraphVideo":
+            media_url = media_node["video_url"]
+        elif media_node["__typename"] == "GraphImage":
+            print(json.dumps(media_node))
+            resources = media_node.get("display_resources", media_node.get("thumbnail_resources"))
+            try:
+                media_url = resources.pop()["src"]
+            except AttributeError:
+                media_url = media_node.get("display_url", "")
+        else:
+            media_url = media_node["display_url"]
 
-					try:
-						results.append({
-							"id": comment.id,
-							"thread_id": thread_id,
-							"parent_id": thread_id,
-							"body": comment.text,
-							"author": comment.owner.username,
-							"timestamp": int(comment.created_at_utc.timestamp()),
-							"type": "comment",
-							"url": "",
-							"hashtags": ",".join(hashtag.findall(comment.text)),
-							"usertags": "",
-							"mentioned": ",".join(mention.findall(comment.text)),
-							"num_likes": comment.likes_count if hasattr(comment, "likes_count") else 0,
-							"num_comments": len(answers),
-							"subject": ""
-						})
-					except instaloader.QueryReturnedNotFoundException:
-						pass
+        # type, 'mixed' means carousel with video and photo
+        type_map = {"GraphSidecar": "photo", "GraphVideo": "video"}
+        if node["__typename"] != "GraphSidecar":
+            media_type = type_map.get(node["__typename"], "unknown")
+        else:
+            media_types = set([s["node"]["__typename"] for s in node["edge_sidecar_to_children"]["edges"]])
+            media_type = "mixed" if len(media_types) > 1 else type_map.get(media_types.pop(), "unknown")
 
-					# instagram only has one reply depth level at the time of
-					# writing, represented here
-					for answer in answers:
-						try:
-							results.append({
-								"id": answer.id,
-								"thread_id": thread_id,
-								"parent_id": comment.id,
-								"body": answer.text,
-								"author": answer.owner.username,
-								"timestamp": int(answer.created_at_utc.timestamp()),
-								"type": "comment",
-								"url": "",
-								"hashtags": ",".join(hashtag.findall(answer.text)),
-								"usertags": "",
-								"mentioned": ",".join(mention.findall(answer.text)),
-								"num_likes": answer.likes_count if hasattr(answer, "likes_count") else 0,
-								"num_comments": 0,
-								"subject": ""
-							})
-						except instaloader.QueryReturnedNotFoundException:
-							pass
+        mapped_item = {
+            "id": node["shortcode"],
+            "thread_id": node["shortcode"],
+            "parent_id": node["shortcode"],
+            "body": caption,
+            "author": node["owner"]["username"],
+            "author_fullname": node["owner"].get("full_name", ""),
+            "author_avatar_url": node["owner"].get("profile_pic_url", ""),
+            "timestamp": node["taken_at_timestamp"],
+            "type": media_type,
+            "url": "https://www.instagram.com/p/" + node["shortcode"],
+            "image_url": node["display_url"],
+            "media_url": media_url,
+            "hashtags": ",".join(re.findall(r"#([^\s!@#$%ˆ&*()_+{}:\"|<>?\[\];'\,./`~']+)", caption)),
+            # "usertags": ",".join(
+            #     [u["node"]["user"]["username"] for u in node["edge_media_to_tagged_user"]["edges"]]),
+            "num_likes": node["edge_media_preview_like"]["count"],
+            "num_comments": node.get("edge_media_preview_comment", {}).get("count", 0),
+            "num_media": num_media,
+            "subject": ""
+        }
 
-			except (instaloader.QueryReturnedNotFoundException, instaloader.ConnectionException):
-				# data not available...? this happens sometimes, not clear why
-				pass
+        return mapped_item
 
-		# remove temporary fetched data and return posts
-		return results
+    def parse_itemlist_item(self, node):
+        """
+        Parse Instagram post in 'item list' format
 
-	def validate_query(query, request, user):
-		"""
-		Validate custom data input
+        :param node:  Data as received from Instagram
+        :return dict:  Mapped item
+        """
+        num_media = 1 if node["media_type"] != self.MEDIA_TYPE_CAROUSEL else len(node["carousel_media"])
+        caption = "" if not node.get("caption") else node["caption"]["text"]
 
-		Confirms that the uploaded file is a valid CSV file and, if so, returns
-		some metadata.
+        # get media url
+        # for carousels, get the first media item, for videos, get the video
+        # url, for photos, get the highest resolution
+        if node["media_type"] == self.MEDIA_TYPE_CAROUSEL:
+            media_node = node["carousel_media"][0]
+        else:
+            media_node = node
 
-		:param dict query:  Query parameters, from client-side.
-		:param request:  Flask request
-		:param User user:  User object of user who has submitted the query
-		:return dict:  Safe query parameters
-		"""
-		# no query 4 u
-		if not query.get("query", "").strip():
-			raise QueryParametersException("You must provide a search query.")
+        if media_node["media_type"] == self.MEDIA_TYPE_VIDEO:
+            media_url = media_node["video_versions"][0]["url"]
+            display_url = media_node["image_versions2"]["candidates"][0]["url"]
+        elif media_node["media_type"] == self.MEDIA_TYPE_PHOTO:
+            media_url = media_node["image_versions2"]["candidates"][0]["url"]
+            display_url = media_url
+        else:
+            media_url = ""
+            display_url = ""
 
-		# reformat queries to be a comma-separated list with no wrapping
-		# whitespace
-		whitespace = re.compile(r"\s+")
-		items = whitespace.sub("", query.get("query").replace("\n", ","))
-		if len(items.split(",")) > 5:
-			raise QueryParametersException("You cannot query more than 5 items at a time.")
+        # type, 'mixed' means carousel with video and photo
+        type_map = {self.MEDIA_TYPE_PHOTO: "photo", self.MEDIA_TYPE_VIDEO: "video"}
+        if node["media_type"] != self.MEDIA_TYPE_CAROUSEL:
+            media_type = type_map.get(node["media_type"], "unknown")
+        else:
+            media_types = set([s["media_type"] for s in node["carousel_media"]])
+            media_type = "mixed" if len(media_types) > 1 else type_map.get(media_types.pop(), "unknown")
 
-		# simple!
-		return {
-			"items": query.get("max_posts"),
-			"query": items,
-			"board": query.get("search_scope") + "s",  # used in web interface
-			"search_scope": query.get("search_scope"),
-			"scrape_comments": query.get("scrape_comments")
-		}
+        mapped_item = {
+            "id": node["code"],
+            "thread_id": node["code"],
+            "parent_id": node["code"],
+            "body": caption,
+            "author": node["user"]["username"],
+            "author_fullname": node["user"]["full_name"],
+            "author_avatar_url": node["user"]["profile_pic_url"],
+            "timestamp": node["taken_at"],
+            "type": media_type,
+            "url": "https://www.instagram.com/p/" + node["code"],
+            "image_url": display_url,
+            "media_url": media_url,
+            "hashtags": ",".join(re.findall(r"#([^\s!@#$%ˆ&*()_+{}:\"|<>?\[\];'\,./`~']+)", caption)),
+            # "usertags": ",".join(
+            #     [u["node"]["user"]["username"] for u in node["edge_media_to_tagged_user"]["edges"]]),
+            "num_likes": node["like_count"],
+            "num_comments": node["comment_count"],
+            "num_media": num_media,
+            "subject": ""
+        }
 
-	@staticmethod
-	def salt_to_fernet_key():
-		"""
-		Use 4CAT's anonymisation salt to generate a Fernet encryption key
-
-		THIS IS NOT A ROBUST ENCRYPTION METHOD. The goal here is to make it
-		impossible to decrypt data if you have access to the database but
-		*not* to the filesystem. If you have access to the 4CAT configuration
-		file, it is trivial to generate this key yourself.
-
-		For now however, it is better than storing the login details in the
-		database in plain text.
-
-		:return bytes:  Fernet-compatible 256-bit encryption key
-		"""
-		salt = config.ANONYMISATION_SALT
-		while len(salt) < 32:
-			salt += salt
-
-		salt = bytearray(salt.encode("utf-8"))[0:32]
-		return base64.urlsafe_b64encode(bytes(salt))
+        return mapped_item
