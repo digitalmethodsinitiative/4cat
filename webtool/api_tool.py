@@ -197,6 +197,71 @@ def datasource_script(datasource_id):
 	return send_file(str(script_path))
 
 
+@app.route("/api/import-dataset/", methods=["POST"])
+@limiter.limit("5 per minute")
+@openapi.endpoint("tool")
+def import_dataset():
+	"""
+	Import a dataset from another tool via upload
+
+	Currently only Zeeschuimer is explicitly supported. Receives a file,
+	stores it at a temporary location, and runs the search worker for the given
+	platform with a "file" parameter pointing to the temporary location. The
+	search worker should then parse the data file and finish the dataset.
+
+	The data should be sent in the request body, as a POST request.
+
+    :request-param str ?access_token:  Access token; only required if not
+                                       logged in currently.
+
+	:return-error 404:  If the platform specified in the
+						`X-Zeeschuimer-Platform` header is not known
+
+	:return-schema: {
+		type=object,
+		properties={
+			status={type=string},
+			key={type=string},
+			url={type=integer}
+		}
+	}
+	"""
+	platform = request.headers.get("X-Zeeschuimer-Platform").split(".")[0]
+	if not platform or platform not in backend.all_modules.datasources:
+		return error(404, message="Unknown platform or source format")
+
+	worker_type = "%s-search" % platform
+	worker = backend.all_modules.workers.get(worker_type)
+	if not worker:
+		return error(404, message="Unknown platform or source format")
+
+	dataset = DataSet(parameters={"user": current_user.get_id(), "datasource": platform}, type=worker.type, db=db)
+	dataset.update_status("Importing uploaded file...")
+
+	# store the file at the result path for the dataset, but with a different suffix
+	# since the dataset was only just created, this file is guaranteed to not exist yet
+	# cleaning it up later is left as an exercise for the search worker
+	temporary_path = dataset.get_results_path().with_suffix(".importing")
+	dataset.file = str(temporary_path)
+
+	with temporary_path.open("wb") as outfile:
+		while True:
+			chunk = request.stream.read(4096)
+			if len(chunk) == 0:
+				break
+
+			outfile.write(chunk)
+
+	job = queue.add_job(worker_type, {"file": str(temporary_path)}, dataset.key)
+	dataset.link_job(job)
+
+	return jsonify({
+		"status": "queued",
+		"key": dataset.key,
+		"url": url_for("show_result", key=dataset.key)
+	})
+
+
 @app.route("/api/queue-query/", methods=["POST"])
 @login_required
 @limiter.limit("5 per minute")
@@ -267,7 +332,6 @@ def queue_dataset():
 
 
 @app.route('/api/check-query/')
-@login_required
 @openapi.endpoint("tool")
 def check_dataset():
 	"""
@@ -290,7 +354,8 @@ def check_dataset():
 			done={type=boolean},
 			path={type=string},
 			empty={type=boolean},
-			is_favourite={type=boolean}
+			is_favourite={type=boolean},
+			url={type=string}
 		}
 	}
 
@@ -316,17 +381,18 @@ def check_dataset():
 		path = ""
 
 	status = {
+		"datasource": dataset.parameters.get("datasource"),
 		"status": dataset.get_status(),
 		"status_html": render_template("result-status.html", dataset=dataset),
 		"label": dataset.get_label(),
-		"query": dataset.data["query"],
 		"rows": dataset.data["num_rows"],
 		"key": dataset_key,
 		"done": True if dataset.is_finished() else False,
 		"path": path,
 		"empty": (dataset.data["num_rows"] == 0),
 		"is_favourite": (db.fetchone("SELECT COUNT(*) AS num FROM users_favourites WHERE name = %s AND key = %s",
-									 (current_user.get_id(), dataset.key))["num"] > 0)
+									 (current_user.get_id(), dataset.key))["num"] > 0),
+		"url": url_for("show_result", key=dataset.key, _external=True)
 	}
 
 	return jsonify(status)

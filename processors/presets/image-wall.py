@@ -55,7 +55,7 @@ class DownloadImagesAndMakeImageWall(ProcessorPreset):
                 "type": "image-downloader",
                 "parameters": {
                     "amount": 125,
-                    "overwrite": False
+                    "columns": ["item"]
                 }
             },
             # then, create an image wall

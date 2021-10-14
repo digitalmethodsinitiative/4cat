@@ -375,6 +375,19 @@ article.result > section:first-child {
     left: -.75em;
 }
 
+.processor-options-wrap .multi-select-wrapper {
+    margin-left: 0.5em;
+}
+
+.processor-option-wrap {
+    margin: 0.25em;
+    display: flex;
+    flex-wrap: wrap;
+}
+
+.processor.option-wrap > *:not(label) {
+    margin-left: 0.5em;
+}
 
 .multi-select-search {
     position: relative;
@@ -395,7 +408,13 @@ article.result > section:first-child {
     background-color: var(--gray);
 }
 
-.multi-select-options > label {
+.processor-option-wrap .multi-select-options {
+    height: auto;
+    max-height: 15em;
+    width: 19em;
+}
+
+.multi-select-options > label, .form-element .multi-select-options label {
     text-align: left;
     cursor: pointer;
     user-select: none;

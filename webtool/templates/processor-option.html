@@ -1,5 +1,5 @@
 {% set option_settings = processor.get_options(dataset, current_user)[option] %}
-<div class="processor-option-wrap" style="display: flex; flex-wrap: wrap; margin: 0.25em;">
+<div class="processor-option-wrap">
     <label class="option-type-{{ option_settings.type }}">
         {% if option_settings.type == "toggle" %}
             <input type="checkbox" name="option-{{ option }}"{% if option_settings.default %} checked="checked"{% endif %}>

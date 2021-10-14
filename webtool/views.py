@@ -189,7 +189,10 @@ def show_index():
 	"""
 	Main tool frontend
 	"""
-	return render_template('create-dataset.html', datasources=backend.all_modules.datasources)
+	datasources = {datasource: metadata for datasource, metadata in backend.all_modules.datasources.items() if
+				   metadata["has_worker"] and metadata["has_options"]}
+
+	return render_template('create-dataset.html', datasources=datasources)
 
 
 @app.route('/get-boards/<string:datasource>/')

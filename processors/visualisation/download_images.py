@@ -2,7 +2,6 @@
 Download images linked in dataset
 """
 import requests
-import binascii
 import hashlib
 import base64
 import json
@@ -10,7 +9,6 @@ import time
 import re
 import csv
 import shutil
-import uuid
 
 from pathlib import Path
 from PIL import Image, UnidentifiedImageError
@@ -38,7 +36,10 @@ class ImageDownloader(BasicProcessor):
 	type = "image-downloader"  # job type ID
 	category = "Visual"  # category
 	title = "Download images"  # title displayed in UI
-	description = "Download top images and compress as a zip file. May take a while to complete as images are sourced externally. Note that not always all images can be retrieved. For imgur galleries, only the first image is saved. For imgur gifv files, only the first frame is saved. Use the \"Add download status\" option to see what downloads succeeded"  # description displayed in UI
+	description = "Download images and compress as a zip file. May take a while to complete as images are sourced " \
+				  "externally. Note that not always all images can be retrieved. For imgur galleries, only the first " \
+				  "image is saved. For animations, only the first frame is saved if available. A JSON metadata file " \
+				  "is included in the output archive."  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
 
 	options = {
@@ -49,12 +50,12 @@ class ImageDownloader(BasicProcessor):
 			"min": 0,
 			"max": 5000
 		},
-		"overwrite": {
-			"type": UserInput.OPTION_TOGGLE,
-			"default": True,
-			"help": "Add download status to Top images",
-			"tooltip": "This will add two columns, \"download_status\" and \"img_name\", to above csv file so you can check whether downloading succeeded and what the image's filename is."
-		}
+		"columns": {
+			"type": UserInput.OPTION_TEXT,
+			"help": "Column to get image links from",
+			"default": "image_url",
+			"tooltip": "If column contains a single URL, use that URL; else, try to find image URLs in the column's content"
+		},
 	}
 
 	@classmethod
@@ -64,7 +65,7 @@ class ImageDownloader(BasicProcessor):
 
 		:param module: Dataset or processor to determine compatibility with
 		"""
-		return module.type == "top-images"
+		return module.type == "top-images" or module.type.endswith("search")
 
 	def process(self):
 		"""
@@ -72,9 +73,12 @@ class ImageDownloader(BasicProcessor):
 		with one column with image hashes, one with the first file name used
 		for the image, and one with the amount of times the image was used
 		"""
-		images = {}
 
-		urls = []
+		# Get the source file data path
+		top_parent = self.dataset.get_genealogy()[0]
+		datasource = top_parent.parameters.get("datasource")
+		amount = self.parameters.get("amount", 0)
+		columns = self.parameters.get("columns")
 
 		# is there anything for us to download?
 		if self.source_dataset.num_rows == 0:
@@ -82,66 +86,90 @@ class ImageDownloader(BasicProcessor):
 			self.dataset.finish(0)
 			return
 
-		# Get the source file data path
-		top_parent = self.dataset.get_genealogy()[0]
-		datasource = top_parent.parameters["datasource"]
+		if not columns:
+			self.dataset.update_status("No columns selected; no images extracted.", is_final=True)
+			self.dataset.finish(0)
+			return
 
-		try:
-			amount = max(0, min(1000, int(self.parameters.get("amount", 0))))
-		except ValueError:
-			amount = 100
+		# prepare
+		results_path = self.dataset.get_staging_area()
+		urls = {}
+		url_file_map = {}
+		file_url_map = {}
 
-		extensions = {}
+		# for image URL extraction, we use the following heuristic:
+		# Makes sure that it gets "http://site.com/img.jpg", but also
+		# more complicated ones like
+		# https://preview.redd.it/3thfhsrsykb61.gif?format=mp4&s=afc1e4568789d2a0095bd1c91c5010860ff76834
+		img_link_regex = re.compile(
+			r"(?:www\.|https?:\/\/)[^\s\(\)\]\[,']*\.(?:png|jpg|jpeg|gif|gifv)[^\s\(\)\]\[,']*", re.IGNORECASE)
 
-		# 4chan is the odd one out (images are traced to and scraped from
-		# external archives rather than 4chan itself) so here we collect the
-		# relevant archive URLs for any 4chan images we encounter
-		if datasource == "4chan":
-			self.dataset.update_status("Reading source file")
-			external = "fireden" if top_parent.parameters.get("board") == "v" else "4plebs"
-			rate_limit = 1 if external == "fireden" else 16
+		# Imgur and gfycat links that do not end in an extension are also accepted.
+		# These can later be downloaded by adding an extension.
+		img_domain_regex = re.compile(r"(?:https:\/\/gfycat\.com\/|https:\/\/imgur\.com\/)[^\s\(\)\]\[,']*",
+									  re.IGNORECASE)
 
-			for post in self.iterate_items(self.source_file):
-				# stop processing if worker has been asked to stop
-				if self.interrupted:
-					raise ProcessorInterruptedException("Interrupted while extracting image URLs")
+		external = None
+		if datasource == "4chan" and ("image_md5" in columns or "image_file" in columns):
+			external = "boards.fireden.net" if top_parent.parameters.get("board") == "v" else "archive.4plebs.org"
 
-				extension = post["filename"].split(".")[1].lower()
-				if extension not in ("jpg", "jpeg", "png", "gif"):
+		# first, get URLs to download images from
+		self.dataset.update_status("Reading source file")
+		item_index = 0
+		for item in self.iterate_items(self.source_file):
+			item_urls = set()
+			item_index += 1
+			item_id = item.get("id", item_index)
+
+			if item_index % 50 == 0:
+				self.dataset.update_status("Extracting image links from post %i/%i" % (item_index, self.source_dataset.num_rows))
+
+			# loop through all columns and process values for item
+			for column in columns:
+				value = item.get(column)
+				if not value:
 					continue
 
-				local_file = post["url_4cat"].split("/")[-1]
-				local_path = Path(config.PATH_IMAGES, local_file)
-				if local_path.exists():
-					url = local_path
+				if re.match(r"https?://[^\s]+", value):
+					# single URL
+					item_urls.add(value)
 				else:
-					url = post["url_" + external]
+					# search for image URLs in string
+					item_urls |= set(img_link_regex.findall(value))
+					item_urls |= set(img_domain_regex.findall(value))
 
-				urls.append(url)
-				extensions[url] = extension
+			if external:
+				# 4chan has a module that saves images locally, so if the columns in
+				# the dataset that reference those local images are selected, check
+				# if the referenced images aren't available locally. If not, try a
+				# public 4chan mirror to see if they may be downloaded there.
 
-		# With other sources, simply take the URLs as they are provided by the
-		# parent dataset
-		else:
-			for row in self.iterate_items(self.source_file):
+				md5 = hashlib.md5()
+				md5.update(base64.b64decode(item["image_md5"]))
+				extension = item["image_file"].split(".")[-1]
 
-				img_url = row["item"]
-				extension = img_url.split(".")[-1].lower()
-				extensions[img_url] = extension
-				urls.append(img_url)
+				local_path = Path(config.PATH_IMAGES, md5.hexdigest() + "." + extension)
+				if local_path.exists():
+					local_path = str(local_path.absolute())
+					item_urls.add(local_path)
 
-		# prepare staging area
-		results_path = self.dataset.get_staging_area()
-		counter = 0
-		downloaded_images = 0
+				else:
+					remote_path = "https://%s/_/search/image/%s" % (external, item["image_md5"].replace("/", "_"))
+					item_urls.add(remote_path)
 
-		# Used to overwrite top-images csv file with download status
-		success = []
+			for item_url in item_urls:
+				if item_url not in urls:
+					urls[item_url] = []
 
-		# loop through images and download them - until we have as many images
+				urls[item_url].append(item_id)
+
+		# next, loop through images and download them - until we have as many images
 		# as required. Note that images that cannot be downloaded or parsed do
 		# not count towards that limit
-		for path in urls:
+		downloaded_images = 0
+		processed_urls = 0
+		failures = []
+		for url in urls:
 			if downloaded_images >= amount:
 				break
 
@@ -149,73 +177,62 @@ class ImageDownloader(BasicProcessor):
 			if self.interrupted:
 				raise ProcessorInterruptedException("Interrupted while downloading images.")
 
-			counter += 1
-			success.append({"download_status": "failed", "img_name": ""})
-			self.dataset.update_status("Downloading image %i of %i" % (counter, len(urls)))
+			processed_urls += 1
+			self.dataset.update_status("Downloading image %i/%i" % (processed_urls, len(urls)))
 
-			# acquire and resize image
 			try:
-				if datasource == "4chan":
-					picture = self.get_4chan_image(path, rate_limit=rate_limit)
+				# acquire image
+				if not url.lower().startswith("http"):
+					image, image_filename = Image.open(url)
 				else:
-					picture, image_name = self.get_image(path)
+					image, image_filename = self.get_image(url)
 
-			except (requests.RequestException, IndexError, FileNotFoundError) as e:
+				try:
+					picture = Image.open(image)
+				except UnidentifiedImageError:
+					picture = Image.open(image.raw)
+
+			except (FileNotFoundError, UnidentifiedImageError):
+				failures.append(url)
 				continue
 
-			# Again, some different processing for 4chan
-			if datasource == "4chan":
+			# save the image...? avoid overwriting images by appending
+			# -[number] to filenames if they already exist
+			index = 0
+			image_filename = Path(image_filename).name  # no folder shenanigans
+			image_stem = Path(image_filename).stem
+			image_suffix = Path(image_filename).suffix
+			if not image_suffix or image_suffix not in (".png", ".gif", ".jpeg", ".jpg"):
+				# default to PNG
+				image_suffix = ".png"
 
-				# hash needs to be hexified if it's a 4chan hash
-				if not isinstance(path, Path) and path[-2:] == "==":
-					md5 = hashlib.md5()
-					b64hash = base64.b64decode(path.split("/")[-1].split(".")[0].replace("_", "/"))
+			save_location = results_path.joinpath(image_filename).with_suffix(image_suffix)
+			while save_location.exists():
+				save_location = results_path.joinpath(image_stem + "-" + str(index) + image_suffix)
+				index += 1
 
-					try:
-						md5.update(b64hash)
-					except binascii.Error:
-						self.log.warning("Invalid base64 hash %s, skipping" % b64hash)
-						continue
+			url_file_map[url] = save_location.name
+			file_url_map[save_location.name] = url
+			picture.save(save_location)
 
-					hash = md5.hexdigest()
-
-				# if we're using an already-saved image the image filename is good as it is
-				else:
-					hash = path.stem
-
-				# determine file name and where to save
-				image_name = hash + "." + extensions[path]
-				imagepath = str(results_path.joinpath(image_name))
-
-			# For other data sources, we take the imagename it already had.
-			else:
-				if results_path.joinpath(image_name).exists():
-					# File exists; rename
-					image_name = uuid.uuid4().hex + "_" + image_name
-
-				imagepath = str(results_path.joinpath(image_name))
-
-			# save file
-			try:
-				picture.save(imagepath, format="png")
-				downloaded_images += 1
-			except (OSError, ValueError):
-				self.log.warning("Could not save image %s to disk - invalid format" % path)
-				continue
-
-			# If this all succeeded, we update the download status and the filename.
-			success[counter - 1]["download_status"] = "succeeded"
-			success[counter - 1]["img_name"] = image_name
-
-		# Also add the data to the original csv file, if indicated.
-		if self.parameters.get("overwrite"):
-			self.update_parent(success)
+		# save some metadata to be able to connect the images to their source
+		# posts again later
+		metadata = {
+			url: {
+				"filename": url_file_map.get(url),
+				"success": url not in failures,
+				"from_dataset": self.source_dataset.key,
+				"post_ids": urls[url]
+			} for url in urls
+		}
+		with results_path.joinpath(".metadata.json").open("w", encoding="utf-8") as outfile:
+			json.dump(metadata, outfile)
 
 		# finish up
 		self.dataset.update_status("Compressing images")
 		self.write_archive_and_finish(results_path)
 
-	def get_image(self, path):
+	def get_image(self, url):
 		"""
 		Get image from a generic URL.
 
@@ -227,105 +244,70 @@ class ImageDownloader(BasicProcessor):
 		:return Image:  Image object, or nothing if loading it failed
 		:returm str:  	Filename of the image
 		"""
-
-		image_url = None
-
-		# gfycat and imgur images have to handled a bit differently, so check for these first.
-		img_domain_regex = re.compile(r"(?:https:\/\/gfycat\.com\/|imgur\.com\/)[^\s\(\)\]\[]*", re.IGNORECASE)
-
-		# Determine whether the URL ends with a valid image extension.
-		exts = ["png", "jpg", "jpeg", "gif", "gifv"]
-		url_ext = path.split("/")[-1].lower().split(".")[-1]
-		if url_ext not in exts:
-			url_ext = None
+		domain = url.split("/")[2].lower()
+		url_ext = url.split(".")[-1].lower()
 
 		# Treat imgur and gfycat links a bit differently.
-		if (img_domain_regex.search(path)):
+		image_url = url
+		if domain in ("www.imgur.com", "imgur.com"):
+			# gifv files on imgur are actually small mp4 files. Since
+			# downloading videos complicates this and follow-up processors,
+			# just save the first frame that imgur also hosts as a .gif file.
+			if url_ext == "gifv":
+				image_url = url[:-1]
 
-			# Imgur images can appear in different formats, so we have to process this a bit.
-			if "imgur.com/" in path:
+			# If there's not file extension at the end of the url, and the link
+			# is a so-called "gallery", use the image's .json endpoint imgur so
+			# graciously provides :)
+			# We only save the first image of the gallery.
+			elif "gallery" in url:
+				url += ".json"
+				page = requests.get(url)
 
-				# gifv files on imgur are actually small mp4 files.
-				# Since downloading videos complicates this and follow-up processors,
-				# just safe the first frame that imgur also hosts as a .gif file.
-				if url_ext == "gifv":
-					image_url = path[:-1]
+				try:
+					imgur_data = page.json()
+				except json.JSONDecodeError:
+					self.dataset.log("Error loading gallery for image %s, skipping")
+					raise FileNotFoundError()
 
-				# Other urls ending in file extensions we just attempt to download straight away.
-				elif any([ext == url_ext for ext in exts]):
-					image_url = path
+				try:
+					image = imgur_data["data"]["image"]["album_images"]["images"][0]
+				except KeyError as e:
+					raise FileNotFoundError()
 
-				# If there's not file extention at the end of the url,
-				# and the link is a so-called "gallery",
-				# use the image's .json endpoint imgur so graciously provides :)
-				# We only save the first image of the gallery.
-				elif "gallery" in path:
-					path += ".json"
-					page = requests.get(path)
-					imgur_images = []
-					try:
-						imgur_data = page.json()
-					except json.JSONDecodeError:
-						self.dataset.log("Error loading gallery for image %s, skipping")
-						raise FileNotFoundError
+				image_url = "https://imgur.com/" + image["hash"] + image["ext"]
 
-					try:
-						image = imgur_data["data"]["image"]["album_images"]["images"][0]
-					except KeyError as e:
-						raise FileNotFoundError
+			# Handle image preview page
+			# Two formats identified: https://imgur.com/a/randomid, https://imgur.com/randomid
+			else:
+				page = requests.get(url)
+				# This seems unlikely to last; could use BeautifulSoup for more dynamic capturing of url
+				image_url = \
+				page.content.decode('utf-8').split('<meta property="og:image"')[1].split('content="')[1].split('?fb">')[
+					0]
 
-					image_url = "https://imgur.com/" + image["hash"] + image["ext"]
-
-				# Handle image preview page
-				# Two formats identified: https://imgur.com/a/randomid, https://imgur.com/randomid
-				else:
-					page = requests.get(path)
-					# This seems unlikely to last; could use BeautifulSoup for more dynamic capturing of url
-					image_url = page.content.decode('utf-8').split('<meta property="og:image"')[1].split('content="')[1].split(
-						'?fb">')[0]
-
-
-
-		elif "gfycat.com/" in path:
-
-				if not url_ext:
-					# For gfycat.com links, just add .gif and download
-					image_url = path + ".gif"
-				else:
-					image_url = path
-
-		# If the URL ends with an image file extension and it's not from imgur or gfycat, just attempt to download it.
-		else:
-			image_url = path
+		elif domain.endswith("gfycat.com") and url_ext not in ("png", "jpg", "jpeg", "gif", "gifv"):
+			# For gfycat.com links, just add .gif and download
+			image_url = url + ".gif"
 
 		# Get the image!
-		if image_url:
+		if domain.endswith("4plebs.org") or domain.endswith("fireden.net") and image_url:
+			image = self.get_4chan_image(url)
+		elif image_url:
 			image = requests.get(image_url, stream=True, timeout=20, headers={"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/12.1.1 Safari/605.1.15"})
 		else:
-			raise FileNotFoundError
+			raise FileNotFoundError()
 
 		# Use this for local saving.
-		image_name = image_url.split("/")[-1]
-		# Some URLs have parameters after extention. Remove if this is the case.
-		if "?" in image_name:
-			image_name = image_name.split("?")[0]
+		image_name = image_url.split("/")[-1].split("?")[0]
 
 		# Check if we succeeded; content type should be an image
 		if image.status_code != 200 or image.headers.get("content-type", "")[:5] != "image":
-			raise FileNotFoundError
+			raise FileNotFoundError()
 
-		# Try opening the image in multiple ways
-		try:
-			picture = Image.open(BytesIO(image.content))
-		except UnidentifiedImageError:
-			try:
-				picture = Image.open(image.raw)
-			except UnidentifiedImageError:
-				raise FileNotFoundError
+		return BytesIO(image.content), image_name
 
-		return picture, image_name
-
-	def get_4chan_image(self, path, rate_limit=0):
+	def get_4chan_image(self, url):
 		"""
 		Get image from a 4chan archive and save.
 
@@ -334,25 +316,25 @@ class ImageDownloader(BasicProcessor):
 		and cache the downloaded result if possible, else discard the file
 		afterwards.
 
-		:param path:  Path to image, either a local path or a URL
-		:param rate_limit:  Seconds to wait after downloading, if downloading
+		:param url:  Image URL, pointing to a 4chan mirror
 		:return Image:  Image object, or nothing if loading it failed
 		"""
 		rate_regex = re.compile(r"Search limit exceeded. Please wait ([0-9]+) seconds before attempting again.")
+		rate_limit = 1 if "fireden.net" in url else 16  # empirically verified
 
-		if isinstance(path, Path):
+		if isinstance(url, Path):
 			# local file
-			return Image.open(path)
+			return Image.open(url)
 
 		# get link to image from external HTML search results
 		# detect rate limiting and wait until we're good to go again
-		page = requests.get(path, headers={"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/12.1.1 Safari/605.1.15"})
+		page = requests.get(url, headers={"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/12.1.1 Safari/605.1.15"})
 		rate_limited = rate_regex.search(page.content.decode("utf-8"))
 
 		while rate_limited:
 			self.log.debug("Rate-limited by external source. Waiting %s seconds." % rate_limited[1])
 			time.sleep(int(rate_limited[1]))
-			page = requests.get(path)
+			page = requests.get(url)
 			rate_limited = rate_regex.search(page.content.decode("utf-8"))
 
 		# get link to image file from HTML returned
@@ -369,37 +351,24 @@ class ImageDownloader(BasicProcessor):
 			image = requests.get(thumbnail_url, stream=True)
 
 		if image.status_code != 200:
-			raise FileNotFoundError
+			raise FileNotFoundError()
 
-		# cache the image for later, if needed
+		md5 = hashlib.md5()
+		based_hash = url.split("/")[-1].split(".")[0].replace("_", "/")
+		extension = image_url.split(".")[-1].lower()
+		md5.update(base64.b64decode(based_hash))
+		file_name = md5.hexdigest() + "." + extension
+
+		# cache the image for later, if configured so
 		if config.PATH_IMAGES:
-			md5 = hashlib.md5()
-
-			based_hash = path.split("/")[-1].split(".")[0].replace("_", "/")
-			extension = image_url.split(".")[-1].lower()
-			md5.update(base64.b64decode(based_hash))
-
 			local_path = Path(config.PATH_IMAGES, md5.hexdigest() + "." + extension)
-			delete_after = False
-		else:
-			query_result = self.dataset.get_results_path()
-			local_path = Path(query_result.source_dataset, query_result.name + "-temp")
-			delete_after = True
-
-		# save file, somewhere
-		with open(local_path, 'wb') as file:
-			for chunk in image.iter_content(1024):
-				file.write(chunk)
+			with open(local_path, 'wb') as file:
+				for chunk in image.iter_content(1024):
+					file.write(chunk)
 
 		# avoid getting rate-limited by image source
 		time.sleep(rate_limit)
-		picture = Image.open(local_path)
-
-		# if no image folder is configured, delete the temporary file
-		if delete_after:
-			local_path.unlink()
-
-		return picture
+		return BytesIO(image.content), file_name
 
 	def update_parent(self, success):
 		"""
@@ -447,3 +416,32 @@ class ImageDownloader(BasicProcessor):
 		shutil.rmtree(tmp_path)
 
 		self.dataset.update_status("Parent dataset updated.")
+
+
+
+	@classmethod
+	def get_options(cls, parent_dataset=None, user=None):
+		"""
+		Get processor options
+
+		This method by default returns the class's "options" attribute, or an
+		empty dictionary. It can be redefined by processors that need more
+		fine-grained options, e.g. in cases where the availability of options
+		is partially determined by the parent dataset's parameters.
+
+		:param DataSet parent_dataset:  An object representing the dataset that
+		the processor would be run on
+		:param User user:  Flask user the options will be displayed for, in
+		case they are requested for display in the 4CAT web interface. This can
+		be used to show some options only to privileges users.
+		"""
+		options = cls.options
+
+		if parent_dataset and parent_dataset.get_columns():
+			columns = parent_dataset.get_columns()
+			options["columns"]["type"] = UserInput.OPTION_MULTI_SELECT
+			options["columns"]["options"] = {v: v for v in columns}
+			options["columns"]["default"] = "body" if "body" in columns else sorted(columns, key=lambda k: "image" in k).pop()
+
+		return options
+
