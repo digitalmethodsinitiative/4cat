@@ -1,5 +1,8 @@
 """
 Create an PixPlot of downloaded images
+
+Use http://host.docker.internal:4000 to connect to docker hosted PixPlot on
+same server (assuming that container is exposing port 4000).
 """
 import shutil
 import requests
@@ -93,17 +96,23 @@ class PixPlotGenerator(BasicProcessor):
 		# Name of folder for images
 		data = {'folder_name': self.dataset.key}
 		response = requests.post(upload_url, files=files, data=data)
+		if response.status_code == 403:
+			error = "403: 4CAT does not have permission to use this PixPlot server"
+			self.dataset.update_status(error)
+			raise RuntimeError(error)
 
 		# Request PixPlot server create PixPlot
 		self.dataset.update_status("Sending request to PixPlot")
-		create_plot_url = response.json()['create_pixplot_post_info']['url']
+		create_plot_url = config.PIXPLOT_SERVER.rstrip('/') + '/api/pixplot'
 		# All the options, which you can edit to add any additional options you want PixPlot to use during creation
 		json_data = response.json()['create_pixplot_post_info']['json']
 		# Send; receives response that process has started
 		resp = requests.post(create_plot_url, json=json_data)
+
 		if resp.status_code == 202:
 			# new request
 			new_request = True
+			results_url = config.PIXPLOT_SERVER.rstrip('/') + '/api/pixplot?key=' + resp.json()['key']
 		elif 'already exists' in resp.json()['error']:
 			# repeat request
 			new_request = False
@@ -117,7 +126,7 @@ class PixPlotGenerator(BasicProcessor):
 		self.dataset.update_status("PixPlot generating results")
 		while new_request:
 			time.sleep(10)
-			result = requests.get(resp.json()['result_url'])
+			result = requests.get(results_url)
 			self.log.debug(str(result.json()))
 			if 'status' in result.json().keys() and result.json()['status'] == 'running':
 				# Still running
