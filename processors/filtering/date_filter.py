@@ -30,7 +30,7 @@ class DateFilter(BasicProcessor):
     options = {
         "daterange": {
             "type": UserInput.OPTION_DATERANGE,
-            "help": "Date range:",
+            "help": "Date range:"
         },
         "parse_error": {
             "type": UserInput.OPTION_CHOICE,
