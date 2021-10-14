@@ -7,6 +7,7 @@ same server (assuming that container is exposing port 4000).
 import shutil
 import requests
 import time
+import json
 import dateutil.parser
 import csv
 import os
@@ -177,11 +178,11 @@ class PixPlotGenerator(BasicProcessor):
 		it in memory. Instead we will loop through it and build the metadata file as we go.
 
 		"""
-		parents = self.dataset.get_genealogy()
-		# Get the top_downloads file path which serves as the key to source file
-		top_downloads_path = parents[-3].get_results_path()
 		# Get source file path; should be the top parent
 		source_path = self.dataset.top_parent().get_results_path()
+		# Get image data
+		with open(os.path.join(temp_path, '.metadata.json')) as file:
+			image_data = json.load(file)
 		# Get path for metadata file
 		metadata_file_path = temp_path.joinpath('metadata.csv')
 		# Set fieldnames for metadata file
@@ -192,29 +193,43 @@ class PixPlotGenerator(BasicProcessor):
 			# Our to-be metadata
 			images = {}
 
-			# Loop through top_downloads csv and build key
+			# Reformat image_data to access by filename and begin metadata
 			post_id_image_dictionary = {}
-			for post in self.iterate_items(top_downloads_path):
+			for url, data in image_data.items():
 
 				# Check if image successfully downloaded for image
-				if post["download_status"] == 'succeeded':
-					ids = post['ids'].split(',')
+				if data.get('success'):
+					ids = data.get('post_ids')
+					filename = data.get('filename')
 					for post_id in ids:
 						# Add to key
 						if post_id in post_id_image_dictionary.keys():
-							post_id_image_dictionary[post_id].append(post['img_name'])
+							post_id_image_dictionary[post_id].append(filename)
 						else:
-							post_id_image_dictionary[post_id] = [post['img_name']]
+							post_id_image_dictionary[post_id] = [filename]
 
 					# Add to metadata
-					images[post['img_name']] = {'filename': post['img_name'],
-												'permalink': post['item'],
-												'description': '<b>Num of Post(s) w/ Image:</b> ' + str(post['value']),
-												'tags': '',
-												'number_of_posts': 0,
-												}
+					images[filename] = {'filename': filename,
+										'permalink': url,
+										'description': '<b>Num of Post(s) w/ Image:</b> ' + str(len(ids)),
+										'tags': '',
+										'number_of_posts': 0,
+										}
+
+			# Check if there is a map_item
+			item_mapper = None
+			parent_processor = self.all_modules.processors.get(self.dataset.top_parent().type)
+			if parent_processor:
+				if hasattr(parent_processor, "map_item"):
+					item_mapper = parent_processor.map_item
+
 			# Loop through source file
 			for post in self.iterate_items(source_path):
+
+				if item_mapper:
+					# and if so, map it
+					post = item_mapper(post)
+
 				# Check if post contains one of the downloaded images
 				if post['id'] in post_id_image_dictionary.keys():
 					for img_name in post_id_image_dictionary[post['id']]:
@@ -223,8 +238,15 @@ class PixPlotGenerator(BasicProcessor):
 						# Update description
 						image['number_of_posts'] += 1
 						image['description'] += '<br/><br/><b>Post ' + str(image['number_of_posts']) + '</b>'
-						for field in post.keys():
-							image['description'] += '<br/><br/><b>' + field + ':</b> ' + str(post[field])
+						# Order of Description elements
+						ordered_descriptions = ['id', 'timestamp', 'subject', 'body', 'author']
+						for detail in ordered_descriptions:
+							if post.get(detail):
+								image['description'] += '<br/><br/><b>' + detail + ':</b> ' + str(post.get(detail))
+						for key, value in post.items():
+							if key not in ordered_descriptions:
+								image['description'] += '<br/><br/><b>' + key + ':</b> ' + str(value)
+
 						# PixPlot has a field limit of 131072
 						image['description'] = image['description'][:131072]
 
