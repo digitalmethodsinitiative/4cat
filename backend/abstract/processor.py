@@ -158,6 +158,9 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 				else:
 					parent_key = ""
 
+				# remove any result files that have been created so far
+				self.remove_files()
+
 				raise ProcessorException("Processor %s raised %s while processing dataset %s%s in %s:\n   %s\n" % (self.type, e.__class__.__name__, self.dataset.key, parent_key, location, str(e)))
 		else:
 			# dataset already finished, job shouldn't be open anymore
@@ -230,16 +233,23 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
 		self.job.finish()
 
-	def abort(self):
+	def remove_files(self):
 		"""
-		Abort dataset creation and clean up so it may be attempted again later
+		Clean up result files and any staging files for processor to be attempted
+		later if desired.
 		"""
-		# remove any result files that have been created so far
 		if self.dataset.get_results_path().exists():
 			self.dataset.get_results_path().unlink(missing_ok=True)
 
 		if self.dataset.get_staging_area().exists():
 			shutil.rmtree(str(self.dataset.get_staging_area()))
+
+	def abort(self):
+		"""
+		Abort dataset creation and clean up so it may be attempted again later
+		"""
+		# remove any result files that have been created so far
+		self.remove_files()
 
 		# we release instead of finish, since interrupting is just that - the
 		# job should resume at a later point. Delay resuming by 10 seconds to
