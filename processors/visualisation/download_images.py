@@ -118,8 +118,12 @@ class ImageDownloader(BasicProcessor):
 		item_index = 0
 		for item in self.iterate_items(self.source_file):
 			item_urls = set()
+			if 'ids' in item.keys():
+				item_ids = [id for id in item.get('ids').split(',')]
+			else:
+				item_ids = [item.get("id", item_index)]
+			# let's iterate after; otherwise we could do something crazy like start an index at 1
 			item_index += 1
-			item_id = item.get("id", item_index)
 
 			if item_index % 50 == 0:
 				self.dataset.update_status("Extracting image links from post %i/%i" % (item_index, self.source_dataset.num_rows))
@@ -161,7 +165,7 @@ class ImageDownloader(BasicProcessor):
 				if item_url not in urls:
 					urls[item_url] = []
 
-				urls[item_url].append(item_id)
+				[urls[item_url].append(id) for id in item_ids]
 
 		# next, loop through images and download them - until we have as many images
 		# as required. Note that images that cannot be downloaded or parsed do
@@ -444,4 +448,3 @@ class ImageDownloader(BasicProcessor):
 			options["columns"]["default"] = "body" if "body" in columns else sorted(columns, key=lambda k: "image" in k).pop()
 
 		return options
-
