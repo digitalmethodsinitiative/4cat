@@ -59,6 +59,11 @@ class MakeWordCloud(BasicProcessor):
 					"type": UserInput.OPTION_TOGGLE,
 					"default": True,
 					"help": "Convert to lowercase?"
+				},
+				"max_words": {
+					"type": UserInput.OPTION_TEXT,
+					"default": 200,
+					"help": "Convert to lowercase?"
 				}
 			}
 		return options
@@ -74,6 +79,10 @@ class MakeWordCloud(BasicProcessor):
 		word_column = self.parameters.get("word_column")
 		count_column = self.parameters.get("count_column")
 		to_lower = self.parameters.get("to_lower")
+		try:
+			max_words = int(self.parameters.get("max_words"))
+		except (ValueError, TypeError) as e:
+			max_words = self.parameters["max_words"]["default"]
 
 		self.dataset.update_status("Extracting words and counts.")
 
@@ -97,7 +106,7 @@ class MakeWordCloud(BasicProcessor):
 			try:
 				count = int(post[count_column])
 			except ValueError:
-				self.dataset.update_status("Couldn't convert value %s to an integer. Please set a valid count column." % post[count_column])
+				self.dataset.update_status("Couldn't convert value '%s' to an integer. Please set a valid count column." % post[count_column])
 				self.dataset.finish(0)
 				return
 
@@ -108,7 +117,7 @@ class MakeWordCloud(BasicProcessor):
 				words[word] = count
 
 		self.dataset.update_status("Making word cloud.")
-		cloud = WordCloud(prefer_horizontal=1, background_color="rgba(255, 255, 255, 0)", mode="RGBA", color_func=lambda *args, **kwargs: (0,0,0), width=1600, height=1000, collocations=False).generate_from_frequencies(words)
+		cloud = WordCloud(prefer_horizontal=1, background_color="rgba(255, 255, 255, 0)", mode="RGBA", color_func=lambda *args, **kwargs: (0,0,0), width=1600, height=1000, collocations=False, max_words=max_words).generate_from_frequencies(words)
 		
 		# Write to svg
 		cloud = cloud.to_svg(embed_font=True)
