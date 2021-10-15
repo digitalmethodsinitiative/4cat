@@ -524,24 +524,25 @@ class DataSet(FourcatModule):
 
 		:return str:  Dataset key
 		"""
-		# Return a unique key if random posts are queried
-		if parameters.get("random_amount", None):
-			random_int = str(random.randint(1, 10000000))
-			return hashlib.md5(random_int.encode("utf-8")).hexdigest()
+		# Return a hash based on parameters
+		# we're going to use the hash of the parameters to uniquely identify
+		# the dataset, so make sure it's always in the same order, or we might
+		# end up creating multiple keys for the same dataset if python
+		# decides to return the dict in a different order
+		param_key = collections.OrderedDict()
+		for key in sorted(parameters):
+			param_key[key] = parameters[key]
 
-		# Return a hash based on parameters for other datasets
-		else:
-			# we're going to use the hash of the parameters to uniquely identify
-			# the dataset, so make sure it's always in the same order, or we might
-			# end up creating multiple keys for the same dataset if python
-			# decides to return the dict in a different order
-			param_key = collections.OrderedDict()
-			for key in sorted(parameters):
-				param_key[key] = parameters[key]
+		# this ensures a different key for the same query if not queried
+		# at the exact same second. Since the same query may return
+		# different results when done at different times, getting a
+		# duplicate key is not actually always desirable. The resolution
+		# of this salt could be experimented with...
+		param_key["_salt"] = int(time.time())
 
-			parent_key = str(parent) if parent else ""
-			plain_key = repr(param_key) + str(query) + parent_key
-			return hashlib.md5(plain_key.encode("utf-8")).hexdigest()
+		parent_key = str(parent) if parent else ""
+		plain_key = repr(param_key) + str(query) + parent_key
+		return hashlib.md5(plain_key.encode("utf-8")).hexdigest()
 
 	def get_status(self):
 		"""
