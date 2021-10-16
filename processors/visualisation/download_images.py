@@ -18,6 +18,8 @@ from lxml.cssselect import CSSSelector as css
 from io import StringIO, BytesIO
 
 import config
+from requests import ConnectTimeout
+
 from common.lib.helpers import UserInput
 from backend.abstract.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
@@ -217,7 +219,16 @@ class ImageDownloader(BasicProcessor):
 
 			url_file_map[url] = save_location.name
 			file_url_map[save_location.name] = url
-			picture.save(save_location)
+			try:
+				picture.save(save_location)
+			except OSError:
+				# some images may need to be converted
+				try:
+					picture.convert('RGB').save(save_location)
+				except ValueError as e:
+					self.dataset.log(f"Error '{e}' saving image for {url}, skipping")
+					failures.append(url)
+					continue
 
 		# save some metadata to be able to connect the images to their source
 		# posts again later
@@ -250,6 +261,7 @@ class ImageDownloader(BasicProcessor):
 		"""
 		domain = url.split("/")[2].lower()
 		url_ext = url.split(".")[-1].lower()
+		exts = ["png", "jpg", "jpeg", "gif", "gifv"]
 
 		# Treat imgur and gfycat links a bit differently.
 		image_url = url
@@ -259,6 +271,11 @@ class ImageDownloader(BasicProcessor):
 			# just save the first frame that imgur also hosts as a .gif file.
 			if url_ext == "gifv":
 				image_url = url[:-1]
+
+			# Check for image extensions and directly download
+			# Some imgur.com links are directly to images (not just i.imgur.com)
+			elif any([ext == url_ext for ext in exts]):
+				pass
 
 			# If there's not file extension at the end of the url, and the link
 			# is a so-called "gallery", use the image's .json endpoint imgur so
@@ -285,10 +302,14 @@ class ImageDownloader(BasicProcessor):
 			# Two formats identified: https://imgur.com/a/randomid, https://imgur.com/randomid
 			else:
 				page = requests.get(url)
-				# This seems unlikely to last; could use BeautifulSoup for more dynamic capturing of url
-				image_url = \
-				page.content.decode('utf-8').split('<meta property="og:image"')[1].split('content="')[1].split('?fb">')[
-					0]
+				try:
+					# This seems unlikely to last; could use BeautifulSoup for more dynamic capturing of url
+					image_url = \
+						page.content.decode('utf-8').split('<meta property="og:image"')[1].split('content="')[1].split('?fb">')[0]
+				except IndexError:
+					# Noted that image not found pages (no status code of course) will not have this property
+					self.dataset.log("Error possible 404 for image %s, skipping")
+					raise FileNotFoundError()
 
 		elif domain.endswith("gfycat.com") and url_ext not in ("png", "jpg", "jpeg", "gif", "gifv"):
 			# For gfycat.com links, just add .gif and download
@@ -298,7 +319,11 @@ class ImageDownloader(BasicProcessor):
 		if domain.endswith("4plebs.org") or domain.endswith("fireden.net") and image_url:
 			image = self.get_4chan_image(url)
 		elif image_url:
-			image = requests.get(image_url, stream=True, timeout=20, headers={"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/12.1.1 Safari/605.1.15"})
+			try:
+				image = requests.get(image_url, stream=True, timeout=20, headers={"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/12.1.1 Safari/605.1.15"})
+			except ConnectTimeout:
+				self.dataset.log("Timed out while trying to download image %s, skipping")
+				raise FileNotFoundError()
 		else:
 			raise FileNotFoundError()
 
