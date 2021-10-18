@@ -48,16 +48,16 @@ class TfIdf(BasicProcessor):
 		},
 		"min_occurrences": {
 			"type": UserInput.OPTION_TEXT,
-			"default": "",
-			"min": 1,
+			"default": 0,
+			"min": 0,
 			"max": 10000,
 			"help": "[scikit-learn] Ignore terms that appear in less than this amount of documents",
 			"tooltip": "Useful for filtering out very sporadic terms. For instance, a value of 3 means that terms must appear in at least three documents (e.g. weekly data)."
 		},
 		"max_occurrences": {
 			"type": UserInput.OPTION_TEXT,
-			"default": "",
-			"min": 1,
+			"default": 0,
+			"min": 0,
 			"max": 10000,
 			"help": "[scikit-learn] Ignore terms that appear in more than this amount of documents",
 			"tooltip": "Useful for getting more specific terms per document. Leaving empty means terms may appear in all documents. For instance, if you have 12 monthly documents and insert 10 here, terms may not appear in 11 or 12 months."
