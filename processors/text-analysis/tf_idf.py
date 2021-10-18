@@ -243,7 +243,13 @@ class TfIdf(BasicProcessor):
 		self.dataset.update_status("Vectorizing")
 		tfidf_vectorizer = TfidfVectorizer(min_df=min_occurrences, max_df=max_occurrences, ngram_range=ngram_range,
 										   analyzer="word", token_pattern=None, tokenizer=lambda i: i, lowercase=False)
-		tfidf_matrix = tfidf_vectorizer.fit_transform(tokens)
+
+		try:
+			tfidf_matrix = tfidf_vectorizer.fit_transform(tokens)
+		except ValueError:
+			self.dataset.update_status("No tokens remain with these parameters. Set less strict constraints and try again.", is_final=True)
+			self.dataset.finish(0)
+			return
 
 		feature_array = np.array(tfidf_vectorizer.get_feature_names())
 		tfidf_sorting = np.argsort(tfidf_matrix.toarray()).flatten()[::-1]
