@@ -18,7 +18,6 @@ from lxml.cssselect import CSSSelector as css
 from io import StringIO, BytesIO
 
 import config
-from requests import ConnectTimeout
 
 from common.lib.helpers import UserInput
 from backend.abstract.processor import BasicProcessor
@@ -223,12 +222,11 @@ class ImageDownloader(BasicProcessor):
 				picture.save(save_location)
 			except OSError:
 				# some images may need to be converted
-				try:
-					picture.convert('RGB').save(save_location)
-				except ValueError as e:
-					self.dataset.log(f"Error '{e}' saving image for {url}, skipping")
-					failures.append(url)
-					continue
+				picture.convert('RGB').save(save_location)
+			except ValueError as e:
+				self.dataset.log(f"Error '{e}' saving image for {url}, skipping")
+				failures.append(url)
+				continue
 
 		# save some metadata to be able to connect the images to their source
 		# posts again later
@@ -283,7 +281,14 @@ class ImageDownloader(BasicProcessor):
 			# We only save the first image of the gallery.
 			elif "gallery" in url:
 				url += ".json"
-				page = requests.get(url)
+				try:
+					page = requests.get(url)
+				except requests.exceptions.ConnectTimeout:
+					self.dataset.log("Timed out while trying to download image %s, skipping" % url)
+					raise FileNotFoundError()
+				except requests.exceptions.SSLError:
+					self.dataset.log("SSLError while trying to download image %s, skipping" % url)
+					raise FileNotFoundError()
 
 				try:
 					imgur_data = page.json()
@@ -301,7 +306,15 @@ class ImageDownloader(BasicProcessor):
 			# Handle image preview page
 			# Two formats identified: https://imgur.com/a/randomid, https://imgur.com/randomid
 			else:
-				page = requests.get(url)
+				try:
+					page = requests.get(url)
+				except requests.exceptions.ConnectTimeout:
+					self.dataset.log("Timed out while trying to download image %s, skipping" % url)
+					raise FileNotFoundError()
+				except requests.exceptions.SSLError:
+					self.dataset.log("SSLError while trying to download image %s, skipping" % url)
+					raise FileNotFoundError()
+
 				try:
 					# This seems unlikely to last; could use BeautifulSoup for more dynamic capturing of url
 					image_url = \
@@ -321,8 +334,11 @@ class ImageDownloader(BasicProcessor):
 		elif image_url:
 			try:
 				image = requests.get(image_url, stream=True, timeout=20, headers={"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/12.1.1 Safari/605.1.15"})
-			except ConnectTimeout:
-				self.dataset.log("Timed out while trying to download image %s, skipping")
+			except requests.exceptions.ConnectTimeout:
+				self.dataset.log("Timed out while trying to download image %s, skipping" % image_url)
+				raise FileNotFoundError()
+			except requests.exceptions.SSLError:
+				self.dataset.log("SSLError while trying to download image %s, skipping" % image_url)
 				raise FileNotFoundError()
 		else:
 			raise FileNotFoundError()
