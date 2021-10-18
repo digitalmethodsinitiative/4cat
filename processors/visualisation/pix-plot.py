@@ -43,6 +43,46 @@ class PixPlotGenerator(BasicProcessor):
 			"max": 1000,
 			"tooltip": "'0' uses as many images as available in the source image archive (up to 1000)"
 		},
+		"intro-plot-options": {
+			"type": UserInput.OPTION_INFO,
+			"help": "The below options will help configure your plot. Note that full images are always available by " 
+					"clicking on the thumbnails (you will also find metadata related to the source of the image here). "
+					"Nearest neighbors (n_neighbors): small numbers identify local clusters, larger numbers "
+					"create a more global shape. Large datasets may benefit from have higher values (think how many "
+					"alike pictures could make up a cluster)."
+					"Minimum Distance (min_dist): determines how tightly packed images can be with one and other (i.e.,"
+					"small numbers (0.0001-0.001) are tightly packed, and larger (0.05-0.2) are disperse."
+					"[More information and example on parameters]("
+					"https://umap-learn.readthedocs.io/en/latest/parameters.html)"
+		},
+		"image_size": {
+			"type": UserInput.OPTION_CHOICE,
+			"help": "Thumbnail Size (large datasets run better with smaller thumbnails)",
+			"options": {
+				"10": "10px tiny",
+				"32": "32px small",
+				"64": "64px normal",
+				"128": "128px large",
+				"256": "256px X-large",
+			},
+			"default": "64"
+		},
+		"n_neighbors": {
+			"type": UserInput.OPTION_TEXT,
+			"help": "Nearest Neighbors",
+			"tooltip": "Larger datasets may benefit from a larger value",
+			"min": 2,
+			"max": 200,
+			"default": 15
+		},
+		"min_dist": {
+			"type": UserInput.OPTION_TEXT,
+			"help": "Minimum Distance between points (images)",
+			"tooltip": "Small values often work best",
+			"min": 0.0001,
+			"max": 0.99,
+			"default": 0.01
+		},
 	}
 
 	@classmethod
@@ -107,6 +147,12 @@ class PixPlotGenerator(BasicProcessor):
 		create_plot_url = config.PIXPLOT_SERVER.rstrip('/') + '/api/pixplot'
 		# All the options, which you can edit to add any additional options you want PixPlot to use during creation
 		json_data = response.json()['create_pixplot_post_info']['json']
+		# Additional options for PixPlot
+		cell_size = self.parameters.get('image_size')
+		n_neighbors = self.parameters.get('n_neighbors')
+		min_dist = self.parameters.get('min_dist')
+		json_data['args'] += ['--cell_size', str(cell_size), '--n_neighbors', str(n_neighbors), '--min_dist', str(min_dist)]
+
 		# Send; receives response that process has started
 		resp = requests.post(create_plot_url, json=json_data)
 

@@ -255,7 +255,6 @@ def get_result(query_file):
 
 
 @app.route('/mapped-result/<string:key>/')
-@login_required
 def get_mapped_result(key):
 	"""
 	Get mapped result
