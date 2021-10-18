@@ -10,7 +10,7 @@
             <nav class="dataset-toolbox" aria-label="Actions for dataset">
                 <ul>
                     <li><a href="{{ url_for('toggle_favourite_interactive', key=dataset.key) }}" class="toggle-favourites"><i class="fa{% if is_favourite %}r{% else %}s{% endif %} fa-star" aria-hidden="true"></i> {% if is_favourite %}Delete from{% else %}Add to{% endif %} favourites</a></li>
-                    <li><a href="{{ url_for('show_result', key=dataset.key) }}/"><i class="fas fa-link" aria-hidden="true"></i> Permalink</a></li>
+                    <li><a href="{{ url_for('show_result', key=dataset.key) }}"><i class="fas fa-link" aria-hidden="true"></i> Permalink</a></li>
                     {% if current_user.get_id() == dataset.parameters.user or current_user.is_admin() %}
                         <li><a href="{{ url_for('delete_dataset_interactive', key=dataset.key) }}" class="confirm-first" data-confirm-action="delete this dataset"><i class="fas fa-trash-alt" aria-hidden="true"></i> Delete dataset</a></li>
                         <li><a href="{{ url_for('restart_dataset', key=dataset.key) }}" class="confirm-first" data-confirm-action="delete all results for this dataset, including processor results, and re-run the query"><i class="fas fa-sync-alt" aria-hidden="true"></i> Re-run dataset</a></li>
