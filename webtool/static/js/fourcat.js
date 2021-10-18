@@ -1,153 +1,107 @@
-var dot_ticker = 0;
-var timeout;
-var query_key = null;
-var poll_interval;
+$(init);
 
 /**
  * Page init
  */
-
-$(init);
-
 function init() {
-	// Check status of query
-	if($('body.result-page').length > 0) {
-		query.update_status();
-		setInterval(query.update_status, 4000);
+	// self-updating containers
+	dynamic_container.init();
 
-		// Check processor queue
-		query.check_processor_queue();
-		setInterval(query.check_processor_queue, 10000);
-	}
+	// tooltips
+	tooltip.init();
 
-	// Check search queue
-	if($('#query-form').length > 0) {
-		query.check_search_queue();
-		setInterval(query.check_search_queue, 10000);
-	}
+	// popups
+	popup.init();
 
-	//regularly check for unfinished datasets
-	setInterval(query.check_resultpage, 2000);
-
-	// Update dynamic containers
-	setInterval(dynamic_container.refresh, 2500);
-
-	// Start querying when go button is clicked
-	$('#query-form').on('submit', function (e) {
-		e.preventDefault();
-		query.start();
-	});
-
-	// Data source select boxes trigger an update of the boards available for the chosen data source
-	$('#datasource-select').on('change', query.update_form);
-	$('#datasource-select').trigger('change');
-
-	// Special cases in dataset entry form
-	$('#datasource-form').on('change', 'input[type=date]', query.proxy_dates);
-	$('#datasource-form').on('change', '#forminput-search_scope', query.handle_density);
-	$('#datasource-form').on('change', '#forminput-board', query.custom_board_options);
-
-	// Controls to change which results show up in overview
-	$('.view-controls button').hide();
-	$('.view-controls input, .view-controls select, .view-controls textarea').on('change', function () {
-		$(this).parents('form').trigger('submit');
-	});
-
-	//expand/collapse
-	$(document).on('click', '.toggle-button', toggleButton);
-	$(document).on('click', '#expand-datasets', toggleDatasets);
-
-	//tooltips
-	$(document).on('mousemove', '.tooltip-trigger', tooltip.show);
-	$(document).on('mouseout', '.tooltip-trigger', tooltip.hide);
-	$(document).on('click', '.tooltip-trigger', tooltip.toggle);
-
-	//popups
-	$(document).on('click', '.popup-trigger', popup.show);
-
-	// child of child of child etc interface bits
-	$(document).on('click', '.processor-queue-button', processor.queue);
-
-	// dataset deletion
-	$(document).on('click', '.delete-link', processor.delete);
-
-	// dataset label edit
-	$('.result-page .card h2').each(query.label.init);
-	$(document).on('click', '.edit-dataset-label', query.label.handle);
-	$(document).on('keydown', '#new-dataset-label', query.label.handle);
-
-	//allow opening given analysis path via anchor links
-	navpath = window.location.hash.substr(1);
-	if (navpath.substring(0, 4) === 'nav=') {
-		let analyses = navpath.substring(4).split(',');
-		let navigate = setInterval(function () {
-			if (analyses.length === 0) {
-				clearInterval(navigate);
-				return;
-			}
-			let breadcrumb = analyses.shift();
-			if (analyses.length === 0) {
-				$('.anchor-child').removeClass('anchor-child');
-				$('#child-' + breadcrumb).addClass('anchor-child');
-			}
-			$('#child-' + breadcrumb + ' > .processor-expand > button').trigger('click');
-		}, 25);
-	}
-
-	// Notify that dense threads can only be selected if a body string is provided
-	$('#dense-threads-filterlabel').on('click', function(){
-		if ($('#body-input').val().length == 0) {
-			alert('Please provide a keyword in the post body field.');
-			$('#body-input').focus();
-			$('#body-input').select;
-		}
-	});
-
-	// initialize javascript-powered multichoice form elements
+	// multichoice form elements
 	multichoice.init();
 
-	//confirm links
-	$(document).on('click', '.confirm-first', function(e) {
-		let action = 'do this';
+	// general form helpers
+	ui_helpers.init();
 
-		if($(this).attr('data-confirm-action')) {
-			action = $(this).attr('data-confirm-action');
+	// result page-specific information handlers
+	result_page.init();
+
+	// dataset querying
+	query.init();
+
+	// processors
+	processor.init();
+}
+
+/**
+ * Result page dataset trees navigation handlers
+ */
+const result_page = {
+	/**
+	 * Set up navigation of result page dataset trees
+	 */
+	init: function() {
+		// dataset 'collapse'/'expand' buttons in result view
+		$(document).on('click', '#expand-datasets', result_page.toggleDatasets);
+
+		//allow opening given analysis path via anchor links
+		let navpath = window.location.hash.substr(1);
+		if (navpath.substring(0, 4) === 'nav=') {
+			let analyses = navpath.substring(4).split(',');
+			let navigate = setInterval(function () {
+				if (analyses.length === 0) {
+					clearInterval(navigate);
+					return;
+				}
+				let breadcrumb = analyses.shift();
+				if (analyses.length === 0) {
+					$('.anchor-child').removeClass('anchor-child');
+					$('#child-' + breadcrumb).addClass('anchor-child');
+				}
+				$('#child-' + breadcrumb + ' > .processor-expand > button').trigger('click');
+			}, 25);
 		}
+	},
 
-		if(!confirm('Are you sure you want to ' + action + '? This cannot be undone.')) {
-			e.preventDefault();
-			return false;
+
+	/**
+	 * Toggle the visibility of all datasets in a result tree
+	 *
+	 * @param e  Triggering event
+	 */
+	toggleDatasets: function (e) {
+		let new_text;
+		let expanded_state;
+
+		if ($(this).text().toLowerCase().indexOf('expand') >= 0) {
+			new_text = 'Collapse all';
+			expanded_state = true;
 		} else {
-			return true;
+			new_text = 'Expand all';
+			expanded_state = false;
 		}
-	});
 
-	//long texts with '...more' link
-	$(document).on('click', 'div.expandable a', function(e) {
-		e.preventDefault();
-
-		if($(this).text() == '...more') {
-			$(this).text('...less');
-			$(this).parent().find('.sr-only').removeClass('sr-only').addClass('expanded');
-		} else {
-			$(this).text('...more');
-			$(this).parent().find('.expanded').addClass('sr-only').removeClass('expanded');
-		}
-	});
-	$('.has-more').each(function() {
-		let max_length = parseInt($(this).attr('data-max-length'));
-		let full_value = $(this).text();
-		if(full_value.length < max_length) {
-			return;
-		}
-		$(this).replaceWith('<div class="expandable">' + full_value.substring(0, max_length) + '<span class="sr-only">' + full_value.substring(max_length) + '</span><a href="#">...more</a></div>');
-	});
+		$(this).text(new_text);
+		$('.processor-expand > button').each(function () {
+			let controls = $('#' + $(this).attr('aria-controls'));
+			if (controls.attr('aria-expanded')) {
+				controls.attr('aria-expanded', expanded_state);
+			}
+		});
+	}
 }
 
 /**
  * Post-processor handling
  */
- processor = {
+const processor = {
+	/**
+	 * Set up processor queueing event listeners
+	 */
+	init: function() {
+		// child of child of child etc interface bits
+		$(document).on('click', '.processor-queue-button', processor.queue);
+
+		// dataset deletion
+		$(document).on('click', '.delete-link', processor.delete);
+	},
+
 	/**
 	 * Queue a post-processor
 	 *
@@ -160,11 +114,10 @@ function init() {
 
 		if ($(this).text().includes('Run')) {
 			let form = $(this).parents('form');
-			let position = form.position().top + parseInt(form.height());
 
 			// if it's a big dataset, ask if the user is *really* sure
 			let parent = $(this).parents('li.child-wrapper');
-			if(parent.length == 0) {
+			if(parent.length === 0) {
 				parent = $('.result-tree');
 			}
 			let num_rows = parseInt($('#dataset-' + parent.attr('data-dataset-key') + '-result-count').attr('data-num-results'));
@@ -179,7 +132,7 @@ function init() {
 				'method': form.attr('method'),
 				'data': form.serialize(),
 				'success': function (response) {
-					if (response.messages.length > 0) {
+					if (response.hasOwnProperty("messages") && response.messages.length > 0) {
 						alert(response.messages.join("\n\n"));
 					}
 
@@ -215,7 +168,12 @@ function init() {
 					}
 				},
 				'error': function (response) {
-					alert('The analysis could not be queued: ' + response.responseText);
+					try {
+						response = JSON.parse(response.responseText);
+						alert('The analysis could not be queued: ' + response["error"]);
+					} catch(Exception) {
+						alert('The analysis could not be queued: ' + response.responseText);
+					}
 				}
 			});
 
@@ -257,6 +215,54 @@ function init() {
  * Query queueing and updating
  */
 const query = {
+	dot_ticker: 0,
+	poll_interval: null,
+	query_key: null,
+
+	/**
+	 * Set up query status checkers and event listeners
+	 */
+	init: function() {
+		// Check status of query
+		if($('body.result-page').length > 0) {
+			query.update_status();
+			setInterval(query.update_status, 4000);
+
+			// Check processor queue
+			query.check_processor_queue();
+			setInterval(query.check_processor_queue, 10000);
+		}
+
+		// Check search queue
+		if($('#query-form').length > 0) {
+			query.check_search_queue();
+			setInterval(query.check_search_queue, 10000);
+		}
+
+		//regularly check for unfinished datasets
+		setInterval(query.check_resultpage, 2000);
+
+		// Start querying when go button is clicked
+		$('#query-form').on('submit', function (e) {
+			e.preventDefault();
+			query.start();
+		});
+
+		// Data source select boxes trigger an update of the boards available for the chosen data source
+		$('#datasource-select').on('change', query.update_form);
+		$('#datasource-select').trigger('change');
+
+		// Special cases in dataset entry form
+		$('#datasource-form').on('change', 'input[type=date]', query.proxy_dates);
+		$('#datasource-form').on('change', '#forminput-search_scope', query.handle_density);
+		$('#datasource-form').on('change', '#forminput-board', query.custom_board_options);
+
+		// dataset label edit
+		$('.result-page .card h2').each(query.label.init);
+		$(document).on('click', '.edit-dataset-label', query.label.handle);
+		$(document).on('keydown', '#new-dataset-label', query.label.handle);
+	},
+
 	/**
 	 * Enable query form, so settings may be changed
 	 */
@@ -314,6 +320,7 @@ const query = {
 			processData: false,
 
 			success: function (response) {
+				console.log(response);
 
 				// If the query is rejected by the server.
 				if (response.substr(0, 14) === 'Invalid query.') {
@@ -324,14 +331,14 @@ const query = {
 				// If the query is accepted by the server.
 				else {
 					$('#query-status .message').html('Query submitted, waiting for results');
-					query_key = response;
-					query.check(query_key);
+					query.query_key = response;
+					query.check(query.query_key);
 
-					$('#query-status').append($('<button class="delete-link" data-key="' + query_key + '">Cancel</button>'));
+					$('#query-status').append($('<button class="delete-link" data-key="' + query.query_key + '">Cancel</button>'));
 
 					// poll results every 2000 ms after submitting
-					poll_interval = setInterval(function () {
-						query.check(query_key);
+					query.poll_interval = setInterval(function () {
+						query.check(query.query_key);
 					}, 4000);
 				}
 			},
@@ -364,7 +371,7 @@ const query = {
 				}
 
 				if (json.done) {
-					clearInterval(poll_interval);
+					clearInterval(query.poll_interval);
 					let keyword = json.label;
 
 					$('#query-results').append('<li><a href="/results/' + json.key + '">' + keyword + ' (' + json.rows + ' items)</a></li>');
@@ -372,14 +379,14 @@ const query = {
 					alert('Query for \'' + keyword + '\' complete!');
 				} else {
 					let dots = '';
-					for (let i = 0; i < dot_ticker; i += 1) {
+					for (let i = 0; i < query.dot_ticker; i += 1) {
 						dots += '.';
 					}
 					$('#query-status .dots').html(dots);
 
-					dot_ticker += 1;
-					if (dot_ticker > 3) {
-						dot_ticker = 0;
+					query.dot_ticker += 1;
+					if (query.dot_ticker > 3) {
+						query.dot_ticker = 0;
 					}
 				}
 			},
@@ -801,11 +808,20 @@ const query = {
 	}
 };
 
-
 /**
  * Tooltip management
  */
- tooltip = {
+const tooltip = {
+	/**
+	 * Set up tooltip event listeners
+	 */
+ 	init: function() {
+		//tooltips
+		$(document).on('mousemove', '.tooltip-trigger', tooltip.show);
+		$(document).on('mouseout', '.tooltip-trigger', tooltip.hide);
+		$(document).on('click', '.tooltip-trigger', tooltip.toggle);
+	},
+
 	/**
 	 * Show tooltip
 	 *
@@ -895,7 +911,7 @@ const query = {
 /**
  * Popup management
  */
- popup = {
+const popup = {
 	/**
 	 * Set up containers and event listeners for popup
 	 */
@@ -903,7 +919,11 @@ const query = {
 	 init: function() {
 		$('<div id="blur"></div>').appendTo('body');
 		$('<div id="popup"><div class="content"></div><button id="popup-close"><i class="fa fa-times" aria-hidden="true"></i> <span class="sr-only">Close popup</span></button></div>').appendTo('body');
+
+		//popups
+		$(document).on('click', '.popup-trigger', popup.show);
 		$('body').on('click', '#blur, #popup-close', popup.hide);
+
 		popup.is_initialised = true;
 	 },
 	/**
@@ -959,7 +979,15 @@ const query = {
 /**
  * Dynamic panels
  */
- dynamic_container = {
+const dynamic_container = {
+	/**
+	 * Set up updater interval for dynamic containers
+	 */
+	init: function() {
+		// Update dynamic containers
+		setInterval(dynamic_container.refresh, 2500);
+	},
+
 	refresh: function() {
 		if(!document.hasFocus()) {
 			//don't hammer the server while user is looking at something else
@@ -991,47 +1019,13 @@ const query = {
 	}
 };
 
-/** General-purpose toggle buttons **/
-function toggleButton(e, force_close=false) {
-	e.preventDefault();
-
-	target = '#' + $(this).attr('aria-controls');
-	
-	is_open = $(target).attr('aria-expanded') !== 'false';
-	if (is_open || force_close) {
-		$(target).animate({'height': 0}, 250, function() { $(this).attr('aria-expanded', false).css('height', ''); });
-
-		// Also collapse underlying panels that are still open
-		$(target).find('*[aria-expanded=true]').attr('aria-expanded', false);
-	} else {
-		$(target).css('visibility', 'hidden').css('position', 'absolute').css('display', 'block').attr('aria-expanded', true);
-		let targetHeight = $(target).height();
-		$(target).css('aria-expanded', false).css('position', '').css('display', '').css('visibility', '').css('height', 0);
-		$(target).attr('aria-expanded', true).animate({"height": targetHeight}, 250, function() { $(this).css('height', '')});
-	}
-}
-
-function toggleDatasets(e) {
-	let new_text;
-	let expanded_state;
-
-	if($(this).text().toLowerCase().indexOf('expand') >= 0) {
-		new_text = 'Collapse all';
-		expanded_state = true;
-	} else {
-		new_text = 'Expand all';
-		expanded_state = false;
-	}
-
-	$(this).text(new_text);
-	$('.processor-expand > button').each(function() {
-		if($('#' + $(this).attr('aria-controls')).attr('aria-expanded')) {
-			$('#' + $(this).attr('aria-controls')).attr('aria-expanded', expanded_state);
-		}
-	});
-}
-
+/**
+ * Multi-choice form elements
+ */
 const multichoice = {
+	/**
+	 * Set up multichoice events via event listeners
+	 */
 	init: function() {
 		// Multichoice inputs need to be loaded dynamically
 		$(document).on('click', '.toggle-button', function () {
@@ -1046,6 +1040,9 @@ const multichoice = {
 		$(document).on('click', '.multi-select-selected > span', multichoice.removeMultiChoiceOption);
 	},
 
+	/**
+	 * Make multichoice select boxes so
+	 */
 	makeMultichoice: function() {
 		//more user-friendly select multiple
 		$('.multichoice-wrapper').each(function () {
@@ -1072,6 +1069,9 @@ const multichoice = {
 		});
 	},
 
+	/**
+	 * Make multiselect select boxes so
+	 */
 	makeMultiSelect: function() {
 		// Multi-select choice menu requires some code.
 		$('.multi-select-wrapper').each(function () {
@@ -1172,12 +1172,112 @@ const multichoice = {
 }
 
 /**
+ * Misc UI helpers
+ */
+const ui_helpers = {
+	/**
+	 * Initialize UI enhancements via event listeners
+	 */
+	init: function() {
+		$(document).on('click', '.toggle-button', ui_helpers.toggleButton);
+
+		//confirm links
+		$(document).on('click', '.confirm-first', ui_helpers.confirm);
+
+		//long texts with '...more' link
+		$(document).on('click', 'div.expandable a', ui_helpers.expandExpandable);
+
+
+		// Controls to change which results show up in overview
+		$('.view-controls button').hide();
+		$('.view-controls input, .view-controls select, .view-controls textarea').on('change', function () {
+			$(this).parents('form').trigger('submit');
+		});
+
+		// 'more...' expanders
+		$('.has-more').each(function() {
+			let max_length = parseInt($(this).attr('data-max-length'));
+			let full_value = $(this).text();
+			if(full_value.length < max_length) {
+				return;
+			}
+			$(this).replaceWith('<div class="expandable">' + full_value.substring(0, max_length) + '<span class="sr-only">' + full_value.substring(max_length) + '</span><a href="#">...more</a></div>');
+		});
+	},
+
+	/**
+	 * Ask for confirmation before doing whatever happens when the event goes through
+	 *
+	 * @param e  Event that triggers confirmation
+	 * @returns {boolean}  Confirmed or not
+	 */
+	confirm: function(e) {
+		let action = 'do this';
+
+		if ($(this).attr('data-confirm-action')) {
+			action = $(this).attr('data-confirm-action');
+		}
+
+		if (!confirm('Are you sure you want to ' + action + '? This cannot be undone.')) {
+			e.preventDefault();
+			return false;
+		} else {
+			return true;
+		}
+	},
+
+	/**
+	 * Handle '...more' expandables
+	 * @param e  Event that triggers expanding or un-expanding
+	 */
+	expandExpandable: function (e) {
+		e.preventDefault();
+
+		if ($(this).text() === '...more') {
+			$(this).text('...less');
+			$(this).parent().find('.sr-only').removeClass('sr-only').addClass('expanded');
+		} else {
+			$(this).text('...more');
+			$(this).parent().find('.expanded').addClass('sr-only').removeClass('expanded');
+		}
+	},
+
+	/**
+	 * Handle generic toggle button
+	 *
+	 * Uses the 'aria-controls' value of the triggering element to know what to make visible or hide
+	 *
+	 * @param e  Event that triggers toggling
+	 * @param force_close  Assume the event is un-toggling something regardless of current state
+	 */
+	toggleButton: function(e, force_close=false) {
+		e.preventDefault();
+
+		target = '#' + $(this).attr('aria-controls');
+
+		is_open = $(target).attr('aria-expanded') !== 'false';
+		if (is_open || force_close) {
+			$(target).animate({'height': 0}, 250, function() { $(this).attr('aria-expanded', false).css('height', ''); });
+
+			// Also collapse underlying panels that are still open
+			$(target).find('*[aria-expanded=true]').attr('aria-expanded', false);
+		} else {
+			$(target).css('visibility', 'hidden').css('position', 'absolute').css('display', 'block').attr('aria-expanded', true);
+			let targetHeight = $(target).height();
+			$(target).css('aria-expanded', false).css('position', '').css('display', '').css('visibility', '').css('height', 0);
+			$(target).attr('aria-expanded', true).animate({"height": targetHeight}, 250, function() { $(this).css('height', '')});
+		}
+	}
+}
+
+
+/**
  * Convert input string to Unix timestamp
  *
  * @param str  Input string, yyyy-mm-dd ideally
  * @returns {*}  Unix timestamp
  */
- function stringToTimestamp(str) {
+function stringToTimestamp(str) {
 	// Converts a text input to a unix timestamp.
 	// Only used in Safari (other browsers use native HTML date picker)
 	let date_regex = /^\d{4}-\d{2}-\d{2}$/;
@@ -1209,10 +1309,10 @@ const multichoice = {
  * @param endpoint Relative URL to call (/api/endpoint)
  * @returns  Absolute URL
  */
- function getRelativeURL(endpoint) {
+function getRelativeURL(endpoint) {
 	let root = $("body").attr("data-url-root");
-	if(!root) {
+	if (!root) {
 		root = '/';
 	}
 	return root + endpoint;
- }
+}
