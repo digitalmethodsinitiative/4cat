@@ -617,7 +617,7 @@ def queue_processor(key=None, processor=None):
 		options = UserInput.parse_all(available_processors[processor].get_options(dataset, current_user), request.form.to_dict(), silently_correct=False)
 		options["user"] = current_user.get_id()
 	except QueryParametersException as e:
-		return jsonify({"error": e})
+		return jsonify({"error": str(e)})
 
 	analysis = DataSet(parent=dataset.key, parameters=options, db=db,
 					   extension=available_processors[processor].extension, type=processor)
