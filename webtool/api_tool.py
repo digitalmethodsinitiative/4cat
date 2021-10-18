@@ -583,14 +583,14 @@ def queue_processor(key=None, processor=None):
 	if request.files and "input_file" in request.files:
 		input_file = request.files["input_file"]
 		if not input_file:
-			return jsonify({"error": "No file input provided"})
+			return error(400, error="No file input provided")
 
 		if input_file.filename[-4:] != ".csv":
-			return jsonify({"error": "File input is not a csv file"})
+			return error(400, error="File input is not a csv file")
 
 		test_csv_file = csv.DictReader(input_file.stream)
 		if "body" not in test_csv_file.fieldnames:
-			return jsonify({"error": "File must contain a 'body' column"})
+			return error(400, error="File must contain a 'body' column")
 
 		filename = secure_filename(input_file.filename)
 		input_file.save(config.PATH_DATA + "/")
@@ -605,19 +605,19 @@ def queue_processor(key=None, processor=None):
 	try:
 		dataset = DataSet(key=key, db=db)
 	except TypeError:
-		return jsonify({"error": "Not a valid dataset key."})
+		return error(404, error="Not a valid dataset key.")
 
 	# check if processor is available for this dataset
 	available_processors = dataset.get_available_processors()
 	if processor not in available_processors:
-		return jsonify({"error": "This processor is not available for this dataset or has already been run."})
+		return error(404, error="This processor is not available for this dataset or has already been run.")
 
 	# create a dataset now
 	try:
 		options = UserInput.parse_all(available_processors[processor].get_options(dataset, current_user), request.form.to_dict(), silently_correct=False)
 		options["user"] = current_user.get_id()
 	except QueryParametersException as e:
-		return jsonify({"error": str(e)})
+		return error(400, error=str(e))
 
 	analysis = DataSet(parent=dataset.key, parameters=options, db=db,
 					   extension=available_processors[processor].extension, type=processor)
@@ -717,24 +717,24 @@ def datasource_call(datasource, action):
 
 	forbidden_call_name = re.compile(r"[^a-zA-Z0-9_]")
 	if forbidden_call_name.findall(action) or action[0:2] == "__":
-		return error(406, error="Datasource '%s' has no call '%s'" % (datasource, action))
+		return error(400, error="Datasource '%s' has no call '%s'" % (datasource, action))
 
 	folder = backend.all_modules.datasources[datasource]["path"]
 	views_file = folder.joinpath("webtool", "views.py")
 	if not views_file.exists():
-		return error(406, error="Datasource '%s' has no call '%s'" % (datasource, action))
+		return error(400, error="Datasource '%s' has no call '%s'" % (datasource, action))
 
 	datasource_id = backend.all_modules.datasources[datasource]["id"]
 	datasource_calls = importlib.import_module("datasources.%s.webtool.views" % datasource_id)
 
 	if not hasattr(datasource_calls, action) or not callable(getattr(datasource_calls, action)):
-		return error(406, error="Datasource '%s' has no call '%s'" % (datasource, action))
+		return error(400, error="Datasource '%s' has no call '%s'" % (datasource, action))
 
 	parameters = request.args if request.method == "GET" else request.form
 	response = getattr(datasource_calls, action).__call__(request, current_user, **parameters)
 
 	if not response:
-		return jsonify({"success": False})
+		return error(400, success=False)
 	elif response is True:
 		return jsonify({"success": True})
 	else:
