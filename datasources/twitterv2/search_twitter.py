@@ -148,7 +148,7 @@ class SearchWithTwitterAPIv2(Search):
             api_response = None
             while retries > 0:
                 try:
-                    api_response = requests.get(endpoint, headers=auth, params=params)
+                    api_response = requests.get(endpoint, headers=auth, params=params, timeout=30)
                     break
                 except (ConnectionError, requests.exceptions.RequestException) as e:
                     retries -= 1
