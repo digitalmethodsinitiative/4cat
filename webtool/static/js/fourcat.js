@@ -320,8 +320,6 @@ const query = {
 			processData: false,
 
 			success: function (response) {
-				console.log(response);
-
 				// If the query is rejected by the server.
 				if (response.substr(0, 14) === 'Invalid query.') {
 					alert(response);
@@ -455,7 +453,6 @@ const query = {
 					update.attr('aria-expanded', target.attr('aria-expanded'));
 
 					if (target.attr('data-status') === update.attr('data-status') && target.attr('class') === update.attr('class')) {
-						console.log(target.attr('data-status'));
 						return;
 					}
 
@@ -554,7 +551,6 @@ const query = {
 				}
 			},
 			error: function (error) {
-				console.log(error["responseText"])
 				console.log('Something went wrong when checking 4CAT\'s status');
 			}
 		});
