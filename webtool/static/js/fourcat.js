@@ -673,6 +673,7 @@ const query = {
                 // should also be rendered dynamically if processor options are expanded.
                 if ($('.multichoice-wrapper').length || $('.multi-select-wrapper').length) {
                     multichoice.makeMultichoice();
+                    multichoice.makeMultiSelect();
                 }
 			},
 			'error': function() {
