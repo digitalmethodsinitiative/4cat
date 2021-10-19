@@ -21,29 +21,60 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
 	sure crashes are caught properly and the relevant data is available to the
 	worker code.
 	"""
-	type = "misc"  # this should match the job type as saved in the database
-	pause = 1  # time to wait between scrapes
-	max_workers = 1  # max amount of workers of this type
+	#: Worker type - should match Job ID used when queuing jobs
+	type = "misc"
 
-	# flag values to indicate what to do when an interruption is requested
+	#: Amount of workers of this type that can run in parallel. Be careful with
+	#: this, because values higher than 1 will mean that e.g. API rate limits
+	#: are easily violated.
+	max_workers = 1
+
+	#: Flag value to indicate worker interruption type - not interrupted
 	INTERRUPT_NONE = False
+
+	#: Flag value to indicate worker interruption type - interrupted, but can
+	#: be retried
 	INTERRUPT_RETRY = 1
+
+	#: Flag value to indicate worker interruption type - interrupted, but
+	#: should be cancelled
 	INTERRUPT_CANCEL = 2
 
-	queue = None  # JobQueue
-	job = None  # Job for this worker
-	log = None  # Logger
-	manager = None  # WorkerManager that manages this worker
-	interrupted = False  # interrupt flag, to request halting
+	#: Job queue that can be used to create or manipulate jobs
+	queue = None
+
+	#: Job this worker is being run for
+	job = None
+
+	#: Logger object
+	log = None
+
+	#: WorkerManager that manages this worker
+	manager = None
+
+	#: Interrupt status, one of the `INTERRUPT_` class constants
+	interrupted = False
+
+	#: Module index
 	modules = None
-	init_time = 0  # Time this worker was started
+
+	#: Unix timestamp at which this worker was started
+	init_time = 0
 
 	def __init__(self, logger, job, queue=None, manager=None, modules=None):
 		"""
-		Basic init, just make sure our thread name is meaningful
+		Worker init
 
-		:param JobQueue queue: Job Queue - if not given, a new one will be instantiated
-		:param WorkerManager manager:  Worker manager reference
+		Set up object attributes, e.g. the worker queue and manager, and
+		initialize a new database connection and connected job queue. We cannot
+		share database connections between workers because they are not
+		thread-safe.
+
+		:param Logger logger:  Logging interface
+		:param Job job:  Job this worker is being run on
+		:param JobQueue queue:  Job queue
+		:param WorkerManager manager:  Scheduler instance that started this worker
+		:param modules:  Module catalog
 		"""
 		super().__init__()
 		self.name = self.type
@@ -63,9 +94,18 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
 
 	def run(self):
 		"""
-		Loop the worker
+		Run the worker
 
-		This simply calls the work method
+		This calls the `work()` method, quite simply, but adds some
+		scaffolding to take care of any exceptions that occur during the
+		execution of the worker. The exception is then logged and the worker
+		is gracefully ended, but the job is *not* released to ensure that the
+		job is not run again immediately (which would probably instantly crash
+		in the exact same way).
+
+		You can configure the `WARN_SLACK_URL` configuration variable to make
+		reports of worker crashers be sent to a Slack channel, which is a good
+		way to monitor a running 4CAT instance!
 		"""
 		try:
 			self.work()
@@ -93,7 +133,9 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
 		"""
 		Called when the application shuts down
 
-		Can be used to stop loops, for looping workers.
+		Can be used to stop loops, for looping workers. Workers should override
+		this method to implement any procedures to run to clean up a worker
+		when it is interrupted; by default this does nothing.
 		"""
 		pass
 
@@ -101,12 +143,12 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
 		"""
 		Set the 'abort requested' flag
 
-		Child workers should quit at their earliest convenience when this is set
+		Child workers should quit at their earliest convenience when this is
+		set. This can be done simply by checking the value of
+		`self.interrupted`.
 
 		:param int level:  Retry or cancel? Either `self.INTERRUPT_RETRY` or
-		`self.INTERRUPT_CANCEL`.
-
-		:return:
+		  `self.INTERRUPT_CANCEL`.
 		"""
 		self.log.debug("Interrupt requested for worker %s/%s" % (self.job.data["jobtype"], self.job.data["remote_id"]))
 		self.interrupted = level
@@ -116,7 +158,8 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
 		"""
 		This is where the actual work happens
 
-		Whatever the worker is supposed to do, it should happen (or be initiated from) this
-		method, which is looped indefinitely until the worker is told to finish.
+		Whatever the worker is supposed to do, it should happen (or be
+		initiated from) this method. By default it does nothing, descending
+		classes should implement this method.
 		"""
 		pass

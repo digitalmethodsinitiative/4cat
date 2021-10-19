@@ -24,31 +24,65 @@ csv.field_size_limit(1024 * 1024 * 1024)
 
 class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 	"""
-	Abstract post-processor class
+	Abstract processor class
 
-	A post-processor takes a finished search query as input and processed its
-	result in some way, with another result set as output. The input thus is
-	a CSV file, and the output (usually) as well. In other words, the result of
-	a post-processor run can be used as input for another post-processor
-	(though whether and when this is useful is another question).
+	A processor takes a finished dataset as input and processes its result in
+	some way, with another dataset set as output. The input thus is a file, and
+	the output (usually) as well. In other words, the result of a processor can
+	be used as input for another processor (though whether and when this is
+	useful is another question).
+
+	To determine whether a processor can process a given dataset, you can
+	define a `is_compatible_with(FourcatModule module=None):) -> bool` class
+	method which takes a dataset *or* processor as argument and returns a bool
+	that determines if this processor is considered compatible with that
+	dataset or processor. For example:
+
+	.. code-block:: python
+
+        @classmethod
+        def is_compatible_with(cls, module=None):
+            return module.type == "linguistic-features"
+
+
 	"""
-	db = None  # database handler
-	dataset = None  # Dataset object representing the dataset to be created
-	job = None  # Job object that requests the execution of this processor
-	source_dataset = None  # Dataset object to be processed, if applicable
-	source_file = None  # path to dataset to be processed, if applicable
 
-	description = "No description available"  # processor description, shown in web front-end
-	category = "Other"  # processor category, for sorting in web front-end
-	extension = "csv"  # extension of files created by this processor
-	options = {}  # configurable options for this processor
-	parameters = {}  # values for the processor's configurable options
+	#: Database handler to interface with the 4CAT database
+	db = None
 
-	is_running_in_preset = False  # is this processor running 'within' a preset processor?
+	#: Job object that requests the execution of this processor
+	job = None
 
-	# the following will be defined automatically upon loading the processor
-	# there is no need to override manually
-	filepath = None  # do not override
+	#: The dataset object that the processor is *creating*.
+	dataset = None
+
+	#: The dataset object that the processor is *processing*.
+	source_dataset = None
+
+	#: The file that is being processed
+	source_file = None
+
+	#: Processor description, which will be displayed in the web interface
+	description = "No description available"
+
+	#: Category identifier, used to group processors in the web interface
+	category = "Other"
+
+	#: Extension of the file created by the processor
+	extension = "csv"
+
+	#: Configurable options for this processor
+	options = {}
+
+	#: Values for the processor's options, populated by user input
+	parameters = {}
+
+	#: Is this processor running 'within' a preset processor?
+	is_running_in_preset = False
+
+	#: This will be defined automatically upon loading the processor. There is
+	#: no need to override manually
+	filepath = None
 
 	def work(self):
 		"""
@@ -167,7 +201,11 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
 	def after_process(self):
 		"""
-		After processing, declare job finished
+		Run after processing the dataset
+
+		This method cleans up temporary files, and if needed, handles logistics
+		concerning the result file, e.g. running a pre-defined processor on the
+		result, copying it to another dataset, and so on.
 		"""
 		if self.dataset.data["num_rows"] > 0:
 			self.dataset.update_status("Dataset saved.")
@@ -276,7 +314,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		collection directly instead of from a static file
 
 		:param Path path: 	Path to file to read
-		:return Generator:  A generator that yields each item as a dictionary
+		:return generator:  A generator that yields each item as a dictionary
 		"""
 
 		# see if an item mapping function has been defined
@@ -330,9 +368,9 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		these, as a list.
 
 		:param Path path:  Path to the dataset file; if left empty, use the
-		processor's own dataset's path
+		  processor's own dataset's path
 		:return list:  List of keys, may be empty if there are no items in the
-		dataset
+		  dataset
 
 		:todo: Figure out if this makes more sense as a Dataset method
 		"""
@@ -361,8 +399,8 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
 		:param Path path: 	Path to zip file to read
 		:param Path staging_area:  Where to store the files while they're
-		being worked with. If omitted, a temporary folder is created and
-		deleted after use
+		  being worked with. If omitted, a temporary folder is created and
+		  deleted after use
 		:return:  An iterator with a Path item for each file
 		"""
 
@@ -410,8 +448,8 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
 		:param Path path: 	Path to zip file to read
 		:param Path staging_area:  Where to store the files while they're
-		being worked with. If omitted, a temporary folder is created and
-		deleted after use
+		  being worked with. If omitted, a temporary folder is created and
+		  deleted after use
 		:return Path:  A path to the staging area
 		"""
 
@@ -479,12 +517,12 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		Archive a bunch of files into a zip archive and finish processing
 
 		:param list|Path files: If a list, all files will be added to the
-		archive and deleted afterwards. If a folder, all files in the folder
-		will be added and the folder will be deleted afterwards.
+		  archive and deleted afterwards. If a folder, all files in the folder
+		  will be added and the folder will be deleted afterwards.
 		:param int num_items: Items in the dataset. If None, the amount of
-		files added to the archive will be used.
+		  files added to the archive will be used.
 		:param int compression:  Type of compression to use. By default, files
-		are not compressed, to speed up unarchiving.
+		  are not compressed, to speed up unarchiving.
 		"""
 		is_folder = False
 		if issubclass(type(files), PurePath):
@@ -514,9 +552,12 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		self.dataset.finish(num_items)
 
 	def create_standalone(self):
-		# copy this dataset - the filtered version - and make that copy standalone
-		# this has the benefit of allowing for all analyses that can be run on
-		# full datasets on the new, filtered copy as well
+		"""
+		Copy this dataset and make that copy standalone
+
+		This has the benefit of allowing for all analyses that can be run on
+		full datasets on the new, filtered copy as well.
+		"""
 		top_parent = self.source_dataset
 
 		standalone = self.dataset.copy(shallow=False)
@@ -564,10 +605,10 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		is partially determined by the parent dataset's parameters.
 
 		:param DataSet parent_dataset:  An object representing the dataset that
-		the processor would be run on
+		  the processor would be run on
 		:param User user:  Flask user the options will be displayed for, in
-		case they are requested for display in the 4CAT web interface. This can
-		be used to show some options only to privileges users.
+		  case they are requested for display in the 4CAT web interface. This can
+		  be used to show some options only to privileges users.
 		"""
 		return cls.options if hasattr(cls, "options") else {}
 
@@ -576,7 +617,6 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		"""
 		Get processor status
 
-		Useful to 
 		:return list:	Statuses of this processor
 		"""
 		return cls.status if hasattr(cls, "status") else None
@@ -613,7 +653,10 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 	def is_dataset(cls):
 		"""
 		Confirm this is *not* a dataset, but a processor.
-		Used for processor compatibility
+
+		Used for processor compatibility checks.
+
+		:return bool:  Always `False`, because this is a processor.
 		"""
 		return False
 
@@ -621,15 +664,21 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 	def is_top_dataset(cls):
 		"""
 		Confirm this is *not* a top dataset, but a processor.
-		Used for processor compatibility
+
+		Used for processor compatibility checks.
+
+		:return bool:  Always `False`, because this is a processor.
 		"""
 		return False
 
 	@classmethod
 	def get_extension(self):
 		"""
-		Return the extension of 
-		Used for processor compatibility
+		Return the extension of the processor's dataset
+
+		Used for processor compatibility checks.
+
+		:return str|None:  Dataset extension (without leading `.`) or `None`.
 		"""
 
 		if self.extension and not self.is_filter():
@@ -642,7 +691,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		Used for processor compatibility
 
 		:param bool multiple_items:  Consider datasets with multiple items per
-		item (e.g. word_1, word_2, etc)? Included for compatibility
+		  item (e.g. word_1, word_2, etc)? Included for compatibility
 		"""
 		return False
 

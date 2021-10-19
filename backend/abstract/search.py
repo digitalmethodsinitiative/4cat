@@ -19,32 +19,43 @@ from common.lib.exceptions import WorkerInterruptedException, ProcessorInterrupt
 
 class Search(BasicProcessor, ABC):
 	"""
-	Process substring queries from the front-end
+	Process search queries from the front-end
 
-	Requests are added to the pool as "query" jobs. This class is to be
-	extended by data source-specific search classes, which will define the
-	abstract methods at the end of this class to tailor the search engine
-	to their database layouts.
+	This class can be descended from to define a 'search worker', which
+	collects items from a given data source to create a dataset according to
+	parameters provided by the user via the web interface.
+
+	Each data source defines a search worker that contains code to interface
+	with e.g. an API or a database server. The search worker also contains a
+	definition of the parameters that can be configured by the user, via the
+	`options` attribute and/or the `get_options()` class method.
 	"""
-	type = "query"
+	#: Search worker identifier - should end with 'search' for
+	#: backwards-compatibility reasons. For example, `instagram-search`.
+	type = "abstract-search"
+
+	#: Amount of workers of this type that can run in parallel. Be careful with
+	#: this, because values higher than 1 will mean that e.g. API rate limits
+	#: are easily violated.
 	max_workers = 1
 
+	#: This attribute is only used by search workers that collect data from a
+	#: local database, to determine the name of the table to collect the data
+	#: from. If this is `4chan`, for example, posts are read from
+	#: `posts_4chan`.
 	prefix = ""
 
 	# Columns to return in csv
 	# Mandatory columns: ['thread_id', 'body', 'subject', 'timestamp']
 	return_cols = ['thread_id', 'body', 'subject', 'timestamp']
 
-	# not available as a processor for existing datasets
-	accepts = [None]
-
 	def process(self):
 		"""
-		Run 4CAT search query
+		Create 4CAT dataset from a data source
 
 		Gets query details, passes them on to the object's search method, and
-		writes the results to a CSV file. If that all went well, the query and
-		job are marked as finished.
+		writes the results to a file. If that all went well, the query and job
+		are marked as finished.
 		"""
 
 		query_parameters = self.dataset.get_parameters()
@@ -108,7 +119,7 @@ class Search(BasicProcessor, ABC):
 		"""
 		Search for items matching the given query
 
-		The real work is done by the get_posts() method of the descending
+		The real work is done by the get_items() method of the descending
 		class. This method just provides some scaffolding and post-processing
 		of results via `after_search()`, if it is defined.
 
@@ -133,6 +144,10 @@ class Search(BasicProcessor, ABC):
 		Method to fetch items with for a given query
 
 		To be implemented by descending classes!
+
+		:param dict query:  Query parameters
+		:return Generator:  A generator or iterable that returns items
+		  collected according to the provided parameters.
 		"""
 		pass
 
@@ -145,10 +160,14 @@ class Search(BasicProcessor, ABC):
 		that require importing from other or multiple file types can overwrite
 		this method.
 
+		This method has a generic implementation, but in most cases would be
+		redefined in descending classes to account for nuances in incoming data
+		for a given data source.
+
 		The file is considered disposable and deleted after importing.
 
 		:param str path:  Path to read from
-		:return:  Yields all items in the file, item for item.
+		:return Generator:  Yields all items in the file, item for item.
 		"""
 		path = Path(path)
 		if not path.exists():
@@ -171,10 +190,10 @@ class Search(BasicProcessor, ABC):
 		some specific processing is done on the "body" key to strip HTML from it,
 		and a human-readable timestamp is provided next to the UNIX timestamp.
 
-		:param results:			List of dict rows from data source.
-		:param filepath:		Filepath for the resulting csv
+		:param Iterable results:  List of dict rows from data source.
+		:param Path filepath:  Filepath for the resulting csv
 
-		:return int:  Amount of posts that were processed
+		:return int:  Amount of items that were processed
 
 		"""
 		if not filepath:
@@ -250,10 +269,10 @@ class Search(BasicProcessor, ABC):
 				# replace author column with salted hash of the author name, if
 				# pseudonymisation is enabled
 				if pseudonymise_author:
-					check_cashe = CheckCashe(hash_cache, hasher)
+					check_cache = CheckCache(hash_cache, hasher)
 					author_fields = [field for field in row.keys() if "author" in field]
 					for author_field in author_fields:
-						row[author_field] = check_cashe.update_cache(row[author_field])
+						row[author_field] = check_cache.update_cache(row[author_field])
 				writer.writerow(row)
 
 		return processed
@@ -282,7 +301,7 @@ class Search(BasicProcessor, ABC):
 			hash_cache = {}
 			hasher = hashlib.blake2b(digest_size=24)
 			hasher.update(str(config.ANONYMISATION_SALT).encode("utf-8"))
-			check_cashe = CheckCashe(hash_cache, hasher)
+			check_cache = CheckCache(hash_cache, hasher)
 
 		processed = 0
 		with filepath.open("w", encoding="utf-8", newline="") as outfile:
@@ -293,14 +312,14 @@ class Search(BasicProcessor, ABC):
 				# replace author column with salted hash of the author name, if
 				# pseudonymisation is enabled
 				if pseudonymise_author:
-					item = dict_search_and_update(item, ['author'], check_cashe.update_cache)
+					item = dict_search_and_update(item, ['author'], check_cache.update_cache)
 
 				outfile.write(json.dumps(item) + "\n")
 				processed += 1
 
 		return processed
 
-class CheckCashe():
+class CheckCache():
 	"""
 	Handler for the hasher
 	"""
@@ -470,18 +489,52 @@ class SearchWithScope(Search, ABC):
 
 	@abstractmethod
 	def get_items_simple(self, query):
+		"""
+		Get items via the simple pathway
+
+		If `get_search_mode()` returned `"simple"`, this method is used to
+		retrieve items. What this method does exactly is up to the descending
+		class.
+
+		:param dict query:  Query parameters
+		:return Iterable:  Items that match the parameters
+		"""
 		pass
 
 	@abstractmethod
 	def get_items_complex(self, query):
+		"""
+		Get items via the complex pathway
+
+		If `get_search_mode()` returned `"complex"`, this method is used to
+		retrieve items. What this method does exactly is up to the descending
+		class.
+
+		:param dict query:  Query parameters
+		:return Iterable:  Items that match the parameters
+		"""
 		pass
 
 	@abstractmethod
 	def fetch_posts(self, post_ids, where=None, replacements=None):
+		"""
+		Get posts for given IDs
+
+		:param Iterable post_ids:  Post IDs to e.g. match against a database
+		:param where:  Deprecated, do not use
+		:param replacements:  Deprecated, do not use
+		:return Iterable[dict]:  Post objects
+		"""
 		pass
 
 	@abstractmethod
 	def fetch_threads(self, thread_ids):
+		"""
+		Get posts for given thread IDs
+
+		:param Iterable thread_ids:  Thread IDs to e.g. match against a database
+		:return Iterable[dict]:  Post objects
+		"""
 		pass
 
 	@abstractmethod
