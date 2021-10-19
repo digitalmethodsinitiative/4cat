@@ -154,7 +154,7 @@ with open(args.input, encoding="utf-8") as inputfile:
 			threads_committed = 0
 			for thread_seen, last_seen in threads_last_seen.items():
 				if last_seen > 10000:
-					db.insert("threads_4chan", data=threads[thread_seen], commit=False, safe=safe, constraints=["id", "board"])
+					db.upsert("threads_4chan", data=threads[thread_seen], commit=False, safe=safe, constraints=["id", "board"])
 					threads.pop(thread_seen)
 					threads_committed += 1
 
@@ -168,7 +168,7 @@ with open(args.input, encoding="utf-8") as inputfile:
 	# Add the last posts and threads as well
 	print("Commiting leftover threads")
 	for thread in threads.values():
-		db.insert("threads_4chan", data=thread, commit=False, safe=safe, constraints=["id", "board"])
+		db.upsert("threads_4chan", data=thread, commit=False, safe=safe, constraints=["id", "board"])
 
 	db.commit()
 
