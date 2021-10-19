@@ -45,13 +45,14 @@ def openapi_overview():
 		"status": "The following API specifications are available from this server.",
 		"data": {
 			api_id: "http" + (
-				"s" if config.FlaskConfig.SERVER_HTTPS else "") + "://" + config.FlaskConfig.SERVER_NAME + "/api/spec/" + api_id + "/"
+				"s" if config.FlaskConfig.SERVER_HTTPS else "") + "://" + config.FlaskConfig.SERVER_NAME + "/api/spec/" + api_id + "/swagger.json"
 			for api_id in openapi.apis
 		}
 	})
 
 
 @app.route('/api/spec/<string:api_id>/')
+@app.route('/api/spec/<string:api_id>/swagger.json')
 @api_ratelimit
 def openapi_specification(api_id="all"):
 	"""
