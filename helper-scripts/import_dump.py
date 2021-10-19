@@ -38,7 +38,7 @@ db = Database(logger=logger, appname="queue-dump")
 csvnone = re.compile(r"^N$")
 
 safe = False
-if args.skip_duplicates:
+if args.skip_duplicates.lower() == "true":
 	print("Skipping duplicate rows (ON CONFLICT DO NOTHING).")
 	safe = True
 
@@ -64,6 +64,10 @@ with open(args.input, encoding="utf-8") as inputfile:
 
 	for post in reader:
 
+		# Skip rows if needed. Can be useful when importing didn't go correctly.
+		if args.offset and posts < args.offset:
+			continue
+		
 		post = {k: csvnone.sub("", post[k]) if post[k] else None for k in post}
 
 		# We collect thread data first, even though we might skip this post
@@ -103,11 +107,6 @@ with open(args.input, encoding="utf-8") as inputfile:
 		for k, v in threads_last_seen.items():
 			threads_last_seen[k] += 1
 		posts += 1
-		
-		# Skip rows if needed. Can be useful when importing didn't go correctly.
-		if args.offset and posts < args.offset:
-			continue
-		
 		
 		if post["media_filename"] and len({"media_w", "media_h", "preview_h", "preview_w"} - set(post.keys())) == 0:
 			dimensions = {"w": post["media_w"], "h": post["media_h"], "tw": post["preview_w"], "th": post["preview_h"]}
