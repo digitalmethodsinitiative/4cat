@@ -50,16 +50,17 @@ with open(args.input, encoding="utf-8") as inputfile:
 		# The /v/ dump has no headers and slightly different column ordering.
 		# The unknown ones are irrelevant but also tricky to extract (e.g.
 		# poster_country), so we're just calling them 'unknown_x'
-		fieldnames = ("num", "subnum", "thread_num", "op", "timestamp", "timestamp_expired", "preview_orig", "preview_w", "preview_h", "media_filename", "media_w", "media_h", "media_size", "media_hash", "media_orig", "spoiler", "deleted", "author_type", "email", "name", "trip", "title", "comment", "sticky", "locked", "unknown_8", "unknown_9", "unknown_10", "unknown_11", "unknown_12", "unknown_13", "unknown_14")
+		fieldnames = ("num", "subnum", "thread_num", "op", "timestamp", "timestamp_expired", "preview_orig", "preview_w", "preview_h", "media_filename", "media_w", "media_h", "media_size", "media_hash", "media_orig", "spoiler", "deleted", "author_type_id", "email", "name", "trip", "title", "comment", "sticky", "locked", "unknown_8", "unknown_9", "unknown_10", "unknown_11", "unknown_12", "unknown_13", "unknown_14")
 	else:
 		fieldnames = ("num", "subnum", "thread_num", "op", "timestamp", "timestamp_expired", "preview_orig", "preview_w", "preview_h", "media_filename", "media_w", "media_h", "media_size", "media_hash", "media_orig", "spoiler", "deleted", "capcode", "email", "name", "trip", "title", "comment", "sticky", "locked", "poster_hash", "poster_country", "exif")
-	
+
 	reader = csv.DictReader(inputfile, fieldnames=fieldnames, doublequote=False, escapechar="\\", strict=True)
 	
 	# Skip header
 	next(reader, None)
 
 	posts = 0
+	posts_added = 0
 	threads = {}
 	threads_last_seen = {}
 
@@ -133,7 +134,7 @@ with open(args.input, encoding="utf-8") as inputfile:
 			"author": post.get("name", ""),
 			"author_trip": post.get("trip", ""),
 			"author_type": post.get("author_type", ""),
-			"author_type_id": post["capcode"] if post["capcode"] != "" else "N",
+			"author_type_id": post["author_type_id"] if post["author_type_id"] != "" else "N",
 			"country_name": "",
 			"country_code": post.get("poster_country", ""),
 			"image_file": post["media_filename"],
@@ -146,7 +147,8 @@ with open(args.input, encoding="utf-8") as inputfile:
 		post_data = {k: str(v).replace("\x00", "") for k, v in post_data.items()}
 		
 		if post["deleted"] == "0":
-			db.insert("posts_4chan", post_data, commit=False, safe=safe)
+			new_post = db.insert("posts_4chan", post_data, commit=False, safe=safe)
+		
 		else:
 			
 			# database.py throws a TypeError when the post already exists and we're not updating, since it didn't return a row. However, we need the id_seq field for deleted posts. In this case, catch the TypeError and simply retrieve the id_seq from the database.
@@ -157,11 +159,13 @@ with open(args.input, encoding="utf-8") as inputfile:
 				r = db.fetchone("SELECT id_seq FROM posts_4chan WHERE board = '%s' AND id = %i;" % (args.board, int(post["num"])))
 				new_id = r["id_seq"] if r else None
 			if new_id:
-				db.insert("posts_4chan_deleted", {"id_seq": new_id, "timestamp_deleted": post["deleted"]}, safe=True)
+				new_post = db.insert("posts_4chan_deleted", {"id_seq": new_id, "timestamp_deleted": post["timestamp"]}, safe=True)
 
+		posts_added += new_post
+		
 		# Insert per every 10000 posts
 		if posts > 0 and posts % 10000 == 0:
-			print("Committing %i - %i posts. " % (posts - 10000, posts), end="")
+			print("Committing posts %i - %i. %i new posts added. " % (posts - 10000, posts, posts_added), end="")
 
 			# We're commiting the threads we didn't encounter in the last 100.000 posts. We're assuming they're complete and won't be seen in this archive anymore.
 			# This is semi-necessary to prevent RAM hogging.
