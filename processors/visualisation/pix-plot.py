@@ -13,6 +13,7 @@ import csv
 import os
 import config
 
+from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.helpers import UserInput, convert_to_int
 from backend.abstract.processor import BasicProcessor
 
@@ -40,20 +41,20 @@ class PixPlotGenerator(BasicProcessor):
 			"help": "No. of images (max 1000)",
 			"default": 100,
 			"min": 0,
-			"max": 1000,
-			"tooltip": "'0' uses as many images as available in the source image archive (up to 1000)"
+			"max": 10000,
+			"tooltip": "'0' uses as many images as available in the source image archive (up to 10000)"
 		},
 		"intro-plot-options": {
 			"type": UserInput.OPTION_INFO,
-			"help": "The below options will help configure your plot. Note that full images are always available by " 
+			"help": "The below options will help configure your plot. Note that full images are always available by "
 					"clicking on the thumbnails (you will also find metadata related to the source of the image here). "
-					"Nearest neighbors (n_neighbors): small numbers identify local clusters, larger numbers "
+					"\nNearest neighbors (n_neighbors): small numbers identify local clusters, larger numbers "
 					"create a more global shape. Large datasets may benefit from have higher values (think how many "
 					"alike pictures could make up a cluster)."
-					"Minimum Distance (min_dist): determines how tightly packed images can be with one and other (i.e.,"
-					"small numbers (0.0001-0.001) are tightly packed, and larger (0.05-0.2) are disperse."
-					"[More information and example on parameters]("
-					"https://umap-learn.readthedocs.io/en/latest/parameters.html)"
+					"\nMinimum Distance (min_dist): determines how tightly packed images can be with one and other "
+					"(i.e., small numbers (0.0001-0.001) are tightly packed, and larger (0.05-0.2) are disperse."
+					"\nMore information and examples on parameters: "
+					"https://umap-learn.readthedocs.io/en/latest/parameters.html"
 		},
 		"image_size": {
 			"type": UserInput.OPTION_CHOICE,
@@ -113,6 +114,11 @@ class PixPlotGenerator(BasicProcessor):
 		if max_images == 0:
 			max_images = self.get_options()["amount"]["max"]
 
+		# Get labels to send PixPlot server
+		top_dataset = self.dataset.top_parent()
+		image_label = str(top_dataset.get_label()) + '-' + str(top_dataset.key)
+		plot_label = str(top_dataset.get_label()) + '-' + str(self.dataset.key)
+
 		# Unpack the images into a staging_area
 		self.dataset.update_status("Unzipping images")
 		staging_area = self.unpack_archive_contents(self.source_file)
@@ -122,36 +128,75 @@ class PixPlotGenerator(BasicProcessor):
 		self.dataset.update_status("Collecting metadata")
 		metadata_file_path = self.format_metadata(staging_area)
 
+		# Check if images have already been sent
+		filename_url = config.PIXPLOT_SERVER.rstrip('/') + '/api/list_filenames?folder_name=' + image_label
+		filename_response = requests.get(filename_url)
+
+		# Check if 4CAT has access to this PixPlot server
+		if filename_response.status_code == 403:
+			self.dataset.update_status("403: 4CAT does not have permission to use this PixPlot server", is_final=True)
+			self.dataset.finish(0)
+			return
+
+		uploaded_files = filename_response.json().get('filenames', [])
+
 		# First send photos to PixPlot
-		# TODO: check if images have already been sent
 		self.dataset.update_status("Uploading images to PixPlot")
-		upload_url = config.PIXPLOT_SERVER.rstrip('/') + '/api/send_photos'
-		# Prep metadata
-		files = [('metadata', open(metadata_file_path, 'rb'))]
-		# Prep images
+
+		# Folder name is PixPlot identifier and set at dataset key
+		data = {'folder_name': image_label}
+		# Metadata
+		upload_url = config.PIXPLOT_SERVER.rstrip('/') + '/api/send_metadata'
+		metadata_response = requests.post(upload_url, files={'metadata': open(metadata_file_path, 'rb')}, data=data)
+
+		# Images
+		# Send images one by one as large requests may fail
 		filenames = os.listdir(staging_area)
+		# Only upload images that have not already been uploaded
+		filenames = [filename for filename in filenames if filename not in uploaded_files + ['.metadata.json', 'metadata.csv']]
+		total_images = len(filenames) + len(uploaded_files)
+		upload_url = config.PIXPLOT_SERVER.rstrip('/') + '/api/send_photo'
+		images_uploaded = 0
+		estimated_num_images = len(filenames)
 		for i, filename in enumerate(filenames):
+			if self.interrupted:
+				raise ProcessorInterruptedException("Interrupted while downloading images.")
+			if i % 100 == 0:
+				self.dataset.update_status("Images uploaded: %i of %i" % (i, estimated_num_images))
 			if i > max_images:
 				break
-			files.append(('images', open(os.path.join(staging_area, filename), 'rb')))
-		# Name of folder for images
-		data = {'folder_name': self.dataset.key}
-		response = requests.post(upload_url, files=files, data=data)
-		if response.status_code == 403:
-			error = "403: 4CAT does not have permission to use this PixPlot server"
-			self.dataset.update_status(error)
-			raise RuntimeError(error)
+
+			response = requests.post(upload_url, files={'image': open(os.path.join(staging_area, filename), 'rb')},
+									 data=data)
+			if response.status_code == 200:
+				images_uploaded += 1
+			else:
+				self.dataset.update_status("Error with image %s: %s" % (filename, response.text))
+
+		if total_images < 1:
+			self.dataset.update_status("No images uploaded!", is_final=True)
+			self.dataset.finish(0)
+			return
 
 		# Request PixPlot server create PixPlot
-		self.dataset.update_status("Sending request to PixPlot")
+		self.dataset.update_status("Sending create PixPlot request")
 		create_plot_url = config.PIXPLOT_SERVER.rstrip('/') + '/api/pixplot'
-		# All the options, which you can edit to add any additional options you want PixPlot to use during creation
-		json_data = response.json()['create_pixplot_post_info']['json']
+		# Gather info from PixPlot server response
+		create_pixplot_post_info = metadata_response.json()['create_pixplot_post_info']
+		# Create json package for creation request
+		json_data = {'args': ['--images', create_pixplot_post_info.get('images_folder') + "/*",
+							  '--out_dir', create_pixplot_post_info.get('plot_folder_root') + '/' + plot_label,
+							  '--metadata', create_pixplot_post_info.get('metadata_filepath')]}
+
 		# Additional options for PixPlot
 		cell_size = self.parameters.get('image_size')
 		n_neighbors = self.parameters.get('n_neighbors')
 		min_dist = self.parameters.get('min_dist')
-		json_data['args'] += ['--cell_size', str(cell_size), '--n_neighbors', str(n_neighbors), '--min_dist', str(min_dist)]
+		json_data['args'] += ['--cell_size', str(cell_size), '--n_neighbors', str(n_neighbors), '--min_dist',
+							  str(min_dist)]
+
+		# Increase timeout (default is 3600 seconds)
+		json_data['timeout'] = 21600
 
 		# Send; receives response that process has started
 		resp = requests.post(create_plot_url, json=json_data)
@@ -171,29 +216,33 @@ class PixPlotGenerator(BasicProcessor):
 
 		# Wait for PixPlot to complete
 		self.dataset.update_status("PixPlot generating results")
+		start_time = time.time()
 		while new_request:
-			time.sleep(10)
-			result = requests.get(results_url)
-			self.log.debug(str(result.json()))
-			if 'status' in result.json().keys() and result.json()['status'] == 'running':
-				# Still running
-				continue
-			elif 'report' in result.json().keys() and result.json()['report'][-6:-1] == 'Done!':
-				# Complete without error
-				self.dataset.update_status("PixPlot Completed!")
-				self.log.info('PixPlot saved on : ' + config.PIXPLOT_SERVER)
-				break
-			else:
-				# Something botched
-				self.dataset.update_status("PixPlot Error")
-				self.log.error("PixPlot Error: " + str(result.json()))
+			time.sleep(1)
+			# If interrupted is called, attempt to finish dataset while PixPlot server still running
+			if self.interrupted:
 				break
 
-		if staging_area:
-			shutil.rmtree(staging_area)
+			# Send request to check status every 60 seconds
+			if int(time.time() - start_time) % 60 == 0:
+				result = requests.get(results_url)
+				self.log.debug(str(result.json()))
+				if 'status' in result.json().keys() and result.json()['status'] == 'running':
+					# Still running
+					continue
+				elif 'report' in result.json().keys() and result.json()['report'][-6:-1] == 'Done!':
+					# Complete without error
+					self.dataset.update_status("PixPlot Completed!")
+					self.log.info('PixPlot saved on : ' + config.PIXPLOT_SERVER)
+					break
+				else:
+					# Something botched
+					self.dataset.update_status("PixPlot Error")
+					self.log.error("PixPlot Error: " + str(result.json()))
+					break
 
 		# Create HTML file
-		plot_url = config.PIXPLOT_SERVER.rstrip('/') + '/plots/' + self.dataset.key + '/index.html'
+		plot_url = config.PIXPLOT_SERVER.rstrip('/') + '/plots/' + plot_label + '/index.html'
 		html_file = self.get_html_page(plot_url)
 
 		# Write HTML file
@@ -203,6 +252,10 @@ class PixPlotGenerator(BasicProcessor):
 		# Finish
 		self.dataset.update_status("Finished")
 		self.dataset.finish(1)
+
+		# Clean up staging area
+		if staging_area:
+			shutil.rmtree(staging_area)
 
 	def format_metadata(self, temp_path):
 		"""
