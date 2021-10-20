@@ -29,7 +29,7 @@ class SearchWithTwitterAPIv2(Search):
             "type": UserInput.OPTION_INFO,
             "help": "This data source uses either the Standard 7-day historical Search endpoint or the full-archive "
                     "search endpoint of the Twitter API, v2. To use the latter, you must have access to the Academic "
-                    "Research track of the Twitter API, and provide a valid [bearer "
+                    "Research track of the Twitter API. In either case, you will need to provide a valid [bearer "
                     "token](https://developer.twitter.com/en/docs/authentication/oauth-2-0). The bearer token **will "
                     "be sent to the 4CAT server**, where it will be deleted after data collection has started. "
                     "\n\nPlease refer to the [Twitter API documentation]("
@@ -40,7 +40,7 @@ class SearchWithTwitterAPIv2(Search):
         },
         "api_type": {
             "type": UserInput.OPTION_CHOICE,
-            "help": "API type",
+            "help": "API track",
             "options": {
                 "all": "Academic: Full-archive search",
                 "recent": "Standard: Recent search (Tweets published in last 7 days)",
@@ -54,7 +54,7 @@ class SearchWithTwitterAPIv2(Search):
         "amount": {
             "type": UserInput.OPTION_TEXT,
             "help": "Tweets to retrieve",
-            "tooltip": "0 = unlimited",
+            "tooltip": "0 = unlimited (be careful!)",
             "min": 0,
             "max": 10000000,
             "default": 10
