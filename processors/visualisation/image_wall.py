@@ -228,6 +228,12 @@ class ImageWallGenerator(BasicProcessor):
 		# our final image set
 		sorted_image_files = [path for path in sorted(image_colours, key=lambda k: image_colours[k])[:max_images]]
 		dimensions = {path: dimensions[path] for path in sorted_image_files}
+
+		if not dimensions:
+			self.dataset.update_status("No images left after sorting; cannot make image wall", is_final=True)
+			self.dataset.finish(0)
+			return
+
 		average_size = (
 			sum([k[0] for k in dimensions.values()]) / len(dimensions),
 			sum([k[1] for k in dimensions.values()]) / len(dimensions))
