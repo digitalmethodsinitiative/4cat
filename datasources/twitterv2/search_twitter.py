@@ -27,15 +27,16 @@ class SearchWithTwitterAPIv2(Search):
     options = {
         "intro-1": {
             "type": UserInput.OPTION_INFO,
-            "help": "This data source uses the full-archive search endpoint of the Twitter API, v2. To use this "
-                    "endpoint, you must have access to the Academic Research track of the Twitter API, and provide a "
-                    "valid [bearer token](https://developer.twitter.com/en/docs/authentication/oauth-2-0). The bearer "
-                    "token **will be sent to the 4CAT server**, where it will be deleted after the scrape has started. "
+            "help": "This data source uses either the Standard 7-day historical Search endpoint or the full-archive "
+                    "search endpoint of the Twitter API, v2. To use the latter, you must have access to the Academic "
+                    "Research track of the Twitter API, and provide a valid [bearer "
+                    "token](https://developer.twitter.com/en/docs/authentication/oauth-2-0). The bearer token **will "
+                    "be sent to the 4CAT server**, where it will be deleted after data collection has started. "
                     "\n\nPlease refer to the [Twitter API documentation]("
                     "https://developer.twitter.com/en/docs/twitter-api/tweets/search/quick-start/full-archive-search) "
                     "documentation for more information about this API endpoint and the syntax you can use in your "
                     "search query. Note that any tweets retrieved with 4CAT will count towards your monthly Tweet "
-                    "retrieval cap. Also note that results are saved as [NDJSON](http://ndjson.org/), not CSV. "
+                    "retrieval cap."
         },
         "api_type": {
             "type": UserInput.OPTION_CHOICE,
