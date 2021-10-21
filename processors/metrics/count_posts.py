@@ -57,7 +57,12 @@ class CountPosts(BasicProcessor):
 			counter = 0
 
 			for post in self.iterate_items(self.source_file):
-				date = get_interval_descriptor(post, timeframe)
+				try:
+					date = get_interval_descriptor(post, timeframe)
+				except ValueError as e:
+					self.dataset.update_status("%s, cannot count posts per %s" % (str(e), timeframe), is_final=True)
+					self.dataset.update_status(0)
+					return
 
 				# Add a count for the respective timeframe
 				if date not in intervals:

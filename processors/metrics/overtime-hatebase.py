@@ -118,7 +118,12 @@ class OvertimeHatefulAnalysis(BasicProcessor):
 		hatebase_regex = re.compile(r"\b(" + "|".join([re.escape(term) for term in hatebase if not min_offensive or (hatebase[term]["average_offensiveness"] and hatebase[term]["average_offensiveness"] > min_offensive)]) + r")\b")
 
 		for post in self.iterate_items(self.source_file):
-			time_unit = get_interval_descriptor(post, timeframe)
+			try:
+				time_unit = get_interval_descriptor(post, timeframe)
+			except ValueError as e:
+				self.dataset.update_status("%s, cannot count posts per %s" % (str(e), timeframe), is_final=True)
+				self.dataset.update_status(0)
+				return
 
 			# determine where to put this data
 			if time_unit not in activity:

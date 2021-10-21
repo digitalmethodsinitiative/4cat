@@ -321,7 +321,7 @@ def get_interval_descriptor(item, interval):
 		return interval
 
 	if "timestamp" not in item:
-		return "invalid_date"
+		raise ValueError("No date available for item in dataset")
 
 	# Catch cases where a custom timestamp has an epoch integer as value.
 	try:
@@ -329,12 +329,12 @@ def get_interval_descriptor(item, interval):
 		try:
 			timestamp = datetime.datetime.fromtimestamp(timestamp)
 		except (ValueError, TypeError) as e:
-			return "invalid_date"
+			raise ValueError("Invalid timestamp '%s'" % str(item["timestamp"]))
 	except:
 		try:
 			timestamp = datetime.datetime.strptime(item["timestamp"], "%Y-%m-%d %H:%M:%S")
 		except (ValueError, TypeError) as e:
-			return "invalid_date"
+			raise ValueError("Invalid date '%s'" % str(item["timestamp"]))
 
 	if interval == "year":
 		return str(timestamp.year)

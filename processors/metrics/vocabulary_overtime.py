@@ -154,7 +154,13 @@ class OvertimeAnalysis(BasicProcessor):
 					continue
 
 				# determine what interval to save the frequency for
-				interval = get_interval_descriptor(post, timeframe)
+				try:
+					interval = get_interval_descriptor(post, timeframe)
+				except ValueError as e:
+					self.dataset.update_status("%s, cannot count posts per %s" % (str(e), timeframe), is_final=True)
+					self.dataset.update_status(0)
+					return
+
 				if interval not in activity[vocabulary_id]:
 					activity[vocabulary_id][interval] = 0
 

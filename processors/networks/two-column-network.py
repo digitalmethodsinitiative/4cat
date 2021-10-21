@@ -153,7 +153,12 @@ class ColumnNetworker(BasicProcessor):
                 values_a = [v.strip() for v in values_a.pop().split(",")]
                 values_b = [v.strip() for v in values_b.pop().split(",")]
 
-            interval = get_interval_descriptor(item, interval_type)
+            try:
+                interval = get_interval_descriptor(item, interval_type)
+            except ValueError as e:
+                self.dataset.update_status("%s, cannot count posts per %s" % (str(e), interval_type), is_final=True)
+                self.dataset.update_status(0)
+                return
 
             for value_a in values_a:
                 for value_b in values_b:

@@ -131,7 +131,13 @@ class AttributeRanker(BasicProcessor):
 		self.dataset.update_status("Reading source file")
 		for post in self.iterate_items(self.source_file):
 			# determine where to put this data
-			time_unit = get_interval_descriptor(post, timeframe)
+			try:
+				time_unit = get_interval_descriptor(post, timeframe)
+			except ValueError as e:
+				self.dataset.update_status("%s, cannot count posts per %s" % (str(e), timeframe), is_final=True)
+				self.dataset.update_status(0)
+				return
+
 			if time_unit not in items:
 				items[time_unit] = OrderedDict()
 
