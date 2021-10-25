@@ -211,7 +211,12 @@ class Tokenise(BasicProcessor):
 				
 			# determine what output unit this post belongs to
 			if docs_per != "thread":
-				document_descriptor = get_interval_descriptor(post, docs_per)
+				try:
+					document_descriptor = get_interval_descriptor(post, docs_per)
+				except ValueError as e:
+					self.dataset.update_status("%s, cannot count posts per %s" % (str(e), docs_per), is_final=True)
+					self.dataset.update_status(0)
+					return
 			else:
 				document_descriptor = post["thread_id"] if post["thread_id"] else "undefined"
 

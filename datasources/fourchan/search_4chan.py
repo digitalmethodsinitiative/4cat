@@ -416,9 +416,9 @@ class Search4Chan(SearchWithScope):
 				for c in country_name:
 					country_names.append(c)
 
-			where.append("p.country_name IN (%s)")
+			where.append("p.country_name IN %s")
 
-			replacements.append(country_names)
+			replacements.append(tuple(country_names))
 
 		sql_query = ("SELECT p.*, t.board " \
 					 "FROM posts_" + self.prefix + " AS p " \
@@ -527,7 +527,8 @@ class Search4Chan(SearchWithScope):
 		
 		# handle country names through sphinx
 		if query.get("country_name", None) and not query.get("check_dense_country", None):
-			replacements.append(query.get("country_name"))
+			where.append("country_name IN %s")
+			replacements.append(tuple(query.get("country_name")))
 
 		# both possible FTS parameters go in one MATCH() operation
 		if match and use_sphinx:
@@ -547,8 +548,6 @@ class Search4Chan(SearchWithScope):
 			if self.interrupted:
 				raise ProcessorInterruptedException("Interrupted while fetching post data")
 			query = "SELECT " + columns + " FROM posts_" + self.prefix + " WHERE " + where + " ORDER BY id ASC"
-			print(query)
-			print(replacements)
 			posts = self.db.fetchall_interruptable(self.queue, query, replacements)
 
 		if posts is None:

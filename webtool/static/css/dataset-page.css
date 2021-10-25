@@ -392,7 +392,7 @@ article.result > section:first-child {
 .multi-select-search {
     position: relative;
     display: block;
-    width: 20em;
+    width: 75%;
     margin-bottom: 4px;
 }
 
@@ -402,7 +402,7 @@ article.result > section:first-child {
     flex-direction: column;
     align-items: stretch;
     height: 125px;
-    max-width: 40em;
+    width: 75%;
     overflow-y: scroll;
     overflow-x: hidden;
     background-color: var(--gray);
@@ -415,6 +415,7 @@ article.result > section:first-child {
 }
 
 .multi-select-options > label, .form-element .multi-select-options label {
+    width: 20em;
     text-align: left;
     cursor: pointer;
     user-select: none;
@@ -422,6 +423,7 @@ article.result > section:first-child {
 
 .multi-select-options .no-match {
     font-style: italic;
+    width: 20em;
     padding: 7px;
     color: var(--gray-darker);
     cursor: default;
