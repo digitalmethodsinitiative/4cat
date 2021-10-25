@@ -281,14 +281,7 @@ class ImageDownloader(BasicProcessor):
 			# We only save the first image of the gallery.
 			elif "gallery" in url:
 				url += ".json"
-				try:
-					page = requests.get(url)
-				except requests.exceptions.ConnectTimeout:
-					self.dataset.log("Timed out while trying to download image %s, skipping" % url)
-					raise FileNotFoundError()
-				except requests.exceptions.SSLError:
-					self.dataset.log("SSLError while trying to download image %s, skipping" % url)
-					raise FileNotFoundError()
+				page = self.request_get_w_error_handling(url)
 
 				try:
 					imgur_data = page.json()
@@ -306,14 +299,7 @@ class ImageDownloader(BasicProcessor):
 			# Handle image preview page
 			# Two formats identified: https://imgur.com/a/randomid, https://imgur.com/randomid
 			else:
-				try:
-					page = requests.get(url)
-				except requests.exceptions.ConnectTimeout:
-					self.dataset.log("Timed out while trying to download image %s, skipping" % url)
-					raise FileNotFoundError()
-				except requests.exceptions.SSLError:
-					self.dataset.log("SSLError while trying to download image %s, skipping" % url)
-					raise FileNotFoundError()
+				page = self.request_get_w_error_handling(url)
 
 				try:
 					# This seems unlikely to last; could use BeautifulSoup for more dynamic capturing of url
@@ -321,7 +307,7 @@ class ImageDownloader(BasicProcessor):
 						page.content.decode('utf-8').split('<meta property="og:image"')[1].split('content="')[1].split('?fb">')[0]
 				except IndexError:
 					# Noted that image not found pages (no status code of course) will not have this property
-					self.dataset.log("Error possible 404 for image %s, skipping")
+					self.dataset.log("Error: IndexError may be 404 for image %s, skipping" % image_url)
 					raise FileNotFoundError()
 
 		elif domain.endswith("gfycat.com") and url_ext not in ("png", "jpg", "jpeg", "gif", "gifv"):
@@ -332,14 +318,7 @@ class ImageDownloader(BasicProcessor):
 		if domain.endswith("4plebs.org") or domain.endswith("fireden.net") and image_url:
 			image = self.get_4chan_image(url)
 		elif image_url:
-			try:
-				image = requests.get(image_url, stream=True, timeout=20, headers={"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/12.1.1 Safari/605.1.15"})
-			except requests.exceptions.ConnectTimeout:
-				self.dataset.log("Timed out while trying to download image %s, skipping" % image_url)
-				raise FileNotFoundError()
-			except requests.exceptions.SSLError:
-				self.dataset.log("SSLError while trying to download image %s, skipping" % image_url)
-				raise FileNotFoundError()
+			image = self.request_get_w_error_handling(image_url, stream=True, timeout=20, headers={"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/12.1.1 Safari/605.1.15"})
 		else:
 			raise FileNotFoundError()
 
@@ -373,13 +352,13 @@ class ImageDownloader(BasicProcessor):
 
 		# get link to image from external HTML search results
 		# detect rate limiting and wait until we're good to go again
-		page = requests.get(url, headers={"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/12.1.1 Safari/605.1.15"})
+		page = self.request_get_w_error_handling(url, headers={"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/12.1.1 Safari/605.1.15"})
 		rate_limited = rate_regex.search(page.content.decode("utf-8"))
 
 		while rate_limited:
 			self.log.debug("Rate-limited by external source. Waiting %s seconds." % rate_limited[1])
 			time.sleep(int(rate_limited[1]))
-			page = requests.get(url)
+			page = self.request_get_w_error_handling(url)
 			rate_limited = rate_regex.search(page.content.decode("utf-8"))
 
 		# get link to image file from HTML returned
@@ -388,12 +367,12 @@ class ImageDownloader(BasicProcessor):
 		image_url = css("a.thread_image_link")(tree)[0].get("href")
 
 		# download image itself
-		image = requests.get(image_url, stream=True)
+		image = self.request_get_w_error_handling(image_url, stream=True)
 
 		# if not available, the thumbnail may be
 		if image.status_code != 200:
 			thumbnail_url = ".".join(image_url.split(".")[:-1]) + "s." + image_url.split(".")[-1]
-			image = requests.get(thumbnail_url, stream=True)
+			image = self.request_get_w_error_handling(thumbnail_url, stream=True)
 
 		if image.status_code != 200:
 			raise FileNotFoundError()
@@ -414,6 +393,30 @@ class ImageDownloader(BasicProcessor):
 		# avoid getting rate-limited by image source
 		time.sleep(rate_limit)
 		return BytesIO(image.content), file_name
+
+	def request_get_w_error_handling(self, url, retries=0, **kwargs):
+		"""
+		Try requests.get() and raise FileNotFoundError while logging actual
+		error in dataset.log().
+
+		Retries ConnectionError three times
+		"""
+		try:
+			response = requests.get(url, **kwargs)
+		except requests.exceptions.Timeout as e:
+			self.dataset.log("Error: Timeout while trying to download image %s: %s" % (url, e))
+			raise FileNotFoundError()
+		except requests.exceptions.SSLError as e:
+			self.dataset.log("Error: SSLError while trying to download image %s: %s" % (url, e))
+			raise FileNotFoundError()
+		except requests.exceptions.ConnectionError as e:
+			if retries < 3:
+				self.request_get_w_error_handling(url, retries + 1, **kwargs)
+			else:
+				self.dataset.log("Error: ConnectionError while trying to download image %s: %s" % (url, e))
+				raise FileNotFoundError()
+		return response
+
 
 	def update_parent(self, success):
 		"""
