@@ -30,13 +30,14 @@ RUN unzip /tmp/chromedriver.zip chromedriver -d /usr/local/bin/
 # install dependencies
 RUN pip3 install --upgrade pip
 COPY ./requirements.txt /usr/src/app/requirements.txt
+RUN pip3 install -r requirements.txt
+
 COPY ./setup.py /usr/src/app/setup.py
 COPY ./VERSION /usr/src/app/VERSION
 COPY ./README.md /usr/src/app/README.md
 RUN mkdir /usr/src/app/backend
 RUN mkdir /usr/src/app/webtool
 RUN mkdir /usr/src/app/datasources
-RUN pip3 install -r requirements.txt
 
 # Frontend requirements
 RUN pip3 install gunicorn
