@@ -371,6 +371,10 @@ class SearchBitChute(Search):
                     video["category"] = "moderated-terrorism-extremism"
                     return (video, [])
 
+                elif "Copyright</h4>" in video_page.text:
+                    video["category"] = "moderated-copyright"
+                    return (video, [])
+
                 else:
                     video["category"] = "moderated-other"
                     self.log.warning("Unknown moderated reason for BitChute video %s" % video["id"])
