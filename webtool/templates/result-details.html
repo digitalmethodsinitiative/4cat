@@ -16,7 +16,7 @@
                         <li><a href="{{ url_for('restart_dataset', key=dataset.key) }}" class="confirm-first" data-confirm-method="POST" data-confirm-action="delete all results for this dataset, including processor results, and re-run the query"><i class="fas fa-sync-alt" aria-hidden="true"></i> Re-run dataset</a></li>
                     {% endif %}
                     {% if current_user.is_admin() and not dataset.is_finished() %}
-                        <li><a href="{{ url_for('nuke_dataset_interactive', key=dataset.key) }}" class="prompt-first" data-confirm-method="POST" data-confirm-var="reason" data-confirm-action="cancel this dataset? You can provide a reason that will be displayed to the user"><i class="fas fa-trash-alt" aria-hidden="true"></i> Cancel dataset</a></li>
+                        <li><a href="{{ url_for('nuke_dataset_interactive', key=dataset.key) }}" class="prompt-first" data-confirm-method="POST" data-confirm-var="reason" data-confirm-action="cancel this dataset? You can provide a reason that will be displayed to the user"><i class="fas fa-radiation" aria-hidden="true"></i> Cancel dataset</a></li>
                     {% endif %}
                 </ul>
             </nav>
