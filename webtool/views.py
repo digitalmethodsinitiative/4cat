@@ -21,7 +21,7 @@ from flask_login import login_required, current_user
 from webtool import app, db, log
 from webtool.lib.helpers import Pagination, error
 
-from webtool.api_tool import delete_dataset, toggle_favourite, queue_processor
+from webtool.api_tool import delete_dataset, toggle_favourite, queue_processor, nuke_dataset
 
 from common.lib.dataset import DataSet
 from common.lib.queue import JobQueue
@@ -515,7 +515,38 @@ def restart_dataset(key):
 	return redirect("/results/" + dataset.key + "/")
 
 
-@app.route("/result/<string:key>/delete/")
+@app.route("/result/<string:key>/nuke/", methods=["GET", "DELETE", "POST"])
+@login_required
+def nuke_dataset_interactive(key):
+	"""
+	Nuke dataset
+
+	Uses code from corresponding API endpoint, but redirects to a normal page
+	rather than returning JSON as the API does, so this can be used for
+	'normal' links.
+
+	:param str key:  Dataset key
+	:return:
+	"""
+	try:
+		dataset = DataSet(key=key, db=db)
+	except TypeError:
+		return error(404, message="Dataset not found.")
+
+	top_key = dataset.top_parent().key
+	reason = request.form.get("reason", "")
+
+	success = nuke_dataset(key, reason)
+
+	if not success.is_json:
+		return success
+	else:
+		# If it's a child processor, refresh the page.
+		# Else go to the results overview page.
+		return redirect(url_for('show_result', key=top_key))
+
+
+@app.route("/result/<string:key>/delete/", methods=["GET", "DELETE", "POST"])
 @login_required
 def delete_dataset_interactive(key):
 	"""
