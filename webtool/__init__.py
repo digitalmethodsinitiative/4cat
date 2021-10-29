@@ -27,12 +27,14 @@ from common.lib.database import Database
 from common.lib.logger import Logger
 from common.lib.queue import JobQueue
 
-database_name = config.DB_NAME_TEST if hasattr(config.FlaskConfig, "DEBUG") and config.FlaskConfig.DEBUG == "Test" else config.DB_NAME
+# initialize global objects for interacting with all the things
+database_name = config.DB_NAME_TEST if hasattr(config.FlaskConfig,
+                                               "DEBUG") and config.FlaskConfig.DEBUG == "Test" else config.DB_NAME
 login_manager = LoginManager()
 app = Flask(__name__)
 log = Logger()
 # Set up logging for Gunicorn; only run w/ Docker
-if os.path.exists(config.DOCKER_CONFIG_FILE):
+if hasattr(config, "DOCKER_CONFIG_FILE") and os.path.exists(config.DOCKER_CONFIG_FILE):
     docker_config_parser = configparser.ConfigParser()
     docker_config_parser.read(config.DOCKER_CONFIG_FILE)
     if docker_config_parser['DOCKER'].getboolean('use_docker_config'):
