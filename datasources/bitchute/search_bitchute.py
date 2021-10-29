@@ -534,10 +534,13 @@ class SearchBitChute(Search):
                 else:
                     raise NotImplemented()
 
+                if request.status_code >= 300:
+                    raise ValueError("Response %i from BitChut for URL %s, need to retry" % (request.status_code, url))
+
                 response = request.json()
                 return response
 
-            except (ConnectionResetError, requests.RequestException) as e:
+            except (ConnectionResetError, requests.RequestException, ValueError) as e:
                 retries += 1
                 time.sleep(retries * 2)
 
