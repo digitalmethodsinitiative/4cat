@@ -135,6 +135,7 @@ class ImageDownloader(BasicProcessor):
 				if not value:
 					continue
 
+				value = str(value)
 				if re.match(r"https?://[^\s]+", value):
 					# single URL
 					item_urls.add(value)
