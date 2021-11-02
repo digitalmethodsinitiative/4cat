@@ -221,6 +221,8 @@ class ImageDownloader(BasicProcessor):
 			file_url_map[save_location.name] = url
 			try:
 				picture.save(save_location)
+				# Counting is important
+				downloaded_images += 1
 			except OSError:
 				# some images may need to be converted
 				picture.convert('RGB').save(save_location)
