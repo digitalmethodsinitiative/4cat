@@ -536,5 +536,7 @@ def send_email(recipient, message):
 		if hasattr(config, "MAIL_USERNAME") and hasattr(config, "MAIL_PASSWORD") and config.MAIL_USERNAME and config.MAIL_PASSWORD:
 			smtp.ehlo()
 			smtp.login(config.MAIL_USERNAME, config.MAIL_PASSWORD)
-
-		smtp.sendmail(config.NOREPLY_EMAIL, recipient, message.as_string())
+		if type(message) == str:
+			smtp.sendmail(config.NOREPLY_EMAIL, recipient, message)
+		else:
+			smtp.sendmail(config.NOREPLY_EMAIL, recipient, message.as_string())
