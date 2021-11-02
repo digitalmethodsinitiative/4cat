@@ -43,13 +43,18 @@ class ImageDownloader(BasicProcessor):
 				  "is included in the output archive."  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
 
+	if hasattr(config, 'MAX_NUMBER_IMAGES'):
+		max_number_images = int(config.MAX_NUMBER_IMAGES)
+	else:
+		max_number_images = 1000
+
 	options = {
 		"amount": {
 			"type": UserInput.OPTION_TEXT,
-			"help": "No. of images (max 1000)",
+			"help": "No. of images (max %s)" % max_number_images,
 			"default": 100,
 			"min": 0,
-			"max": 5000
+			"max": max_number_images
 		},
 		"columns": {
 			"type": UserInput.OPTION_TEXT,
@@ -78,7 +83,9 @@ class ImageDownloader(BasicProcessor):
 		# Get the source file data path
 		top_parent = self.dataset.get_genealogy()[0]
 		datasource = top_parent.parameters.get("datasource")
-		amount = self.parameters.get("amount", 0)
+		amount = self.parameters.get("amount", 100)
+		if amount == 0:
+			amount = self.max_number_images
 		columns = self.parameters.get("columns")
 
 		# is there anything for us to download?
