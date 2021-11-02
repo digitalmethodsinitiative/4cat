@@ -196,7 +196,7 @@ class SearchParler(Search):
                         "echoes": post_src["echoCount"],
                         "votes": post_src["voteCount"],
                         "image_url": post_src.get("image", ""),
-                        "video_url": post_src.get["video_data"]["videoSrc"] if post_src["has_video"] else "",
+                        "video_url": post_src["video_data"]["videoSrc"] if post_src["has_video"] else "",
                         "linked_urls": post_src.get("long_link"),
                         "is_echo": "yes" if is_echo else "no",
                         "is_sensitive": "yes" if bool(post_src["sensitive"]) else "no",
