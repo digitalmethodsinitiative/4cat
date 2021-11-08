@@ -52,7 +52,7 @@ class InternalAPI(BasicWorker):
 					self.manager.log.info("Could not open port %i yet (%s), retrying in 10 seconds" % (self.port, e))
 					time.sleep(10.0)  # wait a few seconds before retrying
 					continue
-				self.manager.log.error("Port %s is already in use! Local API not available." % self.port)
+				self.manager.log.error("Port %s is already in use! Local API not available. Check if a residual 4CAT process may still be listening at the port." % self.port)
 				return
 			except ConnectionRefusedError:
 				self.manager.log.error("OS refused listening at port %i! Local API not available." % self.port)

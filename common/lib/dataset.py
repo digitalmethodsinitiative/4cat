@@ -44,6 +44,7 @@ class DataSet(FourcatModule):
 	folder = None
 	is_new = True
 	no_status_updates = False
+	staging_area = []
 
 	def __init__(self, parameters={}, key=None, job=None, data=None, db=None, parent=None, extension="csv",
 				 type=None):
@@ -240,6 +241,10 @@ class DataSet(FourcatModule):
 
 		# create temporary folder
 		results_path.mkdir()
+
+		# Storing the staging area with the dataset so that it can be removed later
+		self.staging_area.append(results_path)
+
 		return results_path
 
 	def get_results_dir(self):

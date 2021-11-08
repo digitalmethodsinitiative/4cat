@@ -1,5 +1,8 @@
+import configparser
 import subprocess
 import sys
+import os
+import logging
 from pathlib import Path
 
 # first-run.py ensures everything is set up right when running 4CAT for the first time
@@ -24,10 +27,31 @@ from common.lib.database import Database
 from common.lib.logger import Logger
 from common.lib.queue import JobQueue
 
-database_name = config.DB_NAME_TEST if hasattr(config.FlaskConfig, "DEBUG") and config.FlaskConfig.DEBUG == "Test" else config.DB_NAME
+# initialize global objects for interacting with all the things
+database_name = config.DB_NAME_TEST if hasattr(config.FlaskConfig,
+                                               "DEBUG") and config.FlaskConfig.DEBUG == "Test" else config.DB_NAME
 login_manager = LoginManager()
 app = Flask(__name__)
 log = Logger()
+# Set up logging for Gunicorn; only run w/ Docker
+if hasattr(config, "DOCKER_CONFIG_FILE") and os.path.exists(config.DOCKER_CONFIG_FILE):
+    docker_config_parser = configparser.ConfigParser()
+    docker_config_parser.read(config.DOCKER_CONFIG_FILE)
+    if docker_config_parser['DOCKER'].getboolean('use_docker_config'):
+        gunicorn_logger = logging.getLogger('gunicorn.error')
+        app.logger.handlers = gunicorn_logger.handlers
+        app.logger.setLevel(gunicorn_logger.level) # debug is int 10
+
+        # Log file
+        file_handler = logging.handlers.RotatingFileHandler(
+                                                            filename='4cat_flask.log',
+                                                            maxBytes=int( 50 * 1024 * 1024),
+                                                            backupCount= 1,
+                                                            )
+        logFormatter = logging.Formatter("%(asctime)s [%(levelname)-5.5s]  %(message)s")
+        file_handler.setFormatter(logFormatter)
+        app.logger.addHandler(file_handler)
+
 db = Database(logger=log, dbname=database_name, appname="frontend")
 queue = JobQueue(logger=log, database=db)
 
