@@ -72,6 +72,12 @@ class ColumnNetworker(BasicProcessor):
             "tooltip": "If enabled, the same values from different columns are treated as separate nodes. For "
                        "example, the value 'hello' from the column 'user' is treated as a different node than the "
                        "value 'hello' from the column 'subject'. If disabled, they would be considered a single node."
+        },
+        "to-lowercase": {
+            "type": UserInput.OPTION_TOGGLE,
+            "default": False,
+            "help": "Convert values to lowercase",
+            "tooltip": "Merges values with varying cases"
         }
     }
 
@@ -123,6 +129,7 @@ class ColumnNetworker(BasicProcessor):
         split_comma = self.parameters.get("split-comma")
         allow_loops = self.parameters.get("allow-loops")
         interval_type = self.parameters.get("interval")
+        to_lower = self.parameters.get("to-lowercase", False)
 
         processed = 0
 
@@ -162,6 +169,12 @@ class ColumnNetworker(BasicProcessor):
 
             for value_a in values_a:
                 for value_b in values_b:
+
+                    # Possibly convert to lowercase
+                    if to_lower:
+                        value_a = value_a.lower()
+                        value_b = value_b.lower()
+
                     # node 'ID', which we use to differentiate by column (or not)
                     node_a = column_a + "-" + value_a if categorise else "node-" + value_a
                     node_b = column_b + "-" + value_b if categorise else "node-" + value_b
