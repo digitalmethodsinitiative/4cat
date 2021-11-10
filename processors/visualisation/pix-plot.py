@@ -35,6 +35,10 @@ class PixPlotGenerator(BasicProcessor):
 	description = "Put all images in an archive into a PixPlot, which allows you to explore and visualize them."
 	extension = "html"  # extension of result file, used internally and in UI
 
+	# PixPlot requires a minimum number of photos to be created
+	# This is currently due to the clustering algorithm which creates 12 clusters
+	min_photos_needed = 12
+
 	options = {
 		"amount": {
 			"type": UserInput.OPTION_TEXT,
@@ -116,17 +120,12 @@ class PixPlotGenerator(BasicProcessor):
 
 		# Get labels to send PixPlot server
 		top_dataset = self.dataset.top_parent()
-		image_label = str(top_dataset.get_label()) + '-' + str(top_dataset.key)
-		plot_label = str(top_dataset.get_label()) + '-' + str(self.dataset.key)
+		label_formated = ''.join(e if e.isalnum() else '_' for e in top_dataset.get_label())
+		image_label = label_formated + '-' + str(top_dataset.key)
+		plot_label = label_formated + '-' + str(self.dataset.key)
 
-		# Unpack the images into a staging_area
-		self.dataset.update_status("Unzipping images")
-		staging_area = self.unpack_archive_contents(self.source_file)
-		self.log.info('PixPlot image staging area created: ' + str(staging_area))
-
-		# Gather metadata
-		self.dataset.update_status("Collecting metadata")
-		metadata_file_path = self.format_metadata(staging_area)
+		# Folder name is PixPlot identifier and set at dataset key
+		data = {'folder_name': image_label}
 
 		# Check if images have already been sent
 		filename_url = config.PIXPLOT_SERVER.rstrip('/') + '/api/list_filenames?folder_name=' + image_label
@@ -139,30 +138,45 @@ class PixPlotGenerator(BasicProcessor):
 			return
 
 		uploaded_files = filename_response.json().get('filenames', [])
+		if len(uploaded_files) > 0:
+			self.dataset.update_status("Found %i images previously uploaded" % (len(uploaded_files)))
 
-		# First send photos to PixPlot
-		self.dataset.update_status("Uploading images to PixPlot")
+		# Images
+		# Unpack the images into a staging_area
+		self.dataset.update_status("Unzipping images")
+		staging_area = self.unpack_archive_contents(self.source_file)
+		self.log.info('PixPlot image staging area created: ' + str(staging_area))
+		filenames = os.listdir(staging_area)
 
-		# Folder name is PixPlot identifier and set at dataset key
-		data = {'folder_name': image_label}
+		# Compare photos with upload images
+		filenames = [filename for filename in filenames if filename not in uploaded_files + ['.metadata.json', 'metadata.csv']]
+		total_images = len(filenames) + len(uploaded_files)
+
+		# Check to ensure enough photos will be uploaded to create a PixPlot
+		if total_images < self.min_photos_needed:
+			self.dataset.update_status("Minimum of %i photos needed for a PixPlot to be created" % self.min_photos_needed, is_final=True)
+			self.dataset.finish(0)
+			return
+
+		# Gather metadata
+		self.dataset.update_status("Collecting metadata")
+		metadata_file_path = self.format_metadata(staging_area)
 		# Metadata
 		upload_url = config.PIXPLOT_SERVER.rstrip('/') + '/api/send_metadata'
 		metadata_response = requests.post(upload_url, files={'metadata': open(metadata_file_path, 'rb')}, data=data)
 
-		# Images
-		# Send images one by one as large requests may fail
-		filenames = os.listdir(staging_area)
-		# Only upload images that have not already been uploaded
-		filenames = [filename for filename in filenames if filename not in uploaded_files + ['.metadata.json', 'metadata.csv']]
-		total_images = len(filenames) + len(uploaded_files)
+		# Now send photos to PixPlot
+		self.dataset.update_status("Uploading images to PixPlot")
+		# Configure upload photo url
 		upload_url = config.PIXPLOT_SERVER.rstrip('/') + '/api/send_photo'
 		images_uploaded = 0
 		estimated_num_images = len(filenames)
+		self.dataset.update_status("Uploading %i images" % (estimated_num_images))
+		# Begin looping through photos
 		for i, filename in enumerate(filenames):
 			if self.interrupted:
 				raise ProcessorInterruptedException("Interrupted while downloading images.")
-			if i % 100 == 0:
-				self.dataset.update_status("Images uploaded: %i of %i" % (i, estimated_num_images))
+
 			if i > max_images:
 				break
 
@@ -170,13 +184,10 @@ class PixPlotGenerator(BasicProcessor):
 									 data=data)
 			if response.status_code == 200:
 				images_uploaded += 1
+				if images_uploaded % 100 == 0:
+					self.dataset.update_status("Images uploaded: %i of %i" % (i, estimated_num_images))
 			else:
-				self.dataset.update_status("Error with image %s: %s" % (filename, response.text))
-
-		if total_images < 1:
-			self.dataset.update_status("No images uploaded!", is_final=True)
-			self.dataset.finish(0)
-			return
+				self.dataset.update_status("Error with image %s: %i - %s" % (filename, response.status_code, response.reason))
 
 		# Request PixPlot server create PixPlot
 		self.dataset.update_status("Sending create PixPlot request")
