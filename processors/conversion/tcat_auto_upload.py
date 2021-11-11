@@ -85,9 +85,19 @@ class ConvertNDJSONToJSON(BasicProcessor):
         try:
             resp_content = response.json()
         except ValueError:
-            raise ProcessorException('TCAT Unexpected response: %s - %s - %s' %  (response.status_code, str(response.reason), response.text))
+            # If import-jsondump.php fails, no json response is returned
+            if 'The query bin' in response.text and 'already exists' in response.text:
+                # Query bin already uploaded
+                # TODO: look at possibility to add to existing bin?
+                self.dataset.update_status("TCAT bin already exists; unable to add to existing bin.", is_final=True)
+    			self.dataset.finish(0)
+    			return
+            else:
+                # Something else is wrong...
+                raise ProcessorException('TCAT Unexpected response: %s - %s - %s' %  (response.status_code, str(response.reason), response.text))
 
         if 'success' not in resp_content:
+            # A json response was returned, but not the one we're expecting!
             raise ProcessorException('TCAT Unexpected response: %s - %s - %s' %  (response.status_code, str(response.reason), response.text))
         elif not resp_content['success']:
             # success should be True if upload was successful
