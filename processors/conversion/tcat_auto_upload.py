@@ -2,6 +2,7 @@
 Send TCAT-ready json to a particular TCAT instance
 """
 import requests
+from urllib.parse import urlparse
 
 from backend.abstract.processor import BasicProcessor
 from common.lib.exceptions import ProcessorException
@@ -35,18 +36,20 @@ class ConvertNDJSONToJSON(BasicProcessor):
         return module.type == "convert-ndjson-for-tcat" and \
             hasattr(config, 'TCAT_SERVER') and \
             config.TCAT_SERVER and \
-            hasattr(config, 'TCAT_TOKEN')
+            hasattr(config, 'TCAT_TOKEN') and \
+            hasattr(config, 'TCAT_USERNAME') and \
+            hasattr(config, 'TCAT_PASSWORD')
 
     def process(self):
         """
         Send TCAT-ready json to a particular TCAT instance.
         """
         self.dataset.update_status("Preparing Arguments")
-        bin_name = self.dataset.top_parent().get_label()
+        bin_name = ''.join(e if e.isalnum() else '_' for e in self.dataset.top_parent().get_label())
         self.dataset.log('Label for TCAT bin_name: ' + bin_name)
 
-        url_to_file = self.dataset.get_parent().get_result_url()
-        self.dataset.log('URL: ' + url_to_file)
+        url_to_file = self.dataset.get_parent()get_result_url()
+        self.dataset.log('File location URL: ' + url_to_file)
 
         # DOCKER shenanigans
         self.dataset.log('Docker search: ' + str('host.docker.internal' in config.TCAT_SERVER))
@@ -57,27 +60,20 @@ class ConvertNDJSONToJSON(BasicProcessor):
         query = str(self.dataset.top_parent().get_parameters().get("query", ""))
         self.dataset.log('Twitter query: ' + query)
 
-        auth = ('admin', '65mXwcZMcAL7k5LGvKvuNhb7wTRqZQUAaSEpr8')
+        # TCAT authorization information
+        auth = (config.TCAT_USERNAME, config.TCAT_PASSWORD)
 
-        self.dataset.update_status("Sending to TCAT")
-        response = requests.post(config.TCAT_SERVER, auth=auth, data={
+        # from urlparse import urlparse  # Python 2
+        parsed_uri = urlparse(config.TCAT_SERVER)
+        post_json_url = '{uri.scheme}://{uri.netloc}'.format(uri=parsed_uri)
+        post_json_url = post_json_url + '/api/import-from-4cat.php'
+        self.dataset.update_status("Sending to TCAT: %s" % post_json_url)
+        response = requests.post(post_json_url, auth=auth, data={
                                                 'url': url_to_file,
                                                 'name': bin_name,
                                                 'query': query,
                                                 'token': config.TCAT_TOKEN,
                                                 })
-        try:
-            self.dataset.log('TCAT text: ' + str(response.text))
-        except:
-            pass
-        try:
-            self.dataset.log('TCAT reason: ' + str(response.reason))
-        except:
-            pass
-        try:
-            self.dataset.log('TCAT json: ' + str(response.json()))
-        except:
-            pass
 
         if response.status_code == 404:
             raise ProcessorException('TCAT URL 404 error at %s' % config.TCAT_SERVER)
@@ -86,8 +82,18 @@ class ConvertNDJSONToJSON(BasicProcessor):
         else:
             pass
 
-        if not response.json()['success']:
-            raise ProcessorException('TCAT Import failure: %s' % response.json()['error'])
+        try:
+            resp_content = response.json()
+        except ValueError:
+            raise ProcessorException('TCAT Unexpected response: %s - %s - %s' %  (response.status_code, str(response.reason), response.text))
+
+        if 'success' not in resp_content:
+            raise ProcessorException('TCAT Unexpected response: %s - %s - %s' %  (response.status_code, str(response.reason), response.text))
+        elif not resp_content['success']:
+            # success should be True if upload was successful
+            raise ProcessorException('TCAT Import failure: %s' % str(resp_content))
+        else:
+            pass
 
         self.dataset.update_status("Waiting for upload to complete")
         # Unsure how to query TCAT, invalid bin_name still returns 200 response
