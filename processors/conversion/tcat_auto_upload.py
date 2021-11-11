@@ -48,7 +48,7 @@ class ConvertNDJSONToJSON(BasicProcessor):
         bin_name = ''.join(e if e.isalnum() else '_' for e in self.dataset.top_parent().get_label())
         self.dataset.log('Label for TCAT bin_name: ' + bin_name)
 
-        url_to_file = self.dataset.get_parent()get_result_url()
+        url_to_file = self.dataset.get_parent().get_result_url()
         self.dataset.log('File location URL: ' + url_to_file)
 
         # DOCKER shenanigans
