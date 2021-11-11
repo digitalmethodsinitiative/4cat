@@ -90,8 +90,8 @@ class ConvertNDJSONToJSON(BasicProcessor):
                 # Query bin already uploaded
                 # TODO: look at possibility to add to existing bin?
                 self.dataset.update_status("TCAT bin already exists; unable to add to existing bin.", is_final=True)
-    			self.dataset.finish(0)
-    			return
+                self.dataset.finish(0)
+                return
             else:
                 # Something else is wrong...
                 raise ProcessorException('TCAT Unexpected response: %s - %s - %s' %  (response.status_code, str(response.reason), response.text))
