@@ -35,7 +35,10 @@ class SeleniumScraper(Search, metaclass=abc.ABCMeta):
                       Returns false if no movement was detected
         """
         self.reset_current_page()
+        # try:
         self.driver.get(url)
+        # except WebDriverException as e:
+        #     # restart selenium 
 
         if self.check_for_movement():
             detected_404 = self.check_for_404(title_404_strings)

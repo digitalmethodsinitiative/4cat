@@ -1,11 +1,7 @@
 """
 Twitter keyword search via the Twitter API v2
 """
-import requests
 import datetime
-import copy
-import time
-import json
 
 from backend.abstract.selenium_scraper import SeleniumScraper
 from selenium.common.exceptions import TimeoutException
@@ -17,7 +13,7 @@ class SearchWithSelenium(SeleniumScraper):
     """
     Get HTML via the Selenium webdriver and Chrome browser
     """
-    type = "webpage-search"  # job ID
+    type = "url_scraper-search"  # job ID
     max_workers = 1
 
     options = {
@@ -50,6 +46,8 @@ class SearchWithSelenium(SeleniumScraper):
         """
         urls = [url.strip() for url in self.parameters.get("query", "").split('\n')]
 
+        results = []
+
         for url in urls:
             result = {
                       "url": url,
@@ -62,24 +60,31 @@ class SearchWithSelenium(SeleniumScraper):
                       }
             if not validate_url(url):
                 # technically we have already validated, but best to inform user which urls are invalid
-                result['timestamp'] = datetime.datetime.now().timestamp()
+                result['timestamp'] = int(datetime.datetime.now().timestamp())
                 result['error'] = 'Invalid URL format'
-                yield  result
+                results.append(result)
 
             try:
                 scraped_page = self.simple_scrape_page(url)
             except TimeoutException as e:
-                result['timestamp'] = datetime.datetime.now().timestamp()
+                result['timestamp'] = int(datetime.datetime.now().timestamp())
                 result['error'] = 'Selenium TimeoutException: %s' % e
-                yield  result
+                results.append(result)
 
-            result['final_url'] = scraped_page.final_url
-            result['body'] = scraped_page.page_source
-            result['subject'] = scraped_page.page_title
-            result['detected_404'] = scraped_page.detected_404
-            result['timestamp'] = datetime.datetime.now().timestamp()
+            if scraped_page:
+                result['final_url'] = scraped_page.get('final_url')
+                result['body'] = scraped_page.get('page_source')
+                result['subject'] = scraped_page.get('page_title')
+                result['detected_404'] = scraped_page.get('detected_404')
+                result['timestamp'] = int(datetime.datetime.now().timestamp())
+            else:
+                result['timestamp'] = int(datetime.datetime.now().timestamp())
+                result['error'] = 'Unable to scrape url' % e
+                results.append(result)
 
-            yield result
+            results.append(result)
+
+        return results
 
     @staticmethod
     def validate_query(query, request, user):

@@ -1,6 +1,7 @@
 """
 Miscellaneous helper functions for the 4CAT backend
 """
+from urllib.parse import urlparse
 import subprocess
 import datetime
 import smtplib
