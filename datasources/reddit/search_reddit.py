@@ -220,12 +220,12 @@ class SearchReddit(SearchWithScope):
 			urls = []
 			domains = []
 
-			if "," in query["url"]:
-				urls_input = query["url"].split(",")
-			elif "|" in query["url"]:
-				urls_input = query["url"].split("|")
+			if "," in query["subject_url"]:
+				urls_input = query["subject_url"].split(",")
+			elif "|" in query["subject_url"]:
+				urls_input = query["subject_url"].split("|")
 			else:
-				urls_input = [query["url"]]
+				urls_input = [query["subject_url"]]
 
 			# Input strings
 			for url in urls_input:
