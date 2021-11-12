@@ -303,7 +303,7 @@ class SearchReddit(SearchWithScope):
 		# only query for individual posts if no subject keyword is given
 		# since individual posts don't have subjects so if there is a subject
 		# query no results should be returned
-		do_body_query = not bool(query["subject_match"].strip()) and scope != "op-only"
+		do_body_query = not bool(query["subject_match"].strip()) and not bool(query["subject_url"].strip()) and scope != "op-only"
 
 		while do_body_query:
 			if self.interrupted:
@@ -348,7 +348,7 @@ class SearchReddit(SearchWithScope):
 					total_posts += 1
 
 			# update our progress
-			self.dataset.update_status("Found %i posts via Pushshift API..." % total_posts)
+			self.dataset.update_status("Found %i comments via Pushshift API..." % total_posts)
 
 		# and done!
 		if total_posts == 0 and total_threads == 0:
@@ -609,7 +609,7 @@ class SearchReddit(SearchWithScope):
 		query["board"] = ",".join(boards)
 		
 		# this is the bare minimum, else we can't narrow down the full data set
-		if not user.is_admin() and not user.get_value("reddit.can_query_without_keyword", False) and not query.get("body_match", "").strip() and not query.get("subject_match", "").strip():
+		if not user.is_admin() and not user.get_value("reddit.can_query_without_keyword", False) and not query.get("body_match", "").strip() and not query.get("subject_match", "").strip() and not query.get("subject_url", ""):
 			raise QueryParametersException("Please provide a body query or subject query.")
 
 		# body query and full threads are incompatible, returning too many posts
