@@ -540,3 +540,13 @@ def send_email(recipient, message):
 			smtp.sendmail(config.NOREPLY_EMAIL, recipient, message)
 		else:
 			smtp.sendmail(config.NOREPLY_EMAIL, recipient, message.as_string())
+
+def validate_url(x):
+    if type(x) == str:
+        if x.count('http://') > 1 or x.count('https://') > 1:
+            # check for errors in spliting urls
+            return False
+        result = urlparse(x)
+        return all([result.scheme, result.netloc])
+    else:
+        return False

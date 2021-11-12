@@ -19,19 +19,39 @@ class SeleniumScraper(Search, metaclass=abc.ABCMeta):
     driver = None
     last_scraped_url = None
 
-
-    @abc.abstractmethod
-    def scrape_pages(self, query):
+    def simple_scrape_page(self, url, title_404_strings='default'):
         """
-        Method to scrape urls with for a given query
+        Simple helper to scrape url. Returns a dictionary containing basic results from scrape including final_url,
+        page_title, and page_source otherwise False if the page did not advance (self.check_for_movement() failed).
+        Does not handle errors from driver.get() (e.g., badly formed URLs, Timeouts, etc.).
 
-        To be implemented by descending classes!
+        Note: calls self.reset_current_page() prior to requesting url to ensure each page is uniquely checked.
 
-        :param dict query:  Query parameters
-        :return Generator:  A generator or iterable that returns items
-          collected according to the provided parameters.
+        You are invited to use this as a template for more complex scraping.
+
+        :param str url:  url as string; beginning with scheme (e.g., http, https)
+        :param List title_404_strings:  List of strings representing possible 404 text to be compared with driver.title
+        :return dict: A dictionary containing basic results from scrape including final_url, page_title, and page_source.
+                      Returns false if no movement was detected
         """
-        pass
+        self.reset_current_page()
+        self.driver.get(url)
+
+        if self.check_for_movement():
+            detected_404 = self.check_for_404(title_404_strings)
+            page_title = self.driver.title
+            current_url = self.driver.current_url
+            page_source = self.driver.page_source
+
+            return {
+                    'original_url': url,
+                    'final_url': current_url,
+                    'page_title': page_title,
+                    'page_source': page_source,
+                    'detected_404': detected_404
+                    }
+        else:
+            return False
 
     def search(self, query):
         """
@@ -45,8 +65,18 @@ class SeleniumScraper(Search, metaclass=abc.ABCMeta):
         :return:  Iterable of matching items, or None if there are no results.
         """
         self.start_selenium()
+        # Returns to default position; i.e., 'data:,'
+        self.reset_current_page()
+        # Sets timeout to 60
+        self.set_page_load_timeout()
 
-        posts = self.get_items(query)
+        # Normal Search function to be used To be implemented by descending classes!
+        try:
+            posts = self.get_items(query)
+        except Exception as e:
+            # Ensure Selenium always quits
+            self.quit_selenium()
+            raise e
 
         self.quit_selenium()
 
@@ -80,27 +110,33 @@ class SeleniumScraper(Search, metaclass=abc.ABCMeta):
             else:
                 raise ProcessorException("Could not connect to Chromium (%s)." % e)
 
-        # self.last_scraped_url = self.driver.current_url
-
     def quit_selenium(self):
         """
-        Always attempt to close the browser
+        Always attempt to close the browser otherwise multiple versions of Chrome will be left running.
+
+        And Chrome is a memory hungry monster.
         """
         try:
             self.driver.quit()
         except:
             pass
 
+    def set_page_load_timeout(self, timeout=60):
+        """
+        Adjust the time that Selenium will wait for a page to load before failing
+        """
+        self.driver.set_page_load_timeout(timeout)
+
     def check_for_movement(self):
         """
-        Some driver.get() commands will not result in an error even if the do not result in updating the page source.
+        Some driver.get() commands will not result in an error even if they do not result in updating the page source.
         This can happen, for example, if a url directs the browser to attempt to download a file. It can therefore be
         important to check and ensure a new page was actually obtained before retrieving the page source as you will
         otherwise retrieve he same information from the previous url.
 
-        WARNING: It may also be true that a url redirects to the same url as previous. This check would assume no
-        movement occurred. In the event of scraping, that information would already be obtained, but you would not know
-        the new url redirects to the same information.
+        WARNING: It may also be true that a url redirects to the same url as previous scraped url. This check would assume no
+        movement occurred. Use in conjunction with self.reset_current_page() if it is necessary to check every url results
+        and identify redirects.
         """
         current_url = self.driver.current_url
         if current_url == self.last_scraped_url:
@@ -108,12 +144,25 @@ class SeleniumScraper(Search, metaclass=abc.ABCMeta):
         else:
             return True
 
+    def reset_current_page(self):
+        """
+        It may be desirable to "reset" the current page, for example in conjunction with self.check_for_movement(),
+        to ensure the results are obtained for a specific url provided.
+
+        Example: driver.get(url_1) is called and page_source is collected. Then driver.get(url_2) is called, but fails.
+        Depending on the type of failure (which may not be detected), calling page_source may return the page_source
+        from url_1 even after driver.get(url_2) is called.
+        """
+        self.driver.get('data:,')
+        self.last_scraped_url = self.driver.current_url
+
     def check_for_404(self, stop_if_in_title='default'):
         """
         Checks page title for references to 404
 
         Selenium does not have a "status code" in the same way the python requests and other libraries do. This can be
-        used to approximate a 404. Alternately, you could use another library to check for 404 errors.
+        used to approximate a 404. Alternately, you could use another library to check for 404 errors but that can lead
+        to misleading results (as the new library will necessarily constitute a separate request).
         More information here:
         https://www.selenium.dev/documentation/worst_practices/http_response_codes/
 
@@ -128,3 +177,14 @@ class SeleniumScraper(Search, metaclass=abc.ABCMeta):
             return True
         else:
             return False
+
+    def enable_download_in_headless_chrome(self, download_dir):
+        """
+        It is possible to allow the webbrowser to download files.
+        NOTE: this could introduce security risks.
+        """
+        # add missing support for chrome "send_command"  to selenium webdriver
+        self.driver.command_executor._commands["send_command"] = ("POST", '/session/$sessionId/chromium/send_command')
+
+        params = {'cmd': 'Page.setDownloadBehavior', 'params': {'behavior': 'allow', 'downloadPath': download_dir}}
+        return self.driver.execute("send_command", params)
