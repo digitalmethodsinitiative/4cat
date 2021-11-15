@@ -10,11 +10,15 @@
             <p>Access to {{ __tool_name }} is available upon request for researchers and students who would like to use
                 it for their
                 project. Please provide your details via the form below to request an account.</p>
+        {% if access_policy %}
+            {{ access_policy|markdown|safe }}
+        {% else %}
             <p>Note that unfortunately due to limited resources we need to evaluate applications on a case-by-case basis
                 and cannot guarantee access. Applications are processed manually, and may take some time to complete.</p>
             <p><em>Please try to be somewhat specific</em>, we're interested in how people use our tool so we'd be
                 grateful if you
                 could provide some more detail than e.g. just "research" as your stated intent.</p>
+        {% endif %}
 
             <form action="{{ url_for('request_access') }}" method="POST" class="wide">
                 {% for notice in flashes %}

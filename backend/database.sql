@@ -28,21 +28,29 @@ CREATE UNIQUE INDEX IF NOT EXISTS unique_job
 
 -- queries
 CREATE TABLE IF NOT EXISTS datasets (
-  id               SERIAL PRIMARY KEY,
-  key              text,
-  type             text DEFAULT 'search',
-  key_parent       text DEFAULT '',
-  query            text,
-  job              integer DEFAULT 0,
-  parameters       text,
-  result_file      text DEFAULT '',
-  timestamp        integer,
-  status           text,
-  num_rows         integer DEFAULT 0,
-  is_finished      boolean DEFAULT FALSE,
-  software_version text,
-  software_file    text DEFAULT ''
+  id                SERIAL PRIMARY KEY,
+  key               text,
+  type              text DEFAULT 'search',
+  key_parent        text DEFAULT '',
+  query             text,
+  job               integer DEFAULT 0,
+  parameters        text,
+  result_file       text DEFAULT '',
+  timestamp         integer,
+  status            text,
+  num_rows          integer DEFAULT 0,
+  is_finished       boolean DEFAULT FALSE,
+  software_version  text,
+  software_file     text DEFAULT '',
+  annotation_fields text DEFAULT ''
 );
+
+-- annotations
+CREATE TABLE IF NOT EXISTS annotations (
+  key               text UNIQUE PRIMARY KEY,
+  annotations       text DEFAULT ''
+)
+
 
 -- users
 CREATE TABLE IF NOT EXISTS users (

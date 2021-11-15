@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<head>
+	<title>4CAT Explorer &bull; {{ key if key else thread }}</title>
+
+	<link rel="stylesheet" type="text/css" href="{{url_for('static', filename='css/explorer.css')}}">
+	<link rel="stylesheet" type="text/css" href="{{url_for('static', filename='css/flags.css')}}">
+	<link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='fontawesome/css/fontawesome.css') }}">
+	<link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='fontawesome/css/regular.css') }}">
+	<link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='fontawesome/css/solid.css') }}">
+	<link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='fontawesome/css/brands.css') }}">
+
+	<!-- Include datasource-specific css if it exists -->
+	{% if custom_css %}
+		<style type="text/css">
+			{{ custom_css }}
+		</style>
+	{% endif %}
+	
+	<script type="text/javascript" src="{{url_for('static', filename='js/jquery-3.3.1.min.js')}}"></script>
+	<script type="text/javascript" src="{{url_for('static', filename='js/explorer.js')}}"></script>
+
+</head>
+<body>
+<header>
+	{% include "explorer/header.html" %}
+	{% include "explorer/annotations.html" %}
+</header>
+
+<div class="content">
+	<ol class="posts">
+	{% for post in posts %}
+		{% include "explorer/post.html" %}
+	{% endfor %}
+	</ol>
+	{% include "explorer/nav-pages.html" %}
+</div>
+
+<footer>
+	{% include "explorer/footer.html" %}
+</footer>
+
+</body>

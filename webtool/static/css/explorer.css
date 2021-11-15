@@ -1,0 +1,252 @@
+@font-face {
+    font-family: 'Open Sans';
+    src: url("../fonts/OpenSans-Regular.ttf")
+}
+
+/** --------------------- *
+      Colour definitions
+  * --------------------- */
+:root {
+    --accent: #CE1B28;
+    --highlight: #FF2231;
+    --accent-alternate: #19B0A3;
+    --accent-okay: #26b018;
+    --accent-warning: #b05d13;
+    --accent-error: #ff2231;
+    --gray-dark: #DFDFDF;
+    --gray-darker: #6C6C6C;
+    --gray: #E9E9E9;
+    --gray-light: #EEE;
+    --contrast-bright: #F5F5F5;
+    --contrast-dark: #21202E;
+    --always-white: #FFF;
+    --text: #37373C;
+    --warning: var(--accent);
+}
+
+/** --------------------- *
+     Basic HTML elements
+  * --------------------- */
+*, body, code, select, input, textarea {
+    font-family: 'Open Sans', 'Trebuchet MS', sans-serif;
+}
+
+body {
+    background-color: #f9fbff;
+}
+
+strong {
+    color: var(--highlight);
+}
+
+/** --------------------- *
+     Header
+  * --------------------- */
+
+body > header {
+    min-width: 640px;
+    max-width: 960px;
+    margin: 0 auto;
+    font-size: 1.5em;
+    padding: 0.5em;
+    box-sizing: border-box;
+}
+body > header h1 {
+    font-size: 1.5em;
+}
+
+body > header #metadata {
+    font-size: 16px;
+}
+
+body > header #metadata #parameters > span {
+    font-family: monospace;
+    font-size: 12px;
+    display: inline-block;
+    background: white;
+    margin: 2px;
+    padding: 4px;
+    border: 1px solid black;
+    border-radius: 5px;
+    cursor: default;
+}
+
+
+/** --------------------- *
+     Navigation pages
+  * --------------------- */
+.nav-pages {
+    text-align: center;
+}
+
+span.page {
+    display: inline-block;
+    padding: 10px;
+    min-width: 20px;
+    overflow: hidden;
+    color: black;
+    background-color: white;
+    font-family: monospace;
+    border: 1px solid black;
+}
+
+span.page.selected {
+    color: white;
+    background-color: black;
+}
+
+/** --------------------- *
+     Posts
+  * --------------------- */
+.posts {
+    list-style: none;
+}
+.posts li {
+    background: #d1e2ff;
+    padding: 1em;
+    min-width: 640px;
+    max-width: 960px;
+    min-height: 110px;
+    margin: 0 auto;
+    margin-bottom: 1em;
+}
+.posts header {
+    border-bottom: 1px solid #000;
+    display: inline;
+    cursor: default;
+}
+.posts article {
+    margin-top: 0.5em;
+}
+.posts article .post-content {
+    display: inline;
+    vertical-align: top;
+}
+.posts header .author {
+    font-weight: bold;
+}
+.posts header span {
+    display: inline-block;
+}
+.posts header span:not(:last-child)::after {
+    content: '\2022';
+    margin-left: 0.5em;
+}
+
+.posts li.op {
+    border: 2px solid #000;
+    background: #485ba6;
+    color: #FFF;
+}
+.posts li.op header {
+    border-color: #FFF;
+}
+
+.posts .external-url {
+    float: right;
+}
+
+.quote {
+    color: #ff5750;
+}
+.greentext {
+    color: #3eb439;
+}
+.op .greentext {
+    color: #50ff50;
+}
+.highlight, :target {
+    outline: 2px solid #ff5750;
+}
+li a {
+    color: inherit;
+    text-decoration: none;
+}
+a.has_image {
+    background: #FFF;
+    float: left;
+    color: #000;
+    width: 5em;
+    text-align: center;
+    margin-right: 1em;
+}
+a.has_image img {
+    width: 100%;
+}
+
+.clear {
+    clear: both;
+}
+
+
+/** --------------------- *
+     Annotations editor
+  * --------------------- */
+#annotations-editor {
+    display: none;
+    background-color: #d1e2ff;
+    margin-top: 5px;
+    margin-bottom: 5px;
+    padding: 10px;
+}
+
+.annotation-field > div {
+    vertical-align: top;
+} 
+
+#annotation-fields .input-fields {
+    display: inline-block;
+}
+#annotation-fields .input-field {
+    display: block;
+}
+
+#annotation-fields input.invalid {
+    border: 1px solid red;
+}
+
+#annotations-input-warning {
+    font-size: 0.7em;
+    color: red;
+    font-weight: bold;
+}
+
+/** --------------------- *
+     Annotation post elements
+  * --------------------- */
+.post-annotations {
+    background-color: #bed4f9;
+    margin-top: 5px;
+    padding: 15px;
+}
+    
+li.op > .post-annotations {
+    background-color: #3b4b8c;
+}
+
+.post-annotation {
+    line-height: 2.5em;
+}
+
+.post-annotation .annotation-label {
+    display: inline-block;
+    text-align: right;
+    width: 130px;
+    margin-right: 5px;
+}
+
+.post-annotation-list {
+    display: inline-block;
+}
+
+.post-annotation-list > input {
+    display: inline-block;
+}
+
+
+/** --------------------- *
+     Footer
+  * --------------------- */
+footer {
+    text-align: center;
+}

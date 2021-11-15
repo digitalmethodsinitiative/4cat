@@ -22,6 +22,8 @@ from webtool.api_tool import limiter
 from webtool.lib.user import User
 from common.lib.helpers import send_email
 
+from pathlib import Path
+
 
 @login_manager.user_loader
 def load_user(user_name):
@@ -196,6 +198,11 @@ def request_access():
 
 	incomplete = []
 
+	policy_template = Path(config.PATH_ROOT, "webtool/pages/access-policy.md")
+	access_policy = ""
+	if policy_template.exists():
+		access_policy = policy_template.read_text(encoding="utf-8")
+
 	if request.method == "POST":
 		required = ("name", "email", "university", "intent", "source")
 		for field in required:
@@ -237,7 +244,7 @@ def request_access():
 									   message="The form could not be submitted; the e-mail server is unreachable.")
 
 	return render_template("account/request.html", incomplete=incomplete, flashes=get_flashed_messages(),
-						   form=request.form)
+						   form=request.form, access_policy=access_policy)
 
 
 @app.route("/reset-password/", methods=["GET", "POST"])
