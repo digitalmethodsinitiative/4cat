@@ -201,7 +201,6 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 			self.log.warning("Job %s/%s was queued for a dataset already marked as finished, deleting..." % (self.job.data["jobtype"], self.job.data["remote_id"]))
 			self.job.finish()
 
-
 	def after_process(self):
 		"""
 		Run after processing the dataset

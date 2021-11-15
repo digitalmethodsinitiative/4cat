@@ -81,8 +81,6 @@ class SeleniumScraper(Search, metaclass=abc.ABCMeta):
             self.quit_selenium()
             raise e
 
-        self.quit_selenium()
-
         if not posts:
             return None
 
@@ -123,6 +121,13 @@ class SeleniumScraper(Search, metaclass=abc.ABCMeta):
             self.driver.quit()
         except:
             pass
+
+    def after_search_completed(self):
+        """
+        Runs after search (and thus the get_items generator) is used, allowing the Selenium driver to be used
+        dynamically and items to be yielded and written in turn
+        """
+        self.quit_selenium()
 
     def set_page_load_timeout(self, timeout=60):
         """

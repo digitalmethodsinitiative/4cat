@@ -46,8 +46,6 @@ class SearchWithSelenium(SeleniumScraper):
         """
         urls = [url.strip() for url in self.parameters.get("query", "").split('\n')]
 
-        results = []
-
         for url in urls:
             result = {
                       "url": url,
@@ -62,29 +60,29 @@ class SearchWithSelenium(SeleniumScraper):
                 # technically we have already validated, but best to inform user which urls are invalid
                 result['timestamp'] = int(datetime.datetime.now().timestamp())
                 result['error'] = 'Invalid URL format'
-                results.append(result)
-
-            try:
-                scraped_page = self.simple_scrape_page(url)
-            except TimeoutException as e:
-                result['timestamp'] = int(datetime.datetime.now().timestamp())
-                result['error'] = 'Selenium TimeoutException: %s' % e
-                results.append(result)
-
-            if scraped_page:
-                result['final_url'] = scraped_page.get('final_url')
-                result['body'] = scraped_page.get('page_source')
-                result['subject'] = scraped_page.get('page_title')
-                result['detected_404'] = scraped_page.get('detected_404')
-                result['timestamp'] = int(datetime.datetime.now().timestamp())
             else:
-                result['timestamp'] = int(datetime.datetime.now().timestamp())
-                result['error'] = 'Unable to scrape url' % e
-                results.append(result)
+                # Try to scrape the url
+                try:
+                    self.dataset.log('Scraping url: %s' % url)
+                    scraped_page = self.simple_scrape_page(url)
+                except TimeoutException as e:
+                    result['timestamp'] = int(datetime.datetime.now().timestamp())
+                    result['error'] = 'Selenium TimeoutException: %s' % e
+                    yield result
+                    continue
 
-            results.append(result)
+                # simple_scrape_page returns False if the browser did not load a new page
+                if scraped_page:
+                    result['final_url'] = scraped_page.get('final_url')
+                    result['body'] = scraped_page.get('page_source')
+                    result['subject'] = scraped_page.get('page_title')
+                    result['detected_404'] = scraped_page.get('detected_404')
+                    result['timestamp'] = int(datetime.datetime.now().timestamp())
+                else:
+                    result['timestamp'] = int(datetime.datetime.now().timestamp())
+                    result['error'] = 'Unable to scrape url' % e
 
-        return results
+            yield result
 
     @staticmethod
     def validate_query(query, request, user):
