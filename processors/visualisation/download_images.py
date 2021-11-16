@@ -374,7 +374,11 @@ class ImageDownloader(BasicProcessor):
 		# get link to image file from HTML returned
 		parser = etree.HTMLParser()
 		tree = etree.parse(StringIO(page.content.decode("utf-8")), parser)
-		image_url = css("a.thread_image_link")(tree)[0].get("href")
+		try:
+			image_url = css("a.thread_image_link")(tree)[0].get("href")
+		except IndexError as e:
+			self.dataset.log("Error: IndexError while trying to download 4chan image %s: %s" % (url, e))
+			raise FileNotFoundError()
 
 		# download image itself
 		image = self.request_get_w_error_handling(image_url, stream=True)
