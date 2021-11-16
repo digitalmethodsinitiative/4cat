@@ -319,6 +319,17 @@ class ImageDownloader(BasicProcessor):
 					# Noted that image not found pages (no status code of course) will not have this property
 					self.dataset.log("Error: IndexError may be 404 for image %s, skipping" % image_url)
 					raise FileNotFoundError()
+				except UnicodeDecodeError:
+					try:
+						self.dataset.log("Debug: UnicodeDecodeError detected for image %s" % image_url)
+						# Use requests chardet to detect encoding
+						page.encoding = page.apparent_encoding
+						image_url = \
+							page.text.split('<meta property="og:image"')[1].split('content="')[1].split('?fb">')[0]
+					except IndexError:
+						# Noted that image not found pages (no status code of course) will not have this property
+						self.dataset.log("Error: IndexError may be 404 for image %s, skipping" % image_url)
+						raise FileNotFoundError()
 
 		elif domain.endswith("gfycat.com") and url_ext not in ("png", "jpg", "jpeg", "gif", "gifv"):
 			# For gfycat.com links, just add .gif and download
