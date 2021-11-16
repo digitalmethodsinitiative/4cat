@@ -165,8 +165,8 @@ class ColumnNetworker(BasicProcessor):
 
             # account for possibility of multiple values by always treating a
             # column as a list of values, just sometimes with only one item
-            values_a = [item[column_a].strip()]
-            values_b = [item[column_b].strip()]
+            values_a = [str(item[column_a]).strip()]
+            values_b = [str(item[column_b]).strip()]
 
             if split_comma:
                 values_a = [v.strip() for v in values_a.pop().split(",")]
