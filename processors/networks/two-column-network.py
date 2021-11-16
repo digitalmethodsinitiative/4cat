@@ -163,10 +163,27 @@ class ColumnNetworker(BasicProcessor):
             if not item.get(column_a) or not item.get(column_b):
                 continue
 
+            # try casting the values to strings
+            # if this fails, treat them as empty, so skip the item
+            try:
+                values_a = str(item[column_a])
+            except ValueError:
+                continue
+
+            try:
+                values_b = str(item[column_b])
+            except ValueError:
+                continue
+
+            # convert to lowercase, if needed
+            if to_lower:
+                values_a = values_a.lower()
+                values_b = values_b.lower()
+
             # account for possibility of multiple values by always treating a
             # column as a list of values, just sometimes with only one item
-            values_a = [str(item[column_a]).strip()]
-            values_b = [str(item[column_b]).strip()]
+            values_a = [values_a]
+            values_b = [values_b]
 
             if split_comma:
                 values_a = [v.strip() for v in values_a.pop().split(",")]
@@ -181,12 +198,6 @@ class ColumnNetworker(BasicProcessor):
 
             for value_a in values_a:
                 for value_b in values_b:
-
-                    # Possibly convert to lowercase
-                    if to_lower:
-                        value_a = value_a.lower()
-                        value_b = value_b.lower()
-
                     # node 'ID', which we use to differentiate by column (or not)
                     node_a = column_a + "-" + value_a if categorise else "node-" + value_a
                     node_b = column_b + "-" + value_b if categorise else "node-" + value_b
