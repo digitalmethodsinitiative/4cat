@@ -142,11 +142,16 @@ class ImageDownloader(BasicProcessor):
 				if not value:
 					continue
 
-				value = str(value)
-				if re.match(r"https?://[^\s]+", value):
+				# remove all whitespace from beginning and end (needed for single URL check)
+				value = ' '.join(str(value).split())
+				if re.match(r"https?://(\S+)$", value):
 					# single URL
 					item_urls.add(value)
 				else:
+					# # Debug
+					# if re.match(r"https?://[^\s]+", value):
+					# 	self.dataset.log("Debug: OLD single detect url %s" % value)
+
 					# search for image URLs in string
 					item_urls |= set(img_link_regex.findall(value))
 					item_urls |= set(img_domain_regex.findall(value))
@@ -191,7 +196,8 @@ class ImageDownloader(BasicProcessor):
 				raise ProcessorInterruptedException("Interrupted while downloading images.")
 
 			processed_urls += 1
-			self.dataset.update_status("Downloading image %i/%i" % (processed_urls, len(urls)))
+			self.dataset.update_status("Downloaded %i images; checking url for next %i/%i: %s" %
+									   (downloaded_images, processed_urls, len(urls), url))
 
 			try:
 				# acquire image
