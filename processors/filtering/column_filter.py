@@ -9,7 +9,7 @@ from backend.abstract.processor import BasicProcessor
 from common.lib.helpers import UserInput
 
 __author__ = "Stijn Peeters"
-__credits__ = ["Stijn Peeters"]
+__credits__ = ["Stijn Peeters", "Dale Wahl"]
 __maintainer__ = "Stijn Peeters"
 __email__ = "4cat@oilab.eu"
 
@@ -61,6 +61,17 @@ class LexicalFilter(BasicProcessor):
             },
             "tooltip": "When matching on multiple values, you can choose to retain items if all provided values "
                        "match, or if any single one matches. Ignored when matching on a single value."
+        },
+        "record-matches": {
+            "type": UserInput.OPTION_CHOICE,
+            "help": "Create True/False column for each match string",
+            "default": "no",
+            "options": {
+                "yes": "Yes, create match value columns",
+                "no": "No, filter only"
+            },
+            "tooltip": "Only relevant for 'any' match type. A column is created for each match value and marked True "
+                       "if value was found in column."
         }
     }
 
@@ -101,6 +112,9 @@ class LexicalFilter(BasicProcessor):
         match_style = self.parameters.get("match-style", "")
         match_multiple = self.parameters.get("match-multiple")
         match_function = any if match_multiple == "any" else all
+        record_matches = True if self.parameters.get("record-matches") == 'yes' else False
+        self.dataset.log('Searching for matches in column %s' % column)
+        self.dataset.log('Match values: %s' % ', '.join(match_values))
 
         if match_style in ("less-than", "greater-than"):
             try:
@@ -131,7 +145,6 @@ class LexicalFilter(BasicProcessor):
 
         matching_items = 0
         processed_items = 0
-        date_compare = None
         with self.dataset.get_results_path().open("w", encoding="utf-8") as outfile:
             writer = None
 
@@ -143,16 +156,23 @@ class LexicalFilter(BasicProcessor):
                         self.dataset.finish(0)
                         return
 
+                    if match_multiple == "any" and record_matches:
+                        fieldnames = list(item.keys()) + match_values
+                    else:
+                        fieldnames = item.keys()
                     # initialise csv writer - we do this explicitly rather than
                     # using self.write_items_and_finish() because else we have
                     # to store a potentially very large amount of items in
                     # memory which is not a good idea
-                    writer = csv.DictWriter(outfile, fieldnames=item.keys())
+                    writer = csv.DictWriter(outfile, fieldnames=fieldnames)
                     writer.writeheader()
 
                 processed_items += 1
                 if processed_items % 500 == 0:
                     self.dataset.update_status("Processed %i items (%i matching)" % (processed_items, matching_items))
+
+                # Get column to be used in search for matches
+                item_column = item.get(column)
 
                 # comparing dates is allowed on both unix timestamps and
                 # 'human' timestamps. For that reason, if we *are* indeed
@@ -160,44 +180,30 @@ class LexicalFilter(BasicProcessor):
                 # actually compare the value properly.
                 if match_style in ("before", "after"):
                     if re.match(r"[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}", item.get(column)):
-                        date_compare = datetime.datetime.strptime(item.get(column), "%Y-%m-%d %H:%M:%S").timestamp()
+                        item_column = datetime.datetime.strptime(item.get(column), "%Y-%m-%d %H:%M:%S").timestamp()
                     else:
                         try:
-                            date_compare = int(item.get(column))
+                            item_column = int(item.get(column))
                         except ValueError:
-                            self.dataset.update_status("Invalid date value '%s', cannot determine if before or after" % item.get(column), is_final=True)
+                            self.dataset.update_status(
+                                "Invalid date value '%s', cannot determine if before or after" % item.get(column),
+                                is_final=True)
                             self.dataset.finish(0)
                             return
 
-                # depending on match type, mark as matching or not one way or
-                # another. This could be greatly optimised for some cases, e.g.
-                # when there is only a single value to compare to, and
-                # short-circuiting for 'any' matches - not clear if worth it.
-                matches = False
-                if match_style == "exact" and match_function([item.get(column) == value for value in match_values]):
+                # Compare each match_value with item_column depending on match_style
+                match_list = self.get_list_of_matches(match_style, item_column, match_values)
+                # Check 'any' or 'all'
+                if match_list is not None and match_function(match_list):
                     matches = True
-                elif match_style == "exact-not" and match_function([item.get(column) != value for value in match_values]):
-                    matches = True
-                elif match_style == "contains" and match_function([value in item.get(column) for value in match_values]):
-                    matches = True
-                elif match_style == "contains-not" and match_function([value not in item.get(column) for value in match_values]):
-                    matches = True
-                elif match_style == "after" and match_function([value <= date_compare for value in match_values]):
-                    matches = True
-                elif match_style == "before" and match_function([value >= date_compare for value in match_values]):
-                    matches = True
+
+                    # If recording matches, then update the item to include columns for the match_values
+                    if match_multiple == "any" and record_matches:
+                        for i in range(len(match_values)):
+                            # Map the results to the matches
+                            item[match_values[i]] = match_list[i]
                 else:
-                    # wrap this in a try-catch because we cannot be sure that
-                    # the column we're comparing to contains valid numerical
-                    # values
-                    try:
-                        if match_style == "greater-than" and match_function([float(value) < float(item.get(column)) for value in match_values]):
-                            matches = True
-                        elif match_style == "less-than" and match_function([float(value) > float(item.get(column)) for value in match_values]):
-                            matches = True
-                    except (TypeError, ValueError):
-                        # do not match
-                        pass
+                    matches = False
 
                 if matches:
                     writer.writerow(item)
@@ -206,7 +212,43 @@ class LexicalFilter(BasicProcessor):
         if matching_items == 0:
             self.dataset.update_status("No items matched your criteria", is_final=True)
 
-        self.dataset.finish(matching_items)
+         self.dataset.finish(matching_items)
+
+    def get_list_of_matches(self, match_style, item_column, match_values):
+        """
+        Depending on the match_style, a list of True/False is returned for each value in match_values compared to
+        item_column
+        """
+        # depending on match type, mark as matching or not one way or
+        # another. This could be greatly optimised for some cases, e.g.
+        # when there is only a single value to compare to, and
+        # short-circuiting for 'any' matches - not clear if worth it.
+        if match_style == "exact":
+            match_list = [item_column == value for value in match_values]
+        elif match_style == "exact-not":
+            match_list = [item_column != value for value in match_values]
+        elif match_style == "contains":
+            match_list = [value in item_column for value in match_values]
+        elif match_style == "contains-not":
+            match_list = [value not in item_column for value in match_values]
+        elif match_style == "after":
+            match_list = [value <= item_column for value in match_values]
+        elif match_style == "before":
+            match_list = [value >= item_column for value in match_values]
+        else:
+            # wrap this in a try-catch because we cannot be sure that
+            # the column we're comparing to contains valid numerical
+            # values
+            try:
+                if match_style == "greater-than":
+                    match_list = [float(value) < float(item_column) for value in match_values]
+                elif match_style == "less-than":
+                    match_list = [float(value) > float(item_column) for value in match_values]
+            except (TypeError, ValueError):
+                # do not match
+                match_list = None
+
+        return match_list
 
     def after_process(self):
         super().after_process()
