@@ -125,6 +125,8 @@ class SearchReddit(SearchWithScope):
 	submission_endpoint = None
 	comment_endpoint = None
 	api_type = None
+	since = "since"
+	after = "after"
 
 	def get_items_simple(self, query):
 		"""
@@ -340,7 +342,7 @@ class SearchReddit(SearchWithScope):
 					# For the regular API, increase the time.
 					# this is the only way to go to the next page right now...
 					if self.api_type == "regular":
-						post_parameters[since] = post["created_utc"]
+						post_parameters[self.since] = post["created_utc"]
 					# For the beta API, we can sort by IDs and only get those higher than the last encountered.
 					elif self.api_type == "beta":
 						post_parameters["min_id"] = post["id"] + 1
@@ -443,7 +445,7 @@ class SearchReddit(SearchWithScope):
 				if latest_timestamp == first_timestamp:
 					latest_timestamp += 1
 
-				thread_params[since] = latest_timestamp
+				thread_params[self.since] = latest_timestamp
 
 		return posts
 
