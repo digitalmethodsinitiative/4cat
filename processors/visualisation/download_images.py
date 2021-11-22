@@ -101,6 +101,7 @@ class ImageDownloader(BasicProcessor):
 
 		# prepare
 		results_path = self.dataset.get_staging_area()
+		self.dataset.log('Staging directory location: %s' % results_path)
 		urls = {}
 		url_file_map = {}
 		file_url_map = {}
@@ -236,9 +237,11 @@ class ImageDownloader(BasicProcessor):
 				picture.save(save_location)
 				# Counting is important
 				downloaded_images += 1
-			except OSError:
-				# some images may need to be converted
-				picture.convert('RGB').save(save_location)
+			except OSError as e:
+				# some images may need to be converted to RGB to be saved
+				self.dataset.log('Debug: OSError when saving image %s: %s' % (save_location, e))
+				picture = picture.convert('RGB')
+				picture.save(save_location)
 			except ValueError as e:
 				self.dataset.log(f"Error '{e}' saving image for {url}, skipping")
 				failures.append(url)
