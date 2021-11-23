@@ -5,8 +5,8 @@ import requests
 import datetime
 import time
 import json
-from apiclient.discovery import build
 
+from apiclient.discovery import build
 from backend.abstract.search import Search
 from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException
 from common.lib.helpers import convert_to_int, UserInput
