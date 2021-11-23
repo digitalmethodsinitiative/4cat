@@ -443,6 +443,76 @@ def edit_dataset_label(key):
 	})
 
 
+@app.route("/api/nuke-query/", methods=["DELETE"])
+@api_ratelimit
+@login_required
+@openapi.endpoint("tool")
+def nuke_dataset(key=None, reason=None):
+	"""
+	Use executive override to cancel a query
+
+	This cancels the running query for a dataset but does not delete the
+	dataset; rather it allows the cancelling user to set a reason for the
+	cancellation that will be displayed as the 'dataset status' in the
+	interface.
+
+	This can *only* be done by admins, *not* by the 'owner' of the dataset
+	(unless that user is also an admin).
+
+	:request-param str key:  ID of the dataset to delete
+	:request-param str reason:  Deletion reason
+	:request-param str ?access_token:  Access token; only required if not
+	logged in currently.
+
+	:return: A dictionary with a successful `status`.
+
+	:return-schema: {type=object,properties={status={type=string}}}
+
+	:return-error 404:  If the dataset does not exist.
+	:return-error 403:  If the user is not an administrator
+	"""
+	dataset_key = request.form.get("key", "") if not key else key
+	reason = request.form.get("reason", "") if not reason else reason
+	if not reason:
+		reason = "[no reason given]"
+
+	try:
+		dataset = DataSet(key=dataset_key, db=db)
+	except TypeError:
+		return error(404, error="Dataset does not exist.")
+
+	if not current_user.is_admin():
+		return error(403, message="Not allowed")
+
+	# if there is an active or queued job for some child dataset, cancel and
+	# delete it
+	children = dataset.get_all_children()
+	for child in children:
+		try:
+			job = Job.get_by_remote_ID(child.key, database=db, jobtype=child.type)
+			call_api("cancel-job", {"remote_id": child.key, "jobtype": dataset.type, "level": BasicWorker.INTERRUPT_CANCEL})
+			job.finish()
+			child.delete()
+		except JobNotFoundException:
+			pass
+
+	# now cancel and delete the job for this one (if it exists)
+	try:
+		job = Job.get_by_remote_ID(dataset.key, database=db, jobtype=dataset.type)
+		call_api("cancel-job", {"remote_id": dataset.key, "jobtype": dataset.type, "level": BasicWorker.INTERRUPT_CANCEL})
+	except JobNotFoundException:
+		pass
+
+	# wait for the dataset to actually be cancelled
+	time.sleep(2)
+
+	dataset.get_results_path().unlink(missing_ok=True)
+	dataset.update_status("Dataset cancelled by instance administrator. Reason: %s" % reason)
+	dataset.finish(0)
+
+	return jsonify({"status": "success", "key": dataset.key})
+
+
 @app.route("/api/delete-query/", methods=["DELETE", "POST"])
 @api_ratelimit
 @login_required

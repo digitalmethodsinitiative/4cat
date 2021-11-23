@@ -43,13 +43,18 @@ class ImageDownloader(BasicProcessor):
 				  "is included in the output archive."  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
 
+	if hasattr(config, 'MAX_NUMBER_IMAGES'):
+		max_number_images = int(config.MAX_NUMBER_IMAGES)
+	else:
+		max_number_images = 1000
+
 	options = {
 		"amount": {
 			"type": UserInput.OPTION_TEXT,
-			"help": "No. of images (max 1000)",
+			"help": "No. of images (max %s)" % max_number_images,
 			"default": 100,
 			"min": 0,
-			"max": 5000
+			"max": max_number_images
 		},
 		"columns": {
 			"type": UserInput.OPTION_TEXT,
@@ -78,7 +83,9 @@ class ImageDownloader(BasicProcessor):
 		# Get the source file data path
 		top_parent = self.dataset.get_genealogy()[0]
 		datasource = top_parent.parameters.get("datasource")
-		amount = self.parameters.get("amount", 0)
+		amount = self.parameters.get("amount", 100)
+		if amount == 0:
+			amount = self.max_number_images
 		columns = self.parameters.get("columns")
 
 		# is there anything for us to download?
@@ -94,6 +101,7 @@ class ImageDownloader(BasicProcessor):
 
 		# prepare
 		results_path = self.dataset.get_staging_area()
+		self.dataset.log('Staging directory location: %s' % results_path)
 		urls = {}
 		url_file_map = {}
 		file_url_map = {}
@@ -135,10 +143,16 @@ class ImageDownloader(BasicProcessor):
 				if not value:
 					continue
 
-				if re.match(r"https?://[^\s]+", value):
+				# remove all whitespace from beginning and end (needed for single URL check)
+				value = ' '.join(str(value).split())
+				if re.match(r"https?://(\S+)$", value):
 					# single URL
 					item_urls.add(value)
 				else:
+					# # Debug
+					# if re.match(r"https?://[^\s]+", value):
+					# 	self.dataset.log("Debug: OLD single detect url %s" % value)
+
 					# search for image URLs in string
 					item_urls |= set(img_link_regex.findall(value))
 					item_urls |= set(img_domain_regex.findall(value))
@@ -183,7 +197,8 @@ class ImageDownloader(BasicProcessor):
 				raise ProcessorInterruptedException("Interrupted while downloading images.")
 
 			processed_urls += 1
-			self.dataset.update_status("Downloading image %i/%i" % (processed_urls, len(urls)))
+			self.dataset.update_status("Downloaded %i images; checking url for next %i/%i: %s" %
+									   (downloaded_images, processed_urls, len(urls), url))
 
 			try:
 				# acquire image
@@ -219,10 +234,14 @@ class ImageDownloader(BasicProcessor):
 			url_file_map[url] = save_location.name
 			file_url_map[save_location.name] = url
 			try:
-				picture.save(save_location)
-			except OSError:
-				# some images may need to be converted
-				picture.convert('RGB').save(save_location)
+				picture.save(str(save_location))
+				# Counting is important
+				downloaded_images += 1
+			except OSError as e:
+				# some images may need to be converted to RGB to be saved
+				self.dataset.log('Debug: OSError when saving image %s: %s' % (save_location, e))
+				picture = picture.convert('RGB')
+				picture.save(str(save_location))
 			except ValueError as e:
 				self.dataset.log(f"Error '{e}' saving image for {url}, skipping")
 				failures.append(url)
@@ -309,6 +328,17 @@ class ImageDownloader(BasicProcessor):
 					# Noted that image not found pages (no status code of course) will not have this property
 					self.dataset.log("Error: IndexError may be 404 for image %s, skipping" % image_url)
 					raise FileNotFoundError()
+				except UnicodeDecodeError:
+					try:
+						self.dataset.log("Debug: UnicodeDecodeError detected for image %s" % image_url)
+						# Use requests chardet to detect encoding
+						page.encoding = page.apparent_encoding
+						image_url = \
+							page.text.split('<meta property="og:image"')[1].split('content="')[1].split('?fb">')[0]
+					except IndexError:
+						# Noted that image not found pages (no status code of course) will not have this property
+						self.dataset.log("Error: IndexError may be 404 for image %s, skipping" % image_url)
+						raise FileNotFoundError()
 
 		elif domain.endswith("gfycat.com") and url_ext not in ("png", "jpg", "jpeg", "gif", "gifv"):
 			# For gfycat.com links, just add .gif and download
@@ -364,7 +394,11 @@ class ImageDownloader(BasicProcessor):
 		# get link to image file from HTML returned
 		parser = etree.HTMLParser()
 		tree = etree.parse(StringIO(page.content.decode("utf-8")), parser)
-		image_url = css("a.thread_image_link")(tree)[0].get("href")
+		try:
+			image_url = css("a.thread_image_link")(tree)[0].get("href")
+		except IndexError as e:
+			self.dataset.log("Error: IndexError while trying to download 4chan image %s: %s" % (url, e))
+			raise FileNotFoundError()
 
 		# download image itself
 		image = self.request_get_w_error_handling(image_url, stream=True)

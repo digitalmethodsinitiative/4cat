@@ -1,0 +1,63 @@
+<li id="post-{{ post.id }}"{% if post.thread_id == post.id %} class="op"{% endif %}>    
+	<header>
+		<!-- Mandatory metadata -->
+		<span title="Author" class="author">{{ post.author }}</span>
+		<span title="Thread ID" class="thread_id">{% if is_local %}<a href="/explorer/thread/{{ datasource }}/{{ board }}/{{ post.thread_id }}">{{ post.thread_id }}</a>{% else %}{{ post.thread_id }}{% endif %}</span>
+		<span title="Post ID" class="post_id">{{ post.id }}</span>
+		{% if post.timestamp is integer %}
+			<span title="Date" class="datetime">{{ post.timestamp|datetime('%Y-%m-%d %H:%M') }}</span>
+		{% else %}
+			<span title="Date" class="datetime">{{ post.timestamp }}</span>
+		{% endif %}
+		<!-- Custom metadata -->
+		{% if custom_fields %}
+
+			{% for custom_field in custom_fields %}
+				{% if post.get(custom_field) %}
+				<span title="{{ custom_field }}" class="{{ custom_field }}">{{ post.get(custom_field) }}</span>
+				{% endif %}
+			{% endfor %}
+		{% endif %}
+
+	</header>
+
+	<!-- Optional image(s) -->
+	{% if "images" in post %}
+		{% set images = post.images %}
+	{% elif custom_fields and "images" in custom_fields %}
+		{% set images = post[custom_fields["images"].get("field")] %}
+
+		<!-- Prepend a URL to the image filenames -->
+		{% if images and "url_root" in custom_fields["images"] %}
+			{% set images = custom_fields["images"]["url_root"] + images %}
+			
+			<!-- Replace board variable of image URL -->
+			{% if "{{board}}" in images %}
+				{% set images = images | post_field(post) %}
+			{% endif %}
+		{% endif %}
+
+	{% endif %}
+
+	<!-- Possible external link -->
+	{% if custom_fields and "external_url" in custom_fields %}
+		{% set external_url = custom_fields.external_url | post_field(post, board) %}
+		<a href="{{ external_url }}" target="_blank"><span class="external-url"><i class="fas fa-external-link-alt"></i></span></a>
+	{% endif %}
+
+	<!-- Post content-->
+	<article>
+	{% if images %}
+	<a href="{{ images }}" target="_blank" rel="external" class="has_image">
+		<img src="{{ images }}">
+	</a>
+	{% endif %}
+	<span class="post-content">
+		{{ post.body|safe }}
+	</span>
+	</article>
+	<!-- Annotations -->
+	<div class="post-annotations">
+	</div>
+
+</li>

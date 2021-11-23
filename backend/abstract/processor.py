@@ -279,8 +279,10 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		if self.dataset.get_results_path().exists():
 			self.dataset.get_results_path().unlink(missing_ok=True)
 
-		if self.dataset.get_staging_area().exists():
-			shutil.rmtree(str(self.dataset.get_staging_area()))
+		if self.dataset.staging_area:
+			for staging_area in self.dataset.staging_area:
+				if staging_area.is_dir():
+					shutil.rmtree(staging_area)
 
 	def abort(self):
 		"""

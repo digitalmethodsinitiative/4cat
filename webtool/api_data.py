@@ -5,7 +5,10 @@
 import datetime
 import config
 import json
+import csv
 import re
+
+from backend import all_modules
 
 from collections import OrderedDict
 from pathlib import Path
@@ -19,7 +22,7 @@ from common.lib.helpers import strip_tags
 api_ratelimit = limiter.shared_limit("45 per minute", scope="api")
 
 
-@app.route('/api/<datasource>/<board>/thread/<int:thread_id>.json')
+@app.route('/api/<datasource>/<board>/thread/<string:thread_id>.json')
 @api_ratelimit
 @openapi.endpoint("data")
 def api_thread(datasource, board, thread_id):
@@ -41,36 +44,19 @@ def api_thread(datasource, board, thread_id):
 	if datasource not in config.DATASOURCES:
 		return error(404, error="Invalid data source")
 
-	thread = db.fetchone("SELECT * FROM threads_" + datasource + " WHERE board = %s AND id = %s", (board, thread_id))
+	posts = get_posts(db, datasource, board, ids=tuple([thread_id]), threads=True, order_by=["id"])
 
-	if thread == None:
-		return "Thread is not anymore available on the server."
+	posts = [strip_html(post) for post in posts]
 
-	response = get_thread(datasource, board, thread, db)
-
-	def strip_html(post):
-		post["com"] = strip_tags(post.get("com", ""))
-		return post
-
-	response["posts"] = [strip_html(post) for post in response["posts"]]
-
-	if not response:
-		return error(404, error="No posts available for this datasource")
+	if not posts:
+		return error(404, error="No posts available for this thread")
 
 	elif request.args.get("format", "json") == "html":
-		def format(post):
-			post["com"] = format_post(post.get("com", "")).replace("\n", "<br>")
-			return post
-
-		response["posts"] = [format(post) for post in response["posts"]]
-		metadata = {
-			"subject": "".join([post.get("sub", "") for post in response["posts"]]),
-			"id": response["posts"][0]["no"]
-		}
-		return render_template("thread.html", datasource=datasource, board=board, posts=response["posts"],
-							   thread=thread, metadata=metadata)
+		
+		posts = [format(post) for post in posts]
+		return render_template("explorer/explorer.html", datasource=datasource, board=board, posts=posts, limit=len(posts), post_count=len(posts), thread=thread_id)
 	else:
-		return jsonify(response)
+		return jsonify(posts)
 
 
 @app.route('/api/<datasource>/<board>/threads.json')
@@ -258,6 +244,167 @@ def get_archive(datasource, board):
 	return jsonify([thread["id"] for thread in threads])
 
 
+@app.route('/explorer/dataset/<key>/', defaults={'page': 0})
+@app.route('/explorer/dataset/<key>/<int:page>')
+@api_ratelimit
+@openapi.endpoint("data")
+def explorer_dataset(key, page):
+	"""
+	Show posts from a specific dataset
+
+	:param str dataset_key:  Dataset key
+
+	:return-schema: {type=array,items={type=integer}}
+
+	:return-error 404: If the dataset does not exist.
+	"""
+
+	# Get dataset info.
+	dataset = db.fetchone("SELECT * FROM datasets WHERE key = %s", (key,))
+
+	# The amount of posts to show on a page
+	limit = 100
+
+	# The offset for posts depending on the current page
+	offset = ((page - 1) * limit) if page else 0
+
+	# Do come catching
+	if not dataset:
+		return error(404, error="Invalid data source")
+
+	if dataset["key_parent"]:
+		return error(404, error="Exporer only available for top-level datasets")
+
+	if not dataset["result_file"] or not dataset["is_finished"]:
+		return error(404, error="This dataset didn't finish executing (yet)")
+
+	# Load some variables
+	parameters = json.loads(dataset["parameters"])
+	datasource = parameters["datasource"]
+	board = parameters["board"]
+	annotation_fields = json.loads(dataset["annotation_fields"]) if dataset["annotation_fields"] else None
+
+	# If the dataset is local, we can add some more features
+	# (like the ability to navigate to threads)
+	is_local = True if all_modules.datasources[datasource].get("is_local") else False
+	
+	# Check if the dataset in fact exists
+	dataset_path = Path(config.PATH_ROOT, config.PATH_DATA, dataset["result_file"])
+	if not dataset_path.exists():
+		abort(404)
+
+	# Load posts
+	post_ids = []
+	posts = []
+	count = 0
+	with open(dataset_path, "r", encoding="utf-8") as dataset_file:
+		reader = csv.reader(dataset_file)
+		
+		# Get the column names (varies per datasource).
+		columns = next(reader)
+
+		for post in reader:
+
+			# Use an offset if we're showing a page beyond the first.
+			count += 1
+			if count <= offset:
+				continue
+
+			# Attribute column names and collect dataset's posts.
+			post = {columns[i]: post[i] for i in range(len(post))}
+			post_ids.append(post["id"])
+			posts.append(post)
+
+			# Stop if we exceed the max posts per page.
+			if count >= (offset + limit):
+				break
+
+	# Clean up HTML
+	posts = [strip_html(post) for post in posts]
+	posts = [format(post) for post in posts]
+
+	# Include custom css if it exists in the datasource's 'explorer' dir.
+	# The file's naming format should e.g. be 'reddit-explorer.css'.
+	css = get_custom_css(datasource)
+
+	# Include custom fields if it they are in the datasource's 'explorer' dir.
+	# The file's naming format should e.g. be 'reddit-explorer.json'.
+	custom_fields = get_custom_fields(datasource)
+
+	if not posts:
+		return error(404, error="No posts available for this datasource")
+
+	# Generate the HTML page
+	return render_template("explorer/explorer.html", key=key, datasource=datasource, board=board, is_local=is_local, parameters=parameters, annotation_fields=annotation_fields, posts=posts, css=css, custom_fields=custom_fields, page=page, offset=offset, limit=limit, post_count=int(dataset["num_rows"]))
+
+@app.route('/explorer/thread/<datasource>/<board>/<string:thread_id>')
+@api_ratelimit
+@openapi.endpoint("data")
+def explorer_thread(datasource, board, thread_id):
+	"""
+	Show a thread in the explorer
+
+	:param str datasource:  Data source ID
+	:param str board:  Board name
+	:param int thread_id:  Thread ID
+
+	:return-error 404:  If the thread ID does not exist for the given data source.
+	"""
+
+	if not datasource:
+		return error(404, error="No datasource provided")
+	if datasource not in config.DATASOURCES:
+		return error(404, error="Invalid data source")
+	if not board:
+		return error(404, error="No board provided")
+	if not thread_id:
+		return error(404, error="No thread ID provided")
+
+	# Get the posts with this thread ID.
+	posts = get_posts(db, datasource, board, ids=tuple([thread_id]), threads=True, order_by=["id"])
+
+	posts = [strip_html(post) for post in posts]
+
+	if not posts:
+		return error(404, error="No posts available for this thread")
+
+	posts = [format(post) for post in posts]
+	return render_template("explorer/explorer.html", datasource=datasource, board=board, posts=posts, limit=len(posts), post_count=len(posts), thread=thread_id)
+
+@app.route('/explorer/post/<datasource>/<board>/<string:post_id>')
+@api_ratelimit
+@openapi.endpoint("data")
+def explorer_post(datasource, board, thread_id):
+	"""
+	Show a thread in the explorer
+
+	:param str datasource:  Data source ID
+	:param str board:  Board name
+	:param int thread_id:  Thread ID
+
+	:return-error 404:  If the thread ID does not exist for the given data source.
+	"""
+
+	if not datasource:
+		return error(404, error="No datasource provided")
+	if datasource not in config.DATASOURCES:
+		return error(404, error="Invalid data source")
+	if not board:
+		return error(404, error="No board provided")
+	if not thread_id:
+		return error(404, error="No thread ID provided")
+
+	# Get the posts with this thread ID.
+	posts = get_posts(db, datasource, board, ids=tuple([thread_id]), threads=True, order_by=["id"])
+
+	posts = [strip_html(post) for post in posts]
+
+	if not posts:
+		return error(404, error="No posts available for this thread")
+
+	posts = [format(post) for post in posts]
+	return render_template("explorer/explorer.html", datasource=datasource, board=board, posts=posts, limit=len(posts), post_count=len(posts), thread=thread_id)
+
 @app.route('/api/<datasource>/boards.json')
 @api_ratelimit
 @openapi.endpoint("data")
@@ -283,88 +430,22 @@ def get_boards(datasource):
 	boards = db.fetchall("SELECT DISTINCT board FROM threads_" + datasource)
 	return jsonify({"boards": [{"board": board["board"]} for board in boards]})
 
+def get_posts(db, datasource, board, ids, threads=False, limit=0, offset=0, order_by=["timestamp"]):
 
-def get_thread(datasource, board, thread, db, limit=0):
+	if not ids:
+		return None
+
+	id_field = "id" if not threads else "thread_id"
+	order_by = " ORDER BY " + ", ".join(order_by)
 	limit = "" if not limit or limit <= 0 else " LIMIT %i" % int(limit)
-	posts = db.fetchall("SELECT * FROM posts_" + datasource + " WHERE thread_id = %s ORDER BY timestamp ASC" + limit,
-						(thread["id"],))
+	offset = " OFFSET %i" % int(offset)
+
+	posts = db.fetchall("SELECT * FROM posts_" + datasource + " WHERE " + id_field + " IN %s " + order_by + " ASC" + limit + offset,
+						(ids,))
 	if not posts:
 		return False
 
-	response = {"posts": []}
-
-	first_post = True
-	for post in posts:
-
-		# add data that is present for every single post
-		response_post = OrderedDict({
-			"resto": 0 if first_post else int(thread["id"]),
-			"no": post["id"],
-			"time": post["timestamp"],
-			"now": datetime.datetime.utcfromtimestamp(post["timestamp"]).strftime("%m/%d/%y(%a)%H:%I")
-		})
-
-		# first post has some extra data as well that is never present for replies
-		if first_post:
-			if thread["is_sticky"]:
-				response_post["sticky"] = 1
-			if thread["is_closed"]:
-				response_post["closed"] = 1
-
-			response_post["imagelimit"] = 1 if thread["limit_image"] else 0
-			response_post["bumplimit"] = 1 if thread["limit_bump"] else 0
-
-			if thread["timestamp_archived"] > 0:
-				response_post["archived"] = 1
-				response_post["archived_on"] = thread["timestamp_archived"]
-
-			response_post["unique_ips"] = thread["num_unique_ips"]
-			response_post["replies"] = thread["num_replies"] - 1  # OP doesn't count as reply
-			response_post["images"] = thread["num_images"]
-
-		# there are a few fields that are only present if an image was attached
-		if post["image_file"]:
-			response_post["tim"] = int(post["image_4chan"].split(".")[0])
-			response_post["ext"] = "." + post["image_4chan"].split(".").pop()
-			response_post["md5"] = post["image_md5"]
-			response_post["filename"] = ".".join(post["image_file"].split(".")[:-1])
-			response_post["fsize"] = post["image_filesize"]
-
-			dimensions = json.loads(post["image_dimensions"])
-			if "w" in dimensions and "h" in dimensions:
-				response_post["w"] = dimensions["w"]
-				response_post["h"] = dimensions["h"]
-			if "tw" in dimensions and "th" in dimensions:
-				response_post["tn_w"] = dimensions["tw"]
-				response_post["tn_h"] = dimensions["th"]
-
-		# for the rest, just add it if not empty
-		if post["subject"]:
-			response_post["sub"] = post["subject"]
-
-		if post["body"]:
-			response_post["com"] = post["body"]
-
-		if post["author"]:
-			response_post["name"] = post["author"]
-
-		if post["author_trip"]:
-			response_post["trip"] = post["author_trip"]
-
-		if post["author_type"]:
-			response_post["id"] = post["author_type"]
-
-		if post["author_type_id"]:
-			response_post["capcode"] = post["author_type_id"]
-
-		if post["semantic_url"]:
-			response_post["semantic_url"] = post["semantic_url"]
-
-		response["posts"].append(response_post)
-		first_post = False
-
-	return response
-
+	return posts
 
 @app.route('/api/image/<img_file>')
 @app.route('/api/imagefile/<img_file>')
@@ -382,3 +463,67 @@ def get_image_file(img_file, limit=0):
 		abort(404)
 
 	return send_file(str(image_path))
+
+def get_custom_css(datasource):
+	"""
+	Check if there's a custom css file for this dataset.
+	If so, return the text.
+	Custom css files should be placed in an 'explorer' directory in the the datasource folder and named '<datasourcename>-explorer.css' (e.g. 'reddit/explorer/reddit-explorer.css').
+	
+	:param datasource, str: Datasource name
+
+	:return: The css as string.
+	"""
+
+	# Set the directory name of this datasource.
+	# Do some conversion for some imageboard names (4chan, 8chan).
+	if datasource.startswith("4"):
+		datasource_dir = datasource.replace("4", "four")
+	elif datasource.startswith("8"):
+		datasource_dir = datasource.replace("8", "eight")
+	else:
+		datasource_dir = datasource
+	
+	css_path = Path(config.PATH_ROOT, "datasources", datasource_dir, "explorer", datasource.lower() + "-explorer.css")
+	if css_path.exists():
+		with open(css_path, "r", encoding="utf-8") as css:
+			css = css.read()
+	else:
+		css = None
+	return css
+
+def get_custom_fields(datasource):
+	"""
+	Check if there are custom fields that need to be showed for this datasource.
+	If so, return a dictionary of those fields.
+	Custom field json files should be placed in an 'explorer' directory in the the datasource folder and named '<datasourcename>-explorer.json' (e.g. 'reddit/explorer/reddit-explorer.json').
+
+	:param datasource, str: Datasource name
+
+	:return: Dictionary of custom fields that should be shown.
+	"""
+
+	# Set the directory name of this datasource.
+	# Do some conversion for some imageboard names (4chan, 8chan).
+	if datasource.startswith("4"):
+		datasource_dir = datasource.replace("4", "four")
+	elif datasource.startswith("8"):
+		datasource_dir = datasource.replace("8", "eight")
+	else:
+		datasource_dir = datasource
+
+	json_path = Path(config.PATH_ROOT, "datasources", datasource_dir, "explorer", datasource.lower() + "-explorer.json")
+	if json_path.exists():
+		with open(json_path, "r", encoding="utf-8") as json_file:
+			custom_fields = json.load(json_file)
+	else:
+		custom_fields = None
+	return custom_fields
+
+def strip_html(post):
+	post["body"] = strip_tags(post.get("body", ""))
+	return post
+
+def format(post):
+	post["body"] = format_post(post.get("body", "")).replace("\n", "<br>")
+	return post

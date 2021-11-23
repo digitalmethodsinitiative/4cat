@@ -31,6 +31,10 @@ DB_USER = "fourcat"
 DB_NAME = "fourcat"
 DB_PASSWORD = "supers3cr3t"
 
+# Processor Options
+# download_images.py
+MAX_NUMBER_IMAGES = 1000
+
 # Path to folders where logs/images/data may be saved.
 # Paths are relative to the folder this config file is in.
 PATH_ROOT = os.path.abspath(os.path.dirname(__file__))  # better don't change this

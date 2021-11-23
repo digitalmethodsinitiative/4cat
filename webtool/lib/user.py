@@ -209,7 +209,8 @@ class User:
 
 		# the actual e-mail...
 		url_base = config.FlaskConfig.SERVER_NAME
-		url = "https://%s/reset-password/?token=%s" % (url_base, register_token)
+		protocol = "https" if config.FlaskConfig.SERVER_HTTPS else "http"
+		url = "%s://%s/reset-password/?token=%s" % (protocol, url_base, register_token)
 
 		# we use slightly different e-mails depending on whether this is the first time setting a password
 		if new:
@@ -217,11 +218,11 @@ class User:
 			message["Subject"] = "Account created"
 			mail = """
 			<p>Hello %s,</p>
-			<p>A 4CAT account has been created for you. You can now log in to 4CAT at <a href="http://%s">%s</a>.</p>
+			<p>A 4CAT account has been created for you. You can now log in to 4CAT at <a href="%s://%s">%s</a>.</p>
 			<p>Note that before you log in, you will need to set a password. You can do so via the following link:</p>
 			<p><a href="%s">%s</a></p> 
 			<p>Please complete your registration within 72 hours as the link above will become invalid after this time.</p>
-			""" % (username, url_base, url_base, url, url)
+			""" % (username, protocol, url_base, url_base, url, url)
 		else:
 			
 			message["Subject"] = "Password reset"

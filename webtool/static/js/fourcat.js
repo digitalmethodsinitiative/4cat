@@ -1181,6 +1181,9 @@ const ui_helpers = {
 		//confirm links
 		$(document).on('click', '.confirm-first', ui_helpers.confirm);
 
+		//confirm links
+		$(document).on('click', '.prompt-first', ui_helpers.confirm_with_prompt);
+
 		//long texts with '...more' link
 		$(document).on('click', 'div.expandable a', ui_helpers.expandExpandable);
 
@@ -1220,6 +1223,40 @@ const ui_helpers = {
 			return false;
 		} else {
 			return true;
+		}
+	},
+
+
+	/**
+	 * Ask for confirmation before doing whatever happens when the event goes through
+	 *
+	 * Also ask for some input to send with the confirmation, if given
+	 *
+	 * @param e  Event that triggers confirmation
+	 * @returns {boolean}  Confirmed or not
+	 */
+	confirm_with_prompt: function(e) {
+		let action = 'do this';
+
+		if ($(this).attr('data-confirm-action')) {
+			action = $(this).attr('data-confirm-action');
+		}
+
+		let method = $(this).attr('data-confirm-method') ? $(this).attr('data-confirm-method') : 'GET';
+		let result = prompt('Please confirm that you want to ' + action + '. This cannot be undone.');
+		let html = '';
+		let url = $(this).attr('href');
+
+		e.preventDefault();
+		if (!result) {
+			return false;
+		} else {
+			if($(this).attr('data-confirm-var')) {
+				html = '<input type="hidden" name="' + $(this).attr('data-confirm-var') + '" value="' + result + '">';
+			}
+			console.log(html)
+			$('<form style="display: none;"/>').attr('method', method).attr('action', url).html(html).appendTo('body').submit().remove();
+			return false;
 		}
 	},
 

@@ -54,6 +54,8 @@ class WorkerManager:
 		# queue worker that calculates datasource metrics every day
 		self.queue.add_job("datasource-metrics", remote_id="localhost", interval=86400)
 
+		self.log.info('4CAT Started')
+
 		# it's time
 		self.loop()
 
