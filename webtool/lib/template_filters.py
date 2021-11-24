@@ -76,8 +76,7 @@ def _jinja2_filter_httpquery(data):
 
 @app.template_filter('markdown')
 def _jinja2_filter_markdown(text):
-	text = "<p>" + text + "</p>"
-	val = markdown.markdown(strip_tags(text))
+	val = markdown.markdown(text)
 	return val
 
 
