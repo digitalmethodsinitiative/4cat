@@ -71,6 +71,20 @@ def load_user_from_request(request):
 
 
 @app.before_request
+def banned_users():
+	"""
+	Displays a 'sorry, no 4cat for you' message to banned or deactivated users.
+	"""
+	if current_user and current_user.is_authenticated and current_user.is_deactivated():
+		message = "Your 4CAT account has been deactivated and you can no longer access this page."
+		if current_user.get_attribute("deactivated.reason"):
+			message += "\n\nThe following reason was recorded for your account's deactivation: *"
+			message += current_user.get_attribute("deactivated.reason") + "*"
+
+		return render_template("error.html", title="Your account has been deactivated", message=message), 403
+
+
+@app.before_request
 def autologin_whitelist():
 	"""
 	Checks if host name matches whitelisted hostmask. If so, the user is logged
