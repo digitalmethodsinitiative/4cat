@@ -16,7 +16,7 @@ print("  Checking if users table has a column 'is_deactivated'...")
 has_column = db.fetchone("SELECT COUNT(*) AS num FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'is_deactivated'")
 if has_column["num"] == 0:
     print("  ...No, adding.")
-    db.execute("ALTER TABLE users ADD COLUMN is_deactivated BOOLEAN DEFAULT True")
+    db.execute("ALTER TABLE users ADD COLUMN is_deactivated BOOLEAN DEFAULT False")
 else:
     print("  ...Yes, nothing to update.")
 
