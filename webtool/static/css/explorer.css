@@ -187,6 +187,7 @@ span.page.selected {
     min-height: 110px;
     margin: 0 auto;
     margin-bottom: 1em;
+    overflow-x: hidden;
 }
 .posts header {
     border-bottom: 1px solid #000;
@@ -479,6 +480,8 @@ li.op > .post-annotations {
     text-align: right;
     width: 130px;
     margin-right: 5px;
+    line-height: 1.6em;
+    overflow-x: hidden;
 }
 
 .post-annotation.checkbox > .post-annotation-options {
@@ -487,6 +490,7 @@ li.op > .post-annotations {
 
 .post-annotation-options {
     display: inline-block;
+    vertical-align: top;
 }
 
 .post-annotation-options > input {
