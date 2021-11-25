@@ -1,14 +1,20 @@
-<h1>4CAT explorer</h1>
-
+<h1>
+	<span class="return">
+		<a href="/results/{{ key }}"><i class="fas fa-arrow-left"></i> Return to dataset</a>
+	</span>
+		
+	<span>
+		4CAT Explorer{% if parameters and parameters.get("label") %}  &bull; {{ parameters.get("label") }}{% elif thread %}  &bull; {{ thread }}{% endif %}
+	</span>
+</h1>
+<span id="dataset-key">{{ key }}</span>
 <div id="metadata">
-
 	{% if key %}
 		<div id="dataset-info">
-			<p>Dataset: <a href="/results/{{ key }}">{{ key }}</a> </p>
 			<p>Showing posts {{ offset + 1 }} - {{ post_count if (offset + limit) > post_count else (offset + limit) }} ({{ post_count }} in total).</p>
 			<p>Sorted by time.</p>
 		</div>
-		<div id="parameters">
+		<!-- <div id="parameters">
 		{% set primary_fields = ("datasource", "board", "body_match", "min_date", "max_date") %}
 		{% for field in primary_fields %}
 			<span>{{ field }}: {{ parameters[field] }}</span>
@@ -18,7 +24,7 @@
 				<span>{{ other_field }}: {{ value }}</span>
 			{% endif %}
 		{% endfor%}
-		</div>
+		</div> -->
 	{% elif thread %}
 		<p>Showing {{ post_count }} posts from {{ datasource }}/{{ board }} thread {{ thread }}.</p>
 		<p>Note that the archived posts may not be complete.</p>

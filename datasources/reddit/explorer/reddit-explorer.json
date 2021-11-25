@@ -1,0 +1,5 @@
+{
+	"subreddit": "subreddit",
+	"score": "score",
+	"external_url": "https://reddit.com/r/{{board}}/comments/{{thread_id}}/comment/{{id}}"
+}

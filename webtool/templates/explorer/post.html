@@ -1,7 +1,13 @@
 <li id="post-{{ post.id }}"{% if post.thread_id == post.id %} class="op"{% endif %}>    
 	<header>
 		<!-- Mandatory metadata -->
-		<span title="Author" class="author">{{ post.author }}</span>
+		<span title="Author" class="author">
+		{% if post.author|length > 20 %}
+			{{ post.author[:17] + '...' }}
+		{% else %}
+			{{ post.author }}
+		{% endif %}
+		</span>
 		<span title="Thread ID" class="thread_id">{% if is_local %}<a href="/explorer/thread/{{ datasource }}/{{ board }}/{{ post.thread_id }}">{{ post.thread_id }}</a>{% else %}{{ post.thread_id }}{% endif %}</span>
 		<span title="Post ID" class="post_id">{{ post.id }}</span>
 		{% if post.timestamp is integer %}
@@ -20,7 +26,6 @@
 		{% endif %}
 
 	</header>
-
 	<!-- Optional image(s) -->
 	{% if "images" in post %}
 		{% set images = post.images %}
@@ -55,9 +60,64 @@
 	<span class="post-content">
 		{{ post.body|safe }}
 	</span>
+
 	</article>
+
 	<!-- Annotations -->
 	<div class="post-annotations">
+		
+		{% if annotation_fields %}
+			{% set old_annotations = None %}
+
+			{% if annotations and post.id in annotations %}
+				{% set old_annotations = annotations[post.id] %}
+			{% endif %}
+
+			{% for field in annotation_fields %}
+
+				{% set type = annotation_fields[field]["type"] %}
+				{% set label = annotation_fields[field]["label"] %}
+				{% set old_annotation = "" %}
+
+				{% if old_annotations and label in old_annotations %}
+					{% set old_annotation = old_annotations[label] %}
+				{% endif %}
+				
+				<div class="post-annotation field-{{ field }} {{ type }}"><label class="annotation-label">{{ label }}</label>
+
+				{% if type == 'text' %}
+					<input type="text" class="post-annotation-input text-{{ field }}" value="{{ old_annotation }}">
+
+				{% elif type == 'textarea' %}
+					<textarea class="post-annotation-input textarea-{{ field }}">{{ old_annotation }}</textarea>
+
+				{% elif type == 'dropdown' %}
+					<select class="post-annotation-options select-{{ type }}" id="{{ field }}">
+					<option class='post-annotation-input' value=''></option>
+
+					{% for option in annotation_fields[field]["options"] %}
+						{% set option_id = option.keys() | list %}
+						{% set option_label = option.values() | list %}
+						<option class="post-annotation-input option-{{ option_id[0] }}" id="option-{{ option_id[0] }}" value="{{ option_label[0] }}" {% if option_label[0] == old_annotation %}selected{% endif %}>{{ option_label[0] }}</option>
+					{% endfor %}
+					</select>
+
+				{% elif type == 'checkbox' %}
+					<div class='post-annotation-options checkboxes-{{ field }}'>
+						
+					{% for option in annotation_fields[field]["options"] %}
+						{% set option_id = option.keys() | list %}
+						{% set option_label = option.values() | list %}
+						{% set checked = "checked" if old_annotation and option_label[0] in old_annotation else "" %}
+
+						<input type='checkbox' class='post-annotation-input option-{{ option_id[0] }}' id='option-{{ post.id }}-{{ option_id[0] }}' value='{{ option_label[0] }}' {{ checked }}><label for='option-{{ post.id }}-{{ option_id[0] }}'>{{ option_label[0] }}</label>
+					{% endfor %}
+					</div>
+				{% endif %}
+
+				</div>
+			{% endfor %}
+		{% endif %}
 	</div>
 
 </li>

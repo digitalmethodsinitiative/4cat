@@ -21,7 +21,7 @@ columns = [row["column_name"] for row in db.fetchall("SELECT column_name FROM in
 if "annotation_fields" in columns:
 	print("yes!\n")
 else:
-	print(" adding 'annotation_fields' column to datasets table\n")
+	print(" no, adding 'annotation_fields' column to datasets table\n")
 	db.execute("ALTER TABLE datasets ADD COLUMN annotation_fields TEXT DEFAULT '' ")
 
 # Make annotations table

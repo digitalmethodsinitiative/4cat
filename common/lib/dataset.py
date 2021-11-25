@@ -446,6 +446,32 @@ class DataSet(FourcatModule):
 			# not a CSV or NDJSON file, or no map_item function available
 			return []
 
+	def get_annotation_fields(self):
+		"""
+		Retrieves the saved annotation fields for this dataset.
+		:return dict: The saved annotation fields.
+		"""
+
+		annotation_fields = self.db.fetchone("SELECT annotation_fields FROM datasets WHERE key = %s;", (self.top_parent().key,))
+		
+		if annotation_fields:
+			return json.loads(annotation_fields["annotation_fields"])
+		else:
+			return None
+
+	def get_annotations(self):
+		"""
+		Retrieves the annotations for this dataset.
+		return dict: The annotations
+		"""
+
+		annotations = self.db.fetchone("SELECT annotations FROM annotations WHERE key = %s;", (self.top_parent().key,))
+		
+		if annotations:
+			return json.loads(annotations["annotations"])
+		else:
+			return None
+
 	def update_label(self, label):
 		"""
 		Update label for this dataset

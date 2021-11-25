@@ -3,6 +3,26 @@
     src: url("../fonts/OpenSans-Regular.ttf")
 }
 
+@font-face {
+    font-family: 'Open Sans';
+    font-weight: bold;
+    src: url("../fonts/OpenSans-Bold.ttf")
+}
+
+@font-face {
+    font-family: 'Open Sans';
+    font-style: italic;
+    src: url("../fonts/OpenSans-Italic.ttf")
+}
+
+@font-face {
+    font-family: 'Open Sans';
+    font-weight: bold;
+    font-style: italic;
+    src: url("../fonts/OpenSans-BoldItalic.ttf")
+}
+
+
 /** --------------------- *
       Colour definitions
   * --------------------- */
@@ -33,10 +53,41 @@
 
 body {
     background-color: #f9fbff;
+    margin: 0;
+    padding: 0;
 }
 
-strong {
-    color: var(--highlight);
+select, input, textarea {
+    background: var(--gray);
+    border: 1px solid var(--gray);
+    font-size: 14px;
+    padding: 0.25em;
+}
+
+label {
+    font-size: 14px;
+}
+
+button {
+    border: 2px solid var(--contrast-dark);
+    background: var(--contrast-bright);
+    color: var(--text);
+    border-radius: 0.5em;
+    font-size: 14px;
+    cursor: pointer;
+    padding: 0.25em 1em;
+}
+
+button:hover {
+    background: var(--accent);
+    color: var(--contrast-bright);
+}
+
+button.invalid, button.invalid:hover {
+    cursor: default;
+    background: var(--contrast-bright);
+    color: var(--text);
+    border-color: var(--gray-dark);
 }
 
 /** --------------------- *
@@ -44,19 +95,33 @@ strong {
   * --------------------- */
 
 body > header {
-    min-width: 640px;
-    max-width: 960px;
-    margin: 0 auto;
-    font-size: 1.5em;
-    padding: 0.5em;
-    box-sizing: border-box;
+    width: 100%;
+    margin: 0;
+    padding: 0;
 }
+
 body > header h1 {
+    box-shadow: 0 5px 10px #888;
+    margin: 0;
+    padding: 0;
     font-size: 1.5em;
+    background: var(--contrast-dark);
+    color: var(--contrast-bright);
+    text-align: center;
+    font-size: 1.5em;
+    line-height: 1.5em;
+    font-weight: bold;
+    padding: 0.50em 0;
+    cursor: default;
 }
 
 body > header #metadata {
     font-size: 16px;
+    min-width: 640px;
+    max-width: 960px;
+    margin: 0 auto;
+    margin-top: 40px;
+    margin-bottom: 40px;
 }
 
 body > header #metadata #parameters > span {
@@ -71,6 +136,18 @@ body > header #metadata #parameters > span {
     cursor: default;
 }
 
+body > header .return a {
+    position: absolute;
+    left: 0;
+    padding-left: 12px;
+    color: white;
+    font-size: 0.6em;
+    text-decoration: none;
+}
+
+#dataset-key {
+    display: none;
+}
 
 /** --------------------- *
      Navigation pages
@@ -100,6 +177,7 @@ span.page.selected {
   * --------------------- */
 .posts {
     list-style: none;
+    padding: 0;
 }
 .posts li {
     background: #d1e2ff;
@@ -178,37 +256,204 @@ a.has_image img {
     clear: both;
 }
 
+span.divider {
+    font-size: 16px;
+    color: var(--gray-darker);
+    cursor: default;
+}
 
 /** --------------------- *
      Annotations editor
   * --------------------- */
-#annotations-editor {
+#annotations-editor-container {
+    background: rgba(0, 0, 0, .4);
     display: none;
-    background-color: #d1e2ff;
-    margin-top: 5px;
-    margin-bottom: 5px;
-    padding: 10px;
+    height: 100%;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    z-index: 9;
 }
 
-.annotation-field > div {
-    vertical-align: top;
-} 
+#annotations-editor {
+    width: 100px;
+    height: 500px;
+    position: absolute;
+    top:0;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    margin: auto;
+    min-height: 100px;
+    background-color: #fff;
+    border-radius: 10px;
+    box-shadow: 10px 10px 60px #555;
+    width: 95%;
+    max-width: 620px;
+    padding: 15px 2%;
+}
 
-#annotation-fields .input-fields {
+#annotation-fields-container {
+    max-height: 91%;
+    overflow-y: scroll;
+}
+
+#annotation-fields-container #annotation-headers {
+    display: flex;
+    align-items: flex-start;
+}
+
+#annotation-fields-container .annotation-header {
+    display: inline-block;
+    font-size: 14px;
+    font-weight: bold;
+}
+
+#annotation-fields-container .annotation-header#ah-label {
+    width: 235px;
+}
+#annotation-fields-container .annotation-header#ah-type {
+    width: 105px;
+}
+
+#annotation-fields .option-fields {
     display: inline-block;
 }
-#annotation-fields .input-field {
+
+#annotation-fields .option-field {
     display: block;
+}
+
+.annotation-fields-row {
+    display: flex;
+    align-items: flex-start;
+    margin-top: 5px;
+    padding: 2px;
+}
+
+.annotation-fields-row * {
+    margin-right: 3px;
+}
+
+.annotation-fields-row select, .annotation-fields-row button {
+    height:  30px;
+}
+
+.annotation-fields-row input {
+    height: 21px;
+    margin-bottom:3px;
+}
+
+.annotation-field-title {
+    display: inline-block;
+    font-size: 15px;
+}
+
+.annotation-field-title#at-label {
+    width: 150px;
 }
 
 #annotation-fields input.invalid {
     border: 1px solid red;
 }
 
+#annotation-fields i.fas.fa-trash {
+    margin: 0;
+}
+
 #annotations-input-warning {
-    font-size: 0.7em;
+    font-size: 14px;
     color: red;
     font-weight: bold;
+}
+
+#annotations-input-warning.hidden {
+    font-size: 14px;
+    color: red;
+    font-weight: bold;
+}
+
+#toggle-annotations {
+    width: 170px;
+}
+
+#annotations-input-warning.valid{
+    color: var(--accent-okay);
+}
+
+#close-annotation-fields {
+    position: absolute;
+    right: 0;
+    padding: 2px;
+    top: 0;
+    margin-right: 7px;
+    cursor: pointer;
+}
+
+#add-annotation-fields {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    margin: 15px;
+    text-align: right;
+    line-height: 0px;
+    margin-bottom: 4px;
+}
+
+#add-annotation-fields #notice {
+    font-size: 12px;
+    text-align: right;
+    color: var(--gray-darker);
+    cursor: default;
+}
+
+#annotation-controls {
+    position: fixed;
+    margin: 10px;
+    right: 0;
+    bottom:  0;
+    border-radius: 10px;
+    background-color: var(--gray);
+    z-index: 10;
+    box-shadow: 10px 10px 60px #555;
+}
+
+#annotation-controls #toggle-annotation-controls {
+    display: inline-block;
+    height: 50px;
+    width: 50px;
+    line-height: 50px;
+    text-align: center;
+    vertical-align: middle;
+    font-size: 15px;
+    cursor: pointer;
+}
+
+#toggle-annotation-fields {
+    margin-left: 10px;
+}
+
+#annotation-controls #annotation-controls-buttons {
+    display: inline-block;  
+}
+
+#annotation-controls #annotation-controls-buttons.hidden {
+    display: none;
+    transition: display 0s, opacity 0.5s linear;
+}
+
+.spinner {
+    -webkit-animation: spinner 2s linear infinite;
+}
+
+@-webkit-keyframes spinner {
+    from{
+        -webkit-transform: rotate(0deg);
+    }
+    to{
+        -webkit-transform: rotate(360deg);
+    }
 }
 
 /** --------------------- *
@@ -218,6 +463,7 @@ a.has_image img {
     background-color: #bed4f9;
     margin-top: 5px;
     padding: 15px;
+    display: none;
 }
     
 li.op > .post-annotations {
@@ -235,18 +481,23 @@ li.op > .post-annotations {
     margin-right: 5px;
 }
 
-.post-annotation-list {
+.post-annotation.checkbox > .post-annotation-options {
     display: inline-block;
 }
 
-.post-annotation-list > input {
+.post-annotation-options {
     display: inline-block;
 }
 
+.post-annotation-options > input {
+    display: inline-block;
+}
 
 /** --------------------- *
      Footer
   * --------------------- */
 footer {
     text-align: center;
+    margin-top: 40px;
+    margin-bottom: 70px;
 }
