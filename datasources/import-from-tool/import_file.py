@@ -234,7 +234,7 @@ class ImportFromExternalTool(BasicProcessor):
 				entity_name = "Page Name" if "Page Name" in reader.fieldnames else "Group Name"
 
 				writer = csv.DictWriter(output_csv, fieldnames=(
-					"id", "thread_id", "body", "author", "timestamp", "page_id", "page_name", "page_likes",
+					"id", "thread_id", "body", "author", "subject", "timestamp", "page_id", "page_name", "page_likes",
 					"page_followers", "page_shared_from", "type", "interactions", "likes", "comments", "shares",
 					"likes_love", "likes_wow", "likes_haha", "likes_sad", "likes_angry", "likes_care", "views_post",
 					"views_total", "views_total_crossposts", "video_length", "video_status", "url", "url_original",
@@ -259,6 +259,7 @@ class ImportFromExternalTool(BasicProcessor):
 						"thread_id": item["URL"].split("/")[-1],
 						"body": item["Message"],
 						"author": item["User Name"],
+						"subject": "",
 						"timestamp": int(date.timestamp()),
 						"page_name": item[entity_name],
 						"page_likes": item["Likes at Posting"],
@@ -299,7 +300,7 @@ class ImportFromExternalTool(BasicProcessor):
 				entity_name = "Page Name" if "Page Name" in reader.fieldnames else "Group Name"
 
 				writer = csv.DictWriter(output_csv, fieldnames=(
-					"id", "thread_id", "body", "author", "timestamp", "page_id", "page_name", "page_category",
+					"id", "thread_id", "body", "author", "subject", "timestamp", "page_id", "page_name", "page_category",
 					"page_top_country", "page_description", "page_created", "page_likes", "page_followers",
 					"page_shared_from", "type", "interactions", "likes", "comments", "shares", "likes_love",
 					"likes_wow", "likes_haha", "likes_sad", "likes_angry", "likes_care", "views_post", "views_total",
@@ -334,6 +335,7 @@ class ImportFromExternalTool(BasicProcessor):
 						"thread_id": item["URL"].split("/")[-1],
 						"body": item["Message"],
 						"author": item["User Name"],
+						"subject": "",
 						"timestamp": int(date.timestamp()),
 						"page_name": item[entity_name],
 						"page_category": item["Page Category"],
@@ -479,3 +481,24 @@ class ImportFromExternalTool(BasicProcessor):
 		dataset.finish(done)
 		dataset.update_status("Result processed")
 		dataset.update_version(get_software_version())
+
+
+	@classmethod
+	def get_options(cls, parent_dataset=None, user=None):
+		"""
+		Get processor options
+
+		This method by default returns the class's "options" attribute, or an
+		empty dictionary. It can be redefined by processors that need more
+		fine-grained options, e.g. in cases where the availability of options
+		is partially determined by the parent dataset's parameters.
+
+		:param DataSet parent_dataset:  An object representing the dataset that
+		the processor would be run on
+		:param User user:  Flask user the options will be displayed for, in
+		case they are requested for display in the 4CAT web interface. This can
+		be used to show some options only to privileges users.
+		"""
+		options = cls.options
+
+		cls.options
