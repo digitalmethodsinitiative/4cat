@@ -32,25 +32,34 @@ database_name = config.DB_NAME_TEST if hasattr(config.FlaskConfig,
                                                "DEBUG") and config.FlaskConfig.DEBUG == "Test" else config.DB_NAME
 login_manager = LoginManager()
 app = Flask(__name__)
-log = Logger()
+
 # Set up logging for Gunicorn; only run w/ Docker
 if hasattr(config, "DOCKER_CONFIG_FILE") and os.path.exists(config.DOCKER_CONFIG_FILE):
+    # rename 4cat.log to 4cat_frontend.log
+    # Normally this is mostly empty; could combine it, but may be useful to identify processes running on both front and backend
+    log = Logger(filename='frontend_4cat.log')
+
     docker_config_parser = configparser.ConfigParser()
     docker_config_parser.read(config.DOCKER_CONFIG_FILE)
     if docker_config_parser['DOCKER'].getboolean('use_docker_config'):
+        # Add Gunicorn error log to main app logger
         gunicorn_logger = logging.getLogger('gunicorn.error')
         app.logger.handlers = gunicorn_logger.handlers
         app.logger.setLevel(gunicorn_logger.level) # debug is int 10
 
-        # Log file
+        # Gunicorn Error Log file
+        error_file_path = Path(config.PATH_ROOT, config.PATH_LOGS, 'error_gunicorn.log')
         file_handler = logging.handlers.RotatingFileHandler(
-                                                            filename='4cat_flask.log',
+                                                            filename=error_file_path,
                                                             maxBytes=int( 50 * 1024 * 1024),
                                                             backupCount= 1,
                                                             )
         logFormatter = logging.Formatter("%(asctime)s [%(levelname)-5.5s]  %(message)s")
         file_handler.setFormatter(logFormatter)
         app.logger.addHandler(file_handler)
+
+else:
+    log = Logger()
 
 db = Database(logger=log, dbname=database_name, appname="frontend")
 queue = JobQueue(logger=log, database=db)

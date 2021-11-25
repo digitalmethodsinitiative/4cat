@@ -15,7 +15,7 @@ from pathlib import Path
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
-from flask import render_template, jsonify, request, abort, flash, get_flashed_messages, url_for
+from flask import render_template, jsonify, request, abort, flash, get_flashed_messages, url_for, redirect
 from flask_login import login_required, current_user
 
 from webtool import app, db
@@ -43,7 +43,7 @@ def admin_frontpage(page):
     users = db.fetchall("SELECT * FROM users " + filter_bit + "ORDER BY is_admin DESC, name ASC LIMIT 20 OFFSET %i" % offset, replacements)
     pagination = Pagination(page, 20, num_users, "admin_frontpage")
 
-    return render_template("controlpanel/frontpage.html", users=users, filter={"filter": filter}, pagination=pagination)
+    return render_template("controlpanel/frontpage.html", users=users, filter={"filter": filter}, pagination=pagination, flashes=get_flashed_messages())
 
 
 @app.route("/admin/worker-status/")
@@ -199,6 +199,7 @@ def reject_user():
 
 @app.route("/admin/<string:mode>-user/", methods=["GET", "POST"])
 @login_required
+@admin_required
 def manipulate_user(mode):
     if not current_user.is_authenticated or not current_user.is_admin():
         return error(403, message="This page is off-limits to you.")
@@ -211,7 +212,7 @@ def manipulate_user(mode):
 
     incomplete = []
     if request.method == "POST":
-        if not request.form.get("name"):
+        if not request.form.get("name", request.args.get("name")):
             incomplete.append("name")
 
         # userdata needs to be valid JSON, or empty
@@ -230,7 +231,8 @@ def manipulate_user(mode):
             user_data = {
                 "name": request.form.get("name"),
                 "is_admin": request.form.get("is_admin") == "on",
-                "userdata": request.form.get("userdata").strip()
+                "is_deactivated": request.form.get("is_deactivated") == "on",
+                "userdata": request.form.get("userdata", "").strip()
             }
             if not user_data["userdata"]:
                 # it's expected that this parses to a JSON object

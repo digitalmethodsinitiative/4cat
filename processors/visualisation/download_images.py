@@ -234,14 +234,14 @@ class ImageDownloader(BasicProcessor):
 			url_file_map[url] = save_location.name
 			file_url_map[save_location.name] = url
 			try:
-				picture.save(save_location)
+				picture.save(str(save_location))
 				# Counting is important
 				downloaded_images += 1
 			except OSError as e:
 				# some images may need to be converted to RGB to be saved
 				self.dataset.log('Debug: OSError when saving image %s: %s' % (save_location, e))
 				picture = picture.convert('RGB')
-				picture.save(save_location)
+				picture.save(str(save_location))
 			except ValueError as e:
 				self.dataset.log(f"Error '{e}' saving image for {url}, skipping")
 				failures.append(url)

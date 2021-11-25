@@ -42,7 +42,7 @@ class Logger:
 	}
 	alert_level = "FATAL"
 
-	def __init__(self, output=False, db=None):
+	def __init__(self, output=False, db=None, filename='4cat.log'):
 		"""
 		Set up log handler
 
@@ -52,7 +52,7 @@ class Logger:
 			return
 
 		self.print_logs = output
-		self.log_path = Path(config.PATH_ROOT, config.PATH_LOGS, "4cat.log")
+		self.log_path = Path(config.PATH_ROOT, config.PATH_LOGS, filename)
 		self.previous_report = time.time()
 
 		self.logger = logging.getLogger("4cat-backend")
