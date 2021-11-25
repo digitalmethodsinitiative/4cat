@@ -20,7 +20,11 @@
 
 			{% for custom_field in custom_fields %}
 				{% if post.get(custom_field) %}
-				<span title="{{ custom_field }}" class="{{ custom_field }}">{{ post.get(custom_field) }}</span>
+					{% set custom_value = post.get(custom_field) %}
+					{% if custom_value|length > 100 %}
+						{% set custom_value = custom_value[:97] + '...' %}
+					{% endif %}
+					<span title="{{ custom_field }}: {{ custom_value }}" class="{{ custom_field }}">{{ custom_value }}</span>
 				{% endif %}
 			{% endfor %}
 		{% endif %}
