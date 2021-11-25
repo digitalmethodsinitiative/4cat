@@ -83,13 +83,13 @@ def explorer_dataset(key, page):
 		# Get the column names (varies per datasource).
 		columns = next(reader)
 
-		time_col = columns.index("timestamp")
-
 		# Sort on date
-		reader = sorted(reader, key=operator.itemgetter(time_col))    
+		# Unix timestamp integers are not always saved in the same field
+		time_col = columns.index("unix_timestamp") if "unix_timestamp" in columns else columns.index("timestamp")
+		reader = sorted(reader, key=operator.itemgetter(time_col))
 
 		for post in reader:
-
+			
 			# Use an offset if we're showing a page beyond the first.
 			count += 1
 			if count <= offset:
