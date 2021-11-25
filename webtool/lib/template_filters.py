@@ -135,7 +135,7 @@ def _jinja2_filter_extension_to_noun(ext):
 @app.template_filter('post_field')
 def _jinja2_filter_post_field(field, post, board=""):
 	
-	field = field.replace("{{board}}", board).replace("{{thread_id}}", post.get("thread_id", "")).replace("{{id}}", post.get("id", "")).replace("{{author}}", post.get("author", ""))
+	field = field.replace("{{board}}", board).replace("{{thread_id}}", str(post.get("thread_id", ""))).replace("{{id}}", str(post.get("id", ""))).replace("{{author}}", post.get("author", ""))
 	return field
 
 @app.template_filter('hasattr')
