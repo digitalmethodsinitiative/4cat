@@ -46,7 +46,6 @@
 .flag-by, .flag-BY { background-position: -64px -22px }
 .flag-bz, .flag-BZ { background-position: -80px -22px }
 .flag-ca, .flag-CA { background-position: -96px -22px }
-.flag-catalonia, .flag-CATALONIA { background-position: -112px -22px }
 .flag-cc, .flag-CC { background-position: -128px -22px }
 .flag-cd, .flag-CD { background-position: -144px -22px }
 .flag-cf, .flag-CF { background-position: -160px -22px }
@@ -81,7 +80,7 @@
 .flag-es, .flag-ES { background-position: -112px -44px }
 .flag-et, .flag-ET { background-position: -128px -44px }
 .flag-eu, .flag-EU { background-position: -144px -44px }
-.flag-fam, .flag-FAM { background-position: -160px -44px }
+.flag-fa, .flag-FA { background-position: -160px -44px }
 .flag-fi, .flag-FI { background-position: -176px -44px }
 .flag-fj, .flag-FJ { background-position: -192px -44px }
 .flag-fk, .flag-FK { background-position: -208px -44px }
@@ -267,7 +266,7 @@
 .flag-zm, .flag-ZM { background-position: -16px -176px }
 .flag-zw, .flag-ZW { background-position: -32px -176px }
 
-.trollflag {
+.trollflag, .flag[class*="flag-t"] {
 	display:inline-block;
 	width:16px;
 	height:11px;
@@ -275,72 +274,72 @@
 	top:1px;
 	background:url('../img/flags/troll-flags.png') no-repeat
 }
-.trollflag-ac, .trollflag-AC {
+.trollflag-ac, .trollflag-AC, .flag-t_AC {
 	background-position:0 0
 }
-.trollflag-an, .trollflag-AN {
+.trollflag-an, .trollflag-AN, .flag-t_AN {
 	background-position:-16px 0
 }
-.trollflag-bl, .trollflag-BL {
+.trollflag-bl, .trollflag-BL, .flag-t_BL {
 	background-position:-32px 0
 }
-.trollflag-cf, .trollflag-CF {
+.trollflag-cf, .trollflag-CF, .flag-t_CF {
 	background-position:-48px 0
 }
-.trollflag-cm, .trollflag-CM {
+.trollflag-cm, .trollflag-CM, .flag-t_CM {
 	background-position:0 -11px
 }
-.trollflag-ct, .trollflag-CT {
+.trollflag-ct, .trollflag-CT, .flag-t_CT {
 	background-position:-16px -11px
 }
-.trollflag-dm, .trollflag-DM {
+.trollflag-dm, .trollflag-DM, .flag-t_DM {
 	background-position:-32px -11px
 }
-.trollflag-eu, .trollflag-EU {
+.trollflag-eu, .trollflag-EU, .flag-t_EU {
 	background-position:-48px -11px
 }
-.trollflag-fc, .trollflag-FC {
+.trollflag-fc, .trollflag-FC, .flag-t_FC {
 	background-position:0 -22px
 }
-.trollflag-gn, .trollflag-GN {
+.trollflag-gn, .trollflag-GN, .flag-t_GN {
 	background-position:-16px -22px
 }
-.trollflag-gy, .trollflag-GY {
+.trollflag-gy, .trollflag-GY, .flag-t_GY {
 	background-position:-32px -22px
 }
-.trollflag-jh, .trollflag-JH {
+.trollflag-jh, .trollflag-JH, .flag-t_JH {
 	background-position:-48px -22px
 }
-.trollflag-kn, .trollflag-KN {
+.trollflag-kn, .trollflag-KN, .flag-t_KN {
 	background-position:0 -33px
 }
-.trollflag-mf, .trollflag-MF {
+.trollflag-mf, .trollflag-MF, .flag-t_MF {
 	background-position:-16px -33px
 }
-.trollflag-nb, .trollflag-NB {
+.trollflag-nb, .trollflag-NB, .flag-t_NB {
 	background-position:-32px -33px
 }
-.trollflag-nz, .trollflag-NZ {
+.trollflag-nz, .trollflag-NZ, .flag-t_NZ {
 	background-position:-48px -33px
 }
-.trollflag-pc, .trollflag-PC {
+.trollflag-pc, .trollflag-PC, .flag-t_PC {
 	background-position:0 -44px
 }
-.trollflag-pr, .trollflag-PR {
+.trollflag-pr, .trollflag-PR, .flag-t_PR {
 	background-position:-16px -44px
 }
-.trollflag-re, .trollflag-RE {
+.trollflag-re, .trollflag-RE, .flag-t_RE {
 	background-position:-32px -44px
 }
-.trollflag-tm, .trollflag-TM {
+.trollflag-tm, .trollflag-TM, .flag-t_TM {
 	background-position:-48px -44px
 }
-.trollflag-tr, .trollflag-TR {
+.trollflag-tr, .trollflag-TR, .flag-t_TR {
 	background-position:0 -55px
 }
-.trollflag-un, .trollflag-UN {
+.trollflag-un, .trollflag-UN, .flag-t_UN {
 	background-position:-16px -55px
 }
-.trollflag-wp, .trollflag-WP {
+.trollflag-wp, .trollflag-WP, .flag-t_WP {
 	background-position:-32px -55px
 }
