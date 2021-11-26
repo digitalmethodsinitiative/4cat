@@ -1,0 +1,42 @@
+@font-face {
+    font-family: 'IBM Plex Sans';
+    src: url("../fonts/IBMPlexSans-Regular.ttf")
+}
+
+@font-face {
+    font-family: 'IBM Plex Sans';
+    font-weight: bold;
+    src: url("../fonts/IBMPlexSans-SemiBold.ttf")
+}
+
+body {
+	background-color: #265273;
+}
+
+#metadata {
+	color: white;
+}
+
+.content article {
+	font-family: 'IBM Plex Sans', Arial, sans-serif;
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 21px;
+    word-break: break-word;
+}
+
+.content .posts li header {
+	text-decoration: none;
+	border: none;
+	color: #858585;
+	font-size: 14px;
+}
+
+.content .posts li {
+	display: table;
+	min-height: auto;
+	min-width: auto;
+	margin-left: 10px;
+	border-radius: 5px;
+	background-color: white;
+}

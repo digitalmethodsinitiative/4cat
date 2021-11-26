@@ -5,16 +5,21 @@
 
 	<header>
 		<!-- Metadata -->
+		{% if 'pseudonymise' in parameters and parameters.get('pseudonymise') %}
+		<span title="Pseudonymous author" class="author">
+			<i class="fa fa-user-secret tooltip-trigger"></i>
+		{% else %}
 		<span title="Author" class="author">
-		{% if custom_fields and custom_fields.get("author") %}
-			{% set author = custom_fields.author | post_field(post) %}
-		{% else %}
-			{% set author = post.author %}
-		{% endif %}
-		{% if author|length > 20 %}
-			{{ author[:17] + '...' }}
-		{% else %}
-			{{ author }}
+			{% if custom_fields and custom_fields.get("author") %}
+				{% set author = custom_fields.author | post_field(post) %}
+			{% else %}
+				{% set author = post.author %}
+			{% endif %}
+			{% if author|length > 20 %}
+				{{ author[:17] + '...' }}
+			{% else %}
+				{{ author }}
+			{% endif %}
 		{% endif %}
 		</span>
 		{% if 'thread_id' in post %}
@@ -46,6 +51,7 @@
 		{% endif %}
 
 	</header>
+
 	<!-- Optional image(s) -->
 	{% if "images" in post %}
 		{% set images = post.images %}

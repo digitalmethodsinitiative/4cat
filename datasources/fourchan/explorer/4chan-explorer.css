@@ -1,5 +1,49 @@
-
-
 body {
-	background-color: red;
+	background: #ffe;
+}
+
+.content {
+	color: maroon;
+	font-family: arial;
+	font-size: 10pt;
+	margin-left: 0;
+	margin-right: 0;
+	margin-top: 5px;
+}
+
+.content article {
+	font-size: 10pt;
+}
+
+.content .posts li {
+	display: table;
+	margin-left: 10px;
+	background-color: #f0e0d6;
+	border: 1px solid #d9bfb7;
+	width: auto;
+	min-width: 10px;
+	max-width: 100%;
+	border-left: none;
+	border-top: none;
+	padding: 10px;
+}
+
+.content .posts li.op {
+	background-color: #ffe;
+	color: maroon;
+	border: 1px solid #d9bfb7;
+	border-left: none;
+	border-top: none;
+}
+
+.content .posts li.op header {
+	font-weight: bold;
+}
+
+.content .post-annotations {
+	background-color: #e2c6b5;
+}
+
+.content .op .post-annotations {
+	background-color: #ffdeca;
 }

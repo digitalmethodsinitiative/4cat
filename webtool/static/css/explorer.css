@@ -122,6 +122,7 @@ body > header #metadata {
     margin: 0 auto;
     margin-top: 40px;
     margin-bottom: 40px;
+    text-align: center;
 }
 
 body > header #metadata #parameters > span {
@@ -223,6 +224,7 @@ span.page.selected {
 
 .posts .external-url {
     float: right;
+    margin-left: 10px;
 }
 
 .quote {

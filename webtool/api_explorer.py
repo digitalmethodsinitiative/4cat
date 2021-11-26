@@ -98,8 +98,6 @@ def explorer_dataset(key, page):
 	posts = [strip_html(post) for post in posts]
 	posts = [format(post) for post in posts]
 
-	print(posts[:1])
-
 	if not posts:
 		return error(404, error="No posts available for this datasource")
 
@@ -120,7 +118,7 @@ def explorer_dataset(key, page):
 		annotations = json.loads(annotations["annotations"])
 
 	# Generate the HTML page
-	return render_template("explorer/explorer.html", key=key, datasource=datasource, board=board, is_local=is_local, parameters=parameters, annotation_fields=annotation_fields, annotations=annotations, posts=posts, css=css, custom_fields=custom_fields, page=page, offset=offset, limit=limit, post_count=int(dataset["num_rows"]))
+	return render_template("explorer/explorer.html", key=key, datasource=datasource, board=board, is_local=is_local, parameters=parameters, annotation_fields=annotation_fields, annotations=annotations, posts=posts, custom_css=css, custom_fields=custom_fields, page=page, offset=offset, limit=limit, post_count=int(dataset["num_rows"]))
 
 @app.route('/explorer/thread/<datasource>/<board>/<string:thread_id>')
 @api_ratelimit
@@ -163,7 +161,7 @@ def explorer_thread(datasource, board, thread_id):
 	# The file's naming format should e.g. be 'reddit-explorer.json'.
 	custom_fields = get_custom_fields(datasource)
 
-	return render_template("explorer/explorer.html", datasource=datasource, board=board, posts=posts, css=css, custom_fields=custom_fields, limit=len(posts), post_count=len(posts), thread=thread_id)
+	return render_template("explorer/explorer.html", datasource=datasource, board=board, posts=posts, custom_css=css, custom_fields=custom_fields, limit=len(posts), post_count=len(posts), thread=thread_id)
 
 @app.route('/explorer/post/<datasource>/<board>/<string:post_id>')
 @api_ratelimit
@@ -192,12 +190,17 @@ def explorer_post(datasource, board, thread_id):
 	posts = get_posts(db, datasource, board, ids=tuple([thread_id]), threads=True, order_by=["id"])
 
 	posts = [strip_html(post) for post in posts]
-
-	if not posts:
-		return error(404, error="No posts available for this thread")
-
 	posts = [format(post) for post in posts]
-	return render_template("explorer/explorer.html", datasource=datasource, board=board, posts=posts, limit=len(posts), post_count=len(posts), thread=thread_id)
+
+	# Include custom css if it exists in the datasource's 'explorer' dir.
+	# The file's naming format should e.g. be 'reddit-explorer.css'.
+	css = get_custom_css(datasource)
+
+	# Include custom fields if it they are in the datasource's 'explorer' dir.
+	# The file's naming format should e.g. be 'reddit-explorer.json'.
+	custom_fields = get_custom_fields(datasource)
+
+	return render_template("explorer/explorer.html", datasource=datasource, board=board, posts=posts, custom_css=css, custom_fields=custom_fields, limit=len(posts), post_count=len(posts))
 
 @app.route("/explorer/save_annotation_fields/<string:key>", methods=["POST"])
 @api_ratelimit
@@ -538,6 +541,8 @@ def get_custom_css(datasource):
 			css = css.read()
 	else:
 		css = None
+		#css = Path(config.PATH_ROOT, "datasources", datasource_dir, "explorer", datasource.lower() + "-explorer.css")
+	print(css)
 	return css
 
 def get_custom_fields(datasource):
