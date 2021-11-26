@@ -28,7 +28,10 @@
 <body data-url-root="{{ url_for("show_frontpage") }}">
 <header>
 	{% include "explorer/header.html" %}
-	{% include "explorer/annotations.html" %}
+
+	{% if not thread %}
+		{% include "explorer/annotations.html" %}
+	{% endif %}
 </header>
 
 <div class="content">

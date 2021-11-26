@@ -162,7 +162,17 @@ def explorer_thread(datasource, board, thread_id):
 		return error(404, error="No posts available for this thread")
 
 	posts = [format(post) for post in posts]
-	return render_template("explorer/explorer.html", datasource=datasource, board=board, posts=posts, limit=len(posts), post_count=len(posts), thread=thread_id)
+
+
+	# Include custom css if it exists in the datasource's 'explorer' dir.
+	# The file's naming format should e.g. be 'reddit-explorer.css'.
+	css = get_custom_css(datasource)
+
+	# Include custom fields if it they are in the datasource's 'explorer' dir.
+	# The file's naming format should e.g. be 'reddit-explorer.json'.
+	custom_fields = get_custom_fields(datasource)
+
+	return render_template("explorer/explorer.html", datasource=datasource, board=board, posts=posts, css=css, custom_fields=custom_fields, limit=len(posts), post_count=len(posts), thread=thread_id)
 
 @app.route('/explorer/post/<datasource>/<board>/<string:post_id>')
 @api_ratelimit

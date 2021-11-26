@@ -19,12 +19,14 @@
 		{% if custom_fields %}
 
 			{% for custom_field in custom_fields %}
-				{% if post.get(custom_field) %}
+				{% if post.get(custom_field, "") %}
 					{% set custom_value = post.get(custom_field) %}
 					{% if custom_value|length > 100 %}
 						{% set custom_value = custom_value[:97] + '...' %}
 					{% endif %}
-					<span title="{{ custom_field }}: {{ custom_value }}" class="{{ custom_field }}">{{ custom_value }}</span>
+					{% if custom_value and custom_value != "None" %}
+						<span title="{{ custom_field }}: {{ custom_value }}" class="{{ custom_field }}">{{ custom_value }}</span>
+					{% endif %}
 				{% endif %}
 			{% endfor %}
 		{% endif %}
