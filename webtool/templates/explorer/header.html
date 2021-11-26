@@ -12,7 +12,6 @@
 	{% if key %}
 		<div id="dataset-info">
 			<p>Showing posts {{ offset + 1 }} - {{ post_count if (offset + limit) > post_count else (offset + limit) }} ({{ post_count }} in total).</p>
-			<p>Sorted by time.</p>
 		</div>
 		<!-- <div id="parameters">
 		{% set primary_fields = ("datasource", "board", "body_match", "min_date", "max_date") %}

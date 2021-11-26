@@ -15,6 +15,12 @@
 			{{ custom_css }}
 		</style>
 	{% endif %}
+
+	<!-- favicon -->
+	<link rel="shortcut icon" href="{{url_for('static', filename='img/favicon/favicon-bw.ico')}}">
+	<meta name="msapplication-TileColor" content="#485ba6">
+	<meta name="msapplication-config" content="static/img/favicon/browserconfig.xml">
+	<meta name="theme-color" content="#ffffff">
 	
 	<script type="text/javascript" src="{{url_for('static', filename='js/jquery-3.3.1.min.js')}}"></script>
 	<script type="text/javascript" src="{{url_for('static', filename='js/explorer.js')}}"></script>
