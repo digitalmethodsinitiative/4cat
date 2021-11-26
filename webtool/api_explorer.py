@@ -60,7 +60,7 @@ def explorer_dataset(key, page):
 	# Load some variables
 	parameters = json.loads(dataset["parameters"])
 	datasource = parameters["datasource"]
-	board = parameters["board"]
+	board = parameters.get("board", "")
 	annotation_fields = json.loads(dataset["annotation_fields"]) if dataset["annotation_fields"] else None
 
 	# If the dataset is local, we can add some more features
@@ -76,37 +76,29 @@ def explorer_dataset(key, page):
 	post_ids = []
 	posts = []
 	count = 0
-	with open(dataset_path, "r", encoding="utf-8") as dataset_file:
 		
-		reader = csv.reader(dataset_file)
-		
-		# Get the column names (varies per datasource).
-		columns = next(reader)
+	first_post = False
 
-		# Sort on date
-		# Unix timestamp integers are not always saved in the same field
-		time_col = columns.index("unix_timestamp") if "unix_timestamp" in columns else columns.index("timestamp")
-		reader = sorted(reader, key=operator.itemgetter(time_col))
-
-		for post in reader:
+	for post in iterate_items(dataset_path):
 			
-			# Use an offset if we're showing a page beyond the first.
-			count += 1
-			if count <= offset:
-				continue
+		# Use an offset if we're showing a page beyond the first.
+		count += 1
+		if count <= offset:
+			continue
 
-			# Attribute column names and collect dataset's posts.
-			post = {columns[i]: post[i] for i in range(len(post))}
-			post_ids.append(post["id"])
-			posts.append(post)
+		# Attribute column names and collect dataset's posts.
+		post_ids.append(post["id"])
+		posts.append(post)
 
-			# Stop if we exceed the max posts per page.
-			if count >= (offset + limit):
-				break
+		# Stop if we exceed the max posts per page.
+		if count >= (offset + limit):
+			break
 
 	# Clean up HTML
 	posts = [strip_html(post) for post in posts]
 	posts = [format(post) for post in posts]
+
+	print(posts[:1])
 
 	if not posts:
 		return error(404, error="No posts available for this datasource")
@@ -162,7 +154,6 @@ def explorer_thread(datasource, board, thread_id):
 		return error(404, error="No posts available for this thread")
 
 	posts = [format(post) for post in posts]
-
 
 	# Include custom css if it exists in the datasource's 'explorer' dir.
 	# The file's naming format should e.g. be 'reddit-explorer.css'.
@@ -465,6 +456,44 @@ def get_image_file(img_file, limit=0):
 		abort(404)
 
 	return send_file(str(image_path))
+
+def iterate_items(in_file):
+	# Loop through both csv and NDJSON files.
+	
+	suffix = in_file.name.split(".")[-1].lower()
+
+	if suffix == "csv":
+
+		with open(in_file, "r", encoding="utf-8") as dataset_file:
+		
+			# Sort on date.
+			# Unix timestamp integers are not always saved in the same field.
+			reader = csv.reader(dataset_file)
+			columns = next(reader)
+			time_col = columns.index("unix_timestamp") if "unix_timestamp" in columns else columns.index("timestamp")
+			reader = sorted(reader, key=operator.itemgetter(time_col))
+			
+			for item in reader:
+
+				# Add columns
+				item = {columns[i]: item[i] for i in range(len(item))}
+				
+				yield item
+
+	elif suffix == "ndjson":
+		# in this format each line in the file is a self-contained JSON
+		# file
+
+		with open(in_file, "r", encoding="utf-8") as dataset_file:
+
+			for line in dataset_file:
+
+				# Unfortunately we can't easily sort on date here.
+				# So we're just looping through the file.
+				item = json.loads(line)
+				yield item
+
+	return Exception("Can't loop through file with extension %s" % suffix)
 
 def get_posts(db, datasource, board, ids, threads=False, limit=0, offset=0, order_by=["timestamp"]):
 

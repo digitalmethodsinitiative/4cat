@@ -1,10 +1,10 @@
 {
-	"subject": "subject",
-	"board": "board",
+	"subject": "{{subject}}",
+	"board": "{{board}}",
 	"images": {
 		"field": "image_4chan",
 		"url_root": "https://i.4pcdn.org/{{board}}/"
 	},
-	"country_code": "{{flag}}",
+	"country": "<span class='flag flag-{{country_code}}' title='{{country_code}}'></span>",
 	"external_url": "https://archive.4plebs.org/{{board}}/thread/{{thread_id}}#{{id}}"
 }

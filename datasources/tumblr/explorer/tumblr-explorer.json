@@ -1,5 +1,5 @@
 {
 	"external_url": "https://{{author}}.tumblr.com/{{id}}",
-	"notes": "notes",
-	"tags": "tags"
+	"notes": "Notes: {{notes}}",
+	"body": "{{ body }}<br><br><em>{{tags}}</em>"
 }

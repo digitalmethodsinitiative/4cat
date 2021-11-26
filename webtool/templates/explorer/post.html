@@ -1,31 +1,45 @@
 <li id="post-{{ post.id }}"{% if post.thread_id == post.id %} class="op"{% endif %}>    
+
+	<!-- Special fields we're handling a bit differently -->
+	{% set special_fields = ["external_url", "author", "subject", "body", "timestamp", "image", "images"] %}
+
 	<header>
-		<!-- Mandatory metadata -->
+		<!-- Metadata -->
 		<span title="Author" class="author">
-		{% if post.author|length > 20 %}
-			{{ post.author[:17] + '...' }}
+		{% if custom_fields and custom_fields.get("author") %}
+			{% set author = custom_fields.author | post_field(post) %}
 		{% else %}
-			{{ post.author }}
+			{% set author = post.author %}
+		{% endif %}
+		{% if author|length > 20 %}
+			{{ author[:17] + '...' }}
+		{% else %}
+			{{ author }}
 		{% endif %}
 		</span>
-		<span title="Thread ID" class="thread_id">{% if is_local %}<a href="/explorer/thread/{{ datasource }}/{{ board }}/{{ post.thread_id }}">{{ post.thread_id }}</a>{% else %}{{ post.thread_id }}{% endif %}</span>
-		<span title="Post ID" class="post_id">{{ post.id }}</span>
-		{% if post.timestamp is integer %}
-			<span title="Date" class="datetime">{{ post.timestamp|datetime('%Y-%m-%d %H:%M') }}</span>
-		{% else %}
-			<span title="Date" class="datetime">{{ post.timestamp }}</span>
+		{% if 'thread_id' in post %}
+			<span title="Thread ID" class="thread_id">{% if is_local %}<a href="/explorer/thread/{{ datasource }}/{{ board }}/{{ post.thread_id }}">{{ post.thread_id }}</a>{% else %}{{ post.thread_id }}{% endif %}</span>
 		{% endif %}
+		<span title="Post ID" class="post_id">{{ post.id }}</span>
+		{% if 'timestamp' in post %}
+			{% if post.timestamp is integer %}
+				<span title="Date" class="datetime">{{ post.timestamp|datetime('%Y-%m-%d %H:%M') }}</span>
+			{% else %}
+				<span title="Date" class="datetime">{{ post.timestamp }}</span>
+			{% endif %}
+		{% endif %}
+
 		<!-- Custom metadata -->
 		{% if custom_fields %}
 
 			{% for custom_field in custom_fields %}
-				{% if post.get(custom_field, "") %}
-					{% set custom_value = post.get(custom_field) %}
+				{% if custom_field not in special_fields %}
+					{% set custom_value = custom_fields[custom_field] | post_field(post) | safe %}
 					{% if custom_value|length > 100 %}
 						{% set custom_value = custom_value[:97] + '...' %}
 					{% endif %}
 					{% if custom_value and custom_value != "None" %}
-						<span title="{{ custom_field }}: {{ custom_value }}" class="{{ custom_field }}">{{ custom_value }}</span>
+						<span title="{{ custom_field }}" class="{{ custom_field }}">{{ custom_value }}</span>
 					{% endif %}
 				{% endif %}
 			{% endfor %}
@@ -52,8 +66,10 @@
 
 	<!-- Possible external link -->
 	{% if custom_fields and "external_url" in custom_fields %}
-		{% set external_url = custom_fields.external_url | post_field(post, board) %}
-		<a href="{{ external_url }}" target="_blank"><span class="external-url"><i class="fas fa-external-link-alt"></i></span></a>
+		{% set external_url = custom_fields.external_url | post_field(post) %}
+		{% if external_url %}
+			<a href="{{ external_url }}" target="_blank"><span class="external-url"><i class="fas fa-external-link-alt"></i></span></a>
+		{% endif %}
 	{% endif %}
 
 	<!-- Post content-->
@@ -64,7 +80,11 @@
 	</a>
 	{% endif %}
 	<span class="post-content">
-		{{ post.body|safe }}
+		{% if custom_fields and 'body' in custom_fields %}
+			{{ custom_fields.body | post_field(post) | safe }}
+		{% else %}
+			{{ post.body|safe }}
+		{% endif %}
 	</span>
 
 	</article>

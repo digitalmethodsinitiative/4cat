@@ -1,0 +1,8 @@
+{
+	"body": "{{ text }}",
+	"author": "{{ author_user.username }}",
+	"created": "{{ created_at }}",
+	"likes": "{{ public_metrics.like_count }} <i class='fas fa-heart'></i>",
+	"retweets": "{{ public_metrics.retweet_count }} <i class='fas fa-retweet'></i>",
+	"external_url": "https://twitter.com/{{ author_user.username }}/status/{{ id }}"
+}
