@@ -56,6 +56,16 @@ class SeleniumScraper(Search, metaclass=abc.ABCMeta):
         else:
             return False
 
+    def collect_links(self):
+        """
+
+        """
+        if self.driver is None:
+            raise ProcessorException('Selenium Drive not yet started: Cannot collect links')
+
+        elems = self.driver.find_elements_by_xpath("//a[@href]")
+        return [elem.get_attribute("href") for elem in elems]
+
     def search(self, query):
         """
         Search for items matching the given query
