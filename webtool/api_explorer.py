@@ -542,7 +542,7 @@ def get_custom_css(datasource):
 	else:
 		css = None
 		#css = Path(config.PATH_ROOT, "datasources", datasource_dir, "explorer", datasource.lower() + "-explorer.css")
-	print(css)
+	
 	return css
 
 def get_custom_fields(datasource):

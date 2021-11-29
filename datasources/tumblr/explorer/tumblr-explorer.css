@@ -1,0 +1,63 @@
+body {
+	background-color: #001935
+}
+
+.content {
+	font-family: "Favorit", "Helvetica Neue", "HelveticaNeue", Helvetica, Arial, sans-serif;
+}
+
+.posts li {
+	background-color: white;
+	color: black;
+	font-size: 14px;
+	left: 0;
+	border-radius: 3px;
+	max-width: 540px;
+	padding: 0;
+}
+
+.posts li header {
+	display: inline-block;
+	text-decoration: none;
+	font-weight: bold;
+	border: none;
+	padding: 10px;
+	line-height: 40px;
+	margin-top: 0px;
+	margin-bottom: 0px;
+}
+
+.posts li article {
+	padding: 0;
+	margin: 0;
+}
+
+.posts li .post-content {
+	display: block;
+	margin: 25px;
+	margin-top: 0px;
+}
+
+.posts li .post-tags {
+	color: #5e5e5e;
+	margin-top: 20px;
+	word-break: break-all;
+}
+
+.posts li .author {
+	font-weight: bold;
+}
+
+.posts li .post-image {
+	width: 100%;
+	margin-bottom: 15px;
+}
+
+.posts li .external-url {
+	padding: 10px;
+}
+
+.posts li .post-annotations {
+	background-color: white;
+	border-top: 1px solid #5e5e5e;
+}

@@ -1,15 +1,23 @@
 <li id="post-{{ post.id }}"{% if post.thread_id == post.id %} class="op"{% endif %}>    
 
 	<!-- Special fields we're handling a bit differently -->
-	{% set special_fields = ["external_url", "author", "subject", "body", "timestamp", "image", "images"] %}
+	{% set special_fields = ["external_url", "author", "body", "timestamp", "image", "images"] %}
+
+	<!-- Possible external link -->
+	{% if custom_fields and "external_url" in custom_fields %}
+		{% set external_url = custom_fields.external_url | post_field(post) %}
+		{% if external_url %}
+			<a href="{{ external_url }}" target="_blank"><span class="external-url" title="Original post"><i class="fas fa-external-link-alt"></i></span></a>
+		{% endif %}
+	{% endif %}
 
 	<header>
 		<!-- Metadata -->
 		{% if 'pseudonymise' in parameters and parameters.get('pseudonymise') %}
-		<span title="Pseudonymous author" class="author">
+			<span title="Pseudonymous author" class="author">
 			<i class="fa fa-user-secret tooltip-trigger"></i>
 		{% else %}
-		<span title="Author" class="author">
+			<span title="Author" class="author">
 			{% if custom_fields and custom_fields.get("author") %}
 				{% set author = custom_fields.author | post_field(post) %}
 			{% else %}
@@ -36,55 +44,51 @@
 
 		<!-- Custom metadata -->
 		{% if custom_fields %}
-
 			{% for custom_field in custom_fields %}
+
 				{% if custom_field not in special_fields %}
+					
 					{% set custom_value = custom_fields[custom_field] | post_field(post) | safe %}
-					{% if custom_value|length > 100 %}
-						{% set custom_value = custom_value[:97] + '...' %}
-					{% endif %}
 					{% if custom_value and custom_value != "None" %}
-						<span title="{{ custom_field }}" class="{{ custom_field }}">{{ custom_value }}</span>
+						<span title="{{ custom_field }}" class="{{ custom_field }}">{{ custom_value | safe }}</span>
 					{% endif %}
+
 				{% endif %}
 			{% endfor %}
 		{% endif %}
 
 	</header>
 
-	<!-- Optional image(s) -->
-	{% if "images" in post %}
-		{% set images = post.images %}
-	{% elif custom_fields and "images" in custom_fields %}
-		{% set images = post[custom_fields["images"].get("field")] %}
-
-		<!-- Prepend a URL to the image filenames -->
-		{% if images and "url_root" in custom_fields["images"] %}
-			{% set images = custom_fields["images"]["url_root"] + images %}
-			
-			<!-- Replace board variable of image URL -->
-			{% if "{{board}}" in images %}
-				{% set images = images | post_field(post) %}
+	<!-- Post content-->
+	<article>
+		<!-- Singular image -->
+		{% if 'image' in custom_fields %}
+			{% set img_link = custom_fields['image'] | post_field(post) %}
+			{% if img_link %}
+				<a href="{{ img_link }}" target="_blank" rel="external">
+				<div class="post-image">
+					<img src="{{ img_link }}">
+				</div>
+				</a>
+			{% endif %}
+		
+		<!-- Multiple images -->
+		{% elif 'images' in custom_fields %}
+			{% set img_links = custom_fields['images'] | post_field(post) %}
+			{% if img_links %}
+				{% set img_links = img_links.split(",") %}
+				<div class="post-images">
+				{% for img_link in img_links %}
+				<a href="{{ img_link }}" target="_blank" rel="external">
+					<div class="post-image">
+						<img src="{{ img_link }}">
+					</div>
+				</a>
+				{% endfor %}
+				</div>
 			{% endif %}
 		{% endif %}
 
-	{% endif %}
-
-	<!-- Possible external link -->
-	{% if custom_fields and "external_url" in custom_fields %}
-		{% set external_url = custom_fields.external_url | post_field(post) %}
-		{% if external_url %}
-			<a href="{{ external_url }}" target="_blank"><span class="external-url"><i class="fas fa-external-link-alt"></i></span></a>
-		{% endif %}
-	{% endif %}
-
-	<!-- Post content-->
-	<article>
-	{% if images %}
-	<a href="{{ images }}" target="_blank" rel="external" class="has_image">
-		<img src="{{ images }}">
-	</a>
-	{% endif %}
 	<span class="post-content">
 		{% if custom_fields and 'body' in custom_fields %}
 			{{ custom_fields.body | post_field(post) | safe }}

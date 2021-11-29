@@ -1,8 +1,11 @@
 {
-	"body": "{{ text }}",
+	"profile_picture": "<img src='{{ author_user.profile_image_url }}'>",
 	"author": "{{ author_user.username }}",
 	"created": "{{ created_at }}",
 	"likes": "{{ public_metrics.like_count }} <i class='fas fa-heart'></i>",
 	"retweets": "{{ public_metrics.retweet_count }} <i class='fas fa-retweet'></i>",
-	"external_url": "https://twitter.com/{{ author_user.username }}/status/{{ id }}"
+	"replies": "{{ public_metrics.reply_count }} <i class='fas fa-reply'></i>",
+	"external_url": "https://twitter.com/{{ author_user.username }}/status/{{ id }}",
+	"image": "{{ attachments.media_keys.url }}",
+	"body": "{{ text }}"
 }

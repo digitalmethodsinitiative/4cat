@@ -40,3 +40,31 @@ body {
 	border-radius: 5px;
 	background-color: white;
 }
+
+.content .posts li.op {
+	color: black;
+}
+
+.content .posts li.op .subject {
+	display: block;
+	font-size: 16px;
+	color: black;
+	font-weight: bold;
+	margin-top: 10px;
+}
+
+.content .posts li.op .subject:after {
+	display: none;
+}
+
+.content .posts li.op .subject_url {
+	
+}
+
+.content .posts li .post-image {
+	
+}
+
+footer p {
+	color: white;
+}

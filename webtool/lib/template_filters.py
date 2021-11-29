@@ -149,9 +149,14 @@ def _jinja2_filter_post_field(field, post):
 		val = post
 
 		for k in keys:
-			val = val.get(k.strip(), "")
-		
-		if not val:
+			if isinstance(val, list):
+				val = val[0]
+			if isinstance(val, dict):
+				val = val.get(k.strip(), "")
+
+		# Return nothing if one of the fields is not found.
+		# We see 0 as a valid value - e.g. '0 retweets'.
+		if not val and val != 0:
 			return ""
 
 		formatted_field = formatted_field.replace("{{" + key + "}}", str(val))

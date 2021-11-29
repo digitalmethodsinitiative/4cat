@@ -180,34 +180,40 @@ span.page.selected {
     list-style: none;
     padding: 0;
 }
+
 .posts li {
     background: #d1e2ff;
     padding: 1em;
     min-width: 640px;
     max-width: 960px;
-    min-height: 110px;
     margin: 0 auto;
     margin-bottom: 1em;
     overflow-x: hidden;
 }
+
 .posts header {
     border-bottom: 1px solid #000;
     display: inline;
     cursor: default;
 }
+
 .posts article {
     margin-top: 0.5em;
 }
+
 .posts article .post-content {
     display: inline;
     vertical-align: top;
 }
+
 .posts header .author {
     font-weight: bold;
 }
+
 .posts header span {
     display: inline-block;
 }
+
 .posts header span:not(:last-child)::after {
     content: '\2022';
     margin-left: 0.5em;
@@ -218,6 +224,7 @@ span.page.selected {
     background: #485ba6;
     color: #FFF;
 }
+
 .posts li.op header {
     border-color: #FFF;
 }
@@ -243,15 +250,8 @@ li a {
     color: inherit;
     text-decoration: none;
 }
-a.has_image {
-    background: #FFF;
-    float: left;
-    color: #000;
-    width: 5em;
-    text-align: center;
-    margin-right: 1em;
-}
-a.has_image img {
+
+.posts li .post-image img {
     width: 100%;
 }
 
