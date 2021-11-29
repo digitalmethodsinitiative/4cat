@@ -519,7 +519,9 @@ def get_custom_css(datasource):
 	"""
 	Check if there's a custom css file for this dataset.
 	If so, return the text.
-	Custom css files should be placed in an 'explorer' directory in the the datasource folder and named '<datasourcename>-explorer.css' (e.g. 'reddit/explorer/reddit-explorer.css').
+	Custom css files should be placed in an 'explorer' directory in the the datasource folder and named
+	'<datasourcename>-explorer.css' (e.g. 'reddit/explorer/reddit-explorer.css').
+	See https://github.com/digitalmethodsinitiative/4cat/wiki/Exploring-and-annotating-datasets for more information.
 	
 	:param datasource, str: Datasource name
 
@@ -549,8 +551,10 @@ def get_custom_fields(datasource):
 	"""
 	Check if there are custom fields that need to be showed for this datasource.
 	If so, return a dictionary of those fields.
-	Custom field json files should be placed in an 'explorer' directory in the the datasource folder and named '<datasourcename>-explorer.json' (e.g. 'reddit/explorer/reddit-explorer.json').
-
+	Custom field json files should be placed in an 'explorer' directory in the the datasource folder and named
+	'<datasourcename>-explorer.json' (e.g. 'reddit/explorer/reddit-explorer.json').
+	See https://github.com/digitalmethodsinitiative/4cat/wiki/Exploring-and-annotating-datasets for more information.
+ 
 	:param datasource, str: Datasource name
 
 	:return: Dictionary of custom fields that should be shown.
