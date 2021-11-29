@@ -62,7 +62,7 @@
 	<!-- Post content-->
 	<article>
 		<!-- Singular image -->
-		{% if 'image' in custom_fields %}
+		{% if custom_fields and 'image' in custom_fields %}
 			{% set img_link = custom_fields['image'] | post_field(post) %}
 			{% if img_link %}
 				<a href="{{ img_link }}" target="_blank" rel="external">
@@ -73,7 +73,7 @@
 			{% endif %}
 		
 		<!-- Multiple images -->
-		{% elif 'images' in custom_fields %}
+		{% elif custom_fields and 'images' in custom_fields %}
 			{% set img_links = custom_fields['images'] | post_field(post) %}
 			{% if img_links %}
 				{% set img_links = img_links.split(",") %}
