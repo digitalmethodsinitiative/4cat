@@ -86,7 +86,7 @@ class LexicalFilter(BasicProcessor):
 
     @classmethod
     def get_options(cls, parent_dataset=None, user=None):
-        
+
         options = cls.options
         if not parent_dataset:
             return options
@@ -99,7 +99,7 @@ class LexicalFilter(BasicProcessor):
                 "options": parent_columns,
                 "help": "Filter items on this column"
         }
-        
+
         return options
 
     def process(self):
@@ -212,7 +212,7 @@ class LexicalFilter(BasicProcessor):
         if matching_items == 0:
             self.dataset.update_status("No items matched your criteria", is_final=True)
 
-         self.dataset.finish(matching_items)
+        self.dataset.finish(matching_items)
 
     def get_list_of_matches(self, match_style, item_column, match_values):
         """
