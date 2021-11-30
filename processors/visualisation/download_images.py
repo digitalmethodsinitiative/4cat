@@ -443,6 +443,9 @@ class ImageDownloader(BasicProcessor):
 		except requests.exceptions.SSLError as e:
 			self.dataset.log("Error: SSLError while trying to download image %s: %s" % (url, e))
 			raise FileNotFoundError()
+		except requests.exceptions.TooManyRedirects as e:
+			self.dataset.log("Error: TooManyRedirects while trying to download image %s: %s" % (url, e))
+			raise FileNotFoundError()
 		except requests.exceptions.ConnectionError as e:
 			if retries < 3:
 				self.request_get_w_error_handling(url, retries + 1, **kwargs)
