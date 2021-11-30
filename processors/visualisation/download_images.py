@@ -219,6 +219,8 @@ class ImageDownloader(BasicProcessor):
 			# save the image...? avoid overwriting images by appending
 			# -[number] to filenames if they already exist
 			index = 0
+			if not image_filename:
+				image_filename = 'image'
 			image_filename = Path(image_filename).name  # no folder shenanigans
 			image_stem = Path(image_filename).stem
 			image_suffix = Path(image_filename).suffix
