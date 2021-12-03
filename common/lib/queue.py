@@ -148,7 +148,7 @@ class JobQueue:
 		             just as valid).
 		"""
 
-		data =  data={
+		data = {
 			"jobtype": jobtype,
 			"details": json.dumps(details),
 			"timestamp": int(time.time()),
