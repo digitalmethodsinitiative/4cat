@@ -4,6 +4,7 @@ Miscellaneous helper functions for the 4CAT backend
 import subprocess
 import datetime
 import smtplib
+import platform
 import socket
 import copy
 import json
@@ -131,6 +132,28 @@ def get_software_version():
 			return version
 	except OSError:
 		return ""
+
+
+def get_instance_id():
+	"""
+	Get identifier of this 4CAT instance
+
+	Ideally this is configured explicitly. In other cases, use the hostname of
+	the machine this is running on
+
+	:return str:  Instance ID
+	"""
+	instance_id = ""
+	if hasattr(config, "INSTANCE_ID") and config.INSTANCE_ID:
+		instance_id = config.INSTANCE_ID
+	else:
+		instance_id = platform.uname().node
+
+	# '*' is not a valid ID, since it is used as a wildcard
+	if instance_id == "*":
+		instance_id = "_" + instance_id
+
+	return instance_id
 
 
 def convert_to_int(value, default=0):

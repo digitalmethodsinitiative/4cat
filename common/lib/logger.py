@@ -3,7 +3,6 @@ Log handler
 """
 import requests
 import datetime
-import platform
 import smtplib
 import logging
 import socket
@@ -16,7 +15,7 @@ from collections import OrderedDict
 from pathlib import Path
 
 from logging.handlers import RotatingFileHandler, SMTPHandler
-from common.lib.helpers import send_email
+from common.lib.helpers import send_email, get_instance_id
 
 import config
 
@@ -137,7 +136,7 @@ class Logger:
 
 			# prepare slack webhook payload
 			message = {
-				"text": "4CAT Alert logged on `%s`:" % platform.uname().node,
+				"text": "4CAT Alert logged on `%s`:" % get_instance_id(),
 				"mrkdwn_in": ["text"],
 				"attachments": [{
 					"color": color,

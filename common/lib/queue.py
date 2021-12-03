@@ -5,6 +5,7 @@ import time
 import json
 
 from common.lib.job import Job
+from common.lib.helpers import get_instance_id
 import psycopg2
 
 
@@ -12,9 +13,13 @@ class JobQueue:
 	"""
 	A simple job queue
 
-	Jobs are basically database records. The job has some information that a worker
-	can use to do its job. The job queue is shared between workers so that nothing
-	is done twice.
+	Jobs are basically database records. The job has some information that a
+	worker can use to do its job. The job queue is shared between workers so
+	that nothing is done twice.
+
+	Multiple 4CAT instances can work with the same job queue (by having them
+	connect to the same database). Each 4CAT instance only sees jobs that have
+	their 'instance' attribute set to that instance's ID, or to `*`.
 	"""
 	db = None
 	log = None
@@ -49,9 +54,10 @@ class JobQueue:
 			"          AND timestamp_claimed = 0"
 			"          AND timestamp_after < %s"
 			"          AND (interval = 0 OR timestamp_lastclaimed + interval < %s)"
+			"          AND instance IN ('*', %s)"
 			"    ORDER BY timestamp ASC"
 			"       LIMIT 1;"),
-			(jobtype, timestamp, timestamp))
+			(jobtype, timestamp, timestamp, get_instance_id()))
 
 		return Job.get_by_data(job, database=self.db) if job else None
 
@@ -87,7 +93,9 @@ class JobQueue:
 			replacements.append(now)
 			replacements.append(now)
 
+		query += "AND instance IN ('*', %s)"
 		query += "         ORDER BY timestamp ASC"
+		replacements.append(get_instance_id())
 
 		try:
 			jobs = self.db.fetchall(query, replacements)
@@ -109,13 +117,13 @@ class JobQueue:
 		:return int:  Number of jobs
 		"""
 		if jobtype == "*":
-			count = self.db.fetchone("SELECT COUNT(*) FROM jobs;", ())
+			count = self.db.fetchone("SELECT COUNT(*) FROM jobs WHERE instance IN ('*', %s)", (get_instance_id(),))
 		else:
-			count = self.db.fetchone("SELECT COUNT(*) FROM jobs WHERE jobtype = %s;", (jobtype,))
+			count = self.db.fetchone("SELECT COUNT(*) FROM jobs WHERE jobtype = %s AND instance IN ('*', %s)", (jobtype, get_instance_id()))
 
 		return int(count["count"])
 
-	def add_job(self, jobtype, details=None, remote_id=0, claim_after=0, interval=0):
+	def add_job(self, jobtype, details=None, remote_id=0, claim_after=0, interval=0, instance="*"):
 		"""
 		Add a new job to the queue
 
@@ -128,6 +136,10 @@ class JobQueue:
 		:param claim_after:  Absolute timestamp after which job may be claimed
 		:param interval:  If this is not zero, the job is made a repeating job,
 		                  which will be repeated at most every `interval` seconds.
+		:param str instance:  Instance to add the job for. Defaults to the
+		                      `*` (any instance). Use
+		                      `common.lib.helpers.get_instance_id()` to queue a
+		                      job for this 4CAT instance only.
 
 		:return Job: A job that matches the input type and remote ID. This may
 		             be a newly added job or an existing that matched the same
@@ -135,6 +147,7 @@ class JobQueue:
 		             with those parameters could be queued, and the old one is
 		             just as valid).
 		"""
+
 		data =  data={
 			"jobtype": jobtype,
 			"details": json.dumps(details),
@@ -144,7 +157,8 @@ class JobQueue:
 			"remote_id": remote_id,
 			"timestamp_after": claim_after,
 			"interval": interval,
-			"attempts": 0
+			"attempts": 0,
+			"instance": instance
 		}
 
 		self.db.insert("jobs", data, safe=True, constraints=("jobtype", "remote_id"))
@@ -157,7 +171,7 @@ class JobQueue:
 
 		All claimed jobs are released. This is useful to run when the backend is restarted.
 		"""
-		self.db.execute("UPDATE jobs SET timestamp_claimed = 0")
+		self.db.execute("UPDATE jobs SET timestamp_claimed = 0 WHERE instance IN('*', %s)", (get_instance_id(),))
 
 
 

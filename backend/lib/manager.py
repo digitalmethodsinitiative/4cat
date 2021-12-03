@@ -7,6 +7,7 @@ import time
 from backend import all_modules
 from backend.lib.keyboard import KeyPoller
 from common.lib.exceptions import JobClaimedException
+from common.lib.helpers import get_instance_id
 
 
 class WorkerManager:
@@ -46,13 +47,13 @@ class WorkerManager:
 		self.validate_datasources()
 
 		# queue a job for the api handler so it will be run
-		self.queue.add_job("api", remote_id="localhost")
+		self.queue.add_job("api", remote_id="localhost", instance=get_instance_id())
 
 		# queue worker that deletes expired datasets every so often
-		self.queue.add_job("expire-datasets", remote_id="localhost", interval=300)
+		self.queue.add_job("expire-datasets", remote_id="localhost", interval=300, instance=get_instance_id())
 
 		# queue worker that calculates datasource metrics every day
-		self.queue.add_job("datasource-metrics", remote_id="localhost", interval=86400)
+		self.queue.add_job("datasource-metrics", remote_id="localhost", interval=86400, instance=get_instance_id())
 
 		self.log.info('4CAT Started')
 
