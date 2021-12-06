@@ -15,7 +15,8 @@ CREATE TABLE IF NOT EXISTS jobs (
   timestamp_claimed      integer DEFAULT 0,
   status                 text,
   attempts               integer DEFAULT 0,
-  interval               integer DEFAULT 0
+  interval               integer DEFAULT 0,
+  instance               varchar DEFAULT '*'
 );
 
 -- enforce
@@ -49,7 +50,7 @@ CREATE TABLE IF NOT EXISTS datasets (
 CREATE TABLE IF NOT EXISTS annotations (
   key               text UNIQUE PRIMARY KEY,
   annotations       text DEFAULT ''
-)
+);
 
 
 -- users
