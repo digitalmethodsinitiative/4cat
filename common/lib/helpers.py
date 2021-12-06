@@ -544,6 +544,15 @@ def send_email(recipient, message):
 
 
 def validate_url(x):
+	"""
+	Checks that a string is a valid url. Uses urlparse from urllib.parse to check that there is both a proper scheme
+	and netloc (host) for the url.
+
+	Returns False if type of x is not a string.
+
+	:param str x:  string representing a url
+	:return bool:  True if string is valid url, False if not
+	"""
 	if type(x) == str:
 		if x.count('http://') > 1 or x.count('https://') > 1:
 			# check for errors in spliting urls
