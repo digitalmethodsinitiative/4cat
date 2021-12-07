@@ -1,5 +1,8 @@
 <div class="nav-pages">
 	{% set pages = ((post_count / limit) + (post_count % limit > 0))|int %}
+	{% if post_count > max_posts %}
+		{% set pages = ((max_posts / limit) + (max_posts % limit > 0))|int  %}
+	{% endif %}
 	{% set selected = "selected" %}
 	{% set lower_bound = 3 %}
 	{% set upper_bound = pages - lower_bound - 1 %}

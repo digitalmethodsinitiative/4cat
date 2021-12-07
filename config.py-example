@@ -109,6 +109,10 @@ REDDIT_API_SECRET = ""
 # downloaded images into a PixPlot there
 PIXPLOT_SERVER = ""
 
+# Explorer settings
+# The maximum allowed amount of rows (prevents timeouts and memory errors)
+MAX_POSTS_EXPLORER = 500000
+
 # Web tool settings
 class FlaskConfig:
     FLASK_APP = 'webtool/fourcat'

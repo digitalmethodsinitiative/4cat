@@ -11,6 +11,9 @@
 <div id="metadata">
 	{% if key %}
 		<div id="dataset-info">
+			{% if post_count > max_posts %}
+				<p><strong>Large dataset - only showing the first {{ max_posts }} posts. Use filter processors to limit the dataset.</strong></p>
+			{% endif %}
 			<p>Showing posts {{ offset + 1 }} - {{ post_count if (offset + limit) > post_count else (offset + limit) }} ({{ post_count }} in total).</p>
 			<p>Sorted by time.</p>
 		</div>
