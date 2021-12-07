@@ -1,0 +1,66 @@
+body {
+	background-color: white;
+}
+
+.posts li {
+	background-color: white;
+	max-width: 620px;
+	border: 1px solid #d6d6d6;
+	border-radius: 10px;
+	min-height: 50px;
+}
+
+.posts li header {
+	line-height: 3em;
+	border: none;
+	color: rgb(104, 119, 130);
+}
+
+.posts li header .post_id {
+	display: none;
+}
+
+.posts li header .author {
+	color: black;
+}
+
+.posts li header .profile_picture {
+	float: left;
+	margin-right: 15px;
+}
+
+.posts li header .profile_picture img {
+	border-radius: 100px;
+	width: 50px;
+}
+
+.posts li header .profile_picture:after {
+	display: none;
+}
+
+.posts li article {
+	margin: 0;
+	padding: 0;
+}
+
+.posts li .post-content {
+	display: inline-block;
+}
+
+.posts li .post-image {
+	margin-bottom: 10px;
+}
+
+.posts li .post-image img {
+	border-radius: 10px;
+}
+
+.post-annotations {
+	border-radius: 10px;
+	background-color: rgb(241, 249, 255);
+	color: #474747;
+}
+
+span.hashtag {
+	color: rgb(29, 155, 240);
+}

@@ -219,6 +219,8 @@ class ImageDownloader(BasicProcessor):
 			# save the image...? avoid overwriting images by appending
 			# -[number] to filenames if they already exist
 			index = 0
+			if not image_filename:
+				image_filename = 'image'
 			image_filename = Path(image_filename).name  # no folder shenanigans
 			image_stem = Path(image_filename).stem
 			image_suffix = Path(image_filename).suffix
@@ -442,6 +444,9 @@ class ImageDownloader(BasicProcessor):
 			raise FileNotFoundError()
 		except requests.exceptions.SSLError as e:
 			self.dataset.log("Error: SSLError while trying to download image %s: %s" % (url, e))
+			raise FileNotFoundError()
+		except requests.exceptions.TooManyRedirects as e:
+			self.dataset.log("Error: TooManyRedirects while trying to download image %s: %s" % (url, e))
 			raise FileNotFoundError()
 		except requests.exceptions.ConnectionError as e:
 			if retries < 3:

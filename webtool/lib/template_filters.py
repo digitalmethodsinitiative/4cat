@@ -4,6 +4,7 @@ import json
 import uuid
 import math
 import os
+import re
 
 from pathlib import Path
 from urllib.parse import urlencode
@@ -133,10 +134,34 @@ def _jinja2_filter_extension_to_noun(ext):
 		return "item"
 
 @app.template_filter('post_field')
-def _jinja2_filter_post_field(field, post, board=""):
+def _jinja2_filter_post_field(field, post):
+	# Takes a value in between {{ two curly brackets }} and uses that
+	# as a dictionary key. It then returns the corresponding value.
 	
-	field = field.replace("{{board}}", board).replace("{{thread_id}}", str(post.get("thread_id", ""))).replace("{{id}}", str(post.get("id", ""))).replace("{{author}}", post.get("author", ""))
-	return field
+	matches = False
+	formatted_field = field
+
+	for key in re.findall(r"\{\{(.*?)\}\}", str(field)):
+
+		# They keys can also be subfields (e.g. "author.username")
+		# So we're splitting and looping until we get the value.
+		keys = key.split(".")
+		val = post
+
+		for k in keys:
+			if isinstance(val, list):
+				val = val[0]
+			if isinstance(val, dict):
+				val = val.get(k.strip(), "")
+
+		# Return nothing if one of the fields is not found.
+		# We see 0 as a valid value - e.g. '0 retweets'.
+		if not val and val != 0:
+			return ""
+
+		formatted_field = formatted_field.replace("{{" + key + "}}", str(val))
+
+	return formatted_field
 
 @app.template_filter('hasattr')
 def _jinja2_filter_hasattr(obj, attribute):
@@ -163,3 +188,4 @@ def inject_now():
 		"__announcement": announcement_file.open().read().strip() if announcement_file.exists() else None,
 		"uniqid": uniqid
 	}
+

@@ -63,7 +63,7 @@ def explorer_dataset(key, page):
 	# Load some variables
 	parameters = json.loads(dataset["parameters"])
 	datasource = parameters["datasource"]
-	board = parameters["board"]
+	board = parameters.get("board", "")
 	annotation_fields = json.loads(dataset["annotation_fields"]) if dataset["annotation_fields"] else None
 	post_count = int(dataset["num_rows"])
 
@@ -81,34 +81,27 @@ def explorer_dataset(key, page):
 	posts = []
 	count = 0
 
-	with open(dataset_path, "r", encoding="utf-8") as dataset_file:
-		
-		reader = csv.reader(dataset_file)
-		
-		# Get the column names (varies per datasource).
-		columns = next(reader)
+	first_post = False
 
-		# Sort on date
-		# Unix timestamp integers are not always saved in the same field
-		if post_count <= max_posts:
-			time_col = columns.index("unix_timestamp") if "unix_timestamp" in columns else columns.index("timestamp")
-			reader = sorted(reader, key=operator.itemgetter(time_col))
-
-		for post in reader:
+	for post in iterate_items(dataset_path):
 			
-			# Use an offset if we're showing a page beyond the first.
-			count += 1
-			if count <= offset and count <= max_posts:
-				continue
+		# Use an offset if we're showing a page beyond the first.
+		count += 1
+		if count <= offset:
+			continue
 
-			# Attribute column names and collect dataset's posts.
-			post = {columns[i]: post[i] for i in range(len(post))}
-			post_ids.append(post["id"])
-			posts.append(post)
+		# Use an offset if we're showing a page beyond the first.
+		count += 1
+		if count <= offset:
+			continue
 
-			# Stop if we exceed the max posts per page.
-			if count >= (offset + limit) or count >= max_posts:
-				break
+		# Attribute column names and collect dataset's posts.
+		post_ids.append(post["id"])
+		posts.append(post)
+
+		# Stop if we exceed the max posts per page.
+		if count >= (offset + limit) or count > max_posts:
+			break
 
 	# Clean up HTML
 	posts = [strip_html(post) for post in posts]
@@ -134,7 +127,7 @@ def explorer_dataset(key, page):
 		annotations = json.loads(annotations["annotations"])
 
 	# Generate the HTML page
-	return render_template("explorer/explorer.html", key=key, datasource=datasource, board=board, is_local=is_local, parameters=parameters, annotation_fields=annotation_fields, annotations=annotations, posts=posts, css=css, custom_fields=custom_fields, page=page, offset=offset, limit=limit, post_count=post_count, max_posts=max_posts)
+	return render_template("explorer/explorer.html", key=key, datasource=datasource, board=board, is_local=is_local, parameters=parameters, annotation_fields=annotation_fields, annotations=annotations, posts=posts, custom_css=css, custom_fields=custom_fields, page=page, offset=offset, limit=limit, post_count=post_count, max_posts=max_posts)
 
 @app.route('/explorer/thread/<datasource>/<board>/<string:thread_id>')
 @api_ratelimit
@@ -169,7 +162,6 @@ def explorer_thread(datasource, board, thread_id):
 
 	posts = [format(post) for post in posts]
 
-
 	# Include custom css if it exists in the datasource's 'explorer' dir.
 	# The file's naming format should e.g. be 'reddit-explorer.css'.
 	css = get_custom_css(datasource)
@@ -178,7 +170,8 @@ def explorer_thread(datasource, board, thread_id):
 	# The file's naming format should e.g. be 'reddit-explorer.json'.
 	custom_fields = get_custom_fields(datasource)
 
-	return render_template("explorer/explorer.html", datasource=datasource, board=board, posts=posts, css=css, custom_fields=custom_fields, limit=len(posts), post_count=len(posts), thread=thread_id)
+
+	return render_template("explorer/explorer.html", datasource=datasource, board=board, posts=posts, custom_css=css, custom_fields=custom_fields, limit=len(posts), post_count=len(posts), thread=thread_id)
 
 @app.route('/explorer/post/<datasource>/<board>/<string:post_id>')
 @api_ratelimit
@@ -207,12 +200,17 @@ def explorer_post(datasource, board, thread_id):
 	posts = get_posts(db, datasource, board, ids=tuple([thread_id]), threads=True, order_by=["id"])
 
 	posts = [strip_html(post) for post in posts]
-
-	if not posts:
-		return error(404, error="No posts available for this thread")
-
 	posts = [format(post) for post in posts]
-	return render_template("explorer/explorer.html", datasource=datasource, board=board, posts=posts, limit=len(posts), post_count=len(posts), thread=thread_id)
+
+	# Include custom css if it exists in the datasource's 'explorer' dir.
+	# The file's naming format should e.g. be 'reddit-explorer.css'.
+	css = get_custom_css(datasource)
+
+	# Include custom fields if it they are in the datasource's 'explorer' dir.
+	# The file's naming format should e.g. be 'reddit-explorer.json'.
+	custom_fields = get_custom_fields(datasource)
+
+	return render_template("explorer/explorer.html", datasource=datasource, board=board, posts=posts, custom_css=css, custom_fields=custom_fields, limit=len(posts), post_count=len(posts))
 
 @app.route("/explorer/save_annotation_fields/<string:key>", methods=["POST"])
 @api_ratelimit
@@ -472,6 +470,44 @@ def get_image_file(img_file, limit=0):
 
 	return send_file(str(image_path))
 
+def iterate_items(in_file):
+	# Loop through both csv and NDJSON files.
+	
+	suffix = in_file.name.split(".")[-1].lower()
+
+	if suffix == "csv":
+
+		with open(in_file, "r", encoding="utf-8") as dataset_file:
+		
+			# Sort on date.
+			# Unix timestamp integers are not always saved in the same field.
+			reader = csv.reader(dataset_file)
+			columns = next(reader)
+			time_col = columns.index("unix_timestamp") if "unix_timestamp" in columns else columns.index("timestamp")
+			reader = sorted(reader, key=operator.itemgetter(time_col))
+			
+			for item in reader:
+
+				# Add columns
+				item = {columns[i]: item[i] for i in range(len(item))}
+				
+				yield item
+
+	elif suffix == "ndjson":
+		# in this format each line in the file is a self-contained JSON
+		# file
+
+		with open(in_file, "r", encoding="utf-8") as dataset_file:
+
+			for line in dataset_file:
+
+				# Unfortunately we can't easily sort on date here.
+				# So we're just looping through the file.
+				item = json.loads(line)
+				yield item
+
+	return Exception("Can't loop through file with extension %s" % suffix)
+
 def get_posts(db, datasource, board, ids, threads=False, limit=0, offset=0, order_by=["timestamp"]):
 
 	if not ids:
@@ -493,7 +529,9 @@ def get_custom_css(datasource):
 	"""
 	Check if there's a custom css file for this dataset.
 	If so, return the text.
-	Custom css files should be placed in an 'explorer' directory in the the datasource folder and named '<datasourcename>-explorer.css' (e.g. 'reddit/explorer/reddit-explorer.css').
+	Custom css files should be placed in an 'explorer' directory in the the datasource folder and named
+	'<datasourcename>-explorer.css' (e.g. 'reddit/explorer/reddit-explorer.css').
+	See https://github.com/digitalmethodsinitiative/4cat/wiki/Exploring-and-annotating-datasets for more information.
 	
 	:param datasource, str: Datasource name
 
@@ -515,14 +553,18 @@ def get_custom_css(datasource):
 			css = css.read()
 	else:
 		css = None
+		#css = Path(config.PATH_ROOT, "datasources", datasource_dir, "explorer", datasource.lower() + "-explorer.css")
+	
 	return css
 
 def get_custom_fields(datasource):
 	"""
 	Check if there are custom fields that need to be showed for this datasource.
 	If so, return a dictionary of those fields.
-	Custom field json files should be placed in an 'explorer' directory in the the datasource folder and named '<datasourcename>-explorer.json' (e.g. 'reddit/explorer/reddit-explorer.json').
-
+	Custom field json files should be placed in an 'explorer' directory in the the datasource folder and named
+	'<datasourcename>-explorer.json' (e.g. 'reddit/explorer/reddit-explorer.json').
+	See https://github.com/digitalmethodsinitiative/4cat/wiki/Exploring-and-annotating-datasets for more information.
+ 
 	:param datasource, str: Datasource name
 
 	:return: Dictionary of custom fields that should be shown.

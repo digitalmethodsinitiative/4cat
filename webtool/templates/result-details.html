@@ -9,8 +9,8 @@
         {% if current_user.is_authenticated %}
             <nav class="dataset-toolbox" aria-label="Actions for dataset">
                 <ul>
-                    {% if dataset.result_file.split(".")[-1] == 'csv' %}
-                        <li><a href="{{ url_for('explorer_dataset', key=dataset.key) }}" class="explorer-dataset" target="__blank"><i class="fas fa-binoculars" aria-hidden="true"></i> Explore & annotate</a></li>
+                    {% if dataset.num_rows > 0 %}
+                      <li><a href="{{ url_for('explorer_dataset', key=dataset.key) }}" class="explorer-dataset" target="__blank"><i class="fas fa-binoculars" aria-hidden="true"></i> Explore & annotate</a></li>
                     {% endif %}
                     <li><a href="{{ url_for('toggle_favourite_interactive', key=dataset.key) }}" class="toggle-favourites"><i class="fa{% if is_favourite %}r{% else %}s{% endif %} fa-star" aria-hidden="true"></i> {% if is_favourite %}Delete from{% else %}Add to{% endif %} favourites</a></li>
                     <li><a href="{{ url_for('show_result', key=dataset.key) }}"><i class="fas fa-link" aria-hidden="true"></i> Permalink</a></li>

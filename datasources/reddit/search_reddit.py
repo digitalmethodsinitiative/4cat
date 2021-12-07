@@ -46,10 +46,10 @@ class SearchReddit(SearchWithScope):
 			"help": "API version",
 			"options": {
 				"regular": "Regular",
-				"beta": "Beta"
+				"beta": "Beta (experimental)"
 			},
 			"default": "regular",
-			"tooltip": "The beta version retrieves more comments per request but may be more experimental."
+			"tooltip": "The beta version retrieves more comments per request but may be incomplete."
 		},
 		"board": {
 			"type": UserInput.OPTION_TEXT,
@@ -66,6 +66,7 @@ class SearchReddit(SearchWithScope):
 					"*may not be complete* depending on the parameters used,"
 					" data from the last few days might not be there yet,"
 					" and post scores can be out of date. "
+					"See [this paper](https://arxiv.org/pdf/1803.05046.pdf) for an overview of the gaps in data. "
 					"Double-check manually or via the official Reddit API if completeness is a concern. Check the "
 					"[Pushshift API](https://github.com/pushshift/api) reference [beta](https://beta.pushshift.io/redoc) for"
 					"documentation on query syntax, "
