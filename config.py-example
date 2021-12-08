@@ -16,6 +16,7 @@ DATASOURCES = {
 		},
     "telegram": {},
     "twitterv2": {},
+#    "url_scraper": {},
 }
 
 # Configure how the tool is to be named in its web interface. The backend will
