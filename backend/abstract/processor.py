@@ -192,7 +192,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 				else:
 					parent_key = ""
 
-				# remove any result files that have been created so far
+				# Remove any result files that have been created so far
 				self.remove_files()
 
 				raise ProcessorException("Processor %s raised %s while processing dataset %s%s in %s:\n   %s\n" % (self.type, e.__class__.__name__, self.dataset.key, parent_key, location, str(e)))
@@ -203,20 +203,16 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
 	def after_process(self):
 		"""
-		Run after processing the dataset
+		Run after successfully processing the dataset
 
-		This method cleans up temporary files, and if needed, handles logistics
-		concerning the result file, e.g. running a pre-defined processor on the
-		result, copying it to another dataset, and so on.
+		This marks the dataset as complete and handles logistics concerning the result file, e.g. running a pre-defined
+		processor on the result, copying it to another dataset, and so on.
 		"""
 		if self.dataset.data["num_rows"] > 0:
 			self.dataset.update_status("Dataset saved.")
 
 		if not self.dataset.is_finished():
 			self.dataset.finish()
-
-		if hasattr(self, "staging_area") and type(self.staging_area) == Path and self.staging_area.exists():
-			shutil.rmtree(self.staging_area)
 
 		# see if we have anything else lined up to run next
 		for next in self.parameters.get("next", []):
@@ -270,18 +266,25 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
 		self.job.finish()
 
-	def remove_files(self):
+	def clean_up(self):
 		"""
-		Clean up result files and any staging files for processor to be attempted
-		later if desired.
-		"""
-		if self.dataset.get_results_path().exists():
-			self.dataset.get_results_path().unlink(missing_ok=True)
+		Clean up any temporary files that were created by the processor.
+		This overwrites Worker.clean_up() and runs after Worker.work()
+		whether it completes successfully or results in an interruption or error.
 
+		Can be overwritten by processors (with super().clean_up()) to allow for additional cleanup.
+		"""
 		if self.dataset.staging_area:
 			for staging_area in self.dataset.staging_area:
 				if staging_area.is_dir():
 					shutil.rmtree(staging_area)
+
+	def remove_files(self):
+		"""
+		Delete result files for processor to be attempted later if desired.
+		"""
+		if self.dataset.get_results_path().exists():
+			self.dataset.get_results_path().unlink(missing_ok=True)
 
 	def abort(self):
 		"""
