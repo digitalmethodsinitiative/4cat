@@ -2,6 +2,7 @@
 Send TCAT-ready json to a particular TCAT instance
 """
 import requests
+import random
 from urllib.parse import urlparse
 
 from backend.abstract.processor import BasicProcessor
@@ -15,15 +16,15 @@ __maintainer__ = "Dale Wahl"
 __email__ = "d.l.wahl@uva.nl"
 
 
-class ConvertNDJSONToJSON(BasicProcessor):
+class FourcatToDmiTcatUploader(BasicProcessor):
     """
     Send TCAT-ready json to a particular TCAT instance.
     File to  be imported by TCAT's import-jsondump.php
     """
-    type = "tcat_auto_upload"  # job type ID
+    type = "tcat-auto-upload"  # job type ID
     category = "Conversion"  # category
-    title = "Upload to TCAT"  # title displayed in UI
-    description = "Send TCAT-ready json to a particular TCAT instance."  # description displayed in UI
+    title = "Upload to DMI-TCAT"  # title displayed in UI
+    description = "Send TCAT-ready json to a particular DMI-TCAT instance."  # description displayed in UI
     extension = "html"  # extension of result file, used internally and in UI
 
     @classmethod
@@ -44,12 +45,16 @@ class ConvertNDJSONToJSON(BasicProcessor):
         """
         Send TCAT-ready json to a particular TCAT instance.
         """
-        self.dataset.update_status("Preparing Arguments")
+        self.dataset.update_status("Preparing upload")
         bin_name = ''.join(e if e.isalnum() else '_' for e in self.dataset.top_parent().get_label())
-        self.dataset.log('Label for TCAT bin_name: ' + bin_name)
+        self.dataset.log('Label for DMI-TCAT bin_name: ' + bin_name)
 
         url_to_file = self.dataset.get_parent().get_result_url()
         self.dataset.log('File location URL: ' + url_to_file)
+
+        tcat_server = config.TCAT_SERVER
+        if type(config.TCAT_SERVER) in (list, tuple, set):
+            tcat_server = random.choice(config.TCAT_SERVER)
 
         # DOCKER shenanigans
         self.dataset.log('Docker search: ' + str('host.docker.internal' in config.TCAT_SERVER))
@@ -67,7 +72,7 @@ class ConvertNDJSONToJSON(BasicProcessor):
         parsed_uri = urlparse(config.TCAT_SERVER)
         post_json_url = '{uri.scheme}://{uri.netloc}'.format(uri=parsed_uri)
         post_json_url = post_json_url + '/api/import-from-4cat.php'
-        self.dataset.update_status("Sending to TCAT: %s" % post_json_url)
+        self.dataset.update_status("Sending dataset to DMI-TCAT: %s" % post_json_url)
         response = requests.post(post_json_url, auth=auth, data={
                                                 'url': url_to_file,
                                                 'name': bin_name,
@@ -76,9 +81,9 @@ class ConvertNDJSONToJSON(BasicProcessor):
                                                 })
 
         if response.status_code == 404:
-            raise ProcessorException('TCAT URL 404 error at %s' % config.TCAT_SERVER)
+            raise ProcessorException('DMI-TCAT URL 404 error at %s' % config.TCAT_SERVER)
         elif response.status_code != 200:
-            raise ProcessorException('TCAT Connection Error %i error: %s' % (response.status_code, str(response.reason)))
+            raise ProcessorException('DMI-TCAT Connection Error %i error: %s' % (response.status_code, str(response.reason)))
         else:
             pass
 
@@ -89,19 +94,19 @@ class ConvertNDJSONToJSON(BasicProcessor):
             if 'The query bin' in response.text and 'already exists' in response.text:
                 # Query bin already uploaded
                 # TODO: look at possibility to add to existing bin?
-                self.dataset.update_status("TCAT bin already exists; unable to add to existing bin.", is_final=True)
+                self.dataset.update_status("DMI-TCAT bin already exists; unable to add to existing bin.", is_final=True)
                 self.dataset.finish(0)
                 return
             else:
                 # Something else is wrong...
-                raise ProcessorException('TCAT Unexpected response: %s - %s - %s' %  (response.status_code, str(response.reason), response.text))
+                raise ProcessorException('DMI-TCAT Unexpected response: %s - %s - %s' %  (response.status_code, str(response.reason), response.text))
 
         if 'success' not in resp_content:
             # A json response was returned, but not the one we're expecting!
-            raise ProcessorException('TCAT Unexpected response: %s - %s - %s' %  (response.status_code, str(response.reason), response.text))
+            raise ProcessorException('DMI-TCAT Unexpected response: %s - %s - %s' %  (response.status_code, str(response.reason), response.text))
         elif not resp_content['success']:
             # success should be True if upload was successful
-            raise ProcessorException('TCAT Import failure: %s' % str(resp_content))
+            raise ProcessorException('DMI-TCAT Import failure: %s' % str(resp_content))
         else:
             pass
 
@@ -120,10 +125,10 @@ class ConvertNDJSONToJSON(BasicProcessor):
 
         # Finish
         self.dataset.update_status("Finished")
-        self.dataset.finish(1)
+        self.dataset.finish(self.dataset.top_parent().num_rows)
 
     def get_html_page(self, url):
         """
-        Returns a html string to redirect to PixPlot.
+        Returns a html string to redirect to the location of the DMI-TCAT dataset.
         """
         return f"<head><meta http-equiv='refresh' content='0; URL={url}'></head>"
