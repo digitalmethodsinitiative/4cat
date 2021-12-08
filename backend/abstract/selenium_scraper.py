@@ -132,11 +132,12 @@ class SeleniumScraper(Search, metaclass=abc.ABCMeta):
         except:
             pass
 
-    def after_search_completed(self):
+    def clean_up(self):
         """
-        Runs after search (and thus the get_items generator) is used, allowing the Selenium driver to be used
-        dynamically and items to be yielded and written in turn
+        Ensures Selenium webdriver and Chrome browser and closed whether processor completes successfully or not.
         """
+        super().clean_up()
+
         self.quit_selenium()
 
     def set_page_load_timeout(self, timeout=60):
