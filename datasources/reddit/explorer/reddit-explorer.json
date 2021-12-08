@@ -1,0 +1,8 @@
+{
+	"subreddit": "<a href='https://reddit.com/r/{{subreddit}}' target='__blank'>r/{{subreddit}}</a>",
+	"score": "<i class='fas fa-arrow-up'></i> {{score}} <i class='fas fa-arrow-down'></i>",
+	"external_url": "https://reddit.com/r/{{subreddit}}/comments/{{thread_id}}/comment/{{id}}",
+	"image": "{{ image_file }}",
+	"subject": "{{ subject }}",
+	"subject_url": "<a href='{{ url }}'>{{ domain }}</a>"
+}

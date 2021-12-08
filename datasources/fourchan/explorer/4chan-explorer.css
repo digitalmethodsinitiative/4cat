@@ -1,0 +1,103 @@
+/* 
+
+See https://github.com/digitalmethodsinitiative/4cat/wiki/Exploring-and-annotating-datasets for information on how to add custom CSS.
+ 
+ */
+
+body {
+	background: #ffe;
+}
+
+*, body {
+	font-family: arial;
+}
+
+.content {
+	color: maroon;
+	font-family: arial;
+	font-size: 10pt;
+	margin-left: 0;
+	margin-right: 0;
+	margin-top: 5px;
+}
+
+.content article {
+	font-size: 10pt;
+}
+
+.posts li {
+	display: table;
+	margin-left: 10px;
+	background-color: #f0e0d6;
+	border: 1px solid #d9bfb7;
+	width: auto;
+	min-width: 10px;
+	max-width: 100%;
+	border-left: none;
+	border-top: none;
+	padding: 10px;
+}
+
+.posts li.op {
+	background-color: #ffe;
+	color: maroon;
+	border: none;
+	border-left: none;
+	border-top: none;
+}
+
+.posts li header {
+	border: none;
+}
+
+.posts li.op header {
+	font-weight: bold;
+}
+
+.posts li .author {
+	font-weight: 700;
+}
+
+.posts li .subject {
+	color: #cc1105;
+	font-weight: 700;
+}
+
+.posts li .post-content {
+	display: block;
+	margin: 15px;
+	margin-left: 35px;
+}
+
+.posts li .quote {
+	color: navy;
+	text-decoration: underline;
+}
+.posts li .greentext {
+	color: #789922;
+}
+
+.posts li.op .greentext {
+	color: #63b563;
+}
+
+.posts li .post-annotations {
+	background-color: #e2c6b5;
+}
+
+.posts li.op .post-annotations {
+	background-color: #f0e0d6;
+}
+
+.post-image {
+    background: #FFF;
+    float: left;
+    color: #000;
+    height: 5em;
+    text-align: center;
+    margin-right: 1em;
+}
+
+.post-image img {
+    height: 100%;
+}

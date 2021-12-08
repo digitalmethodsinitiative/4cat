@@ -1,0 +1,159 @@
+<li id="post-{{ post.id }}"{% if post.thread_id == post.id %} class="op"{% endif %}>    
+
+	<!-- Special fields we're handling a bit differently -->
+	{% set special_fields = ["external_url", "author", "body", "timestamp", "image", "images"] %}
+
+	<!-- Possible external link -->
+	{% if custom_fields and "external_url" in custom_fields %}
+		{% set external_url = custom_fields.external_url | post_field(post) %}
+		{% if external_url %}
+			<a href="{{ external_url }}" target="_blank"><span class="external-url" title="Original post"><i class="fas fa-external-link-alt"></i></span></a>
+		{% endif %}
+	{% endif %}
+
+	<header>
+		<!-- Metadata -->
+		{% if 'pseudonymise' in parameters and parameters.get('pseudonymise') %}
+			<span title="Pseudonymous author" class="author">
+			<i class="fa fa-user-secret tooltip-trigger"></i>
+		{% else %}
+			<span title="Author" class="author">
+			{% if custom_fields and custom_fields.get("author") %}
+				{% set author = custom_fields.author | post_field(post) %}
+			{% else %}
+				{% set author = post.author %}
+			{% endif %}
+			{% if author|length > 20 %}
+				{{ author[:17] + '...' }}
+			{% else %}
+				{{ author }}
+			{% endif %}
+		{% endif %}
+		</span>
+		{% if 'thread_id' in post %}
+			<span title="Thread ID" class="thread_id">{% if is_local %}<a href="/explorer/thread/{{ datasource }}/{{ board }}/{{ post.thread_id }}">{{ post.thread_id }}</a>{% else %}{{ post.thread_id }}{% endif %}</span>
+		{% endif %}
+		<span title="Post ID" class="post_id">{{ post.id }}</span>
+		{% if 'timestamp' in post %}
+			{% if post.timestamp is integer %}
+				<span title="Date" class="datetime">{{ post.timestamp|datetime('%Y-%m-%d %H:%M') }}</span>
+			{% else %}
+				<span title="Date" class="datetime">{{ post.timestamp }}</span>
+			{% endif %}
+		{% endif %}
+
+		<!-- Custom metadata -->
+		{% if custom_fields %}
+			{% for custom_field in custom_fields %}
+
+				{% if custom_field not in special_fields %}
+					
+					{% set custom_value = custom_fields[custom_field] | post_field(post) | safe %}
+					{% if custom_value and custom_value != "None" %}
+						<span title="{{ custom_field }}" class="{{ custom_field }}">{{ custom_value | safe }}</span>
+					{% endif %}
+
+				{% endif %}
+			{% endfor %}
+		{% endif %}
+
+	</header>
+
+	<!-- Post content-->
+	<article>
+		<!-- Singular image -->
+		{% if custom_fields and 'image' in custom_fields %}
+			{% set img_link = custom_fields['image'] | post_field(post) %}
+			{% if img_link %}
+				<a href="{{ img_link }}" target="_blank" rel="external">
+				<div class="post-image">
+					<img src="{{ img_link }}">
+				</div>
+				</a>
+			{% endif %}
+		
+		<!-- Multiple images -->
+		{% elif custom_fields and 'images' in custom_fields %}
+			{% set img_links = custom_fields['images'] | post_field(post) %}
+			{% if img_links %}
+				{% set img_links = img_links.split(",") %}
+				<div class="post-images">
+				{% for img_link in img_links %}
+				<a href="{{ img_link }}" target="_blank" rel="external">
+					<div class="post-image">
+						<img src="{{ img_link }}">
+					</div>
+				</a>
+				{% endfor %}
+				</div>
+			{% endif %}
+		{% endif %}
+
+	<span class="post-content">
+		{% if custom_fields and 'body' in custom_fields %}
+			{{ custom_fields.body | post_field(post) | safe }}
+		{% else %}
+			{{ post.body|safe }}
+		{% endif %}
+	</span>
+
+	</article>
+
+	<!-- Annotations -->
+	<div class="post-annotations">
+		
+		{% if annotation_fields %}
+			{% set old_annotations = None %}
+
+			{% if annotations and post.id in annotations %}
+				{% set old_annotations = annotations[post.id] %}
+			{% endif %}
+
+			{% for field in annotation_fields %}
+
+				{% set type = annotation_fields[field]["type"] %}
+				{% set label = annotation_fields[field]["label"] %}
+				{% set old_annotation = "" %}
+
+				{% if old_annotations and label in old_annotations %}
+					{% set old_annotation = old_annotations[label] %}
+				{% endif %}
+				
+				<div class="post-annotation field-{{ field }} {{ type }}"><label class="annotation-label">{{ label }}</label>
+
+				{% if type == 'text' %}
+					<input type="text" class="post-annotation-input text-{{ field }}" value="{{ old_annotation }}">
+
+				{% elif type == 'textarea' %}
+					<textarea class="post-annotation-input textarea-{{ field }}">{{ old_annotation }}</textarea>
+
+				{% elif type == 'dropdown' %}
+					<select class="post-annotation-options select-{{ type }}" id="{{ field }}">
+					<option class='post-annotation-input' value=''></option>
+
+					{% for option in annotation_fields[field]["options"] %}
+						{% set option_id = option.keys() | list %}
+						{% set option_label = option.values() | list %}
+						<option class="post-annotation-input option-{{ option_id[0] }}" id="option-{{ option_id[0] }}" value="{{ option_label[0] }}" {% if option_label[0] == old_annotation %}selected{% endif %}>{{ option_label[0] }}</option>
+					{% endfor %}
+					</select>
+
+				{% elif type == 'checkbox' %}
+					<div class='post-annotation-options checkboxes-{{ field }}'>
+						
+					{% for option in annotation_fields[field]["options"] %}
+						{% set option_id = option.keys() | list %}
+						{% set option_label = option.values() | list %}
+						{% set checked = "checked" if old_annotation and option_label[0] in old_annotation else "" %}
+
+						<input type='checkbox' class='post-annotation-input option-{{ option_id[0] }}' id='option-{{ post.id }}-{{ option_id[0] }}' value='{{ option_label[0] }}' {{ checked }}><label for='option-{{ post.id }}-{{ option_id[0] }}'>{{ option_label[0] }}</label>
+					{% endfor %}
+					</div>
+				{% endif %}
+
+				</div>
+			{% endfor %}
+		{% endif %}
+	</div>
+
+</li>

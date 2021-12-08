@@ -78,7 +78,13 @@ class AttributeRanker(BasicProcessor):
 			"default": "",
 			"help": "Weigh frequencies by column",
 			"tooltip": "Frequencies will be multiplied by the value in this column (e.g. 'views'). If the column does not exist or contains a non-numeric value, multiply with 1."
-		}
+		},
+		"to-lowercase": {
+            "type": UserInput.OPTION_TOGGLE,
+            "default": True,
+            "help": "Convert attribute to lowercase",
+            "tooltip": "Merges attributes with varying cases"
+        }
 	}
 
 	def process(self):
@@ -93,7 +99,8 @@ class AttributeRanker(BasicProcessor):
 		rank_style = self.parameters.get("top-style")
 		cutoff = convert_to_int(self.parameters.get("top"), 15)
 		weighby = self.parameters.get("weigh")
-
+		to_lowercase = self.parameters.get("to-lowercase", True)
+		
 		try:
 			if self.parameters.get("filter"):
 				filter = re.compile(".*" + self.parameters.get("filter") + ".*")
@@ -120,6 +127,8 @@ class AttributeRanker(BasicProcessor):
 			for post in self.iterate_items(self.source_file):
 				values = self.get_values(post, attribute, filter, weighby)
 				for value in values:
+					if to_lowercase:
+						value = value.lower()
 					if value not in overall_top:
 						overall_top[value] = 0
 
@@ -146,6 +155,9 @@ class AttributeRanker(BasicProcessor):
 
 			# keep track of occurrences of found items per relevant time period
 			for value in values:
+				if to_lowercase:
+						value = value.lower()
+				
 				if rank_style == "overall" and value not in overall_top:
 					continue
 

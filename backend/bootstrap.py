@@ -2,11 +2,14 @@
 4CAT Backend init - used to start the backend!
 """
 import shutil
+import os
 
 from common.lib.queue import JobQueue
 from common.lib.database import Database
 from backend.lib.manager import WorkerManager
 from common.lib.logger import Logger
+
+import config
 
 
 def run(as_daemon=True):
@@ -36,7 +39,11 @@ def run(as_daemon=True):
 		print(indent + "+---------------------------------------------------------------+\n\n")
 
 	# load everything
-	log = Logger(output=not as_daemon)
+	if hasattr(config, "DOCKER_CONFIG_FILE") and os.path.exists(config.DOCKER_CONFIG_FILE):
+		# Rename log if Docker setup
+		log = Logger(output=not as_daemon, filename='backend_4cat.log')
+	else:
+		log = Logger(output=not as_daemon)
 	db = Database(logger=log, appname="main")
 	queue = JobQueue(logger=log, database=db)
 

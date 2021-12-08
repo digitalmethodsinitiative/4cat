@@ -1,6 +1,8 @@
 """
 Generate network of values from two columns
 """
+from dateutil.relativedelta import relativedelta
+
 from backend.abstract.processor import BasicProcessor
 from common.lib.helpers import UserInput, get_interval_descriptor
 
@@ -26,8 +28,8 @@ class ColumnNetworker(BasicProcessor):
     extension = "gexf"
 
     options = {
-        "column_a": {},
-        "column_b": {},
+        "column-a": {},
+        "column-b": {},
         "interval": {
             "type": UserInput.OPTION_CHOICE,
             "help": "Make network dynamic by",
@@ -72,31 +74,47 @@ class ColumnNetworker(BasicProcessor):
             "tooltip": "If enabled, the same values from different columns are treated as separate nodes. For "
                        "example, the value 'hello' from the column 'user' is treated as a different node than the "
                        "value 'hello' from the column 'subject'. If disabled, they would be considered a single node."
+        },
+        "to-lowercase": {
+            "type": UserInput.OPTION_TOGGLE,
+            "default": False,
+            "help": "Convert values to lowercase",
+            "tooltip": "Merges values with varying cases"
         }
     }
 
     @classmethod
     def get_options(cls, parent_dataset=None, user=None):
-        
+        """
+        Get processor options
+
+        These are dynamic for this processor: the 'column names' option is
+        populated with the column names from the parent dataset, if available.
+
+        :param DataSet parent_dataset:  Parent dataset
+        :param user:  Flask User to which the options are shown, if applicable
+        :return dict:  Processor options
+        """
         options = cls.options
-        if not parent_dataset:
+        if parent_dataset is None:
             return options
+
         parent_columns = parent_dataset.get_columns()
 
         if parent_columns:
             parent_columns = {c: c for c in sorted(parent_columns)}
             options["column-a"] = {
-                    "type": UserInput.OPTION_CHOICE,
-                    "options": parent_columns,
-                    "help": "'From' column name",
-                    "tooltip": "Name of the column of values from which edges originate"
-                }
+                "type": UserInput.OPTION_CHOICE,
+                "options": parent_columns,
+                "help": "'From' column name",
+                "tooltip": "Name of the column of values from which edges originate"
+            }
             options["column-b"] = {
-                    "type": UserInput.OPTION_CHOICE,
-                    "options": parent_columns,
-                    "help": "'To' column name",
-                    "tooltip": "Name of the column of values at which edges terminate"
-                }
+                "type": UserInput.OPTION_CHOICE,
+                "options": parent_columns,
+                "help": "'To' column name",
+                "tooltip": "Name of the column of values at which edges terminate"
+            }
 
         return options
 
@@ -123,6 +141,7 @@ class ColumnNetworker(BasicProcessor):
         split_comma = self.parameters.get("split-comma")
         allow_loops = self.parameters.get("allow-loops")
         interval_type = self.parameters.get("interval")
+        to_lower = self.parameters.get("to-lowercase", False)
 
         processed = 0
 
@@ -144,10 +163,27 @@ class ColumnNetworker(BasicProcessor):
             if not item.get(column_a) or not item.get(column_b):
                 continue
 
+            # try casting the values to strings
+            # if this fails, treat them as empty, so skip the item
+            try:
+                values_a = str(item[column_a])
+            except ValueError:
+                continue
+
+            try:
+                values_b = str(item[column_b])
+            except ValueError:
+                continue
+
+            # convert to lowercase, if needed
+            if to_lower:
+                values_a = values_a.lower()
+                values_b = values_b.lower()
+
             # account for possibility of multiple values by always treating a
             # column as a list of values, just sometimes with only one item
-            values_a = [item[column_a].strip()]
-            values_b = [item[column_b].strip()]
+            values_a = [values_a]
+            values_b = [values_b]
 
             if split_comma:
                 values_a = [v.strip() for v in values_a.pop().split(",")]
@@ -208,7 +244,7 @@ class ColumnNetworker(BasicProcessor):
         # or edge was present
         # since gexf can only handle per-day data, generate weights for each
         # day in the interval at the required resolution
-        if interval_type not in ("day", "overall"):
+        if interval_type != "overall":
             num_items = len(network.nodes) + len(network.edges)
             transformed = 1
             for component in (network.nodes, network.edges):
@@ -264,7 +300,12 @@ class ColumnNetworker(BasicProcessor):
 
                     component[item]["spells"] = spells
                     component[item]["frequency"] = weights
-                    del component[item]["intervals"]
+
+        # the "intervals" key is no longer needed since it has been gexf-ified
+        # in the 'spells' and 'frequency' keys
+        for component in (network.nodes, network.edges):
+            for item in component:
+                del component[item]["intervals"]
 
         self.dataset.update_status("Writing network file")
         
@@ -290,20 +331,20 @@ class ColumnNetworker(BasicProcessor):
 
         if interval_type == "year":
             moment = datetime.datetime(int(interval), 1, 1)
-            interval_end = moment + datetime.timedelta(years=1)
+            interval_end = moment + relativedelta(years=+1)
         elif interval_type == "month":
             moment = datetime.datetime(int(interval.split("-")[0]), int(interval.split("-")[1]), 1)
-            interval_end = moment + datetime.timedelta(months=1)
+            interval_end = moment + relativedelta(months=+1)
         elif interval_type == "week":
             # a little bit more complicated
             moment = datetime.datetime.strptime("%s-%s-1" % tuple(interval.split("-")), "%Y-%W-%w").date()
-            interval_end = moment + datetime.timedelta(days=7)
+            interval_end = moment + relativedelta(weeks=+1)
         else:
             raise ValueError("extrapolate_weights() expects interval to be one of year, month, week")
 
         result = {}
         while moment < interval_end:
             result[moment.strftime("%Y-%m-%d")] = weight
-            moment += datetime.timedelta(days=1)
+            moment += relativedelta(days=+1)
 
         return result

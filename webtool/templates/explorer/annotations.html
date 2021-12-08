@@ -1,0 +1,69 @@
+<div id="annotations-editor-container">
+	<div id="annotations-editor" class="saved">
+    <span class="helper"></span>
+		<div id="close-annotation-fields">&times;</div>
+
+		<div id="annotation-fields-container">
+			<div class="annotation-headers">
+				<div class="annotation-header" id="ah-label">Label</div>
+				<div class="annotation-header" id="ah-type">Input type</div>
+				<div class="annotation-header" id="ah-options">Options</div>
+			</div>
+
+			<div id="annotation-fields">
+			{% if annotation_fields %}
+				
+			{% for field in annotation_fields %}
+
+				{% set annotation_type = annotation_fields[field]["type"] %}
+				{% set label = annotation_fields[field]["label"] %}
+				<div class="annotation-fields-row annotation-field" id="field-{{ field }}">
+				<input type="text" class="annotation-field-label" name="annotation-field-label" placeholder="Field label" value="{{ label }}">
+				<button class="delete-input"><i class="fas fa-trash"></i></button>
+				<select name="annotation-field-type" class="annotation-field-type">
+					<option class="annotation-field-option" value="text" {% if annotation_type == "text" %}selected{% endif %}>Text</option>
+					<option class="annotation-field-option" value="textarea" {% if annotation_type == "textarea" %}selected{% endif %}>Textarea</option>
+					<option class="annotation-field-option" value="dropdown" {% if annotation_type == "dropdown" %}selected{% endif %}>Dropdown</option>
+					<option class="annotation-field-option" value="checkbox" {% if annotation_type == "checkbox" %}selected{% endif %}>Checkbox</option>
+				</select>
+
+				{% if annotation_type == "dropdown" or annotation_type == "checkbox" %}
+					<div class="option-fields">
+					{% for option in annotation_fields[field]["options"] %}
+						{% set option_id = option.keys() | list %}
+						{% set option_label = option.values() | list %}
+						<div class="option-field">
+							<input type="text" id="input-{{ option_id[0] }}" value={{ option_label[0] }}>
+							<button class="delete-option-field"><i class="fas fa-trash"></i></button>
+						</div>
+					{% endfor %}
+						<div class="option-field">
+							<input type="text" id="input-{{ range(1, 100000000) | random }}" placeholder="Value">
+							
+						</div>
+					</div>
+				{% endif %}
+				</div>
+			{% endfor %}
+			{% endif %}
+			</div>
+		</div>
+		<div id="add-annotation-fields">
+			<span id="annotations-input-warning" class="hidden"></span>
+			<button id="add-annotation-field"><i class="fas fa-plus"></i> New field</button>
+			<button id="save-annotation-fields" class="invalid" disabled><i class="fas fa-save"></i> Apply</button>
+		<p id="notice"><em>Note: Changing input types will overwrite existing annotations for the field</em></p>
+		</div>
+	</div>
+</div>
+
+<div id="annotation-controls">
+	<div id="annotation-controls-buttons" class="">
+		<button id="toggle-annotation-fields"><i class="fas fa-edit"></i> Edit fields</button>
+		<button id="toggle-annotations" class="invalid hidden"><i class="fas fa-eye"></i> Show annotations</button>
+		<span class="divider">|</span>
+		<button id="save-annotations" class="invalid" disabled><i class="fas fa-save"></i> Save annotations</button>
+		<input id="save-to-dataset" class="invalid" type="checkbox" disabled><label for="save-to-dataset">Also write to dataset</label>
+	</div>
+	<span id="toggle-annotation-controls"><i class="fas fa-chevron-left"></i></span>
+</div>

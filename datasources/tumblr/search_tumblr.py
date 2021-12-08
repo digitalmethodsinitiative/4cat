@@ -713,7 +713,7 @@ class SearchTumblr(Search):
 				"post_slug": post["slug"],
 				"thread_id": post["reblog_key"],
 				"body": text.replace("\x00", ""),
-				"tags": ",".join(post["tags"]) if post.get("tags") else None,
+				"tags": ", ".join(post["tags"]) if post.get("tags") else None,
 				"notes": post["note_count"],
 				"urls": post.get("link_url"),
 				"images": ",".join([photo["original_size"]["url"] for photo in post["photos"]]) if post.get("photos") else None,

@@ -26,6 +26,7 @@ webtool/fourcat/static/data/word_embeddings/
 data/
 webtool/fourcat/static/boards.json
 webtool/pages/reject-template.md
+webtool/pages/access-policy.md
 stats.json
 news.json
 ANNOUNCEMENT.md
@@ -41,6 +42,7 @@ webtool/venv/
 .idea
 .env/
 *.ipynb
+venv/
 
 # do not ignore interface images
 !webtool/static/img/*.png

@@ -44,6 +44,7 @@ class DataSet(FourcatModule):
 	folder = None
 	is_new = True
 	no_status_updates = False
+	staging_area = []
 
 	def __init__(self, parameters={}, key=None, job=None, data=None, db=None, parent=None, extension="csv",
 				 type=None):
@@ -240,6 +241,10 @@ class DataSet(FourcatModule):
 
 		# create temporary folder
 		results_path.mkdir()
+
+		# Storing the staging area with the dataset so that it can be removed later
+		self.staging_area.append(results_path)
+
 		return results_path
 
 	def get_results_dir(self):
@@ -402,20 +407,70 @@ class DataSet(FourcatModule):
 	def get_columns(self):
 		"""
 		Returns the dataset columns.
-		Useful for processor input forms.
+
+		Useful for processor input forms. Can deal with both CSV and NDJSON
+		files, the latter only if a `map_item` function is available in the
+		processor that generated it. While in other cases one could use the
+		keys of the JSON object, this is not always possible in follow-up code
+		that uses the 'column' names, so for consistency this function acts as
+		if no column can be parsed if no `map_item` function exists.
 		
-		:return:  Set of dataset columns
+		:return list:  List of dataset columns; empty list if unable to parse
 		"""
 
-		if self.get_results_path().suffix != ".csv" or not self.get_results_path().exists():
+		if not self.get_results_path().exists():
+			# no file to get columns from
 			return False
 
-		with self.get_results_path().open(encoding="utf-8") as infile:
-			reader = csv.DictReader(infile)
+		if self.get_results_path().suffix.lower() == ".csv":
+			with self.get_results_path().open(encoding="utf-8") as infile:
+				reader = csv.DictReader(infile)
+				try:
+					return list(reader.fieldnames)
+				except (TypeError, ValueError):
+					# not a valid CSV file?
+					return []
+
+		elif self.get_results_path().suffix.lower() == ".ndjson" and hasattr(self.get_own_processor(), "map_item"):
+			with self.get_results_path().open(encoding="utf-8") as infile:
+				first_line = infile.readline()
+
 			try:
-				return set(reader.fieldnames)
-			except (TypeError, ValueError):
-				return False
+				item = json.loads(first_line)
+				return list(self.get_own_processor().map_item(item).keys())
+			except (json.JSONDecodeError, ValueError):
+				# not a valid NDJSON file?
+				return []
+
+		else:
+			# not a CSV or NDJSON file, or no map_item function available
+			return []
+
+	def get_annotation_fields(self):
+		"""
+		Retrieves the saved annotation fields for this dataset.
+		:return dict: The saved annotation fields.
+		"""
+
+		annotation_fields = self.db.fetchone("SELECT annotation_fields FROM datasets WHERE key = %s;", (self.top_parent().key,))
+		
+		if annotation_fields:
+			return json.loads(annotation_fields["annotation_fields"])
+		else:
+			return None
+
+	def get_annotations(self):
+		"""
+		Retrieves the annotations for this dataset.
+		return dict: The annotations
+		"""
+
+		annotations = self.db.fetchone("SELECT annotations FROM annotations WHERE key = %s;", (self.top_parent().key,))
+		
+		if annotations:
+			return json.loads(annotations["annotations"])
+		else:
+			return None
 
 	def update_label(self, label):
 		"""

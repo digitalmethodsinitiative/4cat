@@ -169,6 +169,14 @@ class User:
 		"""
 		return self.data["is_admin"]
 
+	def is_deactivated(self):
+		"""
+		Check if user has been deactivated
+
+		:return bool:
+		"""
+		return self.data.get("is_deactivated", False)
+
 	def get_attribute(self, attribute):
 		return json.loads(self.data["userdata"]).get(attribute, None)
 

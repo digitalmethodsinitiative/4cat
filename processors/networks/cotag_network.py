@@ -4,6 +4,7 @@ Generate co-tag network of co-occurring (hash)tags in items
 import csv
 
 from backend.abstract.preset import ProcessorPreset
+from common.lib.helpers import UserInput
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -22,6 +23,15 @@ class CoTaggerPreset(ProcessorPreset):
                   "between all tags used together on an item. Edges are weighted by the amount of co-tag " \
                   "occurrences; nodes are weighted by the frequency of the tag."  # description displayed in UI
     extension = "gexf"  # extension of result file, used internally and in UI
+
+    options = {
+        "to-lowercase": {
+            "type": UserInput.OPTION_TOGGLE,
+            "default": True,
+            "help": "Convert tags to lowercase",
+            "tooltip": "Merges tags with varying cases"
+        }
+    }
 
     @classmethod
     def is_compatible_with(cls, module=None):
@@ -73,7 +83,8 @@ class CoTaggerPreset(ProcessorPreset):
                     "directed": False,
                     "split-comma": True,
                     "categorise": True,
-                    "allow-loops": False
+                    "allow-loops": False,
+                    "to-lowercase": self.parameters.get("to-lowercase", True)
                 }
             }
         ]

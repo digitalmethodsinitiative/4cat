@@ -41,6 +41,16 @@ class SearchReddit(SearchWithScope):
 					"careful** when using this privilege.",
 			"requires": "reddit.can_query_without_keyword"
 		},
+		"api_type": {
+			"type": UserInput.OPTION_CHOICE,
+			"help": "API version",
+			"options": {
+				"regular": "Regular",
+				"beta": "Beta (experimental)"
+			},
+			"default": "regular",
+			"tooltip": "The beta version retrieves more comments per request but may be incomplete."
+		},
 		"board": {
 			"type": UserInput.OPTION_TEXT,
 			"help": "Subreddit(s)",
@@ -53,22 +63,28 @@ class SearchReddit(SearchWithScope):
 			"type": UserInput.OPTION_INFO,
 			"help": "Reddit data is retrieved from [Pushshift](https://pushshift.io) (see also [this "
 					"paper](https://ojs.aaai.org/index.php/ICWSM/article/view/7347)). Note that Pushshift's dataset "
-					"*may not be complete* depending on the parameters used, and post scores will not be up to date. "
+					"*may not be complete* depending on the parameters used,"
+					" data from the last few days might not be there yet,"
+					" and post scores can be out of date. "
+					"See [this paper](https://arxiv.org/pdf/1803.05046.pdf) for an overview of the gaps in data. "
 					"Double-check manually or via the official Reddit API if completeness is a concern. Check the "
-					"[Pushshift API](https://github.com/pushshift/api) reference for documentation on query syntax, "
+					"[Pushshift API](https://github.com/pushshift/api) reference [beta](https://beta.pushshift.io/redoc) for"
+					"documentation on query syntax, "
 					"e.g. on how to format keyword queries."
 		},
 		"body_match": {
 			"type": UserInput.OPTION_TEXT,
-			"help": "Message search"
+			"help": "Message search",
+			"tooltip": "Matches anything in the body of a comment or post."
 		},
 		"subject_match": {
 			"type": UserInput.OPTION_TEXT,
-			"help": "Subject search"
+			"help": "Subject search",
+			"tooltip": "Matches anything in the title of a post."
 		},
 		"subject_url": {
 			"type": UserInput.OPTION_TEXT,
-			"help": "Thread link URL"
+			"help": "URL/domain in post"
 		},
 		"divider-2": {
 			"type": UserInput.OPTION_DIVIDER
@@ -105,6 +121,14 @@ class SearchReddit(SearchWithScope):
 		}
 	}
 
+	# These change depending on the API type used,
+	# but should be globally accessible.
+	submission_endpoint = None
+	comment_endpoint = None
+	api_type = None
+	since = "since"
+	after = "after"
+
 	def get_items_simple(self, query):
 		"""
 		In the case of Reddit, there is no need for multiple pathways, so we
@@ -125,20 +149,42 @@ class SearchReddit(SearchWithScope):
 		:return list:  Posts, sorted by thread and post ID, in ascending order
 		"""
 		scope = query.get("search_scope")
-
+		self.api_type = query.get("api_type", "regular")
+		
 		# first, build the request parameters
-		post_parameters = {
-			"sort": "asc",
-			"sort_type": "created_utc",
-			"size": 500,
-			"metadata": True
-		}
+		if self.api_type == "regular":
+			self.submission_endpoint = "https://api.pushshift.io/reddit/submission/search"
+			self.comment_endpoint = "https://api.pushshift.io/reddit/comment/search"
+			
+			post_parameters = {
+				"sort": "asc",
+				"sort_type": "created_utc",
+				"size": 100, # max value
+				"metadata": True
+			}
+			since = "after"
+			until = "before"
+
+		# beta fields are a bit different.
+		elif self.api_type == "beta":
+			self.submission_endpoint = "https://beta.pushshift.io/reddit/search/submissions"
+			self.comment_endpoint = "https://beta.pushshift.io/reddit/search/comments"
+
+			# For beta requests, we're sorting by IDs so we're not missing data.
+			# This is unavailable for the regular API.
+			post_parameters = {
+				"sort": "id",
+				"order": "asc",
+				"limit": 1000 # max value
+			}
+			since = "since"
+			until = "until"
 
 		if query["min_date"]:
-			post_parameters["after"] = int(query["min_date"])
+			post_parameters[since] = int(query["min_date"])
 
 		if query["max_date"]:
-			post_parameters["before"] = int(query["max_date"])
+			post_parameters[until] = int(query["max_date"])
 
 		if query["board"] and query["board"] != "*":
 			post_parameters["subreddit"] = query["board"]
@@ -152,13 +198,16 @@ class SearchReddit(SearchWithScope):
 		total_posts = 0
 		max_retries = 3
 
-		# get rate limit from API server
-		try:
-			api_metadata = requests.get("https://api.pushshift.io/meta").json()
-			self.rate_limit = api_metadata["server_ratelimit_per_minute"]
-			self.log.info("Got rate limit from Pushshift: %i requests/minute" % self.rate_limit)
-		except (requests.RequestException, json.JSONDecodeError, KeyError) as e:
-			self.log.warning("Could not retrieve rate limit from Pushshift: %s" % e)
+		# get rate limit from API server when using the regular API
+		if self.api_type != "regular":
+			try:
+				api_metadata = requests.get("https://api.pushshift.io/meta").json()
+				self.rate_limit = api_metadata["server_ratelimit_per_minute"]
+				self.log.info("Got rate limit from Pushshift: %i requests/minute" % self.rate_limit)
+			except (requests.RequestException, json.JSONDecodeError, KeyError) as e:
+				self.log.warning("Could not retrieve rate limit from Pushshift: %s" % e)
+				self.rate_limit = 120
+		else:
 			self.rate_limit = 120
 
 		# first, search for threads - this is a separate endpoint from comments
@@ -168,17 +217,18 @@ class SearchReddit(SearchWithScope):
 		if query["subject_match"]:
 			submission_parameters["title"] = query["subject_match"]
 
-		# Check whether only OPs linking to certain URLs should be retreived
-		if query.get("url", None):
+		# Check whether only OPs linking to certain URLs should be retreived.
+		# Only available for the regular API.
+		if query.get("subject_url", None):
 			urls = []
 			domains = []
 
-			if "," in query["url"]:
-				urls_input = query["url"].split(",")
-			elif "|" in query["url"]:
-				urls_input = query["url"].split("|")
+			if "," in query["subject_url"]:
+				urls_input = query["subject_url"].split(",")
+			elif "|" in query["subject_url"]:
+				urls_input = query["subject_url"].split("|")
 			else:
-				urls_input = [query["url"]]
+				urls_input = [query["subject_url"]]
 
 			# Input strings
 			for url in urls_input:
@@ -212,9 +262,9 @@ class SearchReddit(SearchWithScope):
 				raise ProcessorInterruptedException("Interrupted while fetching thread data from the Pushshift API")
 
 			retries = 0
-
-			response = self.call_pushshift_api("https://api.pushshift.io/reddit/submission/search",
+			response = self.call_pushshift_api(self.submission_endpoint,
 											   params=submission_parameters)
+			
 			if response is None:
 				return response
 
@@ -235,8 +285,14 @@ class SearchReddit(SearchWithScope):
 					seen_threads.add(thread["id"])
 					yield self.thread_to_4cat(thread)
 
+					# For the regular API, increase the time.
 					# this is the only way to go to the next page right now...
-					submission_parameters["after"] = thread["created_utc"]
+					if self.api_type == "regular":
+						submission_parameters[since] = thread["created_utc"]
+					# For the beta API, we can sort by IDs and only get those higher than the last encountered.
+					elif self.api_type == "beta":
+						submission_parameters["min_id"] = thread["id"] + 1
+
 					total_threads += 1
 
 			# update status
@@ -250,13 +306,14 @@ class SearchReddit(SearchWithScope):
 		# only query for individual posts if no subject keyword is given
 		# since individual posts don't have subjects so if there is a subject
 		# query no results should be returned
-		do_body_query = not bool(query["subject_match"].strip()) and scope != "op-only"
+		do_body_query = not bool(query["subject_match"].strip()) and not bool(query["subject_url"].strip()) and scope != "op-only"
 
 		while do_body_query:
 			if self.interrupted:
 				raise ProcessorInterruptedException("Interrupted while fetching post data from the Pushshift API")
 
-			response = self.call_pushshift_api("https://api.pushshift.io/reddit/comment/search", params=post_parameters)
+			response = self.call_pushshift_api(self.comment_endpoint, params=post_parameters)
+
 			if response is None:
 				return response
 
@@ -267,6 +324,7 @@ class SearchReddit(SearchWithScope):
 
 			# no more posts
 			posts = response.json()["data"]
+			
 			if len(posts) == 0:
 				# this could happen in some edge cases if we're searching by
 				# chunk (if no IDs in the chunk match the other parameters)
@@ -281,12 +339,19 @@ class SearchReddit(SearchWithScope):
 				if post["id"] not in seen_posts:
 					seen_posts.add(post["id"])
 					yield self.post_to_4cat(post)
-					post_parameters["after"] = post["created_utc"]
+
+					# For the regular API, increase the time.
+					# this is the only way to go to the next page right now...
+					if self.api_type == "regular":
+						post_parameters[self.since] = post["created_utc"]
+					# For the beta API, we can sort by IDs and only get those higher than the last encountered.
+					elif self.api_type == "beta":
+						post_parameters["min_id"] = post["id"] + 1
 
 					total_posts += 1
 
 			# update our progress
-			self.dataset.update_status("Found %i posts via Pushshift API..." % total_posts)
+			self.dataset.update_status("Found %i comments via Pushshift API..." % total_posts)
 
 		# and done!
 		if total_posts == 0 and total_threads == 0:
@@ -309,7 +374,8 @@ class SearchReddit(SearchWithScope):
 			if not chunk:
 				break
 
-			response = self.call_pushshift_api("https://api.pushshift.io/reddit/comment/search?ids=" + ",".join(chunk))
+			response = self.call_pushshift_api(self.comment_endpoint + "?ids=" + ",".join(chunk))
+
 			if not response:
 				break
 
@@ -345,7 +411,7 @@ class SearchReddit(SearchWithScope):
 			while True:
 				# can't get all posts in one request, so loop until thread is
 				# exhausted
-				response = self.call_pushshift_api("https://api.pushshift.io/reddit/search/comment/",
+				response = self.call_pushshift_api(self.comment_endpoint,
 												   params=thread_params)
 				if response is None:
 					# error or empty response
@@ -380,7 +446,7 @@ class SearchReddit(SearchWithScope):
 				if latest_timestamp == first_timestamp:
 					latest_timestamp += 1
 
-				thread_params["after"] = latest_timestamp
+				thread_params[self.since] = latest_timestamp
 
 		return posts
 
@@ -405,7 +471,7 @@ class SearchReddit(SearchWithScope):
 			if not chunk:
 				break
 
-			response = self.call_pushshift_api("https://api.pushshift.io/reddit/submission/search?ids=" + ",".join(chunk))
+			response = self.call_pushshift_api(self.submission_endpoint + "?ids=" + ",".join(chunk))
 			if response is None:
 				break
 
@@ -425,8 +491,9 @@ class SearchReddit(SearchWithScope):
 		:param dict post:  Post data, as from the pushshift API
 		:return dict:  Re-formatted data
 		"""
+		
 		return {
-			"thread_id": post["link_id"].split("_")[1],
+			"thread_id": post["link_id"].split("_")[1] if self.api_type == "regular" else post["link_id"],
 			"id": post["id"],
 			"timestamp": post["created_utc"],
 			"body": post["body"].strip().replace("\r", ""),
@@ -545,7 +612,7 @@ class SearchReddit(SearchWithScope):
 		query["board"] = ",".join(boards)
 		
 		# this is the bare minimum, else we can't narrow down the full data set
-		if not user.is_admin() and not user.get_value("reddit.can_query_without_keyword", False) and not query.get("body_match", "").strip() and not query.get("subject_match", "").strip():
+		if not user.is_admin() and not user.get_value("reddit.can_query_without_keyword", False) and not query.get("body_match", "").strip() and not query.get("subject_match", "").strip() and not query.get("subject_url", ""):
 			raise QueryParametersException("Please provide a body query or subject query.")
 
 		# body query and full threads are incompatible, returning too many posts
@@ -568,17 +635,21 @@ class SearchReddit(SearchWithScope):
 			if all(startswith_minus):
 				raise QueryParametersException("Please provide body queries that do not start with a minus sign.")
 
+		# URL queries are not possible (yet) for the beta API
+		if query.get("api_type") == "beta" and query.get("subject_url", None):
+			raise QueryParametersException("URL querying is not possible (yet) for the beta endpoint.")
+
 		# both dates need to be set, or none
 		if query.get("min_date", None) and not query.get("max_date", None):
 			raise QueryParametersException("When setting a date range, please provide both an upper and lower limit.")
 
 		# the dates need to make sense as a range to search within
 		query["min_date"], query["max_date"] = query.get("daterange")
-
+		
 		if "*" in query.get("body_match", "") and not user.get_value("reddit.can_query_without_keyword", False):
 			raise QueryParametersException("Wildcard queries are not allowed as they typically return too many results to properly process.")
 
-		if "*" in query.get("board", "") and not user.get_value("reddit.can_query_without_keyword", False):
+		if "*" in query.get("board", "") and not user.get_value("reddit.can_query_without_keyword"):
 			raise QueryParametersException("Wildcards are not allowed for boards as this typically returns too many results to properly process.")
 
 		del query["daterange"]

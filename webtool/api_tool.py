@@ -676,11 +676,14 @@ def queue_processor(key=None, processor=None):
 	try:
 		dataset = DataSet(key=key, db=db)
 	except TypeError:
+		print("KEY", key)
 		return error(404, error="Not a valid dataset key.")
 
 	# check if processor is available for this dataset
 	available_processors = dataset.get_available_processors()
 	if processor not in available_processors:
+		print(processor)
+		print(available_processors)
 		return error(404, error="This processor is not available for this dataset or has already been run.")
 
 	# create a dataset now

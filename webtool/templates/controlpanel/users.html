@@ -11,6 +11,9 @@
                 <button>Filter</button>
             </form>
         </nav>
+        {% for notice in flashes %}
+            <p class="form-notice">{{ notice|safe }}</p>
+        {% endfor %}
         <table class="fullwidth user-table">
             <colgroup>
                 <col class="name">
@@ -22,9 +25,16 @@
             </tr>
             {% for user in users %}
                 <tr>
-                    <td>{{ user.name }}{% if user.is_admin %}
+                    <td>{{ user.name }}
+                        {% if user.is_admin %}
                         <i class="fa fa-user-shield tooltip-trigger" aria-hidden="true"></i>
-                        <span class="sr-only"> (Admin user)</span>{% endif %}</td>
+                        <span class="sr-only"> (Admin user)</span>
+                        {% endif %}
+                        {% if user.is_deactivated %}
+                        <i class="fa fa-ban tooltip-trigger" aria-hidden="true"></i>
+                        <span class="sr-only"> (Deactivated user)</span>
+                        {% endif %}
+                    </td>
                     <td>
                         {% if user.name not in ("anonymous", "autologin") %}
                             <a class="button-like" href="{{ url_for("manipulate_user", mode="edit") }}?name={{ user.name }}"><i

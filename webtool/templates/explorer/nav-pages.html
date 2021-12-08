@@ -1,0 +1,59 @@
+<div class="nav-pages">
+	{% if post_count > max_posts %}
+		{% set post_count = max_posts %}
+	{% endif %}
+	{% set pages = ((post_count / limit) + (post_count % limit > 0))|int %}
+	{% set selected = "selected" %}
+	{% set lower_bound = 3 %}
+	{% set upper_bound = pages - 2 %}
+	{% if not page %}
+		{% set page = 1 %}
+	{% endif %}
+
+	{# show all pages if it's 10 or less #}
+	{% if pages <= 10 %}
+		{% for i in range(pages) %}
+		{% set current_page = (i + 1) %}
+		<a href="/explorer/dataset/{{key}}/{{ current_page }}"><span class="page {{ selected if page == current_page }}">{{ current_page }}</span></a>
+		{% endfor %}
+
+	{# More complex formatting if there are more than 10 pages #}
+	{% else %}
+
+		{# Always display the lower three pages #}
+		{% for i in range(lower_bound) %}
+		{% set current_page = (i + 1) %}
+		<a href="/explorer/dataset/{{key}}/{{ current_page }}"><span class="page {{ selected if page == current_page }}">{{ current_page }}</span></a>
+		{% endfor %}
+
+		{# Show lower 'edge' pages #}
+		{% if lower_bound <= page <= lower_bound + 2 %}
+			{% for i in range(lower_bound, page + 1) %}
+			<a href="/explorer/dataset/{{key}}/{{ i + 1 }}"><span class="page {{ selected if i + 1 == page }}">{{ i + 1 }}</span></a>
+			{% endfor %}
+		{% endif %}
+		<span class="page">...</span>
+
+		{# Show middle pages #}
+		{% if (lower_bound + 2) < page < (upper_bound - 2)  %}
+			{% set current_page = page %}
+			{% for i in range((page - 1), (page + 2)) %}
+			<a href="/explorer/dataset/{{key}}/{{ i }}"><span class="page {{ selected if i == current_page }}">{{ i }}</span></a>
+			{% endfor %}
+			<span class="page">...</span>
+
+		{# Show upper 'edge' pages #}
+		{% elif upper_bound - 2 <= page <= upper_bound %}
+			{% for i in range(page - 1, upper_bound) %}
+			<a href="/explorer/dataset/{{key}}/{{ i - 1 }}"><span class="page {{ selected if i - 1 == page }}">{{ i - 1 }}</span></a>
+			{% endfor %}
+		{% endif %}
+
+
+		{# Always display the upper three pages #}
+		{% for i in range(lower_bound) %}
+		{% set current_page = upper_bound + i %}
+		<a href="/explorer/dataset/{{key}}/{{ current_page }}"><span class="page {{ selected if page == current_page }}">{{ current_page }}</span></a>
+		{% endfor %}
+	{% endif %}
+</div>

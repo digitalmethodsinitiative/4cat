@@ -1,0 +1,516 @@
+/* 
+
+See https://github.com/digitalmethodsinitiative/4cat/wiki/Exploring-and-annotating-datasets for information on how to add custom CSS.
+ 
+ */
+
+@font-face {
+    font-family: 'Open Sans';
+    src: url("../fonts/OpenSans-Regular.ttf")
+}
+
+@font-face {
+    font-family: 'Open Sans';
+    font-weight: bold;
+    src: url("../fonts/OpenSans-Bold.ttf")
+}
+
+@font-face {
+    font-family: 'Open Sans';
+    font-style: italic;
+    src: url("../fonts/OpenSans-Italic.ttf")
+}
+
+@font-face {
+    font-family: 'Open Sans';
+    font-weight: bold;
+    font-style: italic;
+    src: url("../fonts/OpenSans-BoldItalic.ttf")
+}
+
+
+/** --------------------- *
+      Colour definitions
+  * --------------------- */
+:root {
+    --accent: #CE1B28;
+    --highlight: #FF2231;
+    --accent-alternate: #19B0A3;
+    --accent-okay: #26b018;
+    --accent-warning: #b05d13;
+    --accent-error: #ff2231;
+    --gray-dark: #DFDFDF;
+    --gray-darker: #6C6C6C;
+    --gray: #E9E9E9;
+    --gray-light: #EEE;
+    --contrast-bright: #F5F5F5;
+    --contrast-dark: #21202E;
+    --always-white: #FFF;
+    --text: #37373C;
+    --warning: var(--accent);
+}
+
+/** --------------------- *
+     Basic HTML elements
+  * --------------------- */
+*, body, code, select, input, textarea {
+    font-family: 'Open Sans', 'Trebuchet MS', sans-serif;
+}
+
+body {
+    background-color: #f9fbff;
+    margin: 0;
+    padding: 0;
+}
+
+select, input, textarea {
+    background: var(--gray);
+    border: 1px solid var(--gray);
+    font-size: 14px;
+    padding: 0.25em;
+}
+
+label {
+    font-size: 14px;
+}
+
+button {
+    border: 2px solid var(--contrast-dark);
+    background: var(--contrast-bright);
+    color: var(--text);
+    border-radius: 0.5em;
+    font-size: 14px;
+    cursor: pointer;
+    padding: 0.25em 1em;
+}
+
+button:hover {
+    background: var(--accent);
+    color: var(--contrast-bright);
+}
+
+button.invalid, button.invalid:hover {
+    cursor: default;
+    background: var(--contrast-bright);
+    color: var(--text);
+    border-color: var(--gray-dark);
+}
+
+/** --------------------- *
+     Header
+  * --------------------- */
+
+body > header {
+    width: 100%;
+    margin: 0;
+    padding: 0;
+}
+
+body > header h1 {
+    box-shadow: 0 5px 10px #888;
+    margin: 0;
+    padding: 0;
+    font-size: 1.5em;
+    background: var(--contrast-dark);
+    color: var(--contrast-bright);
+    text-align: center;
+    font-size: 1.5em;
+    line-height: 1.5em;
+    font-weight: bold;
+    padding: 0.50em 0;
+    cursor: default;
+}
+
+body > header #metadata {
+    font-size: 16px;
+    min-width: 640px;
+    max-width: 960px;
+    margin: 0 auto;
+    margin-top: 40px;
+    margin-bottom: 40px;
+    text-align: center;
+}
+
+body > header #metadata #parameters > span {
+    font-family: monospace;
+    font-size: 12px;
+    display: inline-block;
+    background: white;
+    margin: 2px;
+    padding: 4px;
+    border: 1px solid black;
+    border-radius: 5px;
+    cursor: default;
+}
+
+body > header .return a {
+    position: absolute;
+    left: 0;
+    padding-left: 12px;
+    color: white;
+    font-size: 0.6em;
+    text-decoration: none;
+}
+
+#dataset-key {
+    display: none;
+}
+
+/** --------------------- *
+     Navigation pages
+  * --------------------- */
+.nav-pages {
+    text-align: center;
+}
+
+span.page {
+    display: inline-block;
+    padding: 10px;
+    min-width: 20px;
+    overflow: hidden;
+    color: black;
+    background-color: white;
+    font-family: monospace;
+    border: 1px solid black;
+}
+
+span.page.selected {
+    color: white;
+    background-color: black;
+}
+
+/** --------------------- *
+     Posts
+  * --------------------- */
+.posts {
+    list-style: none;
+    padding: 0;
+}
+
+.posts li {
+    background: #d1e2ff;
+    padding: 1em;
+    min-width: 640px;
+    max-width: 960px;
+    margin: 0 auto;
+    margin-bottom: 1em;
+    overflow-x: hidden;
+}
+
+.posts header {
+    border-bottom: 1px solid #000;
+    display: inline;
+    cursor: default;
+}
+
+.posts article {
+    margin-top: 0.5em;
+}
+
+.posts article .post-content {
+    display: inline;
+    vertical-align: top;
+}
+
+.posts header .author {
+    font-weight: bold;
+}
+
+.posts header span {
+    display: inline-block;
+}
+
+.posts header span:not(:last-child)::after {
+    content: '\2022';
+    margin-left: 0.5em;
+}
+
+.posts li.op {
+    border: 2px solid #000;
+    background: #485ba6;
+    color: #FFF;
+}
+
+.posts li.op header {
+    border-color: #FFF;
+}
+
+.posts .external-url {
+    float: right;
+    margin-left: 10px;
+}
+
+.quote {
+    color: #ff5750;
+}
+.greentext {
+    color: #3eb439;
+}
+.op .greentext {
+    color: #50ff50;
+}
+.highlight, :target {
+    outline: 2px solid #ff5750;
+}
+li a {
+    color: inherit;
+    text-decoration: none;
+}
+
+.posts li .post-image img {
+    width: 100%;
+}
+
+.clear {
+    clear: both;
+}
+
+span.divider {
+    font-size: 16px;
+    color: var(--gray-darker);
+    cursor: default;
+}
+
+/** --------------------- *
+     Annotations editor
+  * --------------------- */
+#annotations-editor-container {
+    background: rgba(0, 0, 0, .4);
+    display: none;
+    height: 100%;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    z-index: 9;
+}
+
+#annotations-editor {
+    width: 100px;
+    height: 500px;
+    position: absolute;
+    top:0;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    margin: auto;
+    min-height: 100px;
+    background-color: #fff;
+    border-radius: 10px;
+    box-shadow: 10px 10px 60px #555;
+    width: 95%;
+    max-width: 620px;
+    padding: 15px 2%;
+}
+
+#annotation-fields-container {
+    max-height: 91%;
+    overflow-y: scroll;
+}
+
+#annotation-fields-container #annotation-headers {
+    display: flex;
+    align-items: flex-start;
+}
+
+#annotation-fields-container .annotation-header {
+    display: inline-block;
+    font-size: 14px;
+    font-weight: bold;
+}
+
+#annotation-fields-container .annotation-header#ah-label {
+    width: 235px;
+}
+#annotation-fields-container .annotation-header#ah-type {
+    width: 105px;
+}
+
+#annotation-fields .option-fields {
+    display: inline-block;
+}
+
+#annotation-fields .option-field {
+    display: block;
+}
+
+.annotation-fields-row {
+    display: flex;
+    align-items: flex-start;
+    margin-top: 5px;
+    padding: 2px;
+}
+
+.annotation-fields-row * {
+    margin-right: 3px;
+}
+
+.annotation-fields-row select, .annotation-fields-row button {
+    height:  30px;
+}
+
+.annotation-fields-row input {
+    height: 21px;
+    margin-bottom:3px;
+}
+
+.annotation-field-title {
+    display: inline-block;
+    font-size: 15px;
+}
+
+.annotation-field-title#at-label {
+    width: 150px;
+}
+
+#annotation-fields input.invalid {
+    border: 1px solid red;
+}
+
+#annotation-fields i.fas.fa-trash {
+    margin: 0;
+}
+
+#annotations-input-warning {
+    font-size: 14px;
+    color: red;
+    font-weight: bold;
+}
+
+#annotations-input-warning.hidden {
+    font-size: 14px;
+    color: red;
+    font-weight: bold;
+}
+
+#toggle-annotations {
+    width: 170px;
+}
+
+#annotations-input-warning.valid{
+    color: var(--accent-okay);
+}
+
+#close-annotation-fields {
+    position: absolute;
+    right: 0;
+    padding: 2px;
+    top: 0;
+    margin-right: 7px;
+    cursor: pointer;
+}
+
+#add-annotation-fields {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    margin: 15px;
+    text-align: right;
+    line-height: 0px;
+    margin-bottom: 4px;
+}
+
+#add-annotation-fields #notice {
+    font-size: 12px;
+    text-align: right;
+    color: var(--gray-darker);
+    cursor: default;
+}
+
+#annotation-controls {
+    position: fixed;
+    margin: 10px;
+    right: 0;
+    bottom:  0;
+    border-radius: 10px;
+    background-color: var(--gray);
+    z-index: 10;
+    box-shadow: 10px 10px 60px #555;
+}
+
+#annotation-controls #toggle-annotation-controls {
+    display: inline-block;
+    height: 50px;
+    width: 50px;
+    line-height: 50px;
+    text-align: center;
+    vertical-align: middle;
+    font-size: 15px;
+    cursor: pointer;
+}
+
+#toggle-annotation-fields {
+    margin-left: 10px;
+}
+
+#annotation-controls #annotation-controls-buttons {
+    display: inline-block;  
+}
+
+#annotation-controls #annotation-controls-buttons.hidden {
+    display: none;
+    transition: display 0s, opacity 0.5s linear;
+}
+
+.spinner {
+    -webkit-animation: spinner 2s linear infinite;
+}
+
+@-webkit-keyframes spinner {
+    from{
+        -webkit-transform: rotate(0deg);
+    }
+    to{
+        -webkit-transform: rotate(360deg);
+    }
+}
+
+/** --------------------- *
+     Annotation post elements
+  * --------------------- */
+.post-annotations {
+    background-color: #bed4f9;
+    margin-top: 5px;
+    padding: 15px;
+    display: none;
+}
+    
+li.op > .post-annotations {
+    background-color: #3b4b8c;
+}
+
+.post-annotation {
+    line-height: 2.5em;
+}
+
+.post-annotation .annotation-label {
+    display: inline-block;
+    vertical-align: middle;
+    text-align: right;
+    width: 130px;
+    margin-right: 5px;
+    line-height: 1.6em;
+    overflow-x: hidden;
+}
+
+.post-annotation.checkbox > .post-annotation-options {
+    display: inline-block;
+}
+
+.post-annotation-options {
+    display: inline-block;
+    vertical-align: top;
+}
+
+.post-annotation-options > input {
+    display: inline-block;
+}
+
+/** --------------------- *
+     Footer
+  * --------------------- */
+footer {
+    text-align: center;
+    margin-top: 40px;
+    margin-bottom: 70px;
+}

@@ -226,7 +226,10 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 			available_processors = self.dataset.get_available_processors()
 
 			# run it only if the post-processor is actually available for this query
-			if next_type in available_processors:
+			if self.dataset.data["num_rows"] <= 0:
+				self.log.info("Not running follow-up processor of type %s for dataset %s, no input data for follow-up" % (next_type, self.dataset.key))
+
+			elif next_type in available_processors:
 				next_analysis = DataSet(parameters=next_parameters, type=next_type, db=self.db, parent=self.dataset.key,
 										extension=available_processors[next_type].extension)
 				self.queue.add_job(next_type, remote_id=next_analysis.key)
@@ -279,8 +282,10 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		if self.dataset.get_results_path().exists():
 			self.dataset.get_results_path().unlink(missing_ok=True)
 
-		if self.dataset.get_staging_area().exists():
-			shutil.rmtree(str(self.dataset.get_staging_area()))
+		if self.dataset.staging_area:
+			for staging_area in self.dataset.staging_area:
+				if staging_area.is_dir():
+					shutil.rmtree(staging_area)
 
 	def abort(self):
 		"""

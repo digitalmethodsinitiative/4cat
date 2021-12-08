@@ -22,6 +22,8 @@ from webtool.api_tool import limiter
 from webtool.lib.user import User
 from common.lib.helpers import send_email
 
+from pathlib import Path
+
 
 @login_manager.user_loader
 def load_user(user_name):
@@ -66,6 +68,20 @@ def load_user_from_request(request):
 		user = User.get_by_name(user["user"])
 		user.authenticate()
 		return user
+
+
+@app.before_request
+def banned_users():
+	"""
+	Displays a 'sorry, no 4cat for you' message to banned or deactivated users.
+	"""
+	if current_user and current_user.is_authenticated and current_user.is_deactivated():
+		message = "Your 4CAT account has been deactivated and you can no longer access this page."
+		if current_user.get_attribute("deactivated.reason"):
+			message += "\n\nThe following reason was recorded for your account's deactivation: *"
+			message += current_user.get_attribute("deactivated.reason") + "*"
+
+		return render_template("error.html", title="Your account has been deactivated", message=message), 403
 
 
 @app.before_request
@@ -196,6 +212,11 @@ def request_access():
 
 	incomplete = []
 
+	policy_template = Path(config.PATH_ROOT, "webtool/pages/access-policy.md")
+	access_policy = ""
+	if policy_template.exists():
+		access_policy = policy_template.read_text(encoding="utf-8")
+
 	if request.method == "POST":
 		required = ("name", "email", "university", "intent", "source")
 		for field in required:
@@ -237,7 +258,7 @@ def request_access():
 									   message="The form could not be submitted; the e-mail server is unreachable.")
 
 	return render_template("account/request.html", incomplete=incomplete, flashes=get_flashed_messages(),
-						   form=request.form)
+						   form=request.form, access_policy=access_policy)
 
 
 @app.route("/reset-password/", methods=["GET", "POST"])
