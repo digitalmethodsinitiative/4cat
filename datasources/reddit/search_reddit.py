@@ -570,7 +570,7 @@ class SearchReddit(SearchWithScope):
 
 		if retries >= self.max_retries:
 			self.log.error("Error during Pushshift fetch of query %s" % self.dataset.key)
-			self.dataset.update_status("Error while searching for posts on Pushshift - API did not respond as expected", is_final=True)
+			self.dataset.update_status("Error while searching for posts on Pushshift - API did not respond as expected")
 			return None
 
 		return response
