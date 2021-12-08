@@ -370,6 +370,9 @@ class SearchReddit(SearchWithScope):
 		# search threads in chunks
 		offset = 0
 		while True:
+			if self.interrupted:
+				raise ProcessorInterruptedException("Interrupted while fetching posts from the Pushshift API")
+
 			chunk = post_ids[offset:offset + chunk_size]
 			if not chunk:
 				break
@@ -406,6 +409,9 @@ class SearchReddit(SearchWithScope):
 		for thread_id in thread_ids:
 			offset += 1
 			self.dataset.update_status("Retrieving posts for thread %i of %i" % (offset, len(thread_ids)))
+
+			if self.interrupted:
+				raise ProcessorInterruptedException("Interrupted while fetching threads from the Pushshift API")
 
 			thread_params = {"link_id": thread_id, "size": expected_results_per_page, "sort": "asc", "sort_type": "created_utc"}
 			while True:
