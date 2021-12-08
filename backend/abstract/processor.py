@@ -178,8 +178,9 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 				self.process()
 				self.after_process()
 			except WorkerInterruptedException as e:
+				# Raise this explicitly (instead of masking it in ProcessorException)
 				self.dataset.log("Processing interrupted (%s), trying again later" % str(e))
-				self.abort()
+				raise e
 			except Exception as e:
 				self.dataset.log("Processor crashed (%s), trying again later" % str(e))
 				frames = traceback.extract_tb(e.__traceback__)
@@ -291,21 +292,9 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		"""
 		Abort dataset creation and clean up so it may be attempted again later
 		"""
+		self.dataset.update_status("Dataset processing interrupted. Retrying later.")
 		# remove any result files that have been created so far
 		self.remove_files()
-
-		# we release instead of finish, since interrupting is just that - the
-		# job should resume at a later point. Delay resuming by 10 seconds to
-		# give 4CAT the time to do whatever it wants (though usually this isn't
-		# needed since restarting also stops the spawning of new workers)
-		self.dataset.update_status("Dataset processing interrupted. Retrying later.")
-
-		if self.interrupted == self.INTERRUPT_RETRY:
-			# retry later - wait at least 10 seconds to give the backend time to shut down
-			self.job.release(delay=10)
-		elif self.interrupted == self.INTERRUPT_CANCEL:
-			# cancel job
-			self.job.finish()
 
 	def iterate_items(self, path, bypass_map_item=False):
 		"""
