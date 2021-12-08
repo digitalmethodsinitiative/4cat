@@ -13,7 +13,7 @@ class FourcatToDmiTcatConverterAndUploader(ProcessorPreset):
     category = "Presets"  # category. 'Presets' are always listed first in the UI.
     title = "Upload to DMI-TCAT"  # title displayed in UI
     description = "Convert the dataset to a format compatible with DMI-TCAT and upload it to an available instance."  # description displayed in UI
-    extension = "svg"
+    extension = "html"
 
     @classmethod
     def is_compatible_with(cls, module=None):
