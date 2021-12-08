@@ -87,8 +87,6 @@ class Search(BasicProcessor, ABC):
 		elif posts is not None:
 			self.dataset.update_status("Query finished, no results found.")
 
-		self.after_search_completed()
-
 		# queue predefined post-processors
 		if num_posts > 0 and query_parameters.get("next", []):
 			for next in query_parameters.get("next"):
@@ -150,17 +148,6 @@ class Search(BasicProcessor, ABC):
 		:param dict query:  Query parameters
 		:return Generator:  A generator or iterable that returns items
 		  collected according to the provided parameters.
-		"""
-		pass
-
-	def after_search_completed(self):
-		"""
-		Method to use if anything needs to be run after the search method is completely finished.
-
-		Descending classes to implement if desired.
-
-		This is will allow get_items or search to act as a generator as it is called after items_to_csv or
-		items_to_ndjson is called.
 		"""
 		pass
 
