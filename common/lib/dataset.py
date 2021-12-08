@@ -911,6 +911,20 @@ class DataSet(FourcatModule):
 			return self.get_results_path().suffix[1:]
 		return False
 
+	def get_result_url(self):
+		"""
+		Gets the 4CAT frontend URL of a dataset file.
+
+		Uses the config.py FlaskConfig attributes (i.e., SERVER_NAME and
+		SERVER_HTTPS) plus hardcoded '/result/'.
+		TODO: create more dynamic method of obtaining url.
+		"""
+		filename = self.get_results_path().name
+		url_to_file = ('https://' if config.FlaskConfig.SERVER_HTTPS else 'http://') + \
+						config.FlaskConfig.SERVER_NAME + '/result/' + filename
+		return url_to_file
+
+
 	def __getattr__(self, attr):
 		"""
 		Getter so we don't have to use .data all the time
