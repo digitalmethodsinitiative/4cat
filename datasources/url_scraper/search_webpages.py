@@ -20,13 +20,13 @@ class SearchWithSelenium(SeleniumScraper):
     options = {
         "intro-1": {
             "type": UserInput.OPTION_INFO,
-            "help": "This data source uses [Selenium](https://selenium-python.readthedocs.io/) in combination with"
-                    "a [Chrome webdriver](https://sites.google.com/chromium.org/driver/) and Google Chrome for linux"
-                    "to scrape the HTML source code."
+            "help": "This data source uses [Selenium](https://selenium-python.readthedocs.io/) in combination with "
+                    "a [Chrome webdriver](https://sites.google.com/chromium.org/driver/) and Google Chrome for linux "
+                    "to scrape the HTML source code. "
                     "\n"
-                    "By mimicing a person using an actual browser, this method results in source code that closer"
-                    "resembles the source code an actual user receives when compared with simple HTML requests. It"
-                    "will also render JavaScript that starts as soon as a url is retrieved by a browser."
+                    "By mimicing a person using an actual browser, this method results in source code that closer "
+                    "resembles the source code an actual user receives when compared with simple HTML requests. It "
+                    "will also render JavaScript that starts as soon as a url is retrieved by a browser. "
         },
         "query-info": {
             "type": UserInput.OPTION_INFO,
