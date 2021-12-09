@@ -18,8 +18,8 @@ class ConvertNDJSONToJSON(BasicProcessor):
     type = "convert-ndjson-for-tcat"  # job type ID
     category = "Conversion"  # category
     title = "Convert to TCAT JSON"  # title displayed in UI
-    description = "Convert a Twitter dataset to a format compatible with DMI-TCAT and upload it to an available DMI-TCAT instance."  # description displayed in UI
-    extension = "html"  # extension of result file, used internally and in UI
+    description = "Convert a Twitter dataset to a format compatible with DMI-TCAT which can be uploaded to an available DMI-TCAT instance."  # description displayed in UI
+    extension = "json"  # extension of result file, used internally and in UI
 
     @classmethod
     def is_compatible_with(cls, module=None):
