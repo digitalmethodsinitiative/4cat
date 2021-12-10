@@ -152,7 +152,7 @@ class FourcatToDmiTcatUploader(BasicProcessor):
 
         self.dataset.update_status("Upload complete, writing HTML file")
         # Create HTML file
-        tcat_result_url = config.TCAT_SERVER.replace('/api/import-from-4cat.php', '').rstrip('/') + '/analysis/index.php?dataset=' + bin_name
+        tcat_result_url = server_choice.replace('/api/import-from-4cat.php', '').rstrip('/') + '/analysis/index.php?dataset=' + bin_name
         html_file = self.get_html_page(tcat_result_url)
 
         # Write HTML file
