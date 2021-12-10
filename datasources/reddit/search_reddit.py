@@ -99,8 +99,8 @@ class SearchReddit(SearchWithScope):
 			"options": {
 				"op-only": "Opening posts only (no replies/comments)",
 				"posts-only": "All matching posts",
-				"full-threads": "All posts in threads with matching posts (full threads)",
-				"dense-threads": "All posts in threads in which at least x% of posts match (dense threads)"
+#				"full-threads": "All posts in threads with matching posts (full threads)",
+#				"dense-threads": "All posts in threads in which at least x% of posts match (dense threads)"
 			},
 			"default": "posts-only"
 		},
