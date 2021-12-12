@@ -18,7 +18,7 @@ class ConvertNDJSONToJSON(BasicProcessor):
     type = "convert-ndjson-for-tcat"  # job type ID
     category = "Conversion"  # category
     title = "Convert to TCAT JSON"  # title displayed in UI
-    description = "Convert a NDJSON Twitter file to TCAT JSON format. Can be imported with TCAT's import-jsondump.php script."  # description displayed in UI
+    description = "Convert a Twitter dataset to a format compatible with DMI-TCAT which can be uploaded to an available DMI-TCAT instance."  # description displayed in UI
     extension = "json"  # extension of result file, used internally and in UI
 
     @classmethod

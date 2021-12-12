@@ -53,7 +53,7 @@ class ThreadMetadata(BasicProcessor):
 					"count": 0,
 				}
 
-			if post["subject"]:
+			if post.get("subject"):
 				threads[post["thread_id"]]["subject"] = post.get("subject", "")
 
 			if post.get("image_md5"):

@@ -450,61 +450,11 @@ class ImageDownloader(BasicProcessor):
 			raise FileNotFoundError()
 		except requests.exceptions.ConnectionError as e:
 			if retries < 3:
-				self.request_get_w_error_handling(url, retries + 1, **kwargs)
+				response = self.request_get_w_error_handling(url, retries + 1, **kwargs)
 			else:
 				self.dataset.log("Error: ConnectionError while trying to download image %s: %s" % (url, e))
 				raise FileNotFoundError()
 		return response
-
-
-	def update_parent(self, success):
-		"""
-		Update the original dataset with a nouns column
-
-		"""
-
-		self.dataset.update_status("Adding image urls to the source file")
-
-		# Get the source file data path
-		parent_path = self.source_dataset.get_results_path()
-
-		# Get a temporary path where we can store the data
-		tmp_path = self.dataset.get_staging_area()
-		tmp_file_path = tmp_path.joinpath(parent_path.name)
-
-		count = 0
-
-		# Get field names
-		fieldnames = self.get_item_keys(parent_path)
-		for fieldname in ["download_status", "img_name"]:
-			if fieldname not in fieldnames:
-				fieldnames += [fieldname]
-
-		# Iterate through the original dataset and add values to a new img_link column
-		self.dataset.update_status("Writing download status to Top images csv.")
-		with tmp_file_path.open("w", encoding="utf-8", newline="") as output:
-
-			writer = csv.DictWriter(output, fieldnames=fieldnames)
-			writer.writeheader()
-
-			for post in self.iterate_items(parent_path):
-
-				if count < len(success):
-					post["download_status"] = success[count]["download_status"]
-					post["img_name"] = success[count]["img_name"]
-
-				writer.writerow(post)
-				count += 1
-
-		# Replace the source file path with the new file
-		shutil.copy(str(tmp_file_path), str(parent_path))
-
-		# delete temporary files and folder
-		shutil.rmtree(tmp_path)
-
-		self.dataset.update_status("Parent dataset updated.")
-
-
 
 	@classmethod
 	def get_options(cls, parent_dataset=None, user=None):

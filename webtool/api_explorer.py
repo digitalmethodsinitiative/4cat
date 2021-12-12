@@ -44,6 +44,9 @@ def explorer_dataset(key, page):
 	# The amount of posts to show on a page
 	limit = 50
 
+	# The amount of posts that may be included (limit for large datasets)
+	max_posts = config.MAX_EXPLORER_POSTS if hasattr(config, "MAX_EXPLORER_POSTS") else 500000
+	
 	# The offset for posts depending on the current page
 	offset = ((page - 1) * limit) if page else 0
 
@@ -62,6 +65,7 @@ def explorer_dataset(key, page):
 	datasource = parameters["datasource"]
 	board = parameters.get("board", "")
 	annotation_fields = json.loads(dataset["annotation_fields"]) if dataset["annotation_fields"] else None
+	post_count = int(dataset["num_rows"])
 
 	# If the dataset is local, we can add some more features
 	# (like the ability to navigate to threads)
@@ -76,11 +80,16 @@ def explorer_dataset(key, page):
 	post_ids = []
 	posts = []
 	count = 0
-		
+
 	first_post = False
 
 	for post in iterate_items(dataset_path):
 			
+		# Use an offset if we're showing a page beyond the first.
+		count += 1
+		if count <= offset:
+			continue
+
 		# Use an offset if we're showing a page beyond the first.
 		count += 1
 		if count <= offset:
@@ -91,7 +100,7 @@ def explorer_dataset(key, page):
 		posts.append(post)
 
 		# Stop if we exceed the max posts per page.
-		if count >= (offset + limit):
+		if count >= (offset + limit) or count > max_posts:
 			break
 
 	# Clean up HTML
@@ -118,7 +127,7 @@ def explorer_dataset(key, page):
 		annotations = json.loads(annotations["annotations"])
 
 	# Generate the HTML page
-	return render_template("explorer/explorer.html", key=key, datasource=datasource, board=board, is_local=is_local, parameters=parameters, annotation_fields=annotation_fields, annotations=annotations, posts=posts, custom_css=css, custom_fields=custom_fields, page=page, offset=offset, limit=limit, post_count=int(dataset["num_rows"]))
+	return render_template("explorer/explorer.html", key=key, datasource=datasource, board=board, is_local=is_local, parameters=parameters, annotation_fields=annotation_fields, annotations=annotations, posts=posts, custom_css=css, custom_fields=custom_fields, page=page, offset=offset, limit=limit, post_count=post_count, max_posts=max_posts)
 
 @app.route('/explorer/thread/<datasource>/<board>/<string:thread_id>')
 @api_ratelimit
@@ -160,6 +169,7 @@ def explorer_thread(datasource, board, thread_id):
 	# Include custom fields if it they are in the datasource's 'explorer' dir.
 	# The file's naming format should e.g. be 'reddit-explorer.json'.
 	custom_fields = get_custom_fields(datasource)
+
 
 	return render_template("explorer/explorer.html", datasource=datasource, board=board, posts=posts, custom_css=css, custom_fields=custom_fields, limit=len(posts), post_count=len(posts), thread=thread_id)
 

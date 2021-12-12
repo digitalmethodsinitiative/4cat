@@ -99,8 +99,8 @@ class SearchReddit(SearchWithScope):
 			"options": {
 				"op-only": "Opening posts only (no replies/comments)",
 				"posts-only": "All matching posts",
-				"full-threads": "All posts in threads with matching posts (full threads)",
-				"dense-threads": "All posts in threads in which at least x% of posts match (dense threads)"
+#				"full-threads": "All posts in threads with matching posts (full threads)",
+#				"dense-threads": "All posts in threads in which at least x% of posts match (dense threads)"
 			},
 			"default": "posts-only"
 		},
@@ -370,6 +370,9 @@ class SearchReddit(SearchWithScope):
 		# search threads in chunks
 		offset = 0
 		while True:
+			if self.interrupted:
+				raise ProcessorInterruptedException("Interrupted while fetching posts from the Pushshift API")
+
 			chunk = post_ids[offset:offset + chunk_size]
 			if not chunk:
 				break
@@ -406,6 +409,9 @@ class SearchReddit(SearchWithScope):
 		for thread_id in thread_ids:
 			offset += 1
 			self.dataset.update_status("Retrieving posts for thread %i of %i" % (offset, len(thread_ids)))
+
+			if self.interrupted:
+				raise ProcessorInterruptedException("Interrupted while fetching threads from the Pushshift API")
 
 			thread_params = {"link_id": thread_id, "size": expected_results_per_page, "sort": "asc", "sort_type": "created_utc"}
 			while True:
@@ -564,7 +570,7 @@ class SearchReddit(SearchWithScope):
 
 		if retries >= self.max_retries:
 			self.log.error("Error during Pushshift fetch of query %s" % self.dataset.key)
-			self.dataset.update_status("Error while searching for posts on Pushshift - API did not respond as expected", is_final=True)
+			self.dataset.update_status("Error while searching for posts on Pushshift - API did not respond as expected")
 			return None
 
 		return response

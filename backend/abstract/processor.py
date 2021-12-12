@@ -298,8 +298,6 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		# job should resume at a later point. Delay resuming by 10 seconds to
 		# give 4CAT the time to do whatever it wants (though usually this isn't
 		# needed since restarting also stops the spawning of new workers)
-		self.dataset.update_status("Dataset processing interrupted. Retrying later.")
-
 		if self.interrupted == self.INTERRUPT_RETRY:
 			# retry later - wait at least 10 seconds to give the backend time to shut down
 			self.job.release(delay=10)

@@ -63,7 +63,7 @@ class MakeWordCloud(BasicProcessor):
 				"max_words": {
 					"type": UserInput.OPTION_TEXT,
 					"default": 200,
-					"help": "Convert to lowercase?"
+					"help": "Max words to show"
 				}
 			}
 		return options

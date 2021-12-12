@@ -58,8 +58,12 @@ class SVGHistogramRenderer(BasicProcessor):
 
 		# collect post numbers per month
 		intervals = {}
+		have_float = False
 		for post in self.iterate_items(self.source_file):
-			value = int(float(post["value"]))
+			value = float(post["value"])
+			if value != int(value):
+				have_float = True
+
 			intervals[post["date"]] = value
 			max_posts = max(max_posts, value)
 
@@ -100,7 +104,7 @@ class SVGHistogramRenderer(BasicProcessor):
 		x_width = width - (x_margin + x_margin_left)
 
 		# normalize the Y axis to a multiple of a power of 10
-		magnitude = pow(10, len(str(max_posts)) - 1)  # ew
+		magnitude = pow(10, len(str(int(max_posts))) - 1)  # ew
 		max_neat = math.ceil(max_posts / magnitude) * magnitude
 		self.dataset.update_status("Max (normalized): %i (%i) (magnitude: %i)" % (max_posts, max_neat, magnitude))
 
@@ -132,7 +136,7 @@ class SVGHistogramRenderer(BasicProcessor):
 			arc_adjust = 0
 
 		for interval in intervals:
-			posts = int(intervals[interval])
+			posts = intervals[interval]
 			bar_height = ((posts / max_neat) * item_height)
 			self.dataset.update_status("%s: %i posts" % (interval, posts))
 			bar_top = height - y_margin - bar_height
@@ -198,7 +202,11 @@ class SVGHistogramRenderer(BasicProcessor):
 		origin = (x_margin_left / 2)
 		step = y_height / 10
 		for i in range(0, 11):
-			label = str(int((max_neat / 10) * i))
+			label_value = (max_neat / 10) * i
+			if not have_float:
+				label_value = int(label_value)
+			label = str(label_value)
+
 			labelsize = (len(label) * fontsize_normal * 1.25, fontsize_normal)
 			label_x = origin - (tick_width * 2)
 			label_y = height - y_margin - (i * step) - (labelsize[1] / 2)
