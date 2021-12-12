@@ -140,17 +140,6 @@ class Job:
 		self.db.update("jobs", data=update, where={"id": self.data["id"]})
 		self.is_claimed = False
 
-	def update_status(self, status):
-		"""
-		Update job status
-
-		For internal use - use `add_status()` instead.
-
-		:param status:  New status
-		"""
-		self.data["status"] = status
-		self.db.update("jobs", data={"status": status}, where={"id": self.data["id"]})
-
 	def add_status(self, status):
 		"""
 		Add a status for this Job

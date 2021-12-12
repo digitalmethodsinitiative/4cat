@@ -121,13 +121,11 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
 			self.abort()
 		except ProcessorException as e:
 			self.log.error(str(e))
-			self.job.add_status("Crash during execution")
 		except Exception as e:
 			frames = traceback.extract_tb(e.__traceback__)
 			frames = [frame.filename.split("/").pop() + ":" + str(frame.lineno) for frame in frames]
 			location = "->".join(frames)
 			self.log.error("Worker %s raised exception %s and will abort: %s at %s" % (self.type, e.__class__.__name__, str(e), location))
-			self.job.add_status("Crash during execution")
 
 	def abort(self):
 		"""
@@ -150,7 +148,7 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
 		:param int level:  Retry or cancel? Either `self.INTERRUPT_RETRY` or
 		  `self.INTERRUPT_CANCEL`.
 		"""
-		self.log.debug("Interrupt requested for worker %s/%s" % (self.job.data["jobtype"], self.job.data["remote_id"]))
+		self.log.info("Interrupt requested for worker %s/%s" % (self.job.data["jobtype"], self.job.data["remote_id"]))
 		self.interrupted = level
 
 	@abc.abstractmethod

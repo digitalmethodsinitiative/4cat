@@ -13,7 +13,6 @@ CREATE TABLE IF NOT EXISTS jobs (
   timestamp_after        integer DEFAULT 0,
   timestamp_lastclaimed  integer DEFAULT 0,
   timestamp_claimed      integer DEFAULT 0,
-  status                 text,
   attempts               integer DEFAULT 0,
   interval               integer DEFAULT 0,
   instance               varchar DEFAULT '*'
