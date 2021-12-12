@@ -140,40 +140,6 @@ class Job:
 		self.db.update("jobs", data=update, where={"id": self.data["id"]})
 		self.is_claimed = False
 
-	def add_status(self, status):
-		"""
-		Add a status for this Job
-
-		The status is added to a JSON-encoded array that is saved to the database
-
-		:param str status:  Status to add
-		"""
-		current = self.get_status()
-		current.append(status)
-		self.update_status(json.dumps(current))
-
-	def get_status(self):
-		"""
-		Get statuses
-
-		Returns a list of statuses, ordered old to new.
-
-		:return list:  Statuses
-		"""
-		try:
-			status = json.loads(self.data["status"])
-			return status
-		except (TypeError, json.JSONDecodeError):
-			return [str(self.data.get("status", ""))]
-
-	def current_status(self):
-		"""
-		Get current job status
-
-		:return str:  Latest status
-		"""
-		return self.get_status().pop()
-
 	def is_claimable(self):
 		"""
 		Can this job be claimed?
