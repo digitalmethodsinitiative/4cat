@@ -8,6 +8,7 @@ from backend import all_modules
 from backend.lib.keyboard import KeyPoller
 from common.lib.exceptions import JobClaimedException
 from common.lib.helpers import get_instance_id
+from common.lib.job import Job
 
 
 class WorkerManager:
@@ -45,15 +46,19 @@ class WorkerManager:
 			signal.signal(signal.SIGINT, self.request_interrupt)
 
 		self.validate_datasources()
+		instance_id = get_instance_id()
 
 		# queue a job for the api handler so it will be run
-		self.queue.add_job("api", remote_id="localhost", instance=get_instance_id())
+		self.queue.add_job("api", remote_id=instance_id, instance=instance_id)
 
 		# queue worker that deletes expired datasets every so often
-		self.queue.add_job("expire-datasets", remote_id="localhost", interval=300, instance=get_instance_id())
+		self.queue.add_job("expire-datasets", remote_id=instance_id, interval=300, instance=instance_id)
 
 		# queue worker that calculates datasource metrics every day
-		self.queue.add_job("datasource-metrics", remote_id="localhost", interval=86400, instance=get_instance_id())
+		self.queue.add_job("datasource-metrics", remote_id=instance_id, interval=86400, instance=instance_id)
+
+		# queue worker that cleans up orphaned result files
+		self.queue.add_job("clean-temp-files", remote_id=instance_id, interval=3600, instance=instance_id)
 
 		self.log.info('4CAT Started')
 
@@ -67,12 +72,14 @@ class WorkerManager:
 		Checks for open jobs, and then passes those to dedicated workers, if
 		slots are available for those workers.
 		"""
-		jobs = self.queue.get_all_jobs()
+		jobs = self.queue.get_all_jobs(restrict_claimable=False)
+		known_job_ids = [j.data["id"] for j in jobs]
 
 		num_active = sum([len(self.worker_pool[jobtype]) for jobtype in self.worker_pool])
 		self.log.debug("Running workers: %i" % num_active)
 
 		# clean up workers that have finished processing
+		# request interrupts for workers that no longer have a record in the database
 		for jobtype in self.worker_pool:
 			all_workers = self.worker_pool[jobtype]
 			for worker in all_workers:
@@ -80,10 +87,18 @@ class WorkerManager:
 					worker.join()
 					self.worker_pool[jobtype].remove(worker)
 
+				elif worker.job.data["id"] not in known_job_ids:
+					# job has been cancelled in the meantime
+					self.log.info("Requesting interrupt for job %s" % worker.job.data["jobtype"])
+					worker.request_interrupt()
+
 			del all_workers
 
 		# check if workers are available for unclaimed jobs
 		for job in jobs:
+			if not job.is_claimable():
+				continue
+
 			jobtype = job.data["jobtype"]
 
 			if jobtype in all_modules.workers:
@@ -95,7 +110,7 @@ class WorkerManager:
 				# worker slots, start a new worker to run it
 				if len(self.worker_pool[jobtype]) < worker_class.max_workers:
 					try:
-						self.log.debug("Starting new worker for job %s" % jobtype)
+						self.log.info("Starting new worker for job %s" % jobtype)
 						job.claim()
 						worker = worker_class(logger=self.log, manager=self, job=job, modules=all_modules)
 						worker.start()
@@ -132,7 +147,7 @@ class WorkerManager:
 				self.log.info("Waiting for worker %s..." % jobtype)
 				worker.join()
 
-		time.sleep(3)
+		time.sleep(1)
 
 		# abort
 		self.log.info("Bye!")
@@ -222,3 +237,22 @@ class WorkerManager:
 				# now all queries are interrupted, formally request an abort
 				worker.request_interrupt(interrupt_level)
 				return
+
+	def request_delete(self, job=None, remote_id=None, jobtype=None):
+		"""
+		Delete job from queue
+
+		This will trigger an interrupt to any workers running for this job.
+		This can be used to trigger an interrupt regardless of on which
+		4CAT instance the job is running - as long as they are working with the
+		same database, the interrupt will be triggered on the right instance.
+
+		:param Job job:  Job object to cancel worker for
+		:param str remote_id:  Remote ID for worker job to cancel
+		:param str jobtype:  Job type for worker job to cancel
+		"""
+		if job:
+			job.finish(delete=True)
+		else:
+			job = Job.get_by_remote_ID(remote_id=remote_id, jobtype=jobtype, database=self.db)
+			job.finish(delete=True)

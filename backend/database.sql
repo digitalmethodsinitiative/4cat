@@ -23,7 +23,8 @@ CREATE TABLE IF NOT EXISTS jobs (
 CREATE UNIQUE INDEX IF NOT EXISTS unique_job
   ON jobs (
     jobtype,
-    remote_id
+    remote_id,
+    instance
   );
 
 

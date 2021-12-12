@@ -93,7 +93,7 @@ class JobQueue:
 			replacements.append(now)
 			replacements.append(now)
 
-		query += "AND instance IN ('*', %s)"
+		query += " AND instance IN ('*', %s)"
 		query += "         ORDER BY timestamp ASC"
 		replacements.append(get_instance_id())
 

@@ -191,7 +191,10 @@ class Job:
 
 		:return bool: If the job is not claimed yet and also isn't finished.
 		"""
-		return not self.is_claimed and not self.is_finished
+		return \
+			not self.is_claimed \
+			and not self.is_finished \
+			and self.data["timestamp_lastclaimed"] < time.time() - self.data["interval"]
 
 	@property
 	def details(self):
