@@ -20,5 +20,19 @@ if has_column["num"] == 0:
 else:
     print("  ...Yes, nothing to update.")
 
+print("  Dropping 'unique job' index if it exists...")
+db.execute("DROP INDEX IF EXISTS unique_job")
+
+print("  Creating anew...")
+db.execute("CREATE UNIQUE INDEX IF NOT EXISTS unique_job ON jobs (jobtype, remote_id, instance)")
+print("  ...done")
+
+print("  Dropping job status column if it exists...")
+has_column = db.fetchone("SELECT COUNT(*) AS num FROM information_schema.columns WHERE table_name = 'jobs' AND column_name = 'status'")
+if has_column["num"] == 0:
+    print("  ...found column, dropping")
+    db.execute("ALTER TABLE jobs DROP COLUMN status")
+else:
+    print("  ...column already dropped or never created")
 
 print("  Done!")
