@@ -4,6 +4,7 @@ import json
 
 import config
 from backend.abstract.worker import BasicWorker
+from common.lib.helpers import get_instance_id
 
 
 class InternalAPI(BasicWorker):
@@ -217,7 +218,7 @@ class InternalAPI(BasicWorker):
 			# all jobs plus, for those that are currently active, some worker
 			# info as well as related datasets. useful to monitor server
 			# activity and judge whether 4CAT can safely be interrupted
-			open_jobs = self.db.fetchall("SELECT jobtype, timestamp, timestamp_claimed, timestamp_lastclaimed, interval, remote_id FROM jobs ORDER BY jobtype ASC, timestamp ASC, remote_id ASC")
+			open_jobs = self.db.fetchall("SELECT jobtype, timestamp, timestamp_claimed, timestamp_lastclaimed, interval, remote_id FROM jobs WHERE instance in ('*', %s) ORDER BY jobtype ASC, timestamp ASC, remote_id ASC", (get_instance_id(),))
 			running = []
 			queue = {}
 
