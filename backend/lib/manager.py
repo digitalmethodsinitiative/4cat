@@ -6,7 +6,7 @@ import time
 
 from backend import all_modules
 from backend.lib.keyboard import KeyPoller
-from common.lib.exceptions import JobClaimedException
+from common.lib.exceptions import JobClaimedException, JobNotFoundException
 from common.lib.helpers import get_instance_id
 from common.lib.job import Job
 
@@ -261,7 +261,11 @@ class WorkerManager:
 		:param str jobtype:  Job type for worker job to cancel
 		"""
 		if not job:
-			job = Job.get_by_remote_ID(remote_id=remote_id, jobtype=jobtype, database=self.db, own_instance_only=False)
+			try:
+				job = Job.get_by_remote_ID(remote_id=remote_id, jobtype=jobtype, database=self.db, own_instance_only=False)
+			except JobNotFoundException:
+				# job doesn't exist - OK, may have been deleted or finished already
+				return
 
 		self.log.info(
 				"Job deletion requested for job %s/%s/%s" % (job.data["instance"], job.data["jobtype"], job.data["remote_id"]))
