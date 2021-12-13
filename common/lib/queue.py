@@ -182,7 +182,7 @@ class JobQueue:
 			"instance": instance
 		}
 
-		self.db.insert("jobs", data, safe=True, constraints=("jobtype", "remote_id"))
+		self.db.insert("jobs", data, safe=True, constraints=("jobtype", "remote_id", "instance"))
 
 		return Job.get_by_data(data, database=self.db)
 
