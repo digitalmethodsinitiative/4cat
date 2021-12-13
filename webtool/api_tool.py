@@ -540,19 +540,10 @@ def delete_dataset(key=None):
 	# delete it
 	children = dataset.get_all_children()
 	for child in children:
-		try:
-			job = Job.get_by_remote_ID(child.key, database=db, jobtype=child.type)
-			call_api("cancel-job", {"remote_id": child.key, "jobtype": dataset.type, "level": BasicWorker.INTERRUPT_CANCEL})
-			job.finish()
-		except JobNotFoundException:
-			pass
+		call_api("cancel-job", {"remote_id": child.key, "jobtype": dataset.type, "level": BasicWorker.INTERRUPT_CANCEL})
 
 	# now cancel and delete the job for this one (if it exists)
-	try:
-		job = Job.get_by_remote_ID(dataset.key, database=db, jobtype=dataset.type)
-		call_api("cancel-job", {"remote_id": dataset.key, "jobtype": dataset.type, "level": BasicWorker.INTERRUPT_CANCEL})
-	except JobNotFoundException:
-		pass
+	call_api("cancel-job", {"remote_id": dataset.key, "jobtype": dataset.type, "level": BasicWorker.INTERRUPT_CANCEL})
 
 	# and delete the dataset and child datasets
 	dataset.delete()
