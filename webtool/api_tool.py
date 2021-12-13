@@ -488,11 +488,21 @@ def nuke_dataset(key=None, reason=None):
 	# delete it
 	children = dataset.get_all_children()
 	for child in children:
-		call_api("cancel-job", {"remote_id": child.key, "jobtype": dataset.type, "level": BasicWorker.INTERRUPT_CANCEL})
+		try:
+			# test if a job is running for this child dataset
+			job = Job.get_by_remote_ID(child.key, db, dataset.type, own_instance_only=False)
+			call_api("cancel-job", {"remote_id": child.key, "jobtype": dataset.type})
+		except JobNotFoundException:
+			pass
+
 		child.delete()
 
 	# now cancel and delete the job for this one (if it exists)
-	call_api("cancel-job", {"remote_id": dataset.key, "jobtype": dataset.type, "level": BasicWorker.INTERRUPT_CANCEL})
+	try:
+		job = Job.get_by_remote_ID(dataset.key, db, dataset.type, own_instance_only=False)
+		call_api("cancel-job", {"remote_id": dataset.key, "jobtype": dataset.type})
+	except JobNotFoundException:
+		pass
 
 	# wait for the dataset to actually be cancelled
 	time.sleep(2)
@@ -540,10 +550,20 @@ def delete_dataset(key=None):
 	# delete it
 	children = dataset.get_all_children()
 	for child in children:
-		call_api("cancel-job", {"remote_id": child.key, "jobtype": dataset.type, "level": BasicWorker.INTERRUPT_CANCEL})
+		try:
+			# test if there is a job for this dataset
+			job = Job.get_by_remote_ID(child.key, db, dataset.type, own_instance_only=False)
+			call_api("cancel-job", {"remote_id": child.key, "jobtype": dataset.type})
+		except JobNotFoundException:
+			# already finished or deleted, just skip
+			continue
 
 	# now cancel and delete the job for this one (if it exists)
-	call_api("cancel-job", {"remote_id": dataset.key, "jobtype": dataset.type, "level": BasicWorker.INTERRUPT_CANCEL})
+	try:
+		job = Job.get_by_remote_ID(dataset.key, db, dataset.type, own_instance_only=False)
+		call_api("cancel-job", {"remote_id": dataset.key, "jobtype": dataset.type})
+	except JobNotFoundException:
+		pass
 
 	# and delete the dataset and child datasets
 	dataset.delete()
