@@ -160,7 +160,6 @@ class InternalAPI(BasicWorker):
 			payload = payload.get("payload", {})
 			remote_id = payload.get("remote_id")
 			jobtype = payload.get("jobtype")
-			level = payload.get("level", BasicWorker.INTERRUPT_RETRY)
 
 			self.manager.request_delete(remote_id=remote_id, jobtype=jobtype)
 			return "OK"

@@ -8,6 +8,7 @@ from common.lib.queue import JobQueue
 from common.lib.database import Database
 from backend.lib.manager import WorkerManager
 from common.lib.logger import Logger
+from common.lib.helpers import get_instance_id
 
 import config
 
@@ -52,5 +53,6 @@ def run(as_daemon=True):
 	queue.release_all()
 
 	# make it happen
+	log.info("Starting 4CAT instance '%s'" % get_instance_id())
 	WorkerManager(logger=log, database=db, queue=queue, as_daemon=as_daemon)
 	log.info("4CAT Backend shut down.")

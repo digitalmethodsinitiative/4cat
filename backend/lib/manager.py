@@ -20,6 +20,7 @@ class WorkerManager:
 	log = None
 
 	worker_pool = {}
+	stopping_workers = []
 	job_mapping = {}
 	pool = []
 	looping = True
@@ -86,11 +87,16 @@ class WorkerManager:
 				if not worker.is_alive():
 					worker.join()
 					self.worker_pool[jobtype].remove(worker)
+					self.stopping_workers.remove(worker.job.data["id"])
 
-				elif worker.job.data["id"] not in known_job_ids:
+				elif worker.job.data["id"] not in known_job_ids and worker.job.data["id"] not in self.stopping_workers:
 					# job has been cancelled in the meantime
 					self.log.info("Requesting interrupt for job %s" % worker.job.data["jobtype"])
 					worker.request_interrupt()
+
+					# this is so an interrupt isn't requested every loop while
+					# the worker is already quitting
+					self.stopping_workers.append(worker.job.data["id"])
 
 			del all_workers
 
@@ -251,8 +257,9 @@ class WorkerManager:
 		:param str remote_id:  Remote ID for worker job to cancel
 		:param str jobtype:  Job type for worker job to cancel
 		"""
-		if job:
-			job.finish(delete=True)
-		else:
-			job = Job.get_by_remote_ID(remote_id=remote_id, jobtype=jobtype, database=self.db)
-			job.finish(delete=True)
+		if not job:
+			job = Job.get_by_remote_ID(remote_id=remote_id, jobtype=jobtype, database=self.db, own_instance_only=False)
+
+		self.log.info(
+				"Job deletion requested for job %s/%s/%s" % (job.data["instance"], job.data["jobtype"], job.data["remote_id"]))
+		job.finish(delete=True)

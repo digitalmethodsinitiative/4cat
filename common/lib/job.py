@@ -34,20 +34,30 @@ class Job:
 		self.is_finished = "is_finished" in self.data and self.data["is_finished"]
 		self.is_claimed = self.data["timestamp_claimed"] and self.data["timestamp_claimed"] > 0
 
-	def get_by_ID(id, database):
+	@staticmethod
+	def get_by_ID(job_id, database, own_instance_only=True):
 		"""
 		Instantiate job object by ID
 
-		:param int id: Job ID
+		:param int job_id: Job ID
 		:param database:  Database handler
+		:param bool own_instance_only:  Only consider jobs that are claimable
+		or claimed by this instance. If `False`, also considers jobs currently
+		claimed by other instances.
 		:return Job: Job object
 		"""
-		data = database.fetchone("SELECT * FROM jobs WHERE id = %s AND instance IN ('*', %s)", (id, get_instance_id()))
+		instance_filter = ("*", get_instance_id()) if own_instance_only else ()
+		if instance_filter:
+			data = database.fetchone("SELECT * FROM jobs WHERE id = %s AND instance IN %s", (job_id, instance_filter))
+		else:
+			data = database.fetchone("SELECT * FROM jobs WHERE id = %s", (job_id,))
+
 		if not data:
 			raise JobNotFoundException
 
 		return Job.get_by_data(data, database)
 
+	@staticmethod
 	def get_by_data(data, database):
 		"""
 		Instantiate job object with given data
@@ -58,7 +68,8 @@ class Job:
 		"""
 		return Job(data, database)
 
-	def get_by_remote_ID(remote_id, database, jobtype="*"):
+	@staticmethod
+	def get_by_remote_ID(remote_id, database, jobtype="*", own_instance_only=True):
 		"""
 		Instantiate job object by combination of remote ID and job type
 
@@ -67,12 +78,25 @@ class Job:
 		:param database: Database handler
 		:param str jobtype: Job type
 		:param str remote_id: Job remote ID
+		:param bool own_instance_only:  Only consider jobs that are claimable
+		or claimed by this instance. If `False`, also considers jobs currently
+		claimed by other instances.
 		:return Job: Job object
 		"""
+		instance_filter = ("*", get_instance_id()) if own_instance_only else ()
+
 		if jobtype != "*":
-			data = database.fetchone("SELECT * FROM jobs WHERE jobtype = %s AND remote_id = %s AND instance IN ('*', %s)", (jobtype, remote_id, get_instance_id()))
+			if instance_filter:
+				data = database.fetchone("SELECT * FROM jobs WHERE jobtype = %s AND remote_id = %s AND instance IN %s",
+										 (jobtype, remote_id, instance_filter))
+			else:
+				data = database.fetchone("SELECT * FROM jobs WHERE jobtype = %s AND remote_id = %s",
+										 (jobtype, remote_id))
 		else:
-			data = database.fetchone("SELECT * FROM jobs WHERE remote_id = %s AND instance IN ('*', %s)", (remote_id,))
+			if instance_filter:
+				data = database.fetchone("SELECT * FROM jobs WHERE remote_id = %s AND instance IN %s", (remote_id, instance_filter))
+			else:
+				data = database.fetchone("SELECT * FROM jobs WHERE remote_id = %s", (remote_id,))
 
 		if not data:
 			raise JobNotFoundException

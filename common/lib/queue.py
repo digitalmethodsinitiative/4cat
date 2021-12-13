@@ -32,7 +32,7 @@ class JobQueue:
 
 		self.db = database
 
-	def get_job(self, jobtype, timestamp=-1):
+	def get_job(self, jobtype, timestamp=-1, own_instance_only=True):
 		"""
 		Get job of a specific type
 
@@ -43,10 +43,15 @@ class JobQueue:
 		:param int timestamp:  Find jobs that may be claimed after this timestamp. If set to
 							   a negative value (default), any job with a "claim after" time
 							   earlier than the current time is selected.
+		:param bool own_instance_only:  Only consider jobs that are claimable
+		or claimed by this instance. If `False`, also considers jobs currently
+		claimed by other instances.
 		:return dict: Job data, or `None` if no job was found
 		"""
 		if timestamp < 0:
 			timestamp = int(time.time())
+
+		instance_filter = ("*", get_instance_id()) if own_instance_only else ("*",)
 
 		job = self.db.fetchone((
 			"SELECT * FROM jobs"
@@ -54,14 +59,14 @@ class JobQueue:
 			"          AND timestamp_claimed = 0"
 			"          AND timestamp_after < %s"
 			"          AND (interval = 0 OR timestamp_lastclaimed + interval < %s)"
-			"          AND instance IN ('*', %s)"
+			"          AND instance IN %s"
 			"    ORDER BY timestamp ASC"
 			"       LIMIT 1;"),
-			(jobtype, timestamp, timestamp, get_instance_id()))
+			(jobtype, timestamp, timestamp, instance_filter))
 
 		return Job.get_by_data(job, database=self.db) if job else None
 
-	def get_all_jobs(self, jobtype="*", remote_id=False, restrict_claimable=True):
+	def get_all_jobs(self, jobtype="*", remote_id=False, restrict_claimable=True, own_instance_only=True):
 		"""
 		Get all unclaimed (and claimable) jobs
 
@@ -69,6 +74,9 @@ class JobQueue:
 		:param string remote_id:  Remote ID, takes precedence over `jobtype`
 		:param bool restrict_claimable:  Only return jobs that may be claimed
 		according to their parameters
+		:param bool own_instance_only:  Only consider jobs that are claimable
+		or claimed by this instance. If `False`, also considers jobs currently
+		claimed by other instances.
 		:return list:
 		"""
 		replacements = []
@@ -81,6 +89,7 @@ class JobQueue:
 		else:
 			filter = "WHERE jobtype != ''"
 
+		instance_filter = ("*", get_instance_id()) if own_instance_only else ()
 
 		query = "SELECT * FROM jobs %s" % filter
 
@@ -93,9 +102,10 @@ class JobQueue:
 			replacements.append(now)
 			replacements.append(now)
 
-		query += " AND instance IN ('*', %s)"
-		query += "         ORDER BY timestamp ASC"
-		replacements.append(get_instance_id())
+		if instance_filter:
+			query += " AND instance IN %s"
+			query += "         ORDER BY timestamp ASC"
+			replacements.append(instance_filter)
 
 		try:
 			jobs = self.db.fetchall(query, replacements)
@@ -109,17 +119,28 @@ class JobQueue:
 
 		return [Job.get_by_data(job, self.db) for job in jobs if job]
 
-	def get_job_count(self, jobtype="*"):
+	def get_job_count(self, jobtype="*", own_instance_only=True):
 		"""
 		Get total number of jobs
 
 		:param jobtype:  Type of jobs to count. Default (`*`) counts all jobs.
+		:param bool own_instance_only:  Only consider jobs that are claimable
+		or claimed by this instance. If `False`, also considers jobs currently
+		claimed by other instances.
 		:return int:  Number of jobs
 		"""
+		instance_filter = ("*", get_instance_id()) if own_instance_only else ()
+
 		if jobtype == "*":
-			count = self.db.fetchone("SELECT COUNT(*) FROM jobs WHERE instance IN ('*', %s)", (get_instance_id(),))
+			if instance_filter:
+				count = self.db.fetchone("SELECT COUNT(*) FROM jobs WHERE instance IN %s", (instance_filter,))
+			else:
+				count = self.db.fetchone("SELECT COUNT(*) FROM jobs")
 		else:
-			count = self.db.fetchone("SELECT COUNT(*) FROM jobs WHERE jobtype = %s AND instance IN ('*', %s)", (jobtype, get_instance_id()))
+			if instance_filter:
+				count = self.db.fetchone("SELECT COUNT(*) FROM jobs WHERE jobtype = %s AND instance IN %s", (jobtype, instance_filter))
+			else:
+				count = self.db.fetchone("SELECT COUNT(*) FROM jobs WHERE jobtype = %s", (jobtype,))
 
 		return int(count["count"])
 
@@ -165,15 +186,22 @@ class JobQueue:
 
 		return Job.get_by_data(data, database=self.db)
 
-	def release_all(self):
+	def release_all(self, own_instance_only=True):
 		"""
 		Release all jobs
 
 		All claimed jobs are released. This is useful to run when the backend is restarted.
+
+		:param bool own_instance_only:  Only consider jobs that are claimable
+		or claimed by this instance. If `False`, also considers jobs currently
+		claimed by other instances.
 		"""
-		self.db.execute("UPDATE jobs SET timestamp_claimed = 0 WHERE instance IN('*', %s)", (get_instance_id(),))
+		instance_filter = ("*", get_instance_id()) if own_instance_only else ()
 
-
+		if instance_filter:
+			self.db.execute("UPDATE jobs SET timestamp_claimed = 0 WHERE instance IN %s", (instance_filter,))
+		else:
+			self.db.execute("UPDATE jobs SET timestamp_claimed = 0")
 
 	def get_place_in_queue(self, job):
 		"""
