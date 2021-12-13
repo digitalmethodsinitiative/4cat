@@ -87,7 +87,10 @@ class WorkerManager:
 				if not worker.is_alive():
 					worker.join()
 					self.worker_pool[jobtype].remove(worker)
-					self.stopping_workers.remove(worker.job.data["id"])
+
+					if worker.job.data["id"] in self.stopping_workers:
+						# this was stopped via an interrupt
+						self.stopping_workers.remove(worker.job.data["id"])
 
 				elif worker.job.data["id"] not in known_job_ids and worker.job.data["id"] not in self.stopping_workers:
 					# job has been cancelled in the meantime
