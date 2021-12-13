@@ -94,7 +94,7 @@ class WorkerManager:
 
 				elif worker.job.data["id"] not in known_job_ids and worker.job.data["id"] not in self.stopping_workers:
 					# job has been cancelled in the meantime
-					self.log.info("Requesting interrupt for job %s" % worker.job.data["jobtype"])
+					self.log.debug("Requesting interrupt for job %s" % worker.job.data["jobtype"])
 					worker.request_interrupt()
 
 					# this is so an interrupt isn't requested every loop while
@@ -119,7 +119,7 @@ class WorkerManager:
 				# worker slots, start a new worker to run it
 				if len(self.worker_pool[jobtype]) < worker_class.max_workers:
 					try:
-						self.log.info("Starting new worker for job %s" % jobtype)
+						self.log.debug("Starting new worker for job %s" % jobtype)
 						job.claim()
 						worker = worker_class(logger=self.log, manager=self, job=job, modules=all_modules)
 						worker.start()
