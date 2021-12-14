@@ -655,10 +655,16 @@ class DataSet(FourcatModule):
 		:param string version:  Version identifier
 		:return bool:  Update successul?
 		"""
-		self.data["software_version"] = version
+		try:
+			# this fails if the processor type is unknown
+			# edge case, but let's not crash...
+			processor_path = backend.all_modules.processors.get(self.data["type"]).filepath
+		except AttributeError:
+			processor_path = ""
+
 		updated = self.db.update("datasets", where={"key": self.data["key"]}, data={
 			"software_version": version,
-			"software_file": backend.all_modules.processors.get(self.data["type"]).filepath
+			"software_file": processor_path
 		})
 
 		return updated > 0
