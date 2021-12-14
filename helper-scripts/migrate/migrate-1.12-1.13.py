@@ -13,8 +13,8 @@ db = Database(logger=log, dbname=config.DB_NAME, user=config.DB_USER, password=c
 for datasource in ("8kun", "8chan"):
 	print("  Checking for %s database tables... " % datasource, end="")
 
-	test = db.fetchone("SELECT EXISTS ( SELECT FROM information_schema.tables WHERE table_schema = %s AND table_name = %s )", ("public", "posts_%s" % datasource))
-	if not test["exists"]:
+	chan_table = db.fetchone("SELECT EXISTS ( SELECT FROM information_schema.tables WHERE table_schema = %s AND table_name = %s )", ("public", "posts_%s" % datasource))
+	if not chan_table["exists"]:
 		print("not available, nothing to upgrade!")
 		continue
 
