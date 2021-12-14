@@ -506,7 +506,9 @@ def nuke_dataset(key=None, reason=None):
 	# wait for the dataset to actually be cancelled
 	time.sleep(2)
 
-	dataset.get_results_path().unlink(missing_ok=True)
+	if dataset.get_results_path().exists():
+		dataset.get_results_path().unlink()
+
 	dataset.update_status("Dataset cancelled by instance administrator. Reason: %s" % reason)
 	dataset.finish(0)
 

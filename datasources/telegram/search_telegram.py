@@ -154,7 +154,10 @@ class SearchTelegram(Search):
             self.dataset.update_status(
                 "Session is not authenticated: login security code may have expired. You need to re-enter the security code.",
                 is_final=True)
-            session_path.unlink(missing_ok=True)
+
+            if session_path.exists():
+                session_path.unlink()
+
             if client and hasattr(client, "disconnect"):
                 await client.disconnect()
             return None

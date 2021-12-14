@@ -283,4 +283,5 @@ class UrlUnshortener(BasicProcessor):
         # we don't need this file anymore - it has been copied to the new
         # standalone dataset, and this one is not accessible via the interface
         # except as a link to the copied standalone dataset
-        self.dataset.get_results_path().unlink(missing_ok=True)
+        if self.dataset.get_results_path().exists():
+            self.dataset.get_results_path().unlink()
