@@ -13,7 +13,7 @@
 
 	<header>
 		<!-- Metadata -->
-		{% if 'pseudonymise' in parameters and parameters.get('pseudonymise') %}
+		{% if parameters and ('pseudonymise' in parameters and parameters.get('pseudonymise')) %}
 			<span title="Pseudonymous author" class="author">
 			<i class="fa fa-user-secret tooltip-trigger"></i>
 		{% else %}

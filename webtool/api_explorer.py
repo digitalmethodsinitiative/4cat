@@ -152,6 +152,9 @@ def explorer_thread(datasource, board, thread_id):
 	if not thread_id:
 		return error(404, error="No thread ID provided")
 
+	# The amount of posts that may be included (limit for large datasets)
+	max_posts = config.MAX_EXPLORER_POSTS if hasattr(config, "MAX_EXPLORER_POSTS") else 500000
+
 	# Get the posts with this thread ID.
 	posts = get_posts(db, datasource, board, ids=tuple([thread_id]), threads=True, order_by=["id"])
 
@@ -170,8 +173,7 @@ def explorer_thread(datasource, board, thread_id):
 	# The file's naming format should e.g. be 'reddit-explorer.json'.
 	custom_fields = get_custom_fields(datasource)
 
-
-	return render_template("explorer/explorer.html", datasource=datasource, board=board, posts=posts, custom_css=css, custom_fields=custom_fields, limit=len(posts), post_count=len(posts), thread=thread_id)
+	return render_template("explorer/explorer.html", datasource=datasource, board=board, posts=posts, custom_css=css, custom_fields=custom_fields, limit=len(posts), post_count=len(posts), thread=thread_id, max_posts=max_posts)
 
 @app.route('/explorer/post/<datasource>/<board>/<string:post_id>')
 @api_ratelimit
