@@ -26,7 +26,7 @@ packages = [
 	"html2text==2018.1.9",
 	"ImageHash==4.2.0",
 	"instaloader==4.5.3",
-	"lxml==4.6.3",
+	"lxml==4.6.5",
 	"Markdown==3.0.1",
 	"nltk==3.5",
 	"networkx>=2.5.1",

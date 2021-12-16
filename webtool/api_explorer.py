@@ -85,8 +85,13 @@ def explorer_dataset(key, page):
 
 	for post in iterate_items(dataset_path):
 			
-		# Use an offset if we're showing a page beyond the first.
 		count += 1
+		
+		# Use an offset if we're showing a page beyond the first.
+		if count <= offset:
+			continue
+
+		# Use an offset if we're showing a page beyond the first.
 		if count <= offset:
 			continue
 

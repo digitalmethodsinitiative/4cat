@@ -280,7 +280,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		later if desired.
 		"""
 		if self.dataset.get_results_path().exists():
-			self.dataset.get_results_path().unlink(missing_ok=True)
+			self.dataset.get_results_path().unlink()
 
 		if self.dataset.staging_area:
 			for staging_area in self.dataset.staging_area:
