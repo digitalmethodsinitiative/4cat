@@ -9,6 +9,7 @@ body {
 }
 
 .posts li {
+	position: relative;
 	background-color: white;
 	max-width: 620px;
 	border: 1px solid #d6d6d6;
@@ -17,7 +18,9 @@ body {
 }
 
 .posts li header {
-	line-height: 3em;
+	display: inline-block;
+	line-height: 1.7em;
+	margin-bottom: 5px;
 	border: none;
 	color: rgb(104, 119, 130);
 }
@@ -49,6 +52,11 @@ body {
 	padding: 0;
 }
 
+.posts li.op {
+	background-color: white;
+	color: black;
+}
+
 .posts li .post-content {
 	display: inline-block;
 }
@@ -59,6 +67,10 @@ body {
 
 .posts li .post-image img {
 	border-radius: 10px;
+}
+
+.posts .external-url {
+	color: rgb(104, 119, 130);
 }
 
 .post-annotations {

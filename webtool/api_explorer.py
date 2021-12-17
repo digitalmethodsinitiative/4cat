@@ -20,6 +20,8 @@ from webtool import app, db, log, openapi, limiter
 from webtool.lib.helpers import format_post, error
 from common.lib.helpers import strip_tags
 
+
+
 api_ratelimit = limiter.shared_limit("45 per minute", scope="api")
 
 
@@ -76,6 +78,25 @@ def explorer_dataset(key, page):
 	if not dataset_path.exists():
 		abort(404)
 
+	# Check if we have to sort the data in a specific way.
+	sort_by = request.args.get("sort")
+	if sort_by == "dataset-order":
+		sort_by = None
+	
+	# Check if we have to reverse the order.
+	descending = request.args.get("desc")
+	if descending == "true" or descending == True:
+		descending = True
+	else:
+		descending = False
+
+	# Check if we have to convert the sort value to an integer.
+	force_int = request.args.get("int")
+	if force_int == "true" or force_int == True:
+		force_int = True
+	else:
+		force_int = False
+
 	# Load posts
 	post_ids = []
 	posts = []
@@ -83,7 +104,7 @@ def explorer_dataset(key, page):
 
 	first_post = False
 
-	for post in iterate_items(dataset_path):
+	for post in iterate_items(dataset_path, sort_by=sort_by, descending=descending, force_int=force_int):
 			
 		count += 1
 		
@@ -472,8 +493,15 @@ def get_image_file(img_file, limit=0):
 
 	return send_file(str(image_path))
 
-def iterate_items(in_file):
-	# Loop through both csv and NDJSON files.
+def iterate_items(in_file, sort_by=None, descending=False, force_int=False):
+	"""
+	Loop through both csv and NDJSON files.
+	:param in_file, str:		The input file to read.
+	:param sort_by, str:		The key for a value that determines the sort order.
+	:param descending, bool:	Whether to sort by descending values.
+	:param force_int, bool:		Whether the sort value should be converted to an 
+								integer.
+	"""
 	
 	suffix = in_file.name.split(".")[-1].lower()
 
@@ -481,12 +509,19 @@ def iterate_items(in_file):
 
 		with open(in_file, "r", encoding="utf-8") as dataset_file:
 		
-			# Sort on date.
+			# Sort on date by default
 			# Unix timestamp integers are not always saved in the same field.
 			reader = csv.reader(dataset_file)
 			columns = next(reader)
-			time_col = columns.index("unix_timestamp") if "unix_timestamp" in columns else columns.index("timestamp")
-			reader = sorted(reader, key=operator.itemgetter(time_col))
+			if sort_by:
+				try:
+					sort_by = columns.index(sort_by)
+					if force_int:
+						reader = sorted(reader, key=lambda x: int(x[sort_by]), reverse=descending)
+					else:
+						reader = sorted(reader, key=operator.itemgetter(sort_by), reverse=descending)
+				except ValueError:
+					pass
 			
 			for item in reader:
 
@@ -496,17 +531,30 @@ def iterate_items(in_file):
 				yield item
 
 	elif suffix == "ndjson":
-		# in this format each line in the file is a self-contained JSON
-		# file
 
+		# In this format each line in the file is a self-contained JSON
+		# file
 		with open(in_file, "r", encoding="utf-8") as dataset_file:
 
-			for line in dataset_file:
+			# Unfortunately we can't easily sort here.
+			# We're just looping through the file if no sort is given.
+			if not sort_by:
+				for line in dataset_file:
+					item = json.loads(line)
+					yield item
+			
+			# If a sort order is given explititly, we're sorting anyway.
+			else:
+				keys = sort_by.split(".")
 
-				# Unfortunately we can't easily sort on date here.
-				# So we're just looping through the file.
-				item = json.loads(line)
-				yield item
+				if force_int:
+					for item in sorted([json.loads(line) for line in dataset_file], key=lambda x: int(get_nested_value(x, keys)), reverse=descending):
+
+						yield item
+				else:
+					for item in sorted([json.loads(line) for line in dataset_file], key=lambda x: get_nested_value(x, keys), reverse=descending):
+
+						yield item
 
 	return Exception("Can't loop through file with extension %s" % suffix)
 
@@ -584,10 +632,25 @@ def get_custom_fields(datasource):
 	json_path = Path(config.PATH_ROOT, "datasources", datasource_dir, "explorer", datasource.lower() + "-explorer.json")
 	if json_path.exists():
 		with open(json_path, "r", encoding="utf-8") as json_file:
-			custom_fields = json.load(json_file)
+			try:
+				custom_fields = json.load(json_file)
+			except ValueError:
+				return "invalid"
 	else:
 		custom_fields = None
 	return custom_fields
+
+def get_nested_value(di, keys):
+	"""
+	Gets a nested value on the basis of a dictionary and a list of keys.
+	"""
+
+	for key in keys:
+		di = di.get(key)
+
+		if not di:
+			return 0
+	return di
 
 def strip_html(post):
 	post["body"] = strip_tags(post.get("body", ""))

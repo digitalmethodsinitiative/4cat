@@ -188,6 +188,7 @@ span.page.selected {
 }
 
 .posts li {
+    position: relative;
     background: #d1e2ff;
     padding: 1em;
     min-width: 640px;
@@ -236,8 +237,10 @@ span.page.selected {
 }
 
 .posts .external-url {
-    float: right;
-    margin-left: 10px;
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    padding: 10px;
 }
 
 .quote {

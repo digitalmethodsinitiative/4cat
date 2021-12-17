@@ -10,11 +10,13 @@
 		{% set page = 1 %}
 	{% endif %}
 
+	{% set parameters = request.url | parameter_str %}
+
 	{# show all pages if it's 10 or less #}
 	{% if pages <= 10 %}
 		{% for i in range(pages) %}
 		{% set current_page = (i + 1) %}
-		<a href="/explorer/dataset/{{key}}/{{ current_page }}"><span class="page {{ selected if page == current_page }}">{{ current_page }}</span></a>
+		<a href="/explorer/dataset/{{key}}/{{ current_page }}{{ parameters }}"><span class="page {{ selected if page == current_page }}">{{ current_page }}</span></a>
 		{% endfor %}
 
 	{# More complex formatting if there are more than 10 pages #}
@@ -23,13 +25,13 @@
 		{# Always display the lower three pages #}
 		{% for i in range(lower_bound) %}
 		{% set current_page = (i + 1) %}
-		<a href="/explorer/dataset/{{key}}/{{ current_page }}"><span class="page {{ selected if page == current_page }}">{{ current_page }}</span></a>
+		<a href="/explorer/dataset/{{key}}/{{ current_page }}{{ parameters }}"><span class="page {{ selected if page == current_page }}">{{ current_page }}</span></a>
 		{% endfor %}
 
 		{# Show lower 'edge' pages #}
 		{% if lower_bound <= page <= lower_bound + 2 %}
 			{% for i in range(lower_bound, page + 1) %}
-			<a href="/explorer/dataset/{{key}}/{{ i + 1 }}"><span class="page {{ selected if i + 1 == page }}">{{ i + 1 }}</span></a>
+			<a href="/explorer/dataset/{{key}}/{{ i + 1 }}{{ parameters }}"><span class="page {{ selected if i + 1 == page }}">{{ i + 1 }}</span></a>
 			{% endfor %}
 		{% endif %}
 		<span class="page">...</span>
@@ -38,14 +40,14 @@
 		{% if (lower_bound + 2) < page < (upper_bound - 2)  %}
 			{% set current_page = page %}
 			{% for i in range((page - 1), (page + 2)) %}
-			<a href="/explorer/dataset/{{key}}/{{ i }}"><span class="page {{ selected if i == current_page }}">{{ i }}</span></a>
+			<a href="/explorer/dataset/{{key}}/{{ i }}{{ parameters }}"><span class="page {{ selected if i == current_page }}">{{ i }}</span></a>
 			{% endfor %}
 			<span class="page">...</span>
 
 		{# Show upper 'edge' pages #}
 		{% elif upper_bound - 2 <= page <= upper_bound %}
 			{% for i in range(page - 1, upper_bound) %}
-			<a href="/explorer/dataset/{{key}}/{{ i - 1 }}"><span class="page {{ selected if i - 1 == page }}">{{ i - 1 }}</span></a>
+			<a href="/explorer/dataset/{{key}}/{{ i - 1 }}{{ parameters }}"><span class="page {{ selected if i - 1 == page }}">{{ i - 1 }}</span></a>
 			{% endfor %}
 		{% endif %}
 
@@ -53,7 +55,7 @@
 		{# Always display the upper three pages #}
 		{% for i in range(lower_bound) %}
 		{% set current_page = upper_bound + i %}
-		<a href="/explorer/dataset/{{key}}/{{ current_page }}"><span class="page {{ selected if page == current_page }}">{{ current_page }}</span></a>
+		<a href="/explorer/dataset/{{key}}/{{ current_page }}{{ parameters }}"><span class="page {{ selected if page == current_page }}">{{ current_page }}</span></a>
 		{% endfor %}
 	{% endif %}
 </div>
