@@ -856,8 +856,19 @@ const page_functions = {
 		// Change the dropdown sort option based on the URL parameter
 		let searchParams = new URLSearchParams(window.location.search)
 		let sort_order = searchParams.get("sort");
+		let desc = searchParams.get("desc");
+
 		if (sort_order) {
-			$("#sort-select").val(sort_order);
+			// There can be multiple options with the same key since
+			// one of them might be reversed and the other not (e.g. 
+			// timestamps sorted by new to old and vice versa).
+			// So select the sort order with the right desc attribute.
+			if (desc == "true") {
+				$("#sort-select").find("option[value='" + sort_order + "'][data-desc='True']").attr("selected", "selected");
+			}
+			else {
+				$("#sort-select").val(sort_order);
+			}
 		}
 
 	}
