@@ -91,7 +91,8 @@ class ConvertNDJSONToJSON(BasicProcessor):
                     'created_at' : tweet['created_at'],
                     'user' : {
                               'screen_name' : tweet.get('author_user').get('username'),
-                              'id_str' : tweet.get('author_user').get('id'),
+                              # if author_user id has been pseudonymised, change to integer
+                              'id_str' : self.hash_if_not_int(tweet.get('author_user').get('id')),
                               'statuses_count' : tweet.get('author_user').get('public_metrics').get('tweet_count'),
                               'followers_count' : tweet.get('author_user').get('public_metrics').get('followers_count'),
                               'listed_count' : tweet.get('author_user').get('public_metrics').get('listed_count'),
@@ -261,3 +262,12 @@ class ConvertNDJSONToJSON(BasicProcessor):
             hashtag['text'] = hashtag.get('tag')
             modified_hashtags.append(hashtag)
         return modified_hashtags
+
+    def hash_if_not_int(self, var):
+        """
+        Checks if var is an integer, and if not, returns an integer hash
+        """
+        if isinstance(var, int):
+            return var
+        else:
+            return hash(var)
