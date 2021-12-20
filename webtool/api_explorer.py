@@ -104,7 +104,7 @@ def explorer_dataset(key, page):
 
 	first_post = False
 
-	for post in iterate_items(dataset_path, sort_by=sort_by, descending=descending, force_int=force_int):
+	for post in iterate_items(dataset_path, max_rows=max_posts, sort_by=sort_by, descending=descending, force_int=force_int):
 			
 		count += 1
 		
@@ -137,7 +137,10 @@ def explorer_dataset(key, page):
 
 	# Include custom fields if it they are in the datasource's 'explorer' dir.
 	# The file's naming format should e.g. be 'reddit-explorer.json'.
-	custom_fields = get_custom_fields(datasource)
+	# For some datasources (e.g. Twitter) we also have to explicitly set
+	# what data type we're working with.
+	filetype = dataset["result_file"].split(".")[-1].lower()
+	custom_fields = get_custom_fields(datasource, filetype=filetype)
 
 	# Check whether there's already annotations inserted already.
 	# If so, also pass these to the template.
@@ -493,7 +496,7 @@ def get_image_file(img_file, limit=0):
 
 	return send_file(str(image_path))
 
-def iterate_items(in_file, sort_by=None, descending=False, force_int=False):
+def iterate_items(in_file, max_rows=None, sort_by=None, descending=False, force_int=False):
 	"""
 	Loop through both csv and NDJSON files.
 	:param in_file, str:		The input file to read.
@@ -516,10 +519,7 @@ def iterate_items(in_file, sort_by=None, descending=False, force_int=False):
 			if sort_by:
 				try:
 					sort_by = columns.index(sort_by)
-					if force_int:
-						reader = sorted(reader, key=lambda x: int(x[sort_by]), reverse=descending)
-					else:
-						reader = sorted(reader, key=operator.itemgetter(sort_by), reverse=descending)
+					reader = sorted(reader, key=lambda x: to_int(x[sort_by], convert=force_int), reverse=descending)
 				except ValueError:
 					pass
 			
@@ -547,14 +547,12 @@ def iterate_items(in_file, sort_by=None, descending=False, force_int=False):
 			else:
 				keys = sort_by.split(".")
 
-				if force_int:
-					for item in sorted([json.loads(line) for line in dataset_file], key=lambda x: int(get_nested_value(x, keys)), reverse=descending):
-
-						yield item
+				if max_rows:
+					for item in sorted([json.loads(line) for i, line in enumerate(dataset_file) if i < max_rows], key=lambda x: to_int(get_nested_value(x, keys), convert=force_int), reverse=descending):
+							yield item
 				else:
-					for item in sorted([json.loads(line) for line in dataset_file], key=lambda x: get_nested_value(x, keys), reverse=descending):
-
-						yield item
+					for item in sorted([json.loads(line) for line in dataset_file], key=lambda x: to_int(get_nested_value(x, keys), convert=force_int), reverse=descending):
+							yield item
 
 	return Exception("Can't loop through file with extension %s" % suffix)
 
@@ -607,7 +605,7 @@ def get_custom_css(datasource):
 	
 	return css
 
-def get_custom_fields(datasource):
+def get_custom_fields(datasource, filetype=None):
 	"""
 	Check if there are custom fields that need to be showed for this datasource.
 	If so, return a dictionary of those fields.
@@ -616,6 +614,8 @@ def get_custom_fields(datasource):
 	See https://github.com/digitalmethodsinitiative/4cat/wiki/Exploring-and-annotating-datasets for more information.
  
 	:param datasource, str: Datasource name
+	:param filetype, str:	The filetype that is handled. This can fluctuate
+							between e.g. NDJSON and csv files.
 
 	:return: Dictionary of custom fields that should be shown.
 	"""
@@ -638,6 +638,11 @@ def get_custom_fields(datasource):
 				return "invalid"
 	else:
 		custom_fields = None
+
+	if filetype:
+		if filetype in custom_fields:
+			custom_fields = custom_fields[filetype]
+
 	return custom_fields
 
 def get_nested_value(di, keys):
@@ -647,10 +652,14 @@ def get_nested_value(di, keys):
 
 	for key in keys:
 		di = di.get(key)
-
 		if not di:
 			return 0
 	return di
+
+def to_int(value, convert=False):
+	if convert:
+		value = int(value)
+	return(value)
 
 def strip_html(post):
 	post["body"] = strip_tags(post.get("body", ""))
