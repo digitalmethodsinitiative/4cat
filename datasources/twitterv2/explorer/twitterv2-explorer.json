@@ -22,22 +22,25 @@
 			{
 				"key": "id",
 				"label": "Post id",
-				"force_int": true
+				"force_int": true,
 			},
 			{
 				"key": "public_metrics.like_count",
 				"label": "Most likes",
-				"descending": true
+				"descending": true,
+				"force_int": true
 			},
 			{
 				"key": "public_metrics.retweet_count",
 				"label": "Most retweets",
-				"descending": true
+				"descending": true,
+				"force_int": true
 			},
 			{
 				"key": "public_metrics.reply_count",
 				"label": "Most replies",
-				"descending": true
+				"descending": true,
+				"force_int": true
 			}
 		]		
 	},
@@ -52,32 +55,38 @@
 		"sort_options": [
 			{
 				"key": "unix_timestamp",
-				"label": "Old to new"
+				"label": "Old to new",
+				"force_int": true
 			},
 			{
 				"key": "unix_timestamp",
 				"label": "New to old",
-				"descending": true
+				"descending": true,
+				"force_int": true
 			},
 			{
 				"key": "id",
 				"label": "Post id",
+				"force_int": true,
 				"force_int": true
 			},
 			{
 				"key": "like_count",
 				"label": "Most likes",
-				"descending": true
+				"descending": true,
+				"force_int": true
 			},
 			{
 				"key": "retweet_count",
 				"label": "Most retweets",
-				"descending": true
+				"descending": true,
+				"force_int": true
 			},
 			{
 				"key": "reply_count",
 				"label": "Most replies",
-				"descending": true
+				"descending": true,
+				"force_int": true
 			}
 		]		
 	}
