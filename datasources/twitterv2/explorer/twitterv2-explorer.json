@@ -22,7 +22,7 @@
 			{
 				"key": "id",
 				"label": "Post id",
-				"force_int": true,
+				"force_int": true
 			},
 			{
 				"key": "public_metrics.like_count",
