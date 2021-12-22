@@ -474,7 +474,8 @@ span.divider {
 .post-annotations {
     background-color: #bed4f9;
     margin-top: 5px;
-    padding: 15px;
+    margin-right: 20px;
+    padding: 5px;
     display: none;
 }
     
@@ -507,6 +508,9 @@ li.op > .post-annotations {
 
 .post-annotation-options > input {
     display: inline-block;
+}
+
+.posts .external-url {
 }
 
 /** --------------------- *

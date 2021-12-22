@@ -73,7 +73,7 @@ body {
 	color: rgb(104, 119, 130);
 }
 
-.post-annotations {
+.posts li.op .post-annotations, .posts li .post-annotations {
 	border-radius: 10px;
 	background-color: rgb(241, 249, 255);
 	color: #474747;

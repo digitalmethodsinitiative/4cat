@@ -45,12 +45,11 @@
 		]		
 	},
 	"csv": {
-		"created": "{{ timestamp }}",
 		"likes": "{{ like_count }} <i class='fas fa-heart'></i>",
 		"retweets": "{{ retweet_count }} <i class='fas fa-retweet'></i>",
 		"replies": "{{ reply_count }} <i class='fas fa-reply'></i>",
 		"external_url": "https://twitter.com/{{ author }}/status/{{ id }}",
-		"image": "{{ images }}",
+		"images": "{{ images }}",
 		"body": "{{ body }}",
 		"sort_options": [
 			{

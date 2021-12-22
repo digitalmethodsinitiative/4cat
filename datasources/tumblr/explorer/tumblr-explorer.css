@@ -70,4 +70,5 @@ body {
 .posts li .post-annotations {
 	background-color: white;
 	border-top: 1px solid #5e5e5e;
+	margin-right: 0;
 }
