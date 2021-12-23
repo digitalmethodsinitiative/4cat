@@ -55,9 +55,6 @@ class WriteAnnotations(BasicProcessor):
 		# Load annotation fields and annotations
 		annotations = self.dataset.get_annotations()
 		annotation_fields = self.dataset.get_annotation_fields()
-		annotation_labels = [v["label"] for v in annotation_fields.values()]
-
-		to_lowercase = self.parameters.get("to-lowercase", False)
 		
 		# If there are no fields or annotations saved, we're done here
 		if not annotation_fields:
@@ -68,6 +65,11 @@ class WriteAnnotations(BasicProcessor):
 			self.dataset.update_status("This dataset has no annotations saved.")
 			self.dataset.finish(0)
 			return
+
+		annotation_labels = [v["label"] for v in annotation_fields.values()]
+
+		to_lowercase = self.parameters.get("to-lowercase", False)
+		
 
 		self.dataset.update_status("Writing annotations")
 		with self.dataset.get_results_path().open("w", encoding="utf-8", newline="") as output:

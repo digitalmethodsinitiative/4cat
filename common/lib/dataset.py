@@ -454,10 +454,10 @@ class DataSet(FourcatModule):
 
 		annotation_fields = self.db.fetchone("SELECT annotation_fields FROM datasets WHERE key = %s;", (self.top_parent().key,))
 		
-		if annotation_fields:
-			return json.loads(annotation_fields["annotation_fields"])
-		else:
-			return None
+		if annotation_fields and annotation_fields.get("annotation_fields"):
+			annotation_fields = json.loads(annotation_fields["annotation_fields"])
+		
+		return annotation_fields
 
 	def get_annotations(self):
 		"""
