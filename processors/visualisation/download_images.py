@@ -221,9 +221,9 @@ class ImageDownloader(BasicProcessor):
 			index = 0
 			if not image_filename:
 				image_filename = 'image'
-			image_filename = Path(image_filename).name  # no folder shenanigans
+			image_filename = Path(image_filename).name[:100]  # no folder shenanigans
 			image_stem = Path(image_filename).stem
-			image_suffix = Path(image_filename).suffix
+			image_suffix = Path(image_filename).suffix.lower()
 			if not image_suffix or image_suffix not in (".png", ".gif", ".jpeg", ".jpg"):
 				# default to PNG
 				image_suffix = ".png"
