@@ -646,6 +646,21 @@ class DataSet(FourcatModule):
 
 		return updated > 0
 
+	def finish_with_error(self, error):
+		"""
+		Set error as final status, and finish with 0 results
+
+		This is a convenience function to avoid having to repeat
+		"update_status" and "finish" a lot.
+
+		:param str error:  Error message for final dataset status.
+		:return:
+		"""
+		self.update_status(error, is_final=True)
+		self.finish(0)
+
+		return None
+
 	def update_version(self, version):
 		"""
 		Update software version used for this dataset
