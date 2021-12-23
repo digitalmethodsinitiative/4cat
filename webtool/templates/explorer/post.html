@@ -1,7 +1,7 @@
 <li id="post-{{ post.id }}"{% if post.thread_id == post.id %} class="op"{% endif %}>    
 
 	<!-- Special fields we're handling a bit differently -->
-	{% set special_fields = ["external_url", "author", "body", "timestamp", "image", "images"] %}
+	{% set special_fields = ["external_url", "author", "body", "timestamp", "image", "images", "sort_options"] %}
 
 	<!-- Possible external link -->
 	{% if custom_fields and "external_url" in custom_fields %}
@@ -13,7 +13,7 @@
 
 	<header>
 		<!-- Metadata -->
-		{% if 'pseudonymise' in parameters and parameters.get('pseudonymise') %}
+		{% if parameters and ('pseudonymise' in parameters and parameters.get('pseudonymise')) %}
 			<span title="Pseudonymous author" class="author">
 			<i class="fa fa-user-secret tooltip-trigger"></i>
 		{% else %}
@@ -120,7 +120,6 @@
 				{% endif %}
 				
 				<div class="post-annotation field-{{ field }} {{ type }}"><label class="annotation-label">{{ label }}</label>
-
 				{% if type == 'text' %}
 					<input type="text" class="post-annotation-input text-{{ field }}" value="{{ old_annotation }}">
 

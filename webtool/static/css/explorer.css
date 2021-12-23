@@ -188,6 +188,7 @@ span.page.selected {
 }
 
 .posts li {
+    position: relative;
     background: #d1e2ff;
     padding: 1em;
     min-width: 640px;
@@ -236,8 +237,10 @@ span.page.selected {
 }
 
 .posts .external-url {
-    float: right;
-    margin-left: 10px;
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    padding: 10px;
 }
 
 .quote {
@@ -471,7 +474,8 @@ span.divider {
 .post-annotations {
     background-color: #bed4f9;
     margin-top: 5px;
-    padding: 15px;
+    margin-right: 20px;
+    padding: 5px;
     display: none;
 }
     
@@ -504,6 +508,9 @@ li.op > .post-annotations {
 
 .post-annotation-options > input {
     display: inline-block;
+}
+
+.posts .external-url {
 }
 
 /** --------------------- *

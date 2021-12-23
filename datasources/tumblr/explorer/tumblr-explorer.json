@@ -3,5 +3,26 @@
 	"notes": "{{notes}} notes",
 	"reblog": "{{ is_reblog }}",
 	"images": "{{ images }}",
-	"body": "{{ body }}<div class='post-tags'>{{tags}}</div>"
+	"body": "{{ body }}<div class='post-tags'>{{tags}}</div>",
+	"sort_options": [
+		{
+			"key": "timestamp",
+			"label": "Old to new"
+		},
+		{
+			"key": "timestamp",
+			"label": "New to old",
+			"descending": true
+		},
+		{
+			"key": "id",
+			"label": "Post id"
+		},
+		{
+			"key": "notes",
+			"label": "Most notes",
+			"descending": true,
+			"force_int": true
+		}
+	]
 }

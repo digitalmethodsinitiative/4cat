@@ -50,7 +50,7 @@ class DateFilter(BasicProcessor):
 
         :param module: Dataset or processor to determine compatibility with
         """
-        return module.is_top_dataset() and module.get_extension() == "csv"
+        return module.is_top_dataset() and module.get_extension() in ("csv", "ndjson")
 
     def process(self):
         """
@@ -80,8 +80,9 @@ class DateFilter(BasicProcessor):
         matching_items = 0
 
         # Start writer
-        with self.dataset.get_results_path().open("w", encoding="utf-8") as outfile:
+        with self.dataset.get_results_path().open("w", encoding="utf-8", newline="") as outfile:
             writer = None
+
 
             # Loop through items
             for item in self.iterate_items(self.source_file):
@@ -102,9 +103,7 @@ class DateFilter(BasicProcessor):
                 # Update 4CAT and user on status
                 processed_items += 1
                 if processed_items % 500 == 0:
-                    self.dataset.update_status("Processed %i items (%i matching, %i invalid dates)" % (processed_items,
-                                                                                                       matching_items,
-                                                                                                       invalid_dates))
+                    self.dataset.update_status("Processed %i items (%i matching, %i invalid dates)" % (processed_items, matching_items, invalid_dates))
 
                 # Attempt to parse timestamp
                 try:

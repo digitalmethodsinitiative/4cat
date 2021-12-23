@@ -4,5 +4,30 @@
 	"external_url": "https://reddit.com/r/{{subreddit}}/comments/{{thread_id}}/comment/{{id}}",
 	"image": "{{ image_file }}",
 	"subject": "{{ subject }}",
-	"subject_url": "<a href='{{ url }}'>{{ domain }}</a>"
+	"subject_url": "<a href='{{ url }}'>{{ domain }}</a>",
+	"sort_options": [
+		{
+			"key": "timestamp",
+			"label": "Old to new"
+		},
+		{
+			"key": "timestamp",
+			"label": "New to old",
+			"descending": true
+		},
+		{
+			"key": "id",
+			"label": "Post id"
+		},
+		{
+			"key": "thread_id",
+			"label": "Thread id"
+		},
+		{
+			"key": "score",
+			"label": "Score",
+			"descending": true,
+			"force_int": true
+		}
+	]
 }

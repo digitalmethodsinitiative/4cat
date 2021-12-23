@@ -7,7 +7,7 @@ import os
 import re
 
 from pathlib import Path
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlparse
 from webtool import app
 
 from common.lib.helpers import strip_tags
@@ -162,6 +162,19 @@ def _jinja2_filter_post_field(field, post):
 		formatted_field = formatted_field.replace("{{" + key + "}}", str(val))
 
 	return formatted_field
+
+
+@app.template_filter('parameter_str')
+def _jinja2_filter_parameter_str(url):
+	# Returns the current URL parameters as a valid string.
+
+	params = urlparse(url).query
+	if not params:
+		return ""
+	else:
+		params = "?" + params
+
+	return params
 
 @app.template_filter('hasattr')
 def _jinja2_filter_hasattr(obj, attribute):

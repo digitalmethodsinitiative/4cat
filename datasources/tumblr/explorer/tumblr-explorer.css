@@ -5,7 +5,11 @@ See https://github.com/digitalmethodsinitiative/4cat/wiki/Exploring-and-annotati
  */
 
 body {
-	background-color: #001935
+	background-color: #001935;
+}
+
+#metadata, footer {
+	color: white;
 }
 
 .content {
@@ -27,10 +31,10 @@ body {
 	text-decoration: none;
 	font-weight: bold;
 	border: none;
-	padding: 10px;
-	line-height: 40px;
-	margin-top: 0px;
-	margin-bottom: 0px;
+	padding: 0px;
+	line-height: 1.7em;
+	margin: 25px;
+	margin-bottom: 10px;
 }
 
 .posts li article {
@@ -60,10 +64,11 @@ body {
 }
 
 .posts li .external-url {
-	padding: 10px;
+	
 }
 
 .posts li .post-annotations {
 	background-color: white;
 	border-top: 1px solid #5e5e5e;
+	margin-right: 0;
 }

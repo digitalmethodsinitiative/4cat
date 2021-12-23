@@ -68,7 +68,7 @@ class SearchReddit(SearchWithScope):
 					" and post scores can be out of date. "
 					"See [this paper](https://arxiv.org/pdf/1803.05046.pdf) for an overview of the gaps in data. "
 					"Double-check manually or via the official Reddit API if completeness is a concern. Check the "
-					"[Pushshift API](https://github.com/pushshift/api) reference [beta](https://beta.pushshift.io/redoc) for"
+					"[Pushshift API](https://github.com/pushshift/api) reference [beta](https://beta.pushshift.io/redoc) for "
 					"documentation on query syntax, "
 					"e.g. on how to format keyword queries."
 		},

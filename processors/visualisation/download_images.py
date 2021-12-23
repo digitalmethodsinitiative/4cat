@@ -243,7 +243,7 @@ class ImageDownloader(BasicProcessor):
 				# some images may need to be converted to RGB to be saved
 				self.dataset.log('Debug: OSError when saving image %s: %s' % (save_location, e))
 				picture = picture.convert('RGB')
-				picture.save(str(save_location))
+				picture.save(str(results_path.joinpath(image_stem + '.png')))
 			except ValueError as e:
 				self.dataset.log(f"Error '{e}' saving image for {url}, skipping")
 				failures.append(url)

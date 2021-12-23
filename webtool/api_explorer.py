@@ -20,6 +20,8 @@ from webtool import app, db, log, openapi, limiter
 from webtool.lib.helpers import format_post, error
 from common.lib.helpers import strip_tags
 
+
+
 api_ratelimit = limiter.shared_limit("45 per minute", scope="api")
 
 
@@ -76,6 +78,25 @@ def explorer_dataset(key, page):
 	if not dataset_path.exists():
 		abort(404)
 
+	# Check if we have to sort the data in a specific way.
+	sort_by = request.args.get("sort")
+	if sort_by == "dataset-order":
+		sort_by = None
+	
+	# Check if we have to reverse the order.
+	descending = request.args.get("desc")
+	if descending == "true" or descending == True:
+		descending = True
+	else:
+		descending = False
+
+	# Check if we have to convert the sort value to an integer.
+	force_int = request.args.get("int")
+	if force_int == "true" or force_int == True:
+		force_int = True
+	else:
+		force_int = False
+
 	# Load posts
 	post_ids = []
 	posts = []
@@ -83,15 +104,15 @@ def explorer_dataset(key, page):
 
 	first_post = False
 
-	for post in iterate_items(dataset_path):
+	for post in iterate_items(dataset_path, max_rows=max_posts, sort_by=sort_by, descending=descending, force_int=force_int):
 			
-		# Use an offset if we're showing a page beyond the first.
 		count += 1
+		
+		# Use an offset if we're showing a page beyond the first.
 		if count <= offset:
 			continue
 
 		# Use an offset if we're showing a page beyond the first.
-		count += 1
 		if count <= offset:
 			continue
 
@@ -116,7 +137,10 @@ def explorer_dataset(key, page):
 
 	# Include custom fields if it they are in the datasource's 'explorer' dir.
 	# The file's naming format should e.g. be 'reddit-explorer.json'.
-	custom_fields = get_custom_fields(datasource)
+	# For some datasources (e.g. Twitter) we also have to explicitly set
+	# what data type we're working with.
+	filetype = dataset["result_file"].split(".")[-1].lower()
+	custom_fields = get_custom_fields(datasource, filetype=filetype)
 
 	# Check whether there's already annotations inserted already.
 	# If so, also pass these to the template.
@@ -152,6 +176,9 @@ def explorer_thread(datasource, board, thread_id):
 	if not thread_id:
 		return error(404, error="No thread ID provided")
 
+	# The amount of posts that may be included (limit for large datasets)
+	max_posts = config.MAX_EXPLORER_POSTS if hasattr(config, "MAX_EXPLORER_POSTS") else 500000
+
 	# Get the posts with this thread ID.
 	posts = get_posts(db, datasource, board, ids=tuple([thread_id]), threads=True, order_by=["id"])
 
@@ -170,8 +197,7 @@ def explorer_thread(datasource, board, thread_id):
 	# The file's naming format should e.g. be 'reddit-explorer.json'.
 	custom_fields = get_custom_fields(datasource)
 
-
-	return render_template("explorer/explorer.html", datasource=datasource, board=board, posts=posts, custom_css=css, custom_fields=custom_fields, limit=len(posts), post_count=len(posts), thread=thread_id)
+	return render_template("explorer/explorer.html", datasource=datasource, board=board, posts=posts, custom_css=css, custom_fields=custom_fields, limit=len(posts), post_count=len(posts), thread=thread_id, max_posts=max_posts)
 
 @app.route('/explorer/post/<datasource>/<board>/<string:post_id>')
 @api_ratelimit
@@ -470,8 +496,15 @@ def get_image_file(img_file, limit=0):
 
 	return send_file(str(image_path))
 
-def iterate_items(in_file):
-	# Loop through both csv and NDJSON files.
+def iterate_items(in_file, max_rows=None, sort_by=None, descending=False, force_int=False):
+	"""
+	Loop through both csv and NDJSON files.
+	:param in_file, str:		The input file to read.
+	:param sort_by, str:		The key for a value that determines the sort order.
+	:param descending, bool:	Whether to sort by descending values.
+	:param force_int, bool:		Whether the sort value should be converted to an 
+								integer.
+	"""
 	
 	suffix = in_file.name.split(".")[-1].lower()
 
@@ -479,12 +512,16 @@ def iterate_items(in_file):
 
 		with open(in_file, "r", encoding="utf-8") as dataset_file:
 		
-			# Sort on date.
+			# Sort on date by default
 			# Unix timestamp integers are not always saved in the same field.
 			reader = csv.reader(dataset_file)
 			columns = next(reader)
-			time_col = columns.index("unix_timestamp") if "unix_timestamp" in columns else columns.index("timestamp")
-			reader = sorted(reader, key=operator.itemgetter(time_col))
+			if sort_by:
+				try:
+					sort_by = columns.index(sort_by)
+					reader = sorted(reader, key=lambda x: to_int(x[sort_by], convert=force_int), reverse=descending)
+				except ValueError:
+					pass
 			
 			for item in reader:
 
@@ -494,17 +531,28 @@ def iterate_items(in_file):
 				yield item
 
 	elif suffix == "ndjson":
-		# in this format each line in the file is a self-contained JSON
-		# file
 
+		# In this format each line in the file is a self-contained JSON
+		# file
 		with open(in_file, "r", encoding="utf-8") as dataset_file:
 
-			for line in dataset_file:
+			# Unfortunately we can't easily sort here.
+			# We're just looping through the file if no sort is given.
+			if not sort_by:
+				for line in dataset_file:
+					item = json.loads(line)
+					yield item
+			
+			# If a sort order is given explititly, we're sorting anyway.
+			else:
+				keys = sort_by.split(".")
 
-				# Unfortunately we can't easily sort on date here.
-				# So we're just looping through the file.
-				item = json.loads(line)
-				yield item
+				if max_rows:
+					for item in sorted([json.loads(line) for i, line in enumerate(dataset_file) if i < max_rows], key=lambda x: to_int(get_nested_value(x, keys), convert=force_int), reverse=descending):
+							yield item
+				else:
+					for item in sorted([json.loads(line) for line in dataset_file], key=lambda x: to_int(get_nested_value(x, keys), convert=force_int), reverse=descending):
+							yield item
 
 	return Exception("Can't loop through file with extension %s" % suffix)
 
@@ -557,7 +605,7 @@ def get_custom_css(datasource):
 	
 	return css
 
-def get_custom_fields(datasource):
+def get_custom_fields(datasource, filetype=None):
 	"""
 	Check if there are custom fields that need to be showed for this datasource.
 	If so, return a dictionary of those fields.
@@ -566,6 +614,8 @@ def get_custom_fields(datasource):
 	See https://github.com/digitalmethodsinitiative/4cat/wiki/Exploring-and-annotating-datasets for more information.
  
 	:param datasource, str: Datasource name
+	:param filetype, str:	The filetype that is handled. This can fluctuate
+							between e.g. NDJSON and csv files.
 
 	:return: Dictionary of custom fields that should be shown.
 	"""
@@ -582,10 +632,34 @@ def get_custom_fields(datasource):
 	json_path = Path(config.PATH_ROOT, "datasources", datasource_dir, "explorer", datasource.lower() + "-explorer.json")
 	if json_path.exists():
 		with open(json_path, "r", encoding="utf-8") as json_file:
-			custom_fields = json.load(json_file)
+			try:
+				custom_fields = json.load(json_file)
+			except ValueError:
+				return "invalid"
 	else:
 		custom_fields = None
+
+	if filetype:
+		if filetype in custom_fields:
+			custom_fields = custom_fields[filetype]
+
 	return custom_fields
+
+def get_nested_value(di, keys):
+	"""
+	Gets a nested value on the basis of a dictionary and a list of keys.
+	"""
+
+	for key in keys:
+		di = di.get(key)
+		if not di:
+			return 0
+	return di
+
+def to_int(value, convert=False):
+	if convert:
+		value = int(value)
+	return(value)
 
 def strip_html(post):
 	post["body"] = strip_tags(post.get("body", ""))
