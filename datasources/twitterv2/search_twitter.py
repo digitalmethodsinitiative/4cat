@@ -144,7 +144,7 @@ class SearchWithTwitterAPIv2(Search):
             time.sleep(0.05)
             self.previous_request = int(time.time())
 
-            # now send the request, allowing for at least 5 replies if the connection seems unstable
+            # now send the request, allowing for at least 5 retries if the connection seems unstable
             retries = 5
             api_response = None
             while retries > 0:
