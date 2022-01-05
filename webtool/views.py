@@ -401,6 +401,7 @@ def show_result(key):
 
 	# if the datasource is configured for it, this dataset may be deleted at some point
 	datasource = dataset.parameters.get("datasource", "")
+	datasources = list(backend.all_modules.datasources.keys())
 	if datasource in backend.all_modules.datasources and backend.all_modules.datasources[datasource].get("expire-datasets", None):
 		timestamp_expires = dataset.timestamp + int(backend.all_modules.datasources[datasource].get("expire-datasets"))
 	else:
@@ -413,7 +414,7 @@ def show_result(key):
 
 	return render_template(template, dataset=dataset, parent_key=dataset.key, processors=backend.all_modules.processors,
 						   is_processor_running=is_processor_running, messages=get_flashed_messages(),
-						   is_favourite=is_favourite, timestamp_expires=timestamp_expires)
+						   is_favourite=is_favourite, timestamp_expires=timestamp_expires, datasources=datasources)
 
 
 @app.route("/preview-csv/<string:key>/")

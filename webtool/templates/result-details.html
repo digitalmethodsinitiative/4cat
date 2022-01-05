@@ -60,6 +60,22 @@
                 <dd>{% include 'result-metadata.html' %}</dd>
             </div>
 
+            {% if dataset.is_finished() and dataset.num_rows > 0 and current_user.is_admin() and dataset.parameters.datasource == 'custom' %}
+            <div class="fullwidth" id="dataset-results">
+                <dt>Convert</dt>
+                <dd>
+                    <select id="convert-dataset">
+                        <option value=""></option>
+                        {% for datasource in datasources %}
+                            {% if datasource != 'custom' %}
+                                <option value="{{ datasource }}">{{ datasource }}</option>
+                            {% endif %}
+                        {% endfor %}
+                    </select>
+                </dd>
+            </div>
+            {% endif %}
+
             <div class="fullwidth" id="dataset-results">
             {% if dataset.is_finished() and dataset.num_rows > 0 %}
                 {% include "result-result-row.html" %}
