@@ -525,6 +525,19 @@ class DataSet(FourcatModule):
 		else:
 			return default
 
+	def change_datasource(self, datasource):
+		"""
+		Change the datasource type for this dataset
+
+		:param str label:  New datasource type
+		:return str:  The new datasource type
+		"""
+
+		self.parameters["datasource"] = datasource
+
+		self.db.update("datasets", data={"parameters": json.dumps(self.parameters)}, where={"key": self.key})
+		return datasource
+
 	def reserve_result_file(self, parameters=None, extension="csv"):
 		"""
 		Generate a unique path to the results file for this dataset
