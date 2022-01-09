@@ -6,6 +6,7 @@ import datetime
 import copy
 import time
 import json
+import re
 
 from backend.abstract.search import Search
 from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException
@@ -46,6 +47,15 @@ class SearchWithTwitterAPIv2(Search):
                 "recent": "Standard: Recent search (Tweets published in last 7 days)",
             },
             "default": "all"
+        },
+        "query_type": {
+            "type": UserInput.OPTION_CHOICE,
+            "help": "Query type",
+            "options": {
+                "query": "Search query",
+                "id_lookup": "Tweets by ID (list IDs seperated by commas or one per line)",
+            },
+            "default": "query"
         },
         "query": {
             "type": UserInput.OPTION_TEXT_LARGE,
@@ -91,8 +101,6 @@ class SearchWithTwitterAPIv2(Search):
         bearer_token = self.parameters.get("api_bearer_token")
         auth = {"Authorization": "Bearer %s" % bearer_token}
 
-        endpoint = "https://api.twitter.com/2/tweets/search/" + query.get("api_type")
-
         # these are all expansions and fields available at the time of writing
         # since it does not cost anything extra in terms of rate limiting, go
         # for as much data per tweet as possible...
@@ -111,152 +119,180 @@ class SearchWithTwitterAPIv2(Search):
         media_fields = (
         "duration_ms", "height", "media_key", "non_public_metrics", "organic_metrics", "preview_image_url",
         "promoted_metrics", "public_metrics", "type", "url", "width")
-        amount = convert_to_int(self.parameters.get("amount"), 10)
 
         params = {
-            "query": self.parameters.get("query", ""),
             "expansions": ",".join(expansions),
             "tweet.fields": ",".join(tweet_fields),
             "user.fields": ",".join(user_fields),
             "poll.fields": ",".join(poll_fields),
             "place.fields": ",".join(place_fields),
             "media.fields": ",".join(media_fields),
-            "max_results": max(10, min(amount, 100)) if amount > 0 else 100,  # 100 = upper limit, 10 = lower
         }
 
-        if self.parameters.get("min_date"):
-            params["start_time"] = datetime.datetime.fromtimestamp(self.parameters["min_date"]).strftime(
-                "%Y-%m-%dT%H:%M:%SZ")
+        if  self.parameters.get("query_type", "query") == 'id_lookup':
+            endpoint = "https://api.twitter.com/2/tweets"
 
-        if self.parameters.get("max_date"):
-            params["end_time"] = datetime.datetime.fromtimestamp(self.parameters["max_date"]).strftime(
-                "%Y-%m-%dT%H:%M:%SZ")
+            tweet_ids = self.parameters.get("query", []).split(',')
+
+            chunk_size = 100
+            queries = [','.join(tweet_ids[i:i+chunk_size]) for i in range(0, len(tweet_ids), chunk_size)]
+
+            amount = len(tweet_ids)
+
+        else:
+            # Query to all or search
+            endpoint = "https://api.twitter.com/2/tweets/search/" + query.get("api_type")
+
+            queries = [self.parameters.get("query", "")]
+
+            amount = convert_to_int(self.parameters.get("amount"), 10)
+            params['max_results'] =  max(10, min(amount, 100)) if amount > 0 else 100  # 100 = upper limit, 10 = lower
+
+            if self.parameters.get("min_date"):
+                params["start_time"] = datetime.datetime.fromtimestamp(self.parameters["min_date"]).strftime(
+                    "%Y-%m-%dT%H:%M:%SZ")
+
+            if self.parameters.get("max_date"):
+                params["end_time"] = datetime.datetime.fromtimestamp(self.parameters["max_date"]).strftime(
+                    "%Y-%m-%dT%H:%M:%SZ")
 
         tweets = 0
-        self.dataset.log("Search parameters: %s" % repr(params))
-        while True:
-            if self.interrupted:
-                raise ProcessorInterruptedException("Interrupted while getting tweets from the Twitter API")
+        for query in queries:
+            if self.parameters.get("query_type", "query") == 'id_lookup':
+                params['ids'] = query
+            else:
+                params['query'] = query
+            self.dataset.log("Search parameters: %s" % repr(params))
+            while True:
+                if self.interrupted:
+                    raise ProcessorInterruptedException("Interrupted while getting tweets from the Twitter API")
 
-            # there is a limit of one request per second, so stay on the safe side of this
-            while self.previous_request == int(time.time()):
-                time.sleep(0.1)
-            time.sleep(0.05)
-            self.previous_request = int(time.time())
+                # there is a limit of one request per second, so stay on the safe side of this
+                while self.previous_request == int(time.time()):
+                    time.sleep(0.1)
+                time.sleep(0.05)
+                self.previous_request = int(time.time())
 
-            # now send the request, allowing for at least 5 replies if the connection seems unstable
-            retries = 5
-            api_response = None
-            while retries > 0:
-                try:
-                    api_response = requests.get(endpoint, headers=auth, params=params, timeout=30)
-                    break
-                except (ConnectionError, requests.exceptions.RequestException) as e:
-                    retries -= 1
-                    wait_time = (5 - retries) * 10
-                    self.dataset.update_status("Got %s, waiting %i seconds before retrying" % (str(e), wait_time))
-                    time.sleep(wait_time)
+                # now send the request, allowing for at least 5 replies if the connection seems unstable
+                retries = 5
+                api_response = None
+                while retries > 0:
+                    try:
+                        api_response = requests.get(endpoint, headers=auth, params=params, timeout=30)
+                        break
+                    except (ConnectionError, requests.exceptions.RequestException) as e:
+                        retries -= 1
+                        wait_time = (5 - retries) * 10
+                        self.dataset.update_status("Got %s, waiting %i seconds before retrying" % (str(e), wait_time))
+                        time.sleep(wait_time)
 
-            # rate limited - the limit at time of writing is 300 reqs per 15
-            # minutes
-            # usually you don't hit this when requesting batches of 500 at
-            # 1/second
-            if api_response.status_code == 429:
-                resume_at = convert_to_int(api_response.headers["x-rate-limit-reset"]) + 1
-                resume_at_str = datetime.datetime.fromtimestamp(int(resume_at)).strftime("%c")
-                self.dataset.update_status("Hit Twitter rate limit - waiting until %s to continue." % resume_at_str)
-                while time.time() <= resume_at:
-                    time.sleep(0.5)
-                continue
+                # rate limited - the limit at time of writing is 300 reqs per 15
+                # minutes
+                # usually you don't hit this when requesting batches of 500 at
+                # 1/second
+                if api_response.status_code == 429:
+                    resume_at = convert_to_int(api_response.headers["x-rate-limit-reset"]) + 1
+                    resume_at_str = datetime.datetime.fromtimestamp(int(resume_at)).strftime("%c")
+                    self.dataset.update_status("Hit Twitter rate limit - waiting until %s to continue." % resume_at_str)
+                    while time.time() <= resume_at:
+                        time.sleep(0.5)
+                    continue
 
-            # API keys that are valid but don't have access or haven't been
-            # activated properly get a 403
-            elif api_response.status_code == 403:
-                try:
-                    structured_response = api_response.json()
-                    self.dataset.update_status("'Forbidden' error from the Twitter API. Could not connect to Twitter API "
-                                               "with this API key. %s" % structured_response.get("detail", ""), is_final=True)
-                except (json.JSONDecodeError, ValueError):
-                    self.dataset.update_status("'Forbidden' error from the Twitter API. Your key may not have access to "
-                                               "the full-archive search endpoint.", is_final=True)
-                finally:
+                # API keys that are valid but don't have access or haven't been
+                # activated properly get a 403
+                elif api_response.status_code == 403:
+                    try:
+                        structured_response = api_response.json()
+                        self.dataset.update_status("'Forbidden' error from the Twitter API. Could not connect to Twitter API "
+                                                   "with this API key. %s" % structured_response.get("detail", ""), is_final=True)
+                    except (json.JSONDecodeError, ValueError):
+                        self.dataset.update_status("'Forbidden' error from the Twitter API. Your key may not have access to "
+                                                   "the full-archive search endpoint.", is_final=True)
+                    finally:
+                        return
+
+                # sometimes twitter says '503 service unavailable' for unclear
+                # reasons - in that case just wait a while and try again
+                elif api_response.status_code in (502, 503, 504):
+                    resume_at = time.time() + 60
+                    resume_at_str = datetime.datetime.fromtimestamp(int(resume_at)).strftime("%c")
+                    self.dataset.update_status("Twitter unavailable (status %i) - waiting until %s to continue." % (
+                    api_response.status_code, resume_at_str))
+                    while time.time() <= resume_at:
+                        time.sleep(0.5)
+                    continue
+
+                # this usually means the query is too long or otherwise contains
+                # a syntax error
+                elif api_response.status_code == 400:
+                    msg = "Response %i from the Twitter API; " % api_response.status_code
+                    try:
+                        api_response = api_response.json()
+                        msg += api_response.get("title", "")
+                        if "detail" in api_response:
+                            msg += ": " + api_response.get("detail", "")
+                    except (json.JSONDecodeError, TypeError):
+                        msg += "Some of your parameters (e.g. date range) may be invalid."
+
+                    self.dataset.update_status(msg, is_final=True)
                     return
 
-            # sometimes twitter says '503 service unavailable' for unclear
-            # reasons - in that case just wait a while and try again
-            elif api_response.status_code in (502, 503, 504):
-                resume_at = time.time() + 60
-                resume_at_str = datetime.datetime.fromtimestamp(int(resume_at)).strftime("%c")
-                self.dataset.update_status("Twitter unavailable (status %i) - waiting until %s to continue." % (
-                api_response.status_code, resume_at_str))
-                while time.time() <= resume_at:
-                    time.sleep(0.5)
-                continue
+                # invalid API key
+                elif api_response.status_code == 401:
+                    self.dataset.update_status("Invalid API key - could not connect to Twitter API", is_final=True)
+                    return
 
-            # this usually means the query is too long or otherwise contains
-            # a syntax error
-            elif api_response.status_code == 400:
-                msg = "Response %i from the Twitter API; " % api_response.status_code
-                try:
-                    api_response = api_response.json()
-                    msg += api_response.get("title", "")
-                    if "detail" in api_response:
-                        msg += ": " + api_response.get("detail", "")
-                except (json.JSONDecodeError, TypeError):
-                    msg += "Some of your parameters (e.g. date range) may be invalid."
+                # haven't seen one yet, but they probably exist
+                elif api_response.status_code != 200:
+                    self.dataset.update_status(
+                        "Unexpected HTTP status %i. Halting tweet collection." % api_response.status_code, is_final=True)
+                    self.log.warning("Twitter API v2 responded with status code %i. Response body: %s" % (
+                    api_response.status_code, api_response.text))
+                    return
 
-                self.dataset.update_status(msg, is_final=True)
-                return
+                elif not api_response:
+                    self.dataset.update_status("Could not connect to Twitter. Cancelling.", is_final=True)
+                    return
 
-            # invalid API key
-            elif api_response.status_code == 401:
-                self.dataset.update_status("Invalid API key - could not connect to Twitter API", is_final=True)
-                return
+                api_response = api_response.json()
 
-            # haven't seen one yet, but they probably exist
-            elif api_response.status_code != 200:
-                self.dataset.update_status(
-                    "Unexpected HTTP status %i. Halting tweet collection." % api_response.status_code, is_final=True)
-                self.log.warning("Twitter API v2 responded with status code %i. Response body: %s" % (
-                api_response.status_code, api_response.text))
-                return
+                # The API response contains tweets (of course) and 'includes',
+                # objects that can be referenced in tweets. Later we will splice
+                # this data into the tweets themselves to make them easier to
+                # process. So extract them first...
+                included_users = api_response.get("includes", {}).get("users", {})
+                included_media = api_response.get("includes", {}).get("media", {})
+                included_polls = api_response.get("includes", {}).get("polls", {})
+                included_tweets = api_response.get("includes", {}).get("tweets", {})
+                included_places = api_response.get("includes", {}).get("places", {})
 
-            elif not api_response:
-                self.dataset.update_status("Could not connect to Twitter. Cancelling.", is_final=True)
-                return
+                for tweet in api_response.get("data", []):
+                    if 0 < amount <= tweets:
+                        break
 
-            api_response = api_response.json()
+                    # splice referenced data back in
+                    # we use copy.deepcopy here because else we run into a
+                    # pass-by-reference quagmire
+                    tweet = self.enrich_tweet(tweet, included_users, included_media, included_polls, included_places, copy.deepcopy(included_tweets))
 
-            # The API response contains tweets (of course) and 'includes',
-            # objects that can be referenced in tweets. Later we will splice
-            # this data into the tweets themselves to make them easier to
-            # process. So extract them first...
-            included_users = api_response.get("includes", {}).get("users", {})
-            included_media = api_response.get("includes", {}).get("media", {})
-            included_polls = api_response.get("includes", {}).get("polls", {})
-            included_tweets = api_response.get("includes", {}).get("tweets", {})
-            included_places = api_response.get("includes", {}).get("places", {})
+                    tweets += 1
+                    if tweets % 500 == 0:
+                        self.dataset.update_status("Received %i tweets from the Twitter API" % tweets)
 
-            for tweet in api_response.get("data", []):
-                if 0 < amount <= tweets:
+                    yield tweet
+
+                if self.parameters.get("query_type", "query") == 'id_lookup':
+                    # If id_lookup return errors in collecting tweets
+                    for tweet_error in api_response.get("errors", []):
+                        if tweet_error.get('resource_type') == "tweet":
+                            tweet_error = self.fix_tweet_error(tweet_error)
+                            yield tweet_error
+
+                # paginate
+                if (amount <= 0 or tweets < amount) and api_response.get("meta") and "next_token" in api_response["meta"]:
+                    params["next_token"] = api_response["meta"]["next_token"]
+                else:
                     break
-
-                # splice referenced data back in
-                # we use copy.deepcopy here because else we run into a
-                # pass-by-reference quagmire
-                tweet = self.enrich_tweet(tweet, included_users, included_media, included_polls, included_places, copy.deepcopy(included_tweets))
-
-                tweets += 1
-                if tweets % 500 == 0:
-                    self.dataset.update_status("Received %i tweets from the Twitter API" % tweets)
-
-                yield tweet
-
-            # paginate
-            if (amount <= 0 or tweets < amount) and api_response.get("meta") and "next_token" in api_response["meta"]:
-                params["next_token"] = api_response["meta"]["next_token"]
-            else:
-                break
 
     def enrich_tweet(self, tweet, users, media, polls, places, referenced_tweets):
         """
@@ -357,8 +393,18 @@ class SearchWithTwitterAPIv2(Search):
         if not query.get("api_bearer_token", None):
             raise QueryParametersException("Please provide a valid bearer token.")
 
-        if len(query.get("query")) > 1024:
+        if len(query.get("query")) > 1024 and query.get('query_type') != 'id_lookup':
             raise QueryParametersException("Twitter API queries cannot be longer than 1024 characters.")
+
+        if query.get('query_type') == 'id_lookup':
+            # reformat queries to be a comma-separated list with no wrapping
+            # whitespace
+            whitespace = re.compile(r"\s+")
+            items = whitespace.sub("", query.get("query").replace("\n", ","))
+            # eliminate empty queries
+            twitter_query = ','.join([item for item in items.split(",") if item])
+        else:
+            twitter_query =  query.get("query")
 
         # the dates need to make sense as a range to search within
         # but, on Twitter, you can also specify before *or* after only
@@ -368,13 +414,34 @@ class SearchWithTwitterAPIv2(Search):
 
         # if we made it this far, the query can be executed
         return {
-            "query": query.get("query"),
+            "query": twitter_query,
             "api_bearer_token": query.get("api_bearer_token"),
             "api_type": query.get("api_type"),
+            "query_type": query.get('query_type'),
             "min_date": after,
             "max_date": before,
             "amount": query.get("amount")
         }
+
+    def fix_tweet_error(self, tweet_error):
+        """
+        Add fields as needed by map_tweet and other functions for errors as they
+        do not conform to normal tweet fields
+        """
+        modified_tweet = tweet_error
+        modified_tweet['id'] = tweet_error.get('resource_id')
+        modified_tweet['created_at'] =  datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S.000Z")
+        modified_tweet['text'] = ''
+        modified_tweet['author_user'] = {}
+        modified_tweet['author_user']['name'] = 'UNKNOWN'
+        modified_tweet['author_user']['username'] = 'UNKNOWN'
+        modified_tweet['author_id'] = 'UNKNOWN'
+        modified_tweet['public_metrics'] = {}
+
+        # putting detail info in 'subject' field which is normally blank for tweets
+        modified_tweet['subject'] = tweet_error.get('detail')
+
+        return modified_tweet
 
     @staticmethod
     def map_item(tweet):
