@@ -639,9 +639,11 @@ def get_custom_fields(datasource, filetype=None):
 	else:
 		custom_fields = None
 
-	if filetype:
+	if filetype and custom_fields:
 		if filetype in custom_fields:
 			custom_fields = custom_fields[filetype]
+	else:
+		custom_fields = None
 
 	return custom_fields
 
