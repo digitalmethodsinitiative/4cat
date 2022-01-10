@@ -139,6 +139,9 @@ class SearchWithTwitterAPIv2(Search):
 
             amount = len(tweet_ids)
 
+            # Iniciate collection of any IDs that are unavailable
+            collected_errors = []
+
         else:
             # Query to all or search
             endpoint = "https://api.twitter.com/2/tweets/search/" + query.get("api_type")
@@ -284,8 +287,10 @@ class SearchWithTwitterAPIv2(Search):
                 if self.parameters.get("query_type", "query") == 'id_lookup':
                     # If id_lookup return errors in collecting tweets
                     for tweet_error in api_response.get("errors", []):
-                        if tweet_error.get('resource_type') == "tweet":
+                        tweet_id = str(tweet_error.get('resource_id'))
+                        if tweet_error.get('resource_type') == "tweet" and tweet_id in tweet_ids and tweet_id not in collected_errors:
                             tweet_error = self.fix_tweet_error(tweet_error)
+                            collected_errors.append(tweet_id)
                             yield tweet_error
 
                 # paginate
@@ -475,7 +480,7 @@ class SearchWithTwitterAPIv2(Search):
             "thread_id": tweet.get("conversation_id", tweet["id"]),
             "timestamp": tweet_time.strftime("%Y-%m-%d %H:%M:%S"),
             "unix_timestamp": int(tweet_time.timestamp()),
-            "subject": "",
+            "subject": tweet.get('subject', ""),
             "body": tweet["text"],
             "author": tweet["author_user"]["username"],
             "author_fullname": tweet["author_user"]["name"],
