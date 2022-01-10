@@ -400,7 +400,7 @@ class SearchWithTwitterAPIv2(Search):
         is_retweet = any([ref.get("type") == "retweeted" for ref in tweet.get("referenced_tweets", [])])
         if is_retweet:
             retweeted_tweet = [t for t in tweet["referenced_tweets"] if t.get("type") == "retweeted"][0]
-            retweeted_body = retweeted_tweet["text"]
+            retweeted_body = retweeted_tweet.get("text", "")
             tweet["text"] = "RT @" + retweeted_tweet["author_user"]["username"] + ": " + retweeted_body
 
         return {
