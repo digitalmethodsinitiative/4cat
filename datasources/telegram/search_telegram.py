@@ -14,6 +14,7 @@ from backend.abstract.search import Search
 from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException
 from common.lib.helpers import convert_to_int, UserInput
 
+from datetime import datetime
 from telethon import TelegramClient
 from telethon.errors.rpcerrorlist import UsernameInvalidError, BadRequestError, TimeoutError
 from telethon.tl.types import User, PeerChannel, PeerChat, PeerUser
@@ -94,6 +95,11 @@ class SearchTelegram(Search):
             "min": 1,
             "max": 50000,
             "default": 10
+        },
+        "before": {
+            "type": UserInput.OPTION_DATE,
+            "help": "Before",
+            "tooltip": "Only scrape posts before this date"
         }
     }
 
@@ -171,9 +177,15 @@ class SearchTelegram(Search):
         parameters = self.dataset.get_parameters()
         queries = [query.strip() for query in parameters.get("query", "").split(",")]
         max_items = convert_to_int(parameters.get("items", 10), 10)
-
+        before = parameters.get("before")
+        if before:
+            try:
+                before = datetime.fromtimestamp(int(before))
+            except ValueError:
+                before = None
+        
         try:
-            posts = await self.gather_posts(client, queries, max_items)
+            posts = await self.gather_posts(client, queries, max_items, before)
         except Exception as e:
             self.dataset.update_status("Error scraping posts from Telegram")
             self.log.error("Telegram scraping error: %s" % traceback.format_exc())
@@ -183,13 +195,14 @@ class SearchTelegram(Search):
 
         return posts
 
-    async def gather_posts(self, client, queries, max_items):
+    async def gather_posts(self, client, queries, max_items, before):
         """
         Gather messages for each entity for which messages are requested
 
         :param TelegramClient client:  Telegram Client
         :param list queries:  List of entities to query (as string)
         :param int max_items:  Messages to scrape per entity
+        :param int before:  Unix timestamp to get posts before
         :return list:  List of messages, each message a dictionary.
         """
         posts = []
@@ -203,7 +216,7 @@ class SearchTelegram(Search):
                 query_posts = []
                 i = 0
                 try:
-                    async for message in client.iter_messages(entity=query):
+                    async for message in client.iter_messages(entity=query, offset_date=before):
                         if self.interrupted:
                             raise ProcessorInterruptedException(
                                 "Interrupted while fetching message data from the Telegram API")
@@ -458,7 +471,8 @@ class SearchTelegram(Search):
             "board": "",  # needed for web interface
             "api_id": query.get("api_id"),
             "api_hash": query.get("api_hash"),
-            "api_phone": query.get("api_phone")
+            "api_phone": query.get("api_phone"),
+            "before": query.get("before")
         }
 
     @classmethod
