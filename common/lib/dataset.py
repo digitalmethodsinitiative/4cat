@@ -44,6 +44,7 @@ class DataSet(FourcatModule):
 	folder = None
 	is_new = True
 	no_status_updates = False
+	staging_area = None
 
 	def __init__(self, parameters={}, key=None, job=None, data=None, db=None, parent=None, extension="csv",
 				 type=None):
