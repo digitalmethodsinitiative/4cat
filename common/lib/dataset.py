@@ -44,7 +44,6 @@ class DataSet(FourcatModule):
 	folder = None
 	is_new = True
 	no_status_updates = False
-	staging_area = []
 
 	def __init__(self, parameters={}, key=None, job=None, data=None, db=None, parent=None, extension="csv",
 				 type=None):
@@ -58,6 +57,7 @@ class DataSet(FourcatModule):
 		"""
 		self.db = db
 		self.folder = Path(config.PATH_ROOT, config.PATH_DATA)
+		self.staging_area = []
 
 		if key is not None:
 			self.key = key
