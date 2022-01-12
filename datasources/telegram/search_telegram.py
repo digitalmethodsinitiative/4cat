@@ -96,10 +96,9 @@ class SearchTelegram(Search):
             "max": 50000,
             "default": 10
         },
-        "before": {
-            "type": UserInput.OPTION_DATE,
-            "help": "Before",
-            "tooltip": "Only scrape posts before this date"
+        "daterange": {
+            "type": UserInput.OPTION_DATERANGE,
+            "help": "Date range"
         }
     }
 
@@ -177,15 +176,25 @@ class SearchTelegram(Search):
         parameters = self.dataset.get_parameters()
         queries = [query.strip() for query in parameters.get("query", "").split(",")]
         max_items = convert_to_int(parameters.get("items", 10), 10)
-        before = parameters.get("before")
-        if before:
+        
+        # Telethon requires the offset date to be a datetime date
+        max_date = parameters.get("max_date")
+        if max_date:
             try:
-                before = datetime.fromtimestamp(int(before))
+                max_date = datetime.fromtimestamp(int(max_date))
             except ValueError:
-                before = None
+                max_date = None
+        
+        # min_date can remain an integer
+        min_date = parameters.get("min_date")
+        if min_date:
+            try:
+                min_date = int(min_date)
+            except ValueError:
+                min_date = None
         
         try:
-            posts = await self.gather_posts(client, queries, max_items, before)
+            posts = await self.gather_posts(client, queries, max_items, min_date, max_date)
         except Exception as e:
             self.dataset.update_status("Error scraping posts from Telegram")
             self.log.error("Telegram scraping error: %s" % traceback.format_exc())
@@ -195,14 +204,15 @@ class SearchTelegram(Search):
 
         return posts
 
-    async def gather_posts(self, client, queries, max_items, before):
+    async def gather_posts(self, client, queries, max_items, min_date, max_date):
         """
         Gather messages for each entity for which messages are requested
 
         :param TelegramClient client:  Telegram Client
         :param list queries:  List of entities to query (as string)
         :param int max_items:  Messages to scrape per entity
-        :param int before:  Unix timestamp to get posts before
+        :param int min_date:  Datetime date to get posts after
+        :param int max_date:  Datetime date to get posts before
         :return list:  List of messages, each message a dictionary.
         """
         posts = []
@@ -216,7 +226,7 @@ class SearchTelegram(Search):
                 query_posts = []
                 i = 0
                 try:
-                    async for message in client.iter_messages(entity=query, offset_date=before):
+                    async for message in client.iter_messages(entity=query, offset_date=max_date):
                         if self.interrupted:
                             raise ProcessorInterruptedException(
                                 "Interrupted while fetching message data from the Telegram API")
@@ -235,6 +245,11 @@ class SearchTelegram(Search):
                         i += 1
                         if i > max_items:
                             break
+
+                        # Stop if we're below the min date
+                        if min_date and parsed_message.get("timestamp") < min_date:
+                            break
+
                 except (ValueError, UsernameInvalidError) as e:
                     self.dataset.update_status("Could not scrape entity '%s'" % query)
 
@@ -464,6 +479,9 @@ class SearchTelegram(Search):
         # eliminate empty queries
         items = ",".join([item for item in items.split(",") if item])
 
+        # the dates need to make sense as a range to search within
+        min_date, max_date = query.get("daterange")
+
         # simple!
         return {
             "items": query.get("max_posts"),
@@ -472,7 +490,8 @@ class SearchTelegram(Search):
             "api_id": query.get("api_id"),
             "api_hash": query.get("api_hash"),
             "api_phone": query.get("api_phone"),
-            "before": query.get("before")
+            "min_date": min_date,
+            "max_date": max_date
         }
 
     @classmethod
