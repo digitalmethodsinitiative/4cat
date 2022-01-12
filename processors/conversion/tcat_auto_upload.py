@@ -3,10 +3,12 @@ Send TCAT-ready json to a particular TCAT instance
 """
 import requests
 import random
+import json
 from urllib.parse import urlparse
 
 from backend.abstract.processor import BasicProcessor
 from common.lib.user_input import UserInput
+from common.lib.helpers import get_last_line
 
 import config
 
@@ -82,7 +84,7 @@ class FourcatToDmiTcatUploader(BasicProcessor):
         Send TCAT-ready json to a particular TCAT instance.
         """
         self.dataset.update_status("Preparing upload")
-        bin_name = ''.join(e if e.isalnum() else '_' for e in self.dataset.top_parent().get_label())
+        bin_name = ''.join(e if e.isalnum() else '_' for e in self.dataset.top_parent().get_label()).lower()
         self.dataset.log('Label for DMI-TCAT bin_name: ' + bin_name)
 
         url_to_file = self.dataset.get_parent().get_result_url()
@@ -149,10 +151,15 @@ class FourcatToDmiTcatUploader(BasicProcessor):
             return self.dataset.finish_with_error("Error while importing to DMI-TCAT: %s" % resp_content['error'])
 
         self.dataset.update_status("Waiting for upload to complete")
+        # TODO: check for completion
 
-        self.dataset.update_status("Upload complete, writing HTML file")
         # Create HTML file
-        tcat_result_url = server_choice.replace('/api/import-from-4cat.php', '').rstrip('/') + '/analysis/index.php?dataset=' + bin_name
+        self.dataset.update_status("Upload complete, writing HTML file")
+        # GET first and last dates
+        parent_file = self.dataset.get_parent().get_results_path()
+        start_date, end_date = self.get_first_and_last_dates(parent_file)
+
+        tcat_result_url = server_choice.replace('/api/import-from-4cat.php', '').rstrip('/') + '/analysis/index.php?dataset=' + bin_name + '&startdate=' + start_date + '&enddate=' + end_date
         html_file = self.get_html_page(tcat_result_url)
 
         # Write HTML file
@@ -168,3 +175,22 @@ class FourcatToDmiTcatUploader(BasicProcessor):
         Returns a html string to redirect to the location of the DMI-TCAT dataset.
         """
         return f"<head><meta http-equiv='refresh' content='0; URL={url}'></head>"
+
+    def get_first_and_last_dates(self, filename):
+        """
+        Grabs the first and last lines of filename and finds their 'created_at'
+        dates to return
+        """
+        last_tweet = get_last_line(filename)
+        last_tweet = json.loads(last_tweet)
+        start_date = last_tweet.get('created_at', '')
+        if start_date:
+            # Just the date
+            start_date = start_date[:10]
+
+        with open(filename) as file:
+            first_tweet = json.loads(file.readline())
+        end_date = first_tweet.get('created_at', '')
+        if end_date:
+            end_date = end_date[:10]
+        return start_date, end_date
