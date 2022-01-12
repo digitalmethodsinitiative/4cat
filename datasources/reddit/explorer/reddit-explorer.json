@@ -25,8 +25,13 @@
 		},
 		{
 			"key": "score",
-			"label": "Score",
+			"label": "Score (highest to lowest)",
 			"descending": true,
+			"force_int": true
+		},
+		{
+			"key": "score",
+			"label": "Score (lowest to highest)",
 			"force_int": true
 		}
 	]

@@ -105,7 +105,7 @@ def explorer_dataset(key, page):
 	first_post = False
 
 	for post in iterate_items(dataset_path, max_rows=max_posts, sort_by=sort_by, descending=descending, force_int=force_int):
-			
+		
 		count += 1
 		
 		# Use an offset if we're showing a page beyond the first.
@@ -519,8 +519,9 @@ def iterate_items(in_file, max_rows=None, sort_by=None, descending=False, force_
 			if sort_by:
 				try:
 					sort_by = columns.index(sort_by)
-					reader = sorted(reader, key=lambda x: to_int(x[sort_by], convert=force_int), reverse=descending)
-				except ValueError:
+					reader = sorted(reader, key=lambda x: to_float(x[sort_by], convert=force_int), reverse=descending)
+				except ValueError as e:
+					print(e)
 					pass
 			
 			for item in reader:
@@ -548,10 +549,10 @@ def iterate_items(in_file, max_rows=None, sort_by=None, descending=False, force_
 				keys = sort_by.split(".")
 
 				if max_rows:
-					for item in sorted([json.loads(line) for i, line in enumerate(dataset_file) if i < max_rows], key=lambda x: to_int(get_nested_value(x, keys), convert=force_int), reverse=descending):
+					for item in sorted([json.loads(line) for i, line in enumerate(dataset_file) if i < max_rows], key=lambda x: to_float(get_nested_value(x, keys), convert=force_int), reverse=descending):
 							yield item
 				else:
-					for item in sorted([json.loads(line) for line in dataset_file], key=lambda x: to_int(get_nested_value(x, keys), convert=force_int), reverse=descending):
+					for item in sorted([json.loads(line) for line in dataset_file], key=lambda x: to_float(get_nested_value(x, keys), convert=force_int), reverse=descending):
 							yield item
 
 	return Exception("Can't loop through file with extension %s" % suffix)
@@ -658,10 +659,10 @@ def get_nested_value(di, keys):
 			return 0
 	return di
 
-def to_int(value, convert=False):
+def to_float(value, convert=False):
 	if convert:
-		value = int(value)
-	return(value)
+		value = float(value)
+	return value
 
 def strip_html(post):
 	post["body"] = strip_tags(post.get("body", ""))
