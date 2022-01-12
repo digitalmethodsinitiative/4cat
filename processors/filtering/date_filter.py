@@ -63,6 +63,13 @@ class DateFilter(BasicProcessor):
 
         # Process inputs from user
         min_date, max_date = self.parameters.get("daterange")
+
+        # Should not be None
+        if not min_date or not max_date:
+            self.dataset.update_status("No date range provided", is_final=True)
+            self.dataset.finish(0)
+            return
+
         # Convert to datetime for easy comparison
         min_date = datetime.fromtimestamp(min_date).date()
         max_date = datetime.fromtimestamp(max_date).date()
