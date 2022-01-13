@@ -490,6 +490,7 @@ li.op > .post-annotations {
 .post-annotation .annotation-label {
     display: inline-block;
     vertical-align: middle;
+    font-weight: bold;
     text-align: right;
     width: 130px;
     margin-right: 5px;
