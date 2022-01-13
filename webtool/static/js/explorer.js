@@ -434,7 +434,7 @@ const annotations = {
 											$(this).append("<option class='post-annotation-input option-" + option_id + "' id='option-" + post_option_id + "' value='" + new_label + "'>" + new_label + "</option>");
 										}
 										else if (input_type == "checkbox") {
-											$(this).append("<input class='post-annotation-input option-" + option_id + "' id='option-" + post_option_id + "' value='" + new_label + "' type='checkbox'><label for='" + post_option_id + "'>" + new_label + "</label>");
+											$(this).append("<input class='post-annotation-input option-" + option_id + "' id='option-" + post_option_id + "' value='" + new_label + "' type='checkbox'><label for='option-" + post_option_id + "'>" + new_label + "</label>");
 										}
 									});
 								}
