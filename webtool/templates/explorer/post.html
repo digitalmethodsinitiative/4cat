@@ -5,6 +5,7 @@
 
 	<!-- Possible external link -->
 	{% if custom_fields and "external_url" in custom_fields %}
+
 		{% set external_url = custom_fields.external_url | post_field(post) %}
 		{% if external_url %}
 			<a href="{{ external_url }}" target="_blank"><span class="external-url" title="Original post"><i class="fas fa-external-link-alt"></i></span></a>
@@ -93,7 +94,7 @@
 		{% if custom_fields and 'body' in custom_fields %}
 			{{ custom_fields.body | post_field(post) | safe }}
 		{% else %}
-			{{ post.body|safe }}
+			{{ post.body | safe }}
 		{% endif %}
 	</span>
 
@@ -131,9 +132,9 @@
 					<option class='post-annotation-input' value=''></option>
 
 					{% for option in annotation_fields[field]["options"] %}
-						{% set option_id = option.keys() | list %}
-						{% set option_label = option.values() | list %}
-						<option class="post-annotation-input option-{{ option_id[0] }}" id="option-{{ option_id[0] }}" value="{{ option_label[0] }}" {% if option_label[0] == old_annotation %}selected{% endif %}>{{ option_label[0] }}</option>
+						{% set option_id = option.keys() | first %}
+						{% set option_label = option.values() | first %}
+						<option class="post-annotation-input option-{{ option_id }}" id="option-{{ option_id }}" value="{{ option_label }}" {% if option_label == old_annotation %}selected{% endif %}>{{ option_label }}</option>
 					{% endfor %}
 					</select>
 
@@ -141,11 +142,11 @@
 					<div class='post-annotation-options checkboxes-{{ field }}'>
 						
 					{% for option in annotation_fields[field]["options"] %}
-						{% set option_id = option.keys() | list %}
-						{% set option_label = option.values() | list %}
-						{% set checked = "checked" if old_annotation and option_label[0] in old_annotation else "" %}
+						{% set option_id = option.keys() | first %}
+						{% set option_label = option.values() | first %}
+						{% set checked = "checked" if old_annotation and option_label in old_annotation else "" %}
 
-						<input type='checkbox' class='post-annotation-input option-{{ option_id[0] }}' id='option-{{ post.id }}-{{ option_id[0] }}' value='{{ option_label[0] }}' {{ checked }}><label for='option-{{ post.id }}-{{ option_id[0] }}'>{{ option_label[0] }}</label>
+						<input type='checkbox' class='post-annotation-input option-{{ option_id }}' id='option-{{ post.id }}-{{ option_id }}' value='{{ option_label }}' {{ checked }}><label for='option-{{ post.id }}-{{ option_id }}'>{{ option_label }}</label>
 					{% endfor %}
 					</div>
 				{% endif %}
