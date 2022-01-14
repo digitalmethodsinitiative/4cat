@@ -115,7 +115,7 @@ class FourcatToDmiTcatUploader(BasicProcessor):
         if response.status_code == 404:
             return self.dataset.finish_with_error("Cannot upload dataset to DMI-TCAT server: server responded with 404 not found.")
         if response.status_code == 504:
-            if
+            
             # TODO: try a new TCAT server if there are more than one
             # TODO: save point: converted date could be saved and processor resumed here at a later point
             self.dataset.update_status("TCAT server currently busy; please try again later")
