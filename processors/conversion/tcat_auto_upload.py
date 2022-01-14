@@ -109,21 +109,17 @@ class FourcatToDmiTcatUploader(BasicProcessor):
             url_to_file = url_to_file.replace('localhost', 'host.docker.internal')
             self.dataset.log('Server is a Docker container, new URL: ' + url_to_file)
 
-        # sanitize server URL and send the file to it
-        # todo: chunk it
-        parsed_uri = urlparse(server_choice)
-        post_json_url = '{uri.scheme}://{uri.netloc}'.format(uri=parsed_uri)
-        post_json_url = post_json_url + '/api/import-from-4cat.php'
-        self.dataset.update_status("Sending dataset to DMI-TCAT: %s" % post_json_url)
-        response = requests.post(post_json_url, auth=auth, data={
-                                                'url': url_to_file,
-                                                'name': bin_name,
-                                                'query': query,
-                                                'token': config.TCAT_TOKEN,
-                                                })
+        # Send request to TCAT server
+        response = self.send_request_to_TCAT(server_choice, auth, url_to_file, bin_name, query)
 
         if response.status_code == 404:
             return self.dataset.finish_with_error("Cannot upload dataset to DMI-TCAT server: server responded with 404 not found.")
+        if response.status_code == 504:
+            if
+            # TODO: try a new TCAT server if there are more than one
+            # TODO: save point: converted date could be saved and processor resumed here at a later point
+            self.dataset.update_status("TCAT server currently busy; please try again later")
+            return self.dataset.finish(0)
         elif response.status_code != 200:
             return self.dataset.finish_with_error("Cannot upload dataset to DMI-TCAT server: server responded with %i %s." % (response.status_code, str(response.reason)))
 
@@ -169,6 +165,33 @@ class FourcatToDmiTcatUploader(BasicProcessor):
         # Finish
         self.dataset.update_status("Finished")
         self.dataset.finish(self.dataset.top_parent().num_rows)
+
+    def send_request_to_TCAT(self, server_choice, auth, url_to_file, bin_name, query):
+        """
+        Send request to a TCAT server. Request contains authoriaztion to the TCAT instance,
+        a url pointing where the file is stored on the 4CAT server, a name for the tweet "bin",
+        and the original query used to collect the tweet data. TCAT will download the actual
+        file.
+
+        :param str server_choice:  url to a TCAT instance
+        :param tuple auth:  (username, password) for TCAT instance
+        :param str url_to_file:  url to file location on 4CAT
+        :param str bin_name:  desired name of tweet bin for TCAT
+        :param dict query:  parameters used to collect Twitter data
+    	:return Response: requests response object
+        """
+        # sanitize server URL and send the url to the file location to it
+        parsed_uri = urlparse(server_choice)
+        post_json_url = '{uri.scheme}://{uri.netloc}'.format(uri=parsed_uri)
+        post_json_url = post_json_url + '/api/import-from-4cat.php'
+        self.dataset.update_status("Sending dataset to DMI-TCAT: %s" % post_json_url)
+        response = requests.post(post_json_url, auth=auth, data={
+                                                'url': url_to_file,
+                                                'name': bin_name,
+                                                'query': query,
+                                                'token': config.TCAT_TOKEN,
+                                                })
+        return response
 
     def get_html_page(self, url):
         """
