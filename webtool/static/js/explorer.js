@@ -125,6 +125,11 @@ const annotations = {
 		// Check whether there's already fields saved for this dataset
 		annotations.fieldsExist();
 
+		// Save annotations every 10 seconds
+		setInterval(function() {
+			annotations.saveAnnotations();
+		}, 10000);
+
 	},
 
 	toggleField: function (el) {
@@ -694,7 +699,7 @@ const annotations = {
 					$("#save-annotations").addClass("invalid").prop("disabled", true);
 					$("#save-to-dataset").prop("checked", false);
 					old_annotation_fields = $("#annotation-fields").html();
-					alert(alert_message);
+					// alert(alert_message);
 				}
 				else {
 					annotations.enableSaving();
