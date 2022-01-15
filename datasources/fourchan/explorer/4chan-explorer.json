@@ -1,6 +1,6 @@
 {
 	"subject": "{{ subject }}",
-	"board": "{{ board }}",
+	"board": "/{{ board }}/",
 	"image": "http://i.4pcdn.org/{{ board }}/{{ image_file }}",
 	"country": "<span class='flag flag-{{country_code}}' title='{{country_code}}'></span>",
 	"external_url": "https://archive.4plebs.org/{{board}}/thread/{{thread_id}}#{{id}}",
