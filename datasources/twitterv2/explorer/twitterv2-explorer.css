@@ -8,7 +8,7 @@ body {
 	background-color: white;
 }
 
-.posts li {
+.posts .post {
 	position: relative;
 	background-color: white;
 	max-width: 620px;
@@ -17,7 +17,7 @@ body {
 	min-height: 50px;
 }
 
-.posts li header {
+.posts .post header {
 	display: inline-block;
 	line-height: 1.7em;
 	margin-bottom: 5px;
@@ -25,47 +25,47 @@ body {
 	color: rgb(104, 119, 130);
 }
 
-.posts li header .post_id {
+.posts .post header .post_id {
 	display: none;
 }
 
-.posts li header .author {
+.posts .post header .author {
 	color: black;
 }
 
-.posts li header .profile_picture {
+.posts .post header .profile_picture {
 	float: left;
 	margin-right: 15px;
 }
 
-.posts li header .profile_picture img {
+.posts .post header .profile_picture img {
 	border-radius: 100px;
 	width: 50px;
 }
 
-.posts li header .profile_picture:after {
+.posts .post header .profile_picture:after {
 	display: none;
 }
 
-.posts li article {
+.posts .post article {
 	margin: 0;
 	padding: 0;
 }
 
-.posts li.op {
+.posts .post.op {
 	background-color: white;
 	color: black;
 }
 
-.posts li .post-content {
+.posts .post .post-content {
 	display: inline-block;
 }
 
-.posts li .post-image {
+.posts .post .post-image {
 	margin-bottom: 10px;
 }
 
-.posts li .post-image img {
+.posts .post .post-image img {
 	border-radius: 10px;
 }
 
@@ -73,7 +73,7 @@ body {
 	color: rgb(104, 119, 130);
 }
 
-.posts li.op .post-annotations, .posts li .post-annotations {
+.posts .post.op .post-annotations, .posts .post .post-annotations {
 	border-radius: 10px;
 	background-color: rgb(241, 249, 255);
 	color: #474747;

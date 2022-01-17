@@ -8,7 +8,8 @@ import json
 import csv
 import re
 import operator
-import markdown
+#import markdown
+import markdown2
 
 from backend import all_modules
 
@@ -18,13 +19,10 @@ from pathlib import Path
 from flask import jsonify, abort, send_file, request, render_template
 
 from webtool import app, db, log, openapi, limiter
-from webtool.lib.helpers import format_post, error
+from webtool.lib.helpers import format_chan_post, error
 from common.lib.helpers import strip_tags
 
-
-
 api_ratelimit = limiter.shared_limit("45 per minute", scope="api")
-
 
 @app.route('/explorer/dataset/<string:key>/', defaults={'page': 0})
 @app.route('/explorer/dataset/<string:key>/<int:page>')
@@ -139,15 +137,15 @@ def explorer_dataset(key, page):
 	# what data type we're working with.
 	filetype = dataset["result_file"].split(".")[-1].lower()
 	custom_fields = get_custom_fields(datasource, filetype=filetype)
-
-	# Convert posts from markdown to html
-	if custom_fields and "mardown" in custom_fields and custom_fields.get("markdown"):
+	
+	# Convert posts from markdown to HTML
+	if custom_fields and "markdown" in custom_fields and custom_fields.get("markdown"):
 		posts = [convert_markdown(post) for post in posts]
 	# Clean up HTML
 	else:
 		posts = [strip_html(post) for post in posts]
-		posts = [format(post) for post in posts]
-
+		posts = [format(post, datasource=datasource) for post in posts]
+	
 	if not posts:
 		return error(404, error="No posts available for this datasource")
 
@@ -189,14 +187,13 @@ def explorer_thread(datasource, board, thread_id):
 	max_posts = config.MAX_EXPLORER_POSTS if hasattr(config, "MAX_EXPLORER_POSTS") else 500000
 
 	# Get the posts with this thread ID.
-	posts = get_posts(db, datasource, board, ids=tuple([thread_id]), threads=True, order_by=["id"])
-
-	posts = [strip_html(post) for post in posts]
+	posts = get_posts(db, datasource, board=board, ids=tuple([thread_id]), threads=True, order_by=["id"])
 
 	if not posts:
 		return error(404, error="No posts available for this thread")
 
-	posts = [format(post) for post in posts]
+	posts = [strip_html(post) for post in posts]
+	posts = [format(post, datasource=datasource) for post in posts]
 
 	# Include custom css if it exists in the datasource's 'explorer' dir.
 	# The file's naming format should e.g. be 'reddit-explorer.css'.
@@ -232,7 +229,7 @@ def explorer_post(datasource, board, thread_id):
 		return error(404, error="No thread ID provided")
 
 	# Get the posts with this thread ID.
-	posts = get_posts(db, datasource, board, ids=tuple([thread_id]), threads=True, order_by=["id"])
+	posts = get_posts(db, datasource, board=board, ids=tuple([thread_id]), threads=True, order_by=["id"])
 
 	posts = [strip_html(post) for post in posts]
 	posts = [format(post) for post in posts]
@@ -565,17 +562,20 @@ def iterate_items(in_file, max_rows=None, sort_by=None, descending=False, force_
 
 	return Exception("Can't loop through file with extension %s" % suffix)
 
-def get_posts(db, datasource, board, ids, threads=False, limit=0, offset=0, order_by=["timestamp"]):
+def get_posts(db, datasource, ids, board="", threads=False, limit=0, offset=0, order_by=["timestamp"]):
 
 	if not ids:
 		return None
+
+	if board:
+		board = " AND board = '" + board + "' "
 
 	id_field = "id" if not threads else "thread_id"
 	order_by = " ORDER BY " + ", ".join(order_by)
 	limit = "" if not limit or limit <= 0 else " LIMIT %i" % int(limit)
 	offset = " OFFSET %i" % int(offset)
-
-	posts = db.fetchall("SELECT * FROM posts_" + datasource + " WHERE " + id_field + " IN %s " + order_by + " ASC" + limit + offset,
+	
+	posts = db.fetchall("SELECT * FROM posts_" + datasource + " WHERE " + id_field + " IN %s " + board + order_by + " ASC" + limit + offset,
 						(ids,))
 	if not posts:
 		return False
@@ -676,10 +676,16 @@ def strip_html(post):
 	post["body"] = strip_tags(post.get("body", ""))
 	return post
 
-def format(post):
-	post["body"] = format_post(post.get("body", "")).replace("\n", "<br>")
+def format(post, datasource=""):
+	post["body"] = post.get("body", "").replace("\n", "<br>")
+	if "chan" in datasource or datasource == "8kun":
+		post["body"] = format_chan_post(post.get("body", ""))
 	return post
 
 def convert_markdown(post):
-	post["body"] = markdown.markdown(post.get("body", ""), extensions=['urlize'])
+	if ">" in post["body"]:
+		print(post["body"])
+	post["body"] = post.get("body", "").replace("\n", "\n\n")
+	post["body"] = markdown2.markdown(post.get("body", ""))
+
 	return post

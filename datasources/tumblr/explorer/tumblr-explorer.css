@@ -16,7 +16,7 @@ body {
 	font-family: "Favorit", "Helvetica Neue", "HelveticaNeue", Helvetica, Arial, sans-serif;
 }
 
-.posts li {
+.posts li.post {
 	background-color: white;
 	color: black;
 	font-size: 14px;
@@ -26,7 +26,7 @@ body {
 	padding: 0;
 }
 
-.posts li header {
+.posts li.post header {
 	display: inline-block;
 	text-decoration: none;
 	font-weight: bold;
@@ -37,37 +37,37 @@ body {
 	margin-bottom: 10px;
 }
 
-.posts li article {
+.posts li.post article {
 	padding: 0;
 	margin: 0;
 }
 
-.posts li .post-content {
+.posts li.post .post-content {
 	display: block;
 	margin: 25px;
 	margin-top: 0px;
 }
 
-.posts li .post-tags {
+.posts li.post .post-tags {
 	color: #5e5e5e;
 	margin-top: 20px;
 	word-break: break-all;
 }
 
-.posts li .author {
+.posts li.post .author {
 	font-weight: bold;
 }
 
-.posts li .post-image {
+.posts li.post .post-image {
 	width: 100%;
 	margin-bottom: 15px;
 }
 
-.posts li .external-url {
+.posts li.post .external-url {
 	
 }
 
-.posts li .post-annotations {
+.posts li.post .post-annotations {
 	background-color: white;
 	border-top: 1px solid #5e5e5e;
 	margin-right: 0;

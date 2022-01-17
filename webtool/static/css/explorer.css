@@ -187,7 +187,7 @@ span.page.selected {
     padding: 0;
 }
 
-.posts li {
+.posts li.post {
     position: relative;
     background: #d1e2ff;
     padding: 1em;
@@ -226,14 +226,18 @@ span.page.selected {
     margin-left: 0.5em;
 }
 
-.posts li.op {
+.posts li.post.op {
     border: 2px solid #000;
     background: #485ba6;
     color: #FFF;
 }
 
-.posts li.op header {
+.posts li.post.op header {
     border-color: #FFF;
+}
+
+.posts li.post .post-content a {
+    color: #215bc6;
 }
 
 .posts .external-url {
@@ -246,12 +250,7 @@ span.page.selected {
 .quote {
     color: #ff5750;
 }
-.greentext {
-    color: #3eb439;
-}
-.op .greentext {
-    color: #50ff50;
-}
+
 .highlight, :target {
     outline: 2px solid #ff5750;
 }
@@ -479,7 +478,7 @@ span.divider {
     display: none;
 }
     
-li.op > .post-annotations {
+li.post.op > .post-annotations {
     background-color: #3b4b8c;
 }
 

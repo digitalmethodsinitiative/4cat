@@ -1,4 +1,4 @@
-<li id="post-{{ post.id }}"{% if post.thread_id == post.id %} class="op"{% endif %}>    
+<li id="post-{{ post.id }}" class="post{% if post.thread_id == post.id %} op{% endif %}">    
 
 	<!-- Special fields we're handling a bit differently -->
 	{% set special_fields = ["external_url", "author", "body", "timestamp", "image", "images", "sort_options", "markdown"] %}

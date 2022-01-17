@@ -18,20 +18,20 @@ body {
 }
 
 .content article {
-	font-size: 14px;
+	font-size: 13px;
     font-weight: 400;
     line-height: 21px;
     word-break: break-word;
 }
 
-.content .posts li header {
+.content .posts .post header {
 	text-decoration: none;
 	border: none;
 	color: #858585;
 	font-size: 14px;
 }
 
-.content .posts li {
+.content .posts .post {
 	display: table;
 	min-height: auto;
 	min-width: auto;
@@ -40,11 +40,12 @@ body {
 	background-color: white;
 }
 
-.content .posts li.op {
+.content .posts .post.op {
 	color: black;
+	background-color: white;
 }
 
-.content .posts li.op .subject {
+.content .posts .post.op .subject {
 	display: block;
 	font-size: 16px;
 	color: black;
@@ -52,24 +53,30 @@ body {
 	margin-top: 10px;
 }
 
-.content .posts li.op .subject:after {
+.content .posts .post.op .subject:after {
 	display: none;
 }
 
-.content .posts li.op .subject_url {
+.content .posts .post.op .subject_url {
 	
 }
 
-.content .posts li .post-image {
+.content .posts .post .post-image {
 	
 }
 
-.posts li .post-annotations {
+.content .posts .post blockquote {
+	border-left: 2px solid #c5c1ad;
+	margin: 10px;
+	padding-left: 20px;
+}
+
+.posts .post .post-annotations {
 	border-radius: 5px;
 	background-color: #f1f8fd;
 	color: #474747;
 }
 
 footer p {
-	color: white;
+
 }
