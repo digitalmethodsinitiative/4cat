@@ -1,7 +1,7 @@
 <li id="post-{{ post.id }}"{% if post.thread_id == post.id %} class="op"{% endif %}>    
 
 	<!-- Special fields we're handling a bit differently -->
-	{% set special_fields = ["external_url", "author", "body", "timestamp", "image", "images", "sort_options"] %}
+	{% set special_fields = ["external_url", "author", "body", "timestamp", "image", "images", "sort_options", "markdown"] %}
 
 	<!-- Possible external link -->
 	{% if custom_fields and "external_url" in custom_fields %}

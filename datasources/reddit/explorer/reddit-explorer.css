@@ -4,28 +4,21 @@ See https://github.com/digitalmethodsinitiative/4cat/wiki/Exploring-and-annotati
  
  */
 
-@font-face {
-    font-family: 'IBM Plex Sans';
-    src: url("../fonts/IBMPlexSans-Regular.ttf")
-}
 
-@font-face {
-    font-family: 'IBM Plex Sans';
-    font-weight: bold;
-    src: url("../fonts/IBMPlexSans-SemiBold.ttf")
+*, body, code, select, input, textarea {
+	font-family: normal x-small verdana, arial, helvetica, sans-serif;
 }
 
 body {
-	background-color: #265273;
+	background-color: #ebf9ff;
 }
 
 #metadata {
-	color: white;
+	color: black;
 }
 
 .content article {
-	font-family: 'IBM Plex Sans', Arial, sans-serif;
-    font-size: 14px;
+	font-size: 14px;
     font-weight: 400;
     line-height: 21px;
     word-break: break-word;

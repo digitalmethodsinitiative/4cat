@@ -8,6 +8,7 @@ import json
 import csv
 import re
 import operator
+import markdown
 
 from backend import all_modules
 
@@ -120,16 +121,13 @@ def explorer_dataset(key, page):
 		post_ids.append(post["id"])
 		posts.append(post)
 
+		if "link_id" in post:
+			if post["link_id"][2] == "_":
+				post["link_id"] = post["link_id"][3:]
+
 		# Stop if we exceed the max posts per page.
 		if count >= (offset + limit) or count > max_posts:
 			break
-
-	# Clean up HTML
-	posts = [strip_html(post) for post in posts]
-	posts = [format(post) for post in posts]
-
-	if not posts:
-		return error(404, error="No posts available for this datasource")
 
 	# Include custom css if it exists in the datasource's 'explorer' dir.
 	# The file's naming format should e.g. be 'reddit-explorer.css'.
@@ -141,6 +139,17 @@ def explorer_dataset(key, page):
 	# what data type we're working with.
 	filetype = dataset["result_file"].split(".")[-1].lower()
 	custom_fields = get_custom_fields(datasource, filetype=filetype)
+
+	# Convert posts from markdown to html
+	if custom_fields and "mardown" in custom_fields and custom_fields.get("markdown"):
+		posts = [convert_markdown(post) for post in posts]
+	# Clean up HTML
+	else:
+		posts = [strip_html(post) for post in posts]
+		posts = [format(post) for post in posts]
+
+	if not posts:
+		return error(404, error="No posts available for this datasource")
 
 	# Check whether there's already annotations inserted already.
 	# If so, also pass these to the template.
@@ -521,7 +530,6 @@ def iterate_items(in_file, max_rows=None, sort_by=None, descending=False, force_
 					sort_by = columns.index(sort_by)
 					reader = sorted(reader, key=lambda x: to_float(x[sort_by], convert=force_int), reverse=descending)
 				except ValueError as e:
-					print(e)
 					pass
 			
 			for item in reader:
@@ -670,4 +678,8 @@ def strip_html(post):
 
 def format(post):
 	post["body"] = format_post(post.get("body", "")).replace("\n", "<br>")
+	return post
+
+def convert_markdown(post):
+	post["body"] = markdown.markdown(post.get("body", ""), extensions=['urlize'])
 	return post

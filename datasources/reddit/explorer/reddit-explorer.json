@@ -34,5 +34,6 @@
 			"label": "Score (lowest to highest)",
 			"force_int": true
 		}
-	]
+	],
+	"markdown": true
 }
