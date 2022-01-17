@@ -684,6 +684,5 @@ def format(post, datasource=""):
 
 def convert_markdown(post):
 	post["body"] = post.get("body", "").replace("\n", "\n\n").replace("&gt;", ">")
-	print(post["body"])
 	post["body"] = markdown2.markdown(post.get("body", ""), extras=["nofollow","target-blank-links"])
 	return post
