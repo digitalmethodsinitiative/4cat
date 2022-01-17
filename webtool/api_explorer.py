@@ -574,7 +574,7 @@ def get_posts(db, datasource, ids, board="", threads=False, limit=0, offset=0, o
 	order_by = " ORDER BY " + ", ".join(order_by)
 	limit = "" if not limit or limit <= 0 else " LIMIT %i" % int(limit)
 	offset = " OFFSET %i" % int(offset)
-	
+
 	posts = db.fetchall("SELECT * FROM posts_" + datasource + " WHERE " + id_field + " IN %s " + board + order_by + " ASC" + limit + offset,
 						(ids,))
 	if not posts:
@@ -683,9 +683,7 @@ def format(post, datasource=""):
 	return post
 
 def convert_markdown(post):
-	if ">" in post["body"]:
-		print(post["body"])
-	post["body"] = post.get("body", "").replace("\n", "\n\n")
-	post["body"] = markdown2.markdown(post.get("body", ""))
-
+	post["body"] = post.get("body", "").replace("\n", "\n\n").replace("&gt;", ">")
+	print(post["body"])
+	post["body"] = markdown2.markdown(post.get("body", ""), extras=["nofollow","target-blank-links"])
 	return post
