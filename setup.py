@@ -28,7 +28,7 @@ packages = [
 	"instaloader==4.5.3",
 	"lxml==4.6.5",
 	"Markdown==3.0.1",
-	"mardown2==2.4.2"
+	"markdown2==2.4.2",
 	"nltk==3.5",
 	"networkx>=2.5.1",
 	"numpy>=1.19.2",
