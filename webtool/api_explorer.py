@@ -70,7 +70,9 @@ def explorer_dataset(key, page):
 
 	# If the dataset is local, we can add some more features
 	# (like the ability to navigate to threads)
-	is_local = True if all_modules.datasources[datasource].get("is_local") else False
+	is_local = False
+	if datasource in list(all_modules.datasources.keys()):
+		is_local = True if all_modules.datasources[datasource].get("is_local") else False
 	
 	# Check if the dataset in fact exists
 	dataset_path = Path(config.PATH_ROOT, config.PATH_DATA, dataset["result_file"])
