@@ -145,7 +145,7 @@ def explorer_dataset(key, page):
 	else:
 		posts = [strip_html(post) for post in posts]
 		posts = [format(post, datasource=datasource) for post in posts]
-	
+		
 	if not posts:
 		return error(404, error="No posts available for this datasource")
 
@@ -677,12 +677,12 @@ def strip_html(post):
 	return post
 
 def format(post, datasource=""):
-	post["body"] = post.get("body", "").replace("\n", "<br>")
 	if "chan" in datasource or datasource == "8kun":
 		post["body"] = format_chan_post(post.get("body", ""))
+	post["body"] = post.get("body", "").replace("\n", "<br>")
 	return post
 
 def convert_markdown(post):
-	post["body"] = post.get("body", "").replace("\n", "\n\n").replace("&gt;", ">")
+	post["body"] = post.get("body", "").replace("\n", "\n\n").replace("&gt;", ">").replace("] (", "](")
 	post["body"] = markdown2.markdown(post.get("body", ""), extras=["nofollow","target-blank-links"])
 	return post
