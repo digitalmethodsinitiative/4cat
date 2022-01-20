@@ -96,6 +96,10 @@ button.invalid, button.invalid:hover {
     border-color: var(--gray-dark);
 }
 
+textarea {
+    width: 340px;
+}
+
 /** --------------------- *
      Header
   * --------------------- */
