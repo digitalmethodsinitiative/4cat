@@ -123,9 +123,12 @@ class ExtractNouns(BasicProcessor):  # TEMPORARILY DISABLED
 
             if li_entities:
 
-                # Also add the data to the original csv file, if indicated.
+                # Also add the data to the original file, if indicated.
                 if self.parameters.get("overwrite"):
-                    self.update_parent(li_entities)
+                    self.add_field_to_parent(field_name='named_entities',
+                                             # Format like "Apple:ORG, Gates:PERSON, ..." and add to the row
+                                             new_data=[", ".join([":".join(post_entities) for post_entities in entity]) for entity in li_entities],
+                                             which_parent=self.dataset.top_parent())
 
                 all_entities = []
                 # Convert to lower and filter out one-letter words. Join the words with the entities so we can group easily.
@@ -149,50 +152,6 @@ class ExtractNouns(BasicProcessor):  # TEMPORARILY DISABLED
                 self.dataset.update_status("Finished, but no entities were extracted.")
                 self.dataset.finish(0)
 
-    def update_parent(self, li_entities):
-        """
-        Update the original dataset with an "entities" column
-
-        """
-
-        self.dataset.update_status("Adding entities the source file")
-
-        # Get the initial dataset path
-        top_path = self.dataset.top_parent().get_results_path()
-
-        # Get a temporary path where we can store the data
-        tmp_path = self.dataset.get_staging_area()
-        tmp_file_path = tmp_path.joinpath(top_path.name)
-
-        count = 0
-
-        # Get field names
-        fieldnames = self.get_item_keys(top_path)
-        if "entities" not in fieldnames:
-            fieldnames.append("entities")
-
-        # Iterate through the original dataset and add values to a new "entities" column
-        self.dataset.update_status("Writing csv with entities.")
-        with tmp_file_path.open("w", encoding="utf-8", newline="") as output:
-
-            writer = csv.DictWriter(output, fieldnames=fieldnames)
-            writer.writeheader()
-
-            for post in self.iterate_items(top_path):
-                # Format like "Apple ORG, Gates PERSON, ..." and add to the row
-                pos_tags = ", ".join([":".join(post_entities) for post_entities in li_entities[count]])
-                post["entities"] = pos_tags
-                writer.writerow(post)
-                count += 1
-
-        # Replace the source file path with the new file
-        shutil.copy(str(tmp_file_path), str(top_path))
-
-        # delete temporary files and folder
-        shutil.rmtree(tmp_path)
-
-        self.dataset.update_status("Parent dataset updated.")
-
     @classmethod
     def get_options(cls, parent_dataset=None, user=None):
         """
@@ -207,7 +166,7 @@ class ExtractNouns(BasicProcessor):  # TEMPORARILY DISABLED
         :return dict:
         """
         options = cls.options
-        if parent_dataset and parent_dataset.top_parent().get_results_path().suffix == ".csv":
+        if parent_dataset and parent_dataset.top_parent().get_results_path().suffix in [".csv", ".ndjson"]:
             options["overwrite"] = {
                 "type": UserInput.OPTION_TOGGLE,
                 "default": False,

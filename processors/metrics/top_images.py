@@ -10,6 +10,7 @@ import shutil
 
 from collections import Counter, OrderedDict
 from backend.abstract.processor import BasicProcessor
+from common.lib.exceptions import ProcessorException
 from common.lib.helpers import UserInput
 
 __author__ = "Stijn Peeters"
@@ -152,53 +153,16 @@ class TopImageCounter(BasicProcessor):
             self.dataset.update_status("Zero image URLs detected.")
             return
 
-        # Also add the data to the original csv file, if indicated.
+        # Also add the data to the original file, if indicated.
         if self.parameters.get("overwrite"):
-            self.update_parent(all_links)
+            try:
+                self.add_field_to_parent(field_name='img_url',
+                                         new_data=[", ".join(link[1]) for link in all_links],
+                                         which_parent=self.source_dataset)
+            except ProcessorException as e:
+                self.dataset.update_status("Error updating parent dataset: %s" % e)
 
         self.write_csv_items_and_finish(results)
-
-    def update_parent(self, li_urls):
-        """
-        Update the original dataset with a column detailing the image urls.
-
-        """
-
-        self.dataset.update_status("Adding image URLs to the source file")
-
-        # Get the source file data path
-        parent_path = self.source_dataset.get_results_path()
-
-        # Get a temporary path where we can store the data
-        tmp_path = self.dataset.get_staging_area()
-        tmp_file_path = tmp_path.joinpath(parent_path.name)
-
-        count = 0
-
-        # Get field names
-        fieldnames = self.get_item_keys(parent_path)
-        fieldnames.append("img_url")
-
-        # Iterate through the original dataset and add values to a new img_link column
-        self.dataset.update_status("Writing new source file with image URLs.")
-        with tmp_file_path.open("w", encoding="utf-8", newline="") as output:
-            writer = csv.DictWriter(output, fieldnames=fieldnames)
-            writer.writeheader()
-
-            count = 0
-
-            for post in self.iterate_items(parent_path):
-                post["img_url"] = ", ".join(li_urls[count][1])
-                writer.writerow(post)
-                count += 1
-
-        # Replace the source file path with the new file
-        shutil.copy(str(tmp_file_path), str(parent_path))
-
-        # delete temporary files and folder
-        shutil.rmtree(tmp_path)
-
-        self.dataset.update_status("Parent dataset updated.")
 
     @classmethod
     def get_options(cls, parent_dataset=None, user=None):
@@ -213,8 +177,6 @@ class TopImageCounter(BasicProcessor):
         :param parent_dataset:  Dataset to get options for
         :return dict:
         """
-        if parent_dataset and parent_dataset.get_results_path().suffix != ".csv":
-            return {}
 
         return {
             "overwrite": {

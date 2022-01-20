@@ -371,6 +371,92 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		else:
 			raise NotImplementedError("Cannot iterate through %s file" % path.suffix)
 
+	def add_field_to_parent(self, field_name, new_data, which_parent=source_dataset, update_existing=False):
+		"""
+		This function adds a new field to the parent dataset. Expects a list of data points, one for each item
+		in the parent dataset. Processes csv and ndjson. If udpate_existing is set to True, this can be used
+		to overwrite an existing field.
+
+		TODO: could be improved by accepting different types of data depending on csv or ndjson.
+
+		:param str field_name: 	name of the desired
+		:param List new_data: 	List of data to be added to parent dataset
+		:param DataSet which_parent: 	DataSet to be updated (e.g., self.source_dataset, self.dataset.get_parent(), self.dataset.top_parent())
+		:param bool update_existing: 	False (default) will raise an error if the field_name already exists
+										True will allow updating existing data
+		"""
+		if len(new_data) < 1:
+			# no data
+			raise ProcessorException('No data provided')
+
+		if not hasattr(self, "source_dataset") and which_parent is not None:
+			# no source to update
+			raise ProcessorException('No source dataset to update')
+
+		# Get the source file data path
+		parent_path = which_parent.get_results_path()
+
+		if len(new_data) != which_parent.num_rows:
+			raise ProcessorException('Must have new data point for each record')
+
+		self.dataset.update_status("Adding new field %s to the source file" % field_name)
+
+		# Get a temporary path where we can store the data
+		tmp_path = self.dataset.get_staging_area()
+		tmp_file_path = tmp_path.joinpath(parent_path.name)
+
+		# go through items one by one, optionally mapping them
+		if parent_path.suffix.lower() == ".csv":
+			# Get field names
+			fieldnames = self.get_item_keys(parent_path)
+			if not update_existing and field_name in fieldnames:
+				raise ProcessorException('field_name %s already exists!' % field_name)
+			fieldnames.append(field_name)
+
+			# Iterate through the original dataset and add values to a new column
+			self.dataset.update_status("Writing new source file with %s." % field_name)
+			with tmp_file_path.open("w", encoding="utf-8", newline="") as output:
+				writer = csv.DictWriter(output, fieldnames=fieldnames)
+				writer.writeheader()
+
+				for count, post in enumerate(self.iterate_items(parent_path, bypass_map_item=True)):
+					# stop processing if worker has been asked to stop
+					if self.interrupted:
+						raise ProcessorInterruptedException("Interrupted while writing CSV file")
+
+					post[field_name] = new_data[count]
+					writer.writerow(post)
+
+		elif parent_path.suffix.lower() == ".ndjson":
+			# JSON cannot encode sets
+			if type(new_data[0]) is set:
+				# could check each if type(datapoint) is set, but that could be extensive...
+				new_data = [list(datapoint) for datapoint in new_data]
+
+			with tmp_file_path.open("w", encoding="utf-8", newline="") as output:
+				for count, post in enumerate(self.iterate_items(parent_path, bypass_map_item=True)):
+					# stop processing if worker has been asked to stop
+					if self.interrupted:
+						raise ProcessorInterruptedException("Interrupted while writing NDJSON file")
+
+					if not update_existing and field_name in post.keys():
+						raise ProcessorException('field_name %s already exists!' % field_name)
+
+					# Update data
+					post[field_name] = new_data[count]
+
+					output.write(json.dumps(post) + "\n")
+		else:
+			raise NotImplementedError("Cannot iterate through %s file" % path.suffix)
+
+		# Replace the source file path with the new file
+		shutil.copy(str(tmp_file_path), str(parent_path))
+
+		# delete temporary files and folder
+		shutil.rmtree(tmp_path)
+
+		self.dataset.update_status("Parent dataset updated.")
+
 	def get_item_keys(self, path=None):
 		"""
 		Get item attribute names
@@ -695,7 +781,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		"""
 
 		if self.extension and not self.is_filter():
-			return self.extension 
+			return self.extension
 		return None
 
 	@classmethod
