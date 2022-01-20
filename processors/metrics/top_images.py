@@ -153,10 +153,12 @@ class TopImageCounter(BasicProcessor):
             self.dataset.update_status("Zero image URLs detected.")
             return
 
-        # Also add the data to the original csv file, if indicated.
+        # Also add the data to the original file, if indicated.
         if self.parameters.get("overwrite"):
             try:
-                self.add_field_to_parent(field_name='img_url', new_data=[link[1] for link in all_links])
+                self.add_field_to_parent(field_name='img_url',
+                                         new_data=[", ".join(link[1]) for link in all_links],
+                                         which_parent=self.source_dataset)
             except ProcessorException as e:
                 self.dataset.update_status("Error updating parent dataset: %s" % e)
 
