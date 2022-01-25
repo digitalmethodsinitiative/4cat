@@ -148,7 +148,7 @@ class ColumnNetworker(BasicProcessor):
         network_parameters = {"generated_by": "4CAT Capture & Analysis Toolkit", "source_dataset_id": self.source_dataset.key}
         network = nx.DiGraph(**network_parameters) if directed else nx.Graph(**network_parameters)
 
-        for item in self.iterate_items(self.source_file):
+        for item in self.source_dataset.iterate_items(self):
             if column_a not in item or column_b not in item:
                 missing = "'" + "' and '".join([c for c in (column_a, column_b) if c not in item]) + "'"
                 self.dataset.update_status("Column(s) %s not found in dataset" % missing, is_final=True)

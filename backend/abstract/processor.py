@@ -305,72 +305,6 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 			# cancel job
 			self.job.finish()
 
-	def iterate_items(self, path, bypass_map_item=False):
-		"""
-		A generator that iterates through a CSV or NDJSON file
-
-		With every iteration, the processor's 'interrupted' flag is checked,
-		and if set a ProcessorInterruptedException is raised, which by default
-		is caught and subsequently stops execution gracefully.
-
-		Processors can define a method called `map_item` that can be used to
-		map an item from the dataset file before it is processed any further
-		this is slower than storing the data file in the right format to begin
-		with but not all data sources allow for easy 'flat' mapping of items,
-		e.g. tweets are nested objects when retrieved from the twitter API
-		that are easier to store as a JSON file than as a flat CSV file, and
-		it would be a shame to throw away that data
-
-		There are two file types that can be iterated (currently): CSV files
-		and NDJSON (newline-delimited JSON) files. In the future, one could
-		envision adding a pathway to retrieve items from e.g. a MongoDB
-		collection directly instead of from a static file
-
-		:param Path path: 	Path to file to read
-		:return generator:  A generator that yields each item as a dictionary
-		"""
-
-		# see if an item mapping function has been defined
-		# open question if 'source_dataset' shouldn't be an attribute of the dataset
-		# instead of the processor...
-		item_mapper = None
-		if hasattr(self, "source_dataset") and self.source_dataset and not bypass_map_item:
-			parent_processor = self.all_modules.processors.get(self.source_dataset.type)
-			if parent_processor:
-				if hasattr(parent_processor, "map_item"):
-					item_mapper = parent_processor.map_item
-
-		# go through items one by one, optionally mapping them
-		if path.suffix.lower() == ".csv":
-			with path.open(encoding="utf-8") as input:
-				reader = csv.DictReader(input)
-
-				for item in reader:
-					if self.interrupted:
-						raise ProcessorInterruptedException("Processor interrupted while iterating through CSV file")
-
-					if item_mapper:
-						item = item_mapper(item)
-
-					yield item
-
-		elif path.suffix.lower() == ".ndjson":
-			# in this format each line in the file is a self-contained JSON
-			# file
-			with path.open(encoding="utf-8") as input:
-				for line in input:
-					if self.interrupted:
-						raise ProcessorInterruptedException("Processor interrupted while iterating through NDJSON file")
-
-					item = json.loads(line)
-					if item_mapper:
-						item = item_mapper(item)
-
-					yield item
-
-		else:
-			raise NotImplementedError("Cannot iterate through %s file" % path.suffix)
-
 	def add_field_to_parent(self, field_name, new_data, which_parent=source_dataset, update_existing=False):
 		"""
 		This function adds a new field to the parent dataset. Expects a list of data points, one for each item
@@ -408,7 +342,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		# go through items one by one, optionally mapping them
 		if parent_path.suffix.lower() == ".csv":
 			# Get field names
-			fieldnames = self.get_item_keys(parent_path)
+			fieldnames = which_parent.get_item_keys(self)
 			if not update_existing and field_name in fieldnames:
 				raise ProcessorException('field_name %s already exists!' % field_name)
 			fieldnames.append(field_name)
@@ -419,7 +353,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 				writer = csv.DictWriter(output, fieldnames=fieldnames)
 				writer.writeheader()
 
-				for count, post in enumerate(self.iterate_items(parent_path, bypass_map_item=True)):
+				for count, post in enumerate(which_parent.iterate_items(self, bypass_map_item=True)):
 					# stop processing if worker has been asked to stop
 					if self.interrupted:
 						raise ProcessorInterruptedException("Interrupted while writing CSV file")
@@ -434,7 +368,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 				new_data = [list(datapoint) for datapoint in new_data]
 
 			with tmp_file_path.open("w", encoding="utf-8", newline="") as output:
-				for count, post in enumerate(self.iterate_items(parent_path, bypass_map_item=True)):
+				for count, post in enumerate(which_parent.iterate_items(self, bypass_map_item=True)):
 					# stop processing if worker has been asked to stop
 					if self.interrupted:
 						raise ProcessorInterruptedException("Interrupted while writing NDJSON file")
@@ -456,35 +390,6 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		shutil.rmtree(tmp_path)
 
 		self.dataset.update_status("Parent dataset updated.")
-
-	def get_item_keys(self, path=None):
-		"""
-		Get item attribute names
-
-		It can be useful to know what attributes an item in the dataset is
-		stored with, e.g. when one wants to produce a new dataset identical
-		to the source_dataset one but with extra attributes. This method provides
-		these, as a list.
-
-		:param Path path:  Path to the dataset file; if left empty, use the
-		  processor's own dataset's path
-		:return list:  List of keys, may be empty if there are no items in the
-		  dataset
-
-		:todo: Figure out if this makes more sense as a Dataset method
-		"""
-		if not path:
-			path = self.dataset.get_results_path()
-
-		items = self.iterate_items(path)
-		try:
-			keys = list(items.__next__().keys())
-		except StopIteration:
-			return []
-		finally:
-			del items
-
-		return keys
 
 	def iterate_archive_contents(self, path, staging_area=None):
 		"""

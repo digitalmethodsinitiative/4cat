@@ -158,7 +158,7 @@ class UrlUnshortener(BasicProcessor):
         """
 
         # get field names
-        fieldnames = self.get_item_keys(self.source_file)
+        fieldnames = self.source_dataset.get_item_keys(self)
 
         # avoid requesting the same URL multiple times
         cache = {}
@@ -218,7 +218,7 @@ class UrlUnshortener(BasicProcessor):
             writer.writeheader()
             processed = 0
 
-            for post in self.iterate_items(self.source_file):
+            for post in self.source_dataset.iterate_items(self):
                 if self.interrupted:
                     raise ProcessorInterruptedException("Interrupted while iterating through items")
 
@@ -241,29 +241,12 @@ class UrlUnshortener(BasicProcessor):
         self.dataset.finish(processed)
 
     def after_process(self):
+        """
+        Create stand-alone dataset with filtered data
+
+        :return:
+        """
         super().after_process()
 
-        # copy this dataset - the filtered version - and make that copy standalone
-        # this has the benefit of allowing for all analyses that can be run on
-        # full datasets on the new, filtered copy as well
-        standalone = self.dataset.copy(shallow=False)
-        standalone.body_match = "(Filtered) " + self.source_dataset.query
-        standalone.datasource = self.source_dataset.parameters.get("datasource", "custom")
-
-        try:
-            standalone.board = self.source_dataset.board
-        except KeyError:
-            standalone.board = self.type
-
-        standalone.type = "search"
-
-        standalone.detach()
-        standalone.delete_parameter("key_parent")
-
-        self.dataset.copied_to = standalone.key
-
-        # we don't need this file anymore - it has been copied to the new
-        # standalone dataset, and this one is not accessible via the interface
-        # except as a link to the copied standalone dataset
-        if self.dataset.get_results_path().exists():
-            self.dataset.get_results_path().unlink()
+        # Request standalone
+        self.create_standalone()

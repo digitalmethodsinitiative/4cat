@@ -39,11 +39,7 @@ class ConvertNDJSONToJSON(BasicProcessor):
 
         # This handles and writes one Tweet at a time
         with self.dataset.get_results_path().open("w") as output:
-            for post in self.iterate_items(self.source_file, bypass_map_item=True):
-                # stop processing if worker has been asked to stop
-                if self.interrupted:
-                    raise ProcessorInterruptedException("Interrupted while processing NDJSON file")
-
+            for post in self.source_dataset.iterate_items(self, bypass_map_item=True):
                 posts += 1
 
                 post = self.map_to_TCAT(post)

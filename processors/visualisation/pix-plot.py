@@ -334,7 +334,7 @@ class PixPlotGenerator(BasicProcessor):
 					item_mapper = parent_processor.map_item
 
 			# Loop through source file
-			for post in self.iterate_items(source_path):
+			for post in self.source_dataset.iterate_items(self):
 
 				if item_mapper:
 					# and if so, map it

@@ -62,7 +62,7 @@ class RedditVoteChecker(BasicProcessor):
 		# than querying individual posts, so we first gather all thread IDs to
 		# query.
 		thread_ids = set()
-		for post in self.iterate_items(self.source_file):
+		for post in self.source_dataset.iterate_items(self):
 			thread_ids.add(post["thread_id"])
 
 		post_scores = {}
@@ -97,7 +97,7 @@ class RedditVoteChecker(BasicProcessor):
 
 		# now write a new CSV with the updated scores
 		# get field names
-		fieldnames = [*self.get_item_keys(self.source_file)]
+		fieldnames = [*self.source_dataset.get_item_keys(self)]
 		if "score" not in fieldnames:
 			fieldnames.append("score")
 
@@ -107,7 +107,7 @@ class RedditVoteChecker(BasicProcessor):
 			writer.writeheader()
 			processed = 0
 
-			for post in self.iterate_items(self.source_file):
+			for post in self.source_dataset.iterate_items(self):
 				# threads may be included too, so store the right score
 				if post["thread_id"] == post["id"]:
 					post["score"] = thread_scores[post["thread_id"]]

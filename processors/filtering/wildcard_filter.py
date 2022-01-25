@@ -56,7 +56,7 @@ class WildcardFilter(BasicProcessor):
 
         with self.dataset.get_results_path().open("w", encoding="utf-8") as output:
             # get header row, we need to copy it for the output
-            fieldnames = self.get_item_keys(self.source_file)
+            fieldnames = self.source_dataset.get_item_keys(self)
 
             # start the output file
             fieldnames.append("matching_lexicons")
@@ -64,7 +64,7 @@ class WildcardFilter(BasicProcessor):
             writer.writeheader()
 
             # iterate through posts and see if they match
-            for post in self.iterate_items(self.source_file):
+            for post in self.source_dataset.iterate_items(self):
                 processed += 1
                 if not post.get("body", None):
                     continue

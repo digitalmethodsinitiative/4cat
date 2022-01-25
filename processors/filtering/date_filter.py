@@ -92,7 +92,7 @@ class DateFilter(BasicProcessor):
 
 
             # Loop through items
-            for item in self.iterate_items(self.source_file):
+            for item in self.source_dataset.iterate_items(self):
                 if not writer:
                     # First iteration, check if column actually exists
                     if date_column_name not in item.keys():

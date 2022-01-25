@@ -73,7 +73,7 @@ class SplitSentences(BasicProcessor):
 			writer = csv.DictWriter(output, fieldnames=("post_id", "sentence",))
 			writer.writeheader()
 
-			for post in self.iterate_items(self.source_file):
+			for post in self.source_dataset.iterate_items(self):
 				if num_posts % 100 == 0:
 					self.dataset.update_status("Processing post %i" % num_posts)
 

@@ -55,16 +55,12 @@ class ConvertCSVToMacExcel(BasicProcessor):
 
 		# recreate CSV file with the new dialect
 		with self.dataset.get_results_path().open("w") as output:
-			fieldnames = self.get_item_keys(self.source_file)
+			fieldnames = self.source_dataset.get_item_keys(self)
 
 			writer = csv.DictWriter(output, fieldnames=fieldnames, dialect="excel-mac")
 			writer.writeheader()
 
-			for post in self.iterate_items(self.source_file):
-				# stop processing if worker has been asked to stop
-				if self.interrupted:
-					raise ProcessorInterruptedException("Interrupted while processing CSV file")
-
+			for post in self.source_dataset.iterate_items(self):
 				writer.writerow(post)
 				posts += 1
 

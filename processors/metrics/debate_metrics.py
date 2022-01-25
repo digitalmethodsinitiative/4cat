@@ -56,7 +56,7 @@ class DebateMetrics(BasicProcessor):
 		board = self.source_dataset.parameters["board"]
 
 		self.dataset.update_status("Reading source file")
-		for post in self.iterate_items(self.source_file):
+		for post in self.source_dataset.iterate_items(self):
 			if post["thread_id"] not in threads:
 				threads[post["thread_id"]] = {
 					"subject": post["subject"],

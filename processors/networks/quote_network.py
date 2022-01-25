@@ -46,7 +46,7 @@ class QuoteNetworkGrapher(BasicProcessor):
 		network = nx.Graph()
 
 		self.dataset.update_status("Reading source file")
-		for post in self.iterate_items(self.source_file):
+		for post in self.source_dataset.iterate_items(self):
 			quotes = link.findall(post["body"])
 			if quotes:
 				if post["id"] not in network.nodes:

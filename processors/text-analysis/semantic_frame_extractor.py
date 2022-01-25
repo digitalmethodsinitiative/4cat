@@ -62,7 +62,7 @@ class SemanticFrameExtractor(BasicProcessor):
 		with self.dataset.get_results_path().open("w") as output:
 			writer = csv.DictWriter(output, fieldnames=("sentence", "utterance", "frameEvokingElement", "cause", "effect"))
 			writer.writeheader()
-			reader = self.iterate_items(self.source_file)
+			reader = self.source_dataset.iterate_items(self)
 			while True:
 				# the API can't handle too many sentences at once, so send
 				# them in chunks

@@ -124,7 +124,7 @@ class AttributeRanker(BasicProcessor):
 		overall_top = {}
 		if rank_style == "overall":
 			self.dataset.update_status("Determining overall top-%i items" % cutoff)
-			for post in self.iterate_items(self.source_file):
+			for post in self.source_dataset.iterate_items(self):
 				values = self.get_values(post, attribute, filter, weighby)
 				for value in values:
 					if to_lowercase:
@@ -138,7 +138,7 @@ class AttributeRanker(BasicProcessor):
 
 		# now for the real deal
 		self.dataset.update_status("Reading source file")
-		for post in self.iterate_items(self.source_file):
+		for post in self.source_dataset.iterate_items(self):
 			# determine where to put this data
 			try:
 				time_unit = get_interval_descriptor(post, timeframe)
