@@ -263,7 +263,7 @@ class DataSet(FourcatModule):
 				reader = csv.DictReader(infile)
 
 				for item in reader:
-					if processor.interrupted:
+					if hasattr(processor, "interrupted") and processor.interrupted:
 						raise ProcessorInterruptedException("Processor interrupted while iterating through CSV file")
 
 					if item_mapper:
@@ -276,7 +276,7 @@ class DataSet(FourcatModule):
 			# file
 			with path.open(encoding="utf-8") as infile:
 				for line in infile:
-					if processor.interrupted:
+					if hasattr(processor, "interrupted") and processor.interrupted:
 						raise ProcessorInterruptedException("Processor interrupted while iterating through NDJSON file")
 
 					item = json.loads(line)
