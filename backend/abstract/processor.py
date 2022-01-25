@@ -668,7 +668,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		except KeyError:
 			standalone.board = self.type
 
-		standalone.type = "search"
+		standalone.type = top_parent.type
 
 		standalone.detach()
 		standalone.delete_parameter("key_parent")
