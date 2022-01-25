@@ -307,7 +307,7 @@ const query = {
 			let item_name = datasource + '.' + $(this).attr('name');
 			let s = localStorage.setItem(item_name, $(this).val());
 		})
-		
+
 		// Disable form
 		query.disable_form();
 		$('html,body').scrollTop(200);
@@ -523,7 +523,7 @@ const query = {
 			//don't hammer the server while user is looking at something else
 			return;
 		}
-		
+
 		$.getJSON({
 			url: getRelativeURL('api/status.json'),
 			success: function (json) {
@@ -614,7 +614,7 @@ const query = {
 
 		// Country flag check
 		if ($('#check-country-flag').is(':checked') && ($('#body-input').val()).length < 2 && valid) {
-			
+
 			let common_countries = ['US', 'GB', 'CA', 'AU'];
 			let country = $('#country_flag').val();
 
@@ -624,7 +624,7 @@ const query = {
 
 					let min_date = stringToTimestamp($('#input-min-time').val());
 					let max_date = stringToTimestamp($('#input-max-time').val());
-					
+
 					// Max three monhts for the common country flags without any body parameters
 					if (max_date - min_date > 7889231) {
 						valid = false;
@@ -671,7 +671,7 @@ const query = {
 
 				query.handle_density();
 				query.custom_board_options();
-                
+
                 // Render custom multiple choice fields
                 // should also be rendered dynamically if processor options are expanded.
                 if ($('.multichoice-wrapper').length || $('.multi-select-wrapper').length) {
@@ -967,6 +967,7 @@ const popup = {
 		}
 
 		//determine target - last aria-controls value starting with 'popup-'
+		console.log(parent);
 		let targets = $(parent).attr('aria-controls').split(' ');
 		let popup_container = '';
 		targets.forEach(function(target) {
@@ -976,15 +977,29 @@ const popup = {
 		});
 		popup_container = '#' + popup_container;
 
+		if ($(parent).attr('data-load-from')) {
+			popup.render('<iframe src="' + $(parent).attr('data-load-from') + '"></iframe>', true);
+		} else {
+			popup.render($(popup_container).html());
+		}
+	},
+
+	render: function (content, is_fullsize=false) {
 		//copy popup contents into container
-		$('#popup .content').html($(popup_container).html());
+		$('#popup .content').html(content);
+		if(is_fullsize) {
+			$('#popup').addClass('fullsize');
+		} else {
+			$('#popup').removeClass('fullsize');
+		}
 		$('#blur').attr('aria-expanded', true);
 		$('#popup').attr('aria-expanded', true);
 
-		$('#popup embed').each(function() {
+		$('#popup embed').each(function () {
 			svgPanZoom(this, {contain: true});
 		});
 	},
+
 	/**
 	 * Hide popup
 	 *
