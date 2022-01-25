@@ -144,7 +144,7 @@ class SearchWithTwitterAPIv2(Search):
             time.sleep(0.05)
             self.previous_request = int(time.time())
 
-            # now send the request, allowing for at least 5 replies if the connection seems unstable
+            # now send the request, allowing for at least 5 retries if the connection seems unstable
             retries = 5
             api_response = None
             while retries > 0:
@@ -237,6 +237,21 @@ class SearchWithTwitterAPIv2(Search):
             included_tweets = api_response.get("includes", {}).get("tweets", {})
             included_places = api_response.get("includes", {}).get("places", {})
 
+            # Collect errors by type
+            missing_objects = {}
+            for missing_object in api_response.get("errors", {}):
+                parameter_type = missing_object.get('resource_type', 'unknown')
+                if parameter_type in missing_objects:
+                    missing_objects[parameter_type][missing_object.get('resource_id')] = missing_object
+                else:
+                    missing_objects[parameter_type] = {missing_object.get('resource_id'): missing_object}
+            self.dataset.log('Missing objects collected: ' + ', '.join(['%s: %s' % (k, len(v)) for k, v in missing_objects.items()]))
+
+            expected_error_types = ['user', 'media', 'poll', 'tweet', 'place']
+            if any(key not in expected_error_types for key in missing_objects.keys()):
+                self.log.warning("Twitter API v2 returned unknown error types: %s" % str([key for key in missing_objects.keys() if key not in expected_error_types]))
+
+            # Loop through and collect tweets
             for tweet in api_response.get("data", []):
                 if 0 < amount <= tweets:
                     break
@@ -244,7 +259,7 @@ class SearchWithTwitterAPIv2(Search):
                 # splice referenced data back in
                 # we use copy.deepcopy here because else we run into a
                 # pass-by-reference quagmire
-                tweet = self.enrich_tweet(tweet, included_users, included_media, included_polls, included_places, copy.deepcopy(included_tweets))
+                tweet = self.enrich_tweet(tweet, included_users, included_media, included_polls, included_places, copy.deepcopy(included_tweets), missing_objects)
 
                 tweets += 1
                 if tweets % 500 == 0:
@@ -258,7 +273,7 @@ class SearchWithTwitterAPIv2(Search):
             else:
                 break
 
-    def enrich_tweet(self, tweet, users, media, polls, places, referenced_tweets):
+    def enrich_tweet(self, tweet, users, media, polls, places, referenced_tweets, missing_objects):
         """
         Enrich tweet with user and attachment metadata
 
@@ -284,6 +299,8 @@ class SearchWithTwitterAPIv2(Search):
         :param list places:  Place metadata, as a list of place objects
         :param list referenced_tweets:  Tweets referenced in the tweet, as a
         list of tweet objects. These will be enriched in turn.
+        :param dict missing_objects: Dictionary with data on missing objects
+                from the API by type.
 
         :return dict:  Enriched tweet object
         """
@@ -303,36 +320,52 @@ class SearchWithTwitterAPIv2(Search):
 
         # add place to geo metadata
         # referenced_tweets also contain place_id, but these places may not included in the place objects
-        if 'place_id' in tweet.get('geo', {}) and tweet.get("geo").get("place_id") in places_by_id.keys():
-            tweet["geo"]["place"] = places_by_id[tweet.get("geo").get("place_id")]
+        if 'place_id' in tweet.get('geo', {}) and tweet.get("geo").get("place_id") in places_by_id:
+            tweet["geo"]["place"] = places_by_id.get(tweet.get("geo").get("place_id"))
+        elif 'place_id' in tweet.get('geo', {}) and tweet.get("geo").get("place_id") in missing_objects.get('place', {}):
+            tweet["geo"]["place"] = missing_objects.get('place', {}).get(tweet.get("geo").get("place_id"), {})
 
         # add user metadata for mentioned users
         for index, mention in enumerate(tweet.get("entities", {}).get("mentions", [])):
-            tweet["entities"]["mentions"][index] = {**tweet["entities"]["mentions"][index],
-                                                    **users_by_name.get(mention["username"], {})}
+            if mention["username"] in users_by_name:
+                tweet["entities"]["mentions"][index] = {**tweet["entities"]["mentions"][index], **users_by_name.get(mention["username"])}
+            # missing users can be stored by either user ID or Username in Twitter API's error data; we check both
+            elif mention["username"] in missing_objects.get('user', {}):
+                tweet["entities"]["mentions"][index] = {**tweet["entities"]["mentions"][index], **{'error': missing_objects['user'][mention["username"]]}}
+            elif mention["id"] in missing_objects.get('user', {}):
+                tweet["entities"]["mentions"][index] = {**tweet["entities"]["mentions"][index], **{'error': missing_objects['user'][mention["id"]]}}
+
 
         # add poll metadata
         for index, poll_id in enumerate(tweet.get("attachments", {}).get("poll_ids", [])):
-            tweet["attachments"]["poll_ids"][index] = polls_by_id[poll_id] if poll_id in polls_by_id else poll_id
+            if poll_id in polls_by_id:
+                tweet["attachments"]["poll_ids"][index] = polls_by_id[poll_id]
+            elif poll_id in missing_objects.get('poll', {}):
+                tweet["attachments"]["poll_ids"][index] = {'poll_id': poll_id, 'error': missing_objects['poll'][poll_id]}
 
         # add media metadata - seems to be just the media type, the media URL
         # etc is stored in the 'entities' attribute instead
         for index, media_key in enumerate(tweet.get("attachments", {}).get("media_keys", [])):
-            tweet["attachments"]["media_keys"][index] = media_by_key[
-                media_key] if media_key in media_by_key else media_key
+            if media_key in media_by_key:
+                tweet["attachments"]["media_keys"][index] = media_by_key[media_key]
+            elif media_key in missing_objects.get('media', {}):
+                tweet["attachments"]["media_keys"][index] = {'media_key': media_key, 'error': missing_objects['media'][media_key]}
 
         # replied-to user metadata
         if "in_reply_to_user_id" in tweet:
-            tweet["in_reply_to_user"] = users_by_id[tweet["in_reply_to_user_id"]] if tweet[
-                                                                                         "in_reply_to_user_id"] in users_by_id else {}
+            if tweet["in_reply_to_user_id"] in users_by_id:
+                tweet["in_reply_to_user"] = users_by_id[tweet["in_reply_to_user_id"]]
+            elif tweet["in_reply_to_user_id"] in missing_objects.get('user', {}):
+                tweet["in_reply_to_user"] = {'in_reply_to_user_id': tweet["in_reply_to_user_id"], 'error': missing_objects['user'][tweet["in_reply_to_user_id"]]}
 
         # enrich referenced tweets. Even though there should be no recursion -
         # since tweets cannot be edited - we do not recursively enrich
         # referenced tweets (should we?)
         for index, reference in enumerate(tweet.get("referenced_tweets", [])):
             if reference["id"] in tweets_by_id:
-                tweet["referenced_tweets"][index] = {**reference, **self.enrich_tweet(tweets_by_id[reference["id"]], users, media, polls, places, [])}
-
+                tweet["referenced_tweets"][index] = {**reference, **self.enrich_tweet(tweets_by_id[reference["id"]], users, media, polls, places, [], missing_objects)}
+            elif reference["id"] in missing_objects.get('tweet', {}):
+                tweet["referenced_tweets"][index] = {**reference, **{'error': missing_objects['tweet'][reference["id"]]}}
 
         return tweet
 
@@ -400,8 +433,9 @@ class SearchWithTwitterAPIv2(Search):
         is_retweet = any([ref.get("type") == "retweeted" for ref in tweet.get("referenced_tweets", [])])
         if is_retweet:
             retweeted_tweet = [t for t in tweet["referenced_tweets"] if t.get("type") == "retweeted"][0]
-            retweeted_body = retweeted_tweet["text"]
-            tweet["text"] = "RT @" + retweeted_tweet["author_user"]["username"] + ": " + retweeted_body
+            if retweeted_tweet.get("text", False) and retweeted_tweet.get("author_user", {}).get("username", False):
+                retweeted_body = retweeted_tweet.get("text")
+                tweet["text"] = "RT @" + retweeted_tweet.get("author_user", {}).get("username") + ": " + retweeted_body
 
         return {
             "id": tweet["id"],

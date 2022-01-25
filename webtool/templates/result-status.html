@@ -1,6 +1,6 @@
 {% if not dataset.is_finished() %}
     {% if not dataset.get_status() or "queued" in dataset.get_status().lower() %}
-        <i class="fas fa-hourglass-half" aria-label="Query in progress..."></i>
+        <i class="fas fa-hourglass-half" aria-label="Query in progress..."></i> Queued...
     {% else %}
         <i class="fas fa-sync fa-spin" aria-label="Query in progress..."></i>
     {% endif %}

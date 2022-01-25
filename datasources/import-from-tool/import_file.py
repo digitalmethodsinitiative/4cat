@@ -186,8 +186,8 @@ class ImportFromExternalTool(BasicProcessor):
 				wrapped_upload = io.TextIOWrapper(file, encoding=encoding)
 				reader = csv.DictReader(wrapped_upload)
 				writer = csv.DictWriter(output_csv, fieldnames=(
-					"id", "thread_id", "parent_id", "body", "author", "timestamp", "type", "url", "thumbnail_url",
-					"hashtags", "usertags", "mentioned", "num_likes", "num_comments", "subject"))
+					"id", "thread_id", "parent_id", "body", "author", "timestamp", "unix_timestamp", "type", "url",
+					"thumbnail_url", "hashtags", "usertags", "mentioned", "num_likes", "num_comments", "subject"))
 				writer.writeheader()
 
 				dataset.update_status("Sorting by date...")
@@ -213,7 +213,8 @@ class ImportFromExternalTool(BasicProcessor):
 						"parent_id": id,
 						"body": caption if caption is not None else "",
 						"author": item["User Name"],
-						"timestamp": int(date.timestamp()),
+						"timestamp": date.strftime('%Y-%m-%d %H:%M:%S'),
+						"unix_timestamp": int(date.timestamp()),
 						"type": "picture" if item["Type"] == "Photo" else item["Type"].lower(),
 						"url": item["URL"],
 						"thumbnail_url": item["Photo"],
@@ -234,11 +235,12 @@ class ImportFromExternalTool(BasicProcessor):
 				entity_name = "Page Name" if "Page Name" in reader.fieldnames else "Group Name"
 
 				writer = csv.DictWriter(output_csv, fieldnames=(
-					"id", "thread_id", "body", "author", "timestamp", "page_id", "page_name", "page_likes",
-					"page_followers", "page_shared_from", "type", "interactions", "likes", "comments", "shares",
-					"likes_love", "likes_wow", "likes_haha", "likes_sad", "likes_angry", "likes_care", "views_post",
-					"views_total", "views_total_crossposts", "video_length", "video_status", "url", "url_original",
-					"body_image", "body_link", "body_description", "hashtags", "sponsor_id", "sponsor_name"))
+					"id", "thread_id", "body", "author", "subject", "timestamp", "unix_timestamp", "page_id",
+					"page_name", "page_likes", "page_followers", "page_shared_from", "type", "interactions", "likes",
+					"comments", "shares", "likes_love", "likes_wow", "likes_haha", "likes_sad", "likes_angry",
+					"likes_care", "views_post", "views_total", "views_total_crossposts", "video_length", "video_status",
+					"url", "url_original", "body_image", "body_link", "body_description", "hashtags", "sponsor_id",
+					"sponsor_name"))
 				writer.writeheader()
 
 				dataset.update_status("Sorting by date...")
@@ -259,7 +261,9 @@ class ImportFromExternalTool(BasicProcessor):
 						"thread_id": item["URL"].split("/")[-1],
 						"body": item["Message"],
 						"author": item["User Name"],
-						"timestamp": int(date.timestamp()),
+						"subject": "",
+						"timestamp": date.strftime('%Y-%m-%d %H:%M:%S'),
+						"unix_timestamp": int(date.timestamp()),
 						"page_name": item[entity_name],
 						"page_likes": item["Likes at Posting"],
 						"page_id": item["Facebook Id"],
@@ -299,13 +303,13 @@ class ImportFromExternalTool(BasicProcessor):
 				entity_name = "Page Name" if "Page Name" in reader.fieldnames else "Group Name"
 
 				writer = csv.DictWriter(output_csv, fieldnames=(
-					"id", "thread_id", "body", "author", "timestamp", "page_id", "page_name", "page_category",
-					"page_top_country", "page_description", "page_created", "page_likes", "page_followers",
-					"page_shared_from", "type", "interactions", "likes", "comments", "shares", "likes_love",
-					"likes_wow", "likes_haha", "likes_sad", "likes_angry", "likes_care", "views_post", "views_total",
-					"views_total_crossposts", "overperforming_score", "video_length", "video_status", "video_own",
-					"url", "url_original", "body_image", "body_link", "body_description", "hashtags", "sponsor_id",
-					"sponsor_name", "sponsor_category"))
+					"id", "thread_id", "body", "author", "subject", "timestamp", "unix_timestamp", "page_id",
+					"page_name", "page_category", "page_top_country", "page_description", "page_created", "page_likes",
+					"page_followers", "page_shared_from", "type", "interactions", "likes", "comments", "shares",
+					"likes_love", "likes_wow", "likes_haha", "likes_sad", "likes_angry", "likes_care", "views_post",
+					"views_total", "views_total_crossposts", "overperforming_score", "video_length", "video_status",
+					"video_own", "url", "url_original", "body_image", "body_link", "body_description", "hashtags",
+					"sponsor_id", "sponsor_name", "sponsor_category"))
 				writer.writeheader()
 
 				dataset.update_status("Sorting by date...")
@@ -334,7 +338,9 @@ class ImportFromExternalTool(BasicProcessor):
 						"thread_id": item["URL"].split("/")[-1],
 						"body": item["Message"],
 						"author": item["User Name"],
-						"timestamp": int(date.timestamp()),
+						"subject": "",
+						"timestamp": date.strftime('%Y-%m-%d %H:%M:%S'),
+						"unix_timestamp": int(date.timestamp()),
 						"page_name": item[entity_name],
 						"page_category": item["Page Category"],
 						"page_top_country": item["Page Admin Top Country"],
@@ -392,9 +398,9 @@ class ImportFromExternalTool(BasicProcessor):
 				wrapped_upload = io.TextIOWrapper(file, encoding=encoding)
 				reader = csv.DictReader(wrapped_upload)
 				writer = csv.DictWriter(output_csv, fieldnames=("id", "thread_id", "author", "subject", "body",
-					"timestamp", "is_harmful", "is_duet", "music_name", "music_id", "music_author", "video_url",
-					"tiktok_url", "thumbnail_url", "amount_likes", "amount_comments", "amount_shares", "amount_plays",
-					"hashtags"))
+					"timestamp", "unix_timestamp", "is_harmful", "is_duet", "music_name", "music_id", "music_author",
+					"video_url", "tiktok_url", "thumbnail_url", "amount_likes", "amount_comments", "amount_shares",
+					"amount_plays", "hashtags"))
 				writer.writeheader()
 
 
@@ -414,7 +420,8 @@ class ImportFromExternalTool(BasicProcessor):
 						"author": item["authorMeta.name"],
 						"subject": "",
 						"body": item["text"],
-						"timestamp": int(item["createTime"]),
+						"timestamp": datetime.datetime.utcfromtimestamp(int(item["createTime"])).strftime('%Y-%m-%d %H:%M:%S'),
+						"unix_timestamp": int(item["createTime"]),
 						"is_harmful": -1,
 						"is_duet": -1,
 						"music_name": item["musicMeta.musicName"],
@@ -435,9 +442,9 @@ class ImportFromExternalTool(BasicProcessor):
 				wrapped_upload = io.TextIOWrapper(file, encoding=encoding)
 				reader = csv.DictReader(wrapped_upload)
 				writer = csv.DictWriter(output_csv, fieldnames=("id", "thread_id", "author", "subject", "body",
-					"timestamp", "is_harmful", "is_duet", "music_name", "music_id", "music_author", "video_url",
-					"tiktok_url", "thumbnail_url", "amount_likes", "amount_comments", "amount_shares", "amount_plays",
-					"hashtags"))
+					"timestamp", "unix_timestamp", "is_harmful", "is_duet", "music_name", "music_id", "music_author",
+					"video_url", "tiktok_url", "thumbnail_url", "amount_likes", "amount_comments", "amount_shares",
+					"amount_plays", "hashtags"))
 				writer.writeheader()
 
 
@@ -457,7 +464,8 @@ class ImportFromExternalTool(BasicProcessor):
 						"author": item["authorMeta.name"],
 						"subject": "",
 						"body": item["text"],
-						"timestamp": int(item["createTime"]),
+						"timestamp": datetime.datetime.utcfromtimestamp(int(item["createTime"])).strftime('%Y-%m-%d %H:%M:%S'),
+						"unix_timestamp": int(item["createTime"]),
 						"is_harmful": -1,
 						"is_duet": -1,
 						"music_name": item["musicMeta.musicName"],
@@ -479,3 +487,24 @@ class ImportFromExternalTool(BasicProcessor):
 		dataset.finish(done)
 		dataset.update_status("Result processed")
 		dataset.update_version(get_software_version())
+
+
+	@classmethod
+	def get_options(cls, parent_dataset=None, user=None):
+		"""
+		Get processor options
+
+		This method by default returns the class's "options" attribute, or an
+		empty dictionary. It can be redefined by processors that need more
+		fine-grained options, e.g. in cases where the availability of options
+		is partially determined by the parent dataset's parameters.
+
+		:param DataSet parent_dataset:  An object representing the dataset that
+		the processor would be run on
+		:param User user:  Flask user the options will be displayed for, in
+		case they are requested for display in the 4CAT web interface. This can
+		be used to show some options only to privileges users.
+		"""
+		options = cls.options
+
+		return options

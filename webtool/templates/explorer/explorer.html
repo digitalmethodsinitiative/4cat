@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <head>
-	<title>4CAT Explorer &bull; {{ key if key else thread }}</title>
+	<title>4CAT Explorer &bull; {% if parameters and parameters.get("label") %}{{ parameters.get("label") }}{% elif key %}{{ key }}{% elif thread %}{{ thread }}{% endif %}</title>
 
 	<link rel="stylesheet" type="text/css" href="{{url_for('static', filename='css/explorer.css')}}">
 	<link rel="stylesheet" type="text/css" href="{{url_for('static', filename='css/flags.css')}}">
@@ -9,24 +9,40 @@
 	<link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='fontawesome/css/solid.css') }}">
 	<link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='fontawesome/css/brands.css') }}">
 
-	<!-- Include datasource-specific css if it exists -->
-	{% if custom_css %}
-		<style type="text/css">
-			{{ custom_css }}
-		</style>
-	{% endif %}
+	<!-- favicon -->
+	<link rel="shortcut icon" href="{{url_for('static', filename='img/favicon/favicon-bw.ico')}}">
+	<meta name="msapplication-TileColor" content="#485ba6">
+	<meta name="msapplication-config" content="static/img/favicon/browserconfig.xml">
+	<meta name="theme-color" content="#ffffff">
+
 	
 	<script type="text/javascript" src="{{url_for('static', filename='js/jquery-3.3.1.min.js')}}"></script>
 	<script type="text/javascript" src="{{url_for('static', filename='js/explorer.js')}}"></script>
 
+	<!-- Possible annotation fields -->
+	<script type="text/javascript">
+	var annotation_fields = {% if annotation_fields %}{{ annotation_fields | safe }}{% else %}{}{% endif %}
+	</script>
+
+	<!-- Include datasource-specific css if it exists -->
+	{% if custom_css %}
+		<style>
+			{{ custom_css | safe }}"
+		</style>
+	{% endif %}
 </head>
-<body>
+<body data-url-root="{{ url_for("show_frontpage") }}">
+
 <header>
 	{% include "explorer/header.html" %}
-	{% include "explorer/annotations.html" %}
+
+	{% if not thread %}
+		{% include "explorer/annotations.html" %}
+	{% endif %}
 </header>
 
 <div class="content">
+	{% include "explorer/nav-pages.html" %}
 	<ol class="posts">
 	{% for post in posts %}
 		{% include "explorer/post.html" %}

@@ -42,7 +42,7 @@ class ThreadMetadata(BasicProcessor):
 		for post in self.iterate_items(self.source_file):
 			if post["thread_id"] not in threads:
 				threads[post["thread_id"]] = {
-					"subject": post["subject"],
+					"subject": post.get("subject", ""),
 					"first_post": int(time.time()),
 					"image_md5": "",  # only relevant for the chans
 					"country_name": "",  # only relevant for the chans
@@ -53,17 +53,17 @@ class ThreadMetadata(BasicProcessor):
 					"count": 0,
 				}
 
-			if post["subject"]:
-				threads[post["thread_id"]]["subject"] = post["subject"]
+			if post.get("subject"):
+				threads[post["thread_id"]]["subject"] = post.get("subject", "")
 
 			if post.get("image_md5"):
 				threads[post["thread_id"]]["images"] += 1
 
 			if post["id"] == post["thread_id"]:
-				threads[post["thread_id"]]["author"] = post["author"]
+				threads[post["thread_id"]]["author"] = post.get("author", "")
 				threads[post["thread_id"]]["country_name"] = post.get("country_name", "N/A")
 				threads[post["thread_id"]]["image_md5"] = post.get("image_md5", "N/A")
-				threads[post["thread_id"]]["op_body"] = post["body"]
+				threads[post["thread_id"]]["op_body"] = post.get("body", "")
 
 			timestamp = int(datetime.datetime.strptime(post["timestamp"], "%Y-%m-%d %H:%M:%S").timestamp())
 

@@ -135,16 +135,15 @@ def get_preview(query):
 		i = 0
 		for post in posts:
 			i += 1
-			post["body"] = format_post(post["body"])
 			preview.append(post)
 			if i > 25:
 				break
 	return preview
 
 
-def format_post(post):
+def format_chan_post(post):
 	"""
-	Format a plain-text 4chan post for HTML display
+	Format a plain-text imageboard post post for HTML display
 
 	Converts >>references into links and adds a class to greentext.s
 

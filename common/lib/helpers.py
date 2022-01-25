@@ -520,6 +520,25 @@ def dict_search_and_update(item, keyword_matches, function):
 	loop_helper_function(temp_item, keyword_matches, function)
 	return temp_item
 
+def get_last_line(filepath):
+	"""
+	Seeks from end of file for '\n' and returns that line
+
+	:param str filepath:  path to file
+	:return str: last line of file
+	"""
+	with open(filepath, "rb") as file:
+		try:
+			 # start at the end of file
+			file.seek(-2, os.SEEK_END)
+			# check if NOT endline i.e. '\n'
+			while file.read(1) != b'\n':
+				# if not '\n', back up two characters and check again
+				file.seek(-2, os.SEEK_CUR)
+		except OSError:
+			file.seek(0)
+		last_line = file.readline().decode()
+	return last_line
 
 def send_email(recipient, message):
 	"""

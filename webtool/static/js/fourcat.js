@@ -261,6 +261,9 @@ const query = {
 		$('.result-page .card h2').each(query.label.init);
 		$(document).on('click', '.edit-dataset-label', query.label.handle);
 		$(document).on('keydown', '#new-dataset-label', query.label.handle);
+
+		// convert dataset
+		$(document).on('change', '#convert-dataset', query.convert_dataset)
 	},
 
 	/**
@@ -799,6 +802,27 @@ const query = {
 				},
 				error: function (response) {
 					alert('Oh no! ' +response.text);
+				}
+			});
+		}
+	},
+
+	convert_dataset: function(self) {
+		let datasource = $(self.target).val();
+		let dataset_key = $('section.result-tree').attr('data-dataset-key')
+
+		if (datasource.length > 0) {
+			$.post({
+				dataType: "json",
+				url: '/api/convert-dataset/' + dataset_key + '/',
+				data: {to_datasource: datasource},
+				cache: false,
+
+				success: function (json) {
+					location.reload();
+				},
+				error: function (response) {
+					alert('Oh no! ' + response.text);
 				}
 			});
 		}

@@ -192,7 +192,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 				else:
 					parent_key = ""
 
-				# Remove any result files that have been created so far
+				# remove any result files that have been created so far
 				self.remove_files()
 
 				raise ProcessorException("Processor %s raised %s while processing dataset %s%s in %s:\n   %s\n" % (self.type, e.__class__.__name__, self.dataset.key, parent_key, location, str(e)))
@@ -201,18 +201,23 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 			self.log.warning("Job %s/%s was queued for a dataset already marked as finished, deleting..." % (self.job.data["jobtype"], self.job.data["remote_id"]))
 			self.job.finish()
 
+
 	def after_process(self):
 		"""
-		Run after successfully processing the dataset
+		Run after processing the dataset
 
-		This marks the dataset as complete and handles logistics concerning the result file, e.g. running a pre-defined
-		processor on the result, copying it to another dataset, and so on.
+		This method cleans up temporary files, and if needed, handles logistics
+		concerning the result file, e.g. running a pre-defined processor on the
+		result, copying it to another dataset, and so on.
 		"""
 		if self.dataset.data["num_rows"] > 0:
 			self.dataset.update_status("Dataset saved.")
 
 		if not self.dataset.is_finished():
 			self.dataset.finish()
+
+		if hasattr(self, "staging_area") and type(self.staging_area) == Path and self.staging_area.exists():
+			shutil.rmtree(self.staging_area)
 
 		# see if we have anything else lined up to run next
 		for next in self.parameters.get("next", []):
@@ -221,7 +226,10 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 			available_processors = self.dataset.get_available_processors()
 
 			# run it only if the post-processor is actually available for this query
-			if next_type in available_processors:
+			if self.dataset.data["num_rows"] <= 0:
+				self.log.info("Not running follow-up processor of type %s for dataset %s, no input data for follow-up" % (next_type, self.dataset.key))
+
+			elif next_type in available_processors:
 				next_analysis = DataSet(parameters=next_parameters, type=next_type, db=self.db, parent=self.dataset.key,
 										extension=available_processors[next_type].extension)
 				self.queue.add_job(next_type, remote_id=next_analysis.key)
@@ -266,25 +274,18 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
 		self.job.finish()
 
-	def clean_up(self):
+	def remove_files(self):
 		"""
-		Clean up any temporary files that were created by the processor.
-		This overwrites Worker.clean_up() and runs after Worker.work()
-		whether it completes successfully or results in an interruption or error.
+		Clean up result files and any staging files for processor to be attempted
+		later if desired.
+		"""
+		if self.dataset.get_results_path().exists():
+			self.dataset.get_results_path().unlink()
 
-		Can be overwritten by processors (with super().clean_up()) to allow for additional cleanup.
-		"""
 		if self.dataset.staging_area:
 			for staging_area in self.dataset.staging_area:
 				if staging_area.is_dir():
 					shutil.rmtree(staging_area)
-
-	def remove_files(self):
-		"""
-		Delete result files for processor to be attempted later if desired.
-		"""
-		if self.dataset.get_results_path().exists():
-			self.dataset.get_results_path().unlink(missing_ok=True)
 
 	def abort(self):
 		"""
@@ -297,8 +298,6 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		# job should resume at a later point. Delay resuming by 10 seconds to
 		# give 4CAT the time to do whatever it wants (though usually this isn't
 		# needed since restarting also stops the spawning of new workers)
-		self.dataset.update_status("Dataset processing interrupted. Retrying later.")
-
 		if self.interrupted == self.INTERRUPT_RETRY:
 			# retry later - wait at least 10 seconds to give the backend time to shut down
 			self.job.release(delay=10)
@@ -371,6 +370,92 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
 		else:
 			raise NotImplementedError("Cannot iterate through %s file" % path.suffix)
+
+	def add_field_to_parent(self, field_name, new_data, which_parent=source_dataset, update_existing=False):
+		"""
+		This function adds a new field to the parent dataset. Expects a list of data points, one for each item
+		in the parent dataset. Processes csv and ndjson. If udpate_existing is set to True, this can be used
+		to overwrite an existing field.
+
+		TODO: could be improved by accepting different types of data depending on csv or ndjson.
+
+		:param str field_name: 	name of the desired
+		:param List new_data: 	List of data to be added to parent dataset
+		:param DataSet which_parent: 	DataSet to be updated (e.g., self.source_dataset, self.dataset.get_parent(), self.dataset.top_parent())
+		:param bool update_existing: 	False (default) will raise an error if the field_name already exists
+										True will allow updating existing data
+		"""
+		if len(new_data) < 1:
+			# no data
+			raise ProcessorException('No data provided')
+
+		if not hasattr(self, "source_dataset") and which_parent is not None:
+			# no source to update
+			raise ProcessorException('No source dataset to update')
+
+		# Get the source file data path
+		parent_path = which_parent.get_results_path()
+
+		if len(new_data) != which_parent.num_rows:
+			raise ProcessorException('Must have new data point for each record')
+
+		self.dataset.update_status("Adding new field %s to the source file" % field_name)
+
+		# Get a temporary path where we can store the data
+		tmp_path = self.dataset.get_staging_area()
+		tmp_file_path = tmp_path.joinpath(parent_path.name)
+
+		# go through items one by one, optionally mapping them
+		if parent_path.suffix.lower() == ".csv":
+			# Get field names
+			fieldnames = self.get_item_keys(parent_path)
+			if not update_existing and field_name in fieldnames:
+				raise ProcessorException('field_name %s already exists!' % field_name)
+			fieldnames.append(field_name)
+
+			# Iterate through the original dataset and add values to a new column
+			self.dataset.update_status("Writing new source file with %s." % field_name)
+			with tmp_file_path.open("w", encoding="utf-8", newline="") as output:
+				writer = csv.DictWriter(output, fieldnames=fieldnames)
+				writer.writeheader()
+
+				for count, post in enumerate(self.iterate_items(parent_path, bypass_map_item=True)):
+					# stop processing if worker has been asked to stop
+					if self.interrupted:
+						raise ProcessorInterruptedException("Interrupted while writing CSV file")
+
+					post[field_name] = new_data[count]
+					writer.writerow(post)
+
+		elif parent_path.suffix.lower() == ".ndjson":
+			# JSON cannot encode sets
+			if type(new_data[0]) is set:
+				# could check each if type(datapoint) is set, but that could be extensive...
+				new_data = [list(datapoint) for datapoint in new_data]
+
+			with tmp_file_path.open("w", encoding="utf-8", newline="") as output:
+				for count, post in enumerate(self.iterate_items(parent_path, bypass_map_item=True)):
+					# stop processing if worker has been asked to stop
+					if self.interrupted:
+						raise ProcessorInterruptedException("Interrupted while writing NDJSON file")
+
+					if not update_existing and field_name in post.keys():
+						raise ProcessorException('field_name %s already exists!' % field_name)
+
+					# Update data
+					post[field_name] = new_data[count]
+
+					output.write(json.dumps(post) + "\n")
+		else:
+			raise NotImplementedError("Cannot iterate through %s file" % parent_path.suffix)
+
+		# Replace the source file path with the new file
+		shutil.copy(str(tmp_file_path), str(parent_path))
+
+		# delete temporary files and folder
+		shutil.rmtree(tmp_path)
+
+		self.dataset.update_status("Parent dataset updated.")
 
 	def get_item_keys(self, path=None):
 		"""
@@ -696,7 +781,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		"""
 
 		if self.extension and not self.is_filter():
-			return self.extension 
+			return self.extension
 		return None
 
 	@classmethod

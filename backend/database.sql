@@ -49,7 +49,7 @@ CREATE TABLE IF NOT EXISTS datasets (
 CREATE TABLE IF NOT EXISTS annotations (
   key               text UNIQUE PRIMARY KEY,
   annotations       text DEFAULT ''
-)
+);
 
 
 -- users

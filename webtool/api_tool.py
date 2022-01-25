@@ -443,6 +443,50 @@ def edit_dataset_label(key):
 	})
 
 
+@app.route("/api/convert-dataset/<string:key>/", methods=["POST"])
+@api_ratelimit
+@login_required
+@openapi.endpoint("tool")
+def convert_dataset(key):
+	"""
+	Change the type of custom datasets.
+
+	Only allowed for admin!
+
+	:request-param str key: ID of the dataset for which to change the label
+	:return: Dataset info, containing the dataset `key`, the dataset `url`,
+	         and the new `datasource`.
+
+	:return-schema: {
+		type=object,
+		properties={
+			key={type=string},
+			url={type=string},
+			datasource={type=string}
+		}
+	}
+
+	:return-error 404:  If the dataset does not exist.
+	:return-error 403:  If the user is not an admin
+	"""
+	dataset_key = request.form.get("key", "") if not key else key
+	datasource = request.form.get("to_datasource", "")
+
+	try:
+		dataset = DataSet(key=dataset_key, db=db)
+	except TypeError:
+		return error(404, error="Dataset does not exist.")
+
+	if not current_user.is_admin():
+		return error(403, message="Not allowed")
+
+	dataset.change_datasource(datasource)
+	return jsonify({
+		"key": dataset.key,
+		"url": url_for("show_result", key=dataset.key),
+		"label": dataset.get_label()
+	})
+
 @app.route("/api/nuke-query/", methods=["DELETE"])
 @api_ratelimit
 @login_required
@@ -506,7 +550,9 @@ def nuke_dataset(key=None, reason=None):
 	# wait for the dataset to actually be cancelled
 	time.sleep(2)
 
-	dataset.get_results_path().unlink(missing_ok=True)
+	if dataset.get_results_path().exists():
+		dataset.get_results_path().unlink()
+
 	dataset.update_status("Dataset cancelled by instance administrator. Reason: %s" % reason)
 	dataset.finish(0)
 
@@ -676,11 +722,14 @@ def queue_processor(key=None, processor=None):
 	try:
 		dataset = DataSet(key=key, db=db)
 	except TypeError:
+		print("KEY", key)
 		return error(404, error="Not a valid dataset key.")
 
 	# check if processor is available for this dataset
 	available_processors = dataset.get_available_processors()
 	if processor not in available_processors:
+		print(processor)
+		print(available_processors)
 		return error(404, error="This processor is not available for this dataset or has already been run.")
 
 	# create a dataset now

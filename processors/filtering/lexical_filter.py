@@ -50,6 +50,17 @@ class LexicalFilter(BasicProcessor):
 			"default": False,
 			"help": "Interpret custom lexicon as regular expression",
 			"tooltip": "Regular expressions are parsed with Python's dialect"
+		},
+		"exclude": {
+			"type": UserInput.OPTION_TOGGLE,
+			"default": False,
+			"help": "Should not include the above word(s)",
+			"tooltip": "Only posts that do not match the above lexicon are retained"
+		},
+		"case-sensitive": {
+			"type": UserInput.OPTION_TOGGLE,
+			"default": False,
+			"help": "Case sensitive"
 		}
 	}
 
@@ -58,6 +69,9 @@ class LexicalFilter(BasicProcessor):
 		Reads a CSV file, counts occurrences of chosen values over all posts,
 		and aggregates the results per chosen time frame
 		"""
+
+		exclude = self.parameters.get("exclude", False)
+		case_sensitive = self.parameters.get("case-sensitive", False)
 
 		# load lexicons from word lists
 		lexicons = {}
@@ -93,9 +107,13 @@ class LexicalFilter(BasicProcessor):
 				phrases = [term for term in lexicons[lexicon_id] if term]
 
 			try:
-				lexicon_regexes[lexicon_id] = re.compile(
+				if not case_sensitive:
+					lexicon_regexes[lexicon_id] = re.compile(
 					r"\b(" + "|".join(phrases) + r")\b",
 					flags=re.IGNORECASE)
+				else:
+					lexicon_regexes[lexicon_id] = re.compile(
+					r"\b(" + "|".join(phrases) + r")\b")
 			except re.error:
 				self.dataset.update_status("Invalid regular expression, cannot use as filter", is_final=True)
 				self.dataset.finish(0)
@@ -108,7 +126,7 @@ class LexicalFilter(BasicProcessor):
 		processed = 0
 		matching_items = 0
 
-		with self.dataset.get_results_path().open("w", encoding="utf-8") as output:
+		with self.dataset.get_results_path().open("w", encoding="utf-8", newline="") as output:
 			# get header row, we need to copy it for the output
 			fieldnames = self.get_item_keys(self.source_file)
 
@@ -136,7 +154,9 @@ class LexicalFilter(BasicProcessor):
 					lexicon_regex = lexicon_regexes[lexicon_id]
 
 					# check if we match
-					if not lexicon_regex.findall(post["body"]):
+					if not lexicon_regex.findall(post["body"]) and not exclude:
+						continue
+					elif lexicon_regex.findall(post["body"]) and exclude:
 						continue
 
 					matching_lexicons.add(lexicon_id)

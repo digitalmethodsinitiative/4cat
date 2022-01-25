@@ -101,6 +101,7 @@ class ImageDownloader(BasicProcessor):
 
 		# prepare
 		results_path = self.dataset.get_staging_area()
+		self.dataset.log('Staging directory location: %s' % results_path)
 		urls = {}
 		url_file_map = {}
 		file_url_map = {}
@@ -142,11 +143,16 @@ class ImageDownloader(BasicProcessor):
 				if not value:
 					continue
 
-				value = str(value)
-				if re.match(r"https?://[^\s]+", value):
+				# remove all whitespace from beginning and end (needed for single URL check)
+				value = ' '.join(str(value).split())
+				if re.match(r"https?://(\S+)$", value):
 					# single URL
 					item_urls.add(value)
 				else:
+					# # Debug
+					# if re.match(r"https?://[^\s]+", value):
+					# 	self.dataset.log("Debug: OLD single detect url %s" % value)
+
 					# search for image URLs in string
 					item_urls |= set(img_link_regex.findall(value))
 					item_urls |= set(img_domain_regex.findall(value))
@@ -191,7 +197,8 @@ class ImageDownloader(BasicProcessor):
 				raise ProcessorInterruptedException("Interrupted while downloading images.")
 
 			processed_urls += 1
-			self.dataset.update_status("Downloading image %i/%i" % (processed_urls, len(urls)))
+			self.dataset.update_status("Downloaded %i images; checking url for next %i/%i: %s" %
+									   (downloaded_images, processed_urls, len(urls), url))
 
 			try:
 				# acquire image
@@ -212,9 +219,11 @@ class ImageDownloader(BasicProcessor):
 			# save the image...? avoid overwriting images by appending
 			# -[number] to filenames if they already exist
 			index = 0
-			image_filename = Path(image_filename).name  # no folder shenanigans
+			if not image_filename:
+				image_filename = 'image'
+			image_filename = Path(image_filename).name[:100]  # no folder shenanigans
 			image_stem = Path(image_filename).stem
-			image_suffix = Path(image_filename).suffix
+			image_suffix = Path(image_filename).suffix.lower()
 			if not image_suffix or image_suffix not in (".png", ".gif", ".jpeg", ".jpg"):
 				# default to PNG
 				image_suffix = ".png"
@@ -227,12 +236,14 @@ class ImageDownloader(BasicProcessor):
 			url_file_map[url] = save_location.name
 			file_url_map[save_location.name] = url
 			try:
-				picture.save(save_location)
+				picture.save(str(save_location))
 				# Counting is important
 				downloaded_images += 1
-			except OSError:
-				# some images may need to be converted
-				picture.convert('RGB').save(save_location)
+			except OSError as e:
+				# some images may need to be converted to RGB to be saved
+				self.dataset.log('Debug: OSError when saving image %s: %s' % (save_location, e))
+				picture = picture.convert('RGB')
+				picture.save(str(results_path.joinpath(image_stem + '.png')))
 			except ValueError as e:
 				self.dataset.log(f"Error '{e}' saving image for {url}, skipping")
 				failures.append(url)
@@ -319,6 +330,17 @@ class ImageDownloader(BasicProcessor):
 					# Noted that image not found pages (no status code of course) will not have this property
 					self.dataset.log("Error: IndexError may be 404 for image %s, skipping" % image_url)
 					raise FileNotFoundError()
+				except UnicodeDecodeError:
+					try:
+						self.dataset.log("Debug: UnicodeDecodeError detected for image %s" % image_url)
+						# Use requests chardet to detect encoding
+						page.encoding = page.apparent_encoding
+						image_url = \
+							page.text.split('<meta property="og:image"')[1].split('content="')[1].split('?fb">')[0]
+					except IndexError:
+						# Noted that image not found pages (no status code of course) will not have this property
+						self.dataset.log("Error: IndexError may be 404 for image %s, skipping" % image_url)
+						raise FileNotFoundError()
 
 		elif domain.endswith("gfycat.com") and url_ext not in ("png", "jpg", "jpeg", "gif", "gifv"):
 			# For gfycat.com links, just add .gif and download
@@ -374,7 +396,11 @@ class ImageDownloader(BasicProcessor):
 		# get link to image file from HTML returned
 		parser = etree.HTMLParser()
 		tree = etree.parse(StringIO(page.content.decode("utf-8")), parser)
-		image_url = css("a.thread_image_link")(tree)[0].get("href")
+		try:
+			image_url = css("a.thread_image_link")(tree)[0].get("href")
+		except IndexError as e:
+			self.dataset.log("Error: IndexError while trying to download 4chan image %s: %s" % (url, e))
+			raise FileNotFoundError()
 
 		# download image itself
 		image = self.request_get_w_error_handling(image_url, stream=True)
@@ -419,63 +445,16 @@ class ImageDownloader(BasicProcessor):
 		except requests.exceptions.SSLError as e:
 			self.dataset.log("Error: SSLError while trying to download image %s: %s" % (url, e))
 			raise FileNotFoundError()
+		except requests.exceptions.TooManyRedirects as e:
+			self.dataset.log("Error: TooManyRedirects while trying to download image %s: %s" % (url, e))
+			raise FileNotFoundError()
 		except requests.exceptions.ConnectionError as e:
 			if retries < 3:
-				self.request_get_w_error_handling(url, retries + 1, **kwargs)
+				response = self.request_get_w_error_handling(url, retries + 1, **kwargs)
 			else:
 				self.dataset.log("Error: ConnectionError while trying to download image %s: %s" % (url, e))
 				raise FileNotFoundError()
 		return response
-
-
-	def update_parent(self, success):
-		"""
-		Update the original dataset with a nouns column
-
-		"""
-
-		self.dataset.update_status("Adding image urls to the source file")
-
-		# Get the source file data path
-		parent_path = self.source_dataset.get_results_path()
-
-		# Get a temporary path where we can store the data
-		tmp_path = self.dataset.get_staging_area()
-		tmp_file_path = tmp_path.joinpath(parent_path.name)
-
-		count = 0
-
-		# Get field names
-		fieldnames = self.get_item_keys(parent_path)
-		for fieldname in ["download_status", "img_name"]:
-			if fieldname not in fieldnames:
-				fieldnames += [fieldname]
-
-		# Iterate through the original dataset and add values to a new img_link column
-		self.dataset.update_status("Writing download status to Top images csv.")
-		with tmp_file_path.open("w", encoding="utf-8", newline="") as output:
-
-			writer = csv.DictWriter(output, fieldnames=fieldnames)
-			writer.writeheader()
-
-			for post in self.iterate_items(parent_path):
-
-				if count < len(success):
-					post["download_status"] = success[count]["download_status"]
-					post["img_name"] = success[count]["img_name"]
-
-				writer.writerow(post)
-				count += 1
-
-		# Replace the source file path with the new file
-		shutil.copy(str(tmp_file_path), str(parent_path))
-
-		# delete temporary files and folder
-		shutil.rmtree(tmp_path)
-
-		self.dataset.update_status("Parent dataset updated.")
-
-
 
 	@classmethod
 	def get_options(cls, parent_dataset=None, user=None):

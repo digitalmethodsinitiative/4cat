@@ -1,0 +1,74 @@
+/* 
+
+See https://github.com/digitalmethodsinitiative/4cat/wiki/Exploring-and-annotating-datasets for information on how to add custom CSS.
+ 
+ */
+
+body {
+	background-color: #001935;
+}
+
+#metadata, footer {
+	color: white;
+}
+
+.content {
+	font-family: "Favorit", "Helvetica Neue", "HelveticaNeue", Helvetica, Arial, sans-serif;
+}
+
+.posts li.post {
+	background-color: white;
+	color: black;
+	font-size: 14px;
+	left: 0;
+	border-radius: 3px;
+	max-width: 540px;
+	padding: 0;
+}
+
+.posts li.post header {
+	display: inline-block;
+	text-decoration: none;
+	font-weight: bold;
+	border: none;
+	padding: 0px;
+	line-height: 1.7em;
+	margin: 25px;
+	margin-bottom: 10px;
+}
+
+.posts li.post article {
+	padding: 0;
+	margin: 0;
+}
+
+.posts li.post .post-content {
+	display: block;
+	margin: 25px;
+	margin-top: 0px;
+}
+
+.posts li.post .post-tags {
+	color: #5e5e5e;
+	margin-top: 20px;
+	word-break: break-all;
+}
+
+.posts li.post .author {
+	font-weight: bold;
+}
+
+.posts li.post .post-image {
+	width: 100%;
+	margin-bottom: 15px;
+}
+
+.posts li.post .external-url {
+	
+}
+
+.posts li.post .post-annotations {
+	background-color: white;
+	border-top: 1px solid #5e5e5e;
+	margin-right: 0;
+}

@@ -46,10 +46,10 @@ class SearchReddit(SearchWithScope):
 			"help": "API version",
 			"options": {
 				"regular": "Regular",
-				"beta": "Beta"
+				"beta": "Beta (experimental)"
 			},
 			"default": "regular",
-			"tooltip": "The beta version retrieves more comments per request but may be more experimental."
+			"tooltip": "The beta version retrieves more comments per request but may be incomplete."
 		},
 		"board": {
 			"type": UserInput.OPTION_TEXT,
@@ -66,8 +66,9 @@ class SearchReddit(SearchWithScope):
 					"*may not be complete* depending on the parameters used,"
 					" data from the last few days might not be there yet,"
 					" and post scores can be out of date. "
+					"See [this paper](https://arxiv.org/pdf/1803.05046.pdf) for an overview of the gaps in data. "
 					"Double-check manually or via the official Reddit API if completeness is a concern. Check the "
-					"[Pushshift API](https://github.com/pushshift/api) reference [beta](https://beta.pushshift.io/redoc) for"
+					"[Pushshift API](https://github.com/pushshift/api) reference [beta](https://beta.pushshift.io/redoc) for "
 					"documentation on query syntax, "
 					"e.g. on how to format keyword queries."
 		},
@@ -98,8 +99,8 @@ class SearchReddit(SearchWithScope):
 			"options": {
 				"op-only": "Opening posts only (no replies/comments)",
 				"posts-only": "All matching posts",
-				"full-threads": "All posts in threads with matching posts (full threads)",
-				"dense-threads": "All posts in threads in which at least x% of posts match (dense threads)"
+#				"full-threads": "All posts in threads with matching posts (full threads)",
+#				"dense-threads": "All posts in threads in which at least x% of posts match (dense threads)"
 			},
 			"default": "posts-only"
 		},
@@ -125,6 +126,8 @@ class SearchReddit(SearchWithScope):
 	submission_endpoint = None
 	comment_endpoint = None
 	api_type = None
+	since = "since"
+	after = "after"
 
 	def get_items_simple(self, query):
 		"""
@@ -340,7 +343,7 @@ class SearchReddit(SearchWithScope):
 					# For the regular API, increase the time.
 					# this is the only way to go to the next page right now...
 					if self.api_type == "regular":
-						post_parameters[since] = post["created_utc"]
+						post_parameters[self.since] = post["created_utc"]
 					# For the beta API, we can sort by IDs and only get those higher than the last encountered.
 					elif self.api_type == "beta":
 						post_parameters["min_id"] = post["id"] + 1
@@ -367,6 +370,9 @@ class SearchReddit(SearchWithScope):
 		# search threads in chunks
 		offset = 0
 		while True:
+			if self.interrupted:
+				raise ProcessorInterruptedException("Interrupted while fetching posts from the Pushshift API")
+
 			chunk = post_ids[offset:offset + chunk_size]
 			if not chunk:
 				break
@@ -403,6 +409,9 @@ class SearchReddit(SearchWithScope):
 		for thread_id in thread_ids:
 			offset += 1
 			self.dataset.update_status("Retrieving posts for thread %i of %i" % (offset, len(thread_ids)))
+
+			if self.interrupted:
+				raise ProcessorInterruptedException("Interrupted while fetching threads from the Pushshift API")
 
 			thread_params = {"link_id": thread_id, "size": expected_results_per_page, "sort": "asc", "sort_type": "created_utc"}
 			while True:
@@ -443,7 +452,7 @@ class SearchReddit(SearchWithScope):
 				if latest_timestamp == first_timestamp:
 					latest_timestamp += 1
 
-				thread_params[since] = latest_timestamp
+				thread_params[self.since] = latest_timestamp
 
 		return posts
 
@@ -561,7 +570,7 @@ class SearchReddit(SearchWithScope):
 
 		if retries >= self.max_retries:
 			self.log.error("Error during Pushshift fetch of query %s" % self.dataset.key)
-			self.dataset.update_status("Error while searching for posts on Pushshift - API did not respond as expected", is_final=True)
+			self.dataset.update_status("Error while searching for posts on Pushshift - API did not respond as expected")
 			return None
 
 		return response

@@ -144,7 +144,7 @@ class Tokenise(BasicProcessor):
 		self.dataset.update_status("Building filtering automaton")
 
 		link_regex = re.compile(r"https?://[^\s]+")
-		symbol = re.compile(r"[" + re.escape(string.punctuation) + "]")
+		symbol = re.compile(r"[" + re.escape(string.punctuation) + "’‘“”" + "]")
 		numbers = re.compile(r"\b[0-9]+\b")
 
 		# Twitter tokenizer if indicated

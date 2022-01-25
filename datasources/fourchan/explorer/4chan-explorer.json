@@ -1,10 +1,32 @@
 {
-	"subject": "subject",
-	"board": "board",
-	"images": {
-		"field": "image_4chan",
-		"url_root": "https://i.4pcdn.org/{{board}}/"
-	},
-	"country_code": "{{flag}}",
-	"external_url": "https://archive.4plebs.org/{{board}}/thread/{{thread_id}}#{{id}}"
+	"subject": "{{ subject }}",
+	"board": "/{{ board }}/",
+	"image": "http://i.4pcdn.org/{{ board }}/{{ image_file }}",
+	"country": "<span class='flag flag-{{country_code}}' title='{{country_code}}'></span>",
+	"external_url": "https://archive.4plebs.org/{{board}}/thread/{{thread_id}}#{{id}}",
+	"sort_options": [
+		{
+			"key": "timestamp",
+			"label": "Old to new"
+		},
+		{
+			"key": "timestamp",
+			"label": "New to old",
+			"descending": true
+		},
+		{
+			"key": "id",
+			"label": "Post id",
+			"force_int": true
+		},
+		{
+			"key": "thread_id",
+			"label": "Thread id",
+			"force_int": true
+		},
+		{
+			"key": "country_code",
+			"label": "Country"
+		}
+	]
 }

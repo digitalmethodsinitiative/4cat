@@ -25,7 +25,7 @@ class Search4Chan(SearchWithScope):
 	prefix = "4chan"  # table identifier for this datasource; see below for usage
 
 	# Columns to return in csv
-	return_cols = ['thread_id', 'id', 'timestamp', 'body', 'subject', 'author', 'image_file', 'image_md5',
+	return_cols = ['thread_id', 'id', 'timestamp', 'board', 'body', 'subject', 'author', 'image_file', 'image_md5',
 				   'country_name', 'country_code']
 
 	# before running a sphinx query, store it here so it can be cancelled via

@@ -7,6 +7,7 @@ import re
 import io
 
 from dateutil.parser import parse as parse_datetime
+from datetime import datetime
 
 from backend.abstract.processor import BasicProcessor
 from common.lib.exceptions import QueryParametersException
@@ -27,17 +28,22 @@ class SearchCustom(BasicProcessor):
 			"help": "You can upload a CSV or TAB file here that, after upload, will be available for further analysis "
 					"and processing. Files need to be utf-8 encoded and must contain a header row with at least the "
 					"following columns: `id`, `thread_id`, `author`, `body`, `subject`, `timestamp`.\n\nThe "
-					"`timestamp` column should be formatted `YYYY-mm-dd HH:MM:SS`. "
+					"`timestamp` column should be formatted in a common format (e.g. unix timestamps or `YYYY-mm-dd HH:MM:SS`). "
 					"If your file contains hashtags, name the column `tags` or `hashtags` and make sure they are comma-separated."
 		},
 		"data_upload": {
 			"type": UserInput.OPTION_FILE,
 			"help": "File"
 		},
+		"time_col": {
+			"type": UserInput.OPTION_TEXT,
+			"help": "Name of date column",
+			"default": "timestamp"
+		},
 		"strip_html": {
 			"type": UserInput.OPTION_TOGGLE,
 			"help": "Strip HTML tags from item text?",
-			"ddefault": False
+			"default": False
 		}
 	}
 
@@ -79,7 +85,6 @@ class SearchCustom(BasicProcessor):
 		wrapped_file.seek(0)
 		dialect = csv.Sniffer().sniff(sample, delimiters=(",", ";", "\t"))
 
-
 		# With validated csvs, save as is but make sure the raw file is sorted
 		reader = csv.DictReader(wrapped_file, dialect=dialect)
 
@@ -102,7 +107,11 @@ class SearchCustom(BasicProcessor):
 		try:
 			row = reader.__next__()
 			try:
-				parse_datetime(row["timestamp"])
+
+				if row["timestamp"].isdecimal():
+					datetime.fromtimestamp(float(row["timestamp"]))
+				else:
+					parse_datetime(row["timestamp"])
 			except ValueError:
 				raise QueryParametersException("Your 'timestamp' column does not use a recognisable format (yyyy-mm-dd hh:mm:ss is recommended)")
 		except StopIteration:
@@ -165,7 +174,10 @@ class SearchCustom(BasicProcessor):
 			writer.writeheader()
 			for row in sorted_reader:
 				try:
-					sanitised_time = parse_datetime(row["timestamp"])
+					if row["timestamp"].isdecimal():
+						sanitised_time = datetime.fromtimestamp(float(row["timestamp"]))
+					else:
+						sanitised_time = parse_datetime(row["timestamp"])
 					row["timestamp"] = sanitised_time.strftime("%Y-%m-%d %H:%I:%S")
 					row["unix_timestamp"] = sanitised_time.timestamp()
 				except (TypeError, ValueError, OverflowError):

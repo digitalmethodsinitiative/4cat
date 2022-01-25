@@ -1,0 +1,39 @@
+{
+	"subreddit": "<a href='https://reddit.com/r/{{subreddit}}' target='__blank'>r/{{subreddit}}</a>",
+	"score": "<i class='fas fa-arrow-up'></i> {{score}} <i class='fas fa-arrow-down'></i>",
+	"external_url": "https://reddit.com/r/{{subreddit}}/comments/{{thread_id}}/comment/{{id}}",
+	"image": "{{ image_file }}",
+	"subject": "{{ subject }}",
+	"subject_url": "<a href='{{ url }}'>{{ domain }}</a>",
+	"sort_options": [
+		{
+			"key": "timestamp",
+			"label": "Old to new"
+		},
+		{
+			"key": "timestamp",
+			"label": "New to old",
+			"descending": true
+		},
+		{
+			"key": "id",
+			"label": "Post id"
+		},
+		{
+			"key": "thread_id",
+			"label": "Thread id"
+		},
+		{
+			"key": "score",
+			"label": "Score (highest to lowest)",
+			"descending": true,
+			"force_int": true
+		},
+		{
+			"key": "score",
+			"label": "Score (lowest to highest)",
+			"force_int": true
+		}
+	],
+	"markdown": true
+}

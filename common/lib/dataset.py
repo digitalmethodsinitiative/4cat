@@ -44,7 +44,7 @@ class DataSet(FourcatModule):
 	folder = None
 	is_new = True
 	no_status_updates = False
-	staging_area = []
+	staging_area = None
 
 	def __init__(self, parameters={}, key=None, job=None, data=None, db=None, parent=None, extension="csv",
 				 type=None):
@@ -58,6 +58,7 @@ class DataSet(FourcatModule):
 		"""
 		self.db = db
 		self.folder = Path(config.PATH_ROOT, config.PATH_DATA)
+		self.staging_area = []
 
 		if key is not None:
 			self.key = key
@@ -446,6 +447,32 @@ class DataSet(FourcatModule):
 			# not a CSV or NDJSON file, or no map_item function available
 			return []
 
+	def get_annotation_fields(self):
+		"""
+		Retrieves the saved annotation fields for this dataset.
+		:return dict: The saved annotation fields.
+		"""
+
+		annotation_fields = self.db.fetchone("SELECT annotation_fields FROM datasets WHERE key = %s;", (self.top_parent().key,))
+		
+		if annotation_fields and annotation_fields.get("annotation_fields"):
+			annotation_fields = json.loads(annotation_fields["annotation_fields"])
+		
+		return annotation_fields
+
+	def get_annotations(self):
+		"""
+		Retrieves the annotations for this dataset.
+		return dict: The annotations
+		"""
+
+		annotations = self.db.fetchone("SELECT annotations FROM annotations WHERE key = %s;", (self.top_parent().key,))
+		
+		if annotations:
+			return json.loads(annotations["annotations"])
+		else:
+			return None
+
 	def update_label(self, label):
 		"""
 		Update label for this dataset
@@ -498,6 +525,19 @@ class DataSet(FourcatModule):
 			return parameters["datasource"] + "/" + parameters["board"]
 		else:
 			return default
+
+	def change_datasource(self, datasource):
+		"""
+		Change the datasource type for this dataset
+
+		:param str label:  New datasource type
+		:return str:  The new datasource type
+		"""
+
+		self.parameters["datasource"] = datasource
+
+		self.db.update("datasets", data={"parameters": json.dumps(self.parameters)}, where={"key": self.key})
+		return datasource
 
 	def reserve_result_file(self, parameters=None, extension="csv"):
 		"""
@@ -620,6 +660,21 @@ class DataSet(FourcatModule):
 
 		return updated > 0
 
+	def finish_with_error(self, error):
+		"""
+		Set error as final status, and finish with 0 results
+
+		This is a convenience function to avoid having to repeat
+		"update_status" and "finish" a lot.
+
+		:param str error:  Error message for final dataset status.
+		:return:
+		"""
+		self.update_status(error, is_final=True)
+		self.finish(0)
+
+		return None
+
 	def update_version(self, version):
 		"""
 		Update software version used for this dataset
@@ -629,10 +684,16 @@ class DataSet(FourcatModule):
 		:param string version:  Version identifier
 		:return bool:  Update successul?
 		"""
-		self.data["software_version"] = version
+		try:
+			# this fails if the processor type is unknown
+			# edge case, but let's not crash...
+			processor_path = backend.all_modules.processors.get(self.data["type"]).filepath
+		except AttributeError:
+			processor_path = ""
+
 		updated = self.db.update("datasets", where={"key": self.data["key"]}, data={
 			"software_version": version,
-			"software_file": backend.all_modules.processors.get(self.data["type"]).filepath
+			"software_file": processor_path
 		})
 
 		return updated > 0
@@ -884,6 +945,20 @@ class DataSet(FourcatModule):
 		if self.get_results_path().exists():
 			return self.get_results_path().suffix[1:]
 		return False
+
+	def get_result_url(self):
+		"""
+		Gets the 4CAT frontend URL of a dataset file.
+
+		Uses the config.py FlaskConfig attributes (i.e., SERVER_NAME and
+		SERVER_HTTPS) plus hardcoded '/result/'.
+		TODO: create more dynamic method of obtaining url.
+		"""
+		filename = self.get_results_path().name
+		url_to_file = ('https://' if config.FlaskConfig.SERVER_HTTPS else 'http://') + \
+						config.FlaskConfig.SERVER_NAME + '/result/' + filename
+		return url_to_file
+
 
 	def __getattr__(self, attr):
 		"""

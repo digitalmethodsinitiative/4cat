@@ -1,0 +1,82 @@
+/* 
+
+See https://github.com/digitalmethodsinitiative/4cat/wiki/Exploring-and-annotating-datasets for information on how to add custom CSS.
+ 
+ */
+
+
+*, body, code, select, input, textarea {
+	font-family: normal x-small verdana, arial, helvetica, sans-serif;
+}
+
+body {
+	background-color: #ebf9ff;
+}
+
+#metadata {
+	color: black;
+}
+
+.content article {
+	font-size: 13px;
+    font-weight: 400;
+    line-height: 21px;
+    word-break: break-word;
+}
+
+.content .posts .post header {
+	text-decoration: none;
+	border: none;
+	color: #858585;
+	font-size: 14px;
+}
+
+.content .posts .post {
+	display: table;
+	min-height: auto;
+	min-width: auto;
+	margin-left: 10px;
+	border-radius: 5px;
+	background-color: white;
+}
+
+.content .posts .post.op {
+	color: black;
+	background-color: white;
+}
+
+.content .posts .post.op .subject {
+	display: block;
+	font-size: 16px;
+	color: black;
+	font-weight: bold;
+	margin-top: 10px;
+}
+
+.content .posts .post.op .subject:after {
+	display: none;
+}
+
+.content .posts .post.op .subject_url {
+	
+}
+
+.content .posts .post .post-image {
+	
+}
+
+.content .posts .post blockquote {
+	border-left: 2px solid #c5c1ad;
+	margin: 10px;
+	padding-left: 20px;
+}
+
+.posts .post .post-annotations {
+	border-radius: 5px;
+	background-color: #f1f8fd;
+	color: #474747;
+}
+
+footer p {
+
+}
