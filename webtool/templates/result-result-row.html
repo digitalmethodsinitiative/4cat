@@ -1,7 +1,8 @@
 <dt>Result file</dt>
 <dd id="dataset-{{ dataset.key }}-result-count" data-num-results="{{ dataset.num_rows }}">
-
-    {% if dataset.get_extension() == "csv" or dataset.get_own_processor().map_item %}<a data-load-from="{{ url_for('preview_items', key=dataset.key) }}" class="popup-trigger"
+    {% if dataset.get_extension() == "csv" or dataset.get_own_processor().map_item %}
+        <a href="{{ url_for('preview_items', key=dataset.key) }}"
+           data-load-from="{{ url_for('preview_items', key=dataset.key) }}" class="popup-trigger"
            aria-controls="popup-preview-{{ dataset.key }}"><i class="fa fa-search" aria-hidden="true"></i> Preview</a>
         <div role="dialog" id="popup-preview-{{ dataset.key }}"></div>
         &bull;

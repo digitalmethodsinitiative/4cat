@@ -1,10 +1,12 @@
 <!DOCTYPE html>
 <head>
-    <title>Tabulated preview - {{ filename }}</title>
+    <title>Tabulated preview - {{ dataset.get_results_path().name }}</title>
 	<link rel="stylesheet" type="text/css" href="{{url_for('static', filename='css/stylesheet.css')}}">
 </head>
 <body class="csv-preview">
-<p class="warning">Note: only the first {% if num_items %}{{ num_items }}{% else %}100{% endif %} items of a dataset are shown in this preview</p>
+{% if dataset.num_rows > max_items %}
+<p class="warning">Note: only the first {{ "{:,}".format(max_items) }} of {{ "{:,}".format(dataset.num_rows) }} total items of this dataset are shown in this preview (~{{ ((max_items / dataset.num_rows) * 100)|round(0)|int }}%)</p>
+{% endif %}
 <table>
     {% for row in rows %}
         {% set outer_loop = loop %}

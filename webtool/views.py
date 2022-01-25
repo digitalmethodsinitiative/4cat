@@ -434,7 +434,7 @@ def preview_items(key):
 	except TypeError:
 		return error(404, "Dataset not found.")
 
-	preview_size = 1020
+	preview_size = 1000
 
 	processor = dataset.get_own_processor()
 	if not processor:
@@ -454,8 +454,8 @@ def preview_items(key):
 	except NotImplementedError:
 		abort(404)
 
-	return render_template("result-csv-preview.html", rows=rows, num_items=preview_size,
-						   filename=dataset.get_results_path().name)
+	return render_template("result-csv-preview.html", rows=rows, max_items=preview_size,
+						   dataset=dataset)
 
 
 @app.route("/result/<string:key>/toggle-favourite/")
