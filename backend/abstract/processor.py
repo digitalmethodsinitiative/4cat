@@ -447,7 +447,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
 					output.write(json.dumps(post) + "\n")
 		else:
-			raise NotImplementedError("Cannot iterate through %s file" % path.suffix)
+			raise NotImplementedError("Cannot iterate through %s file" % parent_path.suffix)
 
 		# Replace the source file path with the new file
 		shutil.copy(str(tmp_file_path), str(parent_path))
