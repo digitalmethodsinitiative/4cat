@@ -943,7 +943,8 @@ class DataSet(FourcatModule):
 
 		:return:  Processor class, or `None` if not available.
 		"""
-		return backend.all_modules.processors.get(self.data.get("type"))
+		processor_type = self.parameters.get("type", self.data.get("type"))
+		return backend.all_modules.processors.get(processor_type)
 
 
 	def get_available_processors(self):
