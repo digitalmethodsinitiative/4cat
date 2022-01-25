@@ -26,20 +26,12 @@ class UrlUnshortener(BasicProcessor):
     type = "expand-url-shorteners"  # job type ID
     category = "Filtering"  # category
     title = "Expand shortened URLs"  # title displayed in UI
-    description = "Expand shortened URLs. Replaces any URL in the dataset that is recognised as a shortened URL with " \
-                  "the URL it redirects to. URLs are resolved recursively up to a depth of 5 links. This can take a " \
-                  "long time for large datasets, and it is not recommended to run this processor on datasets larger " \
-                  "than 10,000."
+    description = "Expand shortened URLs. Replaces any URL in the dataset's 'body' field that is recognised as a " \
+                  "shortened URL with the URL it redirects to. URLs are resolved recursively up to a depth of 5 " \
+                  "links. This can take a long time for large datasets, and it is not recommended to run this " \
+                  "processor on datasets larger than 10,000 items. Creates a new dataset with expanded URLs in place " \
+                  "of redirects."
     extension = "csv"  # extension of result file, used internally and in UI
-
-    options = {
-        "overwrite": {
-            "type": UserInput.OPTION_TOGGLE,
-            "help": "Overwrite URLs in original dataset",
-            "default": True,
-            "tooltip": "If unchecked, this creates a *new* dataset with any URLs replaced with the URL they redirect to."
-        }
-    }
 
     # taken from https://github.com/timleland/url-shorteners
     # current as of 9 April 2021
@@ -246,24 +238,14 @@ class UrlUnshortener(BasicProcessor):
                 if processed % 25 == 0:
                     self.dataset.update_status("Processed %i items" % processed)
 
-        # now comes the big trick - replace original dataset with updated one
-        if not self.parameters.get("overwrite", False):
-            shutil.move(self.dataset.get_results_path(), self.source_dataset.get_results_path())
-            self.dataset.update_status("Parent dataset updated.")
-
         self.dataset.finish(processed)
 
     def after_process(self):
         super().after_process()
 
-        if not self.parameters.get("overwrite", False):
-            return
-
         # copy this dataset - the filtered version - and make that copy standalone
         # this has the benefit of allowing for all analyses that can be run on
         # full datasets on the new, filtered copy as well
-        top_parent = self.source_dataset
-
         standalone = self.dataset.copy(shallow=False)
         standalone.body_match = "(Filtered) " + self.source_dataset.query
         standalone.datasource = self.source_dataset.parameters.get("datasource", "custom")
