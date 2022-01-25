@@ -1,0 +1,5 @@
+
+    <section>
+        <h2><span>{% if title %}{{ title }}{% else %}Notice{% endif %}</span></h2>
+        <p>{{ message|markdown|safe }}</p>
+    </section>

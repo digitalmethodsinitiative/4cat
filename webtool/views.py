@@ -417,9 +417,9 @@ def show_result(key):
 						   is_favourite=is_favourite, timestamp_expires=timestamp_expires, datasources=datasources)
 
 
-@app.route("/preview-csv/<string:key>/")
+@app.route("/preview-as-table/<string:key>/")
 @login_required
-def preview_csv(key):
+def preview_items(key):
 	"""
 	Preview a CSV file
 
@@ -434,20 +434,28 @@ def preview_csv(key):
 	except TypeError:
 		return error(404, "Dataset not found.")
 
+	preview_size = 1020
+
+	processor = dataset.get_own_processor()
+	if not processor:
+		return render_template("components/error_message.html", title="Preview not available", message="No preview is available for this file.")
+
+	rows = []
 	try:
-		with dataset.get_results_path().open(encoding="utf-8") as csvfile:
-			rows = []
-			reader = csv.reader(csvfile)
-			while len(rows) < 25:
-				try:
-					row = next(reader)
-					rows.append(row)
-				except StopIteration:
-					break
-	except FileNotFoundError:
+		for row in dataset.iterate_items():
+			if len(rows) > preview_size:
+				break
+
+			if len(rows) == 0:
+				rows.append(list(row.keys()))
+
+			rows.append(list(row.values()))
+
+	except NotImplementedError:
 		abort(404)
 
-	return render_template("result-csv-preview.html", rows=rows, filename=dataset.get_results_path().name)
+	return render_template("result-csv-preview.html", rows=rows, num_items=preview_size,
+						   filename=dataset.get_results_path().name)
 
 
 @app.route("/result/<string:key>/toggle-favourite/")
