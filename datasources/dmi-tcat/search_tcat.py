@@ -1,5 +1,5 @@
 """
-Twitter keyword search via the Twitter API v2
+Twitter search within a DMI-TCAT bin
 """
 import requests
 import datetime
@@ -9,8 +9,8 @@ import re
 import io
 
 from backend.abstract.search import Search
-from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException
-from common.lib.helpers import sniff_encoding, UserInput
+from common.lib.exceptions import QueryParametersException
+from common.lib.helpers import UserInput
 import config
 
 
@@ -18,8 +18,8 @@ class SearchWithinTCATBins(Search):
     """
     Get Tweets via DMI-TCAT
 
-    This only allows for historical search - use f.ex. TCAT for more advanced
-    queries.
+    This allows subsetting an existing query bin, similar to the 'Data
+    Selection' panel in the DMI-TCAT analysis interface
     """
     type = "dmi-tcat-search"  # job ID
     extension = "csv"
@@ -93,7 +93,7 @@ class SearchWithinTCATBins(Search):
             "default": False,
             "tooltip": "Enabling this will filter all replies from the data"
         },
-        "date-range": {
+        "daterange": {
             "type": UserInput.OPTION_DATERANGE,
             "help": "Date range"
         }
@@ -104,10 +104,8 @@ class SearchWithinTCATBins(Search):
         """
         Get data source options
 
-        This method by default returns the class's "options" attribute, or an
-        empty dictionary. It can be redefined by processors that need more
-        fine-grained options, e.g. in cases where the availability of options
-        is partially determined by the parent dataset's parameters.
+        This method takes the pre-defined options, but fills the 'bins' options
+        with bins currently available from the configured TCAT instances.
 
         :param DataSet parent_dataset:  An object representing the dataset that
         the processor would be run on
@@ -120,9 +118,12 @@ class SearchWithinTCATBins(Search):
         instances = config.DATASOURCES.get("dmi-tcat", {}).get("instances")
         all_bins = {}
         for instance in instances:
+            # query each configured TCAT instance for a list of bins that can
+            # be subsetted
             instance = instance.rstrip("/")
             api_url = instance + "/api/bin-stats.php"
             try:
+                # todo: cache this somehow!
                 api_request = requests.get(api_url, timeout=5)
                 instance_bins = json.loads(api_request.content)
                 all_bins[instance] = {k: instance_bins[k] for k in sorted(instance_bins)}
@@ -133,15 +134,15 @@ class SearchWithinTCATBins(Search):
                 }
                 return options
 
-        options = {**options,
-            "bin": {
-                "type": UserInput.OPTION_CHOICE,
-                "options": {},
-                "help": "Query bin"
-            }
+        options["bin"] = {
+            "type": UserInput.OPTION_CHOICE,
+            "options": {},
+            "help": "Query bin"
         }
 
         for instance, bins in all_bins.items():
+            # make the host somewhat human-readable
+            # also strip out embedded HTTP auths
             host = "@".join(re.sub(r"^https?://", "", instance).split("@")[1:])
             for bin_name in bins:
                 bin_key = "%s@%s" % (bin_name, host)
@@ -163,6 +164,8 @@ class SearchWithinTCATBins(Search):
         # we cannot store the full instance URL as a parameter, because it may
         # contain sensitive information (e.g. HTTP auth) - so we find the full
         # instance URL again here
+        # while the parameter could be marked 'sensitive', the values would
+        # still show up in e.g. the HTML of the 'create dataset' form
         available_instances = config.DATASOURCES.get("dmi-tcat", {}).get("instances", [])
         instance_url = ""
         for available_instance in available_instances:
@@ -187,18 +190,26 @@ class SearchWithinTCATBins(Search):
             "lang": self.parameters.get("tweet-language"),
             "exclude_from_user_name": self.parameters.get("user-exclude"),
             "from_source": self.parameters.get("tweet-client"),
-            "startdate": datetime.datetime.fromtimestamp(self.parameters.get("date-range")[0]).strftime("%Y-%m-%d"),
-            "enddate": datetime.datetime.fromtimestamp(self.parameters.get("date-range")[1]).strftime("%Y-%m-%d"),
+            "startdate": datetime.datetime.fromtimestamp(self.parameters.get("daterange")[0]).strftime("%Y-%m-%d"),
+            "enddate": datetime.datetime.fromtimestamp(self.parameters.get("daterange")[1]).strftime("%Y-%m-%d"),
             "replyto": "yes" if self.parameters.get("exclude-replies") else "no",
             "whattodo": "",
             "graph_resolution": "day",
             "outputformat": "csv"
         }
 
+        # for now we simply request the full CSV export of the bin with the
+        # given parameters. To account for large exports, it would be better
+        # to chunk the download and parse it item by item
+        # todo: chunk the download
         self.dataset.update_status("Searching for tweets on %s" % bin_host)
         response = requests.get(request_url, params=parameters)
         self.log.info("Getting tweets via %s" % response.url)
 
+        # this is terrible and should be done better
+        # the issue is that the downloaded csv file has a BOM which we want to ignore
+        # there has to be a better way than this
+        # todo: do something less dumb here
         wrapped_export = io.TextIOWrapper(io.BytesIO(), encoding="utf-8-sig", line_buffering=True)
         wrapped_export.write(response.text.encode("utf-8").decode("utf-8-sig"))
         wrapped_export.seek(0)
@@ -210,6 +221,10 @@ class SearchWithinTCATBins(Search):
                 self.dataset.update_status("Loaded %i tweets from bin %s@%s" % (items, bin_name, bin_host))
                 items += 1
 
+            # there is more data in the downloaded csv file than this; the
+            # format here is identical to that of the Twitter v2 data source's
+            # `map_item()` output.
+            # todo: do something with the other data
             yield {
                 "id": tweet["id"],
                 "thread_id": tweet["in_reply_to_status_id"] if tweet["in_reply_to_status_id"] else tweet["id"],
@@ -250,6 +265,12 @@ class SearchWithinTCATBins(Search):
         # no query 4 u
         if not query.get("bin", "").strip():
             raise QueryParametersException("You must choose a query bin to get tweets from.")
+
+        # the dates need to make sense as a range to search within
+        # but, on Twitter, you can also specify before *or* after only
+        after, before = query.get("daterange")
+        if before and after and before < after:
+            raise QueryParametersException("Date range must start before it ends")
 
         # simple!
         return query
