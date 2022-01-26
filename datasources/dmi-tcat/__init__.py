@@ -1,5 +1,5 @@
 """
-Initialize Twitter API v2 data source
+Initialize data source that interfaces with DMI-TCAT query bins
 """
 
 # An init_datasource function is expected to be available to initialize this

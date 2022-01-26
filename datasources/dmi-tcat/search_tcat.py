@@ -143,7 +143,7 @@ class SearchWithinTCATBins(Search):
         for instance, bins in all_bins.items():
             # make the host somewhat human-readable
             # also strip out embedded HTTP auths
-            host = "@".join(re.sub(r"^https?://", "", instance).split("@")[1:])
+            host = re.sub(r"^https?://", "", instance).split("@").pop()
             for bin_name in bins:
                 bin_key = "%s@%s" % (bin_name, host)
                 options["bin"]["options"][bin_key] = "%s: %s" % (host, bin_name)
@@ -159,7 +159,7 @@ class SearchWithinTCATBins(Search):
         """
         bin = self.parameters.get("bin")
         bin_name = bin.split("@")[0]
-        bin_host = "@".join(bin.split("@")[1:])
+        bin_host = bin.split("@").pop()
 
         # we cannot store the full instance URL as a parameter, because it may
         # contain sensitive information (e.g. HTTP auth) - so we find the full
@@ -189,9 +189,9 @@ class SearchWithinTCATBins(Search):
             "from_user_lang": self.parameters.get("user-language"),
             "lang": self.parameters.get("tweet-language"),
             "exclude_from_user_name": self.parameters.get("user-exclude"),
-            "from_source": self.parameters.get("tweet-client"),
-            "startdate": datetime.datetime.fromtimestamp(self.parameters.get("daterange")[0]).strftime("%Y-%m-%d"),
-            "enddate": datetime.datetime.fromtimestamp(self.parameters.get("daterange")[1]).strftime("%Y-%m-%d"),
+            "from_source": re.sub(r"<[^>]+>", "", self.parameters.get("tweet-client")),
+            "startdate": datetime.datetime.fromtimestamp(self.parameters.get("min_date")).strftime("%Y-%m-%d"),
+            "enddate": datetime.datetime.fromtimestamp(self.parameters.get("max_date")).strftime("%Y-%m-%d"),
             "replyto": "yes" if self.parameters.get("exclude-replies") else "no",
             "whattodo": "",
             "graph_resolution": "day",
@@ -204,7 +204,6 @@ class SearchWithinTCATBins(Search):
         # todo: chunk the download
         self.dataset.update_status("Searching for tweets on %s" % bin_host)
         response = requests.get(request_url, params=parameters)
-        self.log.info("Getting tweets via %s" % response.url)
 
         # this is terrible and should be done better
         # the issue is that the downloaded csv file has a BOM which we want to ignore
@@ -267,10 +266,13 @@ class SearchWithinTCATBins(Search):
             raise QueryParametersException("You must choose a query bin to get tweets from.")
 
         # the dates need to make sense as a range to search within
-        # but, on Twitter, you can also specify before *or* after only
+        # and a date range is needed, to not make it too easy to just get all tweets
         after, before = query.get("daterange")
-        if before and after and before < after:
-            raise QueryParametersException("Date range must start before it ends")
+        if (not after or not before) or before <= after:
+            raise QueryParametersException("A date range is required and must start before it ends")
+
+        query["min_date"], query["max_date"] = query.get("daterange")
+        del query["daterange"]
 
         # simple!
         return query
