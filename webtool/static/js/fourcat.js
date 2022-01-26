@@ -375,7 +375,7 @@ const query = {
 					clearInterval(query.poll_interval);
 					let keyword = json.label;
 
-					$('#query-results').append('<li><a href="/results/' + json.key + '">' + keyword + ' (' + json.rows + ' items)</a></li>');
+					$('#query-results').append('<li><a href="../results/' + json.key + '">' + keyword + ' (' + json.rows + ' items)</a></li>');
 					query.enable_form();
 					alert('Query for \'' + keyword + '\' complete!');
 				} else {
