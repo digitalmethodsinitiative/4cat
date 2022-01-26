@@ -3,6 +3,7 @@ Twitter keyword search via the Twitter API v2
 """
 from urllib.parse import urlparse
 import datetime
+import random
 
 from backend.abstract.selenium_scraper import SeleniumScraper
 from selenium.common.exceptions import TimeoutException
@@ -62,10 +63,10 @@ class SearchWithSelenium(SeleniumScraper):
             result = self.collect_page_result(url)
 
             # Add additional links to be scraped afterwards
-            if num_of_subpages > 0:
+            if num_of_subpages > 0 and result['error'] is False:
                 host = urlparse(url).netloc
                 links = self.collect_links()
-                additional_urls_groups_to_scrape.append((host, url, links))
+                additional_urls_groups_to_scrape.append((host, (url, result['final_url']), links))
 
             yield result
 
@@ -74,18 +75,21 @@ class SearchWithSelenium(SeleniumScraper):
             for url_group in additional_urls_groups_to_scrape:
                 collected_pages = 0
                 host = url_group[0]
-                original_link = url_group[1]
                 links = url_group[2]
+                # Shuffle the links
+                random.shuffle(links)
+                # Try not to recrawl links; initialize with original link
+                crawled_links = [url_group[1][0], url_group[1][1]]
                 for url in links:
                     # Break if adequate pages collected
                     if collected_pages >= num_of_subpages:
                         break
                     # Check that url is in same host and not the original link
-                    if urlparse(url).netloc == host and url != original_link:
+                    if urlparse(url).netloc == host and url not in crawled_links:
                         # Attempt to scrape url
                         result = self.collect_page_result(url)
                         # Check that results was successfully scraped
-                        if result['error'] is False:
+                        if result['error'] is False and result['final_url'] not in crawled_links:
                             collected_pages += 1
                             yield result
 
