@@ -15,7 +15,7 @@ DATASOURCES = {
 							"boards": "*",
 		},
     "telegram": {},
-    "twitterv2": {}
+    "twitterv2": {'id_lookup': False}
 }
 
 #####################
