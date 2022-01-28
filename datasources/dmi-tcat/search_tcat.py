@@ -64,12 +64,12 @@ class SearchWithinTCATBins(Search):
         },
         "user-language": {
             "type": UserInput.OPTION_TEXT,
-            "help": "User bio",
+            "help": "User language",
             "tooltip": "Match all tweets from users using this language (as detected by Twitter)."
         },
         "tweet-language": {
             "type": UserInput.OPTION_TEXT,
-            "help": "User bio",
+            "help": "Tweet language",
             "tooltip": "Match all tweets from users with this language (as detected by Twitter)."
         },
         "tweet-client": {
