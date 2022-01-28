@@ -75,7 +75,8 @@ class WriteAnnotations(BasicProcessor):
 		with self.dataset.get_results_path().open("w", encoding="utf-8", newline="") as output:
 			
 			# get header row and add input fields to them, if not already present.
-			fieldnames = self.get_item_keys(self.source_file)
+			fieldnames = self.source_dataset.get_item_keys(self)
+			print(fieldnames)
 			for label in annotation_labels:
 				if label not in fieldnames:
 					fieldnames.append(label)
@@ -89,7 +90,7 @@ class WriteAnnotations(BasicProcessor):
 			post_count = 0
 
 			# iterate through posts and check if they appear in the annotations
-			for post in self.iterate_items(self.source_file):
+			for post in self.source_dataset.iterate_items(self):
 				
 				post_count += 1
 

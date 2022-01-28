@@ -78,7 +78,7 @@ class LinguisticFeatures(BasicProcessor):
 
 		# Get all ze text first so we can process it in batches
 		posts = []
-		for post in self.iterate_items(self.source_file):
+		for post in self.source_dataset.iterate_items(self):
 			if post.get("body", ""):
 				if len(post["body"]) > 1000000:
 					body = post["body"][:1000000]

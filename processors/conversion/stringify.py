@@ -68,7 +68,7 @@ class Stringify(BasicProcessor):
 		posts = 0
 		self.dataset.update_status("Processing posts")
 		with self.dataset.get_results_path().open("w", encoding="utf-8") as results:
-			for post in self.iterate_items(self.source_file):
+			for post in self.source_dataset.iterate_items(self):
 				posts += 1
 				if not post["body"]:
 					continue

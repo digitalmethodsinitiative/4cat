@@ -49,7 +49,7 @@ class AuthorInfoRemover(BasicProcessor):
                 writer = None
                 author_columns = []
 
-                for item in self.iterate_items(self.source_file):
+                for item in self.source_dataset.iterate_items(self):
                     if not writer:
                         # initialise csv writer - we do this explicitly rather than
                         # using self.write_items_and_finish() because else we have
@@ -71,7 +71,7 @@ class AuthorInfoRemover(BasicProcessor):
             elif self.source_file.suffix.lower() == ".ndjson":
                 # Iterating through items
                 # using bypass_map_item to not modify data further than necessary
-                for item in self.iterate_items(self.source_file, bypass_map_item=True):
+                for item in self.source_dataset.iterate_items(self, bypass_map_item=True):
                     # Delete author data
                     item = dict_search_and_update(item, ['author'], lambda x: 'REDACTED')
 

@@ -148,7 +148,7 @@ class LexicalFilter(BasicProcessor):
         with self.dataset.get_results_path().open("w", encoding="utf-8") as outfile:
             writer = None
 
-            for item in self.iterate_items(self.source_file):
+            for item in self.source_dataset.iterate_items(self):
                 if not writer:
                     # first iteration, check if column actually exists
                     if column not in item.keys():

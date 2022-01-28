@@ -98,7 +98,7 @@ class FlowChart(BasicProcessor):
 		else:
 			guess_time_format = True
 
-		for post in self.iterate_items(self.source_file):
+		for post in self.source_dataset.iterate_items(self):
 			
 			# Set label names
 			if "item" in post:

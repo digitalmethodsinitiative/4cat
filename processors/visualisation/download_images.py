@@ -125,7 +125,7 @@ class ImageDownloader(BasicProcessor):
 		# first, get URLs to download images from
 		self.dataset.update_status("Reading source file")
 		item_index = 0
-		for item in self.iterate_items(self.source_file):
+		for item in self.source_dataset.iterate_items(self):
 			item_urls = set()
 			if 'ids' in item.keys():
 				item_ids = [id for id in item.get('ids').split(',')]

@@ -71,7 +71,7 @@ class RankFlowRenderer(BasicProcessor):
 
 		# first create a map with the ranks for each period
 		weighted = False
-		for row in self.iterate_items(self.source_file):
+		for row in self.source_dataset.iterate_items(self):
 			if row["date"] not in items:
 				items[row["date"]] = {}
 

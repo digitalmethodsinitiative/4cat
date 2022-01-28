@@ -52,10 +52,7 @@ class ConvertVisionOutputToCSV(BasicProcessor):
             return
 
         # recreate CSV file with the new dialect
-        for annotations in self.iterate_items(self.source_file):
-            if self.interrupted:
-                raise ProcessorInterruptedException("Interrupted while converting Vision API output")
-
+        for annotations in self.source_dataset.iterate_items(self):
             file_result = {}
 
             # special case format

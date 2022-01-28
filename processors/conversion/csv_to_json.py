@@ -43,11 +43,7 @@ class ConvertCSVToJSON(BasicProcessor):
 		# and this buffers one row at most
 		with self.dataset.get_results_path().open("w") as output:
 			output.write("[")
-			for post in self.iterate_items(self.source_file):
-				# stop processing if worker has been asked to stop
-				if self.interrupted:
-					raise ProcessorInterruptedException("Interrupted while processing CSV file")
-
+			for post in self.source_dataset.iterate_items(self):
 				posts += 1
 
 				if posts > 1:

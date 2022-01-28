@@ -133,7 +133,7 @@ class OvertimeAnalysis(BasicProcessor):
 		intervals = set()
 
 		processed = 0
-		for post in self.iterate_items(self.source_file):
+		for post in self.source_dataset.iterate_items(self):
 			if not post["body"]:
 				post["body"] = ""
 				

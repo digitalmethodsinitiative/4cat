@@ -99,7 +99,7 @@ class OvertimeHatefulAnalysis(BasicProcessor):
 		views = {}
 		intervals = set()
 
-		fieldnames = self.get_item_keys(self.source_file)
+		fieldnames = self.source_dataset.get_item_keys(self)
 		if "views" in fieldnames:
 			engagement_field = "views"
 		elif "score" in fieldnames:
@@ -117,7 +117,7 @@ class OvertimeHatefulAnalysis(BasicProcessor):
 		hatebase = {term.lower(): hatebase[term] for term in hatebase}
 		hatebase_regex = re.compile(r"\b(" + "|".join([re.escape(term) for term in hatebase if not min_offensive or (hatebase[term]["average_offensiveness"] and hatebase[term]["average_offensiveness"] > min_offensive)]) + r")\b")
 
-		for post in self.iterate_items(self.source_file):
+		for post in self.source_dataset.iterate_items(self):
 			try:
 				time_unit = get_interval_descriptor(post, timeframe)
 			except ValueError as e:

@@ -71,7 +71,7 @@ class VisionTagNetworker(BasicProcessor):
         except ValueError:
             min_confidence = 0
 
-        for annotations in self.iterate_items(self.source_file):
+        for annotations in self.source_dataset.iterate_items(self):
             file_annotations = []
 
             annotations = {atype: annotations[atype] for atype in include if atype in annotations}

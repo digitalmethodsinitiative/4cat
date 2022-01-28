@@ -15,6 +15,7 @@ import backend
 from common.lib.job import Job, JobNotFoundException
 from common.lib.helpers import get_software_version
 from common.lib.fourcat_module import FourcatModule
+from common.lib.exceptions import ProcessorInterruptedException
 
 
 class DataSet(FourcatModule):
@@ -218,6 +219,109 @@ class DataSet(FourcatModule):
 				logtime = line.split(":")[0]
 				logmsg = ":".join(line.split(":")[1:])
 				yield (logtime, logmsg)
+
+	def iterate_items(self, processor=None, bypass_map_item=False):
+		"""
+		A generator that iterates through a CSV or NDJSON file
+
+		If a reference to a processor is provided, with every iteration,
+		the processor's 'interrupted' flag is checked, and if set a
+		ProcessorInterruptedException is raised, which by default is caught
+		in the worker and subsequently stops execution gracefully.
+
+		Processors can define a method called `map_item` that can be used to
+		map an item from the dataset file before it is processed any further
+		this is slower than storing the data file in the right format to begin
+		with but not all data sources allow for easy 'flat' mapping of items,
+		e.g. tweets are nested objects when retrieved from the twitter API
+		that are easier to store as a JSON file than as a flat CSV file, and
+		it would be a shame to throw away that data.
+
+		There are two file types that can be iterated (currently): CSV files
+		and NDJSON (newline-delimited JSON) files. In the future, one could
+		envision adding a pathway to retrieve items from e.g. a MongoDB
+		collection directly instead of from a static file
+
+		:param BasicProcessor processor:  A reference to the processor
+		iterating the dataset.
+		:param bool bypass_map_item:  If set to `True`, this ignores any
+		`map_item` method of the datasource when returning items.
+		:return generator:  A generator that yields each item as a dictionary
+		"""
+
+		# see if an item mapping function has been defined
+		# open question if 'source_dataset' shouldn't be an attribute of the dataset
+		# instead of the processor...
+		item_mapper = None
+
+		if not bypass_map_item:
+			if not processor:
+				# this loads the processor *class* instead of the *object*
+				# (which would be passed by reference). That works for the
+				# map_item method (which is static), but will not trigger the
+				# ProcessorInterruptedException, since a class cannot logically
+				# have its interrupted flag set.
+				processor = self.get_own_processor()
+
+			if hasattr(processor, "map_item"):
+				item_mapper = processor.map_item
+
+		# go through items one by one, optionally mapping them
+		path = self.get_results_path()
+		if path.suffix.lower() == ".csv":
+			with path.open(encoding="utf-8") as infile:
+				reader = csv.DictReader(infile)
+
+				for item in reader:
+					if hasattr(processor, "interrupted") and processor.interrupted:
+						raise ProcessorInterruptedException("Processor interrupted while iterating through CSV file")
+
+					if item_mapper:
+						item = item_mapper(item)
+
+					yield item
+
+		elif path.suffix.lower() == ".ndjson":
+			# in this format each line in the file is a self-contained JSON
+			# file
+			with path.open(encoding="utf-8") as infile:
+				for line in infile:
+					if hasattr(processor, "interrupted") and processor.interrupted:
+						raise ProcessorInterruptedException("Processor interrupted while iterating through NDJSON file")
+
+					item = json.loads(line)
+					if item_mapper:
+						item = item_mapper(item)
+
+					yield item
+
+		else:
+			raise NotImplementedError("Cannot iterate through %s file" % path.suffix)
+
+	def get_item_keys(self, processor=None):
+		"""
+		Get item attribute names
+
+		It can be useful to know what attributes an item in the dataset is
+		stored with, e.g. when one wants to produce a new dataset identical
+		to the source_dataset one but with extra attributes. This method provides
+		these, as a list.
+
+		:param BasicProcessor processor:  A reference to the processor
+		asking for the item keys, to pass on to iterate_itesm
+		:return list:  List of keys, may be empty if there are no items in the
+		  dataset
+		"""
+
+		items = self.iterate_items(processor)
+		try:
+			keys = list(items.__next__().keys())
+		except StopIteration:
+			return []
+		finally:
+			del items
+
+		return keys
 
 	def get_staging_area(self):
 		"""
@@ -839,7 +943,8 @@ class DataSet(FourcatModule):
 
 		:return:  Processor class, or `None` if not available.
 		"""
-		return backend.all_modules.processors.get(self.data.get("type"))
+		processor_type = self.parameters.get("type", self.data.get("type"))
+		return backend.all_modules.processors.get(processor_type)
 
 
 	def get_available_processors(self):

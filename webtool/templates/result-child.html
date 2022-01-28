@@ -72,6 +72,17 @@
         {# Parameters #}
         <div class="parameters">
             <ul>
+                {% if item.get_extension() == "csv" or item.get_own_processor().map_item %}
+                <li>
+                    <a href="{{ url_for('preview_items', key=item.key) }}"
+                       data-load-from="{{ url_for('preview_items', key=item.key) }}"
+                       class="property-badge permalink popup-trigger tooltip-trigger"
+                       aria-controls="tooltip-preview-{{ item.key }} popup-preview-{{ item.key }}"><i
+                            class="fa fa-fw fa-search"></i> <span class="sr-only">Preview this dataset</span></a>
+                    <div role="dialog" id="popup-preview-{{ dataset.key }}"></div>
+                    <p role="tooltip" id="tooltip-preview-{{ item.key }}" aria-hidden="true">Preview this dataset</p>
+                </li>
+                {% endif %}
                 <li rel="external">
                     <a class="property-badge permalink tooltip-trigger" aria-controls="tooltip-permalink-{{ item.key }}" href="{{ url_for('show_results') }}{{ parent_key }}/#nav={{ item.get_breadcrumbs() }}" target="_blank"><i class="fa fa-fw fa-hashtag" aria-hidden="true"></i> <span class="sr-only">Permalink to this result (with context)</span></a>
                     <p role="tooltip" id="tooltip-permalink-{{ item.key }}" aria-hidden="true">Permanent link to this analysis (with context)</p>

@@ -75,7 +75,7 @@ class RandomFilter(BasicProcessor):
 		with self.dataset.get_results_path().open("w", encoding="utf-8", newline="") as output:
 			
 			# get header row, we need to copy it for the output
-			fieldnames = self.get_item_keys(self.source_file)
+			fieldnames = self.source_dataset.get_item_keys(self)
 
 			# start the output file
 			writer = csv.DictWriter(output, fieldnames=fieldnames)
@@ -86,7 +86,7 @@ class RandomFilter(BasicProcessor):
 			match_row = posts_to_keep[0] # The row count of the first matching row 
 
 			# Iterate through posts and keep those in the match list
-			for post in self.iterate_items(self.source_file):
+			for post in self.source_dataset.iterate_items(self):
 				
 				# Write on match
 				if count == match_row:
