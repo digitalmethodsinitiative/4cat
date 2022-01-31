@@ -15,6 +15,11 @@
                     <p><br>Please be conservative; 4CAT is a shared resource and large dataset queries may prevent others
                         from using it. We recommend to start with smaller date ranges and specific queries and then cast
                         a wider net if needed.</p>
+                {%  if __expire_datasets %}
+                    <p>Note that datasets will be deleted automatically after {{ __expire_datasets|timify_long }}.
+                        {% if __expire_optout %} You can choose to keep the dataset for longer from the result
+                            page.{% endif %}</p>
+                {% endif %}
                     <div class="form-element">
                         <label for="datasource-select">Data source:</label>
                         <div>

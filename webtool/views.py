@@ -83,7 +83,6 @@ def show_frontpage():
 
 	datasources = backend.all_modules.datasources
 
-
 	return render_template("frontpage.html", stats=stats, news=news, datasources=datasources)
 
 
@@ -402,8 +401,13 @@ def show_result(key):
 	# if the datasource is configured for it, this dataset may be deleted at some point
 	datasource = dataset.parameters.get("datasource", "")
 	datasources = list(backend.all_modules.datasources.keys())
+	expires_datasource = False
+	can_unexpire = hasattr(config, "EXPIRE_ALLOW_OPTOUT") and config.EXPIRE_ALLOW_OPTOUT
 	if datasource in backend.all_modules.datasources and backend.all_modules.datasources[datasource].get("expire-datasets", None):
 		timestamp_expires = dataset.timestamp + int(backend.all_modules.datasources[datasource].get("expire-datasets"))
+		expires_datasource = True
+	elif dataset.parameters.get("expires-after"):
+		timestamp_expires = dataset.parameters.get("expires-after")
 	else:
 		timestamp_expires = None
 
@@ -414,7 +418,8 @@ def show_result(key):
 
 	return render_template(template, dataset=dataset, parent_key=dataset.key, processors=backend.all_modules.processors,
 						   is_processor_running=is_processor_running, messages=get_flashed_messages(),
-						   is_favourite=is_favourite, timestamp_expires=timestamp_expires, datasources=datasources)
+						   is_favourite=is_favourite, timestamp_expires=timestamp_expires,
+						   expires_by_datasource=expires_datasource, can_unexpire=can_unexpire, datasources=datasources)
 
 
 @app.route("/preview-as-table/<string:key>/")
@@ -522,6 +527,29 @@ def restart_dataset(key):
 
 	flash("Dataset queued for re-running.")
 	return redirect("/results/" + dataset.key + "/")
+
+@app.route("/result/<string:key>/keep/", methods=["GET"])
+@login_required
+def keep_dataset(key):
+	try:
+		dataset = DataSet(key=key, db=db)
+	except TypeError:
+		return error(404, message="Dataset not found.")
+
+	if not dataset.key_parent:
+		# top-level dataset
+		# check if data source forces expiration - in that case, the user
+		# cannot reset this
+		datasources = backend.all_modules.datasources
+		datasource = dataset.parameters.get("datasource")
+		if datasource in datasources and datasources[datasource].get("expire-datasets"):
+			return render_template("error.html", title="Dataset cannot be kept",
+								   message="All datasets of this data source (%s) are scheduled for automatic deletion. This cannot be overridden." %
+										   datasource["name"]), 403
+
+	dataset.delete_parameter("expires-after")
+	flash("Dataset expiration data removed. The dataset will no longer be deleted automatically.")
+	return redirect(url_for("show_result", key=key))
 
 
 @app.route("/result/<string:key>/nuke/", methods=["GET", "DELETE", "POST"])
