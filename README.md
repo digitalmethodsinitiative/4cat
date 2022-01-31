@@ -8,8 +8,8 @@
 <p align="center"><img alt="A screenshot of 4CAT, displaying its 'Create Dataset' interface" src="common/assets/screenshot1.png"><img alt="A screenshot of 4CAT, displaying a network visualisation of a dataset" src="common/assets/screenshot2.png"></p>
 
 4CAT is a research tool that can be used to analyse and process data from
-online  social platforms. Its goal is to make the capture and analysis of data
-from these  platforms accessible to people through a web interface, without
+online social platforms. Its goal is to make the capture and analysis of data
+from these platforms accessible to people through a web interface, without
 requiring any programming or web scraping skills. Our target audience is
 researchers, students and journalists interested using Digital Methods in their
 work.
@@ -39,7 +39,9 @@ import data into 4CAT for analysis:
 
 * Facebook (via [CrowdTangle](https://www.crowdtangle.com) exports)
 * Instagram (via CrowdTangle)
-* TikTok (via [tiktok-scraper](https://github.com/drawrowfly/tiktok-scraper))
+* TikTok (via
+  [Zeeschuimer](https://github.com/digitalmethodsinitiative/zeeschuimer) or 
+  [tiktok-scraper](https://github.com/drawrowfly/tiktok-scraper))
 
 A number of other platforms have built-in support that is untested, or requires
 e.g. special API access. You can view the [full list of data
@@ -53,12 +55,14 @@ You can install 4CAT locally or on a server via Docker or manually. The usual
 docker-compose up
 ```
 
-will work, but detailed and alternative installation
-instructions are available [in our
+will work, but detailed and alternative installation instructions are available 
+[in our
 wiki](https://github.com/digitalmethodsinitiative/4cat/wiki/Installing-4CAT).
 Currently 4chan, 8chan, and 8kun require additional steps; please see the wiki.
 
-Please check our [issues](https://github.com/digitalmethodsinitiative/4cat/issues) and create one if you experience any problems (pull requests are also very welcome).
+Please check our 
+[issues](https://github.com/digitalmethodsinitiative/4cat/issues) and create 
+one if you experience any problems (pull requests are also very welcome).
 
 ## Components
 4CAT consists of several components, each in a separate folder:
@@ -73,18 +77,19 @@ Please check our [issues](https://github.com/digitalmethodsinitiative/4cat/issue
   If you want to set up your own data sources, refer to the
   [wiki](https://github.com/digitalmethodsinitiative/4cat/wiki/How-to-make-a-data-source).
 - `processors`: A collection of data processing scripts that can plug into
-  4CAT and manipulate or process datasets created with 4CAT. There is an API
+  4CAT to manipulate or process datasets created with 4CAT. There is an API
   you can use to [make your own
   processors](https://github.com/digitalmethodsinitiative/4cat/wiki/How-to-make-a-processor).
 
 ## Credits & License
 4CAT was created at [OILab](https://oilab.eu) and the
 [Digital Methods Initiative](https://www.digitalmethods.net) at the University
-of Amsterdam. The tool was inspired by the
-[TCAT](https://wiki.digitalmethods.net/Dmi/ToolDmiTcat), a tool with comparable
-functionality that can be used to scrape and analyse Twitter data.
+of Amsterdam. The tool was inspired by
+[DMI-TCAT](https://wiki.digitalmethods.net/Dmi/ToolDmiTcat), a tool with 
+comparable  functionality that can be used to scrape and analyse Twitter data.
 
-4CAT development is supported by the Dutch [PDI-SSH](https://pdi-ssh.nl/en/) foundation through the [CAT4SMR project](https://cat4smr.humanities.uva.nl/).
+4CAT development is supported by the Dutch [PDI-SSH](https://pdi-ssh.nl/en/) 
+foundation through the [CAT4SMR project](https://cat4smr.humanities.uva.nl/).
 
 4CAT is licensed under the Mozilla Public License, 2.0. Refer to the `LICENSE`
 file for more information.
