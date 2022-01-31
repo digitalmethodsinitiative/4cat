@@ -12,6 +12,8 @@ from svgwrite.path import Path
 from svgwrite.text import Text
 from svgwrite.gradients import LinearGradient
 
+from xml.parsers.expat import ExpatError
+
 __author__ = ["Stijn Peeters"]
 __credits__ = ["Stijn Peeters","Bernhard Rieder"]
 __maintainer__ = ["Stijn Peeters"]
@@ -71,7 +73,12 @@ class RankFlowRenderer(BasicProcessor):
 
 		# first create a map with the ranks for each period
 		weighted = False
+		processed = 0
 		for row in self.source_dataset.iterate_items(self):
+			processed += 1
+			if processed % 250 == 0:
+				self.dataset.update_status("Determining RankFlow parameters, item %i/%i" % (processed, self.source_dataset.num_rows))
+
 			if row["date"] not in items:
 				items[row["date"]] = {}
 
@@ -97,6 +104,7 @@ class RankFlowRenderer(BasicProcessor):
 		max_change = 1
 		max_item_length = 0
 		for period in items:
+			self.dataset.update_status("Aggregating data for period %s" % period)
 			changes[period] = {}
 			for item in items[period]:
 				max_item_length = max(len(item), max_item_length)
@@ -149,6 +157,7 @@ class RankFlowRenderer(BasicProcessor):
 
 		# go through all periods and draw boxes and flows
 		for period in items:
+			self.dataset.update_status("Rendering items for period %s" % period)
 			# reset Y coordinate, i.e. start at top
 			box_start_y = margin
 
@@ -270,5 +279,13 @@ class RankFlowRenderer(BasicProcessor):
 			canvas.add(item)
 
 		# finally, save the svg file
-		canvas.saveas(pretty=True, filename=str(self.dataset.get_results_path()))
+		self.dataset.update_status("Rendering visualisation as SVG file")
+		try:
+			canvas.saveas(pretty=True, filename=str(self.dataset.get_results_path()))
+		except ExpatError:
+			# Expat seemingly can't deal with very large XML files
+			# but this only triggers when trying to pretty-print
+			self.dataset.log("Pretty-printing failed, retrying...")
+			canvas.saveas(filename=str(self.dataset.get_results_path()))
+
 		self.dataset.finish(len(items) * len(list(items.items()).pop()))
