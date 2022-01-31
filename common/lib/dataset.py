@@ -255,16 +255,9 @@ class DataSet(FourcatModule):
 		item_mapper = None
 
 		if not bypass_map_item:
-			if not processor:
-				# this loads the processor *class* instead of the *object*
-				# (which would be passed by reference). That works for the
-				# map_item method (which is static), but will not trigger the
-				# ProcessorInterruptedException, since a class cannot logically
-				# have its interrupted flag set.
-				processor = self.get_own_processor()
-
-			if hasattr(processor, "map_item"):
-				item_mapper = processor.map_item
+			own_processor = self.get_own_processor()
+			if hasattr(own_processor, "map_item"):
+				item_mapper = own_processor.map_item
 
 		# go through items one by one, optionally mapping them
 		path = self.get_results_path()
