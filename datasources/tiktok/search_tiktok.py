@@ -57,7 +57,9 @@ class SearchTikTok(Search):
                 if self.interrupted:
                     raise WorkerInterruptedException()
 
-                post = json.loads(line)["data"]
+                # remove NUL bytes here because they trip up a lot of other
+                # things
+                post = json.loads(line.replace("\0", ""))["data"]
 
                 hashtags = [extra["hashtagName"] for extra in post.get("textExtra", []) if "hashtagName" in extra and extra["hashtagName"]]
 
