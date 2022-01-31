@@ -164,7 +164,13 @@ def datasource_form(datasource_id):
 	html = render_template_string(form, datasource_id=datasource_id,
 								  datasource_config=config.DATASOURCES[datasource_id], datasource=datasource)
 
-	return jsonify({"status": "success", "datasource": datasource_id, "has_javascript": has_javascript, "html": html})
+	return jsonify({
+		"status": "success",
+		"datasource": datasource_id,
+		"has_javascript": has_javascript,
+		"type": labels,
+		"html": html
+	})
 
 
 @app.route("/api/datasource-script/<string:datasource_id>/")

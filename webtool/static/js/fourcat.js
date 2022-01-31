@@ -669,6 +669,9 @@ const query = {
 				   }
 				});
 
+				//update data source type indicator
+				$('#datasource-type-label').html(data.type.join(", "));
+
 				query.handle_density();
 				query.custom_board_options();
 
