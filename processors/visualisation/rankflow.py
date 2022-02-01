@@ -6,11 +6,14 @@ import csv
 
 from backend.abstract.processor import BasicProcessor
 from common.lib.helpers import UserInput, get_4cat_canvas
+from common.lib.exceptions import ProcessorInterruptedException
 
 from svgwrite.shapes import Rect
 from svgwrite.path import Path
 from svgwrite.text import Text
 from svgwrite.gradients import LinearGradient
+from svgwrite.container import Script, Style
+from svgwrite.filters import Filter
 
 from xml.parsers.expat import ExpatError
 
@@ -23,30 +26,38 @@ csv.field_size_limit(1024 * 1024 * 1024)
 
 class RankFlowRenderer(BasicProcessor):
 	"""
-	Count occurrence of values for a given post attribute for a given time
-	frame
+	Visualise relative occurrence of values over time
 
-	For example, this may be used to count the most-used author names per year;
-	most-occurring country codes per month; overall top host names, etc
+	For example, this may be used to visualise how particular word become more
+	popular over time by using this to process a set of top vectors per month.
 	"""
 	type = "render-rankflow"  # job type ID
 	category = "Visual"  # category
 	title = "RankFlow diagram"  # title displayed in UI
-	description = "Create a diagram showing changes in prevalence over time for sequential ranked lists (following Bernhard Rieder's RankFlow grapher)."  # description displayed in UI
+	description = "Create a diagram showing changes in prevalence over time for sequential ranked lists (following " \
+				  "Bernhard Rieder's RankFlow grapher)."  # description displayed in UI
 	extension = "svg"  # extension of result file, used internally and in UI
+
+	references = [
+		"[Rieder, B. RankFlow. *The Politics of Systems*](https://labs.polsys.net/tools/rankflow/)"
+	]
 
 	options = {
 		"colour_property": {
 			"type": UserInput.OPTION_CHOICE,
-			"options": {"change": "Change from previous", "weight": "Occurence", "none": "None"},
+			"options": {"change": "Change from previous", "weight": "Occurrence", "none": "None"},
 			"default": "change",
-			"help": "Colour according to"
+			"help": "Colour according to",
+			"tooltip": "Colour by change to highlight elements that suddenly rise or drop in rank; colour by "
+					   "occurrence to highlight the most prevalent items per period"
 		},
 		"size_property": {
 			"type": UserInput.OPTION_CHOICE,
 			"options": {"weight": "Occurence", "none": "None"},
 			"default": "change",
-			"help": "Size according to"
+			"help": "Size according to",
+			"tooltip": "Either size each element according to how prevalent it is for the given period, or make all "
+					   "elements the same size."
 		},
 		"show_value": {
 			"type": UserInput.OPTION_TOGGLE,
@@ -65,6 +76,9 @@ class RankFlowRenderer(BasicProcessor):
 		return module.is_rankable()
 		
 	def process(self):
+		"""
+		Render RankFlow diagram
+		"""
 		items = {}
 		max_weight = 1
 		colour_property = self.parameters.get("colour_property")
@@ -75,6 +89,9 @@ class RankFlowRenderer(BasicProcessor):
 		weighted = False
 		processed = 0
 		for row in self.source_dataset.iterate_items(self):
+			if self.interrupted:
+				raise ProcessorInterruptedException("Interrupted while analysing items")
+
 			processed += 1
 			if processed % 250 == 0:
 				self.dataset.update_status("Determining RankFlow parameters, item %i/%i" % (processed, self.source_dataset.num_rows))
@@ -107,6 +124,9 @@ class RankFlowRenderer(BasicProcessor):
 			self.dataset.update_status("Aggregating data for period %s" % period)
 			changes[period] = {}
 			for item in items[period]:
+				if self.interrupted:
+					raise ProcessorInterruptedException("Interrupted while aggregating items")
+
 				max_item_length = max(len(item), max_item_length)
 				now = items[period][item]
 				then = -1
@@ -124,7 +144,7 @@ class RankFlowRenderer(BasicProcessor):
 				else:
 					changes[period][item] = 1
 
-		# some sizing parameters for the chart - experiment with those
+		# some sizing parameters for the chart - experiment with these
 		fontsize_normal = 12
 		fontsize_small = 8
 		box_width = fontsize_normal
@@ -155,6 +175,15 @@ class RankFlowRenderer(BasicProcessor):
 		base_colour = [.55, .95, .95]
 		max_y = 0
 
+		# this is a filter to make text labels have a solid background
+		# it is used for the interactive elements, to make the text stand out
+		# more when a path is highlighted
+		solid = Filter(start=(0, 0), size=(1, 1), id="solid")
+		solid.feFlood(flood_color="white", result="bg")
+		solid.feMerge(("bg", "SourceGraphic"))
+		definitions.append(solid)
+		flow_ids = {}
+
 		# go through all periods and draw boxes and flows
 		for period in items:
 			self.dataset.update_status("Rendering items for period %s" % period)
@@ -162,6 +191,13 @@ class RankFlowRenderer(BasicProcessor):
 			box_start_y = margin
 
 			for item in items[period]:
+				if item not in flow_ids:
+					flow_ids[item] = len(flow_ids) + 1
+
+				if self.interrupted:
+					raise ProcessorInterruptedException("Interrupted while rendering items")
+
+				flow_class = "flow-%i" % flow_ids[item]
 				# determine weight (and thereby height) of this particular item
 				weight = items[period][item]
 				weight_factor = weight / max_weight
@@ -179,7 +215,8 @@ class RankFlowRenderer(BasicProcessor):
 				box = Rect(
 					insert=(box_start_x, box_start_y),
 					size=(box_width, height),
-					fill=box_fill
+					fill=box_fill,
+					class_=flow_class
 				)
 				boxes.append(box)
 
@@ -188,7 +225,8 @@ class RankFlowRenderer(BasicProcessor):
 				label_value = "" if not include_value else (" (%s)" % weight if weight != 1 else "")
 				label = Text(
 					text=(item + label_value),
-					insert=(box_start_x + box_width + box_gap_y, label_y)
+					insert=(box_start_x + box_width + box_gap_y, label_y),
+					class_=flow_class
 				)
 				labels.append(label)
 
@@ -233,7 +271,7 @@ class RankFlowRenderer(BasicProcessor):
 					# beziers though quadratic could work as well since our
 					# control points are, in principle, mirrored
 					flow_start = (previous_box["x"] + previous_box["width"], previous_box["y"])
-					flow = Path(fill=gradient_key, opacity="0.35")
+					flow = Path(fill=gradient_key, opacity="0.35", class_=flow_class)
 					flow.push("M %f %f" % flow_start)  # go to start
 					flow.push("C %f %f %f %f %f %f" % (
 						*control_top_left, *control_top_right, box["x"], box["y"]))  # top bezier
@@ -278,6 +316,10 @@ class RankFlowRenderer(BasicProcessor):
 		for item in (*boxes, *labels):
 			canvas.add(item)
 
+		# make it interactive
+		canvas.defs.add(Style(self.get_css()))
+		canvas.add(Script(content=self.get_svg_script()))
+
 		# finally, save the svg file
 		self.dataset.update_status("Rendering visualisation as SVG file")
 		try:
@@ -289,3 +331,60 @@ class RankFlowRenderer(BasicProcessor):
 			canvas.saveas(filename=str(self.dataset.get_results_path()))
 
 		self.dataset.finish(len(items) * len(list(items.items()).pop()))
+
+	def get_svg_script(self):
+		"""
+		Simple embeddable JavaScript to highlight hovered flows
+
+		:return str:  Script code
+		"""
+		return """
+window.addEventListener('DOMContentLoaded', function() {
+	document.querySelectorAll('rect, path, text').forEach((obj) => {
+		obj.addEventListener('mouseover', function(e) {
+			let path_class = e.target.classList[0];
+			document.querySelectorAll('.' + path_class).forEach((component) => {
+				component.classList.add('highlighted');
+			});
+		});
+		obj.addEventListener('click', function(e) {
+			let path_class = e.target.classList[0];
+			let is_enabled = e.target.classList.contains('persistent');
+			document.querySelectorAll('.' + path_class).forEach((component) => {
+				if(!is_enabled) {
+					component.classList.add('persistent');
+					component.classList.add('highlighted');
+				} else {
+					component.classList.remove('highlighted');
+					component.classList.remove('persistent');
+				}
+			});
+		});
+		obj.addEventListener('mouseout', function(e) {
+			let path_class = e.target.classList[0];
+			document.querySelectorAll('.' + path_class + ':not(.persistent)').forEach((component) => {
+				component.classList.remove('highlighted');
+			});
+		});
+	});
+});
+"""
+
+	def get_css(self):
+		"""
+		Simple embeddable stylesheet to highlight hovered flows
+
+		:return str:  CSS code
+		"""
+		return """
+path.highlighted, rect.highlighted {
+	stroke: #000;
+	stroke-width: 2px;
+	opacity: 1;
+}
+
+text.highlighted {
+	filter: url(#solid);
+	fill: #000;
+}
+"""
