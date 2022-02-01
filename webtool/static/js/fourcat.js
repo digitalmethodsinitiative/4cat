@@ -1024,7 +1024,7 @@ const dynamic_container = {
 	 */
 	init: function() {
 		// Update dynamic containers
-		setInterval(dynamic_container.refresh, 2500);
+		setInterval(dynamic_container.refresh, 250);
 	},
 
 	refresh: function() {
