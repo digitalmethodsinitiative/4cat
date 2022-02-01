@@ -60,7 +60,8 @@ CREATE TABLE IF NOT EXISTS users (
   register_token     TEXT DEFAULT '',
   timestamp_token    INTEGER DEFAULT 0,
   timestamp_seen     INTEGER DEFAULT 0,
-  userdata           TEXT DEFAULT '{}'
+  userdata           TEXT DEFAULT '{}',
+  is_deactivated     BOOLEAN DEFAULT FALSE
 );
 
 INSERT INTO users
