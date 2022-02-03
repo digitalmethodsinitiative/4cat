@@ -32,6 +32,7 @@ CREATE TABLE IF NOT EXISTS datasets (
   key               text,
   type              text DEFAULT 'search',
   key_parent        text DEFAULT '',
+  owner             VARCHAR DEFAULT 'anonymous',
   query             text,
   job               integer DEFAULT 0,
   parameters        text,
@@ -40,6 +41,7 @@ CREATE TABLE IF NOT EXISTS datasets (
   status            text,
   num_rows          integer DEFAULT 0,
   is_finished       boolean DEFAULT FALSE,
+  is_private        boolean DEFAULT TRUE,
   software_version  text,
   software_file     text DEFAULT '',
   annotation_fields text DEFAULT ''

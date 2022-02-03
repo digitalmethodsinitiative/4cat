@@ -242,7 +242,12 @@ def import_dataset():
 	if not worker:
 		return error(404, message="Unknown platform or source format")
 
-	dataset = DataSet(parameters={"user": current_user.get_id(), "datasource": platform}, type=worker.type, db=db)
+	dataset = DataSet(
+		parameters={"datasource": platform},
+		type=worker.type,
+		db=db,
+		owner=current_user.get_id()
+	)
 	dataset.update_status("Importing uploaded file...")
 
 	# store the file at the result path for the dataset, but with a different suffix
@@ -295,7 +300,6 @@ def queue_dataset():
 	              status and results.
 	:return-error 404: If the datasource does not exist.
 	"""
-
 	datasource_id = request.form.get("datasource", "")
 	if datasource_id not in backend.all_modules.datasources:
 		return error(404, message="Datasource '%s' does not exist" % datasource_id)
@@ -318,14 +322,21 @@ def queue_dataset():
 	else:
 		raise NotImplementedError("Data sources MUST sanitise input values with validate_query")
 
-	sanitised_query["user"] = current_user.get_id()
 	sanitised_query["datasource"] = datasource_id
 	sanitised_query["type"] = search_worker_id
 
 	sanitised_query["pseudonymise"] = bool(request.form.to_dict().get("pseudonymise", False))
+	is_private = bool(request.form.to_dict().get("make-private", True))
 
 	extension = search_worker.extension if hasattr(search_worker, "extension") else "csv"
-	dataset = DataSet(parameters=sanitised_query, db=db, type=search_worker_id, extension=extension)
+	dataset = DataSet(
+		parameters=sanitised_query,
+		db=db,
+		type=search_worker_id,
+		extension=extension,
+		is_private=is_private,
+		owner=current_user.get_id()
+	)
 
 	if request.form.get("label"):
 		dataset.update_label(request.form.get("label"))
@@ -373,6 +384,9 @@ def check_dataset():
 		dataset = DataSet(key=dataset_key, db=db)
 	except TypeError:
 		return error(404, error="Dataset does not exist.")
+
+	if not current_user.can_access_dataset(dataset):
+		return error(403, error="Dataset is private")
 
 	results = dataset.check_dataset_finished()
 	if results == 'empty':
@@ -438,7 +452,7 @@ def edit_dataset_label(key):
 	except TypeError:
 		return error(404, error="Dataset does not exist.")
 
-	if not current_user.is_admin() and not current_user.get_id() == dataset.parameters.get("user"):
+	if not current_user.is_admin() and not current_user.get_id() == dataset.owner:
 		return error(403, message="Not allowed")
 
 	dataset.update_label(label)
@@ -594,7 +608,7 @@ def delete_dataset(key=None):
 	except TypeError:
 		return error(404, error="Dataset does not exist.")
 
-	if not current_user.is_admin() and not current_user.get_id() == dataset.parameters.get("user"):
+	if not current_user.is_admin() and not current_user.get_id() == dataset.owner:
 		return error(403, message="Not allowed")
 
 	# if there is an active or queued job for some child dataset, cancel and
@@ -658,6 +672,9 @@ def toggle_favourite(key):
 	except TypeError:
 		return error(404, error="Dataset does not exist.")
 
+	if not current_user.can_access_dataset(dataset):
+		return error(403, error="This dataset is private")
+
 	current_status = db.fetchone("SELECT * FROM users_favourites WHERE name = %s AND key = %s",
 								 (current_user.get_id(), dataset.key))
 	if not current_status:
@@ -667,6 +684,38 @@ def toggle_favourite(key):
 		db.delete("users_favourites", where={"name": current_user.get_id(), "key": dataset.key})
 		return jsonify({"success": True, "favourite_status": False})
 
+@app.route("/api/toggle-dataset-private/<string:key>")
+@login_required
+@openapi.endpoint("tool")
+def toggle_private(key):
+	"""
+	Toggle whether a dataset is private or not
+
+	Private datasets cannot be viewed by users that are not an admin or the
+	owner of the dataset. An exception is datasets assigned to the user
+	'anonymous', which can be viewed by anyone. Only admins and owners can
+	toggle private status of a dataset.
+
+	:param str key: Key of the dataset to mark as (not) private
+
+	:return: A JSON object with the status of the request
+	:return-schema: {type=object,properties={success={type=boolean},is_private={type=boolean}}}
+
+	:return-error 404:  If the dataset key was not found
+	"""
+	try:
+		dataset = DataSet(key=key, db=db)
+	except TypeError:
+		return error(404, error="Dataset does not exist.")
+
+	if dataset.owner != current_user.get_id() and not current_user.is_admin():
+		return error(403, error="This dataset is private")
+
+	# apply status to dataset and all children
+	dataset.is_private = not dataset.is_private
+	dataset.update_children(is_private=dataset.is_private)
+
+	return jsonify({"success": True, "is_private": dataset.is_private})
 
 @app.route("/api/queue-processor/", methods=["POST"])
 @api_ratelimit
@@ -731,6 +780,9 @@ def queue_processor(key=None, processor=None):
 		print("KEY", key)
 		return error(404, error="Not a valid dataset key.")
 
+	if not current_user.can_access_dataset(dataset):
+		return error(403, error="You cannot run processors on private datasets")
+
 	# check if processor is available for this dataset
 	available_processors = dataset.get_available_processors()
 	if processor not in available_processors:
@@ -741,12 +793,19 @@ def queue_processor(key=None, processor=None):
 	# create a dataset now
 	try:
 		options = UserInput.parse_all(available_processors[processor].get_options(dataset, current_user), request.form.to_dict(), silently_correct=False)
-		options["user"] = current_user.get_id()
 	except QueryParametersException as e:
 		return error(400, error=str(e))
 
-	analysis = DataSet(parent=dataset.key, parameters=options, db=db,
-					   extension=available_processors[processor].extension, type=processor)
+	# private or not is inherited from parent dataset
+	analysis = DataSet(parent=dataset.key,
+					   parameters=options,
+					   db=db,
+					   extension=available_processors[processor].extension,
+					   type=processor,
+					   is_private=dataset.is_private,
+					   owner=current_user.get_id()
+	)
+
 	if analysis.is_new:
 		# analysis has not been run or queued before - queue a job to run it
 		queue.add_job(jobtype=processor, remote_id=analysis.key)
@@ -801,6 +860,9 @@ def check_processor():
 		try:
 			dataset = DataSet(key=key, db=db)
 		except TypeError:
+			continue
+
+		if not current_user.can_access_dataset(dataset):
 			continue
 
 		genealogy = dataset.get_genealogy()

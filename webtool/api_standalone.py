@@ -138,7 +138,14 @@ def process_standalone(processor):
 		return error(402, error="Input is empty")
 
 	# ok, valid input!
-	temp_dataset = DataSet(extension="csv", type="standalone", parameters={"user": current_user.get_id(), "after": [processor]}, db=db)
+	temp_dataset = DataSet(
+		extension="csv",
+		type="standalone",
+		parameters={"next": [processor]},
+		db=db,
+		owner=current_user.get_id(),
+		is_private=True
+	)
 	temp_dataset.finish(len(input))
 
 	# make sure the file is deleted later, whichever way this request is
