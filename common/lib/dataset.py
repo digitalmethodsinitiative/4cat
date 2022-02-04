@@ -250,6 +250,7 @@ class DataSet(FourcatModule):
 		`map_item` method of the datasource when returning items.
 		:return generator:  A generator that yields each item as a dictionary
 		"""
+		path = self.get_results_path()
 
 		# see if an item mapping function has been defined
 		# open question if 'source_dataset' shouldn't be an attribute of the dataset
@@ -258,11 +259,15 @@ class DataSet(FourcatModule):
 
 		if not bypass_map_item:
 			own_processor = self.get_own_processor()
-			if hasattr(own_processor, "map_item"):
+			# only run item mapper if extension of processor == extension of
+			# data file, for the scenario where a csv file was uploaded and
+			# converted to an ndjson-based data source, for example
+			# todo: this is kind of ugly, and a better fix may be possible
+			extension_fits = hasattr(own_processor, "extension") and ("." + own_processor.extension) == self.get_extension()
+			if hasattr(own_processor, "map_item") and extension_fits:
 				item_mapper = own_processor.map_item
 
 		# go through items one by one, optionally mapping them
-		path = self.get_results_path()
 		if path.suffix.lower() == ".csv":
 			with path.open(encoding="utf-8") as infile:
 				reader = csv.DictReader(infile)
@@ -1057,10 +1062,11 @@ class DataSet(FourcatModule):
 		Also checks whether the results file exists.
 		Used for checking processor and dataset compatibility.
 
+		:return str extension:  Extension, e.g. `csv`
 		"""
-
 		if self.get_results_path().exists():
 			return self.get_results_path().suffix[1:]
+
 		return False
 
 	def get_result_url(self):
