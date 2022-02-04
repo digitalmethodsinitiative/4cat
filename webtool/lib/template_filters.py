@@ -10,8 +10,6 @@ from pathlib import Path
 from urllib.parse import urlencode, urlparse
 from webtool import app
 
-from common.lib.helpers import strip_tags
-
 import config
 
 

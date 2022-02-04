@@ -79,7 +79,7 @@ def add_user():
     :return: Either an html page with a message, or a JSON response, depending
     on whether ?format == html
     """
-    if not current_user.is_authenticated or not current_user.is_admin():
+    if not current_user.is_authenticated or not current_user.is_admin:
         return error(403, message="This page is off-limits to you.")
 
     response = {"success": False}
@@ -95,7 +95,7 @@ def add_user():
         try:
             db.insert("users", data={"name": username, "timestamp_token": int(time.time())})
 
-            user = User.get_by_name(username)
+            user = User.get_by_name(db, username)
             if user is None:
                 response = {**response, **{"message": "User was created but could not be instantiated properly."}}
             else:
@@ -117,7 +117,7 @@ def add_user():
                 # if a user does not use their token in time, maybe you want to
                 # be a benevolent admin and give them another change, without
                 # having them go through the whole signup again
-                user = User.get_by_name(username)
+                user = User.get_by_name(db, username)
                 db.update("users", data={"timestamp_token": int(time.time())}, where={"name": username})
 
                 try:
@@ -147,7 +147,7 @@ def reject_user():
 
     :return: HTML form, or message containing the e-mail send status
     """
-    if not current_user.is_authenticated or not current_user.is_admin():
+    if not current_user.is_authenticated or not current_user.is_admin:
         return error(403, message="This page is off-limits to you.")
 
     email_address = request.form.get("email", request.args.get("email", "")).strip()
@@ -201,7 +201,7 @@ def reject_user():
 @login_required
 @admin_required
 def manipulate_user(mode):
-    if not current_user.is_authenticated or not current_user.is_admin():
+    if not current_user.is_authenticated or not current_user.is_admin:
         return error(403, message="This page is off-limits to you.")
 
     user_email = request.args.get("name", request.form.get("current-name"))
@@ -244,7 +244,7 @@ def manipulate_user(mode):
             else:
                 try:
                     db.insert("users", user_data)
-                    user = User.get_by_name(user_data["name"])
+                    user = User.get_by_name(db, user_data["name"])
 
                     if request.form.get("password"):
                         user.set_password(request.form.get("password"))

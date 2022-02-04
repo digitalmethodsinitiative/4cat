@@ -19,7 +19,7 @@
 {% endif %}
 {% for option in options %}
     {% set settings = options[option] %}
-    {% if not settings.requires or (current_user.is_authenticated and current_user.is_admin()) or current_user.get_attribute(settings.requires) %}
+    {% if not settings.requires or (current_user.is_authenticated and current_user.is_admin) or current_user.get_attribute(settings.requires) %}
     {% if not fieldset.open %}<fieldset>{% set fieldset.open = True %}{% endif %}
     {% if settings.type == "divider" %}
         </fieldset>
