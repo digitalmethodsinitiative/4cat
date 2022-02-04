@@ -274,7 +274,7 @@ def get_mapped_result(key):
 	except TypeError:
 		abort(404)
 
-	if dataset.is_private and not (current_user.is_admin() or dataset.owner == current_user.get_id()):
+	if dataset.is_private and not (current_user.is_admin or dataset.owner == current_user.get_id()):
 		return error(403, error="This dataset is private.")
 
 	if dataset.get_extension() == ".csv":
@@ -350,7 +350,7 @@ def show_results(page):
 		where.append("query LIKE %s")
 		replacements.append("%" + query_filter + "%")
 
-	if not current_user.is_admin():
+	if not current_user.is_admin:
 		where.append("(is_private = FALSE OR owner = %s)")
 		replacements.append(current_user.get_id())
 
@@ -450,7 +450,7 @@ def preview_items(key):
 	except TypeError:
 		return error(404, error="Dataset not found.")
 		
-	if dataset.is_private and not (current_user.is_admin() or dataset.owner == current_user.get_id()):
+	if dataset.is_private and not (current_user.is_admin or dataset.owner == current_user.get_id()):
 		return error(403, error="This dataset is private.")
 
 	preview_size = 1000
@@ -570,10 +570,10 @@ def restart_dataset(key):
 	except TypeError:
 		return error(404, message="Dataset not found.")
 		
-	if dataset.is_private and not (current_user.is_admin() or dataset.owner == current_user.get_id()):
+	if dataset.is_private and not (current_user.is_admin or dataset.owner == current_user.get_id()):
 		return error(403, error="This dataset is private.")
 
-	if current_user.get_id() != dataset.owner and not current_user.is_admin():
+	if current_user.get_id() != dataset.owner and not current_user.is_admin:
 		return error(403, message="Not allowed.")
 
 	if not dataset.is_finished():

@@ -101,7 +101,7 @@ class User:
 		if not dataset.is_private:
 			return True
 
-		elif self.is_admin():
+		elif self.is_admin:
 			return True
 
 		elif self.get_id() == dataset.owner:
@@ -113,8 +113,7 @@ class User:
 		else:
 			return False
 
-
-	def __init__(self, data, authenticated=False):
+	def __init__(self, db, data, authenticated=False):
 		"""
 		Instantiate user object
 

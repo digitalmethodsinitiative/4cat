@@ -38,5 +38,13 @@ if has_column["num"] == 0:
 else:
     print("  ...Yes, nothing to update.")
 
+print("  Checking if anonymous user exists...")
+has_anon = db.fetchone("SELECT COUNT(*) AS num FROM users WHERE name = 'anonymous'")
+if not has_anon["num"] > 0:
+    print("  ...No, adding.")
+    db.execute("INSERT INTO users (name, password) VALUES ('anonymous', '')")
+    db.commit()
+
+
 
 print("  Done!")
