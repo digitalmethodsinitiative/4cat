@@ -48,7 +48,7 @@ class DataSet(FourcatModule):
 	staging_area = None
 
 	def __init__(self, parameters={}, key=None, job=None, data=None, db=None, parent=None, extension="csv",
-				 type=None):
+				 type=None, is_private=True, owner="anonymous"):
 		"""
 		Create new dataset object
 
@@ -101,12 +101,14 @@ class DataSet(FourcatModule):
 			self.data = {
 				"key": self.key,
 				"query": self.get_label(parameters, default=type),
+				"owner": owner,
 				"parameters": json.dumps(parameters),
 				"result_file": "",
 				"status": "",
 				"type": type,
 				"timestamp": int(time.time()),
 				"is_finished": False,
+				"is_private": is_private,
 				"software_version": get_software_version(),
 				"software_file": "",
 				"num_rows": 0,
@@ -454,6 +456,23 @@ class DataSet(FourcatModule):
 		except FileNotFoundError:
 			# already deleted, apparently
 			pass
+
+	def update_children(self, **kwargs):
+		"""
+		Update an attribute for all child datasets
+
+		Can be used to e.g. change the owner, version, finished status for all
+		datasets in a tree
+
+		:param kwargs:  Parameters corresponding to known dataset attributes
+		"""
+		children = self.db.fetchall("SELECT * FROM datasets WHERE key_parent = %s", (self.key,))
+		for child in children:
+			child = DataSet(key=child["key"], db=self.db)
+			for attr, value in kwargs.items():
+				child.__setattr__(attr, value)
+
+			child.update_children(**kwargs)
 
 	def is_finished(self):
 		"""

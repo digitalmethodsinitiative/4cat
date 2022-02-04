@@ -46,9 +46,18 @@
                         appropriate.</p>
                     <div class="form-element">
                         <label for="data-pseudonymise">Pseudonymise:</label>
-                        <div class="filter-parameters" id="board-filter">
+                        <div class="filter-parameters">
                             <label><input type="checkbox" checked="checked" name="pseudonymise" id="data-pseudonymise"> Replace author names with hashed values</label>
                         </div>
+                    </div>
+                    <div class="form-element">
+                        <label for="data-make-private">Make private:</label>
+                        <div class="filter-parameters">
+                            <label><input type="checkbox" name="make-private" id="data-make-private"> Make dataset private</label>
+                        </div>
+
+                        <button class="tooltip-trigger" aria-controls="tooltip-dataset-private" aria-label="Extended help for option">?</button>
+                        <p role="tooltip" id="tooltip-dataset-private">This will only hide your dataset from other users. It will NOT encrypt your data and instance maintainers will still be able to view it. If you are working with sensitive data, you should consider running your own 4CAT instance.</p>
                     </div>
                     <div class="form-element">
                         <label for="dataset-label">Dataset name:</label>

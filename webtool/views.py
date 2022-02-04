@@ -7,6 +7,9 @@ import re
 import csv
 import json
 import glob
+
+import flask
+
 import config
 import markdown
 
@@ -21,7 +24,7 @@ from flask_login import login_required, current_user
 from webtool import app, db, log
 from webtool.lib.helpers import Pagination, error
 
-from webtool.api_tool import delete_dataset, toggle_favourite, queue_processor, nuke_dataset
+from webtool.api_tool import delete_dataset, toggle_favourite, toggle_private, queue_processor, nuke_dataset
 
 from common.lib.dataset import DataSet
 from common.lib.queue import JobQueue
@@ -271,6 +274,9 @@ def get_mapped_result(key):
 	except TypeError:
 		abort(404)
 
+	if dataset.is_private and not (current_user.is_admin() or dataset.owner == current_user.get_id()):
+		return error(403, error="This dataset is private.")
+
 	if dataset.get_extension() == ".csv":
 		# if it's already a csv, just return the existing file
 		return url_for(get_result, query_file=dataset.get_results_path().name)
@@ -333,7 +339,7 @@ def show_results(page):
 		depth = "own"
 
 	if depth == "own":
-		where.append("parameters::json->>'user' = %s")
+		where.append("owner = %s")
 		replacements.append(current_user.get_id())
 
 	if depth == "favourites":
@@ -344,6 +350,10 @@ def show_results(page):
 		where.append("query LIKE %s")
 		replacements.append("%" + query_filter + "%")
 
+	if not current_user.is_admin():
+		where.append("(is_private = FALSE OR owner = %s)")
+		replacements.append(current_user.get_id())
+
 	where = " AND ".join(where)
 
 	num_datasets = db.fetchone("SELECT COUNT(*) AS num FROM datasets WHERE " + where, tuple(replacements))["num"]
@@ -352,6 +362,9 @@ def show_results(page):
 	replacements.append(offset)
 	datasets = db.fetchall("SELECT key FROM datasets WHERE " + where + " ORDER BY timestamp DESC LIMIT %s OFFSET %s",
 						   tuple(replacements))
+
+	print("SELECT key FROM datasets WHERE " + where + " ORDER BY timestamp DESC LIMIT %s OFFSET %s")
+	print(replacements)
 
 	if not datasets and page != 1:
 		abort(404)
@@ -384,7 +397,10 @@ def show_result(key):
 	try:
 		dataset = DataSet(key=key, db=db)
 	except TypeError:
-		abort(404)
+		return error(404)
+		
+	if not current_user.can_access_dataset(dataset):
+		return error(403, error="This dataset is private.")
 
 	# child datasets are not available via a separate page - redirect to parent
 	if dataset.key_parent:
@@ -432,7 +448,10 @@ def preview_items(key):
 	try:
 		dataset = DataSet(key=key, db=db)
 	except TypeError:
-		return error(404, "Dataset not found.")
+		return error(404, error="Dataset not found.")
+		
+	if dataset.is_private and not (current_user.is_admin() or dataset.owner == current_user.get_id()):
+		return error(403, error="This dataset is private.")
 
 	preview_size = 1000
 
@@ -506,6 +525,34 @@ def toggle_favourite_interactive(key):
 		return render_template("error.html", message="Error while toggling favourite status for dataset %s." % key)
 
 
+@app.route("/result/<string:key>/toggle-private/")
+@login_required
+def toggle_private_interactive(key):
+	"""
+	Toggle dataset 'private' status
+
+	Uses code from corresponding API endpoint, but redirects to a normal page
+	rather than returning JSON as the API does, so this can be used for
+	'normal' links.
+
+	:param str key:  Dataset key
+	:return:
+	"""
+	success = toggle_private(key)
+	if not success.is_json:
+		return success
+
+	if success.json["success"]:
+		if success.json["is_private"]:
+			flash("Dataset has been made private")
+		else:
+			flash("Dataset has been made public")
+
+		return redirect("/results/" + key + "/")
+	else:
+		return render_template("error.html", message="Error while toggling private status for dataset %s." % key)
+
+
 @app.route("/result/<string:key>/restart/")
 @login_required
 def restart_dataset(key):
@@ -522,8 +569,11 @@ def restart_dataset(key):
 		dataset = DataSet(key=key, db=db)
 	except TypeError:
 		return error(404, message="Dataset not found.")
+		
+	if dataset.is_private and not (current_user.is_admin() or dataset.owner == current_user.get_id()):
+		return error(403, error="This dataset is private.")
 
-	if current_user.get_id() != dataset.parameters.get("user", "") and not current_user.is_admin:
+	if current_user.get_id() != dataset.owner and not current_user.is_admin():
 		return error(403, message="Not allowed.")
 
 	if not dataset.is_finished():
@@ -561,6 +611,9 @@ def nuke_dataset_interactive(key):
 		dataset = DataSet(key=key, db=db)
 	except TypeError:
 		return error(404, message="Dataset not found.")
+		
+	if not current_user.can_access_dataset(dataset):
+		return error(403, error="This dataset is private.")
 
 	top_key = dataset.top_parent().key
 	reason = request.form.get("reason", "")
@@ -592,6 +645,9 @@ def delete_dataset_interactive(key):
 		dataset = DataSet(key=key, db=db)
 	except TypeError:
 		return error(404, message="Dataset not found.")
+		
+	if not current_user.can_access_dataset(dataset):
+		return error(403, error="This dataset is private.")
 
 	top_key = dataset.top_parent().key
 

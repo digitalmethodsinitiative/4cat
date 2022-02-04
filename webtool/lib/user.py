@@ -86,7 +86,35 @@ class User:
 		else:
 			return User(db, user)
 
-	def __init__(self, db, data, authenticated=False):
+	def can_access_dataset(self, dataset):
+		"""
+		Check if this user should be able to access a given dataset.
+
+		This depends mostly on the dataset's owner, which should match the
+		user if the dataset is private. If the dataset is not private, or
+		if the user is an admin or the dataset is private but assigned to
+		an anonymous user, the dataset can be accessed.
+
+		:param dataset:  The dataset to check access to
+		:return bool:
+		"""
+		if not dataset.is_private:
+			return True
+
+		elif self.is_admin():
+			return True
+
+		elif self.get_id() == dataset.owner:
+			return True
+
+		elif dataset.owner == "anonymous":
+			return True
+
+		else:
+			return False
+
+
+	def __init__(self, data, authenticated=False):
 		"""
 		Instantiate user object
 
