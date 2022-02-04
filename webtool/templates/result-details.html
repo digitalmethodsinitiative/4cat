@@ -17,7 +17,7 @@
                         <li><a href="{{ url_for('toggle_private_interactive', key=dataset.key) }}" class="toggle-private"><i class="fas fa-lock{% if dataset.is_private %}-open{% endif %}" aria-hidden="true"></i> {% if dataset.is_private %}Make public{% else %}Make private{% endif %}</a></li>
                     {% endif %}
                     <li><a href="{{ url_for('show_result', key=dataset.key) }}"><i class="fas fa-link" aria-hidden="true"></i> Permalink</a></li>
-                    {% if current_user.get_id() == dataset.parameters.user or current_user.is_admin %}
+                    {% if current_user.get_id() == dataset.owner or current_user.is_admin %}
                         <li><a href="{{ url_for('delete_dataset_interactive', key=dataset.key) }}" class="confirm-first" data-confirm-action="delete this dataset"><i class="fas fa-trash-alt" aria-hidden="true"></i> Delete dataset</a></li>
                         <li><a href="{{ url_for('restart_dataset', key=dataset.key) }}" class="confirm-first" data-confirm-method="POST" data-confirm-action="delete all results for this dataset, including processor results, and re-run the query"><i class="fas fa-sync-alt" aria-hidden="true"></i> Re-run dataset</a></li>
                     {% endif %}
