@@ -452,10 +452,30 @@ def preview_items(key):
 			rows.append(list(row.values()))
 
 	except NotImplementedError:
-		abort(404)
+		return error(404)
 
 	return render_template("result-csv-preview.html", rows=rows, max_items=preview_size,
 						   dataset=dataset)
+
+@app.route("/results/<string:key>/log/")
+@login_required
+def view_log(key):
+	try:
+		dataset = DataSet(key=key, db=db)
+	except TypeError:
+		return error(404, "Dataset not found.")
+		
+	if dataset.is_private and not (current_user.is_admin or dataset.owner == current_user.get_id()):
+		return error(403, error="This dataset is private.")
+
+	logfile = dataset.get_log_path()
+	if not logfile.exists():
+		return error(404)
+
+	log = flask.Response(dataset.get_log_path().read_text("utf-8"))
+	log.headers["Content-type"] = "text/plain"
+
+	return log
 
 
 @app.route("/result/<string:key>/toggle-favourite/")
