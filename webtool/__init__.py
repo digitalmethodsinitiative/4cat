@@ -3,6 +3,8 @@ import subprocess
 import sys
 import os
 import logging
+
+from functools import partial
 from pathlib import Path
 
 # first-run.py ensures everything is set up right when running 4CAT for the first time
@@ -26,6 +28,8 @@ import config
 from common.lib.database import Database
 from common.lib.logger import Logger
 from common.lib.queue import JobQueue
+
+from webtool.lib.user import User
 
 # initialize global objects for interacting with all the things
 database_name = config.DB_NAME_TEST if hasattr(config.FlaskConfig,
@@ -73,10 +77,11 @@ limiter = Limiter(app, key_func=get_remote_address)
 
 # make sure a secret key was set in the config file, for secure session cookies
 if config.FlaskConfig.SECRET_KEY == "REPLACE_THIS":
-	raise Exception("You need to set a FLASK_SECRET in config.py before running the web tool.")
+    raise Exception("You need to set a FLASK_SECRET in config.py before running the web tool.")
 
 # initialize login manager
 app.config.from_object("config.FlaskConfig")
+login_manager.anonymous_user = partial(User.get_by_name, db=db, name="anonymous")
 login_manager.init_app(app)
 login_manager.login_view = "show_login"
 
@@ -93,5 +98,5 @@ import webtool.lib.template_filters
 
 # run it
 if __name__ == "__main__":
-	print('Starting server...')
-	app.run(host='0.0.0.0', debug=True)
+    print('Starting server...')
+    app.run(host='0.0.0.0', debug=True)

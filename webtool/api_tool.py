@@ -438,7 +438,7 @@ def edit_dataset_label(key):
 	except TypeError:
 		return error(404, error="Dataset does not exist.")
 
-	if not current_user.is_admin() and not current_user.get_id() == dataset.parameters.get("user"):
+	if not current_user.is_admin and not current_user.get_id() == dataset.parameters.get("user"):
 		return error(403, message="Not allowed")
 
 	dataset.update_label(label)
@@ -483,7 +483,7 @@ def convert_dataset(key):
 	except TypeError:
 		return error(404, error="Dataset does not exist.")
 
-	if not current_user.is_admin():
+	if not current_user.is_admin:
 		return error(403, message="Not allowed")
 
 	dataset.change_datasource(datasource)
@@ -531,7 +531,7 @@ def nuke_dataset(key=None, reason=None):
 	except TypeError:
 		return error(404, error="Dataset does not exist.")
 
-	if not current_user.is_admin():
+	if not current_user.is_admin:
 		return error(403, message="Not allowed")
 
 	# if there is an active or queued job for some child dataset, cancel and
@@ -594,7 +594,7 @@ def delete_dataset(key=None):
 	except TypeError:
 		return error(404, error="Dataset does not exist.")
 
-	if not current_user.is_admin() and not current_user.get_id() == dataset.parameters.get("user"):
+	if not current_user.is_admin and not current_user.get_id() == dataset.parameters.get("user"):
 		return error(403, message="Not allowed")
 
 	# if there is an active or queued job for some child dataset, cancel and

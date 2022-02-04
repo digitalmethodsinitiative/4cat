@@ -34,7 +34,7 @@ def load_user(user_name):
 	:param user_name:  ID of user
 	:return:  User object
 	"""
-	user = User.get_by_name(user_name)
+	user = User.get_by_name(db, user_name)
 	if user:
 		user.authenticate()
 	return user
@@ -65,7 +65,7 @@ def load_user_from_request(request):
 		return None
 	else:
 		db.execute("UPDATE access_tokens SET calls = calls + 1 WHERE name = %s", (user["user"],))
-		user = User.get_by_name(user["user"])
+		user = User.get_by_name(db, user["user"])
 		user.authenticate()
 		return user
 
@@ -75,7 +75,7 @@ def banned_users():
 	"""
 	Displays a 'sorry, no 4cat for you' message to banned or deactivated users.
 	"""
-	if current_user and current_user.is_authenticated and current_user.is_deactivated():
+	if current_user and current_user.is_authenticated and current_user.is_deactivated:
 		message = "Your 4CAT account has been deactivated and you can no longer access this page."
 		if current_user.get_attribute("deactivated.reason"):
 			message += "\n\nThe following reason was recorded for your account's deactivation: *"
@@ -116,7 +116,7 @@ def autologin_whitelist():
 	# if the hostname matches the whitelist
 	for hostmask in config.FlaskConfig.HOSTNAME_WHITELIST:
 		if fnmatch.filter([hostname], hostmask):
-			autologin_user = User.get_by_name("autologin")
+			autologin_user = User.get_by_name(db, "autologin")
 			if not autologin_user:
 				# this user should exist by default
 				abort(500)
@@ -166,7 +166,7 @@ def show_login():
 
 	username = request.form['username']
 	password = request.form['password']
-	registered_user = User.get_by_login(username, password)
+	registered_user = User.get_by_login(db, username, password)
 
 	if registered_user is None:
 		flash('Username or Password is invalid.', 'error')
@@ -279,8 +279,8 @@ def reset_password():
 		# we need *a* token
 		return render_template("error.html", message="You need a valid reset token to set a password.")
 
-	resetting_user = User.get_by_token(token)
-	if not resetting_user or resetting_user.is_special():
+	resetting_user = User.get_by_token(db, token)
+	if not resetting_user or resetting_user.is_special:
 		# this doesn't mean the token is unknown, but it could be older than 3 days
 		return render_template("error.html",
 							   message="You need a valid reset token to set a password. Your token may have expired: in this case, you have to request a new one.")
@@ -333,8 +333,8 @@ def request_password():
 			flash("Please provide a username.")
 
 		# is it also a valid username? that is not a 'special' user (like autologin)?
-		resetting_user = User.get_by_name(username)
-		if resetting_user is None or resetting_user.is_special():
+		resetting_user = User.get_by_name(db, username)
+		if resetting_user is None or resetting_user.is_special:
 			incomplete.append("username")
 			flash("That user is not known here. Note that your username is typically your e-mail address.")
 
