@@ -263,7 +263,7 @@ class DataSet(FourcatModule):
 			# data file, for the scenario where a csv file was uploaded and
 			# converted to an ndjson-based data source, for example
 			# todo: this is kind of ugly, and a better fix may be possible
-			extension_fits = hasattr(own_processor, "extension") and ("." + own_processor.extension) == self.get_extension()
+			extension_fits = hasattr(own_processor, "extension") and own_processor.extension == self.get_extension()
 			if hasattr(own_processor, "map_item") and extension_fits:
 				item_mapper = own_processor.map_item
 
