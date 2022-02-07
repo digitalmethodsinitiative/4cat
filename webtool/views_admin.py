@@ -22,7 +22,7 @@ from webtool import app, db
 from webtool.lib.helpers import admin_required, error, Pagination
 from webtool.lib.user import User
 
-from common.lib.helpers import call_api
+from common.lib.helpers import call_api, send_email
 
 
 @app.route('/admin/', defaults={'page': 1})
@@ -177,19 +177,17 @@ def reject_user():
         return render_template("account/reject.html", email=email_address, name=name, message=form_message,
                                incomplete=incomplete)
 
-    email = MIMEMultipart("alternative")
-    email["From"] = config.NOREPLY_EMAIL
-    email["To"] = email_address
-    email["Subject"] = "Your %s account request" % config.TOOL_NAME
+    message = MIMEMultipart("alternative")
+    message["From"] = config.NOREPLY_EMAIL
+    message["To"] = email_address
+    message["Subject"] = "Your %s account request" % config.TOOL_NAME
+
+    html_message = markdown.markdown(form_message)
+    message.attach(MIMEText(form_message, "plain"))
+    message.attach(MIMEText(html_message, "html"))
 
     try:
-        html_message = markdown.markdown(form_message)
-
-        email.attach(MIMEText(form_message, "plain"))
-        email.attach(MIMEText(html_message, "html"))
-
-        with smtplib.SMTP(config.MAILHOST) as smtp:
-            smtp.sendmail(config.NOREPLY_EMAIL, [email_address], email.as_string())
+        send_email([email_address], message)
     except (smtplib.SMTPException, ConnectionRefusedError) as e:
         return render_template("error.html", message="Could not send e-mail to %s: %s" % (email_address, e),
                                title="Error sending rejection")
