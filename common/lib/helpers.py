@@ -86,6 +86,8 @@ def sniff_encoding(file):
 	elif hasattr(file, "peek"):
 		buffer = file.peek(32)
 		maybe_bom = buffer[:3]
+	elif type(file) in (bytes, bytearray):
+		maybe_bom = file[:3]
 	else:
 		maybe_bom = False
 

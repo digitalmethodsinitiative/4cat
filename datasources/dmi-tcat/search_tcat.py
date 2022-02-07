@@ -8,9 +8,11 @@ import json
 import re
 import io
 
+import ural
+
 from backend.abstract.search import Search
 from common.lib.exceptions import QueryParametersException
-from common.lib.helpers import UserInput
+from common.lib.helpers import UserInput, sniff_encoding
 import config
 
 
@@ -199,57 +201,102 @@ class SearchWithinTCATBins(Search):
         }
 
         # for now we simply request the full CSV export of the bin with the
-        # given parameters. To account for large exports, it would be better
-        # to chunk the download and parse it item by item
-        # todo: chunk the download
+        # given parameters, letting TCAT handle the full text search and so
+        # on
         self.dataset.update_status("Searching for tweets on %s" % bin_host)
-        response = requests.get(request_url, params=parameters)
+        response = requests.get(request_url, params=parameters, stream=True)
+        if response.status_code != 200:
+            return self.dataset.finish_with_error("Query bin not available: received HTTP Error %i" % response.status_code)
 
-        # this is terrible and should be done better
-        # the issue is that the downloaded csv file has a BOM which we want to ignore
-        # there has to be a better way than this
-        # todo: do something less dumb here
-        wrapped_export = io.TextIOWrapper(io.BytesIO(), encoding="utf-8-sig", line_buffering=True)
-        wrapped_export.write(response.text.encode("utf-8").decode("utf-8-sig"))
-        wrapped_export.seek(0)
-        reader = csv.DictReader(wrapped_export, delimiter=",")
-
+        # process the file in 1kB chunks, buffer as we go
+        # If a newline is encountered, the buffer is processed as a row of csv
+        # data. This works as long as there are no newlines in the csv itself,
+        # which is the case for TCAT exports. Processing as a stream is needed
+        # to avoid having to load the full file in memory
+        buffer = bytearray()
+        fieldnames = None
         items = 0
-        for tweet in reader:
-            if items % 500 == 0:
-                self.dataset.update_status("Loaded %i tweets from bin %s@%s" % (items, bin_name, bin_host))
-                items += 1
+        encoding = None
+        for chunk in response.iter_content(chunk_size=1024):
+            # see if this chunk contains a newline, in which case we have a
+            # full line to process (e.g. as a tweet)
+            lines = []
+            buffer += bytearray(chunk)
 
-            # there is more data in the downloaded csv file than this; the
-            # format here is identical to that of the Twitter v2 data source's
-            # `map_item()` output.
-            # todo: do something with the other data
-            yield {
-                "id": tweet["id"],
-                "thread_id": tweet["in_reply_to_status_id"] if tweet["in_reply_to_status_id"] else tweet["id"],
-                "timestamp": tweet["created_at"],
-                "unix_timestamp": tweet["time"],
-                "subject": "",
-                "body": tweet["text"],
-                "author": tweet["from_user_name"],
-                "author_fullname": tweet["from_user_realname"],
-                "author_id": tweet["from_user_id"],
-                "source": tweet["source"],
-                "language_guess": tweet.get("lang"),
-                "possibly_sensitive": "yes" if tweet.get("possibly_sensitive") not in ("", "0") else "no",
-                "retweet_count": tweet["retweet_count"],
-                "reply_count": -1,
-                "like_count": tweet["favorite_count"],
-                "quote_count": -1,
-                "is_retweet": "yes" if tweet["text"][:4] == "RT @" else "no",
-                "is_quote_tweet": "yes" if tweet["quoted_status_id"] else "no",
-                "is_reply": "yes" if "in_repy_to_status_id" else "no",
-                "hashtags": ",".join(re.findall(r"#([^\s!@#$%^&*()_+{}:\"|<>?\[\];'\,./`~]+)", tweet["text"])),
-                "urls": ",".join(re.findall(r"https?://[^\s\]()]+", tweet["text"])),
-                "images": ",".join(re.findall(r"https://t\.co/[a-zA-Z0-9]+$", tweet["text"])),
-                "mentions": ",".join(re.findall(r"@([^\s!@#$%^&*()+{}:\"|<>?\[\];'\,./`~]+)", tweet["text"])),
-                "reply_to": tweet["to_user_name"]
-            }
+            if not encoding and len(buffer) > 3:
+                # response.encoding is not correct sometimes, since it does not
+                # indicate that the file uses a BOM, so sniff it instead once
+                # we have some bytes
+                encoding = sniff_encoding(buffer)
+
+            # split buffer by newlines and process each full line
+            # the last line is always carried over, since it may be incomplete
+            if b"\n" in buffer:
+                buffered_lines = buffer.split(b"\n")
+                lines = buffered_lines[:-1]
+                buffer = buffered_lines.pop()
+            elif not chunk:
+                # eof, process left-over data
+                lines = buffer.split(b"\n")
+
+            # and finally we can process the data
+            for line in lines:
+                # use a dummy csv reader to abstract away the annoying csv parsing
+                # this is quite a bit of overhead, but beats implementing csv parsing
+                # manually, and it's still reasonably fast (about 10k/second)
+                dummy_file = io.TextIOWrapper(io.BytesIO(line.replace(b"\0", b"")), encoding=encoding)
+                reader = csv.reader(dummy_file,
+                                    delimiter=",",
+                                    quotechar='"',
+                                    doublequote=True,
+                                    quoting=csv.QUOTE_MINIMAL)
+                row_data = next(reader)
+
+                if row_data and not fieldnames:
+                    # first line in file
+                    fieldnames = row_data.copy()
+                elif row_data:
+                    tweet = dict(zip(fieldnames, row_data))
+                    items += 1
+
+                    if items % 250 == 0:
+                        self.dataset.update_status("Loaded %i tweets from bin %s@%s" % (items, bin_name, bin_host))
+
+                    # there is more data in the downloaded csv file than this; the
+                    # format here is identical to that of the Twitter v2 data source's
+                    # `map_item()` output.
+                    # todo: do something with the other data
+                    yield {
+                        "id": tweet["id"],
+                        "thread_id": tweet["in_reply_to_status_id"] if tweet["in_reply_to_status_id"] else tweet["id"],
+                        "timestamp": int(tweet["created_at"]),
+                        "unix_timestamp": tweet["time"],
+                        "subject": "",
+                        "body": tweet["text"],
+                        "author": tweet["from_user_name"],
+                        "author_fullname": tweet["from_user_realname"],
+                        "author_id": tweet["from_user_id"],
+                        "source": tweet["source"],
+                        "language_guess": tweet.get("lang"),
+                        "possibly_sensitive": "yes" if tweet.get("possibly_sensitive") not in ("", "0") else "no",
+                        "retweet_count": tweet["retweet_count"],
+                        "reply_count": -1,
+                        "like_count": tweet["favorite_count"],
+                        "quote_count": -1,
+                        "is_retweet": "yes" if tweet["text"][:4] == "RT @" else "no",
+                        "is_quote_tweet": "yes" if tweet["quoted_status_id"] else "no",
+                        "is_reply": "yes" if "in_repy_to_status_id" else "no",
+                        "hashtags": ",".join(re.findall(r"#([^\s!@#$%^&*()_+{}:\"|<>?\[\];'\,./`~]+)", tweet["text"])),
+                        "urls": ",".join(ural.urls_from_text(tweet["text"])),
+                        "images": ",".join(re.findall(r"https://t\.co/[a-zA-Z0-9]+$", tweet["text"])),
+                        "mentions": ",".join(re.findall(r"@([^\s!@#$%^&*()+{}:\"|<>?\[\];'\,./`~]+)", tweet["text"])),
+                        "reply_to": tweet["to_user_name"]
+                    }
+
+            if not chunk:
+                # end of file
+                break
+
 
     @staticmethod
     def validate_query(query, request, user):
