@@ -20,3 +20,16 @@ Required endpoints:
 ----- Dataset text filter endpoint.
 - Thread enpoint. Loads an entire thread.
 
+
+
+BUGS / IMPROVEMENTS
+- Remember "show annotations"
+- Safari: New field stays on "applying"
+- Feature to arrange the options fields
+- Page index also on top
+- duurt lang om op te slaan
+- meer feedback over welke annotaties zijn opgeslagen en wanneer
+- save annotations één knop en vragen of je het ook naar de dataset weg wilt schrijven, met uitleg dat het lang kan duren
+- annotation view compacter
+- synchronisatie werking duidelijk maken
+- kleine "how to use"

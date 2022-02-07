@@ -104,6 +104,9 @@ class YouTubeMetadata(BasicProcessor):
 
 		for post in self.source_dataset.iterate_items(self):
 
+			if not post:
+				continue
+
 			post_urls = []
 
 			# Reddit posts have a dedicated URL column.
