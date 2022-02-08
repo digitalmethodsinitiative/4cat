@@ -23,7 +23,7 @@
         <span class="inline-label">{{ parameter }}:</span>
         <span class="inline-query has-more" data-max-length="75">{{ dataset.parameters[parameter]|string }}</span>
         {% elif dataset.parameters[parameter] %}
-        <span class="property-badge">{{ parameter }}</span>
+        <span class="property-badge"><i class="fa fa-check" aria-hidden="true"></i> {{ parameter }}</span>
         {% endif %}
     {% endif %}
 {% endfor %}

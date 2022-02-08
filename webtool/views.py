@@ -417,7 +417,7 @@ def show_result(key):
 
 	# if the datasource is configured for it, this dataset may be deleted at some point
 	datasource = dataset.parameters.get("datasource", "")
-	datasources = list(backend.all_modules.datasources.keys())
+	datasources = backend.all_modules.datasources
 	if datasource in backend.all_modules.datasources and backend.all_modules.datasources[datasource].get("expire-datasets", None):
 		timestamp_expires = dataset.timestamp + int(backend.all_modules.datasources[datasource].get("expire-datasets"))
 	else:

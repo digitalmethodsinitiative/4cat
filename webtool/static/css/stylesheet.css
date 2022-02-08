@@ -761,6 +761,11 @@ article section li p, article aside li p {
     cursor: default;
 }
 
+.property-badge.fullsize {
+    font-size: 0.8em;
+    margin-right: 0.5em;
+}
+
 a.property-badge {
     cursor: pointer;
 }
