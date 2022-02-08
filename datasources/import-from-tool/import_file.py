@@ -2,6 +2,8 @@
 Custom data upload to create bespoke datasets
 """
 import datetime
+import requests
+import ural
 import time
 import json
 import csv
@@ -34,13 +36,18 @@ class ImportFromExternalTool(BasicProcessor):
 				"facebook-crowdtangle": "Facebook (CrowdTangle export)",
 				"facebook-crowdtangle-old": "Facebook (CrowdTangle export, old format)",
 				"instagram-dmi-scraper": "Instagram (DMI Instagram scraper)",
-				"tiktok": "TikTok (drawrowfly/tiktok-scraper)"
+				"tiktok": "TikTok (drawrowfly/tiktok-scraper)",
+				# "tiktok-trex": "TikTok (TikTok Tracking Exposed)"
 			},
 			"default": "instagram-crowdtangle"
 		},
-		"data_upload": {
+		"data-upload": {
 			"type": UserInput.OPTION_FILE,
-			"help": "File"
+			"help": "File upload"
+		},
+		"data-url": {
+			"type": UserInput.OPTION_TEXT,
+			"help": "File URL"
 		}
 	}
 
@@ -51,13 +58,6 @@ class ImportFromExternalTool(BasicProcessor):
 		"instagram-dmi-scraper": (
 			"id", "thread_id", "parent_id", "body", "author", "timestamp", "type", "url", "thumbnail_url", "hashtags",
 			"usertags", "mentioned", "num_likes", "num_comments", "subject"
-		),
-		# todo: remove this one somewhere past june 2021
-		"facebook-crowdtangle-old": (
-			"User Name", "Facebook Id", "Likes at Posting", "Followers at Posting", "Created", "Type",
-			"Likes", "Comments", "Shares", "Love", "Wow", "Haha", "Sad", "Angry", "Care", "Video Share Status",
-			"Post Views", "Total Views", "Total Views For All Crossposts", "Video Length", "URL", "Message", "Link",
-			"Final Link", "Image Text", "Link Text", "Description", "Sponsor Id", "Sponsor Name", "Total Interactions"
 		),
 		"facebook-crowdtangle": (
 			"Page Name", "User Name", "Facebook Id", "Page Category", "Page Admin Top Country", "Page Description",
@@ -71,6 +71,10 @@ class ImportFromExternalTool(BasicProcessor):
 			"id", "text", "createTime", "authorMeta.name", "authorMeta.id", "musicMeta.musicId", "musicMeta.musicName",
 			"musicMeta.musicAuthor", "imageUrl", "videoUrl", "diggCount", "shareCount", "playCount", "commentCount",
 			"mentions", "hashtags"
+		),
+		"tiktok-trex": (
+			"type", "videoId", "authorId", "publishingDate", "order", "tags", "metadataId", "savingTime", "publicKey",
+			"query", "textdesc", "thumbfile"
 		),
 		"facepager": (
 			"path", "id", "parent_id", "level", "object_id", "object_type", "query_status", "query_time", "query_type",
@@ -105,22 +109,49 @@ class ImportFromExternalTool(BasicProcessor):
 		"""
 
 		# do we have an uploaded file?
-		if "option-data_upload" not in request.files:
+		if "option-data-upload" not in request.files:
 			raise QueryParametersException("No file was offered for upload.")
 
 		platform = query.get("platform", "")
 		if platform not in ImportFromExternalTool.required_columns:
 			raise QueryParametersException("Invalid platform")
 
-		file = request.files["option-data_upload"]
-		if not file:
-			raise QueryParametersException("No file was offered for upload.")
+		if platform == "tiktok-trex":
+			# this one gets the data from a remote URL
+			# this approach works generically, so could be applied for other
+			# URL-based imports in the future
+			url = query.get("data-url")
+			if not ural.is_url(url, allow_spaces_in_path=True):
+				raise QueryParametersException("No valid URL was offered for importing.")
 
-		# detect encoding - UTF-8 with or without BOM
-		encoding = sniff_encoding(file)
-		wrapped_upload = io.TextIOWrapper(file, encoding=encoding)
+			download = requests.get(url, stream=True)
+
+			if download.status_code != 200:
+				raise QueryParametersException("URL returned a '%i' response, cannot download." % download.status_code)
+
+			encoding = download.encoding
+			buffer = bytearray()
+			for chunk in download.iter_content(chunk_size=1024):
+				if not chunk or len(buffer) >= 2048:
+					# 2048 bytes ought to be enough for everybody
+					# to sniff the csv/json format and BOM, at least
+					download.close()
+					break
+
+				buffer += bytearray(chunk)
+
+			file = io.BytesIO(buffer)
+
+		else:
+			file = request.files["option-data-upload"]
+			if not file:
+				raise QueryParametersException("No file was offered for upload.")
+
+			# detect encoding - UTF-8 with or without BOM
+			encoding = sniff_encoding(file)
 
 		# validate file as csv
+		wrapped_upload = io.TextIOWrapper(file, encoding=encoding)
 		reader = csv.DictReader(wrapped_upload, delimiter=",")
 
 		try:
@@ -148,6 +179,7 @@ class ImportFromExternalTool(BasicProcessor):
 		return {"filename": disallowed_characters.sub("", file.filename), "time": time.time(), "datasource": platform,
 				"board": "upload", "platform": platform}
 
+	@staticmethod
 	def after_create(query, dataset, request):
 		"""
 		Hook to execute after the dataset for this source has been created
@@ -159,10 +191,8 @@ class ImportFromExternalTool(BasicProcessor):
 		:param DataSet dataset:  Dataset created for this query
 		:param request:  Flask request submitted for its creation
 		"""
-		hashtag = re.compile(r"#([^\s,.+=-]+)")
-		usertag = re.compile(r"@([^\s,.+=-]+)")
 
-		file = request.files["option-data_upload"]
+		file = request.files["option-data-upload"]
 		platform = dataset.parameters.get("platform")
 
 		# this is a bit hacky, but sometimes we have multiple tools that can
@@ -174,6 +204,9 @@ class ImportFromExternalTool(BasicProcessor):
 		datasource = platform.split("-")[0]
 		dataset.type = "%s-search" % datasource
 		dataset.datasource = datasource
+
+		re_hashtag = re.compile(r"#([^\s,.+=-]+)")
+		re_usertag = re.compile(r"@([^\s,.+=-]+)")
 
 		file.seek(0)
 		done = 0
@@ -201,8 +234,8 @@ class ImportFromExternalTool(BasicProcessor):
 
 					id = url.split("/")[-1]
 					caption = item["Description"]
-					hashtags = hashtag.findall(caption)
-					usertags = usertag.findall(caption)
+					hashtags = re_hashtag.findall(caption)
+					usertags = re_usertag.findall(caption)
 
 					datestamp = " ".join(item["Post Created"].split(" ")[:-1])
 					date = datetime.datetime.strptime(datestamp, "%Y-%m-%d %H:%M:%S")
@@ -225,75 +258,6 @@ class ImportFromExternalTool(BasicProcessor):
 						"num_comments": item["Comments"],
 						"subject": item["Title"]}
 					)
-
-		elif platform == "facebook-crowdtangle-old":
-			# todo: remove this one somewhere after june 2021
-			with dataset.get_results_path().open("w", encoding="utf-8", newline="") as output_csv:
-				wrapped_upload = io.TextIOWrapper(file, encoding=encoding)
-				reader = csv.DictReader(wrapped_upload)
-
-				entity_name = "Page Name" if "Page Name" in reader.fieldnames else "Group Name"
-
-				writer = csv.DictWriter(output_csv, fieldnames=(
-					"id", "thread_id", "body", "author", "subject", "timestamp", "unix_timestamp", "page_id",
-					"page_name", "page_likes", "page_followers", "page_shared_from", "type", "interactions", "likes",
-					"comments", "shares", "likes_love", "likes_wow", "likes_haha", "likes_sad", "likes_angry",
-					"likes_care", "views_post", "views_total", "views_total_crossposts", "video_length", "video_status",
-					"url", "url_original", "body_image", "body_link", "body_description", "hashtags", "sponsor_id",
-					"sponsor_name"))
-				writer.writeheader()
-
-				dataset.update_status("Sorting by date...")
-				posts = sorted(reader, key=lambda x: x["Created"])
-
-				dataset.update_status("Processing posts...")
-				for item in posts:
-					done += 1
-					hashtags = hashtag.findall(item["Message"])
-
-					date = datetime.datetime.strptime(" ".join(item["Created"].split(" ")[:2]), "%Y-%m-%d %H:%M:%S")
-
-					is_from_elsewhere = item["Link"].find("https://www.facebook.com/" + item["User Name"]) < 0
-					shared_page = item["Link"].split("/")[3] if is_from_elsewhere and item["Link"].find("https://www.facebook.com/") == 0 else ""
-
-					writer.writerow({
-						"id": item["URL"].split("/")[-1],
-						"thread_id": item["URL"].split("/")[-1],
-						"body": item["Message"],
-						"author": item["User Name"],
-						"subject": "",
-						"timestamp": date.strftime('%Y-%m-%d %H:%M:%S'),
-						"unix_timestamp": int(date.timestamp()),
-						"page_name": item[entity_name],
-						"page_likes": item["Likes at Posting"],
-						"page_id": item["Facebook Id"],
-						"page_followers": item["Followers at Posting"],
-						"page_shared_from": shared_page,
-						"type": item["Type"],
-						"interactions": int(re.sub(r"[^0-9]", "", item["Total Interactions"])) if item["Total Interactions"] else 0,
-						"comments": item["Comments"],
-						"shares": item["Shares"],
-						"likes": item["Likes"],
-						"likes_love": item["Love"],
-						"likes_wow": item["Wow"],
-						"likes_haha": item["Haha"],
-						"likes_sad": item["Sad"],
-						"likes_angry": item["Angry"],
-						"likes_care": item["Care"],
-						"views_post": item["Post Views"],
-						"views_total": item["Total Views"],
-						"views_total_crossposts": item["Total Views For All Crossposts"],
-						"video_length": "" if item["Video Length"] == "N/A" else item["Video Length"],
-						"video_status": item["Video Share Status"],
-						"url": item["URL"],
-						"hashtags": ",".join(hashtags),
-						"url_original": item["Link"],
-						"body_image": item["Image Text"],
-						"body_link": item["Link Text"],
-						"body_description": item["Description"],
-						"sponsor_id": item["Sponsor Id"],
-						"sponsor_name": item["Sponsor Name"]
-					})
 
 		elif platform == "facebook-crowdtangle":
 			with dataset.get_results_path().open("w", encoding="utf-8", newline="") as output_csv:
@@ -319,7 +283,7 @@ class ImportFromExternalTool(BasicProcessor):
 				dataset.update_status("Processing posts...")
 				for item in posts:
 					done += 1
-					hashtags = hashtag.findall(item["Message"])
+					hashtags = re_hashtag.findall(item["Message"])
 
 					date = datetime.datetime.strptime(" ".join(item["Post Created"].split(" ")[:2]), "%Y-%m-%d %H:%M:%S")
 
@@ -437,7 +401,7 @@ class ImportFromExternalTool(BasicProcessor):
 						"hashtags": ",".join(hashtags),
 					})
 
-		elif platform == "facepager":
+		elif platform == "tiktok-trex":
 			with dataset.get_results_path().open("w", encoding="utf-8", newline="") as output_csv:
 				wrapped_upload = io.TextIOWrapper(file, encoding=encoding)
 				reader = csv.DictReader(wrapped_upload)
@@ -481,30 +445,8 @@ class ImportFromExternalTool(BasicProcessor):
 						"hashtags": ",".join(hashtags),
 					})
 
-
 		file.close()
 
 		dataset.finish(done)
 		dataset.update_status("Result processed")
 		dataset.update_version(get_software_version())
-
-
-	@classmethod
-	def get_options(cls, parent_dataset=None, user=None):
-		"""
-		Get processor options
-
-		This method by default returns the class's "options" attribute, or an
-		empty dictionary. It can be redefined by processors that need more
-		fine-grained options, e.g. in cases where the availability of options
-		is partially determined by the parent dataset's parameters.
-
-		:param DataSet parent_dataset:  An object representing the dataset that
-		the processor would be run on
-		:param User user:  Flask user the options will be displayed for, in
-		case they are requested for display in the 4CAT web interface. This can
-		be used to show some options only to privileges users.
-		"""
-		options = cls.options
-
-		return options
