@@ -375,7 +375,7 @@ const query = {
 					clearInterval(query.poll_interval);
 					let keyword = json.label;
 
-					$('#query-results').append('<li><a href="/results/' + json.key + '">' + keyword + ' (' + json.rows + ' items)</a></li>');
+					$('#query-results').append('<li><a href="../results/' + json.key + '">' + keyword + ' (' + json.rows + ' items)</a></li>');
 					query.enable_form();
 					alert('Query for \'' + keyword + '\' complete!');
 				} else {
@@ -668,6 +668,9 @@ const query = {
 					   $(this).val(cached_value);
 				   }
 				});
+
+				//update data source type indicator
+				$('#datasource-type-label').html(data.type.join(", "));
 
 				query.handle_density();
 				query.custom_board_options();
@@ -1021,7 +1024,7 @@ const dynamic_container = {
 	 */
 	init: function() {
 		// Update dynamic containers
-		setInterval(dynamic_container.refresh, 2500);
+		setInterval(dynamic_container.refresh, 250);
 	},
 
 	refresh: function() {

@@ -1,3 +1,8 @@
+{% if dataset.is_private %}
+    <i class="fa fa-lock tooltip-trigger" aria-hidden="true" aria-controls="tooltip-{{ dataset.key }}-private"></i> <span class="sr-only">This dataset is private and can only be viewed by your user and instance maintainers</span>
+    <span role="tooltip" aria-hidden="true" id="tooltip-{{ dataset.key }}-private">This dataset is private and can only be viewed by your user and instance maintainers</span>
+{% endif %}
+
 {% if "pseudonymise" in dataset.parameters and dataset.parameters.pseudonymise %}
     <i class="fa fa-user-secret tooltip-trigger" aria-hidden="true" aria-controls="tooltip-{{ dataset.key }}-pseudonymised"></i> <span class="sr-only">Usernames have been pseudonymised</span>
     <span role="tooltip" aria-hidden="true" id="tooltip-{{ dataset.key }}-pseudonymised">Usernames have been pseudonymised</span>

@@ -1,24 +1,25 @@
 {% set fieldset = namespace(open=false) %}
 {% if labels %}
-    <p class="form-intro">Type: 
-    {% for label in labels %}
-        {% set label_id = label | replace(" ", "_") %}
-        <span class="property-badge tooltip-trigger" aria-controls="tooltip-option-label-{{ label_id }}">{{ label }}</span>
-        {% if label == "local" %}
-            <span role="tooltip" id="tooltip-option-label-{{ label_id }}">The data for this data source are gathered and stored by this 4CAT instance.</span>
-        {% elif label == "static" %}
-            <span role="tooltip" id="tooltip-option-label-{{ label_id }}">The data for this datasource are not updated anymore.</span>
-        {% elif label == "external api" %}
-            <span role="tooltip" id="tooltip-option-label-{{ label_id }}">The data for this datasource is collected through an external API.</span>
-        {% elif label == "experimental" %}
-            <span role="tooltip" id="tooltip-option-label-{{ label_id }}">This data source is not bug-proof.</span>
-        {% endif %}
-    {% endfor %}
-    </p>
+    <div role="tooltip" id="tooltip-datasource-type">
+        <ul>
+        {% for label in labels %}
+            {% set label_id = label | replace(" ", "_") %}
+            {% if label == "local" %}
+                <li>The data for this data source are gathered and stored by this 4CAT instance.</li>
+            {% elif label == "static" %}
+                <li>The data for this datasource are not updated anymore.</li>
+            {% elif label == "external api" %}
+                <li>The data for this datasource is collected through an external API.</li>
+            {% elif label == "experimental" %}
+                <li>This data source is not bug-proof.</li>
+            {% endif %}
+        {% endfor %}
+        </ul>
+    </div>
 {% endif %}
 {% for option in options %}
     {% set settings = options[option] %}
-    {% if not settings.requires or (current_user.is_authenticated and current_user.is_admin()) or current_user.get_attribute(settings.requires) %}
+    {% if not settings.requires or (current_user.is_authenticated and current_user.is_admin) or current_user.get_attribute(settings.requires) %}
     {% if not fieldset.open %}<fieldset>{% set fieldset.open = True %}{% endif %}
     {% if settings.type == "divider" %}
         </fieldset>

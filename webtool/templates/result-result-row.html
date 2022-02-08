@@ -18,4 +18,11 @@
         &bull; <a href="{{ url_for('get_mapped_result', key=dataset.key) }}"><i class="fas fa-download"
                                                                                              aria-hidden="true"></i>
             Download csv</a>
-    {% endif %}</dd>
+    {% endif %}
+    {% if dataset.get_log_path().exists() and current_user.is_authenticated %}
+        &bull; <a href="{{ url_for('view_log', key=dataset.key) }}"
+           data-load-from="{{ url_for('view_log', key=dataset.key) }}" class="popup-trigger"
+           aria-controls="popup-log-{{ dataset.key }}"><i class="fa fa-clipboard-list" aria-hidden="true"></i> Log file</a>
+        <div role="dialog" id="popup-log-{{ dataset.key }}"></div>
+    {% endif %}
+</dd>

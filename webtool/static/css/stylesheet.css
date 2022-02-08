@@ -299,6 +299,10 @@ nav > ul.flat > li:not(:last-child)::after {
     min-width: 25em;
 }
 
+*[role=tooltip] ul {
+    margin-left: 1.5em;
+}
+
 button.tooltip-trigger, button.popup-trigger {
 	font-size: 0.8em;
 	position: relative;
