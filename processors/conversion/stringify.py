@@ -2,6 +2,7 @@
 Collapse post bodies into one long string
 """
 import re
+import string
 
 from backend.abstract.processor import BasicProcessor
 from common.lib.helpers import UserInput
@@ -61,7 +62,7 @@ class Stringify(BasicProcessor):
 		if strip_numbers:
 			regex += "0-9"
 		if strip_punctuation:
-			regex += "\\/()>.,&'\"“”’‘«»:;\[\]„_–!?-#@•"
+			regex += string.punctuation
 		
 		delete_regex = re.compile("[\n\t" + regex + "]")
 
