@@ -14,10 +14,16 @@ import config
 
 
 @app.template_filter('datetime')
-def _jinja2_filter_datetime(date, fmt=None):
+def _jinja2_filter_datetime(date, fmt=None, wrap=True):
 	date = datetime.datetime.utcfromtimestamp(date)
 	format = "%d %b %Y" if not fmt else fmt
-	return date.strftime(format)
+	formatted = date.strftime(format)
+
+	if wrap:
+		html_formatted = date.strftime("%Y-%m-%dT%H:%M:%S%z")
+		return '<time datetime="' + html_formatted + '">' + formatted + '</time>'
+	else:
+		return formatted
 
 
 @app.template_filter('numberify')
@@ -110,6 +116,7 @@ def _jinja2_filter_filesize(file, short=False):
 	if bytes > (1024 * 1024):
 		return ("{0:" + format_precision + "}MB").format(bytes / 1024 / 1024)
 	elif bytes > 1024:
+		format_precision = ".0f"
 		return ("{0:" + format_precision + "}kB").format(bytes / 1024)
 	elif short:
 		return "%iB" % bytes

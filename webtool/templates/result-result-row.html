@@ -1,4 +1,4 @@
-<div id="dataset-{{ dataset.key }}-status" class="{% if not dataset.is_finished() or dataset.num_rows < 1 %}status-message{% else %}result-actions{% endif %}" {% if dataset.is_finished() %}data-num-results="{{ dataset.num_rows }}"{% endif %}>
+<div id="dataset-{{ dataset.key }}-status" class="full-block dataset-status {% if not dataset.is_finished() or dataset.num_rows < 1 %}status-message{% else %}result-actions{% endif %}" {% if dataset.is_finished() %}data-num-results="{{ dataset.num_rows }}"{% endif %}>
 {% if not dataset.is_finished() %}
     {% include "result-status.html" %}
 {% elif dataset.num_rows < 1 %}
@@ -24,7 +24,7 @@
         <a href="{{ url_for('preview_items', key=dataset.key) }}"
            data-load-from="{{ url_for('preview_items', key=dataset.key) }}" class="popup-trigger"
            aria-controls="popup-preview-{{ dataset.key }}">
-            <i class="fa fa-search" aria-hidden="true"></i> Preview
+            <i class="fa fa-eye" aria-hidden="true"></i> Preview
         </a>
         <div role="dialog" id="popup-preview-{{ dataset.key }}"></div>
         </li>

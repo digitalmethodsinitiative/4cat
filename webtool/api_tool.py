@@ -380,6 +380,8 @@ def check_dataset():
 	:return-error 404:  If the dataset does not exist.
 	"""
 	dataset_key = request.args.get("key")
+	block = request.args.get("block", "status")
+
 	try:
 		dataset = DataSet(key=dataset_key, db=db)
 	except TypeError:
@@ -401,10 +403,12 @@ def check_dataset():
 	else:
 		path = ""
 
+	template = "result-status.html" if block == "status" else "result-result-row.html"
+
 	status = {
 		"datasource": dataset.parameters.get("datasource"),
 		"status": dataset.get_status(),
-		"status_html": render_template("result-status.html", dataset=dataset),
+		"status_html": render_template(template, dataset=dataset),
 		"label": dataset.get_label(),
 		"rows": dataset.data["num_rows"],
 		"key": dataset_key,
@@ -559,6 +563,9 @@ def nuke_dataset(key=None, reason=None):
 			child.delete()
 		except JobNotFoundException:
 			pass
+		except ConnectionRefusedError:
+			return error(500,
+						 message="The 4CAT backend is not available. Try again in a minute or contact the instance maintainer if the problem persists.")
 
 	# now cancel and delete the job for this one (if it exists)
 	try:
@@ -566,6 +573,9 @@ def nuke_dataset(key=None, reason=None):
 		call_api("cancel-job", {"remote_id": dataset.key, "jobtype": dataset.type, "level": BasicWorker.INTERRUPT_CANCEL})
 	except JobNotFoundException:
 		pass
+	except ConnectionRefusedError:
+		return error(500,
+					 message="The 4CAT backend is not available. Try again in a minute or contact the instance maintainer if the problem persists.")
 
 	# wait for the dataset to actually be cancelled
 	time.sleep(2)
@@ -621,6 +631,8 @@ def delete_dataset(key=None):
 			job.finish()
 		except JobNotFoundException:
 			pass
+		except ConnectionRefusedError:
+			return error(500, message="The 4CAT backend is not available. Try again in a minute or contact the instance maintainer if the problem persists.")
 
 	# now cancel and delete the job for this one (if it exists)
 	try:
@@ -628,6 +640,9 @@ def delete_dataset(key=None):
 		call_api("cancel-job", {"remote_id": dataset.key, "jobtype": dataset.type, "level": BasicWorker.INTERRUPT_CANCEL})
 	except JobNotFoundException:
 		pass
+	except ConnectionRefusedError:
+		return error(500,
+					 message="The 4CAT backend is not available. Try again in a minute or contact the instance maintainer if the problem persists.")
 
 	# and delete the dataset and child datasets
 	dataset.delete()

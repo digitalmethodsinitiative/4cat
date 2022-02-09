@@ -42,7 +42,7 @@
                                             {{ board }}
                                             {% if datasource in stats and board in stats[datasource]["boards"] %}
                                             ({{ stats[datasource]["boards"][board]["posts"]|numberify }} posts
-                                            from {{ stats[datasource]["boards"][board]["first"]|datetime('%d %b %Y') }} to {{ stats[datasource]["boards"][board]["last"]|datetime('%d %b %Y'
+                                            from {{ stats[datasource]["boards"][board]["first"]|datetime('%d %b %Y')|safe }} to {{ stats[datasource]["boards"][board]["last"]|datetime('%d %b %Y'
                                             )
                                             }})
                                             {% endif %}

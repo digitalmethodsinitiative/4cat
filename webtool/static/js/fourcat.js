@@ -411,9 +411,13 @@ const query = {
 
 		$('.dataset-unfinished').each(function() {
 			let container = $(this);
+			let block_type = container.hasClass('full-block') ? 'full' : 'status';
 			$.getJSON({
 				url: getRelativeURL('api/check-query/'),
-				data: {key: $(this).attr('data-key')},
+				data: {
+					key: $(this).attr('data-key'),
+					block: block_type
+				},
 				success: function (json) {
 					if (json.done) {
 						//refresh

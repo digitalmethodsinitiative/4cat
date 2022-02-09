@@ -750,7 +750,7 @@ article section li p, article aside li p {
 }
 
 .property-badge {
-    font-size: 0.6em;
+    font-size: 0.8em;
     display: inline;
     border: 1px solid var(--contrast-dark);
     border-radius: 2px;

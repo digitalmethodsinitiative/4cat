@@ -42,7 +42,7 @@
             {% if timestamp_expires %}
                 <div class="fullwidth notice">
                     <strong>Note:</strong> this dataset will no longer be available
-                    after {{ timestamp_expires|datetime("%d %b %Y, %H:%M") }}.
+                    after {{ timestamp_expires|datetime("%d %b %Y, %H:%M")|safe }}.
                 </div>
             {% endif %}
 
@@ -56,12 +56,14 @@
 
             <div class="card-content">
                 <dl class="metadata-wrapper">
-                    <div>
+                    <div class="fullwidth">
                         <dt>Data source</dt>
                         <dd>
-                        <span class="property-badge fullsize">{{ dataset.parameters.datasource }}{%
+                        {% set github_link = dataset.get_version_url("backend/processors/" + processors[dataset.type].filepath) %}
+                        <{% if github_link %}a href="{{ github_link }}" rel="external" target="_blank"{% else %}span{% endif %} class="property-badge fullsize" >
+                            {{ dataset.parameters.datasource }}{%
                                 if "board" in dataset.parameters and dataset.parameters.board %}/
-                                {{ dataset.parameters.board }}/{% endif %}</span>
+                                {{ dataset.parameters.board }}/{% endif %}</{% if github_link %}a{% else %}span{% endif %}>
                         {% if dataset.parameters.datasource in datasources %}
                             {{ datasources[dataset.parameters.datasource].name }}
                         {% endif %}
@@ -69,9 +71,9 @@
                     </div>
 
                     <div class="fullwidth">
-                        <dt>Queued at</dt>
+                        <dt>Created</dt>
                         <dd>
-                            {{ dataset.timestamp|datetime(fmt="%d %b %Y, %H:%M") }}
+                            {{ dataset.timestamp|datetime(fmt="%d %B %Y, %H:%M")|safe }}
                             {% if current_user.is_authenticated and current_user.is_admin and dataset.owner %}
                                 by
                                 <a href="{{ url_for("manipulate_user", mode="edit") }}?name={{ dataset.owner }}">{{ dataset.owner }}</a>
@@ -103,7 +105,9 @@
 
                     <div class="fullwidth" id="dataset-result">
                         <dt>Result</dt>
-                        <dd>{% include "result-result-row.html" %}</dd>
+                        <dd data-key="{{ dataset.key }}"{% if not dataset.is_finished() %} class="dataset-unfinished"{% endif %}>
+                            {% include "result-result-row.html" %}
+                        </dd>
                     </div>
                 </dl>
             </div>
