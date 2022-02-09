@@ -98,6 +98,9 @@ class DataSet(FourcatModule):
 			self.parameters = json.loads(self.data["parameters"])
 			self.is_new = False
 		else:
+			if hasattr(config, "EXPIRE_DATASETS") and config.EXPIRE_DATASETS and not parent:
+				parameters["expires-after"] = int(time.time() + config.EXPIRE_DATASETS)
+
 			self.data = {
 				"key": self.key,
 				"query": self.get_label(parameters, default=type),

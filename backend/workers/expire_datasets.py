@@ -43,7 +43,7 @@ class DatasetExpirer(BasicWorker):
 		# and now find datasets that have their expiration date set
 		# individually
 		cutoff = int(time.time())
-		datasets += self.db.fetchall("SELECT key FROM datasets WHERE parameters::json->>'expires-after' IS NOT NULL AND (parameters::json->>'expires-after')::int > %s", (cutoff,))
+		datasets += self.db.fetchall("SELECT key FROM datasets WHERE parameters::json->>'expires-after' IS NOT NULL AND (parameters::json->>'expires-after')::int < %s", (cutoff,))
 
 		# we instantiate the dataset, because its delete() method does all
 		# the work (e.g. deleting child datasets) for us
