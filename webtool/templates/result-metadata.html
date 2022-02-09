@@ -18,7 +18,7 @@
     {% elif parameter == "country_name" and dataset.parameters[parameter] != "all" %}
         <span class="inline-label">country:</span>
         <span class="inline-query">{{ dataset.parameters.country_name|join(', ') }}</span>
-    {% elif dataset.parameters[parameter] and parameter[0:4] != "api_" and parameter not in ("jst", "mst", "copied_from", "copied_at", "pseudonymise", "user", "time", "search-scope", "search_scope", "random_amount", "scope_length", "scope_density", "country_name", "min_date", "max_date", "board", "datasource", "type", "label") %}
+    {% elif dataset.parameters[parameter] and parameter[0:4] != "api_" and parameter not in ("jst", "mst", "copied_from", "copied_at", "pseudonymise", "user", "time", "search-scope", "search_scope", "random_amount", "scope_length", "scope_density", "country_name", "min_date", "max_date", "board", "datasource", "type", "label", "expires-after") %}
         {% if not dataset.parameters[parameter]|isbool and dataset.parameters[parameter] %}
         <span class="inline-label">{{ parameter }}:</span>
         <span class="inline-query has-more" data-max-length="75">{{ dataset.parameters[parameter]|string }}</span>

@@ -31,7 +31,7 @@
         <dl class="metadata-wrapper">
         {% if timestamp_expires %}
             <div class="fullwidth notice">
-                <strong>Note:</strong> this dataset will no longer be available after {{ timestamp_expires|datetime("%d %b %Y, %H:%M") }}
+                <strong>Note:</strong> this dataset will no longer be available after {{ timestamp_expires|datetime("%d %b %Y, %H:%M") }}.{% if not expires_by_datasource and can_unexpire %} You can <a href="{{ url_for("keep_dataset", key=dataset.key) }}">cancel deletion</a>.{% endif %}
             </div>
         {% endif %}
         {% if "copied_from" in dataset.parameters %}
