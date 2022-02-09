@@ -61,7 +61,7 @@ class Stringify(BasicProcessor):
 		if strip_numbers:
 			regex += "0-9"
 		if strip_punctuation:
-			regex += "\\/()>.,&'\"“”’‘«»:;\[\]„_–"
+			regex += "\\/()>.,&'\"“”’‘«»:;\[\]„_–!?-#@•"
 		
 		delete_regex = re.compile("[\n\t" + regex + "]")
 
