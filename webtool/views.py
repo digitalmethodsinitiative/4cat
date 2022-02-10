@@ -558,7 +558,7 @@ def toggle_private_interactive(key):
 		return render_template("error.html", message="Error while toggling private status for dataset %s." % key)
 
 
-@app.route("/result/<string:key>/restart/")
+@app.route("/results/<string:key>/restart/")
 @login_required
 def restart_dataset(key):
 	"""
@@ -584,16 +584,12 @@ def restart_dataset(key):
 	if not dataset.is_finished():
 		return render_template("error.html", message="This dataset is not finished yet - you cannot re-run it.")
 
-	if "type" not in dataset.parameters:
-		return render_template("error.html",
-							   message="This is an older dataset that unfortunately lacks the information necessary to properly restart it.")
-
 	for child in dataset.children:
 		child.delete()
 
 	dataset.unfinish()
 	queue = JobQueue(logger=log, database=db)
-	queue.add_job(jobtype=dataset.parameters["type"], remote_id=dataset.key)
+	queue.add_job(jobtype=dataset.type, remote_id=dataset.key)
 
 	flash("Dataset queued for re-running.")
 	return redirect("/results/" + dataset.key + "/")
