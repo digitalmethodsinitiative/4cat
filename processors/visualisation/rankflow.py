@@ -79,7 +79,7 @@ class RankFlowRenderer(BasicProcessor):
 		},
 		"filter-incomplete": {
 			"type": UserInput.OPTION_TOGGLE,
-			"default": True,
+			"default": False,
 			"help": "Remove items that do not occur in all mapped periods."
 		}
 	}
@@ -111,7 +111,7 @@ class RankFlowRenderer(BasicProcessor):
 		size_property = self.parameters.get("size_property")
 		include_value = self.parameters.get("show_value", False)
 		normal_size = self.parameters.get("normalise-size", False)
-		filter_incomplete = self.parameters.get("filter-incomplete", True)
+		filter_incomplete = self.parameters.get("filter-incomplete", False)
 
 		# completeness filter - this finds the items in the source data that
 		# do not have a value for all periods
