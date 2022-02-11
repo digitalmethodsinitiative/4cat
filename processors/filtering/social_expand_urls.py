@@ -222,9 +222,9 @@ class UrlUnshortener(BasicProcessor):
                 if self.interrupted:
                     raise ProcessorInterruptedException("Interrupted while iterating through items")
 
-                expanded_urls = []
-
-                post["body"] = re.sub(r"https?://[^\s]+", resolve_redirect, post["body"])
+                if post.get("body"):
+                    expanded_urls = []
+                    post["body"] = re.sub(r"https?://[^\s]+", resolve_redirect, post["body"])
 
                 # go through links and do a HEAD request for all of them to figure out the redirect location
                 if post.get("urls"):
