@@ -635,6 +635,45 @@ def delete_dataset(key=None):
 	return jsonify({"status": "success", "key": dataset.key})
 
 
+@app.route("/api/erase-credentials/", methods=["DELETE"])
+@api_ratelimit
+@login_required
+@openapi.endpoint("tool")
+def erase_credentials(key=None):
+	"""
+	Erase sensitive parameters from dataset
+
+	Removes all parameters starting with `api_`. This heuristic could be made
+	more expansive if more fine-grained control is required.
+
+	:request-param str key:  ID of the dataset to delete
+	:request-param str ?access_token:  Access token; only required if not
+	logged in currently.
+
+	:return: A dictionary with a successful `status`.
+
+	:return-schema: {type=object,properties={status={type=string}}}
+
+	:return-error 404:  If the dataset does not exist.
+	:return-error 403:  If the user is not an administrator or the owner
+	"""
+	dataset_key = request.form.get("key", "") if not key else key
+
+	try:
+		dataset = DataSet(key=dataset_key, db=db)
+	except TypeError:
+		return error(404, error="Dataset does not exist.")
+
+	if not current_user.is_admin and not current_user.get_id() == dataset.owner:
+		return error(403, message="Not allowed")
+
+	for field in dataset.parameters:
+		if field.startswith("api_"):
+			dataset.delete_parameter(field, instant=True)
+
+	return jsonify({"status": "success", "key": dataset.key})
+
+
 @app.route("/api/check-search-queue/")
 @login_required
 @openapi.endpoint("tool")
@@ -821,7 +860,7 @@ def queue_processor(key=None, processor=None):
 		"container": "*[data-dataset-key=" + dataset.key + "]",
 		"key": analysis.key,
 		"html": render_template("result-child.html", child=analysis, dataset=dataset, parent_key=dataset.key,
-								processors=backend.all_modules.processors) if analysis.is_new else "",
+                                processors=backend.all_modules.processors) if analysis.is_new else "",
 		"messages": get_flashed_messages(),
 		"is_filter": available_processors[processor].is_filter()
 	})
@@ -873,8 +912,8 @@ def check_processor():
 			"key": dataset.key,
 			"finished": dataset.is_finished(),
 			"html": render_template("result-child.html", child=dataset, dataset=parent,
-									query=dataset.get_genealogy()[0], parent_key=top_parent.key,
-									processors=backend.all_modules.processors),
+                                    query=dataset.get_genealogy()[0], parent_key=top_parent.key,
+                                    processors=backend.all_modules.processors),
 			"resultrow_html": render_template("result-result-row.html", dataset=top_parent),
 			"url": "/result/" + dataset.data["result_file"]
 		})
@@ -890,7 +929,7 @@ def datasource_call(datasource, action):
 	Call datasource function
 
 	Datasources may define custom API calls as functions in a file
-	'webtool/views.py'. These are then available as 'actions' with this API
+	'webtool/views_misc.py'. These are then available as 'actions' with this API
 	endpoint. Any GET parameters are passed as keyword arguments to the
 	function.
 
@@ -908,7 +947,7 @@ def datasource_call(datasource, action):
 		return error(400, error="Datasource '%s' has no call '%s'" % (datasource, action))
 
 	folder = backend.all_modules.datasources[datasource]["path"]
-	views_file = folder.joinpath("webtool", "views.py")
+	views_file = folder.joinpath("webtool", "views_misc.py")
 	if not views_file.exists():
 		return error(400, error="Datasource '%s' has no call '%s'" % (datasource, action))
 
