@@ -67,7 +67,7 @@
         <div class="fullwidth">
             <dt>API Credentials</dt>
             <dd>
-                {% for credential in has_credentials %}<span class="property-badge">{{ credential }}</span>{% endfor %}
+                {% for credential in has_credentials %}<span class="property-badge">{{ credential }}</span> {% endfor %}
                 (<a href="{{ url_for("erase_credentials_interactive", key=dataset.key) }}">erase</a>)
             </dd>
         </div>
