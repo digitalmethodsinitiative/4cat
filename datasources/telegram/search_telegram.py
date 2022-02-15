@@ -16,7 +16,7 @@ from common.lib.helpers import convert_to_int, UserInput
 
 from datetime import datetime
 from telethon import TelegramClient
-from telethon.errors.rpcerrorlist import UsernameInvalidError, BadRequestError, TimeoutError
+from telethon.errors.rpcerrorlist import UsernameInvalidError, TimeoutError
 from telethon.tl.types import User, PeerChannel, PeerChat, PeerUser
 
 import config
@@ -48,27 +48,22 @@ class SearchTelegram(Search):
             "type": UserInput.OPTION_INFO,
             "help": "Messages are scraped in reverse chronological order: the most recent message for a given entity "
                     "(e.g. a group) will be scraped first.\n\nTo query the Telegram API, you need to supply your [API "
-                    "credentials](https://my.telegram.org/apps). These **will be sent to the 4CAT server** and will be "
-                    "stored there while data is fetched. After the dataset has been created your credentials will be "
-                    "deleted from the server. 4CAT at this time does not support two-factor authentication for "
-                    "Telegram."
+                    "credentials](https://my.telegram.org/apps). 4CAT at this time does not support two-factor "
+                    "authentication for Telegram."
         },
         "api_id": {
             "type": UserInput.OPTION_TEXT,
             "help": "API ID",
-            "sensitive": True,
             "cache": True,
         },
         "api_hash": {
             "type": UserInput.OPTION_TEXT,
             "help": "API Hash",
-            "sensitive": True,
             "cache": True,
         },
         "api_phone": {
             "type": UserInput.OPTION_TEXT,
             "help": "Phone number",
-            "sensitive": True,
             "cache": True,
             "default": "+xxxxxxxxxx"
         },
@@ -99,6 +94,22 @@ class SearchTelegram(Search):
         "daterange": {
             "type": UserInput.OPTION_DATERANGE,
             "help": "Date range"
+        },
+        "divider-2": {
+            "type": UserInput.OPTION_DIVIDER
+        },
+        "info-sensitive": {
+            "type": UserInput.OPTION_INFO,
+            "help": "Your API credentials and phone number **will be sent to the 4CAT server** and will be stored "
+                    "there while data is fetched. After the dataset has been created your credentials will be "
+                    "deleted from the server, unless you enable the option below. If you want to download images "
+                    "attached to the messages in your collected data, you need to enable this option. Your "
+                    "credentials will never be visible to other users and can be erased later via the result page."
+        },
+        "save-sensitive": {
+            "type": UserInput.OPTION_TOGGLE,
+            "help": "Save session:",
+            "default": False
         }
     }
 
@@ -115,6 +126,11 @@ class SearchTelegram(Search):
             self.dataset.update_status("Could not create dataset since the Telegram API Hash and ID are missing. Try "
                                        "creating it again from scratch.", is_final=True)
             return None
+
+        if not query.get("save-sensitive"):
+            self.dataset.delete_parameter("api_hash", instant=False)
+            self.dataset.delete_parameter("api_phone", instant=False)
+            self.dataset.delete_parameter("api_id", instant=False)
 
         results = asyncio.run(self.execute_queries())
         return results
