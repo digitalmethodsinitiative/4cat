@@ -127,12 +127,13 @@ class SearchTelegram(Search):
                                        "creating it again from scratch.", is_final=True)
             return None
 
-        if not query.get("save-sensitive"):
-            self.dataset.delete_parameter("api_hash", instant=False)
-            self.dataset.delete_parameter("api_phone", instant=False)
-            self.dataset.delete_parameter("api_id", instant=False)
-
         results = asyncio.run(self.execute_queries())
+
+        if not query.get("save-sensitive"):
+            self.dataset.delete_parameter("api_hash", instant=True)
+            self.dataset.delete_parameter("api_phone", instant=True)
+            self.dataset.delete_parameter("api_id", instant=True)
+            
         return results
 
     async def execute_queries(self):
@@ -506,6 +507,7 @@ class SearchTelegram(Search):
             "api_id": query.get("api_id"),
             "api_hash": query.get("api_hash"),
             "api_phone": query.get("api_phone"),
+            "save-sensitive": query.get("save-sensitive"),
             "min_date": min_date,
             "max_date": max_date
         }
