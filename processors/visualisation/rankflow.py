@@ -45,26 +45,52 @@ class RankFlowRenderer(BasicProcessor):
 	options = {
 		"colour_property": {
 			"type": UserInput.OPTION_CHOICE,
-			"options": {"change": "Change from previous", "weight": "Occurrence", "none": "None"},
+			"options": {
+				"change": "Delta (rising or falling items are highlighted)",
+				"weight": "Value (more prevalent items are highlighted)",
+				"item": "Item (unique colour per item)",
+				"none": "None (same colour for everything)"
+			},
 			"default": "change",
-			"help": "Colour according to",
-			"tooltip": "Colour by change to highlight elements that suddenly rise or drop in rank; colour by "
-					   "occurrence to highlight the most prevalent items per period"
+			"help": "Colour according to"
 		},
 		"size_property": {
 			"type": UserInput.OPTION_CHOICE,
-			"options": {"weight": "Occurence", "none": "None"},
+			"options": {
+				"weight": "Value (items with a higher value are bigger)",
+				"none": "None (same size for all elements)"
+			},
 			"default": "change",
-			"help": "Size according to",
-			"tooltip": "Either size each element according to how prevalent it is for the given period, or make all "
-					   "elements the same size."
+			"help": "Size according to"
+		},
+		"normalise-size": {
+			"type": UserInput.OPTION_TOGGLE,
+			"help": "Normalise size per period",
+			"tooltip": "This makes the rankings have the same height per period regardless of the amount of items in "
+					   "that period. Makes the graph more readable at the cost of over-representing periods with fewer "
+					   "items.",
+			"default": False
 		},
 		"show_value": {
 			"type": UserInput.OPTION_TOGGLE,
 			"default": True,
-			"help": "Include value in label"
+			"help": "Include value in label",
+			"tooltip": "Make the value (e.g. number of occurrences) part of the label."
+		},
+		"filter-incomplete": {
+			"type": UserInput.OPTION_TOGGLE,
+			"default": False,
+			"help": "Remove items that do not occur in all mapped periods."
 		}
 	}
+
+	# 25-colour palette via https://medialab.github.io/iwanthue/
+	palette = [[0.081, 1.0, 0.902], [0.625, 0.995, 0.749], [0.23, 1.0, 0.855], [0.883, 0.863, 1.0], [0.273, 1.0, 0.659],
+			   [0.823, 1.0, 0.549], [0.434, 1.0, 0.863], [0.917, 1.0, 0.82], [0.327, 0.498, 0.867],
+			   [0.587, 0.996, 0.914], [0.266, 1.0, 0.537], [0.602, 0.58, 1.0], [0.987, 1.0, 0.718],
+			   [0.46, 0.993, 0.549], [0.996, 0.718, 1.0], [0.397, 1.0, 0.459], [0.016, 0.541, 1.0],
+			   [0.309, 0.381, 0.843], [0.986, 0.431, 1.0], [0.188, 0.951, 0.161], [0.069, 0.468, 0.988],
+			   [0.179, 1.0, 0.475], [0.108, 0.502, 0.914], [0.096, 1.0, 0.502], [0.123, 1.0, 0.69]]
 
 	@classmethod
 	def is_compatible_with(cls, module=None):
@@ -74,7 +100,7 @@ class RankFlowRenderer(BasicProcessor):
 		:param module: Dataset or processor to determine compatibility with
 		"""
 		return module.is_rankable()
-		
+
 	def process(self):
 		"""
 		Render RankFlow diagram
@@ -84,52 +110,92 @@ class RankFlowRenderer(BasicProcessor):
 		colour_property = self.parameters.get("colour_property")
 		size_property = self.parameters.get("size_property")
 		include_value = self.parameters.get("show_value", False)
+		normal_size = self.parameters.get("normalise-size", False)
+		filter_incomplete = self.parameters.get("filter-incomplete", False)
 
-		# first create a map with the ranks for each period
+		# completeness filter - this finds the items in the source data that
+		# do not have a value for all periods
+		ignore = []
+		max_item_length = 0
+		if filter_incomplete:
+			all_periods = set()
+			known_periods = {}
+			for row in self.source_dataset.iterate_items(self):
+				all_periods.add(row["date"])
+
+				label = self.get_label(row)
+				if label not in known_periods:
+					known_periods[label] = set()
+
+				known_periods[label].add(row["date"])
+
+			ignore = [label for label in known_periods if len(known_periods[label]) != len(all_periods)]
+
+		# now first create a map with the ranks for each period
 		weighted = False
 		processed = 0
 		for row in self.source_dataset.iterate_items(self):
-			if self.interrupted:
-				raise ProcessorInterruptedException("Interrupted while analysing items")
-
 			processed += 1
 			if processed % 250 == 0:
 				self.dataset.update_status("Determining RankFlow parameters, item %i/%i" % (processed, self.source_dataset.num_rows))
 
-			if row["date"] not in items:
-				items[row["date"]] = {}
+			# figure out label and apply completeness filter
+			label = self.get_label(row)
+			if label in ignore:
+				continue
 
+			# always treat weight (value) as float - can be converted to lower
+			# precision later
 			try:
 				weight = float(row["value"])
 				weighted = True
 			except (KeyError, ValueError):
-				weight = 1
+				weight = 1.0
 
-			# Handle collocations a bit differently
-			if [k for k in row if k.startswith("word_")]:
-				label = " ".join([row[k] for k in row if k.startswith("word_")])
-			else:
-				label = row["item"]
-
+			if row["date"] not in items:
+				items[row["date"]] = {}
 			items[row["date"]][label] = weight
+
 			max_weight = max(max_weight, weight)
+			max_item_length = max(max_item_length, len(row["date"]))
 
 		# determine per-period changes
 		# this is used for determining what colour to give to nodes, and
 		# visualise outlying items in the data
 		changes = {}
-		max_change = 1
-		max_item_length = 0
+		max_change = 1.0
+		max_per_period = {}
+
+		# this is only needed for normalisation, but it's not too much overhead
+		for period in items:
+			max_per_period[period] = 0
+			for item, value in items[period].items():
+				max_per_period[period] += value
+
+		if normal_size:
+			# reset, because we're recalculating the weights
+			max_weight = 0.0
+
+		# determine deltas, normalise values, figure out item label length
 		for period in items:
 			self.dataset.update_status("Aggregating data for period %s" % period)
 			changes[period] = {}
-			for item in items[period]:
+			for item, value in items[period].items():
 				if self.interrupted:
 					raise ProcessorInterruptedException("Interrupted while aggregating items")
 
-				max_item_length = max(len(item), max_item_length)
-				now = items[period][item]
-				then = -1
+				if normal_size:
+					# normalise values as a percentage of the max value for
+					# that period
+					value = value / max_per_period[period]
+					items[period][item] = float(value)
+					max_weight = max(max_weight, value)
+
+				label = self.get_label({"item": item, "value": items[period][item]}, with_value=include_value, as_pct=normal_size)
+				max_item_length = max(len(label), max_item_length)
+				then = -1.0
+
+				# find most recent known value for this item
 				for previous_period in items:
 					if previous_period == period:
 						break
@@ -137,25 +203,28 @@ class RankFlowRenderer(BasicProcessor):
 						if previous_item == item:
 							then = items[previous_period][item]
 
+				# delta can be used to highlight trending topics
 				if then >= 0:
-					change = abs(now - then)
+					change = abs(value - then)
 					max_change = max(max_change, change)
 					changes[period][item] = change
 				else:
-					changes[period][item] = 1
+					changes[period][item] = 0.0
 
 		# some sizing parameters for the chart - experiment with these
 		fontsize_normal = 12
 		fontsize_small = 8
 		box_width = fontsize_normal
-		box_height = fontsize_normal * 1.25  # boxes will never be smaller than this
-		box_max_height = box_height * 10
-		box_gap_x = max_item_length * fontsize_normal * 0.75
+		box_height = fontsize_normal * 1.5  # boxes will never be smaller than this
+		box_max_height = box_height * (3 if normal_size else 6)  # how dramatic are the size changes?
+		box_gap_x = ((max_item_length + 3) * fontsize_normal / 2) - box_width
 		box_gap_y = 5
-		margin = 25
+
+		margin_width = max(25, 5 + ((box_gap_x + box_width) / 2))
+		margin_height = 20
 
 		# don't change this - initial X value for top left box
-		box_start_x = margin
+		box_start_x = margin_width
 
 		# we use this to know if and where to draw the flow curve between a box
 		# and its previous counterpart
@@ -169,6 +238,7 @@ class RankFlowRenderer(BasicProcessor):
 		labels = []
 		flows = []
 		definitions = []
+		date_labels = []
 
 		# this is the default colour for items (it's blue-ish)
 		# we're using HSV, so we can increase the hue for more prominent items
@@ -188,7 +258,14 @@ class RankFlowRenderer(BasicProcessor):
 		for period in items:
 			self.dataset.update_status("Rendering items for period %s" % period)
 			# reset Y coordinate, i.e. start at top
-			box_start_y = margin
+			box_start_y = margin_height + (fontsize_normal * 1.5)
+
+			# label at the very top, one per period (column)
+			date_labels.append(Text(
+				text=period,
+				insert=(box_start_x + (box_width / 2), (fontsize_normal * 2)),
+				text_anchor="middle"
+			))
 
 			for item in items[period]:
 				if item not in flow_ids:
@@ -204,11 +281,20 @@ class RankFlowRenderer(BasicProcessor):
 				height = int(
 					max(box_height, box_max_height * weight_factor)) if size_property != "none" and weighted else box_height
 
-				# colour ranges from blue to red
-				change = changes[period][item]
-				change_factor = 0 if not weighted or change <= 0 else (changes[period][item] / max_change)
-				colour = base_colour.copy()
-				colour[0] += (1 - base_colour[0]) * (weight_factor if colour_property == "weight" else change_factor)
+				if colour_property == "item":
+					# static colour from palette
+					colour_index = (flow_ids[item] - 1) % len(self.palette)
+					colour = self.palette[colour_index]
+					opacity = "1.0"  # too much?
+					text_colour = self.black_or_white(colour)
+				else:
+					# colour ranges from blue to red
+					change = changes[period][item]
+					change_factor = 0 if not weighted or change <= 0 else (changes[period][item] / max_change)
+					colour = base_colour.copy()
+					colour[0] += (1 - base_colour[0]) * (weight_factor if colour_property == "weight" else change_factor)
+					opacity = "0.35"
+					text_colour = "black"
 
 				# first draw the box
 				box_fill = "rgb(%i, %i, %i)" % tuple([int(v * 255) for v in colorsys.hsv_to_rgb(*colour)])
@@ -222,11 +308,11 @@ class RankFlowRenderer(BasicProcessor):
 
 				# then the text label
 				label_y = (box_start_y + (height / 2)) + 3
-				label_value = "" if not include_value else (" (%s)" % weight if weight != 1 else "")
 				label = Text(
-					text=(item + label_value),
-					insert=(box_start_x + box_width + box_gap_y, label_y),
-					class_=flow_class
+					text=self.get_label({"item": item, "value": weight}, with_value=include_value, as_pct=normal_size),
+					insert=(box_start_x + (box_width / 2), label_y),
+					class_=flow_class + " color-" + text_colour,
+					text_anchor="middle"
 				)
 				labels.append(label)
 
@@ -271,7 +357,7 @@ class RankFlowRenderer(BasicProcessor):
 					# beziers though quadratic could work as well since our
 					# control points are, in principle, mirrored
 					flow_start = (previous_box["x"] + previous_box["width"], previous_box["y"])
-					flow = Path(fill=gradient_key, opacity="0.35", class_=flow_class)
+					flow = Path(fill=gradient_key, opacity=opacity, class_=flow_class)
 					flow.push("M %f %f" % flow_start)  # go to start
 					flow.push("C %f %f %f %f %f %f" % (
 						*control_top_left, *control_top_right, box["x"], box["y"]))  # top bezier
@@ -295,8 +381,8 @@ class RankFlowRenderer(BasicProcessor):
 
 		# generate SVG canvas to add elements to
 		canvas = get_4cat_canvas(self.dataset.get_results_path(),
-								 width=(margin * 2) + (len(items) * (box_width + box_gap_x)),
-								 height=max_y + (margin * 2),
+								 width=(margin_width * 2) + (len(items) * box_width) + ((len(items) - 1) * box_gap_x),
+								 height=max_y + (margin_height * 2),
 								 fontsize_normal=fontsize_normal,
 								 fontsize_small=fontsize_small)
 
@@ -313,7 +399,7 @@ class RankFlowRenderer(BasicProcessor):
 			canvas.add(flow)
 
 		# add boxes and labels:
-		for item in (*boxes, *labels):
+		for item in (*boxes, *labels, *date_labels):
 			canvas.add(item)
 
 		# make it interactive
@@ -331,6 +417,65 @@ class RankFlowRenderer(BasicProcessor):
 			canvas.saveas(filename=str(self.dataset.get_results_path()))
 
 		self.dataset.finish(len(items) * len(list(items.items()).pop()))
+
+	def black_or_white(self, hsv):
+		"""
+		Determine text colour on a given background
+
+		First calculates the perceived lightness of the colour, then returns
+		either `black` or `white` depending on which of those has the highest
+		contrast against this background colour.
+
+		Thanks to https://stackoverflow.com/a/56678483 !
+
+		:param list hsv:  HSV values to calculate against
+		:return str: `black` or `white`
+		"""
+		red, green, blue = colorsys.hsv_to_rgb(*hsv)
+
+		# linearise rgb
+		r1 = (red / 12.92) if red <= 0.04045 else pow((red + 0.055) / 1.055, 2.4)
+		g1 = (green / 12.92) if green <= 0.04045 else pow((green + 0.055) / 1.055, 2.4)
+		b1 = (blue / 12.92) if blue <= 0.04045 else pow((blue + 0.055) / 1.055, 2.4)
+
+		# calculate luminance
+		y = (0.2126 * r1) + (0.7152 * g1) + (0.0722 * b1)
+
+		# calculate perceived lightness
+		l = (y * 903.3) if y <= 0.008856 else (pow(y, 1 / 3) * 116 - 16)
+
+		return "black" if l > 50 else "white"
+
+
+	def get_label(self, row, with_value=False, as_pct=False):
+		"""
+		Get label for row in source dataset
+
+		This can be either simply the listed item, or a combination of
+		collocated words. Simple convenience method.
+
+		:param dict row:  Row to get label from
+		:param bool with_value:  Include value in label?
+		:param bool as_pct:  Show value as percentage?
+		:return str:  Label
+		"""
+		label = ""
+		if [k for k in row if k.startswith("word_")]:
+			label += " ".join([row[k] for k in row if k.startswith("word_")])
+		else:
+			label += row["item"]
+
+		# how do we display the value, if at all?
+		# don't go further than 2 decimals for floats
+		if with_value and row["value"] != 1:
+			if row["value"] != int(row["value"]):
+				label_weight = "{0:.2g}".format(row["value"]) if not as_pct else str(int(row["value"] * 100)) + "%"
+			else:
+				label_weight = str(int(row["value"]))
+
+			label += " (%s)" % label_weight
+
+		return label
 
 	def get_svg_script(self):
 		"""
@@ -383,8 +528,14 @@ path.highlighted, rect.highlighted {
 	opacity: 1;
 }
 
+text.color-white {
+    fill: #FFF;
+    text-shadow: -1px 0 rgba(0,0,0,0.5), 0 1px rgba(0,0,0,0.5), 1px 0 rgba(0,0,0,0.5), 0 -1px rgba(0,0,0,0.5);
+}
+
 text.highlighted {
 	filter: url(#solid);
 	fill: #000;
+	text-shadow: none;
 }
 """

@@ -87,6 +87,15 @@ PATH_SESSIONS = "sessions" # folder where API session data is stored (e.g., Tele
 PATH_VERSION = ".git-checked-out"  # file containing a commit ID (everything after the first whitespace found is ignored)
 GITHUB_URL = "https://github.com/digitalmethodsinitiative/4cat"  # URL to the github repository for this 4CAT instance
 
+# These settings control whether top-level datasets (i.e. those created via the
+# 'Create dataset' page) are deleted automatically, and if so, after how much
+# time. You can also allow users to cancel this (i.e. opt out). Note that if
+# users are allowed to opt out, data sources can still force the expiration of
+# datasets created through that data source. This cannot be overridden by the
+# user.
+EXPIRE_DATASETS = 0  # 0 or False-y to not expire
+EXPIRE_ALLOW_OPTOUT = True  # allow users to opt out of expiration
+
 # 4CAT has an API (available from localhost) that can be used for monitoring
 # and will listen for requests on the following port. "0" disables the API.
 API_HOST = "localhost"

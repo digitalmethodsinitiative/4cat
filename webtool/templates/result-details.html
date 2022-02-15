@@ -13,12 +13,15 @@
                       <li><a href="{{ url_for('explorer_dataset', key=dataset.key) }}" class="explorer-dataset" target="__blank"><i class="fas fa-binoculars" aria-hidden="true"></i> Explore & annotate</a></li>
                     {% endif %}
                     <li><a href="{{ url_for('toggle_favourite_interactive', key=dataset.key) }}" class="toggle-favourites"><i class="fa{% if is_favourite %}r{% else %}s{% endif %} fa-star" aria-hidden="true"></i> {% if is_favourite %}Delete from{% else %}Add to{% endif %} favourites</a></li>
+                    {% if current_user.is_authenticated and (current_user.is_admin or current_user.get_id() == dataset.owner) %}
+                        <li><a href="{{ url_for('toggle_private_interactive', key=dataset.key) }}" class="toggle-private"><i class="fas fa-lock{% if dataset.is_private %}-open{% endif %}" aria-hidden="true"></i> {% if dataset.is_private %}Make public{% else %}Make private{% endif %}</a></li>
+                    {% endif %}
                     <li><a href="{{ url_for('show_result', key=dataset.key) }}"><i class="fas fa-link" aria-hidden="true"></i> Permalink</a></li>
-                    {% if current_user.get_id() == dataset.parameters.user or current_user.is_admin() %}
+                    {% if current_user.get_id() == dataset.owner or current_user.is_admin %}
                         <li><a href="{{ url_for('delete_dataset_interactive', key=dataset.key) }}" class="confirm-first" data-confirm-action="delete this dataset"><i class="fas fa-trash-alt" aria-hidden="true"></i> Delete dataset</a></li>
                         <li><a href="{{ url_for('restart_dataset', key=dataset.key) }}" class="confirm-first" data-confirm-method="POST" data-confirm-action="delete all results for this dataset, including processor results, and re-run the query"><i class="fas fa-sync-alt" aria-hidden="true"></i> Re-run dataset</a></li>
                     {% endif %}
-                    {% if current_user.is_admin() and not dataset.is_finished() %}
+                    {% if current_user.is_admin and not dataset.is_finished() %}
                         <li><a href="{{ url_for('nuke_dataset_interactive', key=dataset.key) }}" class="prompt-first" data-confirm-method="POST" data-confirm-var="reason" data-confirm-action="cancel this dataset? You can provide a reason that will be displayed to the user"><i class="fas fa-radiation" aria-hidden="true"></i> Cancel dataset</a></li>
                     {% endif %}
                 </ul>
@@ -28,7 +31,7 @@
         <dl class="metadata-wrapper">
         {% if timestamp_expires %}
             <div class="fullwidth notice">
-                <strong>Note:</strong> this dataset will no longer be available after {{ timestamp_expires|datetime("%d %b %Y, %H:%M") }}
+                <strong>Note:</strong> this dataset will no longer be available after {{ timestamp_expires|datetime("%d %b %Y, %H:%M") }}.{% if not expires_by_datasource and can_unexpire %} You can <a href="{{ url_for("keep_dataset", key=dataset.key) }}">cancel deletion</a>.{% endif %}
             </div>
         {% endif %}
         {% if "copied_from" in dataset.parameters %}
@@ -48,10 +51,10 @@
                 <dd>{{ dataset.timestamp|datetime(fmt="%d %b %Y, %H:%M") }}</dd>
             </div>
 
-        {% if current_user.is_authenticated and current_user.is_admin() and dataset.parameters.user %}
+        {% if current_user.is_authenticated and current_user.is_admin and dataset.owner %}
             <div class="fullwidth">
                 <dt>Queued by</dt>
-                <dd>{{ dataset.parameters.user }}</dd>
+                <dd>{{ dataset.owner }}</dd>
             </div>
         {% endif %}
 
@@ -60,7 +63,7 @@
                 <dd>{% include 'result-metadata.html' %}</dd>
             </div>
 
-            {% if dataset.is_finished() and dataset.num_rows > 0 and current_user.is_admin() and dataset.parameters.datasource == 'custom' %}
+            {% if dataset.is_finished() and dataset.num_rows > 0 and current_user.is_admin and dataset.parameters.datasource == 'custom' %}
             <div class="fullwidth" id="dataset-results">
                 <dt>Convert</dt>
                 <dd>

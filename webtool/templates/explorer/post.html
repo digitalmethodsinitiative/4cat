@@ -20,15 +20,12 @@
 		{% else %}
 			<span title="Author" class="author">
 			{% if custom_fields and custom_fields.get("author") %}
-				{% set author = custom_fields.author | post_field(post) %}
+				{% set author = custom_fields.author | post_field(post) | safe %}
 			{% else %}
 				{% set author = post.author %}
 			{% endif %}
-			{% if author|length > 20 %}
-				{{ author[:17] + '...' }}
-			{% else %}
-				{{ author }}
-			{% endif %}
+			{{ author }}
+
 		{% endif %}
 		</span>
 		{% if 'thread_id' in post %}

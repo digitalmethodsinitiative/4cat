@@ -505,6 +505,8 @@ class SearchReddit(SearchWithScope):
 			"body": post["body"].strip().replace("\r", ""),
 			"subject": "",
 			"author": post["author"],
+			"author_flair": post.get("author_flair_text", ""),
+			"post_flair": "",
 			"domain": "",
 			"url": "",
 			"image_file": "",
@@ -532,6 +534,8 @@ class SearchReddit(SearchWithScope):
 			"body": thread.get("selftext", "").strip().replace("\r", ""),
 			"subject": thread["title"],
 			"author": thread["author"],
+			"author_flair": thread.get("author_flair_text", ""),
+			"post_flair": thread.get("link_flair_text", ""),
 			"image_file": thread["url"] if image_match.search(thread["url"]) else "",
 			"domain": thread["domain"],
 			"url": thread["url"],
@@ -618,7 +622,7 @@ class SearchReddit(SearchWithScope):
 		query["board"] = ",".join(boards)
 		
 		# this is the bare minimum, else we can't narrow down the full data set
-		if not user.is_admin() and not user.get_value("reddit.can_query_without_keyword", False) and not query.get("body_match", "").strip() and not query.get("subject_match", "").strip() and not query.get("subject_url", ""):
+		if not user.is_admin and not user.get_value("reddit.can_query_without_keyword", False) and not query.get("body_match", "").strip() and not query.get("subject_match", "").strip() and not query.get("subject_url", ""):
 			raise QueryParametersException("Please provide a body query or subject query.")
 
 		# body query and full threads are incompatible, returning too many posts
