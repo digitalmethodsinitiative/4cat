@@ -50,7 +50,9 @@
 					
 					{% set custom_value = custom_fields[custom_field] | post_field(post) | safe %}
 					{% if custom_value and custom_value != "None" %}
-						<span title="{{ custom_field }}" class="{{ custom_field }}">{{ custom_value | safe }}</span>
+						{% if not ("author" in custom_field and pseudonymised) %}
+							<span title="{{ custom_field }}" class="{{ custom_field }}">{{ custom_value | safe }}</span>
+						{% endif %}
 					{% endif %}
 
 				{% endif %}

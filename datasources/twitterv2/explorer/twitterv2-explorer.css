@@ -33,17 +33,17 @@ body {
 	color: black;
 }
 
-.posts .post header .profile_picture {
+.posts .post header .author_picture {
 	float: left;
 	margin-right: 15px;
 }
 
-.posts .post header .profile_picture img {
+.posts .post header .author_picture img {
 	border-radius: 100px;
 	width: 50px;
 }
 
-.posts .post header .profile_picture:after {
+.posts .post header .author_picture:after {
 	display: none;
 }
 
