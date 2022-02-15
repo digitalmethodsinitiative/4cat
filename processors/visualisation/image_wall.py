@@ -80,7 +80,7 @@ class ImageWallGenerator(BasicProcessor):
 
 		:param module: Dataset or processor to determine compatibility with
 		"""
-		return module.type == "image-downloader"
+		return module.type.startswith("image-downloader")
 
 	def process(self):
 		"""
