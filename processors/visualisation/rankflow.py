@@ -159,6 +159,10 @@ class RankFlowRenderer(BasicProcessor):
 			max_weight = max(max_weight, weight)
 			max_item_length = max(max_item_length, len(row["date"]))
 
+		if not items:
+			return self.dataset.finish_with_error("No items remain after filtering. Try disabling 'Remove items that "
+												  "do not occur...'.")
+
 		# determine per-period changes
 		# this is used for determining what colour to give to nodes, and
 		# visualise outlying items in the data
