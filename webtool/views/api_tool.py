@@ -947,7 +947,7 @@ def datasource_call(datasource, action):
 		return error(400, error="Datasource '%s' has no call '%s'" % (datasource, action))
 
 	folder = backend.all_modules.datasources[datasource]["path"]
-	views_file = folder.joinpath("webtool", "views_misc.py")
+	views_file = folder.joinpath("webtool", "views.py")
 	if not views_file.exists():
 		return error(400, error="Datasource '%s' has no call '%s'" % (datasource, action))
 
