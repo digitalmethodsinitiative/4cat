@@ -117,6 +117,12 @@ class SearchTelegram(Search):
             return None
 
         results = asyncio.run(self.execute_queries())
+
+        if not query.get("save-sensitive"):
+            self.dataset.delete_parameter("api_hash", instant=True)
+            self.dataset.delete_parameter("api_phone", instant=True)
+            self.dataset.delete_parameter("api_id", instant=True)
+
         return results
 
     async def execute_queries(self):
