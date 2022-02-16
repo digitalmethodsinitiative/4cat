@@ -76,6 +76,12 @@ article.result > section:first-child {
     padding: 0.5em;
 }
 
+#dataset-result .dataset-items {
+    display: block;
+    padding: 0.5em;
+    border-bottom: 1px solid var(--gray);
+}
+
 #dataset-result .result-actions {
     text-align: center;
     padding: 0;

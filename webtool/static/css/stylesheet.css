@@ -741,10 +741,6 @@ article section li p, article aside li p {
 /** --------------------- *
   Pages -> Results metadata
   * --------------------- */
-.inline-label {
-    color: var(--accent-alternate);
-}
-
 .inline-query {
     overflow-wrap: anywhere;
 }
