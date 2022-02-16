@@ -157,6 +157,9 @@ const processor = {
 						new_element.css('height', '0px').css('border-width', '0px').css('opacity', 0);
 
 						let expand = function() {
+							if($('#child-tree-header').hasClass('collapsed')) {
+								$('#child-tree-header').attr('aria-hidden', 'false').removeClass('collapsed');
+							}
 							new_element.animate({'height': targetHeight, 'opacity': 1}, 500, false, function() { $(this).css('height', '').css('opacity', '').css('border-width', ''); });
 						}
 
@@ -202,6 +205,9 @@ const processor = {
 			data: {key: $(this).attr('data-key')},
 			success: function(json) {
 				$('li#child-' + json.key).animate({height: 0}, 200, function() { $(this).remove(); });
+				if($('.child-list.top-level li').length === 0) {
+					$('#child-tree-header').attr('aria-hidden', 'true').addClass('collapsed');
+				}
 				query.enable_form();
 			},
 			error: function(json) {
@@ -405,9 +411,13 @@ const query = {
 
 		$('.dataset-unfinished').each(function() {
 			let container = $(this);
+			let block_type = container.hasClass('full-block') ? 'full' : 'status';
 			$.getJSON({
 				url: getRelativeURL('api/check-query/'),
-				data: {key: $(this).attr('data-key')},
+				data: {
+					key: $(this).attr('data-key'),
+					block: block_type
+				},
 				success: function (json) {
 					if (json.done) {
 						//refresh

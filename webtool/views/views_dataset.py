@@ -316,12 +316,11 @@ def show_result(key):
 
     # if the datasource is configured for it, this dataset may be deleted at some point
     datasource = dataset.parameters.get("datasource", "")
-    datasources = list(backend.all_modules.datasources.keys())
+    datasources = backend.all_modules.datasources
     expires_datasource = False
     can_unexpire = hasattr(config, "EXPIRE_ALLOW_OPTOUT") and config.EXPIRE_ALLOW_OPTOUT
-    if datasource in backend.all_modules.datasources and backend.all_modules.datasources[datasource].get \
-                ("expire-datasets", None):
-        timestamp_expires = dataset.timestamp + int(backend.all_modules.datasources[datasource].get("expire-datasets"))
+    if datasource in datasources and datasources[datasource].get("expire-datasets", None):
+        timestamp_expires = dataset.timestamp + int(datasources[datasource].get("expire-datasets"))
         expires_datasource = True
     elif dataset.parameters.get("expires-after"):
         timestamp_expires = dataset.parameters.get("expires-after")
@@ -330,7 +329,7 @@ def show_result(key):
 
     # if the dataset has parameters with credentials, give user the option to
     # erase them
-    has_credentials = [p for p in dataset.parameters if p.startswith("api_")]
+    has_credentials = [p for p in dataset.parameters if p.startswith("api_") and p not in ("api_type", "api_track")]
 
     # we can either show this view as a separate page or as a bunch of html
     # to be retrieved via XHR
