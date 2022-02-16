@@ -741,16 +741,12 @@ article section li p, article aside li p {
 /** --------------------- *
   Pages -> Results metadata
   * --------------------- */
-.inline-label {
-    color: var(--accent-alternate);
-}
-
 .inline-query {
     overflow-wrap: anywhere;
 }
 
 .property-badge {
-    font-size: 0.6em;
+    font-size: 0.8em;
     display: inline;
     border: 1px solid var(--contrast-dark);
     border-radius: 2px;
@@ -759,6 +755,11 @@ article section li p, article aside li p {
     top: -1px;
 	vertical-align: baseline;
     cursor: default;
+}
+
+.property-badge.fullsize {
+    font-size: 0.8em;
+    margin-right: 0.5em;
 }
 
 a.property-badge {
