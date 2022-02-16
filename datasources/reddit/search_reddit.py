@@ -41,7 +41,7 @@ class SearchReddit(SearchWithScope):
 					"careful** when using this privilege.",
 			"requires": "reddit.can_query_without_keyword"
 		},
-		"api_type": {
+		"pushshift_track": {
 			"type": UserInput.OPTION_CHOICE,
 			"help": "API version",
 			"options": {
@@ -149,7 +149,7 @@ class SearchReddit(SearchWithScope):
 		:return list:  Posts, sorted by thread and post ID, in ascending order
 		"""
 		scope = query.get("search_scope")
-		self.api_type = query.get("api_type", "regular")
+		self.api_type = query.get("pushshift_track", "regular")
 		
 		# first, build the request parameters
 		if self.api_type == "regular":
@@ -646,7 +646,7 @@ class SearchReddit(SearchWithScope):
 				raise QueryParametersException("Please provide body queries that do not start with a minus sign.")
 
 		# URL queries are not possible (yet) for the beta API
-		if query.get("api_type") == "beta" and query.get("subject_url", None):
+		if query.get("pushshift_track") == "beta" and query.get("subject_url", None):
 			raise QueryParametersException("URL querying is not possible (yet) for the beta endpoint.")
 
 		# both dates need to be set, or none

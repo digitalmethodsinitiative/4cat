@@ -9,7 +9,7 @@ import re
 
 import flask
 import markdown
-from flask import render_template, abort, request, redirect, send_from_directory, flash, get_flashed_messages, \
+from flask import render_template, request, redirect, send_from_directory, flash, get_flashed_messages, \
     url_for, stream_with_context
 from flask_login import login_required, current_user
 
@@ -49,7 +49,7 @@ def show_page(page):
     page_path = page_folder + "/" + page + ".md"
 
     if not os.path.exists(page_path):
-        abort(404)
+        return error(404, error="Page not found")
 
     with open(page_path, encoding="utf-8") as file:
         page_raw = file.read()
@@ -117,7 +117,7 @@ def show_results(page):
     print(replacements)
 
     if not datasets and page != 1:
-        abort(404)
+        return error(404)
 
     pagination = Pagination(page, page_size, num_datasets)
     filtered = []
@@ -165,7 +165,7 @@ def get_mapped_result(key):
     try:
         dataset = DataSet(key=key, db=db)
     except TypeError:
-        abort(404)
+        return error(404, error="Dataset not found.")
 
     if dataset.is_private and not (current_user.is_admin or dataset.owner == current_user.get_id()):
         return error(403, error="This dataset is private.")
@@ -176,7 +176,7 @@ def get_mapped_result(key):
 
     if not hasattr(dataset.get_own_processor(), "map_item"):
         # cannot map without a mapping method
-        abort(404)
+        return error(404, error="File not found.")
 
     mapper = dataset.get_own_processor().map_item
 
@@ -216,7 +216,7 @@ def view_log(key):
     try:
         dataset = DataSet(key=key, db=db)
     except TypeError:
-        return error(404, "Dataset not found.")
+        return error(404, error="Dataset not found.")
 
     if dataset.is_private and not (current_user.is_admin or dataset.owner == current_user.get_id()):
         return error(403, error="This dataset is private.")
@@ -553,10 +553,10 @@ def delete_dataset_interactive(key):
 @login_required
 def erase_credentials_interactive(key):
     """
-	Erase sensitive parameters from dataset
+    Erase sensitive parameters from dataset
 
-	Removes all parameters starting with `api_`. This heuristic could be made
-	more expansive if more fine-grained control is required.
+    Removes all parameters starting with `api_`. This heuristic could be made
+    more expansive if more fine-grained control is required.
 
     Uses code from corresponding API endpoint, but redirects to a normal page
     rather than returning JSON as the API does, so this can be used for

@@ -28,7 +28,7 @@ class TelegramImageDownloader(BasicProcessor):
 
     Downloads attached images from Telegram messages and saves as zip archive
     """
-    type = "image-downloader"  # job type ID
+    type = "image-downloader-telegram"  # job type ID
     category = "Visual"  # category
     title = "Download images"  # title displayed in UI
     description = "Download images and compress as a zip file. May take a while to complete as images are downloaded " \
