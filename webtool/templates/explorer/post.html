@@ -2,33 +2,32 @@
 
 	<!-- Special fields we're handling a bit differently -->
 	{% set special_fields = ["external_url", "author", "body", "timestamp", "image", "images", "sort_options", "markdown"] %}
+	{% set pseudonymised = True if parameters and ('pseudonymise' in parameters and parameters.get('pseudonymise')) else False %}
 
-	<!-- Possible external link -->
+	<!-- Possible external link if not pseudonymised -->
 	{% if custom_fields and "external_url" in custom_fields %}
-
 		{% set external_url = custom_fields.external_url | post_field(post) %}
-		{% if external_url %}
-			<a href="{{ external_url }}" target="_blank"><span class="external-url" title="Original post"><i class="fas fa-external-link-alt"></i></span></a>
+		{% if external_url and pseudonymised %}
+			<span class="external-url deactivated" title="External URLs unavailable for pseudonymised datasets"><i class="fas fa-external-link-alt"></i></span>
+		{% elif external_url and not pseudonymised %}
+			<a href="{{ external_url }}" target="_blank"><span class="external-url" title="Go to original post"><i class="fas fa-external-link-alt"></i></span></a>
 		{% endif %}
 	{% endif %}
 
 	<header>
 		<!-- Metadata -->
-		{% if parameters and ('pseudonymise' in parameters and parameters.get('pseudonymise')) %}
+		{% if pseudonymised %}
 			<span title="Pseudonymous author" class="author">
 			<i class="fa fa-user-secret tooltip-trigger"></i>
 		{% else %}
 			<span title="Author" class="author">
 			{% if custom_fields and custom_fields.get("author") %}
-				{% set author = custom_fields.author | post_field(post) %}
+				{% set author = custom_fields.author | post_field(post) | safe %}
 			{% else %}
 				{% set author = post.author %}
 			{% endif %}
-			{% if author|length > 20 %}
-				{{ author[:17] + '...' }}
-			{% else %}
-				{{ author }}
-			{% endif %}
+			{{ author }}
+
 		{% endif %}
 		</span>
 		{% if 'thread_id' in post %}
@@ -51,7 +50,9 @@
 					
 					{% set custom_value = custom_fields[custom_field] | post_field(post) | safe %}
 					{% if custom_value and custom_value != "None" %}
-						<span title="{{ custom_field }}" class="{{ custom_field }}">{{ custom_value | safe }}</span>
+						{% if not ("author" in custom_field and pseudonymised) %}
+							<span title="{{ custom_field }}" class="{{ custom_field }}">{{ custom_value | safe }}</span>
+						{% endif %}
 					{% endif %}
 
 				{% endif %}

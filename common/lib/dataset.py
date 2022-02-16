@@ -592,7 +592,7 @@ class DataSet(FourcatModule):
 
 		annotations = self.db.fetchone("SELECT annotations FROM annotations WHERE key = %s;", (self.top_parent().key,))
 		
-		if annotations:
+		if annotations and annotations.get("annotations"):
 			return json.loads(annotations["annotations"])
 		else:
 			return None
@@ -822,14 +822,15 @@ class DataSet(FourcatModule):
 
 		return updated > 0
 
-	def delete_parameter(self, parameter):
+	def delete_parameter(self, parameter, instant=True):
 		"""
 		Delete a parameter from the dataset metadata
 
 		:param string parameter:  Parameter to delete
+		:param bool instant:  Also delete parameters in this instance object?
 		:return bool:  Update successul?
 		"""
-		parameters = self.parameters
+		parameters = self.parameters.copy()
 		if parameter in parameters:
 			del parameters[parameter]
 		else:
@@ -837,7 +838,9 @@ class DataSet(FourcatModule):
 
 		updated = self.db.update("datasets", where={"key": self.data["key"]},
 								 data={"parameters": json.dumps(parameters)})
-		self.parameters = parameters
+
+		if instant:
+			self.parameters = parameters
 
 		return updated > 0
 

@@ -86,12 +86,14 @@ login_manager.init_app(app)
 login_manager.login_view = "show_login"
 
 # import all views
-import webtool.access
-import webtool.views
-import webtool.views_admin
-import webtool.api_tool
-import webtool.api_explorer
-import webtool.api_standalone
+import webtool.views.views_misc
+import webtool.views.views_dataset
+import webtool.views.views_admin
+import webtool.views.views_processors
+import webtool.views.access
+import webtool.views.api_explorer
+import webtool.views.api_standalone
+import webtool.views.api_tool
 
 # import custom jinja2 template filters
 import webtool.lib.template_filters

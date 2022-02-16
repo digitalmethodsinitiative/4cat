@@ -529,8 +529,10 @@ def iterate_items(in_file, max_rows=None, sort_by=None, descending=False, force_
 				try:
 					# Get index number of sort_by value
 					sort_by = columns.index(sort_by)
+
 					# Generate reader on the basis of sort_by value
 					reader = sorted(reader, key=lambda x: to_float(x[sort_by], convert=force_int), reverse=descending)
+
 				except (ValueError, IndexError) as e:
 					pass
 			
@@ -674,7 +676,10 @@ def get_nested_value(di, keys):
 
 def to_float(value, convert=False):
 	if convert:
-		value = float(value)
+		if not value:
+			value = 0
+		else:
+			value = float(value)
 	return value
 
 def strip_html(post):

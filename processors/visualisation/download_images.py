@@ -71,7 +71,8 @@ class ImageDownloader(BasicProcessor):
 
 		:param module: Dataset or processor to determine compatibility with
 		"""
-		return module.type == "top-images" or module.type.endswith("search")
+		return (module.type == "top-images" or module.type.endswith("search")) \
+			   and module.type != "telegram-search"
 
 	def process(self):
 		"""

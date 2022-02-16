@@ -98,7 +98,7 @@ class PixPlotGenerator(BasicProcessor):
 
 		:param module: Dataset or processor to determine compatibility with
 		"""
-		return module.type == "image-downloader" and hasattr(config, 'PIXPLOT_SERVER') and config.PIXPLOT_SERVER
+		return module.type.startswith("image-downloader") and hasattr(config, 'PIXPLOT_SERVER') and config.PIXPLOT_SERVER
 
 	def process(self):
 		"""

@@ -18,7 +18,7 @@ import config
 from flask import request, abort, render_template, redirect, url_for, flash, get_flashed_messages
 from flask_login import login_user, login_required, logout_user, current_user
 from webtool import app, login_manager, db
-from webtool.api_tool import limiter
+from webtool.views.api_tool import limiter
 from webtool.lib.user import User
 from common.lib.helpers import send_email
 
@@ -201,11 +201,11 @@ def request_access():
 	"""
 	if not config.ADMIN_EMAILS:
 		return render_template("error.html",
-							   message="No administrator e-mail is configured; the request form cannot be displayed.")
+                               message="No administrator e-mail is configured; the request form cannot be displayed.")
 
 	if not config.MAILHOST:
 		return render_template("error.html",
-							   message="No e-mail server configured; the request form cannot be displayed.")
+                               message="No e-mail server configured; the request form cannot be displayed.")
 
 	if current_user.is_authenticated:
 		return render_template("error.html", message="You are already logged in and cannot request another account.")
@@ -252,13 +252,13 @@ def request_access():
 			try:
 				send_email(config.ADMIN_EMAILS, message)
 				return render_template("error.html", title="Thank you",
-									   message="Your request has been submitted; we'll try to answer it as soon as possible.")
+                                       message="Your request has been submitted; we'll try to answer it as soon as possible.")
 			except (smtplib.SMTPException, ConnectionRefusedError, socket.timeout) as e:
 				return render_template("error.html", title="Error",
-									   message="The form could not be submitted; the e-mail server is unreachable.")
+                                       message="The form could not be submitted; the e-mail server is unreachable.")
 
 	return render_template("account/request.html", incomplete=incomplete, flashes=get_flashed_messages(),
-						   form=request.form, access_policy=access_policy)
+                           form=request.form, access_policy=access_policy)
 
 
 @app.route("/reset-password/", methods=["GET", "POST"])
@@ -283,7 +283,7 @@ def reset_password():
 	if not resetting_user or resetting_user.is_special:
 		# this doesn't mean the token is unknown, but it could be older than 3 days
 		return render_template("error.html",
-							   message="You need a valid reset token to set a password. Your token may have expired: in this case, you have to request a new one.")
+                               message="You need a valid reset token to set a password. Your token may have expired: in this case, you have to request a new one.")
 
 	# check form
 	incomplete = []
@@ -303,8 +303,8 @@ def reset_password():
 
 	# show form
 	return render_template("account/reset-password.html", username=resetting_user.get_name(), incomplete=incomplete,
-						   flashes=get_flashed_messages(), token=token,
-						   form=request.form)
+                           flashes=get_flashed_messages(), token=token,
+                           form=request.form)
 
 
 @app.route("/request-password/", methods=["GET", "POST"])
@@ -349,7 +349,7 @@ def request_password():
 			try:
 				resetting_user.email_token(new=False)
 				return render_template("error.html", title="Success",
-									   message="An e-mail has been sent to you containing instructions on how to reset your password.")
+                                       message="An e-mail has been sent to you containing instructions on how to reset your password.")
 			except RuntimeError:
 				# no e-mail could be sent - clear the token so the user can try again later
 				resetting_user.clear_token()
@@ -358,4 +358,4 @@ def request_password():
 
 	# show page
 	return render_template("account/request-password.html", incomplete=incomplete, flashes=get_flashed_messages(),
-						   form=request.form)
+                           form=request.form)
