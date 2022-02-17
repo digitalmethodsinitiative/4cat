@@ -234,7 +234,7 @@ def request_access():
 			message["From"] = sender
 			message["To"] = config.ADMIN_EMAILS[0]
 
-			mail = "<p>Hello! Some requests a 4CAT Account:</p>\n"
+			mail = "<p>Hello! Someone requests a 4CAT Account:</p>\n"
 			for field in required:
 				mail += "<p><b>" + field + "</b>: " + request.form.get(field, "") + " </p>\n"
 
