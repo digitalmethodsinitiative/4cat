@@ -288,8 +288,6 @@ class PixPlotGenerator(BasicProcessor):
 		it in memory. Instead we will loop through it and build the metadata file as we go.
 
 		"""
-		# Get source file path; should be the top parent
-		source_path = self.dataset.top_parent().get_results_path()
 		# Get image data
 		with open(os.path.join(temp_path, '.metadata.json')) as file:
 			image_data = json.load(file)
@@ -334,7 +332,7 @@ class PixPlotGenerator(BasicProcessor):
 					item_mapper = parent_processor.map_item
 
 			# Loop through source file
-			for post in self.source_dataset.iterate_items(self):
+			for post in self.dataset.top_parent().iterate_items(self):
 
 				if item_mapper:
 					# and if so, map it
