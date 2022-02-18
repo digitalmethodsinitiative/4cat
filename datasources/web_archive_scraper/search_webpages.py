@@ -105,7 +105,7 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
                     try:
                         while time_to_wait > 0:
                             if self.check_for_movement():
-                                scraped_page = self.collect_results()
+                                scraped_page = self.collect_results(url)
                                 if scraped_page:
                                     scraped_page['text'] = self.scrape_beautiful_text(scraped_page['page_source'])
                                     break
