@@ -17,6 +17,7 @@ DATASOURCES = {
     "telegram": {},
     "twitterv2": {"id_lookup": True,},
     "url_scraper": {},
+    "web_archive_scraper": {},
 }
 
 #####################
