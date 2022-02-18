@@ -573,9 +573,9 @@ def validate_url(x):
 	:return bool:  True if string is valid url, False if not
 	"""
 	if type(x) == str:
-		if x.count('http://') > 1 or x.count('https://') > 1:
-			# check for errors in spliting urls
-			return False
+		# if x.count('http://') > 1 or x.count('https://') > 1:
+		# 	# check for errors in spliting urls
+		# 	return False
 		result = urlparse(x)
 		return all([result.scheme, result.netloc])
 	else:
