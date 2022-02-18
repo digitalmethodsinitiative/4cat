@@ -80,10 +80,10 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
             success = False
             while attempts < 5:
                 attempts += 1
-                scraped_page = scraper.simple_scrape_page(url)
+                scraped_page = self.simple_scrape_page(url)
 
                 if scraped_page:
-                    scraped_page['text'] = scraper.scrape_beautiful_text(scraped_page['page_source'])
+                    scraped_page['text'] = self.scrape_beautiful_text(scraped_page['page_source'])
                 else:
                     # Hard Fail?
                     self.dataset.log('Hard fail; no page source on url: %s' % url)
@@ -92,16 +92,16 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
                 # Redirects require waiting on Internet Archive
                 if any([redirect_text in text for text in scraped_page['text']]):
                     # Update last_scraped_url for movement check
-                    scraper.last_scraped_url = scraper.driver.current_url
+                    self.last_scraped_url = self.driver.current_url
                     self.dataset.log('Redirect url: %s' % url)
                     time.sleep(3)
                     time_to_wait = 5
                     try:
                         while time_to_wait > 0:
-                            if scraper.check_for_movement():
-                                scraped_page = scraper.collect_results()
+                            if self.check_for_movement():
+                                scraped_page = self.collect_results()
                                 if scraped_page:
-                                    scraped_page['text'] = scraper.scrape_beautiful_text(scraped_page['page_source'])
+                                    scraped_page['text'] = self.scrape_beautiful_text(scraped_page['page_source'])
                                     break
                                 else:
                                     raise Exception('No page source on url: %s' % url)
@@ -139,7 +139,7 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
                     if not url_obj['subpage_links']:
                         # If no, collect links
                         domain = urlparse(url).scheme + '://' + urlparse(url).netloc
-                        num_of_links, links = scraper.get_beautiful_links(scraped_page['page_source'], domain)
+                        num_of_links, links = self.get_beautiful_links(scraped_page['page_source'], domain)
                         # Randomize links (else we end up with mostly menu items at the top of webpages)
                         random.shuffle(links)
                     else:
