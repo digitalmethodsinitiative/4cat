@@ -48,7 +48,12 @@ class SeleniumScraper(Search, metaclass=abc.ABCMeta):
         """
         self.reset_current_page()
 
-        self.driver.get(url)
+        try:
+            self.driver.get(url)
+        except Exception:
+            # try again
+            self.restart_selenium()
+            self.driver.get(url)
 
         if self.check_for_movement():
 
@@ -177,6 +182,14 @@ class SeleniumScraper(Search, metaclass=abc.ABCMeta):
         super().clean_up()
 
         self.quit_selenium()
+
+    def restart_selenium(self):
+        """
+        Weird Selenium error? Restart and try again.
+        """
+        self.quit_selenium()
+        self.start_selenium()
+        self.reset_current_page()
 
     def set_page_load_timeout(self, timeout=60):
         """
