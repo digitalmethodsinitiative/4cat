@@ -1,10 +1,22 @@
 import abc
 from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
 from selenium.common.exceptions import WebDriverException, SessionNotCreatedException
+from urllib.parse import urlparse, urljoin
+from bs4 import BeautifulSoup
+from bs4.element import Comment
 
 from backend.abstract.search import Search
 from common.lib.exceptions import ProcessorException
+import config
+
+if hasattr(config, 'SELENIUM_BROWSER') and hasattr(config, 'SELENIUM_EXECUTABLE_PATH'):
+    if config.SELENIUM_BROWSER == 'chrome':
+        from selenium.webdriver.chrome.options import Options
+    elif config.SELENIUM_BROWSER == 'firefox':
+        from selenium.webdriver.firefox.options import Options
+    else:
+        # TODO raise some sort of error; stop class from being used
+        pass
 
 
 class SeleniumScraper(Search, metaclass=abc.ABCMeta):
@@ -19,7 +31,7 @@ class SeleniumScraper(Search, metaclass=abc.ABCMeta):
     driver = None
     last_scraped_url = None
 
-    def simple_scrape_page(self, url, title_404_strings='default'):
+    def simple_scrape_page(self, url, extract_links=False, title_404_strings='default'):
         """
         Simple helper to scrape url. Returns a dictionary containing basic results from scrape including final_url,
         page_title, and page_source otherwise False if the page did not advance (self.check_for_movement() failed).
@@ -35,26 +47,41 @@ class SeleniumScraper(Search, metaclass=abc.ABCMeta):
                       Returns false if no movement was detected
         """
         self.reset_current_page()
-        # try:
+
         self.driver.get(url)
-        # except WebDriverException as e:
-        #     # restart selenium
 
         if self.check_for_movement():
-            detected_404 = self.check_for_404(title_404_strings)
-            page_title = self.driver.title
-            current_url = self.driver.current_url
-            page_source = self.driver.page_source
 
-            return {
-                    'original_url': url,
-                    'final_url': current_url,
-                    'page_title': page_title,
-                    'page_source': page_source,
-                    'detected_404': detected_404
-                    }
+            results = self.collect_results(extract_links, title_404_strings)
+            return results
+
         else:
             return False
+
+    def collect_results(self, extract_links=False, title_404_strings='default'):
+
+        result = {
+            'original_url': url,
+            'detected_404': self.check_for_404(title_404_strings),
+            'page_title': self.driver.title,
+            'final_url': self.driver.current_url,
+            'page_source': self.driver.page_source,
+            }
+
+        if extract_links:
+            try:
+                links = self.collect_links()
+            except Exception as e:
+                print(e)
+                print('trying to get links again')
+                try:
+                    links = self.collect_links()
+                except Exception as e:
+                    print(e)
+                    links = []
+            result['links'] = links
+
+        return result
 
     def collect_links(self):
         """
@@ -105,6 +132,7 @@ class SeleniumScraper(Search, metaclass=abc.ABCMeta):
         """
         Start a headless browser
         """
+        # TODO review and compare Chrome vs Firefox options 
         options = Options()
         options.headless = True
         options.add_argument('--headless')
@@ -115,7 +143,14 @@ class SeleniumScraper(Search, metaclass=abc.ABCMeta):
         options.add_argument("--disable-browser-side-navigation")
 
         try:
-            self.driver = webdriver.Chrome(options=options)
+            if hasattr(config, 'SELENIUM_BROWSER') and hasattr(config, 'SELENIUM_EXECUTABLE_PATH'):
+                if config.SELENIUM_BROWSER == 'chrome':
+                    self.driver = webdriver.Chrome(executable_path=config.SELENIUM_EXECUTABLE_PATH, options=options)
+                elif config.SELENIUM_BROWSER == 'firefox':
+                    self.driver = webdriver.Firefox(executable_path=config.SELENIUM_EXECUTABLE_PATH, options=options)
+                else:
+                    raise ProcessorException('Selenium Scraper not configured')
+
         except (SessionNotCreatedException, WebDriverException) as e:
             if "binary not found" in str(e):
                 raise ProcessorException("Chromium binary is not available.")
@@ -193,7 +228,7 @@ class SeleniumScraper(Search, metaclass=abc.ABCMeta):
         :param list stop_if_in_title:  List of strings representing possible 404 text
         """
         if stop_if_in_title == 'default':
-            stop_if_in_title = ["page not found", "directory not found", "file not found", "404 not found", "error 404"]
+            stop_if_in_title = ["page not found", "directory not found", "file not found", "404 not found", "error 404", "error page"]
 
         if any(four_oh_four.lower() in self.driver.title.lower() for four_oh_four in stop_if_in_title):
             return True
@@ -210,3 +245,80 @@ class SeleniumScraper(Search, metaclass=abc.ABCMeta):
 
         params = {'cmd': 'Page.setDownloadBehavior', 'params': {'behavior': 'allow', 'downloadPath': download_dir}}
         return self.driver.execute("send_command", params)
+
+    # Some BeautifulSoup helper functions
+    @staticmethod
+    def scrape_beautiful_text(page_source, beautiful_soup_parser='html.parser'):
+        """takes page source and uses BeautifulSoup to extract a list of all visible text items on page"""
+
+        # Couple of helper functions
+        def tag_visible(element):
+            """checks BeautifulSoup element to see if it is visible on webpage"""
+
+            """original list of elements:
+            ['style', 'script', 'head', 'title', 'meta', '[document]']
+            """
+            if element.parent.name in ['i:pgf', 'svg', 'img', 'script', 'style', 'script', 'head', 'title', 'meta', '[document]']:
+                return False
+            if isinstance(element, Comment):
+                return False
+            return True
+
+        def text_from_html(soup):
+            """take BeautifulSoup entity, finds all text blocks, and checks if block is visible on page"""
+            texts = soup.findAll(text=True)
+            visible_texts = filter(tag_visible, texts)
+            return visible_texts
+
+        def anyalpha(string):
+            """Check for any alpha"""
+            return any([c.isalpha() for c in string])
+
+        # Create soup
+        soup = BeautifulSoup(page_source, beautiful_soup_parser)
+
+        # I may be able to simplify this... just if t?
+        text = [t.strip() for t in text_from_html(soup) if t.strip()]
+        # Only return is there is at least some alphabetic info
+        text = [t for t in text if anyalpha(t)]
+        # Add the page title as the first entry to the text
+        if soup.title:
+            title = soup.title.text.strip()
+            return [title] + text
+        else:
+            return text
+
+    @staticmethod
+    def get_beautiful_links(page_source, domain, beautiful_soup_parser='html.parser'):
+        """
+        takes page_source and creates BeautifulSoup entity and url that was scraped, finds all links,
+        and returns the number of links and a list of all links in tuple of shown text, fixed link,
+        and original link.
+
+        Uses domain to attempt to fix links that are partial.
+        """
+        soup = BeautifulSoup(page_source, beautiful_soup_parser)
+        url_count = 0
+        all_links= soup.findAll('a')
+        links_to_return = []
+        for link in all_links:
+            link_url = link.get('href')
+            original_url = link_url
+            link_text = None
+            if link_url is not None:
+                url_count += 1
+                link_text = link.text
+                # If image in link, find alt text and add to link_text
+                for img in link.findAll('img'):
+                    alt_text = img.get('alt')
+                    if alt_text and type(alt_text) == str:
+                        link_text = ' '.join([link_text, alt_text])
+                # Fix URL if needed
+                if link_url.strip()[:4] == "http":
+                    pass
+                else:
+                    link_url = urljoin(domain, link_url)
+            else:
+                continue
+            links_to_return.append((link_text, link_url.rstrip('/'), original_url))
+        return url_count, links_to_return

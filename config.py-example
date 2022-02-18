@@ -126,6 +126,10 @@ IMAGE_INTERVAL = 3600
 # The maximum allowed amount of rows (prevents timeouts and memory errors)
 MAX_EXPLORER_POSTS = 100000
 
+# Selenium Scraper Settings
+SELENIUM_BROWSER = 'chrome' # 'chrome' or 'firefox'
+SELENIUM_EXECUTABLE_PATH = 'chromedriver' # path to webdriver executable
+
 # Web tool settings
 class FlaskConfig:
     FLASK_APP = 'webtool/fourcat'
