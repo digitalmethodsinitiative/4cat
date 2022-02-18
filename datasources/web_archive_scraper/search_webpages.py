@@ -189,7 +189,11 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
                             break
                 # Unsure if we should return ALL failures, but certainly the originally supplied urls
                 result['timestamp'] = int(datetime.datetime.now().timestamp())
-                result['error'] = scraped_page.get('error')
+                if scraped_page:
+                    result['error'] = scraped_page.get('error')
+                else:
+                    # missing error...
+                    result['error'] = 'Unable to scrape'
                 yield result
 
     @staticmethod
