@@ -96,7 +96,7 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
                     continue
 
                 # Redirects require waiting on Internet Archive
-                if any([redirect_text in text for text in scraped_page['text']]):
+                if any([self.redirect_text in text for text in scraped_page['text']]):
                     # Update last_scraped_url for movement check
                     self.last_scraped_url = self.driver.current_url
                     self.dataset.log('Redirect url: %s' % url)
@@ -121,7 +121,7 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
                         scraped_page['error'] = e
                         break
 
-                if any([bad_response_text in text for text in scraped_page['text']]):
+                if any([self.bad_response_text in text for text in scraped_page['text']]):
                     # Bad response from Internet Archive
                     self.dataset.log('Internet Archive bad requests on url: %s' % url)
                     # Try again; Internet Achive is mean
