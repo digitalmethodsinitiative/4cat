@@ -4,6 +4,7 @@ Twitter keyword search via the Twitter API v2
 from urllib.parse import urlparse
 import datetime
 import random
+import time
 
 from backend.abstract.selenium_scraper import SeleniumScraper
 from selenium.common.exceptions import TimeoutException
@@ -17,6 +18,11 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
     """
     type = "web_archive_scraper-search"  # job ID
     max_workers = 1
+
+    # Web Archive returns "internal error" sometimes even when snapshot exists; we retry
+    bad_response_text = 'This snapshot cannot be displayed due to an internal error'
+    # Web Archive will load and then redirect after a few seconds; check for new page to load
+    redirect_text = 'Got an HTTP 302 response at crawl time'
 
     options = {
         "intro-1": {
