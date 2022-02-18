@@ -52,13 +52,13 @@ class SeleniumScraper(Search, metaclass=abc.ABCMeta):
 
         if self.check_for_movement():
 
-            results = self.collect_results(extract_links, title_404_strings)
+            results = self.collect_results(url, extract_links, title_404_strings)
             return results
 
         else:
             return False
 
-    def collect_results(self, extract_links=False, title_404_strings='default'):
+    def collect_results(self, url, extract_links=False, title_404_strings='default'):
 
         result = {
             'original_url': url,
@@ -132,7 +132,7 @@ class SeleniumScraper(Search, metaclass=abc.ABCMeta):
         """
         Start a headless browser
         """
-        # TODO review and compare Chrome vs Firefox options 
+        # TODO review and compare Chrome vs Firefox options
         options = Options()
         options.headless = True
         options.add_argument('--headless')
