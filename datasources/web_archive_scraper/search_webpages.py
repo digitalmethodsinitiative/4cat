@@ -154,7 +154,7 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
                     # Find the first link that has not been previously scraped
                     while links:
                         link = links.pop(0)
-                        if link[1] not in scraped_urls:
+                        if link[1] not in scraped_urls and link[1][:10] != 'javascript':
                             # Add it to be scraped next
                             urls_to_scrape.insert(0, {
                                 'url': link[1],
