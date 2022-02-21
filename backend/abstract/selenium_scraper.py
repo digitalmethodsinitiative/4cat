@@ -51,7 +51,7 @@ class SeleniumScraper(Search, metaclass=abc.ABCMeta):
         try:
             self.driver.get(url)
         except Exception as e:
-            self.log.error("Selenium driver.get() exception: " + str(e))
+            self.warning.error("Selenium driver.get() exception: " + str(e))
             self.restart_selenium()
             try:
                 # try again
