@@ -81,7 +81,7 @@ class SearchWithinTCATBins(Search):
         },
         "user-bio": {
             "type": UserInput.OPTION_TEXT,
-            "help": "User bio",
+            "help": "User bio text",
             "tooltip": "Match all tweets from users with biographies containing this text."
         },
         "user-language": {
@@ -126,6 +126,7 @@ class SearchWithinTCATBins(Search):
         be used to show some options only to privileges users.
         """
         options = cls.options
+        print('TCAT CALLING get_options', flush=True)
 
         instances = config.DATASOURCES.get("dmi-tcat", {}).get("instances")
         all_bins = {}
@@ -279,7 +280,9 @@ class SearchWithinTCATBins(Search):
                     # todo: do something with the other data
                     yield {
                         "id": tweet["id"],
-                        "thread_id": tweet["in_reply_to_status_id"] if tweet["in_reply_to_status_id"] else tweet["id"],
+                        # For thread_id, we use in_reply_to_status_id if tweet is reply, quoted_status_id if tweet is quote tweet (aka retweet w/ comment), or its own ID
+                        # Note: tweets can have BOTH in_reply_to_status_id and quoted_status as you can retweet a quote or quote a retweet.
+                        "thread_id": tweet["in_reply_to_status_id"] if tweet["in_reply_to_status_id"] else tweet["quoted_status_id"] if tweet["quoted_status_id"] else tweet["id"],
                         "timestamp": int(tweet["created_at"]),
                         "unix_timestamp": tweet["time"],
                         "subject": "",
@@ -296,12 +299,34 @@ class SearchWithinTCATBins(Search):
                         "quote_count": -1,
                         "is_retweet": "yes" if tweet["text"][:4] == "RT @" else "no",
                         "is_quote_tweet": "yes" if tweet["quoted_status_id"] else "no",
-                        "is_reply": "yes" if "in_repy_to_status_id" else "no",
+                        "is_reply": "yes" if tweet["in_reply_to_status_id"] else "no",
                         "hashtags": ",".join(re.findall(r"#([^\s!@#$%^&*()_+{}:\"|<>?\[\];'\,./`~]+)", tweet["text"])),
                         "urls": ",".join(ural.urls_from_text(tweet["text"])),
                         "images": ",".join(re.findall(r"https://t\.co/[a-zA-Z0-9]+$", tweet["text"])),
                         "mentions": ",".join(re.findall(r"@([^\s!@#$%^&*()+{}:\"|<>?\[\];'\,./`~]+)", tweet["text"])),
-                        "reply_to": tweet["to_user_name"]
+                        "reply_to": tweet["to_user_name"],
+                        # Additional TCAT data (compared to twitterv2 map_item function)
+                        "filter_level": tweet['filter_level'],
+                        'withheld_copyright': tweet['withheld_copyright'], # TCAT may no collect this anymore
+                        'withheld_scope': tweet['withheld_scope'], # TCAT may no collect this anymore
+                        'truncated': tweet['truncated'], # Older tweets could be truncated meaning their text was cut off due to Twitter/TCAT db character limits
+                        'location': tweet['location'],
+                        'latitude': tweet['lat'],
+                        'longitude': tweet['lng'],
+                        'author_verified': tweet['from_user_verified'],
+                        'author_description': tweet['from_user_description'],
+                        'author_url': tweet['from_user_url'],
+                        'author_profile_image': tweet['from_user_profile_image_url'],
+                        'author_timezone_UTC_offset': (tweet['from_user_utcoffset'] if tweet['from_user_utcoffset'] else 0)/60/60,
+                        'author_timezone_name': tweet['from_user_timezone'],
+                        'author_language': tweet['from_user_lang'],
+                        'author_tweet_count': tweet['from_user_tweetcount'],
+                        'author_follower_count': tweet['from_user_followercount'],
+                        'author_friend_following_count': tweet['from_user_friendcount'],
+                        'author_favorite_count': tweet['from_user_favourites_count'],
+                        'author_listed_count': tweet['from_user_listed'],
+                        'author_withheld_scope': tweet['from_user_withheld_scope'],
+                        'author_created_at': tweet['from_user_created_at'],
                     }
 
             if not chunk:
@@ -312,7 +337,7 @@ class SearchWithinTCATBins(Search):
     @staticmethod
     def validate_query(query, request, user):
         """
-        Validate BitChute query input
+        Validate DMI-TCAT query input
 
         :param dict query:  Query parameters, from client-side.
         :param request:  Flask request
