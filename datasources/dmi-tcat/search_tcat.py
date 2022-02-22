@@ -283,7 +283,7 @@ class SearchWithinTCATBins(Search):
                         # For thread_id, we use in_reply_to_status_id if tweet is reply, quoted_status_id if tweet is quote tweet (aka retweet w/ comment), or its own ID
                         # Note: tweets can have BOTH in_reply_to_status_id and quoted_status as you can retweet a quote or quote a retweet.
                         "thread_id": tweet["in_reply_to_status_id"] if tweet["in_reply_to_status_id"] else tweet["quoted_status_id"] if tweet["quoted_status_id"] else tweet["id"],
-                        "timestamp": int(tweet["created_at"]),
+                        "timestamp": int(tweet["time"]),
                         "unix_timestamp": tweet["time"],
                         "subject": "",
                         "body": tweet["text"],
@@ -317,7 +317,7 @@ class SearchWithinTCATBins(Search):
                         'author_description': tweet['from_user_description'],
                         'author_url': tweet['from_user_url'],
                         'author_profile_image': tweet['from_user_profile_image_url'],
-                        'author_timezone_UTC_offset': (tweet['from_user_utcoffset'] if tweet['from_user_utcoffset'] else 0)/60/60,
+                        'author_timezone_UTC_offset': int((int(tweet['from_user_utcoffset']) if tweet['from_user_utcoffset'] else 0)/60/60),
                         'author_timezone_name': tweet['from_user_timezone'],
                         'author_language': tweet['from_user_lang'],
                         'author_tweet_count': tweet['from_user_tweetcount'],
