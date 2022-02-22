@@ -146,9 +146,10 @@ class SearchWithinTCATBins(Search):
             # make the host somewhat human-readable
             # also strip out embedded HTTP auths
             host = re.sub(r"^https?://", "", instance).split("@").pop()
-            for bin_name in bins:
+            for bin_name, bin in bins.items():
                 bin_key = "%s@%s" % (bin_name, host)
-                options["bin"]["options"][bin_key] = "%s: %s" % (host, bin_name)
+                display_text = f"{bin_name}: {bin.get('tweets_approximate')} tweets from {bin.get('range').get('first_tweet')} to {bin.get('range').get('last_tweet')}"
+                options["bin"]["options"][bin_key] = display_text
 
         return options
 
