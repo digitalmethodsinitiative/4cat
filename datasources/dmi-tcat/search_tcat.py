@@ -12,7 +12,9 @@ import ural
 
 from backend.abstract.search import Search
 from common.lib.exceptions import QueryParametersException
-from common.lib.helpers import UserInput, sniff_encoding
+from common.lib.user_input import UserInput
+from common.lib.helpers import sniff_encoding
+
 import config
 
 
@@ -41,12 +43,12 @@ class SearchWithinTCATBins(Search):
         },
         "query": {
             "type": UserInput.OPTION_TEXT,
-            "help": "Query",
+            "help": "Query text",
             "tooltip": "Match all tweets containing this text."
         },
         "query-exclude": {
             "type": UserInput.OPTION_TEXT,
-            "help": "Exclude",
+            "help": "Exclude text",
             "tooltip": "Match all tweets that do NOT contain this text."
         },
         "user-name": {
@@ -58,6 +60,24 @@ class SearchWithinTCATBins(Search):
             "type": UserInput.OPTION_TEXT,
             "help": "Exclude user",
             "tooltip": "Match all tweets NOT from this username."
+        },
+        "exclude-replies": {
+            "type": UserInput.OPTION_TOGGLE,
+            "help": "Exclude 'reply' tweets",
+            "default": False,
+            "tooltip": "Enabling this will remove all replies from the data"
+        },
+        "daterange": {
+            "type": UserInput.OPTION_DATERANGE,
+            "help": "Date range"
+        },
+        # Advanced Options Section
+        "divider-2": {
+            "type": UserInput.OPTION_DIVIDER
+        },
+        "advanced_options_info": {
+            "type": UserInput.OPTION_INFO,
+            "help": "Advanced Query Options can further refine your query"
         },
         "user-bio": {
             "type": UserInput.OPTION_TEXT,
@@ -89,16 +109,6 @@ class SearchWithinTCATBins(Search):
             "help": "(Part of) media URL",
             "tooltip": "Match all tweets containing this (partial) media URL."
         },
-        "exclude-replies": {
-            "type": UserInput.OPTION_TOGGLE,
-            "help": "Exclude 'in reply to' Tweets",
-            "default": False,
-            "tooltip": "Enabling this will filter all replies from the data"
-        },
-        "daterange": {
-            "type": UserInput.OPTION_DATERANGE,
-            "help": "Date range"
-        }
     }
 
     @classmethod
