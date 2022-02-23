@@ -8,6 +8,7 @@ import shutil
 import requests
 import time
 import json
+import datetime
 import dateutil.parser
 import csv
 import os
@@ -119,10 +120,11 @@ class PixPlotGenerator(BasicProcessor):
 			max_images = self.get_options()["amount"]["max"]
 
 		# Get labels to send PixPlot server
+		date =  datetime.datetime.now().strftime("%Y-%m-%d-%H%M%S")
 		top_dataset = self.dataset.top_parent()
 		label_formated = ''.join(e if e.isalnum() else '_' for e in top_dataset.get_label())
-		image_label = label_formated + '-' + str(top_dataset.key)
-		plot_label = label_formated + '-' + str(self.dataset.key)
+		image_label = date + '-' + label_formated + '-' + str(top_dataset.key)
+		plot_label = date + '-' + label_formated + '-' + str(self.dataset.key)
 
 		# Folder name is PixPlot identifier and set at dataset key
 		data = {'folder_name': image_label}
