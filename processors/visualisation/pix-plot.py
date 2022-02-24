@@ -326,20 +326,8 @@ class PixPlotGenerator(BasicProcessor):
 										'number_of_posts': 0,
 										}
 
-			# Check if there is a map_item
-			item_mapper = None
-			parent_processor = self.all_modules.processors.get(self.dataset.top_parent().type)
-			if parent_processor:
-				if hasattr(parent_processor, "map_item"):
-					item_mapper = parent_processor.map_item
-
 			# Loop through source file
 			for post in self.dataset.top_parent().iterate_items(self):
-
-				if item_mapper:
-					# and if so, map it
-					post = item_mapper(post)
-
 				# Check if post contains one of the downloaded images
 				if post['id'] in post_id_image_dictionary.keys():
 					for img_name in post_id_image_dictionary[post['id']]:
