@@ -8,6 +8,7 @@ import shutil
 import requests
 import time
 import json
+import datetime
 import dateutil.parser
 import csv
 import os
@@ -119,10 +120,11 @@ class PixPlotGenerator(BasicProcessor):
 			max_images = self.get_options()["amount"]["max"]
 
 		# Get labels to send PixPlot server
+		date =  datetime.datetime.now().strftime("%Y-%m-%d-%H%M%S")
 		top_dataset = self.dataset.top_parent()
 		label_formated = ''.join(e if e.isalnum() else '_' for e in top_dataset.get_label())
-		image_label = label_formated + '-' + str(top_dataset.key)
-		plot_label = label_formated + '-' + str(self.dataset.key)
+		image_label = date + '-' + label_formated + '-' + str(top_dataset.key)
+		plot_label = date + '-' + label_formated + '-' + str(self.dataset.key)
 
 		# Folder name is PixPlot identifier and set at dataset key
 		data = {'folder_name': image_label}
@@ -324,20 +326,8 @@ class PixPlotGenerator(BasicProcessor):
 										'number_of_posts': 0,
 										}
 
-			# Check if there is a map_item
-			item_mapper = None
-			parent_processor = self.all_modules.processors.get(self.dataset.top_parent().type)
-			if parent_processor:
-				if hasattr(parent_processor, "map_item"):
-					item_mapper = parent_processor.map_item
-
 			# Loop through source file
 			for post in self.dataset.top_parent().iterate_items(self):
-
-				if item_mapper:
-					# and if so, map it
-					post = item_mapper(post)
-
 				# Check if post contains one of the downloaded images
 				if post['id'] in post_id_image_dictionary.keys():
 					for img_name in post_id_image_dictionary[post['id']]:
