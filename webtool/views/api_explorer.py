@@ -528,11 +528,11 @@ def iterate_items(in_file, max_rows=None, sort_by=None, descending=False, force_
 			if sort_by:
 				try:
 					# Get index number of sort_by value
-					sort_by = columns.index(sort_by)
+					sort_by_index = columns.index(sort_by)
 
 					# Generate reader on the basis of sort_by value
-					reader = sorted(reader, key=lambda x: to_float(x[sort_by], convert=force_int), reverse=descending)
-
+					reader = sorted(reader, key=lambda x: to_float(x[sort_by_index], convert=force_int) if len(x) >= sort_by_index else 0, reverse=descending)
+			
 				except (ValueError, IndexError) as e:
 					pass
 			
