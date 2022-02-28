@@ -26,6 +26,7 @@ packages = [
 	"html2text==2018.1.9",
 	"ImageHash==4.2.0",
 	"instaloader==4.5.3",
+	"itsdangerous==2.0.1", # per issue with Flask 1.0; can likely remove when we upgrade Flask
 	"lxml==4.6.5",
 	"Markdown==3.0.1",
 	"markdown2==2.4.2",
