@@ -20,10 +20,16 @@ done
 
 echo "PostgreSQL started"
 
-# This logs an error if the DB doesn't exist. Actually not a problem but can confuse users.
-if psql --host=db --port=5432 --user=$POSTGRES_USER --dbname=$POSTGRES_DB -tAc "SELECT 1 FROM users WHERE name='admin'"; then echo 'Seed present'; else
-# Seed DB
-cd /usr/src/app && psql --host=db --port=5432 --user=$POSTGRES_USER --dbname=$POSTGRES_DB < backend/database.sql
+# Create Database if it does not already exist
+# TODO could move this to Build step now that admin user is created via frontend 
+# Check for "jobs" table
+if [[ `psql --host=db --port=5432 --user=$POSTGRES_USER --dbname=$POSTGRES_DB -tAc "SELECT EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'jobs')"` = 't' ]]; then
+  # Table already exists
+  echo "Database already created"
+else
+  echo "Creating Database"
+  # Seed DB
+  cd /usr/src/app && psql --host=db --port=5432 --user=$POSTGRES_USER --dbname=$POSTGRES_DB < backend/database.sql
 fi
 
 echo 'Starting app'

@@ -22,25 +22,27 @@ echo "PostgreSQL started"
 
 # Check if DB exists and creates admin is it does not
 user_created=false
-# This seems SUPER weird. It returns true as long as DB exists; doesn't matter if admin does.
-if psql --host=db --port=5432 --user=$POSTGRES_USER --dbname=$POSTGRES_DB -tAc "SELECT 1 FROM users WHERE name='admin'"; then echo 'Seed present'; else
-echo 'Generating admin user'
+# Check for "jobs" table
+if [[ `psql --host=db --port=5432 --user=$POSTGRES_USER --dbname=$POSTGRES_DB -tAc "SELECT EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'jobs')"` = 't' ]]; then
+  # Table already exists
+  echo "Database already created"
+else
+  echo 'Creating database'
+  # Seed DB
+  cd /usr/src/app && psql --host=db --port=5432 --user=$POSTGRES_USER --dbname=$POSTGRES_DB < backend/database.sql
 
-# Generate password for admin user
-admin_password=$(openssl rand -base64 12)
-
-# Seed DB
-cd /usr/src/app && psql --host=db --port=5432 --user=$POSTGRES_USER --dbname=$POSTGRES_DB < backend/database.sql
-
-python3 /usr/src/app/helper-scripts/create_user.py -u admin -e -p "$admin_password" -a
-echo 'Your admin username:' >> docker/shared/login.txt
-echo 'admin' >> docker/shared/login.txt
-echo 'Your admin password:' >> docker/shared/login.txt
-echo "$admin_password" >> docker/shared/login.txt
-user_created=true
-# Make admin an actual admin user
-psql --host=db --port=5432 --user=$POSTGRES_USER --dbname=$POSTGRES_DB -tAc "UPDATE users SET is_admin='t' WHERE name='admin'";
-
+  echo 'Generating admin user'
+  # Generate password for admin user
+  admin_password=$(openssl rand -base64 12)
+  # Run python script to create new user
+  python3 /usr/src/app/helper-scripts/create_user.py -u admin -e -p "$admin_password" -a
+  echo 'Your admin username:' >> docker/shared/login.txt
+  echo 'admin' >> docker/shared/login.txt
+  echo 'Your admin password:' >> docker/shared/login.txt
+  echo "$admin_password" >> docker/shared/login.txt
+  user_created=true
+  # Make admin an actual admin user
+  psql --host=db --port=5432 --user=$POSTGRES_USER --dbname=$POSTGRES_DB -tAc "UPDATE users SET is_admin='t' WHERE name='admin'";
 fi
 
 echo 'Starting app'
