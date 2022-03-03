@@ -230,8 +230,15 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 				self.log.info("Not running follow-up processor of type %s for dataset %s, no input data for follow-up" % (next_type, self.dataset.key))
 
 			elif next_type in available_processors:
-				next_analysis = DataSet(parameters=next_parameters, type=next_type, db=self.db, parent=self.dataset.key,
-										extension=available_processors[next_type].extension)
+				next_analysis = DataSet(
+					parameters=next_parameters,
+					type=next_type,
+					db=self.db,
+					parent=self.dataset.key,
+					extension=available_processors[next_type].extension,
+					is_private=self.dataset.is_private,
+					owner=self.dataset.owner
+				)
 				self.queue.add_job(next_type, remote_id=next_analysis.key)
 			else:
 				self.log.warning("Dataset %s (of type %s) wants to run processor %s next, but it is incompatible" % (self.dataset.key, self.type, next_type))

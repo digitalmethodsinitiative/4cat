@@ -24,6 +24,10 @@ class DatasetExpirer(BasicWorker):
 		delete old datasets, do so for all qualifying datasets
 		:return:
 		"""
+		datasets = []
+
+		# first get datasets for which the data source specifies that they need
+		# to be deleted after a certain amount of time
 		for datasource_id in self.all_modules.datasources:
 			datasource = self.all_modules.datasources[datasource_id]
 
@@ -32,15 +36,21 @@ class DatasetExpirer(BasicWorker):
 				continue
 
 			cutoff = time.time() - datasource.get("expire-datasets")
-			datasets = self.db.fetchall(
+			datasets += self.db.fetchall(
 				"SELECT key FROM datasets WHERE key_parent = '' AND parameters::json->>'datasource' = %s AND timestamp < %s",
 				(datasource_id, cutoff))
 
-			# we instantiate the dataset, because its delete() method does all
-			# the work (e.g. deleting child datasets) for us
-			for dataset in datasets:
-				dataset = DataSet(key=dataset["key"], db=self.db)
-				dataset.delete()
-				self.log.info("Deleting dataset %s/%s (expired per configuration)" % (datasource, dataset.key))
+		# and now find datasets that have their expiration date set
+		# individually
+		cutoff = int(time.time())
+		datasets += self.db.fetchall("SELECT key FROM datasets WHERE parameters::json->>'expires-after' IS NOT NULL AND (parameters::json->>'expires-after')::int < %s", (cutoff,))
+
+		# we instantiate the dataset, because its delete() method does all
+		# the work (e.g. deleting child datasets) for us
+		for dataset in datasets:
+			dataset = DataSet(key=dataset["key"], db=self.db)
+			dataset.delete()
+			self.log.info("Deleting dataset %s/%s (expired per configuration)" % (dataset.parameters.get("datasource", "unknown"), dataset.key))
+
 
 		self.job.finish()

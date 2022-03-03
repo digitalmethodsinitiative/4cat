@@ -57,16 +57,30 @@ class SearchTikTok(Search):
                 if self.interrupted:
                     raise WorkerInterruptedException()
 
-                post = json.loads(line)["data"]
+                # remove NUL bytes here because they trip up a lot of other
+                # things
+                post = json.loads(line.replace("\0", ""))["data"]
 
                 hashtags = [extra["hashtagName"] for extra in post.get("textExtra", []) if "hashtagName" in extra and extra["hashtagName"]]
+
+                if type(post["author"]) is dict:
+                    # from intercepted API response
+                    user_nickname = post["author"]["uniqueId"]
+                    user_fullname = post["author"]["nickname"]
+                    user_id = post["author"]["id"]
+                else:
+                    # from embedded JSON object
+                    user_nickname = post["author"]
+                    user_fullname = post["nickname"]
+                    user_id = ""
+
 
                 mapped_item = {
                     "id": post["id"],
                     "thread_id": post["id"],
-                    "author": post["author"]["uniqueId"],
-                    "author_full": post["author"]["nickname"],
-                    "author_id": post["author"]["id"],
+                    "author": user_nickname,
+                    "author_full": user_fullname,
+                    "author_id": user_id,
                     "author_followers": post["authorStats"]["followerCount"],
                     "subject": "",
                     "body": post["desc"],
@@ -76,7 +90,7 @@ class SearchTikTok(Search):
                     "music_id": post["music"]["id"],
                     "music_url": post["music"]["playUrl"],
                     "video_url": post["video"].get("downloadAddr", ""),
-                    "tiktok_url": "https://tiktok.com/@%s/video/%s" % (post["author"]["uniqueId"], post["id"]),
+                    "tiktok_url": "https://tiktok.com/@%s/video/%s" % (user_nickname, post["id"]),
                     "thumbnail_url": post["video"]["cover"],
                     "likes": post["stats"]["diggCount"],
                     "comments": post["stats"]["commentCount"],

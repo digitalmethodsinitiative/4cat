@@ -100,7 +100,7 @@ class TopImageCounter(BasicProcessor):
                 "filename": images[id]["filename"],
                 "num_posts": images[id]["count"],
                 "url_4cat": (
-                                "s" if config.FlaskConfig.SERVER_HTTPS else "") + "://" + config.FlaskConfig.SERVER_NAME + "/api/image/" +
+                                "https" if config.FlaskConfig.SERVER_HTTPS else "http") + "://" + config.FlaskConfig.SERVER_NAME + "/api/image/" +
                             images[id]["md5"] + "." + images[id]["filename"].split(".")[
                                 -1],
                 "url_4plebs": "https://archive.4plebs.org/_/search/image/" + images[id]["hash"].replace("/", "_"),
@@ -129,7 +129,7 @@ class TopImageCounter(BasicProcessor):
             for post in self.source_dataset.iterate_items(self):
                 post_img_links = set()  # set to only count images once per post
                 for field, value in post.items():
-                    if field == "body" or "url" in field.lower() or "image" in field.lower():
+                    if value and (field == "body" or "url" in field.lower() or "image" in field.lower()):
                         post_img_links |= set(img_link_regex.findall(value))
                         post_img_links |= set(img_domain_regex.findall(value))
 

@@ -18,8 +18,9 @@ import config
 from flask import request, abort, render_template, redirect, url_for, flash, get_flashed_messages
 from flask_login import login_user, login_required, logout_user, current_user
 from webtool import app, login_manager, db
-from webtool.api_tool import limiter
+from webtool.views.api_tool import limiter
 from webtool.lib.user import User
+from webtool.lib.helpers import error
 from common.lib.helpers import send_email
 
 from pathlib import Path
@@ -34,7 +35,7 @@ def load_user(user_name):
 	:param user_name:  ID of user
 	:return:  User object
 	"""
-	user = User.get_by_name(user_name)
+	user = User.get_by_name(db, user_name)
 	if user:
 		user.authenticate()
 	return user
@@ -65,7 +66,7 @@ def load_user_from_request(request):
 		return None
 	else:
 		db.execute("UPDATE access_tokens SET calls = calls + 1 WHERE name = %s", (user["user"],))
-		user = User.get_by_name(user["user"])
+		user = User.get_by_name(db, user["user"])
 		user.authenticate()
 		return user
 
@@ -75,7 +76,7 @@ def banned_users():
 	"""
 	Displays a 'sorry, no 4cat for you' message to banned or deactivated users.
 	"""
-	if current_user and current_user.is_authenticated and current_user.is_deactivated():
+	if current_user and current_user.is_authenticated and current_user.is_deactivated:
 		message = "Your 4CAT account has been deactivated and you can no longer access this page."
 		if current_user.get_attribute("deactivated.reason"):
 			message += "\n\nThe following reason was recorded for your account's deactivation: *"
@@ -116,7 +117,7 @@ def autologin_whitelist():
 	# if the hostname matches the whitelist
 	for hostmask in config.FlaskConfig.HOSTNAME_WHITELIST:
 		if fnmatch.filter([hostname], hostmask):
-			autologin_user = User.get_by_name("autologin")
+			autologin_user = User.get_by_name(db, "autologin")
 			if not autologin_user:
 				# this user should exist by default
 				abort(500)
@@ -148,6 +149,54 @@ def exempt_from_limit():
 	return False
 
 
+@app.route("/first-run/", methods=["GET", "POST"])
+def create_first_user():
+	"""
+	Special route for creating an initial admin user
+
+	This route is only available if there are no admin users in the database
+	yet. The user created through this route is always made an admin.
+
+	:return:
+	"""
+	has_admin_user = db.fetchone("SELECT COUNT(*) AS amount FROM users WHERE is_admin = True")
+	missing = []
+	if has_admin_user["amount"]:
+		return error(403, message="The 'first run' page is not available")
+
+	if request.method == 'GET':
+		return render_template("account/first-run.html", incomplete=missing, form=request.form)
+
+	username = request.form.get("username").strip()
+	password = request.form.get("password").strip()
+
+	if not username:
+		missing.append("username")
+	else:
+		user_exists = db.fetchone("SELECT name FROM users WHERE name = %s", (username,))
+		if user_exists:
+			flash("The username '%s' already exists and is reserved." % username)
+			missing.append("username")
+
+	if not password:
+		missing.append("password")
+
+	if missing:
+		flash("Please make sure all fields are complete")
+		return render_template("account/first-run.html", form=request.form, incomplete=missing, flashes=get_flashed_messages())
+
+	db.insert("users", data={"name": username})
+	db.commit()
+	user = User.get_by_name(db=db, name=username)
+	user.set_password(password)
+
+	db.update("users", where={"name": username}, data={"is_admin": True, "is_deactivated": False})
+	db.commit()
+
+	flash("The admin user '%s' was created, you can now use it to log in." % username)
+	return redirect(url_for("show_login"))
+
+
 @app.route('/login/', methods=['GET', 'POST'])
 def show_login():
 	"""
@@ -161,12 +210,16 @@ def show_login():
 	if current_user.is_authenticated:
 		return redirect(url_for("show_index"))
 
+	has_admin_user = db.fetchone("SELECT * FROM users WHERE is_admin = True")
+	if not has_admin_user:
+		return redirect(url_for("create_first_user"))
+
 	if request.method == 'GET':
 		return render_template('account/login.html', flashes=get_flashed_messages())
 
 	username = request.form['username']
 	password = request.form['password']
-	registered_user = User.get_by_login(username, password)
+	registered_user = User.get_by_login(db, username, password)
 
 	if registered_user is None:
 		flash('Username or Password is invalid.', 'error')
@@ -201,11 +254,11 @@ def request_access():
 	"""
 	if not config.ADMIN_EMAILS:
 		return render_template("error.html",
-							   message="No administrator e-mail is configured; the request form cannot be displayed.")
+                               message="No administrator e-mail is configured; the request form cannot be displayed.")
 
 	if not config.MAILHOST:
 		return render_template("error.html",
-							   message="No e-mail server configured; the request form cannot be displayed.")
+                               message="No e-mail server configured; the request form cannot be displayed.")
 
 	if current_user.is_authenticated:
 		return render_template("error.html", message="You are already logged in and cannot request another account.")
@@ -234,7 +287,7 @@ def request_access():
 			message["From"] = sender
 			message["To"] = config.ADMIN_EMAILS[0]
 
-			mail = "<p>Hello! Some requests a 4CAT Account:</p>\n"
+			mail = "<p>Hello! Someone requests a 4CAT Account:</p>\n"
 			for field in required:
 				mail += "<p><b>" + field + "</b>: " + request.form.get(field, "") + " </p>\n"
 
@@ -252,13 +305,13 @@ def request_access():
 			try:
 				send_email(config.ADMIN_EMAILS, message)
 				return render_template("error.html", title="Thank you",
-									   message="Your request has been submitted; we'll try to answer it as soon as possible.")
+                                       message="Your request has been submitted; we'll try to answer it as soon as possible.")
 			except (smtplib.SMTPException, ConnectionRefusedError, socket.timeout) as e:
 				return render_template("error.html", title="Error",
-									   message="The form could not be submitted; the e-mail server is unreachable.")
+                                       message="The form could not be submitted; the e-mail server is unreachable.")
 
 	return render_template("account/request.html", incomplete=incomplete, flashes=get_flashed_messages(),
-						   form=request.form, access_policy=access_policy)
+                           form=request.form, access_policy=access_policy)
 
 
 @app.route("/reset-password/", methods=["GET", "POST"])
@@ -279,11 +332,11 @@ def reset_password():
 		# we need *a* token
 		return render_template("error.html", message="You need a valid reset token to set a password.")
 
-	resetting_user = User.get_by_token(token)
-	if not resetting_user or resetting_user.is_special():
+	resetting_user = User.get_by_token(db, token)
+	if not resetting_user or resetting_user.is_special:
 		# this doesn't mean the token is unknown, but it could be older than 3 days
 		return render_template("error.html",
-							   message="You need a valid reset token to set a password. Your token may have expired: in this case, you have to request a new one.")
+                               message="You need a valid reset token to set a password. Your token may have expired: in this case, you have to request a new one.")
 
 	# check form
 	incomplete = []
@@ -303,8 +356,8 @@ def reset_password():
 
 	# show form
 	return render_template("account/reset-password.html", username=resetting_user.get_name(), incomplete=incomplete,
-						   flashes=get_flashed_messages(), token=token,
-						   form=request.form)
+                           flashes=get_flashed_messages(), token=token,
+                           form=request.form)
 
 
 @app.route("/request-password/", methods=["GET", "POST"])
@@ -333,8 +386,8 @@ def request_password():
 			flash("Please provide a username.")
 
 		# is it also a valid username? that is not a 'special' user (like autologin)?
-		resetting_user = User.get_by_name(username)
-		if resetting_user is None or resetting_user.is_special():
+		resetting_user = User.get_by_name(db, username)
+		if resetting_user is None or resetting_user.is_special:
 			incomplete.append("username")
 			flash("That user is not known here. Note that your username is typically your e-mail address.")
 
@@ -349,7 +402,7 @@ def request_password():
 			try:
 				resetting_user.email_token(new=False)
 				return render_template("error.html", title="Success",
-									   message="An e-mail has been sent to you containing instructions on how to reset your password.")
+                                       message="An e-mail has been sent to you containing instructions on how to reset your password.")
 			except RuntimeError:
 				# no e-mail could be sent - clear the token so the user can try again later
 				resetting_user.clear_token()
@@ -358,4 +411,4 @@ def request_password():
 
 	# show page
 	return render_template("account/request-password.html", incomplete=incomplete, flashes=get_flashed_messages(),
-						   form=request.form)
+                           form=request.form)

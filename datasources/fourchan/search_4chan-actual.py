@@ -745,7 +745,7 @@ class Search4Chan(SearchWithScope):
 		"""
 
 		# this is the bare minimum, else we can't narrow down the full data set
-		if not user.is_admin() and not user.get_value("4chan.can_query_without_keyword", False) and not query.get("body_match", None) and not query.get("subject_match", None) and query.get("search_scope",	"") != "random-sample":
+		if not user.is_admin and not user.get_value("4chan.can_query_without_keyword", False) and not query.get("body_match", None) and not query.get("subject_match", None) and query.get("search_scope",	"") != "random-sample":
 			raise QueryParametersException("Please provide a message or subject search query")
 
 		query["min_date"], query["max_date"] = query["daterange"]

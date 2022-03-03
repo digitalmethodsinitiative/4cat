@@ -308,8 +308,9 @@ def save_annotation_fields(key):
 
 			# We'll delete all prior annotations for a field if its input field is deleted
 			if field_id not in new_field_ids:
+
 				# Labels are used as keys in the annotations table 
-				# They should be unique, so that's okay.
+				# They should already be unique, so that's okay.
 				fields_to_delete.add(field["label"])
 				continue
 
@@ -508,7 +509,7 @@ def iterate_items(in_file, max_rows=None, sort_by=None, descending=False, force_
 	"""
 	Loop through both csv and NDJSON files.
 	:param in_file, str:		The input file to read.
-	:param sort_by, str:		The key for a value that determines the sort order.
+	:param sort_by, str:		The key that determines the sort order.
 	:param descending, bool:	Whether to sort by descending values.
 	:param force_int, bool:		Whether the sort value should be converted to an 
 								integer.
@@ -526,9 +527,13 @@ def iterate_items(in_file, max_rows=None, sort_by=None, descending=False, force_
 			columns = next(reader)
 			if sort_by:
 				try:
-					sort_by = columns.index(sort_by)
-					reader = sorted(reader, key=lambda x: to_float(x[sort_by], convert=force_int), reverse=descending)
-				except ValueError as e:
+					# Get index number of sort_by value
+					sort_by_index = columns.index(sort_by)
+
+					# Generate reader on the basis of sort_by value
+					reader = sorted(reader, key=lambda x: to_float(x[sort_by_index], convert=force_int) if len(x) >= sort_by_index else 0, reverse=descending)
+			
+				except (ValueError, IndexError) as e:
 					pass
 			
 			for item in reader:
@@ -551,7 +556,7 @@ def iterate_items(in_file, max_rows=None, sort_by=None, descending=False, force_
 					item = json.loads(line)
 					yield item
 			
-			# If a sort order is given explititly, we're sorting anyway.
+			# If a sort order is given explicitly, we're sorting anyway.
 			else:
 				keys = sort_by.split(".")
 
@@ -671,7 +676,10 @@ def get_nested_value(di, keys):
 
 def to_float(value, convert=False):
 	if convert:
-		value = float(value)
+		if not value:
+			value = 0
+		else:
+			value = float(value)
 	return value
 
 def strip_html(post):

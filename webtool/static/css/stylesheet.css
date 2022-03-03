@@ -86,6 +86,15 @@ code {
     font-weight: bold;
 }
 
+pre {
+    font-family: monospace;
+    margin: 1em 1em;
+    background: var(--gray);
+    color: var(--accent-alternate);
+    overflow: auto;
+    padding: 0.5em;
+}
+
 em, strong {
     font-weight: bold;
 }
@@ -297,6 +306,10 @@ nav > ul.flat > li:not(:last-child)::after {
 
 *[role=tooltip].force-width, article p[role=toolip].force-width {
     min-width: 25em;
+}
+
+*[role=tooltip] ul {
+    margin-left: 1.5em;
 }
 
 button.tooltip-trigger, button.popup-trigger {
@@ -737,16 +750,12 @@ article section li p, article aside li p {
 /** --------------------- *
   Pages -> Results metadata
   * --------------------- */
-.inline-label {
-    color: var(--accent-alternate);
-}
-
 .inline-query {
     overflow-wrap: anywhere;
 }
 
 .property-badge {
-    font-size: 0.6em;
+    font-size: 0.8em;
     display: inline;
     border: 1px solid var(--contrast-dark);
     border-radius: 2px;
@@ -755,6 +764,11 @@ article section li p, article aside li p {
     top: -1px;
 	vertical-align: baseline;
     cursor: default;
+}
+
+.property-badge.fullsize {
+    font-size: 0.8em;
+    margin-right: 0.5em;
 }
 
 a.property-badge {

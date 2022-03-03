@@ -93,13 +93,14 @@ class ModuleCollector:
                 # try importing
                 try:
                     module = importlib.import_module(module_name)
-                except ImportError as e:
+                except (SyntaxError, ImportError) as e:
                     # this is fine, just ignore this data source and give a heads up
                     self.ignore.append(module_name)
-                    if e.name not in self.missing_modules:
-                        self.missing_modules[e.name] = [module_name]
+                    key_name = e.name if hasattr(e, "name") else module_name
+                    if key_name not in self.missing_modules:
+                        self.missing_modules[key_name] = [module_name]
                     else:
-                        self.missing_modules[e.name].append(module_name)
+                        self.missing_modules[key_name].append(module_name)
                     continue
 
                 # see if module contains the right type of content by looping

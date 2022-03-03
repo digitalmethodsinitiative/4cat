@@ -26,6 +26,7 @@ packages = [
 	"html2text==2018.1.9",
 	"ImageHash==4.2.0",
 	"instaloader==4.5.3",
+	"itsdangerous==2.0.1", # per issue with Flask 1.0; can likely remove when we upgrade Flask
 	"lxml==4.6.5",
 	"Markdown==3.0.1",
 	"markdown2==2.4.2",
@@ -50,6 +51,7 @@ packages = [
 	"spacy==3.0.5",
 	"svgwrite==1.3.1",
 	"Telethon==1.10.6",
+	"ural==0.30.0",
 	"Werkzeug==0.15.5",
 	"wordcloud==1.8.1",
 	"en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.0.0/en_core_web_sm-3.0.0.tar.gz#egg=en_core_web_sm"
