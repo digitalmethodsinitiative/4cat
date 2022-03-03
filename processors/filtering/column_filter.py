@@ -157,7 +157,7 @@ class LexicalFilter(BasicProcessor):
                         return
 
                     if match_multiple == "any" and record_matches:
-                        fieldnames = list(item.keys()) + match_values
+                        fieldnames = list(item.keys()) + match_values + ['list_matches']
                     else:
                         fieldnames = item.keys()
                     # initialise csv writer - we do this explicitly rather than
@@ -199,9 +199,13 @@ class LexicalFilter(BasicProcessor):
 
                     # If recording matches, then update the item to include columns for the match_values
                     if match_multiple == "any" and record_matches:
+                        list_matches = []
                         for i in range(len(match_values)):
                             # Map the results to the matches
                             item[match_values[i]] = match_list[i]
+                            if match_list[i]:
+                                list_matches.append(str(match_values[i]))
+                        item['list_matches'] = list_matches
                 else:
                     matches = False
 
