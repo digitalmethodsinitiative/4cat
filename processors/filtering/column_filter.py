@@ -107,6 +107,7 @@ class LexicalFilter(BasicProcessor):
         Reads a CSV file, filtering items that match in the required way, and
         creates a new dataset containing the matching values
         """
+        num_of_surrounding_characters_to_select = 25
         column = self.parameters.get("column", "")
         match_values = [value.strip() for value in self.parameters.get("match-value").split(",")]
         match_style = self.parameters.get("match-style", "")
@@ -202,7 +203,11 @@ class LexicalFilter(BasicProcessor):
                         list_matches = []
                         for i in range(len(match_values)):
                             # Map the results to the matches
-                            item[match_values[i]] = match_list[i]
+                            if match_list[i] and type(item_column) == str:
+                                item[match_values[i]] = self.surrounding_text(item_column, match_values[i], num_of_surrounding_characters_to_select)
+                            else:
+                                item[match_values[i]] = match_list[i]
+                            # Create aggregate column
                             if match_list[i]:
                                 list_matches.append(str(match_values[i]))
                         item['list_matches'] = list_matches
@@ -253,6 +258,17 @@ class LexicalFilter(BasicProcessor):
                 match_list = None
 
         return match_list
+
+    def surrounding_text(self, text, target, num_char):
+        """
+        Simple find some surrounding text function. Probably should use
+        regex, but whatever.
+        """
+        start_of_match = text.find(target)
+        if start_of_match != -1:
+            return text[max(start_of_match - num_char,0):start_of_match + len(target) + num_char]
+        else:
+            return None
 
     def after_process(self):
         super().after_process()
