@@ -51,13 +51,13 @@ class SeleniumScraper(Search, metaclass=abc.ABCMeta):
         try:
             self.driver.get(url)
         except Exception as e:
-            self.warning.error("Selenium driver.get() exception: " + str(e))
+            self.log.warning("Selenium driver.get() exception: " + str(e))
             self.restart_selenium()
             try:
                 # try again
                 self.driver.get(url)
             except Exception as e:
-                self.log.error(e)
+                self.log.error(str(e))
                 return False
 
         if self.check_for_movement():
