@@ -137,8 +137,8 @@ IMAGE_INTERVAL = 3600
 MAX_EXPLORER_POSTS = 100000
 
 # Selenium Scraper Settings
-SELENIUM_BROWSER = 'chrome' # 'chrome' or 'firefox'
-SELENIUM_EXECUTABLE_PATH = 'chromedriver' # path to webdriver executable
+SELENIUM_BROWSER = 'firefox' # 'chrome' or 'firefox'
+SELENIUM_EXECUTABLE_PATH = 'geckodriver' # path to chromedriver or geckodriver executable
 
 # Web tool settings
 class FlaskConfig:
