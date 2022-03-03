@@ -79,6 +79,9 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
         scraped_urls = set()
 
         while urls_to_scrape:
+            if self.interrupted:
+                raise ProcessorInterruptedException("Interrupted while scraping urls from the Web Archive")
+
             # Grab first url
             url_obj = urls_to_scrape.pop(0)
             url = url_obj['url']
