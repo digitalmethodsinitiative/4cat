@@ -13,6 +13,8 @@ from common.lib.exceptions import QueryParametersException, ProcessorInterrupted
 from common.lib.helpers import validate_url
 from common.lib.user_input import UserInput
 
+import config
+
 class SearchWebArchiveWithSelenium(SeleniumScraper):
     """
     Get HTML page source from Web Archive (web.archive.org) via the Selenium webdriver and Chrome browser
@@ -56,7 +58,7 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
             "help": "HTTP or Selenium request",
             "tooltip": "HTTP request added to body field; HTTP request not parsed for text",
             "options": {
-                "both": "Scrape with both HTTP request and Selenium WebDriver",
+                "both": "Both HTTP request and Selenium WebDriver",
                 "selenium_only": "Only use Selenium WebDriver",
             },
             "default": "selenium_only"
@@ -70,7 +72,13 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
         :param query:
         :return:
         """
+        self.dataset.log('parameters: ' + str(self.parameters))
+        self.dataset.log('query: ' + str(query))
         http_request = self.parameters.get("http_request") == 'both'
+        if http_request:
+            self.dataset.update_status('Scraping Web Archives with Selenium %s and HTTP Requests' % config.SELENIUM_BROWSER)
+        else:
+            self.dataset.update_status('Scraping Web Archives with Selenium %s' % config.SELENIUM_BROWSER)
         scrape_additional_subpages = self.parameters.get("subpages")
         urls_to_scrape = [url.strip() for url in self.parameters.get("query", "").split('\n')]
         urls_to_scrape = [{'url':url, 'num_additional_subpages': scrape_additional_subpages, 'subpage_links':[]} for url in urls_to_scrape]
@@ -189,10 +197,12 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
                 if http_request:
                     try:
                         http_response = self.request_get_w_error_handling(scraped_page.get('final_url'))
-                        result['body'] += '\nHTTP RESPONSE:\n' + http_response.text
+                        self.dataset.log('Collected HTTP response: %s' % scraped_page.get('final_url'))
+                        result['body'] = 'SELENIUM RESPONSE:\n' + str(result['body']) + '\nHTTP RESPONSE:\n' + http_response.text
                     except Exception as e:
-                        http_error = '; HTTP Error: %s' % e
-                        result['error'] += http_error
+                        result['body'] = 'SELENIUM RESPONSE:\n' + str(result['body']) + '\nHTTP RESPONSE:\nNone'
+                        http_error = '\nHTTP ERROR:\n' % str(e)
+                        result['error'] = 'SELENIUM ERROR:\n' + str(result['error']) + http_error
 
                 yield result
             else:
@@ -228,21 +238,21 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
         try:
             response = requests.get(url, **kwargs)
         except requests.exceptions.Timeout as e:
-            self.dataset.log("Error: Timeout on url %s: %s" % (url, e))
+            self.dataset.log("Error: Timeout on url %s: %s" % (url, str(e)))
             raise e
         except requests.exceptions.SSLError as e:
-            self.dataset.log("Error: SSLError on url %s: %s" % (url, e))
+            self.dataset.log("Error: SSLError on url %s: %s" % (url, str(e)))
             raise e
         except requests.exceptions.TooManyRedirects as e:
-            self.dataset.log("Error: TooManyRedirects on url %s: %s" % (url, e))
+            self.dataset.log("Error: TooManyRedirects on url %s: %s" % (url, str(e)))
             raise e
         except requests.exceptions.ConnectionError as e:
             if retries > 0:
                 response = self.request_get_w_error_handling(url, retries=retries - 1, **kwargs)
             else:
-                self.dataset.log("Error: ConnectionError on url %s: %s" % (url, e))
+                self.dataset.log("Error: ConnectionError on url %s: %s" % (url, str(e)))
                 raise e
-            return response
+        return response
 
     @staticmethod
     def validate_query(query, request, user):
@@ -267,7 +277,11 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
         if not preprocessed_urls:
             raise QueryParametersException("No Urls detected!")
 
+        if not query.get("http_request"):
+            raise QueryParametersException("Selenium/HTTP option must exist!")
+
         return {
             "query": query.get("query"),
-            "subpages": query.get("subpages", 0)
+            "subpages": query.get("subpages", 0),
+            'http_request': query.get("http_request"),
             }
