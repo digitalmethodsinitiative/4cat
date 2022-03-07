@@ -46,15 +46,15 @@ class SeleniumScraper(Search, metaclass=abc.ABCMeta):
         :return dict: A dictionary containing basic results from scrape including final_url, page_title, and page_source.
                       Returns false if no movement was detected
         """
-        self.reset_current_page()
-
         try:
+            self.reset_current_page()
             self.driver.get(url)
         except Exception as e:
             self.log.warning("Selenium driver.get() exception: " + str(e))
             self.restart_selenium()
             try:
                 # try again
+                self.reset_current_page()
                 self.driver.get(url)
             except Exception as e:
                 self.log.error(str(e))
