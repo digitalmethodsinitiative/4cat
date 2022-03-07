@@ -25,7 +25,7 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
     # Web Archive returns "internal error" sometimes even when snapshot exists; we retry
     bad_response_text = 'This snapshot cannot be displayed due to an internal error'
     # Web Archive will load and then redirect after a few seconds; check for new page to load
-    redirect_text = 'Got an HTTP 302 response at crawl time'
+    redirect_text = ['Got an HTTP 302 response at crawl time', 'Got an HTTP 301 response at crawl time']
 
     options = {
         "intro-1": {
@@ -119,7 +119,7 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
                     continue
 
                 # Redirects require waiting on Internet Archive
-                if any([self.redirect_text in text for text in scraped_page['text']]):
+                if any([any([redirect_text in text for redirect_text in self.redirect_text]) for text in scraped_page['text']]):
                     # Update last_scraped_url for movement check
                     self.last_scraped_url = self.driver.current_url
                     self.dataset.log('Redirect url: %s' % url)
@@ -196,7 +196,7 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
 
                 if http_request:
                     try:
-                        http_response = self.request_get_w_error_handling(scraped_page.get('final_url'))
+                        http_response = self.request_get_w_error_handling(scraped_page.get('final_url'), timeout=120)
                         self.dataset.log('Collected HTTP response: %s' % scraped_page.get('final_url'))
                         result['body'] = 'SELENIUM RESPONSE:\n' + str(result['body']) + '\nHTTP RESPONSE:\n' + http_response.text
                     except Exception as e:
