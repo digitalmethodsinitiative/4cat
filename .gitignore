@@ -17,7 +17,6 @@
 
 # actual files that are part of 4CAT but should not be included
 .current-version
-config.py
 deploy.sh
 module_cache.pb
 webtool/fourcat/js/jquery-csv-master/
