@@ -9,5 +9,5 @@ activity on the platform.
 It may be possible to implement a solution for this using Proxies or Tor. Apart from this issue, the data source is in
 principle set up to allow scraping the full Douban website.
 
-## Acknowledgements
+### Acknowledgements
 Thanks to Tong Wu for introducing the platform and helping us find our way in it.
