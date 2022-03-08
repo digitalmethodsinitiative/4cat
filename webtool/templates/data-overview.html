@@ -34,12 +34,6 @@
             <div class="card-content">
                 <dl class="metadata-wrapper">
                     <div class="fullwidth">
-                        <dt>id</dt>
-                        <dd>
-                            {{ datasource_id }}
-                        </dd>
-                    </div>
-                    <div class="fullwidth">
                         <dt>Type</dt>
                         <dd>
                             {% if labels %}
@@ -87,8 +81,7 @@
                     <div class="fullwidth">
                         <dt>Source code & technical info</dt>
                         <dd>
-                            {% set datasource_dir = datasources[datasource_id].path|string %}
-                            <a href="{{ github_url }}/tree/master/datasources/{{ datasource_dir.split('\\')[-1] }}" rel="external" target="_blank">GitHub link</a>
+                            <a href="{{ github_url }}/tree/master/datasources/{{ datasources[datasource_id].id }}" rel="external" target="_blank">GitHub link</a>
                         </dd>
                     </div>
                     {% if references %}
