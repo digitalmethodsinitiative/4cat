@@ -27,6 +27,10 @@ class SearchWithTwitterAPIv2(Search):
 
     previous_request = 0
 
+    references = [
+        "[Twitter API documentation](https://developer.twitter.com/en/docs/twitter-api)"
+    ]
+
     options = {
         "intro-1": {
             "type": UserInput.OPTION_INFO,

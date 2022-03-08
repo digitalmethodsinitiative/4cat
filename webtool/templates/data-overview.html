@@ -11,11 +11,11 @@
 
 {% block body %}
     <article class="with-aside">
-        <section>
+        <section class="data-overview">
             <div>
                 <h2><span>{% if datasource_id %}{{ datasource_name }} data overview{% else %}Datasource overview{% endif %}</span></h2>
             </div>
-
+            <div class="description">
             {% if datasource_id %}
                 {% if description %}
                     <p>{{ description|markdown|safe }}</p>
@@ -23,11 +23,14 @@
                     <p>No description set. Data source descriptions can be added with a <code>DESCRIPTION.md</code> file in the data source folder.</p>
                 {% endif %}
             
+            {% if labels and "local" in labels %}
+                {% include "query-syntax.html" %}
+            {% endif %}
+            </div>
             <h3>Metadata</h3>
             {% if daily_counts %}
                 {% include "day-graph.html" %}
             {% endif %}
-            
             <div class="card-content">
                 <dl class="metadata-wrapper">
                     <div class="fullwidth">

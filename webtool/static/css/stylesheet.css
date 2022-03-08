@@ -623,6 +623,10 @@ article section li p, article aside li p {
     margin-left: 0;
 }
 
+article section.data-overview .description {
+    padding: 1em 0;
+}
+
 /** --------------------- *
           Pagination
   * --------------------- */
