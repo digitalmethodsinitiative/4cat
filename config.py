@@ -182,7 +182,7 @@ def get_all():
         cursor.execute(query)
         rows = cursor.fetchall()
         connection.close()
-        values = {row['name']:row['value'] for row in rows}
+        values = {row['name']:json.loads(row['value']) for row in rows}
     except (Exception, psycopg2.DatabaseError) as error:
         # TODO: log?
         print(error)
