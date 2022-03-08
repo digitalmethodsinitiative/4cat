@@ -22,6 +22,8 @@ class SearchInstagram(Search):
     title = "Import scraped Instagram data"  # title displayed in UI
     description = "Import Instagram data collected with an external tool such as Zeeschuimer."  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
+    is_local = False    # Whether this datasource is locally scraped
+    is_static = False   # Whether this datasource is still updated
 
     # not available as a processor for existing datasets
     accepts = [None]

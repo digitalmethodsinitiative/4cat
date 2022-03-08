@@ -19,8 +19,12 @@ class SearchReddit(SearchWithScope):
 	title = "Reddit Search"  # title displayed in UI
 	description = "Query the Pushshift API to retrieve Reddit posts and threads matching the search parameters"  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
-
+	is_local = False	# Whether this datasource is locally scraped
+	is_static = False	# Whether this datasource is still updated
+	
 	references = [
+		"[API documentation](https://github.com/pushshift/api)",
+		"[r/pushshift](https://www.reddit.com/r/pushshift/)",
 		"[Baumgartner, J., Zannettou, S., Keegan, B., Squire, M., & Blackburn, J. (2020). The Pushshift Reddit Dataset. *Proceedings of the International AAAI Conference on Web and Social Media*, 14(1), 830-839.](https://ojs.aaai.org/index.php/ICWSM/article/view/7347)"
 	]
 

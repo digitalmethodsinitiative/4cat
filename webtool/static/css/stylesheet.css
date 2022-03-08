@@ -211,6 +211,13 @@ article.small .form-element > *:not([type=radio], [type=checkbox]) {
     padding: 1em;
 }
 
+.data-overview-link {
+    display: block;
+    font-size: 13px;
+    position: absolute;
+    margin-top: -3px;
+}
+
 button, .button-like {
     border: 2px solid var(--contrast-dark);
     background: var(--contrast-bright);
@@ -596,6 +603,11 @@ ol li:nth-child(even) {
 article section ul, article aside ul {
     list-style: disc outside;
     margin-left: 2.5em;
+}
+
+article section ul.nobullet, article aside ul.nobullet {
+    list-style: none;
+    margin-left: auto;
 }
 
 article section li p, article aside li p {

@@ -1,0 +1,123 @@
+{% extends "layout.html" %}
+
+{% if datasource_id %}
+    {% set datasource_name = datasources[datasource_id].name %}
+{% endif %}
+
+{% block title %}{% if datasource_id %}{{ datasource_name }} data overview{% else %}Data overview{% endif %}{% endblock %}
+
+{% block body_class %}plain-page {{ body_class }}{% endblock %}
+
+
+{% block body %}
+    <article class="with-aside">
+        <section>
+            <div>
+                <h2><span>{% if datasource_id %}{{ datasource_name }} data overview{% else %}Datasource overview{% endif %}</span></h2>
+            </div>
+
+            {% if datasource_id %}
+                {% if description %}
+                    <p>{{ description|markdown|safe }}</p>
+                {% else %}
+                    <p>No description set. Data source descriptions can be added with a <code>DESCRIPTION.md</code> file in the data source folder.</p>
+                {% endif %}
+            
+            <h3>Metadata</h3>
+            {% if daily_counts %}
+                {% include "day-graph.html" %}
+            {% endif %}
+            
+            <div class="card-content">
+                <dl class="metadata-wrapper">
+                    <div class="fullwidth">
+                        <dt>id</dt>
+                        <dd>
+                            {{ datasource_id }}
+                        </dd>
+                    </div>
+                    <div class="fullwidth">
+                        <dt>Type</dt>
+                        <dd>
+                            {% if labels %}
+                                {% for label in labels %}
+                                 <button class="tooltip-trigger" aria-controls="tooltip-datasource-type" aria-label="Explain datasource type" id="datasource-type-label">{{ label }}</button>
+                                <div role="tooltip" id="tooltip-datasource-type">
+                                    <ul class="nobullet">
+
+                                    {% set label_id = label | replace(" ", "_") %}
+                                    {% if label == "local" %}
+                                        <li>The data for this data source are gathered and stored by this 4CAT instance.</li>
+                                    {% elif label == "static" %}
+                                        <li>The data for this datasource are not updated anymore.</li>
+                                    {% elif label == "external" %}
+                                        <li>The data for this datasource is collected externally (API or custom upload).</li>
+                                    {% elif label == "experimental" %}
+                                        <li>This data source is not bug-proof.</li>
+                                    {% endif %}
+                                {% endfor %}
+                                </ul>
+                            </div>
+                            {% endif %}
+                        </dd>
+                    </div>
+                    {% if labels and "local" in labels %}
+                    <div class="fullwidth">
+                        <dt>Total posts</dt>
+                        <dd>
+                            <ul class="nobullet">
+                            {% for board, count in total_counts.items() %}
+                                <li><strong>{{ board }}</strong>: {{ count|commafy }}</li>
+                            {% endfor %} 
+                            </ul>
+                        </dd>
+                    </div>
+                    {% endif %}
+                    {% if datasources[datasource_id]['expire-datasets'] %}
+                    <div class="fullwidth">
+                        <dt>Dataset expiration</dt>
+                        <dd>
+                            After {{ datasources[datasource_id]['expire-datasets']|timify_long|safe }}
+                        </dd>
+                    </div>
+                    {% endif %}
+                    <div class="fullwidth">
+                        <dt>Source code & technical info</dt>
+                        <dd>
+                            {% set datasource_dir = datasources[datasource_id].path|string %}
+                            <a href="{{ github_url }}/tree/master/datasources/{{ datasource_dir.split('\\')[-1] }}" rel="external" target="_blank">GitHub link</a>
+                        </dd>
+                    </div>
+                    {% if references %}
+                     <div class="fullwidth">
+                        <dt>Documentation and literature</dt>
+                        <dd>
+                            <ul class="nobullet">
+                            {% for ref in references %}
+                                <li>{{ ref|markdown|safe }}</li>
+                            {% endfor %}
+                            </ul>
+                        </dd>
+                    </div>
+                    {% endif %}
+                </dl>
+            </div>
+            {% else %}
+                <p>Select a data source from the panel.</p>
+            {% endif %}
+
+        </section>
+
+        <aside>
+            <div>
+                <h2 id="datasource-header"><span>Data sources</span></h2>
+                <ol id="datasource-list">
+                    {% for datasource in datasources %}
+                        <li>{% if datasource_id != datasource %}<a href="{{ url_for('data_overview') }}{{ datasource }}">{% endif %}<h4>{{ datasources[datasource].name }}</h4>{% if datasource_id != datasource %}</a>{% endif %}</li>
+                    {% endfor %}
+                </ol>
+            </div>
+        </aside>
+    </article>
+{% endblock %}
+

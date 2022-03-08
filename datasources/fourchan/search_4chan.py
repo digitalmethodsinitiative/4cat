@@ -23,6 +23,8 @@ class Search4Chan(SearchWithScope):
 	type = "4chan-search"  # job ID
 	sphinx_index = "4chan"  # prefix for sphinx indexes for this data source. Should usually match sphinx.conf
 	prefix = "4chan"  # table identifier for this datasource; see below for usage
+	is_local = True	# Whether this datasource is locally scraped
+	is_static = False	# Whether this datasource is still updated
 
 	# Columns to return in csv
 	return_cols = ['thread_id', 'id', 'timestamp', 'board', 'body', 'subject', 'author', 'image_file', 'image_md5',

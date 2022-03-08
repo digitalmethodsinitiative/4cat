@@ -1,0 +1,72 @@
+<script type="text/javascript" src="https://code.highcharts.com/highcharts.js"></script>
+<figure class="highcharts-figure">
+<div id="container"></div>
+</figure>
+<script type="text/javascript">
+	Highcharts.setOptions({
+    chart: {
+        style: {
+            fontFamily: 'comic sans'
+        }
+    }
+	});
+    Highcharts.chart('container', {
+
+        title: {
+            text: 'Collected data per day for {{ datasource_name }}'
+        },
+        subtitle: {
+        	text: 'Counts updated daily'
+        },
+        yAxis: {
+            title: {
+                text: 'Number of posts'
+            }
+        },
+        xAxis: {
+            type: 'datetime'
+        },
+
+        legend: {
+            layout: 'horizontal',
+            align: 'center',
+            verticalAlign: 'top'
+        },
+
+        plotOptions: {
+            series: {
+                label: {
+                    connectorAllowed: false
+                },
+                pointStart: Date.UTC{{ daily_counts["first_date"] }},
+                pointInterval: 24 * 3600 * 1000
+            }
+        },
+
+        series: [
+
+            {% for board in total_counts.keys() %}
+            {
+                name: '{{ board }}',
+                data: {{ daily_counts[board] }}
+            },
+            {% endfor %}
+        ],
+
+        responsive: {
+            rules: [{
+                condition: {
+                    maxWidth: 500
+                },
+                chartOptions: {
+                    legend: {
+                        layout: 'horizontal',
+                        align: 'center',
+                        verticalAlign: 'bottom'
+                    }
+                }
+            }]
+        }
+
+    });
+</script>
