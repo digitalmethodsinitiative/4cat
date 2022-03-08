@@ -14,7 +14,7 @@ import config
 logger = Logger()
 database = Database(logger=logger, appname="result-cleaner")
 
-os.chdir(config.PATH_DATA)
+os.chdir(config.get('PATH_DATA'))
 files = glob.glob("*.*")
 
 for file in files:
@@ -23,4 +23,4 @@ for file in files:
 		query = DataSet(key=key, db=database)
 	except TypeError:
 		print("Not linked to a query: %s" % file)
-		os.unlink(config.PATH_DATA + "/" + file)
+		os.unlink(config.get('PATH_DATA') + "/" + file)

@@ -238,7 +238,7 @@ class User:
 		:param bool new:  Is this the first time setting a password for this
 						  account?
 		"""
-		if not config.MAILHOST:
+		if not config.get('MAILHOST'):
 			raise RuntimeError("No e-mail server configured. 4CAT cannot send any e-mails.")
 
 		if self.is_special:
@@ -250,7 +250,7 @@ class User:
 		register_token = self.generate_token(regenerate=True)
 
 		# prepare welcome e-mail
-		sender = config.NOREPLY_EMAIL
+		sender = config.get('NOREPLY_EMAIL')
 		message = MIMEMultipart("alternative")
 		message["From"] = sender
 		message["To"] = username

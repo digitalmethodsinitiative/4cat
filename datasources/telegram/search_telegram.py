@@ -133,7 +133,7 @@ class SearchTelegram(Search):
             self.dataset.delete_parameter("api_hash", instant=True)
             self.dataset.delete_parameter("api_phone", instant=True)
             self.dataset.delete_parameter("api_id", instant=True)
-            
+
         return results
 
     async def execute_queries(self):
@@ -150,7 +150,7 @@ class SearchTelegram(Search):
 
         hash_base = query["api_phone"].replace("+", "") + query["api_id"] + query["api_hash"]
         session_id = hashlib.blake2b(hash_base.encode("ascii")).hexdigest()
-        session_path = Path(config.PATH_ROOT).joinpath(config.PATH_SESSIONS, session_id + ".session")
+        session_path = Path(config.get('PATH_ROOT')).joinpath(config.get('PATH_SESSIONS'), session_id + ".session")
 
         client = None
 
@@ -193,7 +193,7 @@ class SearchTelegram(Search):
         parameters = self.dataset.get_parameters()
         queries = [query.strip() for query in parameters.get("query", "").split(",")]
         max_items = convert_to_int(parameters.get("items", 10), 10)
-        
+
         # Telethon requires the offset date to be a datetime date
         max_date = parameters.get("max_date")
         if max_date:
@@ -201,7 +201,7 @@ class SearchTelegram(Search):
                 max_date = datetime.fromtimestamp(int(max_date))
             except ValueError:
                 max_date = None
-        
+
         # min_date can remain an integer
         min_date = parameters.get("min_date")
         if min_date:
@@ -209,7 +209,7 @@ class SearchTelegram(Search):
                 min_date = int(min_date)
             except ValueError:
                 min_date = None
-        
+
         try:
             posts = await self.gather_posts(client, queries, max_items, min_date, max_date)
         except Exception as e:

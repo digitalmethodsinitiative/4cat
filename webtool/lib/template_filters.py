@@ -188,7 +188,7 @@ def _jinja2_filter_extension_to_noun(ext):
 def _jinja2_filter_post_field(field, post):
 	# Takes a value in between {{ two curly brackets }} and uses that
 	# as a dictionary key. It then returns the corresponding value.
-	
+
 	matches = False
 	formatted_field = field
 
@@ -241,17 +241,16 @@ def inject_now():
 		"""
 		return str(uuid.uuid4())
 
-	announcement_file = Path(config.PATH_ROOT, "ANNOUNCEMENT.md")
+	announcement_file = Path(config.get('PATH_ROOT'), "ANNOUNCEMENT.md")
 
 	return {
-		"__datasources_config": config.DATASOURCES,
+		"__datasources_config": config.get('DATASOURCES'),
 		"__has_https": config.FlaskConfig.SERVER_HTTPS,
 		"__datenow": datetime.datetime.utcnow(),
-		"__tool_name": config.TOOL_NAME,
-		"__tool_name_long": config.TOOL_NAME_LONG,
+		"__tool_name": config.get('TOOL_NAME'),
+		"__tool_name_long": config.get('TOOL_NAME_LONG'),
 		"__announcement": announcement_file.open().read().strip() if announcement_file.exists() else None,
-		"__expire_datasets": config.EXPIRE_DATASETS if hasattr(config, "EXPIRE_DATASETS") else None,
-		"__expire_optout": config.EXPIRE_ALLOW_OPTOUT if hasattr(config, "EXPIRE_ALLOW_OPTOUT") else None,
+		"__expire_datasets": config.get('EXPIRE_DATASETS'),
+		"__expire_optout": config.get('EXPIRE_ALLOW_OPTOUT'),
 		"uniqid": uniqid
 	}
-

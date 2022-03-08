@@ -43,7 +43,7 @@ def authenticate(request, user, **kwargs):
 
 	# store session ID for user so it can be found again for later queries
 	user.set_value("telegram.session", session_id)
-	session_path = Path(config.PATH_ROOT).joinpath(config.PATH_SESSIONS, session_id + ".session")
+	session_path = Path(config.get('PATH_ROOT')).joinpath(config.get('PATH_SESSIONS'), session_id + ".session")
 
 
 	client = None

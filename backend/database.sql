@@ -3,6 +3,12 @@
 -- on a fresh 4CAT install - individual data sources may also provide their
 -- own database.sql files with data source-specific tables and indices.
 
+-- 4CAT settings table
+CREATE TABLE IF NOT EXISTS fourcat_settings (
+  name                   TEXT UNIQUE PRIMARY KEY,
+  value                  TEXT DEFAULT '{}'
+);
+
 -- jobs table
 CREATE TABLE IF NOT EXISTS jobs (
   id                     SERIAL PRIMARY KEY,
@@ -101,3 +107,34 @@ CREATE FUNCTION count_estimate(query text) RETURNS bigint AS $$
     RETURN rec."QUERY PLAN"->0->'Plan'->'Plan Rows';
   END;
   $$ LANGUAGE plpgsql VOLATILE STRICT;
+
+
+-- fourcat settings insert default settings
+INSERT INTO fourcat_settings
+  (name, value)
+  Values
+    --('4chan.boards', '["pol", "v"]')
+    ('TOOL_NAME', '"4CAT"'),
+    ('TOOL_NAME_LONG', '"4CAT: Capture and Analysis Toolkit"'),
+    ('PATH_VERSION', '".git-checked-out"'),
+    ('GITHUB_URL', '"https://github.com/digitalmethodsinitiative/4cat"'),
+    ('EXPIRE_DATASETS', '0'),
+    ('EXPIRE_ALLOW_OPTOUT', 'true'),
+    ('WARN_INTERVAL', '600'),
+    ('WARN_LEVEL', '"WARNING"'),
+    ('WARN_SLACK_URL', 'null'),
+    ('WARN_EMAILS', 'null'),
+    ('ADMIN_EMAILS', 'null'),
+    ('MAILHOST', 'null'),
+    ('MAIL_SSL', 'false'),
+    ('MAIL_USERNAME', 'null'),
+    ('MAIL_PASSWORD', 'null'),
+    ('NOREPLY_EMAIL', '"noreply@localhost"'),
+    ('SCRAPE_TIMEOUT', '5'),
+    ('SCRAPE_PROXIES', '{"http": []}'),
+    ('IMAGE_INTERVAL', '3600'),
+    ('MAX_EXPLORER_POSTS', '100000'),
+    ('FLASK_APP', '"webtool/fourcat"'),
+    ('SERVER_HTTPS', 'false'),
+    ('HOSTNAME_WHITELIST_NAME', '"Automatic login"')
+    ON CONFLICT DO NOTHING;

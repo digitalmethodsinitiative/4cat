@@ -62,7 +62,7 @@ if not args.no_version_check:
 #     Check validity of configuration file
 # (could be expanded to check for other values)
 # ---------------------------------------------
-if not config.ANONYMISATION_SALT or config.ANONYMISATION_SALT == "REPLACE_THIS":
+if not config.get('ANONYMISATION_SALT') or config.get('ANONYMISATION_SALT') == "REPLACE_THIS":
     print(
         "You need to set a random value for anonymisation in config.py before you can run 4CAT. Look for the ANONYMISATION_SALT option.")
     sys.exit(1)
@@ -94,7 +94,7 @@ else:
     from daemon import pidfile
 
 # determine PID file
-lockfile = Path(config.PATH_ROOT, config.PATH_LOCKFILE, "4cat.pid")  # pid file location
+lockfile = Path(config.get('PATH_ROOT'), config.get('PATH_LOCKFILE'), "4cat.pid")  # pid file location
 
 
 # ---------------------------------------------
@@ -259,7 +259,7 @@ elif command == "status":
         print("4CAT Backend Daemon is currently up and running.")
 
         # fetch more detailed status via internal API
-        if not config.API_PORT:
+        if not config.get('API_PORT'):
             sys.exit(0)
 
         print("\n     Active workers:\n-------------------------")

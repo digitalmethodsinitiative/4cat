@@ -41,9 +41,9 @@ class Search4Chan(SearchWithScope):
 		},
 		"board": {
 			"type": UserInput.OPTION_CHOICE,
-			"options": {b: b for b in config.DATASOURCES[prefix].get("boards", [])},
+			"options": {b: b for b in config.get('DATASOURCES')[prefix].get("boards", [])},
 			"help": "Board",
-			"default": config.DATASOURCES[prefix].get("boards", [""])[0]
+			"default": config.get('DATASOURCES')[prefix].get("boards", [""])[0]
 		},
 		"body_match": {
 			"type": UserInput.OPTION_TEXT,
@@ -57,7 +57,7 @@ class Search4Chan(SearchWithScope):
 			"type": UserInput.OPTION_MULTI_SELECT,
 			"help": "Poster country",
 			"board_specific": ["pol", "sp", "int"],
-			"tooltip": "The IP-derived flag attached to posts. Can be an actual country or \"meme flag\". Leave empty for all.", 
+			"tooltip": "The IP-derived flag attached to posts. Can be an actual country or \"meme flag\". Leave empty for all.",
 			"options": {
 				"Armenia|Albania|Andorra|Austria|Belarus|Belgium|Bosnia and Herzegovina|Bulgaria|Croatia|Cyprus|Czech Republic|Denmark|Estonia|Finland|France|Germany|Greece|Hungary|Iceland|Republic of Ireland|Italy|Kosovo|Latvia|Liechtenstein|Lithuania|Luxembourg|Republic of Macedonia|North Macedonia|Macedonia|Malta|Moldova|Monaco|Montenegro|Netherlands|The Netherlands|Norway|Poland|Portugal|Romania|Russia|San Marino|Serbia|Slovakia|Slovenia|Spain|Sweden|Switzerland|Turkey|Ukraine|United Kingdom|Vatican City": "<span class='flag flag-eu' title='Afghanistan'></span> European countries",
 				"Afghanistan": "<span class='flag flag-af' title='Afghanistan'></span> Afghanistan",
@@ -488,7 +488,7 @@ class Search4Chan(SearchWithScope):
 		match = []
 
 		# Option wether to use sphinx for text searches
-		use_sphinx = config.DATASOURCES["4chan"].get("use_sphinx", True)
+		use_sphinx = config.get('DATASOURCES')["4chan"].get("use_sphinx", True)
 
 		if query.get("min_date", None):
 			try:
@@ -524,7 +524,7 @@ class Search4Chan(SearchWithScope):
 			if query.get("subject_match", None):
 				where.append("lower(subject) LIKE %s")
 				replacements.append("%" + query["subject_match"] + "%")
-		
+
 		# handle country names through sphinx
 		if query.get("country_name", None) and not query.get("check_dense_country", None):
 			where.append("country_name IN %s")
@@ -539,7 +539,7 @@ class Search4Chan(SearchWithScope):
 		self.dataset.update_status("Searching for matches")
 
 		where = " AND ".join(where)
-		
+
 		if use_sphinx:
 			posts = self.fetch_sphinx(where, replacements)
 		# Query the postgres table immediately if we're not using sphinx.
@@ -708,8 +708,8 @@ class Search4Chan(SearchWithScope):
 		"""
 		return MySQLDatabase(
 			host="localhost",
-			user=config.DB_USER,
-			password=config.DB_PASSWORD,
+			user=config.get('DB_USER'),
+			password=config.get('DB_PASSWORD'),
 			port=9306,
 			logger=self.log
 		)

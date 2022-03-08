@@ -111,7 +111,7 @@ class OvertimeHatefulAnalysis(BasicProcessor):
 			self.dataset.finish(0)
 			return
 
-		with open(config.PATH_ROOT + "/common/assets/hatebase/hatebase-%s.json" % language) as hatebasedata:
+		with open(config.get('PATH_ROOT') + "/common/assets/hatebase/hatebase-%s.json" % language) as hatebasedata:
 			hatebase = json.loads(hatebasedata.read())
 
 		hatebase = {term.lower(): hatebase[term] for term in hatebase}

@@ -178,7 +178,7 @@ class SearchTumblr(Search):
 						if reblog_post:
 							reblog_post = self.parse_tumblr_posts([reblog_post], reblog=True)
 							results.append(reblog_post[0])
-		
+
 		self.job.finish()
 		return results
 
@@ -255,7 +255,7 @@ class SearchTumblr(Search):
 				posts = [post for post in posts if post["timestamp"] <= max_date_original]
 
 			max_date_str = datetime.fromtimestamp(max_date).strftime("%Y-%m-%d %H:%M:%S")
-			
+
 			# except Exception as e:
 			# 	print(e)
 			# 	self.dataset.update_status("Reached the limit of the Tumblr API. Last timestamp: %s" % str(max_date))
@@ -292,10 +292,10 @@ class SearchTumblr(Search):
 			else:
 
 				posts = self.parse_tumblr_posts(posts)
-				
+
 				# Get all timestamps and sort them.
 				post_dates = sorted([post["timestamp"] for post in posts])
-				
+
 				# Get the lowest date and use it as the next "before" parameter.
 				max_date = post_dates[0]
 
@@ -316,7 +316,7 @@ class SearchTumblr(Search):
 					# After having collected 250 posts, check whether the time
 					# difference between posts far exceeds the average time difference
 					# between posts. If it's more than five times this amount,
-					# restart the query with the timestamp just before the gap, minus the 
+					# restart the query with the timestamp just before the gap, minus the
 					# average time difference up to this point - something might be up with Tumblr's API.
 					if len(all_posts) >= 250 and time_dif > (avg_time_dif * 5):
 
@@ -327,12 +327,12 @@ class SearchTumblr(Search):
 						posts = [post for post in posts if post["timestamp"] >= date]
 						if posts:
 							all_posts += posts
-						
+
 						max_date = date
 						break
 
 					time_difs.append(time_dif)
-				
+
 				# To start a new query
 				if not posts:
 					break
@@ -341,10 +341,10 @@ class SearchTumblr(Search):
 				# This functonality is not natively supported by Tumblr.
 				if min_date:
 					if max_date < min_date:
-					
+
 						# Get rid of all the posts that are earlier than the max_date timestamp
 						posts = [post for post in posts if post["timestamp"] >= min_date and post["timestamp"] <= max_date_original]
-						
+
 						if posts:
 							all_posts += posts
 							self.seen_ids.update([post["id"] for post in posts])
@@ -359,7 +359,7 @@ class SearchTumblr(Search):
 
 				# Add to seen ids
 				self.seen_ids.update([post["id"] for post in posts])
-				
+
 				# Add time differences and calculate new average time difference
 				all_time_difs += time_difs
 
@@ -579,10 +579,10 @@ class SearchTumblr(Search):
 
 		"""
 		client = pytumblr.TumblrRestClient(
-			config.TUMBLR_CONSUMER_KEY,
-			config.TUMBLR_CONSUMER_SECRET_KEY,
-			config.TUMBLR_API_KEY,
-			config.TUMBLR_API_SECRET_KEY
+			config.get('TUMBLR_CONSUMER_KEY'),
+			config.get('TUMBLR_CONSUMER_SECRET_KEY'),
+			config.get('TUMBLR_API_KEY'),
+			config.get('TUMBLR_API_SECRET_KEY')
 		)
 		client_info = client.info()
 
@@ -625,7 +625,7 @@ class SearchTumblr(Search):
 
 		# So it shows nicely in the frontend.
 		items = ", ".join([item.lstrip().rstrip() for item in items if item])
-		
+
 		# the dates need to make sense as a range to search within
 		query["min_date"], query["max_date"] = query.get("daterange")
 		if any(query.get("daterange")) and not all(query.get("daterange")):

@@ -55,7 +55,7 @@ class SearchWithTwitterAPIv2(Search):
             "help": "API Bearer Token"
         },
     }
-    if config.DATASOURCES.get('twitterv2', {}).get('id_lookup', False):
+    if config.get('DATASOURCES').get('twitterv2', {}).get('id_lookup', False):
         options["query_type"] = {
                 "type": UserInput.OPTION_CHOICE,
                 "help": "Query type",
@@ -139,7 +139,7 @@ class SearchWithTwitterAPIv2(Search):
 
             tweet_ids = self.parameters.get("query", []).split(',')
 
-            # Only can lookup 100 tweets in each query per Twitter API 
+            # Only can lookup 100 tweets in each query per Twitter API
             chunk_size = 100
             queries = [','.join(tweet_ids[i:i+chunk_size]) for i in range(0, len(tweet_ids), chunk_size)]
 

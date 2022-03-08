@@ -36,7 +36,7 @@ class TelegramImageDownloader(BasicProcessor):
                   "included in the output archive."  # description displayed in UI
     extension = "zip"  # extension of result file, used internally and in UI
 
-    max_number_images = int(config.MAX_NUMBER_IMAGES) if hasattr(config, 'MAX_NUMBER_IMAGES') else 1000
+    max_number_images = int(config.get('MAX_NUMBER_IMAGES', 1000))
 
     options = {
         "amount": {
@@ -95,7 +95,7 @@ class TelegramImageDownloader(BasicProcessor):
         query = self.source_dataset.top_parent().parameters
         hash_base = query["api_phone"].replace("+", "") + query["api_id"] + query["api_hash"]
         session_id = hashlib.blake2b(hash_base.encode("ascii")).hexdigest()
-        session_path = Path(config.PATH_ROOT).joinpath(config.PATH_SESSIONS, session_id + ".session")
+        session_path = Path(config.get('PATH_ROOT')).joinpath(config.get('PATH_SESSIONS'), session_id + ".session")
         amount = self.parameters.get("amount")
         client = None
 

@@ -46,8 +46,8 @@ def explorer_dataset(key, page):
 	limit = 50
 
 	# The amount of posts that may be included (limit for large datasets)
-	max_posts = config.MAX_EXPLORER_POSTS if hasattr(config, "MAX_EXPLORER_POSTS") else 500000
-	
+	max_posts = config.get('MAX_EXPLORER_POSTS', 500000)
+
 	# The offset for posts depending on the current page
 	offset = ((page - 1) * limit) if page else 0
 
@@ -73,9 +73,9 @@ def explorer_dataset(key, page):
 	is_local = False
 	if datasource in list(all_modules.datasources.keys()):
 		is_local = True if all_modules.datasources[datasource].get("is_local") else False
-	
+
 	# Check if the dataset in fact exists
-	dataset_path = Path(config.PATH_ROOT, config.PATH_DATA, dataset["result_file"])
+	dataset_path = Path(config.get('PATH_ROOT'), config.get('PATH_DATA'), dataset["result_file"])
 	if not dataset_path.exists():
 		abort(404)
 
@@ -83,7 +83,7 @@ def explorer_dataset(key, page):
 	sort_by = request.args.get("sort")
 	if sort_by == "dataset-order":
 		sort_by = None
-	
+
 	# Check if we have to reverse the order.
 	descending = request.args.get("desc")
 	if descending == "true" or descending == True:
@@ -106,9 +106,9 @@ def explorer_dataset(key, page):
 	first_post = False
 
 	for post in iterate_items(dataset_path, max_rows=max_posts, sort_by=sort_by, descending=descending, force_int=force_int):
-		
+
 		count += 1
-		
+
 		# Use an offset if we're showing a page beyond the first.
 		if count <= offset:
 			continue
@@ -139,7 +139,7 @@ def explorer_dataset(key, page):
 	# what data type we're working with.
 	filetype = dataset["result_file"].split(".")[-1].lower()
 	custom_fields = get_custom_fields(datasource, filetype=filetype)
-	
+
 	# Convert posts from markdown to HTML
 	if custom_fields and "markdown" in custom_fields and custom_fields.get("markdown"):
 		posts = [convert_markdown(post) for post in posts]
@@ -147,7 +147,7 @@ def explorer_dataset(key, page):
 	else:
 		posts = [strip_html(post) for post in posts]
 		posts = [format(post, datasource=datasource) for post in posts]
-		
+
 	if not posts:
 		return error(404, error="No posts available for this datasource")
 
@@ -178,7 +178,7 @@ def explorer_thread(datasource, board, thread_id):
 
 	if not datasource:
 		return error(404, error="No datasource provided")
-	if datasource not in config.DATASOURCES:
+	if datasource not in config.get('DATASOURCES'):
 		return error(404, error="Invalid data source")
 	if not board:
 		return error(404, error="No board provided")
@@ -186,7 +186,7 @@ def explorer_thread(datasource, board, thread_id):
 		return error(404, error="No thread ID provided")
 
 	# The amount of posts that may be included (limit for large datasets)
-	max_posts = config.MAX_EXPLORER_POSTS if hasattr(config, "MAX_EXPLORER_POSTS") else 500000
+	max_posts = config.get('MAX_EXPLORER_POSTS', 500000)
 
 	# Get the posts with this thread ID.
 	posts = get_posts(db, datasource, board=board, ids=tuple([thread_id]), threads=True, order_by=["id"])
@@ -223,7 +223,7 @@ def explorer_post(datasource, board, thread_id):
 
 	if not datasource:
 		return error(404, error="No datasource provided")
-	if datasource not in config.DATASOURCES:
+	if datasource not in config.get('DATASOURCES'):
 		return error(404, error="Invalid data source")
 	if not board:
 		return error(404, error="No board provided")
@@ -309,7 +309,7 @@ def save_annotation_fields(key):
 			# We'll delete all prior annotations for a field if its input field is deleted
 			if field_id not in new_field_ids:
 
-				# Labels are used as keys in the annotations table 
+				# Labels are used as keys in the annotations table
 				# They should already be unique, so that's okay.
 				fields_to_delete.add(field["label"])
 				continue
@@ -329,11 +329,11 @@ def save_annotation_fields(key):
 			if old_label != new_label:
 				labels_to_update[old_label] = new_label
 
-			# Check if the options for dropdowns or checkboxes have changed 
+			# Check if the options for dropdowns or checkboxes have changed
 			if new_type == "checkbox" or new_type == "dropdown":
-				
+
 				if "options" in old_fields[field_id]:
-					
+
 					option_fields.add(old_fields[field_id]["label"])
 					new_options = new_fields[field_id]["options"]
 
@@ -352,7 +352,7 @@ def save_annotation_fields(key):
 
 						# Change the label if it has changed. Bit ugly but it works.
 						new_label = [list(new_option.values())[0] for i, new_option in enumerate(new_options) if list(new_options[i].keys())[0] == option_id][0]
-						
+
 						if option_label != new_label:
 							options_to_update[option_label] = new_label
 
@@ -362,7 +362,7 @@ def save_annotation_fields(key):
 			for post_id in list(annotations.keys()):
 
 				for field_label in list(annotations[post_id].keys()):
-					
+
 					# Delete the field entirely
 					if field_label in fields_to_delete:
 						del annotations[post_id][field_label]
@@ -430,7 +430,7 @@ def save_annotations(key):
 
 	if not key:
 		return error(404, error="No dataset key provided")
-	
+
 	new_annotations = request.get_json()
 
 	# If there were already annotations added, we need to make sure
@@ -443,7 +443,7 @@ def save_annotations(key):
 
 		if "annotations" in old_annotations and old_annotations["annotations"]:
 			old_annotations = json.loads(old_annotations["annotations"])
-			
+
 			# Loop through all new annotations and add/overwrite them
 			# with the old annotations dict.
 			for post_id in list(new_annotations.keys()):
@@ -482,7 +482,7 @@ def get_boards(datasource):
 
 	:return-error 404: If the datasource does not exist.
 	"""
-	if datasource not in config.DATASOURCES:
+	if datasource not in config.get('DATASOURCES'):
 		return error(404, error="Invalid data source")
 
 	boards = db.fetchall("SELECT DISTINCT board FROM threads_" + datasource)
@@ -499,7 +499,7 @@ def get_image_file(img_file, limit=0):
 	if not re.match(r"([a-zA-Z0-9]+)\.([a-z]+)", img_file):
 		abort(404)
 
-	image_path = Path(config.PATH_ROOT, config.PATH_IMAGES, img_file)
+	image_path = Path(config.get('PATH_ROOT'), config.get('PATH_IMAGES'), img_file)
 	if not image_path.exists():
 		abort(404)
 
@@ -511,16 +511,16 @@ def iterate_items(in_file, max_rows=None, sort_by=None, descending=False, force_
 	:param in_file, str:		The input file to read.
 	:param sort_by, str:		The key that determines the sort order.
 	:param descending, bool:	Whether to sort by descending values.
-	:param force_int, bool:		Whether the sort value should be converted to an 
+	:param force_int, bool:		Whether the sort value should be converted to an
 								integer.
 	"""
-	
+
 	suffix = in_file.name.split(".")[-1].lower()
 
 	if suffix == "csv":
 
 		with open(in_file, "r", encoding="utf-8") as dataset_file:
-		
+
 			# Sort on date by default
 			# Unix timestamp integers are not always saved in the same field.
 			reader = csv.reader(dataset_file)
@@ -532,15 +532,15 @@ def iterate_items(in_file, max_rows=None, sort_by=None, descending=False, force_
 
 					# Generate reader on the basis of sort_by value
 					reader = sorted(reader, key=lambda x: to_float(x[sort_by_index], convert=force_int) if len(x) >= sort_by_index else 0, reverse=descending)
-			
+
 				except (ValueError, IndexError) as e:
 					pass
-			
+
 			for item in reader:
 
 				# Add columns
 				item = {columns[i]: item[i] for i in range(len(item))}
-				
+
 				yield item
 
 	elif suffix == "ndjson":
@@ -555,7 +555,7 @@ def iterate_items(in_file, max_rows=None, sort_by=None, descending=False, force_
 				for line in dataset_file:
 					item = json.loads(line)
 					yield item
-			
+
 			# If a sort order is given explicitly, we're sorting anyway.
 			else:
 				keys = sort_by.split(".")
@@ -596,7 +596,7 @@ def get_custom_css(datasource):
 	Custom css files should be placed in an 'explorer' directory in the the datasource folder and named
 	'<datasourcename>-explorer.css' (e.g. 'reddit/explorer/reddit-explorer.css').
 	See https://github.com/digitalmethodsinitiative/4cat/wiki/Exploring-and-annotating-datasets for more information.
-	
+
 	:param datasource, str: Datasource name
 
 	:return: The css as string.
@@ -610,15 +610,15 @@ def get_custom_css(datasource):
 		datasource_dir = datasource.replace("8", "eight")
 	else:
 		datasource_dir = datasource
-	
-	css_path = Path(config.PATH_ROOT, "datasources", datasource_dir, "explorer", datasource.lower() + "-explorer.css")
+
+	css_path = Path(config.get('PATH_ROOT'), "datasources", datasource_dir, "explorer", datasource.lower() + "-explorer.css")
 	if css_path.exists():
 		with open(css_path, "r", encoding="utf-8") as css:
 			css = css.read()
 	else:
 		css = None
-		#css = Path(config.PATH_ROOT, "datasources", datasource_dir, "explorer", datasource.lower() + "-explorer.css")
-	
+		#css = Path(config.get('PATH_ROOT'), "datasources", datasource_dir, "explorer", datasource.lower() + "-explorer.css")
+
 	return css
 
 def get_custom_fields(datasource, filetype=None):
@@ -628,7 +628,7 @@ def get_custom_fields(datasource, filetype=None):
 	Custom field json files should be placed in an 'explorer' directory in the the datasource folder and named
 	'<datasourcename>-explorer.json' (e.g. 'reddit/explorer/reddit-explorer.json').
 	See https://github.com/digitalmethodsinitiative/4cat/wiki/Exploring-and-annotating-datasets for more information.
- 
+
 	:param datasource, str: Datasource name
 	:param filetype, str:	The filetype that is handled. This can fluctuate
 							between e.g. NDJSON and csv files.
@@ -645,7 +645,7 @@ def get_custom_fields(datasource, filetype=None):
 	else:
 		datasource_dir = datasource
 
-	json_path = Path(config.PATH_ROOT, "datasources", datasource_dir, "explorer", datasource.lower() + "-explorer.json")
+	json_path = Path(config.get('PATH_ROOT'), "datasources", datasource_dir, "explorer", datasource.lower() + "-explorer.json")
 	if json_path.exists():
 		with open(json_path, "r", encoding="utf-8") as json_file:
 			try:

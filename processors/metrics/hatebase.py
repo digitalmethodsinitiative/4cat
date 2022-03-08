@@ -75,7 +75,7 @@ class HatebaseAnalyser(BasicProcessor):
 			columns = [self.parameters.get("search_columns")]
 
 		# read and convert to a way we can easily match whether any word occurs
-		with open(config.PATH_ROOT + "/common/assets/hatebase/hatebase-%s.json" % language) as hatebasedata:
+		with open(config.get('PATH_ROOT') + "/common/assets/hatebase/hatebase-%s.json" % language) as hatebasedata:
 			hatebase = json.loads(hatebasedata.read())
 
 		hatebase = {term.lower(): hatebase[term] for term in hatebase}

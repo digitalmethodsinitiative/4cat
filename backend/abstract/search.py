@@ -213,7 +213,7 @@ class Search(BasicProcessor, ABC):
 		# speed, since we will potentially need to calculate a large amount of
 		# hashes
 		hasher = hashlib.blake2b(digest_size=24)
-		hasher.update(str(config.ANONYMISATION_SALT).encode("utf-8"))
+		hasher.update(str(config.get('ANONYMISATION_SALT')).encode("utf-8"))
 
 		processed = 0
 		header_written = False
@@ -300,7 +300,7 @@ class Search(BasicProcessor, ABC):
 		if pseudonymise_author:
 			hash_cache = {}
 			hasher = hashlib.blake2b(digest_size=24)
-			hasher.update(str(config.ANONYMISATION_SALT).encode("utf-8"))
+			hasher.update(str(config.get('ANONYMISATION_SALT')).encode("utf-8"))
 			check_cache = CheckCache(hash_cache, hasher)
 
 		processed = 0

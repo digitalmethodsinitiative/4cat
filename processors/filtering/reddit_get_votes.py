@@ -47,8 +47,8 @@ class RedditVoteChecker(BasicProcessor):
 		"""
 		try:
 			user_agent = "4cat:4cat:v1.0 (by /u/oilab-4cat)"
-			reddit = praw.Reddit(client_id=config.REDDIT_API_CLIENTID,
-							 client_secret=config.REDDIT_API_SECRET,
+			reddit = praw.Reddit(client_id=config.get('REDDIT_API_CLIENTID'),
+							 client_secret=config.get('REDDIT_API_SECRET'),
 							 user_agent=user_agent)
 		except praw.exceptions.PRAWException:
 			# unclear what kind of expression gets thrown here

@@ -252,11 +252,11 @@ def request_access():
 	sent to the 4CAT admin via e-mail so they can create an account (if
 	approved)
 	"""
-	if not config.ADMIN_EMAILS:
+	if not config.get('ADMIN_EMAILS'):
 		return render_template("error.html",
                                message="No administrator e-mail is configured; the request form cannot be displayed.")
 
-	if not config.MAILHOST:
+	if not config.get('MAILHOST'):
 		return render_template("error.html",
                                message="No e-mail server configured; the request form cannot be displayed.")
 
@@ -265,7 +265,7 @@ def request_access():
 
 	incomplete = []
 
-	policy_template = Path(config.PATH_ROOT, "webtool/pages/access-policy.md")
+	policy_template = Path(config.get('PATH_ROOT'), "webtool/pages/access-policy.md")
 	access_policy = ""
 	if policy_template.exists():
 		access_policy = policy_template.read_text(encoding="utf-8")
@@ -281,11 +281,11 @@ def request_access():
 		else:
 			html_parser = html2text.HTML2Text()
 
-			sender = config.NOREPLY_EMAIL
+			sender = config.get('NOREPLY_EMAIL')
 			message = MIMEMultipart("alternative")
 			message["Subject"] = "Account request"
 			message["From"] = sender
-			message["To"] = config.ADMIN_EMAILS[0]
+			message["To"] = config.get('ADMIN_EMAILS')[0]
 
 			mail = "<p>Hello! Someone requests a 4CAT Account:</p>\n"
 			for field in required:
@@ -303,7 +303,7 @@ def request_access():
 			message.attach(MIMEText(mail, "html"))
 
 			try:
-				send_email(config.ADMIN_EMAILS, message)
+				send_email(config.get('ADMIN_EMAILS'), message)
 				return render_template("error.html", title="Thank you",
                                        message="Your request has been submitted; we'll try to answer it as soon as possible.")
 			except (smtplib.SMTPException, ConnectionRefusedError, socket.timeout) as e:

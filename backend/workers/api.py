@@ -13,8 +13,8 @@ class InternalAPI(BasicWorker):
 	type = "api"
 	max_workers = 1
 
-	host = config.API_HOST
-	port = config.API_PORT
+	host = config.get('API_HOST')
+	port = config.get('API_PORT')
 
 	def work(self):
 		"""

@@ -105,7 +105,7 @@ def get_software_version():
 
 	:return str:  4CAT version
 	"""
-	versionpath = Path(config.PATH_ROOT, config.PATH_VERSION)
+	versionpath = Path(config.get('PATH_ROOT'), config.get('PATH_VERSION'))
 
 	if versionpath.exists() and not versionpath.is_file():
 		return ""
@@ -116,7 +116,7 @@ def get_software_version():
 		# the currently checked-out commit
 		try:
 			cwd = os.getcwd()
-			os.chdir(config.PATH_ROOT)
+			os.chdir(config.get('PATH_ROOT'))
 			show = subprocess.run(["git", "show"], stderr=subprocess.PIPE, stdout=subprocess.PIPE)
 			os.chdir(cwd)
 			if show.returncode != 0:
@@ -277,7 +277,7 @@ def call_api(action, payload=None):
 	"""
 	connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 	connection.settimeout(15)
-	connection.connect((config.API_HOST, config.API_PORT))
+	connection.connect((config.get('API_HOST'), config.get('API_PORT')))
 
 	msg = json.dumps({"request": action, "payload": payload})
 	connection.sendall(msg.encode("ascii", "ignore"))
@@ -549,13 +549,13 @@ def send_email(recipient, message):
 	:param list recipient:  Recipient e-mail addresses
 	:param MIMEMultipart message:  Message to send
 	"""
-	connector = smtplib.SMTP_SSL if hasattr(config, "MAIL_SSL") and config.MAIL_SSL else smtplib.SMTP
+	connector = smtplib.SMTP_SSL if config.get('MAIL_SSL') else smtplib.SMTP
 
-	with connector(config.MAILHOST) as smtp:
-		if hasattr(config, "MAIL_USERNAME") and hasattr(config, "MAIL_PASSWORD") and config.MAIL_USERNAME and config.MAIL_PASSWORD:
+	with connector(config.get('MAILHOST')) as smtp:
+		if config.get('MAIL_USERNAME') and config.get('MAIL_PASSWORD'):
 			smtp.ehlo()
-			smtp.login(config.MAIL_USERNAME, config.MAIL_PASSWORD)
+			smtp.login(config.get('MAIL_USERNAME'), config.get('MAIL_PASSWORD'))
 		if type(message) == str:
-			smtp.sendmail(config.NOREPLY_EMAIL, recipient, message)
+			smtp.sendmail(config.get('NOREPLY_EMAIL'), recipient, message)
 		else:
-			smtp.sendmail(config.NOREPLY_EMAIL, recipient, message.as_string())
+			smtp.sendmail(config.get('NOREPLY_EMAIL'), recipient, message.as_string())

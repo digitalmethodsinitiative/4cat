@@ -56,11 +56,11 @@ class DatasourceMetrics(BasicWorker):
 			# Only update local datasources
 			if datasource.get("is_local"):
 
-				boards = config.DATASOURCES[datasource_id].get("boards")
+				boards = config.get('DATASOURCES')[datasource_id].get("boards")
 
 				if not boards:
 					boards = [""]
-				
+
 				# If a datasource is static (so not updated) and it
 				# is already present in the metrics table, we don't
 				# need to update its metrics anymore.
@@ -92,7 +92,7 @@ class DatasourceMetrics(BasicWorker):
 						# If the datasource is dynamic, we also only update days
 						# that haven't been added yet - these are heavy queries.
 						if not datasource.get("is_static"):
-							
+
 							days_added = self.db.fetchall("SELECT date FROM metrics WHERE datasource = '%s' AND board = '%s' AND metric = 'posts_per_day';" % (datasource_id, board))
 
 							if days_added:
@@ -109,7 +109,7 @@ class DatasourceMetrics(BasicWorker):
 								after_timestamp = int(last_day_added.timestamp())
 
 								time_sql += " AND timestamp > " + str(after_timestamp) + " "
-						
+
 						self.log.info("Calculating metric posts_per_day for datasource %s%s" % (datasource_id, "/" + board))
 
 						# Get those counts
@@ -119,16 +119,16 @@ class DatasourceMetrics(BasicWorker):
 							WHERE %s AND %s
 							GROUP BY metric, datasource, board, date;
 							""" % (datasource_id, posts_table, board_sql, time_sql)
-						
+
 						# Add to metrics table
 						rows = [dict(row) for row in self.db.fetchall(query)]
-						
+
 						if rows:
 							for row in rows:
 								self.db.insert("metrics", row)
 
 					# -------------------------------
-					#   no other metrics added yet 
+					#   no other metrics added yet
 					# -------------------------------
 
 		self.job.finish()

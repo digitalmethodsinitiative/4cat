@@ -30,14 +30,14 @@ class FourcatToDmiTcatConverterAndUploader(ProcessorPreset):
         :param User user:  User that will be uploading it
         :return dict:  Option definition
         """
-        if hasattr(config, "TCAT_SERVER") and type(config.TCAT_SERVER) in (set, list, tuple) and len(config.TCAT_SERVER) > 1:
+        if config.get('TCAT_SERVER') and type(config.get('TCAT_SERVER')) in (set, list, tuple) and len(config.get('TCAT_SERVER')) > 1:
             return {
                 "server": {
                     "type": UserInput.OPTION_CHOICE,
                     "options": {
                         "random": "Choose one based on available capacity",
                         **{
-                            url: url for url in config.TCAT_SERVER
+                            url: url for url in config.get('TCAT_SERVER')
                         }
                     },
                     "default": "random",
@@ -59,7 +59,7 @@ class FourcatToDmiTcatConverterAndUploader(ProcessorPreset):
         """
         return module.type == "twitterv2-search" and \
                hasattr(config, 'TCAT_SERVER') and \
-               config.TCAT_SERVER and \
+               config.get('TCAT_SERVER') and \
                hasattr(config, 'TCAT_TOKEN') and \
                hasattr(config, 'TCAT_USERNAME') and \
                hasattr(config, 'TCAT_PASSWORD')

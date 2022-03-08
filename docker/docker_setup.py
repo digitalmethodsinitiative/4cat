@@ -34,13 +34,13 @@ if os.path.exists(DOCKER_CONFIG_FILE):
 
     # Ensure filepaths exist
     import config
-    for path in [config.PATH_DATA,
-                 config.PATH_IMAGES,
-                 config.PATH_LOGS,
-                 config.PATH_LOCKFILE,
-                 config.PATH_SESSIONS,
+    for path in [config.get('PATH_DATA'),
+                 config.get('PATH_IMAGES'),
+                 config.get('PATH_LOGS'),
+                 config.get('PATH_LOCKFILE'),
+                 config.get('PATH_SESSIONS'),
                  ]:
-        if Path(config.PATH_ROOT, path).is_dir():
+        if Path(config.get('PATH_ROOT'), path).is_dir():
             pass
         else:
-            os.makedirs(Path(config.PATH_ROOT, path))
+            os.makedirs(Path(config.get('PATH_ROOT'), path))

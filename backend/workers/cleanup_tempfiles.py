@@ -31,7 +31,7 @@ class TempFileCleaner(BasicWorker):
         :return:
         """
 
-        result_files = Path(config.PATH_DATA).glob("*")
+        result_files = Path(config.get('PATH_DATA')).glob("*")
         for file in result_files:
             if self.interrupted:
                 raise ProcessorInterruptedException("Interrupted while cleaning up orphaned result files")

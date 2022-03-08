@@ -52,7 +52,7 @@ class Logger:
 			return
 
 		self.print_logs = output
-		self.log_path = Path(config.PATH_ROOT, config.PATH_LOGS, filename)
+		self.log_path = Path(config.get('PATH_ROOT'), config.get('PATH_LOGS'), filename)
 		self.previous_report = time.time()
 
 		self.logger = logging.getLogger("4cat-backend")
@@ -66,8 +66,8 @@ class Logger:
 
 		self.logger.addHandler(handler)
 
-		if hasattr(config, "WARN_LEVEL"):
-			self.alert_level = self.levels.get(config.WARN_LEVEL, self.alert_level)
+		if config.get('WARN_LEVEL'):
+			self.alert_level = self.levels.get(config.get('WARN_LEVEL'), self.alert_level)
 
 		if db:
 			self.db = db
@@ -79,7 +79,7 @@ class Logger:
 		This sends an e-mail to a pre-defined address when a log message of at least
 		level WARNING is logged.
 		"""
-		mailer = SMTPHandler("localhost", config.NOREPLY_EMAIL, config.WARN_EMAILS, "4CAT Backend logger")
+		mailer = SMTPHandler("localhost", config.get('NOREPLY_EMAIL'), config.get('WARN_EMAILS'), "4CAT Backend logger")
 		mailer.setLevel(logging.WARNING)
 
 		self.logger.addHandler(mailer)
@@ -122,7 +122,7 @@ class Logger:
 
 		# log messages can optionally be sent as a Slack alert
 		# this is configured in config.py with WARN_SLACK_URL and WARN_LEVEL
-		if level >= self.alert_level and hasattr(config, "WARN_SLACK_URL") and config.WARN_SLACK_URL:
+		if level >= self.alert_level and config.get('WARN_SLACK_URL'):
 			# determine appropriate colour - red = uh oh, orange = warning, rest = green
 			if level in (logging.ERROR, logging.CRITICAL):
 				color = "#FF0000"  # red
@@ -153,14 +153,14 @@ class Logger:
 			# call the Slack web hook
 			if slack_alert:
 				try:
-					e = requests.post(config.WARN_SLACK_URL, json.dumps(message))
+					e = requests.post(config.get('WARN_SLACK_URL'), json.dumps(message))
 				except requests.RequestException as e:
 					# do not use self.warning because it will trigger an infinite
 					# loop of trying to send something to Slack
 					self.log(self.levels["WARNING"], "Could not send log alerts to Slack webhook (%s)" % e, False)
 
 		# every 10 minutes, collect and send warnings etc
-		if config.WARN_EMAILS and self.previous_report < time.time() - config.WARN_INTERVAL:
+		if config.get('WARN_EMAILS') and self.previous_report < time.time() - config.get('WARN_INTERVAL'):
 			self.previous_report = time.time()
 			self.collect_and_send()
 
@@ -219,7 +219,7 @@ class Logger:
 		grouped_logs = {}
 		log_regex = re.compile("([0-9: -]+) \| ([A-Z]+) \(([^)]+)\): (.+)")
 		try:
-			min_level = self.levels[config.WARN_LEVEL]
+			min_level = self.levels[config.get('WARN_LEVEL')]
 		except KeyError:
 			min_level = self.levels["WARNING"]
 
@@ -281,7 +281,7 @@ class Logger:
 			sorted_logs[logkey] = grouped_logs[logkey]
 
 		# compile a report to send to an unfortunate admin, if so configured
-		if config.WARN_EMAILS:
+		if config.get('WARN_EMAILS'):
 			mail = "Hello! The following 4CAT warnings were logged since the last alert:\n\n"
 			for logkey in reversed(sorted_logs):
 				log = sorted_logs[logkey]
@@ -294,6 +294,6 @@ class Logger:
 			mail += "This report was compiled at %s." % datetime.datetime.now().strftime('%d %B %Y %H:%M:%S')
 
 			try:
-				send_email(config.WARN_EMAILS, mail)
+				send_email(config.get('WARN_EMAILS'), mail)
 			except (smtplib.SMTPException, ConnectionRefusedError, socket.timeout) as e:
 				self.error("Could not send log alerts via e-mail (%s)" % e)

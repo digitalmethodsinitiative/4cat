@@ -8,7 +8,7 @@ from common.lib.logger import Logger
 import config
 
 log = Logger(output=True)
-db = Database(logger=log, dbname=config.DB_NAME, user=config.DB_USER, password=config.DB_PASSWORD, host=config.DB_HOST, port=config.DB_PORT, appname="4cat-migrate")
+db = Database(logger=log, dbname=config.get('DB_NAME'), user=config.get('DB_USER'), password=config.get('DB_PASSWORD'), host=config.get('DB_HOST'), port=config.get('DB_PORT'), appname="4cat-migrate")
 
 for datasource in ("8kun", "8chan"):
 	print("  Checking for %s database tables... " % datasource, end="")

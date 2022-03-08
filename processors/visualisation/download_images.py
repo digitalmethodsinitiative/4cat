@@ -44,7 +44,7 @@ class ImageDownloader(BasicProcessor):
 	extension = "zip"  # extension of result file, used internally and in UI
 
 	if hasattr(config, 'MAX_NUMBER_IMAGES'):
-		max_number_images = int(config.MAX_NUMBER_IMAGES)
+		max_number_images = int(config.get('MAX_NUMBER_IMAGES'))
 	else:
 		max_number_images = 1000
 
@@ -168,7 +168,7 @@ class ImageDownloader(BasicProcessor):
 				md5.update(base64.b64decode(item["image_md5"]))
 				extension = item["image_file"].split(".")[-1]
 
-				local_path = Path(config.PATH_IMAGES, md5.hexdigest() + "." + extension)
+				local_path = Path(config.get('PATH_IMAGES'), md5.hexdigest() + "." + extension)
 				if local_path.exists():
 					local_path = str(local_path.absolute())
 					item_urls.add(local_path)
@@ -421,8 +421,8 @@ class ImageDownloader(BasicProcessor):
 		file_name = md5.hexdigest() + "." + extension
 
 		# cache the image for later, if configured so
-		if config.PATH_IMAGES:
-			local_path = Path(config.PATH_IMAGES, md5.hexdigest() + "." + extension)
+		if config.get('PATH_IMAGES'):
+			local_path = Path(config.get('PATH_IMAGES'), md5.hexdigest() + "." + extension)
 			with open(local_path, 'wb') as file:
 				for chunk in image.iter_content(1024):
 					file.write(chunk)

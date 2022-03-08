@@ -58,7 +58,7 @@ class DataSet(FourcatModule):
 		:param db:  Database connection
 		"""
 		self.db = db
-		self.folder = Path(config.PATH_ROOT, config.PATH_DATA)
+		self.folder = Path(config.get('PATH_ROOT'), config.get('PATH_DATA'))
 		self.staging_area = []
 
 		if key is not None:
@@ -98,8 +98,8 @@ class DataSet(FourcatModule):
 			self.parameters = json.loads(self.data["parameters"])
 			self.is_new = False
 		else:
-			if hasattr(config, "EXPIRE_DATASETS") and config.EXPIRE_DATASETS and not parent:
-				parameters["expires-after"] = int(time.time() + config.EXPIRE_DATASETS)
+			if config.get('EXPIRE_DATASETS') and not parent:
+				parameters["expires-after"] = int(time.time() + config.get('EXPIRE_DATASETS'))
 
 			self.data = {
 				"key": self.key,
@@ -539,7 +539,7 @@ class DataSet(FourcatModule):
 		keys of the JSON object, this is not always possible in follow-up code
 		that uses the 'column' names, so for consistency this function acts as
 		if no column can be parsed if no `map_item` function exists.
-		
+
 		:return list:  List of dataset columns; empty list if unable to parse
 		"""
 
@@ -578,10 +578,10 @@ class DataSet(FourcatModule):
 		"""
 
 		annotation_fields = self.db.fetchone("SELECT annotation_fields FROM datasets WHERE key = %s;", (self.top_parent().key,))
-		
+
 		if annotation_fields and annotation_fields.get("annotation_fields"):
 			annotation_fields = json.loads(annotation_fields["annotation_fields"])
-		
+
 		return annotation_fields
 
 	def get_annotations(self):
@@ -591,7 +591,7 @@ class DataSet(FourcatModule):
 		"""
 
 		annotations = self.db.fetchone("SELECT annotations FROM annotations WHERE key = %s;", (self.top_parent().key,))
-		
+
 		if annotations and annotations.get("annotations"):
 			return json.loads(annotations["annotations"])
 		else:
@@ -851,10 +851,10 @@ class DataSet(FourcatModule):
 		:param file:  File to link within the repository
 		:return:  URL, or an empty string
 		"""
-		if not self.data["software_version"] or not config.GITHUB_URL:
+		if not self.data["software_version"] or not config.get('GITHUB_URL'):
 			return ""
 
-		return config.GITHUB_URL + "/blob/" + self.data["software_version"] + self.data.get("software_file", "")
+		return config.get('GITHUB_URL') + "/blob/" + self.data["software_version"] + self.data.get("software_file", "")
 
 	def top_parent(self):
 		"""

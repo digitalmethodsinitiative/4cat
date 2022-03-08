@@ -88,7 +88,7 @@ class OvertimeAnalysis(BasicProcessor):
 		# load vocabularies from word lists
 		vocabularies = {}
 		for vocabulary_id in self.parameters.get("vocabulary", []):
-			vocabulary_file = Path(config.PATH_ROOT, "common/assets/wordlists/%s.txt" % vocabulary_id)
+			vocabulary_file = Path(config.get('PATH_ROOT'), "common/assets/wordlists/%s.txt" % vocabulary_id)
 			if not vocabulary_file.exists():
 				continue
 
