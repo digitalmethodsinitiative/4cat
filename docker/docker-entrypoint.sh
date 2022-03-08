@@ -21,7 +21,7 @@ echo "PostgreSQL started"
 # Check if DB exists
 # Check for "jobs" table
 #TODO: move db creation to Dockerfile
-if [[ `psql --host=db --port=5432 --user=$POSTGRES_USER --dbname=$POSTGRES_DB -tAc "SELECT EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'jobs')"` = 't' ]]; then
+if [ `psql --host=db --port=5432 --user=$POSTGRES_USER --dbname=$POSTGRES_DB -tAc "SELECT EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'jobs')"` = 't' ]; then
   # Table already exists
   echo "Database already created"
 else
