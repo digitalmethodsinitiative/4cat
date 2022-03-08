@@ -13,19 +13,21 @@ trap exit_backend INT TERM
 python3 docker/docker_setup.py
 
 echo "Waiting for postgres..."
+
 while ! nc -z db 5432; do
   sleep 0.1
 done
+
 echo "PostgreSQL started"
 
-# Check if DB exists
+# Create Database if it does not already exist
+# TODO could move this to Build step now that admin user is created via frontend 
 # Check for "jobs" table
-#TODO: move db creation to Dockerfile
 if [[ `psql --host=db --port=5432 --user=$POSTGRES_USER --dbname=$POSTGRES_DB -tAc "SELECT EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'jobs')"` = 't' ]]; then
   # Table already exists
   echo "Database already created"
 else
-  echo 'Creating database'
+  echo "Creating Database"
   # Seed DB
   cd /usr/src/app && psql --host=db --port=5432 --user=$POSTGRES_USER --dbname=$POSTGRES_DB < backend/database.sql
 fi

@@ -1,9 +1,11 @@
 """
 4CAT Web Tool views - pages to be viewed by the user
 """
+import re
 import os
 import csv
 import json
+import markdown
 
 import config
 
@@ -16,7 +18,7 @@ from flask import render_template, jsonify, abort
 from flask_login import login_required, current_user
 
 from webtool import app, db
-from webtool.lib.helpers import pad_interval
+from webtool.lib.helpers import pad_interval, error
 
 csv.field_size_limit(1024 * 1024 * 1024)
 
@@ -33,7 +35,7 @@ def show_access_tokens():
     user = current_user.get_id()
 
     if user == "autologin":
-        abort(403)
+        return error(403, message="You cannot view or generate access tokens without a personal acount.")
 
     tokens = db.fetchall("SELECT * FROM access_tokens WHERE name = %s", (user,))
 
@@ -173,3 +175,37 @@ def getboards(datasource):
         result = config.DATASOURCES[datasource]["boards"]
 
     return jsonify(result)
+
+@app.route('/page/<string:page>/')
+def show_page(page):
+    """
+    Display a markdown page within the 4CAT UI
+
+    To make adding static pages easier, they may be saved as markdown files
+    in the pages subdirectory, and then called via this view. The markdown
+    will be parsed to HTML and displayed within the layout template.
+
+    :param page: ID of the page to load, should correspond to a markdown file
+    in the pages/ folder (without the .md extension)
+    :return:  Rendered template
+    """
+    page = re.sub(r"[^a-zA-Z0-9-_]*", "", page)
+    page_class = "page-" + page
+    page_folder = Path(config.PATH_ROOT, "webtool", "pages")
+    page_path = page_folder.joinpath(page + ".md")
+
+    if not page_path.exists():
+        return error(404, error="Page not found")
+
+    with page_path.open(encoding="utf-8") as file:
+        page_raw = file.read()
+        page_parsed = markdown.markdown(page_raw)
+        page_parsed = re.sub(r"<h2>(.*)</h2>", r"<h2><span>\1</span></h2>", page_parsed)
+
+        if config.ADMIN_EMAILS:
+            # replace this one explicitly instead of doing a generic config
+            # filter, to avoid accidentally exposing config values
+            admin_email = config.ADMIN_EMAILS[0] if config.ADMIN_EMAILS else "4cat-admin@example.com"
+            page_parsed = page_parsed.replace("%%ADMIN_EMAIL%%", admin_email)
+
+    return render_template("page.html", body_content=page_parsed, body_class=page_class, page_name=page)

@@ -12,9 +12,9 @@
 
             <form id="query-form" action="{{ url_for('queue_dataset') }}" method="POST" enctype="multipart/form-data">
                 <fieldset class="datasource-form">
-                    <p><br>Please be conservative; 4CAT is a shared resource and large dataset queries may prevent others
-                        from using it. We recommend to start with smaller date ranges and specific queries and then cast
-                        a wider net if needed.</p>
+                    <p><br>Please be considerate of other users; 4CAT is a shared resource and large dataset queries may
+                        prevent others from using it if they take a very long time to complete. We recommend to start
+                        with smaller date ranges and specific queries and then cast a wider net if needed.</p>
                 {%  if __expire_datasets %}
                     <p>Note that datasets will be deleted automatically after {{ __expire_datasets|timify_long }}.
                         {% if __expire_optout %} You can choose to keep the dataset for longer from the result

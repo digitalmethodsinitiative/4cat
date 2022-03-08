@@ -20,6 +20,7 @@ from flask_login import login_user, login_required, logout_user, current_user
 from webtool import app, login_manager, db
 from webtool.views.api_tool import limiter
 from webtool.lib.user import User
+from webtool.lib.helpers import error
 from common.lib.helpers import send_email
 
 from pathlib import Path
@@ -148,6 +149,54 @@ def exempt_from_limit():
 	return False
 
 
+@app.route("/first-run/", methods=["GET", "POST"])
+def create_first_user():
+	"""
+	Special route for creating an initial admin user
+
+	This route is only available if there are no admin users in the database
+	yet. The user created through this route is always made an admin.
+
+	:return:
+	"""
+	has_admin_user = db.fetchone("SELECT COUNT(*) AS amount FROM users WHERE is_admin = True")
+	missing = []
+	if has_admin_user["amount"]:
+		return error(403, message="The 'first run' page is not available")
+
+	if request.method == 'GET':
+		return render_template("account/first-run.html", incomplete=missing, form=request.form)
+
+	username = request.form.get("username").strip()
+	password = request.form.get("password").strip()
+
+	if not username:
+		missing.append("username")
+	else:
+		user_exists = db.fetchone("SELECT name FROM users WHERE name = %s", (username,))
+		if user_exists:
+			flash("The username '%s' already exists and is reserved." % username)
+			missing.append("username")
+
+	if not password:
+		missing.append("password")
+
+	if missing:
+		flash("Please make sure all fields are complete")
+		return render_template("account/first-run.html", form=request.form, incomplete=missing, flashes=get_flashed_messages())
+
+	db.insert("users", data={"name": username})
+	db.commit()
+	user = User.get_by_name(db=db, name=username)
+	user.set_password(password)
+
+	db.update("users", where={"name": username}, data={"is_admin": True, "is_deactivated": False})
+	db.commit()
+
+	flash("The admin user '%s' was created, you can now use it to log in." % username)
+	return redirect(url_for("show_login"))
+
+
 @app.route('/login/', methods=['GET', 'POST'])
 def show_login():
 	"""
@@ -160,6 +209,10 @@ def show_login():
 	"""
 	if current_user.is_authenticated:
 		return redirect(url_for("show_index"))
+
+	has_admin_user = db.fetchone("SELECT * FROM users WHERE is_admin = True")
+	if not has_admin_user:
+		return redirect(url_for("create_first_user"))
 
 	if request.method == 'GET':
 		return render_template('account/login.html', flashes=get_flashed_messages())

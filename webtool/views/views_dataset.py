@@ -30,41 +30,6 @@ Results overview
 """
 
 
-@app.route('/page/<string:page>/')
-def show_page(page):
-    """
-    Display a markdown page within the 4CAT UI
-
-    To make adding static pages easier, they may be saved as markdown files
-    in the pages subdirectory, and then called via this view. The markdown
-    will be parsed to HTML and displayed within the layout template.
-
-    :param page: ID of the page to load, should correspond to a markdown file
-    in the pages/ folder (without the .md extension)
-    :return:  Rendered template
-    """
-    page = re.sub(r"[^a-zA-Z0-9-_]*", "", page)
-    page_class = "page-" + page
-    page_folder = os.path.dirname(os.path.abspath(__file__)) + "/pages"
-    page_path = page_folder + "/" + page + ".md"
-
-    if not os.path.exists(page_path):
-        return error(404, error="Page not found")
-
-    with open(page_path, encoding="utf-8") as file:
-        page_raw = file.read()
-        page_parsed = markdown.markdown(page_raw)
-        page_parsed = re.sub(r"<h2>(.*)</h2>", r"<h2><span>\1</span></h2>", page_parsed)
-
-        if config.ADMIN_EMAILS:
-            # replace this one explicitly instead of doing a generic config
-            # filter, to avoid accidentally exposing config values
-            admin_email = config.ADMIN_EMAILS[0] if config.ADMIN_EMAILS else "4cat-admin@example.com"
-            page_parsed = page_parsed.replace("%%ADMIN_EMAIL%%", admin_email)
-
-    return render_template("page.html", body_content=page_parsed, body_class=page_class, page_name=page)
-
-
 @app.route('/results/', defaults={'page': 1})
 @app.route('/results/page/<int:page>/')
 @login_required
