@@ -44,6 +44,34 @@ class SearchTumblr(Search):
 	seen_ids = set()
 	failed_notes = []
 
+	config = {
+	# Tumblr API keys to use for data capturing
+		'tumblr-search.TUMBLR_CONSUMER_KEY': {
+			'type': UserInput.OPTION_TEXT,
+			'default' : "",
+			'help': 'Tumblr Consumer Key',
+			'tooltip': "",
+			},
+		'tumblr-search.TUMBLR_CONSUMER_SECRET_KEY': {
+			'type': UserInput.OPTION_TEXT,
+			'default' : "",
+			'help': 'Tumblr Consumer Secret Key',
+			'tooltip': "",
+			},
+		'tumblr-search.TUMBLR_API_KEY': {
+			'type': UserInput.OPTION_TEXT,
+			'default' : "",
+			'help': 'Tumblr API Key',
+			'tooltip': "",
+			},
+		'tumblr-search.TUMBLR_API_SECRET_KEY': {
+			'type': UserInput.OPTION_TEXT,
+			'default' : "",
+			'help': 'Tumblr API Secret Key',
+			'tooltip': "",
+			},
+		}
+
 	options = {
 		"intro": {
 			"type": UserInput.OPTION_INFO,
@@ -579,10 +607,10 @@ class SearchTumblr(Search):
 
 		"""
 		client = pytumblr.TumblrRestClient(
-			config.get('TUMBLR_CONSUMER_KEY'),
-			config.get('TUMBLR_CONSUMER_SECRET_KEY'),
-			config.get('TUMBLR_API_KEY'),
-			config.get('TUMBLR_API_SECRET_KEY')
+			config.get('tumblr-search.TUMBLR_CONSUMER_KEY'),
+			config.get('tumblr-search.TUMBLR_CONSUMER_SECRET_KEY'),
+			config.get('tumblr-search.TUMBLR_API_KEY'),
+			config.get('tumblr-search.TUMBLR_API_SECRET_KEY')
 		)
 		client_info = client.info()
 

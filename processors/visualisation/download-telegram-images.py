@@ -36,7 +36,15 @@ class TelegramImageDownloader(BasicProcessor):
                   "included in the output archive."  # description displayed in UI
     extension = "zip"  # extension of result file, used internally and in UI
 
-    max_number_images = int(config.get('MAX_NUMBER_IMAGES', 1000))
+    config = {
+		'image_downloader_telegram.MAX_NUMBER_IMAGES': {
+			'type': UserInput.OPTION_TEXT,
+			'default' : "1000",
+			'help': 'Maxmimum number of Telegram images a user can download.',
+			'tooltip': "",
+			},
+	}
+    max_number_images = int(config.get('image_downloader_telegram.MAX_NUMBER_IMAGES', 1000))
 
     options = {
         "amount": {

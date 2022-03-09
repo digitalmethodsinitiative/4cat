@@ -194,4 +194,23 @@ defaults = {
         'help': 'User Name for whitelisted hosts',
         'tooltip': "",
     },
+    # YouTube variables to use for processors
+    'YOUTUBE_API_SERVICE_NAME': {
+        'type': UserInput.OPTION_TEXT,
+        'default' : "youtube",
+        'help': 'YouTube API Service Name',
+        'tooltip': "",
+    },
+    'YOUTUBE_API_VERSION': {
+        'type': UserInput.OPTION_TEXT,
+        'default' : "v3",
+        'help': 'YouTube API Version',
+        'tooltip': "e.g., 'v3'",
+    },
+    'YOUTUBE_DEVELOPER_KEY': {
+        'type': UserInput.OPTION_TEXT,
+        'default' : "",
+        'help': 'YouTube Developer Key',
+        'tooltip': "",
+    },
 }

@@ -59,55 +59,6 @@ class ConfigManager:
     HOSTNAME_WHITELIST = ["localhost", your_server]  # only these may access the web tool; "*" or an empty list matches everything
     HOSTNAME_WHITELIST_API = ["localhost", your_server]  # hostnames matching these are exempt from rate limiting
 
-    #TODO: any datasource options need to be moved and modified into their search class
-    # Data source configuration
-    DATASOURCES = {
-      "bitchute": {},
-      "custom": {},
-      "douban": {},
-      "customimport": {},
-      "parler": {},
-      "reddit": {
-    							"boards": "*",
-    		},
-      "telegram": {},
-      "twitterv2": {"id_lookup": False}
-    }
-
-    #TODO: These Need to be moved to the Processors
-    #####################
-    # Processor Options #
-    #####################
-
-    # download_images.py
-    MAX_NUMBER_IMAGES = 1000
-
-    # YouTube variables to use for processors
-    YOUTUBE_API_SERVICE_NAME = "youtube"
-    YOUTUBE_API_VERSION = "v3"
-    YOUTUBE_DEVELOPER_KEY = ""
-
-    # Tumblr API keys to use for data capturing
-    TUMBLR_CONSUMER_KEY = ""
-    TUMBLR_CONSUMER_SECRET_KEY = ""
-    TUMBLR_API_KEY = ""
-    TUMBLR_API_SECRET_KEY = ""
-
-    # Reddit API keys
-    REDDIT_API_CLIENTID = ""
-    REDDIT_API_SECRET = ""
-
-    # tcat_auto_upload.py
-    TCAT_SERVER = ''
-    TCAT_TOKEN = ''
-    TCAT_USERNAME = ''
-    TCAT_PASSWORD = ''
-
-    # pix-plot.py
-    # If you host a version of https://github.com/digitalmethodsinitiative/dmi_pix_plot, you can use a processor to publish
-    # downloaded images into a PixPlot there
-    PIXPLOT_SERVER = ""
-
 class QuickDatabase:
     """
     Simple Database handler if multiple calls are expected
