@@ -782,8 +782,8 @@ const query = {
 
 	convert_dataset: function(self) {
 		let datasource = $(self.target).val();
-		let dataset_key = $('section.result-tree').attr('data-dataset-key')
-
+		let dataset_key = $('article.result').attr('data-dataset-key')
+		
 		if (datasource.length > 0) {
 			$.post({
 				dataType: "json",
