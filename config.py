@@ -108,7 +108,44 @@ class ConfigManager:
     # downloaded images into a PixPlot there
     PIXPLOT_SERVER = ""
 
-def get(attribute_name, default=None):
+class QuickDatabase:
+    """
+    Simple Database handler if multiple calls are expected
+    """
+    def __init__(self):
+        self.connection, self.cursor = self.quick_db_connect()
+
+    def close(self):
+        self.connection.close()
+
+    @staticmethod
+    def quick_db_connect():
+        """
+        Create a connection and cursor with the database
+        """
+        connection = psycopg2.connect(dbname=ConfigManager.DB_NAME, user=ConfigManager.DB_USER, password=ConfigManager.DB_PASSWORD, host=ConfigManager.DB_HOST, port=ConfigManager.DB_PORT)
+        cursor = connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        return connection, cursor
+
+def check_attribute_exists(attribute_name, connection=None, cursor=None, keep_connection_open=False):
+    """
+    Checks if attribute exists in database.
+
+    :return bool: True if attribute exists else False
+    """
+    if not connection or not cursor:
+        connection, cursor = QuickDatabase.quick_db_connect()
+
+    query = 'SELECT EXISTS (SELECT FROM fourcat_settings WHERE name = %s)'
+    cursor.execute(query, (attribute_name, ))
+    row = cursor.fetchone()
+
+    if not keep_connection_open:
+        connection.close()
+
+    return row['exists']
+
+def get(attribute_name, default=None, connection=None, cursor=None, keep_connection_open=False):
     """
     Checks if attribute defined in namespace and returns, if not then checks database for attribute and returns value
     """
@@ -119,12 +156,16 @@ def get(attribute_name, default=None):
         return attribute
     else:
         try:
-            connection = psycopg2.connect(dbname=ConfigManager.DB_NAME, user=ConfigManager.DB_USER, password=ConfigManager.DB_PASSWORD, host=ConfigManager.DB_HOST, port=ConfigManager.DB_PORT)
-            cursor = connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            if not connection or not cursor:
+                connection, cursor = QuickDatabase.quick_db_connect()
+
             query = 'SELECT value FROM fourcat_settings WHERE name = %s'
             cursor.execute(query, (attribute_name, ))
             row = cursor.fetchone()
-            connection.close()
+
+            if not keep_connection_open:
+                connection.close()
+
             value = json.loads(row['value'])
         except (Exception, psycopg2.DatabaseError) as error:
             # TODO: log?
@@ -133,7 +174,7 @@ def get(attribute_name, default=None):
             print('SQL row: ' + str(row))
             value = None
         finally:
-            if connection is not None:
+            if connection is not None and not keep_connection_open:
                 connection.close()
 
         if value is None:
@@ -141,7 +182,7 @@ def get(attribute_name, default=None):
         else:
             return value
 
-def set_value(attribute_name, value):
+def set_value(attribute_name, value, connection=None, cursor=None, keep_connection_open=False):
     """
     Updates database attribute with new value. Returns number of updated rows
     (which ought to be either 1 for success or 0 for failure).
@@ -153,45 +194,83 @@ def set_value(attribute_name, value):
         return None
 
     try:
-        connection = psycopg2.connect(dbname=ConfigManager.DB_NAME, user=ConfigManager.DB_USER, password=ConfigManager.DB_PASSWORD, host=ConfigManager.DB_HOST, port=ConfigManager.DB_PORT)
-        cursor = connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        if not connection or not cursor:
+            connection, cursor = QuickDatabase.quick_db_connect()
         query = 'UPDATE fourcat_settings SET value = %s WHERE name = %s'
         cursor.execute(query, (value, attribute_name))
         updated_rows = cursor.rowcount
         connection.commit()
-        connection.close()
+        if not keep_connection_open:
+            connection.close()
     except (Exception, psycopg2.DatabaseError) as error:
         # TODO: log?
         print(error)
         updated_rows = None
     finally:
-        if connection is not None:
+        if connection is not None and not keep_connection_open:
             connection.close()
 
     return updated_rows
 
-def get_all():
+def get_all(connection=None, cursor=None, keep_connection_open=False):
     """
     Gets all database settings in 4cat_settings table. These are editable, while
     other attributes (part of the ConfigManager class are not directly editable)
     """
     try:
-        connection = psycopg2.connect(dbname=ConfigManager.DB_NAME, user=ConfigManager.DB_USER, password=ConfigManager.DB_PASSWORD, host=ConfigManager.DB_HOST, port=ConfigManager.DB_PORT)
-        cursor = connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        if not connection or not cursor:
+            connection, cursor = QuickDatabase.quick_db_connect()
+
         query = 'SELECT name, value FROM fourcat_settings'
         cursor.execute(query)
         rows = cursor.fetchall()
-        connection.close()
+
+        if not keep_connection_open:
+            connection.close()
+
         values = {row['name']:json.loads(row['value']) for row in rows}
     except (Exception, psycopg2.DatabaseError) as error:
         # TODO: log?
         print(error)
         values = None
     finally:
-        if connection is not None:
+        if connection is not None and not keep_connection_open:
             connection.close()
 
     return values
+
+def insert_new_parameter(attribute_name, value, connection=None, cursor=None, keep_connection_open=False):
+    """
+    Insert a new paramter into the database. Does nothing on conflict.
+
+    :return int: number of updated rows
+    """
+    try:
+        value = json.dumps(value)
+    except ValueError:
+        return None
+
+    try:
+        if not connection or not cursor:
+            connection, cursor = QuickDatabase.quick_db_connect()
+
+        query = 'INSERT INTO fourcat_settings (name, value) Values (%s, %s) ON CONFLICT DO NOTHING'
+        cursor.execute(query, (attribute_name, value))
+        updated_rows = cursor.rowcount
+        connection.commit()
+
+        if not keep_connection_open:
+            connection.close()
+
+    except (Exception, psycopg2.DatabaseError) as error:
+        # TODO: log?
+        print(error)
+        updated_rows = None
+    finally:
+        if connection is not None and not keep_connection_open:
+            connection.close()
+
+    return updated_rows
 
 # Web tool settings
 # This is a pass through class; may not be the best way to do this
