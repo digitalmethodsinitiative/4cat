@@ -8,12 +8,23 @@ Database. Additional options can be defined in Datasources or Processors as
 from common.lib.helpers import UserInput
 
 defaults = {
-    'available_datasources': {
+    'DATASOURCES': {
         'type': UserInput.OPTION_TEXT,
-        'default' : "'bitchute','custom','douban','8chan','8kun','4chan','customimport','parler','reddit','telegram','twitterv2'",
-        'help': 'Possible DataSources',
-        'tooltip': 'Separate with commas',
-        },
+        'default' : """{
+          "bitchute": {},
+          "custom": {},
+          "douban": {},
+          "customimport": {},
+          "parler": {},
+          "reddit": {
+                                    "boards": "*",
+                },
+          "telegram": {},
+          "twitterv2": {"id_lookup": False}
+        }""",
+        'help': 'Data Sources object defining enabled datasources and their settings',
+        'tooltip': "",
+    },
     # Configure how the tool is to be named in its web interface. The backend will
     # always refer to '4CAT' - the name of the software, and a 'powered by 4CAT'
     # notice may also show up in the web interface regardless of the value entered here.
