@@ -43,10 +43,16 @@ class ImageDownloader(BasicProcessor):
 				  "is included in the output archive."  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
 
-	if hasattr(config, 'MAX_NUMBER_IMAGES'):
-		max_number_images = int(config.get('MAX_NUMBER_IMAGES'))
-	else:
-		max_number_images = 1000
+	config = {
+		'image_downloader.MAX_NUMBER_IMAGES': {
+			'type': UserInput.OPTION_TEXT,
+			'default' : "1000",
+			'help': 'Maxmimum number of images a user can download.',
+			'tooltip': "",
+			},
+	}
+
+	max_number_images = int(config.get('image_downloader.MAX_NUMBER_IMAGES', 1000))
 
 	options = {
 		"amount": {

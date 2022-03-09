@@ -40,11 +40,10 @@ class FourcatToDmiTcatUploader(BasicProcessor):
         :param module: Dataset or processor to determine compatibility with
         """
         return module.type == "convert-ndjson-for-tcat" and \
-            hasattr(config, 'TCAT_SERVER') and \
             config.get('TCAT_SERVER') and \
-            hasattr(config, 'TCAT_TOKEN') and \
-            hasattr(config, 'TCAT_USERNAME') and \
-            hasattr(config, 'TCAT_PASSWORD')
+            config.get('TCAT_TOKEN') and \
+            config.get('TCAT_USERNAME') and \
+            config.get('TCAT_PASSWORD')
 
     @classmethod
     def get_options(cls, parent_dataset=None, user=None):

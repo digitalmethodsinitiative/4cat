@@ -58,11 +58,10 @@ class FourcatToDmiTcatConverterAndUploader(ProcessorPreset):
         :param module: Dataset or processor to determine compatibility with
         """
         return module.type == "twitterv2-search" and \
-               hasattr(config, 'TCAT_SERVER') and \
                config.get('TCAT_SERVER') and \
-               hasattr(config, 'TCAT_TOKEN') and \
-               hasattr(config, 'TCAT_USERNAME') and \
-               hasattr(config, 'TCAT_PASSWORD')
+               config.get('TCAT_TOKEN') and \
+               config.get('TCAT_USERNAME') and \
+               config.get('TCAT_PASSWORD')
 
     def get_processor_pipeline(self):
         """
