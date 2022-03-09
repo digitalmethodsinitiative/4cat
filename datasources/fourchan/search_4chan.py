@@ -23,11 +23,19 @@ class Search4Chan(SearchWithScope):
 	type = "4chan-search"  # job ID
 	sphinx_index = "4chan"  # prefix for sphinx indexes for this data source. Should usually match sphinx.conf
 	prefix = "4chan"  # table identifier for this datasource; see below for usage
+	is_local = True	# Whether this datasource is locally scraped
+	is_static = False	# Whether this datasource is still updated
 
 	# Columns to return in csv
-	return_cols = ['thread_id', 'id', 'timestamp', 'board', 'body', 'subject', 'author', 'image_file', 'image_md5',
+	return_cols = ['thread_id', 'id', 'timestamp', 'body', 'subject', 'author', 'image_file', 'image_md5',
 				   'country_name', 'country_code']
 
+
+	references = [
+		"[4chan API](https://github.com/4chan/4chan-API)",
+		"[4plebs](https://archive.4plebs.org)"
+	]
+	
 	# before running a sphinx query, store it here so it can be cancelled via
 	# request_abort() later
 	running_query = ""
@@ -36,7 +44,7 @@ class Search4Chan(SearchWithScope):
 		"intro": {
 			"type": UserInput.OPTION_INFO,
 			"help": "Results are limited to 5 million items maximum. Be sure to read the [query "
-					"syntax](/page/query-syntax/) for local data sources first - your query design will "
+					"syntax](/data-overview/4chan#query-syntax) for local data sources first - your query design will "
 					"significantly impact the results. Note that large queries can take a long time to complete!"
 		},
 		"board": {

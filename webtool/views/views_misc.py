@@ -10,14 +10,15 @@ import markdown
 import config
 
 from pathlib import Path
+from datetime import datetime
 
 import backend
 
-from flask import render_template, jsonify
+from flask import render_template, jsonify, abort
 from flask_login import login_required, current_user
 
 from webtool import app, db
-from webtool.lib.helpers import error
+from webtool.lib.helpers import pad_interval, error
 
 csv.field_size_limit(1024 * 1024 * 1024)
 
@@ -92,6 +93,78 @@ def show_index():
 
     return render_template('create-dataset.html', datasources=datasources)
 
+
+@app.route('/data-overview/')
+@app.route('/data-overview/<string:datasource>')
+@login_required
+def data_overview(datasource=None):
+    """
+    Main tool frontend
+    """
+    datasources = {datasource: metadata for datasource, metadata in backend.all_modules.datasources.items() if
+                   metadata["has_worker"] and metadata["has_options"]}
+
+    if datasource not in datasources:
+        datasource_name = None
+
+    github_url = config.GITHUB_URL
+
+    # Get information for a specific data source
+    datasource_id = None
+    description = None
+    total_counts = None
+    daily_counts = None
+    references = None
+    labels = None
+
+    if datasource:
+
+        datasource_id = datasource
+        worker_class = backend.all_modules.workers.get(datasource_id + "-search")
+
+        # Get description
+        description_path = Path(datasources[datasource_id].get("path"), "DESCRIPTION.md")
+        if description_path.exists():
+            with description_path.open() as description_file:
+                description = description_file.read()
+
+        # Status labels to display in query form
+        labels = []
+        datasource_options = worker_class.get_options()
+        is_local = "local" if hasattr(worker_class, "is_local") and worker_class.is_local else "external"
+        is_static = True if hasattr(worker_class, "is_static") and worker_class.is_static else False
+        labels.append(is_local)
+
+        if is_static:
+            labels.append("static")
+
+        # Get daily post counts for local datasource to display in a graph
+        if is_local == "local":
+
+            total_counts = db.fetchall("SELECT board, SUM(count) AS post_count FROM metrics WHERE metric = 'posts_per_day' AND datasource = %s GROUP BY board", (datasource_id,))
+            total_counts = {d["board"]: d["post_count"] for d in total_counts}
+            
+            boards = set(total_counts.keys())
+            
+            # Fetch date counts per board from the database
+            db_counts = db.fetchall("SELECT board, date, count FROM metrics WHERE metric = 'posts_per_day' AND datasource = %s", (datasource_id,))
+
+            # Get the first and last days for padding
+            all_dates = [datetime.strptime(row["date"], "%Y-%m-%d").timestamp() for row in db_counts]
+            first_date = datetime.fromtimestamp(min(all_dates))
+            last_date = datetime.fromtimestamp(max(all_dates))
+            
+            # Format the dates in a regular dictionary to be used by Highcharts
+            daily_counts = {"first_date": (first_date.year, first_date.month, first_date.day)}
+            for board in boards:
+                daily_counts[board] = {row["date"]: row["count"] for row in db_counts if row["board"] == board}
+                # Then make sure the empty dates are filled with 0
+                # and each board has the same amount of values.
+                daily_counts[board] = [v for k, v in pad_interval(daily_counts[board], first_interval=first_date)[1].items()]
+
+        references = worker_class.references if hasattr(worker_class, "references") else None        
+
+    return render_template('data-overview.html', datasources=datasources, datasource_id=datasource_id, description=description, labels=labels, total_counts=total_counts, daily_counts=daily_counts, github_url=github_url, references=references)
 
 @app.route('/get-boards/<string:datasource>/')
 @login_required

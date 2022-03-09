@@ -612,7 +612,7 @@ const query = {
 	},
 
 	/**
-	 * Update board select list for chosen datasource
+	 * Query form for chosen datasource
 	 */
 	update_form: function() {
 		datasource = $('#datasource-select').val();
@@ -637,6 +637,9 @@ const query = {
 
 				//update data source type indicator
 				$('#datasource-type-label').html(data.type.join(", "));
+
+				// update data overview link
+				$('.data-overview-link > a').attr("href", getRelativeURL('data-overview/' + data.datasource))
 
 				query.handle_density();
 				query.custom_board_options();

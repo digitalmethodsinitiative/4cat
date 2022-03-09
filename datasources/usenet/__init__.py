@@ -10,5 +10,3 @@ from common.lib.helpers import init_datasource
 # Internal identifier for this data source
 DATASOURCE = "usenet"
 NAME = "Usenet"
-IS_LOCAL = True
-IS_STATIC = True

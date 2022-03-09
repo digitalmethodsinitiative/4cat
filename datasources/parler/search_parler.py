@@ -23,6 +23,8 @@ class SearchParler(Search):
     title = "Search Parler"  # title displayed in UI
     description = "Retrieve Parler posts by user or hashtag, in chronological order"  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
+    is_local = False    # Whether this datasource is locally scraped
+    is_static = False   # Whether this datasource is still updated
 
     # not available as a processor for existing datasets
     accepts = [None]
