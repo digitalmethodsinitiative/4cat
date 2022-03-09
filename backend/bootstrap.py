@@ -9,8 +9,7 @@ from common.lib.database import Database
 from backend.lib.manager import WorkerManager
 from common.lib.logger import Logger
 
-import config
-
+import common.config_manager as config
 
 def run(as_daemon=True):
 	if not as_daemon:

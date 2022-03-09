@@ -9,8 +9,7 @@ import copy
 from pathlib import Path
 from abc import ABC, abstractmethod
 
-import config
-
+import common.config_manager as config
 from common.lib.dataset import DataSet
 from backend.abstract.processor import BasicProcessor
 from common.lib.helpers import strip_tags, dict_search_and_update

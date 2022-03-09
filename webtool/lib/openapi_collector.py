@@ -22,8 +22,7 @@ import inspect
 import json
 import re
 
-import config
-
+import common.config_manager as config
 
 class OpenAPICollector:
 	"""

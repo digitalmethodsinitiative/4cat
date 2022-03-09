@@ -7,8 +7,7 @@ import re
 
 from pathlib import Path
 
-import config
-
+import common.config_manager as config
 from common.lib.helpers import call_api
 
 cli = argparse.ArgumentParser()

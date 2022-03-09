@@ -7,7 +7,7 @@ import time
 from pymysql import OperationalError, ProgrammingError
 from pymysql.err import Warning as SphinxWarning
 
-import config
+import common.config_manager as config
 from backend.lib.database_mysql import MySQLDatabase
 from common.lib.helpers import UserInput
 from backend.abstract.search import SearchWithScope

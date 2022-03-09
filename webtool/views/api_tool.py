@@ -5,7 +5,7 @@
 import importlib
 import hashlib
 import psutil
-import config
+import common.config_manager as config
 import json
 import time
 import csv

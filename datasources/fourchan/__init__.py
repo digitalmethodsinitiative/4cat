@@ -7,8 +7,7 @@ Initialize 4chan data source
 # backend helpers library.
 from common.lib.helpers import init_datasource as base_init_datasource
 
-import config
-
+import common.config_manager as config
 # Internal identifier for this data source
 #
 # This name is to be used whenever referring to the data source or a property

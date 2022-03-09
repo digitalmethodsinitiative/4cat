@@ -4,8 +4,7 @@ Get YouTube metadata from video links posted
 import time
 import urllib.request
 
-import config
-
+import common.config_manager as config
 from apiclient.discovery import build
 
 from backend.abstract.processor import BasicProcessor

@@ -9,8 +9,7 @@ import psycopg2
 import markdown
 
 import backend
-import config
-
+import common.config_manager as config
 from pathlib import Path
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText

@@ -9,8 +9,7 @@ sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)) + "/..")
 from common.lib.database import Database
 from common.lib.logger import Logger
 from common.lib.dataset import DataSet
-import config
-
+import common.config_manager as config
 logger = Logger()
 database = Database(logger=logger, appname="result-cleaner")
 

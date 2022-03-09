@@ -12,8 +12,7 @@ from googleapiclient.errors import HttpError
 from backend.abstract.processor import BasicProcessor
 from common.lib.helpers import UserInput, get_yt_compatible_ids
 
-import config
-
+import common.config_manager as config
 __author__ = "Sal Hagen"
 __credits__ = ["Sal Hagen"]
 __maintainer__ = "Sal Hagen"

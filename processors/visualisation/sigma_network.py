@@ -9,8 +9,7 @@ import json
 import unicodedata
 import random
 
-import config
-
+import common.config_manager as config
 from common.lib.helpers import UserInput
 from backend.abstract.processor import BasicProcessor
 

@@ -17,8 +17,7 @@ from lxml import etree
 from lxml.cssselect import CSSSelector as css
 from io import StringIO, BytesIO
 
-import config
-
+import common.config_manager as config
 from common.lib.helpers import UserInput
 from backend.abstract.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
@@ -52,23 +51,36 @@ class ImageDownloader(BasicProcessor):
 			},
 	}
 
-	max_number_images = int(config.get('image_downloader.MAX_NUMBER_IMAGES', 1000))
+	@classmethod
+	def get_options(cls, parent_dataset=None, user=None):
+		"""
+		Get processor options
 
-	options = {
-		"amount": {
-			"type": UserInput.OPTION_TEXT,
-			"help": "No. of images (max %s)" % max_number_images,
-			"default": 100,
-			"min": 0,
-			"max": max_number_images
-		},
-		"columns": {
-			"type": UserInput.OPTION_TEXT,
-			"help": "Column to get image links from",
-			"default": "image_url",
-			"tooltip": "If column contains a single URL, use that URL; else, try to find image URLs in the column's content"
-		},
-	}
+		Give the user the choice of where to upload the dataset, if multiple
+		TCAT servers are configured. Otherwise, no options are given since
+		there is nothing to choose.
+
+		:param DataSet parent_dataset:  Dataset that will be uploaded
+		:param User user:  User that will be uploading it
+		:return dict:  Option definition
+		"""
+		max_number_images = int(config.get('image_downloader.MAX_NUMBER_IMAGES', 1000))
+
+		return {
+			"amount": {
+				"type": UserInput.OPTION_TEXT,
+				"help": "No. of images (max %s)" % max_number_images,
+				"default": 100,
+				"min": 0,
+				"max": max_number_images
+			},
+			"columns": {
+				"type": UserInput.OPTION_TEXT,
+				"help": "Column to get image links from",
+				"default": "image_url",
+				"tooltip": "If column contains a single URL, use that URL; else, try to find image URLs in the column's content"
+			},
+		}
 
 	@classmethod
 	def is_compatible_with(cls, module=None):

@@ -8,10 +8,10 @@ import csv
 from prawcore.exceptions import Forbidden
 
 from backend.abstract.processor import BasicProcessor
+from common.lib.user_input import UserInput
 from common.lib.exceptions import ProcessorInterruptedException
 
-import config
-
+import common.config_manager as config
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
 __maintainer__ = "Stijn Peeters"

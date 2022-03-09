@@ -18,8 +18,7 @@ from pathlib import Path
 from logging.handlers import RotatingFileHandler, SMTPHandler
 from common.lib.helpers import send_email
 
-import config
-
+import common.config_manager as config
 
 class Logger:
 	"""

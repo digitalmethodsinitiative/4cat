@@ -35,8 +35,7 @@ from backend.abstract.scraper import BasicJSONScraper
 from common.lib.exceptions import JobAlreadyExistsException
 from common.lib.helpers import strip_tags
 
-import config
-
+import common.config_manager as config
 
 class ThreadScraper4chan(BasicJSONScraper):
 	"""

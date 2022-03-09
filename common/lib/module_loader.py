@@ -4,7 +4,7 @@ Load modules and datasources dynamically
 from pathlib import Path
 import importlib
 import inspect
-import config
+import common.config_manager as config
 import pickle
 import sys
 import re

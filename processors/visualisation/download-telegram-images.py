@@ -9,8 +9,7 @@ from pathlib import Path
 
 from telethon import TelegramClient
 
-import config
-
+import common.config_manager as config
 from backend.abstract.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.helpers import UserInput
@@ -37,24 +36,39 @@ class TelegramImageDownloader(BasicProcessor):
     extension = "zip"  # extension of result file, used internally and in UI
 
     config = {
-		'image_downloader_telegram.MAX_NUMBER_IMAGES': {
-			'type': UserInput.OPTION_TEXT,
-			'default' : "1000",
-			'help': 'Maxmimum number of Telegram images a user can download.',
-			'tooltip': "",
-			},
-	}
-    max_number_images = int(config.get('image_downloader_telegram.MAX_NUMBER_IMAGES', 1000))
-
-    options = {
-        "amount": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "No. of images (max %s)" % max_number_images,
-            "default": 100,
-            "min": 0,
-            "max": max_number_images
+        'image_downloader_telegram.MAX_NUMBER_IMAGES': {
+            'type': UserInput.OPTION_TEXT,
+            'default' : "1000",
+            'help': 'Maxmimum number of Telegram images a user can download.',
+            'tooltip': "",
+            },
         }
-    }
+
+    @classmethod
+    def get_options(cls, parent_dataset=None, user=None):
+        """
+        Get processor options
+
+        Give the user the choice of where to upload the dataset, if multiple
+        TCAT servers are configured. Otherwise, no options are given since
+        there is nothing to choose.
+
+        :param DataSet parent_dataset:  Dataset that will be uploaded
+        :param User user:  User that will be uploading it
+        :return dict:  Option definition
+        """
+        max_number_images = int(config.get('image_downloader_telegram.MAX_NUMBER_IMAGES', 1000))
+
+        return  {
+            "amount": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "No. of images (max %s)" % max_number_images,
+                "default": 100,
+                "min": 0,
+                "max": max_number_images
+            }
+        }
+
 
     @classmethod
     def is_compatible_with(cls, module=None):

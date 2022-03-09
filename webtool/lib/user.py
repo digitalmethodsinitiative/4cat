@@ -14,8 +14,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from common.lib.helpers import send_email
 
-import config
-
+import common.config_manager as config
 
 class User:
 	"""

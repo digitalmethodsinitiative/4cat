@@ -44,5 +44,42 @@ if not has_anon["num"] > 0:
     db.commit()
 
 
+#DALE
+
+#####################
+# Processor Options #
+#####################
+
+# download_images.py
+image_downloader.MAX_NUMBER_IMAGES
+image_downloader_telegram.MAX_NUMBER_IMAGES
+MAX_NUMBER_IMAGES = 1000
+
+tumblr-search.TUMBLR_CONSUMER_KEY
+# Tumblr API keys to use for data capturing
+TUMBLR_CONSUMER_KEY = ""
+TUMBLR_CONSUMER_SECRET_KEY = ""
+TUMBLR_API_KEY = ""
+TUMBLR_API_SECRET_KEY = ""
+
+get-reddit-votes.REDDIT_API_CLIENTID
+# Reddit API keys
+REDDIT_API_CLIENTID = ""
+REDDIT_API_SECRET = ""
+
+tcat-auto-upload.TCAT_SERVER
+# tcat_auto_upload.py
+TCAT_SERVER = ''
+TCAT_TOKEN = ''
+TCAT_USERNAME = ''
+TCAT_PASSWORD = ''
+
+pix-plot.PIXPLOT_SERVER
+# pix-plot.py
+# If you host a version of https://github.com/digitalmethodsinitiative/dmi_pix_plot, you can use a processor to publish
+# downloaded images into a PixPlot there
+PIXPLOT_SERVER = ""
+
+
 
 print("  Done!")

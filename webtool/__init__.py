@@ -23,8 +23,7 @@ from flask_login import LoginManager
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 
-import config
-
+import common.config_manager as config
 from common.lib.database import Database
 from common.lib.logger import Logger
 from common.lib.queue import JobQueue

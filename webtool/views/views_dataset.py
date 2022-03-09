@@ -18,7 +18,7 @@ from webtool.lib.helpers import Pagination, error
 from webtool.views.api_tool import delete_dataset, toggle_favourite, toggle_private, queue_processor, nuke_dataset, \
     erase_credentials
 
-import config
+import common.config_manager as config
 import backend
 from common.lib.dataset import DataSet
 from common.lib.queue import JobQueue

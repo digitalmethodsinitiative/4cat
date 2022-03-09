@@ -5,8 +5,7 @@ sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)) + "'/../..")
 from common.lib.database import Database
 from common.lib.logger import Logger
 
-import config
-
+import common.config_manager as config
 log = Logger(output=True)
 db = Database(logger=log, dbname=config.get('DB_NAME'), user=config.get('DB_USER'), password=config.get('DB_PASSWORD'), host=config.get('DB_HOST'), port=config.get('DB_PORT'), appname="4cat-migrate")
 

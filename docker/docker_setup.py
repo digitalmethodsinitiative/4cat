@@ -33,7 +33,7 @@ if os.path.exists(DOCKER_CONFIG_FILE):
         docker_config.write(configfile)
 
     # Ensure filepaths exist
-    import config
+    import common.config_manager as config
     for path in [config.get('PATH_DATA'),
                  config.get('PATH_IMAGES'),
                  config.get('PATH_LOGS'),

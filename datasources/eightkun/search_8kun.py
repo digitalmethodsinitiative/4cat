@@ -3,7 +3,7 @@
 """
 from datasources.fourchan.search_4chan import Search4Chan
 
-import config
+import common.config_manager as config
 from common.lib.helpers import UserInput
 
 

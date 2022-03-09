@@ -9,8 +9,7 @@ from datetime import datetime, time, timezone
 from backend.abstract.worker import BasicWorker
 from common.lib.dataset import DataSet
 
-import config
-
+import common.config_manager as config
 class DatasourceMetrics(BasicWorker):
 	"""
 	Calculate metrics for local datasources

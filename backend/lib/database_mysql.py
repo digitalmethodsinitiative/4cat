@@ -4,8 +4,7 @@ Database wrapper
 import pymysql.connections as mysqlconnections
 import pymysql
 
-import config
-
+import common.config_manager as config
 
 class MySQLDatabase:
 	"""

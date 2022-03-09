@@ -11,8 +11,7 @@ import re
 from backend.abstract.search import Search
 from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException
 from common.lib.helpers import convert_to_int, UserInput
-import config
-
+import common.config_manager as config
 class SearchWithTwitterAPIv2(Search):
     """
     Get Tweets via the Twitter API

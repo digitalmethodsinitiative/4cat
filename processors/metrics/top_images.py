@@ -4,7 +4,7 @@ Extract most-used images from corpus
 import hashlib
 import base64
 import re
-import config
+import common.config_manager as config
 import csv
 import shutil
 

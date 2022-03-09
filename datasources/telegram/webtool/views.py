@@ -10,8 +10,7 @@ from pathlib import Path
 from telethon.sync import TelegramClient
 from telethon.errors.rpcerrorlist import FloodWaitError, ApiIdInvalidError, PhoneNumberInvalidError
 
-import config
-
+import common.config_manager as config
 def authenticate(request, user, **kwargs):
 	"""
 	Check authentication with provided API credentials

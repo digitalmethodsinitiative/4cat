@@ -7,8 +7,7 @@ import csv
 import json
 import markdown
 
-import config
-
+import common.config_manager as config
 from pathlib import Path
 
 import backend

@@ -12,8 +12,7 @@ import datetime
 import dateutil.parser
 import csv
 import os
-import config
-
+import common.config_manager as config
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.helpers import UserInput, convert_to_int
 from backend.abstract.processor import BasicProcessor

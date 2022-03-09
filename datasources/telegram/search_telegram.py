@@ -19,8 +19,7 @@ from telethon import TelegramClient
 from telethon.errors.rpcerrorlist import UsernameInvalidError, TimeoutError
 from telethon.tl.types import User, PeerChannel, PeerChat, PeerUser
 
-import config
-
+import common.config_manager as config
 
 class SearchTelegram(Search):
     """

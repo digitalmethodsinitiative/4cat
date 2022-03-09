@@ -10,7 +10,7 @@ import re
 
 from pathlib import Path
 
-import config
+import common.config_manager as config
 import backend
 from common.lib.job import Job, JobNotFoundException
 from common.lib.helpers import get_software_version

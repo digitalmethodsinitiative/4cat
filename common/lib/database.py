@@ -12,8 +12,7 @@ from psycopg2.extras import execute_values
 from common.lib.exceptions import DatabaseQueryInterruptedException
 
 
-import config
-
+import common.config_manager as config
 
 class Database:
 	"""

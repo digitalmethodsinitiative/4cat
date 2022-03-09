@@ -10,8 +10,7 @@ import abc
 from pathlib import Path
 from backend.abstract.worker import BasicWorker
 
-import config
-
+import common.config_manager as config
 
 class BasicHTTPScraper(BasicWorker, metaclass=abc.ABCMeta):
 	"""

@@ -21,8 +21,7 @@ import os
 import re
 
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)) + "/..")
-import config
-
+import common.config_manager as config
 
 # parse parameters
 cli = argparse.ArgumentParser()

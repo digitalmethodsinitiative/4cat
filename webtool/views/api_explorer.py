@@ -3,7 +3,7 @@
 """
 
 import datetime
-import config
+import common.config_manager as config
 import json
 import csv
 import re

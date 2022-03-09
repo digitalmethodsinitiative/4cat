@@ -13,8 +13,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
 sys.path.insert(0, os.path.dirname(__file__) + '/../..')
-import config
-
+import common.config_manager as config
 from flask import request, abort, render_template, redirect, url_for, flash, get_flashed_messages
 from flask_login import login_user, login_required, logout_user, current_user
 from webtool import app, login_manager, db

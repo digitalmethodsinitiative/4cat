@@ -11,8 +11,7 @@ from pathlib import Path
 from urllib.parse import urlencode, urlparse
 from webtool import app
 
-import config
-
+import common.config_manager as config
 
 @app.template_filter('datetime')
 def _jinja2_filter_datetime(date, fmt=None, wrap=True):

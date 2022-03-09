@@ -1,6 +1,7 @@
 """ 4CAT configuration """
 import os
 import json
+from pathlib import Path
 import psycopg2
 import psycopg2.extras
 import configparser
@@ -39,7 +40,7 @@ class ConfigManager:
     API_HOST = config_reader['API'].get('api_host')
     API_PORT = config_reader['API'].getint('api_port')
 
-    PATH_ROOT = os.path.abspath(os.path.dirname(__file__))  # better don't change this
+    PATH_ROOT =  str(Path(os.path.abspath(os.path.dirname(__file__))).joinpath('..'))  # better don't change this
     PATH_LOGS = config_reader['PATHS'].get('path_logs', "")
     PATH_IMAGES = config_reader['PATHS'].get('path_images', "")
     PATH_DATA = config_reader['PATHS'].get('path_data', "")
