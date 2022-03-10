@@ -6,9 +6,13 @@ from common.lib.database import Database
 from common.lib.logger import Logger
 
 import psycopg2
-import common.config_manager as config
 log = Logger(output=True)
-db = Database(logger=log, dbname=config.get('DB_NAME'), user=config.get('DB_USER'), password=config.get('DB_PASSWORD'), host=config.get('DB_HOST'), port=config.get('DB_PORT'), appname="4cat-migrate")
+try:
+    import config
+    db = Database(logger=log, dbname=config.DB_NAME, user=config.DB_USER, password=config.DB_PASSWORD, host=config.DB_HOST, port=config.DB_PORT, appname="4cat-migrate")
+except (SyntaxError, ImportError) as e:
+    import common.config_manager as config
+    db = Database(logger=log, dbname=config.get('DB_NAME'), user=config.get('DB_USER'), password=config.get('DB_PASSWORD'), host=config.get('DB_HOST'), port=config.get('DB_PORT'), appname="4cat-migrate")
 
 print("  Making sure nltk packages are present...")
 import nltk
