@@ -214,6 +214,39 @@ def insert_new_parameter(attribute_name, value, connection=None, cursor=None, ke
 
     return updated_rows
 
+def set_or_create_setting(attribute_name, value, connection=None, cursor=None, keep_connection_open=False):
+    """
+    Insert OR set value for a paramter in the database. ON CONFLICT SET VALUE.
+
+    :return int: number of updated rows
+    """
+    try:
+        value = json.dumps(value)
+    except ValueError:
+        return None
+
+    try:
+        if not connection or not cursor:
+            connection, cursor = QuickDatabase.quick_db_connect()
+
+        query = 'INSERT INTO fourcat_settings (name, value) Values (%s, %s) ON CONFLICT (name) DO UPDATE SET value = EXCLUDED.value'
+        cursor.execute(query, (attribute_name, value))
+        updated_rows = cursor.rowcount
+        connection.commit()
+
+        if not keep_connection_open:
+            connection.close()
+
+    except (Exception, psycopg2.DatabaseError) as error:
+        # TODO: log?
+        print(error)
+        updated_rows = None
+    finally:
+        if connection is not None and not keep_connection_open:
+            connection.close()
+
+    return updated_rows
+
 # Web tool settings
 # This is a pass through class; may not be the best way to do this
 class FlaskConfig:
