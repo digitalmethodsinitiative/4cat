@@ -107,7 +107,7 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
 
             attempts = 0
             success = False
-            while attempts < 5:
+            while attempts < 3:
                 attempts += 1
                 scraped_page = self.simple_scrape_page(url)
 
@@ -176,7 +176,7 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
                     # Find the first link that has not been previously scraped
                     while links:
                         link = links.pop(0)
-                        if link[1] not in scraped_urls and link[1][:10] != 'javascript':
+                        if link[1] not in scraped_urls and not any(['mailto:', 'javascript'] not in link[1][:10]) and not any(['archive.org/about', 'archive.org/account/'] in link[1]):
                             # Add it to be scraped next
                             urls_to_scrape.insert(0, {
                                 'url': link[1],
@@ -212,7 +212,7 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
                     links = url_obj['subpage_links']
                     while links:
                         link = links.pop(0)
-                        if link[1] not in scraped_urls:
+                        if link[1] not in scraped_urls and not any(['mailto:', 'javascript'] not in link[1][:10]) and not any(['archive.org/about', 'archive.org/account/'] in link[1]):
                             # Add it to be scraped next
                             urls_to_scrape.insert(0, {
                                 'url': link[1],
