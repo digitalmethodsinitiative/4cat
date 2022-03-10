@@ -229,7 +229,7 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
                     result['error'] = 'Unable to scrape'
                 yield result
 
-    def check_exclude_link(link, previously_used_links):
+    def check_exclude_link(self, link, previously_used_links):
         """
         Check if a link should not be used. Returns true if link not in previously used
         and not in bad url list and not in excluded urls.
