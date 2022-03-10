@@ -48,17 +48,7 @@ class ConfigManager:
     PATH_SESSIONS = config_reader['PATHS'].get('path_sessions', "")
 
     ANONYMISATION_SALT = config_reader['GENERATE'].get('anonymisation_salt')
-
-    # Web tool settings
-    # can be your server url or ip
-    your_server = config_reader['SERVER'].get('server_name', 'localhost')
     SECRET_KEY = config_reader['GENERATE'].get('secret_key')
-    if config_reader['SERVER'].getint('public_port') == 80:
-      SERVER_NAME = your_server
-    else:
-      SERVER_NAME = f"{your_server}:{config_reader['SERVER'].get('public_port')}"
-    HOSTNAME_WHITELIST = ["localhost", your_server]  # only these may access the web tool; "*" or an empty list matches everything
-    HOSTNAME_WHITELIST_API = ["localhost", your_server]  # hostnames matching these are exempt from rate limiting
 
 class QuickDatabase:
     """

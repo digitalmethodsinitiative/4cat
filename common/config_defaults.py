@@ -92,7 +92,7 @@ defaults = {
     },
     'WARN_SLACK_URL': {
         'type': UserInput.OPTION_TEXT,
-        'default' : None,
+        'default' : '',
         'help': 'Slack callback URL to use for alerts',
         'tooltip': "WARN_LEVEL (or higher) will be sent there immediately",
     },
@@ -175,12 +175,29 @@ defaults = {
     # Web tool settings
     # These are used by the FlaskConfig class in config.py
     # Flask may require a restart to update them
-    # TODO: additional options are currently in config_defaults.ini due to Docker
     'FLASK_APP': {
         'type': UserInput.OPTION_TEXT,
         'default' : 'webtool/fourcat',
         'help': 'Flask App Name',
         'tooltip': "",
+    },
+    'SERVER_NAME': {
+        'type': UserInput.OPTION_TEXT,
+        'default' : '"localhost"',
+        'help': 'Server Name (e.g., my4CAT.com, localhost, 127.0.0.1)',
+        'tooltip': "Default is localhost; For Docker PUBLIC_PORT is set in your .env file",
+    },
+    'HOSTNAME_WHITELIST': {
+        'type': UserInput.OPTION_TEXT,
+        'default' : '["localhost"]',
+        'help': 'Hostname Whitelist',
+        'tooltip': "Docker should include localhost and Server Name",
+    },
+    'HOSTNAME_WHITELIST_API': {
+        'type': UserInput.OPTION_TEXT,
+        'default' : '["localhost"]',
+        'help': 'Hostname Whitelist for API',
+        'tooltip': "Docker should include localhost and Server Name",
     },
     'SERVER_HTTPS': {
         'type': UserInput.OPTION_TOGGLE,
@@ -190,26 +207,26 @@ defaults = {
     },
     'HOSTNAME_WHITELIST_NAME': {
         'type': UserInput.OPTION_TEXT,
-        'default' : "Automatic login",
+        'default' : 'Automatic login',
         'help': 'User Name for whitelisted hosts',
         'tooltip': "",
     },
     # YouTube variables to use for processors
     'YOUTUBE_API_SERVICE_NAME': {
         'type': UserInput.OPTION_TEXT,
-        'default' : "youtube",
+        'default' : 'youtube',
         'help': 'YouTube API Service Name',
         'tooltip': "",
     },
     'YOUTUBE_API_VERSION': {
         'type': UserInput.OPTION_TEXT,
-        'default' : "v3",
+        'default' : 'v3',
         'help': 'YouTube API Version',
         'tooltip': "e.g., 'v3'",
     },
     'YOUTUBE_DEVELOPER_KEY': {
         'type': UserInput.OPTION_TEXT,
-        'default' : "",
+        'default' : '',
         'help': 'YouTube Developer Key',
         'tooltip': "",
     },

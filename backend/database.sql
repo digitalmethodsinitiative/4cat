@@ -136,5 +136,8 @@ INSERT INTO fourcat_settings
     ('MAX_EXPLORER_POSTS', '100000'),
     ('FLASK_APP', '"webtool/fourcat"'),
     ('SERVER_HTTPS', 'false'),
-    ('HOSTNAME_WHITELIST_NAME', '"Automatic login"')
+    ('SERVER_NAME', '"localhost"'),
+    ('HOSTNAME_WHITELIST_NAME', '"Automatic login"'),
+    ('HOSTNAME_WHITELIST', '["localhost"]'),
+    ('HOSTNAME_WHITELIST_API', '["localhost"]')
     ON CONFLICT DO NOTHING;
