@@ -34,8 +34,8 @@ class RankFlowRenderer(BasicProcessor):
 	type = "render-rankflow"  # job type ID
 	category = "Visual"  # category
 	title = "RankFlow diagram"  # title displayed in UI
-	description = "Create a diagram showing changes in prevalence over time for sequential ranked lists (following " \
-				  "Bernhard Rieder's RankFlow grapher)."  # description displayed in UI
+	description = "Create a diagram showing changes in prevalence over time for ranked lists (following " \
+				  "Bernhard Rieder's RankFlow."  # description displayed in UI
 	extension = "svg"  # extension of result file, used internally and in UI
 
 	references = [

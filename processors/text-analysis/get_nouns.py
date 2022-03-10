@@ -26,8 +26,12 @@ class ExtractNouns(BasicProcessor):
     type = "extract-nouns"  # job type ID
     category = "Text analysis"  # category
     title = "Extract nouns"  # title displayed in UI
-    description = "Get the prediction of nouns from your text corpus, as annotated by SpaCy's part-of-speech tagging. Make sure to have selected \"Part of Speech\" in the previous module, as well as \"Dependency parsing\" if you want to extract compound nouns. The output is a csv with the most-used nouns ranked."  # description displayed in UI
+    description = "Retrieve nouns detected by SpaCy's part-of-speech tagging, and rank by frequency. " \
+                  "Make sure to have selected \"Part of Speech\" in the previous " \
+                  "module, as well as \"Dependency parsing\" if you want to extract compound nouns or noun chunks." # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
+
+    references = ["[Information on noun chunks](https://spacy.io/usage/linguistic-features#noun-chunks)"]
 
     options = {
         "type": {
@@ -38,7 +42,9 @@ class ExtractNouns(BasicProcessor):
                 "nouns_and_compounds": "Nouns and compound nouns",
                 "noun_chunks": "Noun chunks"
             },
-            "help": "Whether to only get 1) separate words indicated as nouns, 2) nouns and compound nouns (nouns with multiple words, e.g.\"United States\") using a custom parser, or 3) noun chunks: nouns plus the words describing them, e.g. \"the old grandpa\". See https://spacy.io/usage/linguistic-features#noun-chunks."
+            "help": "Whether to only get 1) separate words indicated as nouns, 2) nouns and compound nouns " \
+                    "(nouns with multiple words, e.g.\"United States\") using a custom parser, or 3) noun chunks: " \
+                    "nouns plus the words describing them, e.g. \"the old grandpa\". See the references for more info."
         }
     }
 

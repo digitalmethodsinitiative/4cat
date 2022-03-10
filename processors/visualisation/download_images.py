@@ -37,9 +37,9 @@ class ImageDownloader(BasicProcessor):
 	type = "image-downloader"  # job type ID
 	category = "Visual"  # category
 	title = "Download images"  # title displayed in UI
-	description = "Download images and compress as a zip file. May take a while to complete as images are sourced " \
-				  "externally. Note that not always all images can be retrieved. For imgur galleries, only the first " \
-				  "image is saved. For animations, only the first frame is saved if available. A JSON metadata file " \
+	description = "Download images and store in a a zip file. May take a while to complete as images are retrieved " \
+				  "externally. Note that not always all images can be saved. For imgur galleries, only the first " \
+				  "image is saved. For animations (GIFs), only the first frame is saved if available. A JSON metadata file " \
 				  "is included in the output archive."  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
 

@@ -19,8 +19,9 @@ class VectorRanker(BasicProcessor):
 	"""
 	type = "vector-ranker"  # job type ID
 	category = "Post metrics" # category
-	title = "Top vectors"  # title displayed in UI
-	description = "Ranks most used tokens per token set. Reveals most-used words and/or most-used vernacular per time period. Limited to 100 most-used tokens."  # description displayed in UI
+	title = "Extract top words"  # title displayed in UI
+	description = "Ranks most used tokens per tokenset (overall or per timeframe). " \
+				  "Limited to 100 most-used tokens."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
 	options = {
@@ -32,9 +33,9 @@ class VectorRanker(BasicProcessor):
 		"top-style": {
 			"type": UserInput.OPTION_CHOICE,
 			"default": "per-item",
-			"options": {"per-item": "per interval (separate ranking per interval)", "overall": "overall (per-interval ranking for overall top items)"},
+			"options": {"per-item": "per interval (separate ranking per interval)", "overall": "overall (only include overall top items in the timeframe)"},
 			"help": "Determine top items",
-			"tooltip": "'Overall' will first determine the most prevalent vectors across all intervals, then calculate top vectors per interval using this as a shortlist."
+			"tooltip": "'Overall' will first determine the top values across all timeframes, and then check how often these occur per timeframe."
 		},
 	}
 

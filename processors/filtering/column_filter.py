@@ -16,22 +16,22 @@ __email__ = "4cat@oilab.eu"
 csv.field_size_limit(1024 * 1024 * 1024)
 
 
-class LexicalFilter(BasicProcessor):
+class ColumnFilter(BasicProcessor):
     """
     Retain only posts where a given column matches a given value
     """
     type = "column-filter"  # job type ID
     category = "Filtering"  # category
-    title = "Filter by column"  # title displayed in UI
-    description = "Copies the dataset, retaining only posts where the chosen 'column' (attribute) matches in the " \
-                  "configured way. This creates a new, separate dataset you can run analyses on."
+    title = "Filter by value"  # title displayed in UI
+    description = "A generic filter that checks whether a value in a selected column matches a custom requirement. " \
+                  "This will create a new dataset."
     extension = "csv"  # extension of result file, used internally and in UI
 
     options = {
         "column": {},
         "match-style": {
             "type": UserInput.OPTION_CHOICE,
-            "help": "Match as",
+            "help": "Match type",
             "options": {
                 "exact": "is equal to",
                 "exact-not": "is not equal to",
@@ -86,7 +86,7 @@ class LexicalFilter(BasicProcessor):
             options["column"] = {
                 "type": UserInput.OPTION_CHOICE,
                 "options": parent_columns,
-                "help": "Filter items on this column"
+                "help": "Column"
         }
         
         return options

@@ -13,7 +13,7 @@
     <article class="with-aside">
         <section class="data-overview">
             <div>
-                <h2><span>{% if datasource_id %}{{ datasource_name }} data overview{% else %}Datasource overview{% endif %}</span></h2>
+                <h2><span>{% if datasource_id %}{{ datasource_name }} data overview{% else %}Data overview{% endif %}</span></h2>
             </div>
             <div class="description">
             {% if datasource_id %}
@@ -99,7 +99,8 @@
                 </dl>
             </div>
             {% else %}
-                <p>Select a data source from the panel.</p>
+                <p>This 4CAT installation has {{ datasources|length }} data sources enabled.</p>
+                <p>Select a data source from the panel for source-specific information.</p>
             {% endif %}
 
         </section>

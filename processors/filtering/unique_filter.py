@@ -22,7 +22,7 @@ class UniqueFilter(BasicProcessor):
 	type = "unique-filter"  # job type ID
 	category = "Filtering"  # category
 	title = "Filter for unique posts"  # title displayed in UI
-	description = "Retain only posts with unique post bodies. Only keeps the first encounter of a text. Useful for filtering spam. This creates a new, separate dataset you can run analyses on."  # description displayed in UI
+	description = "Retain posts with a unique body text. Only keeps the first encounter of a text. Useful for filtering spam. This creates a new dataset."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
 	# the following determines the options available to the user via the 4CAT
@@ -32,7 +32,7 @@ class UniqueFilter(BasicProcessor):
 			"type": UserInput.OPTION_TOGGLE,
 			"help": "Case sensitive",
 			"default": False,
-			"tooltip": "Check to consider posts with different capitals as different."
+			"tooltip": "Selecting this will e.g. consider 'Cat' and and 'cat' as different."
 		}
 	}
 
@@ -83,7 +83,7 @@ class UniqueFilter(BasicProcessor):
 
 				processed += 1
 
-		self.dataset.update_status("New dataset created with %i matching item(s)" % unique, is_final=True)
+		self.dataset.update_status("New dataset created with %i unique post(s)" % unique, is_final=True)
 		self.dataset.finish(unique)
 
 	def after_process(self):

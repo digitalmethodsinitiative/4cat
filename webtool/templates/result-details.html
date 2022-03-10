@@ -140,15 +140,11 @@
     {% if dataset.num_rows > 0 and dataset.get_available_processors()|length > 0 and current_user.is_authenticated %}
         <section class="analysis-gallery">
 
-            <h3 class="blocktitle section-subheader"><span>Analytical processors</span></h3>
+            <h3 class="blocktitle section-subheader"><span>Processors</span></h3>
             {% set part = "main" %}
             <div class="intro">
-                <p>Start your analysis of the retrieved data by choosing one of the analysis modules below.
-                    Note that some may take a while to complete, so carefully consider which one you want to run
-                    before queueing it.</p>
-                <p>If you are new to {{ __tool_name }}, we recommend you consult the
-                    <a href="https://bit.ly/37fzES6">4CAT Cookbook</a>, which explains this interface and
-                    includes examples of several analyses you can run.</p>
+                <p>The processors below manipulate the dataset you created. These manipulations range from counting posts per month to downloading images. Read the description and tooltips for more information. Some processors also have relevant references indicated with <i class="fa fa-graduation-cap" aria-hidden="true"></i>. Click on <i class="fa fa-sitemap" aria-hidden="true"></i> to see what processors can be run after running that processor.</p>
+                <p>Some processors may take a while to complete.</p>
             </div>
             {% set cat = namespace(egory='') %}
             {% for processor in dataset.get_available_processors().values() %}

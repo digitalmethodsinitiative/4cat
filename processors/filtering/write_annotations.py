@@ -24,8 +24,8 @@ class WriteAnnotations(BasicProcessor):
 	"""
 	type = "write-annotations"  # job type ID
 	category = "Filtering"  # category
-	title = "Write annotations to dataset"  # title displayed in UI
-	description = "Writes annotated fields to the dataset, with each input field as a column."  # description displayed in UI
+	title = "Write annotations"  # title displayed in UI
+	description = "Writes annotations from the Explorer to the dataset. Each input field will get a column. This creates a new dataset."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 	
 	options = {
@@ -125,7 +125,7 @@ class WriteAnnotations(BasicProcessor):
 
 				writer.writerow(post)
 
-		self.dataset.update_status("Created dataset with annotations for %s posts." % count)
+		self.dataset.update_status("Created a new dataset with annotations for %s posts." % count)
 		self.dataset.finish(post_count)
 
 	def after_process(self):

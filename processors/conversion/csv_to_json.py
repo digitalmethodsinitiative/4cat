@@ -18,7 +18,7 @@ class ConvertCSVToJSON(BasicProcessor):
 	type = "convert-csv"  # job type ID
 	category = "Conversion"  # category
 	title = "Convert to JSON"  # title displayed in UI
-	description = "Convert a CSV file to JSON"  # description displayed in UI
+	description = "Change a CSV file to a JSON file"  # description displayed in UI
 	extension = "json"  # extension of result file, used internally and in UI
 
 	@classmethod

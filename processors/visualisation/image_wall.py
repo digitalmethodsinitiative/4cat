@@ -27,7 +27,7 @@ class ImageWallGenerator(BasicProcessor):
 	type = "image-wall"  # job type ID
 	category = "Visual"  # category
 	title = "Image wall"  # title displayed in UI
-	description = "Put all images in an archive into a single combined image, optionally sorting and resizing them"
+	description = "Put all images in a single combined image. Images can be sorted and resized."
 	extension = "png"  # extension of result file, used internally and in UI
 
 	options = {
@@ -37,7 +37,7 @@ class ImageWallGenerator(BasicProcessor):
 			"default": 100,
 			"min": 0,
 			"max": 1000,
-			"tooltip": "'0' uses as many images as available in the source image archive (up to 1000)"
+			"tooltip": "'0' uses as many images as available in the archive (up to 1000)"
 		},
 		"tile-size": {
 			"type": UserInput.OPTION_CHOICE,
@@ -48,7 +48,7 @@ class ImageWallGenerator(BasicProcessor):
 			},
 			"default": "square",
 			"help": "Image tile size",
-			"tooltip": "'Fit height' retains image ratios but resizes them all to be the same height"
+			"tooltip": "'Fit height' retains image ratios but makes them have the same height"
 		},
 		"sort-mode": {
 			"type": UserInput.OPTION_CHOICE,
