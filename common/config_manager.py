@@ -255,7 +255,7 @@ def set_all_defaults(dictionary_of_defaults):
 
     for name, setting in defaults.items():
         if not check_attribute_exists(name, connection=QD.connection, cursor=QD.cursor, keep_connection_open=True):
-            insert_new_parameter(name, setting, connection=QD.connection, cursor=QD.cursor, keep_connection_open=True)
+            insert_new_parameter(name, setting.get('default'), connection=QD.connection, cursor=QD.cursor, keep_connection_open=True)
     if QD.connection:
         QD.close()
 
