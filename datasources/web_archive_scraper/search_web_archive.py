@@ -235,8 +235,8 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
         and not in bad url list and not in excluded urls.
         """
         if link not in previously_used_links and \
-            not any([bad_url in link[:10] for bad_url in ['mailto:', 'javascript']] and \
-            not any([exclude_url in link for exclude_url in ['archive.org/about', 'archive.org/account/']]:
+            not any([bad_url in link[:10] for bad_url in ['mailto:', 'javascript']]) and \
+            not any([exclude_url in link for exclude_url in ['archive.org/about', 'archive.org/account/']]):
             return True
         else:
             return False
