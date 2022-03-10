@@ -247,6 +247,18 @@ def set_or_create_setting(attribute_name, value, connection=None, cursor=None, k
 
     return updated_rows
 
+def set_all_defaults(dictionary_of_defaults):
+    """
+    Takes a dictionary with default values, checks if they exist, and if not, inserts them.
+    """
+    QD = config.QuickDatabase()
+
+    for name, setting in defaults.items():
+        if not check_attribute_exists(name, connection=QD.connection, cursor=QD.cursor, keep_connection_open=True):
+            insert_new_parameter(name, setting, connection=QD.connection, cursor=QD.cursor, keep_connection_open=True)
+    if QD.connection:
+        QD.close()
+
 # Web tool settings
 # This is a pass through class; may not be the best way to do this
 class FlaskConfig:

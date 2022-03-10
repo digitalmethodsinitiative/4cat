@@ -10,7 +10,7 @@ from common.lib.helpers import UserInput
 defaults = {
     'DATASOURCES': {
         'type': UserInput.OPTION_TEXT,
-        'default' : """{
+        'default' : {
           "bitchute": {},
           "custom": {},
           "douban": {},
@@ -21,7 +21,7 @@ defaults = {
                 },
           "telegram": {},
           "twitterv2": {"id_lookup": False}
-        }""",
+        },
         'help': 'Data Sources object defining enabled datasources and their settings',
         'tooltip': "",
     },
