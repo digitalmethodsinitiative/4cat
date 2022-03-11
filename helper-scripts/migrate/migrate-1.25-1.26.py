@@ -1,6 +1,7 @@
 # Add 'is_deactivated' column to user table
 import sys
 import os
+import configparser
 
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)) + "'/../..")
 from common.lib.database import Database
@@ -39,14 +40,20 @@ if transfer_settings:
     print("  Moving settings to database...")
     # FIRST update config_defaults.ini or docker_config.ini
     # Check if Docker
+    USING_DOCKER = True
+    configfile_to_save = old_config.DOCKER_CONFIG_FILE
     if os.path.exists(old_config.DOCKER_CONFIG_FILE):
       config_reader = configparser.ConfigParser()
       config_reader.read(old_config.DOCKER_CONFIG_FILE)
       if not config_reader['DOCKER'].getboolean('use_docker_config'):
           # Not using docker
-          config_reader.read('backend/config_defaults.ini')
+          USING_DOCKER = False
+          configfile_to_save = 'backend/config_defaults.ini'
+          config_reader.read(configfile_to_save)
 
     # Update DB info
+    if not config_reader.has_section('DATABASE'):
+        config_reader.add_section('DATABASE')
     if old_config.DB_HOST:
         config_reader['DATABASE']['db_host'] = old_config.DB_HOST
     if old_config.DB_PORT:
@@ -59,12 +66,16 @@ if transfer_settings:
         config_reader['DATABASE']['db_name'] = old_config.DB_NAME
 
     # Update API info
+    if not config_reader.has_section('API'):
+        config_reader.add_section('API')
     if old_config.API_HOST:
         config_reader['API']['api_host'] = old_config.API_HOST
     if old_config.API_PORT:
         config_reader['API']['api_port'] = old_config.API_PORT
 
     # Update PATH info
+    if not config_reader.has_section('PATHS'):
+        config_reader.add_section('PATHS')
     if old_config.PATH_LOGS:
         config_reader['PATHS']['path_logs'] = old_config.PATH_LOGS
     if old_config.PATH_IMAGES:
@@ -77,10 +88,16 @@ if transfer_settings:
         config_reader['PATHS']['path_sessions'] = old_config.PATH_SESSIONS
 
     # Update SALT and KEY
+    if not config_reader.has_section('GENERATE'):
+        config_reader.add_section('GENERATE')
     if old_config.ANONYMISATION_SALT:
         config_reader['GENERATE']['anonymisation_salt'] = old_config.ANONYMISATION_SALT
     if old_config.SECRET_KEY:
         config_reader['GENERATE']['secret_key'] = old_config.SECRET_KEY
+
+    # Save config file
+    with open(configfile_to_save, 'w') as configfile:
+        config_reader.write(configfile)
 
     # UPDATE Database with other settings
     if not config:
