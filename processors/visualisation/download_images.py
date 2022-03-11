@@ -213,7 +213,7 @@ class ImageDownloader(BasicProcessor):
 				except UnidentifiedImageError:
 					picture = Image.open(image.raw)
 
-			except (FileNotFoundError, UnidentifiedImageError):
+			except (FileNotFoundError, UnidentifiedImageError, AttributeError):
 				failures.append(url)
 				continue
 
@@ -386,7 +386,7 @@ class ImageDownloader(BasicProcessor):
 		# get link to image from external HTML search results
 		# detect rate limiting and wait until we're good to go again
 		page = self.request_get_w_error_handling(url, headers={"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/12.1.1 Safari/605.1.15"})
-		rate_limited = rate_regex.search(page.content.decode("utf-8"))
+		rate_limited = rate_regex.search(page.text)
 
 		while rate_limited:
 			self.log.debug("Rate-limited by external source. Waiting %s seconds." % rate_limited[1])
