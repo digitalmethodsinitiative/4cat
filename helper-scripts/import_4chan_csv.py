@@ -140,6 +140,9 @@ with open(args.input, encoding="utf-8") as inputfile:
 			"unsorted_data": post.get("unsorted_data", "")
 		}
 
+		if post_data["image_md5"]:
+			print(post_data)
+
 		new_post = db.insert("posts_4chan", post_data, commit=False, safe=safe, constraints=["id", "board"])
 
 		posts_added += new_post
@@ -154,7 +157,7 @@ with open(args.input, encoding="utf-8") as inputfile:
 			threads_committed = 0
 			for thread_seen, last_seen in threads_last_seen.items():
 				if last_seen > 10000:
-					db.upsert("threads_4chan", data=threads[thread_seen], commit=False, safe=safe, constraints=["id", "board"])
+					db.insert("threads_4chan", data=threads[thread_seen], commit=False, safe=safe, constraints=["id", "board"])
 					threads.pop(thread_seen)
 					threads_committed += 1
 
@@ -168,7 +171,7 @@ with open(args.input, encoding="utf-8") as inputfile:
 	# Add the last posts and threads as well
 	print("Commiting leftover threads")
 	for thread in threads.values():
-		db.upsert("threads_4chan", data=thread, commit=False, safe=safe, constraints=["id", "board"])
+		db.insert("threads_4chan", data=thread, commit=False, safe=safe, constraints=["id", "board"])
 
 	db.commit()
 
