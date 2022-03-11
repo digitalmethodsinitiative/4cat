@@ -23,7 +23,7 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
     max_workers = 1
 
     # Web Archive returns "internal error" sometimes even when snapshot exists; we retry
-    bad_response_text = 'This snapshot cannot be displayed due to an internal error'
+    bad_response_text = ['This snapshot cannot be displayed due to an internal error', 'The Wayback Machine requires your browser to support JavaScript']
     # Web Archive will load and then redirect after a few seconds; check for new page to load
     redirect_text = ['Got an HTTP 302 response at crawl time', 'Got an HTTP 301 response at crawl time']
 
@@ -144,7 +144,7 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
                         scraped_page['error'] = e
                         break
 
-                if any([self.bad_response_text in text for text in scraped_page['text']]):
+                if any([any([bad_response in text for bad_response in self.bad_response_text]) for text in scraped_page['text']]):
                     # Bad response from Internet Archive
                     self.dataset.log('Internet Archive bad requests on url: %s' % url)
                     # Try again; Internet Achive is mean
