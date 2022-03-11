@@ -107,7 +107,7 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
 
             attempts = 0
             success = False
-            while attempts < 3:
+            while attempts < 2:
                 attempts += 1
                 scraped_page = self.simple_scrape_page(url)
 
