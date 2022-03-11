@@ -3,10 +3,12 @@ Send TCAT-ready json to a particular TCAT instance
 """
 import requests
 import random
+import json
 from urllib.parse import urlparse
 
 from backend.abstract.processor import BasicProcessor
 from common.lib.user_input import UserInput
+from common.lib.helpers import get_last_line
 
 import config
 
@@ -82,7 +84,7 @@ class FourcatToDmiTcatUploader(BasicProcessor):
         Send TCAT-ready json to a particular TCAT instance.
         """
         self.dataset.update_status("Preparing upload")
-        bin_name = ''.join(e if e.isalnum() else '_' for e in self.dataset.top_parent().get_label())
+        bin_name = ''.join(e if e.isalnum() else '_' for e in self.dataset.top_parent().get_label()).lower()
         self.dataset.log('Label for DMI-TCAT bin_name: ' + bin_name)
 
         url_to_file = self.dataset.get_parent().get_result_url()
@@ -107,21 +109,17 @@ class FourcatToDmiTcatUploader(BasicProcessor):
             url_to_file = url_to_file.replace('localhost', 'host.docker.internal')
             self.dataset.log('Server is a Docker container, new URL: ' + url_to_file)
 
-        # sanitize server URL and send the file to it
-        # todo: chunk it
-        parsed_uri = urlparse(server_choice)
-        post_json_url = '{uri.scheme}://{uri.netloc}'.format(uri=parsed_uri)
-        post_json_url = post_json_url + '/api/import-from-4cat.php'
-        self.dataset.update_status("Sending dataset to DMI-TCAT: %s" % post_json_url)
-        response = requests.post(post_json_url, auth=auth, data={
-                                                'url': url_to_file,
-                                                'name': bin_name,
-                                                'query': query,
-                                                'token': config.TCAT_TOKEN,
-                                                })
+        # Send request to TCAT server
+        response = self.send_request_to_TCAT(server_choice, auth, url_to_file, bin_name, query)
 
         if response.status_code == 404:
             return self.dataset.finish_with_error("Cannot upload dataset to DMI-TCAT server: server responded with 404 not found.")
+        if response.status_code == 504:
+            
+            # TODO: try a new TCAT server if there are more than one
+            # TODO: save point: converted date could be saved and processor resumed here at a later point
+            self.dataset.update_status("TCAT server currently busy; please try again later")
+            return self.dataset.finish(0)
         elif response.status_code != 200:
             return self.dataset.finish_with_error("Cannot upload dataset to DMI-TCAT server: server responded with %i %s." % (response.status_code, str(response.reason)))
 
@@ -149,10 +147,15 @@ class FourcatToDmiTcatUploader(BasicProcessor):
             return self.dataset.finish_with_error("Error while importing to DMI-TCAT: %s" % resp_content['error'])
 
         self.dataset.update_status("Waiting for upload to complete")
+        # TODO: check for completion
 
-        self.dataset.update_status("Upload complete, writing HTML file")
         # Create HTML file
-        tcat_result_url = server_choice.replace('/api/import-from-4cat.php', '').rstrip('/') + '/analysis/index.php?dataset=' + bin_name
+        self.dataset.update_status("Upload complete, writing HTML file")
+        # GET first and last dates
+        parent_file = self.dataset.get_parent().get_results_path()
+        start_date, end_date = self.get_first_and_last_dates(parent_file)
+
+        tcat_result_url = server_choice.replace('/api/import-from-4cat.php', '').rstrip('/') + '/analysis/index.php?dataset=' + bin_name + '&startdate=' + start_date + '&enddate=' + end_date
         html_file = self.get_html_page(tcat_result_url)
 
         # Write HTML file
@@ -163,8 +166,54 @@ class FourcatToDmiTcatUploader(BasicProcessor):
         self.dataset.update_status("Finished")
         self.dataset.finish(self.dataset.top_parent().num_rows)
 
+    def send_request_to_TCAT(self, server_choice, auth, url_to_file, bin_name, query):
+        """
+        Send request to a TCAT server. Request contains authoriaztion to the TCAT instance,
+        a url pointing where the file is stored on the 4CAT server, a name for the tweet "bin",
+        and the original query used to collect the tweet data. TCAT will download the actual
+        file.
+
+        :param str server_choice:  url to a TCAT instance
+        :param tuple auth:  (username, password) for TCAT instance
+        :param str url_to_file:  url to file location on 4CAT
+        :param str bin_name:  desired name of tweet bin for TCAT
+        :param dict query:  parameters used to collect Twitter data
+    	:return Response: requests response object
+        """
+        # sanitize server URL and send the url to the file location to it
+        parsed_uri = urlparse(server_choice)
+        post_json_url = '{uri.scheme}://{uri.netloc}'.format(uri=parsed_uri)
+        post_json_url = post_json_url + '/api/import-from-4cat.php'
+        self.dataset.update_status("Sending dataset to DMI-TCAT: %s" % post_json_url)
+        response = requests.post(post_json_url, auth=auth, data={
+                                                'url': url_to_file,
+                                                'name': bin_name,
+                                                'query': query,
+                                                'token': config.TCAT_TOKEN,
+                                                })
+        return response
+
     def get_html_page(self, url):
         """
         Returns a html string to redirect to the location of the DMI-TCAT dataset.
         """
         return f"<head><meta http-equiv='refresh' content='0; URL={url}'></head>"
+
+    def get_first_and_last_dates(self, filename):
+        """
+        Grabs the first and last lines of filename and finds their 'created_at'
+        dates to return
+        """
+        last_tweet = get_last_line(filename)
+        last_tweet = json.loads(last_tweet)
+        start_date = last_tweet.get('created_at', '')
+        if start_date:
+            # Just the date
+            start_date = start_date[:10]
+
+        with open(filename) as file:
+            first_tweet = json.loads(file.readline())
+        end_date = first_tweet.get('created_at', '')
+        if end_date:
+            end_date = end_date[:10]
+        return start_date, end_date

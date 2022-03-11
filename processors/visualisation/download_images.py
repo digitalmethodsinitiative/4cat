@@ -71,7 +71,8 @@ class ImageDownloader(BasicProcessor):
 
 		:param module: Dataset or processor to determine compatibility with
 		"""
-		return module.type == "top-images" or module.type.endswith("search")
+		return (module.type == "top-images" or module.type.endswith("search")) \
+			   and module.type != "telegram-search"
 
 	def process(self):
 		"""
@@ -125,7 +126,7 @@ class ImageDownloader(BasicProcessor):
 		# first, get URLs to download images from
 		self.dataset.update_status("Reading source file")
 		item_index = 0
-		for item in self.iterate_items(self.source_file):
+		for item in self.source_dataset.iterate_items(self):
 			item_urls = set()
 			if 'ids' in item.keys():
 				item_ids = [id for id in item.get('ids').split(',')]
@@ -221,9 +222,9 @@ class ImageDownloader(BasicProcessor):
 			index = 0
 			if not image_filename:
 				image_filename = 'image'
-			image_filename = Path(image_filename).name  # no folder shenanigans
+			image_filename = Path(image_filename).name[:100]  # no folder shenanigans
 			image_stem = Path(image_filename).stem
-			image_suffix = Path(image_filename).suffix
+			image_suffix = Path(image_filename).suffix.lower()
 			if not image_suffix or image_suffix not in (".png", ".gif", ".jpeg", ".jpg"):
 				# default to PNG
 				image_suffix = ".png"
@@ -243,7 +244,7 @@ class ImageDownloader(BasicProcessor):
 				# some images may need to be converted to RGB to be saved
 				self.dataset.log('Debug: OSError when saving image %s: %s' % (save_location, e))
 				picture = picture.convert('RGB')
-				picture.save(str(save_location))
+				picture.save(str(results_path.joinpath(image_stem + '.png')))
 			except ValueError as e:
 				self.dataset.log(f"Error '{e}' saving image for {url}, skipping")
 				failures.append(url)

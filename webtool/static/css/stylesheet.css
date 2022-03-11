@@ -86,6 +86,15 @@ code {
     font-weight: bold;
 }
 
+pre {
+    font-family: monospace;
+    margin: 1em 1em;
+    background: var(--gray);
+    color: var(--accent-alternate);
+    overflow: auto;
+    padding: 0.5em;
+}
+
 em, strong {
     font-weight: bold;
 }
@@ -211,6 +220,13 @@ article.small .form-element > *:not([type=radio], [type=checkbox]) {
     padding: 1em;
 }
 
+.data-overview-link {
+    display: block;
+    font-size: 13px;
+    position: absolute;
+    margin-top: -3px;
+}
+
 button, .button-like {
     border: 2px solid var(--contrast-dark);
     background: var(--contrast-bright);
@@ -299,6 +315,10 @@ nav > ul.flat > li:not(:last-child)::after {
     min-width: 25em;
 }
 
+*[role=tooltip] ul {
+    margin-left: 1.5em;
+}
+
 button.tooltip-trigger, button.popup-trigger {
 	font-size: 0.8em;
 	position: relative;
@@ -336,6 +356,12 @@ button.tooltip-trigger, button.popup-trigger {
     left: 50%;
 }
 
+#popup.fullsize {
+    width: 90%;
+    height: 90%;
+    max-width: 90%;
+}
+
 #popup .content {
     overflow: auto;
     height: 100%;
@@ -345,6 +371,15 @@ button.tooltip-trigger, button.popup-trigger {
 #popup .content em {
     font-weight: normal;
     font-style: italic;
+}
+
+#popup .content iframe {
+    width: 100%;
+    height: 100%;
+}
+
+.csv-preview {
+    font-size: 10px;
 }
 
 #popup h2 {
@@ -579,8 +614,17 @@ article section ul, article aside ul {
     margin-left: 2.5em;
 }
 
+article section ul.nobullet, article aside ul.nobullet {
+    list-style: none;
+    margin-left: auto;
+}
+
 article section li p, article aside li p {
     margin-left: 0;
+}
+
+article section.data-overview .description {
+    padding: 1em 0;
 }
 
 /** --------------------- *
@@ -722,16 +766,12 @@ article section li p, article aside li p {
 /** --------------------- *
   Pages -> Results metadata
   * --------------------- */
-.inline-label {
-    color: var(--accent-alternate);
-}
-
 .inline-query {
     overflow-wrap: anywhere;
 }
 
 .property-badge {
-    font-size: 0.6em;
+    font-size: 0.8em;
     display: inline;
     border: 1px solid var(--contrast-dark);
     border-radius: 2px;
@@ -740,6 +780,11 @@ article section li p, article aside li p {
     top: -1px;
 	vertical-align: baseline;
     cursor: default;
+}
+
+.property-badge.fullsize {
+    font-size: 0.8em;
+    margin-right: 0.5em;
 }
 
 a.property-badge {

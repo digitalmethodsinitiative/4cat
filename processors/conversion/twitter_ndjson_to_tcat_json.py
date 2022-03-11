@@ -39,11 +39,7 @@ class ConvertNDJSONToJSON(BasicProcessor):
 
         # This handles and writes one Tweet at a time
         with self.dataset.get_results_path().open("w") as output:
-            for post in self.iterate_items(self.source_file, bypass_map_item=True):
-                # stop processing if worker has been asked to stop
-                if self.interrupted:
-                    raise ProcessorInterruptedException("Interrupted while processing NDJSON file")
-
+            for post in self.source_dataset.iterate_items(self, bypass_map_item=True):
                 posts += 1
 
                 post = self.map_to_TCAT(post)
@@ -89,33 +85,7 @@ class ConvertNDJSONToJSON(BasicProcessor):
         new_tweet = {
                     'id_str' : tweet['id'],
                     'created_at' : tweet['created_at'],
-                    'user' : {
-                              'screen_name' : tweet.get('author_user').get('username'),
-                              'id_str' : tweet.get('author_user').get('id'),
-                              'statuses_count' : tweet.get('author_user').get('public_metrics').get('tweet_count'),
-                              'followers_count' : tweet.get('author_user').get('public_metrics').get('followers_count'),
-                              'listed_count' : tweet.get('author_user').get('public_metrics').get('listed_count'),
-                              'friends_count' : tweet.get('author_user').get('public_metrics').get('following_count'),
-                              'name' : tweet.get('author_user').get('name'),
-                              'description' : tweet.get('author_user').get('description'),
-                              'url' : tweet.get('author_user').get('url'),
-                              'verified' : tweet.get('author_user').get('verified'),
-                              'profile_image_url' : tweet.get('author_user').get('profile_image_url'),
-                              'created_at' : tweet.get('author_user').get('created_at'),
-                              'location' : tweet.get('author_user').get('location'),
-                              'withheld_in_countries' : tweet.get('author_user').get('withheld', {}).get('country_codes') if tweet.get('author_user').get('withheld') else None,
-
-                              # Not used by TCAT
-                              'protected' : tweet.get('author_user').get('protected'),
-                              'pinned_tweet_id' : tweet.get('author_user').get('pinned_tweet_id'),
-                              'entities' : tweet.get('author_user').get('entities'),
-
-                              # Required by TCAT, but not in APIv2
-                              'lang' : None,
-                              'utc_offset': None,
-                              'time_zone' : None,
-                              'favourites_count' : None,
-                             },
+                    'user' : self.author_conversion(tweet.get('author_user')),
                     'source' : tweet.get('source'),
                     'lang' : tweet.get('lang'),
                     'possibly_sensitive' : tweet.get('possibly_sensitive'),
@@ -171,14 +141,43 @@ class ConvertNDJSONToJSON(BasicProcessor):
         # We instead search for a referenced_tweets with type 'retweeted'
         # This assumes only one retweet in reference tweets (which has proven true in testing)
         if any([ref["type"] == "retweeted" for ref in tweet.get("referenced_tweets", [])]):
-            new_tweet['retweeted_status'] = self.reformat_retweet(next(retweet for retweet in tweet.get('referenced_tweets') if retweet.get('type') == 'retweeted'))
-
-            # Also adding user to user_mentions in first position for TCAT
-            # TCAT will add this user to the retweet user_mentions
-            # See https://github.com/digitalmethodsinitiative/dmi-tcat/blob/9654fe3ff489fd3b0efc6ddcf7c19adf8ed7726d/capture/common/functions.php#L1683
-            new_tweet["entities"]["user_mentions"].insert(0, new_tweet['user'])
+            retweet = next(retweet for retweet in tweet.get('referenced_tweets') if retweet.get('type') == 'retweeted')
+            new_tweet['retweeted_status'] = self.reformat_retweet(retweet)
 
         return new_tweet
+
+    def author_conversion(self, author_user):
+        """
+        Handle the author object and conver to TCAT
+        """
+        return {
+                  'screen_name' : author_user.get('username'),
+                  # if author_user id has been pseudonymised, change to integer
+                  'id_str' : self.hash_if_not_int(author_user.get('id')),
+                  'statuses_count' : author_user.get('public_metrics').get('tweet_count'),
+                  'followers_count' : author_user.get('public_metrics').get('followers_count'),
+                  'listed_count' : author_user.get('public_metrics').get('listed_count'),
+                  'friends_count' : author_user.get('public_metrics').get('following_count'),
+                  'name' : author_user.get('name'),
+                  'description' : author_user.get('description'),
+                  'url' : author_user.get('url'),
+                  'verified' : author_user.get('verified'),
+                  'profile_image_url' : author_user.get('profile_image_url'),
+                  'created_at' : author_user.get('created_at'),
+                  'location' : author_user.get('location'),
+                  'withheld_in_countries' : author_user.get('withheld', {}).get('country_codes') if author_user.get('withheld') else None,
+
+                  # Not used by TCAT
+                  'protected' : author_user.get('protected'),
+                  'pinned_tweet_id' : author_user.get('pinned_tweet_id'),
+                  'entities' : author_user.get('entities'),
+
+                  # Required by TCAT, but not in APIv2
+                  'lang' : None,
+                  'utc_offset': None,
+                  'time_zone' : None,
+                  'favourites_count' : None,
+                 }
 
     def reformat_retweet(self, retweet):
         """
@@ -188,7 +187,7 @@ class ConvertNDJSONToJSON(BasicProcessor):
         return {
                 'full_text' : retweet.get('text'),
                 'id_str' : retweet.get('id'),
-                'user' : {'screen_name' : retweet.get('username')},
+                'user' : self.author_conversion(retweet.get('author_user')),
                 'entities' : {
                               'user_mentions' : self.user_mentions_item(retweet.get('entities', {}).get('mentions')) if retweet.get('entities', {}).get('mentions') else [],
                               'hashtags' : self.hashtag_item(retweet.get('entities', {}).get('hashtags')) if retweet.get('entities', {}).get('hashtags') else [],
@@ -261,3 +260,12 @@ class ConvertNDJSONToJSON(BasicProcessor):
             hashtag['text'] = hashtag.get('tag')
             modified_hashtags.append(hashtag)
         return modified_hashtags
+
+    def hash_if_not_int(self, var):
+        """
+        Checks if var is an integer, and if not, returns an integer hash
+        """
+        if isinstance(var, int):
+            return var
+        else:
+            return hash(var)

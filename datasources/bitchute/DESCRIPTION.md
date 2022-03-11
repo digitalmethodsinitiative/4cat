@@ -1,0 +1,1 @@
+Bitchute data is collected through scraping the website. Historical data is thus not available. Check the source code for more detail.

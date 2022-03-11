@@ -56,7 +56,7 @@ class CountPosts(BasicProcessor):
 		with self.dataset.get_results_path().open("w") as results:
 			counter = 0
 
-			for post in self.iterate_items(self.source_file):
+			for post in self.source_dataset.iterate_items(self):
 				try:
 					date = get_interval_descriptor(post, timeframe)
 				except ValueError as e:
@@ -154,7 +154,10 @@ class CountPosts(BasicProcessor):
 		options = cls.options
 
 		# We give an option to add relative trends for local datasources
-		if parent_dataset and parent_dataset.parameters.get("datasource") in ("4chan", "8kun", "8chan", "parliaments", "usenet", "breitbart"):
+		if not parent_dataset:
+			return options
+	
+		if parent_dataset.parameters.get("datasource") in ("4chan", "8kun", "8chan", "parliaments", "usenet", "breitbart"):
 			options["add_relative"] = {
 				"type": UserInput.OPTION_TOGGLE,
 				"default": False,

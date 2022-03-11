@@ -30,10 +30,10 @@
 				{% if annotation_type == "dropdown" or annotation_type == "checkbox" %}
 					<div class="option-fields">
 					{% for option in annotation_fields[field]["options"] %}
-						{% set option_id = option.keys() | list %}
-						{% set option_label = option.values() | list %}
+						{% set option_id = option.keys() | first %}
+						{% set option_label = option.values() | first %}
 						<div class="option-field">
-							<input type="text" id="input-{{ option_id[0] }}" value={{ option_label[0] }}>
+							<input type="text" id="input-{{ option_id }}" value="{{ option_label }}">
 							<button class="delete-option-field"><i class="fas fa-trash"></i></button>
 						</div>
 					{% endfor %}

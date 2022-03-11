@@ -14,8 +14,9 @@ from backend.abstract.search import Search
 from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException
 from common.lib.helpers import convert_to_int, UserInput
 
+from datetime import datetime
 from telethon import TelegramClient
-from telethon.errors.rpcerrorlist import UsernameInvalidError, BadRequestError, TimeoutError
+from telethon.errors.rpcerrorlist import UsernameInvalidError, TimeoutError
 from telethon.tl.types import User, PeerChannel, PeerChat, PeerUser
 
 import config
@@ -30,6 +31,8 @@ class SearchTelegram(Search):
     title = "Telegram API search"  # title displayed in UI
     description = "Scrapes messages from open Telegram groups via its API."  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
+    is_local = False    # Whether this datasource is locally scraped
+    is_static = False   # Whether this datasource is still updated
 
     # not available as a processor for existing datasets
     accepts = [None]
@@ -47,27 +50,22 @@ class SearchTelegram(Search):
             "type": UserInput.OPTION_INFO,
             "help": "Messages are scraped in reverse chronological order: the most recent message for a given entity "
                     "(e.g. a group) will be scraped first.\n\nTo query the Telegram API, you need to supply your [API "
-                    "credentials](https://my.telegram.org/apps). These **will be sent to the 4CAT server** and will be "
-                    "stored there while data is fetched. After the dataset has been created your credentials will be "
-                    "deleted from the server. 4CAT at this time does not support two-factor authentication for "
-                    "Telegram."
+                    "credentials](https://my.telegram.org/apps). 4CAT at this time does not support two-factor "
+                    "authentication for Telegram."
         },
         "api_id": {
             "type": UserInput.OPTION_TEXT,
             "help": "API ID",
-            "sensitive": True,
             "cache": True,
         },
         "api_hash": {
             "type": UserInput.OPTION_TEXT,
             "help": "API Hash",
-            "sensitive": True,
             "cache": True,
         },
         "api_phone": {
             "type": UserInput.OPTION_TEXT,
             "help": "Phone number",
-            "sensitive": True,
             "cache": True,
             "default": "+xxxxxxxxxx"
         },
@@ -94,6 +92,26 @@ class SearchTelegram(Search):
             "min": 1,
             "max": 50000,
             "default": 10
+        },
+        "daterange": {
+            "type": UserInput.OPTION_DATERANGE,
+            "help": "Date range"
+        },
+        "divider-2": {
+            "type": UserInput.OPTION_DIVIDER
+        },
+        "info-sensitive": {
+            "type": UserInput.OPTION_INFO,
+            "help": "Your API credentials and phone number **will be sent to the 4CAT server** and will be stored "
+                    "there while data is fetched. After the dataset has been created your credentials will be "
+                    "deleted from the server, unless you enable the option below. If you want to download images "
+                    "attached to the messages in your collected data, you need to enable this option. Your "
+                    "credentials will never be visible to other users and can be erased later via the result page."
+        },
+        "save-sensitive": {
+            "type": UserInput.OPTION_TOGGLE,
+            "help": "Save session:",
+            "default": False
         }
     }
 
@@ -112,6 +130,12 @@ class SearchTelegram(Search):
             return None
 
         results = asyncio.run(self.execute_queries())
+
+        if not query.get("save-sensitive"):
+            self.dataset.delete_parameter("api_hash", instant=True)
+            self.dataset.delete_parameter("api_phone", instant=True)
+            self.dataset.delete_parameter("api_id", instant=True)
+            
         return results
 
     async def execute_queries(self):
@@ -154,7 +178,10 @@ class SearchTelegram(Search):
             self.dataset.update_status(
                 "Session is not authenticated: login security code may have expired. You need to re-enter the security code.",
                 is_final=True)
-            session_path.unlink(missing_ok=True)
+
+            if session_path.exists():
+                session_path.unlink()
+
             if client and hasattr(client, "disconnect"):
                 await client.disconnect()
             return None
@@ -168,9 +195,25 @@ class SearchTelegram(Search):
         parameters = self.dataset.get_parameters()
         queries = [query.strip() for query in parameters.get("query", "").split(",")]
         max_items = convert_to_int(parameters.get("items", 10), 10)
-
+        
+        # Telethon requires the offset date to be a datetime date
+        max_date = parameters.get("max_date")
+        if max_date:
+            try:
+                max_date = datetime.fromtimestamp(int(max_date))
+            except ValueError:
+                max_date = None
+        
+        # min_date can remain an integer
+        min_date = parameters.get("min_date")
+        if min_date:
+            try:
+                min_date = int(min_date)
+            except ValueError:
+                min_date = None
+        
         try:
-            posts = await self.gather_posts(client, queries, max_items)
+            posts = await self.gather_posts(client, queries, max_items, min_date, max_date)
         except Exception as e:
             self.dataset.update_status("Error scraping posts from Telegram")
             self.log.error("Telegram scraping error: %s" % traceback.format_exc())
@@ -180,13 +223,15 @@ class SearchTelegram(Search):
 
         return posts
 
-    async def gather_posts(self, client, queries, max_items):
+    async def gather_posts(self, client, queries, max_items, min_date, max_date):
         """
         Gather messages for each entity for which messages are requested
 
         :param TelegramClient client:  Telegram Client
         :param list queries:  List of entities to query (as string)
         :param int max_items:  Messages to scrape per entity
+        :param int min_date:  Datetime date to get posts after
+        :param int max_date:  Datetime date to get posts before
         :return list:  List of messages, each message a dictionary.
         """
         posts = []
@@ -200,7 +245,7 @@ class SearchTelegram(Search):
                 query_posts = []
                 i = 0
                 try:
-                    async for message in client.iter_messages(entity=query):
+                    async for message in client.iter_messages(entity=query, offset_date=max_date):
                         if self.interrupted:
                             raise ProcessorInterruptedException(
                                 "Interrupted while fetching message data from the Telegram API")
@@ -219,6 +264,11 @@ class SearchTelegram(Search):
                         i += 1
                         if i > max_items:
                             break
+
+                        # Stop if we're below the min date
+                        if min_date and parsed_message.get("timestamp") < min_date:
+                            break
+
                 except (ValueError, UsernameInvalidError) as e:
                     self.dataset.update_status("Could not scrape entity '%s'" % query)
 
@@ -448,6 +498,9 @@ class SearchTelegram(Search):
         # eliminate empty queries
         items = ",".join([item for item in items.split(",") if item])
 
+        # the dates need to make sense as a range to search within
+        min_date, max_date = query.get("daterange")
+
         # simple!
         return {
             "items": query.get("max_posts"),
@@ -455,7 +508,10 @@ class SearchTelegram(Search):
             "board": "",  # needed for web interface
             "api_id": query.get("api_id"),
             "api_hash": query.get("api_hash"),
-            "api_phone": query.get("api_phone")
+            "api_phone": query.get("api_phone"),
+            "save-sensitive": query.get("save-sensitive"),
+            "min_date": min_date,
+            "max_date": max_date
         }
 
     @classmethod

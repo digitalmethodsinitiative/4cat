@@ -101,7 +101,7 @@ class IsometricMultigraphRenderer(BasicProcessor):
 		first_date = "9999-99-99"
 		last_date = "0000-00-00"
 
-		for row in self.iterate_items(self.source_file):
+		for row in self.source_dataset.iterate_items(self):
 			if [k for k in row if k.startswith("word_")]:
 				item = " ".join([row[k] for k in row if k.startswith("word_")])
 			else:

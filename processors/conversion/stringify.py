@@ -2,6 +2,7 @@
 Collapse post bodies into one long string
 """
 import re
+import string
 
 from backend.abstract.processor import BasicProcessor
 from common.lib.helpers import UserInput
@@ -32,6 +33,11 @@ class Stringify(BasicProcessor):
 			"default": False,
 			"help": "Remove numbers"
 		},
+		"strip-punctuation": {
+			"type": UserInput.OPTION_TOGGLE,
+			"default": False,
+			"help": "Remove punctuation"
+		},
 		"to-lowercase": {
 			"type": UserInput.OPTION_TOGGLE,
 			"default": True,
@@ -46,20 +52,24 @@ class Stringify(BasicProcessor):
 		"""
 
 		strip_urls = self.parameters.get("strip-urls")
+		strip_punctuation = self.parameters.get("strip-punctuation")
 		strip_numbers = self.parameters.get("strip-numbers")
 		to_lowercase = self.parameters.get("to-lowercase")
 
 		link_regex = re.compile(r"https?://[^\s]+")\
 
+		regex = ""
 		if strip_numbers:
-			delete_regex = re.compile(r"[^a-zA-Z)(.,\n -]")
-		else:
-			delete_regex = re.compile(r"[^a-zA-Z0-9)(.,\n -]")
+			regex += "0-9"
+		if strip_punctuation:
+			regex += string.punctuation
+		
+		delete_regex = re.compile("[\n\t" + regex + "]")
 
 		posts = 0
 		self.dataset.update_status("Processing posts")
-		with self.dataset.get_results_path().open("w") as results:
-			for post in self.iterate_items(self.source_file):
+		with self.dataset.get_results_path().open("w", encoding="utf-8") as results:
+			for post in self.source_dataset.iterate_items(self):
 				posts += 1
 				if not post["body"]:
 					continue

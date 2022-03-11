@@ -25,7 +25,7 @@ body {
 	font-size: 10pt;
 }
 
-.posts li {
+.posts li.post {
 	display: table;
 	margin-left: 10px;
 	background-color: #f0e0d6;
@@ -38,7 +38,7 @@ body {
 	padding: 10px;
 }
 
-.posts li.op {
+.posts li.post.op {
 	background-color: #ffe;
 	color: maroon;
 	border: none;
@@ -46,46 +46,46 @@ body {
 	border-top: none;
 }
 
-.posts li header {
+.posts li.post header {
 	border: none;
 }
 
-.posts li.op header {
+.posts li.post.op header {
 	font-weight: bold;
 }
 
-.posts li .author {
+.posts li.post .author {
 	font-weight: 700;
 }
 
-.posts li .subject {
+.posts li.post .subject {
 	color: #cc1105;
 	font-weight: 700;
 }
 
-.posts li .post-content {
+.posts li.post .post-content {
 	display: block;
 	margin: 15px;
 	margin-left: 35px;
 }
 
-.posts li .quote {
+.posts li.post .quote, .posts li.post .quote a {
 	color: navy;
 	text-decoration: underline;
 }
-.posts li .greentext {
+.posts li.post .greentext {
 	color: #789922;
 }
 
-.posts li.op .greentext {
+.posts li.post.op .greentext {
 	color: #63b563;
 }
 
-.posts li .post-annotations {
+.posts li.post .post-annotations {
 	background-color: #e2c6b5;
 }
 
-.posts li.op .post-annotations {
+.posts li.post.op .post-annotations {
 	background-color: #f0e0d6;
 }
 

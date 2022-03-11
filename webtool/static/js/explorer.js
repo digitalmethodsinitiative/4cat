@@ -8,7 +8,7 @@ $(init);
 function init() {
 
 	// Functional stuff
-	page_markup.init();
+	page_functions.init();
 
 	// Annotations
 	annotations.init();
@@ -124,6 +124,11 @@ const annotations = {
 
 		// Check whether there's already fields saved for this dataset
 		annotations.fieldsExist();
+
+		// Save annotations every 10 seconds
+		setInterval(function() {
+			annotations.saveAnnotations();
+		}, 10000);
 
 	},
 
@@ -434,7 +439,7 @@ const annotations = {
 											$(this).append("<option class='post-annotation-input option-" + option_id + "' id='option-" + post_option_id + "' value='" + new_label + "'>" + new_label + "</option>");
 										}
 										else if (input_type == "checkbox") {
-											$(this).append("<input class='post-annotation-input option-" + option_id + "' id='option-" + post_option_id + "' value='" + new_label + "' type='checkbox'><label for='" + post_option_id + "'>" + new_label + "</label>");
+											$(this).append("<input class='post-annotation-input option-" + option_id + "' id='option-" + post_option_id + "' value='" + new_label + "' type='checkbox'><label for='option-" + post_option_id + "'>" + new_label + "</label>");
 										}
 									});
 								}
@@ -694,7 +699,7 @@ const annotations = {
 					$("#save-annotations").addClass("invalid").prop("disabled", true);
 					$("#save-to-dataset").prop("checked", false);
 					old_annotation_fields = $("#annotation-fields").html();
-					alert(alert_message);
+					// alert(alert_message);
 				}
 				else {
 					annotations.enableSaving();
@@ -817,7 +822,7 @@ const annotations = {
 	}
 };
 
-const page_markup = {
+const page_functions = {
 	init: function() {
 		document.querySelectorAll('.quote a').forEach(link => link.addEventListener('mouseover', function(e) {
 			let post = 'post-' + this.getAttribute('href').split('-').pop();
@@ -826,6 +831,51 @@ const page_markup = {
 		document.querySelectorAll('.quote a').forEach(link => link.addEventListener('mouseout', function(e) {
 			document.querySelectorAll('.thread li').forEach(link => link.classList.remove('highlight'));
 		}));
+
+		// Reorder the dataset when the sort type is changed
+		$("#sort-select").on("change", function(){
+			
+			let selected = $(this).find("option:selected");
+
+			// Pass whether the order should be reversed or not
+			let sort_order = selected.data("desc");	
+			if (sort_order){
+				sort_order = "&desc=true"
+			}
+			else {
+				sort_order = ""
+			}
+
+			// Pass whether we should treat this value as an integer
+			let force_int = selected.data("force-int");	
+			if (force_int){
+				force_int = "&int=true"
+			}
+			else {
+				force_int = ""
+			}
+
+			window.location.href = getRelativeURL('explorer/dataset/' + $("#dataset-key").text() + "?sort=" + $(this).val() + sort_order + force_int);
+		});
+
+		// Change the dropdown sort option based on the URL parameter
+		let searchParams = new URLSearchParams(window.location.search)
+		let sort_order = searchParams.get("sort");
+		let desc = searchParams.get("desc");
+
+		if (sort_order) {
+			// There can be multiple options with the same key since
+			// one of them might be reversed and the other not (e.g. 
+			// timestamps sorted by new to old and vice versa).
+			// So select the sort order with the right desc attribute.
+			if (desc == "true") {
+				$("#sort-select").find("option[value='" + sort_order + "'][data-desc='True']").attr("selected", "selected");
+			}
+			else {
+				$("#sort-select").val(sort_order);
+			}
+		}
+
 	}
 };
 

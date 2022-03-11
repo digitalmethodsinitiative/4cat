@@ -1,25 +1,30 @@
 import datetime
 import markdown
 import json
+import time
 import uuid
 import math
 import os
 import re
 
 from pathlib import Path
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlparse
 from webtool import app
-
-from common.lib.helpers import strip_tags
 
 import config
 
 
 @app.template_filter('datetime')
-def _jinja2_filter_datetime(date, fmt=None):
+def _jinja2_filter_datetime(date, fmt=None, wrap=True):
 	date = datetime.datetime.utcfromtimestamp(date)
 	format = "%d %b %Y" if not fmt else fmt
-	return date.strftime(format)
+	formatted = date.strftime(format)
+
+	if wrap:
+		html_formatted = date.strftime("%Y-%m-%dT%H:%M:%S%z")
+		return '<time datetime="' + html_formatted + '">' + formatted + '</time>'
+	else:
+		return formatted
 
 
 @app.template_filter('numberify')
@@ -37,6 +42,18 @@ def _jinja2_filter_numberify(number):
 		return str(int(number / 1000)) + "k"
 
 	return str(number)
+
+@app.template_filter('commafy')
+def _jinja2_filter_commafy(number):
+	"""
+	Applies thousands separator to ints.
+	"""
+	try:
+		number = int(number)
+	except TypeError:
+		return number
+
+	return f"{number:,}"
 
 @app.template_filter('timify')
 def _jinja2_filter_numberify(number):
@@ -62,8 +79,55 @@ def _jinja2_filter_numberify(number):
 
 	return time_str.strip()
 
+@app.template_filter('timify_long')
+def _jinja2_filter_timify_long(number):
+	"""
+	Make a number look like an indication of time
 
+	:param number:  Number to convert. If the number is larger than the current
+	UNIX timestamp, decrease by that amount
+	:return str: A nice, string, for example `1 month, 3 weeks, 4 hours and 2 minutes`
+	"""
+	components = []
+	if number > time.time():
+		number = time.time() - number
 
+	month_length = 30.42 * 86400
+	months = math.floor(number / month_length)
+	if months:
+		components.append("%i month%s" % (months, "s" if months != 1 else ""))
+		number -= (months * month_length)
+
+	week_length = 7 * 86400
+	weeks = math.floor(number / week_length)
+	if weeks:
+		components.append("%i week%s" % (weeks, "s" if weeks != 1 else ""))
+		number -= (weeks * week_length)
+
+	day_length = 86400
+	days = math.floor(number / day_length)
+	if days:
+		components.append("%i day%s" % (days, "s" if days != 1 else ""))
+		number -= (days * day_length)
+
+	hour_length = 3600
+	hours = math.floor(number / hour_length)
+	if hours:
+		components.append("%i hour%s" % (hours, "s" if hours != 1 else ""))
+		number -= (hours * hour_length)
+
+	minute_length = 60
+	minutes = math.floor(number / minute_length)
+	if minutes:
+		components.append("%i minute%s" % (minutes, "s" if minutes != 1 else ""))
+
+	last_str = components.pop()
+	time_str = ""
+	if components:
+		time_str = ", ".join(components)
+		time_str += " and "
+
+	return time_str + last_str
 
 @app.template_filter("http_query")
 def _jinja2_filter_httpquery(data):
@@ -74,12 +138,10 @@ def _jinja2_filter_httpquery(data):
 	except TypeError:
 		return ""
 
-
 @app.template_filter('markdown')
 def _jinja2_filter_markdown(text):
 	val = markdown.markdown(text)
 	return val
-
 
 @app.template_filter('isbool')
 def _jinja2_filter_isbool(value):
@@ -112,6 +174,7 @@ def _jinja2_filter_filesize(file, short=False):
 	if bytes > (1024 * 1024):
 		return ("{0:" + format_precision + "}MB").format(bytes / 1024 / 1024)
 	elif bytes > 1024:
+		format_precision = ".0f"
 		return ("{0:" + format_precision + "}kB").format(bytes / 1024)
 	elif short:
 		return "%iB" % bytes
@@ -135,8 +198,9 @@ def _jinja2_filter_extension_to_noun(ext):
 
 @app.template_filter('post_field')
 def _jinja2_filter_post_field(field, post):
-	# Takes a value in between {{ two curly brackets }} and uses that
-	# as a dictionary key. It then returns the corresponding value.
+	# Extracts string values between {{ two curly brackets }} and uses that
+	# as a dictionary key for the given dict. It then returns the corresponding value.
+	# Mainly used in the Explorer.
 	
 	matches = False
 	formatted_field = field
@@ -163,6 +227,19 @@ def _jinja2_filter_post_field(field, post):
 
 	return formatted_field
 
+
+@app.template_filter('parameter_str')
+def _jinja2_filter_parameter_str(url):
+	# Returns the current URL parameters as a valid string.
+
+	params = urlparse(url).query
+	if not params:
+		return ""
+	else:
+		params = "?" + params
+
+	return params
+
 @app.template_filter('hasattr')
 def _jinja2_filter_hasattr(obj, attribute):
 	return hasattr(obj, attribute)
@@ -186,6 +263,8 @@ def inject_now():
 		"__tool_name": config.TOOL_NAME,
 		"__tool_name_long": config.TOOL_NAME_LONG,
 		"__announcement": announcement_file.open().read().strip() if announcement_file.exists() else None,
+		"__expire_datasets": config.EXPIRE_DATASETS if hasattr(config, "EXPIRE_DATASETS") else None,
+		"__expire_optout": config.EXPIRE_ALLOW_OPTOUT if hasattr(config, "EXPIRE_ALLOW_OPTOUT") else None,
 		"uniqid": uniqid
 	}
 

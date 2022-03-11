@@ -96,6 +96,10 @@ button.invalid, button.invalid:hover {
     border-color: var(--gray-dark);
 }
 
+textarea {
+    width: 340px;
+}
+
 /** --------------------- *
      Header
   * --------------------- */
@@ -187,7 +191,8 @@ span.page.selected {
     padding: 0;
 }
 
-.posts li {
+.posts li.post {
+    position: relative;
     background: #d1e2ff;
     padding: 1em;
     min-width: 640px;
@@ -225,30 +230,36 @@ span.page.selected {
     margin-left: 0.5em;
 }
 
-.posts li.op {
+.posts li.post.op {
     border: 2px solid #000;
     background: #485ba6;
     color: #FFF;
 }
 
-.posts li.op header {
+.posts li.post.op header {
     border-color: #FFF;
 }
 
+.posts li.post .post-content a {
+    color: #215bc6;
+}
+
 .posts .external-url {
-    float: right;
-    margin-left: 10px;
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    padding: 10px;
+}
+
+.posts .external-url.deactivated {
+    color: #cbcbcb;
+    cursor: not-allowed;
 }
 
 .quote {
     color: #ff5750;
 }
-.greentext {
-    color: #3eb439;
-}
-.op .greentext {
-    color: #50ff50;
-}
+
 .highlight, :target {
     outline: 2px solid #ff5750;
 }
@@ -471,11 +482,12 @@ span.divider {
 .post-annotations {
     background-color: #bed4f9;
     margin-top: 5px;
-    padding: 15px;
+    margin-right: 20px;
+    padding: 5px;
     display: none;
 }
     
-li.op > .post-annotations {
+li.post.op > .post-annotations {
     background-color: #3b4b8c;
 }
 
@@ -486,6 +498,7 @@ li.op > .post-annotations {
 .post-annotation .annotation-label {
     display: inline-block;
     vertical-align: middle;
+    font-weight: bold;
     text-align: right;
     width: 130px;
     margin-right: 5px;
@@ -504,6 +517,9 @@ li.op > .post-annotations {
 
 .post-annotation-options > input {
     display: inline-block;
+}
+
+.posts .external-url {
 }
 
 /** --------------------- *

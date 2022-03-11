@@ -93,13 +93,14 @@ class ModuleCollector:
                 # try importing
                 try:
                     module = importlib.import_module(module_name)
-                except ImportError as e:
+                except (SyntaxError, ImportError) as e:
                     # this is fine, just ignore this data source and give a heads up
                     self.ignore.append(module_name)
-                    if e.name not in self.missing_modules:
-                        self.missing_modules[e.name] = [module_name]
+                    key_name = e.name if hasattr(e, "name") else module_name
+                    if key_name not in self.missing_modules:
+                        self.missing_modules[key_name] = [module_name]
                     else:
-                        self.missing_modules[e.name].append(module_name)
+                        self.missing_modules[key_name].append(module_name)
                     continue
 
                 # see if module contains the right type of content by looping
@@ -173,9 +174,7 @@ class ModuleCollector:
                 "path": subdirectory,
                 "name": datasource.NAME if hasattr(datasource, "NAME") else datasource_id,
                 "id": subdirectory.parts[-1],
-                "init": datasource.init_datasource,
-                "is_local": hasattr(datasource, "IS_LOCAL") and datasource.IS_LOCAL,
-                "is_static": hasattr(datasource, "IS_STATIC") and datasource.IS_STATIC
+                "init": datasource.init_datasource
             }
 
         sorted_datasources = {datasource_id: self.datasources[datasource_id] for datasource_id in

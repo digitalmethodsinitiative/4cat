@@ -66,7 +66,7 @@ class URLCoLinker(BasicProcessor):
 		processed = 0
 		network = nx.Graph()
 
-		for post in self.iterate_items(self.source_file):
+		for post in self.source_dataset.iterate_items(self):
 			processed += 1
 			if processed % 50 == 0:
 				self.dataset.update_status("Extracting URLs from item %i" % processed)

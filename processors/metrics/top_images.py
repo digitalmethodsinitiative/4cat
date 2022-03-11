@@ -10,6 +10,7 @@ import shutil
 
 from collections import Counter, OrderedDict
 from backend.abstract.processor import BasicProcessor
+from common.lib.exceptions import ProcessorException
 from common.lib.helpers import UserInput
 
 __author__ = "Stijn Peeters"
@@ -50,7 +51,7 @@ class TopImageCounter(BasicProcessor):
             boards_4plebs = ["pol", "lgbt", "adv", "f", "o", "sp", "tg", "trv", "tv", "x"]
             boards_fireden = ["cm", "co", "ic", "sci", "v", "vip", "y"]
 
-            for post in self.iterate_items(self.source_file):
+            for post in self.source_dataset.iterate_items(self):
 
                 post_img_links = []
 
@@ -99,7 +100,7 @@ class TopImageCounter(BasicProcessor):
                 "filename": images[id]["filename"],
                 "num_posts": images[id]["count"],
                 "url_4cat": (
-                                "s" if config.FlaskConfig.SERVER_HTTPS else "") + "://" + config.FlaskConfig.SERVER_NAME + "/api/image/" +
+                                "https" if config.FlaskConfig.SERVER_HTTPS else "http") + "://" + config.FlaskConfig.SERVER_NAME + "/api/image/" +
                             images[id]["md5"] + "." + images[id]["filename"].split(".")[
                                 -1],
                 "url_4plebs": "https://archive.4plebs.org/_/search/image/" + images[id]["hash"].replace("/", "_"),
@@ -125,10 +126,10 @@ class TopImageCounter(BasicProcessor):
 
             img_links = list()
 
-            for post in self.iterate_items(self.source_file):
+            for post in self.source_dataset.iterate_items(self):
                 post_img_links = set()  # set to only count images once per post
                 for field, value in post.items():
-                    if field == "body" or "url" in field.lower() or "image" in field.lower():
+                    if value and (field == "body" or "url" in field.lower() or "image" in field.lower()):
                         post_img_links |= set(img_link_regex.findall(value))
                         post_img_links |= set(img_domain_regex.findall(value))
 
@@ -152,53 +153,16 @@ class TopImageCounter(BasicProcessor):
             self.dataset.update_status("Zero image URLs detected.")
             return
 
-        # Also add the data to the original csv file, if indicated.
+        # Also add the data to the original file, if indicated.
         if self.parameters.get("overwrite"):
-            self.update_parent(all_links)
+            try:
+                self.add_field_to_parent(field_name='img_url',
+                                         new_data=[", ".join(link[1]) for link in all_links],
+                                         which_parent=self.source_dataset)
+            except ProcessorException as e:
+                self.dataset.update_status("Error updating parent dataset: %s" % e)
 
         self.write_csv_items_and_finish(results)
-
-    def update_parent(self, li_urls):
-        """
-        Update the original dataset with a column detailing the image urls.
-
-        """
-
-        self.dataset.update_status("Adding image URLs to the source file")
-
-        # Get the source file data path
-        parent_path = self.source_dataset.get_results_path()
-
-        # Get a temporary path where we can store the data
-        tmp_path = self.dataset.get_staging_area()
-        tmp_file_path = tmp_path.joinpath(parent_path.name)
-
-        count = 0
-
-        # Get field names
-        fieldnames = self.get_item_keys(parent_path)
-        fieldnames.append("img_url")
-
-        # Iterate through the original dataset and add values to a new img_link column
-        self.dataset.update_status("Writing new source file with image URLs.")
-        with tmp_file_path.open("w", encoding="utf-8", newline="") as output:
-            writer = csv.DictWriter(output, fieldnames=fieldnames)
-            writer.writeheader()
-
-            count = 0
-
-            for post in self.iterate_items(parent_path):
-                post["img_url"] = ", ".join(li_urls[count][1])
-                writer.writerow(post)
-                count += 1
-
-        # Replace the source file path with the new file
-        shutil.copy(str(tmp_file_path), str(parent_path))
-
-        # delete temporary files and folder
-        shutil.rmtree(tmp_path)
-
-        self.dataset.update_status("Parent dataset updated.")
 
     @classmethod
     def get_options(cls, parent_dataset=None, user=None):
@@ -213,8 +177,6 @@ class TopImageCounter(BasicProcessor):
         :param parent_dataset:  Dataset to get options for
         :return dict:
         """
-        if parent_dataset and parent_dataset.get_results_path().suffix != ".csv":
-            return {}
 
         return {
             "overwrite": {

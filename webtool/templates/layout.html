@@ -34,10 +34,11 @@
 			<li><a href="{{ url_for('show_results') }}">Past results</a></li>
 			<li><a href="{{ url_for('show_frontpage') }}">About</a></li>
                         <li><a href="{{ url_for('show_page', page='faq') }}"><abbr title="Frequently Asked Questions">FAQ</abbr></a></li>
-            {% if current_user.is_authenticated and not current_user.is_special() %}
+            <li><a href="{{ url_for('data_overview') }}">Data overview</a></li>
+            {% if current_user.is_authenticated and not current_user.is_special %}
                 <li><a href="{{ url_for('show_access_tokens') }}">API Access</a></li>
             {% endif %}
-            {% if current_user.is_authenticated and current_user.is_admin() %}
+            {% if current_user.is_authenticated and current_user.is_admin %}
                 <li><a href="{{ url_for('admin_frontpage') }}">Control Panel</a></li>
             {% endif %}
 		</ul>
@@ -54,7 +55,7 @@
 	<nav>
 		<ul class="flat">
 		{% if current_user.is_authenticated %}
-			<li>Logged in {% if not current_user.is_special() %} as {{ current_user.get_name() }} (<a href="{{ url_for('logout') }}">Log out</a>){% else %} via {{ current_user.get_name() }}{% endif %}</li>
+			<li>Logged in {% if not current_user.is_special %} as {{ current_user.get_name() }} (<a href="{{ url_for('logout') }}">Log out</a>){% else %} via {{ current_user.get_name() }}{% endif %}</li>
 		{% endif %}
 		  <li><a href="{{ url_for('show_page', page='citing') }}">How to cite</a></li>
 		  <li><a href="{{ url_for('show_page', page='issues') }}">Report issues</a></li>

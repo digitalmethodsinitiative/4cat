@@ -1,4 +1,4 @@
-# Add 'instance' column to jobs table
+# Add 'is_deactivated' column to user table
 import sys
 import os
 
@@ -12,27 +12,39 @@ log = Logger(output=True)
 db = Database(logger=log, dbname=config.DB_NAME, user=config.DB_USER, password=config.DB_PASSWORD, host=config.DB_HOST,
               port=config.DB_PORT, appname="4cat-migrate")
 
-print("  Checking if jobs table has a column 'instance'...")
-has_column = db.fetchone("SELECT COUNT(*) AS num FROM information_schema.columns WHERE table_name = 'jobs' AND column_name = 'instance'")
+print("  Checking if datasets table has a column 'is_private'...")
+has_column = db.fetchone("SELECT COUNT(*) AS num FROM information_schema.columns WHERE table_name = 'datasets' AND column_name = 'is_private'")
 if has_column["num"] == 0:
     print("  ...No, adding.")
-    db.execute("ALTER TABLE jobs ADD COLUMN instance VARCHAR DEFAULT '*'")
+    db.execute("ALTER TABLE datasets ADD COLUMN is_private BOOLEAN DEFAULT TRUE")
+    db.commit()
+
+    # make existing datasets all non-private, as they were before
+    db.execute("UPDATE datasets SET is_private = FALSE")
+    db.commit()
 else:
     print("  ...Yes, nothing to update.")
 
-print("  Dropping 'unique job' index if it exists...")
-db.execute("DROP INDEX IF EXISTS unique_job")
-
-print("  Creating anew...")
-db.execute("CREATE UNIQUE INDEX IF NOT EXISTS unique_job ON jobs (jobtype, remote_id, instance)")
-print("  ...done")
-
-print("  Dropping job status column if it exists...")
-has_column = db.fetchone("SELECT COUNT(*) AS num FROM information_schema.columns WHERE table_name = 'jobs' AND column_name = 'status'")
+print("  Checking if datasets table has a column 'owner'...")
+has_column = db.fetchone("SELECT COUNT(*) AS num FROM information_schema.columns WHERE table_name = 'datasets' AND column_name = 'owner'")
 if has_column["num"] == 0:
-    print("  ...found column, dropping")
-    db.execute("ALTER TABLE jobs DROP COLUMN status")
+    print("  ...No, adding.")
+    db.execute("ALTER TABLE datasets ADD COLUMN owner VARCHAR DEFAULT 'anonymous'")
+    db.commit()
+
+    # make existing datasets all non-private, as they were before
+    db.execute("UPDATE datasets SET owner = parameters::json->>'user' WHERE parameters::json->>'user' IS NOT NULL")
+    db.commit()
 else:
-    print("  ...column already dropped or never created")
+    print("  ...Yes, nothing to update.")
+
+print("  Checking if anonymous user exists...")
+has_anon = db.fetchone("SELECT COUNT(*) AS num FROM users WHERE name = 'anonymous'")
+if not has_anon["num"] > 0:
+    print("  ...No, adding.")
+    db.execute("INSERT INTO users (name, password) VALUES ('anonymous', '')")
+    db.commit()
+
+
 
 print("  Done!")

@@ -1,33 +1,33 @@
-<li id="post-{{ post.id }}"{% if post.thread_id == post.id %} class="op"{% endif %}>    
+<li id="post-{{ post.id }}" class="post{% if post.thread_id == post.id %} op{% endif %}">    
 
 	<!-- Special fields we're handling a bit differently -->
-	{% set special_fields = ["external_url", "author", "body", "timestamp", "image", "images"] %}
+	{% set special_fields = ["external_url", "author", "body", "timestamp", "image", "images", "sort_options", "markdown"] %}
+	{% set pseudonymised = True if parameters and ('pseudonymise' in parameters and parameters.get('pseudonymise')) else False %}
 
-	<!-- Possible external link -->
+	<!-- Possible external link if not pseudonymised -->
 	{% if custom_fields and "external_url" in custom_fields %}
 		{% set external_url = custom_fields.external_url | post_field(post) %}
-		{% if external_url %}
-			<a href="{{ external_url }}" target="_blank"><span class="external-url" title="Original post"><i class="fas fa-external-link-alt"></i></span></a>
+		{% if external_url and pseudonymised %}
+			<span class="external-url deactivated" title="External URLs unavailable for pseudonymised datasets"><i class="fas fa-external-link-alt"></i></span>
+		{% elif external_url and not pseudonymised %}
+			<a href="{{ external_url }}" target="_blank"><span class="external-url" title="Go to original post"><i class="fas fa-external-link-alt"></i></span></a>
 		{% endif %}
 	{% endif %}
 
 	<header>
 		<!-- Metadata -->
-		{% if 'pseudonymise' in parameters and parameters.get('pseudonymise') %}
+		{% if pseudonymised %}
 			<span title="Pseudonymous author" class="author">
 			<i class="fa fa-user-secret tooltip-trigger"></i>
 		{% else %}
 			<span title="Author" class="author">
 			{% if custom_fields and custom_fields.get("author") %}
-				{% set author = custom_fields.author | post_field(post) %}
+				{% set author = custom_fields.author | post_field(post) | safe %}
 			{% else %}
 				{% set author = post.author %}
 			{% endif %}
-			{% if author|length > 20 %}
-				{{ author[:17] + '...' }}
-			{% else %}
-				{{ author }}
-			{% endif %}
+			{{ author }}
+
 		{% endif %}
 		</span>
 		{% if 'thread_id' in post %}
@@ -36,7 +36,7 @@
 		<span title="Post ID" class="post_id">{{ post.id }}</span>
 		{% if 'timestamp' in post %}
 			{% if post.timestamp is integer %}
-				<span title="Date" class="datetime">{{ post.timestamp|datetime('%Y-%m-%d %H:%M') }}</span>
+				<span title="Date" class="datetime">{{ post.timestamp|datetime('%Y-%m-%d %H:%M')|safe }}</span>
 			{% else %}
 				<span title="Date" class="datetime">{{ post.timestamp }}</span>
 			{% endif %}
@@ -50,7 +50,9 @@
 					
 					{% set custom_value = custom_fields[custom_field] | post_field(post) | safe %}
 					{% if custom_value and custom_value != "None" %}
-						<span title="{{ custom_field }}" class="{{ custom_field }}">{{ custom_value | safe }}</span>
+						{% if not ("author" in custom_field and pseudonymised) %}
+							<span title="{{ custom_field }}" class="{{ custom_field }}">{{ custom_value | safe }}</span>
+						{% endif %}
 					{% endif %}
 
 				{% endif %}
@@ -93,7 +95,7 @@
 		{% if custom_fields and 'body' in custom_fields %}
 			{{ custom_fields.body | post_field(post) | safe }}
 		{% else %}
-			{{ post.body|safe }}
+			{{ post.body | safe }}
 		{% endif %}
 	</span>
 
@@ -120,7 +122,6 @@
 				{% endif %}
 				
 				<div class="post-annotation field-{{ field }} {{ type }}"><label class="annotation-label">{{ label }}</label>
-
 				{% if type == 'text' %}
 					<input type="text" class="post-annotation-input text-{{ field }}" value="{{ old_annotation }}">
 
@@ -132,9 +133,9 @@
 					<option class='post-annotation-input' value=''></option>
 
 					{% for option in annotation_fields[field]["options"] %}
-						{% set option_id = option.keys() | list %}
-						{% set option_label = option.values() | list %}
-						<option class="post-annotation-input option-{{ option_id[0] }}" id="option-{{ option_id[0] }}" value="{{ option_label[0] }}" {% if option_label[0] == old_annotation %}selected{% endif %}>{{ option_label[0] }}</option>
+						{% set option_id = option.keys() | first %}
+						{% set option_label = option.values() | first %}
+						<option class="post-annotation-input option-{{ option_id }}" id="option-{{ option_id }}" value="{{ option_label }}" {% if option_label == old_annotation %}selected{% endif %}>{{ option_label }}</option>
 					{% endfor %}
 					</select>
 
@@ -142,11 +143,11 @@
 					<div class='post-annotation-options checkboxes-{{ field }}'>
 						
 					{% for option in annotation_fields[field]["options"] %}
-						{% set option_id = option.keys() | list %}
-						{% set option_label = option.values() | list %}
-						{% set checked = "checked" if old_annotation and option_label[0] in old_annotation else "" %}
+						{% set option_id = option.keys() | first %}
+						{% set option_label = option.values() | first %}
+						{% set checked = "checked" if old_annotation and option_label in old_annotation else "" %}
 
-						<input type='checkbox' class='post-annotation-input option-{{ option_id[0] }}' id='option-{{ post.id }}-{{ option_id[0] }}' value='{{ option_label[0] }}' {{ checked }}><label for='option-{{ post.id }}-{{ option_id[0] }}'>{{ option_label[0] }}</label>
+						<input type='checkbox' class='post-annotation-input option-{{ option_id }}' id='option-{{ post.id }}-{{ option_id }}' value='{{ option_label }}' {{ checked }}><label for='option-{{ post.id }}-{{ option_id }}'>{{ option_label }}</label>
 					{% endfor %}
 					</div>
 				{% endif %}

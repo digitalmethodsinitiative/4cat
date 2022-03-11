@@ -28,7 +28,7 @@ class LinguisticFeatures(BasicProcessor):
 	type = "linguistic-features"  # job type ID
 	category = "Text analysis"  # category
 	title = "Linguistic features"  # title displayed in UI
-	description = "Annotate your text with a variety of linguistic features, including part-of-speech tagging, depencency parsing, and named entity recognition. Subsequent modules can add identified tags and nouns to the original data file. Uses the SpaCy library and the en_core_web_sm model. Currently only available for datasets with less than 100.000 items."  # description displayed in UI
+	description = "Annotate your text with a variety of linguistic features, including part-of-speech tagging, depencency parsing, and named entity recognition. Subsequent modules can add identified tags and nouns to the original data file. Uses the SpaCy library and the en_core_web_sm model. Currently only available for datasets with less than 100.000 items. Texts are cutoff if they are over 100.000 characters."  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
 
 	references = [
@@ -77,7 +77,14 @@ class LinguisticFeatures(BasicProcessor):
 		disable = [option for option in options if option not in enable]
 
 		# Get all ze text first so we can process it in batches
-		posts = [post["body"] if post["body"] else "" for post in self.iterate_items(self.source_file)]
+		posts = []
+		for post in self.source_dataset.iterate_items(self):
+			if post.get("body", ""):
+				if len(post["body"]) > 1000000:
+					body = post["body"][:1000000]
+				else:
+					body = post["body"]
+				posts.append(body)
 
 		# Process the text in batches
 		if len(posts) < 100000:

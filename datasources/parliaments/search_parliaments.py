@@ -21,6 +21,8 @@ class SearchParliamentSpeeches(Search):
     title = "Parliament Speeches Search"  # title displayed in UI
     description = "Queries the MPG's Parliament Speeches dataset via PENELOPE for contributions to German and English parliament speeches."  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
+    is_local = False    # Whether this datasource is locally scraped
+    is_static = True   # Whether this datasource is still updated
 
     # not available as a processor for existing datasets
     accepts = [None]

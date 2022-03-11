@@ -50,7 +50,7 @@ class DateFilter(BasicProcessor):
 
         :param module: Dataset or processor to determine compatibility with
         """
-        return module.is_top_dataset() and module.get_extension() == "csv"
+        return module.is_top_dataset() and module.get_extension() in ("csv", "ndjson")
 
     def process(self):
         """
@@ -63,6 +63,13 @@ class DateFilter(BasicProcessor):
 
         # Process inputs from user
         min_date, max_date = self.parameters.get("daterange")
+
+        # Should not be None
+        if not min_date or not max_date:
+            self.dataset.update_status("No date range provided", is_final=True)
+            self.dataset.finish(0)
+            return
+
         # Convert to datetime for easy comparison
         min_date = datetime.fromtimestamp(min_date).date()
         max_date = datetime.fromtimestamp(max_date).date()
@@ -80,11 +87,12 @@ class DateFilter(BasicProcessor):
         matching_items = 0
 
         # Start writer
-        with self.dataset.get_results_path().open("w", encoding="utf-8") as outfile:
+        with self.dataset.get_results_path().open("w", encoding="utf-8", newline="") as outfile:
             writer = None
 
+
             # Loop through items
-            for item in self.iterate_items(self.source_file):
+            for item in self.source_dataset.iterate_items(self):
                 if not writer:
                     # First iteration, check if column actually exists
                     if date_column_name not in item.keys():
@@ -102,9 +110,7 @@ class DateFilter(BasicProcessor):
                 # Update 4CAT and user on status
                 processed_items += 1
                 if processed_items % 500 == 0:
-                    self.dataset.update_status("Processed %i items (%i matching, %i invalid dates)" % (processed_items,
-                                                                                                       matching_items,
-                                                                                                       invalid_dates))
+                    self.dataset.update_status("Processed %i items (%i matching, %i invalid dates)" % (processed_items, matching_items, invalid_dates))
 
                 # Attempt to parse timestamp
                 try:

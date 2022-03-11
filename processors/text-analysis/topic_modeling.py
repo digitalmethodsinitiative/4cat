@@ -111,7 +111,7 @@ class TopicModeler(BasicProcessor):
                 vectors = vectoriser.fit_transform(tokens)
             except ValueError as e:
                 # 'no words left' after pruning, so nothing to model with
-                self.dataset.update_status(e, is_final=True)
+                self.dataset.update_status(str(e), is_final=True)
                 self.dataset.finish(0)
                 return
 

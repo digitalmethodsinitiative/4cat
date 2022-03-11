@@ -55,9 +55,6 @@ class WriteAnnotations(BasicProcessor):
 		# Load annotation fields and annotations
 		annotations = self.dataset.get_annotations()
 		annotation_fields = self.dataset.get_annotation_fields()
-		annotation_labels = [v["label"] for v in annotation_fields.values()]
-
-		to_lowercase = self.parameters.get("to-lowercase", False)
 		
 		# If there are no fields or annotations saved, we're done here
 		if not annotation_fields:
@@ -69,11 +66,17 @@ class WriteAnnotations(BasicProcessor):
 			self.dataset.finish(0)
 			return
 
+		annotation_labels = [v["label"] for v in annotation_fields.values()]
+
+		to_lowercase = self.parameters.get("to-lowercase", False)
+		
+
 		self.dataset.update_status("Writing annotations")
 		with self.dataset.get_results_path().open("w", encoding="utf-8", newline="") as output:
 			
 			# get header row and add input fields to them, if not already present.
-			fieldnames = self.get_item_keys(self.source_file)
+			fieldnames = self.source_dataset.get_item_keys(self)
+			print(fieldnames)
 			for label in annotation_labels:
 				if label not in fieldnames:
 					fieldnames.append(label)
@@ -87,7 +90,7 @@ class WriteAnnotations(BasicProcessor):
 			post_count = 0
 
 			# iterate through posts and check if they appear in the annotations
-			for post in self.iterate_items(self.source_file):
+			for post in self.source_dataset.iterate_items(self):
 				
 				post_count += 1
 

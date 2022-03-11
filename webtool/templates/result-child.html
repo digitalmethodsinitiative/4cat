@@ -72,6 +72,28 @@
         {# Parameters #}
         <div class="parameters">
             <ul>
+                {% if item.get_extension() == "csv" or item.get_own_processor().map_item %}
+                <li>
+                    <a href="{{ url_for('preview_items', key=item.key) }}"
+                       data-load-from="{{ url_for('preview_items', key=item.key) }}"
+                       class="property-badge permalink popup-trigger tooltip-trigger"
+                       aria-controls="tooltip-preview-{{ item.key }} popup-preview-{{ item.key }}"><i
+                            class="fa fa-fw fa-search"></i> <span class="sr-only">Preview this dataset</span></a>
+                    <div role="dialog" id="popup-preview-{{ dataset.key }}"></div>
+                    <p role="tooltip" id="tooltip-preview-{{ item.key }}" aria-hidden="true">Preview this dataset</p>
+                </li>
+                {% endif %}
+                {% if dataset.get_log_path().exists() and current_user.is_authenticated %}
+                <li>
+                    <a href="{{ url_for('view_log', key=item.key) }}"
+                       data-load-from="{{ url_for('view_log', key=item.key) }}"
+                       class="property-badge permalink popup-trigger tooltip-trigger"
+                       aria-controls="tooltip-log-{{ item.key }} popup-log-{{ item.key }}"><i
+                            class="fa fa-fw fa-clipboard-list"></i> <span class="sr-only">View dataset log file</span></a>
+                    <div role="dialog" id="popup-log-{{ dataset.key }}"></div>
+                    <p role="tooltip" id="tooltip-log-{{ item.key }}" aria-hidden="true">View the log file for this dataset</p>
+                </li>
+                {% endif %}
                 <li rel="external">
                     <a class="property-badge permalink tooltip-trigger" aria-controls="tooltip-permalink-{{ item.key }}" href="{{ url_for('show_results') }}{{ parent_key }}/#nav={{ item.get_breadcrumbs() }}" target="_blank"><i class="fa fa-fw fa-hashtag" aria-hidden="true"></i> <span class="sr-only">Permalink to this result (with context)</span></a>
                     <p role="tooltip" id="tooltip-permalink-{{ item.key }}" aria-hidden="true">Permanent link to this analysis (with context)</p>
@@ -89,7 +111,7 @@
                 </li>
                 {% endif %}
                 {% endif %}
-                {% if current_user.is_authenticated and (current_user.get_id() == dataset.parameters.user or current_user.is_admin() or item.parameters.user == current_user.get_id()) %}
+                {% if current_user.is_authenticated and (current_user.get_id() == dataset.owner or current_user.is_admin or item.owner == current_user.get_id()) %}
                 <li>
                     <a class="property-badge delete-link tooltip-trigger" href="{{ url_for('delete_dataset_interactive', key=item.key) }}" data-confirm-action="delete this dataset"><i class="fa fa-fw fa-times" aria-hidden="true"></i> <span class="sr-only">Delete this analysis</span></a>
                     <p role="tooltip" id="tooltip-delete-{{ item.key }}" aria-hidden="true">{% if not item.is_finished %}Cancel and d{% else %}D{% endif %}elete this analysis and any underlying analyses</p>

@@ -16,6 +16,24 @@
 				{% set post_count = max_posts %}
 			{% endif %}
 			<p>Showing posts {{ offset + 1 }} - {{ post_count if (offset + limit) > post_count else (offset + limit) }} ({{ post_count }} in total).</p>
+		{% if custom_fields and custom_fields == "invalid" %}
+			<p><strong>Invalid custom fields JSON - can't show posts properly</strong></p>
+		{% endif %}
+		{% if custom_fields and 'sort_options' in custom_fields %}
+		<div id="sort-options">
+			<p>Sort posts by:
+				<select id="sort-select" name="sort-select">
+					<option class="sort-option" value="dataset-order">Dataset order</option>
+					
+					{% for sort_option in custom_fields['sort_options'] %}
+
+						<option class="sort-option" value="{{ sort_option.key }}" {% if "descending" in sort_option %}data-desc={{ sort_option.descending }}{% endif %} {% if "force_int" in sort_option %}data-force-int={{ sort_option.force_int }}{% endif %}>{{ sort_option.label }}</option>
+					
+					{% endfor %}
+				</select>
+			</p>
+		</div>
+		{% endif %}
 		</div>
 		<!-- <div id="parameters">
 		{% set primary_fields = ("datasource", "board", "body_match", "min_date", "max_date") %}

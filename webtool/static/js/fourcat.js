@@ -157,6 +157,9 @@ const processor = {
 						new_element.css('height', '0px').css('border-width', '0px').css('opacity', 0);
 
 						let expand = function() {
+							if($('#child-tree-header').hasClass('collapsed')) {
+								$('#child-tree-header').attr('aria-hidden', 'false').removeClass('collapsed');
+							}
 							new_element.animate({'height': targetHeight, 'opacity': 1}, 500, false, function() { $(this).css('height', '').css('opacity', '').css('border-width', ''); });
 						}
 
@@ -202,6 +205,9 @@ const processor = {
 			data: {key: $(this).attr('data-key')},
 			success: function(json) {
 				$('li#child-' + json.key).animate({height: 0}, 200, function() { $(this).remove(); });
+				if($('.child-list.top-level li').length === 0) {
+					$('#child-tree-header').attr('aria-hidden', 'true').addClass('collapsed');
+				}
 				query.enable_form();
 			},
 			error: function(json) {
@@ -261,6 +267,9 @@ const query = {
 		$('.result-page .card h2').each(query.label.init);
 		$(document).on('click', '.edit-dataset-label', query.label.handle);
 		$(document).on('keydown', '#new-dataset-label', query.label.handle);
+
+		// convert dataset
+		$(document).on('change', '#convert-dataset', query.convert_dataset)
 	},
 
 	/**
@@ -304,7 +313,7 @@ const query = {
 			let item_name = datasource + '.' + $(this).attr('name');
 			let s = localStorage.setItem(item_name, $(this).val());
 		})
-		
+
 		// Disable form
 		query.disable_form();
 		$('html,body').scrollTop(200);
@@ -372,7 +381,7 @@ const query = {
 					clearInterval(query.poll_interval);
 					let keyword = json.label;
 
-					$('#query-results').append('<li><a href="/results/' + json.key + '">' + keyword + ' (' + json.rows + ' items)</a></li>');
+					$('#query-results').append('<li><a href="../results/' + json.key + '">' + keyword + ' (' + json.rows + ' items)</a></li>');
 					query.enable_form();
 					alert('Query for \'' + keyword + '\' complete!');
 				} else {
@@ -402,9 +411,13 @@ const query = {
 
 		$('.dataset-unfinished').each(function() {
 			let container = $(this);
+			let block_type = container.hasClass('full-block') ? 'full' : 'status';
 			$.getJSON({
 				url: getRelativeURL('api/check-query/'),
-				data: {key: $(this).attr('data-key')},
+				data: {
+					key: $(this).attr('data-key'),
+					block: block_type
+				},
 				success: function (json) {
 					if (json.done) {
 						//refresh
@@ -520,7 +533,7 @@ const query = {
 			//don't hammer the server while user is looking at something else
 			return;
 		}
-		
+
 		$.getJSON({
 			url: getRelativeURL('api/status.json'),
 			success: function (json) {
@@ -569,69 +582,25 @@ const query = {
 
 		let valid = true;
 
-		if ($('#check-time').is(':checked')) {
-			let min_date = $('#input-min-time').val();
-			let max_date = $('#input-max-time').val();
-			let url_max_date;
-			let url_min_date;
-
-			// Convert the minimum date string to a unix timestamp
-			if (min_date !== '') {
-				url_min_date = stringToTimestamp(min_date);
-
-				// If the string was incorrectly formatted (could be on Safari), a NaN was returned
-				if (isNaN(url_min_date)) {
-					valid = false;
-					alert('Please provide a minimum date in the format dd-mm-yyyy (like 29-11-2017).');
-				}
-			}
-
-			// Convert the maximum date string to a unix timestamp
-			if (max_date !== '' && valid) {
-				url_max_date = stringToTimestamp(max_date);
-				// If the string was incorrectly formatted (could be on Safari), a NaN was returned
-				if (isNaN(url_max_date)) {
-					valid = false;
-					alert('Please provide a maximum date in the format dd-mm-yyyy (like 29-11-2017).');
-				}
-			}
-
-			// Input can be ill-formed, like '01-12-90', resulting in negative timestamps
-			if (url_min_date < 0 || url_max_date < 0 && valid) {
-				valid = false;
-				alert('Invalid date(s). Check the bar on top with details on date ranges of 4CAT data.');
-			}
-
-			// Make sure the first date is later than or the same as the second
-			if (url_min_date >= url_max_date && url_min_date !== 0 && url_max_date !== 0 && valid) {
-				valid = false;
-				alert('The first date is later than or the same as the second.\nPlease provide a correct date range.');
-			}
-		}
-
 		// Country flag check
 		if ($('#check-country-flag').is(':checked') && ($('#body-input').val()).length < 2 && valid) {
-			
+
 			let common_countries = ['US', 'GB', 'CA', 'AU'];
 			let country = $('#country_flag').val();
 
 			// Don't allow querying without date ranges for the common countries
-			if (common_countries.includes(country)){
-				if ($('#check-time').is(':checked')) {
+			if (common_countries.includes(country)) {
+				let min_date = $('#option-daterange-min').val();
+				let max_date = $('#option-daterange-max').val();
 
-					let min_date = stringToTimestamp($('#input-min-time').val());
-					let max_date = stringToTimestamp($('#input-max-time').val());
-					
-					// Max three monhts for the common country flags without any body parameters
-					if (max_date - min_date > 7889231) {
-						valid = false;
-						alert('The date selected is more than three months. Select a date range of max. three months and try again. Only the most common country flags on 4chan/pol/ (US, UK, Canada, Australia) have a date restriction.');
-					}
+				// Max three monhts for the common country flags without any body parameters
+				if (max_date - min_date > 7889231) {
+					valid = false;
+					alert('The date selected is more than three months. Select a date range of max. three months and try again. Only the most common country flags on 4chan/pol/ (US, UK, Canada, Australia) have a date restriction.');
 				}
+
 				else {
 					valid = false;
-					$('#check-time').prop('checked', true);
-					$('#check-time').trigger('change');
 					$('#input-min-time').focus().select();
 					alert('The most common country flags on 4chan/pol/ (US, Canada, Australia) have a date restriction when you want to retreive all of their posts. Select a date range of max. three months and try again.');
 				}
@@ -643,7 +612,7 @@ const query = {
 	},
 
 	/**
-	 * Update board select list for chosen datasource
+	 * Query form for chosen datasource
 	 */
 	update_form: function() {
 		datasource = $('#datasource-select').val();
@@ -666,9 +635,15 @@ const query = {
 				   }
 				});
 
+				//update data source type indicator
+				$('#datasource-type-label').html(data.type.join(", "));
+
+				// update data overview link
+				$('.data-overview-link > a').attr("href", getRelativeURL('data-overview/' + data.datasource))
+
 				query.handle_density();
 				query.custom_board_options();
-                
+
                 // Render custom multiple choice fields
                 // should also be rendered dynamically if processor options are expanded.
                 if ($('.multichoice-wrapper').length || $('.multi-select-wrapper').length) {
@@ -743,6 +718,7 @@ const query = {
 		// store timestamp in hidden 'actual' input field
 		let date_obj = new Date(parseInt(date[2]), parseInt(date[1]) - 1, parseInt(date[0]));
 		let timestamp = Math.floor(date_obj.getTime() / 1000);
+		timestamp -= date_obj.getTimezoneOffset() * 60;  //correct for timezone
 
 		if (isNaN(timestamp)) {
 			// invalid date
@@ -799,6 +775,27 @@ const query = {
 				},
 				error: function (response) {
 					alert('Oh no! ' +response.text);
+				}
+			});
+		}
+	},
+
+	convert_dataset: function(self) {
+		let datasource = $(self.target).val();
+		let dataset_key = $('section.result-tree').attr('data-dataset-key')
+
+		if (datasource.length > 0) {
+			$.post({
+				dataType: "json",
+				url: '/api/convert-dataset/' + dataset_key + '/',
+				data: {to_datasource: datasource},
+				cache: false,
+
+				success: function (json) {
+					location.reload();
+				},
+				error: function (response) {
+					alert('Oh no! ' + response.text);
 				}
 			});
 		}
@@ -943,6 +940,7 @@ const popup = {
 		}
 
 		//determine target - last aria-controls value starting with 'popup-'
+		console.log(parent);
 		let targets = $(parent).attr('aria-controls').split(' ');
 		let popup_container = '';
 		targets.forEach(function(target) {
@@ -952,15 +950,29 @@ const popup = {
 		});
 		popup_container = '#' + popup_container;
 
+		if ($(parent).attr('data-load-from')) {
+			popup.render('<iframe src="' + $(parent).attr('data-load-from') + '"></iframe>', true);
+		} else {
+			popup.render($(popup_container).html());
+		}
+	},
+
+	render: function (content, is_fullsize=false) {
 		//copy popup contents into container
-		$('#popup .content').html($(popup_container).html());
+		$('#popup .content').html(content);
+		if(is_fullsize) {
+			$('#popup').addClass('fullsize');
+		} else {
+			$('#popup').removeClass('fullsize');
+		}
 		$('#blur').attr('aria-expanded', true);
 		$('#popup').attr('aria-expanded', true);
 
-		$('#popup embed').each(function() {
+		$('#popup embed').each(function () {
 			svgPanZoom(this, {contain: true});
 		});
 	},
+
 	/**
 	 * Hide popup
 	 *
@@ -982,7 +994,7 @@ const dynamic_container = {
 	 */
 	init: function() {
 		// Update dynamic containers
-		setInterval(dynamic_container.refresh, 2500);
+		setInterval(dynamic_container.refresh, 250);
 	},
 
 	refresh: function() {
@@ -1302,37 +1314,6 @@ const ui_helpers = {
 			$(target).attr('aria-expanded', true).animate({"height": targetHeight}, 250, function() { $(this).css('height', '')});
 		}
 	}
-}
-
-
-/**
- * Convert input string to Unix timestamp
- *
- * @param str  Input string, yyyy-mm-dd ideally
- * @returns {*}  Unix timestamp
- */
-function stringToTimestamp(str) {
-	// Converts a text input to a unix timestamp.
-	// Only used in Safari (other browsers use native HTML date picker)
-	let date_regex = /^\d{4}-\d{2}-\d{2}$/;
-	let timestamp;
-	if (str.match(date_regex)) {
-		timestamp = (new Date(str).getTime() / 1000)
-	} else {
-		str = str.replace(/\//g, '-');
-		str = str.replace(/\s/g, '-');
-		let date_objects = str.split('-');
-		let year = date_objects[2];
-		let month = date_objects[1];
-		// Support for textual months
-		let testdate = Date.parse(month + "1, 2012");
-		if (!isNaN(testdate)) {
-			month = new Date(testdate).getMonth() + 1;
-		}
-		let day = date_objects[0];
-		timestamp = (new Date(year, (month - 1), day).getTime() / 1000);
-	}
-	return timestamp;
 }
 
 /**

@@ -19,8 +19,12 @@ class SearchReddit(SearchWithScope):
 	title = "Reddit Search"  # title displayed in UI
 	description = "Query the Pushshift API to retrieve Reddit posts and threads matching the search parameters"  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
-
+	is_local = False	# Whether this datasource is locally scraped
+	is_static = False	# Whether this datasource is still updated
+	
 	references = [
+		"[API documentation](https://github.com/pushshift/api)",
+		"[r/pushshift](https://www.reddit.com/r/pushshift/)",
 		"[Baumgartner, J., Zannettou, S., Keegan, B., Squire, M., & Blackburn, J. (2020). The Pushshift Reddit Dataset. *Proceedings of the International AAAI Conference on Web and Social Media*, 14(1), 830-839.](https://ojs.aaai.org/index.php/ICWSM/article/view/7347)"
 	]
 
@@ -41,7 +45,7 @@ class SearchReddit(SearchWithScope):
 					"careful** when using this privilege.",
 			"requires": "reddit.can_query_without_keyword"
 		},
-		"api_type": {
+		"pushshift_track": {
 			"type": UserInput.OPTION_CHOICE,
 			"help": "API version",
 			"options": {
@@ -68,7 +72,7 @@ class SearchReddit(SearchWithScope):
 					" and post scores can be out of date. "
 					"See [this paper](https://arxiv.org/pdf/1803.05046.pdf) for an overview of the gaps in data. "
 					"Double-check manually or via the official Reddit API if completeness is a concern. Check the "
-					"[Pushshift API](https://github.com/pushshift/api) reference [beta](https://beta.pushshift.io/redoc) for"
+					"[Pushshift API](https://github.com/pushshift/api) reference [beta](https://beta.pushshift.io/redoc) for "
 					"documentation on query syntax, "
 					"e.g. on how to format keyword queries."
 		},
@@ -149,7 +153,7 @@ class SearchReddit(SearchWithScope):
 		:return list:  Posts, sorted by thread and post ID, in ascending order
 		"""
 		scope = query.get("search_scope")
-		self.api_type = query.get("api_type", "regular")
+		self.api_type = query.get("pushshift_track", "regular")
 		
 		# first, build the request parameters
 		if self.api_type == "regular":
@@ -505,6 +509,8 @@ class SearchReddit(SearchWithScope):
 			"body": post["body"].strip().replace("\r", ""),
 			"subject": "",
 			"author": post["author"],
+			"author_flair": post.get("author_flair_text", ""),
+			"post_flair": "",
 			"domain": "",
 			"url": "",
 			"image_file": "",
@@ -532,6 +538,8 @@ class SearchReddit(SearchWithScope):
 			"body": thread.get("selftext", "").strip().replace("\r", ""),
 			"subject": thread["title"],
 			"author": thread["author"],
+			"author_flair": thread.get("author_flair_text", ""),
+			"post_flair": thread.get("link_flair_text", ""),
 			"image_file": thread["url"] if image_match.search(thread["url"]) else "",
 			"domain": thread["domain"],
 			"url": thread["url"],
@@ -618,7 +626,7 @@ class SearchReddit(SearchWithScope):
 		query["board"] = ",".join(boards)
 		
 		# this is the bare minimum, else we can't narrow down the full data set
-		if not user.is_admin() and not user.get_value("reddit.can_query_without_keyword", False) and not query.get("body_match", "").strip() and not query.get("subject_match", "").strip() and not query.get("subject_url", ""):
+		if not user.is_admin and not user.get_value("reddit.can_query_without_keyword", False) and not query.get("body_match", "").strip() and not query.get("subject_match", "").strip() and not query.get("subject_url", ""):
 			raise QueryParametersException("Please provide a body query or subject query.")
 
 		# body query and full threads are incompatible, returning too many posts
@@ -642,7 +650,7 @@ class SearchReddit(SearchWithScope):
 				raise QueryParametersException("Please provide body queries that do not start with a minus sign.")
 
 		# URL queries are not possible (yet) for the beta API
-		if query.get("api_type") == "beta" and query.get("subject_url", None):
+		if query.get("pushshift_track") == "beta" and query.get("subject_url", None):
 			raise QueryParametersException("URL querying is not possible (yet) for the beta endpoint.")
 
 		# both dates need to be set, or none

@@ -15,6 +15,7 @@ import backend
 from common.lib.job import Job, JobNotFoundException
 from common.lib.helpers import get_software_version
 from common.lib.fourcat_module import FourcatModule
+from common.lib.exceptions import ProcessorInterruptedException
 
 
 class DataSet(FourcatModule):
@@ -44,10 +45,10 @@ class DataSet(FourcatModule):
 	folder = None
 	is_new = True
 	no_status_updates = False
-	staging_area = []
+	staging_area = None
 
 	def __init__(self, parameters={}, key=None, job=None, data=None, db=None, parent=None, extension="csv",
-				 type=None):
+				 type=None, is_private=True, owner="anonymous"):
 		"""
 		Create new dataset object
 
@@ -58,6 +59,7 @@ class DataSet(FourcatModule):
 		"""
 		self.db = db
 		self.folder = Path(config.PATH_ROOT, config.PATH_DATA)
+		self.staging_area = []
 
 		if key is not None:
 			self.key = key
@@ -96,15 +98,20 @@ class DataSet(FourcatModule):
 			self.parameters = json.loads(self.data["parameters"])
 			self.is_new = False
 		else:
+			if hasattr(config, "EXPIRE_DATASETS") and config.EXPIRE_DATASETS and not parent:
+				parameters["expires-after"] = int(time.time() + config.EXPIRE_DATASETS)
+
 			self.data = {
 				"key": self.key,
 				"query": self.get_label(parameters, default=type),
+				"owner": owner,
 				"parameters": json.dumps(parameters),
 				"result_file": "",
 				"status": "",
 				"type": type,
 				"timestamp": int(time.time()),
 				"is_finished": False,
+				"is_private": is_private,
 				"software_version": get_software_version(),
 				"software_file": "",
 				"num_rows": 0,
@@ -217,6 +224,107 @@ class DataSet(FourcatModule):
 				logtime = line.split(":")[0]
 				logmsg = ":".join(line.split(":")[1:])
 				yield (logtime, logmsg)
+
+	def iterate_items(self, processor=None, bypass_map_item=False):
+		"""
+		A generator that iterates through a CSV or NDJSON file
+
+		If a reference to a processor is provided, with every iteration,
+		the processor's 'interrupted' flag is checked, and if set a
+		ProcessorInterruptedException is raised, which by default is caught
+		in the worker and subsequently stops execution gracefully.
+
+		Processors can define a method called `map_item` that can be used to
+		map an item from the dataset file before it is processed any further
+		this is slower than storing the data file in the right format to begin
+		with but not all data sources allow for easy 'flat' mapping of items,
+		e.g. tweets are nested objects when retrieved from the twitter API
+		that are easier to store as a JSON file than as a flat CSV file, and
+		it would be a shame to throw away that data.
+
+		There are two file types that can be iterated (currently): CSV files
+		and NDJSON (newline-delimited JSON) files. In the future, one could
+		envision adding a pathway to retrieve items from e.g. a MongoDB
+		collection directly instead of from a static file
+
+		:param BasicProcessor processor:  A reference to the processor
+		iterating the dataset.
+		:param bool bypass_map_item:  If set to `True`, this ignores any
+		`map_item` method of the datasource when returning items.
+		:return generator:  A generator that yields each item as a dictionary
+		"""
+		path = self.get_results_path()
+
+		# see if an item mapping function has been defined
+		# open question if 'source_dataset' shouldn't be an attribute of the dataset
+		# instead of the processor...
+		item_mapper = None
+
+		if not bypass_map_item:
+			own_processor = self.get_own_processor()
+			# only run item mapper if extension of processor == extension of
+			# data file, for the scenario where a csv file was uploaded and
+			# converted to an ndjson-based data source, for example
+			# todo: this is kind of ugly, and a better fix may be possible
+			extension_fits = hasattr(own_processor, "extension") and own_processor.extension == self.get_extension()
+			if hasattr(own_processor, "map_item") and extension_fits:
+				item_mapper = own_processor.map_item
+
+		# go through items one by one, optionally mapping them
+		if path.suffix.lower() == ".csv":
+			with path.open(encoding="utf-8") as infile:
+				reader = csv.DictReader(infile)
+
+				for item in reader:
+					if hasattr(processor, "interrupted") and processor.interrupted:
+						raise ProcessorInterruptedException("Processor interrupted while iterating through CSV file")
+
+					if item_mapper:
+						item = item_mapper(item)
+
+					yield item
+
+		elif path.suffix.lower() == ".ndjson":
+			# in this format each line in the file is a self-contained JSON
+			# file
+			with path.open(encoding="utf-8") as infile:
+				for line in infile:
+					if hasattr(processor, "interrupted") and processor.interrupted:
+						raise ProcessorInterruptedException("Processor interrupted while iterating through NDJSON file")
+
+					item = json.loads(line)
+					if item_mapper:
+						item = item_mapper(item)
+
+					yield item
+
+		else:
+			raise NotImplementedError("Cannot iterate through %s file" % path.suffix)
+
+	def get_item_keys(self, processor=None):
+		"""
+		Get item attribute names
+
+		It can be useful to know what attributes an item in the dataset is
+		stored with, e.g. when one wants to produce a new dataset identical
+		to the source_dataset one but with extra attributes. This method provides
+		these, as a list.
+
+		:param BasicProcessor processor:  A reference to the processor
+		asking for the item keys, to pass on to iterate_itesm
+		:return list:  List of keys, may be empty if there are no items in the
+		  dataset
+		"""
+
+		items = self.iterate_items(processor)
+		try:
+			keys = list(items.__next__().keys())
+		except StopIteration:
+			return []
+		finally:
+			del items
+
+		return keys
 
 	def get_staging_area(self):
 		"""
@@ -357,6 +465,23 @@ class DataSet(FourcatModule):
 			# already deleted, apparently
 			pass
 
+	def update_children(self, **kwargs):
+		"""
+		Update an attribute for all child datasets
+
+		Can be used to e.g. change the owner, version, finished status for all
+		datasets in a tree
+
+		:param kwargs:  Parameters corresponding to known dataset attributes
+		"""
+		children = self.db.fetchall("SELECT * FROM datasets WHERE key_parent = %s", (self.key,))
+		for child in children:
+			child = DataSet(key=child["key"], db=self.db)
+			for attr, value in kwargs.items():
+				child.__setattr__(attr, value)
+
+			child.update_children(**kwargs)
+
 	def is_finished(self):
 		"""
 		Check if dataset is finished
@@ -454,10 +579,10 @@ class DataSet(FourcatModule):
 
 		annotation_fields = self.db.fetchone("SELECT annotation_fields FROM datasets WHERE key = %s;", (self.top_parent().key,))
 		
-		if annotation_fields:
-			return json.loads(annotation_fields["annotation_fields"])
-		else:
-			return None
+		if annotation_fields and annotation_fields.get("annotation_fields"):
+			annotation_fields = json.loads(annotation_fields["annotation_fields"])
+		
+		return annotation_fields
 
 	def get_annotations(self):
 		"""
@@ -467,7 +592,7 @@ class DataSet(FourcatModule):
 
 		annotations = self.db.fetchone("SELECT annotations FROM annotations WHERE key = %s;", (self.top_parent().key,))
 		
-		if annotations:
+		if annotations and annotations.get("annotations"):
 			return json.loads(annotations["annotations"])
 		else:
 			return None
@@ -524,6 +649,19 @@ class DataSet(FourcatModule):
 			return parameters["datasource"] + "/" + parameters["board"]
 		else:
 			return default
+
+	def change_datasource(self, datasource):
+		"""
+		Change the datasource type for this dataset
+
+		:param str label:  New datasource type
+		:return str:  The new datasource type
+		"""
+
+		self.parameters["datasource"] = datasource
+
+		self.db.update("datasets", data={"parameters": json.dumps(self.parameters)}, where={"key": self.key})
+		return datasource
 
 	def reserve_result_file(self, parameters=None, extension="csv"):
 		"""
@@ -646,6 +784,21 @@ class DataSet(FourcatModule):
 
 		return updated > 0
 
+	def finish_with_error(self, error):
+		"""
+		Set error as final status, and finish with 0 results
+
+		This is a convenience function to avoid having to repeat
+		"update_status" and "finish" a lot.
+
+		:param str error:  Error message for final dataset status.
+		:return:
+		"""
+		self.update_status(error, is_final=True)
+		self.finish(0)
+
+		return None
+
 	def update_version(self, version):
 		"""
 		Update software version used for this dataset
@@ -655,22 +808,29 @@ class DataSet(FourcatModule):
 		:param string version:  Version identifier
 		:return bool:  Update successul?
 		"""
-		self.data["software_version"] = version
+		try:
+			# this fails if the processor type is unknown
+			# edge case, but let's not crash...
+			processor_path = backend.all_modules.processors.get(self.data["type"]).filepath
+		except AttributeError:
+			processor_path = ""
+
 		updated = self.db.update("datasets", where={"key": self.data["key"]}, data={
 			"software_version": version,
-			"software_file": backend.all_modules.processors.get(self.data["type"]).filepath
+			"software_file": processor_path
 		})
 
 		return updated > 0
 
-	def delete_parameter(self, parameter):
+	def delete_parameter(self, parameter, instant=True):
 		"""
 		Delete a parameter from the dataset metadata
 
 		:param string parameter:  Parameter to delete
+		:param bool instant:  Also delete parameters in this instance object?
 		:return bool:  Update successul?
 		"""
-		parameters = self.parameters
+		parameters = self.parameters.copy()
 		if parameter in parameters:
 			del parameters[parameter]
 		else:
@@ -678,7 +838,9 @@ class DataSet(FourcatModule):
 
 		updated = self.db.update("datasets", where={"key": self.data["key"]},
 								 data={"parameters": json.dumps(parameters)})
-		self.parameters = parameters
+
+		if instant:
+			self.parameters = parameters
 
 		return updated > 0
 
@@ -804,7 +966,8 @@ class DataSet(FourcatModule):
 
 		:return:  Processor class, or `None` if not available.
 		"""
-		return backend.all_modules.processors.get(self.data.get("type"))
+		processor_type = self.parameters.get("type", self.data.get("type"))
+		return backend.all_modules.processors.get(processor_type)
 
 
 	def get_available_processors(self):
@@ -905,10 +1068,11 @@ class DataSet(FourcatModule):
 		Also checks whether the results file exists.
 		Used for checking processor and dataset compatibility.
 
+		:return str extension:  Extension, e.g. `csv`
 		"""
-
 		if self.get_results_path().exists():
 			return self.get_results_path().suffix[1:]
+
 		return False
 
 	def get_result_url(self):

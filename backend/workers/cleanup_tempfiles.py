@@ -33,26 +33,26 @@ class TempFileCleaner(BasicWorker):
 
         result_files = Path(config.PATH_DATA).glob("*")
         for file in result_files:
-            # the key of the dataset files belong to can be extracted from the
-            # file name in a predictable way
-            if file.is_dir():
-                key = file.stem.split("-staging")[0].split("-")[-1]
-            else:
-                key = file.stem.split("-")[-1]
+            if self.interrupted:
+                raise ProcessorInterruptedException("Interrupted while cleaning up orphaned result files")
 
-            key = key[:32]
-            if not re.match(r"[abcdef0-9]{32}", key):
-                # skip these files, since we don't know if they're somehow
-                # important, as they're not recognizable as dataset files
-                self.log.warning("Unknown dataset key format '%s'" % key)
+            # the key of the dataset files belong to can be extracted from the
+            # file name in a predictable way.
+            possible_keys = re.findall(r"[abcdef0-9]{32}", file.stem)
+            if not possible_keys:
+                self.log.warning("File %s does not seem to be a result file - clean up manually" % file)
                 continue
+
+            # if for whatever reason there are multiple hashes in the filename,
+            # the key would always be the last one
+            key = possible_keys.pop()
 
             try:
                 dataset = DataSet(key=key, db=self.db)
             except TypeError:
                 # the dataset has been deleted since, but the result file still
                 # exists - should be safe to clean up
-                self.log.debug("No matching dataset with key %s for file %s, deleting file" % (key, str(file)))
+                self.log.info("No matching dataset with key %s for file %s, deleting file" % (key, str(file)))
                 if file.is_dir():
                     shutil.rmtree(file)
                 else:

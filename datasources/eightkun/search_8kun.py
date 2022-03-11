@@ -19,6 +19,8 @@ class Search8Kun(Search4Chan):
 	type = "8kun-search"
 	sphinx_index = "8kun"
 	prefix = "8kun"
+	is_local = True	# Whether this datasource is locally scraped
+	is_static = False	# Whether this datasource is still updated
 
 	options = {
 		"intro": {

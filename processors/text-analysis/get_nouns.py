@@ -141,9 +141,12 @@ class ExtractNouns(BasicProcessor):
 
             if li_nouns:
 
-                # Also add the data to the original csv file, if indicated.
+                # Also add the data to the original file, if indicated.
                 if self.parameters.get("overwrite"):
-                    self.update_parent(li_nouns, noun_type)
+                    self.add_field_to_parent(field_name=noun_type,
+                                             # Format like "apple, gates, ..." and add to the row
+                                             new_data=[", ".join([post_noun.lower() for post_noun in li_noun if len(post_noun) > 1]) for li_noun in li_nouns],
+                                             which_parent=self.dataset.top_parent())
 
                 # convert to lower and filter out one-letter words
                 all_nouns = []
@@ -162,50 +165,6 @@ class ExtractNouns(BasicProcessor):
                 self.dataset.update_status("Finished, but no nouns were extracted.")
                 self.dataset.finish(0)
 
-    def update_parent(self, li_nouns, noun_type):
-        """
-        Update the original dataset with a nouns column
-
-        """
-
-        self.dataset.update_status("Adding nouns the source file")
-
-        # Get the initial dataset path
-        top_path = self.dataset.top_parent().get_results_path()
-
-        # Get a temporary path where we can store the data
-        tmp_path = self.dataset.get_staging_area()
-        tmp_file_path = tmp_path.joinpath(top_path.name)
-
-        count = 0
-
-        # Get field names
-        fieldnames = self.get_item_keys(top_path)
-        if noun_type not in fieldnames:
-            fieldnames.append(noun_type)
-
-        # Iterate through the original dataset and add values to a new noun column
-        self.dataset.update_status("Writing csv with nouns.")
-        with tmp_file_path.open("w", encoding="utf-8", newline="") as output:
-
-            writer = csv.DictWriter(output, fieldnames=fieldnames)
-            writer.writeheader()
-
-            for post in self.iterate_items(top_path):
-                # Format like "Apple ORG, Gates PERSON, ..." and add to the row
-                noun_tags = ", ".join([post_noun.lower() for post_noun in li_nouns[count] if len(post_noun) > 1])
-                post[noun_type] = noun_tags
-                writer.writerow(post)
-                count += 1
-
-        # Replace the source file path with the new file
-        shutil.copy(str(tmp_file_path), str(top_path))
-
-        # delete temporary files and folder
-        shutil.rmtree(tmp_path)
-
-        self.dataset.update_status("Parent dataset updated.")
-
     @classmethod
     def get_options(cls, parent_dataset=None, user=None):
         """
@@ -220,7 +179,7 @@ class ExtractNouns(BasicProcessor):
         :return dict:
         """
         options = cls.options
-        if parent_dataset and parent_dataset.top_parent().get_results_path().suffix == ".csv":
+        if parent_dataset and parent_dataset.top_parent().get_results_path().suffix in [".csv", ".ndjson"]:
             options["overwrite"] = {
                 "type": UserInput.OPTION_TOGGLE,
                 "default": False,
