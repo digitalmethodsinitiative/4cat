@@ -21,7 +21,7 @@ class SimilarWord2VecWords(BasicProcessor):
 	"""
 	type = "similar-word2vec"  # job type ID
 	category = "Text analysis"  # category
-	title = "Similar words"  # title displayed in UI
+	title = "Extract similar words"  # title displayed in UI
 	description = "Uses a Word2Vec model to find words used in a similar context"  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 

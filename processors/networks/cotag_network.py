@@ -19,9 +19,9 @@ class CoTaggerPreset(ProcessorPreset):
     type = "preset-cotag-network"  # job type ID
     category = "Networks"  # category
     title = "Co-tag network"  # title displayed in UI
-    description = "Create a Gephi-compatible network comprised of all tags appearing in the dataset, with edges " \
-                  "between all tags used together on an item. Edges are weighted by the amount of co-tag " \
-                  "occurrences; nodes are weighted by the frequency of the tag."  # description displayed in UI
+    description = "Create a GEXF network file of tags co-occurring in a posts. " \
+                  "Edges are weighted by the amount of tag co-occurrences; nodes " \
+                  "are weighted by how often the tag appears in the dataset."  # description displayed in UI
     extension = "gexf"  # extension of result file, used internally and in UI
 
     options = {

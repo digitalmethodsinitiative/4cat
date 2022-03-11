@@ -20,7 +20,7 @@ class ConvertCSVToMacExcel(BasicProcessor):
 	type = "convert-csv-excel"  # job type ID
 	category = "Conversion"  # category
 	title = "Convert to Excel-compatible CSV"  # title displayed in UI
-	description = "Convert a CSV file to a format that is compatible with Microsoft Excel."  # description displayed in UI
+	description = "Change a CSV file so it works with Microsoft Excel."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
 	@classmethod

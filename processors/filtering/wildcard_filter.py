@@ -22,7 +22,7 @@ class WildcardFilter(BasicProcessor):
     type = "wildcard-filter"  # job type ID
     category = "Filtering"  # category
     title = "Filter by wildcard"  # title displayed in UI
-    description = "Copies the dataset, retaining only posts that match one of a list of phrases that may contain wildcards. This creates a new, separate dataset you can run analyses on."  # description displayed in UI
+    description = "Retains only posts that contain certain words or phrases. Input may contain a wildcard *, which matches all text in between. This creates a new dataset."  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
 
     # the following determines the options available to the user via the 4CAT
@@ -31,7 +31,7 @@ class WildcardFilter(BasicProcessor):
         "match": {
             "type": UserInput.OPTION_TEXT,
             "default": "",
-            "help": "Keywords to match. You can use * as a wildcard.",
+            "help": "Words or phrases to match. You can use * as a wildcard.",
             "tooltip": "Separate with commas."
         }
     }

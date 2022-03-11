@@ -24,7 +24,7 @@ class ConvertVisionOutputToCSV(BasicProcessor):
     """
     type = "convert-vision-to-csv"  # job type ID
     category = "Conversion"  # category
-    title = "Convert to CSV"  # title displayed in UI
+    title = "Convert Vision results to CSV"  # title displayed in UI
     description = "Convert the Vision API output to a simplified CSV file."  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
 

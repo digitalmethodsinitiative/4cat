@@ -25,8 +25,12 @@ class GenerateWordEmbeddings(BasicProcessor):
 	"""
 	type = "generate-embeddings"  # job type ID
 	category = "Text analysis"  # category
-	title = "Generate Word Embedding Models"  # title displayed in UI
-	description = "Generates Word2Vec or FastText word embedding models for the sentences, per chosen time interval. These can then be used to analyse semantic word associations within the corpus. Note that good models require large(r) datasets."  # description displayed in UI
+	title = "Generate word embedding models"  # title displayed in UI
+	description = "Generates Word2Vec or FastText word embedding models (overall or per timeframe). " \
+				  "These calculate coordinates (vectors) per word on the basis of their context. The " \
+				  "coordinates are positioned in a \"vector space\" with a large amount of dimensions (so a coordinate can " \
+				  "e.g. exist of 100 numbers). These numeric word representations can be used to extract words with similar contexts. " \
+				  "Note that good models require a lot of data."  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
 
 	references = [
@@ -61,14 +65,16 @@ class GenerateWordEmbeddings(BasicProcessor):
 			"default": "5",
 			"options": {"3": 3, "4": 4, "5": 5, "6": 6, "7": 7},
 			"help": "Window",
-			"tooltip": "Maximum distance between the current and predicted word within a sentence"
+			"tooltip": "This sets the length of word sequences taken as the context. For instance, " \
+					   "a window of 3 with the sentence \"the quick brown fox\" will \"slide\" over \"the quick brown\" " \
+					   "and \"quick brown fox\"."
 		},
 		"dimensionality": {
 			"type": UserInput.OPTION_TEXT,
 			"default": 100,
 			"min": 50,
 			"max": 1000,
-			"help": "Dimensionality of the word vectors"
+			"help": "Dimensionality of the vectors"
 		},
 		"min_count": {
 			"type": UserInput.OPTION_TEXT,

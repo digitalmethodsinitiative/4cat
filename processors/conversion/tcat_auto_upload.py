@@ -26,7 +26,7 @@ class FourcatToDmiTcatUploader(BasicProcessor):
     type = "tcat-auto-upload"  # job type ID
     category = "Conversion"  # category
     title = "Upload to DMI-TCAT"  # title displayed in UI
-    description = "Send TCAT-ready json to a particular DMI-TCAT instance."  # description displayed in UI
+    description = "Send a TCAT-ready JSON file to a particular DMI-TCAT server."  # description displayed in UI
     extension = "html"  # extension of result file, used internally and in UI
 
     @classmethod
@@ -71,8 +71,8 @@ class FourcatToDmiTcatUploader(BasicProcessor):
                     },
                     "default": "random",
                     "help": "Instance to upload to",
-                    "tooltip": "Which TCAT instance to upload the dataset to. If you do not choose one, 4CAT will "
-                               "upload the dataset to the instance with the highest available capacity."
+                    "tooltip": "Which TCAT server to upload the dataset to. If you do not choose one, 4CAT will "
+                               "upload the dataset to the server with the highest available capacity."
                 }
                 # todo: actually make it choose one that way instead of choosing at random
             }

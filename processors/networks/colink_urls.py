@@ -19,16 +19,15 @@ class URLCoLinker(BasicProcessor):
 	"""
 	type = "url-network"  # job type ID
 	category = "Networks"  # category
-	title = "URL co-link network"  # title displayed in UI
-	description = "Create a Gephi-compatible GEXF network comprised of all URLs appearing in a post with at least " \
-				  "one other URL. Appearing in the same post constitutes an edge between these nodes. Edges are " \
-				  "weighted by amount of co-links."  # description displayed in UI
+	title = "URL co-occurence network"  # title displayed in UI
+	description = "Create a GEXF network file comprised of URLs appearing together (in a post or thread). " \
+				  "Edges are weighted by amount of co-links."  # description displayed in UI
 	extension = "gexf"  # extension of result file, used internally and in UI
 
 	options = {
 		"detail": {
 			"type": UserInput.OPTION_CHOICE,
-			"help": "Link detail level",
+			"help": "Use URL or domain name",
 			"options": {
 				"url": "Full URL",
 				"domain": "Domain name"
@@ -37,13 +36,13 @@ class URLCoLinker(BasicProcessor):
 		},
 		"level": {
 			"type": UserInput.OPTION_CHOICE,
-			"help": "Co-occurence context",
+			"help": "Set co-occurence by",
 			"options": {
-				"thread": "Thread (works best in full-thread data sets)",
+				"thread": "Thread (works best in full-thread datasets)",
 				"post": "Post"
 			},
 			"default": "thread",
-			"tooltip": "If 'thread' is selected, URLs are considered to occur together if they appear within the same "
+			"tooltip": "If 'thread' is selected, URLs are considered to co-occur if they appear within the same "
 					   "thread, even if they are in different posts."
 		}
 	}

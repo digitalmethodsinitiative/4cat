@@ -33,7 +33,7 @@ class PixPlotGenerator(BasicProcessor):
 	type = "pix-plot"  # job type ID
 	category = "Visual"  # category
 	title = "PixPlot"  # title displayed in UI
-	description = "Put all images in an archive into a PixPlot, which allows you to explore and visualize them."
+	description = "Put all images from an archive into a PixPlot: an explorable map of images grouped by similar features."
 	extension = "html"  # extension of result file, used internally and in UI
 
 	# PixPlot requires a minimum number of photos to be created

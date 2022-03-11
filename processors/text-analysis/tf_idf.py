@@ -28,7 +28,7 @@ class TfIdf(BasicProcessor):
 	type = "tfidf"  # job type ID
 	category = "Text analysis"  # category
 	title = "Tf-idf"  # title displayed in UI
-	description = "Get the tf-idf values of tokenised text. Works better with more documents (e.g. day-separated)."  # description displayed in UI
+	description = "Get the tf-idf values of tokenised text. Works better with more documents (e.g. time-separated)."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
 	options = {
