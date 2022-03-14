@@ -1,6 +1,6 @@
 import abc
 from selenium import webdriver
-from selenium.common.exceptions import WebDriverException, SessionNotCreatedException
+from selenium.common.exceptions import WebDriverException, SessionNotCreatedException, UnexpectedAlertPresentException
 from urllib.parse import urlparse, urljoin
 from bs4 import BeautifulSoup
 from bs4.element import Comment
@@ -213,7 +213,12 @@ class SeleniumScraper(Search, metaclass=abc.ABCMeta):
         movement occurred. Use in conjunction with self.reset_current_page() if it is necessary to check every url results
         and identify redirects.
         """
-        current_url = self.driver.current_url
+        try:
+            current_url = self.driver.current_url
+        except UnexpectedAlertPresentException:
+            # attempt to dismiss random alert
+            self.driver.switch_to.alert.dismiss()
+            current_url = self.driver.current_url
         if current_url == self.last_scraped_url:
             return False
         else:

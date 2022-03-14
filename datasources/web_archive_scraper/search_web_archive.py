@@ -109,7 +109,13 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
             success = False
             while attempts < 2:
                 attempts += 1
-                scraped_page = self.simple_scrape_page(url)
+                try:
+                    scraped_page = self.simple_scrape_page(url)
+                except Exception as e:
+                    self.dataset.log('Url %s unable to be scraped with error: %s' % (url, str(e)))
+                    self.restart_selenium()
+                    scraped_page['error'] = str(e)
+                    continue
 
                 if scraped_page:
                     scraped_page['text'] = self.scrape_beautiful_text(scraped_page['page_source'])
@@ -140,7 +146,7 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
                     except Exception as e:
                         # most likely something in Selenium "went stale"
                         self.dataset.log('Redirect url unable to be scraped: %s' % url)
-                        self.dataset.log(e)
+                        self.dataset.log(str(e))
                         scraped_page['error'] = e
                         break
 
