@@ -102,7 +102,7 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
                 "visible_text": None,
                 "detected_404": None,
                 "timestamp": None,
-                "error": False,
+                "error": '',
             }
 
             attempts = 0
@@ -114,7 +114,7 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
                 except Exception as e:
                     self.dataset.log('Url %s unable to be scraped with error: %s' % (url, str(e)))
                     self.restart_selenium()
-                    scraped_page['error'] = str(e)
+                    scraped_page['error'] = 'SCAPE ERROR:\n' + str(e) + '\n'
                     continue
 
                 if scraped_page:
@@ -146,8 +146,9 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
                     except Exception as e:
                         # most likely something in Selenium "went stale"
                         self.dataset.log('Redirect url unable to be scraped: %s' % url)
-                        self.dataset.log(str(e))
-                        scraped_page['error'] = e
+                        redirect_error = 'REDIRECT ERROR:\n%s\n' % str(e)
+                        self.dataset.log(redirect_error)
+                        scraped_page['error'] = redirect_error if not scraped_page.get('error', False) else scraped_page['error'] + redirect_error
                         break
 
                 if any([any([bad_response in text for bad_response in self.bad_response_text]) for text in scraped_page['text']]):
@@ -157,8 +158,9 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
                     time.sleep(1)
                     continue
                 elif scraped_page['detected_404']:
-                    self.dataset.log('404 detected on url: %s' % url)
-                    scraped_page['error'] = '404 detected on url'
+                    four_oh_four_error = '404 detected on url: %s\n' % url
+                    self.dataset.log(four_oh_four_error)
+                    scraped_page['error'] = four_oh_four_error if not scraped_page.get('error', False) else scraped_page['error'] + four_oh_four_error
                     break
                 else:
                     success = True
@@ -207,7 +209,7 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
                         result['body'] = 'SELENIUM RESPONSE:\n' + str(result['body']) + '\nHTTP RESPONSE:\n' + http_response.text
                     except Exception as e:
                         result['body'] = 'SELENIUM RESPONSE:\n' + str(result['body']) + '\nHTTP RESPONSE:\nNone'
-                        http_error = '\nHTTP ERROR:\n' % str(e)
+                        http_error = '\nHTTP ERROR:\n' + str(e)
                         result['error'] = 'SELENIUM ERROR:\n' + str(result['error']) + http_error
 
                 yield result
