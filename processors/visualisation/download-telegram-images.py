@@ -127,10 +127,10 @@ class TelegramImageDownloader(BasicProcessor):
             if not message.get("attachment_data") or message.get("attachment_type") != "photo":
                 continue
 
-            if message["search_entity"] not in messages_with_photos:
-                messages_with_photos[message["search_entity"]] = []
+            if message["chat"] not in messages_with_photos:
+                messages_with_photos[message["chat"]] = []
 
-            messages_with_photos[message["search_entity"]].append(int(message["id"]))
+            messages_with_photos[message["chat"]].append(int(message["id"]))
             total_media += 1
 
             if amount and total_media >= amount:

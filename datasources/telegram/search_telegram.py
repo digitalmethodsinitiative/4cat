@@ -2,6 +2,7 @@
 Search Telegram via API
 """
 import traceback
+import datetime
 import hashlib
 import asyncio
 import json
@@ -30,7 +31,7 @@ class SearchTelegram(Search):
     category = "Search"  # category
     title = "Telegram API search"  # title displayed in UI
     description = "Scrapes messages from open Telegram groups via its API."  # description displayed in UI
-    extension = "csv"  # extension of result file, used internally and in UI
+    extension = "ndjson"  # extension of result file, used internally and in UI
     is_local = False    # Whether this datasource is locally scraped
     is_static = False   # Whether this datasource is still updated
 
@@ -184,12 +185,12 @@ class SearchTelegram(Search):
 
             if client and hasattr(client, "disconnect"):
                 await client.disconnect()
-            return None
+            return []
         except Exception as e:
             self.dataset.update_status("Error connecting to the Telegram API with provided credentials.", is_final=True)
             if client and hasattr(client, "disconnect"):
                 await client.disconnect()
-            return None
+            return []
 
         # ready our parameters
         parameters = self.dataset.get_parameters()
@@ -211,17 +212,19 @@ class SearchTelegram(Search):
                 min_date = int(min_date)
             except ValueError:
                 min_date = None
-        
+
+        posts = []
         try:
-            posts = await self.gather_posts(client, queries, max_items, min_date, max_date)
+            async for post in self.gather_posts(client, queries, max_items, min_date, max_date):
+                posts.append(post)
+            print(posts)
+            return posts
         except Exception as e:
             self.dataset.update_status("Error scraping posts from Telegram")
             self.log.error("Telegram scraping error: %s" % traceback.format_exc())
-            posts = None
+            return []
         finally:
             await client.disconnect()
-
-        return posts
 
     async def gather_posts(self, client, queries, max_items, min_date, max_date):
         """
@@ -234,7 +237,6 @@ class SearchTelegram(Search):
         :param int max_date:  Datetime date to get posts before
         :return list:  List of messages, each message a dictionary.
         """
-        posts = []
 
         for query in queries:
             delay = 10
@@ -242,31 +244,33 @@ class SearchTelegram(Search):
 
             while True:
                 self.dataset.update_status("Fetching messages for entity '%s'" % query)
-                query_posts = []
                 i = 0
                 try:
+                    entity_posts = 0
                     async for message in client.iter_messages(entity=query, offset_date=max_date):
+                        entity_posts += 1
+                        i += 1
                         if self.interrupted:
                             raise ProcessorInterruptedException(
                                 "Interrupted while fetching message data from the Telegram API")
 
-                        if i % 500 == 0:
+                        if entity_posts % 100 == 0:
                             self.dataset.update_status(
-                                "Retrieved %i posts for entity '%s'" % (len(query_posts) + len(posts), query))
+                                "Retrieved %i posts for entity '%s' (%i total)" % (entity_posts, query, i))
 
                         if message.action is not None:
                             # e.g. someone joins the channel - not an actual message
                             continue
 
-                        parsed_message = self.import_message(message, query)
-                        query_posts.append(parsed_message)
-
-                        i += 1
-                        if i > max_items:
-                            break
+                        serialized_message = SearchTelegram.serialize_obj(message)
 
                         # Stop if we're below the min date
-                        if min_date and parsed_message.get("timestamp") < min_date:
+                        if min_date and serialized_message.get("date") < min_date:
+                            break
+
+                        yield serialized_message
+
+                        if entity_posts > max_items:
                             break
 
                 except (ValueError, UsernameInvalidError) as e:
@@ -286,12 +290,9 @@ class SearchTelegram(Search):
                     delay *= 2
                     continue
 
-                posts += list(reversed(query_posts))
                 break
 
-        return posts
-
-    def import_message(self, message, entity):
+    def map_item(message):
         """
         Convert Message object to 4CAT-ready data object
 
@@ -299,17 +300,7 @@ class SearchTelegram(Search):
         :param str entity:  Entity this message was imported from
         :return dict:  4CAT-compatible item object
         """
-        thread = message.to_id
-
-        # determine thread ID (= entity ID)
-        if type(thread) == PeerChannel:
-            thread_id = thread.channel_id
-        elif type(thread) == PeerChat:
-            thread_id = thread.chat_id
-        elif type(thread) == PeerUser:
-            thread_id = thread.user_id
-        else:
-            thread_id = 0
+        thread = message["_chat"]["username"]
 
         # determine username
         # API responses only include the user *ID*, not the username, and to
@@ -317,70 +308,68 @@ class SearchTelegram(Search):
         # has a username. If no username is available, try the first and
         # last name someone has supplied
         fullname = ""
-        if hasattr(message, "sender") and hasattr(message.sender, "username"):
-            username = message.sender.username if message.sender.username else ""
-            fullname = message.sender.first_name if hasattr(message.sender,
-                                                            "first_name") and message.sender.first_name else ""
-            if hasattr(message.sender, "last_name") and message.sender.last_name:
-                fullname += " " + message.sender.last_name
-            user_id = message.sender.id
-            user_is_bot = message.sender.bot if hasattr(message.sender, "bot") else False
-        elif message.from_id:
-            user_id = message.from_id
-            username = None
-            user_is_bot = None
-        else:
-            user_id = "stream"
-            username = None
-            user_is_bot = False
+        username = ""
+        user_id = message.get("_sender", {}).get("id")
+        user_is_bot = message.get("_sender", {}).get("bot", False)
+
+        if message.get("_sender", {}).get("username"):
+            username = message["_sender"]["username"]
+
+        if message.get("_sender", {}).get("first_name"):
+            fullname += message["_sender"]["first_name"]
+
+        if message.get("_sender", {}).get("last_name"):
+            fullname += " " + message["_sender"]["last_name"]
+
+        fullname = fullname.strip()
 
         # determine media type
         # these store some extra information of the attachment in
         # attachment_data. Since the final result will be serialised as a csv
         # file, we can only store text content. As such some media data is
         # serialised as JSON.
-        attachment_type = self.get_media_type(message.media)
+        attachment_type = SearchTelegram.get_media_type(message["media"])
         if attachment_type == "contact":
-            attachment = message.contact
-            attachment_data = json.dumps({property: getattr(attachment, property) for property in
+            attachment = message["media"]["contact"]
+            attachment_data = json.dumps({property: attachment.get(property) for property in
                                           ("phone_number", "first_name", "last_name", "vcard", "user_id")})
 
         elif attachment_type == "document":
             # videos, etc
             # This could add a separate routine for videos to make them a
             # separate type, which could then be scraped later, etc
-            attachment_type = message.media.document.mime_type.split("/")[0]
+            attachment_type = message["media"]["document"]["mime_type"].split("/")[0]
             if attachment_type == "video":
-                attachment = message.document
+                attachment = message["media"]["document"]
                 attachment_data = json.dumps({
-                    "id": attachment.id,
-                    "dc_id": attachment.dc_id,
-                    "file_reference": attachment.file_reference.hex(),
+                    "id": attachment["id"],
+                    "dc_id": attachment["dc_id"],
+                    "file_reference": attachment["file_reference"],
                 })
             else:
                 attachment_data = ""
 
         elif attachment_type in ("geo", "geo_live"):
             # untested whether geo_live is significantly different from geo
-            attachment_data = "%s %s" % (message.geo.lat, message.geo.long)
+            attachment_data = "%s %s" % (message["geo"]["lat"], message["geo"]["long"])
 
         elif attachment_type == "photo":
             # we don't actually store any metadata about the photo, since very
             # little of the metadata attached is of interest. Instead, the
             # actual photos may be downloaded via a processor that is run on the
             # search results
-            attachment = message.photo
+            attachment = message["media"]["photo"]
             attachment_data = json.dumps({
-                "id": attachment.id,
-                "dc_id": attachment.dc_id,
-                "file_reference": attachment.file_reference.hex(),
+                "id": attachment["id"],
+                "dc_id": attachment["dc_id"],
+                "file_reference": attachment["file_reference"],
             })
 
         elif attachment_type == "poll":
             # unfortunately poll results are only available when someone has
             # actually voted on the poll - that will usually not be the case,
             # so we store -1 as the vote count
-            attachment = message.poll
+            attachment = message["media"]["poll"]
             options = {option.option: option.text for option in attachment.poll.answers}
             attachment_data = json.dumps({
                 "question": attachment.poll.question,
@@ -396,57 +385,51 @@ class SearchTelegram(Search):
 
         elif attachment_type == "url":
             # easy!
-            if hasattr(message.web_preview, "url"):
-                attachment_data = message.web_preview.url
-            else:
-                attachment_data = ""
+            attachment_data = message["media"].get("web_preview", {}).get("url", "")
 
         else:
             attachment_data = ""
 
         # was the message forwarded from somewhere and if so when?
-        forwarded = None
-        forwarded_timestamp = None
-        if message.fwd_from:
-            forwarded_timestamp = message.fwd_from.date.timestamp()
+        forwarded = ""
+        forwarded_timestamp = ""
+        if message["fwd_from"]:
+            forwarded_timestamp = int(message["fwd_from"]["date"])
 
-            if message.fwd_from.post_author:
-                forwarded = message.fwd_from.post_author
-            elif message.fwd_from.from_id:
-                forwarded = message.fwd_from.from_id
-            elif message.fwd_from.channel_id:
-                forwarded = message.fwd_from.channel_id
-            else:
-                from_id = "stream"
+            if message["fwd_from"].get("post_author"):
+                forwarded = message["fwd_from"].get("post_author")
+            elif message["fwd_from"].get("from_id"):
+                forwarded = message["fwd_from"].get("from_id").get("user_id", "")
+            elif message["fwd_from"].get("channel_id"):
+                forwarded = message["fwd_from"].get("channel_id")
 
         msg = {
-            "id": message.id,
-            "thread_id": thread_id,
-            "search_entity": entity,
+            "id": message["id"],
+            "thread_id": thread,
+            "chat": message["_chat"]["username"],
             "author": user_id,
             "author_username": username,
             "author_name": fullname,
             "author_is_bot": user_is_bot,
-            "author_forwarded_from": forwarded,
+            "author_forwarded_from": forwarded if forwarded else "",
             "subject": "",
-            "body": message.message,
-            "reply_to": message.reply_to_msg_id,
-            "views": message.views,
-            "timestamp": int(message.date.timestamp()),
-            "timestamp_edited": int(message.edit_date.timestamp()) if message.edit_date else None,
-            "timestamp_forwarded_from": forwarded_timestamp,
-            "grouped_id": message.grouped_id,
+            "body": message["message"],
+            "reply_to": message.get("reply_to_msg_id", ""),
+            "views": message["views"] if message["views"] else "",
+            "timestamp": datetime.fromtimestamp(message["date"]).strftime("%Y-%m-%d %H:%M:%S"),
+            "unix_timestamp": int(message["date"]),
+            "timestamp_edited": datetime.fromtimestamp(message["edit_date"]).strftime("%Y-%m-%d %H:%M:%S") if message["edit_date"] else "",
+            "unix_timestamp_edited": int(message["edit_date"]) if message["edit_date"] else "",
+            "timestamp_forwarded_from": datetime.fromtimestamp(forwarded_timestamp).strftime("%Y-%m-%d %H:%M:%S") if forwarded_timestamp else "",
+            "unix_timestamp_forwarded_from": forwarded_timestamp,
             "attachment_type": attachment_type,
             "attachment_data": attachment_data
         }
 
-        # if not get_full_userinfo:
-        #	del msg["author_name"]
-        #	del msg["author_is_bot"]
-
         return msg
 
-    def get_media_type(self, media):
+    @staticmethod
+    def get_media_type(media):
         """
         Get media type for a Telegram attachment
 
@@ -468,10 +451,59 @@ class SearchTelegram(Search):
                 "MessageMediaUnsupported": "unsupported",
                 "MessageMediaVenue": "venue",
                 "MessageMediaWebPage": "url"
-            }[type(media).__name__]
-        except KeyError:
+            }[media.get("_type", None)]
+        except (AttributeError, KeyError):
             return ""
 
+    @staticmethod
+    def serialize_obj(input_obj):
+        """
+        Serialize an object as a dictionary
+
+        Telethon message objects are not serializable by themselves, but most
+        relevant attributes are simply struct classes. This function replaces
+        those that are not with placeholders and then returns a dictionary that
+        can be serialized as JSON.
+
+        :param obj:  Object to serialize
+        :return:  Serialized object
+        """
+        scalars = (int, str, float, list, tuple, set, dict, bool)
+
+        if type(input_obj) in scalars or input_obj is None:
+            return input_obj
+
+        if type(input_obj) is not dict:
+            obj = input_obj.__dict__
+        else:
+            obj = input_obj.copy()
+
+        mapped_obj = {}
+        for item, value in obj.items():
+            if type(value) is datetime:
+                mapped_obj[item] = value.timestamp()
+            elif type(value).__module__ in ("telethon.tl.types", "telethon.tl.custom.forward"):
+                mapped_obj[item] = SearchTelegram.serialize_obj(value)
+                if type(obj[item]) is not dict:
+                    mapped_obj[item]["_type"] = type(value).__name__
+            elif type(value) is list:
+                mapped_obj[item] = [SearchTelegram.serialize_obj(item) for item in value]
+            elif type(value).__module__[0:8] == "telethon":
+                # some type of internal telethon struct
+                print(type(value).__module__)
+                continue
+            elif type(value) is bytes:
+                mapped_obj[item] = value.hex()
+            elif type(value) not in scalars and value is not None:
+                # type we can't make sense of here
+                print(value)
+                continue
+            else:
+                mapped_obj[item] = value
+
+        return mapped_obj
+
+    @staticmethod
     def validate_query(query, request, user):
         """
         Validate Telegram query
