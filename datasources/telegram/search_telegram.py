@@ -161,7 +161,8 @@ class SearchTelegram(Search):
             await client.start(phone=SearchTelegram.cancel_start)
         except RuntimeError:
             # session is no longer useable, delete file so user will be asked
-            # for security code again
+            # for security code again. The RuntimeError is raised by
+            # `cancel_start()`
             self.dataset.update_status(
                 "Session is not authenticated: login security code may have expired. You need to re-enter the security code.",
                 is_final=True)
@@ -172,7 +173,9 @@ class SearchTelegram(Search):
             if client and hasattr(client, "disconnect"):
                 await client.disconnect()
             return []
-        except Exception as e:
+        except Exception:
+            # not sure what exception specifically is triggered here, but it
+            # always means the connection failed
             self.dataset.update_status("Error connecting to the Telegram API with provided credentials.", is_final=True)
             if client and hasattr(client, "disconnect"):
                 await client.disconnect()
@@ -203,9 +206,10 @@ class SearchTelegram(Search):
         try:
             async for post in self.gather_posts(client, queries, max_items, min_date, max_date):
                 posts.append(post)
-            print(posts)
             return posts
         except Exception as e:
+            # catch-all so we can disconnect properly
+            # ...should we?
             self.dataset.update_status("Error scraping posts from Telegram")
             self.log.error("Telegram scraping error: %s" % traceback.format_exc())
             return []
@@ -248,6 +252,9 @@ class SearchTelegram(Search):
                             # e.g. someone joins the channel - not an actual message
                             continue
 
+                        # todo: possibly enrich object with e.g. the name of
+                        # the channel a message was forwarded from (but that
+                        # needs extra API requests...)
                         serialized_message = SearchTelegram.serialize_obj(message)
 
                         # Stop if we're below the min date
@@ -263,7 +270,7 @@ class SearchTelegram(Search):
                     self.dataset.update_status("Entity %s is private, skipping" % query)
                     self.flawless = False
 
-                except (ValueError, UsernameInvalidError) as e:
+                except (ValueError, UsernameInvalidError):
                     self.dataset.update_status("Could not scrape entity '%s', does not seem to exist, skipping" % query)
                     self.flawless = False
 
