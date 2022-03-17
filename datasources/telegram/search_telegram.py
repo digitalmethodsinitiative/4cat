@@ -290,6 +290,7 @@ class SearchTelegram(Search):
                     self.dataset.update_status(
                         "QUERY '%s' unable to complete due to error %s. Skipping." % (
                         query, str(e)))
+                    self.dataset.set_warn_user(True)
                     break
 
                 except TimeoutError:

@@ -46,6 +46,7 @@ class DataSet(FourcatModule):
 	is_new = True
 	no_status_updates = False
 	staging_area = None
+	warn_user = False
 
 	def __init__(self, parameters={}, key=None, job=None, data=None, db=None, parent=None, extension="csv",
 				 type=None, is_private=True, owner="anonymous"):
@@ -60,6 +61,8 @@ class DataSet(FourcatModule):
 		self.db = db
 		self.folder = Path(config.PATH_ROOT, config.PATH_DATA)
 		self.staging_area = []
+		# Allow partially complete queries to warn user to check log
+		self.warn_user = False
 
 		if key is not None:
 			self.key = key
@@ -367,7 +370,7 @@ class DataSet(FourcatModule):
 		"""
 		return self.folder
 
-	def finish(self, num_rows=0):
+	def finish(self, num_rows=0, warn_user=False):
 		"""
 		Declare the dataset finished
 		"""
@@ -378,6 +381,8 @@ class DataSet(FourcatModule):
 					   data={"is_finished": True, "num_rows": num_rows})
 		self.data["is_finished"] = True
 		self.data["num_rows"] = num_rows
+		if warn_user or self.warn_user:
+			self.update_status('Dataset partially completed; Check log for details.', is_final=True)
 
 	def unfinish(self):
 		"""
@@ -1087,6 +1092,16 @@ class DataSet(FourcatModule):
 		url_to_file = ('https://' if config.FlaskConfig.SERVER_HTTPS else 'http://') + \
 						config.FlaskConfig.SERVER_NAME + '/result/' + filename
 		return url_to_file
+
+	def set_warn_user(self, warn_user):
+		"""
+		When dataset.finish() is called, if this is set as True, a warning will be displayed to the user
+		to check the dataset log for possible issues.
+
+		This can be used if a dataset or processor experienced errors that were deamed not
+		sufficient enough to warrent failing entirely
+		"""
+		self.warn_user = warn_user
 
 
 	def __getattr__(self, attr):
