@@ -17,7 +17,7 @@ from common.lib.helpers import convert_to_int, UserInput
 
 from datetime import datetime
 from telethon import TelegramClient
-from telethon.errors.rpcerrorlist import UsernameInvalidError, TimeoutError
+from telethon.errors.rpcerrorlist import UsernameInvalidError, TimeoutError, ChannelPrivateError, BadRequestError
 from telethon.tl.types import User
 
 import config
@@ -35,13 +35,9 @@ class SearchTelegram(Search):
     is_local = False    # Whether this datasource is locally scraped
     is_static = False   # Whether this datasource is still updated
 
-    # not available as a processor for existing datasets
-    accepts = [None]
-
     # cache
     eventloop = None
-    usermap = {}
-    botmap = {}
+    flawless = True
 
     max_workers = 1
     max_retries = 3
@@ -80,7 +76,7 @@ class SearchTelegram(Search):
         },
         "query-intro": {
             "type": UserInput.OPTION_INFO,
-            "help": "You can scrape up to **25** items at a time. Separate the items with commas or line breaks."
+            "help": "You can scrape up to **25** entities (channels or groups) at a time. Separate with commas or line breaks."
         },
         "query": {
             "type": UserInput.OPTION_TEXT_LARGE,
@@ -146,6 +142,8 @@ class SearchTelegram(Search):
         This is basically what would be done in get_items(), except due to
         Telethon's architecture this needs to be called in an async method,
         which is this one.
+
+        :return list:  Collected messages
         """
         # session file has been created earlier, and we can re-use it here in
         # order to avoid having to re-enter the security code
@@ -261,14 +259,24 @@ class SearchTelegram(Search):
                         if entity_posts >= max_items:
                             break
 
+                except ChannelPrivateError:
+                    self.dataset.update_status("Entity %s is private, skipping" % query)
+                    self.flawless = False
+
                 except (ValueError, UsernameInvalidError) as e:
-                    self.dataset.update_status("Could not scrape entity '%s'" % query)
+                    self.dataset.update_status("Could not scrape entity '%s', does not seem to exist, skipping" % query)
+                    self.flawless = False
+
+                except BadRequestError as e:
+                    self.dataset.update_status("Error '%s' while collecting entity %s, skipping" % (e.__class__.__name__, query))
+                    self.flawless = False
 
                 except TimeoutError:
                     if retries < 3:
                         self.dataset.update_status(
                             "Tried to fetch messages for entity '%s' but timed out %i times. Skipping." % (
                             query, retries))
+                        self.flawless = False
                         break
 
                     self.dataset.update_status(
@@ -565,7 +573,10 @@ class SearchTelegram(Search):
         """
         options = cls.options.copy()
 
-        if user and user.get_value("telegram.can_query_all_messages", False) and "max" in options["max_posts"]:
-            del options["max_posts"]["max"]
+        if user and user.get_value("telegram.can_query_all_messages", False):
+            if "max" in options["max_posts"]:
+                del options["max_posts"]["max"]
+
+            options["query-intro"]["help"] = "You can scrape any entities (channels or groups). Separate with commas or line breaks."
 
         return options
