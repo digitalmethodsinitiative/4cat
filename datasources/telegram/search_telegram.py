@@ -17,7 +17,7 @@ from common.lib.helpers import convert_to_int, UserInput
 
 from datetime import datetime
 from telethon import TelegramClient
-from telethon.errors.rpcerrorlist import UsernameInvalidError, TimeoutError, ChannelPrivateError, BadRequestError
+from telethon.errors.rpcerrorlist import UsernameInvalidError, TimeoutError, ChannelPrivateError, BadRequestError, FloodWaitError
 from telethon.tl.types import User
 
 import config
@@ -150,8 +150,8 @@ class SearchTelegram(Search):
         # order to avoid having to re-enter the security code
         query = self.parameters
 
-        hash_base = query["api_phone"].replace("+", "") + query["api_id"] + query["api_hash"]
-        session_id = hashlib.blake2b(hash_base.encode("ascii")).hexdigest()
+        session_id = SearchTelegram.create_session_id(query["api_phone"], query["api_id"], query["api_hash"])
+        self.dataset.log('Telegram session id: %s' % session_id)
         session_path = Path(config.PATH_ROOT).joinpath(config.PATH_SESSIONS, session_id + ".session")
 
         client = None
@@ -168,15 +168,17 @@ class SearchTelegram(Search):
                 "Session is not authenticated: login security code may have expired. You need to re-enter the security code.",
                 is_final=True)
 
+            if client and hasattr(client, "disconnect"):
+                await client.disconnect()
+
             if session_path.exists():
                 session_path.unlink()
 
-            if client and hasattr(client, "disconnect"):
-                await client.disconnect()
             return []
-        except Exception:
+        except Exception as e:
             # not sure what exception specifically is triggered here, but it
             # always means the connection failed
+            self.log.error("Telegram: %s\n%s" % (str(e), traceback.format_exc()))
             self.dataset.update_status("Error connecting to the Telegram API with provided credentials.", is_final=True)
             if client and hasattr(client, "disconnect"):
                 await client.disconnect()
@@ -274,6 +276,16 @@ class SearchTelegram(Search):
                 except (ValueError, UsernameInvalidError):
                     self.dataset.update_status("Could not scrape entity '%s', does not seem to exist, skipping" % query)
                     self.flawless = False
+
+                except FloodWaitError as e:
+                    self.dataset.update_status("Rate-limited by Telegram: %s; waiting" % str(e))
+                    if e.seconds < 600:
+                        time.sleep(e.seconds)
+                        continue
+                    else:
+                        self.log.error(str(e))
+                        self.dataset.update_status("Rate-limited by Telegram; requires waiting %i minutes, skipping" % int(e.seconds/60))
+                        break
 
                 except BadRequestError as e:
                     self.dataset.update_status("Error '%s' while collecting entity %s, skipping" % (e.__class__.__name__, query))
@@ -563,6 +575,22 @@ class SearchTelegram(Search):
             "min_date": min_date,
             "max_date": max_date
         }
+
+    @staticmethod
+    def create_session_id(api_phone, api_id, api_hash):
+        """
+        Generate a filename for the session file
+
+        This is a combination of phone number and API credentials, but hashed
+        so that one cannot actually derive someone's phone number from it.
+
+        :param str api_phone:  Phone number for API ID
+        :param int api_id:  Telegram API ID
+        :param str api_hash:  Telegram API Hash
+        :return str: A hash value derived from the input
+        """
+        hash_base = api_phone.strip().replace("+", "") + str(api_id).strip() + api_hash.strip()
+        return hashlib.blake2b(hash_base.encode("ascii")).hexdigest()
 
     @classmethod
     def get_options(cls=None, parent_dataset=None, user=None):

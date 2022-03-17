@@ -10,6 +10,8 @@ from pathlib import Path
 from telethon.sync import TelegramClient
 from telethon.errors.rpcerrorlist import FloodWaitError, ApiIdInvalidError, PhoneNumberInvalidError
 
+from datasources.telegram.search_telegram import SearchTelegram
+
 import config
 
 def authenticate(request, user, **kwargs):
@@ -38,8 +40,7 @@ def authenticate(request, user, **kwargs):
 	# Sessions are important because they are the way we don't need to enter
 	# the security code all the time. If we've tried logging in earlier use
 	# the same session again.
-	hash_base = kwargs["api_phone"] + kwargs["api_id"] + kwargs["api_hash"]
-	session_id = hashlib.blake2b(hash_base.encode("ascii")).hexdigest()
+	session_id = SearchTelegram.create_session_id(kwargs["api_phone"], kwargs["api_id"], kwargs["api_hash"])
 
 	# store session ID for user so it can be found again for later queries
 	user.set_value("telegram.session", session_id)
