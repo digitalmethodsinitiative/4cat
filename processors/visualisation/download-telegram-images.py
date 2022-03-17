@@ -37,6 +37,7 @@ class TelegramImageDownloader(BasicProcessor):
     extension = "zip"  # extension of result file, used internally and in UI
 
     max_number_images = int(config.MAX_NUMBER_IMAGES) if hasattr(config, 'MAX_NUMBER_IMAGES') else 1000
+    flawless = True
 
     options = {
         "amount": {
@@ -166,10 +167,11 @@ class TelegramImageDownloader(BasicProcessor):
                         await client.download_media(message, str(path), thumb=-1)
                     msg_id = message.id
                     success = True
-                except (AttributeError, RuntimeError):
+                except (AttributeError, RuntimeError, ValueError) as e:
                     filename = "%s-index-%i" % (entity, media_done)
                     msg_id = str(message.id) if hasattr(message, "id") else "with index %i" % media_done
-                    self.dataset.log("Could not download image for message %s" % msg_id)
+                    self.dataset.log("Could not download image for message %s (%s)" % (msg_id, str(e)))
+                    self.flawless = False
 
                 media_done += 1
                 self.metadata[filename] = {
@@ -191,3 +193,26 @@ class TelegramImageDownloader(BasicProcessor):
         told they need to re-authenticate via 4CAT.
         """
         raise RuntimeError("Connection cancelled")
+
+    @classmethod
+    def get_options(cls=None, parent_dataset=None, user=None):
+        """
+        Get processor options
+
+        This method by default returns the class's "options" attribute, but
+        will lift the limit on the amount of images collected from Telegram
+        user requesting the options has been configured as such.
+
+        :param DataSet parent_dataset:  An object representing the dataset that
+        the processor would be run on
+        :param User user:  Flask user the options will be displayed for, in
+        case they are requested for display in the 4CAT web interface. This can
+        be used to show some options only to privileges users.
+        """
+        options = cls.options.copy()
+
+        if user and user.get_value("telegram.can_query_all_messages", False):
+            if "max" in options["amount"]:
+                del options["amount"]["max"]
+
+        return options

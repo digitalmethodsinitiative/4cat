@@ -395,7 +395,7 @@ class SearchTelegram(Search):
                 "dc_id": attachment["dc_id"],
                 "file_reference": attachment["file_reference"],
             })
-            attachment_filename = thread + "-" + message["id"] + ".jpeg"
+            attachment_filename = thread + "-" + str(message["id"]) + ".jpeg"
 
         elif attachment_type == "poll":
             # unfortunately poll results are only available when someone has

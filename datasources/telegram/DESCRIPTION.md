@@ -1,17 +1,20 @@
 The Telegram data source collects messages from channels or groups. You can optionally only collect messages within a 
-given date range, or only a given amount of messages per channel/group. Note that due to how Telegram works, you need 
-to know what channels or groups you want to collect data from before you collect it; you cannot search by keyword as 
-you can for some other platforms. 
+given date range, or only a given amount of messages per channel/group. 
 
-Telegram data is collected via Telegram's [official API](https://core.telegram.org/). This is done using the [Telethon 
+Note that due to how Telegram works, you need to know what channels or groups you want to collect data from before you 
+collect it; you cannot search by keyword as you can for some other platforms. You can, however, use the search function 
+in the Telegram app to find groups and channels, and then collect messages from the ones you find with 4CAT.
+
+Telegram data is collected via Telegram's [official API](https://core.telegram.org/) via the
+[MTProto](https://core.telegram.org/mtproto) protocol. This is done using the [Telethon 
 library](https://docs.telethon.dev/) for Python. Everything that happens in a channel or group within the parameters 
 is collected, though "actions" (such as someone joining or leaving a channel) are ignored. The resulting dataset then 
 comprises messages from users and their metadata. 
 
 ### Data format
 Messages are saved as JSON objects, combined in one [NDJSON](http://ndjson.org/) file. For each message, the object 
-collected with Telethon is mapped to JSON. For each message, a lot of information is included, more than can be 
-explained here. The data is roughly congruent with [this 
+collected with Telethon is mapped to JSON. A lot of information is included per message, more than can be explained 
+here. The data is roughly congruent with [this 
 documentation](https://docs.telethon.dev/en/stable/modules/custom.html#telethon.tl.custom.message.Message). Most 
 metadata you may be interested in is included or can be derived from the included data.
 
