@@ -76,7 +76,8 @@ class SearchTelegram(Search):
         },
         "query-intro": {
             "type": UserInput.OPTION_INFO,
-            "help": "You can scrape up to **25** entities (channels or groups) at a time. Separate with commas or line breaks."
+            "help": "You can collect messages from up to **25** entities (channels or groups) at a time. Separate with "
+                    "commas or line breaks."
         },
         "query": {
             "type": UserInput.OPTION_TEXT_LARGE,
@@ -584,6 +585,6 @@ class SearchTelegram(Search):
             if "max" in options["max_posts"]:
                 del options["max_posts"]["max"]
 
-            options["query-intro"]["help"] = "You can scrape any entities (channels or groups). Separate with commas or line breaks."
+            options["query-intro"]["help"] = "You can collect messages from multiple entities (channels or groups). Separate with commas or line breaks."
 
         return options
