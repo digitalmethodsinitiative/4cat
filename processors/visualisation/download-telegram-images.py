@@ -32,8 +32,8 @@ class TelegramImageDownloader(BasicProcessor):
     category = "Visual"  # category
     title = "Download Telegram images"  # title displayed in UI
     description = "Download images and store in a zip file. Downloads through the Telegram API might take a while. " \
-                  "Note that not always all images can be retrieved. A JSON metadata file is " \
-                  "included in the output archive."  # description displayed in UI
+                  "Note that not always all images can be retrieved. A JSON metadata file is included in the output " \
+                  "archive."  # description displayed in UI
     extension = "zip"  # extension of result file, used internally and in UI
 
     max_number_images = int(config.MAX_NUMBER_IMAGES) if hasattr(config, 'MAX_NUMBER_IMAGES') else 1000
@@ -45,6 +45,11 @@ class TelegramImageDownloader(BasicProcessor):
             "default": 100,
             "min": 0,
             "max": max_number_images
+        },
+        "video-thumbnails": {
+            "type": UserInput.OPTION_TOGGLE,
+            "help": "Include videos (as thumbnails)",
+            "default": False
         }
     }
 
@@ -97,6 +102,7 @@ class TelegramImageDownloader(BasicProcessor):
         session_id = hashlib.blake2b(hash_base.encode("ascii")).hexdigest()
         session_path = Path(config.PATH_ROOT).joinpath(config.PATH_SESSIONS, session_id + ".session")
         amount = self.parameters.get("amount")
+        with_thumbnails = self.parameters.get("video-thumbnails")
         client = None
 
         # we need a session file, otherwise we can't retrieve the necessary data
@@ -117,14 +123,16 @@ class TelegramImageDownloader(BasicProcessor):
 
         # figure out which messages from the dataset we need to download media
         # for. Right now, that's everything with a non-empty `photo` attachment
+        # or `video` if we're also including thumbnails
         messages_with_photos = {}
+        downloadable_types = ("photo",) if not with_thumbnails else ("photo", "video")
         total_media = 0
         self.dataset.update_status("Finding messages with image attachments")
         for message in self.source_dataset.iterate_items(self):
             if self.interrupted:
                 raise ProcessorInterruptedException("Interrupted while processing messages")
 
-            if not message.get("attachment_data") or message.get("attachment_type") != "photo":
+            if not message.get("attachment_data") or message.get("attachment_type") not in downloadable_types:
                 continue
 
             if message["chat"] not in messages_with_photos:
@@ -151,7 +159,11 @@ class TelegramImageDownloader(BasicProcessor):
                     self.dataset.update_status("Downloading media %i/%i" % (media_done, total_media))
                     path = self.staging_area.joinpath("%s-%i.jpeg" % (entity, message.id))
                     filename = path.name
-                    await message.download_media(str(path))
+                    if hasattr(message.media, "photo"):
+                        await message.download_media(str(path))
+                    else:
+                        # video thumbnail
+                        await client.download_media(message, str(path), thumb=-1)
                     msg_id = message.id
                     success = True
                 except (AttributeError, RuntimeError):

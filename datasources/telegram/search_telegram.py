@@ -18,7 +18,7 @@ from common.lib.helpers import convert_to_int, UserInput
 from datetime import datetime
 from telethon import TelegramClient
 from telethon.errors.rpcerrorlist import UsernameInvalidError, TimeoutError
-from telethon.tl.types import User, PeerChannel, PeerChat, PeerUser
+from telethon.tl.types import User
 
 import config
 
@@ -109,7 +109,7 @@ class SearchTelegram(Search):
                     "attached to the messages in your collected data, you need to enable this option. Your "
                     "credentials will never be visible to other users and can be erased later via the result page."
         },
-        "save-sensitive": {
+        "save-session": {
             "type": UserInput.OPTION_TOGGLE,
             "help": "Save session:",
             "default": False
@@ -132,7 +132,7 @@ class SearchTelegram(Search):
 
         results = asyncio.run(self.execute_queries())
 
-        if not query.get("save-sensitive"):
+        if not query.get("save-session"):
             self.dataset.delete_parameter("api_hash", instant=True)
             self.dataset.delete_parameter("api_phone", instant=True)
             self.dataset.delete_parameter("api_id", instant=True)
@@ -157,22 +157,10 @@ class SearchTelegram(Search):
 
         client = None
 
-        def cancel_start():
-            """
-            Replace interactive phone number input in Telethon
-
-            By default, if Telethon cannot use the given session file to
-            authenticate, it will interactively prompt the user for a phone
-            number on the command line. That is not useful here, so instead
-            raise a RuntimeError. This will be caught below and the user will
-            be told they need to re-authenticate via 4CAT.
-            """
-            raise RuntimeError("Connection cancelled")
-
         try:
             client = TelegramClient(str(session_path), int(query.get("api_id")), query.get("api_hash"),
                                     loop=self.eventloop)
-            await client.start(phone=cancel_start)
+            await client.start(phone=SearchTelegram.cancel_start)
         except RuntimeError:
             # session is no longer useable, delete file so user will be asked
             # for security code again
@@ -270,7 +258,7 @@ class SearchTelegram(Search):
 
                         yield serialized_message
 
-                        if entity_posts > max_items:
+                        if entity_posts >= max_items:
                             break
 
                 except (ValueError, UsernameInvalidError) as e:
@@ -292,12 +280,25 @@ class SearchTelegram(Search):
 
                 break
 
+    @staticmethod
+    def cancel_start():
+        """
+        Replace interactive phone number input in Telethon
+
+        By default, if Telethon cannot use the given session file to
+        authenticate, it will interactively prompt the user for a phone
+        number on the command line. That is not useful here, so instead
+        raise a RuntimeError. This will be caught below and the user will
+        be told they need to re-authenticate via 4CAT.
+        """
+        raise RuntimeError("Connection cancelled")
+
+    @staticmethod
     def map_item(message):
         """
         Convert Message object to 4CAT-ready data object
 
         :param Message message:  Message to parse
-        :param str entity:  Entity this message was imported from
         :return dict:  4CAT-compatible item object
         """
         thread = message["_chat"]["username"]
@@ -329,6 +330,8 @@ class SearchTelegram(Search):
         # file, we can only store text content. As such some media data is
         # serialised as JSON.
         attachment_type = SearchTelegram.get_media_type(message["media"])
+        attachment_filename = ""
+
         if attachment_type == "contact":
             attachment = message["media"]["contact"]
             attachment_data = json.dumps({property: attachment.get(property) for property in
@@ -364,20 +367,21 @@ class SearchTelegram(Search):
                 "dc_id": attachment["dc_id"],
                 "file_reference": attachment["file_reference"],
             })
+            attachment_filename = thread + "-" + message["id"] + ".jpeg"
 
         elif attachment_type == "poll":
             # unfortunately poll results are only available when someone has
             # actually voted on the poll - that will usually not be the case,
             # so we store -1 as the vote count
-            attachment = message["media"]["poll"]
-            options = {option.option: option.text for option in attachment.poll.answers}
+            attachment = message["media"]
+            options = {option["option"]: option["text"] for option in attachment["poll"]["answers"]}
             attachment_data = json.dumps({
-                "question": attachment.poll.question,
-                "voters": attachment.results.total_voters,
+                "question": attachment["poll"]["question"],
+                "voters": attachment["results"]["total_voters"],
                 "answers": [{
-                    "answer": options[answer.option],
-                    "votes": answer.voters
-                } for answer in attachment.results.results] if attachment.results.results else [{
+                    "answer": options[answer["option"]],
+                    "votes": answer["voters"]
+                } for answer in attachment["results"]["results"]] if attachment["results"]["results"] else [{
                     "answer": options[option],
                     "votes": -1
                 } for option in options]
@@ -412,7 +416,6 @@ class SearchTelegram(Search):
             "author_name": fullname,
             "author_is_bot": user_is_bot,
             "author_forwarded_from": forwarded if forwarded else "",
-            "subject": "",
             "body": message["message"],
             "reply_to": message.get("reply_to_msg_id", ""),
             "views": message["views"] if message["views"] else "",
@@ -423,7 +426,8 @@ class SearchTelegram(Search):
             "timestamp_forwarded_from": datetime.fromtimestamp(forwarded_timestamp).strftime("%Y-%m-%d %H:%M:%S") if forwarded_timestamp else "",
             "unix_timestamp_forwarded_from": forwarded_timestamp,
             "attachment_type": attachment_type,
-            "attachment_data": attachment_data
+            "attachment_data": attachment_data,
+            "attachment_filename": attachment_filename
         }
 
         return msg
@@ -490,13 +494,11 @@ class SearchTelegram(Search):
                 mapped_obj[item] = [SearchTelegram.serialize_obj(item) for item in value]
             elif type(value).__module__[0:8] == "telethon":
                 # some type of internal telethon struct
-                print(type(value).__module__)
                 continue
             elif type(value) is bytes:
                 mapped_obj[item] = value.hex()
             elif type(value) not in scalars and value is not None:
                 # type we can't make sense of here
-                print(value)
                 continue
             else:
                 mapped_obj[item] = value
@@ -541,7 +543,7 @@ class SearchTelegram(Search):
             "api_id": query.get("api_id"),
             "api_hash": query.get("api_hash"),
             "api_phone": query.get("api_phone"),
-            "save-sensitive": query.get("save-sensitive"),
+            "save-session": query.get("save-session"),
             "min_date": min_date,
             "max_date": max_date
         }
