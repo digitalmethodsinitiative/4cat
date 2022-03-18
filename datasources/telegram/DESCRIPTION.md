@@ -5,11 +5,17 @@ Note that due to how Telegram works, you need to know what channels or groups yo
 collect it; you cannot search by keyword as you can for some other platforms. You can, however, use the search function 
 in the Telegram app to find groups and channels, and then collect messages from the ones you find with 4CAT.
 
+### Technical details and caveats
 Telegram data is collected via Telegram's [official API](https://core.telegram.org/) via the
 [MTProto](https://core.telegram.org/mtproto) protocol. This is done using the [Telethon 
 library](https://docs.telethon.dev/) for Python. Everything that happens in a channel or group within the parameters 
 is collected, though "actions" (such as someone joining or leaving a channel) are ignored. The resulting dataset then 
 comprises messages from users and their metadata. 
+
+If a message contains an attachment, the metadata of that attachment is recorded. This can then be used to download e.g.
+the attached image, but only if the 'Save session' option was checked when creating the dataset. If a message contains 
+multiple attachments, these are included and counted as separate messages (one of these will contain the actual message 
+text).
 
 ### Data format
 Messages are saved as JSON objects, combined in one [NDJSON](http://ndjson.org/) file. For each message, the object 
