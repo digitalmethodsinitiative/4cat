@@ -99,7 +99,7 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
                 "final_url": None,
                 "subject": None,
                 "body": None,
-                "visible_text": None,
+                "html": None,
                 "detected_404": None,
                 "timestamp": None,
                 "error": '',
@@ -195,9 +195,9 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
 
                 # Update result and yield it
                 result['final_url'] = scraped_page.get('final_url')
-                result['body'] = scraped_page.get('page_source')
+                result['body'] = scraped_page.get('text')
                 result['subject'] = scraped_page.get('page_title')
-                result['visible_text'] = scraped_page.get('text')
+                result['html'] = scraped_page.get('page_source')
                 result['detected_404'] = scraped_page.get('detected_404')
                 result['timestamp'] = int(datetime.datetime.now().timestamp())
                 result['error'] = scraped_page.get('error') # This should be None...
@@ -206,9 +206,9 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
                     try:
                         http_response = self.request_get_w_error_handling(scraped_page.get('final_url'), timeout=120)
                         self.dataset.log('Collected HTTP response: %s' % scraped_page.get('final_url'))
-                        result['body'] = 'SELENIUM RESPONSE:\n' + str(result['body']) + '\nHTTP RESPONSE:\n' + http_response.text
+                        result['html'] = 'SELENIUM RESPONSE:\n' + str(result['html']) + '\nHTTP RESPONSE:\n' + http_response.text
                     except Exception as e:
-                        result['body'] = 'SELENIUM RESPONSE:\n' + str(result['body']) + '\nHTTP RESPONSE:\nNone'
+                        result['html'] = 'SELENIUM RESPONSE:\n' + str(result['html']) + '\nHTTP RESPONSE:\nNone'
                         http_error = '\nHTTP ERROR:\n' + str(e)
                         result['error'] = 'SELENIUM ERROR:\n' + str(result['error']) + http_error
 
