@@ -26,10 +26,10 @@ class UrlUnshortener(BasicProcessor):
     type = "expand-url-shorteners"  # job type ID
     category = "Filtering"  # category
     title = "Expand shortened URLs"  # title displayed in UI
-    description = "Expand shortened URLs. Replaces any URL in the dataset's 'body' field that is recognised as a " \
-                  "shortened URL with the URL it redirects to. URLs are resolved recursively up to a depth of 5 " \
+    description = "Replaces any URL in the dataset's 'body' field that is recognised as a " \
+                  "shortened URL with the URL it redirects to. URLs are followed up to a depth of 5 " \
                   "links. This can take a long time for large datasets, and it is not recommended to run this " \
-                  "processor on datasets larger than 10,000 items. Creates a new dataset with expanded URLs in place " \
+                  "processor on datasets larger than 10,000 items. This creates a new dataset with expanded URLs in place " \
                   "of redirects."
     extension = "csv"  # extension of result file, used internally and in UI
 

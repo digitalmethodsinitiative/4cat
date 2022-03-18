@@ -32,8 +32,8 @@ class YouTubeMetadata(BasicProcessor):
 
 	type = "youtube-metadata"  # job type ID
 	category = "Post metrics" # category
-	title = "YouTube URL metadata"  # title displayed in UI
-	description = "Extract information from YouTube links to videos and channels"  # description displayed in UI
+	title = "Extract YouTube metadata"  # title displayed in UI
+	description = "Extract information from YouTube videos and channels linked-to in the dataset"  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
 	max_retries = 3
@@ -51,17 +51,18 @@ class YouTubeMetadata(BasicProcessor):
 		"top": {
 			"type": UserInput.OPTION_TEXT,
 			"default": 100,
-			"help": "Top n most-frequently referenced videos/channels (0 = all)"
+			"help": "Amount of most linked-to videos and channels to include (0 = all)"
 		},
 		"min": {
 			"type": UserInput.OPTION_TEXT,
 			"default": 0,
-			"help": "Times a video/channel must be referenced (0 = all)"
+			"help": "Times a video or channel must be linked-to (0 = all)"
 		},
 		"custom-key": {
 			"type": UserInput.OPTION_TEXT,
 			"default": "",
-			"help": "Optional: A custom YouTube API key. Leave empty for 4CAT's API key."
+			"help": "YouTube API key (optional)"
+			"tooltip": "You can insert your personal API key here. Leave empty to use the API key of the administrators of this 4CAT installation."
 		}
 	}
 

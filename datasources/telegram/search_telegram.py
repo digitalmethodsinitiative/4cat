@@ -16,7 +16,7 @@ from common.lib.helpers import convert_to_int, UserInput
 
 from datetime import datetime
 from telethon import TelegramClient
-from telethon.errors.rpcerrorlist import UsernameInvalidError, TimeoutError
+from telethon.errors.rpcerrorlist import UsernameInvalidError, TimeoutError, ChannelPrivateError, FloodWaitError
 from telethon.tl.types import User, PeerChannel, PeerChat, PeerUser
 
 import config
@@ -31,6 +31,8 @@ class SearchTelegram(Search):
     title = "Telegram API search"  # title displayed in UI
     description = "Scrapes messages from open Telegram groups via its API."  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
+    is_local = False    # Whether this datasource is locally scraped
+    is_static = False   # Whether this datasource is still updated
 
     # not available as a processor for existing datasets
     accepts = [None]
@@ -133,7 +135,7 @@ class SearchTelegram(Search):
             self.dataset.delete_parameter("api_hash", instant=True)
             self.dataset.delete_parameter("api_phone", instant=True)
             self.dataset.delete_parameter("api_id", instant=True)
-            
+
         return results
 
     async def execute_queries(self):
@@ -148,8 +150,8 @@ class SearchTelegram(Search):
         # order to avoid having to re-enter the security code
         query = self.parameters
 
-        hash_base = query["api_phone"].replace("+", "") + query["api_id"] + query["api_hash"]
-        session_id = hashlib.blake2b(hash_base.encode("ascii")).hexdigest()
+        session_id = self.create_session_id(query["api_phone"], query["api_id"], query["api_hash"])
+        self.dataset.log('Telegram session id: %s' % session_id)
         session_path = Path(config.PATH_ROOT).joinpath(config.PATH_SESSIONS, session_id + ".session")
 
         client = None
@@ -170,20 +172,23 @@ class SearchTelegram(Search):
             client = TelegramClient(str(session_path), int(query.get("api_id")), query.get("api_hash"),
                                     loop=self.eventloop)
             await client.start(phone=cancel_start)
-        except RuntimeError:
+        except RuntimeError as e:
             # session is no longer useable, delete file so user will be asked
             # for security code again
+            self.log.warning("Telegram RuntimeError: %s" % str(e))
             self.dataset.update_status(
                 "Session is not authenticated: login security code may have expired. You need to re-enter the security code.",
                 is_final=True)
 
+            if client and hasattr(client, "disconnect"):
+                await client.disconnect()
+
             if session_path.exists():
                 session_path.unlink()
 
-            if client and hasattr(client, "disconnect"):
-                await client.disconnect()
             return None
         except Exception as e:
+            self.log.error("Telegram: %s\n%s" % (str(e), traceback.format_exc()))
             self.dataset.update_status("Error connecting to the Telegram API with provided credentials.", is_final=True)
             if client and hasattr(client, "disconnect"):
                 await client.disconnect()
@@ -193,7 +198,7 @@ class SearchTelegram(Search):
         parameters = self.dataset.get_parameters()
         queries = [query.strip() for query in parameters.get("query", "").split(",")]
         max_items = convert_to_int(parameters.get("items", 10), 10)
-        
+
         # Telethon requires the offset date to be a datetime date
         max_date = parameters.get("max_date")
         if max_date:
@@ -201,7 +206,7 @@ class SearchTelegram(Search):
                 max_date = datetime.fromtimestamp(int(max_date))
             except ValueError:
                 max_date = None
-        
+
         # min_date can remain an integer
         min_date = parameters.get("min_date")
         if min_date:
@@ -209,11 +214,11 @@ class SearchTelegram(Search):
                 min_date = int(min_date)
             except ValueError:
                 min_date = None
-        
+
         try:
             posts = await self.gather_posts(client, queries, max_items, min_date, max_date)
         except Exception as e:
-            self.dataset.update_status("Error scraping posts from Telegram")
+            self.dataset.update_status("Error scraping posts from Telegram: %s" % str(e))
             self.log.error("Telegram scraping error: %s" % traceback.format_exc())
             posts = None
         finally:
@@ -269,6 +274,23 @@ class SearchTelegram(Search):
 
                 except (ValueError, UsernameInvalidError) as e:
                     self.dataset.update_status("Could not scrape entity '%s'" % query)
+
+                except FloodWaitError as e:
+                    self.dataset.update_status("Telegram FloodWaitError: %s; Waiting" % str(e))
+                    if e.seconds < 600:
+                        time.sleep(e.seconds)
+                        continue
+                    else:
+                        self.log.error(str(e))
+                        self.dataset.update_status("Telegram wait grown large than %i minutes" % int(e.seconds/60))
+                        posts = None
+                        break
+
+                except ChannelPrivateError as e:
+                    self.dataset.update_status(
+                        "QUERY '%s' unable to complete due to error %s. Skipping." % (
+                        query, str(e)))
+                    break
 
                 except TimeoutError:
                     if retries < 3:
@@ -511,6 +533,11 @@ class SearchTelegram(Search):
             "min_date": min_date,
             "max_date": max_date
         }
+
+    @staticmethod
+    def create_session_id(api_phone, api_id, api_hash):
+        hash_base = api_phone.strip().replace("+", "") + api_id.strip() + api_hash.strip()
+        return hashlib.blake2b(hash_base.encode("ascii")).hexdigest()
 
     @classmethod
     def get_options(cls=None, parent_dataset=None, user=None):

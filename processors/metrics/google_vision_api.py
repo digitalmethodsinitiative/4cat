@@ -27,7 +27,7 @@ class GoogleVisionAPIFetcher(BasicProcessor):
     Request tags and labels from the Google Vision API for a given set of images
     """
     type = "google-vision-api"  # job type ID
-    category = "Metrics"  # category
+    category = "Post metrics"  # category
     title = "Google Vision API Analysis"  # title displayed in UI
     description = "Use the Google Vision API to annotate images with tags and labels identified via machine learning. " \
                   "One request will be made per image per annotation type. Note that this is NOT a free service and " \

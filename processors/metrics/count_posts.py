@@ -18,7 +18,7 @@ class CountPosts(BasicProcessor):
 	type = "count-posts"  # job type ID
 	category = "Post metrics" # category
 	title = "Count posts"  # title displayed in UI
-	description = "Counts how many posts are in the query overall or per timeframe."  # description displayed in UI
+	description = "Counts how many posts are in the dataset (overall or per timeframe)."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
 	options = {
@@ -31,8 +31,8 @@ class CountPosts(BasicProcessor):
 		"pad": {
 			"type": UserInput.OPTION_TOGGLE,
 			"default": True,
-			"help": "Make time series continuous - add intervals if no data is available",
-			"tooltip": "For example, if there are posts for May and July but not June, June will be included as having 0 posts."
+			"help": "Include dates where the count is zero",
+			"tooltip": "Makes the counts continuous. For example, if there are posts in May and July but not June, June will be included with 0 posts."
 		}
 	}
 

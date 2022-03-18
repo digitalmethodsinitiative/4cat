@@ -7,7 +7,6 @@ and to show how many posts a local datasource contains.
 from datetime import datetime, time, timezone
 
 from backend.abstract.worker import BasicWorker
-from common.lib.dataset import DataSet
 
 import config
 
@@ -51,10 +50,15 @@ class DatasourceMetrics(BasicWorker):
 
 		for datasource_id in self.all_modules.datasources:
 
-			datasource = self.all_modules.datasources[datasource_id]
+			datasource = self.all_modules.workers.get(datasource_id + "-search")
+			if not datasource:
+				continue
 
+			is_local = True if hasattr(datasource, "is_local") and datasource.is_local else False
+			is_static = True if hasattr(datasource, "is_static") and datasource.is_static else False
+			
 			# Only update local datasources
-			if datasource.get("is_local"):
+			if is_local:
 
 				boards = config.DATASOURCES[datasource_id].get("boards")
 
@@ -64,7 +68,7 @@ class DatasourceMetrics(BasicWorker):
 				# If a datasource is static (so not updated) and it
 				# is already present in the metrics table, we don't
 				# need to update its metrics anymore.
-				if datasource.get("is_static") and datasource_id in added_datasources:
+				if is_static and datasource_id in added_datasources:
 						continue
 				else:
 
@@ -91,7 +95,7 @@ class DatasourceMetrics(BasicWorker):
 
 						# If the datasource is dynamic, we also only update days
 						# that haven't been added yet - these are heavy queries.
-						if not datasource.get("is_static"):
+						if not is_static:
 							
 							days_added = self.db.fetchall("SELECT date FROM metrics WHERE datasource = '%s' AND board = '%s' AND metric = 'posts_per_day';" % (datasource_id, board))
 

@@ -22,8 +22,14 @@ class SearchWithTwitterAPIv2(Search):
     """
     type = "twitterv2-search"  # job ID
     extension = "ndjson"
+    is_local = False    # Whether this datasource is locally scraped
+    is_static = False   # Whether this datasource is still updated
 
     previous_request = 0
+
+    references = [
+        "[Twitter API documentation](https://developer.twitter.com/en/docs/twitter-api)"
+    ]
 
     options = {
         "intro-1": {

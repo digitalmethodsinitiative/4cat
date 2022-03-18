@@ -32,7 +32,7 @@ class IsometricMultigraphRenderer(BasicProcessor):
 	type = "render-graphs-isometric"  # job type ID
 	category = "Visual"  # category
 	title = "Side-by-side graphs"  # title displayed in UI
-	description = "Generate area graphs showing prevalence per item over time and project these side-by-side on an isometric plane for easy comparison."  # description displayed in UI
+	description = "Generate area graphs showing prevalence per item over time. These are visualised side-by-side on an isometric plane for easy comparison."  # description displayed in UI
 	extension = "svg"  # extension of result file, used internally and in UI
 
 	options = {
@@ -45,7 +45,7 @@ class IsometricMultigraphRenderer(BasicProcessor):
 			"type": UserInput.OPTION_TOGGLE,
 			"default": True,
 			"help": "Normalise values to 0-100% for each graph",
-			"tooltip": "This allows for easier trend comparison, but note that absolute prevalence is no longer visible when this is enabled."
+			"tooltip": "This allows for easier trend comparison (but absolute counts cannot be compared anymore)."
 		},
 		"top": {
 			"type": UserInput.OPTION_TEXT,
@@ -53,7 +53,7 @@ class IsometricMultigraphRenderer(BasicProcessor):
 			"max": 50,
 			"default": 10,
 			"help": "Cut-off for top list",
-			"tooltip": "Only the most-occuring items are retained. Sorted by total amount of occurences (i.e. all frequencies per item, summed)."
+			"tooltip": "Only the most-occuring items are retained. Sorted by total amount of occurences (i.e. all frequencies per item)."
 		},
 		"complete": {
 			"type": UserInput.OPTION_TEXT,

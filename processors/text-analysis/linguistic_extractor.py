@@ -27,8 +27,12 @@ class LinguisticFeatures(BasicProcessor):
 	"""
 	type = "linguistic-features"  # job type ID
 	category = "Text analysis"  # category
-	title = "Linguistic features"  # title displayed in UI
-	description = "Annotate your text with a variety of linguistic features, including part-of-speech tagging, depencency parsing, and named entity recognition. Subsequent modules can add identified tags and nouns to the original data file. Uses the SpaCy library and the en_core_web_sm model. Currently only available for datasets with less than 100.000 items. Texts are cutoff if they are over 100.000 characters."  # description displayed in UI
+	title = "Annotate text features with SpaCy"  # title displayed in UI
+	description = "Annotate your text with a variety of linguistic features using the SpaCy library, " \
+				  "including part-of-speech tagging, depencency parsing, and named entity recognition. " \
+				  "Subsequent processors can extract the words labelled by SpaCy (e.g. as a noun or name). " \
+				  "Produces a Doc file using the en_core_web_sm model. Currently only available for datasets " \
+				  "with less than 100,000 items. " # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
 
 	references = [
@@ -40,9 +44,9 @@ class LinguisticFeatures(BasicProcessor):
 			"type": UserInput.OPTION_MULTI,
 			"default": [],
 			"options": {
-				"tagger": "Part-of-speech tagging: Tags the kind of words in a sentence, like nouns and verbs",
+				"tagger": "Part-of-speech tagging: Tag the grammatical function of words, like nouns and verbs",
 				"parser": "Dependency parsing: Extract how words in a sentence relate to each other",
-				"ner": "Named entity recognition: Labels what kind of objects appear in a sentence (e.g. Apple -> Organisation)"
+				"ner": "Named entity recognition: Annotate what kind of objects appear in a sentence (e.g. Apple -> Organisation)"
 			},
 			"help": "What linguistic features to extract. Without any of these selected, it simply saves the SpaCy docs (tokenised sentences) as a serialized file. See references for more information."
 		}
@@ -91,7 +95,7 @@ class LinguisticFeatures(BasicProcessor):
 			self.dataset.update_status("Extracting linguistic features")
 		else:
 			self.dataset.update_status(
-				"Extracting linguistic features is currently only available for datasets with less than 100.000 items.")
+				"Extracting linguistic features is currently only available for datasets with less than 100,000 items.")
 			self.dataset.finish(0)
 			return
 

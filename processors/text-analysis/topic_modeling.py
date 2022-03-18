@@ -24,7 +24,9 @@ class TopicModeler(BasicProcessor):
     type = "topic-modeller"  # job type ID
     category = "Text analysis"  # category
     title = "Generate topic models"  # title displayed in UI
-    description = "Creates topic models per token set using Latent Dirichlet Allocation (LDA). For a given number of topics, tokens are assigned a relevance weight per topic, which can be used to find clusters of related words."  # description displayed in UI
+    description = "Creates topic models per tokenset using Latent Dirichlet Allocation (LDA). " \
+                  "For a given number of topics, tokens are assigned a relevance weight per topic, " \
+                  "which can be used to find clusters of related words."  # description displayed in UI
     extension = "zip"  # extension of result file, used internally and in UI
 
     options = {

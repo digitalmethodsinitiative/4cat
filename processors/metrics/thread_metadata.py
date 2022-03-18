@@ -27,7 +27,7 @@ class ThreadMetadata(BasicProcessor):
 	type = "thread-metadata"  # job type ID
 	category = "Post metrics"  # category
 	title = "Thread metadata"  # title displayed in UI
-	description = "Create an overview of the threads present in the dataset, containing thread IDs, subjects and post counts."  # description displayed in UI
+	description = "Create an overview of the threads present in the dataset, containing thread IDs, subjects, and post counts."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
 	def process(self):

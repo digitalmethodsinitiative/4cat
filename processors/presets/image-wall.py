@@ -11,9 +11,9 @@ class DownloadImagesAndMakeImageWall(ProcessorPreset):
     Run processor pipeline to make an image wall
     """
     type = "preset-image-wall"  # job type ID
-    category = "Presets"  # category. 'Presets' are always listed first in the UI.
-    title = "Create image wall"  # title displayed in UI
-    description = "Use a sample of the images (up to 125) linked to the most in the dataset and put them in a single " \
+    category = "Combined processors"  # category. 'Combined processors' are always listed first in the UI.
+    title = "Image wall"  # title displayed in UI
+    description = "Use up to 125 most-linked images in the dataset and visualise them in a single " \
                   "image, side-by-side."
     extension = "png"
 

@@ -36,6 +36,7 @@
                                 {% endfor %}
                                 {% if groups.static_header %}</optgroup>{% endif %}
                             </select>
+                            <div class="data-overview-link"><a href="{{ url_for('data_overview') }}{{ datasource }}">How is this data collected?</a></div>
                         </div>
                         <button class="tooltip-trigger" aria-controls="tooltip-datasource-type" aria-label="Explain datasource type" id="datasource-type-label">Local</button>
                     </div>

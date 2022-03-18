@@ -27,10 +27,20 @@ class Tokenise(BasicProcessor):
 	type = "tokenise-posts"  # job type ID
 	category = "Text analysis"  # category
 	title = "Tokenise"  # title displayed in UI
-	description = "Tokenises post bodies, producing corpus data that may be used for further processing by e.g. NLP. " \
-				  "The output is a serialized list of lists, each list representing either all tokens in a post or " \
-				  "all tokens in a sentence in a post."  # description displayed in UI
+	description = "Splits the post body texts in separate words (tokens). This data can then be used for text analysis. " \
+				  "The output is a list of lists (each list representing all post tokens or " \
+				  "tokens per sentence)."  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
+
+	references = [
+			"[NLTK tokenizer documentation](https://www.nltk.org/api/nltk.tokenize.html)",
+			"[Different types of tokenizers in NLTK](https://chendianblog.wordpress.com/2016/11/25/different-types-of-tokenizers-in-nltk/)",
+			"[Words in stopwords-iso word list](https://github.com/stopwords-iso/stopwords-iso/blob/master/stopwords-iso.json)",
+			"[Words in Google Books word list](https://github.com/hackerb9/gwordlist)",
+			"[Words in cracklib word list](https://github.com/cracklib/cracklib/tree/master/words)",
+			"[Words in OpenTaal word list](https://github.com/OpenTaal/opentaal-wordlist)"
+
+	]
 
 	options = {
 		"docs_per": {
@@ -60,31 +70,32 @@ class Tokenise(BasicProcessor):
 				"post": "Post",
 				"sentence": "Sentence in post"
 			},
-			"tooltip": "This is relevant to some underlying processors such as Word2Vec and Tf-idf. If you don't know what to choose, choose 'post'."
+			"tooltip": "This is relevant for some processors such as Word2Vec and Tf-idf. If you don't know what to choose, choose 'post'."
 		},
 		"stem": {
 			"type": UserInput.OPTION_TOGGLE,
 			"default": False,
 			"help": "Stem tokens (with SnowballStemmer)",
-			"tooltip": "Stemming removes suffixes from words: 'running' becomes 'runn', 'bicycles' becomes 'bicycl', and so on."
+			"tooltip": "Stemming removes suffixes from words: 'running' becomes 'runn', 'bicycles' becomes 'bicycl', etc."
 		},
 		"lemmatise": {
 			"type": UserInput.OPTION_TOGGLE,
 			"default": False,
 			"help": "Lemmatise tokens (English only)",
-			"tooltip": "Lemmatisation replaces inflections of a word with its root form: 'running' becomes 'run', 'bicycles' becomes 'bicycle', 'better' becomes 'good'."
+			"tooltip": "Lemmatisation replaces variations of a word with its root form: 'running' becomes 'run', 'bicycles' " \
+					   " becomes 'bicycle', 'better' becomes 'good'."
 		},
 		"accept_words": {
 			"type": UserInput.OPTION_TEXT,
 			"default": "",
 			"help": "Always allow these words",
-			"tooltip": "Separate with commas. These are not stemmed or lemmatised; provide variations yourself if needed."
+			"tooltip": "These won't be deleted as stop words. Also won't be stemmed or lemmatised. Separate with commas."
 		},
 		"reject_words": {
 			"type": UserInput.OPTION_TEXT,
 			"default": "",
-			"help": "Exclude these words",
-			"tooltip": "Separate with commas. These are not stemmed or lemmatised; provide variations yourself if needed."
+			"help": "Always delete these words",
+			"tooltip": "These will be deleted from the corpus. Also won't be stemmed or lemmatised. Separate with commas."
 		},
 		"filter": {
 			"type": UserInput.OPTION_MULTI,
@@ -96,11 +107,13 @@ class Tokenise(BasicProcessor):
 				"stopwords-iso-all": "Stopwords for many languages (including Dutch/English, stopwords-iso)",
 				#"wordlist-infochimps-english": "English word list (infochimps)",
 				"wordlist-googlebooks-english": "English word list (Google One Million Books pre-2008 top unigrams, recommended)",
-				"wordlist-cracklib-english": "English word list (cracklib, warning: computationally heavy)",
+				"wordlist-cracklib-english": "English word list (cracklib, originally used for password checks. Warning: computationally heavy)",
 				"wordlist-opentaal-dutch": "Dutch word list (OpenTaal)",
 				#"wordlist-unknown-dutch": "Dutch word list (unknown origin, larger than OpenTaal)"
 			},
-			"help": "Word lists to exclude (i.e. not tokenise). It is highly recommended to exclude stop words. Note that choosing more word lists increases processing time"
+			"help": "Word lists to exclude",
+			"tooltip": "See the references for information per word list. It is highly recommended to exclude stop words. " \
+					   "Choosing more word lists increases processing time."
 		},
 		"only_unique": {
 			"type": UserInput.OPTION_TOGGLE,
