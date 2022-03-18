@@ -195,7 +195,7 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
 
                 # Update result and yield it
                 result['final_url'] = scraped_page.get('final_url')
-                result['body'] = scraped_page.get('text')
+                result['body'] = '\n'.join(scraped_page.get('text'))
                 result['subject'] = scraped_page.get('page_title')
                 result['html'] = scraped_page.get('page_source')
                 result['detected_404'] = scraped_page.get('detected_404')
