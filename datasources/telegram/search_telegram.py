@@ -2,6 +2,7 @@
 Search Telegram via API
 """
 import traceback
+import binascii
 import datetime
 import hashlib
 import asyncio
@@ -18,6 +19,8 @@ from common.lib.helpers import convert_to_int, UserInput
 from datetime import datetime
 from telethon import TelegramClient
 from telethon.errors.rpcerrorlist import UsernameInvalidError, TimeoutError, ChannelPrivateError, BadRequestError, FloodWaitError
+from telethon.tl.functions.channels import GetFullChannelRequest
+from telethon.tl.functions.users import GetFullUserRequest
 from telethon.tl.types import User
 
 import config
@@ -36,6 +39,8 @@ class SearchTelegram(Search):
     is_static = False   # Whether this datasource is still updated
 
     # cache
+    details_cache = None
+    failures_cache = None
     eventloop = None
     flawless = True
 
@@ -127,6 +132,8 @@ class SearchTelegram(Search):
                                        "creating it again from scratch.", is_final=True)
             return None
 
+        self.details_cache = {}
+        self.failures_cache = set()
         results = asyncio.run(self.execute_queries())
 
         if not query.get("save-session"):
@@ -230,6 +237,7 @@ class SearchTelegram(Search):
         :param int max_date:  Datetime date to get posts before
         :return list:  List of messages, each message a dictionary.
         """
+        resolve_refs = self.parameters.get("resolve-entities")
 
         for query in queries:
             delay = 10
@@ -259,6 +267,8 @@ class SearchTelegram(Search):
                         # the channel a message was forwarded from (but that
                         # needs extra API requests...)
                         serialized_message = SearchTelegram.serialize_obj(message)
+                        if resolve_refs:
+                            serialized_message = await self.resolve_groups(client, serialized_message)
 
                         # Stop if we're below the min date
                         if min_date and serialized_message.get("date") < min_date:
@@ -273,7 +283,7 @@ class SearchTelegram(Search):
                     self.dataset.update_status("Entity %s is private, skipping" % query)
                     self.flawless = False
 
-                except (ValueError, UsernameInvalidError):
+                except (UsernameInvalidError,):
                     self.dataset.update_status("Could not scrape entity '%s', does not seem to exist, skipping" % query)
                     self.flawless = False
 
@@ -289,6 +299,10 @@ class SearchTelegram(Search):
 
                 except BadRequestError as e:
                     self.dataset.update_status("Error '%s' while collecting entity %s, skipping" % (e.__class__.__name__, query))
+                    self.flawless = False
+
+                except ValueError as e:
+                    self.dataset.update_status("Error '%s' while collecting entity %s, skipping" % (str(e), query))
                     self.flawless = False
 
                 except TimeoutError:
@@ -307,6 +321,57 @@ class SearchTelegram(Search):
                     continue
 
                 break
+
+    async def resolve_groups(self, client, message):
+        """
+        Recursively resolve references to groups and users
+
+        :param client:  Telethon client instance
+        :param dict message:  Message, as already mapped by serialize_obj
+        :return:  Resolved dictionary
+        """
+        resolved_message = message.copy()
+        for key, value in message.items():
+            try:
+                if type(value) is not dict:
+                    # if it's not a dict, we never have to resolve it, as it
+                    # does not represent an entity
+                    continue
+
+                elif "_type" in value and value["_type"] in ("InputPeerChannel", "PeerChannel"):
+                    # forwarded from a channel!
+                    if value["channel_id"] in self.failures_cache:
+                        continue
+
+                    if value["channel_id"] not in self.details_cache:
+                        channel = await client(GetFullChannelRequest(value["channel_id"]))
+                        self.details_cache[value["channel_id"]] = SearchTelegram.serialize_obj(channel)
+
+                    resolved_message[key] = self.details_cache[value["channel_id"]]
+                    resolved_message[key]["channel_id"] = value["channel_id"]
+
+                elif "_type" in value and value["_type"] == "PeerUser":
+                    # a user!
+                    if value["user_id"] in self.failures_cache:
+                        continue
+
+                    if value["user_id"] not in self.details_cache:
+                        user = await client(GetFullUserRequest(value["user_id"]))
+                        self.details_cache[value["user_id"]] = SearchTelegram.serialize_obj(user)
+
+                    resolved_message[key] = self.details_cache[value["user_id"]]
+                else:
+                    resolved_message[key] = await self.resolve_groups(client, value)
+
+            except (TypeError, ChannelPrivateError, UsernameInvalidError) as e:
+                self.failures_cache.add(value.get("channel_id", value.get("user_id")))
+                if type(e) in (ChannelPrivateError, UsernameInvalidError):
+                    self.dataset.log("Cannot resolve entity with ID %s of type %s (%s), leaving as-is" % (
+                    str(value.get("channel_id", value.get("user_id"))), value["_type"], e.__class__.__name__))
+                else:
+                    self.dataset.log("Cannot resolve entity with ID %s of type %s, leaving as-is" % (str(value.get("channel_id", value.get("user_id"))), value["_type"]))
+
+        return resolved_message
 
     @staticmethod
     def cancel_start():
@@ -338,16 +403,16 @@ class SearchTelegram(Search):
         # last name someone has supplied
         fullname = ""
         username = ""
-        user_id = message.get("_sender", {}).get("id")
-        user_is_bot = message.get("_sender", {}).get("bot", False)
+        user_id = message["_sender"]["id"] if message.get("_sender") else ""
+        user_is_bot = message["_sender"].get("bot", False) if message.get("_sender") else ""
 
-        if message.get("_sender", {}).get("username"):
+        if message.get("_sender") and message["_sender"].get("username"):
             username = message["_sender"]["username"]
 
-        if message.get("_sender", {}).get("first_name"):
+        if message.get("_sender") and message["_sender"].get("first_name"):
             fullname += message["_sender"]["first_name"]
 
-        if message.get("_sender", {}).get("last_name"):
+        if message.get("_sender") and message["_sender"].get("last_name"):
             fullname += " " + message["_sender"]["last_name"]
 
         fullname = fullname.strip()
@@ -423,17 +488,44 @@ class SearchTelegram(Search):
             attachment_data = ""
 
         # was the message forwarded from somewhere and if so when?
-        forwarded = ""
         forwarded_timestamp = ""
-        if message["fwd_from"]:
+        forwarded_name = ""
+        forwarded_username = ""
+        if message.get("fwd_from") and "from_id" in message["fwd_from"]:
+            # forward information is spread out over a lot of places
+            # we can identify, in order of usefulness: username, full name,
+            # and ID. But not all of these are always available, and not
+            # always in the same place either
             forwarded_timestamp = int(message["fwd_from"]["date"])
+            from_data = message["fwd_from"]["from_id"]
 
-            if message["fwd_from"].get("post_author"):
-                forwarded = message["fwd_from"].get("post_author")
-            elif message["fwd_from"].get("from_id"):
-                forwarded = message["fwd_from"].get("from_id").get("user_id", "")
-            elif message["fwd_from"].get("channel_id"):
-                forwarded = message["fwd_from"].get("channel_id")
+            if from_data:
+                forwarded_from_id = from_data.get("channel_id", from_data.get("user_id", ""))
+
+            if message["fwd_from"].get("from_name"):
+                forwarded_name = message["fwd_from"].get("from_name")
+
+            if from_data and from_data.get("from_name"):
+                forwarded_name = message["fwd_from"]["from_name"]
+
+            if from_data and ("user" in from_data or "chats" in from_data):
+                # 'resolve entities' was enabled for this dataset
+                if "user" in from_data:
+                    if from_data["user"].get("username"):
+                        forwarded_username = from_data["user"]["username"]
+
+                    if from_data["user"].get("first_name"):
+                        forwarded_name = from_data["user"]["first_name"]
+                    if message["fwd_from"].get("last_name"):
+                        forwarded_name += "  " + from_data["user"]["last_name"]
+
+                    forwarded_name = forwarded_name.strip()
+
+                elif "chats" in from_data:
+                    channel_id = from_data["channel_id"]
+                    for chat in from_data["chats"]:
+                        if chat["id"] == channel_id:
+                            forwarded_username = chat["username"]
 
         msg = {
             "id": message["id"],
@@ -443,7 +535,6 @@ class SearchTelegram(Search):
             "author_username": username,
             "author_name": fullname,
             "author_is_bot": user_is_bot,
-            "author_forwarded_from": forwarded if forwarded else "",
             "body": message["message"],
             "reply_to": message.get("reply_to_msg_id", ""),
             "views": message["views"] if message["views"] else "",
@@ -451,6 +542,8 @@ class SearchTelegram(Search):
             "unix_timestamp": int(message["date"]),
             "timestamp_edited": datetime.fromtimestamp(message["edit_date"]).strftime("%Y-%m-%d %H:%M:%S") if message["edit_date"] else "",
             "unix_timestamp_edited": int(message["edit_date"]) if message["edit_date"] else "",
+            "author_forwarded_from_name": forwarded_name,
+            "author_forwarded_from_username": forwarded_username,
             "timestamp_forwarded_from": datetime.fromtimestamp(forwarded_timestamp).strftime("%Y-%m-%d %H:%M:%S") if forwarded_timestamp else "",
             "unix_timestamp_forwarded_from": forwarded_timestamp,
             "attachment_type": attachment_type,
@@ -500,7 +593,7 @@ class SearchTelegram(Search):
         :param obj:  Object to serialize
         :return:  Serialized object
         """
-        scalars = (int, str, float, list, tuple, set, dict, bool)
+        scalars = (int, str, float, list, tuple, set, bool)
 
         if type(input_obj) in scalars or input_obj is None:
             return input_obj
@@ -528,6 +621,9 @@ class SearchTelegram(Search):
             elif type(value) not in scalars and value is not None:
                 # type we can't make sense of here
                 continue
+            elif type(value) is dict:
+                for key, vvalue in value:
+                    mapped_obj[item][key] = SearchTelegram.serialize_obj(vvalue)
             else:
                 mapped_obj[item] = value
 
@@ -550,15 +646,24 @@ class SearchTelegram(Search):
         if not query.get("api_id", None) or not query.get("api_hash", None) or not query.get("api_phone", None):
             raise QueryParametersException("You need to provide valid Telegram API credentials first.")
 
+        privileged = user.get_value("telegram.can_query_all_messages", False)
+
         # reformat queries to be a comma-separated list with no wrapping
         # whitespace
         whitespace = re.compile(r"\s+")
         items = whitespace.sub("", query.get("query").replace("\n", ","))
-        if len(items.split(",")) > 25:
+        if len(items.split(",")) > 25 and not privileged:
             raise QueryParametersException("You cannot query more than 25 items at a time.")
 
-        # eliminate empty queries
-        items = ",".join([item for item in items.split(",") if item])
+        sanitized_items = []
+        # handle telegram URLs
+        for item in items.split(","):
+            if not item.strip():
+                continue
+            item = re.sub(r"^https?://t\.me/", "", item)
+            item = re.sub(r"^/?s/", "", item)
+            item = re.sub(r"[/]*$", "", item)
+            sanitized_items.append(item)
 
         # the dates need to make sense as a range to search within
         min_date, max_date = query.get("daterange")
@@ -566,12 +671,13 @@ class SearchTelegram(Search):
         # simple!
         return {
             "items": query.get("max_posts"),
-            "query": items,
+            "query": ",".join(sanitized_items),
             "board": "",  # needed for web interface
             "api_id": query.get("api_id"),
             "api_hash": query.get("api_hash"),
             "api_phone": query.get("api_phone"),
             "save-session": query.get("save-session"),
+            "resolve-entities": query.get("resolve-entities") if privileged else False,
             "min_date": min_date,
             "max_date": max_date
         }
@@ -614,5 +720,21 @@ class SearchTelegram(Search):
                 del options["max_posts"]["max"]
 
             options["query-intro"]["help"] = "You can collect messages from multiple entities (channels or groups). Separate with commas or line breaks."
+
+            options["resolve-entities-intro"] = {
+                "type": UserInput.OPTION_INFO,
+                "help": "4CAT can resolve the references to channels and user and replace the numeric ID with the full "
+                        "user, channel or group metadata. Doing so allows one to discover e.g. new relevant groups and "
+                        "figure out where or who a message was forwarded from. However, this increases query time and "
+                        "for large datasets, increases the chance you will be rate-limited and your dataset isn't able "
+                        "to finish capturing. It will also dramatically increase the disk space needed to store the "
+                        "data, so only enable this if you really need it!"
+            }
+
+            options["resolve-entities"] = {
+                "type": UserInput.OPTION_TOGGLE,
+                "help": "Resolve references",
+                "default": False,
+            }
 
         return options
