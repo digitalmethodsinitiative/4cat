@@ -50,7 +50,7 @@ packages = [
 	"six==1.15.0",
 	"spacy==3.0.5",
 	"svgwrite==1.3.1",
-	"Telethon==1.10.6",
+	"Telethon==1.24.0",
 	"ural==0.30.0",
 	"Werkzeug==0.15.5",
 	"wordcloud==1.8.1",
