@@ -3,11 +3,7 @@
 <p>4CAT supports advanced query syntax for locally stored sources, based on the <a href="http://sphinxsearch.com/">sphinx search library</a>. This can be used to make queries more precise, much like the syntax Google and other search engines support.</p>
 
 <p>
-It is however tuned so that search queries are completed relatively quickly,
-and this comes at the expense of accuracy in some edge cases; more posts may
-be returned than match your query. In many cases, you can use the analytical 
-post-processors available through 4CAT (such as the Exact Matches analysis) 
-to further narrow down your results.
+Sphinx is tuned so that search queries are completed relatively quickly. This comes at the expense of accuracy in some edge cases, with more posts being returned than match your query. You can use filter processors (such as <code>Filter by words or phrases</code>) to further narrow down your results.
 </p>
 
 <p>
@@ -18,7 +14,7 @@ Reddit search, for instance, will have different syntax.
 </p>
 
 <p>
-The following syntax is supported:
+The following syntax for this data source is supported:
 <ul>
 	<li>
 		<code>amsterdam netherlands</code> - Match posts containing both <code>amsterdam</code> and <code>netherlands</code>
@@ -56,7 +52,7 @@ necessary to wrap them in <code>"quotation marks"</code>; if not, they will be i
 </p>
 
 <p>
-This is especially important to keep in mind when searching for URLs; if you
+Quotations are especially important to keep in mind when searching for URLs. If you
 do not wrap these in quotation marks, their parts will be interpreted as 
 separate words, e.g. <code>http://www.google.com</code> will be interpreted as a query for posts containing <code>http</code>, <code>www</code>, <code>google</code> and <code>com</code> if not quoted.
 </p>

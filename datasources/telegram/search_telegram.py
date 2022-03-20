@@ -140,7 +140,7 @@ class SearchTelegram(Search):
             self.dataset.delete_parameter("api_hash", instant=True)
             self.dataset.delete_parameter("api_phone", instant=True)
             self.dataset.delete_parameter("api_id", instant=True)
-            
+
         return results
 
     async def execute_queries(self):
@@ -195,7 +195,7 @@ class SearchTelegram(Search):
         parameters = self.dataset.get_parameters()
         queries = [query.strip() for query in parameters.get("query", "").split(",")]
         max_items = convert_to_int(parameters.get("items", 10), 10)
-        
+
         # Telethon requires the offset date to be a datetime date
         max_date = parameters.get("max_date")
         if max_date:
@@ -203,7 +203,7 @@ class SearchTelegram(Search):
                 max_date = datetime.fromtimestamp(int(max_date))
             except ValueError:
                 max_date = None
-        
+
         # min_date can remain an integer
         min_date = parameters.get("min_date")
         if min_date:
@@ -304,6 +304,23 @@ class SearchTelegram(Search):
                 except ValueError as e:
                     self.dataset.update_status("Error '%s' while collecting entity %s, skipping" % (str(e), query))
                     self.flawless = False
+
+                except FloodWaitError as e:
+                    self.dataset.update_status("Telegram FloodWaitError: %s; Waiting" % str(e))
+                    if e.seconds < 600:
+                        time.sleep(e.seconds)
+                        continue
+                    else:
+                        self.log.error(str(e))
+                        self.dataset.update_status("Telegram wait grown large than %i minutes" % int(e.seconds/60))
+                        posts = None
+                        break
+
+                except ChannelPrivateError as e:
+                    self.dataset.update_status(
+                        "QUERY '%s' unable to complete due to error %s. Skipping." % (
+                        query, str(e)))
+                    break
 
                 except TimeoutError:
                     if retries < 3:

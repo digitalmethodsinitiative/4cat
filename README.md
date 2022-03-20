@@ -49,13 +49,13 @@ sources](https://github.com/digitalmethodsinitiative/4cat/tree/master/datasource
 in the GitHub repository.
 
 ## Install
-You can install 4CAT locally or on a server via Docker or manually. The usual
+You can install 4CAT locally or on a server via Docker or manually. Copying our docker-compose_prod.yml file and using
 
 ```
-docker-compose up
+docker-compose up -f docker-compose_prod.yml
 ```
 
-will work, but detailed and alternative installation instructions are available 
+will pull the lastest version from Docker Hub, but detailed and alternative installation instructions are available 
 [in our
 wiki](https://github.com/digitalmethodsinitiative/4cat/wiki/Installing-4CAT).
 Currently 4chan, 8chan, and 8kun require additional steps; please see the wiki.

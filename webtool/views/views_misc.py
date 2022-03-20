@@ -142,25 +142,28 @@ def data_overview(datasource=None):
         if is_local == "local":
 
             total_counts = db.fetchall("SELECT board, SUM(count) AS post_count FROM metrics WHERE metric = 'posts_per_day' AND datasource = %s GROUP BY board", (datasource_id,))
-            total_counts = {d["board"]: d["post_count"] for d in total_counts}
-            
-            boards = set(total_counts.keys())
-            
-            # Fetch date counts per board from the database
-            db_counts = db.fetchall("SELECT board, date, count FROM metrics WHERE metric = 'posts_per_day' AND datasource = %s", (datasource_id,))
 
-            # Get the first and last days for padding
-            all_dates = [datetime.strptime(row["date"], "%Y-%m-%d").timestamp() for row in db_counts]
-            first_date = datetime.fromtimestamp(min(all_dates))
-            last_date = datetime.fromtimestamp(max(all_dates))
-            
-            # Format the dates in a regular dictionary to be used by Highcharts
-            daily_counts = {"first_date": (first_date.year, first_date.month, first_date.day)}
-            for board in boards:
-                daily_counts[board] = {row["date"]: row["count"] for row in db_counts if row["board"] == board}
-                # Then make sure the empty dates are filled with 0
-                # and each board has the same amount of values.
-                daily_counts[board] = [v for k, v in pad_interval(daily_counts[board], first_interval=first_date)[1].items()]
+            if total_counts:
+                
+                total_counts = {d["board"]: d["post_count"] for d in total_counts}
+                
+                boards = set(total_counts.keys())
+                
+                # Fetch date counts per board from the database
+                db_counts = db.fetchall("SELECT board, date, count FROM metrics WHERE metric = 'posts_per_day' AND datasource = %s", (datasource_id,))
+
+                # Get the first and last days for padding
+                all_dates = [datetime.strptime(row["date"], "%Y-%m-%d").timestamp() for row in db_counts]
+                first_date = datetime.fromtimestamp(min(all_dates))
+                last_date = datetime.fromtimestamp(max(all_dates))
+                
+                # Format the dates in a regular dictionary to be used by Highcharts
+                daily_counts = {"first_date": (first_date.year, first_date.month, first_date.day)}
+                for board in boards:
+                    daily_counts[board] = {row["date"]: row["count"] for row in db_counts if row["board"] == board}
+                    # Then make sure the empty dates are filled with 0
+                    # and each board has the same amount of values.
+                    daily_counts[board] = [v for k, v in pad_interval(daily_counts[board], first_interval=first_date)[1].items()]
 
         references = worker_class.references if hasattr(worker_class, "references") else None        
 
