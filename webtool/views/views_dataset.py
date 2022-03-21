@@ -283,7 +283,8 @@ def show_result(key):
     datasource = dataset.parameters.get("datasource", "")
     datasources = backend.all_modules.datasources
     expires_datasource = False
-    can_unexpire = hasattr(config, "EXPIRE_ALLOW_OPTOUT") and config.EXPIRE_ALLOW_OPTOUT
+    can_unexpire = hasattr(config, "EXPIRE_ALLOW_OPTOUT") and config.EXPIRE_ALLOW_OPTOUT and (
+                current_user.is_admin or dataset.owner == current_user.get_id())
     if datasource in datasources and datasources[datasource].get("expire-datasets", None):
         timestamp_expires = dataset.timestamp + int(datasources[datasource].get("expire-datasets"))
         expires_datasource = True
