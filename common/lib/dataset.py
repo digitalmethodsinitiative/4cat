@@ -273,7 +273,7 @@ class DataSet(FourcatModule):
 		# go through items one by one, optionally mapping them
 		if path.suffix.lower() == ".csv":
 			with path.open(encoding="utf-8") as infile:
-				reader = csv.DictReader(infile)
+				reader = csv.DictReader(x.replace('\0', '') for x in infile)
 
 				for item in reader:
 					if hasattr(processor, "interrupted") and processor.interrupted:
@@ -539,7 +539,7 @@ class DataSet(FourcatModule):
 		keys of the JSON object, this is not always possible in follow-up code
 		that uses the 'column' names, so for consistency this function acts as
 		if no column can be parsed if no `map_item` function exists.
-		
+
 		:return list:  List of dataset columns; empty list if unable to parse
 		"""
 
@@ -578,10 +578,10 @@ class DataSet(FourcatModule):
 		"""
 
 		annotation_fields = self.db.fetchone("SELECT annotation_fields FROM datasets WHERE key = %s;", (self.top_parent().key,))
-		
+
 		if annotation_fields and annotation_fields.get("annotation_fields"):
 			annotation_fields = json.loads(annotation_fields["annotation_fields"])
-		
+
 		return annotation_fields
 
 	def get_annotations(self):
@@ -591,7 +591,7 @@ class DataSet(FourcatModule):
 		"""
 
 		annotations = self.db.fetchone("SELECT annotations FROM annotations WHERE key = %s;", (self.top_parent().key,))
-		
+
 		if annotations and annotations.get("annotations"):
 			return json.loads(annotations["annotations"])
 		else:
