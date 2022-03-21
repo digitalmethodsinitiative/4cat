@@ -917,6 +917,7 @@ const popup = {
 		//popups
 		$(document).on('click', '.popup-trigger', popup.show);
 		$('body').on('click', '#blur, #popup-close', popup.hide);
+		$(document).on('keyup', popup.handle_key);
 
 		popup.is_initialised = true;
 	 },
@@ -940,7 +941,6 @@ const popup = {
 		}
 
 		//determine target - last aria-controls value starting with 'popup-'
-		console.log(parent);
 		let targets = $(parent).attr('aria-controls').split(' ');
 		let popup_container = '';
 		targets.forEach(function(target) {
@@ -982,6 +982,17 @@ const popup = {
 		$('#popup .content').html('');
 		$('#blur').attr('aria-expanded', false);
 		$('#popup').attr('aria-expanded', false);
+	 },
+
+	/**
+	 * Hide popup when escape is pressed
+	 *
+	 * @param e
+	 */
+	 handle_key: function(e) {
+		 if(e.keyCode === 27 && $('#popup').attr('aria-expanded')) {
+			 popup.hide(e);
+		 }
 	 }
 	};
 
@@ -1266,7 +1277,6 @@ const ui_helpers = {
 			if($(this).attr('data-confirm-var')) {
 				html = '<input type="hidden" name="' + $(this).attr('data-confirm-var') + '" value="' + result + '">';
 			}
-			console.log(html)
 			$('<form style="display: none;"/>').attr('method', method).attr('action', url).html(html).appendTo('body').submit().remove();
 			return false;
 		}
