@@ -197,7 +197,6 @@ def view_log(key):
 
 
 @app.route("/preview-as-table/<string:key>/")
-@login_required
 def preview_items(key):
     """
     Preview a CSV file

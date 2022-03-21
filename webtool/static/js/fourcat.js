@@ -264,7 +264,7 @@ const query = {
 		$('#datasource-form').on('change', '#forminput-board', query.custom_board_options);
 
 		// dataset label edit
-		$('.result-page .card h2').each(query.label.init);
+		$('.result-page .card h2.editable').each(query.label.init);
 		$(document).on('click', '.edit-dataset-label', query.label.handle);
 		$(document).on('keydown', '#new-dataset-label', query.label.handle);
 

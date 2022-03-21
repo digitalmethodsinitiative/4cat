@@ -1,7 +1,7 @@
 <article class="result" data-dataset-key="{{ dataset.key }}">
     <section class="result-tree">
         <div class="card query{% if not dataset.is_finished() %} unfinished{% endif %}">
-            <h2 class="blocktitle">
+            <h2 class="blocktitle{% if current_user.is_authenticated and (current_user.is_admin or current_user.get_id() == dataset.owner) %} editable{% endif %}">
                 <span><a href="{{ url_for('show_results', key=dataset.key) }}">{{ dataset.get_label() }}</a></span>
             </h2>
             <nav class="dataset-toolbox" aria-label="Actions for dataset">
