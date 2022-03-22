@@ -131,8 +131,8 @@ SCRAPE_PROXIES = {"http": []}  # Items in this list should be formatted like "ht
 IMAGE_INTERVAL = 3600
 
 # Explorer settings
-# The maximum allowed amount of rows (prevents timeouts and memory errors)
 MAX_EXPLORER_POSTS = 100000
+EXPLORER_POSTS_ON_PAGE = 50
 
 # Web tool settings
 class FlaskConfig:
