@@ -167,7 +167,7 @@ class TelegramImageDownloader(BasicProcessor):
                         await client.download_media(message, str(path), thumb=-1)
                     msg_id = message.id
                     success = True
-                except (AttributeError, RuntimeError, ValueError) as e:
+                except (AttributeError, RuntimeError, ValueError, TypeError) as e:
                     filename = "%s-index-%i" % (entity, media_done)
                     msg_id = str(message.id) if hasattr(message, "id") else "with index %i" % media_done
                     self.dataset.log("Could not download image for message %s (%s)" % (msg_id, str(e)))
