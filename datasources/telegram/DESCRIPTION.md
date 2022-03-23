@@ -5,6 +5,11 @@ Note that due to how Telegram works, you need to know what channels or groups yo
 collect it; you cannot search by keyword as you can for some other platforms. You can, however, use the search function 
 in the Telegram app to find groups and channels, and then collect messages from the ones you find with 4CAT.
 
+Another way of finding relevant groups is through a standard web search engine, like Google. Search for, for example,
+[`bill gates site:t.me`](https://www.google.com/search?q=bill+gates+site:t.me&hl=en&filter=0&dpr=2) on Google to find 
+Telegram groups Google has indexed that mention 'Bill Gates'. This is never a complete picture, but can be a good way 
+to get started.
+
 ### Technical details and caveats
 Telegram data is collected via Telegram's [official API](https://core.telegram.org/) via the
 [MTProto](https://core.telegram.org/mtproto) protocol. This is done using the [Telethon 
