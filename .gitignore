@@ -16,6 +16,8 @@
 .DS_Store
 
 # actual files that are part of 4CAT but should not be included
+config.py
+docker/shared/docker_config.ini
 .current-version
 deploy.sh
 module_cache.pb
