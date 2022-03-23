@@ -1,11 +1,46 @@
-# Add 'is_deactivated' column to user table
+"""
+Update config to use the database instead of config.py
+
+To upgrade, we need this file and the new configuration manager (which is able
+to populate the new database)
+"""
 import sys
 import os
+import json
 import psycopg2
 import psycopg2.extras
 import configparser
 
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)) + "'/../..")
+
+def set_or_create_setting(attribute_name, value, connection, cursor, keep_connection_open=False):
+    """
+    Insert OR set value for a paramter in the database. ON CONFLICT SET VALUE.
+
+    :return int: number of updated rows
+    """
+    try:
+        value = json.dumps(value)
+    except ValueError:
+        return None
+
+    try:
+        query = 'INSERT INTO fourcat_settings (name, value) Values (%s, %s) ON CONFLICT (name) DO UPDATE SET value = EXCLUDED.value'
+        cursor.execute(query, (attribute_name, value))
+        updated_rows = cursor.rowcount
+        connection.commit()
+
+        if not keep_connection_open:
+            connection.close()
+
+    except (Exception, psycopg2.DatabaseError) as error:
+        print('Error transfering setting %s with value %s: %s' % (attribute_name, str(value), str(error)))
+        updated_rows = None
+    finally:
+        if connection is not None and not keep_connection_open:
+            connection.close()
+
+    return updated_rows
 
 print("  Checking if preexisting config.py file...")
 transfer_settings = False
@@ -35,7 +70,6 @@ if not has_table["exists"]:
     connection.commit()
 else:
     print("  ...Yes, fourcat_settings table already exists.")
-connection.close()
 
 if transfer_settings:
     print("  Moving settings to database...")
@@ -101,10 +135,6 @@ if transfer_settings:
         config_reader.write(configfile)
 
     # UPDATE Database with other settings
-    if not config:
-        import common.config_manager as config
-    QD = config.QuickDatabase()
-
     old_settings = [
         ('DATASOURCES', old_config.DATASOURCES),
         ('YOUTUBE_API_SERVICE_NAME', old_config.YOUTUBE_API_SERVICE_NAME),
@@ -155,11 +185,11 @@ if transfer_settings:
 
     for name, setting in old_settings:
         if setting:
-            config.set_or_create_setting(name, setting, connection=QD.connection, cursor=QD.cursor, keep_connection_open=True)
+            set_or_create_setting(name, setting, connection=connection, cursor=cursor, keep_connection_open=True)
 
-    # Close connection
-    if QD.connection:
-        QD.close()
     print('Setting migrated to Database!')
+
+# Close database connection
+connection.close()
 
 print("  Done!")
