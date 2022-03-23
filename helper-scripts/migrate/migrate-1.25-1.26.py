@@ -23,8 +23,7 @@ else:
     import common.config_manager as config
     connection = psycopg2.connect(dbname=config.get('DB_NAME'), user=config.get('DB_USER'), password=config.get('DB_PASSWORD'), host=config.get('DB_HOST'), port=config.get('DB_PORT'), application_name="4cat-migrate")
 cursor = connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-query = "SELECT EXISTS (SELECT FROM fourcat_settings)"
-cursor.execute(query)
+cursor.execute("SELECT EXISTS (SELECT * from information_schema.tables WHERE table_name=%s)", ('fourcat_settings',))
 has_table = cursor.fetchone()
 if not has_table["exists"]:
     print("  ...No, adding table fourcat_setttings.")
