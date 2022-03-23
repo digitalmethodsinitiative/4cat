@@ -76,7 +76,7 @@ if config.FlaskConfig.SECRET_KEY == "REPLACE_THIS":
     raise Exception("You need to set a FLASK_SECRET in config.py before running the web tool.")
 
 # initialize login manager
-app.config.from_object("config.FlaskConfig")
+app.config.from_object("common.config_manager.FlaskConfig")
 login_manager.anonymous_user = partial(User.get_by_name, db=db, name="anonymous")
 login_manager.init_app(app)
 login_manager.login_view = "show_login"
