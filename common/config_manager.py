@@ -27,9 +27,9 @@ class ConfigManager:
             # User docker_config.ini
             USING_DOCKER = True
             pass
-        elif os.path.exists(CONFIG_FILE):
-            # if docker not enabled, use default config
-            config_reader.read(CONFIG_FILE)
+    if not USING_DOCKER and os.path.exists(CONFIG_FILE):
+        # if docker not enabled, use default config
+        config_reader.read(CONFIG_FILE)
 
     DB_HOST = config_reader['DATABASE'].get('db_host')
     DB_PORT = config_reader['DATABASE'].getint('db_port')
