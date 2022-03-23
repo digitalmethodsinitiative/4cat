@@ -8,8 +8,8 @@ DOCKER_CONFIG_FILE = 'docker/shared/docker_config.ini'
 
 # If Docker config already exists, exit
 if os.path.exists(DOCKER_CONFIG_FILE):
-    print('docker_config.ini already exists')
-    print('Updating .env variables if necessary')
+    print('Configuration file docker_config.ini already exists')
+    print('Updating Docker .env variables if necessary')
     docker_config = configparser.ConfigParser()
     docker_config.read(DOCKER_CONFIG_FILE)
 
@@ -32,7 +32,7 @@ if os.path.exists(DOCKER_CONFIG_FILE):
       config.set_value('SERVER_NAME', f"{your_server}:{public_port}")
 
     # Exit
-    sys.exit(0)
+    exit(0)
 
 ###################
 # Docker settings #
@@ -85,6 +85,7 @@ docker_config['SERVER']['public_port'] = public_port
 # Save config file
 with open(DOCKER_CONFIG_FILE, 'w') as configfile:
     docker_config.write(configfile)
+    print('Created docker_config.ini file')
 
 #############################
 # Update addtional settings #

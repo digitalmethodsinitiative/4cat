@@ -9,9 +9,6 @@ exit_backend() {
 
 trap exit_backend INT TERM
 
-# Run docker_setup to update any environment variables if they were changed
-python3 docker/docker_setup.py
-
 echo "Waiting for postgres..."
 while ! nc -z db 5432; do
   sleep 0.1
@@ -29,6 +26,9 @@ else
   # Seed DB
   cd /usr/src/app && psql --host=db --port=5432 --user=$POSTGRES_USER --dbname=$POSTGRES_DB < backend/database.sql
 fi
+
+# Run docker_setup to update any environment variables if they were changed
+python3 docker/docker_setup.py
 
 echo 'Starting app'
 cd /usr/src/app
