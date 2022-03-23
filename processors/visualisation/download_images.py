@@ -36,9 +36,9 @@ class ImageDownloader(BasicProcessor):
 	type = "image-downloader"  # job type ID
 	category = "Visual"  # category
 	title = "Download images"  # title displayed in UI
-	description = "Download images and compress as a zip file. May take a while to complete as images are sourced " \
-				  "externally. Note that not always all images can be retrieved. For imgur galleries, only the first " \
-				  "image is saved. For animations, only the first frame is saved if available. A JSON metadata file " \
+	description = "Download images and store in a a zip file. May take a while to complete as images are retrieved " \
+				  "externally. Note that not always all images can be saved. For imgur galleries, only the first " \
+				  "image is saved. For animations (GIFs), only the first frame is saved if available. A JSON metadata file " \
 				  "is included in the output archive."  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
 
@@ -231,7 +231,7 @@ class ImageDownloader(BasicProcessor):
 				except UnidentifiedImageError:
 					picture = Image.open(image.raw)
 
-			except (FileNotFoundError, UnidentifiedImageError):
+			except (FileNotFoundError, UnidentifiedImageError, AttributeError):
 				failures.append(url)
 				continue
 
@@ -404,7 +404,7 @@ class ImageDownloader(BasicProcessor):
 		# get link to image from external HTML search results
 		# detect rate limiting and wait until we're good to go again
 		page = self.request_get_w_error_handling(url, headers={"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/12.1.1 Safari/605.1.15"})
-		rate_limited = rate_regex.search(page.content.decode("utf-8"))
+		rate_limited = rate_regex.search(page.text)
 
 		while rate_limited:
 			self.log.debug("Rate-limited by external source. Waiting %s seconds." % rate_limited[1])

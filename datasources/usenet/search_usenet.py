@@ -17,6 +17,8 @@ class SearchUsenet(Search4Chan):
 	type = "usenet-search"  # job ID
 	sphinx_index = "usenet"  # prefix for sphinx indexes for this data source. Should usually match sphinx.conf
 	prefix = "usenet"  # table identifier for this datasource; see below for usage
+	is_local = True	# Whether this datasource is locally scraped
+	is_static = True	# Whether this datasource is still updated
 
 	# Columns to return in csv
 	return_cols = ['thread_id', 'id', 'timestamp', 'body', 'subject', 'author', 'groups', 'headers']

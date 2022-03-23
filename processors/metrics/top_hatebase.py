@@ -22,8 +22,8 @@ class HatebaseRanker(BasicProcessor):
 	"""
 	type = "hatebase-frequencies"  # job type ID
 	category = "Post metrics"  # category
-	title = "Top hateful phrases"  # title displayed in UI
-	description = "Count frequencies for hateful words and phrases found in the dataset and aggregate the results, sorted by most-occurring value. Optionally results may be counted per period."  # description displayed in UI
+	title = "Extract top hateful phrases"  # title displayed in UI
+	description = "Count frequencies for hateful words and phrases found in the dataset and rank the results (overall or per timeframe)."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
 	@classmethod
@@ -42,9 +42,9 @@ class HatebaseRanker(BasicProcessor):
 			"type": UserInput.OPTION_CHOICE,
 			"default": "all",
 			"options": {
-				"all": "Ambigous and unambiguous",
-				"ambiguous": "Ambiguous terms only",
-				"unambiguous": "Unambiguous terms only"
+				"all": "Ambigous and unambiguous hate terms",
+				"ambiguous": "Ambiguous hate terms terms only",
+				"unambiguous": "Unambiguous hate terms terms only"
 			},
 			"help": "Terms to consider"
 		},
@@ -57,10 +57,10 @@ class HatebaseRanker(BasicProcessor):
 		"top-style": {
 			"type": UserInput.OPTION_CHOICE,
 			"default": "per-item",
-			"options": {"per-item": "per interval (separate ranking per interval)",
-						"overall": "overall (per-interval ranking for overall top items)"},
+			"options": {"per-item": "per timeframe (separate ranking per timeframe)",
+						"overall": "overall (only include overall top items in the timeframe)"},
 			"help": "Determine top items",
-			"tooltip": "'Overall' will first determine the most prevalent items across all intervals, then calculate top items per interval using this as a shortlist."
+			"tooltip": "'Overall' will first determine the top values across all timeframes, and then check how often these occur per timeframe."
 		},
 		"top": {
 			"type": UserInput.OPTION_TEXT,

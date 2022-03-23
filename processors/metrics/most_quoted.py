@@ -19,8 +19,8 @@ class QuoteRanker(BasicProcessor):
 	"""
 	type = "quote-ranker"  # job type ID
 	category = "Post metrics" # category
-	title = "Sort by most quoted"  # title displayed in UI
-	description = "Sort posts by how often they were quoted by other posts in the data set. Post IDs may be correlated and triangulated with the full results set."  # description displayed in UI
+	title = "Sort by most replied-to"  # title displayed in UI
+	description = "Sort posts by how often they were replied to by other posts in the dataset."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
 	@classmethod
@@ -76,5 +76,5 @@ class QuoteRanker(BasicProcessor):
 				post["num_quoted"] = quoted[id]
 				writer.writerow(post)
 
-		self.dataset.update_status("Finished")
+		self.dataset.update_status("Sorted posts by most-replied to")
 		self.dataset.finish(len(most_quoted))

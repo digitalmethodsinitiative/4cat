@@ -264,7 +264,7 @@ const query = {
 		$('#datasource-form').on('change', '#forminput-board', query.custom_board_options);
 
 		// dataset label edit
-		$('.result-page .card h2').each(query.label.init);
+		$('.result-page .card h2.editable').each(query.label.init);
 		$(document).on('click', '.edit-dataset-label', query.label.handle);
 		$(document).on('keydown', '#new-dataset-label', query.label.handle);
 
@@ -612,7 +612,7 @@ const query = {
 	},
 
 	/**
-	 * Update board select list for chosen datasource
+	 * Query form for chosen datasource
 	 */
 	update_form: function() {
 		datasource = $('#datasource-select').val();
@@ -637,6 +637,9 @@ const query = {
 
 				//update data source type indicator
 				$('#datasource-type-label').html(data.type.join(", "));
+
+				// update data overview link
+				$('.data-overview-link > a').attr("href", getRelativeURL('data-overview/' + data.datasource))
 
 				query.handle_density();
 				query.custom_board_options();
@@ -757,7 +760,7 @@ const query = {
 			e.preventDefault();
 			let field = $(self).parent().find('input');
 			let new_label = field.val();
-			let dataset_key = $('section.result-tree').attr('data-dataset-key')
+			let dataset_key = $('article.result').attr('data-dataset-key');
 
 			$.post({
 				dataType: "json",
@@ -779,8 +782,8 @@ const query = {
 
 	convert_dataset: function(self) {
 		let datasource = $(self.target).val();
-		let dataset_key = $('section.result-tree').attr('data-dataset-key')
-
+		let dataset_key = $('article.result').attr('data-dataset-key');
+		
 		if (datasource.length > 0) {
 			$.post({
 				dataType: "json",
@@ -914,6 +917,7 @@ const popup = {
 		//popups
 		$(document).on('click', '.popup-trigger', popup.show);
 		$('body').on('click', '#blur, #popup-close', popup.hide);
+		$(document).on('keyup', popup.handle_key);
 
 		popup.is_initialised = true;
 	 },
@@ -937,7 +941,6 @@ const popup = {
 		}
 
 		//determine target - last aria-controls value starting with 'popup-'
-		console.log(parent);
 		let targets = $(parent).attr('aria-controls').split(' ');
 		let popup_container = '';
 		targets.forEach(function(target) {
@@ -979,6 +982,17 @@ const popup = {
 		$('#popup .content').html('');
 		$('#blur').attr('aria-expanded', false);
 		$('#popup').attr('aria-expanded', false);
+	 },
+
+	/**
+	 * Hide popup when escape is pressed
+	 *
+	 * @param e
+	 */
+	 handle_key: function(e) {
+		 if(e.keyCode === 27 && $('#popup').attr('aria-expanded')) {
+			 popup.hide(e);
+		 }
 	 }
 	};
 
@@ -1263,7 +1277,6 @@ const ui_helpers = {
 			if($(this).attr('data-confirm-var')) {
 				html = '<input type="hidden" name="' + $(this).attr('data-confirm-var') + '" value="' + result + '">';
 			}
-			console.log(html)
 			$('<form style="display: none;"/>').attr('method', method).attr('action', url).html(html).appendTo('body').submit().remove();
 			return false;
 		}

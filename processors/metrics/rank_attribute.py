@@ -24,9 +24,11 @@ class AttributeRanker(BasicProcessor):
 	"""
 	type = "attribute-frequencies"  # job type ID
 	category = "Post metrics"  # category
-	title = "Attribute frequencies"  # title displayed in UI
-	description = "Count frequencies for a given post attribute and aggregate the results, sorted by most-occurring value. Optionally results may be counted per period."  # description displayed in UI
+	title = "Count values"  # title displayed in UI
+	description = "Count values in a dataset column, like URLs or hashtags (overall or per timeframe)"  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
+
+	references = ["[regex010](https://regex101.com/)"]
 
 	# the following determines the options available to the user via the 4CAT
 	# interface.
@@ -46,26 +48,26 @@ class AttributeRanker(BasicProcessor):
 				"hashtags": "Hashtag (for datasets with a 'hashtags' column)",
 				"mentions": "Mentions (for datasets with a 'mentions' column)"
 			},
-			"help": "Attribute to aggregate",
+			"help": "Value to aggregate",
 			"tooltip": "When choosing 'Regular expression', any value in a post matching the regular expression will be saved as a separate value."
 		},
 		"timeframe": {
 			"type": UserInput.OPTION_CHOICE,
 			"default": "all",
 			"options": {"all": "Overall", "year": "Year", "month": "Month", "week": "Week", "day": "Day"},
-			"help": "Count frequencies per"
+			"help": "Count values per"
 		},
 		"top": {
 			"type": UserInput.OPTION_TEXT,
 			"default": 15,
-			"help": "Limit to n items"
+			"help": "Limit to this amount of results"
 		},
 		"top-style": {
 			"type": UserInput.OPTION_CHOICE,
 			"default": "per-item",
-			"options": {"per-item": "per interval (separate ranking per interval)", "overall": "overall (per-interval ranking for overall top items)"},
+			"options": {"per-item": "per timeframe (separate ranking per timeframe)", "overall": "overall (only include overall top items in the timeframe)"},
 			"help": "Determine top items",
-			"tooltip": "'Overall' will first determine the most prevalent items across all intervals, then calculate top items per interval using this as a shortlist."
+			"tooltip": "'Overall' will first determine the top values across all timeframes, and then check how often these occur per timeframe."
 		},
 		"filter": {
 			"type": UserInput.OPTION_TEXT,
@@ -77,13 +79,13 @@ class AttributeRanker(BasicProcessor):
 			"type": UserInput.OPTION_TEXT,
 			"default": "",
 			"help": "Weigh frequencies by column",
-			"tooltip": "Frequencies will be multiplied by the value in this column (e.g. 'views'). If the column does not exist or contains a non-numeric value, multiply with 1."
+			"tooltip": "Frequencies will be multiplied by the value in this column (e.g. 'views')."
 		},
 		"to-lowercase": {
             "type": UserInput.OPTION_TOGGLE,
             "default": True,
-            "help": "Convert attribute to lowercase",
-            "tooltip": "Merges attributes with varying cases"
+            "help": "Convert values to lowercase",
+            "tooltip": "Merges values with varying cases"
         }
 	}
 

@@ -22,6 +22,8 @@ class SearchInstagram(Search):
     title = "Import scraped Instagram data"  # title displayed in UI
     description = "Import Instagram data collected with an external tool such as Zeeschuimer."  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
+    is_local = False    # Whether this datasource is locally scraped
+    is_static = False   # Whether this datasource is still updated
 
     # not available as a processor for existing datasets
     accepts = [None]
@@ -181,6 +183,13 @@ class SearchInstagram(Search):
             media_types = set([s["media_type"] for s in node["carousel_media"]])
             media_type = "mixed" if len(media_types) > 1 else type_map.get(media_types.pop(), "unknown")
 
+        if "comment_count" in node:
+            num_comments = node["comment_count"]
+        elif "comments" in node and type(node["comments"]) is list:
+            num_comments = len(node["comments"])
+        else:
+            num_comments = -1
+
         mapped_item = {
             "id": node["code"],
             "thread_id": node["code"],
@@ -198,7 +207,7 @@ class SearchInstagram(Search):
             # "usertags": ",".join(
             #     [u["node"]["user"]["username"] for u in node["edge_media_to_tagged_user"]["edges"]]),
             "num_likes": node["like_count"],
-            "num_comments": node["comment_count"],
+            "num_comments": num_comments,
             "num_media": num_media,
             "subject": ""
         }

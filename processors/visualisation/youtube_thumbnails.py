@@ -26,7 +26,7 @@ class YouTubeThumbnails(BasicProcessor):
 	type = "youtube-thumbnails"  # job type ID
 	category = "Cross-platform" # category
 	title = "Download YouTube thumbnails"  # title displayed in UI
-	description = "Download YouTube video thumbnails."  # description displayed in UI
+	description = "Downloads the thumbnails of YouTube videos and stores it in a zip archive."  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
 	
 	max_retries = 3

@@ -25,7 +25,7 @@ class HatebaseAnalyser(BasicProcessor):
 	type = "hatebase-data"  # job type ID
 	category = "Post metrics"  # category
 	title = "Hatebase analysis"  # title displayed in UI
-	description = "Analyse all posts' content with Hatebase, assigning a score for 'offensiveness' and a propability that the post contains hate speech."  # description displayed in UI
+	description = "Assign scores for 'offensiveness' and hate speech propability to each post by using Hatebase."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
 	token_expires = 0

@@ -25,8 +25,8 @@ class RedditVoteChecker(BasicProcessor):
 	"""
 	type = "get-reddit-votes"  # job type ID
 	category = "Filtering" # category
-	title = "Update Reddit post scores"  # title displayed in UI
-	description = "Updates the scores for each post to more accurately reflect the real score. Can only be used on datasets with < 5,000 posts due to the heavy usage of the API this requires."  # description displayed in UI
+	title = "Update Reddit scores"  # title displayed in UI
+	description = "Updates the scores for each post and comment to more accurately reflect the real score. Can only be used on datasets with < 5,000 posts due to the heavy usage of the Reddit API."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
 	config = {
@@ -136,5 +136,5 @@ class RedditVoteChecker(BasicProcessor):
 		# now comes the big trick - replace original dataset with updated one
 		shutil.move(self.dataset.get_results_path(), self.source_dataset.get_results_path())
 
-		self.dataset.update_status("Parent dataset updated.")
+		self.dataset.update_status("Scores retrieved, parent dataset updated.")
 		self.dataset.finish(processed)

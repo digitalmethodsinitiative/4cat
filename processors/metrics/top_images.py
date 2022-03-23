@@ -27,8 +27,8 @@ class TopImageCounter(BasicProcessor):
     """
     type = "top-images"  # job type ID
     category = "Post metrics"  # category
-    title = "Top images"  # title displayed in UI
-    description = "Collect all images used in the data set, and sort by most used. Contains URLs through which the images may be downloaded."  # description displayed in UI
+    title = "Rank image URLs"  # title displayed in UI
+    description = "Collect all image URLs and sort by most-occurring."  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
 
     def process(self):

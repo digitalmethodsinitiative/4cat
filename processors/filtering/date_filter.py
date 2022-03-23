@@ -15,7 +15,6 @@ __email__ = "4cat@oilab.eu"
 
 csv.field_size_limit(1024 * 1024 * 1024)
 
-
 class DateFilter(BasicProcessor):
     """
     Retain only posts between specific dates
@@ -23,24 +22,14 @@ class DateFilter(BasicProcessor):
     type = "date-filter"  # job type ID
     category = "Filtering"  # category
     title = "Filter by date"  # title displayed in UI
-    description = "Copies the dataset, retaining only posts between the given dates. This creates a new, separate \
-                    dataset you can run analyses on."
+    description = "Retains posts between given dates. This will create a new dataset."
     extension = "csv"  # extension of result file, used internally and in UI
 
     options = {
         "daterange": {
             "type": UserInput.OPTION_DATERANGE,
             "help": "Date range:"
-        },
-        "parse_error": {
-            "type": UserInput.OPTION_CHOICE,
-            "help": "Invalid date formats:",
-            "options": {
-                "return": "Keep invalid dates for new dataset",
-                "reject": "Remove invalid dates for new dataset",
-            },
-            "default": "return"
-        },
+        }
     }
 
     @classmethod
@@ -73,14 +62,7 @@ class DateFilter(BasicProcessor):
         # Convert to datetime for easy comparison
         min_date = datetime.fromtimestamp(min_date).date()
         max_date = datetime.fromtimestamp(max_date).date()
-        # Decide how to handle invalid dates
-        if self.parameters.get("parse_error") == 'return':
-            keep_errors = True
-        elif self.parameters.get("parse_error") == 'reject':
-            keep_errors = False
-        else:
-            raise "Error with parse_error types"
-
+        
         # Track progress
         processed_items = 0
         invalid_dates = 0
@@ -113,19 +95,9 @@ class DateFilter(BasicProcessor):
                     self.dataset.update_status("Processed %i items (%i matching, %i invalid dates)" % (processed_items, matching_items, invalid_dates))
 
                 # Attempt to parse timestamp
-                try:
-                    item_date = dateutil.parser.parse(item.get(date_column_name))
-                except dateutil.parser.ParserError:
-                    if keep_errors:
-                        # Keep item
-                        invalid_dates += 1
-                        writer.writerow(item)
-                        continue
-                    else:
-                        # Reject item
-                        invalid_dates += 1
-                        continue
-
+                item_date = dateutil.parser.parse(item.get(date_column_name))
+                #except dateutil.parser.ParserError:
+                
                 # Only use date for comparison (not time)
                 item_date = item_date.date()
 

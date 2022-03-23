@@ -17,7 +17,6 @@ import common.config_manager as config
 # Likewise, this is the identifier used in the config file to configure what
 # boards are available for this data source (through the DATASOURCES setting).
 DATASOURCE = "4chan"
-IS_LOCAL = True
 
 def init_datasource(database, logger, queue, name):
 	"""

@@ -75,16 +75,11 @@ limiter = Limiter(app, key_func=get_remote_address)
 if config.FlaskConfig.SECRET_KEY == "REPLACE_THIS":
     raise Exception("You need to set a FLASK_SECRET in config.py before running the web tool.")
 
-# figure out if this is a first run
-def get_login_view():
-    has_users = db.fetchone("SELECT * FROM users WHERE is_admin = True")
-    return "show_login" if has_users else "create_first_user"
-
 # initialize login manager
 app.config.from_object("config.FlaskConfig")
 login_manager.anonymous_user = partial(User.get_by_name, db=db, name="anonymous")
 login_manager.init_app(app)
-login_manager.login_view = get_login_view()
+login_manager.login_view = "show_login"
 
 # import all views
 import webtool.views.views_misc

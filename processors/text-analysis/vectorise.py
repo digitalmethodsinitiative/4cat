@@ -18,8 +18,9 @@ class Vectorise(BasicProcessor):
 	"""
 	type = "vectorise-tokens"  # job type ID
 	category = "Text analysis"  # category
-	title = "Vectorise tokens"  # title displayed in UI
-	description = "Creates word vectors for a token set. Token lists are transformed into word => frequency counts."  # description displayed in UI
+	title = "Count words"  # title displayed in UI
+	description = "Counts all tokens so they are transformed into word => frequency counts." \
+				  "This is also knonw as a bag of words."  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
 
 	@classmethod

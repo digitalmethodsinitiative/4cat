@@ -23,9 +23,15 @@ class LexicalFilter(BasicProcessor):
 	"""
 	type = "lexical-filter"  # job type ID
 	category = "Filtering"  # category
-	title = "Filter by lexicon"  # title displayed in UI
-	description = "Copies the dataset, retaining only posts that match any selected lexicon of words or phrases. This creates a new, separate dataset you can run analyses on."  # description displayed in UI
+	title = "Filter by words or phrases"  # title displayed in UI
+	description = "Retains posts that contain selected words or phrases, including preset word lists. " \
+				  "This creates a new dataset."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
+
+	references = [
+		"[Hatebase](https://hatebase.org)",
+		"[Regex101](https://regex101.com/)"
+	]
 
 	# the following determines the options available to the user via the 4CAT
 	# interface.
@@ -37,24 +43,24 @@ class LexicalFilter(BasicProcessor):
 				"hatebase-en-unambiguous": "Hatebase.org hate speech list (English, unambiguous terms)",
 				"hatebase-en-ambiguous": "Hatebase.org hate speech list (English, ambiguous terms)",
 			},
-			"help": "Filter items containing words in these lexicons"
+			"help": "Filter items containing words in these lexicons. Note that they may be outdated."
 		},
 		"lexicon-custom": {
 			"type": UserInput.OPTION_TEXT,
 			"default": "",
-			"help": "Custom lexicon (separate with commas)"
+			"help": "Custom word list (separate with commas)"
 		},
 		"as_regex": {
 			"type": UserInput.OPTION_TOGGLE,
 			"default": False,
-			"help": "Interpret custom lexicon as regular expression",
-			"tooltip": "Regular expressions are parsed with Python's dialect"
+			"help": "Interpret custom word list as a regular expression",
+			"tooltip": "Regular expressions are parsed with Python"
 		},
 		"exclude": {
 			"type": UserInput.OPTION_TOGGLE,
 			"default": False,
 			"help": "Should not include the above word(s)",
-			"tooltip": "Only posts that do not match the above lexicon are retained"
+			"tooltip": "Only posts that do not match the above words are retained"
 		},
 		"case-sensitive": {
 			"type": UserInput.OPTION_TOGGLE,
@@ -172,7 +178,7 @@ class LexicalFilter(BasicProcessor):
 				matching_items += 1
 
 		if matching_items > 0:
-			self.dataset.update_status("New dataset created with %i matching item(s)" % matching_items, is_final=True)
+			self.dataset.update_status("New dataset created with %i matching post(s)" % matching_items, is_final=True)
 		self.dataset.finish(matching_items)
 
 	def after_process(self):

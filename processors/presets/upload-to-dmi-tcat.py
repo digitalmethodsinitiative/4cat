@@ -11,9 +11,9 @@ class FourcatToDmiTcatConverterAndUploader(ProcessorPreset):
     Run processor pipeline to extract neologisms
     """
     type = "preset-upload-tcat"  # job type ID
-    category = "Presets"  # category. 'Presets' are always listed first in the UI.
+    category = "Combined processors"  # category. 'Combined processors' are always listed first in the UI.
     title = "Upload to DMI-TCAT"  # title displayed in UI
-    description = "Convert the dataset to a format compatible with DMI-TCAT and upload it to an available instance."  # description displayed in UI
+    description = "Convert the dataset to a TCAT-compatible format and upload it to an available TCAT server."  # description displayed in UI
     extension = "html"
 
     @classmethod
@@ -40,9 +40,9 @@ class FourcatToDmiTcatConverterAndUploader(ProcessorPreset):
                         }
                     },
                     "default": "random",
-                    "help": "Instance to upload to",
-                    "tooltip": "Which TCAT instance to upload the dataset to. If you do not choose one, 4CAT will "
-                               "upload the dataset to the instance with the highest available capacity."
+                    "help": "Server to upload to",
+                    "tooltip": "Which TCAT server to upload the dataset to. If you do not choose one, 4CAT will "
+                               "upload the dataset to the server with the highest available capacity."
                 }
                 # todo: actually make it choose one that way instead of choosing at random
             }

@@ -21,10 +21,9 @@ class ColumnNetworker(BasicProcessor):
     """
     type = "column-network"
     category = "Networks"
-    title = "Co-column network"
-    description = "Create a Gephi-compatible GEXF network comprised of co-occurring values of two columns of the " \
-                  "source file. For all items in the dataset, an edge is created between the values of the two " \
-                  "columns, if they are not empty. Nodes and edges are weighted by frequency."
+    title = "Custom network"
+    description = "Create a GEXF network file comprised of linked values between a custom set of columns " \
+                  "(e.g. 'author' and 'subreddit'). Nodes and edges are weighted by frequency."
     extension = "gexf"
 
     options = {
@@ -41,7 +40,7 @@ class ColumnNetworker(BasicProcessor):
                 "week": "Week",
                 "day": "Day"
             },
-            "tooltip": "Dynamic networks will record, for each node and edge, in which interval(s) they were present. "
+            "tooltip": "Dynamic networks will record in which interval(s) nodes and edges were present. "
                        "Weights will also be calculated per interval. Dynamic graphs can be opened in e.g. Gephi to "
                        "visually analyse the evolution of the network over time."
         },
@@ -49,7 +48,7 @@ class ColumnNetworker(BasicProcessor):
             "type": UserInput.OPTION_TOGGLE,
             "help": "Directed edges?",
             "default": True,
-            "tooltip": "If enabled, an edge from 'hello' in column 1 to 'world' in column 2 creates a different edge "
+            "tooltip": "If enabled, e.g. an edge from 'hello' in column 1 to 'world' in column 2 creates a different edge "
                        "than from 'world' in column 1 to 'hello' in column 2. If disabled, these would be considered "
                        "the same edge."
         },
@@ -57,8 +56,7 @@ class ColumnNetworker(BasicProcessor):
             "type": UserInput.OPTION_TOGGLE,
             "help": "Allow loops?",
             "default": False,
-            "tooltip": "If enabled, if the two columns contain the same value, a looping edge (from a node to itself) "
-                       "is created. If disabled, such edges are ignored."
+            "tooltip": "If enabled, a looping edge (from a node to itself) is created if the two columns contain the same value."
         },
         "split-comma": {
             "type": UserInput.OPTION_TOGGLE,

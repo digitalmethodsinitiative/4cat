@@ -25,8 +25,8 @@ class SigmaNetwork(BasicProcessor):
 
 	type = "sigma-network"  # job type ID
 	category = "Visualisation"  # category
-	title = "Sigma js network"  # title displayed in UI
-	description = "Visualise a gexf network in the browser with sigma js."  # description displayed in UI
+	title = "Show network in browser"  # title displayed in UI
+	description = "Visualise a GEXF network in the browser with sigma js."  # description displayed in UI
 	extension = "html"  # extension of result file, used internally and in UI
 
 	@classmethod

@@ -42,6 +42,18 @@ def _jinja2_filter_numberify(number):
 
 	return str(number)
 
+@app.template_filter('commafy')
+def _jinja2_filter_commafy(number):
+	"""
+	Applies thousands separator to ints.
+	"""
+	try:
+		number = int(number)
+	except TypeError:
+		return number
+
+	return f"{number:,}"
+
 @app.template_filter('timify')
 def _jinja2_filter_numberify(number):
 	try:
@@ -185,8 +197,9 @@ def _jinja2_filter_extension_to_noun(ext):
 
 @app.template_filter('post_field')
 def _jinja2_filter_post_field(field, post):
-	# Takes a value in between {{ two curly brackets }} and uses that
-	# as a dictionary key. It then returns the corresponding value.
+	# Extracts string values between {{ two curly brackets }} and uses that
+	# as a dictionary key for the given dict. It then returns the corresponding value.
+	# Mainly used in the Explorer.
 
 	matches = False
 	formatted_field = field
