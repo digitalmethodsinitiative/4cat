@@ -187,7 +187,7 @@ if transfer_settings:
         if setting:
             set_or_create_setting(name, setting, connection=connection, cursor=cursor, keep_connection_open=True)
 
-    print('Setting migrated to Database!')
+    print('  Setting migrated to Database!')
 
 # Close database connection
 connection.close()
