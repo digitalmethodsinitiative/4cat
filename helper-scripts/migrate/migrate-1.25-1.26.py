@@ -31,7 +31,7 @@ if not has_table["exists"]:
       name                   TEXT UNIQUE PRIMARY KEY,
       value                  TEXT DEFAULT '{}'
     )""")
-    cursor.commit()
+    connection.commit()
 else:
     print("  ...Yes, fourcat_settings table already exists.")
 connection.close()
