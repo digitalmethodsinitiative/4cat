@@ -27,11 +27,11 @@ cursor.execute("SELECT EXISTS (SELECT * from information_schema.tables WHERE tab
 has_table = cursor.fetchone()
 if not has_table["exists"]:
     print("  ...No, adding table fourcat_setttings.")
-    db.execute("""CREATE TABLE IF NOT EXISTS fourcat_settings (
+    cursor.execute("""CREATE TABLE IF NOT EXISTS fourcat_settings (
       name                   TEXT UNIQUE PRIMARY KEY,
       value                  TEXT DEFAULT '{}'
     )""")
-    db.commit()
+    cursor.commit()
 else:
     print("  ...Yes, fourcat_settings table already exists.")
 connection.close()
