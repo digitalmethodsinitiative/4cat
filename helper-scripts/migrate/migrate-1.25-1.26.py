@@ -57,11 +57,11 @@ if transfer_settings:
     if old_config.DB_HOST:
         config_reader['DATABASE']['db_host'] = old_config.DB_HOST
     if old_config.DB_PORT:
-        config_reader['DATABASE']['db_port'] = old_config.DB_PORT
+        config_reader['DATABASE']['db_port'] = str(old_config.DB_PORT)
     if old_config.DB_USER:
-        config_reader['DATABASE']['db_user'] = old_config.DB_USER
+        config_reader['DATABASE']['db_user'] = str(old_config.DB_USER)
     if old_config.DB_PASSWORD:
-        config_reader['DATABASE']['db_password'] = old_config.DB_PASSWORD
+        config_reader['DATABASE']['db_password'] = str(old_config.DB_PASSWORD)
     if old_config.DB_NAME:
         config_reader['DATABASE']['db_name'] = old_config.DB_NAME
 
@@ -71,7 +71,7 @@ if transfer_settings:
     if old_config.API_HOST:
         config_reader['API']['api_host'] = old_config.API_HOST
     if old_config.API_PORT:
-        config_reader['API']['api_port'] = old_config.API_PORT
+        config_reader['API']['api_port'] = str(old_config.API_PORT)
 
     # Update PATH info
     if not config_reader.has_section('PATHS'):
@@ -91,9 +91,9 @@ if transfer_settings:
     if not config_reader.has_section('GENERATE'):
         config_reader.add_section('GENERATE')
     if old_config.ANONYMISATION_SALT:
-        config_reader['GENERATE']['anonymisation_salt'] = old_config.ANONYMISATION_SALT
+        config_reader['GENERATE']['anonymisation_salt'] = str(old_config.ANONYMISATION_SALT)
     if old_config.SECRET_KEY:
-        config_reader['GENERATE']['secret_key'] = old_config.SECRET_KEY
+        config_reader['GENERATE']['secret_key'] = str(old_config.SECRET_KEY)
 
     # Save config file
     with open(configfile_to_save, 'w') as configfile:
