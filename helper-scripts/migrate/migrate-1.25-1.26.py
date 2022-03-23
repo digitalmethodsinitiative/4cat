@@ -9,6 +9,7 @@ sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)) + "'/../..")
 
 print("  Checking if preexisting config.py file...")
 transfer_settings = False
+config = None
 try:
     import config as old_config
     transfer_settings = True
