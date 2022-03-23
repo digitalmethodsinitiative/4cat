@@ -92,8 +92,8 @@ if transfer_settings:
         config_reader.add_section('GENERATE')
     if old_config.ANONYMISATION_SALT:
         config_reader['GENERATE']['anonymisation_salt'] = str(old_config.ANONYMISATION_SALT)
-    if old_config.SECRET_KEY:
-        config_reader['GENERATE']['secret_key'] = str(old_config.SECRET_KEY)
+    if old_config.FlaskConfig.SECRET_KEY:
+        config_reader['GENERATE']['secret_key'] = str(old_config.FlaskConfig.SECRET_KEY)
 
     # Save config file
     with open(configfile_to_save, 'w') as configfile:
