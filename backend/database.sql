@@ -121,7 +121,7 @@ CREATE FUNCTION count_estimate(query text) RETURNS bigint AS $$
 INSERT INTO fourcat_settings
   (name, value)
   Values
-    --('4chan.boards', '["pol", "v"]')
+    ('DATASOURCES', '{"bitchute": {}, "custom": {}, "douban": {}, "customimport": {}, "parler": {}, "reddit": { "boards": "*", }, "telegram": {}, "twitterv2": {"id_lookup": False} }')
     ('TOOL_NAME', '"4CAT"'),
     ('TOOL_NAME_LONG', '"4CAT: Capture and Analysis Toolkit"'),
     ('PATH_VERSION', '".git-checked-out"'),
