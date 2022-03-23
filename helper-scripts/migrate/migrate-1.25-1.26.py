@@ -1,13 +1,11 @@
 # Add 'is_deactivated' column to user table
 import sys
 import os
+import psycopg2
+import psycopg2.extras
 import configparser
 
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)) + "'/../..")
-from common.lib.database import Database
-from common.lib.logger import Logger
-
-log = Logger(output=True)
 
 print("  Checking if preexisting config.py file...")
 transfer_settings = False
@@ -18,14 +16,16 @@ try:
 except (SyntaxError, ImportError) as e:
     print("  ...No prexisting settings exist.")
 
+print("  Checking if fourcat_settings table exists...")
 if transfer_settings:
-    db = Database(logger=log, dbname=old_config.DB_NAME, user=old_config.DB_USER, password=old_config.DB_PASSWORD, host=old_config.DB_HOST, port=old_config.DB_PORT, appname="4cat-migrate")
+    connection = psycopg2.connect(dbname=old_config.DB_NAME, user=old_config.DB_USER, password=old_config.DB_PASSWORD, host=old_config.DB_HOST, port=old_config.DB_PORT, application_name="4cat-migrate")
 else:
     import common.config_manager as config
-    db = Database(logger=log, dbname=config.get('DB_NAME'), user=config.get('DB_USER'), password=config.get('DB_PASSWORD'), host=config.get('DB_HOST'), port=config.get('DB_PORT'), appname="4cat-migrate")
-
-print("  Checking if fourcat_settings table exists...")
-has_table = db.fetchone("SELECT EXISTS (SELECT FROM fourcat_settings)")
+    connection = psycopg2.connect(dbname=config.get('DB_NAME'), user=config.get('DB_USER'), password=config.get('DB_PASSWORD'), host=config.get('DB_HOST'), port=config.get('DB_PORT'), application_name="4cat-migrate")
+cursor = connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+query = "SELECT EXISTS (SELECT FROM fourcat_settings)"
+cursor.execute(query)
+has_table = cursor.fetchone()
 if not has_table["exists"]:
     print("  ...No, adding table fourcat_setttings.")
     db.execute("""CREATE TABLE IF NOT EXISTS fourcat_settings (
@@ -35,6 +35,7 @@ if not has_table["exists"]:
     db.commit()
 else:
     print("  ...Yes, fourcat_settings table already exists.")
+connection.close()
 
 if transfer_settings:
     print("  Moving settings to database...")
