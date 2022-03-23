@@ -26,8 +26,8 @@ if os.path.exists(DOCKER_CONFIG_FILE):
 
     import common.config_manager as config
     your_server = config.get('SERVER_NAME', 'localhost')
-    if public_port == 80:
-      pass
+    if int(public_port) == 80:
+      config.set_value('SERVER_NAME', your_server)
     else:
       config.set_value('SERVER_NAME', f"{your_server}:{public_port}")
 
@@ -107,10 +107,10 @@ for path in [config.get('PATH_DATA'),
 
 # Update some settings
 your_server = config.get('SERVER_NAME', 'localhost')
-if public_port == 80:
-  pass
+if int(public_port) == 80:
+    config.set_value('SERVER_NAME', your_server)
 else:
-  config.set_value('SERVER_NAME', f"{your_server}:{public_port}")
+    config.set_value('SERVER_NAME', f"{your_server}:{public_port}")
 
 whitelist = config.get('HOSTNAME_WHITELIST')# only these may access the web tool; "*" or an empty list matches everything
 if your_server not in whitelist:
