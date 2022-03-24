@@ -1,3 +1,12 @@
+# EXAMPLE config.ini file. If no config.ini file exists, 4CAT will copy
+# and use this file.
+
+# This tells 4CAT if you are using Docker; leave as False
+# Docker will automatically create a config.ini file for your .env config file
+# so no need to create one
+[DOCKER]
+use_docker_config = False
+
 [DATABASE]
 db_host = localhost
 db_port = 5432
@@ -11,11 +20,18 @@ db_password = supers3cr3t
 api_host = localhost
 api_port = 4444
 
+# Path to folders where logs/images/data may be saved.
+# Paths are relative to the folder this config file is in.
 [PATHS]
+# Images: if left empty or pointing to a non-existent folder, no images will be saved
 path_images = data
+# Data: search results will be stored here as CSV or NDJSON files
 path_data = data
+# Lockfile the daemon lockfile will be saved in this folder. Probably no need to change!
 path_lockfile = backend
+ # Sessions: folder where API session data is stored (e.g., Telegram)
 path_sessions = sessions
+# Losts: store logs here - empty means the 4CAT root folder
 path_logs = logs/
 
 [GENERATE]

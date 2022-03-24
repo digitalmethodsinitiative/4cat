@@ -6,6 +6,8 @@ import psycopg2
 import psycopg2.extras
 import configparser
 
+from common.lib.exceptions import FourcatException
+
 class ConfigManager:
     """
     Manage 4CAT configuation options that cannot be recorded in database
@@ -14,22 +16,20 @@ class ConfigManager:
     Note: some options are here until additional changes are made and they can
     be moved to more appropriate locations.
     """
-    CONFIG_FILE = 'backend/config_defaults.ini'
-    DOCKER_CONFIG_FILE = 'docker/shared/docker_config.ini'
+    CONFIG_FILE = 'config/config.ini'
 
     #TODO: work out best structure for docker vs non-docker
     # Do not need two configs, BUT Docker config.ini has to be in shared volume for both front and backend to access it
     config_reader = configparser.ConfigParser()
     USING_DOCKER = False
-    if os.path.exists(DOCKER_CONFIG_FILE):
-        config_reader.read(DOCKER_CONFIG_FILE)
-        if config_reader['DOCKER'].getboolean('use_docker_config'):
-            # User docker_config.ini
-            USING_DOCKER = True
-            pass
-    if not USING_DOCKER and os.path.exists(CONFIG_FILE):
-        # if docker not enabled, use default config
+    if os.path.exists(CONFIG_FILE):
         config_reader.read(CONFIG_FILE)
+        if config_reader['DOCKER'].getboolean('use_docker_config'):
+            # Can use throughtout 4CAT to know if Docker environment
+            USING_DOCKER = True
+    else:
+        # config should be created!
+        raise FourcatException('No config/config.ini file exists! Update and rename the config.ini-example file.')
 
     DB_HOST = config_reader['DATABASE'].get('db_host')
     DB_PORT = config_reader['DATABASE'].getint('db_port')
