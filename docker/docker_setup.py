@@ -11,9 +11,6 @@ read by a docker-compose.yml.
 This should be run from the command line and is used by docker-entrypoint files.
 """
 
-def update_server_data():
-
-
 if __name__ == "__main__":
     import os
     import configparser
@@ -108,7 +105,7 @@ if __name__ == "__main__":
             config.set_value('HOSTNAME_WHITELIST_API', api_whitelist)
 
 
-    # Config file already exists
+    # Config file already exists; Update .env variables if they changed 
     else:
         print('Configuration file config/config.ini already exists')
         print('Updating Docker .env variables if necessary')
