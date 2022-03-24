@@ -404,6 +404,7 @@ class ImageDownloader(BasicProcessor):
 			raise FileNotFoundError()
 		except UnicodeDecodeError:
 			self.dataset.log("Error: 4chan image search could not be completed for image %s, skipping" % url)
+			raise FileNotFoundError()
 
 		# download image itself
 		image = self.request_get_w_error_handling(image_url, stream=True)
