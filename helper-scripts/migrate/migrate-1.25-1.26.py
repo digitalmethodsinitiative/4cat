@@ -76,7 +76,8 @@ if transfer_settings:
     # FIRST update config_defaults.ini or docker_config.ini
     # Check if Docker
     old_config_filepath = getattr(old_config, "DOCKER_CONFIG_FILE", getattr(old_config, "CONFIG_FILE", None))
-    if os.path.exists(old_config_filepath):
+    if old_config_filepath and os.path.exists(old_config_filepath):
+        # Old config file exists (Docker setup)
         config_reader = configparser.ConfigParser()
         config_reader.read(old_config_filepath)
     else:
