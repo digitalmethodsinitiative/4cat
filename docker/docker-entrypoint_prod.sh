@@ -21,9 +21,9 @@ done
 echo "PostgreSQL started"
 
 # Create Database if it does not already exist
-# TODO could move this to Build step now that admin user is created via frontend 
+# TODO could move this to Build step now that admin user is created via frontend
 # Check for "jobs" table
-if [[ `psql --host=db --port=5432 --user=$POSTGRES_USER --dbname=$POSTGRES_DB -tAc "SELECT EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'jobs')"` = 't' ]]; then
+if [ `psql --host=db --port=5432 --user=$POSTGRES_USER --dbname=$POSTGRES_DB -tAc "SELECT EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'jobs')"` = 't' ]; then
   # Table already exists
   echo "Database already created"
 else
