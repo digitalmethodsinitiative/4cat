@@ -75,16 +75,16 @@ if transfer_settings:
     print("  Moving settings to database...")
     # FIRST update config_defaults.ini or docker_config.ini
     # Check if Docker
-    USING_DOCKER = True
-    configfile_to_save = old_config.DOCKER_CONFIG_FILE
-    if os.path.exists(old_config.DOCKER_CONFIG_FILE):
-      config_reader = configparser.ConfigParser()
-      config_reader.read(old_config.DOCKER_CONFIG_FILE)
-      if not config_reader['DOCKER'].getboolean('use_docker_config'):
-          # Not using docker
-          USING_DOCKER = False
-          configfile_to_save = 'backend/config_defaults.ini'
-          config_reader.read(configfile_to_save)
+    old_config_filepath = getattr(old_config, "DOCKER_CONFIG_FILE", getattr(old_config, "CONFIG_FILE", None))
+    if os.path.exists(old_config_filepath):
+        config_reader = configparser.ConfigParser()
+        config_reader.read(old_config_filepath)
+    else:
+        # new config.ini file
+        config_reader = configparser.ConfigParser()
+        # If there is no config file then it cannot be a Docker instance
+        config_reader.add_section('DOCKER')
+        config_reader['DOCKER']['use_docker_config'] = False
 
     # Update DB info
     if not config_reader.has_section('DATABASE'):
@@ -131,6 +131,7 @@ if transfer_settings:
         config_reader['GENERATE']['secret_key'] = str(old_config.FlaskConfig.SECRET_KEY)
 
     # Save config file
+    configfile_to_save = 'config/config.ini'
     with open(configfile_to_save, 'w') as configfile:
         config_reader.write(configfile)
 
