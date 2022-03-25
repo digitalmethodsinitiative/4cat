@@ -1,6 +1,6 @@
 {% if dataset.is_finished() and dataset.num_rows > 0 %}
 <div id="dataset-{{ dataset.key }}-num-items" class="dataset-items">
-    <i class="fa fa-check" aria-hidden="true"></i> <em>Completed.</em> {{ "{:,}".format(dataset.num_rows) }} item{% if dataset.num_rows != 1 %}s{% endif %} captured.
+    <i class="fa fa-check" aria-hidden="true"></i> <em>{% if dataset.status %}{{ dataset.status }}{% if dataset.status[-1] != '.' %}.{% endif %}{% else %}Completed.{% endif %}</em> {{ "{:,}".format(dataset.num_rows) }} item{% if dataset.num_rows != 1 %}s{% endif %} captured.
 </div>
 {% endif %}
 <div id="dataset-{{ dataset.key }}-status" class="full-block dataset-status {% if not dataset.is_finished() or dataset.num_rows < 1 %}status-message{% else %}result-actions{% endif %}" {% if dataset.is_finished() %}data-num-results="{{ dataset.num_rows }}"{% endif %}>

@@ -211,7 +211,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		result, copying it to another dataset, and so on.
 		"""
 		if self.dataset.data["num_rows"] > 0:
-			self.dataset.update_status("Dataset saved.")
+			self.dataset.update_status("Dataset completed.")
 
 		if not self.dataset.is_finished():
 			self.dataset.finish()
