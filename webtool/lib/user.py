@@ -237,6 +237,7 @@ class User:
 
 		:param bool new:  Is this the first time setting a password for this
 						  account?
+		:return str:  Link for the user to set their password with
 		"""
 		if not config.MAILHOST:
 			raise RuntimeError("No e-mail server configured. 4CAT cannot send any e-mails.")
@@ -290,6 +291,7 @@ class User:
 		# try to send it
 		try:
 			send_email([username], message)
+			return url
 		except (smtplib.SMTPException, ConnectionRefusedError, socket.timeout) as e:
 			raise RuntimeError("Could not send password reset e-mail: %s" % e)
 
