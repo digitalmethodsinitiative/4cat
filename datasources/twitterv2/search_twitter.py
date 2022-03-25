@@ -204,12 +204,27 @@ class SearchWithTwitterAPIv2(Search):
                 # rate limited - the limit at time of writing is 300 reqs per 15
                 # minutes
                 # usually you don't hit this when requesting batches of 500 at
-                # 1/second
+                # 1/second, but this is also returned when the user reaches the
+                # monthly tweet cap, albeit with different content in that case
                 if api_response.status_code == 429:
+                    try:
+                        structured_response = api_response.json()
+                        if structured_response.get("title") == "UsageCapExceeded":
+                            self.dataset.update_status("Hit the monthly tweet cap. You cannot capture more tweets "
+                                                       "until your API quota resets. Dataset completed with tweets "
+                                                       "collected so far.", is_final=True)
+                            return
+                    except (json.JSONDecodeError, ValueError):
+                        self.dataset.update_status("Hit Twitter rate limit, but could not figure out why. Halting "
+                                                   "tweet collection.", is_final=True)
+                        return
+
                     resume_at = convert_to_int(api_response.headers["x-rate-limit-reset"]) + 1
                     resume_at_str = datetime.datetime.fromtimestamp(int(resume_at)).strftime("%c")
                     self.dataset.update_status("Hit Twitter rate limit - waiting until %s to continue." % resume_at_str)
                     while time.time() <= resume_at:
+                        if self.interrupted:
+                            raise ProcessorInterruptedException("Interrupted while waiting for rate limit to reset")
                         time.sleep(0.5)
                     continue
 
