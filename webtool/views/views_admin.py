@@ -123,10 +123,10 @@ def add_user():
                 db.update("users", data={"timestamp_token": int(time.time())}, where={"name": username})
 
                 try:
-                    user.email_token(new=True)
+                    url = user.email_token(new=True)
                     response["success"] = True
                     response = {**response, **{
-                        "message": "A new registration e-mail has been sent to %s." % username}}
+                        "message": "A new registration e-mail has been sent to %s. The registration link is [%s](%s)" % (username, url, url) }}
                 except RuntimeError as e:
                     response = {**response, **{
                         "message": "Token was reset but registration e-mail could not be sent (%s)." % e}}
