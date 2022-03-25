@@ -80,7 +80,7 @@ class User:
 		"""
 		user = db.fetchone(
 			"SELECT * FROM users WHERE register_token = %s AND (timestamp_token = 0 OR timestamp_token > %s)",
-			(token, int(time.time()) - (3 * 86400)))
+			(token, int(time.time()) - (7 * 86400)))
 		if not user:
 			return None
 		else:
