@@ -46,6 +46,21 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
             "type": UserInput.OPTION_TEXT_LARGE,
             "help": "List of urls"
         },
+        "frequency": {
+            "type": UserInput.OPTION_CHOICE,
+            "help": "Frequency over time period",
+            "tooltip": "Default 'First Available' scrapes the first available result after start date",
+            "options": {
+                "first": "First Available",
+                "yearly": "Yearly"
+            },
+            "default": "selenium_only"
+        },
+        "daterange": {
+            "type": UserInput.OPTION_DATERANGE,
+            "tooltip": "Scrapes first available page after start date; Uses start and end date for frequency",
+            "help": "Date range"
+        },
         "subpages": {
             "type": UserInput.OPTION_TEXT,
             "help": "Crawl additional host links/subpages",
@@ -80,8 +95,8 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
         else:
             self.dataset.update_status('Scraping Web Archives with Selenium %s' % config.SELENIUM_BROWSER)
         scrape_additional_subpages = self.parameters.get("subpages")
-        urls_to_scrape = [url.strip() for url in self.parameters.get("query", "").split('\n')]
-        urls_to_scrape = [{'url':url, 'num_additional_subpages': scrape_additional_subpages, 'subpage_links':[]} for url in urls_to_scrape]
+
+        urls_to_scrape = [{'url':url['url'], 'base_url':url['base_url'], 'year':url['year'], 'num_additional_subpages': scrape_additional_subpages, 'subpage_links':[]} for url in query]
 
         # Do not scrape the same site twice
         scraped_urls = set()
@@ -95,6 +110,8 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
             url = url_obj['url']
             num_additional_subpages = url_obj['num_additional_subpages']
             result = {
+                "base_url": url_obj['base_url'],
+                "year": url_obj['year'],
                 "url": url,
                 "final_url": None,
                 "subject": None,
@@ -174,6 +191,7 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
                     # Check if any are available
                     if not url_obj['subpage_links']:
                         # If no, collect links
+                        # Web archive domain
                         domain = urlparse(url).scheme + '://' + urlparse(url).netloc
                         num_of_links, links = self.get_beautiful_links(scraped_page['page_source'], domain)
                         # Randomize links (else we end up with mostly menu items at the top of webpages)
@@ -184,10 +202,12 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
                     # Find the first link that has not been previously scraped
                     while links:
                         link = links.pop(0)
-                        if self.check_exclude_link(link[1], scraped_urls):
+                        if self.check_exclude_link(link[1], scraped_urls, urlparse(url_obj['base_url']).scheme + '://' + urlparse(url_obj['base_url']).netloc):
                             # Add it to be scraped next
                             urls_to_scrape.insert(0, {
                                 'url': link[1],
+                                'base_url': url_obj['base_url'],
+                                'year': url_obj['year'],
                                 'num_additional_subpages': num_additional_subpages - 1, # Make sure to request less additional pages
                                 'subpage_links':links,
                             })
@@ -224,6 +244,8 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
                             # Add it to be scraped next
                             urls_to_scrape.insert(0, {
                                 'url': link[1],
+                                'base_url': url_obj['base_url'],
+                                'year': url_obj['year'],
                                 'num_additional_subpages': num_additional_subpages - 1, # Make sure to request less additional pages
                                 'subpage_links':links,
                             })
@@ -237,7 +259,7 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
                     result['error'] = 'Unable to scrape'
                 yield result
 
-    def check_exclude_link(self, link, previously_used_links):
+    def check_exclude_link(self, link, previously_used_links, base_url_domain=None):
         """
         Check if a link should not be used. Returns true if link not in previously used
         and not in bad url list and not in excluded urls.
@@ -245,7 +267,13 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
         if link not in previously_used_links and \
             not any([bad_url in link[:10] for bad_url in ['mailto:', 'javascript']]) and \
             not any([exclude_url in link for exclude_url in ['archive.org/about', 'archive.org/account/']]):
-            return True
+                if base_url_domain is None:
+                    return True
+                else:
+                    if base_url_domain in link:
+                        return True
+                    else:
+                        return False
         else:
             return False
 
@@ -276,6 +304,44 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
         return response
 
     @staticmethod
+    def create_web_archive_urls(url, start_date, end_date, frequency):
+        """
+        Combines url with Web Archive base (https://web.archive.org/web/) if
+        needed along with start date to create urls. Will use frequency to
+        create additional urls if needed.
+
+        :param str url: url as string
+        :param start_date: starting date
+        :param end_date: ending date
+        :param string frequency: frequency of scrape
+        :return list: List of urls to scrape
+        """
+        web_archive_url = 'https://web.archive.org/web/'
+        min_date = datetime.datetime.fromtimestamp(int(start_date))
+
+        # if already formated, return as is
+        if web_archive_url == url[:len(web_archive_url)]:
+            return [{'base_url': url, 'year': min_date.year, 'url': url}]
+
+        if frequency == 'yearly':
+            max_date = datetime.datetime.fromtimestamp(int(end_date))
+            years = [year for year in range(min_date.year, max_date.year]
+
+            return  [
+                     {
+                     'base_url': url,
+                     'year': year,
+                     'url': web_archive_url + str(year) + min_date.strftime('%m%d') + '/' + url,
+                     }
+                    for year in years]
+
+        elif frequency == 'first':
+            return [{'base_url': url, 'year': min_date.year, 'url': web_archive_url + min_date.strftime('%Y%m%d') + '/' + url}]
+
+        else:
+            raise Exception('frequency type %s not implemented!' % frequency)
+
+    @staticmethod
     def validate_query(query, request, user):
         """
         Validate input for a dataset query on the Selenium Webpage Scraper.
@@ -294,15 +360,23 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
             raise QueryParametersException("Please provide a List of urls.")
 
         urls = [url.strip() for url in query.get("query", "").split('\n')]
-        preprocessed_urls = [url for url in urls if validate_url(url)]
-        if not preprocessed_urls:
+        validated_urls = [url for url in urls if validate_url(url)]
+        if not validated_urls:
             raise QueryParametersException("No Urls detected!")
 
         if not query.get("http_request"):
             raise QueryParametersException("Selenium/HTTP option must exist!")
 
+        # the dates need to make sense as a range to search within
+        query["min_date"], query["max_date"] = query.get("daterange")
+        preprocessed_urls = []
+        for url in validated_urls:
+            url_group = create_web_archive_urls(url, query["min_date"], query["max_date"], query.get('frequency'))
+            [preprocessed_urls.append(new_url) for new_url in url_group]
+
         return {
             "query": query.get("query"),
+            "preprocessed_urls": preprocessed_urls,
             "subpages": query.get("subpages", 0),
             'http_request': query.get("http_request"),
             }
