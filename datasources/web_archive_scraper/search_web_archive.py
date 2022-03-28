@@ -371,7 +371,7 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
         query["min_date"], query["max_date"] = query.get("daterange")
         preprocessed_urls = []
         for url in validated_urls:
-            url_group = create_web_archive_urls(url, query["min_date"], query["max_date"], query.get('frequency'))
+            url_group = SearchWebArchiveWithSelenium.create_web_archive_urls(url, query["min_date"], query["max_date"], query.get('frequency'))
             [preprocessed_urls.append(new_url) for new_url in url_group]
 
         return {
