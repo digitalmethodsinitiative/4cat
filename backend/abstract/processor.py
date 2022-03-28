@@ -223,7 +223,11 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		for next in self.parameters.get("next", []):
 			next_parameters = next.get("parameters", {})
 			next_type = next.get("type", "")
-			available_processors = self.dataset.get_available_processors()
+			try:
+				available_processors = self.dataset.get_available_processors()
+			except ValueError:
+				self.log.info("Trying to queue next processor, but parent dataset no longer exists, halting")
+				break
 
 			# run it only if the post-processor is actually available for this query
 			if self.dataset.data["num_rows"] <= 0:
