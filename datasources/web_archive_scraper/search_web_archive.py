@@ -325,7 +325,7 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
 
         if frequency == 'yearly':
             max_date = datetime.datetime.fromtimestamp(int(end_date))
-            years = [year for year in range(min_date.year, max_date.year]
+            years = [year for year in range(min_date.year, max_date.year)]
 
             return  [
                      {
