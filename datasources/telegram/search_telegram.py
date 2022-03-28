@@ -141,6 +141,10 @@ class SearchTelegram(Search):
             self.dataset.delete_parameter("api_phone", instant=True)
             self.dataset.delete_parameter("api_id", instant=True)
 
+        if not self.flawless:
+            self.dataset.update_status("Dataset completed, but some requested entities were unavailable (they may have"
+                                       "been private). View the log file for details.", is_final=True)
+
         return results
 
     async def execute_queries(self):
@@ -462,9 +466,9 @@ class SearchTelegram(Search):
             else:
                 attachment_data = ""
 
-        elif attachment_type in ("geo", "geo_live"):
+        #elif attachment_type in ("geo", "geo_live"):
             # untested whether geo_live is significantly different from geo
-            attachment_data = "%s %s" % (message["geo"]["lat"], message["geo"]["long"])
+        #    attachment_data = "%s %s" % (message["geo"]["lat"], message["geo"]["long"])
 
         elif attachment_type == "photo":
             # we don't actually store any metadata about the photo, since very
