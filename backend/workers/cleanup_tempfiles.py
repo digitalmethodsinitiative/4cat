@@ -9,6 +9,7 @@ from pathlib import Path
 import config
 from backend.abstract.worker import BasicWorker
 from common.lib.dataset import DataSet
+from common.lib.exceptions import WorkerInterruptedException
 
 
 class TempFileCleaner(BasicWorker):
@@ -34,7 +35,7 @@ class TempFileCleaner(BasicWorker):
         result_files = Path(config.PATH_DATA).glob("*")
         for file in result_files:
             if self.interrupted:
-                raise ProcessorInterruptedException("Interrupted while cleaning up orphaned result files")
+                raise WorkerInterruptedException("Interrupted while cleaning up orphaned result files")
 
             # the key of the dataset files belong to can be extracted from the
             # file name in a predictable way.
@@ -56,7 +57,11 @@ class TempFileCleaner(BasicWorker):
                 if file.is_dir():
                     shutil.rmtree(file)
                 else:
-                    file.unlink()
+                    try:
+                        file.unlink()
+                    except FileNotFoundError:
+                        # the file has been deleted since
+                        pass
                 continue
 
             if file.is_dir() and "-staging" in file.stem and dataset.is_finished():
