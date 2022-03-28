@@ -201,7 +201,7 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
                     # Find the first link that has not been previously scraped
                     while links:
                         link = links.pop(0)
-                        if self.check_exclude_link(link[1], scraped_urls, urlparse(url_obj['base_url']).scheme + '://' + urlparse(url_obj['base_url']).netloc):
+                        if self.check_exclude_link(link[1], scraped_urls):
                             # Add it to be scraped next
                             urls_to_scrape.insert(0, {
                                 'url': link[1],
@@ -258,7 +258,7 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
                     result['error'] = 'Unable to scrape'
                 yield result
 
-    def check_exclude_link(self, link, previously_used_links, base_url_domain=None):
+    def check_exclude_link(self, link, previously_used_links):
         """
         Check if a link should not be used. Returns true if link not in previously used
         and not in bad url list and not in excluded urls.
@@ -266,13 +266,7 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
         if link not in previously_used_links and \
             not any([bad_url in link[:10] for bad_url in ['mailto:', 'javascript']]) and \
             not any([exclude_url in link for exclude_url in ['archive.org/about', 'archive.org/account/']]):
-                if base_url_domain is None:
-                    return True
-                else:
-                    if base_url_domain in link:
-                        return True
-                    else:
-                        return False
+                return True
         else:
             return False
 
