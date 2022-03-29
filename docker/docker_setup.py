@@ -5,7 +5,7 @@ config/config.ini.
 For Docker, it is necessary to keep this file in a shared volume as both the
 backend and frontend use it. The config_manager will also read and edit this
 file. Some variables are defined via the Docker configurations (such as db_host
-or db_port) while others can be set by the user in the `.env` file which is 
+or db_port) while others can be set by the user in the `.env` file which is
 read by a docker-compose.yml.
 
 This should be run from the command line and is used by docker-entrypoint files.
@@ -67,6 +67,7 @@ if __name__ == "__main__":
         config_parser.add_section('SERVER')
         public_port = os.environ['PUBLIC_PORT']
         config_parser['SERVER']['public_port'] = public_port
+        docker_config['SERVER']['server_name'] = os.environ['SERVER_NAME']
 
         # Save config file
         with open(CONFIG_FILE, 'w') as configfile:
@@ -99,6 +100,7 @@ if __name__ == "__main__":
 
         public_port = os.environ['PUBLIC_PORT']
         config_parser['SERVER']['public_port'] = str(public_port)
+        docker_config['SERVER']['server_name'] = os.environ['SERVER_NAME']
 
         # Save config file
         with open(CONFIG_FILE, 'w') as configfile:

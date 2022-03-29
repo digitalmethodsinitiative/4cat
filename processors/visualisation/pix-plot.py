@@ -357,6 +357,8 @@ class PixPlotGenerator(BasicProcessor):
 								image['description'] += '<br/><br/><b>' + key + ':</b> ' + str(value)
 
 						# PixPlot has a field limit of 131072
+						# TODO: PixPlot (dmi version) has been updated and this likely is no longer needed
+						# test first as displaying long descriptions still may have issues
 						image['description'] = image['description'][:131072]
 
 						# Add tags or hashtags
