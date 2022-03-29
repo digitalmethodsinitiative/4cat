@@ -642,10 +642,14 @@ def get_custom_fields(datasource, filetype=None):
 		datasource_dir = datasource.replace("4", "four")
 	elif datasource.startswith("8"):
 		datasource_dir = datasource.replace("8", "eight")
+	elif "facebook" in datasource or "instagram" in datasource:
+		datasource_dir = "import-from-tool"
+		datasource = "import-from-tool"
 	else:
 		datasource_dir = datasource
 
 	json_path = Path(config.PATH_ROOT, "datasources", datasource_dir, "explorer", datasource.lower() + "-explorer.json")
+	print(json_path)
 	if json_path.exists():
 		with open(json_path, "r", encoding="utf-8") as json_file:
 			try:
