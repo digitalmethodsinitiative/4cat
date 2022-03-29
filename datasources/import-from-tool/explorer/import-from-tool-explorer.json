@@ -1,9 +1,9 @@
- {
+{
 	"subject": "{{ subject }}",
-	"likes Facebook": "{{ likes }} <i class='fa-solid fa-thumbs-up'></i>",
-	"likes Instagram": "{{ num_likes }} <i class='fa-solid fa-heart'></i>",
-	"comments Facebook": "{{ comments }} <i class='fa-solid fa-comment'></i>",
-	"comments Instagram": "{{ num_comments }} <i class='fa-solid fa-comment'></i>",
+	"likes Facebook": "{{ likes }} <i class='fas fa-thumbs-up'></i>",
+	"likes Instagram": "{{ num_likes }} <i class='fas fa-heart'></i>",
+	"comments Facebook": "{{ comments }} <i class='fas fa-comment'></i>",
+	"comments Instagram": "{{ num_comments }} <i class='fas fa-comment'></i>",
 	"external_url": "{{ url }}",
 	"sort_options": [
 		{
