@@ -213,7 +213,7 @@ class ImageDownloader(BasicProcessor):
 				except UnidentifiedImageError:
 					picture = Image.open(image.raw)
 
-			except (FileNotFoundError, UnidentifiedImageError, AttributeError):
+			except (FileNotFoundError, UnidentifiedImageError, AttributeError, TypeError):
 				failures.append(url)
 				continue
 
