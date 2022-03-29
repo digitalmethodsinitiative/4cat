@@ -17,23 +17,33 @@
 		},
 		{
 			"key": "likes",
-			"label": "Likes (Facebook)"
+			"label": "Likes (Facebook)",
+			"force_int": true,
+			"descending": true
 		},
 		{
 			"key": "comments",
-			"label": "Comments (Facebook)"
+			"label": "Comments (Facebook)",
+			"force_int": true,
+			"descending": true
 		},
 		{
 			"key": "interactions",
-			"label": "interactions (Facebook)"
+			"label": "interactions (Facebook)",
+			"force_int": true,
+			"descending": true
 		},
 		{
 			"key": "num_likes",
-			"label": "Likes (Instagram)"
+			"label": "Likes (Instagram)",
+			"force_int": true,
+			"descending": true
 		},
 		{
 			"key": "num_comments",
-			"label": "Comments (Instagram)"
+			"label": "Comments (Instagram)",
+			"force_int": true,
+			"descending": true
 		}
 	]
 }
