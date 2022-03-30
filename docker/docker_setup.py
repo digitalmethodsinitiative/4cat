@@ -74,8 +74,14 @@ if __name__ == "__main__":
             config_parser.write(configfile)
             print('Created config/config.ini file')
 
-        # Ensure filepaths exist
         import config
+        # Check if config.py has old docker_config info
+        # TODO: remove after database config merge
+        if hasattr(config, 'DOCKER_CONFIG_FILE '):
+            with open(config.DOCKER_CONFIG_FILE, 'w') as configfile:
+                config_parser.write(configfile)
+
+        # Ensure filepaths exist
         for path in [config.PATH_DATA,
                      config.PATH_IMAGES,
                      config.PATH_LOGS,
@@ -105,3 +111,10 @@ if __name__ == "__main__":
         # Save config file
         with open(CONFIG_FILE, 'w') as configfile:
             config_parser.write(configfile)
+
+        import config
+        # Check if config.py has old docker_config info
+        # TODO: remove after database config merge
+        if hasattr(config, 'DOCKER_CONFIG_FILE '):
+            with open(config.DOCKER_CONFIG_FILE, 'w') as configfile:
+                config_parser.write(configfile)
