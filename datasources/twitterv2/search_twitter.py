@@ -26,6 +26,7 @@ class SearchWithTwitterAPIv2(Search):
     is_static = False   # Whether this datasource is still updated
 
     previous_request = 0
+    flawless = True
 
     references = [
         "[Twitter API documentation](https://developer.twitter.com/en/docs/twitter-api)"
@@ -107,6 +108,8 @@ class SearchWithTwitterAPIv2(Search):
         :param query:
         :return:
         """
+        # Compile any errors to highlight at end of log
+        error_report = []
         # this is pretty sensitive so delete it immediately after storing in
         # memory
         bearer_token = self.parameters.get("api_bearer_token")
@@ -145,7 +148,7 @@ class SearchWithTwitterAPIv2(Search):
 
             tweet_ids = self.parameters.get("query", []).split(',')
 
-            # Only can lookup 100 tweets in each query per Twitter API 
+            # Only can lookup 100 tweets in each query per Twitter API
             chunk_size = 100
             queries = [','.join(tweet_ids[i:i+chunk_size]) for i in range(0, len(tweet_ids), chunk_size)]
 
@@ -296,7 +299,7 @@ class SearchWithTwitterAPIv2(Search):
                 included_tweets = api_response.get("includes", {}).get("tweets", {})
                 included_places = api_response.get("includes", {}).get("places", {})
 
-                # Collect errors by type
+                # Collect missing objects from Twitter API response by type
                 missing_objects = {}
                 for missing_object in api_response.get("errors", {}):
                     parameter_type = missing_object.get('resource_type', 'unknown')
@@ -304,8 +307,19 @@ class SearchWithTwitterAPIv2(Search):
                         missing_objects[parameter_type][missing_object.get('resource_id')] = missing_object
                     else:
                         missing_objects[parameter_type] = {missing_object.get('resource_id'): missing_object}
-                self.dataset.log('Missing objects collected: ' + ', '.join(['%s: %s' % (k, len(v)) for k, v in missing_objects.items()]))
+                num_missing_objects = sum([len(v) for v in missing_objects.values()])
 
+                # Record any missing objects in log
+                if num_missing_objects > 0:
+                    # Log amount
+                    self.dataset.log('Missing objects collected: ' + ', '.join(['%s: %s' % (k, len(v)) for k, v in missing_objects.items()]))
+                if num_missing_objects > 50:
+                    # Large amount of missing objects; possible error with Twitter API
+                    self.flawless = False
+                    error_report.append('%i missing objects received following tweet number %i. Possible issue with Twitter API.', (num_missing_objects, tweets))
+                    error_report.append('Missing objects collected: ' + ', '.join(['%s: %s' % (k, len(v)) for k, v in missing_objects.items()]))
+
+                # Warn if new missing object is recorded (for developers to handle)
                 expected_error_types = ['user', 'media', 'poll', 'tweet', 'place']
                 if any(key not in expected_error_types for key in missing_objects.keys()):
                     self.log.warning("Twitter API v2 returned unknown error types: %s" % str([key for key in missing_objects.keys() if key not in expected_error_types]))
@@ -340,6 +354,10 @@ class SearchWithTwitterAPIv2(Search):
                     params["next_token"] = api_response["meta"]["next_token"]
                 else:
                     break
+
+        if not self.flawless:
+            self.dataset.log('Error Report:\n' + '\n'.join(error_report))
+            self.dataset.update_status("Completed with errors; Check log for Error Report.", is_final=True)
 
     def enrich_tweet(self, tweet, users, media, polls, places, referenced_tweets, missing_objects):
         """
@@ -533,9 +551,17 @@ class SearchWithTwitterAPIv2(Search):
         is_retweet = any([ref.get("type") == "retweeted" for ref in tweet.get("referenced_tweets", [])])
         if is_retweet:
             retweeted_tweet = [t for t in tweet["referenced_tweets"] if t.get("type") == "retweeted"][0]
-            if retweeted_tweet.get("text", False) and retweeted_tweet.get("author_user", {}).get("username", False):
+            if retweeted_tweet.get("text", False):
                 retweeted_body = retweeted_tweet.get("text")
-                tweet["text"] = "RT @" + retweeted_tweet.get("author_user", {}).get("username") + ": " + retweeted_body
+                # Get user's username that was retweeted
+                if retweeted_tweet.get('author_user') and retweeted_tweet.get('author_user').get('username'):
+                    tweet["text"] = "RT @" + retweeted_tweet.get("author_user", {}).get("username") + ": " + retweeted_body
+                elif tweet.get('entities', {}).get('mentions', []):
+                    # Username may not always be here retweeted_tweet["author_user"]["username"] when user was removed/deleted
+                    retweeting_users = [mention.get('username') for mention in tweet.get('entities', {}).get('mentions', []) if mention.get('id') == retweeted_tweet.get('author_id')]
+                    if retweeting_users:
+                        # should only ever be one, but this verifies that there IS one and not NONE
+                        tweet["text"] = "RT @" + retweeting_users[0] + ": " + retweeted_body
 
         return {
             "id": tweet["id"],
