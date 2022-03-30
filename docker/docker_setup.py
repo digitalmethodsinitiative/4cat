@@ -67,7 +67,7 @@ if __name__ == "__main__":
         config_parser.add_section('SERVER')
         public_port = os.environ['PUBLIC_PORT']
         config_parser['SERVER']['public_port'] = public_port
-        docker_config['SERVER']['server_name'] = os.environ['SERVER_NAME']
+        config_parser['SERVER']['server_name'] = os.environ['SERVER_NAME']
 
         # Save config file
         with open(CONFIG_FILE, 'w') as configfile:
@@ -100,7 +100,7 @@ if __name__ == "__main__":
 
         public_port = os.environ['PUBLIC_PORT']
         config_parser['SERVER']['public_port'] = str(public_port)
-        docker_config['SERVER']['server_name'] = os.environ['SERVER_NAME']
+        config_parser['SERVER']['server_name'] = os.environ['SERVER_NAME']
 
         # Save config file
         with open(CONFIG_FILE, 'w') as configfile:
