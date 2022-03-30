@@ -29,7 +29,7 @@
 		},
 		{
 			"key": "interactions",
-			"label": "interactions (Facebook)",
+			"label": "Interactions (Facebook)",
 			"force_int": true,
 			"descending": true
 		},
