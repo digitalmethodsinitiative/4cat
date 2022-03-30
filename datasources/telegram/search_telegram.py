@@ -43,6 +43,7 @@ class SearchTelegram(Search):
     failures_cache = None
     eventloop = None
     flawless = True
+    end_if_rate_limited = 600 # break if Telegram requires wait time above number of seconds
 
     max_workers = 1
     max_retries = 3
@@ -245,9 +246,18 @@ class SearchTelegram(Search):
         """
         resolve_refs = self.parameters.get("resolve-entities")
 
+        # Adding flag to stop; using for rate limits
+        no_additional_queries = False
+
+        # Collect queries
         for query in queries:
             delay = 10
             retries = 0
+
+            if no_additional_queries:
+                # Note that we are note completing this query
+                self.dataset.update_status("Rate-limited by Telegram; not executing query %s" % query)
+                continue
 
             while True:
                 self.dataset.update_status("Fetching messages for entity '%s'" % query)
@@ -295,12 +305,13 @@ class SearchTelegram(Search):
 
                 except FloodWaitError as e:
                     self.dataset.update_status("Rate-limited by Telegram: %s; waiting" % str(e))
-                    if e.seconds < 600:
+                    if e.seconds < self.end_if_rate_limited:
                         time.sleep(e.seconds)
                         continue
                     else:
-                        self.log.error(str(e))
-                        self.dataset.update_status("Rate-limited by Telegram; requires waiting %i minutes, skipping" % int(e.seconds/60))
+                        self.flawless = False
+                        no_additional_queries = True
+                        self.dataset.update_status("Telegram wait grown large than %i minutes, ending" % int(e.seconds/60))
                         break
 
                 except BadRequestError as e:
@@ -310,17 +321,6 @@ class SearchTelegram(Search):
                 except ValueError as e:
                     self.dataset.update_status("Error '%s' while collecting entity %s, skipping" % (str(e), query))
                     self.flawless = False
-
-                except FloodWaitError as e:
-                    self.dataset.update_status("Telegram FloodWaitError: %s; Waiting" % str(e))
-                    if e.seconds < 600:
-                        time.sleep(e.seconds)
-                        continue
-                    else:
-                        self.log.error(str(e))
-                        self.dataset.update_status("Telegram wait grown large than %i minutes" % int(e.seconds/60))
-                        posts = None
-                        break
 
                 except ChannelPrivateError as e:
                     self.dataset.update_status(
