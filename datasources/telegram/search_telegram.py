@@ -221,6 +221,8 @@ class SearchTelegram(Search):
             async for post in self.gather_posts(client, queries, max_items, min_date, max_date):
                 posts.append(post)
             return posts
+        except ProcessorInterruptedException as e:
+            raise e
         except Exception as e:
             # catch-all so we can disconnect properly
             # ...should we?
