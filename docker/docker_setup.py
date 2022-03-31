@@ -77,7 +77,9 @@ if __name__ == "__main__":
         import config
         # Check if config.py has old docker_config info
         # TODO: remove after database config merge
-        if hasattr(config, 'DOCKER_CONFIG_FILE '):
+        if hasattr(config, 'DOCKER_CONFIG_FILE'):
+            if not Path(config.DOCKER_CONFIG_FILE).is_file():
+                os.makedirs(os.path.dirname(config.DOCKER_CONFIG_FILE))
             with open(config.DOCKER_CONFIG_FILE, 'w') as configfile:
                 config_parser.write(configfile)
 
@@ -115,6 +117,8 @@ if __name__ == "__main__":
         import config
         # Check if config.py has old docker_config info
         # TODO: remove after database config merge
-        if hasattr(config, 'DOCKER_CONFIG_FILE '):
+        if hasattr(config, 'DOCKER_CONFIG_FILE'):
+            if not Path(config.DOCKER_CONFIG_FILE).is_file():
+                os.makedirs(os.path.dirname(config.DOCKER_CONFIG_FILE))
             with open(config.DOCKER_CONFIG_FILE, 'w') as configfile:
                 config_parser.write(configfile)
