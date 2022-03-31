@@ -27,12 +27,18 @@
                 <tr>
                     <td>{{ user.name }}
                         {% if user.is_admin %}
-                        <i class="fa fa-user-shield tooltip-trigger" aria-hidden="true"></i>
-                        <span class="sr-only"> (Admin user)</span>
+                        <span class="tooltip-trigger" aria-controls="tooltip-user-admin">
+                            <i class="fa fa-user-shield" aria-hidden="true"></i>
+                            <span class="sr-only"> (Admin user)</span>
+                        </span>
                         {% endif %}
                         {% if user.is_deactivated %}
-                        <i class="fa fa-ban tooltip-trigger" aria-hidden="true"></i>
+                        <i class="fa fa-ban tooltip-trigger" aria-hidden="true" aria-controls="tooltip-user-deactivates"></i>
                         <span class="sr-only"> (Deactivated user)</span>
+                        {% endif %}
+                        {% if not user.password and user.name not in ("anonymous", "autologin") %}
+                        <i class="fas fa-user-clock tooltip-trigger" aria-hidden="true" aria-controls="tooltip-user-registration"></i>
+                        <span class="sr-only"> (User has not completed registration)</span>
                         {% endif %}
                     </td>
                     <td>
@@ -48,5 +54,9 @@
         </table>
 
         {% include "components/pagination.html" %}
+
+        <p role="tooltip" class="multiple" id="tooltip-user-admin" aria-hidden="true">Admin user</p>
+        <p role="tooltip" class="multiple" id="tooltip-user-deactivated" aria-hidden="true">User is deactivated and can no longer use this 4CAT instance</p>
+        <p role="tooltip" class="multiple" id="tooltip-user-registration" aria-hidden="true">User has not yet completed registration by setting a password</p>
     </div>
 </section>

@@ -10,6 +10,8 @@
             {% if mode != "edit" %}
             <p>If you do not enter a password, after creating the account, a link will be generated through which the
                 password may be set by the user.</p>
+            {% elif not user.password %}
+                <p>This user has not completed their registration and set a password. They can do so via <a href="{{ url_for("reset_password") }}?token={{ user.register_token }}">this link</a>. </p>
             {% endif %}
 
             <form action="{{ url_for('manipulate_user', mode=mode) }}" method="POST" class="wide">

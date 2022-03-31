@@ -38,13 +38,13 @@ login_manager = LoginManager()
 app = Flask(__name__)
 
 # Set up logging for Gunicorn; only run w/ Docker
-if hasattr(config, "DOCKER_CONFIG_FILE") and os.path.exists(config.DOCKER_CONFIG_FILE):
+if hasattr(config, "CONFIG_FILE") and os.path.exists(config.CONFIG_FILE):
     # rename 4cat.log to 4cat_frontend.log
     # Normally this is mostly empty; could combine it, but may be useful to identify processes running on both front and backend
     log = Logger(filename='frontend_4cat.log')
 
     docker_config_parser = configparser.ConfigParser()
-    docker_config_parser.read(config.DOCKER_CONFIG_FILE)
+    docker_config_parser.read(config.CONFIG_FILE)
     if docker_config_parser['DOCKER'].getboolean('use_docker_config'):
         # Add Gunicorn error log to main app logger
         gunicorn_logger = logging.getLogger('gunicorn.error')

@@ -100,10 +100,11 @@ def add_user():
                 response = {**response, **{"message": "User was created but could not be instantiated properly."}}
             else:
                 try:
-                    user.email_token(new=True)
+                    token = user.email_token(new=True)
                     response["success"] = True
                     response = {**response, **{
-                        "message": "An e-mail containing a link through which the registration can be completed has been sent to %s." % username}}
+                        "message": "An e-mail containing a link through which the registration can be completed has "
+                                   "been sent to %s.\n\nTheir registration link is [%s](%s)" % (username, token, token)}}
                 except RuntimeError as e:
                     response = {**response, **{
                         "message": "User was created but the registration e-mail could not be sent to them (%s)." % e}}
@@ -111,7 +112,8 @@ def add_user():
             db.rollback()
             if not force:
                 response = {**response, **{
-                    "message": 'Error: User %s already exists. If you want to re-create the user and re-send the registration e-mail, use [this link](/admin/add-user?email=%s&force=1&format=%s).' % (
+                    "message": 'Error: User %s already exists. If you want to re-create the user and re-send the '
+                               'registration e-mail, use [this link](/admin/add-user?email=%s&force=1&format=%s).' % (
                         username, username, fmt)}}
             else:
                 # if a user does not use their token in time, maybe you want to
@@ -121,13 +123,13 @@ def add_user():
                 db.update("users", data={"timestamp_token": int(time.time())}, where={"name": username})
 
                 try:
-                    user.email_token(new=True)
+                    url = user.email_token(new=True)
                     response["success"] = True
                     response = {**response, **{
-                        "message": "A new registration e-mail has been sent to %s." % username}}
+                        "message": "A new registration e-mail has been sent to %s. The registration link is [%s](%s)" % (username, url, url) }}
                 except RuntimeError as e:
                     response = {**response, **{
-                        "message": "Token was reset registration e-mail could not be sent to them (%s)." % e}}
+                        "message": "Token was reset but registration e-mail could not be sent (%s)." % e}}
 
     if fmt == "html":
         return render_template("error.html", message=response["message"],

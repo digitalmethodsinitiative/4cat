@@ -62,7 +62,11 @@
                     <div class="fullwidth">
                         <dt>Data source</dt>
                         <dd>
-                        {% set github_link = dataset.get_version_url("backend/processors/" + processors[dataset.type].filepath) %}
+                        {% if dataset.type in processors %}
+                            {% set github_link = dataset.get_version_url("backend/processors/" + processors[dataset.type].filepath) %}
+                        {% else %}
+                            {% set github_link = None %}
+                        {% endif %}
                         <{% if github_link %}a href="{{ github_link }}" rel="external" target="_blank"{% else %}span{% endif %} class="property-badge fullsize" >
                             {{ dataset.parameters.datasource }}{%
                                 if "board" in dataset.parameters and dataset.parameters.board %}/

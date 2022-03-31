@@ -2,7 +2,7 @@
 import os
 import configparser
 
-DOCKER_CONFIG_FILE = 'docker/shared/docker_config.ini'
+CONFIG_FILE = 'config/config.ini'
 
 # Data source configuration
 DATASOURCES = {
@@ -152,9 +152,9 @@ class FlaskConfig:
 # These values will overwrite anything set previously in this config and
 # originate from the .env file or the docker_config.ini file
 
-if os.path.exists(DOCKER_CONFIG_FILE):
+if os.path.exists(CONFIG_FILE):
   config = configparser.ConfigParser()
-  config.read(DOCKER_CONFIG_FILE)
+  config.read(CONFIG_FILE)
   if config['DOCKER'].getboolean('use_docker_config'):
       # can be your server url or ip
       your_server = config['SERVER'].get('server_name', 'localhost')

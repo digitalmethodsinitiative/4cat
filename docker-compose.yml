@@ -28,7 +28,7 @@ services:
       - ${PUBLIC_API_PORT}:4444
     volumes:
       - 4cat_data:/usr/src/app/data/
-      - 4cat_share:/usr/src/app/docker/shared/
+      - 4cat_share:/usr/src/app/config/
       - 4cat_logs:/usr/src/app/logs/
     entrypoint: docker/docker-entrypoint.sh
 
@@ -43,7 +43,7 @@ services:
       - ${PUBLIC_PORT}:5000
     volumes:
       - 4cat_data:/usr/src/app/data/
-      - 4cat_share:/usr/src/app/docker/shared/
+      - 4cat_share:/usr/src/app/config/
       - 4cat_logs:/usr/src/app/logs/
     entrypoint: gunicorn --worker-tmp-dir /dev/shm --workers=2 --threads=4 --worker-class=gthread --access-logfile /usr/src/app/logs/access_gunicorn.log --log-level=info --reload --bind 0.0.0.0:5000 webtool:app
 
