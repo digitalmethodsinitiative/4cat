@@ -41,6 +41,11 @@ csv.field_size_limit(1024 * 1024 * 1024)
 @app.route("/api/")
 @api_ratelimit
 def openapi_overview():
+	"""
+
+	:return:
+	:rtype: object
+	"""
 	return jsonify({
 		"status": "The following API specifications are available from this server.",
 		"data": {
@@ -59,6 +64,7 @@ def openapi_specification(api_id="all"):
 	Show OpenAPI specification of 4CAT API
 
 	:return: OpenAPI-formatted API specification
+	:rtype: object
 	"""
 	return jsonify(openapi.generate(api_id))
 
@@ -70,6 +76,7 @@ def api_status():
 	Get service status
 
 	:return: Flask JSON response
+	:rtype: object
 	"""
 
 	# get job stats
@@ -123,12 +130,9 @@ def datasource_form(datasource_id):
 	If the data source has no search worker or its search worker does not have
 	any parameters defined, this returns a 404 Not Found status.
 
-	:param datasource_id:  Data source ID, as specified in the data source and
-						   config.py
-	:return: A JSON object with the `html` of the template,
-	         a boolean `has_javascript` determining whether javascript should be
-	         loaded for this template, a `status` code and the `datasource` ID.
-
+	:param datasource_id:  Data source ID, as specified in the data source and config.py
+	:return: A JSON object with the `html` of the template, a boolean `has_javascript` determining whether javascript \
+	should be loaded for this template, a `status` code and the `datasource` ID.
 	:return-error 404: If the datasource does not exist.
 	"""
 	if datasource_id not in backend.all_modules.datasources:
@@ -186,8 +190,7 @@ def datasource_script(datasource_id):
 	endpoint returns the data source's tool javascript file, if it exists as
 	`tool.js` in the data source's `webtool` folder.
 
-	:param datasource_id:  Datasource ID, as specified in the datasource and
-						   config.py
+	:param datasource_id:  Datasource ID, as specified in the datasource and config.py
 	:return: A javascript file
 	:return-error 404: If the datasource does not exist.
 	"""
@@ -220,20 +223,18 @@ def import_dataset():
 
 	The data should be sent in the request body, as a POST request.
 
-    :request-param str ?access_token:  Access token; only required if not
-                                       logged in currently.
-
-	:return-error 404:  If the platform specified in the
-						`X-Zeeschuimer-Platform` header is not known
-
-	:return-schema: {
-		type=object,
-		properties={
-			status={type=string},
-			key={type=string},
-			url={type=integer}
-		}
+	:request-param str ?access_token:  Access token; only required if not logged in currently.
+	:return: *TBD*
+	:rtype: object
+	:return-schema: {\
+		type=object,\
+		properties={\
+			status={type=string},\
+			key={type=string},\
+			url={type=integer}\
+		}\
 	}
+	:return-error 404:  If the platform specified in the `X-Zeeschuimer-Platform` header is not known
 	"""
 	platform = request.headers.get("X-Zeeschuimer-Platform").split(".")[0]
 	if not platform or platform not in backend.all_modules.datasources:
@@ -288,18 +289,16 @@ def queue_dataset():
 	Request parameters vary by data source. The ones mandated constitute the
 	minimum but more may be required.
 
-	:request-param str board:  Board ID to query
-	:request-param str datasource:  Data source ID to query
-	:request-param str body_match:  String to match in the post body
-	:request-param str subject_match:  String to match in the post subject
-    :request-param int min_date:  Timestamp marking the beginning of the match
-                                  period
-    :request-param int max_date:  Timestamp marking the end of the match period
-    :request-param str ?access_token:  Access token; only required if not
-                                       logged in currently.
+	:request-param str board: Board ID to query
+	:request-param str datasource: Data source ID to query
+	:request-param str body_match: String to match in the post body
+	:request-param str subject_match: String to match in the post subject
+	:request-param int min_date: Timestamp marking the beginning of the match period
+	:request-param int max_date: Timestamp marking the end of the match period
+	:request-param str ?access_token:  Access token; only required if not logged in currently.
 
-	:return str:  The dataset key, which may be used to later retrieve dataset
-	              status and results.
+	:return:  The dataset key, which may be used to later retrieve dataset status and results.
+	:rtype: str
 	:return-error 404: If the datasource does not exist.
 	"""
 	datasource_id = request.form.get("datasource", "")
@@ -361,25 +360,23 @@ def check_dataset():
 	Requires authentication by logging in or providing a valid access token.
 
 	:request-param str key:  ID of the dataset for which to return the status
-	:return: Dataset status, containing the `status`, `query`, number of `rows`,
-	         the dataset `key`, whether the dataset is `done`, the `path` of the
-	         result file and whether the dataset is `empty`.
-
-	:return-schema: {
-		type=object,
-		properties={
-			status={type=string},
-			query={type=string},
-			rows={type=integer},
-			key={type=string},
-			done={type=boolean},
-			path={type=string},
-			empty={type=boolean},
-			is_favourite={type=boolean},
-			url={type=string}
-		}
+	:return: Dataset status, containing the `status`, `query`, number of `rows`, the dataset `key`, whether the \
+	dataset is `done`, the `path` of the result file and whether the dataset is `empty`.
+	:rtype: object
+	:return-schema: {\
+		type=object,\
+		properties={\
+			status={type=string},\
+			query={type=string},\
+			rows={type=integer},\
+			key={type=string},\
+			done={type=boolean},\
+			path={type=string},\
+			empty={type=boolean},\
+			is_favourite={type=boolean},\
+			url={type=string}\
+		}\
 	}
-
 	:return-error 404:  If the dataset does not exist.
 	"""
 	dataset_key = request.args.get("key")
@@ -435,17 +432,19 @@ def edit_dataset_label(key):
 
 	Only allowed for dataset owner or admin!
 
+	:param key: *TBD*
+	:type key: *TBD*
 	:request-param str key:  ID of the dataset for which to change the label
-	:return: Label info, containing the dataset `key`, the dataset `url`,
-	         and the new `label`.
+	:return: Label info, containing the dataset `key`, the dataset `url`, and the new `label`.
 
-	:return-schema: {
-		type=object,
-		properties={
-			key={type=string},
-			url={type=string},
-			label={type=string}
-		}
+	:return-schema:\
+	{\
+		type=object,\
+		properties={\
+			key={type=string},\
+			url={type=string},\
+			label={type=string}\
+		}\
 	}
 
 	:return-error 404:  If the dataset does not exist.
@@ -480,17 +479,19 @@ def convert_dataset(key):
 
 	Only allowed for admin!
 
+	:param key: *TBD*
+	:type key: *TBD*
 	:request-param str key: ID of the dataset for which to change the label
-	:return: Dataset info, containing the dataset `key`, the dataset `url`,
-	         and the new `datasource`.
+	:return: Dataset info, containing the dataset `key`, the dataset `url`, and the new `datasource`.
+	:type: object
 
-	:return-schema: {
-		type=object,
-		properties={
-			key={type=string},
-			url={type=string},
-			datasource={type=string}
-		}
+	:return-schema: {\
+		type=object,\
+		properties={\
+			key={type=string},\
+			url={type=string},\
+			datasource={type=string}\
+		}\
 	}
 
 	:return-error 404:  If the dataset does not exist.
@@ -532,8 +533,7 @@ def nuke_dataset(key=None, reason=None):
 
 	:request-param str key:  ID of the dataset to delete
 	:request-param str reason:  Deletion reason
-	:request-param str ?access_token:  Access token; only required if not
-	logged in currently.
+	:request-param str ?access_token:  Access token; only required if not logged in currently.
 
 	:return: A dictionary with a successful `status`.
 
@@ -604,9 +604,10 @@ def delete_dataset(key=None):
 	well as any children linked to it, from 4CAT. Also tells the backend to stop
 	any jobs dealing with the dataset.
 
+	:param key: *TBD*
+	:type key: str
 	:request-param str key:  ID of the dataset to delete
-    :request-param str ?access_token:  Access token; only required if not
-    logged in currently.
+	:request-param str ?access_token:  Access token; only required if not logged in currently.
 
 	:return: A dictionary with a successful `status`.
 
@@ -664,11 +665,13 @@ def erase_credentials(key=None):
 	Removes all parameters starting with `api_`. This heuristic could be made
 	more expansive if more fine-grained control is required.
 
+	:param key: *TBD*
+	:type key: str
 	:request-param str key:  ID of the dataset to delete
-	:request-param str ?access_token:  Access token; only required if not
-	logged in currently.
+	:request-param str ?access_token:  Access token; only required if not logged in currently.
 
 	:return: A dictionary with a successful `status`.
+	:rtype: object
 
 	:return-schema: {type=object,properties={status={type=string}}}
 
@@ -700,6 +703,7 @@ def check_search_queue():
 	Get the amount of search query datasets yet to finish processing.
 
 	:return: An JSON array with search jobtypes and their counts.
+	:rtype: object
 
 	:return-schema: {type=array,properties={jobtype={type=string}, count={type=integer}},items={type=string}}
 	"""
@@ -717,9 +721,11 @@ def toggle_favourite(key):
 	Marks the dataset as being liked by the currently active user, which can be
 	used for organisation in the front-end.
 
-	:param str key: Key of the dataset to mark as favourite.
+	:param key: Key of the dataset to mark as favourite.
+	:type key: str
 
 	:return: A JSON object with the status of the request
+	:rtype: object
 	:return-schema: {type=object,properties={success={type=boolean},favourite_status={type=boolean}}}
 
 	:return-error 404:  If the dataset key was not found
@@ -753,9 +759,11 @@ def toggle_private(key):
 	'anonymous', which can be viewed by anyone. Only admins and owners can
 	toggle private status of a dataset.
 
-	:param str key: Key of the dataset to mark as (not) private
+	:param key: Key of the dataset to mark as (not) private
+	:type key: str
 
 	:return: A JSON object with the status of the request
+	:rtype: object
 	:return-schema: {type=object,properties={success={type=boolean},is_private={type=boolean}}}
 
 	:return-error 404:  If the dataset key was not found
@@ -793,20 +801,24 @@ def queue_processor(key=None, processor=None):
 
 	:request-param str key:  Key of dataset to queue processor for
 	:request-param str processor:  ID of processor to queue
-    :request-param str ?access_token:  Access token; only required if not
-                                       logged in currently.
+	:request-param str ?access_token:  Access token; only required if not logged in currently.
 
-	:return: A list of dataset properties, with each dataset an item with a `key`,
-	        whether it had `finished`, a `html` snippet containing details,
-	        a `url` at which the result may be downloaded when finished, and a
-	        list of `messages` describing any warnings generated while queuing.
+	:param key: *TBD*
+	:type key: str
+	:param processor: *TBD*
+	:type processor: *TBD*
 
-	:return-schema: {type=object,additionalProperties={type=object,properties={
-		key={type=string},
-		finished={type=boolean},
-		html={type=string},
-		url={type=string},
-		messages={type=array,items={type=string}}
+	:return: A list of dataset properties, with each dataset an item with a `key`, whether it had `finished`, a `html` \
+	snippet containing details, a `url` at which the result may be downloaded when finished, and a list of `messages` \
+	describing any warnings generated while queuing.
+	:rtype: object
+
+	:return-schema: {type=object,additionalProperties={type=object,properties={\
+		key={type=string},\
+		finished={type=boolean},\
+		html={type=string},\
+		url={type=string},\
+		messages={type=array,items={type=string}}\
 	}}}
 	"""
 	if request.files and "input_file" in request.files:
@@ -891,17 +903,16 @@ def check_processor():
 	"""
 	Check processor status
 
-	:request-param str subqueries:  A JSON-encoded list of dataset keys to get
-	                                the status of
-	:return: A list of dataset data, with each dataset an item with a `key`,
-	        whether it had `finished`, a `html` snippet containing details, and
-	        a `url` at which the result may be downloaded when finished.
+	:request-param str subqueries:  A JSON-encoded list of dataset keys to get the status of *TBD*
+	:return: A list of dataset data, with each dataset an item with a `key`, whether it had `finished`, a `html` \
+	snippet containing details, and a `url` at which the result may be downloaded when finished.
+	:rtype: object
 
-	:return-schema:{type=array,items={type=object,properties={
-		key={type=string},
-		finished={type=boolean},
-		html={type=string},
-		url={type=string}
+	:return-schema:{type=array,items={type=object,properties={\
+		key={type=string},\
+		finished={type=boolean},\
+		html={type=string},\
+		url={type=string}\
 	}}}
 
 	:return-error 406:  If the list of subqueries could not be parsed.
@@ -951,8 +962,12 @@ def datasource_call(datasource, action):
 	endpoint. Any GET parameters are passed as keyword arguments to the
 	function.
 
-	:param str action:  Action to call
+	:param datasource: *TBD*
+	:type datasource: *TBD*
+	:param action:  Action to call
+	:type action: str
 	:return:  A JSON object
+	:rtype: object
 	"""
 	# allow prettier URLs
 	action = action.replace("-", "_")
@@ -996,6 +1011,7 @@ def request_token():
 	Requires that the user is currently logged in to 4CAT.
 
 	:return: An object with one item `token`
+	:rtype: object
 
 	:return-schema={type=object,properties={token={type=string}}}
 

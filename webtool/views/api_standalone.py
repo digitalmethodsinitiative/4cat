@@ -35,20 +35,20 @@ def get_standalone_processors():
 	"""
 	Get processors available for standalone API requests
 
-	:return: A JSON object, a list with processor IDs that may be used for the
-	`/api/process/<processor>/` endpoint as keys and a `description` of what
-	the processor does, a `name` and the processor's `category`.
+	:return: A JSON object, a list with processor IDs that may be used for the `/api/process/<processor>/` endpoint \
+	as keys and a `description` of what the processor does, a `name` and the processor's `category`.
+	:rtype: object
 
-	:return-schema: {
-		type=object,
-		additionalProperties={
-			type=object,
-			properties={
-				description={type=string},
-				name={type=string},
-				category={type=string}
-			}
-		}
+	:return-schema: {\
+		type=object,\
+		additionalProperties={\
+			type=object,\
+			properties={\
+				description={type=string},\
+				name={type=string},\
+				category={type=string}\
+			}\
+		}\
 	}
 	"""
 	available_processors = {}
@@ -79,37 +79,34 @@ def process_standalone(processor):
 
 	Requires authentication.
 
-	:param str processor:  ID of the processor to run on incoming data
+	:param processor:  ID of the processor to run on incoming data
+	:type processor: str
 
-	:request-body object data:  Data to process, a JSON-formatted list of
-	objects with each object having at least they keys `post_id`,
-	`thread_id`, body`, and `author`.
+	:request-body object data:  Data to process, a JSON-formatted list of objects with each object having at least \
+	they keys `post_id`, `thread_id`, body`, and `author`.
 
-	:request-schema data: {
-		type=object,
-		properties={
-			post_id={type=string},
-			thread_id={type=string},
-			body={type=string},
-			author={type=string}
-		}
+	:request-schema data: {\
+		type=object,\
+		properties={\
+			post_id={type=string},\
+			thread_id={type=string},\
+			body={type=string},\
+			author={type=string}\
+		}\
 	}
 
-    :request-param str ?access_token:  Access token; only required if not
-                                       logged in currently.
+	:request-param str ?access_token:  Access token; only required if not logged in currently.
+	:return: A JSON object containing the processed data, with a processor-specific structure.
+	:rtype: object
 
-	:return:  A JSON object containing the processed data, with a
-	processor-specific structure.
-
-	:return-schema: {
-		type=object,
-		additionalProperties={}
+	:return-schema: {\
+		type=object,\
+		additionalProperties={}\
 	}
 
-	:return-error 402: If an invalid processor is requested, or if the input is
-	not properly-formatted JSON.
-	:return-error 503: If too many other requests are currently being handled,
-	so that the server does not have the capacity to deal with this request
+	:return-error 402: If an invalid processor is requested, or if the input is not properly-formatted JSON.
+	:return-error 503: If too many other requests are currently being handled, so that the server does not have \
+	the capacity to deal with this request
 	"""
 	processors = get_standalone_processors().get_json()
 

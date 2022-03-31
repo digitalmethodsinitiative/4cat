@@ -25,6 +25,10 @@ csv.field_size_limit(1024 * 1024 * 1024)
 
 @app.route("/robots.txt")
 def robots():
+    """
+
+    :return:
+    """
     with open(os.path.dirname(os.path.abspath(__file__)) + "/static/robots.txt") as robotstxt:
         return robotstxt.read()
 
@@ -32,6 +36,10 @@ def robots():
 @app.route("/access-tokens/")
 @login_required
 def show_access_tokens():
+    """
+
+    :return:
+    """
     user = current_user.get_id()
 
     if user == "autologin":
@@ -87,6 +95,8 @@ def show_frontpage():
 def show_index():
     """
     Main tool frontend
+
+    :return:
     """
     datasources = {datasource: metadata for datasource, metadata in backend.all_modules.datasources.items() if
                    metadata["has_worker"] and metadata["has_options"]}
@@ -100,6 +110,8 @@ def show_index():
 def data_overview(datasource=None):
     """
     Main tool frontend
+
+    :return:
     """
     datasources = {datasource: metadata for datasource, metadata in backend.all_modules.datasources.items() if
                    metadata["has_worker"] and metadata["has_options"]}
@@ -172,6 +184,12 @@ def data_overview(datasource=None):
 @app.route('/get-boards/<string:datasource>/')
 @login_required
 def getboards(datasource):
+    """
+
+    :param datasource:
+    :type datasource:
+    :return:
+    """
     if datasource not in config.DATASOURCES or "boards" not in config.DATASOURCES[datasource]:
         result = False
     else:
@@ -188,8 +206,9 @@ def show_page(page):
     in the pages subdirectory, and then called via this view. The markdown
     will be parsed to HTML and displayed within the layout template.
 
-    :param page: ID of the page to load, should correspond to a markdown file
-    in the pages/ folder (without the .md extension)
+    :param page: ID of the page to load, should correspond to a markdown file in the pages/ folder \
+    (without the .md extension)
+    :type page:
     :return:  Rendered template
     """
     page = re.sub(r"[^a-zA-Z0-9-_]*", "", page)

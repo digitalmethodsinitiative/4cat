@@ -194,8 +194,7 @@ class User:
 		"""
 		Check if user is special user
 
-		:return:  Whether the user is the anonymous user, or the automatically
-		logged in user.
+		:return: Whether the user is the anonymous user, or the automatically logged in user.
 		"""
 		return self.get_id() in ("autologin", "anonymous")
 
@@ -301,10 +300,9 @@ class User:
 
 		Tokens are not re-generated if they exist already
 
-		:param username:  Username to generate for: if left empty, it will be
-		inferred from self.data
-		:param regenerate:  Force regenerating even if token exists
-		:return str:  The token
+		:param username: Username to generate for: if left empty, it will be inferred from self.data
+		:param regenerate: Force regenerating even if token exists
+		:return str: The token
 		"""
 		if self.data.get("register_token", None) and not regenerate:
 			return self.data["register_token"]

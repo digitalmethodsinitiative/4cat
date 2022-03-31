@@ -35,9 +35,7 @@ def explorer_dataset(key, page):
 	Show posts from a specific dataset
 
 	:param str dataset_key:  Dataset key
-
 	:return-schema: {type=array,items={type=integer}}
-
 	:return-error 404: If the dataset does not exist.
 	"""
 
@@ -424,7 +422,7 @@ def save_annotations(key):
 	Save the annotations of a dataset to the annotations table.
 
 	:param str key:  The dataset key
-
+	:return: "success"
 	:return-error 404:  If the dataset ID does not exist.
 	"""
 
@@ -470,16 +468,13 @@ def get_boards(datasource):
 	"""
 	Get available boards in datasource
 
-	:param datasource:  The datasource for which to acquire the list of available
-	                  boards.
+	:param datasource:  The datasource for which to acquire the list of available boards.
 	:return:  A list containing a list of `boards`, as string IDs.
-
-	:return-schema: {type=object,properties={
-		boards={type=array,items={type=object,properties={
-			board={type=string}
-		}}}
+	:return-schema: {type=object,properties={\
+		boards={type=array,items={type=object,properties={\
+			board={type=string}\
+		}}}\
 	}}
-
 	:return-error 404: If the datasource does not exist.
 	"""
 	if datasource not in config.DATASOURCES:
@@ -494,7 +489,6 @@ def get_image_file(img_file, limit=0):
 	"""
 	Returns an image based on filename
 	Request should hex the md5 hashes first (e.g. with hexdigest())
-
 	"""
 	if not re.match(r"([a-zA-Z0-9]+)\.([a-z]+)", img_file):
 		abort(404)
@@ -511,8 +505,7 @@ def iterate_items(in_file, max_rows=None, sort_by=None, descending=False, force_
 	:param in_file, str:		The input file to read.
 	:param sort_by, str:		The key that determines the sort order.
 	:param descending, bool:	Whether to sort by descending values.
-	:param force_int, bool:		Whether the sort value should be converted to an 
-								integer.
+	:param force_int, bool:		Whether the sort value should be converted to an integer.
 	"""
 	
 	suffix = in_file.name.split(".")[-1].lower()
@@ -570,7 +563,18 @@ def iterate_items(in_file, max_rows=None, sort_by=None, descending=False, force_
 	return Exception("Can't loop through file with extension %s" % suffix)
 
 def get_posts(db, datasource, ids, board="", threads=False, limit=0, offset=0, order_by=["timestamp"]):
-
+	"""
+	TODO fill
+	:param db:
+	:param datasource:
+	:param ids:
+	:param board:
+	:param threads:
+	:param limit:
+	:param offset:
+	:param order_by:
+	:return:
+	"""
 	if not ids:
 		return None
 
@@ -598,7 +602,6 @@ def get_custom_css(datasource):
 	See https://github.com/digitalmethodsinitiative/4cat/wiki/Exploring-and-annotating-datasets for more information.
 	
 	:param datasource, str: Datasource name
-
 	:return: The css as string.
 	"""
 
@@ -628,11 +631,9 @@ def get_custom_fields(datasource, filetype=None):
 	Custom field json files should be placed in an 'explorer' directory in the the datasource folder and named
 	'<datasourcename>-explorer.json' (e.g. 'reddit/explorer/reddit-explorer.json').
 	See https://github.com/digitalmethodsinitiative/4cat/wiki/Exploring-and-annotating-datasets for more information.
- 
-	:param datasource, str: Datasource name
-	:param filetype, str:	The filetype that is handled. This can fluctuate
-							between e.g. NDJSON and csv files.
 
+	:param datasource, str: Datasource name
+	:param filetype, str:	The filetype that is handled. This can fluctuate between e.g. NDJSON and csv files.
 	:return: Dictionary of custom fields that should be shown.
 	"""
 
@@ -671,8 +672,11 @@ def get_custom_fields(datasource, filetype=None):
 def get_nested_value(di, keys):
 	"""
 	Gets a nested value on the basis of a dictionary and a list of keys.
-	"""
 
+	:param di:
+	:param keys:
+	:return:
+	"""
 	for key in keys:
 		di = di.get(key)
 		if not di:
@@ -680,6 +684,12 @@ def get_nested_value(di, keys):
 	return di
 
 def to_float(value, convert=False):
+	"""
+
+	:param value:
+	:param convert:
+	:return:
+	"""
 	if convert:
 		if not value:
 			value = 0
@@ -688,16 +698,39 @@ def to_float(value, convert=False):
 	return value
 
 def strip_html(post):
+	"""
+	Strips html
+
+	:param post:
+	:return:
+	:rtype: object
+	"""
 	post["body"] = strip_tags(post.get("body", ""))
 	return post
 
 def format(post, datasource=""):
+	"""
+
+	:param post:
+	:type post:
+	:param datasource:
+	:type: datasource:
+	:return:
+	:rtype:
+	"""
 	if "chan" in datasource or datasource == "8kun":
 		post["body"] = format_chan_post(post.get("body", ""))
 	post["body"] = post.get("body", "").replace("\n", "<br>")
 	return post
 
 def convert_markdown(post):
+	"""
+
+	:param post:
+	:type post:
+	:return:
+	:rtype:
+	"""
 	post["body"] = post.get("body", "").replace("\n", "\n\n").replace("&gt;", ">").replace("] (", "](")
 	post["body"] = markdown2.markdown(post.get("body", ""), extras=["nofollow","target-blank-links"])
 	return post
