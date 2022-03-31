@@ -104,7 +104,10 @@ lockfile = Path(config.PATH_ROOT, config.PATH_LOCKFILE, "4cat.pid")  # pid file 
 # daemon modules which are not available on Windows.
 def start():
     """
-    Start backend, as a daemon
+    Start backend, as a daemon.
+
+    Returns false if the 4CAT backend Daemon is already running
+
     :return bool: True
     """
     # only one instance may be running at a time
