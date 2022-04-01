@@ -82,13 +82,13 @@ class SeleniumScraper(Search, metaclass=abc.ABCMeta):
             try:
                 links = self.collect_links()
             except Exception as e:
-                print(e)
-                print('trying to get links again')
                 try:
                     links = self.collect_links()
                 except Exception as e:
-                    print(e)
-                    links = []
+                    if hasattr('dataset', self):
+                        self.dataset.log('Error collecting links for url %s: %s' % (url, str(e)))
+                    links = None
+                    result['collect_links_error': e]
             result['links'] = links
 
         return result

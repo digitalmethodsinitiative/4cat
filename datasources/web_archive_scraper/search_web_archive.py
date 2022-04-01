@@ -126,7 +126,7 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
             while attempts < 2:
                 attempts += 1
                 try:
-                    scraped_page = self.simple_scrape_page(url)
+                    scraped_page = self.simple_scrape_page(url, extract_links=True)
                 except Exception as e:
                     self.dataset.log('Url %s unable to be scraped with error: %s' % (url, str(e)))
                     self.restart_selenium()
@@ -220,6 +220,7 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
                 result['detected_404'] = scraped_page.get('detected_404')
                 result['timestamp'] = int(datetime.datetime.now().timestamp())
                 result['error'] = scraped_page.get('error') # This should be None...
+                result['selenium_links'] = scraped_page.get('links') if not scraped_page.get('links') else scraped_page.get('collect_links_error')
 
                 if http_request:
                     try:
