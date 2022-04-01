@@ -11,6 +11,7 @@ from telethon.sync import TelegramClient
 from telethon.errors.rpcerrorlist import FloodWaitError, ApiIdInvalidError, PhoneNumberInvalidError
 
 from datasources.telegram.search_telegram import SearchTelegram
+
 import config
 
 def authenticate(request, user, **kwargs):
@@ -40,7 +41,6 @@ def authenticate(request, user, **kwargs):
 	# the security code all the time. If we've tried logging in earlier use
 	# the same session again.
 	session_id = SearchTelegram.create_session_id(kwargs["api_phone"], kwargs["api_id"], kwargs["api_hash"])
-	print('Telegram Session ID: ' + str(session_id), flush=True)
 
 	# store session ID for user so it can be found again for later queries
 	user.set_value("telegram.session", session_id)

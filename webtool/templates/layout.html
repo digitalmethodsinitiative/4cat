@@ -32,14 +32,14 @@
 		<ul>
 			<li><a href="{{ url_for('show_index') }}">Create dataset</a></li>
 			<li><a href="{{ url_for('show_results') }}">Past results</a></li>
-			<li><a href="{{ url_for('show_frontpage') }}">About</a></li>
-                        <li><a href="{{ url_for('show_page', page='faq') }}"><abbr title="Frequently Asked Questions">FAQ</abbr></a></li>
             <li><a href="{{ url_for('data_overview') }}">Data overview</a></li>
             {% if current_user.is_authenticated and not current_user.is_special %}
                 <li><a href="{{ url_for('show_access_tokens') }}">API Access</a></li>
             {% endif %}
             {% if current_user.is_authenticated and current_user.is_admin %}
                 <li><a href="{{ url_for('admin_frontpage') }}">Control Panel</a></li>
+            <li><a href="{{ url_for('show_page', page='faq') }}"><abbr title="Frequently Asked Questions">FAQ</abbr></a></li>
+			<li><a href="{{ url_for('show_frontpage') }}">About</a></li>
             {% endif %}
 		</ul>
     {% if __announcement %}

@@ -1,16 +1,18 @@
 <article class="result" data-dataset-key="{{ dataset.key }}">
     <section class="result-tree">
         <div class="card query{% if not dataset.is_finished() %} unfinished{% endif %}">
-            <h2 class="blocktitle">
+            <h2 class="blocktitle{% if current_user.is_authenticated and (current_user.is_admin or current_user.get_id() == dataset.owner) %} editable{% endif %}">
                 <span><a href="{{ url_for('show_results', key=dataset.key) }}">{{ dataset.get_label() }}</a></span>
             </h2>
             <nav class="dataset-toolbox" aria-label="Actions for dataset">
                 <ul>
+                    {% if current_user.is_authenticated %}
                     <li><a href="{{ url_for('toggle_favourite_interactive', key=dataset.key) }}"
                            class="toggle-favourites"><i class="fa{% if is_favourite %}r{% else %}s{% endif %} fa-star"
                                                         aria-hidden="true"></i> {% if is_favourite %}Delete
                         from{% else %}
                         Add to{% endif %} favourites</a></li>
+                    {% endif %}
                     {% if current_user.is_authenticated and (current_user.is_admin or current_user.get_id() == dataset.owner) %}
                         <li><a href="{{ url_for('toggle_private_interactive', key=dataset.key) }}"
                                class="toggle-private"><i
@@ -60,7 +62,11 @@
                     <div class="fullwidth">
                         <dt>Data source</dt>
                         <dd>
-                        {% set github_link = dataset.get_version_url("backend/processors/" + processors[dataset.type].filepath) %}
+                        {% if dataset.type in processors %}
+                            {% set github_link = dataset.get_version_url("backend/processors/" + processors[dataset.type].filepath) %}
+                        {% else %}
+                            {% set github_link = None %}
+                        {% endif %}
                         <{% if github_link %}a href="{{ github_link }}" rel="external" target="_blank"{% else %}span{% endif %} class="property-badge fullsize" >
                             {{ dataset.parameters.datasource }}{%
                                 if "board" in dataset.parameters and dataset.parameters.board %}/

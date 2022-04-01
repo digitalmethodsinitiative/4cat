@@ -53,6 +53,14 @@ CREATE TABLE IF NOT EXISTS annotations (
   annotations       text DEFAULT ''
 );
 
+-- metrics
+CREATE TABLE IF NOT EXISTS metrics (
+  metric             text,
+  datasource         text,
+  board              text,
+  date               text,
+  count              integer
+);
 
 -- users
 CREATE TABLE IF NOT EXISTS users (

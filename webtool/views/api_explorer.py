@@ -17,9 +17,11 @@ from collections import OrderedDict
 from pathlib import Path
 
 from flask import jsonify, abort, send_file, request, render_template
+from flask_login import login_required, current_user
 
 from webtool import app, db, log, openapi, limiter
 from webtool.lib.helpers import format_chan_post, error
+from common.lib.dataset import DataSet
 from common.lib.helpers import strip_tags
 
 api_ratelimit = limiter.shared_limit("45 per minute", scope="api")
@@ -40,33 +42,36 @@ def explorer_dataset(key, page):
 	"""
 
 	# Get dataset info.
-	dataset = db.fetchone("SELECT * FROM datasets WHERE key = %s", (key,))
+	try:
+		dataset = DataSet(key=key, db=db)
+	except TypeError:
+		return error(404, error="Dataset not found.")
+
+	if dataset.is_private and not (current_user.is_admin or dataset.owner == current_user.get_id()):
+		return error(403, error="This dataset is private.")
+
+	if len(dataset.get_genealogy()) > 1:
+		return error(404, error="Exporer only available for top-level datasets")
+
+	results_path = dataset.check_dataset_finished()
+	if not results_path:
+		return error(404, error="This dataset didn't finish executing (yet)")
 
 	# The amount of posts to show on a page
-	limit = 50
-
+	limit = config.EXPLORER_POSTS_ON_PAGE if hasattr(config, "EXPLORER_POSTS_ON_PAGE") else 50
+	
 	# The amount of posts that may be included (limit for large datasets)
 	max_posts = config.MAX_EXPLORER_POSTS if hasattr(config, "MAX_EXPLORER_POSTS") else 500000
 	
 	# The offset for posts depending on the current page
 	offset = ((page - 1) * limit) if page else 0
 
-	# Do come catching
-	if not dataset:
-		return error(404, error="Dataset not found")
-
-	if dataset["key_parent"]:
-		return error(404, error="Exporer only available for top-level datasets")
-
-	if not dataset["result_file"] or not dataset["is_finished"]:
-		return error(404, error="This dataset didn't finish executing (yet)")
-
 	# Load some variables
-	parameters = json.loads(dataset["parameters"])
+	parameters = dataset.get_parameters()
 	datasource = parameters["datasource"]
 	board = parameters.get("board", "")
-	annotation_fields = json.loads(dataset["annotation_fields"]) if dataset["annotation_fields"] else None
-	post_count = int(dataset["num_rows"])
+	post_count = int(dataset.data["num_rows"])
+	annotation_fields = dataset.get_annotation_fields()
 
 	# If the dataset is local, we can add some more features
 	# (like the ability to navigate to threads)
@@ -74,11 +79,6 @@ def explorer_dataset(key, page):
 	if datasource in list(all_modules.datasources.keys()):
 		is_local = True if all_modules.datasources[datasource].get("is_local") else False
 	
-	# Check if the dataset in fact exists
-	dataset_path = Path(config.PATH_ROOT, config.PATH_DATA, dataset["result_file"])
-	if not dataset_path.exists():
-		abort(404)
-
 	# Check if we have to sort the data in a specific way.
 	sort_by = request.args.get("sort")
 	if sort_by == "dataset-order":
@@ -104,8 +104,9 @@ def explorer_dataset(key, page):
 	count = 0
 
 	first_post = False
+	
 
-	for post in iterate_items(dataset_path, max_rows=max_posts, sort_by=sort_by, descending=descending, force_int=force_int):
+	for post in iterate_items(results_path, max_rows=max_posts, sort_by=sort_by, descending=descending, force_int=force_int):
 		
 		count += 1
 		
@@ -137,7 +138,7 @@ def explorer_dataset(key, page):
 	# The file's naming format should e.g. be 'reddit-explorer.json'.
 	# For some datasources (e.g. Twitter) we also have to explicitly set
 	# what data type we're working with.
-	filetype = dataset["result_file"].split(".")[-1].lower()
+	filetype = dataset.get_extension()
 	custom_fields = get_custom_fields(datasource, filetype=filetype)
 	
 	# Convert posts from markdown to HTML
@@ -274,7 +275,6 @@ def save_annotation_fields(key):
 
 	if not dataset:
 		return error(404, error="Dataset not found")
-
 
 	# We're saving the annotation fields as-is
 	db.execute("UPDATE datasets SET annotation_fields = %s WHERE key = %s;", (json.dumps(new_fields), key))
@@ -642,10 +642,14 @@ def get_custom_fields(datasource, filetype=None):
 		datasource_dir = datasource.replace("4", "four")
 	elif datasource.startswith("8"):
 		datasource_dir = datasource.replace("8", "eight")
+	elif "facebook" in datasource or "instagram" in datasource:
+		datasource_dir = "import-from-tool"
+		datasource = "import-from-tool"
 	else:
 		datasource_dir = datasource
 
 	json_path = Path(config.PATH_ROOT, "datasources", datasource_dir, "explorer", datasource.lower() + "-explorer.json")
+	print(json_path)
 	if json_path.exists():
 		with open(json_path, "r", encoding="utf-8") as json_file:
 			try:
@@ -655,6 +659,7 @@ def get_custom_fields(datasource, filetype=None):
 	else:
 		custom_fields = None
 
+	filetype = filetype.replace(".", "")
 	if filetype and custom_fields:
 		if filetype in custom_fields:
 			custom_fields = custom_fields[filetype]

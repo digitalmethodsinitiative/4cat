@@ -99,6 +99,10 @@ em, strong {
     font-weight: bold;
 }
 
+i {
+    font-style: italic;
+}
+
 table {
     margin: 1em auto;
     font-size: inherit;

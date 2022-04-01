@@ -264,7 +264,7 @@ const query = {
 		$('#datasource-form').on('change', '#forminput-board', query.custom_board_options);
 
 		// dataset label edit
-		$('.result-page .card h2').each(query.label.init);
+		$('.result-page .card h2.editable').each(query.label.init);
 		$(document).on('click', '.edit-dataset-label', query.label.handle);
 		$(document).on('keydown', '#new-dataset-label', query.label.handle);
 
@@ -760,7 +760,7 @@ const query = {
 			e.preventDefault();
 			let field = $(self).parent().find('input');
 			let new_label = field.val();
-			let dataset_key = $('section.result-tree').attr('data-dataset-key')
+			let dataset_key = $('article.result').attr('data-dataset-key');
 
 			$.post({
 				dataType: "json",
@@ -782,7 +782,7 @@ const query = {
 
 	convert_dataset: function(self) {
 		let datasource = $(self.target).val();
-		let dataset_key = $('article.result').attr('data-dataset-key')
+		let dataset_key = $('article.result').attr('data-dataset-key');
 		
 		if (datasource.length > 0) {
 			$.post({
@@ -839,10 +839,11 @@ const tooltip = {
 			}
 		});
 		tooltip_container = '#' + tooltip_container;
+		let is_standalone = $(tooltip_container).hasClass('multiple');
 
 		if ($(tooltip_container).is(':hidden')) {
 			$(tooltip_container).removeClass('force-width');
-			let position = $(parent).position();
+			let position = is_standalone ? $(parent).offset() : $(parent).position();
 			let parent_width = parseFloat($(parent).css('width').replace('px', ''));
 			$(tooltip_container).show();
 
@@ -855,6 +856,7 @@ const tooltip = {
 				$(tooltip_container).addClass('force-width');
 			}
 
+			console.log(position);
 			let width = parseFloat($(tooltip_container).css('width').replace('px', ''));
 			let height = parseFloat($(tooltip_container).css('height').replace('px', ''));
 			$(tooltip_container).css('top', (position.top - height - 5) + 'px');
@@ -917,6 +919,7 @@ const popup = {
 		//popups
 		$(document).on('click', '.popup-trigger', popup.show);
 		$('body').on('click', '#blur, #popup-close', popup.hide);
+		$(document).on('keyup', popup.handle_key);
 
 		popup.is_initialised = true;
 	 },
@@ -940,7 +943,6 @@ const popup = {
 		}
 
 		//determine target - last aria-controls value starting with 'popup-'
-		console.log(parent);
 		let targets = $(parent).attr('aria-controls').split(' ');
 		let popup_container = '';
 		targets.forEach(function(target) {
@@ -982,6 +984,17 @@ const popup = {
 		$('#popup .content').html('');
 		$('#blur').attr('aria-expanded', false);
 		$('#popup').attr('aria-expanded', false);
+	 },
+
+	/**
+	 * Hide popup when escape is pressed
+	 *
+	 * @param e
+	 */
+	 handle_key: function(e) {
+		 if(e.keyCode === 27 && $('#popup').attr('aria-expanded')) {
+			 popup.hide(e);
+		 }
 	 }
 	};
 
@@ -1266,7 +1279,6 @@ const ui_helpers = {
 			if($(this).attr('data-confirm-var')) {
 				html = '<input type="hidden" name="' + $(this).attr('data-confirm-var') + '" value="' + result + '">';
 			}
-			console.log(html)
 			$('<form style="display: none;"/>').attr('method', method).attr('action', url).html(html).appendTo('body').submit().remove();
 			return false;
 		}

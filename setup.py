@@ -27,6 +27,7 @@ packages = [
 	"ImageHash==4.2.0",
 	"instaloader==4.5.3",
 	"itsdangerous==2.0.1", # per issue with Flask 1.0; can likely remove when we upgrade Flask
+	"Jinja2==3.0.3", # per issue with Flask 1.0; can likely remove when we upgrade Flask
 	"lxml==4.6.5",
 	"Markdown==3.0.1",
 	"markdown2==2.4.2",
@@ -50,7 +51,7 @@ packages = [
 	"six==1.15.0",
 	"spacy==3.0.5",
 	"svgwrite==1.3.1",
-	"Telethon==1.10.6",
+	"Telethon==1.24.0",
 	"ural==0.30.0",
 	"Werkzeug==0.15.5",
 	"wordcloud==1.8.1",

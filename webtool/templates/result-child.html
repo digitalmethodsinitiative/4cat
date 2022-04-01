@@ -157,7 +157,7 @@
 
     {# 'More' button to show further analysis and preview #}
     <div class="processor-expand button-wrap">
-        {% if item.is_finished() and item.num_rows > 0 and (item.children or item.get_available_processors()) %}
+        {% if current_user.is_authenticated and item.is_finished() and item.num_rows > 0 and (item.children or item.get_available_processors()) %}
         <button aria-controls="child-{{ item.key }}-details" class="toggle-button">
             <span class="headline">
             <i class="fa fa-sitemap" aria-hidden="true"></i> <span class="sr-only">More info</span>

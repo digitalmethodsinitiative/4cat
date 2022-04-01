@@ -151,7 +151,7 @@ def datasource_form(datasource_id):
 	labels = []
 	is_local = "local" if hasattr(worker_class, "is_local") and worker_class.is_local else "external"
 	is_static = True if hasattr(worker_class, "is_static") and worker_class.is_static else False
-	
+
 	labels.append(is_local)
 	if is_static:
 		labels.append("static")
@@ -327,8 +327,9 @@ def queue_dataset():
 	sanitised_query["datasource"] = datasource_id
 	sanitised_query["type"] = search_worker_id
 
+	# unchecked checkboxes do not send data in html forms, so key will not exist if box is left unchecked
 	sanitised_query["pseudonymise"] = bool(request.form.to_dict().get("pseudonymise", False))
-	is_private = bool(request.form.to_dict().get("make-private", True))
+	is_private = bool(request.form.get("make-private", False))
 
 	extension = search_worker.extension if hasattr(search_worker, "extension") else "csv"
 	dataset = DataSet(

@@ -183,6 +183,12 @@ class ImageDownloader(BasicProcessor):
 
 				[urls[item_url].append(id) for id in item_ids]
 
+		if not urls:
+			self.dataset.update_status("No image urls identified.", is_final=True)
+			self.dataset.finish(0)
+			return
+		else:
+			self.dataset.log('Collected %i image urls.' % len(urls))
 		# next, loop through images and download them - until we have as many images
 		# as required. Note that images that cannot be downloaded or parsed do
 		# not count towards that limit
@@ -213,7 +219,7 @@ class ImageDownloader(BasicProcessor):
 				except UnidentifiedImageError:
 					picture = Image.open(image.raw)
 
-			except (FileNotFoundError, UnidentifiedImageError, AttributeError):
+			except (FileNotFoundError, UnidentifiedImageError, AttributeError, TypeError):
 				failures.append(url)
 				continue
 
@@ -263,6 +269,7 @@ class ImageDownloader(BasicProcessor):
 		with results_path.joinpath(".metadata.json").open("w", encoding="utf-8") as outfile:
 			json.dump(metadata, outfile)
 
+		self.dataset.log('Downloaded %i images.' % downloaded_images)
 		# finish up
 		self.dataset.update_status("Compressing images")
 		self.write_archive_and_finish(results_path)
@@ -395,12 +402,15 @@ class ImageDownloader(BasicProcessor):
 			rate_limited = rate_regex.search(page.content.decode("utf-8"))
 
 		# get link to image file from HTML returned
-		parser = etree.HTMLParser()
-		tree = etree.parse(StringIO(page.content.decode("utf-8")), parser)
 		try:
+			parser = etree.HTMLParser()
+			tree = etree.parse(StringIO(page.content.decode("utf-8")), parser)
 			image_url = css("a.thread_image_link")(tree)[0].get("href")
 		except IndexError as e:
 			self.dataset.log("Error: IndexError while trying to download 4chan image %s: %s" % (url, e))
+			raise FileNotFoundError()
+		except UnicodeDecodeError:
+			self.dataset.log("Error: 4chan image search could not be completed for image %s, skipping" % url)
 			raise FileNotFoundError()
 
 		# download image itself
