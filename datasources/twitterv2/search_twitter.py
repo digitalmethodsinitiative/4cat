@@ -316,7 +316,7 @@ class SearchWithTwitterAPIv2(Search):
                 if num_missing_objects > 50:
                     # Large amount of missing objects; possible error with Twitter API
                     self.flawless = False
-                    error_report.append('%i missing objects received following tweet number %i. Possible issue with Twitter API.', (num_missing_objects, tweets))
+                    error_report.append('%i missing objects received following tweet number %i. Possible issue with Twitter API.' % (num_missing_objects, tweets))
                     error_report.append('Missing objects collected: ' + ', '.join(['%s: %s' % (k, len(v)) for k, v in missing_objects.items()]))
 
                 # Warn if new missing object is recorded (for developers to handle)
