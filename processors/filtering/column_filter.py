@@ -204,7 +204,17 @@ class ColumnFilter(BasicProcessor):
                         for i in range(len(match_values)):
                             # Map the results to the matches
                             if match_list[i] and type(item_column) == str:
-                                item[match_values[i]] = self.surrounding_text(item_column, match_values[i], num_of_surrounding_characters_to_select)
+                                matches = []
+                                placeholder = 0
+                                start_of_match = 0
+                                target_text = match_values[i]
+                                while start_of_match >= 0:
+                                    start_of_match = item_column[placeholder:].find(target_text)
+                                    if start_of_match != -1:
+                                        current_match = item_column[max(placeholder + start_of_match - num_of_surrounding_characters_to_select,0):placeholder + start_of_match + len(target_text) + num_of_surrounding_characters_to_select]
+                                        matches.append(current_match)
+                                        placeholder = placeholder + start_of_match + len(target_text)
+                                item[match_values[i]] = ', '.join(matches)
                             else:
                                 item[match_values[i]] = match_list[i]
                             # Create aggregate column
@@ -263,10 +273,17 @@ class ColumnFilter(BasicProcessor):
         """
         Simple find some surrounding text function. Probably should use
         regex, but whatever.
+
+        :param text string: text to be searched
+        :param target string: substring to look for in text parameter
+        :param num_char int: number of charaters to add to beginning and end of
+        target text found
+        :return: None if nothing found else target substring plus nearby text
+        plus the index number from the original text where the target begins
         """
         start_of_match = text.find(target)
         if start_of_match != -1:
-            return text[max(start_of_match - num_char,0):start_of_match + len(target) + num_char]
+            return text[max(start_of_match - num_char,0):start_of_match + len(target) + num_char], start_of_match
         else:
             return None
 
