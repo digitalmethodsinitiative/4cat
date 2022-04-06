@@ -16,7 +16,7 @@
                 <li>
                     <select aria-label="Sort datasets by" name="sort_by">
                         <option value="timestamp"{% if filter.sort_by == "timestamp" %} selected{% endif %}>Sort by date</option>
-                        <option value="num_rows">Sort by size</option>
+                        <option value="num_rows"{% if filter.sort_by == "num_rows" %} selected{% endif %}>Sort by size</option>
                     </select>
                 </li>
             {% endif %}
