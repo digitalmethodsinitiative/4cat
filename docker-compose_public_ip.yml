@@ -25,7 +25,7 @@ services:
       - 4cat_data:/usr/src/app/data/
       - 4cat_share:/usr/src/app/config/
       - 4cat_logs:/usr/src/app/logs/
-    entrypoint: docker/docker-entrypoint.sh
+    entrypoint: docker/docker-entrypoint.sh -p
 
   frontend:
     image: digitalmethodsinitiative/4cat:latest
