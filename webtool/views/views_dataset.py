@@ -37,18 +37,34 @@ def show_results(page):
     """
     Show results overview
 
-    For each result, available analyses are also displayed.
+    For each result, some metadata is displayed. This also implements a number
+    of filters that can be used to narrow down the results. Basically, this is
+    an elaborate Postgres query builder.
 
     :return:  Rendered template
     """
     page_size = 20
     offset = (page - 1) * page_size
 
+    # ensure that we're only getting top-level datasets
     where = ["(key_parent = '' OR key_parent IS NULL)"]
     replacements = []
 
-    query_filter = request.args.get("filter", "")
+    # sanitize and validate filters and options
+    filters = {
+        **{key: request.args.get(key, "") for key in ("filter", "user")},
+        "hide_empty": bool(request.args.get("hide_empty", False)),
+        "sort_by": request.args.get("sort_by", "desc"),
+        "datasource": request.args.get("datasource", "all")
+    }
 
+    if filters["sort_by"] not in ("timestamp", "num_rows"):
+        filters["sort_by"] = "timestamp"
+
+    if not request.args:
+        filters["hide_empty"] = True
+
+    # handle 'depth'; all, own datasets, or favourites?
     depth = request.args.get("depth", "own")
     if depth not in ("own", "favourites", "all"):
         depth = "own"
@@ -61,29 +77,56 @@ def show_results(page):
         where.append("key IN ( SELECT key FROM users_favourites WHERE name = %s )")
         replacements.append(current_user.get_id())
 
-    if query_filter:
-        where.append("query LIKE %s")
-        replacements.append("%" + query_filter + "%")
+    # handle filters
+    if filters["filter"]:
+        # text filter looks in query and label (does it need to do more?)
+        where.append("(query LIKE %s OR parameters::json->>'label' LIKE %s)")
+        replacements.append("%" + filters["filter"] + "%")
+        replacements.append("%" + filters["filter"] + "%")
 
+    # hide private datasets for non-owners and non-admins
     if not current_user.is_admin:
         where.append("(is_private = FALSE OR owner = %s)")
         replacements.append(current_user.get_id())
 
+    # empty datasets could just have no results, or be failures. we make no
+    # distinction here
+    if filters["hide_empty"]:
+        where.append("num_rows > 0")
+
+    # the user filter is only exposed to admins, and otherwise emulates the
+    # 'own' option
+    if filters["user"]:
+        if (current_user.is_admin or current_user.get_id() == filters["user"]):
+            where.append("owner = %s")
+            replacements.append(filters["user"])
+        else:
+            where.append("(owner = %s AND (owner = %s OR is_private = FALSE))")
+            replacements.append(filters["user"])
+            replacements.append(current_user.get_id())
+
+    # not all datasets have a datsource defined, but that is fine, since if
+    # we are looking for all datasources the query just excludes this part
+    if filters["datasource"] and filters["datasource"] != "all":
+        where.append("parameters::json->>'datasource' = %s")
+        replacements.append(filters["datasource"])
+
     where = " AND ".join(where)
 
+    # first figure out how many datasets this matches
     num_datasets = db.fetchone("SELECT COUNT(*) AS num FROM datasets WHERE " + where, tuple(replacements))["num"]
 
+    # then get the current page of results
     replacements.append(page_size)
     replacements.append(offset)
-    datasets = db.fetchall("SELECT key FROM datasets WHERE " + where + " ORDER BY timestamp DESC LIMIT %s OFFSET %s",
-                           tuple(replacements))
-
-    print("SELECT key FROM datasets WHERE " + where + " ORDER BY timestamp DESC LIMIT %s OFFSET %s")
-    print(replacements)
+    datasets = db.fetchall(
+        "SELECT key FROM datasets WHERE " + where + " ORDER BY " + filters["sort_by"] + " DESC LIMIT %s OFFSET %s",
+        tuple(replacements))
 
     if not datasets and page != 1:
         return error(404)
 
+    # some housekeeping to prepare data for the template
     pagination = Pagination(page, page_size, num_datasets)
     filtered = []
 
@@ -93,15 +136,16 @@ def show_results(page):
     favourites = [row["key"] for row in
                   db.fetchall("SELECT key FROM users_favourites WHERE name = %s", (current_user.get_id(),))]
 
-    return render_template("results.html", filter={"filter": query_filter}, depth=depth, datasets=filtered,
-                           pagination=pagination, favourites=favourites)
+    datasources = {datasource: metadata for datasource, metadata in backend.all_modules.datasources.items() if
+                   metadata["has_worker"] and metadata["has_options"]}
+
+    return render_template("results.html", filter=filters, depth=depth, datasources=datasources,
+                           datasets=filtered, pagination=pagination, favourites=favourites)
 
 
 """
 Downloading results
 """
-
-
 @app.route('/result/<string:query_file>/')
 def get_result(query_file):
     """
