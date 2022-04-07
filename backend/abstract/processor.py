@@ -40,9 +40,9 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
 	.. code-block:: python
 
-        @classmethod
-        def is_compatible_with(cls, module=None):
-            return module.type == "linguistic-features"
+	@classmethod\
+	def is_compatible_with(cls, module=None):\
+	return module.type == "linguistic-features"\
 
 
 	"""
@@ -324,11 +324,12 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
 		TODO: could be improved by accepting different types of data depending on csv or ndjson.
 
-		:param str field_name: 	name of the desired
-		:param List new_data: 	List of data to be added to parent dataset
-		:param DataSet which_parent: 	DataSet to be updated (e.g., self.source_dataset, self.dataset.get_parent(), self.dataset.top_parent())
-		:param bool update_existing: 	False (default) will raise an error if the field_name already exists
-										True will allow updating existing data
+		:param str field_name: name of the desired
+		:param list new_data: List of data to be added to parent dataset
+		:param DataSet which_parent: DataSet to be updated (e.g., self.source_dataset, self.dataset.get_parent(), \
+		self.dataset.top_parent())
+		:param bool update_existing: False (default) will raise an error if the field_name already exists True will \
+		allow updating existing data
 		"""
 		if len(new_data) < 1:
 			# no data
@@ -413,9 +414,8 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		Files are temporarily unzipped and deleted after use.
 
 		:param Path path: 	Path to zip file to read
-		:param Path staging_area:  Where to store the files while they're
-		  being worked with. If omitted, a temporary folder is created and
-		  deleted after use
+		:param Path staging_area:  Where to store the files while they're being worked with. If omitted, a \
+		temporary folder is created and deleted after use
 		:return:  An iterator with a Path item for each file
 		"""
 
@@ -462,9 +462,8 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		cleaned up automatically.
 
 		:param Path path: 	Path to zip file to read
-		:param Path staging_area:  Where to store the files while they're
-		  being worked with. If omitted, a temporary folder is created and
-		  deleted after use
+		:param Path staging_area:  Where to store the files while they're being worked with. If omitted, a temporary \
+		folder is created and deleted after use
 		:return Path:  A path to the staging area
 		"""
 
@@ -531,13 +530,11 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		"""
 		Archive a bunch of files into a zip archive and finish processing
 
-		:param list|Path files: If a list, all files will be added to the
-		  archive and deleted afterwards. If a folder, all files in the folder
-		  will be added and the folder will be deleted afterwards.
-		:param int num_items: Items in the dataset. If None, the amount of
-		  files added to the archive will be used.
-		:param int compression:  Type of compression to use. By default, files
-		  are not compressed, to speed up unarchiving.
+		:param list|Path files: If a list, all files will be added to the archive and deleted afterwards. If a folder, \
+		all files in the folder will be added and the folder will be deleted afterwards.
+		:param int num_items: Items in the dataset. If None, the amount of files added to the archive will be used.
+		:param int compression:  Type of compression to use. By default, files are not compressed, to speed \
+		up unarchiving.
 		"""
 		is_folder = False
 		if issubclass(type(files), PurePath):
@@ -604,7 +601,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		Filters do not produce their own dataset but replace the source_dataset dataset
 		instead.
 
-		:todo: Make this a bit more robust than sniffing the processor category
+		todo Make this a bit more robust than sniffing the processor category
 		:return bool:
 		"""
 		return hasattr(cls, "category") and cls.category and "filter" in cls.category.lower()
@@ -619,11 +616,9 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		fine-grained options, e.g. in cases where the availability of options
 		is partially determined by the parent dataset's parameters.
 
-		:param DataSet parent_dataset:  An object representing the dataset that
-		  the processor would be run on
-		:param User user:  Flask user the options will be displayed for, in
-		  case they are requested for display in the 4CAT web interface. This can
-		  be used to show some options only to privileges users.
+		:param DataSet parent_dataset:  An object representing the dataset that the processor would be run on
+		:param User user:  Flask user the options will be displayed for, in case they are requested for display in the \
+		4CAT web interface. This can be used to show some options only to privileges users.
 		"""
 		return cls.options if hasattr(cls, "options") else {}
 
@@ -705,8 +700,8 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		"""
 		Used for processor compatibility
 
-		:param bool multiple_items:  Consider datasets with multiple items per
-		  item (e.g. word_1, word_2, etc)? Included for compatibility
+		:param bool multiple_items:  Consider datasets with multiple items per item (e.g. word_1, word_2, etc)? \
+		Included for compatibility
 		"""
 		return False
 

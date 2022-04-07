@@ -36,11 +36,11 @@ def init_datasource(database, logger, queue, name):
 
 
 def strip_tags(html, convert_newlines=True):
-	"""
+	r"""
 	Strip HTML from a string
 
 	:param html: HTML to strip
-	:param convert_newlines: Convert <br> and </p> tags to \n before stripping
+	:param convert_newlines: Convert <br> and </p> tags to \\\n before stripping
 	:return: Stripped HTML
 	"""
 	if not html:
@@ -180,8 +180,8 @@ def get_yt_compatible_ids(yt_ids):
 	that requires a comma-separated string and can only return
 	max fifty results.
 
-	:param yt_ids list, a list of strings
-	:returns list, a ist of joined strings in pairs of 50
+	:param list yt_ids: a list of strings
+	:returns list: a list of joined strings in pairs of 50
 	"""
 
 	# If there's only one item, return a single list item
@@ -514,8 +514,9 @@ def dict_search_and_update(item, keyword_matches, function):
 	return temp_item
 
 def get_last_line(filepath):
-	"""
-	Seeks from end of file for '\n' and returns that line
+	r"""
+	Seeks from end of file for '\\\n' and returns that line
+
 
 	:param str filepath:  path to file
 	:return str: last line of file

@@ -197,9 +197,8 @@ class Database:
 		insert the row and no error is thrown when the insert violates a unique index or other constraint
 		:param tuple constraints: If `safe` is `True`, this tuple may contain the columns that should be used as a \
 		constraint, e.g. ON CONFLICT (name, lastname) DO NOTHING
-		:param str return_field: If not empty or None, this makes the method
-		return this field of the inserted row, instead of the number of
-		affected rows, with `RETURNING`.
+		:param str return_field: If not empty or None, this makes the method return this field of the inserted row, \
+		instead of the number of affected rows, with `RETURNING`.
 		:return int: Number of affected rows. Note that this may be unreliable if `commit` is `False`
 		"""
 		if constraints is None:
