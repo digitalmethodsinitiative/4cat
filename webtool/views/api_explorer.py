@@ -34,7 +34,8 @@ def explorer_dataset(key, page):
 	"""
 	Show posts from a specific dataset
 
-	:param str dataset_key:  Dataset key
+	:param key: Dataset key
+	:type key: str
 	:return-schema: {type=array,items={type=integer}}
 	:return-error 404: If the dataset does not exist.
 	"""

@@ -7,7 +7,7 @@ The backend is where the magic happens:
 - Various helper methods and classes
 
 The backend is intended to be run as a daemon process. See the 
-`4cat-daemon.py` script in the parent folder for instructions on how to start 
+`4cat_daemon.py` script in the parent folder for instructions on how to start 
 and control the daemon.
 
 ## What it does
