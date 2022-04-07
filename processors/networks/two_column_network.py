@@ -320,8 +320,7 @@ class ColumnNetworker(BasicProcessor):
 
         :param str interval:  Interval descriptor to expand
         :param int weight:  Weight for the given interval
-        :param str interval_type:  One of `overall`, `year`, `month`, `week`,
-        `day`
+        :param str interval_type:  One of `overall`, `year`, `month`, `week`, `day`
         :return dict:  A dictionary containing a weight per day
         """
         if interval_type not in ("month", "week", "year"):
