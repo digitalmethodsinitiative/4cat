@@ -66,7 +66,7 @@ TCAT_TOKEN = ''
 TCAT_USERNAME = ''
 TCAT_PASSWORD = ''
 
-# pix-plot.py
+# pix_plot.py
 # If you host a version of https://github.com/digitalmethodsinitiative/dmi_pix_plot, you can use a processor to publish
 # downloaded images into a PixPlot there
 PIXPLOT_SERVER = ""

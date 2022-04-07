@@ -501,11 +501,9 @@ class ImportFromExternalTool(BasicProcessor):
 		fine-grained options, e.g. in cases where the availability of options
 		is partially determined by the parent dataset's parameters.
 
-		:param DataSet parent_dataset:  An object representing the dataset that
-		the processor would be run on
-		:param User user:  Flask user the options will be displayed for, in
-		case they are requested for display in the 4CAT web interface. This can
-		be used to show some options only to privileges users.
+		:param DataSet parent_dataset:  An object representing the dataset that the processor would be run on
+		:param User user:  Flask user the options will be displayed for, in case they are requested for display in the \
+		4CAT web interface. This can be used to show some options only to privileges users.
 		"""
 		options = cls.options
 
