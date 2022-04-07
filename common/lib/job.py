@@ -115,8 +115,7 @@ class Job:
 		This deletes it from the database, or in the case of recurring jobs,
 		resets the claim flags.
 
-		:param bool delete: Whether to force deleting the job even if it is a
-							job with an interval.
+		:param bool delete: Whether to force deleting the job even if it is a job with an interval.
 		"""
 		if self.data["interval"] == 0 or delete:
 			self.db.delete("jobs", where={"jobtype": self.data["jobtype"], "remote_id": self.data["remote_id"]})
@@ -131,8 +130,7 @@ class Job:
 		Release a job so it may be claimed again
 
 		:param int delay: Delay in seconds after which job may be reclaimed.
-		:param int claim_after:  Timestamp after which job may be claimed. This
-		is overridden by `delay`.
+		:param int claim_after:  Timestamp after which job may be claimed. This is overridden by `delay`.
 		"""
 		update = {"timestamp_claimed": 0, "attempts": self.data["attempts"] + 1}
 		if delay > 0:

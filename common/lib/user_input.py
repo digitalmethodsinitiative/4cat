@@ -39,9 +39,8 @@ class UserInput:
 
         :param dict options:  Options, as a name -> settings dictionary
         :param dict input:  Input, as a form field -> value dictionary
-        :param bool silently_correct:  If true, replace invalid values with the
-        given default value; else, raise a QueryParametersException if a value
-        is invalid.
+        :param bool silently_correct:  If true, replace invalid values with the given default value; else, raise a \
+        QueryParametersException if a value is invalid.
 
         :return dict:  Sanitised form input
         """
@@ -106,9 +105,8 @@ class UserInput:
 
         :param obj settings:  Settings, including defaults and valid options
         :param choice:  The chosen option, to be parsed
-        :param bool silently_correct:  If true, replace invalid values with the
-        given default value; else, raise a QueryParametersException if a value
-        is invalid.
+        :param bool silently_correct:  If true, replace invalid values with the given default value; else, raise a \
+        QueryParametersException if a value is invalid.
 
         :return:  Validated and parsed input
         """

@@ -119,7 +119,8 @@ class Database:
 		:param dict data:  Data to set, Column => Value
 		:param bool commit:  Whether to commit after executing the query
 
-		:return int: Number of affected rows. Note that this may be unreliable if `commit` is `False`
+		:return: Number of affected rows. Note that this may be unreliable if `commit` is `False`
+		:rtype: int
 		"""
 		if where is None:
 			where = {}
@@ -192,10 +193,10 @@ class Database:
 		:param string table:  Table to insert record into
 		:param dict data:   Data to insert
 		:param bool commit: Whether to commit after executing the query
-		:param bool safe: If set to `True`, "ON CONFLICT DO NOTHING" is added to the insert query, so it does not
-						  insert the row and no error is thrown when the insert violates a unique index or other constraint
-		:param tuple constraints: If `safe` is `True`, this tuple may contain the columns that should be used as a
-								  constraint, e.g. ON CONFLICT (name, lastname) DO NOTHING
+		:param bool safe: If set to `True`, "ON CONFLICT DO NOTHING" is added to the insert query, so it does not \
+		insert the row and no error is thrown when the insert violates a unique index or other constraint
+		:param tuple constraints: If `safe` is `True`, this tuple may contain the columns that should be used as a \
+		constraint, e.g. ON CONFLICT (name, lastname) DO NOTHING
 		:param str return_field: If not empty or None, this makes the method
 		return this field of the inserted row, instead of the number of
 		affected rows, with `RETURNING`.
@@ -249,8 +250,8 @@ class Database:
 		:param string table:  Table to upsert record into
 		:param dict data:   Data to upsert
 		:param bool commit: Whether to commit after executing the query
-		:param tuple constraints: This tuple may contain the columns that should be used as a
-								  constraint, e.g. ON CONFLICT (name, lastname) DO UPDATE
+		:param tuple constraints: This tuple may contain the columns that should be used as a \
+		constraint, e.g. ON CONFLICT (name, lastname) DO UPDATE
 		:return int: Number of affected rows. Note that this may be unreliable if `commit` is `False`
 		"""
 		if constraints is None:
@@ -349,8 +350,7 @@ class Database:
 		there should never be more than one active query per connection within
 		4CAT.
 
-		:param JobQueue queue:  A job queue object, required to schedule the
-		query cancellation job
+		:param JobQueue queue:  A job queue object, required to schedule the query cancellation job
 		:param str query:  SQL query
 		:param list args:  Replacement variables
 		:param commit:  Commit transaction after query?
