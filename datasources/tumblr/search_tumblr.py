@@ -189,11 +189,11 @@ class SearchTumblr(Search):
 	def get_posts_by_tag(self, tag, max_date=None, min_date=None):
 		"""
 		Get Tumblr posts posts with a certain tag
-		:param tag, str: the tag you want to look for
-		:param min_date: a unix timestamp, indicates posts should be min_date this date.
-	    :param max_date: a unix timestamp, indicates posts should be max_date this date.
 
-	    :returns: a dict created from the JSON response
+		:param str tag: the tag you want to look for
+		:param min_date: a unix timestamp, indicates posts should be min_date this date.
+		:param max_date: a unix timestamp, indicates posts should be max_date this date.
+		:returns: a dict created from the JSON response
 		"""
 
 		client = self.connect_to_tumblr()
@@ -386,12 +386,12 @@ class SearchTumblr(Search):
 
 	def get_posts_by_blog(self, blog, max_date=None, min_date=None):
 		"""
-		Get Tumblr posts posts with a certain blog
-		:param tag, str: the name of the blog you want to look for
-		:param min_date: a unix timestamp, indicates posts should be min_date this date.
-	    :param max_date: a unix timestamp, indicates posts should be max_date this date.
+		Get Tumblr posts with a certain blog
 
-	    :returns: a dict created from the JSON response
+		:param str blog: the name of the blog you want to look for
+		:param min_date: a unix timestamp, indicates posts should be min_date this date.
+		:param max_date: a unix timestamp, indicates posts should be max_date this date.
+		:returns: a dict created from the JSON response
 		"""
 
 		blog = blog + ".tumblr.com"

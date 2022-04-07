@@ -39,16 +39,16 @@ def get_standalone_processors():
 	as keys and a `description` of what the processor does, a `name` and the processor's `category`.
 	:rtype: object
 
-	:return-schema: {
-		type=object,
-		additionalProperties={
-			type=object,
-			properties={
-				description={type=string},
-				name={type=string},
-				category={type=string}
-			}
-		}
+	:return-schema: { \
+		type=object,\
+		additionalProperties={\
+			type=object,\
+			properties={\
+				description={type=string},\
+				name={type=string},\
+				category={type=string}\
+			}\
+		}\
 	}
 	"""
 	available_processors = {}

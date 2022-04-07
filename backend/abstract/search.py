@@ -146,8 +146,7 @@ class Search(BasicProcessor, ABC):
 		To be implemented by descending classes!
 
 		:param dict query:  Query parameters
-		:return Generator:  A generator or iterable that returns items
-		  collected according to the provided parameters.
+		:return Generator:  A generator or iterable that returns items collected according to the provided parameters.
 		"""
 		pass
 
@@ -543,8 +542,7 @@ class SearchWithScope(Search, ABC):
 		Get thread lengths for all threads
 
 		:param tuple thread_ids:  List of thread IDs to fetch lengths for
-		:param int min_length:  Min length for a thread to be included in the
-		results
+		:param int min_length:  Min length for a thread to be included in the results
 		:return dict:  Threads sizes, with thread IDs as keys
 		"""
 		pass

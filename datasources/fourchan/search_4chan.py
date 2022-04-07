@@ -727,8 +727,7 @@ class Search4Chan(SearchWithScope):
 		Get thread lengths for all threads
 
 		:param tuple thread_ids:  List of thread IDs to fetch lengths for
-		:param int min_length:  Min length for a thread to be included in the
-		results
+		:param int min_length:  Min length for a thread to be included in the results
 		:return dict:  Threads sizes, with thread IDs as keys
 		"""
 		# find total thread lengths for all threads in initial data set
@@ -777,8 +776,7 @@ class Search4Chan(SearchWithScope):
 		they are blocking, and will prevent the worker from actually stopping
 		unless killed.
 
-		:param int level:  Retry or cancel? Either `self.INTERRUPT_RETRY` or
-		`self.INTERRUPT_CANCEL`.
+		:param int level: Retry or cancel? Either 'self.INTERRUPT_RETRY' or 'self.INTERRUPT_CANCEL'.
 		"""
 		super(Search4Chan, self).request_interrupt(level)
 
