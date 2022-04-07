@@ -229,6 +229,11 @@ const query = {
 	 * Set up query status checkers and event listeners
 	 */
 	init: function() {
+		if($('form#query-form').length === 0) {
+			// only init handlers if on 'create dataset' page
+			return;
+		}
+
 		// Check status of query
 		if($('body.result-page').length > 0) {
 			query.update_status();
