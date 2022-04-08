@@ -1,3 +1,3 @@
 """
-Eightchan scraper helpers
+8chan scraper helpers
 """

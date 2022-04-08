@@ -1,3 +1,3 @@
 """
-Eightkun scraper helpers
+8kun scraper helpers
 """
