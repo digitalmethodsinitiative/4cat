@@ -56,7 +56,8 @@ docker-compose -f docker-compose_prod.yml up
 ```
 
 will pull the latest version from Docker Hub, but detailed and alternative installation instructions are available
-[in our wiki](https://github.com/digitalmethodsinitiative/4cat/wiki/Installing-4CAT).
+[in our
+wiki](https://github.com/digitalmethodsinitiative/4cat/wiki/Installing-4CAT).
 Currently 4chan, 8chan, and 8kun require additional steps; please see the wiki.
 
 Please check our
@@ -77,78 +78,8 @@ one if you experience any problems (pull requests are also very welcome).
   [wiki](https://github.com/digitalmethodsinitiative/4cat/wiki/How-to-make-a-data-source).
 - `processors`: A collection of data processing scripts that can plug into
   4CAT to manipulate or process datasets created with 4CAT. There is an API
-  you can use to [make your own processors](https://github.com/digitalmethodsinitiative/4cat/wiki/How-to-make-a-processor).
-
-## Documentation
-Documentation, **in this documentation branch**, is done (semi-)automatically, 
-with the use of docstrings formatted  in RestructuredText, through Sphinx (v4.5) 
-and its autodoc and autosummary modules. Therefore, when merging commits and 
-general updates to the code into this branch, one ought to be aware that the overall
-code structure have changed slightly; mostly in terms of directories and filenames being
-renamed with underscores taking the place of hyphens throughout. This is as Sphinx need
-to import all relevant directories and py-files as modules and packages. This is also why
-there are a lot of empty "__init__.py" files. 
-
-Currently many functions lack thorough documentation, or any documentation at all, 
-please follow the steps below to update as you encounter unfinished documentation!
-
-### Docstring formats:
-Please follow [the official ReStructuredText formatting](https://sphinx-rtd-tutorial.readthedocs.io/en/latest/docstrings.html) for your docstrings:
-
-```
-"""
-[Summary]
-
-[Detailed description if needed]
-
-:param [ParamName]: [ParamDescription], defaults to [DefaultParamVal]
-:type [ParamName]: [ParamType](, optional)
-:raises [ErrorType]: [ErrorDescription]
-:return: [ReturnDescription]
-:rtype: [ReturnType]
-"""
-```
-
-Make sure to, as a minimum, keep the empty lines between summary and param-list 
-
-### How to update the documentation
-For more info, [this short guide](https://sphinx-rtd-tutorial.readthedocs.io/en/latest/sphinx-quickstart.html) might be helpful.
-Make sure that you have `sphinx`, `sphinx-mdinclude` `sphinx-rtd-theme` installed via pip in your environment:
-
-`$ (sudo) pip install sphinx`
-
-`$ (sudo) pip install sphinx-rtd-theme`
-
-`$ (sudo) pip install sphinx-mdinclude`
-
-#### Scenario: I changed or added new information to existing docstrings:
-1) Update project files and merge commits into this documentation branch, 
-   be aware of possible conflicts within naming conventions and resolve accordingly
-2) Open the "documentation" folder in your terminal
-3) Run `make clean && make html` as this will clear existing HTML and regenerate new, including
-   your new docstrings, and you can do what you want with the newly generated HTML-files in the /build directory - success!
-
-#### Scenario: I added a new submodule (i.e. a new datasource)
-1) Update project files and merge commits into this documentation branch,
-   be aware of possible conflicts within naming conventions and resolve accordingly
-2) Open the "documentation" folder in your terminal
-3) Either:
-
-   * Delete the rst file(s) in question within the "source"-directory (leave the index.rst!)
-
-   _or_
-
-   * Manually add the stub in the relevant rst file within the "source"-directory as required
-
-4) Regenerate missing rst files by running `sphinx-apidoc -o ./source .. "/*setup*" "/*4cat-daemon*" "/*config*"` in your terminal
-   and reformat accordingly for layout, as all formatting will be lost upon deletion. The last 
-   part of the command lists the aspects of the code that we want to exclude, as these are work poorly for Sphinx
-   documentation.
-5) run `make clean && make html` as this will clear existing HTML and regenerate new, including
-   your new docstrings, and you can do what you want with the newly generated HTML-files in the /build directory - success!
-
-Feel free to contact Martin on Slack about the documentation.
-
+  you can use to [make your own
+  processors](https://github.com/digitalmethodsinitiative/4cat/wiki/How-to-make-a-processor).
 
 ## Credits & License
 4CAT was created at [OILab](https://oilab.eu) and the

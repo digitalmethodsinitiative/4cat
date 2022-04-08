@@ -39,7 +39,7 @@ packages = [
 	"praw==7.3.0",
 	"prawcore==2.2.0",
 	"psutil==5.6.7",
-	"psycopg2-binary==2.8.6",
+	"psycopg2==2.8.6",
 	"pyahocorasick==1.4.0",
 	"PyMySQL==0.9.2",
 	"python_dateutil==2.8.1",
