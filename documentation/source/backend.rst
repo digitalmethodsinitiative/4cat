@@ -5,6 +5,9 @@
 Module contents
 ---------------
 
+.. mdinclude:: ../../backend/README.md
+
+
 .. automodule:: backend
    :members:
    :undoc-members:
