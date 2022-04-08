@@ -40,9 +40,9 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
 	.. code-block:: python
 
-	@classmethod\
-	def is_compatible_with(cls, module=None):\
-	return module.type == "linguistic-features"\
+		@classmethod
+		def is_compatible_with(cls, module=None):
+			return module.type == "linguistic-features"
 
 
 	"""

@@ -1,8 +1,8 @@
-# Twitter Full-Archive Search
+## Twitter Full-Archive Search
 
 This datasource interfaces with the 'Full-Archive Search' 
 [endpoint](https://developer.twitter.com/en/docs/twitter-api/tweets/search/quick-start/full-archive-search)
-of the Twitte API (v2) to allow historical searches of Twitter.
+of the Twitter API (v2) to allow historical searches of Twitter.
 
 Access to this endpoint is only available by request for qualifying academic projects. To this end, users need to 
 supply a 'bearer token' unique to their account to use the data source. There is additionally a usage cap of ten

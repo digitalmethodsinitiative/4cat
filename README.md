@@ -1,4 +1,4 @@
-# ![](https://github.com/digitalmethodsinitiative/4cat/tree/master/common/assets/logo_readme.png) 4CAT: Capture and Analysis Toolkit
+# 4CAT: Capture and Analysis Toolkit
 
 [![DOI: 10.5281/zenodo.4742622](https://zenodo.org/badge/DOI/10.5281/zenodo.4742622.svg)](https://doi.org/10.5281/zenodo.4742622)
 [![License: MPL 2.0](https://img.shields.io/badge/license-MPL--2.0-informational)](https://github.com/digitalmethodsinitiative/4cat/blob/master/LICENSE)
@@ -55,9 +55,8 @@ You can install 4CAT locally or on a server via Docker or manually. Copying our 
 docker-compose -f docker-compose_prod.yml up
 ```
 
-will pull the lastest version from Docker Hub, but detailed and alternative installation instructions are available
-[in our
-wiki](https://github.com/digitalmethodsinitiative/4cat/wiki/Installing-4CAT).
+will pull the latest version from Docker Hub, but detailed and alternative installation instructions are available
+[in our wiki](https://github.com/digitalmethodsinitiative/4cat/wiki/Installing-4CAT).
 Currently 4chan, 8chan, and 8kun require additional steps; please see the wiki.
 
 Please check our
@@ -78,8 +77,7 @@ one if you experience any problems (pull requests are also very welcome).
   [wiki](https://github.com/digitalmethodsinitiative/4cat/wiki/How-to-make-a-data-source).
 - `processors`: A collection of data processing scripts that can plug into
   4CAT to manipulate or process datasets created with 4CAT. There is an API
-  you can use to [make your own
-  processors](https://github.com/digitalmethodsinitiative/4cat/wiki/How-to-make-a-processor).
+  you can use to [make your own processors](https://github.com/digitalmethodsinitiative/4cat/wiki/How-to-make-a-processor).
 
 ## Documentation
 Documentation, **in this documentation branch**, is done (semi-)automatically, 
@@ -98,49 +96,58 @@ please follow the steps below to update as you encounter unfinished documentatio
 Please follow [the official ReStructuredText formatting](https://sphinx-rtd-tutorial.readthedocs.io/en/latest/docstrings.html) for your docstrings:
 
 ```
-  """
-  [Summary]
-  
-  [Detailed description if needed]
-  
-  :param [ParamName]: [ParamDescription], defaults to [DefaultParamVal]
-  :type [ParamName]: [ParamType](, optional)
-  :raises [ErrorType]: [ErrorDescription]
-  :return: [ReturnDescription]
-  :rtype: [ReturnType]
-  """
+"""
+[Summary]
+
+[Detailed description if needed]
+
+:param [ParamName]: [ParamDescription], defaults to [DefaultParamVal]
+:type [ParamName]: [ParamType](, optional)
+:raises [ErrorType]: [ErrorDescription]
+:return: [ReturnDescription]
+:rtype: [ReturnType]
+"""
 ```
+
 Make sure to, as a minimum, keep the empty lines between summary and param-list 
 
 ### How to update the documentation
 For more info, [this short guide](https://sphinx-rtd-tutorial.readthedocs.io/en/latest/sphinx-quickstart.html) might be helpful.
-Make sure that you have `sphinx` and `sphinx-rtd-theme` installed via pip in your environment:\
-`$ (sudo) pip install sphinx`\
+Make sure that you have `sphinx`, `sphinx-mdinclude` `sphinx-rtd-theme` installed via pip in your environment:
+
+`$ (sudo) pip install sphinx`
+
 `$ (sudo) pip install sphinx-rtd-theme`
+
+`$ (sudo) pip install sphinx-mdinclude`
 
 #### Scenario: I changed or added new information to existing docstrings:
 1) Update project files and merge commits into this documentation branch, 
-be aware of possible conflicts within naming conventions and resolve accordingly
+   be aware of possible conflicts within naming conventions and resolve accordingly
 2) Open the "documentation" folder in your terminal
-3) run `make clean && make html` as this will clear existing HTML and regenerate new, including
-your new docstrings, and you can do what you want with the newly generated HTML-files - success!
+3) Run `make clean && make html` as this will clear existing HTML and regenerate new, including
+   your new docstrings, and you can do what you want with the newly generated HTML-files in the /build directory - success!
 
 #### Scenario: I added a new submodule (i.e. a new datasource)
 1) Update project files and merge commits into this documentation branch,
    be aware of possible conflicts within naming conventions and resolve accordingly
 2) Open the "documentation" folder in your terminal
-3) Either: 
-   * Delete the rst file(s) in question within the "source"-directory (leave the index.rst!)\
+3) Either:
+
+   * Delete the rst file(s) in question within the "source"-directory (leave the index.rst!)
+
    _or_
+
    * Manually add the stub in the relevant rst file within the "source"-directory as required
-4) Regenerate missing rst files by running `sphinx-apidoc -o ./source .. "/*setup*" "/*4cat_daemon*" "/*config*"` in your terminal
+
+4) Regenerate missing rst files by running `sphinx-apidoc -o ./source .. "/*setup*" "/*4cat-daemon*" "/*config*"` in your terminal
    and reformat accordingly for layout, as all formatting will be lost upon deletion. The last 
-   parts lists the aspects of the code that we want to exclude, as these are work poorly for Sphinx
+   part of the command lists the aspects of the code that we want to exclude, as these are work poorly for Sphinx
    documentation.
 5) run `make clean && make html` as this will clear existing HTML and regenerate new, including
-   your new docstrings, and you can do what you want with the newly generated HTML-files - success!
+   your new docstrings, and you can do what you want with the newly generated HTML-files in the /build directory - success!
 
-Feel free to contact Martin Trans on Slack as needed.
+Feel free to contact Martin on Slack about the documentation.
 
 
 ## Credits & License
