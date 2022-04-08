@@ -20,13 +20,13 @@ class SearchWithTwitterAPIv2(Search):
     This only allows for historical search - use f.ex. TCAT for more advanced
     queries.
     """
-    type = "twitterv2-search"  # job ID
-    extension = "ndjson"
-    is_local = False    # Whether this datasource is locally scraped
-    is_static = False   # Whether this datasource is still updated
+    type = "twitterv2-search"  #: job ID
+    extension = "ndjson"    #: file extension exported by datasource
+    is_local = False    #: Whether this datasource is locally scraped
+    is_static = False   #: Whether this datasource is still updated
 
     previous_request = 0
-    #: *TBD*
+    #: TODO example on how to document class variables or constants
     flawless = True
 
     references = [
