@@ -5,20 +5,23 @@ Parses 4chan API data, saving it to database and queueing downloads
 
 Flow:
 
-(crawler)\
--> process():\
-   -> register_thread(): check if thread exists\
-      if not, create preliminary record\
-      -> add_thread()\
-      if so,\
-        if no change in timestamp or number of posts, DONE (halt processing)\
-        if changes, continue\
-   -> create separate sets of new posts and deleted posts\
-   -> mark deleted posts as deleted\
-   -> add new posts to database\
-      -> save_post(): save post data to database\
-         -> queue_image(): if an image was attached, queue a job to scrape it\
-   -> update_thread(): update thread data\
+.. code-block::
+
+	(crawler)
+	-> process():
+	   -> register_thread(): check if thread exists
+		  if not, create preliminary record
+		  -> add_thread()
+		  if so,
+			if no change in timestamp or number of posts, DONE (halt processing)
+			if changes, continue
+	   -> create separate sets of new posts and deleted posts
+	   -> mark deleted posts as deleted
+	   -> add new posts to database
+		  -> save_post(): save post data to database
+			 -> queue_image(): if an image was attached, queue a job to scrape it
+	   -> update_thread(): update thread data
+
 """
 import requests
 import psycopg2
