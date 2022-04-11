@@ -221,7 +221,11 @@ class ImageWallGenerator(BasicProcessor):
 				value = (0, 0, 0)
 
 			# converted to HSV, because RGB does not sort nicely
-			image_colours[path.name] = colorsys.rgb_to_hsv(*value)
+			try:
+				image_colours[path.name] = colorsys.rgb_to_hsv(*value)
+			except ValueError:
+				self.dataset.update_status("Image %s could not be parsed. Skipping." % path)
+				continue
 			index += 1
 
 		# only retain the top n of the sorted list of images - this gives us
