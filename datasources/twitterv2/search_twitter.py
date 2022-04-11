@@ -143,6 +143,7 @@ class SearchWithTwitterAPIv2(Search):
             "media.fields": ",".join(media_fields),
         }
 
+        expected_tweets = 0
         if self.parameters.get("query_type", "query") == 'id_lookup':
             endpoint = "https://api.twitter.com/2/tweets"
 
@@ -151,6 +152,7 @@ class SearchWithTwitterAPIv2(Search):
             # Only can lookup 100 tweets in each query per Twitter API
             chunk_size = 100
             queries = [','.join(tweet_ids[i:i+chunk_size]) for i in range(0, len(tweet_ids), chunk_size)]
+            expected_tweets = len(tweet_ids)
 
             amount = len(tweet_ids)
 
@@ -173,6 +175,36 @@ class SearchWithTwitterAPIv2(Search):
             if self.parameters.get("max_date"):
                 params["end_time"] = datetime.datetime.fromtimestamp(self.parameters["max_date"]).strftime(
                     "%Y-%m-%dT%H:%M:%SZ")
+
+            # figure out how many tweets we expect to get back
+            count_url = "https://api.twitter.com/2/tweets/counts/all"
+            count_fields = ("query", "end_time", "since_id", "start_time", "until")
+            count_params = {
+                "granularity": "day",
+                "query": queries[0],
+                **{field: params.get(field) for field in count_fields if field in params}
+            }
+
+            self.dataset.update_status("Retrieving estimated amount of tweets for query")
+            while True:
+                response = requests.get(count_url, params=count_params, headers=auth)
+                if response.status_code != 200:
+                    break
+
+                for result in response.json()["data"]:
+                    expected_tweets += result["tweet_count"]
+
+                if "next_token" not in response.json()["meta"]:
+                    break
+
+                count_params["next_token"] = response.json()["meta"]["next_token"]
+
+            if expected_tweets:
+                self.dataset.update_status("Twitter says there are approximately %i tweets matching this query" % expected_tweets)
+            else:
+                self.dataset.update_status("Not able to retrieve estimated amount of tweets for query")
+
+        expected_tweets = ("~" + str(expected_tweets)) if expected_tweets else "unknown"
 
         tweets = 0
         for query in queries:
@@ -336,7 +368,7 @@ class SearchWithTwitterAPIv2(Search):
 
                     tweets += 1
                     if tweets % 500 == 0:
-                        self.dataset.update_status("Received %i tweets from the Twitter API" % tweets)
+                        self.dataset.update_status("Received %i of %s tweets from the Twitter API" % (tweets, expected_tweets))
 
                     yield tweet
 
