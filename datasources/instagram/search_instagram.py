@@ -141,8 +141,7 @@ class SearchInstagram(Search):
             #     [u["node"]["user"]["username"] for u in node["edge_media_to_tagged_user"]["edges"]]),
             "num_likes": node["edge_media_preview_like"]["count"],
             "num_comments": node.get("edge_media_preview_comment", {}).get("count", 0),
-            "num_media": num_media,
-            "subject": ""
+            "num_media": num_media
         }
 
         return mapped_item

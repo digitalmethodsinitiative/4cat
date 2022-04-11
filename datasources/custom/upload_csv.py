@@ -29,7 +29,7 @@ class SearchCustom(BasicProcessor):
 			"type": UserInput.OPTION_INFO,
 			"help": "You can upload a CSV or TAB file here that, after upload, will be available for further analysis "
 					"and processing. Files need to be utf-8 encoded and must contain a header row with at least the "
-					"following columns: `id`, `thread_id`, `author`, `body`, `subject`, `timestamp`.\n\nThe "
+					"following columns: `id`, `thread_id`, `author`, `body`, and `timestamp`.\n\nThe "
 					"`timestamp` column should be formatted in a common format (e.g. unix timestamps or `YYYY-mm-dd HH:MM:SS`). "
 					"If your file contains hashtags, name the column `tags` or `hashtags` and make sure they are comma-separated."
 		},
@@ -96,7 +96,7 @@ class SearchCustom(BasicProcessor):
 			raise QueryParametersException("Uploaded file is not a well-formed CSV or TAB file.")
 
 		# check if all required fields are present
-		required = ("id", "thread_id", "subject", "author", "body", "timestamp")
+		required = ("id", "thread_id", "author", "body", "timestamp")
 		missing = []
 		for field in required:
 			if field not in reader.fieldnames:
