@@ -48,7 +48,7 @@
                             <a class="button-like" href="{{ url_for("delete_user") }}?name={{ user.name }}"><i
                                     class="fa fa-times" aria-hidden="true"></i><span class="sr-only">Delete user</span></a>
                         {% endif %}
-                            <a class="button-like tooltip-trigger" aria-controls="tooltip-user-datasets" href="{{ url_for("show_results") }}?user={{ user.name }}"><i
+                            <a class="button-like tooltip-trigger" aria-controls="tooltip-user-datasets" href="{{ url_for("show_results") }}?user={{ user.name }}&amp;depth=all"><i
                                     class="fa fa-database" aria-hidden="true"></i><span class="sr-only">View datasets for user</span></a>
                     </td>
                 </tr>
