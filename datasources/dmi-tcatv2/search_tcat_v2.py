@@ -141,14 +141,13 @@ class SearchWithinTCATBinsV2(Search):
 
         else:
             # "Basic" query
-            where = []
-            replacements = []
             text_query = self.parameters.get("query")
 
+            where = []
+            replacements = []
             # Find AND and OR
             placeholder = 0
             start_of_match = 0
-            first_run = True
             while start_of_match >= 0:
                 match = None
                 and_match = text_query[placeholder:].find(' AND ')
@@ -171,28 +170,25 @@ class SearchWithinTCATBinsV2(Search):
                     # or match only
                     match = 'OR '
                     start_of_match = or_match
-                elif first_run:
-                    # No AND of OR; add query as is
-                    where.append('lower(text) LIKE %s')
-                    replacements.append('%'+text_query.lower()+'%')
-                    match = None
                 else:
-                    # neither and not first run
+                    # neither
                     match = None
                     start_of_match = -1
+                # Add partial query to where and replacements
                 if match:
-                    where.append(match + ' lower(text) LIKE %s') if len(where) > 0 else where.append('lower(text) LIKE %s')
-                    replacements.append(text_query[placeholder:start_of_match+placeholder].lower())
+                    where.append('lower(text) LIKE %s ' + match)
+                    replacements.append('%'+text_query[placeholder:placeholder+start_of_match].lower().strip()+'%')
                     # new start
                     placeholder = placeholder + start_of_match + len(match)
-                if first_run:
-                    first_run = False
+                else:
+                    where.append('lower(text) LIKE %s')
+                    replacements.append('%'+text_query[placeholder:].lower().strip()+'%')
 
             if query.get("min_date", None):
                 try:
                     if int(query.get("min_date")) > 0:
                         where.append("AND created_at >= %s")
-                        replacements.append(int(query.get("min_date")))
+                        replacements.append(datetime.datetime.fromtimestamp(int(query.get("min_date"))))
                 except ValueError:
                     pass
 
@@ -200,7 +196,7 @@ class SearchWithinTCATBinsV2(Search):
                 try:
                     if int(query.get("max_date")) > 0:
                         where.append("AND created_at < %s")
-                        replacements.append(int(query.get("max_date")))
+                        replacements.append(datetime.datetime.fromtimestamp(int(query.get("max_date"))))
                 except ValueError:
                     pass
 
