@@ -237,7 +237,7 @@ class ImportFromExternalTool(BasicProcessor):
 				entity_name = "Page Name" if "Page Name" in reader.fieldnames else "Group Name"
 
 				writer = csv.DictWriter(output_csv, fieldnames=(
-					"id", "thread_id", "body", "author", "subject", "timestamp", "unix_timestamp", "page_id",
+					"id", "thread_id", "body", "author", "timestamp", "unix_timestamp", "page_id",
 					"page_name", "page_likes", "page_followers", "page_shared_from", "type", "interactions", "likes",
 					"comments", "shares", "likes_love", "likes_wow", "likes_haha", "likes_sad", "likes_angry",
 					"likes_care", "views_post", "views_total", "views_total_crossposts", "video_length", "video_status",
@@ -263,7 +263,6 @@ class ImportFromExternalTool(BasicProcessor):
 						"thread_id": item["URL"].split("/")[-1],
 						"body": item["Message"],
 						"author": item["User Name"],
-						"subject": "",
 						"timestamp": date.strftime('%Y-%m-%d %H:%M:%S'),
 						"unix_timestamp": int(date.timestamp()),
 						"page_name": item[entity_name],
@@ -305,7 +304,7 @@ class ImportFromExternalTool(BasicProcessor):
 				entity_name = "Page Name" if "Page Name" in reader.fieldnames else "Group Name"
 
 				writer = csv.DictWriter(output_csv, fieldnames=(
-					"id", "thread_id", "body", "author", "subject", "timestamp", "unix_timestamp", "page_id",
+					"id", "thread_id", "body", "author", "timestamp", "unix_timestamp", "page_id",
 					"page_name", "page_category", "page_top_country", "page_description", "page_created", "page_likes",
 					"page_followers", "page_shared_from", "type", "interactions", "likes", "comments", "shares",
 					"likes_love", "likes_wow", "likes_haha", "likes_sad", "likes_angry", "likes_care", "views_post",
@@ -340,7 +339,6 @@ class ImportFromExternalTool(BasicProcessor):
 						"thread_id": item["URL"].split("/")[-1],
 						"body": item["Message"],
 						"author": item["User Name"],
-						"subject": "",
 						"timestamp": date.strftime('%Y-%m-%d %H:%M:%S'),
 						"unix_timestamp": int(date.timestamp()),
 						"page_name": item[entity_name],
@@ -399,7 +397,7 @@ class ImportFromExternalTool(BasicProcessor):
 			with dataset.get_results_path().open("w", encoding="utf-8", newline="") as output_csv:
 				wrapped_upload = io.TextIOWrapper(file, encoding=encoding)
 				reader = csv.DictReader(wrapped_upload)
-				writer = csv.DictWriter(output_csv, fieldnames=("id", "thread_id", "author", "subject", "body",
+				writer = csv.DictWriter(output_csv, fieldnames=("id", "thread_id", "author", "body",
 					"timestamp", "unix_timestamp", "is_harmful", "is_duet", "music_name", "music_id", "music_author",
 					"video_url", "tiktok_url", "thumbnail_url", "amount_likes", "amount_comments", "amount_shares",
 					"amount_plays", "hashtags"))
@@ -420,7 +418,6 @@ class ImportFromExternalTool(BasicProcessor):
 						"id": item["id"],
 						"thread_id": item["id"],
 						"author": item["authorMeta.name"],
-						"subject": "",
 						"body": item["text"],
 						"timestamp": datetime.datetime.utcfromtimestamp(int(item["createTime"])).strftime('%Y-%m-%d %H:%M:%S'),
 						"unix_timestamp": int(item["createTime"]),
@@ -443,7 +440,7 @@ class ImportFromExternalTool(BasicProcessor):
 			with dataset.get_results_path().open("w", encoding="utf-8", newline="") as output_csv:
 				wrapped_upload = io.TextIOWrapper(file, encoding=encoding)
 				reader = csv.DictReader(wrapped_upload)
-				writer = csv.DictWriter(output_csv, fieldnames=("id", "thread_id", "author", "subject", "body",
+				writer = csv.DictWriter(output_csv, fieldnames=("id", "thread_id", "author", "body",
 					"timestamp", "unix_timestamp", "is_harmful", "is_duet", "music_name", "music_id", "music_author",
 					"video_url", "tiktok_url", "thumbnail_url", "amount_likes", "amount_comments", "amount_shares",
 					"amount_plays", "hashtags"))
@@ -464,7 +461,6 @@ class ImportFromExternalTool(BasicProcessor):
 						"id": item["id"],
 						"thread_id": item["id"],
 						"author": item["authorMeta.name"],
-						"subject": "",
 						"body": item["text"],
 						"timestamp": datetime.datetime.utcfromtimestamp(int(item["createTime"])).strftime('%Y-%m-%d %H:%M:%S'),
 						"unix_timestamp": int(item["createTime"]),

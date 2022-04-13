@@ -514,7 +514,7 @@ class SearchTelegram(Search):
         forwarded_timestamp = ""
         forwarded_name = ""
         forwarded_username = ""
-        if message.get("fwd_from") and "from_id" in message["fwd_from"]:
+        if message.get("fwd_from") and "from_id" in message["fwd_from"] and not (type(message["fwd_from"]["from_id"]) is int):
             # forward information is spread out over a lot of places
             # we can identify, in order of usefulness: username, full name,
             # and ID. But not all of these are always available, and not

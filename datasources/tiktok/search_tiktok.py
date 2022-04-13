@@ -84,7 +84,6 @@ class SearchTikTok(Search):
                     "author_full": user_fullname,
                     "author_id": user_id,
                     "author_followers": post["authorStats"]["followerCount"],
-                    "subject": "",
                     "body": post["desc"],
                     "timestamp": int(post["createTime"]),
                     "is_duet": post["duetInfo"].get("duetFromId") != "0",
