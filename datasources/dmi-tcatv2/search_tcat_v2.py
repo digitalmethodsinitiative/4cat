@@ -123,7 +123,11 @@ class SearchWithinTCATBinsV2(Search):
             # Advanced query should be simple from our perspective...
             self.dataset.log('Query: %s' % self.parameters.get("query"))
             unbuffered_cursor = db.connection.cursor(pymysql.cursors.SSCursor)
-            num_results = unbuffered_cursor.execute(self.parameters.get("query"))
+            try:
+                num_results = unbuffered_cursor.execute(self.parameters.get("query"))
+            except pymysql.err.ProgrammingError as e:
+                self.dataset.update_status("SQL query error: %s" % str(e), is_final=True)
+                return
             # self.dataset.update_status("Retrieving %i results" % int(num_results)) # num_results is CLEARLY not what I thought
             # Get column names from cursor
             column_names = [description[0] for description in unbuffered_cursor.description]
@@ -136,7 +140,7 @@ class SearchWithinTCATBinsV2(Search):
                     "in_reply_to_status_id") else new_result.get("quoted_status_id") if new_result.get(
                     "quoted_status_id") else new_result.get("id")
                 new_result['body'] = new_result.get('text', '')
-                new_result['timestamp'] = new_result.get('created_at', '')
+                new_result['timestamp'] = new_result.get('created_at', None)
                 new_result['subject'] = ''
                 new_result['author'] = new_result.get('from_user_name', '')
                 yield new_result
