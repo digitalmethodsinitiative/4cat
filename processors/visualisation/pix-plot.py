@@ -134,7 +134,7 @@ class PixPlotGenerator(BasicProcessor):
 		date =  datetime.datetime.now().strftime("%Y-%m-%d-%H%M%S")
 		top_dataset = self.dataset.top_parent()
 		label_formated = ''.join(e if e.isalnum() else '_' for e in top_dataset.get_label())
-		image_label = date + '-' + label_formated + '-' + str(top_dataset.key)
+		image_label = label_formated + '-' + str(top_dataset.key)
 		plot_label = date + '-' + label_formated + '-' + str(self.dataset.key)
 
 		# Folder name is PixPlot identifier and set at dataset key
