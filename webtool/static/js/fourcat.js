@@ -133,7 +133,7 @@ const processor = {
 				'data': form.serialize(),
 				'success': function (response) {
 					if (response.hasOwnProperty("messages") && response.messages.length > 0) {
-						alert(response.messages.join("\n\n"));
+						popup.alert(response.messages.join("\n\n"));
 					}
 
 					if (response.html.length > 0) {
@@ -173,9 +173,9 @@ const processor = {
 				'error': function (response) {
 					try {
 						response = JSON.parse(response.responseText);
-						alert('The analysis could not be queued: ' + response["error"]);
+						popup.alert('The analysis could not be queued: ' + response["error"], 'Warning');
 					} catch(Exception) {
-						alert('The analysis could not be queued: ' + response.responseText);
+						popup.alert('The analysis could not be queued: ' + response.responseText, 'Warning');
 					}
 				}
 			});
@@ -211,7 +211,7 @@ const processor = {
 				query.enable_form();
 			},
 			error: function(json) {
-				alert('Could not delete dataset: ' + json.status);
+				popup.alert('Could not delete dataset: ' + json.status, 'Error');
 			}
 		});
 	}
@@ -331,7 +331,7 @@ const query = {
 			success: function (response) {
 				// If the query is rejected by the server.
 				if (response.substr(0, 14) === 'Invalid query.') {
-					alert(response);
+					popup.alert(response, 'Error');
 					query.enable_form();
 				}
 
@@ -383,7 +383,7 @@ const query = {
 
 					$('#query-results').append('<li><a href="../results/' + json.key + '">' + keyword + ' (' + json.rows + ' items)</a></li>');
 					query.enable_form();
-					alert('Query for \'' + keyword + '\' complete!');
+					popup.alert('Query for \'' + keyword + '\' complete!', 'Success');
 				} else {
 					let dots = '';
 					for (let i = 0; i < query.dot_ticker; i += 1) {
@@ -596,13 +596,13 @@ const query = {
 				// Max three monhts for the common country flags without any body parameters
 				if (max_date - min_date > 7889231) {
 					valid = false;
-					alert('The date selected is more than three months. Select a date range of max. three months and try again. Only the most common country flags on 4chan/pol/ (US, UK, Canada, Australia) have a date restriction.');
+					popup.alert('The date selected is more than three months. Select a date range of max. three months and try again. Only the most common country flags on 4chan/pol/ (US, UK, Canada, Australia) have a date restriction.', 'Error');
 				}
 
 				else {
 					valid = false;
 					$('#input-min-time').focus().select();
-					alert('The most common country flags on 4chan/pol/ (US, Canada, Australia) have a date restriction when you want to retreive all of their posts. Select a date range of max. three months and try again.');
+					popup.alert('The most common country flags on 4chan/pol/ (US, Canada, Australia) have a date restriction when you want to retreive all of their posts. Select a date range of max. three months and try again.', 'Error');
 				}
 			}
 		}
@@ -653,7 +653,7 @@ const query = {
 			},
 			'error': function() {
 				$('#datasource-select').parents('form').trigger('reset');
-				alert('Invalid datasource selected.');
+				popup.alert('Invalid datasource selected.', 'Error');
 			}
 		});
 	},
@@ -774,7 +774,7 @@ const query = {
 					$(self).parent().find('i.fa').removeClass('fa-check').addClass('fa-edit');
 				},
 				error: function (response) {
-					alert('Oh no! ' +response.text);
+					popup.alert('Oh no! ' +response.text, 'Error');
 				}
 			});
 		}
@@ -795,7 +795,7 @@ const query = {
 					location.reload();
 				},
 				error: function (response) {
-					alert('Oh no! ' + response.text);
+					popup.alert('Oh no! ' + response.text, 'Error');
 				}
 			});
 		}
@@ -911,18 +911,47 @@ const popup = {
 	/**
 	 * Set up containers and event listeners for popup
 	 */
-	 is_initialised: false,
-	 init: function() {
+	is_initialised: false,
+	current_callback: null,
+
+	init: function () {
 		$('<div id="blur"></div>').appendTo('body');
-		$('<div id="popup"><div class="content"></div><button id="popup-close"><i class="fa fa-times" aria-hidden="true"></i> <span class="sr-only">Close popup</span></button></div>').appendTo('body');
+		$('<div id="popup" role="alertdialog" aria-labelledby="popup-title" aria-describedby="popup-text"><div class="content"></div><button id="popup-close"><i class="fa fa-times" aria-hidden="true"></i> <span class="sr-only">Close popup</span></button></div>').appendTo('body');
 
 		//popups
 		$(document).on('click', '.popup-trigger', popup.show);
-		$('body').on('click', '#blur, #popup-close', popup.hide);
+		$('body').on('click', '#blur, #popup-close, .popup-close', popup.hide);
+		$('body').on('click', '.popup-execute-callback', function() { if(popup.current_callback) { popup.current_callback(); } });
 		$(document).on('keyup', popup.handle_key);
 
 		popup.is_initialised = true;
-	 },
+	},
+
+	alert: function(message, title = 'Notice') {
+		if(!popup.is_initialised) {
+			popup.init();
+		}
+
+		$('#popup').removeClass('confirm').removeClass('render').addClass('alert');
+
+		let wrapper = $('<div><h2 id="popup-title">' + title + '</h2><p id="popup-text">' + message + '</p><div class="controls"><button class="popup-close"><i class="fa fa-check" aria-hidden="true"></i> OK</button></div></div>');
+		popup.render(wrapper.html(), false, false);
+	},
+
+	confirm: function(message, title = 'Confirm', callback = false) {
+		if(!popup.is_initialised) {
+			popup.init();
+		}
+
+		if(callback) {
+			popup.current_callback = callback;
+		}
+
+		$('#popup').removeClass('alert').removeClass('render').addClass('confirm');
+		let wrapper = $('<div><h2 id="popup-title">' + title + '</h2><p id="popup-text">' + message + '</p><div class="controls"><button class="popup-close"><i class="fa fa-times" aria-hidden="true"></i> Cancel</button><button class="popup-execute-callback"><i class="fa fa-check" aria-hidden="true"></i> OK</button></div></div>');
+		popup.render(wrapper.html(), false, false);
+	},
+
 	/**
 	 * Show popup, using the content of a designated container
 	 *
@@ -942,6 +971,8 @@ const popup = {
 			e.preventDefault();
 		}
 
+		$('#popup').removeClass('confirm').removeClass('alert').addClass('render');
+
 		//determine target - last aria-controls value starting with 'popup-'
 		let targets = $(parent).attr('aria-controls').split(' ');
 		let popup_container = '';
@@ -959,7 +990,7 @@ const popup = {
 		}
 	},
 
-	render: function (content, is_fullsize=false) {
+	render: function (content, is_fullsize=false, with_close_button=true) {
 		//copy popup contents into container
 		$('#popup .content').html(content);
 		if(is_fullsize) {
@@ -969,6 +1000,12 @@ const popup = {
 		}
 		$('#blur').attr('aria-expanded', true);
 		$('#popup').attr('aria-expanded', true);
+
+		if(with_close_button) {
+			$('#popup-close').show();
+		} else {
+			$('#popup-close').hide();
+		}
 
 		$('#popup embed').each(function () {
 			svgPanZoom(this, {contain: true});
@@ -1234,20 +1271,42 @@ const ui_helpers = {
 	 * Ask for confirmation before doing whatever happens when the event goes through
 	 *
 	 * @param e  Event that triggers confirmation
+	 * @param message  Message to display in confirmation dialog
 	 * @returns {boolean}  Confirmed or not
 	 */
-	confirm: function(e) {
-		let action = 'do this';
+	confirm: function(e, message=null) {
+		let trigger_type = $(this).prop("tagName");
 
-		if ($(this).attr('data-confirm-action')) {
-			action = $(this).attr('data-confirm-action');
+		if(!message) {
+			let action = 'do this';
+
+			if ($(this).attr('data-confirm-action')) {
+				action = $(this).attr('data-confirm-action');
+			}
+
+			message = 'Are you sure you want to ' + action + '? This cannot be undone.';
 		}
 
-		if (!confirm('Are you sure you want to ' + action + '? This cannot be undone.')) {
+		if(trigger_type === 'A') {
+			// navigate to link, but only after confirmation
 			e.preventDefault();
-			return false;
-		} else {
-			return true;
+			let url = $(this).attr('href');
+
+			popup.confirm(message, 'Please confirm', () => {
+				window.location.href = url;
+			})
+
+		} else if(trigger_type === 'BUTTON' || trigger_type === 'INPUT') {
+			// submit form, but only after confirmation
+			let form = $(this).parents('form');
+			if(!form) {
+				return true;
+			}
+
+			e.preventDefault();
+			popup.confirm(message, 'Please confirm', () => {
+				form.submit();
+			})
 		}
 	},
 
