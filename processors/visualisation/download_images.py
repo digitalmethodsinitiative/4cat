@@ -441,16 +441,20 @@ class ImageDownloader(BasicProcessor):
 		md5.update(base64.b64decode(based_hash))
 		file_name = md5.hexdigest() + "." + extension
 
+		# avoid getting rate-limited by image source
+		time.sleep(rate_limit)
+
 		# cache the image for later, if configured so
 		if config.PATH_IMAGES:
 			local_path = Path(config.PATH_IMAGES, md5.hexdigest() + "." + extension)
-			with open(local_path, 'wb') as file:
+			with open(local_path, 'wb') as outfile:
 				for chunk in image.iter_content(1024):
-					file.write(chunk)
+					outfile.write(chunk)
 
-		# avoid getting rate-limited by image source
-		time.sleep(rate_limit)
-		return BytesIO(image.content), file_name
+			with open(local_path, 'rb') as infile:
+				return BytesIO(infile.read()), file_name
+		else:
+			return BytesIO(image.content), file_name
 
 	def request_get_w_error_handling(self, url, retries=0, **kwargs):
 		"""
