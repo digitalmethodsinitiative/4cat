@@ -583,7 +583,14 @@ class SearchWithTwitterAPIv2(Search):
                 elif response.status_code == 401:
                     raise QueryParametersException("Your bearer token seems to be invalid. Please make sure it is valid "
                                                    "for the Academic Track of the Twitter API.")
+
+                elif response.status_code == 400:
+                    raise QueryParametersException("Your query is invalid. Please make sure the date range does not "
+                                                   "extend into the future, or to before Twitter's founding, and that "
+                                                   "your query is shorter than 1024 characters.")
+
                 else:
+                    # we can still continue without the expected tweets
                     break
 
             if expected_tweets:
