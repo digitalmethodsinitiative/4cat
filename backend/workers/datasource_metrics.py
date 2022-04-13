@@ -59,10 +59,7 @@ class DatasourceMetrics(BasicWorker):
 			# Only update local datasources
 			if is_local:
 
-				boards = config.get('DATASOURCES')[datasource_id].get("boards")
-
-				if not boards:
-					boards = [""]
+				boards = config.get('DATASOURCES')[datasource_id].get("boards", [""])
 
 				# If a datasource is static (so not updated) and it
 				# is already present in the metrics table, we don't

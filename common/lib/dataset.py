@@ -1079,7 +1079,7 @@ class DataSet(FourcatModule):
 		"""
 		Gets the 4CAT frontend URL of a dataset file.
 
-		Uses the config.py FlaskConfig attributes (i.e., SERVER_NAME and
+		Uses the FlaskConfig attributes (i.e., SERVER_NAME and
 		SERVER_HTTPS) plus hardcoded '/result/'.
 		TODO: create more dynamic method of obtaining url.
 		"""
