@@ -531,7 +531,7 @@ class SearchWithTwitterAPIv2(Search):
                 expected_seconds = int(expected_tweets / 30)
                 expected_time = timify_long(expected_seconds)
                 params["expected-tweets"] = expected_tweets
-                if expected_tweets > 1 and not query.get("frontend-confirm"):
+                if expected_seconds > 3600 and not query.get("frontend-confirm"):
                     raise QueryNeedsExplicitConfirmationException(
                         "This query will return about %s tweets. This will take a long time (approximately %s). Are "
                         "you sure you want to run this query?" % ("{:,}".format(expected_tweets), expected_time))
