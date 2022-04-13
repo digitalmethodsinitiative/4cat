@@ -4,6 +4,7 @@ Direct database connection
 """
 import datetime
 import re
+import ural
 import io
 import pymysql
 
@@ -101,7 +102,7 @@ class SearchWithinTCATBinsV2(Search):
         Use the DMI-TCAT tweet export to retrieve tweets
 
         :param query:
-        :return:
+        :yield dict: mapped_tweet for any "basic" query else for "advanced" queries a dictionary with mysql result
         """
         bin = self.parameters.get("bin")
         bin_name = bin.split("@")[0]
@@ -123,6 +124,7 @@ class SearchWithinTCATBinsV2(Search):
             self.dataset.log('Query: %s' % self.parameters.get("query"))
             unbuffered_cursor = db.connection.cursor(pymysql.cursors.SSCursor)
             num_results = unbuffered_cursor.execute(self.parameters.get("query"))
+            # self.dataset.update_status("Retrieving %i results" % int(num_results)) # num_results is CLEARLY not what I thought
             # Get column names from cursor
             column_names = [description[0] for description in unbuffered_cursor.description]
             for result in unbuffered_cursor.fetchall_unbuffered():
@@ -206,71 +208,114 @@ class SearchWithinTCATBinsV2(Search):
             self.dataset.log('Replacements: %s' % ', '.join([str(i) for i in replacements]))
             unbuffered_cursor = db.connection.cursor(pymysql.cursors.SSCursor)
             num_results = unbuffered_cursor.execute(query, replacements)
+            # self.dataset.update_status("Retrieving %i results" % int(num_results)) # num_results is CLEARLY not what I thought
             column_names = [description[0] for description in unbuffered_cursor.description]
             for result in unbuffered_cursor.fetchall_unbuffered():
                 new_result = {k: v for k, v in zip(column_names, result)}
-                # 4CAT necessary fieldnames
-                new_result['id'] = new_result.get('id', '')
-                new_result['thread_id'] = new_result.get("in_reply_to_status_id") if new_result.get("in_reply_to_status_id") else new_result.get("quoted_status_id") if new_result.get("quoted_status_id") else new_result.get("id")
-                new_result['body'] = new_result.get('text', '')
-                new_result['timestamp'] = new_result.get('created_at', '')
-                new_result['subject'] = ''
-                new_result['author'] = new_result.get('from_user_name', '')
+                # Map tweet to 4CAT fields
+                new_result = self.tweet_mapping(new_result)
                 yield new_result
 
-                    # yield {
-                    #     "id": tweet["id"],
-                    #     # For thread_id, we use in_reply_to_status_id if tweet is reply, quoted_status_id if tweet is quote tweet (aka retweet w/ comment), or its own ID
-                    #     # Note: tweets can have BOTH in_reply_to_status_id and quoted_status as you can retweet a quote or quote a retweet.
-                    #     "thread_id": tweet["in_reply_to_status_id"] if tweet["in_reply_to_status_id"] else tweet["quoted_status_id"] if tweet["quoted_status_id"] else tweet["id"],
-                    #     "timestamp": int(tweet["time"]),
-                    #     "unix_timestamp": tweet["time"],
-                    #     "subject": "",
-                    #     "body": tweet["text"],
-                    #     "author": tweet["from_user_name"],
-                    #     "author_fullname": tweet["from_user_realname"],
-                    #     "author_id": tweet["from_user_id"],
-                    #     "source": tweet["source"],
-                    #     "language_guess": tweet.get("lang"),
-                    #     "possibly_sensitive": "yes" if tweet.get("possibly_sensitive") not in ("", "0") else "no",
-                    #     "retweet_count": tweet["retweet_count"],
-                    #     "reply_count": -1,
-                    #     "like_count": tweet["favorite_count"],
-                    #     "quote_count": -1,
-                    #     "is_retweet": "yes" if tweet["text"][:4] == "RT @" else "no",
-                    #     "is_quote_tweet": "yes" if tweet["quoted_status_id"] else "no",
-                    #     "is_reply": "yes" if tweet["in_reply_to_status_id"] else "no",
-                    #     "hashtags": ",".join(re.findall(r"#([^\s!@#$%^&*()_+{}:\"|<>?\[\];'\,./`~]+)", tweet["text"])),
-                    #     "urls": ",".join(ural.urls_from_text(tweet["text"])),
-                    #     "images": ",".join(re.findall(r"https://t\.co/[a-zA-Z0-9]+$", tweet["text"])),
-                    #     "mentions": ",".join(re.findall(r"@([^\s!@#$%^&*()+{}:\"|<>?\[\];'\,./`~]+)", tweet["text"])),
-                    #     "reply_to": tweet["to_user_name"],
-                    #     # Additional TCAT data (compared to twitterv2 map_item function)
-                    #     "filter_level": tweet['filter_level'],
-                    #     'withheld_copyright': tweet['withheld_copyright'], # TCAT may no collect this anymore
-                    #     'withheld_scope': tweet['withheld_scope'], # TCAT may no collect this anymore
-                    #     'truncated': tweet['truncated'], # Older tweets could be truncated meaning their text was cut off due to Twitter/TCAT db character limits
-                    #     'location': tweet['location'],
-                    #     'latitude': tweet['lat'],
-                    #     'longitude': tweet['lng'],
-                    #     'author_verified': tweet['from_user_verified'],
-                    #     'author_description': tweet['from_user_description'],
-                    #     'author_url': tweet['from_user_url'],
-                    #     'author_profile_image': tweet['from_user_profile_image_url'],
-                    #     'author_timezone_UTC_offset': int((int(tweet['from_user_utcoffset']) if tweet['from_user_utcoffset'] else 0)/60/60),
-                    #     'author_timezone_name': tweet['from_user_timezone'],
-                    #     'author_language': tweet['from_user_lang'],
-                    #     'author_tweet_count': tweet['from_user_tweetcount'],
-                    #     'author_follower_count': tweet['from_user_followercount'],
-                    #     'author_friend_following_count': tweet['from_user_friendcount'],
-                    #     'author_favorite_count': tweet['from_user_favourites_count'],
-                    #     'author_listed_count': tweet['from_user_listed'],
-                    #     'author_withheld_scope': tweet['from_user_withheld_scope'],
-                    #     'author_created_at': tweet['from_user_created_at'],
-                    # }
+    @staticmethod
+    def tweet_mapping(tweet):
+        """
+        Takes TCAT output from specific tables and maps them to 4CAT expected fields. The expected fields attempt to
+        mirror that mapped_tweet from twitterv2 datasource.
+
+        :param dict tweet: TCAT dict returned from query; expected to be from bin tweets table
+        :return dict:
+        """
+        mapped_tweet = {'id': tweet.get('id', ''),
+                        # For thread_id, we use in_reply_to_status_id if tweet is reply, retweet_id if tweet is
+                        # retweet, or its own ID
+                        # Note: tweets can have BOTH in_reply_to_status_id and retweet_id as you can retweet a reply
+                        # or reply to retweet.
+                        # THIS IS DIFFERENT from Twitter APIv2 as there does not appear to be a quote ID (for retweets
+                        # with added text)
+                        'thread_id': tweet.get("in_reply_to_status_id") if tweet.get(
+                                               "in_reply_to_status_id") else tweet.get("retweet_id") if tweet.get(
+                                               "retweet_id") else tweet.get("id"),
+                        'body': tweet.get('text', ''),
+                        # 'created_at': tweet.get('created_at'),
+                        'timestamp': int(datetime.datetime.timestamp(tweet.get('created_at'))) if type(
+                                                tweet.get('created_at')) == datetime.datetime else None,
+                        'subject': '',
+                        'author': tweet.get('from_user_name', ''),
+                        "author_fullname": tweet["from_user_realname"],
+                        "author_id": tweet["from_user_id"],
+                        "source": tweet["source"],
+                        "language_guess": tweet.get("lang"),
+
+                        "retweet_count": tweet["retweet_count"],
+                        "like_count": tweet["favorite_count"],
+                        "is_retweet": "yes" if tweet.get('retweet_id', False) else "no",
+                        "is_reply": "yes" if tweet["in_reply_to_status_id"] else "no",
+                        "in_reply_to_status_id": tweet["in_reply_to_status_id"] if tweet["in_reply_to_status_id"] else None,
+                        "reply_to": tweet["to_user_name"],
+                        "reply_to_id": tweet.get('to_user_id') if tweet.get('to_user_id') else None,
+
+                        # 4CAT specifics
+                        "hashtags": ",".join(re.findall(r"#([^\s!@#$%^&*()_+{}:\"|<>?\[\];'\,./`~]+)", tweet["text"])),
+                        "urls": ",".join(ural.urls_from_text(tweet["text"])),
+                        "images": ",".join(re.findall(r"https://t\.co/[a-zA-Z0-9]+$", tweet["text"])),
+                        "mentions": ",".join(re.findall(r"@([^\s!@#$%^&*()+{}:\"|<>?\[\];'\,./`~]+)", tweet["text"])),
+
+                        # Additional TCAT data (compared to twitterv2 map_item function)
+                        "filter_level": tweet['filter_level'],
+                        'location': tweet['location'],
+                        'latitude': tweet['geo_lat'] if tweet['geo_lat'] else None,
+                        'longitude': tweet['geo_lng'] if tweet['geo_lng'] else None,
+                        'author_verified': tweet['from_user_verified'] if tweet['from_user_verified'] else None,
+                        'author_description': tweet['from_user_description'],
+                        'author_url': tweet['from_user_url'],
+                        'author_profile_image': tweet['from_user_profile_image_url'],
+                        'author_timezone_UTC_offset': int((int(tweet['from_user_utcoffset']) if
+                                                           tweet['from_user_utcoffset'] else 0)/60/60),
+                        'author_timezone_name': tweet['from_user_timezone'],
+                        'author_language': tweet['from_user_lang'],
+                        'author_tweet_count': tweet['from_user_tweetcount'],
+                        'author_follower_count': tweet['from_user_followercount'],
+                        'author_friend_following_count': tweet['from_user_friendcount'],
+                        'author_favorite_count': tweet.get('from_user_favourites_count'), # NOT in tweets table?
+                        'author_listed_count': tweet['from_user_listed'] if tweet['from_user_listed'] else None,
+                        'author_withheld_scope': tweet.get('from_user_withheld_scope'), # NOT in tweets table?
+                        'author_created_at': tweet.get('from_user_created_at'), # NOT in tweets table?
+
+                        # TODO find in other TCAT tables or does not exist
+                        # "possibly_sensitive": "yes" if tweet.get("possibly_sensitive") not in ("", "0") else "no",
+                        # "is_quote_tweet": "yes" if tweet["quoted_status_id"] else "no",
+                        # 'withheld_copyright': tweet['withheld_copyright'],  # TCAT may no collect this anymore
+                        # 'withheld_scope': tweet['withheld_scope'], # TCAT may no collect this anymore
+                        # 'truncated': tweet['truncated'], # Older tweets could be truncated meaning their text was cut off due to Twitter/TCAT db character limits
+
+                        }
+
+        # Ensure that any keys not specifically mapped to another field are added to the new mapped_tweet
+        mapped_keys = ['id', 'text', 'created_at', 'from_user_name', 'from_user_realname', 'from_user_id',
+                       'from_user_lang', 'from_user_tweetcount', 'from_user_followercount', 'from_user_friendcount',
+                       'from_user_listed', 'from_user_utcoffset', 'from_user_timezone', 'from_user_description',
+                       'from_user_url', 'from_user_verified', 'from_user_profile_image_url', 'source', 'lang',
+                       'filter_level', 'location', 'to_user_name', 'to_user_id', 'geo_lat', 'geo_lng', 'retweet_count',
+                       'in_reply_to_status_id']
+        for key in tweet.keys():
+            if key not in mapped_keys:
+                index = ''
+                while key + index in mapped_tweet.keys():
+                    index += '_1'
+                mapped_tweet[key + index] = tweet.get(key)
+
+        return mapped_tweet
+
 
     @classmethod
     def collect_tcat_metadata(cls):
+        """
+        Collect specific metadata from TCAT instances listed in the configuration and return a dictionary containing
+        this data. To be used to infor the user of available TCAT bins and create the options from which a user will
+        select.
+
+        :return dict: All of the available bins from accessible TCAT instances
+        """
 
         # todo: cache this somehow! and check for the cache
         instances = config.DATASOURCES.get("dmi-tcatv2", {}).get("instances", [])
@@ -340,8 +385,8 @@ class SearchWithinTCATBinsV2(Search):
         # the dates need to make sense as a range to search within
         # and a date range is needed, to not make it too easy to just get all tweets
         after, before = query.get("daterange")
-        if (not after or not before) or before <= after:
-            raise QueryParametersException("A date range is required and must start before it ends")
+        if (after and before) and not before <= after:
+            raise QueryParametersException("A date range must start before it ends")
 
         query["min_date"], query["max_date"] = query.get("daterange")
         del query["daterange"]
