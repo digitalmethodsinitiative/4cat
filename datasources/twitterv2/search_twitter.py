@@ -547,7 +547,7 @@ class SearchWithTwitterAPIv2(Search):
             count_url = "https://api.twitter.com/2/tweets/counts/all"
             count_params = {
                 "granularity": "day",
-                "query": query,
+                "query": params["query"],
             }
 
             # if we're doing a date range, pass this on to the counts endpoint in
