@@ -294,8 +294,7 @@ const query = {
 	/**
 	 * Tool window: start a query, submit it to the backend
 	 */
-	start: function () {
-
+	start: function (extra_data=null) {
 		//check form input
 		if (!query.validate()) {
 			return;
@@ -307,6 +306,12 @@ const query = {
 		let form = $('#query-form');
 		let formdata = new FormData(form[0]);
 
+		if(extra_data) {
+			for(let key in extra_data) {
+				formdata.append(key, extra_data[key]);
+			}
+		}
+
 		// Cache cacheable values
 		let datasource = form.attr('class');
 		form.find('.cacheable input').each(function() {
@@ -315,13 +320,11 @@ const query = {
 		})
 
 		// Disable form
-		query.disable_form();
 		$('html,body').scrollTop(200);
 
 		// AJAX the query to the server
 		$('#query-status .message').html('Sending dataset parameters');
 		$.post({
-			dataType: "text",
 			url: form.attr('action'),
 			data: formdata,
 			cache: false,
@@ -330,15 +333,21 @@ const query = {
 
 			success: function (response) {
 				// If the query is rejected by the server.
-				if (response.substr(0, 14) === 'Invalid query.') {
-					popup.alert(response, 'Error');
-					query.enable_form();
+				if (response['status'] === 'error') {
+					popup.alert(response['message'], 'Error');
+				}
+
+				else if(response['status'] === 'confirm') {
+					popup.confirm(response['message'], 'Confirm', function() {
+						query.start({'frontend-confirm': true});
+					});
 				}
 
 				// If the query is accepted by the server.
 				else {
+					query.disable_form();
 					$('#query-status .message').html('Query submitted, waiting for results');
-					query.query_key = response;
+					query.query_key = response['key'];
 					query.check(query.query_key);
 
 					$('#query-status').append($('<button class="delete-link" data-key="' + query.query_key + '">Cancel</button>'));
@@ -351,6 +360,7 @@ const query = {
 			},
 			error: function (error) {
 				query.enable_form();
+				popup.alert(error['message'], 'Error');
 				$('#query-status .message').html(error);
 			}
 		});
@@ -921,7 +931,7 @@ const popup = {
 		//popups
 		$(document).on('click', '.popup-trigger', popup.show);
 		$('body').on('click', '#blur, #popup-close, .popup-close', popup.hide);
-		$('body').on('click', '.popup-execute-callback', function() { if(popup.current_callback) { popup.current_callback(); } });
+		$('body').on('click', '.popup-execute-callback', function() { if(popup.current_callback) { popup.current_callback(); } popup.hide(); });
 		$(document).on('keyup', popup.handle_key);
 
 		popup.is_initialised = true;
