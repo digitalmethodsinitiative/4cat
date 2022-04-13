@@ -53,86 +53,133 @@ class SearchWithSelenium(SeleniumScraper):
         :param query:
         :return:
         """
-        num_of_subpages = self.parameters.get("subpages")
-        urls = [url.strip() for url in self.parameters.get("query", "").split('\n')]
-        # Holds additional links if crawling desired
-        additional_urls_groups_to_scrape = []
+        self.dataset.log('Query: %s' % str(query))
+        self.dataset.log('Parameters: %s' % str(self.parameters))
+        scrape_additional_subpages = self.parameters.get("subpages")
+        urls_to_scrape = [{'url':url, 'base_url':url, 'num_additional_subpages': scrape_additional_subpages, 'subpage_links':[]} for url in query.get('urls')]
 
-        # First scrape all original urls
-        for url in urls:
-            result = self.collect_page_result(url)
+        # Do not scrape the same site twice
+        scraped_urls = set()
 
-            # Add additional links to be scraped afterwards
-            if num_of_subpages > 0 and result['error'] is False:
-                host = urlparse(url).netloc
-                links = self.collect_links()
-                additional_urls_groups_to_scrape.append((host, (url, result['final_url']), links))
+        while urls_to_scrape:
+            if self.interrupted:
+                raise ProcessorInterruptedException("Interrupted while scraping urls from the Web Archive")
+            # Grab first url
+            url_obj = urls_to_scrape.pop(0)
+            url = url_obj['url']
+            num_additional_subpages = url_obj['num_additional_subpages']
+            result = {
+                "base_url": url_obj['base_url'],
+                "url": url,
+                "final_url": None,
+                "subject": None,
+                "body": None,
+                "html": None,
+                "detected_404": None,
+                "timestamp": None,
+                "error": '',
+            }
 
-            yield result
+            attempts = 0
+            success = False
+            while attempts < 2:
+                attempts += 1
+                try:
+                    scraped_page = self.simple_scrape_page(url, extract_links=True)
+                except Exception as e:
+                    self.dataset.log('Url %s unable to be scraped with error: %s' % (url, str(e)))
+                    self.restart_selenium()
+                    scraped_page['error'] = 'SCAPE ERROR:\n' + str(e) + '\n'
+                    continue
 
-        # Scrape additional subpages if requested
-        if num_of_subpages > 0:
-            for url_group in additional_urls_groups_to_scrape:
-                collected_pages = 0
-                host = url_group[0]
-                links = url_group[2]
-                # Shuffle the links
-                random.shuffle(links)
-                # Try not to recrawl links; initialize with original link
-                crawled_links = [url_group[1][0], url_group[1][1]]
-                for url in links:
-                    # Break if adequate pages collected
-                    if collected_pages >= num_of_subpages:
-                        break
-                    # Check that url is in same host and not the original link
-                    if urlparse(url).netloc == host and url not in crawled_links:
-                        # Attempt to scrape url
-                        result = self.collect_page_result(url)
-                        # Check that results was successfully scraped
-                        if result['error'] is False and result['final_url'] not in crawled_links:
-                            collected_pages += 1
-                            yield result
+                # Check for results and collect text
+                if scraped_page:
+                    scraped_page['text'] = self.scrape_beautiful_text(scraped_page['page_source'])
+                else:
+                    # Hard Fail?
+                    self.dataset.log('Hard fail; no page source on url: %s' % url)
+                    continue
 
-    def collect_page_result(self, url):
-        """
-        Crawls a url and creates a results object with necessary information
-        """
-        result = {
-            "url": url,
-            "final_url": None,
-            "subject": None,
-            "body": None,
-            "detected_404": None,
-            "timestamp": None,
-            "error": False,
-        }
-        if not validate_url(url):
-            # technically we have already validated, but best to inform user which urls are invalid
-            result['timestamp'] = int(datetime.datetime.now().timestamp())
-            result['error'] = 'Invalid URL format'
-        else:
-            # Try to scrape the url
-            try:
-                self.dataset.log('Scraping url: %s' % url)
-                scraped_page = self.simple_scrape_page(url)
-            except TimeoutException as e:
-                result['timestamp'] = int(datetime.datetime.now().timestamp())
-                result['error'] = 'Selenium TimeoutException: %s' % e
-                return result
+                # Check for 404 errors
+                if scraped_page['detected_404']:
+                    four_oh_four_error = '404 detected on url: %s\n' % url
+                    self.dataset.log(four_oh_four_error)
+                    scraped_page['error'] = four_oh_four_error if not scraped_page.get('error', False) else scraped_page['error'] + four_oh_four_error
+                    break
+                else:
+                    success = True
+                    scraped_urls.add(url)
+                    break
 
-            # simple_scrape_page returns False if the browser did not load a new page
-            if scraped_page:
+            if success:
+                self.dataset.log('Collected: %s' % url)
+                # Update result and yield it
                 result['final_url'] = scraped_page.get('final_url')
-                result['body'] = scraped_page.get('page_source')
+                result['body'] = '\n'.join(scraped_page.get('text'))
                 result['subject'] = scraped_page.get('page_title')
+                result['html'] = scraped_page.get('page_source')
                 result['detected_404'] = scraped_page.get('detected_404')
                 result['timestamp'] = int(datetime.datetime.now().timestamp())
+                result['error'] = scraped_page.get('error') # This should be None...
+                result['selenium_links'] = ','.join(scraped_page.get('links')) if scraped_page.get('links') else scraped_page.get('collect_links_error')
+
+                # Collect links from page source
+                domain = urlparse(url).scheme + '://' + urlparse(url).netloc
+                num_of_links, links = self.get_beautiful_links(scraped_page['page_source'], domain)
+                result['scraped_links'] = ','.join([link[1] for link in links])
+
+                # Check if additional subpages need to be scraped
+                if num_additional_subpages > 0:
+                    # Check if any link from base_url are available
+                    if not url_obj['subpage_links']:
+                        # If not, use this pages links collected above
+                        # TODO could also use selenium detected links; results vary, check as they are also being stored
+                        # Randomize links (else we end up with mostly menu items at the top of webpages)
+                        random.shuffle(links)
+                    else:
+                        links = url_obj['subpage_links']
+
+                    # Find the first link that has not been previously scraped
+                    while links:
+                        link = links.pop(0)
+                        if self.check_exclude_link(link[1], scraped_urls, base_url='.'.join(urlparse(url_obj['base_url']).netloc.split('.')[1:])):
+                            # Add it to be scraped next
+                            urls_to_scrape.insert(0, {
+                                'url': link[1],
+                                'base_url': url_obj['base_url'],
+                                'num_additional_subpages': num_additional_subpages - 1, # Make sure to request less additional pages
+                                'subpage_links':links,
+                            })
+                            break
+
+                yield result
+
             else:
+                # Page was not successfully scraped
+                # Still need subpages?
+                if num_additional_subpages > 0:
+                    # Add the next one if it exists
+                    links = url_obj['subpage_links']
+                    while links:
+                        link = links.pop(0)
+                        if self.check_exclude_link(link[1], scraped_urls, base_url='.'.join(urlparse(url_obj['base_url']).netloc.split('.')[1:])):
+                            # Add it to be scraped next
+                            urls_to_scrape.insert(0, {
+                                'url': link[1],
+                                'base_url': url_obj['base_url'],
+                                'num_additional_subpages': num_additional_subpages - 1, # Make sure to request less additional pages
+                                'subpage_links':links,
+                            })
+                            break
+                # Unsure if we should return ALL failures, but certainly the originally supplied urls
                 result['timestamp'] = int(datetime.datetime.now().timestamp())
-                result['error'] = 'Unable to scrape url'
+                if scraped_page:
+                    result['error'] = scraped_page.get('error')
+                else:
+                    # missing error...
+                    result['error'] = 'Unable to scrape'
 
-        return result
-
+                yield result
 
     @staticmethod
     def validate_query(query, request, user):
@@ -158,6 +205,6 @@ class SearchWithSelenium(SeleniumScraper):
             raise QueryParametersException("No Urls detected!")
 
         return {
-            "query": query.get("query"),
+            "urls": preprocessed_urls,
             "subpages": query.get("subpages", 0)
             }

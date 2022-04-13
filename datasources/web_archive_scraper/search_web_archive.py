@@ -220,7 +220,7 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
                 result['detected_404'] = scraped_page.get('detected_404')
                 result['timestamp'] = int(datetime.datetime.now().timestamp())
                 result['error'] = scraped_page.get('error') # This should be None...
-                result['selenium_links'] = scraped_page.get('links') if not scraped_page.get('links') else scraped_page.get('collect_links_error')
+                result['selenium_links'] = scraped_page.get('links') if scraped_page.get('links') else scraped_page.get('collect_links_error')
 
                 if http_request:
                     try:

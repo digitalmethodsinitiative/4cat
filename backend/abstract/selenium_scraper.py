@@ -103,6 +103,28 @@ class SeleniumScraper(Search, metaclass=abc.ABCMeta):
         elems = self.driver.find_elements_by_xpath("//a[@href]")
         return [elem.get_attribute("href") for elem in elems]
 
+    def check_exclude_link(self, link, previously_used_links, base_url=None, bad_url_list=['mailto:', 'javascript']):
+        """
+        Check if a link should not be used. Returns True if link not in previously_used_links
+        and not in bad_url_list. If a base_url is included, the link string MUST include the
+        base_url as a substring (this can be used to ensure a url contains a particular domain).
+
+        :param str link:                    link to check
+        :param set previously_used_links:   set of links to exclude
+        :param str base_url:                substring to ensure is part of link
+        :return bool:                       True if link should NOT be excluded else False
+        """
+        if link not in previously_used_links and \
+            not any([bad_url in link[:10] for bad_url in bad_url_list]):
+                if base_url is None:
+                    return True
+                elif base_url in link:
+                    return True
+                else:
+                    return False
+        else:
+            return False
+
     def search(self, query):
         """
         Search for items matching the given query
