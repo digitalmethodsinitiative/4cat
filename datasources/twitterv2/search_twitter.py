@@ -342,7 +342,7 @@ class SearchWithTwitterAPIv2(Search):
 
                     tweets += 1
                     if tweets % 500 == 0:
-                        self.dataset.update_status("Received %s of %s tweets from the Twitter API" % ("{:,}".format(tweets), expected_tweets))
+                        self.dataset.update_status("Received %s of ~%s tweets from the Twitter API" % ("{:,}".format(tweets), expected_tweets))
 
                     yield tweet
 
@@ -559,35 +559,46 @@ class SearchWithTwitterAPIv2(Search):
                 count_params["end_time"] = datetime.datetime.fromtimestamp(before).strftime("%Y-%m-%dT%H:%M:%SZ")
 
             bearer_token = params.get("api_bearer_token")
-            response = requests.get(count_url, params=count_params, headers={"Authorization": "Bearer %s" % bearer_token},
-                                    timeout=15)
 
-            if response.status_code == 200:
-                try:
-                    # figure out how many tweets there are and estimate how much
-                    # time it will take to process them. if it's going to take
-                    # longer than half an hour, warn the user
-                    expected_tweets = int(response.json()["meta"]["total_tweet_count"])
-                    if params["amount"] > 0:
-                        # if the user specified a number of tweets to return...
-                        expected_tweets = min(expected_tweets, params["amount"])
+            expected_tweets = 0
+            while True:
+                response = requests.get(count_url, params=count_params, headers={"Authorization": "Bearer %s" % bearer_token},
+                                        timeout=15)
+                if response.status_code == 200:
+                    try:
+                        # figure out how many tweets there are and estimate how much
+                        # time it will take to process them. if it's going to take
+                        # longer than half an hour, warn the user
+                        expected_tweets += int(response.json()["meta"]["total_tweet_count"])
+                    except KeyError:
+                        # no harm done, we just don't know how many tweets will be
+                        # returned (but they will still be returned)
+                        break
 
-                    expected_seconds = int(expected_tweets / 30)  # seems to be about this
-                    expected_time = timify_long(expected_seconds)
-                    params["expected-tweets"] = expected_tweets
+                    if "next_token" not in response.json().get("meta", {}):
+                        break
+                    else:
+                        count_params["next_token"] = response.json()["meta"]["next_token"]
 
-                    if expected_seconds > 1800 and not query.get("frontend-confirm"):
-                        raise QueryNeedsExplicitConfirmationException(
-                            "This query will return about %s tweets. This will take a long time (approximately %s). "
-                            "Are you sure you want to run this query?" % ("{:,}".format(expected_tweets), expected_time))
-                except KeyError:
-                    # no harm done, we just don't know how many tweets will be
-                    # returned (but they will still be returned)
-                    pass
-            elif response.status_code == 401:
-                raise QueryParametersException("Your bearer token seems to be invalid. Please make sure it is valid "
-                                               "for the Academic Track of the Twitter API.")
+                elif response.status_code == 401:
+                    raise QueryParametersException("Your bearer token seems to be invalid. Please make sure it is valid "
+                                                   "for the Academic Track of the Twitter API.")
+                else:
+                    break
 
+            if expected_tweets:
+                if params["amount"] > 0:
+                    # if the user specified a number of tweets to return...
+                    expected_tweets = min(expected_tweets, params["amount"])
+
+                expected_seconds = int(expected_tweets / 30)  # seems to be about this
+                expected_time = timify_long(expected_seconds)
+                params["expected-tweets"] = expected_tweets
+
+                if expected_seconds > 1800 and not query.get("frontend-confirm"):
+                    raise QueryNeedsExplicitConfirmationException(
+                        "This query will return approximately %s tweets. This will take a long time (approximately %s)."
+                        " Are you sure you want to run this query?" % ("{:,}".format(expected_tweets), expected_time))
         return params
 
     @staticmethod
