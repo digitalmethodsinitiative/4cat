@@ -231,6 +231,15 @@ class InternalAPI(BasicWorker):
 
 					queue[job["jobtype"]] += 1
 				else:
+					if hasattr(worker, "dataset") and worker.dataset:
+						running_key = worker.dataset.key
+						running_user = worker.dataset.owner
+						running_parent = worker.dataset.top_parent().key
+					else:
+						running_key = None
+						running_user = None
+						running_parent = None
+
 					running.append({
 						"type": job["jobtype"],
 						"is_claimed": job["timestamp_claimed"] > 0,
@@ -238,9 +247,9 @@ class InternalAPI(BasicWorker):
 						"is_processor": hasattr(worker, "dataset"),
 						"is_recurring": (int(job["interval"]) > 0),
 						"is_maybe_crashed": job["timestamp_claimed"] > 0 and not worker,
-						"dataset_key": worker.dataset.key if hasattr(worker, "dataset") else None,
-						"dataset_user": worker.dataset.owner if hasattr(worker, "dataset") else None,
-						"dataset_parent_key": worker.dataset.top_parent().key if hasattr(worker, "dataset") else None,
+						"dataset_key": running_key,
+						"dataset_user": running_user,
+						"dataset_parent_key": running_parent,
 						"timestamp_queued": job["timestamp"],
 						"timestamp_claimed": job["timestamp_lastclaimed"]
 					})

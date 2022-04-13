@@ -60,7 +60,7 @@ class YouTubeMetadata(BasicProcessor):
 		"custom-key": {
 			"type": UserInput.OPTION_TEXT,
 			"default": "",
-			"help": "YouTube API key (optional)"
+			"help": "YouTube API key (optional)",
 			"tooltip": "You can insert your personal API key here. Leave empty to use the API key of the administrators of this 4CAT installation."
 		}
 	}

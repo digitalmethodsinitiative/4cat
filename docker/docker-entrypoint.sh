@@ -9,20 +9,32 @@ exit_backend() {
 
 trap exit_backend INT TERM
 
+# Handle any options
+while test $# != 0
+do
+    case "$1" in
+    -p ) # set public option to use public IP address as SERVER_NAME
+        echo 'Setting SERVER_NAME to public IP'
+        SERVER_NAME=$(curl -s https://api.ipify.org);;
+    * )  # Invalid option
+        echo "Error: Invalid option"
+        exit;;
+    esac
+    shift
+done
+
 echo "Waiting for postgres..."
 while ! nc -z db 5432; do
   sleep 0.1
 done
 echo "PostgreSQL started"
 
-# Check if DB exists
-# Check for "jobs" table
-#TODO: move db creation to Dockerfile
+# Create Database if it does not already exist
 if [ `psql --host=db --port=5432 --user=$POSTGRES_USER --dbname=$POSTGRES_DB -tAc "SELECT EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'jobs')"` = 't' ]; then
   # Table already exists
   echo "Database already created"
 else
-  echo 'Creating database'
+  echo "Creating Database"
   # Seed DB
   cd /usr/src/app && psql --host=db --port=5432 --user=$POSTGRES_USER --dbname=$POSTGRES_DB < backend/database.sql
 fi
@@ -33,6 +45,7 @@ python3 docker/docker_setup.py
 echo 'Starting app'
 cd /usr/src/app
 
+echo 'Starting app'
 echo "4CAT is accessible at:"
 echo "http://$SERVER_NAME:$PUBLIC_PORT"
 echo ''

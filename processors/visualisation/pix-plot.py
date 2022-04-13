@@ -31,9 +31,15 @@ class PixPlotGenerator(BasicProcessor):
 	"""
 	type = "pix-plot"  # job type ID
 	category = "Visual"  # category
-	title = "PixPlot"  # title displayed in UI
-	description = "Put all images from an archive into a PixPlot: an explorable map of images grouped by similar features."
+	title = "Create PixPlot visualisation"  # title displayed in UI
+	description = "Put all images from an archive into a PixPlot visualisation: an explorable map of images " \
+				  "algorithmically grouped by similarity."
 	extension = "html"  # extension of result file, used internally and in UI
+
+	references = [
+		"[PixPlot](https://pixplot.io/)",
+		"[Parameter documentation](https://pixplot.io/docs/api/parameters.html)"
+	]
 
 	# PixPlot requires a minimum number of photos to be created
 	# This is currently due to the clustering algorithm which creates 12 clusters
@@ -54,7 +60,7 @@ class PixPlotGenerator(BasicProcessor):
 		"amount": {
 			"type": UserInput.OPTION_TEXT,
 			"help": "No. of images (max 1000)",
-			"default": 100,
+			"default": 1000,
 			"min": 0,
 			"max": 10000,
 			"tooltip": "'0' uses as many images as available in the source image archive (up to 10000)"
@@ -62,18 +68,12 @@ class PixPlotGenerator(BasicProcessor):
 		"intro-plot-options": {
 			"type": UserInput.OPTION_INFO,
 			"help": "The below options will help configure your plot. Note that full images are always available by "
-					"clicking on the thumbnails (you will also find metadata related to the source of the image here). "
-					"\nNearest neighbors (n_neighbors): small numbers identify local clusters, larger numbers "
-					"create a more global shape. Large datasets may benefit from have higher values (think how many "
-					"alike pictures could make up a cluster)."
-					"\nMinimum Distance (min_dist): determines how tightly packed images can be with one and other "
-					"(i.e., small numbers (0.0001-0.001) are tightly packed, and larger (0.05-0.2) are disperse."
-					"\nMore information and examples on parameters: "
-					"https://umap-learn.readthedocs.io/en/latest/parameters.html"
+					"clicking on the thumbnails (you will also find metadata related to the source of the image "
+					"there). Large datasets run better with smaller thumbnails."
 		},
 		"image_size": {
 			"type": UserInput.OPTION_CHOICE,
-			"help": "Thumbnail Size (large datasets run better with smaller thumbnails)",
+			"help": "Thumbnail Size",
 			"options": {
 				"10": "10px tiny",
 				"32": "32px small",
@@ -83,6 +83,12 @@ class PixPlotGenerator(BasicProcessor):
 			},
 			"default": "64"
 		},
+		"intro-plot-neighbours": {
+			"type": UserInput.OPTION_INFO,
+			"help": "Nearest neighbors (n_neighbors): small numbers identify local clusters, larger numbers "
+					"create a more global shape. Large datasets may benefit from have higher values (think how many "
+					"alike pictures could make up a cluster)."
+		},
 		"n_neighbors": {
 			"type": UserInput.OPTION_TEXT,
 			"help": "Nearest Neighbors",
@@ -91,9 +97,14 @@ class PixPlotGenerator(BasicProcessor):
 			"max": 200,
 			"default": 15
 		},
+		"intro-plot-mindist": {
+			"type": UserInput.OPTION_INFO,
+			"help": "Minimum Distance (min_dist): determines how tightly packed images can be with one and other "
+					"(i.e., small numbers (0.0001-0.001) are tightly packed, and larger (0.05-0.2) disperse."
+		},
 		"min_dist": {
 			"type": UserInput.OPTION_TEXT,
-			"help": "Minimum Distance between points (images)",
+			"help": "Minimum Distance between images",
 			"tooltip": "Small values often work best",
 			"min": 0.0001,
 			"max": 0.99,
@@ -133,7 +144,7 @@ class PixPlotGenerator(BasicProcessor):
 		date =  datetime.datetime.now().strftime("%Y-%m-%d-%H%M%S")
 		top_dataset = self.dataset.top_parent()
 		label_formated = ''.join(e if e.isalnum() else '_' for e in top_dataset.get_label())
-		image_label = date + '-' + label_formated + '-' + str(top_dataset.key)
+		image_label = label_formated + '-' + str(top_dataset.key)
 		plot_label = date + '-' + label_formated + '-' + str(self.dataset.key)
 
 		# Folder name is PixPlot identifier and set at dataset key
@@ -356,6 +367,8 @@ class PixPlotGenerator(BasicProcessor):
 								image['description'] += '<br/><br/><b>' + key + ':</b> ' + str(value)
 
 						# PixPlot has a field limit of 131072
+						# TODO: PixPlot (dmi version) has been updated and this likely is no longer needed
+						# test first as displaying long descriptions still may have issues
 						image['description'] = image['description'][:131072]
 
 						# Add tags or hashtags

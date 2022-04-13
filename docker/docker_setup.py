@@ -13,9 +13,15 @@ This should be run from the command line and is used by docker-entrypoint files.
 
 if __name__ == "__main__":
     import os
+    import sys
     import configparser
     import bcrypt
     from pathlib import Path
+
+    if len(sys.argv) > 1:
+        public = False#sys.argv[1]
+    else:
+        public = False
 
     # Configuration file location
     CONFIG_FILE = 'config/config.ini'
@@ -40,13 +46,12 @@ if __name__ == "__main__":
         config_parser['API']['api_port'] = '4444' # backend port exposed in docker-compose.py
 
         # File paths
-        # These could perhaps be defined elsewhere
         config_parser.add_section('PATHS')
-        config_parser['PATHS']['path_images'] = 'data'
-        config_parser['PATHS']['path_data'] = 'data'
-        config_parser['PATHS']['path_lockfile'] = 'backend'
-        config_parser['PATHS']['path_sessions'] = 'config/sessions' # this may need to be in a volume (config is a volume)
-        config_parser['PATHS']['path_logs'] = 'logs/'
+        config_parser['PATHS']['path_images'] = 'data' # shared volume defined in docker-compose.yml
+        config_parser['PATHS']['path_data'] = 'data' # shared volume defined in docker-compose.yml
+        config_parser['PATHS']['path_lockfile'] = 'backend' # docker-entrypoint.sh looks for pid file here (in event Docker shutdown was not clean)
+        config_parser['PATHS']['path_sessions'] = 'config/sessions'  # shared volume defined in docker-compose.yml
+        config_parser['PATHS']['path_logs'] = 'logs/' # shared volume defined in docker-compose.yml
 
         # Generated variables
         config_parser.add_section('GENERATE')
@@ -56,7 +61,7 @@ if __name__ == "__main__":
         ################
         # User Defined #
         ################
-        # Per the Docker .env file
+        # Per the Docker .env file; required for docker-entrypoint.sh and db setup
 
         # Database configuration
         config_parser['DATABASE']['db_name'] = os.environ['POSTGRES_DB']
@@ -118,6 +123,8 @@ if __name__ == "__main__":
 
         public_port = os.environ['PUBLIC_PORT']
         config_parser['SERVER']['public_port'] = str(public_port)
+        # TODO server_name should be defined elsewhere, but currently it is in .env file
+        config_parser['SERVER']['server_name'] = os.environ['SERVER_NAME']
 
         # Save config file
         with open(CONFIG_FILE, 'w') as configfile:

@@ -42,6 +42,7 @@ class SearchTelegram(Search):
     failures_cache = None
     eventloop = None
     flawless = True
+    end_if_rate_limited = 600 # break if Telegram requires wait time above number of seconds
 
     max_workers = 1
     max_retries = 3
@@ -140,6 +141,10 @@ class SearchTelegram(Search):
             self.dataset.delete_parameter("api_phone", instant=True)
             self.dataset.delete_parameter("api_id", instant=True)
 
+        if not self.flawless:
+            self.dataset.update_status("Dataset completed, but some requested entities were unavailable (they may have"
+                                       "been private). View the log file for details.", is_final=True)
+
         return results
 
     async def execute_queries(self):
@@ -216,6 +221,8 @@ class SearchTelegram(Search):
             async for post in self.gather_posts(client, queries, max_items, min_date, max_date):
                 posts.append(post)
             return posts
+        except ProcessorInterruptedException as e:
+            raise e
         except Exception as e:
             # catch-all so we can disconnect properly
             # ...should we?
@@ -238,9 +245,18 @@ class SearchTelegram(Search):
         """
         resolve_refs = self.parameters.get("resolve-entities")
 
+        # Adding flag to stop; using for rate limits
+        no_additional_queries = False
+
+        # Collect queries
         for query in queries:
             delay = 10
             retries = 0
+
+            if no_additional_queries:
+                # Note that we are note completing this query
+                self.dataset.update_status("Rate-limited by Telegram; not executing query %s" % query)
+                continue
 
             while True:
                 self.dataset.update_status("Fetching messages for entity '%s'" % query)
@@ -288,12 +304,13 @@ class SearchTelegram(Search):
 
                 except FloodWaitError as e:
                     self.dataset.update_status("Rate-limited by Telegram: %s; waiting" % str(e))
-                    if e.seconds < 600:
+                    if e.seconds < self.end_if_rate_limited:
                         time.sleep(e.seconds)
                         continue
                     else:
-                        self.log.error(str(e))
-                        self.dataset.update_status("Rate-limited by Telegram; requires waiting %i minutes, skipping" % int(e.seconds/60))
+                        self.flawless = False
+                        no_additional_queries = True
+                        self.dataset.update_status("Telegram wait grown large than %i minutes, ending" % int(e.seconds/60))
                         break
 
                 except BadRequestError as e:
@@ -303,17 +320,6 @@ class SearchTelegram(Search):
                 except ValueError as e:
                     self.dataset.update_status("Error '%s' while collecting entity %s, skipping" % (str(e), query))
                     self.flawless = False
-
-                except FloodWaitError as e:
-                    self.dataset.update_status("Telegram FloodWaitError: %s; Waiting" % str(e))
-                    if e.seconds < 600:
-                        time.sleep(e.seconds)
-                        continue
-                    else:
-                        self.log.error(str(e))
-                        self.dataset.update_status("Telegram wait grown large than %i minutes" % int(e.seconds/60))
-                        posts = None
-                        break
 
                 except ChannelPrivateError as e:
                     self.dataset.update_status(
@@ -461,9 +467,9 @@ class SearchTelegram(Search):
             else:
                 attachment_data = ""
 
-        elif attachment_type in ("geo", "geo_live"):
+        #elif attachment_type in ("geo", "geo_live"):
             # untested whether geo_live is significantly different from geo
-            attachment_data = "%s %s" % (message["geo"]["lat"], message["geo"]["long"])
+        #    attachment_data = "%s %s" % (message["geo"]["lat"], message["geo"]["long"])
 
         elif attachment_type == "photo":
             # we don't actually store any metadata about the photo, since very
@@ -507,7 +513,7 @@ class SearchTelegram(Search):
         forwarded_timestamp = ""
         forwarded_name = ""
         forwarded_username = ""
-        if message.get("fwd_from") and "from_id" in message["fwd_from"]:
+        if message.get("fwd_from") and "from_id" in message["fwd_from"] and not (type(message["fwd_from"]["from_id"]) is int):
             # forward information is spread out over a lot of places
             # we can identify, in order of usefulness: username, full name,
             # and ID. But not all of these are always available, and not

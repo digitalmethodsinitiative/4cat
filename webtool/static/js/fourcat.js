@@ -839,10 +839,11 @@ const tooltip = {
 			}
 		});
 		tooltip_container = '#' + tooltip_container;
+		let is_standalone = $(tooltip_container).hasClass('multiple');
 
 		if ($(tooltip_container).is(':hidden')) {
 			$(tooltip_container).removeClass('force-width');
-			let position = $(parent).position();
+			let position = is_standalone ? $(parent).offset() : $(parent).position();
 			let parent_width = parseFloat($(parent).css('width').replace('px', ''));
 			$(tooltip_container).show();
 
@@ -855,6 +856,7 @@ const tooltip = {
 				$(tooltip_container).addClass('force-width');
 			}
 
+			console.log(position);
 			let width = parseFloat($(tooltip_container).css('width').replace('px', ''));
 			let height = parseFloat($(tooltip_container).css('height').replace('px', ''));
 			$(tooltip_container).css('top', (position.top - height - 5) + 'px');
