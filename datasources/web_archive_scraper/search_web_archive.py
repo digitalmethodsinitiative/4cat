@@ -173,7 +173,9 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
 
                 if any([any([bad_response in text for bad_response in self.bad_response_text]) for text in scraped_page['text']]):
                     # Bad response from Internet Archive
-                    self.dataset.log('Internet Archive bad requests on url: %s' % url)
+                    bad_internet_archive_request = 'Web Archive bad request detected on url: %s\nTrying again...' % url
+                    self.dataset.log(bad_internet_archive_request)
+                    result['error'] += bad_internet_archive_request
                     # Try again; Internet Achive is mean
                     time.sleep(1)
                     continue
@@ -258,7 +260,7 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
                 # Unsure if we should return ALL failures, but certainly the originally supplied urls
                 result['timestamp'] = int(datetime.datetime.now().timestamp())
                 if scraped_page:
-                    result['error'] += scraped_page.get('error', '') if scraped_page.get('error') else '' 
+                    result['error'] += scraped_page.get('error', '') if scraped_page.get('error') else ''
                 else:
                     # missing error...
                     result['error'] += 'Unable to scrape'
