@@ -133,7 +133,7 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
                 except Exception as e:
                     self.dataset.log('Url %s unable to be scraped with error: %s' % (url, str(e)))
                     self.restart_selenium()
-                    scraped_page['error'] = 'SCAPE ERROR:\n' + str(e) + '\n'
+                    result['error'] += 'SCAPE ERROR:\n' + str(e) + '\n'
                     continue
 
                 if scraped_page:
@@ -141,6 +141,7 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
                 else:
                     # Hard Fail?
                     self.dataset.log('Hard fail; no page source on url: %s' % url)
+                    result['error'] += 'SCAPE ERROR:\n No page source on url; retrying\n'
                     continue
 
                 # Redirects require waiting on Internet Archive
@@ -167,7 +168,7 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
                         self.dataset.log('Redirect url unable to be scraped: %s' % url)
                         redirect_error = 'REDIRECT ERROR:\n%s\n' % str(e)
                         self.dataset.log(redirect_error)
-                        scraped_page['error'] = redirect_error if not scraped_page.get('error', False) else scraped_page['error'] + redirect_error
+                        result['error'] += redirect_error
                         break
 
                 if any([any([bad_response in text for bad_response in self.bad_response_text]) for text in scraped_page['text']]):
@@ -179,7 +180,7 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
                 elif scraped_page['detected_404']:
                     four_oh_four_error = '404 detected on url: %s\n' % url
                     self.dataset.log(four_oh_four_error)
-                    scraped_page['error'] = four_oh_four_error if not scraped_page.get('error', False) else scraped_page['error'] + four_oh_four_error
+                    result['error'] += four_oh_four_error
                     break
                 else:
                     success = True
@@ -194,7 +195,7 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
                 result['html'] = scraped_page.get('page_source')
                 result['detected_404'] = scraped_page.get('detected_404')
                 result['timestamp'] = int(datetime.datetime.now().timestamp())
-                result['error'] = scraped_page.get('error') # This should be None...
+                result['error'] += scraped_page.get('error')
                 result['selenium_links'] = scraped_page.get('links') if scraped_page.get('links') else scraped_page.get('collect_links_error')
 
                 # Collect links from page source
@@ -257,10 +258,10 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
                 # Unsure if we should return ALL failures, but certainly the originally supplied urls
                 result['timestamp'] = int(datetime.datetime.now().timestamp())
                 if scraped_page:
-                    result['error'] = scraped_page.get('error')
+                    result['error'] += scraped_page.get('error')
                 else:
                     # missing error...
-                    result['error'] = 'Unable to scrape'
+                    result['error'] += 'Unable to scrape'
                 yield result
 
     def check_exclude_link(self, link, previously_used_links, base_url=None):
