@@ -8,8 +8,25 @@
         <form action="{{ url_for("show_results") }}" method="GET">
             <input type="hidden" name="depth" value="{{ depth }}">
             <ul>
-                <li><input aria-label="Query filter" placeholder="Filter queries..." name="filter"
+                <li><input aria-label="Filter by query or label" placeholder="Filter datasets..." name="filter"
                            value="{{ filter.filter }}"></li>
+            {% if current_user.is_admin %}
+                <li><input aria-label="User" placeholder="User..." name="user"
+                           value="{{ filter.user }}"></li>
+                <li>
+                    <select aria-label="Sort datasets by" name="sort_by">
+                        <option value="timestamp"{% if filter.sort_by == "timestamp" %} selected{% endif %}>Sort by date</option>
+                        <option value="num_rows"{% if filter.sort_by == "num_rows" %} selected{% endif %}>Sort by size</option>
+                    </select>
+                </li>
+            {% endif %}
+                <li>
+                    <select name="datasource" aria-label="Data source">
+                        <option value="all"{% if filter.datasource == "all" %} selected{% endif %}>All data sources</option>
+                    {% include 'components/datasource-select.html' %}
+                    </select>
+                </li>
+                <li><label><input type="checkbox" name="hide_empty" {% if filter.hide_empty %} checked="checked"{% endif %}> Hide empty datasets</label></li>
             </ul>
             <button>Filter</button>
         </form>

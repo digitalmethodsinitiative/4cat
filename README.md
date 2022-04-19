@@ -40,7 +40,7 @@ import data into 4CAT for analysis:
 * Facebook (via [CrowdTangle](https://www.crowdtangle.com) exports)
 * Instagram (via CrowdTangle)
 * TikTok (via
-  [Zeeschuimer](https://github.com/digitalmethodsinitiative/zeeschuimer) or 
+  [Zeeschuimer](https://github.com/digitalmethodsinitiative/zeeschuimer) or
   [tiktok-scraper](https://github.com/drawrowfly/tiktok-scraper))
 
 A number of other platforms have built-in support that is untested, or requires
@@ -52,16 +52,16 @@ in the GitHub repository.
 You can install 4CAT locally or on a server via Docker or manually. Copying our docker-compose_prod.yml file and using
 
 ```
-docker-compose up -f docker-compose_prod.yml
+docker-compose -f docker-compose_prod.yml up
 ```
 
-will pull the lastest version from Docker Hub, but detailed and alternative installation instructions are available 
+will pull the lastest version from Docker Hub, but detailed and alternative installation instructions are available
 [in our
 wiki](https://github.com/digitalmethodsinitiative/4cat/wiki/Installing-4CAT).
 Currently 4chan, 8chan, and 8kun require additional steps; please see the wiki.
 
-Please check our 
-[issues](https://github.com/digitalmethodsinitiative/4cat/issues) and create 
+Please check our
+[issues](https://github.com/digitalmethodsinitiative/4cat/issues) and create
 one if you experience any problems (pull requests are also very welcome).
 
 ## Components
@@ -85,10 +85,10 @@ one if you experience any problems (pull requests are also very welcome).
 4CAT was created at [OILab](https://oilab.eu) and the
 [Digital Methods Initiative](https://www.digitalmethods.net) at the University
 of Amsterdam. The tool was inspired by
-[DMI-TCAT](https://wiki.digitalmethods.net/Dmi/ToolDmiTcat), a tool with 
+[DMI-TCAT](https://wiki.digitalmethods.net/Dmi/ToolDmiTcat), a tool with
 comparable  functionality that can be used to scrape and analyse Twitter data.
 
-4CAT development is supported by the Dutch [PDI-SSH](https://pdi-ssh.nl/en/) 
+4CAT development is supported by the Dutch [PDI-SSH](https://pdi-ssh.nl/en/)
 foundation through the [CAT4SMR project](https://cat4smr.humanities.uva.nl/).
 
 4CAT is licensed under the Mozilla Public License, 2.0. Refer to the `LICENSE`

@@ -24,7 +24,7 @@ from werkzeug.utils import secure_filename
 from webtool import app, db, log, openapi, limiter, queue
 from webtool.lib.helpers import error
 
-from common.lib.exceptions import QueryParametersException, JobNotFoundException
+from common.lib.exceptions import QueryParametersException, JobNotFoundException, QueryNeedsExplicitConfirmationException
 from common.lib.queue import JobQueue
 from common.lib.job import Job
 from common.lib.dataset import DataSet
@@ -312,15 +312,24 @@ def queue_dataset():
 
 	search_worker = backend.all_modules.workers[search_worker_id]
 
+	# handle confirmation outside of parameter parsing, since it is not data
+	# source specific
+	has_confirm = bool(request.form.get("frontend-confirm", False))
+
 	if hasattr(search_worker, "validate_query"):
 		try:
 			# first sanitise values
 			sanitised_query = UserInput.parse_all(search_worker.get_options(None, current_user), request.form.to_dict(), silently_correct=False)
 
 			# then validate for this particular datasource
+			sanitised_query = {"frontend-confirm": has_confirm, **sanitised_query}
+			print(sanitised_query)
 			sanitised_query = search_worker.validate_query(sanitised_query, request, current_user)
 		except QueryParametersException as e:
-			return "Invalid query. %s" % e
+			return jsonify({"status": "error", "message": "Invalid query. %s" % e})
+		except QueryNeedsExplicitConfirmationException as e:
+			return jsonify({"status": "confirm", "message": str(e)})
+
 	else:
 		raise NotImplementedError("Data sources MUST sanitise input values with validate_query")
 
@@ -349,7 +358,7 @@ def queue_dataset():
 
 	queue.add_job(jobtype=search_worker_id, remote_id=dataset.key)
 
-	return dataset.key
+	return jsonify({"status": "success", "message": "", "key": dataset.key})
 
 
 @app.route('/api/check-query/')

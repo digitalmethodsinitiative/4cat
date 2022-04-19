@@ -9,9 +9,10 @@ import json
 import re
 
 from backend.abstract.search import Search
-from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException
-from common.lib.helpers import convert_to_int, UserInput
+from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException, QueryNeedsExplicitConfirmationException
+from common.lib.helpers import convert_to_int, UserInput, timify_long
 import config
+
 
 class SearchWithTwitterAPIv2(Search):
     """
@@ -92,8 +93,8 @@ class SearchWithTwitterAPIv2(Search):
             },
         'daterange-info': {
                 "type": UserInput.OPTION_INFO,
-                "help": "By default, Twitter returns tweets up til 30 days ago. If you want to go back further, you need "
-                        "to explicitly set a date range."
+                "help": "By default, Twitter returns tweets up til 30 days ago. If you want to go back further, you "
+                        "need to explicitly set a date range."
             },
         "daterange": {
                 "type": UserInput.OPTION_DATERANGE,
@@ -114,6 +115,7 @@ class SearchWithTwitterAPIv2(Search):
         # memory
         bearer_token = self.parameters.get("api_bearer_token")
         auth = {"Authorization": "Bearer %s" % bearer_token}
+        expected_tweets = query.get("expected-tweets", "unknown")
 
         # these are all expansions and fields available at the time of writing
         # since it does not cost anything extra in terms of rate limiting, go
@@ -151,6 +153,7 @@ class SearchWithTwitterAPIv2(Search):
             # Only can lookup 100 tweets in each query per Twitter API
             chunk_size = 100
             queries = [','.join(tweet_ids[i:i+chunk_size]) for i in range(0, len(tweet_ids), chunk_size)]
+            expected_tweets = len(tweet_ids)
 
             amount = len(tweet_ids)
 
@@ -173,6 +176,9 @@ class SearchWithTwitterAPIv2(Search):
             if self.parameters.get("max_date"):
                 params["end_time"] = datetime.datetime.fromtimestamp(self.parameters["max_date"]).strftime(
                     "%Y-%m-%dT%H:%M:%SZ")
+
+        if type(expected_tweets) is int:
+            expected_tweets = "{:,}".format(expected_tweets)
 
         tweets = 0
         for query in queries:
@@ -265,7 +271,7 @@ class SearchWithTwitterAPIv2(Search):
                         if "detail" in api_response:
                             msg += ": " + api_response.get("detail", "")
                     except (json.JSONDecodeError, TypeError):
-                        msg += "Some of your parameters (e.g. date range) may be invalid."
+                        msg += "Some of your parameters (e.g. date range) may be invalid, or the query may be too long."
 
                     self.dataset.update_status(msg, is_final=True)
                     return
@@ -316,7 +322,7 @@ class SearchWithTwitterAPIv2(Search):
                 if num_missing_objects > 50:
                     # Large amount of missing objects; possible error with Twitter API
                     self.flawless = False
-                    error_report.append('%i missing objects received following tweet number %i. Possible issue with Twitter API.', (num_missing_objects, tweets))
+                    error_report.append('%i missing objects received following tweet number %i. Possible issue with Twitter API.' % (num_missing_objects, tweets))
                     error_report.append('Missing objects collected: ' + ', '.join(['%s: %s' % (k, len(v)) for k, v in missing_objects.items()]))
 
                 # Warn if new missing object is recorded (for developers to handle)
@@ -336,7 +342,7 @@ class SearchWithTwitterAPIv2(Search):
 
                     tweets += 1
                     if tweets % 500 == 0:
-                        self.dataset.update_status("Received %i tweets from the Twitter API" % tweets)
+                        self.dataset.update_status("Received %s of ~%s tweets from the Twitter API" % ("{:,}".format(tweets), expected_tweets))
 
                     yield tweet
 
@@ -455,6 +461,30 @@ class SearchWithTwitterAPIv2(Search):
 
         return tweet
 
+    def fix_tweet_error(self, tweet_error):
+        """
+        Add fields as needed by map_tweet and other functions for errors as they
+        do not conform to normal tweet fields. Specifically for ID Lookup as
+        complete tweet could be missing.
+
+        :param dict tweet_error: Tweet error object from the Twitter API
+        :return dict:  A tweet object with the relevant fields sanitised
+        """
+        modified_tweet = tweet_error
+        modified_tweet['id'] = tweet_error.get('resource_id')
+        modified_tweet['created_at'] = datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S.000Z")
+        modified_tweet['text'] = ''
+        modified_tweet['author_user'] = {}
+        modified_tweet['author_user']['name'] = 'UNKNOWN'
+        modified_tweet['author_user']['username'] = 'UNKNOWN'
+        modified_tweet['author_id'] = 'UNKNOWN'
+        modified_tweet['public_metrics'] = {}
+
+        # putting detail info in 'subject' field which is normally blank for tweets
+        modified_tweet['subject'] = tweet_error.get('detail')
+
+        return modified_tweet
+
     @staticmethod
     def validate_query(query, request, user):
         """
@@ -463,12 +493,16 @@ class SearchWithTwitterAPIv2(Search):
         Will raise a QueryParametersException if invalid parameters are
         encountered. Parameters are additionally sanitised.
 
+        Will also raise a QueryNeedsExplicitConfirmation if the 'counts'
+        endpoint of the Twitter API indicates that it will take more than
+        30 minutes to collect the dataset. In the front-end, this will
+        trigger a warning and confirmation request.
+
         :param dict query:  Query parameters, from client-side.
         :param request:  Flask request
         :param User user:  User object of user who has submitted the query
         :return dict:  Safe query parameters
         """
-
         # this is the bare minimum, else we can't narrow down the full data set
         if not query.get("query", None):
             raise QueryParametersException("Please provide a query.")
@@ -496,7 +530,7 @@ class SearchWithTwitterAPIv2(Search):
             raise QueryParametersException("Date range must start before it ends")
 
         # if we made it this far, the query can be executed
-        return {
+        params = {
             "query": twitter_query,
             "api_bearer_token": query.get("api_bearer_token"),
             "api_type": query.get("api_type"),
@@ -506,26 +540,73 @@ class SearchWithTwitterAPIv2(Search):
             "amount": query.get("amount")
         }
 
-    def fix_tweet_error(self, tweet_error):
-        """
-        Add fields as needed by map_tweet and other functions for errors as they
-        do not conform to normal tweet fields. Specifically for ID Lookup as
-        complete tweet could be missing.
-        """
-        modified_tweet = tweet_error
-        modified_tweet['id'] = tweet_error.get('resource_id')
-        modified_tweet['created_at'] =  datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S.000Z")
-        modified_tweet['text'] = ''
-        modified_tweet['author_user'] = {}
-        modified_tweet['author_user']['name'] = 'UNKNOWN'
-        modified_tweet['author_user']['username'] = 'UNKNOWN'
-        modified_tweet['author_id'] = 'UNKNOWN'
-        modified_tweet['public_metrics'] = {}
+        # figure out how many tweets we expect to get back - we can use this
+        # to dissuade users from running huge queries that will take forever
+        # to process
+        if params["query_type"] == "query" and params["api_type"] == "all":
+            count_url = "https://api.twitter.com/2/tweets/counts/all"
+            count_params = {
+                "granularity": "day",
+                "query": params["query"],
+            }
 
-        # putting detail info in 'subject' field which is normally blank for tweets
-        modified_tweet['subject'] = tweet_error.get('detail')
+            # if we're doing a date range, pass this on to the counts endpoint in
+            # the right format
+            if after:
+                count_params["start_time"] = datetime.datetime.fromtimestamp(after).strftime("%Y-%m-%dT%H:%M:%SZ")
 
-        return modified_tweet
+            if before:
+                count_params["end_time"] = datetime.datetime.fromtimestamp(before).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+            bearer_token = params.get("api_bearer_token")
+
+            expected_tweets = 0
+            while True:
+                response = requests.get(count_url, params=count_params, headers={"Authorization": "Bearer %s" % bearer_token},
+                                        timeout=15)
+                if response.status_code == 200:
+                    try:
+                        # figure out how many tweets there are and estimate how much
+                        # time it will take to process them. if it's going to take
+                        # longer than half an hour, warn the user
+                        expected_tweets += int(response.json()["meta"]["total_tweet_count"])
+                    except KeyError:
+                        # no harm done, we just don't know how many tweets will be
+                        # returned (but they will still be returned)
+                        break
+
+                    if "next_token" not in response.json().get("meta", {}):
+                        break
+                    else:
+                        count_params["next_token"] = response.json()["meta"]["next_token"]
+
+                elif response.status_code == 401:
+                    raise QueryParametersException("Your bearer token seems to be invalid. Please make sure it is valid "
+                                                   "for the Academic Track of the Twitter API.")
+
+                elif response.status_code == 400:
+                    raise QueryParametersException("Your query is invalid. Please make sure the date range does not "
+                                                   "extend into the future, or to before Twitter's founding, and that "
+                                                   "your query is shorter than 1024 characters.")
+
+                else:
+                    # we can still continue without the expected tweets
+                    break
+
+            if expected_tweets:
+                if params["amount"] > 0:
+                    # if the user specified a number of tweets to return...
+                    expected_tweets = min(expected_tweets, params["amount"])
+
+                expected_seconds = int(expected_tweets / 30)  # seems to be about this
+                expected_time = timify_long(expected_seconds)
+                params["expected-tweets"] = expected_tweets
+
+                if expected_seconds > 1800 and not query.get("frontend-confirm"):
+                    raise QueryNeedsExplicitConfirmationException(
+                        "This query will return approximately %s tweets. This will take a long time (approximately %s)."
+                        " Are you sure you want to run this query?" % ("{:,}".format(expected_tweets), expected_time))
+        return params
 
     @staticmethod
     def map_item(tweet):

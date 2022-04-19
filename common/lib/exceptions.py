@@ -41,6 +41,12 @@ class QueryParametersException(FourcatException):
 	"""
 	pass
 
+class QueryNeedsExplicitConfirmationException(FourcatException):
+	"""
+	Raise if a dataset query needs confirmation
+	"""
+	pass
+
 class WorkerInterruptedException(FourcatException):
 	"""
 	Raise when killing a worker before it's done with its job

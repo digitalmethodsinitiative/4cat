@@ -99,7 +99,6 @@ class SearchParliamentSpeeches(Search):
         return {
             "thread_id": post["discussion_title"],
             "id": post["id"],
-            "subject": "",
             "body": post["text"],
             "author": post["name"],
             "author_party": post["party"],

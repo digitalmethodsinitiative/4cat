@@ -7,8 +7,6 @@ import base64
 import json
 import time
 import re
-import csv
-import shutil
 
 from pathlib import Path
 from PIL import Image, UnidentifiedImageError
@@ -62,6 +60,13 @@ class ImageDownloader(BasicProcessor):
 			"default": "image_url",
 			"tooltip": "If column contains a single URL, use that URL; else, try to find image URLs in the column's content"
 		},
+		"split-comma": {
+			"type": UserInput.OPTION_TOGGLE,
+			"help": "Split column values by comma?",
+			"default": False,
+			"tooltip": "If enabled, columns can contain multiple URLs separated by commas, which will be considered "
+					   "separately"
+		}
 	}
 
 	@classmethod
@@ -85,6 +90,8 @@ class ImageDownloader(BasicProcessor):
 		top_parent = self.dataset.get_genealogy()[0]
 		datasource = top_parent.parameters.get("datasource")
 		amount = self.parameters.get("amount", 100)
+		split_comma = self.parameters.get("split-comma", False)
+
 		if amount == 0:
 			amount = self.max_number_images
 		columns = self.parameters.get("columns")
@@ -145,18 +152,22 @@ class ImageDownloader(BasicProcessor):
 					continue
 
 				# remove all whitespace from beginning and end (needed for single URL check)
-				value = ' '.join(str(value).split())
-				if re.match(r"https?://(\S+)$", value):
-					# single URL
-					item_urls.add(value)
-				else:
-					# # Debug
-					# if re.match(r"https?://[^\s]+", value):
-					# 	self.dataset.log("Debug: OLD single detect url %s" % value)
+				values = [' '.join(str(value).split())]
+				if split_comma:
+					values = values[0].split(',')
 
-					# search for image URLs in string
-					item_urls |= set(img_link_regex.findall(value))
-					item_urls |= set(img_domain_regex.findall(value))
+				for value in values:
+					if re.match(r"https?://(\S+)$", value):
+						# single URL
+						item_urls.add(value)
+					else:
+						# # Debug
+						# if re.match(r"https?://[^\s]+", value):
+						# 	self.dataset.log("Debug: OLD single detect url %s" % value)
+
+						# search for image URLs in string
+						item_urls |= set(img_link_regex.findall(value))
+						item_urls |= set(img_domain_regex.findall(value))
 
 			if external:
 				# 4chan has a module that saves images locally, so if the columns in
@@ -204,8 +215,8 @@ class ImageDownloader(BasicProcessor):
 				raise ProcessorInterruptedException("Interrupted while downloading images.")
 
 			processed_urls += 1
-			self.dataset.update_status("Downloaded %i images; checking url for next %i/%i: %s" %
-									   (downloaded_images, processed_urls, len(urls), url))
+			self.dataset.update_status("Downloaded %i/%i images; downloading from %s" %
+									   (downloaded_images, len(urls), url))
 
 			try:
 				# acquire image
@@ -430,16 +441,20 @@ class ImageDownloader(BasicProcessor):
 		md5.update(base64.b64decode(based_hash))
 		file_name = md5.hexdigest() + "." + extension
 
+		# avoid getting rate-limited by image source
+		time.sleep(rate_limit)
+
 		# cache the image for later, if configured so
 		if config.PATH_IMAGES:
 			local_path = Path(config.PATH_IMAGES, md5.hexdigest() + "." + extension)
-			with open(local_path, 'wb') as file:
+			with open(local_path, 'wb') as outfile:
 				for chunk in image.iter_content(1024):
-					file.write(chunk)
+					outfile.write(chunk)
 
-		# avoid getting rate-limited by image source
-		time.sleep(rate_limit)
-		return BytesIO(image.content), file_name
+			with open(local_path, 'rb') as infile:
+				return BytesIO(infile.read()), file_name
+		else:
+			return BytesIO(image.content), file_name
 
 	def request_get_w_error_handling(self, url, retries=0, **kwargs):
 		"""
