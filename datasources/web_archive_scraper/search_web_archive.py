@@ -195,7 +195,7 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
                 result['html'] = scraped_page.get('page_source')
                 result['detected_404'] = scraped_page.get('detected_404')
                 result['timestamp'] = int(datetime.datetime.now().timestamp())
-                result['error'] += scraped_page.get('error')
+                result['error'] += scraped_page.get('error', '') if scraped_page.get('error') else ''
                 result['selenium_links'] = scraped_page.get('links') if scraped_page.get('links') else scraped_page.get('collect_links_error')
 
                 # Collect links from page source
@@ -258,7 +258,7 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
                 # Unsure if we should return ALL failures, but certainly the originally supplied urls
                 result['timestamp'] = int(datetime.datetime.now().timestamp())
                 if scraped_page:
-                    result['error'] += scraped_page.get('error')
+                    result['error'] += scraped_page.get('error', '') if scraped_page.get('error') else '' 
                 else:
                     # missing error...
                     result['error'] += 'Unable to scrape'
