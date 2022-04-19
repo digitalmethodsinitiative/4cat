@@ -320,7 +320,7 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
         # Convert list of text strings to one string
         page_result['body'] = '\n'.join(page_result.get('body')) if page_result.get('body') else ''
         # Convert list of link objects to comma seperated urls
-        page_result['scraped_links'] = ','.join([link.get('url') for link in page_result['scraped_links']])
+        page_result['scraped_links'] = ','.join([link.get('url') for link in page_result['scraped_links']]) if page_result['scraped_links'] else ''
         # Convert list of links to comma seperated urls
         page_result['selenium_links'] = ','.join(map(str,page_result['selenium_links'])) if type(page_result['selenium_links']) == list else page_result['selenium_links']
 
