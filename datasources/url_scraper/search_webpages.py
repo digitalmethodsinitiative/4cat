@@ -145,7 +145,7 @@ class SearchWithSelenium(SeleniumScraper):
                     # Find the first link that has not been previously scraped
                     while links:
                         link = links.pop(0)
-                        if self.check_exclude_link(link[1], scraped_urls, base_url='.'.join(urlparse(url_obj['base_url']).netloc.split('.')[1:])):
+                        if self.check_exclude_link(link.get('url'), scraped_urls, base_url='.'.join(urlparse(url_obj['base_url']).netloc.split('.')[1:])):
                             # Add it to be scraped next
                             urls_to_scrape.insert(0, {
                                 'url': link.get('url'),
@@ -165,7 +165,7 @@ class SearchWithSelenium(SeleniumScraper):
                     links = url_obj['subpage_links']
                     while links:
                         link = links.pop(0)
-                        if self.check_exclude_link(link[1], scraped_urls, base_url='.'.join(urlparse(url_obj['base_url']).netloc.split('.')[1:])):
+                        if self.check_exclude_link(link.get('url'), scraped_urls, base_url='.'.join(urlparse(url_obj['base_url']).netloc.split('.')[1:])):
                             # Add it to be scraped next
                             urls_to_scrape.insert(0, {
                                 'url': link.get('url'),
