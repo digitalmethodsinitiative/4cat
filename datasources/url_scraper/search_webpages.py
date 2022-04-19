@@ -195,7 +195,7 @@ class SearchWithSelenium(SeleniumScraper):
         :return dict:  Dictionary in the format expected by 4CAT
         """
         # Convert list of text strings to one string
-        page_result['body'] = '\n'.join(page_result.get('body'))
+        page_result['body'] = '\n'.join(page_result.get('body')) if page_result.get('body') else ''
         # Convert list of link objects to comma seperated urls
         page_result['scraped_links'] = ','.join([link.get('url') for link in page_result['scraped_links']])
         # Convert list of links to comma seperated urls
