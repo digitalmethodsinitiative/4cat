@@ -365,5 +365,7 @@ class SeleniumScraper(Search, metaclass=abc.ABCMeta):
                     link_url = urljoin(domain, link_url)
             else:
                 continue
-            links_to_return.append((link_text, link_url.rstrip('/'), original_url))
+            links_to_return.append({'link_text': link_text, 
+                                    'url': link_url.rstrip('/'),
+                                    'original_url': original_url})
         return url_count, links_to_return

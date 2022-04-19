@@ -204,7 +204,7 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
                         if self.check_exclude_link(link[1], scraped_urls, base_url='.'.join(urlparse(url_obj['base_url']).netloc.split('.')[1:])):
                             # Add it to be scraped next
                             urls_to_scrape.insert(0, {
-                                'url': link[1],
+                                'url': link.get('url'),
                                 'base_url': url_obj['base_url'],
                                 'year': url_obj['year'],
                                 'num_additional_subpages': num_additional_subpages - 1, # Make sure to request less additional pages
@@ -243,7 +243,7 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
                         if self.check_exclude_link(link[1], scraped_urls, base_url='.'.join(urlparse(url_obj['base_url']).netloc.split('.')[1:])):
                             # Add it to be scraped next
                             urls_to_scrape.insert(0, {
-                                'url': link[1],
+                                'url': link.get('url'),
                                 'base_url': url_obj['base_url'],
                                 'year': url_obj['year'],
                                 'num_additional_subpages': num_additional_subpages - 1, # Make sure to request less additional pages

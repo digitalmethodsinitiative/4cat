@@ -1,5 +1,7 @@
 """
-Twitter keyword search via the Twitter API v2
+Selenium Webpage HTML Scraper
+
+Currently designed around Firefox, but can also work with Chrome; results may vary
 """
 from urllib.parse import urlparse
 import datetime
@@ -13,16 +15,17 @@ from common.lib.user_input import UserInput
 
 class SearchWithSelenium(SeleniumScraper):
     """
-    Get HTML via the Selenium webdriver and Chrome browser
+    Get HTML via the Selenium webdriver and Firefox browser
     """
     type = "url_scraper-search"  # job ID
+    extension = "ndjson"
     max_workers = 1
 
     options = {
         "intro-1": {
             "type": UserInput.OPTION_INFO,
             "help": "This data source uses [Selenium](https://selenium-python.readthedocs.io/) in combination with "
-                    "a [Chrome webdriver](https://sites.google.com/chromium.org/driver/) and Google Chrome for linux "
+                    "a [Firefox webdriver](https://github.com/mozilla/geckodriver/releases) and Firefox for linux "
                     "to scrape the HTML source code. "
                     "\n"
                     "By mimicing a person using an actual browser, this method results in source code that closer "
@@ -115,18 +118,18 @@ class SearchWithSelenium(SeleniumScraper):
                 self.dataset.log('Collected: %s' % url)
                 # Update result and yield it
                 result['final_url'] = scraped_page.get('final_url')
-                result['body'] = '\n'.join(scraped_page.get('text'))
+                result['body'] = scraped_page.get('text')
                 result['subject'] = scraped_page.get('page_title')
                 result['html'] = scraped_page.get('page_source')
                 result['detected_404'] = scraped_page.get('detected_404')
                 result['timestamp'] = int(datetime.datetime.now().timestamp())
                 result['error'] = scraped_page.get('error') # This should be None...
-                result['selenium_links'] = ','.join(map(str,scraped_page.get('links'))) if scraped_page.get('links') else scraped_page.get('collect_links_error')
+                result['selenium_links'] = scraped_page.get('links') if scraped_page.get('links') else scraped_page.get('collect_links_error')
 
                 # Collect links from page source
                 domain = urlparse(url).scheme + '://' + urlparse(url).netloc
                 num_of_links, links = self.get_beautiful_links(scraped_page['page_source'], domain)
-                result['scraped_links'] = ','.join([link[1] for link in links])
+                result['scraped_links'] = links
 
                 # Check if additional subpages need to be scraped
                 if num_additional_subpages > 0:
@@ -145,7 +148,7 @@ class SearchWithSelenium(SeleniumScraper):
                         if self.check_exclude_link(link[1], scraped_urls, base_url='.'.join(urlparse(url_obj['base_url']).netloc.split('.')[1:])):
                             # Add it to be scraped next
                             urls_to_scrape.insert(0, {
-                                'url': link[1],
+                                'url': link.get('url'),
                                 'base_url': url_obj['base_url'],
                                 'num_additional_subpages': num_additional_subpages - 1, # Make sure to request less additional pages
                                 'subpage_links':links,
@@ -165,7 +168,7 @@ class SearchWithSelenium(SeleniumScraper):
                         if self.check_exclude_link(link[1], scraped_urls, base_url='.'.join(urlparse(url_obj['base_url']).netloc.split('.')[1:])):
                             # Add it to be scraped next
                             urls_to_scrape.insert(0, {
-                                'url': link[1],
+                                'url': link.get('url'),
                                 'base_url': url_obj['base_url'],
                                 'num_additional_subpages': num_additional_subpages - 1, # Make sure to request less additional pages
                                 'subpage_links':links,
@@ -180,6 +183,26 @@ class SearchWithSelenium(SeleniumScraper):
                     result['error'] = 'Unable to scrape'
 
                 yield result
+    @staticmethod
+    def map_item(page_result):
+        """
+        Map webpage result from JSON to 4CAT expected values.
+
+        This makes some minor changes to ensure processors can handle specific
+        columns and "export to csv" has formatted data.
+
+        :param json page_result:  Object with original datatypes
+        :return dict:  Dictionary in the format expected by 4CAT
+        """
+        # Convert list of text strings to one string
+        page_result['body'] = '\n'.join(page_result.get('body'))
+        # Convert list of link objects to comma seperated urls
+        page_result['scraped_links'] = ','.join([link.get('url') for link in page_result['scraped_links']])
+        # Convert list of links to comma seperated urls
+        page_result['selenium_links'] = ','.join(map(str,page_result['selenium_links'])) if type(page_result['selenium_links']) == list else page_result['selenium_links']
+
+        return page_result
+
 
     @staticmethod
     def validate_query(query, request, user):
