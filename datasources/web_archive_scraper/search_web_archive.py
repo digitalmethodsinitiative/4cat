@@ -1,5 +1,7 @@
 """
-Twitter keyword search via the Twitter API v2
+Web Archives HTML Scraper
+
+Currently designed around Firefox, but can also work with Chrome; results may vary
 """
 from urllib.parse import urlparse
 import datetime
@@ -17,9 +19,10 @@ import config
 
 class SearchWebArchiveWithSelenium(SeleniumScraper):
     """
-    Get HTML page source from Web Archive (web.archive.org) via the Selenium webdriver and Chrome browser
+    Get HTML page source from Web Archive (web.archive.org) via the Selenium webdriver and Firefox browser
     """
     type = "web_archive_scraper-search"  # job ID
+    extension = "ndjson"
     max_workers = 1
 
     # Web Archive returns "internal error" sometimes even when snapshot exists; we retry
@@ -31,7 +34,7 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
         "intro-1": {
             "type": UserInput.OPTION_INFO,
             "help": "This data source uses [Selenium](https://selenium-python.readthedocs.io/) in combination with "
-                    "a [Chrome webdriver](https://sites.google.com/chromium.org/driver/) and Google Chrome for linux "
+                    "a [Firefox webdriver](https://github.com/mozilla/geckodriver/releases) and Firefox for linux "
                     "to scrape the HTML source code. "
                     "\n"
                     "By mimicing a person using an actual browser, this method results in source code that closer "
@@ -185,14 +188,25 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
 
             if success:
                 self.dataset.log('Collected: %s' % url)
+                result['final_url'] = scraped_page.get('final_url')
+                result['body'] = scraped_page.get('text')
+                result['subject'] = scraped_page.get('page_title')
+                result['html'] = scraped_page.get('page_source')
+                result['detected_404'] = scraped_page.get('detected_404')
+                result['timestamp'] = int(datetime.datetime.now().timestamp())
+                result['error'] = scraped_page.get('error') # This should be None...
+                result['selenium_links'] = scraped_page.get('links') if scraped_page.get('links') else scraped_page.get('collect_links_error')
+
+                # Collect links from page source
+                domain = urlparse(url).scheme + '://' + urlparse(url).netloc
+                num_of_links, links = self.get_beautiful_links(scraped_page['page_source'], domain)
+                result['scraped_links'] = links
+
                 # Check is additional subpages need to be scraped
                 if num_additional_subpages > 0:
                     # Check if any are available
                     if not url_obj['subpage_links']:
                         # If no, collect links
-                        # Web archive domain
-                        domain = urlparse(url).scheme + '://' + urlparse(url).netloc
-                        num_of_links, links = self.get_beautiful_links(scraped_page['page_source'], domain)
                         # Randomize links (else we end up with mostly menu items at the top of webpages)
                         random.shuffle(links)
                     else:
@@ -211,16 +225,6 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
                                 'subpage_links':links,
                             })
                             break
-
-                # Update result and yield it
-                result['final_url'] = scraped_page.get('final_url')
-                result['body'] = '\n'.join(scraped_page.get('text'))
-                result['subject'] = scraped_page.get('page_title')
-                result['html'] = scraped_page.get('page_source')
-                result['detected_404'] = scraped_page.get('detected_404')
-                result['timestamp'] = int(datetime.datetime.now().timestamp())
-                result['error'] = scraped_page.get('error') # This should be None...
-                result['selenium_links'] = scraped_page.get('links') if scraped_page.get('links') else scraped_page.get('collect_links_error')
 
                 if http_request:
                     try:
@@ -301,6 +305,26 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
                 self.dataset.log("Error: ConnectionError on url %s: %s" % (url, str(e)))
                 raise e
         return response
+
+    @staticmethod
+    def map_item(page_result):
+        """
+        Map webpage result from JSON to 4CAT expected values.
+
+        This makes some minor changes to ensure processors can handle specific
+        columns and "export to csv" has formatted data.
+
+        :param json page_result:  Object with original datatypes
+        :return dict:  Dictionary in the format expected by 4CAT
+        """
+        # Convert list of text strings to one string
+        page_result['body'] = '\n'.join(page_result.get('body'))
+        # Convert list of link objects to comma seperated urls
+        page_result['scraped_links'] = ','.join([link.get('url') for link in page_result['scraped_links']])
+        # Convert list of links to comma seperated urls
+        page_result['selenium_links'] = ','.join(map(str,page_result['selenium_links'])) if type(page_result['selenium_links']) == list else page_result['selenium_links']
+
+        return page_result
 
     @staticmethod
     def create_web_archive_urls(url, start_date, end_date, frequency):
