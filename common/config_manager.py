@@ -8,52 +8,55 @@ import configparser
 
 from common.lib.exceptions import FourcatException
 
+
 class ConfigManager:
     """
-    Manage 4CAT configuation options that cannot be recorded in database
+    Manage 4CAT configuration options that cannot be recorded in database
     (generally because they are used to get to the database!).
 
     Note: some options are here until additional changes are made and they can
     be moved to more appropriate locations.
     """
-    CONFIG_FILE = 'config/config.ini'
+    CONFIG_FILE = "config/config.ini"
 
-    #TODO: work out best structure for docker vs non-docker
+    # TODO: work out best structure for docker vs non-docker
     # Do not need two configs, BUT Docker config.ini has to be in shared volume for both front and backend to access it
     config_reader = configparser.ConfigParser()
     USING_DOCKER = False
     if os.path.exists(CONFIG_FILE):
         config_reader.read(CONFIG_FILE)
-        if config_reader['DOCKER'].getboolean('use_docker_config'):
+        if config_reader["DOCKER"].getboolean("use_docker_config"):
             # Can use throughtout 4CAT to know if Docker environment
             USING_DOCKER = True
     else:
         # config should be created!
-        raise FourcatException('No config/config.ini file exists! Update and rename the config.ini-example file.')
+        raise FourcatException("No config/config.ini file exists! Update and rename the config.ini-example file.")
 
-    DB_HOST = config_reader['DATABASE'].get('db_host')
-    DB_PORT = config_reader['DATABASE'].getint('db_port')
-    DB_USER = config_reader['DATABASE'].get('db_user')
-    DB_NAME = config_reader['DATABASE'].get('db_name')
-    DB_PASSWORD = config_reader['DATABASE'].get('db_password')
+    DB_HOST = config_reader["DATABASE"].get("db_host")
+    DB_PORT = config_reader["DATABASE"].getint("db_port")
+    DB_USER = config_reader["DATABASE"].get("db_user")
+    DB_NAME = config_reader["DATABASE"].get("db_name")
+    DB_PASSWORD = config_reader["DATABASE"].get("db_password")
 
-    API_HOST = config_reader['API'].get('api_host')
-    API_PORT = config_reader['API'].getint('api_port')
+    API_HOST = config_reader["API"].get("api_host")
+    API_PORT = config_reader["API"].getint("api_port")
 
-    PATH_ROOT =  str(Path(os.path.abspath(os.path.dirname(__file__))).joinpath('..'))  # better don't change this
-    PATH_LOGS = config_reader['PATHS'].get('path_logs', "")
-    PATH_IMAGES = config_reader['PATHS'].get('path_images', "")
-    PATH_DATA = config_reader['PATHS'].get('path_data', "")
-    PATH_LOCKFILE = config_reader['PATHS'].get('path_lockfile', "")
-    PATH_SESSIONS = config_reader['PATHS'].get('path_sessions', "")
+    PATH_ROOT = str(Path(os.path.abspath(os.path.dirname(__file__))).joinpath(".."))  # better don"t change this
+    PATH_LOGS = config_reader["PATHS"].get("path_logs", "")
+    PATH_IMAGES = config_reader["PATHS"].get("path_images", "")
+    PATH_DATA = config_reader["PATHS"].get("path_data", "")
+    PATH_LOCKFILE = config_reader["PATHS"].get("path_lockfile", "")
+    PATH_SESSIONS = config_reader["PATHS"].get("path_sessions", "")
 
-    ANONYMISATION_SALT = config_reader['GENERATE'].get('anonymisation_salt')
-    SECRET_KEY = config_reader['GENERATE'].get('secret_key')
+    ANONYMISATION_SALT = config_reader["GENERATE"].get("anonymisation_salt")
+    SECRET_KEY = config_reader["GENERATE"].get("secret_key")
+
 
 class QuickDatabase:
     """
     Simple Database handler if multiple calls are expected
     """
+
     def __init__(self):
         self.connection, self.cursor = self.quick_db_connect()
 
@@ -65,9 +68,12 @@ class QuickDatabase:
         """
         Create a connection and cursor with the database
         """
-        connection = psycopg2.connect(dbname=ConfigManager.DB_NAME, user=ConfigManager.DB_USER, password=ConfigManager.DB_PASSWORD, host=ConfigManager.DB_HOST, port=ConfigManager.DB_PORT)
+        connection = psycopg2.connect(dbname=ConfigManager.DB_NAME, user=ConfigManager.DB_USER,
+                                      password=ConfigManager.DB_PASSWORD, host=ConfigManager.DB_HOST,
+                                      port=ConfigManager.DB_PORT)
         cursor = connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         return connection, cursor
+
 
 def check_attribute_exists(attribute_name, connection=None, cursor=None, keep_connection_open=False):
     """
@@ -78,14 +84,15 @@ def check_attribute_exists(attribute_name, connection=None, cursor=None, keep_co
     if not connection or not cursor:
         connection, cursor = QuickDatabase.quick_db_connect()
 
-    query = 'SELECT EXISTS (SELECT FROM settings WHERE name = %s)'
-    cursor.execute(query, (attribute_name, ))
+    query = "SELECT EXISTS (SELECT FROM settings WHERE name = %s)"
+    cursor.execute(query, (attribute_name,))
     row = cursor.fetchone()
 
     if not keep_connection_open:
         connection.close()
 
-    return row['exists']
+    return row["exists"]
+
 
 def get(attribute_name, default=None, connection=None, cursor=None, keep_connection_open=False):
     """
@@ -101,19 +108,19 @@ def get(attribute_name, default=None, connection=None, cursor=None, keep_connect
             if not connection or not cursor:
                 connection, cursor = QuickDatabase.quick_db_connect()
 
-            query = 'SELECT value FROM settings WHERE name = %s'
-            cursor.execute(query, (attribute_name, ))
+            query = "SELECT value FROM settings WHERE name = %s"
+            cursor.execute(query, (attribute_name,))
             row = cursor.fetchone()
 
             if not keep_connection_open:
                 connection.close()
 
-            value = json.loads(row['value'])
+            value = json.loads(row["value"])
         except (Exception, psycopg2.DatabaseError) as error:
             # TODO: log?
-            print('Problem with attribute: ' + str(attribute_name) + ': ' + str(error))
-            print('Connection: ' + str(connection))
-            print('SQL row: ' + str(row))
+            print("Problem with attribute: " + str(attribute_name) + ": " + str(error))
+            print("Connection: " + str(connection))
+            print("SQL row: " + str(row))
             value = None
         finally:
             if connection is not None and not keep_connection_open:
@@ -123,6 +130,7 @@ def get(attribute_name, default=None, connection=None, cursor=None, keep_connect
             return default
         else:
             return value
+
 
 def set_value(attribute_name, value, connection=None, cursor=None, keep_connection_open=False):
     """
@@ -138,7 +146,7 @@ def set_value(attribute_name, value, connection=None, cursor=None, keep_connecti
     try:
         if not connection or not cursor:
             connection, cursor = QuickDatabase.quick_db_connect()
-        query = 'UPDATE settings SET value = %s WHERE name = %s'
+        query = "UPDATE settings SET value = %s WHERE name = %s"
         cursor.execute(query, (value, attribute_name))
         updated_rows = cursor.rowcount
         connection.commit()
@@ -154,6 +162,7 @@ def set_value(attribute_name, value, connection=None, cursor=None, keep_connecti
 
     return updated_rows
 
+
 def get_all(connection=None, cursor=None, keep_connection_open=False):
     """
     Gets all database settings in 4cat_settings table. These are editable, while
@@ -163,14 +172,14 @@ def get_all(connection=None, cursor=None, keep_connection_open=False):
         if not connection or not cursor:
             connection, cursor = QuickDatabase.quick_db_connect()
 
-        query = 'SELECT name, value FROM settings'
+        query = "SELECT name, value FROM settings"
         cursor.execute(query)
         rows = cursor.fetchall()
 
         if not keep_connection_open:
             connection.close()
 
-        values = {row['name']:json.loads(row['value']) for row in rows}
+        values = {row["name"]: json.loads(row["value"]) for row in rows}
     except (Exception, psycopg2.DatabaseError) as error:
         # TODO: log?
         print(error)
@@ -180,6 +189,7 @@ def get_all(connection=None, cursor=None, keep_connection_open=False):
             connection.close()
 
     return values
+
 
 def insert_new_parameter(attribute_name, value, connection=None, cursor=None, keep_connection_open=False):
     """
@@ -196,7 +206,7 @@ def insert_new_parameter(attribute_name, value, connection=None, cursor=None, ke
         if not connection or not cursor:
             connection, cursor = QuickDatabase.quick_db_connect()
 
-        query = 'INSERT INTO settings (name, value) Values (%s, %s) ON CONFLICT DO NOTHING'
+        query = "INSERT INTO settings (name, value) Values (%s, %s) ON CONFLICT DO NOTHING"
         cursor.execute(query, (attribute_name, value))
         updated_rows = cursor.rowcount
         connection.commit()
@@ -214,9 +224,10 @@ def insert_new_parameter(attribute_name, value, connection=None, cursor=None, ke
 
     return updated_rows
 
+
 def set_or_create_setting(attribute_name, value, connection=None, cursor=None, keep_connection_open=False):
     """
-    Insert OR set value for a paramter in the database. ON CONFLICT SET VALUE.
+    Insert OR set value for a parameter in the database. ON CONFLICT SET VALUE.
 
     :return int: number of updated rows
     """
@@ -229,7 +240,7 @@ def set_or_create_setting(attribute_name, value, connection=None, cursor=None, k
         if not connection or not cursor:
             connection, cursor = QuickDatabase.quick_db_connect()
 
-        query = 'INSERT INTO settings (name, value) Values (%s, %s) ON CONFLICT (name) DO UPDATE SET value = EXCLUDED.value'
+        query = "INSERT INTO settings (name, value) Values (%s, %s) ON CONFLICT (name) DO UPDATE SET value = EXCLUDED.value"
         cursor.execute(query, (attribute_name, value))
         updated_rows = cursor.rowcount
         connection.commit()
@@ -247,6 +258,7 @@ def set_or_create_setting(attribute_name, value, connection=None, cursor=None, k
 
     return updated_rows
 
+
 def set_all_defaults(dictionary_of_defaults):
     """
     Takes a dictionary with default values, checks if they exist, and if not, inserts them.
@@ -255,17 +267,20 @@ def set_all_defaults(dictionary_of_defaults):
 
     for name, setting in defaults.items():
         if not check_attribute_exists(name, connection=QD.connection, cursor=QD.cursor, keep_connection_open=True):
-            insert_new_parameter(name, setting.get('default'), connection=QD.connection, cursor=QD.cursor, keep_connection_open=True)
+            insert_new_parameter(name, setting.get("default"), connection=QD.connection, cursor=QD.cursor,
+                                 keep_connection_open=True)
     if QD.connection:
         QD.close()
+
 
 # Web tool settings
 # This is a pass through class; may not be the best way to do this
 class FlaskConfig:
-    FLASK_APP = get('FLASK_APP')
-    SECRET_KEY = get('SECRET_KEY')
-    SERVER_NAME = get('SERVER_NAME') # if using a port other than 80, change to localhost:specific_port
-    SERVER_HTTPS = get('SERVER_HTTPS')  # set to true to make 4CAT use "https" in absolute URLs
-    HOSTNAME_WHITELIST = get('HOSTNAME_WHITELIST')  # only these may access the web tool; "*" or an empty list matches everything
-    HOSTNAME_WHITELIST_API = get('HOSTNAME_WHITELIST_API')  # hostnames matching these are exempt from rate limiting
-    HOSTNAME_WHITELIST_NAME = get('HOSTNAME_WHITELIST_NAME')
+    FLASK_APP = get("FLASK_APP")
+    SECRET_KEY = get("SECRET_KEY")
+    SERVER_NAME = get("SERVER_NAME")  # if using a port other than 80, change to localhost:specific_port
+    SERVER_HTTPS = get("SERVER_HTTPS")  # set to true to make 4CAT use "https" in absolute URLs
+    HOSTNAME_WHITELIST = get(
+        "HOSTNAME_WHITELIST")  # only these may access the web tool; "*" or an empty list matches everything
+    HOSTNAME_WHITELIST_API = get("HOSTNAME_WHITELIST_API")  # hostnames matching these are exempt from rate limiting
+    HOSTNAME_WHITELIST_NAME = get("HOSTNAME_WHITELIST_NAME")
