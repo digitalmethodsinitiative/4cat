@@ -4,8 +4,6 @@ Twitter v2 datasource
 Module contents
 ---------------
 
-.. mdinclude:: ../../datasources/twitterv2/README.md
-
 .. automodule:: datasources.twitterv2
    :members:
    :undoc-members:
