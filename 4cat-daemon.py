@@ -7,9 +7,6 @@ import re
 
 from pathlib import Path
 
-import common.config_manager as config
-from common.lib.helpers import call_api
-
 cli = argparse.ArgumentParser()
 cli.add_argument("--interactive", "-i", default=False, help="Run 4CAT in interactive mode (not in the background).",
                  action="store_true")
@@ -57,6 +54,11 @@ if not args.no_version_check:
         print("  %s helper-scripts/migrate.py" % sys.executable)
         exit(0)
 
+# we can only import this here, because the version check above needs to be
+# done first, as it may detect that the user needs to migrate first before
+# the config manager can be run properly
+import common.config_manager as config
+from common.lib.helpers import call_api
 # ---------------------------------------------
 #     Check validity of configuration file
 # (could be expanded to check for other values)
