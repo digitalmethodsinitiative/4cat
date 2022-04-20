@@ -209,7 +209,7 @@ article.result > section:first-child {
     left: -1.5em;
     font-family: 'Font Awesome 5 Pro', 'Font Awesome 5 Free';
     font-weight: 900;
-    content: '\f347';
+    content: '\f061';
     color: var(--gray-dark);
 }
 
