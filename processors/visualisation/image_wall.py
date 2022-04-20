@@ -147,6 +147,8 @@ class ImageWallGenerator(BasicProcessor):
 			# these calculations can take ages for huge images, so resize if it is
 			# larger than the threshold
 			dimensions[path.name] = (picture.width, picture.height)
+			value = 0
+			
 			if sort_mode not in ("", "random") and (picture.height > sample_max or picture.width > sample_max):
 				sample_width = int(sample_max * picture.width / max(picture.width, picture.height))
 				sample_height = int(sample_max * picture.height / max(picture.width, picture.height))
@@ -221,11 +223,11 @@ class ImageWallGenerator(BasicProcessor):
 				value = (0, 0, 0)
 
 			# converted to HSV, because RGB does not sort nicely
-			try:
+			if type(value) is int:
+				image_colours[path.name] = value
+			else:
 				image_colours[path.name] = colorsys.rgb_to_hsv(*value)
-			except ValueError:
-				self.dataset.update_status("Image %s could not be parsed. Skipping." % path)
-				continue
+
 			index += 1
 
 		# only retain the top n of the sorted list of images - this gives us

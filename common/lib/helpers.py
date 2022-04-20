@@ -6,7 +6,9 @@ import datetime
 import smtplib
 import socket
 import copy
+import time
 import json
+import math
 import csv
 import re
 import os
@@ -172,6 +174,60 @@ def expand_short_number(text):
 		else:
 			raise ValueError("Unknown multiplier '%s' in number '%s'" % (multiplier_bit, text))
 
+
+def timify_long(number):
+	"""
+	Make a number look like an indication of time
+
+	:param number:  Number to convert. If the number is larger than the current
+	UNIX timestamp, decrease by that amount
+	:return str: A nice, string, for example `1 month, 3 weeks, 4 hours and 2 minutes`
+	"""
+	number = int(number)
+
+	components = []
+	if number > time.time():
+		number = time.time() - number
+
+	month_length = 30.42 * 86400
+	months = math.floor(number / month_length)
+	if months:
+		components.append("%i month%s" % (months, "s" if months != 1 else ""))
+		number -= (months * month_length)
+
+	week_length = 7 * 86400
+	weeks = math.floor(number / week_length)
+	if weeks:
+		components.append("%i week%s" % (weeks, "s" if weeks != 1 else ""))
+		number -= (weeks * week_length)
+
+	day_length = 86400
+	days = math.floor(number / day_length)
+	if days:
+		components.append("%i day%s" % (days, "s" if days != 1 else ""))
+		number -= (days * day_length)
+
+	hour_length = 3600
+	hours = math.floor(number / hour_length)
+	if hours:
+		components.append("%i hour%s" % (hours, "s" if hours != 1 else ""))
+		number -= (hours * hour_length)
+
+	minute_length = 60
+	minutes = math.floor(number / minute_length)
+	if minutes:
+		components.append("%i minute%s" % (minutes, "s" if minutes != 1 else ""))
+
+	if not components:
+		components.append("less than a minute")
+
+	last_str = components.pop()
+	time_str = ""
+	if components:
+		time_str = ", ".join(components)
+		time_str += " and "
+
+	return time_str + last_str
 
 def get_yt_compatible_ids(yt_ids):
 	"""
