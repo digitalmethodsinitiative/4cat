@@ -6,11 +6,13 @@ import datetime
 import platform
 import smtplib
 import logging
+import shutil
 import socket
 import time
 import json
 import sys
 import re
+import os
 
 from collections import OrderedDict
 from pathlib import Path
@@ -51,7 +53,11 @@ class Logger:
 			return
 
 		self.print_logs = output
-		self.log_path = Path(config.get('PATH_ROOT'), config.get('PATH_LOGS'), filename)
+		log_folder = Path(config.get('PATH_ROOT'), config.get('PATH_LOGS'))
+		if not log_folder.exists():
+			log_folder.mkdir(parents=True)
+
+		self.log_path = log_folder.joinpath(filename)
 		self.previous_report = time.time()
 
 		self.logger = logging.getLogger("4cat-backend")
