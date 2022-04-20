@@ -1,3 +1,7 @@
+"""
+4CAT utilizes flask to establish a webserver frontend
+"""
+
 import configparser
 import subprocess
 import sys

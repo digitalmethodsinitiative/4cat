@@ -38,11 +38,11 @@ def init_datasource(database, logger, queue, name):
 
 
 def strip_tags(html, convert_newlines=True):
-	"""
+	r"""
 	Strip HTML from a string
 
 	:param html: HTML to strip
-	:param convert_newlines: Convert <br> and </p> tags to \n before stripping
+	:param convert_newlines: Convert <br> and </p> tags to \\\n before stripping
 	:return: Stripped HTML
 	"""
 	if not html:
@@ -231,13 +231,13 @@ def timify_long(number):
 
 def get_yt_compatible_ids(yt_ids):
 	"""
-	:param yt_ids list, a list of strings
-	:returns list, a ist of joined strings in pairs of 50
-
 	Takes a list of IDs and returns list of joined strings
 	in pairs of fifty. This should be done for the YouTube API
 	that requires a comma-separated string and can only return
 	max fifty results.
+
+	:param list yt_ids: a list of strings
+	:returns list: a list of joined strings in pairs of 50
 	"""
 
 	# If there's only one item, return a single list item
@@ -273,8 +273,7 @@ def get_4cat_canvas(path, width, height, header=None, footer="made with 4CAT", f
 	:param width:  Width of the canvas
 	:param height:  Height of the canvas
 	:param header:  Header, if necessary to draw
-	:param footer:  Footer text, if necessary to draw. Defaults to shameless
-	4CAT advertisement.
+	:param footer:  Footer text, if necessary to draw. Defaults to shameless 4CAT advertisement.
 	:param fontsize_normal:  Font size of normal text
 	:param fontsize_small:  Font size of small text (e.g. footer)
 	:param fontsize_large:  Font size of large text (e.g. header)
@@ -328,7 +327,6 @@ def call_api(action, payload=None):
 
 	:param str action: API action
 	:param payload: API payload
-
 	:return: API response, or timeout message in case of timeout
 	"""
 	connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -366,12 +364,9 @@ def get_interval_descriptor(item, interval):
 	"""
 	Get interval descriptor based on timestamp
 
-	:param dict item:  Item to generate descriptor for, should have a
-	"timestamp" key
-	:param str interval:  Interval, one of "all", "overall", "year",
-	"month", "week", "day"
-	:return str:  Interval descriptor, e.g. "overall", "2020", "2020-08",
-	"2020-43", "2020-08-01"
+	:param dict item:  Item to generate descriptor for, should have a "timestamp" key
+	:param str interval:  Interval, one of "all", "overall", "year", "month", "week", "day"
+	:return str:  Interval descriptor, e.g. "overall", "2020", "2020-08", "2020-43", "2020-08-01"
 	"""
 	if interval in ("all", "overall"):
 		return interval
@@ -406,8 +401,7 @@ def pad_interval(intervals, first_interval=None, last_interval=None):
 	"""
 	Pad an interval so all intermediate intervals are filled
 
-	:param dict intervals:  A dictionary, with dates (YYYY{-MM}{-DD}) as keys
-	and a numerical value.
+	:param dict intervals:  A dictionary, with dates (YYYY{-MM}{-DD}) as keys and a numerical value.
 	:param first_interval:
 	:param last_interval:
 	:return:
@@ -576,8 +570,9 @@ def dict_search_and_update(item, keyword_matches, function):
 	return temp_item
 
 def get_last_line(filepath):
-	"""
-	Seeks from end of file for '\n' and returns that line
+	r"""
+	Seeks from end of file for '\\\n' and returns that line
+
 
 	:param str filepath:  path to file
 	:return str: last line of file

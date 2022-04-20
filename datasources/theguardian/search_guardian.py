@@ -132,8 +132,7 @@ class SearchGuardian(SearchWithScope):
 		:param tuple|list post_ids:  List of post IDs to return data for
 		:param list where:  Unused
 		:param list replacements:  Unused
-		:param bool keep_comments:  Include all comments on matching posts in
-		the results
+		:param bool keep_comments:  Include all comments on matching posts in the results
 		:return list: List of posts, with a dictionary representing the record for each post
 		"""
 		if not post_ids:
@@ -198,8 +197,7 @@ class SearchGuardian(SearchWithScope):
 		Get thread lengths for all threads
 
 		:param tuple thread_ids:  List of thread IDs to fetch lengths for
-		:param int min_length:  Min length for a thread to be included in the
-		results
+		:param int min_length:  Min length for a thread to be included in the results
 		:return dict:  Threads sizes, with thread IDs as keys
 		"""
 		posts = self.fetch_threads(thread_ids)
@@ -218,8 +216,7 @@ class SearchGuardian(SearchWithScope):
 		Convert a PENELOPE API post object to 4CAT post data
 
 		:param dict post:  Post data, as from the penelope API
-		:param thread_id:  ID of thread the post belongs to, as this is not
-		part of the post data
+		:param thread_id:  ID of thread the post belongs to, as this is not part of the post data
 		:return dict:  Re-formatted data
 		"""
 		return {

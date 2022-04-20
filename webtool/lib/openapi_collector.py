@@ -4,19 +4,18 @@ OpenAPI specification generator for Flask-based APIs
 Usage:
 
 - Instantiate an OpenAPICollector instance in the Flask app's __init__.py:
-      openapi = OpenAPICollector(app)  # app being the Flask app
+	openapi = OpenAPICollector(app)  # app being the Flask app
 
 - Import the instance in the view definition file(s):
-      from [flask-app-name] import openapi
+	from [flask-app-name] import openapi
 
 - Decorate endpoint routes with the collector decorator:
-      @openapi.endpoint(api_id="api_name")
-      def some_route():
+	@openapi.endpoint(api_id="api_name")
+	def some_route():
 
-- Add a route (or other output method) for the generated specification in which
-  the following call returns a dictionary representing the OpenAPI
-  specification tree:
-      return json.dumps(openapi.generate(api_id))
+- Add a route (or other output method) for the generated specification in which the following call returns \
+a dictionary representing the OpenAPI specification tree:
+	return json.dumps(openapi.generate(api_id))
 """
 import inspect
 import json
@@ -61,8 +60,8 @@ class OpenAPICollector:
 			in the OpenAPI specification.
 
 			:param callback:  Route view function
-			:return:  The same function, but meanwhile the function metadata has
-		          been stored to be integrated in the OpenAPI spec later.
+			:return:  The same function, but meanwhile the function metadata has been stored to be integrated \
+			in the OpenAPI spec later.
 			"""
 			collapse_whitespace = re.compile(r"\s+")
 			if callback.__doc__:
@@ -190,8 +189,8 @@ class OpenAPICollector:
 		built from their docstring. The parser assumes a reST-formatted
 		docstring.
 
-		:return dict: The OpenAPI-formatted specification, as a dictionary
-		              that can be (f.ex.) dumped as JSON for a usable spec.
+		:return dict: The OpenAPI-formatted specification, as a dictionary that can be (f.ex.) \
+		dumped as JSON for a usable spec.
 		"""
 		spec = {
 			"swagger": "2.0",

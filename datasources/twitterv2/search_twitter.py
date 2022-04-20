@@ -21,12 +21,13 @@ class SearchWithTwitterAPIv2(Search):
     This only allows for historical search - use f.ex. TCAT for more advanced
     queries.
     """
-    type = "twitterv2-search"  # job ID
-    extension = "ndjson"
-    is_local = False    # Whether this datasource is locally scraped
-    is_static = False   # Whether this datasource is still updated
+    type = "twitterv2-search"  #: job ID
+    extension = "ndjson"    #: file extension exported by datasource
+    is_local = False    #: Whether this datasource is locally scraped
+    is_static = False   #: Whether this datasource is still updated
 
     previous_request = 0
+    #: TODO example on how to document class variables or constants
     flawless = True
 
     references = [
@@ -389,12 +390,12 @@ class SearchWithTwitterAPIv2(Search):
         :param list media:  Media metadata, as a list of media objects
         :param list polls:  Poll metadata, as a list of poll objects
         :param list places:  Place metadata, as a list of place objects
-        :param list referenced_tweets:  Tweets referenced in the tweet, as a
-        list of tweet objects. These will be enriched in turn.
-        :param dict missing_objects: Dictionary with data on missing objects
-                from the API by type.
+        :param list referenced_tweets:  Tweets referenced in the tweet, as a list of tweet objects. These will be \
+        enriched in turn.
+        :param dict missing_objects: Dictionary with data on missing objects from the API by type.
 
-        :return dict:  Enriched tweet object
+        :return: Enriched tweet object
+        :rtype: dict
         """
         # Copy the tweet so that updating this tweet has no effect on others
         tweet = copy.deepcopy(tweet)

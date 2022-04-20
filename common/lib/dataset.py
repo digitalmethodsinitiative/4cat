@@ -247,10 +247,9 @@ class DataSet(FourcatModule):
 		envision adding a pathway to retrieve items from e.g. a MongoDB
 		collection directly instead of from a static file
 
-		:param BasicProcessor processor:  A reference to the processor
-		iterating the dataset.
-		:param bool bypass_map_item:  If set to `True`, this ignores any
-		`map_item` method of the datasource when returning items.
+		:param BasicProcessor processor:  A reference to the processor iterating the dataset.
+		:param bool bypass_map_item:  If set to `True`, this ignores any `map_item` method of the datasource when \
+		returning items.
 		:return generator:  A generator that yields each item as a dictionary
 		"""
 		path = self.get_results_path()
@@ -310,10 +309,9 @@ class DataSet(FourcatModule):
 		to the source_dataset one but with extra attributes. This method provides
 		these, as a list.
 
-		:param BasicProcessor processor:  A reference to the processor
-		asking for the item keys, to pass on to iterate_itesm
-		:return list:  List of keys, may be empty if there are no items in the
-		  dataset
+		:param BasicProcessor processor:  A reference to the processor asking for the item keys, to pass on \
+		to iterate_items
+		:return list:  List of keys, may be empty if there are no items in the dataset
 		"""
 
 		items = self.iterate_items(processor)
@@ -408,8 +406,8 @@ class DataSet(FourcatModule):
 		Copies the dataset, making a new version with a unique key
 
 
-		:param bool shallow:  Shallow copy: does not copy the result file, but
-		instead refers to the same file as the original dataset did
+		:param bool shallow:  Shallow copy: does not copy the result file, but instead refers to the same \
+		file as the original dataset did
 		:return Dataset:  Copied dataset
 		"""
 		parameters = self.parameters.copy()
@@ -485,6 +483,7 @@ class DataSet(FourcatModule):
 	def is_finished(self):
 		"""
 		Check if dataset is finished
+
 		:return bool:
 		"""
 		return self.data["is_finished"] == True
@@ -496,8 +495,7 @@ class DataSet(FourcatModule):
 		Rankable means that it is a CSV file with 'date' and 'value' columns
 		as well as one or more item label columns
 
-		:param bool multiple_items:  Consider datasets with multiple items per
-		item (e.g. word_1, word_2, etc)?
+		:param bool multiple_items:  Consider datasets with multiple items per item (e.g. word_1, word_2, etc)?
 
 		:return bool:  Whether the dataset is rankable or not
 		"""
@@ -574,6 +572,7 @@ class DataSet(FourcatModule):
 	def get_annotation_fields(self):
 		"""
 		Retrieves the saved annotation fields for this dataset.
+
 		:return dict: The saved annotation fields.
 		"""
 
@@ -587,7 +586,8 @@ class DataSet(FourcatModule):
 	def get_annotations(self):
 		"""
 		Retrieves the annotations for this dataset.
-		return dict: The annotations
+
+		:return dict: The annotations
 		"""
 
 		annotations = self.db.fetchone("SELECT annotations FROM annotations WHERE key = %s;", (self.top_parent().key,))
@@ -614,8 +614,7 @@ class DataSet(FourcatModule):
 		Generate a readable label for the dataset
 
 		:param dict parameters:  Parameters of the dataset
-		:param str default:  Label to use if it cannot be inferred from the
-		parameters
+		:param str default:  Label to use if it cannot be inferred from the parameters
 
 		:return str:  Label
 		"""
@@ -757,9 +756,8 @@ class DataSet(FourcatModule):
 		Statuses are also written to the dataset log file.
 
 		:param string status:  Dataset status
-		:param bool is_final:  If this is `True`, subsequent calls to this
-		method while the object is instantiated will not update the dataset
-		status.
+		:param bool is_final:  If this is `True`, subsequent calls to this method while the object is instantiated \
+		will not update the dataset status.
 		:return bool:  Status update successful?
 		"""
 		if self.no_status_updates:
@@ -1005,11 +1003,11 @@ class DataSet(FourcatModule):
 
 		Note that if no job can be found for this dataset, this method silently
 		fails.
+		todo If the job column ever gets used, make sure it always contains a valid value, rather than silently failing this method.
 
 		:param Job job:  The job that will run this dataset
 
-		:todo: If the job column ever gets used, make sure it always contains
-		       a valid value, rather than silently failing this method.
+
 		"""
 		if type(job) != Job:
 			raise TypeError("link_job requires a Job object as its argument")
@@ -1082,6 +1080,7 @@ class DataSet(FourcatModule):
 		Uses the config.py FlaskConfig attributes (i.e., SERVER_NAME and
 		SERVER_HTTPS) plus hardcoded '/result/'.
 		TODO: create more dynamic method of obtaining url.
+
 		"""
 		filename = self.get_results_path().name
 		url_to_file = ('https://' if config.FlaskConfig.SERVER_HTTPS else 'http://') + \

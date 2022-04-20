@@ -465,8 +465,7 @@ class SearchReddit(SearchWithScope):
 		Get thread lengths for all threads
 
 		:param tuple thread_ids:  List of thread IDs to fetch lengths for
-		:param int min_length:  Min length for a thread to be included in the
-		results
+		:param int min_length:  Min length for a thread to be included in the results
 		:return dict:  Threads sizes, with thread IDs as keys
 		"""
 		chunk_size = 500
@@ -558,7 +557,7 @@ class SearchReddit(SearchWithScope):
 
 		:param args:
 		:param kwargs:
-		:return: Response, or `None`
+		:return: Response, or 'None'
 		"""
 
 		retries = 0

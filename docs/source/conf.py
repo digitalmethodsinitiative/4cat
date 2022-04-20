@@ -13,12 +13,12 @@
 import os
 import sys
 sys.path.insert(0, os.path.abspath('../..'))
-print(os.path.abspath('../..'))
-
+sys.setrecursionlimit(1500)
 
 # -- Project information -----------------------------------------------------
+
 project = '4CAT Capture & Analysis Toolkit'
-copyright = '2021, OILab & Digital Methods Initiative'
+copyright = '2022, OILab & Digital Methods Initiative'
 author = 'OILab & Digital Methods Initiative'
 
 
@@ -27,12 +27,9 @@ author = 'OILab & Digital Methods Initiative'
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
-extensions = [
-    'sphinx.ext.autodoc',
-    'sphinx.ext.autosummary',
-    "sphinx.ext.napoleon",
-    'm2r2',
-    'sphinx.ext.intersphinx'
+extensions = ['sphinx.ext.autodoc',
+              'sphinx.ext.autosummary',
+              'sphinx_mdinclude',
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -43,11 +40,6 @@ templates_path = ['_templates']
 # This pattern also affects html_static_path and html_extra_path.
 exclude_patterns = []
 
-source_suffix = [".rst", ".md"]
-
-autodoc_default_options = {
-    "member-order": "groupwise"
-}
 
 # -- Options for HTML output -------------------------------------------------
 
@@ -60,3 +52,4 @@ html_theme = 'sphinx_rtd_theme'
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ['_static']
+html_favicon = '_static/favicon.ico'

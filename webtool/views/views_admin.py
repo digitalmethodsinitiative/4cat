@@ -30,6 +30,12 @@ from common.lib.helpers import call_api, send_email
 @login_required
 @admin_required
 def admin_frontpage(page):
+    """
+
+    :param page:
+    :type page:
+    :return:
+    """
     offset = (page - 1) * 20
     filter = request.args.get("filter", "")
 
@@ -50,6 +56,10 @@ def admin_frontpage(page):
 @login_required
 @admin_required
 def get_worker_status():
+    """
+
+    :return:
+    """
     workers = call_api("worker-status")["response"]["running"]
     return render_template("controlpanel/worker-status.html", workers=workers, worker_types=backend.all_modules.workers,
                            now=time.time())
@@ -59,6 +69,10 @@ def get_worker_status():
 @login_required
 @admin_required
 def get_queue_status():
+    """
+
+    :return:
+    """
     queue = call_api("worker-status")["response"]["queued"]
     return render_template("controlpanel/queue-status.html", queue=queue, worker_types=backend.all_modules.workers,
                            now=time.time())
@@ -76,8 +90,7 @@ def add_user():
     This route is used for the 'approve' link in the e-mail sent when people
     request a new account.
 
-    :return: Either an html page with a message, or a JSON response, depending
-    on whether ?format == html
+    :return: Either an html page with a message, or a JSON response, depending on whether ?format == html
     """
     if not current_user.is_authenticated or not current_user.is_admin:
         return error(403, message="This page is off-limits to you.")
@@ -201,6 +214,12 @@ def reject_user():
 @login_required
 @admin_required
 def manipulate_user(mode):
+    """
+
+    :param mode:
+    :type mode:
+    :return:
+    """
     if not current_user.is_authenticated or not current_user.is_admin:
         return error(403, message="This page is off-limits to you.")
 
@@ -272,4 +291,7 @@ def manipulate_user(mode):
 @app.route("/admin/delete-user")
 @login_required
 def delete_user():
+    """
+    Informs that deleting users is not possible at the moment by aborting 501
+    """
     abort(501, "Deleting users is not possible at the moment")

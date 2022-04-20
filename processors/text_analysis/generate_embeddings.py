@@ -208,10 +208,9 @@ class GenerateWordEmbeddings(BasicProcessor):
 		them as a generator, reducing memory usage and allowing interruption.
 
 		:param Path file:
-		:param Path staging_area:  Path to staging area, so it can be cleaned
-		up when the processor is interrupted
-		:param Phraser phraser:  Optional. If given, the yielded sentence is
-		passed through the phraser to detect (e.g.) bigrams.
+		:param Path staging_area:  Path to staging area, so it can be cleaned up when the processor is interrupted
+		:param Phraser phraser:  Optional. If given, the yielded sentence is passed through the phraser to detect \
+		(e.g.) bigrams.
 		:return list:  A set of tokens
 		"""
 

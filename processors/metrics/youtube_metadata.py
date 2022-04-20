@@ -168,7 +168,7 @@ class YouTubeMetadata(BasicProcessor):
 		Gets metadata from various YouTube URLs.
 		Currently only supports channels and videos.
 
-		:param di_urls, dict: A dictionary with URLs as keys and post ids as values
+		:param dict di_urls: A dictionary with URLs as keys and post ids as values
 		:returns dict: containing metadata on the YouTube URL
 
 		"""
@@ -306,7 +306,7 @@ class YouTubeMetadata(BasicProcessor):
 		"""
 		Parses the channel ID from URLs pointing to a YouTube channel.
 
-		:param str, url: string of a URL pointing to a YouTube channel.
+		:param str urls: string of a URL pointing to a YouTube channel.
 		:returns dict ids: dict with validly parsed IDs as keys and URLs as values.
 
 		"""

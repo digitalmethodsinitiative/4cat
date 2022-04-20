@@ -1,4 +1,4 @@
-# Usenet data source for 4CAT
+## Usenet data source for 4CAT
 
 This data source allows importing and searching archived Usenet messages.
 

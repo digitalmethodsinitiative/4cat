@@ -51,13 +51,30 @@ A minimal example of a processor could look like this:
             self.write_csv_items_and_finish(data)
 
 
-But there is more you can do. The full API looks like this:
 
---------------------------
-The `BasicProcessor` class
---------------------------
+Module contents
+---------------
 
-.. autoclass:: backend.abstract.processor.BasicProcessor
-    :members:
-    :undoc-members:
-    :show-inheritance:
+.. mdinclude:: ../../processors/README.md
+
+
+.. automodule:: processors
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+
+Subpackages
+-----------
+
+.. toctree::
+   :maxdepth: 4
+
+   processors.conversion
+   processors.filtering
+   processors.metrics
+   processors.networks
+   processors.presets
+   processors.text_analysis
+   processors.visualisation
+

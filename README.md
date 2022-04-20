@@ -1,4 +1,4 @@
-# ![](https://github.com/digitalmethodsinitiative/4cat/tree/master/common/assets/logo_readme.png) 4CAT: Capture and Analysis Toolkit
+# 4CAT: Capture and Analysis Toolkit
 
 [![DOI: 10.5281/zenodo.4742622](https://zenodo.org/badge/DOI/10.5281/zenodo.4742622.svg)](https://doi.org/10.5281/zenodo.4742622)
 [![License: MPL 2.0](https://img.shields.io/badge/license-MPL--2.0-informational)](https://github.com/digitalmethodsinitiative/4cat/blob/master/LICENSE)
@@ -55,7 +55,7 @@ You can install 4CAT locally or on a server via Docker or manually. Copying our 
 docker-compose -f docker-compose_prod.yml up
 ```
 
-will pull the lastest version from Docker Hub, but detailed and alternative installation instructions are available
+will pull the latest version from Docker Hub, but detailed and alternative installation instructions are available
 [in our
 wiki](https://github.com/digitalmethodsinitiative/4cat/wiki/Installing-4CAT).
 Currently 4chan, 8chan, and 8kun require additional steps; please see the wiki.

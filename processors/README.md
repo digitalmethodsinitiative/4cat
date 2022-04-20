@@ -1,4 +1,4 @@
-# Processors
+## Processors
 
 Processors are modules for 4CAT that take a dataset as their input and 
 produce another dataset as their output.

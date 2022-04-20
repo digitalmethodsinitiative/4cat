@@ -1,4 +1,4 @@
-# 4chan data source for 4CAT
+## 4chan data source for 4CAT
 
 This data source can be used to allow 4CAT users to interface with 4chan data.
 Since 4chan has no API that is useful for 4CAT's purposes, this data source 

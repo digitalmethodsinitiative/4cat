@@ -56,18 +56,47 @@ needs to function (e.g. queueing any recurring workers). A default implementatio
 
     from backend.lib.helpers import init_datasource
 
+
 ------------------
 The `Search` class
 ------------------
-.. autoclass:: backend.abstract.search.Search
-    :members:
-    :undoc-members:
-    :show-inheritance:
 
----------------------------
-The `SearchWithScope` class
----------------------------
-.. autoclass:: backend.abstract.search.SearchWithScope
-    :members:
-    :undoc-members:
-    :show-inheritance:
+.. automodule:: backend.abstract.search
+   :members:
+   :undoc-members:
+   :show-inheritance:
+   :noindex:
+
+---------------
+Module contents
+---------------
+
+.. automodule:: datasources
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Subpackages
+-----------
+
+.. toctree::
+   :maxdepth: 4
+
+   datasources.bitchute
+   datasources.custom
+   datasources.douban
+   datasources.eightchan
+   datasources.eightkun
+   datasources.fourchan
+   datasources.import_from_tool
+   datasources.instagram
+   datasources.parler
+   datasources.parliaments
+   datasources.reddit
+   datasources.telegram
+   datasources.theguardian
+   datasources.tiktok
+   datasources.tumblr
+   datasources.twitterv2
+   datasources.usenet
+

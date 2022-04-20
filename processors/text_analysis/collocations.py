@@ -232,14 +232,14 @@ class GetCollocations(BasicProcessor):
 
 	def get_collocations(self, tokens, window_size, n_size, query_string=False, forbidden_words=False, unique=False):
 		""" Generates a tuple of word collocations (bigrams or trigrams).
-		:param li, tokens:				list of tokens
-		:param int, window_size: 		size of word window (context) to calculate the ngrams from
-		:param int, n_size:				n-gram size. 1=unigrams, 2=bigrams, 3=trigrams
-		:param str, query_string:		if given, only return collocations with this word.
-										If emtpy, generates collocations for the overall corpus.
-		:param str, forbidden_words:	possible list of words to exclude from the results
-		:param bool, unique:			Whether to filter for unique collocations per post.
 
+		:param list tokens: list of tokens
+		:param int window_size: size of word window (context) to calculate the ngrams from
+		:param int n_size: n-gram size. 1=unigrams, 2=bigrams, 3=trigrams
+		:param str query_string: if given, only return collocations with this word. If emtpy, generates collocations \
+		for the overall corpus.
+		:param str forbidden_words:	possible list of words to exclude from the results
+		:param bool unique:	Whether to filter for unique collocations per post.
 		:return: list of tuples with collocations 
 		
 		"""

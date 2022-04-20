@@ -35,9 +35,8 @@ class JobQueue:
 		kinds of data.
 
 		:param string jobtype:  Job type
-		:param int timestamp:  Find jobs that may be claimed after this timestamp. If set to
-							   a negative value (default), any job with a "claim after" time
-							   earlier than the current time is selected.
+		:param int timestamp:  Find jobs that may be claimed after this timestamp. If set to a negative value \
+		(default), any job with a "claim after" time earlier than the current time is selected.
 		:return dict: Job data, or `None` if no job was found
 		"""
 		if timestamp < 0:
@@ -61,8 +60,7 @@ class JobQueue:
 
 		:param string jobtype:  Type of job, "*" for all types
 		:param string remote_id:  Remote ID, takes precedence over `jobtype`
-		:param bool restrict_claimable:  Only return jobs that may be claimed
-		according to their parameters
+		:param bool restrict_claimable:  Only return jobs that may be claimed according to their parameters
 		:return list:
 		"""
 		replacements = []
@@ -126,14 +124,12 @@ class JobQueue:
 		:param details:  Job details - may be empty, will be stored as JSON
 		:param remote_id:  Remote ID of object to work on. For example, a post or thread ID
 		:param claim_after:  Absolute timestamp after which job may be claimed
-		:param interval:  If this is not zero, the job is made a repeating job,
-		                  which will be repeated at most every `interval` seconds.
+		:param interval:  If this is not zero, the job is made a repeating job, which will be repeated at most every \
+		`interval` seconds.
 
-		:return Job: A job that matches the input type and remote ID. This may
-		             be a newly added job or an existing that matched the same
-		             combination (which is required to be unique, so no new job
-		             with those parameters could be queued, and the old one is
-		             just as valid).
+		:return Job: A job that matches the input type and remote ID. This may be a newly added job or an existing \
+		that matched the same combination (which is required to be unique, so no new job with those parameters could \
+		be queued, and the old one is just as valid).
 		"""
 		data =  data={
 			"jobtype": jobtype,
@@ -167,9 +163,8 @@ class JobQueue:
 
 		:param Job job:  Job to get place in queue for
 
-		:return int: Place in queue. 0 means the job is currently being
-		processed; 1+ means the job is queued, with 1 corresponding to the
-		front of the queue.
+		:return int: Place in queue. 0 means the job is currently being processed; 1+ means the job is queued, with 1 \
+		corresponding to the front of the queue.
 		"""
 		if job.data["timestamp_claimed"] > 0:
 			return 0

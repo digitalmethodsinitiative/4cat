@@ -1,3 +1,7 @@
+"""
+The backend module consists of a collection of important submodules that are core to 4CAT.
+"""
+
 import sys
 import os
 

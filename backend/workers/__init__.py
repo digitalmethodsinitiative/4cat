@@ -1,3 +1,6 @@
+"""
+Important worker functions for the backend
+"""
 import sys, os
 
 # config

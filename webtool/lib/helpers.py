@@ -105,6 +105,7 @@ def string_to_timestamp(string):
 	:param string: Date string to parse
 	:return: The unix time, or 0 if value could not be parsed
 	"""
+
 	bits = string.split("-")
 	if re.match(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", string):
 		bits = list(reversed(bits))
@@ -126,8 +127,7 @@ def pad_interval(intervals, first_interval=None, last_interval=None):
 	"""
 	Pad an interval so all intermediate intervals are filled
 
-	:param dict intervals:  A dictionary, with dates (YYYY{-MM}{-DD}) as keys
-	and a numerical value.
+	:param dict intervals:  A dictionary, with dates (YYYY{-MM}{-DD}) as keys and a numerical value.
 	:param first_interval:
 	:param last_interval:
 	:return:
