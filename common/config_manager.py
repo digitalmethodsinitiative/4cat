@@ -78,7 +78,7 @@ def check_attribute_exists(attribute_name, connection=None, cursor=None, keep_co
     if not connection or not cursor:
         connection, cursor = QuickDatabase.quick_db_connect()
 
-    query = 'SELECT EXISTS (SELECT FROM fourcat_settings WHERE name = %s)'
+    query = 'SELECT EXISTS (SELECT FROM settings WHERE name = %s)'
     cursor.execute(query, (attribute_name, ))
     row = cursor.fetchone()
 
@@ -101,7 +101,7 @@ def get(attribute_name, default=None, connection=None, cursor=None, keep_connect
             if not connection or not cursor:
                 connection, cursor = QuickDatabase.quick_db_connect()
 
-            query = 'SELECT value FROM fourcat_settings WHERE name = %s'
+            query = 'SELECT value FROM settings WHERE name = %s'
             cursor.execute(query, (attribute_name, ))
             row = cursor.fetchone()
 
@@ -138,7 +138,7 @@ def set_value(attribute_name, value, connection=None, cursor=None, keep_connecti
     try:
         if not connection or not cursor:
             connection, cursor = QuickDatabase.quick_db_connect()
-        query = 'UPDATE fourcat_settings SET value = %s WHERE name = %s'
+        query = 'UPDATE settings SET value = %s WHERE name = %s'
         cursor.execute(query, (value, attribute_name))
         updated_rows = cursor.rowcount
         connection.commit()
@@ -163,7 +163,7 @@ def get_all(connection=None, cursor=None, keep_connection_open=False):
         if not connection or not cursor:
             connection, cursor = QuickDatabase.quick_db_connect()
 
-        query = 'SELECT name, value FROM fourcat_settings'
+        query = 'SELECT name, value FROM settings'
         cursor.execute(query)
         rows = cursor.fetchall()
 
@@ -196,7 +196,7 @@ def insert_new_parameter(attribute_name, value, connection=None, cursor=None, ke
         if not connection or not cursor:
             connection, cursor = QuickDatabase.quick_db_connect()
 
-        query = 'INSERT INTO fourcat_settings (name, value) Values (%s, %s) ON CONFLICT DO NOTHING'
+        query = 'INSERT INTO settings (name, value) Values (%s, %s) ON CONFLICT DO NOTHING'
         cursor.execute(query, (attribute_name, value))
         updated_rows = cursor.rowcount
         connection.commit()
@@ -229,7 +229,7 @@ def set_or_create_setting(attribute_name, value, connection=None, cursor=None, k
         if not connection or not cursor:
             connection, cursor = QuickDatabase.quick_db_connect()
 
-        query = 'INSERT INTO fourcat_settings (name, value) Values (%s, %s) ON CONFLICT (name) DO UPDATE SET value = EXCLUDED.value'
+        query = 'INSERT INTO settings (name, value) Values (%s, %s) ON CONFLICT (name) DO UPDATE SET value = EXCLUDED.value'
         cursor.execute(query, (attribute_name, value))
         updated_rows = cursor.rowcount
         connection.commit()

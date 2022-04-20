@@ -25,7 +25,7 @@ def set_or_create_setting(attribute_name, value, connection, cursor, keep_connec
         return None
 
     try:
-        query = 'INSERT INTO fourcat_settings (name, value) Values (%s, %s) ON CONFLICT (name) DO UPDATE SET value = EXCLUDED.value'
+        query = 'INSERT INTO settings (name, value) Values (%s, %s) ON CONFLICT (name) DO UPDATE SET value = EXCLUDED.value'
         cursor.execute(query, (attribute_name, value))
         updated_rows = cursor.rowcount
         connection.commit()
@@ -52,24 +52,24 @@ try:
 except (SyntaxError, ImportError) as e:
     print("  ...No prexisting settings exist.")
 
-print("  Checking if fourcat_settings table exists...")
+print("  Checking if settings table exists...")
 if transfer_settings:
     connection = psycopg2.connect(dbname=old_config.DB_NAME, user=old_config.DB_USER, password=old_config.DB_PASSWORD, host=old_config.DB_HOST, port=old_config.DB_PORT, application_name="4cat-migrate")
 else:
     import common.config_manager as config
     connection = psycopg2.connect(dbname=config.get('DB_NAME'), user=config.get('DB_USER'), password=config.get('DB_PASSWORD'), host=config.get('DB_HOST'), port=config.get('DB_PORT'), application_name="4cat-migrate")
 cursor = connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-cursor.execute("SELECT EXISTS (SELECT * from information_schema.tables WHERE table_name=%s)", ('fourcat_settings',))
+cursor.execute("SELECT EXISTS (SELECT * from information_schema.tables WHERE table_name=%s)", ('settings',))
 has_table = cursor.fetchone()
 if not has_table["exists"]:
-    print("  ...No, adding table fourcat_setttings.")
-    cursor.execute("""CREATE TABLE IF NOT EXISTS fourcat_settings (
+    print("  ...No, adding table setttings.")
+    cursor.execute("""CREATE TABLE IF NOT EXISTS settings (
       name                   TEXT UNIQUE PRIMARY KEY,
       value                  TEXT DEFAULT '{}'
     )""")
     connection.commit()
 else:
-    print("  ...Yes, fourcat_settings table already exists.")
+    print("  ...Yes, settings table already exists.")
 
 if transfer_settings:
     print("  Moving settings to database...")

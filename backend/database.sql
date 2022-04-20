@@ -4,7 +4,7 @@
 -- own database.sql files with data source-specific tables and indices.
 
 -- 4CAT settings table
-CREATE TABLE IF NOT EXISTS fourcat_settings (
+CREATE TABLE IF NOT EXISTS settings (
   name                   TEXT UNIQUE PRIMARY KEY,
   value                  TEXT DEFAULT '{}'
 );
@@ -118,7 +118,7 @@ CREATE FUNCTION count_estimate(query text) RETURNS bigint AS $$
 
 
 -- fourcat settings insert default settings
-INSERT INTO fourcat_settings
+INSERT INTO settings
   (name, value)
   Values
     ('DATASOURCES', '{"bitchute": {}, "custom": {}, "douban": {}, "customimport": {}, "parler": {}, "reddit": {"boards": "*"}, "telegram": {}, "twitterv2": {"id_lookup": false}}'),
