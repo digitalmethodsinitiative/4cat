@@ -116,7 +116,7 @@ def _jinja2_filter_json(data):
 @app.template_filter('config_override')
 def _jinja2_filter_conf(data, property=""):
 	try:
-		return getattr(config.FlaskConfig, property)
+		return config.get("flask." + property)
 	except AttributeError:
 		return data
 
@@ -219,7 +219,7 @@ def inject_now():
 
 	return {
 		"__datasources_config": config.get('DATASOURCES'),
-		"__has_https": config.FlaskConfig.SERVER_HTTPS,
+		"__has_https": config.get("flask.https"),
 		"__datenow": datetime.datetime.utcnow(),
 		"__tool_name": config.get("4cat.name"),
 		"__tool_name_long": config.get("4cat.name_long"),

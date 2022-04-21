@@ -163,7 +163,7 @@ class User:
 		if self.data["name"] == "anonymous":
 			return "Anonymous"
 		elif self.data["name"] == "autologin":
-			return config.FlaskConfig.HOSTNAME_WHITELIST_NAME
+			return config.get("flask.autologin.name")
 		else:
 			return self.data["name"]
 
@@ -256,8 +256,8 @@ class User:
 		message["To"] = username
 
 		# the actual e-mail...
-		url_base = config.FlaskConfig.SERVER_NAME
-		protocol = "https" if config.FlaskConfig.SERVER_HTTPS else "http"
+		url_base = config.get("flask.server_name")
+		protocol = "https" if config.get("flask.https") else "http"
 		url = "%s://%s/reset-password/?token=%s" % (protocol, url_base, register_token)
 
 		# we use slightly different e-mails depending on whether this is the first time setting a password

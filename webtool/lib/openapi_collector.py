@@ -194,7 +194,7 @@ class OpenAPICollector:
 		"""
 		spec = {
 			"swagger": "2.0",
-			"host": config.FlaskConfig.SERVER_NAME,
+			"host": config.get("flask.server_name"),
 			"info": {
 				"title": config.get("4cat.name_long") + " RESTful API",
 				"description": "This API allows interfacing with the " + config.get("4cat.name") + " Capture and Analysis"

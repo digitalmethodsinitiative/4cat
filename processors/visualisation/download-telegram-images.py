@@ -60,7 +60,7 @@ class TelegramImageDownloader(BasicProcessor):
         """
         max_number_images = int(config.get('image_downloader_telegram.MAX_NUMBER_IMAGES', 1000))
 
-        return  {
+        return {
             "amount": {
                 "type": UserInput.OPTION_TEXT,
                 "help": "No. of images (max %s)" % max_number_images,
@@ -215,26 +215,3 @@ class TelegramImageDownloader(BasicProcessor):
         told they need to re-authenticate via 4CAT.
         """
         raise RuntimeError("Connection cancelled")
-
-    @classmethod
-    def get_options(cls=None, parent_dataset=None, user=None):
-        """
-        Get processor options
-
-        This method by default returns the class's "options" attribute, but
-        will lift the limit on the amount of images collected from Telegram
-        user requesting the options has been configured as such.
-
-        :param DataSet parent_dataset:  An object representing the dataset that
-        the processor would be run on
-        :param User user:  Flask user the options will be displayed for, in
-        case they are requested for display in the 4CAT web interface. This can
-        be used to show some options only to privileges users.
-        """
-        options = cls.options.copy()
-
-        if user and user.get_value("telegram.can_query_all_messages", False):
-            if "max" in options["amount"]:
-                del options["amount"]["max"]
-
-        return options

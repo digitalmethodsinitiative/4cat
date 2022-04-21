@@ -69,7 +69,7 @@ openapi = OpenAPICollector(app)
 limiter = Limiter(app, key_func=get_remote_address)
 
 # make sure a secret key was set in the config file, for secure session cookies
-if config.FlaskConfig.SECRET_KEY == "REPLACE_THIS":
+if config.get("flask.secret_key") == "REPLACE_THIS":
     raise Exception("You need to set a FLASK_SECRET in config.py before running the web tool.")
 
 # initialize login manager

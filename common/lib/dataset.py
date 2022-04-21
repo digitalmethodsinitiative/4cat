@@ -1084,8 +1084,8 @@ class DataSet(FourcatModule):
 		TODO: create more dynamic method of obtaining url.
 		"""
 		filename = self.get_results_path().name
-		url_to_file = ('https://' if config.FlaskConfig.SERVER_HTTPS else 'http://') + \
-						config.FlaskConfig.SERVER_NAME + '/result/' + filename
+		url_to_file = ('https://' if config.get("flask.https") else 'http://') + \
+						config.get("flask.server_name") + '/result/' + filename
 		return url_to_file
 
 
