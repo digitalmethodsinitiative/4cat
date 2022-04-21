@@ -61,7 +61,7 @@ def explorer_dataset(key, page):
 	limit = config.EXPLORER_POSTS_ON_PAGE if hasattr(config, "EXPLORER_POSTS_ON_PAGE") else 50
 
 	# The amount of posts that may be included (limit for large datasets)
-	max_posts = config.get('MAX_EXPLORER_POSTS', 500000)
+	max_posts = config.get('explorer.max_posts', 500000)
 
 	# The offset for posts depending on the current page
 	offset = ((page - 1) * limit) if page else 0
@@ -187,7 +187,7 @@ def explorer_thread(datasource, board, thread_id):
 		return error(404, error="No thread ID provided")
 
 	# The amount of posts that may be included (limit for large datasets)
-	max_posts = config.get('MAX_EXPLORER_POSTS', 500000)
+	max_posts = config.get('explorer.max_posts', 500000)
 
 	# Get the posts with this thread ID.
 	posts = get_posts(db, datasource, board=board, ids=tuple([thread_id]), threads=True, order_by=["id"])

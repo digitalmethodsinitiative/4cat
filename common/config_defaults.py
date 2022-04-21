@@ -28,13 +28,13 @@ defaults = {
     # Configure how the tool is to be named in its web interface. The backend will
     # always refer to "4CAT" - the name of the software, and a "powered by 4CAT"
     # notice may also show up in the web interface regardless of the value entered here.
-    "TOOL_NAME": {
+    "4cat.name": {
         "type": UserInput.OPTION_TEXT,
         "default": "4CAT",
         "help": "Configure short name for the tool in its web interface.",
         "tooltip": "The backend will always refer to '4CAT' - the name of the software, and a 'powered by 4CAT' notice may also show up in the web interface regardless of the value entered here.",
     },
-    "TOOL_NAME_LONG": {
+    "4cat.name_long": {
         "type": UserInput.OPTION_TEXT,
         "default": "4CAT: Capture and Analysis Toolkit",
         "help": "Configure long name for the tool in its web interface.",
@@ -47,13 +47,13 @@ defaults = {
     # links to the exact version of 4CAT code that produced an analysis result.
     # If no version file is available, the output of "git show" in PATH_ROOT will be used
     # to determine the version, if possible.
-    "PATH_VERSION": {
+    "path.versionfile": {
         "type": UserInput.OPTION_TEXT,
         "default": ".git-checked-out",
         "help": "Path to file containing GitHub commit hash",
         "tooltip": "File containing a commit ID (everything after the first whitespace found is ignored)",
     },
-    "GITHUB_URL": {
+    "4cat.github_url": {
         "type": UserInput.OPTION_TEXT,
         "default": "https://github.com/digitalmethodsinitiative/4cat",
         "help": "URL to the github repository for this 4CAT instance",
@@ -65,77 +65,60 @@ defaults = {
     # users are allowed to opt out, data sources can still force the expiration of
     # datasets created through that data source. This cannot be overridden by the
     # user.
-    "EXPIRE_DATASETS": {
+    "expire.timeout": {
         "type": UserInput.OPTION_TEXT,
         "default": "0",
         "help": "Top Level datasets automatically deleted after a period of time",
         "tooltip": "0 will not expire",
     },
-    "EXPIRE_ALLOW_OPTOUT": {
+    "expire.allow_optout": {
         "type": UserInput.OPTION_TOGGLE,
         "default": True,
         "help": "Allow users to opt-out of automatic deletion",
         "tooltip": "Note that if users are allowed to opt out, data sources can still force the expiration of datasets created through that data source. This cannot be overridden by the user.",
     },
-    # Warning report configuration
-    "WARN_INTERVAL": {
-        "type": UserInput.OPTION_TEXT,
-        "default": "600",
-        "help": "Every so many seconds, compile a report of logged warnings and e-mail it to admins",
-        "tooltip": "",
-    },
-    "WARN_LEVEL": {
-        "type": UserInput.OPTION_TEXT,
+    "logging.slack.level": {
+        "type": UserInput.OPTION_CHOICE,
         "default": "WARNING",
-        "help": "Level of alerts (or higher) to be sent",
-        "tooltip": "Only alerts above this level are mailed: DEBUG/INFO/WARNING/ERROR/CRITICAL",
+        "options": {"DEBUG": "Debug", "INFO": "Info", "WARNING": "Warning", "ERROR": "Error", "CRITICAL": "Critical"},
+        "help": "Level of alerts (or higher) to be sent to Slack",
+        "tooltip": "Only alerts above this level are sent to the Slack webhook",
     },
-    "WARN_SLACK_URL": {
+    "logging.slack.webhook": {
         "type": UserInput.OPTION_TEXT,
         "default": "",
         "help": "Slack callback URL to use for alerts",
-        "tooltip": "WARN_LEVEL (or higher) will be sent there immediately",
     },
-    # E-mail settings
-    # If your SMTP server requires login, define the MAIL_USERNAME and
-    # MAIL_PASSWORD variables here additionally.
-    "WARN_EMAILS": {
+    "mail.admin_email": {
         "type": UserInput.OPTION_TEXT,
         "default": "",
-        "help": "E-mail addresses to send warning reports to",
-        "tooltip": "Separate with commas",
+        "help": "E-mail of admin, to send account requests etc to",
     },
-    "ADMIN_EMAILS": {
-        "type": UserInput.OPTION_TEXT,
-        "default": "",
-        "help": "E-mail of admins, to send account requests etc to",
-        "tooltip": "Separate with commas",
-    },
-    "MAILHOST": {
+    "mail.server": {
         "type": UserInput.OPTION_TEXT,
         "default": "localhost",
         "help": "SMTP server to connect to for sending e-mail alerts.",
         "tooltip": "",
     },
-    "MAIL_SSL": {
+    "mail.ssl": {
         "type": UserInput.OPTION_TOGGLE,
         "default": False,
         "help": "Use SSL to connect to e-mail server?",
         "tooltip": "",
     },
-    "MAIL_USERNAME": {
+    "mail.username": {
         "type": UserInput.OPTION_TEXT,
         "default": "",
         "help": "Mail Username",
         "tooltip": "Only if your SMTP server requires login",
     },
-    "MAIL_PASSWORD": {
+    "mail.password": {
         "type": UserInput.OPTION_TEXT,
         "default": "",
         "help": "Mail Password",
         "tooltip": "Only if your SMTP server requires login",
     },
-    "NOREPLY_EMAIL": {
+    "mail.noreply": {
         "type": UserInput.OPTION_TEXT,
         "default": "noreply@localhost",
         "help": "NoReply Email Address",
@@ -166,7 +149,7 @@ defaults = {
     },
     # Explorer settings
     # The maximum allowed amount of rows (prevents timeouts and memory errors)
-    "MAX_EXPLORER_POSTS": {
+    "explorer.max_posts": {
         "type": UserInput.OPTION_TEXT,
         "default": "100000",
         "help": "Maximum Explorer Posts",
@@ -212,19 +195,19 @@ defaults = {
         "tooltip": "",
     },
     # YouTube variables to use for processors
-    "YOUTUBE_API_SERVICE_NAME": {
+    "api.youtube.name": {
         "type": UserInput.OPTION_TEXT,
         "default": "youtube",
         "help": "YouTube API Service Name",
         "tooltip": "",
     },
-    "YOUTUBE_API_VERSION": {
+    "api.youtube.version": {
         "type": UserInput.OPTION_TEXT,
         "default": "v3",
         "help": "YouTube API Version",
         "tooltip": "e.g., ''v3'",
     },
-    "YOUTUBE_DEVELOPER_KEY": {
+    "api.youtube.key": {
         "type": UserInput.OPTION_TEXT,
         "default": "",
         "help": "YouTube Developer Key",

@@ -169,7 +169,7 @@ def reject_user():
         if not form_message:
             form_answer = Path(config.get('PATH_ROOT'), "webtool/pages/reject-template.md")
             if not form_answer.exists():
-                form_message = "No %s 4 u" % config.get('TOOL_NAME')
+                form_message = "No %s 4 u" % config.get("4cat.name")
             else:
                 form_message = form_answer.read_text(encoding="utf-8")
                 form_message = form_message.replace("{{ name }}", name)
@@ -181,7 +181,7 @@ def reject_user():
     message = MIMEMultipart("alternative")
     message["From"] = config.get('NOREPLY_EMAIL')
     message["To"] = email_address
-    message["Subject"] = "Your %s account request" % config.get('TOOL_NAME')
+    message["Subject"] = "Your %s account request" % config.get("4cat.name")
 
     html_message = markdown.markdown(form_message)
     message.attach(MIMEText(form_message, "plain"))

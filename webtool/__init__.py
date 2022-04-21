@@ -1,7 +1,5 @@
-import configparser
 import subprocess
 import sys
-import os
 import logging
 
 from functools import partial
@@ -31,8 +29,7 @@ from common.lib.queue import JobQueue
 from webtool.lib.user import User
 
 # initialize global objects for interacting with all the things
-database_name = config.get('DB_NAME_TEST') if hasattr(config.FlaskConfig,
-                                               "DEBUG") and config.FlaskConfig.DEBUG == "Test" else config.get('DB_NAME')
+database_name = config.get('DB_NAME')
 login_manager = LoginManager()
 app = Flask(__name__)
 
@@ -76,7 +73,15 @@ if config.FlaskConfig.SECRET_KEY == "REPLACE_THIS":
     raise Exception("You need to set a FLASK_SECRET in config.py before running the web tool.")
 
 # initialize login manager
-app.config.from_object("common.config_manager.FlaskConfig")
+app.config.from_mapping({
+    "FLASK_APP": config.get("flask.flask_app"),
+    "SECRET_KEY": config.get("flask.secret_key"),
+    "SERVER_NAME": config.get("flask.server_name"),
+    "SERVER_HTTPS": config.get("flask.https"),
+    "HOSTNAME_WHITELIST": config.get("flask.autologin.hostnames"),
+    "HOSTNAME_WHITELIST_NAME": config.get("flask.autologin.name"),
+    "HOSTNAME_WHITELIST_API": config.get("flask.autologin.api"),
+})
 login_manager.anonymous_user = partial(User.get_by_name, db=db, name="anonymous")
 login_manager.init_app(app)
 login_manager.login_view = "show_login"

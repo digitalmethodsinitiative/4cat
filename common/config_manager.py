@@ -6,7 +6,7 @@ import psycopg2
 import psycopg2.extras
 import configparser
 
-from common.lib.exceptions import FourcatException
+from common.lib.exceptions import ConfigException
 
 
 class ConfigManager:
@@ -17,20 +17,20 @@ class ConfigManager:
     Note: some options are here until additional changes are made and they can
     be moved to more appropriate locations.
     """
-    CONFIG_FILE = "config/config.ini"
+    CONFIG_FILE = Path("config/config.ini")
 
     # TODO: work out best structure for docker vs non-docker
     # Do not need two configs, BUT Docker config.ini has to be in shared volume for both front and backend to access it
     config_reader = configparser.ConfigParser()
     USING_DOCKER = False
-    if os.path.exists(CONFIG_FILE):
+    if CONFIG_FILE.exists():
         config_reader.read(CONFIG_FILE)
         if config_reader["DOCKER"].getboolean("use_docker_config"):
             # Can use throughtout 4CAT to know if Docker environment
             USING_DOCKER = True
     else:
         # config should be created!
-        raise FourcatException("No config/config.ini file exists! Update and rename the config.ini-example file.")
+        raise ConfigException("No config/config.ini file exists! Update and rename the config.ini-example file.")
 
     DB_HOST = config_reader["DATABASE"].get("db_host")
     DB_PORT = config_reader["DATABASE"].getint("db_port")
@@ -52,51 +52,34 @@ class ConfigManager:
     SECRET_KEY = config_reader["GENERATE"].get("secret_key")
 
 
-class QuickDatabase:
+def quick_db_connect():
     """
-    Simple Database handler if multiple calls are expected
+    Create a connection and cursor with the database
+
+    We're not using lib.database.Database because that one relies on some
+    config options, which would get paradoxical really fast.
+
+    :return list: [connection, cursor]
     """
-
-    def __init__(self):
-        self.connection, self.cursor = self.quick_db_connect()
-
-    def close(self):
-        self.connection.close()
-
-    @staticmethod
-    def quick_db_connect():
-        """
-        Create a connection and cursor with the database
-        """
-        connection = psycopg2.connect(dbname=ConfigManager.DB_NAME, user=ConfigManager.DB_USER,
-                                      password=ConfigManager.DB_PASSWORD, host=ConfigManager.DB_HOST,
-                                      port=ConfigManager.DB_PORT)
-        cursor = connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-        return connection, cursor
-
-
-def check_attribute_exists(attribute_name, connection=None, cursor=None, keep_connection_open=False):
-    """
-    Checks if attribute exists in database.
-
-    :return bool: True if attribute exists else False
-    """
-    if not connection or not cursor:
-        connection, cursor = QuickDatabase.quick_db_connect()
-
-    query = "SELECT EXISTS (SELECT FROM settings WHERE name = %s)"
-    cursor.execute(query, (attribute_name,))
-    row = cursor.fetchone()
-
-    if not keep_connection_open:
-        connection.close()
-
-    return row["exists"]
+    connection = psycopg2.connect(dbname=ConfigManager.DB_NAME, user=ConfigManager.DB_USER,
+                                  password=ConfigManager.DB_PASSWORD, host=ConfigManager.DB_HOST,
+                                  port=ConfigManager.DB_PORT)
+    cursor = connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    return connection, cursor
 
 
 def get(attribute_name, default=None, connection=None, cursor=None, keep_connection_open=False):
     """
-    Checks if attribute defined in namespace and returns, if not then checks database for attribute and returns value
+    Get a setting's value from the database
+
+    If the setting does not exist, the provided fallback value is returned.
+
+    :param str attribute_name:  Setting to return
+    :param default:  Value to return if setting does not exist
+    :param connection:  Database connection, if None then a new connection will be created
+    :param cursor:  Database cursor, if None then a new cursor will be created
+    :param bool keep_connection_open:  Close connection after query?
+    :return:  Setting value, or the provided fallback, or `None`.
     """
     if attribute_name in dir(ConfigManager):
         # an explicitly defined attribute should always be called in favour
@@ -106,7 +89,7 @@ def get(attribute_name, default=None, connection=None, cursor=None, keep_connect
     else:
         try:
             if not connection or not cursor:
-                connection, cursor = QuickDatabase.quick_db_connect()
+                connection, cursor = quick_db_connect()
 
             query = "SELECT value FROM settings WHERE name = %s"
             cursor.execute(query, (attribute_name,))
@@ -115,13 +98,10 @@ def get(attribute_name, default=None, connection=None, cursor=None, keep_connect
             if not keep_connection_open:
                 connection.close()
 
-            value = json.loads(row["value"])
+            value = json.loads(row.get("value", None)) if row else None
         except (Exception, psycopg2.DatabaseError) as error:
-            # TODO: log?
-            print("Problem with attribute: " + str(attribute_name) + ": " + str(error))
-            print("Connection: " + str(connection))
-            print("SQL row: " + str(row))
-            value = None
+            raise ConfigException("Error getting setting {}: {}".format(attribute_name, repr(error)))
+
         finally:
             if connection is not None and not keep_connection_open:
                 connection.close()
@@ -134,8 +114,17 @@ def get(attribute_name, default=None, connection=None, cursor=None, keep_connect
 
 def set_value(attribute_name, value, connection=None, cursor=None, keep_connection_open=False):
     """
+    Update setting
+
     Updates database attribute with new value. Returns number of updated rows
     (which ought to be either 1 for success or 0 for failure).
+
+    :param str attribute_name:  Attribute to set
+    :param value:  Value to set (will be serialised as JSON)
+    :param connection:  Database connection, if None then a new connection will be created
+    :param cursor:  Database cursor, if None then a new cursor will be created
+    :param bool keep_connection_open:  Close connection after query?
+    :return int:  Number of updated rows
     """
     # Check value is valid JSON
     try:
@@ -145,7 +134,7 @@ def set_value(attribute_name, value, connection=None, cursor=None, keep_connecti
 
     try:
         if not connection or not cursor:
-            connection, cursor = QuickDatabase.quick_db_connect()
+            connection, cursor = quick_db_connect()
         query = "UPDATE settings SET value = %s WHERE name = %s"
         cursor.execute(query, (value, attribute_name))
         updated_rows = cursor.rowcount
@@ -153,9 +142,8 @@ def set_value(attribute_name, value, connection=None, cursor=None, keep_connecti
         if not keep_connection_open:
             connection.close()
     except (Exception, psycopg2.DatabaseError) as error:
-        # TODO: log?
-        print(error)
-        updated_rows = None
+        raise ConfigException("Error setting setting {}: {}".format(attribute_name, repr(error)))
+
     finally:
         if connection is not None and not keep_connection_open:
             connection.close()
@@ -165,12 +153,19 @@ def set_value(attribute_name, value, connection=None, cursor=None, keep_connecti
 
 def get_all(connection=None, cursor=None, keep_connection_open=False):
     """
-    Gets all database settings in 4cat_settings table. These are editable, while
-    other attributes (part of the ConfigManager class are not directly editable)
+    Gets all database settings in 4cat_settings table. These are editable,
+    while other attributes (part of the ConfigManager class are not directly
+    editable)
+
+    :param connection: Database connection, if None then a new connection will
+    be created
+    :param cursor: Database cursor, if None then a new cursor will be created
+    :param keep_connection_open: Close connection after query?
+    :return dict:  Settings, as setting -> value. Values are decoded from JSON
     """
     try:
         if not connection or not cursor:
-            connection, cursor = QuickDatabase.quick_db_connect()
+            connection, cursor = quick_db_connect()
 
         query = "SELECT name, value FROM settings"
         cursor.execute(query)
@@ -181,9 +176,8 @@ def get_all(connection=None, cursor=None, keep_connection_open=False):
 
         values = {row["name"]: json.loads(row["value"]) for row in rows}
     except (Exception, psycopg2.DatabaseError) as error:
-        # TODO: log?
-        print(error)
-        values = None
+        raise ConfigException("Error getting settings: {}".format(repr(error)))
+
     finally:
         if connection is not None and not keep_connection_open:
             connection.close()
@@ -191,10 +185,18 @@ def get_all(connection=None, cursor=None, keep_connection_open=False):
     return values
 
 
-def insert_new_parameter(attribute_name, value, connection=None, cursor=None, keep_connection_open=False):
+def create_setting(attribute_name, value, connection=None, cursor=None, keep_connection_open=False):
     """
-    Insert a new paramter into the database. Does nothing on conflict.
+    Insert a new setting into the database.
 
+    If the setting already exists, nothing is changed.
+
+    :param str attribute_name:  Attribute to set
+    :param value:  Value to set (will be serialised as JSON)
+    :param connection: Database connection, if None then a new connection will
+    be created
+    :param cursor: Database cursor, if None then a new cursor will be created
+    :param keep_connection_open: Close connection after query?
     :return int: number of updated rows
     """
     try:
@@ -204,7 +206,7 @@ def insert_new_parameter(attribute_name, value, connection=None, cursor=None, ke
 
     try:
         if not connection or not cursor:
-            connection, cursor = QuickDatabase.quick_db_connect()
+            connection, cursor = quick_db_connect()
 
         query = "INSERT INTO settings (name, value) Values (%s, %s) ON CONFLICT DO NOTHING"
         cursor.execute(query, (attribute_name, value))
@@ -215,9 +217,8 @@ def insert_new_parameter(attribute_name, value, connection=None, cursor=None, ke
             connection.close()
 
     except (Exception, psycopg2.DatabaseError) as error:
-        # TODO: log?
-        print(error)
-        updated_rows = None
+        raise ConfigException("Error setting setting {}: {}".format(attribute_name, repr(error)))
+
     finally:
         if connection is not None and not keep_connection_open:
             connection.close()
@@ -227,8 +228,17 @@ def insert_new_parameter(attribute_name, value, connection=None, cursor=None, ke
 
 def set_or_create_setting(attribute_name, value, connection=None, cursor=None, keep_connection_open=False):
     """
-    Insert OR set value for a parameter in the database. ON CONFLICT SET VALUE.
+    Insert OR set value for a setting
 
+    If the setting exists, it is updated; if not, it is created with the given
+    value.
+
+    :param str attribute_name:  Attribute to set
+    :param value:  Value to set (will be serialised as JSON)
+    :param connection: Database connection, if None then a new connection will
+    be created
+    :param cursor: Database cursor, if None then a new cursor will be created
+    :param keep_connection_open: Close connection after query?
     :return int: number of updated rows
     """
     try:
@@ -238,7 +248,7 @@ def set_or_create_setting(attribute_name, value, connection=None, cursor=None, k
 
     try:
         if not connection or not cursor:
-            connection, cursor = QuickDatabase.quick_db_connect()
+            connection, cursor = quick_db_connect()
 
         query = "INSERT INTO settings (name, value) Values (%s, %s) ON CONFLICT (name) DO UPDATE SET value = EXCLUDED.value"
         cursor.execute(query, (attribute_name, value))
@@ -249,38 +259,10 @@ def set_or_create_setting(attribute_name, value, connection=None, cursor=None, k
             connection.close()
 
     except (Exception, psycopg2.DatabaseError) as error:
-        # TODO: log?
-        print(error)
-        updated_rows = None
+        raise ConfigException("Error setting setting {}: {}".format(attribute_name, repr(error)))
+
     finally:
         if connection is not None and not keep_connection_open:
             connection.close()
 
     return updated_rows
-
-
-def set_all_defaults(dictionary_of_defaults):
-    """
-    Takes a dictionary with default values, checks if they exist, and if not, inserts them.
-    """
-    QD = config.QuickDatabase()
-
-    for name, setting in defaults.items():
-        if not check_attribute_exists(name, connection=QD.connection, cursor=QD.cursor, keep_connection_open=True):
-            insert_new_parameter(name, setting.get("default"), connection=QD.connection, cursor=QD.cursor,
-                                 keep_connection_open=True)
-    if QD.connection:
-        QD.close()
-
-
-# Web tool settings
-# This is a pass through class; may not be the best way to do this
-class FlaskConfig:
-    FLASK_APP = get("FLASK_APP")
-    SECRET_KEY = get("SECRET_KEY")
-    SERVER_NAME = get("SERVER_NAME")  # if using a port other than 80, change to localhost:specific_port
-    SERVER_HTTPS = get("SERVER_HTTPS")  # set to true to make 4CAT use "https" in absolute URLs
-    HOSTNAME_WHITELIST = get(
-        "HOSTNAME_WHITELIST")  # only these may access the web tool; "*" or an empty list matches everything
-    HOSTNAME_WHITELIST_API = get("HOSTNAME_WHITELIST_API")  # hostnames matching these are exempt from rate limiting
-    HOSTNAME_WHITELIST_NAME = get("HOSTNAME_WHITELIST_NAME")

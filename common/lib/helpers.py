@@ -106,7 +106,7 @@ def get_software_version():
 
 	:return str:  4CAT version
 	"""
-	versionpath = Path(config.get('PATH_ROOT'), config.get('PATH_VERSION'))
+	versionpath = Path(config.get('PATH_ROOT'), config.get('path.versionfile'))
 
 	if versionpath.exists() and not versionpath.is_file():
 		return ""
@@ -604,13 +604,13 @@ def send_email(recipient, message):
 	:param list recipient:  Recipient e-mail addresses
 	:param MIMEMultipart message:  Message to send
 	"""
-	connector = smtplib.SMTP_SSL if config.get('MAIL_SSL') else smtplib.SMTP
+	connector = smtplib.SMTP_SSL if config.get('mail.ssl') else smtplib.SMTP
 
-	with connector(config.get('MAILHOST')) as smtp:
-		if config.get('MAIL_USERNAME') and config.get('MAIL_PASSWORD'):
+	with connector(config.get('mail.server')) as smtp:
+		if config.get('mail.username') and config.get('mail.password'):
 			smtp.ehlo()
-			smtp.login(config.get('MAIL_USERNAME'), config.get('MAIL_PASSWORD'))
+			smtp.login(config.get('mail.username'), config.get('mail.password'))
 		if type(message) == str:
-			smtp.sendmail(config.get('NOREPLY_EMAIL'), recipient, message)
+			smtp.sendmail(config.get('mail.noreply'), recipient, message)
 		else:
-			smtp.sendmail(config.get('NOREPLY_EMAIL'), recipient, message.as_string())
+			smtp.sendmail(config.get('mail.noreply'), recipient, message.as_string())

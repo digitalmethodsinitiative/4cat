@@ -98,8 +98,8 @@ class DataSet(FourcatModule):
 			self.parameters = json.loads(self.data["parameters"])
 			self.is_new = False
 		else:
-			if config.get('EXPIRE_DATASETS') and not parent:
-				parameters["expires-after"] = int(time.time() + config.get('EXPIRE_DATASETS'))
+			if config.get('expire.timeout') and not parent:
+				parameters["expires-after"] = int(time.time() + config.get('expire.timeout'))
 
 			self.data = {
 				"key": self.key,
@@ -851,10 +851,10 @@ class DataSet(FourcatModule):
 		:param file:  File to link within the repository
 		:return:  URL, or an empty string
 		"""
-		if not self.data["software_version"] or not config.get('GITHUB_URL'):
+		if not self.data["software_version"] or not config.get("4cat.github_url"):
 			return ""
 
-		return config.get('GITHUB_URL') + "/blob/" + self.data["software_version"] + self.data.get("software_file", "")
+		return config.get("4cat.github_url") + "/blob/" + self.data["software_version"] + self.data.get("software_file", "")
 
 	def top_parent(self):
 		"""

@@ -221,10 +221,10 @@ def inject_now():
 		"__datasources_config": config.get('DATASOURCES'),
 		"__has_https": config.FlaskConfig.SERVER_HTTPS,
 		"__datenow": datetime.datetime.utcnow(),
-		"__tool_name": config.get('TOOL_NAME'),
-		"__tool_name_long": config.get('TOOL_NAME_LONG'),
+		"__tool_name": config.get("4cat.name"),
+		"__tool_name_long": config.get("4cat.name_long"),
 		"__announcement": announcement_file.open().read().strip() if announcement_file.exists() else None,
-		"__expire_datasets": config.get('EXPIRE_DATASETS'),
-		"__expire_optout": config.get('EXPIRE_ALLOW_OPTOUT'),
+		"__expire_datasets": config.get("expire.timeout"),
+		"__expire_optout": config.get("expire.allow_optout"),
 		"uniqid": uniqid
 	}

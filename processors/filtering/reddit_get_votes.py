@@ -31,13 +31,13 @@ class RedditVoteChecker(BasicProcessor):
 
 	config = {
 	# Reddit API keys
-		'get-reddit-votes.REDDIT_API_CLIENTID': {
+		'api.reddit.client_id': {
 			'type': UserInput.OPTION_TEXT,
 			'default' : "",
 			'help': 'Reddit API Client ID',
 			'tooltip': "",
 			},
-		'get-reddit-votes.REDDIT_API_SECRET': {
+		'api.reddit.secret': {
 			'type': UserInput.OPTION_TEXT,
 			'default' : "",
 			'help': 'Reddit API Secret',
@@ -63,8 +63,8 @@ class RedditVoteChecker(BasicProcessor):
 		"""
 		try:
 			user_agent = "4cat:4cat:v1.0 (by /u/oilab-4cat)"
-			reddit = praw.Reddit(client_id=config.get('get-reddit-votes.REDDIT_API_CLIENTID'),
-							 client_secret=config.get('get-reddit-votes.REDDIT_API_SECRET'),
+			reddit = praw.Reddit(client_id=config.get('api.reddit.client_id'),
+							 client_secret=config.get('api.reddit.secret'),
 							 user_agent=user_agent)
 		except praw.exceptions.PRAWException:
 			# unclear what kind of expression gets thrown here

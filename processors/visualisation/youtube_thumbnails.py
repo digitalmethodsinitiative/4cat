@@ -64,8 +64,8 @@ class YouTubeThumbnails(BasicProcessor):
 		results_path = self.dataset.get_staging_area()
 
 		# Use YouTubeDL and the YouTube API to request video data
-		youtube = build(config.get('YOUTUBE_API_SERVICE_NAME'), config.get('YOUTUBE_API_VERSION'),
-											developerKey=config.get('YOUTUBE_DEVELOPER_KEY'))
+		youtube = build(config.get('api.youtube.name'), config.get('api.youtube.version'),
+											developerKey=config.get('api.youtube.key'))
 		
 		ids_list = get_yt_compatible_ids(video_ids)
 		retries = 0
