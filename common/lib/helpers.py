@@ -1,6 +1,7 @@
 """
 Miscellaneous helper functions for the 4CAT backend
 """
+import calendar
 import subprocess
 import datetime
 import smtplib
@@ -398,6 +399,12 @@ def get_interval_descriptor(item, interval):
 		return str(timestamp.year) + "-" + str(timestamp.month).zfill(2)
 	elif interval == "week":
 		return str(timestamp.isocalendar()[0]) + "-" + str(timestamp.isocalendar()[1]).zfill(2)
+	elif interval == "hour":
+		return str(timestamp.year) + "-" + str(timestamp.month).zfill(2) + "-" + str(timestamp.day).zfill(
+			2) + " " + str(timestamp.hour).zfill(2)
+	elif interval == "minute":
+		return str(timestamp.year) + "-" + str(timestamp.month).zfill(2) + "-" + str(timestamp.day).zfill(
+			2) + " " + str(timestamp.hour).zfill(2) + ":" + str(timestamp.minute).zfill(2)
 	else:
 		return str(timestamp.year) + "-" + str(timestamp.month).zfill(2) + "-" + str(timestamp.day).zfill(2)
 
@@ -405,6 +412,8 @@ def get_interval_descriptor(item, interval):
 def pad_interval(intervals, first_interval=None, last_interval=None):
 	"""
 	Pad an interval so all intermediate intervals are filled
+
+	Warning, ugly code (PRs very welcome)
 
 	:param dict intervals:  A dictionary, with dates (YYYY{-MM}{-DD}) as keys
 	and a numerical value.
@@ -418,7 +427,6 @@ def pad_interval(intervals, first_interval=None, last_interval=None):
 	# first determine the boundaries of the interval
 	# these may be passed as parameters, or they can be inferred from the
 	# interval given
-
 	if first_interval:
 		first_interval = str(first_interval)
 		first_year = int(first_interval[0:4])
@@ -426,6 +434,11 @@ def pad_interval(intervals, first_interval=None, last_interval=None):
 			first_month = int(first_interval[5:7])
 		if len(first_interval) > 7:
 			first_day = int(first_interval[8:10])
+		if len(first_interval) > 10:
+			first_hour = int(first_interval[11:13])
+		if len(first_interval) > 13:
+			first_minute = int(first_interval[14:16])
+
 	else:
 		first_year = min([int(i[0:4]) for i in intervals])
 		if len(test_key) > 4:
@@ -433,6 +446,13 @@ def pad_interval(intervals, first_interval=None, last_interval=None):
 		if len(test_key) > 7:
 			first_day = min(
 				[int(i[8:10]) for i in intervals if int(i[0:4]) == first_year and int(i[5:7]) == first_month])
+		if len(test_key) > 10:
+			first_hour = min(
+				[int(i[11:13]) for i in intervals if int(i[0:4]) == first_year and int(i[5:7]) == first_month and int(i[8:10]) == first_day])
+		if len(test_key) > 13:
+			first_minute = min(
+				[int(i[14:16]) for i in intervals if int(i[0:4]) == first_year and int(i[5:7]) == first_month and int(i[8:10]) == first_day and int(i[11:13]) == first_hour])
+
 	if last_interval:
 		last_interval = str(last_interval)
 		last_year = int(last_interval[0:4])
@@ -440,6 +460,10 @@ def pad_interval(intervals, first_interval=None, last_interval=None):
 			last_month = int(last_interval[5:7])
 		if len(last_interval) > 7:
 			last_day = int(last_interval[8:10])
+		if len(last_interval) > 10:
+			last_hour = int(last_interval[11:13])
+		if len(last_interval) > 13:
+			last_minute = int(last_interval[14:16])
 	else:
 		last_year = max([int(i[0:4]) for i in intervals])
 		if len(test_key) > 4:
@@ -447,39 +471,66 @@ def pad_interval(intervals, first_interval=None, last_interval=None):
 		if len(test_key) > 7:
 			last_day = max(
 				[int(i[8:10]) for i in intervals if int(i[0:4]) == last_year and int(i[5:7]) == last_month])
+		if len(test_key) > 10:
+			last_hour = max(
+				[int(i[11:13]) for i in intervals if int(i[0:4]) == last_year and int(i[5:7]) == last_month and int(i[8:10]) == last_day])
+		if len(test_key) > 13:
+			last_minute = max(
+				[int(i[14:16]) for i in intervals if int(i[0:4]) == last_year and int(i[5:7]) == last_month and int(i[8:10]) == last_day and int(i[11:13]) == last_hour])
 
-	if re.match(r"^[0-9]{4}$", test_key):
-		# years are quite straightforward
-		for year in range(first_year, last_year + 1):
-			if str(year) not in intervals:
-				intervals[str(year)] = 0
-				missing += 1
+	has_month = re.match(r"^[0-9]{4}-[0-9]", test_key)
+	has_day = re.match(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}", test_key)
+	has_hour = re.match(r"^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}", test_key)
+	has_minute = re.match(r"^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}", test_key)
 
-	elif re.match(r"^[0-9]{4}-[0-9]{2}(-[0-9]{2})?", test_key):
-		# more granular intervals require the following monstrosity to
-		# ensure all intervals are available for every single graph
-		has_day = re.match(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}", test_key)
+	all_intervals = []
+	for year in range(first_year, last_year + 1):
+		start_month = first_month if year == first_year else 1
+		end_month = last_month if year == last_year else 12
+		year_interval = str(year)
 
-		for year in range(first_year, last_year + 1):
-			start_month = first_month if year == first_year else 1
-			end_month = last_month if year == last_year else 12
+		if not has_month:
+			all_intervals.append(year_interval)
+			continue
 
-			for month in range(start_month, end_month + 1):
-				key = str(year) + "-" + str(month).zfill(2)
-				if not has_day:
-					if key not in intervals:
-						intervals[key] = 0
-						missing += 1
-				else:
-					start_day = first_day if year == first_year and month == first_month else 1
-					end_day = last_day if year == last_year and month == last_month else \
-						monthrange(year, month)[1]
+		for month in range(start_month, end_month + 1):
+			month_interval = year_interval + "-" + str(month).zfill(2)
 
-					for day in range(start_day, end_day + 1):
-						day_key = key + "-" + str(day).zfill(2)
-						if day_key not in intervals:
-							intervals[day_key] = 0
-							missing += 1
+			if not has_day:
+				all_intervals.append(month_interval)
+				continue
+
+			start_day = first_day if all((year == first_year, month == first_month)) else 1
+			end_day = last_day if all((year == last_year, month == last_month)) else monthrange(year, month)[1]
+			for day in range(start_day, end_day + 1):
+				day_interval = month_interval + "-" + str(day).zfill(2)
+
+				if not has_hour:
+					all_intervals.append(day_interval)
+					continue
+
+				start_hour = first_hour if all((year == first_year, month == first_month, day == first_day)) else 0
+				end_hour = last_hour if all((year == last_year, month == last_month, day == last_day)) else 23
+				for hour in range(start_hour, end_hour + 1):
+					hour_interval = day_interval + " " + str(hour).zfill(2)
+
+					if not has_minute:
+						all_intervals.append(hour_interval)
+						continue
+
+					start_minute = first_minute if all(
+						(year == first_year, month == first_month, day == first_day, hour == first_hour)) else 0
+					end_minute = last_minute if all(
+						(year == last_year, month == last_month, day == last_day, hour == last_hour)) else 59
+
+					for minute in range(start_minute, end_minute + 1):
+						minute_interval = hour_interval + ":" + str(minute).zfill(2)
+						all_intervals.append(minute_interval)
+
+			for interval in all_intervals:
+				if interval not in intervals:
+					intervals[interval] = 0
+					missing += 1
 
 	# sort while we're at it
 	intervals = {key: intervals[key] for key in sorted(intervals)}

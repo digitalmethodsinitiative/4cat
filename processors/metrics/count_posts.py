@@ -25,7 +25,7 @@ class CountPosts(BasicProcessor):
 		"timeframe": {
 			"type": UserInput.OPTION_CHOICE,
 			"default": "month",
-			"options": {"all": "Overall", "year": "Year", "month": "Month", "week": "Week", "day": "Day"},
+			"options": {"all": "Overall", "year": "Year", "month": "Month", "week": "Week", "day": "Day", "hour": "Hour", "minute": "Minute"},
 			"help": "Produce counts per"
 		},
 		"pad": {
