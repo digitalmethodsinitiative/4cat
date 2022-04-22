@@ -362,7 +362,11 @@ class SearchBitChute(Search):
                     return (video, [])
 
                 elif "Contains Incitement to Hatred" in video_page.text:
-                    video["category"] = "moderated-incitement"
+                    video["category"] = "moderated-incitement-hatred"
+                    return (video, [])
+
+                elif "Threats or Incitement to Violence" in video_page.text:
+                    video["category"] = "moderated-incitement-violence"
                     return (video, [])
 
                 elif "Platform Misuse" in video_page.text:
