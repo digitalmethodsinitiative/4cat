@@ -527,10 +527,10 @@ def pad_interval(intervals, first_interval=None, last_interval=None):
 						minute_interval = hour_interval + ":" + str(minute).zfill(2)
 						all_intervals.append(minute_interval)
 
-			for interval in all_intervals:
-				if interval not in intervals:
-					intervals[interval] = 0
-					missing += 1
+	for interval in all_intervals:
+		if interval not in intervals:
+			intervals[interval] = 0
+			missing += 1
 
 	# sort while we're at it
 	intervals = {key: intervals[key] for key in sorted(intervals)}
