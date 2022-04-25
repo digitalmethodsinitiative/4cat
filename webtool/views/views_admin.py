@@ -21,7 +21,9 @@ from webtool import app, db
 from webtool.lib.helpers import admin_required, error, Pagination
 from webtool.lib.user import User
 
-from common.lib.helpers import call_api, send_email
+from common.lib.helpers import call_api, send_email, UserInput
+from common.lib.exceptions import QueryParametersException
+import common.config_definition as config_definition
 
 
 @app.route('/admin/', defaults={'page': 1})
@@ -272,3 +274,39 @@ def manipulate_user(mode):
 @login_required
 def delete_user():
     abort(501, "Deleting users is not possible at the moment")
+
+@app.route("/admin/settings", methods=["GET", "POST"])
+@login_required
+@admin_required
+def update_settings():
+    definition = config_definition.config_definition
+    categories = config_definition.categories
+    modules = {
+        **{datasource: definition["name"] for datasource, definition in backend.all_modules.datasources.items()},
+        **{processor.type: processor.title for processor in backend.all_modules.processors.values()}
+    }
+
+    for processor in backend.all_modules.processors.values():
+        if hasattr(processor, "config"):
+            definition.update(processor.config)
+
+    if request.method == "POST":
+        try:
+            new_settings = UserInput.parse_all(definition, request.form.to_dict(),
+                                              silently_correct=False)
+
+            for setting, value in new_settings.items():
+                valid = config.set_value(setting, value, raw=definition[setting].get("type") == UserInput.OPTION_TEXT_JSON)
+                if valid is None:
+                    flash("Invalid value for %s" % setting)
+
+            flash("Settings saved")
+        except QueryParametersException as e:
+            flash("Invalid settings: %s" % str(e))
+
+    options = {option: {
+        **definition[option],
+        "default": config.get(option, definition[option]["default"]) if definition[option]["type"] != UserInput.OPTION_TEXT_JSON else json.dumps(config.get(option, definition[option]["default"]))
+    } for option in sorted(definition)}
+
+    return render_template("controlpanel/config.html", options=options, flashes=get_flashed_messages(), categories=categories, modules=modules)

@@ -1,0 +1,35 @@
+{% extends "layout.html" %}
+
+{% block title %}Configure {{ __tool_name }}{% endblock %}
+{% block body_class %}plain-page frontpage admin settings {{ body_class }}{% endblock %}
+
+{% block body %}
+    {% set fieldset = namespace(open=false,legend="") %}
+    <article>
+        <section>
+            <h2><span>Configure {{ __tool_name }}</span></h2>
+            <form action="{{ url_for("update_settings") }}" method="POST" class="wide">
+                {% for notice in flashes %}
+                    <p class="form-notice">{{ notice|safe }}</p>
+                {% endfor %}
+                {% for option in options %}
+                    {% set new_legend = option.split(".")[0] %}
+                    {% if new_legend != fieldset.legend %}
+                        {% set fieldset.legend = new_legend %}
+                        {% if fieldset.open %}{% set fieldset.open = False %}</fieldset>{% endif %}
+                    {% endif %}
+                    {% if not fieldset.open %}<fieldset>
+                        <legend>{% if fieldset.legend in categories %}{{ categories[fieldset.legend] }}{% elif fieldset.legend in modules %}Settings for '{{ modules[fieldset.legend] }}'{% else %}{{ fieldset.legend }}{% endif %}</legend>
+                        {% set fieldset.open = True %}
+                    {% endif %}
+                    {% set settings = options[option] %}
+                    {% include 'components/datasource-option.html' %}
+                {% endfor %}
+                {% if fieldset_open %}</fieldset>{% endif %}
+                <div class="submit-container">
+                    <button><i class="fa fa-save" aria-hidden="true"></i> Save</button>
+                </div>
+            </form>
+        </section>
+    </article>
+{% endblock %}

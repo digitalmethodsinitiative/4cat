@@ -68,7 +68,7 @@ def quick_db_connect():
     return connection, cursor
 
 
-def get(attribute_name, default=None, connection=None, cursor=None, keep_connection_open=False):
+def get(attribute_name, default=None, connection=None, cursor=None, keep_connection_open=False, raw=False):
     """
     Get a setting's value from the database
 
@@ -79,6 +79,7 @@ def get(attribute_name, default=None, connection=None, cursor=None, keep_connect
     :param connection:  Database connection, if None then a new connection will be created
     :param cursor:  Database cursor, if None then a new cursor will be created
     :param bool keep_connection_open:  Close connection after query?
+    :param bool raw:  Do not parse as JSON?
     :return:  Setting value, or the provided fallback, or `None`.
     """
     if attribute_name in dir(ConfigManager):
@@ -98,7 +99,9 @@ def get(attribute_name, default=None, connection=None, cursor=None, keep_connect
             if not keep_connection_open:
                 connection.close()
 
-            value = json.loads(row.get("value", None)) if row else None
+            value = row.get("value", None) if row else None
+            if not raw and value is not None:
+                value = json.loads(value)
         except (Exception, psycopg2.DatabaseError) as error:
             raise ConfigException("Error getting setting {}: {}".format(attribute_name, repr(error)))
 
@@ -112,7 +115,7 @@ def get(attribute_name, default=None, connection=None, cursor=None, keep_connect
             return value
 
 
-def set_value(attribute_name, value, connection=None, cursor=None, keep_connection_open=False):
+def set_value(attribute_name, value, connection=None, cursor=None, keep_connection_open=False, raw=True):
     """
     Update setting
 
@@ -124,13 +127,20 @@ def set_value(attribute_name, value, connection=None, cursor=None, keep_connecti
     :param connection:  Database connection, if None then a new connection will be created
     :param cursor:  Database cursor, if None then a new cursor will be created
     :param bool keep_connection_open:  Close connection after query?
+    :param bool raw:  Do not parse as JSON?
     :return int:  Number of updated rows
     """
     # Check value is valid JSON
-    try:
-        value = json.dumps(value)
-    except ValueError:
-        return None
+    if raw:
+        try:
+            json.dumps(json.loads(value))
+        except json.JSONDecodeError:
+            return None
+    else:
+        try:
+            value = json.dumps(value)
+        except json.JSONDecodeError:
+            return None
 
     try:
         if not connection or not cursor:

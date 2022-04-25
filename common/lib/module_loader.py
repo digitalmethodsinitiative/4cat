@@ -174,7 +174,8 @@ class ModuleCollector:
                 "path": subdirectory,
                 "name": datasource.NAME if hasattr(datasource, "NAME") else datasource_id,
                 "id": subdirectory.parts[-1],
-                "init": datasource.init_datasource
+                "init": datasource.init_datasource,
+                "config": {} if not hasattr(datasource, "config") else datasource.config
             }
 
         sorted_datasources = {datasource_id: self.datasources[datasource_id] for datasource_id in
