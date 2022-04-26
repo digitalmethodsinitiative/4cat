@@ -362,7 +362,11 @@ class SearchBitChute(Search):
                     return (video, [])
 
                 elif "Contains Incitement to Hatred" in video_page.text:
-                    video["category"] = "moderated-incitement"
+                    video["category"] = "moderated-incitement-hatred"
+                    return (video, [])
+
+                elif "Threats or Incitement to Violence" in video_page.text:
+                    video["category"] = "moderated-incitement-violence"
                     return (video, [])
 
                 elif "Platform Misuse" in video_page.text:
@@ -375,6 +379,10 @@ class SearchBitChute(Search):
 
                 elif "Copyright</h4>" in video_page.text:
                     video["category"] = "moderated-copyright"
+                    return (video, [])
+
+                elif "Contains Holocaust Denial" in video_page.text:
+                    video["category"] = "moderated-holocaust-denial"
                     return (video, [])
 
                 else:
@@ -417,7 +425,7 @@ class SearchBitChute(Search):
             counts = self.request_from_bitchute(video_session, "POST", "https://www.bitchute.com/video/%s/counts/" % video["id"], data={"csrfmiddlewaretoken": video_csfrtoken})
 
             if detail == "comments":
-                # if comments are also to be scraped, this is anothe request to make, which returns
+                # if comments are also to be scraped, this is another request to make, which returns
                 # a convenient JSON response with all the comments to the video
                 # we need yet another token for this, which we can extract from a bit of inline
                 # javascript on the page
@@ -537,7 +545,7 @@ class SearchBitChute(Search):
                     raise NotImplemented()
 
                 if request.status_code >= 300:
-                    raise ValueError("Response %i from BitChut for URL %s, need to retry" % (request.status_code, url))
+                    raise ValueError("Response %i from BitChute for URL %s, need to retry" % (request.status_code, url))
 
                 response = request.json()
                 return response
