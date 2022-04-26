@@ -31,9 +31,9 @@ class Search8Chan(Search4Chan):
 		},
 		"board": {
 			"type": UserInput.OPTION_CHOICE,
-			"options": {b: b for b in config.get('DATASOURCES')[prefix].get("boards", [])},
+			"options": {b: b for b in config.get('DATASOURCES').get(prefix, {}).get("boards", [])},
 			"help": "Board",
-			"default": config.get('DATASOURCES')[prefix].get("boards", [""])[0]
+			"default": config.get('DATASOURCES').get(prefix, {}).get("boards", [""])[0]
 		},
 		"body_match": {
 			"type": UserInput.OPTION_TEXT,

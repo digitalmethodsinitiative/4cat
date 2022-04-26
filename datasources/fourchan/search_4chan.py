@@ -49,9 +49,9 @@ class Search4Chan(SearchWithScope):
 		},
 		"board": {
 			"type": UserInput.OPTION_CHOICE,
-			"options": {b: b for b in config.get('DATASOURCES')[prefix].get("boards", [])},
+			"options": {b: b for b in config.get('DATASOURCES').get(prefix, {}).get("boards", [])},
 			"help": "Board",
-			"default": config.get('DATASOURCES')[prefix].get("boards", [""])[0]
+			"default": config.get('DATASOURCES').get(prefix, {}).get("boards", [""])[0]
 		},
 		"body_match": {
 			"type": UserInput.OPTION_TEXT,
@@ -496,7 +496,7 @@ class Search4Chan(SearchWithScope):
 		match = []
 
 		# Option wether to use sphinx for text searches
-		use_sphinx = config.get('DATASOURCES')["4chan"].get("use_sphinx", True)
+		use_sphinx = config.get('DATASOURCES').get("4chan", {}).get("use_sphinx", True)
 
 		if query.get("min_date", None):
 			try:
