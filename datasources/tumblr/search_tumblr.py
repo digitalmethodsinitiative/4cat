@@ -46,32 +46,32 @@ class SearchTumblr(Search):
 	failed_notes = []
 
 	config = {
-	# Tumblr API keys to use for data capturing
+		# Tumblr API keys to use for data capturing
 		'api.tumblr.consumer_key': {
 			'type': UserInput.OPTION_TEXT,
-			'default' : "",
+			'default': "",
 			'help': 'Tumblr Consumer Key',
 			'tooltip': "",
-			},
+		},
 		'api.tumblr.consumer_secret': {
 			'type': UserInput.OPTION_TEXT,
-			'default' : "",
+			'default': "",
 			'help': 'Tumblr Consumer Secret Key',
 			'tooltip': "",
-			},
+		},
 		'api.tumblr.key': {
 			'type': UserInput.OPTION_TEXT,
-			'default' : "",
+			'default': "",
 			'help': 'Tumblr API Key',
 			'tooltip': "",
-			},
+		},
 		'api.tumblr.secret_key': {
 			'type': UserInput.OPTION_TEXT,
-			'default' : "",
+			'default': "",
 			'help': 'Tumblr API Secret Key',
 			'tooltip': "",
-			},
-		}
+		},
+	}
 	references = ["[Tumblr API documentation](https://www.tumblr.com/docs/en/api/v2)"]
 
 	options = {
