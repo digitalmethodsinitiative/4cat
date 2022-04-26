@@ -141,7 +141,7 @@ INSERT INTO settings
     ('IMAGE_INTERVAL', '3600'),
     ('explorer.max_posts', '100000'),
     ('flask.flask_app', '"webtool/fourcat"'),
-    ('flask.secret_key', '""'),
+    ('flask.secret_key', concat('"', substr(md5(random()::text), 0, 25), '"')),
     ('flask.https', 'false'),
     ('flask.server_name', '"localhost"'),
     ('flask.autologin.name', '"Automatic login"'),

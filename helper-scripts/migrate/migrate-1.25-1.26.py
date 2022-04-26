@@ -177,6 +177,7 @@ if transfer_settings:
         # FlaskConfig are accessed from old_config slightly differently
         ('flask.flask_app', getattr(old_config.FlaskConfig, "FLASK_APP", None)),
         ('flask.server_name', getattr(old_config.FlaskConfig, "SERVER_NAME", None)),
+        ('flask.secret_key', getattr(old_config.FlaskConfig, "SECRET_KEY", None)),
         ('flask.https', getattr(old_config.FlaskConfig, "SERVER_HTTPS", None)),
         ('flask.autologin.hostnames', getattr(old_config.FlaskConfig, "HOSTNAME_WHITELIST", None)),
         ('flask.autologin.api', getattr(old_config.FlaskConfig, "HOSTNAME_WHITELIST_API", None)),
