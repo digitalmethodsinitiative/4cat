@@ -85,7 +85,7 @@ if transfer_settings:
         config_reader = configparser.ConfigParser()
         # If there is no config file then it cannot be a Docker instance
         config_reader.add_section('DOCKER')
-        config_reader['DOCKER']['use_docker_config'] = False
+        config_reader['DOCKER']['use_docker_config'] = "False"
 
     # Update DB info
     if not config_reader.has_section('DATABASE'):
