@@ -115,6 +115,45 @@ def get(attribute_name, default=None, connection=None, cursor=None, keep_connect
             return value
 
 
+def get_all(connection=None, cursor=None, keep_connection_open=False, raw=False):
+    """
+    Gets all database settings in 4cat_settings table. These are editable,
+    while other attributes (part of the ConfigManager class are not directly
+    editable)
+
+    :param connection: Database connection, if None then a new connection will
+    be created
+    :param cursor: Database cursor, if None then a new cursor will be created
+    :param keep_connection_open: Close connection after query?
+    :return dict:  Settings, as setting -> value. Values are decoded from JSON
+    """
+    try:
+        if not connection or not cursor:
+            connection, cursor = quick_db_connect()
+
+        query = "SELECT name, value FROM settings"
+        cursor.execute(query)
+        rows = cursor.fetchall()
+
+        if not keep_connection_open:
+            connection.close()
+
+        values = {}
+        for row in rows:
+            value = row.get("value", None) if row else None
+            if not raw and value is not None:
+                value = json.loads(value)
+            values[row["name"]] = value
+    except (Exception, psycopg2.DatabaseError) as error:
+        raise ConfigException("Error getting settings: {}".format(repr(error)))
+
+    finally:
+        if connection is not None and not keep_connection_open:
+            connection.close()
+
+    return values
+
+
 def set_value(attribute_name, value, connection=None, cursor=None, keep_connection_open=False, raw=True):
     """
     Update setting
@@ -159,40 +198,6 @@ def set_value(attribute_name, value, connection=None, cursor=None, keep_connecti
             connection.close()
 
     return updated_rows
-
-
-def get_all(connection=None, cursor=None, keep_connection_open=False):
-    """
-    Gets all database settings in 4cat_settings table. These are editable,
-    while other attributes (part of the ConfigManager class are not directly
-    editable)
-
-    :param connection: Database connection, if None then a new connection will
-    be created
-    :param cursor: Database cursor, if None then a new cursor will be created
-    :param keep_connection_open: Close connection after query?
-    :return dict:  Settings, as setting -> value. Values are decoded from JSON
-    """
-    try:
-        if not connection or not cursor:
-            connection, cursor = quick_db_connect()
-
-        query = "SELECT name, value FROM settings"
-        cursor.execute(query)
-        rows = cursor.fetchall()
-
-        if not keep_connection_open:
-            connection.close()
-
-        values = {row["name"]: json.loads(row["value"]) for row in rows}
-    except (Exception, psycopg2.DatabaseError) as error:
-        raise ConfigException("Error getting settings: {}".format(repr(error)))
-
-    finally:
-        if connection is not None and not keep_connection_open:
-            connection.close()
-
-    return values
 
 
 def create_setting(attribute_name, value, connection=None, cursor=None, keep_connection_open=False):

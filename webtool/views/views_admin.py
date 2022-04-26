@@ -283,7 +283,7 @@ def update_settings():
     categories = config_definition.categories
     modules = {
         **{datasource: definition["name"] for datasource, definition in backend.all_modules.datasources.items()},
-        **{processor.type: processor.title for processor in backend.all_modules.processors.values()}
+        **{processor.type: processor.title if hasattr(processor, "title") else processor.type for processor in backend.all_modules.processors.values()}
     }
 
     for processor in backend.all_modules.processors.values():
@@ -304,9 +304,22 @@ def update_settings():
         except QueryParametersException as e:
             flash("Invalid settings: %s" % str(e))
 
-    options = {option: {
-        **definition[option],
-        "default": config.get(option, definition[option]["default"]) if definition[option]["type"] != UserInput.OPTION_TEXT_JSON else json.dumps(config.get(option, definition[option]["default"]))
-    } for option in sorted(definition)}
+    all_settings = config.get_all()
+    options = {}
+
+    for option in sorted({*all_settings.keys(), *definition.keys()}):
+        if definition.get(option, {}).get("type") != UserInput.OPTION_TEXT_JSON:
+            default = all_settings.get(option, definition.get(option, {}).get("default"))
+        else:
+            default = json.dumps(all_settings.get(option, definition.get(option, {}.get("default"))))
+
+        options[option] = {
+            **definition.get(option, {
+                "type": UserInput.OPTION_TEXT,
+                "help": option,
+                "default": all_settings.get(option)
+            }),
+            "default": default
+        }
 
     return render_template("controlpanel/config.html", options=options, flashes=get_flashed_messages(), categories=categories, modules=modules)
