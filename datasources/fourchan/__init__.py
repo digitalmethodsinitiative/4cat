@@ -30,11 +30,12 @@ def init_datasource(database, logger, queue, name):
 	:param JobQueue queue:  Job Queue instance
 	:param string name:  ID of datasource that is being initialised
 	"""
-	interval = config.get('DATASOURCES')[name]["interval"]
+	base_config = config.get('DATASOURCES').get(name)
+	interval = base_config.get("interval", 0)
 
-	if config.get('DATASOURCES')[name].get("autoscrape", False):
-		for board in config.get('DATASOURCES')[name]["boards"]:
-			if config.get('DATASOURCES')[name].get("no_scrape") and board in config.get('DATASOURCES')[name].get("no_scrape"):
+	if base_config.get("autoscrape", False):
+		for board in base_config.get("boards", []):
+			if base_config.get("no_scrape") and board in base_config.get("no_scrape"):
 				continue
 			else:
 				queue.add_job(name + "-board", {}, board, 0, interval)
