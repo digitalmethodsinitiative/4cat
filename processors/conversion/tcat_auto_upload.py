@@ -33,7 +33,7 @@ class FourcatToDmiTcatUploader(BasicProcessor):
         'tcat-auto-upload.TCAT_SERVER': {
             'type': UserInput.OPTION_TEXT,
             'default' : "",
-            'help': 'TCAT Server Address/URL',
+            'help': 'TCAT Server URL',
             'tooltip': "",
             },
         'tcat-auto-upload.TCAT_USERNAME': {

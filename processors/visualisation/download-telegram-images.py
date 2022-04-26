@@ -37,11 +37,11 @@ class TelegramImageDownloader(BasicProcessor):
     flawless = True
 
     config = {
-        'image_downloader_telegram.MAX_NUMBER_IMAGES': {
+        'image-downloader-telegram.MAX_NUMBER_IMAGES': {
             'type': UserInput.OPTION_TEXT,
             'default' : "1000",
-            'help': 'Maxmimum number of Telegram images a user can download.',
-            'tooltip': "",
+            'help': 'Max images',
+            'tooltip': "Maxmimum number of Telegram images a user can download.",
             },
         }
 

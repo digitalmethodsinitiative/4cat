@@ -199,23 +199,29 @@ config_definition = {
         "help": "Auto-login name",
         "tooltip": "User Name for whitelisted hosts",
     },
+    "flask.secret_key": {
+        "type": UserInput.OPTION_TEXT,
+        "default": "",
+        "help": "Secret key",
+        "tooltip": "Secret key for Flask, used for session cookies",
+    },
     # YouTube variables to use for processors
     "api.youtube.name": {
         "type": UserInput.OPTION_TEXT,
         "default": "youtube",
-        "help": "Service Name",
+        "help": "YouTube API Service",
         "tooltip": "YouTube API 'service name', e.g. youtube, googleapis, etc.",
     },
     "api.youtube.version": {
         "type": UserInput.OPTION_TEXT,
         "default": "v3",
-        "help": "Version",
+        "help": "YouTube API Version",
         "tooltip": "e.g., ''v3'",
     },
     "api.youtube.key": {
         "type": UserInput.OPTION_TEXT,
         "default": "",
-        "help": "Developer Key",
+        "help": "YouTube API Key",
         "tooltip": "The developer key from your API console",
     },
 }
@@ -227,6 +233,7 @@ categories = {
     "explorer": "Data Explorer settings",
     "expire": "Dataset expiration settings",
     "mail": "Mail settings & credentials",
+    "logging": "Logging settings",
     "path": "File paths",
     "DATASOURCES": "Data source configuration"
 }
