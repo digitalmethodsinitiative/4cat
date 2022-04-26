@@ -14,7 +14,7 @@ from pathlib import Path
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
-from flask import render_template, jsonify, request, abort, flash, get_flashed_messages, url_for, redirect
+from flask import render_template, jsonify, request, abort, flash, get_flashed_messages, url_for
 from flask_login import login_required, current_user
 
 from webtool import app, db
@@ -23,7 +23,7 @@ from webtool.lib.user import User
 
 from common.lib.helpers import call_api, send_email, UserInput
 from common.lib.exceptions import QueryParametersException
-import common.config_definition as config_definition
+import common.lib.config_definition as config_definition
 
 
 @app.route('/admin/', defaults={'page': 1})
