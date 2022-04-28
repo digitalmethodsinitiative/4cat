@@ -21,7 +21,7 @@ packages = [
 	"Flask_Limiter==1.0.1",
 	"Flask_Login==0.4.1",
 	"fonttools==4.27.1",
-	"gensim==3.8.3",
+	"gensim>=4.1.0, <4.2",
 	"google_api_python_client==2.0.2",
 	"html2text==2018.1.9",
 	"ImageHash==4.2.0",
