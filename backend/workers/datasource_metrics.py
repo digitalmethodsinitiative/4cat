@@ -46,8 +46,11 @@ class DatasourceMetrics(BasicWorker):
 			""")
 
 		added_datasources = [row["datasource"] for row in self.db.fetchall("SELECT DISTINCT(datasource) FROM metrics")]
+		enabled_datasources = config.get("DATASOURCES", {})
 
 		for datasource_id in self.all_modules.datasources:
+			if datasource_id not in enabled_datasources:
+				continue
 
 			datasource = self.all_modules.workers.get(datasource_id + "-search")
 			if not datasource:
@@ -58,8 +61,7 @@ class DatasourceMetrics(BasicWorker):
 
 			# Only update local datasources
 			if is_local:
-
-				boards = config.get('DATASOURCES')[datasource_id].get("boards", [""])
+				boards = enabled_datasources[datasource_id].get("boards", [""])
 
 				# If a datasource is static (so not updated) and it
 				# is already present in the metrics table, we don't
