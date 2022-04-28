@@ -6,6 +6,7 @@ import time
 import json
 import math
 from common.lib.exceptions import JobClaimedException, JobNotFoundException
+from common.lib.helpers import get_instance_id
 
 
 class Job:
@@ -30,27 +31,33 @@ class Job:
 
 		self.data["remote_id"] = str(self.data["remote_id"])
 
-		try:
-			self.is_finished = "is_finished" in self.data and self.data["is_finished"]
-			self.is_claimed = self.data["timestamp_claimed"] and self.data["timestamp_claimed"] > 0
-		except KeyError:
-			print(data)
-			raise Exception
+		self.is_finished = "is_finished" in self.data and self.data["is_finished"]
+		self.is_claimed = self.data["timestamp_claimed"] and self.data["timestamp_claimed"] > 0
 
-	def get_by_ID(id, database):
+	@staticmethod
+	def get_by_ID(job_id, database, own_instance_only=True):
 		"""
 		Instantiate job object by ID
 
-		:param int id: Job ID
+		:param int job_id: Job ID
 		:param database:  Database handler
+		:param bool own_instance_only:  Only consider jobs that are claimable
+		or claimed by this instance. If `False`, also considers jobs currently
+		claimed by other instances.
 		:return Job: Job object
 		"""
-		data = database.fetchone("SELECT * FROM jobs WHERE id = %s", (id,))
+		instance_filter = ("*", get_instance_id()) if own_instance_only else ()
+		if instance_filter:
+			data = database.fetchone("SELECT * FROM jobs WHERE id = %s AND instance IN %s", (job_id, instance_filter))
+		else:
+			data = database.fetchone("SELECT * FROM jobs WHERE id = %s", (job_id,))
+
 		if not data:
 			raise JobNotFoundException
 
 		return Job.get_by_data(data, database)
 
+	@staticmethod
 	def get_by_data(data, database):
 		"""
 		Instantiate job object with given data
@@ -61,7 +68,8 @@ class Job:
 		"""
 		return Job(data, database)
 
-	def get_by_remote_ID(remote_id, database, jobtype="*"):
+	@staticmethod
+	def get_by_remote_ID(remote_id, database, jobtype="*", own_instance_only=True):
 		"""
 		Instantiate job object by combination of remote ID and job type
 
@@ -70,12 +78,25 @@ class Job:
 		:param database: Database handler
 		:param str jobtype: Job type
 		:param str remote_id: Job remote ID
+		:param bool own_instance_only:  Only consider jobs that are claimable
+		or claimed by this instance. If `False`, also considers jobs currently
+		claimed by other instances.
 		:return Job: Job object
 		"""
+		instance_filter = ("*", get_instance_id()) if own_instance_only else ()
+
 		if jobtype != "*":
-			data = database.fetchone("SELECT * FROM jobs WHERE jobtype = %s AND remote_id = %s", (jobtype, remote_id))
+			if instance_filter:
+				data = database.fetchone("SELECT * FROM jobs WHERE jobtype = %s AND remote_id = %s AND instance IN %s",
+										 (jobtype, remote_id, instance_filter))
+			else:
+				data = database.fetchone("SELECT * FROM jobs WHERE jobtype = %s AND remote_id = %s",
+										 (jobtype, remote_id))
 		else:
-			data = database.fetchone("SELECT * FROM jobs WHERE remote_id = %s", (remote_id,))
+			if instance_filter:
+				data = database.fetchone("SELECT * FROM jobs WHERE remote_id = %s AND instance IN %s", (remote_id, instance_filter))
+			else:
+				data = database.fetchone("SELECT * FROM jobs WHERE remote_id = %s", (remote_id,))
 
 		if not data:
 			raise JobNotFoundException
@@ -86,7 +107,9 @@ class Job:
 		"""
 		Claim a job
 
-		This marks it in the database so it cannot be claimed again.
+		This marks it in the database so it cannot be claimed again. If the job
+		is set up to be executed by any 4CAT instance, it is linked to this
+		specific instance after claiming.
 		"""
 		if self.data["interval"] == 0:
 			claim_time = int(time.time())
@@ -96,9 +119,8 @@ class Job:
 			# the interval remains as set
 			claim_time = math.floor(int(time.time()) / self.data["interval"]) * self.data["interval"]
 
-		updated = self.db.update("jobs", data={"timestamp_claimed": claim_time, "timestamp_lastclaimed": claim_time},
-								 where={"jobtype": self.data["jobtype"], "remote_id": self.data["remote_id"],
-										"timestamp_claimed": 0})
+		updated = self.db.update("jobs", data={"timestamp_claimed": claim_time, "timestamp_lastclaimed": claim_time, "instance": get_instance_id()},
+								 where={"id": self.data["id"], "timestamp_claimed": 0})
 
 		if updated == 0:
 			raise JobClaimedException
@@ -119,10 +141,9 @@ class Job:
 							job with an interval.
 		"""
 		if self.data["interval"] == 0 or delete:
-			self.db.delete("jobs", where={"jobtype": self.data["jobtype"], "remote_id": self.data["remote_id"]})
+			self.db.delete("jobs", where={"id": self.data["id"]})
 		else:
-			self.db.update("jobs", data={"timestamp_claimed": 0, "attempts": 0},
-						   where={"jobtype": self.data["jobtype"], "remote_id": self.data["remote_id"]})
+			self.db.update("jobs", data={"timestamp_claimed": 0, "attempts": 0}, where={"id": self.data["id"]})
 
 		self.is_finished = True
 
@@ -140,55 +161,8 @@ class Job:
 		elif claim_after is not None:
 			update["timestamp_after"] = claim_after
 
-		self.db.update("jobs", data=update,
-					   where={"jobtype": self.data["jobtype"], "remote_id": self.data["remote_id"]})
+		self.db.update("jobs", data=update, where={"id": self.data["id"]})
 		self.is_claimed = False
-
-	def update_status(self, status):
-		"""
-		Update job status
-
-		For internal use - use `add_status()` instead.
-
-		:param status:  New status
-		"""
-		self.data["status"] = status
-		self.db.update("jobs", data={"status": status},
-					   where={"jobtype": self.data["jobtype"], "remote_id": self.data["remote_id"]})
-
-	def add_status(self, status):
-		"""
-		Add a status for this Job
-
-		The status is added to a JSON-encoded array that is saved to the database
-
-		:param str status:  Status to add
-		"""
-		current = self.get_status()
-		current.append(status)
-		self.update_status(json.dumps(current))
-
-	def get_status(self):
-		"""
-		Get statuses
-
-		Returns a list of statuses, ordered old to new.
-
-		:return list:  Statuses
-		"""
-		try:
-			status = json.loads(self.data["status"])
-			return status
-		except (TypeError, json.JSONDecodeError):
-			return [str(self.data.get("status", ""))]
-
-	def current_status(self):
-		"""
-		Get current job status
-
-		:return str:  Latest status
-		"""
-		return self.get_status().pop()
 
 	def is_claimable(self):
 		"""
@@ -196,7 +170,10 @@ class Job:
 
 		:return bool: If the job is not claimed yet and also isn't finished.
 		"""
-		return not self.is_claimed and not self.is_finished
+		return \
+			not self.is_claimed \
+			and not self.is_finished \
+			and self.data["timestamp_lastclaimed"] < time.time() - self.data["interval"]
 
 	@property
 	def details(self):

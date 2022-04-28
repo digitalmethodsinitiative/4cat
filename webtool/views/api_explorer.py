@@ -118,6 +118,11 @@ def explorer_dataset(key, page):
 		if count <= offset:
 			continue
 
+		# Use an offset if we're showing a page beyond the first.
+		count += 1
+		if count <= offset:
+			continue
+
 		# Attribute column names and collect dataset's posts.
 		post_ids.append(post["id"])
 		posts.append(post)

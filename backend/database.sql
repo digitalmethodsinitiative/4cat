@@ -13,16 +13,17 @@ CREATE TABLE IF NOT EXISTS jobs (
   timestamp_after        integer DEFAULT 0,
   timestamp_lastclaimed  integer DEFAULT 0,
   timestamp_claimed      integer DEFAULT 0,
-  status                 text,
   attempts               integer DEFAULT 0,
-  interval               integer DEFAULT 0
+  interval               integer DEFAULT 0,
+  instance               varchar DEFAULT '*'
 );
 
 -- enforce
 CREATE UNIQUE INDEX IF NOT EXISTS unique_job
   ON jobs (
     jobtype,
-    remote_id
+    remote_id,
+    instance
   );
 
 

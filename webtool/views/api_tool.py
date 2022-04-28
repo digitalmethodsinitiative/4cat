@@ -569,20 +569,21 @@ def nuke_dataset(key=None, reason=None):
 	children = dataset.get_all_children()
 	for child in children:
 		try:
-			job = Job.get_by_remote_ID(child.key, database=db, jobtype=child.type)
-			call_api("cancel-job", {"remote_id": child.key, "jobtype": dataset.type, "level": BasicWorker.INTERRUPT_CANCEL})
-			job.finish()
-			child.delete()
+			# test if a job is running for this child dataset
+			job = Job.get_by_remote_ID(child.key, db, dataset.type, own_instance_only=False)
+			call_api("cancel-job", {"remote_id": child.key, "jobtype": dataset.type})
 		except JobNotFoundException:
 			pass
 		except ConnectionRefusedError:
 			return error(500,
 						 message="The 4CAT backend is not available. Try again in a minute or contact the instance maintainer if the problem persists.")
 
+		child.delete()
+
 	# now cancel and delete the job for this one (if it exists)
 	try:
-		job = Job.get_by_remote_ID(dataset.key, database=db, jobtype=dataset.type)
-		call_api("cancel-job", {"remote_id": dataset.key, "jobtype": dataset.type, "level": BasicWorker.INTERRUPT_CANCEL})
+		job = Job.get_by_remote_ID(dataset.key, db, dataset.type, own_instance_only=False)
+		call_api("cancel-job", {"remote_id": dataset.key, "jobtype": dataset.type})
 	except JobNotFoundException:
 		pass
 	except ConnectionRefusedError:
@@ -638,18 +639,17 @@ def delete_dataset(key=None):
 	children = dataset.get_all_children()
 	for child in children:
 		try:
-			job = Job.get_by_remote_ID(child.key, database=db, jobtype=child.type)
-			call_api("cancel-job", {"remote_id": child.key, "jobtype": dataset.type, "level": BasicWorker.INTERRUPT_CANCEL})
-			job.finish()
+			# test if there is a job for this dataset
+			job = Job.get_by_remote_ID(child.key, db, dataset.type, own_instance_only=False)
+			call_api("cancel-job", {"remote_id": child.key, "jobtype": dataset.type})
 		except JobNotFoundException:
-			pass
-		except ConnectionRefusedError:
-			return error(500, message="The 4CAT backend is not available. Try again in a minute or contact the instance maintainer if the problem persists.")
+			# already finished or deleted, just skip
+			continue
 
 	# now cancel and delete the job for this one (if it exists)
 	try:
-		job = Job.get_by_remote_ID(dataset.key, database=db, jobtype=dataset.type)
-		call_api("cancel-job", {"remote_id": dataset.key, "jobtype": dataset.type, "level": BasicWorker.INTERRUPT_CANCEL})
+		job = Job.get_by_remote_ID(dataset.key, db, dataset.type, own_instance_only=False)
+		call_api("cancel-job", {"remote_id": dataset.key, "jobtype": dataset.type})
 	except JobNotFoundException:
 		pass
 	except ConnectionRefusedError:

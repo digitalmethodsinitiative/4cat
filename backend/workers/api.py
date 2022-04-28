@@ -4,6 +4,7 @@ import json
 
 import config
 from backend.abstract.worker import BasicWorker
+from common.lib.helpers import get_instance_id
 
 
 class InternalAPI(BasicWorker):
@@ -154,12 +155,13 @@ class InternalAPI(BasicWorker):
 		"""
 		if request == "cancel-job":
 			# cancel a running job
+			# does not directly cancel the job - but deletes it from the job
+			# queue, after which the manager will cancel any worker running for it
 			payload = payload.get("payload", {})
 			remote_id = payload.get("remote_id")
 			jobtype = payload.get("jobtype")
-			level = payload.get("level", BasicWorker.INTERRUPT_RETRY)
 
-			self.manager.request_interrupt(remote_id=remote_id, jobtype=jobtype, interrupt_level=level)
+			self.manager.request_delete(remote_id=remote_id, jobtype=jobtype)
 			return "OK"
 
 		elif request == "workers":
@@ -215,7 +217,7 @@ class InternalAPI(BasicWorker):
 			# all jobs plus, for those that are currently active, some worker
 			# info as well as related datasets. useful to monitor server
 			# activity and judge whether 4CAT can safely be interrupted
-			open_jobs = self.db.fetchall("SELECT jobtype, timestamp, timestamp_claimed, timestamp_lastclaimed, interval, remote_id FROM jobs ORDER BY jobtype ASC, timestamp ASC, remote_id ASC")
+			open_jobs = self.db.fetchall("SELECT jobtype, timestamp, timestamp_claimed, timestamp_lastclaimed, interval, remote_id FROM jobs WHERE instance in ('*', %s) ORDER BY jobtype ASC, timestamp ASC, remote_id ASC", (get_instance_id(),))
 			running = []
 			queue = {}
 
