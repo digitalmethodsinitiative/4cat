@@ -116,6 +116,20 @@ class SearchTelegram(Search):
             "type": UserInput.OPTION_TOGGLE,
             "help": "Save session:",
             "default": False
+        },
+        "resolve-entities-intro": {
+            "type": UserInput.OPTION_INFO,
+            "help": "4CAT can resolve the references to channels and user and replace the numeric ID with the full "
+                    "user, channel or group metadata. Doing so allows one to discover e.g. new relevant groups and "
+                    "figure out where or who a message was forwarded from. However, this increases query time and "
+                    "for large datasets, increases the chance you will be rate-limited and your dataset isn't able "
+                    "to finish capturing. It will also dramatically increase the disk space needed to store the "
+                    "data, so only enable this if you really need it!"
+        },
+        "resolve-entities": {
+            "type": UserInput.OPTION_TOGGLE,
+            "help": "Resolve references",
+            "default": False,
         }
     }
 
@@ -742,22 +756,7 @@ class SearchTelegram(Search):
             if "max" in options["max_posts"]:
                 del options["max_posts"]["max"]
 
-            options["query-intro"]["help"] = "You can collect messages from multiple entities (channels or groups). Separate with commas or line breaks."
-
-            options["resolve-entities-intro"] = {
-                "type": UserInput.OPTION_INFO,
-                "help": "4CAT can resolve the references to channels and user and replace the numeric ID with the full "
-                        "user, channel or group metadata. Doing so allows one to discover e.g. new relevant groups and "
-                        "figure out where or who a message was forwarded from. However, this increases query time and "
-                        "for large datasets, increases the chance you will be rate-limited and your dataset isn't able "
-                        "to finish capturing. It will also dramatically increase the disk space needed to store the "
-                        "data, so only enable this if you really need it!"
-            }
-
-            options["resolve-entities"] = {
-                "type": UserInput.OPTION_TOGGLE,
-                "help": "Resolve references",
-                "default": False,
-            }
+            options["query-intro"]["help"] = "You can collect messages from multiple entities (channels or groups). " \
+                                             "Separate with commas or line breaks."
 
         return options
