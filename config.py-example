@@ -12,25 +12,25 @@ DATASOURCES = {
     "customimport": {},
     "parler": {},
     "reddit": {
-							"boards": "*",
-		},
+              "boards": "*",
+              },
     "telegram": {},
     "twitterv2": {'id_lookup': False},
-    "dmi-tcat": {
-		"instances": ["http://username:password@tcat.instance.webpage.net"]
-	   },
-     "dmi-tcatv2": {
-                    "instances": [
-                                  {
-                                  'tcat_name': 'tcat4' # for user interface only
-                                  'db_name': 'twittercapture',
-                                  'db_user': 'username',
-                                  'db_password': 'password',
-                                  'db_host': 'ip_or_host',
-                                  'db_port': 3306, # mariadb default
-                                  },
-                                 ]
-    },
+#    "dmi-tcat": {
+#    "instances": ["http://username:password@tcat.instance.webpage.net"]
+#    },
+#     "dmi-tcatv2": {
+#                    "instances": [
+#                                  {
+#                                  'tcat_name': 'tcat4' # for user interface only
+#                                  'db_name': 'twittercapture',
+#                                  'db_user': 'username',
+#                                  'db_password': 'password',
+#                                  'db_host': 'ip_or_host',
+#                                  'db_port': 3306, # mariadb default
+#                                  },
+#                                 ]
+#    },
 }
 
 #####################
