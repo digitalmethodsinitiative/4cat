@@ -17,7 +17,7 @@ DATASOURCES = {
     "telegram": {},
     "twitterv2": {'id_lookup': False},
     "dmi-tcat": {
-		"instances": ["http://dmiadmin:twitter@dmin@tcat4.digitalmethods.net"]
+		"instances": ["http://username:password@tcat.instance.webpage.net"]
 	   },
      "dmi-tcatv2": {
                     "instances": [
