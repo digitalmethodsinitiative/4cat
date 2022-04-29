@@ -310,11 +310,11 @@ class SearchReddit(SearchWithScope):
 		# only query for individual posts if no subject keyword is given
 		# since individual posts don't have subjects so if there is a subject
 		# query no results should be returned
-		do_body_query = not bool(query.get("subject_match", "").strip()) and not bool(query.get("subject_url", "").strip()) and scope != "op-only"
+		do_body_query = not bool(query.get("subject_match", "")) and not bool(query.get("subject_url", "")) and scope != "op-only"
 
 		while do_body_query:
 			if self.interrupted:
-				raise ProcessorInterruptedException("Interrupted while fetching post data from the Pushshift API")
+				raise ProcessorInterruptedException("Interrupted while fetching post data from the Pushshiwft API")
 
 			response = self.call_pushshift_api(self.comment_endpoint, params=post_parameters)
 
