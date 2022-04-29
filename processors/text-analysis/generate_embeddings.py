@@ -157,7 +157,7 @@ class GenerateWordEmbeddings(BasicProcessor):
 
 				self.dataset.update_status("Training %s model for token set %s..." % (model_builder.__name__, token_set_name))
 				try:
-					model = model_builder(negative=use_negative, size=dimensionality, sg=use_skipgram, window=window, workers=3, min_count=min_count, max_final_vocab=max_words)
+					model = model_builder(negative=use_negative, vector_size=dimensionality, sg=use_skipgram, window=window, workers=3, min_count=min_count, max_final_vocab=max_words)
 
 					# we do not simply pass a sentences argument to model builder
 					# because we are using a generator, which exhausts, while
