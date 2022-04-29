@@ -19,7 +19,7 @@ class MySQLDatabase:
 	cursor = None
 	log = None
 
-	def __init__(self, logger, dbname=None, user=None, password=None, host=None, port=None):
+	def __init__(self, logger=None, dbname=None, user=None, password=None, host=None, port=None):
 		"""
 		Set up database connection
 		"""
@@ -31,10 +31,8 @@ class MySQLDatabase:
 
 		self.connection = mysqlconnections.Connection(database=dbname, user=user, password=password, host=host, port=port)
 		self.cursor = self.connection.cursor(pymysql.cursors.DictCursor)
-		self.log = logger
-
-		if self.log is None:
-			raise NotImplementedError
+		if logger:
+			self.log = logger
 
 	def mogrify(self, query, replacements):
 		"""
@@ -54,7 +52,7 @@ class MySQLDatabase:
 		:param args: Replacement values
 		:return None:
 		"""
-		self.log.debug("Executing query %s" % self.mogrify(query, replacements))
+		if self.log: self.log.debug("Executing query %s" % self.mogrify(query, replacements))
 
 		return self.cursor.execute(query, replacements)
 

@@ -14,7 +14,6 @@ from common.lib.exceptions import QueryParametersException
 from common.lib.user_input import UserInput
 from common.lib.helpers import sniff_encoding
 from backend.lib.database_mysql import MySQLDatabase
-from common.lib.logger import Logger
 
 import config
 
@@ -327,7 +326,7 @@ class SearchWithinTCATBinsV2(Search):
         all_bins = {}
         for instance in instances:
             # Query each instance for bins
-            db = MySQLDatabase(logger=Logger(),
+            db = MySQLDatabase(logger=None,
                                dbname=instance.get('db_name'),
                                user=instance.get('db_user'),
                                password=instance.get('db_password'),
