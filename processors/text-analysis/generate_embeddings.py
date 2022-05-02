@@ -164,7 +164,7 @@ class GenerateWordEmbeddings(BasicProcessor):
 					# Word2Vec needs to iterate over the sentences twice
 					# https://stackoverflow.com/a/57632747
 					model.build_vocab(self.tokens_from_file(temp_file, staging_area, phraser=bigram_transformer))
-					model.train(self.tokens_from_file(temp_file, staging_area, phraser=bigram_transformer), epochs=model.iter, total_examples=model.corpus_count)
+					model.train(self.tokens_from_file(temp_file, staging_area, phraser=bigram_transformer), epochs=1, total_examples=model.corpus_count)
 
 				except RuntimeError as e:
 					if "you must first build vocabulary before training the model" in str(e):
