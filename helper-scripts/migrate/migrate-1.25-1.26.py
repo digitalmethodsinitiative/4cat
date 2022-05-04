@@ -150,7 +150,7 @@ if transfer_settings:
         ('expire.allow_optout', getattr(old_config, "EXPIRE_ALLOW_OPTOUT", None)),
         ('logging.slack.level', getattr(old_config, "WARN_LEVEL", None)),
         ('logging.slack.webhook', getattr(old_config, "WARN_SLACK_URL", None)),
-        ('mail.admin_email', getattr(old_config, "ADMIN_EMAILS", [None])[0]),
+        ('mail.admin_email', getattr(old_config, "ADMIN_EMAILS", [None])[0] if getattr(old_config, "ADMIN_EMAILS", [None]) else None),
         ('mail.server', getattr(old_config, "MAILHOST", None)),
         ('mail.ssl', getattr(old_config, "MAIL_SSL", None)),
         ('mail.username', getattr(old_config, "MAIL_USERNAME", None)),
