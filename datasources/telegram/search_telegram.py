@@ -714,7 +714,7 @@ class SearchTelegram(Search):
             "api_hash": query.get("api_hash"),
             "api_phone": query.get("api_phone"),
             "save-session": query.get("save-session"),
-            "resolve-entities": query.get("resolve-entities") if privileged else False,
+            "resolve-entities": query.get("resolve-entities"),
             "min_date": min_date,
             "max_date": max_date
         }
