@@ -30,7 +30,7 @@ def init_datasource(database, logger, queue, name):
 	:param JobQueue queue:  Job Queue instance
 	:param string name:  ID of datasource that is being initialised
 	"""
-	base_config = config.get('DATASOURCES').get(name)
+	base_config = config.get('DATASOURCES').get(name, {})
 	interval = base_config.get("interval", 0)
 
 	if base_config.get("autoscrape", False):
