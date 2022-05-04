@@ -115,7 +115,7 @@ class SearchDouban(Search):
                         "Got response code %i for group %s. Continuing with next group..." % (request.status_code, group))
                     break
 
-                self.dataset.update_status("Scraping group %s...")
+                self.dataset.update_status("Scraping group %s..." % group)
 
                 # parse the HTML and get links to individual topics, as well as group name
                 overview_page = BeautifulSoup(request.text, 'html.parser')
@@ -132,8 +132,14 @@ class SearchDouban(Search):
                     topic_url = topic.find("a").get("href")
                     topic_is_elite = "yes" if bool(topic.select_one(".elite_topic_lable")) else "no"
                     topic_id = topic_url.split("/topic/").pop().split("/")[0]
-                    topic_updated = int(
-                        datetime.datetime.strptime(topic.select_one(".time").text, "%m-%d %H:%M").timestamp())
+
+                    # date can be in either of two formats, with or without time
+                    try:
+                        topic_updated = int(
+                            datetime.datetime.strptime(topic.select_one(".time").text, "%m-%d %H:%M").timestamp())
+                    except ValueError:
+                        topic_updated = int(
+                            datetime.datetime.strptime(topic.select_one(".time").text, "%Y-%m-%d").timestamp())
 
                     # if a date range is given, ignore topics outside of it
                     if start and topic_updated < start:

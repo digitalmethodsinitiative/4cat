@@ -269,7 +269,7 @@ class YouTubeMetadata(BasicProcessor):
 
 			# Store data from original post file for cross-referencing
 			metadata["referenced_urls"] = ','.join(youtube_item["urls_referenced"])
-			metadata["referenced_by"] = ','.join(youtube_item["referenced_by"])
+			metadata["referenced_by"] = ','.join([str(n) for n in youtube_item["referenced_by"]])
 			metadata["count"] = youtube_item["count"]
 
 			# Add api data if the request for the item was succesfull

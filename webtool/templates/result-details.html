@@ -68,6 +68,7 @@
                             {% set github_link = None %}
                         {% endif %}
                         <{% if github_link %}a href="{{ github_link }}" rel="external" target="_blank"{% else %}span{% endif %} class="property-badge fullsize" >
+                        {% if github_link %}<i class="fab fa-fw fa-github" aria-hidden="true"></i>{% endif %}
                             {{ dataset.parameters.datasource }}{%
                                 if "board" in dataset.parameters and dataset.parameters.board %}/
                                 {{ dataset.parameters.board }}/{% endif %}</{% if github_link %}a{% else %}span{% endif %}>
