@@ -15,7 +15,7 @@ packages = [
 	"cryptography==3.3.2",
 	"cssselect>=1.1.0",
 	"datedelta==1.3",
-	"dateparser==1.0.0",
+	"dateparser==1.1.1",
 	"emoji_country_flag==1.1.0",
 	"Flask==1.1.0",
 	"Flask_Limiter==1.0.1",

@@ -289,7 +289,11 @@ class SearchBitChute(Search):
                     video_data["published"] = "1970-01-01"
                 # this is only included as '5 months ago' and so forth, not exact date
                 # so use dateparser to at least approximate the date
-                dt = dateparser.parse(video_data["published"])
+                try:
+                    dt = dateparser.parse(video_data["published"])
+                except Exception as e:
+                    self.log.warning('dateparser.parse error reading video_data["published"]: %s' % str(video_data['published']))
+                    raise e
 
                 video = {
                     "id": video_data["id"],
