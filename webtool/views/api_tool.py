@@ -5,7 +5,7 @@
 import importlib
 import hashlib
 import psutil
-import config
+import common.config_manager as config
 import json
 import time
 import csv
@@ -45,7 +45,7 @@ def openapi_overview():
 		"status": "The following API specifications are available from this server.",
 		"data": {
 			api_id: "http" + (
-				"s" if config.FlaskConfig.SERVER_HTTPS else "") + "://" + config.FlaskConfig.SERVER_NAME + "/api/spec/" + api_id + "/swagger.json"
+				"s" if config.get("flask.https") else "") + "://" + config.get("flask.server_name") + "/api/spec/" + api_id + "/swagger.json"
 			for api_id in openapi.apis
 		}
 	})
@@ -81,7 +81,7 @@ def api_status():
 	jobs_sorted["total"] = jobs_count
 
 	# determine if backend is live by checking if the process is running
-	lockfile = Path(config.PATH_ROOT, config.PATH_LOCKFILE, "4cat.pid")
+	lockfile = Path(config.get('PATH_ROOT'), config.get('PATH_LOCKFILE'), "4cat.pid")
 	if os.path.isfile(lockfile):
 		with lockfile.open() as pidfile:
 			pid = pidfile.read()
@@ -134,7 +134,7 @@ def datasource_form(datasource_id):
 	if datasource_id not in backend.all_modules.datasources:
 		return error(404, message="Datasource '%s' does not exist" % datasource_id)
 
-	if datasource_id not in config.DATASOURCES:
+	if datasource_id not in config.get('DATASOURCES'):
 		return error(404, message="Datasource '%s' does not exist" % datasource_id)
 
 	datasource = backend.all_modules.datasources[datasource_id]
@@ -164,7 +164,7 @@ def datasource_form(datasource_id):
 	has_javascript = javascript_path.exists()
 
 	html = render_template_string(form, datasource_id=datasource_id,
-								  datasource_config=config.DATASOURCES[datasource_id], datasource=datasource)
+								  datasource_config=config.get('DATASOURCES')[datasource_id], datasource=datasource)
 
 	return jsonify({
 		"status": "success",
@@ -194,7 +194,7 @@ def datasource_script(datasource_id):
 	if datasource_id not in backend.all_modules.datasources:
 		return error(404, message="Datasource '%s' does not exist" % datasource_id)
 
-	if datasource_id not in config.DATASOURCES:
+	if datasource_id not in config.get('DATASOURCES'):
 		return error(404, message="Datasource '%s' does not exist" % datasource_id)
 
 	datasource = backend.all_modules.datasources[datasource_id]
@@ -831,7 +831,7 @@ def queue_processor(key=None, processor=None):
 			return error(400, error="File must contain a 'body' column")
 
 		filename = secure_filename(input_file.filename)
-		input_file.save(config.PATH_DATA + "/")
+		input_file.save(config.get('PATH_DATA') + "/")
 
 	elif not key:
 		key = request.form.get("key", "")

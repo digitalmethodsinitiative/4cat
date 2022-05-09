@@ -14,8 +14,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from common.lib.helpers import send_email
 
-import config
-
+import common.config_manager as config
 
 class User:
 	"""
@@ -164,7 +163,7 @@ class User:
 		if self.data["name"] == "anonymous":
 			return "Anonymous"
 		elif self.data["name"] == "autologin":
-			return config.FlaskConfig.HOSTNAME_WHITELIST_NAME
+			return config.get("flask.autologin.name")
 		else:
 			return self.data["name"]
 
@@ -239,7 +238,7 @@ class User:
 						  account?
 		:return str:  Link for the user to set their password with
 		"""
-		if not config.MAILHOST:
+		if not config.get('MAILHOST'):
 			raise RuntimeError("No e-mail server configured. 4CAT cannot send any e-mails.")
 
 		if self.is_special:
@@ -251,14 +250,14 @@ class User:
 		register_token = self.generate_token(regenerate=True)
 
 		# prepare welcome e-mail
-		sender = config.NOREPLY_EMAIL
+		sender = config.get('NOREPLY_EMAIL')
 		message = MIMEMultipart("alternative")
 		message["From"] = sender
 		message["To"] = username
 
 		# the actual e-mail...
-		url_base = config.FlaskConfig.SERVER_NAME
-		protocol = "https" if config.FlaskConfig.SERVER_HTTPS else "http"
+		url_base = config.get("flask.server_name")
+		protocol = "https" if config.get("flask.https") else "http"
 		url = "%s://%s/reset-password/?token=%s" % (protocol, url_base, register_token)
 
 		# we use slightly different e-mails depending on whether this is the first time setting a password

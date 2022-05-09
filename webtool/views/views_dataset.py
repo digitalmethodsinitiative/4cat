@@ -18,7 +18,7 @@ from webtool.lib.helpers import Pagination, error
 from webtool.views.api_tool import delete_dataset, toggle_favourite, toggle_private, queue_processor, nuke_dataset, \
     erase_credentials
 
-import config
+import common.config_manager as config
 import backend
 from common.lib.dataset import DataSet
 from common.lib.queue import JobQueue
@@ -155,7 +155,7 @@ def get_result(query_file):
     :return:  Result file
     :rmime: text/csv
     """
-    directory = config.PATH_ROOT + "/" + config.PATH_DATA
+    directory = config.get('PATH_ROOT') + "/" + config.get('PATH_DATA')
     return send_from_directory(directory=directory, filename=query_file)
 
 
@@ -326,7 +326,7 @@ def show_result(key):
     datasource = dataset.parameters.get("datasource", "")
     datasources = backend.all_modules.datasources
     expires_datasource = False
-    can_unexpire = hasattr(config, "EXPIRE_ALLOW_OPTOUT") and config.EXPIRE_ALLOW_OPTOUT and (
+    can_unexpire = config.get('expire.allow_optout') and (
                 current_user.is_admin or dataset.owner == current_user.get_id())
     if datasource in datasources and datasources[datasource].get("expire-datasets", None):
         timestamp_expires = dataset.timestamp + int(datasources[datasource].get("expire-datasets"))

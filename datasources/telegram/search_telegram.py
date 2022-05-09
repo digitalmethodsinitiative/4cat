@@ -23,8 +23,7 @@ from telethon.tl.functions.channels import GetFullChannelRequest
 from telethon.tl.functions.users import GetFullUserRequest
 from telethon.tl.types import User
 
-import config
-
+import common.config_manager as config
 
 class SearchTelegram(Search):
     """

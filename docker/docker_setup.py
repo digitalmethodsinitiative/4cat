@@ -72,7 +72,6 @@ if __name__ == "__main__":
         config_parser.add_section('SERVER')
         public_port = os.environ['PUBLIC_PORT']
         config_parser['SERVER']['public_port'] = public_port
-        # TODO: allow server_name to be updated; still need default for access
         config_parser['SERVER']['server_name'] = os.environ['SERVER_NAME']
 
         # Save config file
@@ -80,28 +79,38 @@ if __name__ == "__main__":
             config_parser.write(configfile)
             print('Created config/config.ini file')
 
-        import config
-        # Check if config.py has old docker_config info
-        # TODO: remove after database config merge
-        if hasattr(config, 'DOCKER_CONFIG_FILE'):
-            if not Path(config.DOCKER_CONFIG_FILE).is_file():
-                os.makedirs(os.path.dirname(config.DOCKER_CONFIG_FILE))
-            with open(config.DOCKER_CONFIG_FILE, 'w') as configfile:
-                config_parser.write(configfile)
-
         # Ensure filepaths exist
-        for path in [config.PATH_DATA,
-                     config.PATH_IMAGES,
-                     config.PATH_LOGS,
-                     config.PATH_LOCKFILE,
-                     config.PATH_SESSIONS,
+        import common.config_manager as config
+        for path in [config.get('PATH_DATA'),
+                     config.get('PATH_IMAGES'),
+                     config.get('PATH_LOGS'),
+                     config.get('PATH_LOCKFILE'),
+                     config.get('PATH_SESSIONS'),
                      ]:
-            if Path(config.PATH_ROOT, path).is_dir():
+            if Path(config.get('PATH_ROOT'), path).is_dir():
                 pass
             else:
-                os.makedirs(Path(config.PATH_ROOT, path))
+                os.makedirs(Path(config.get('PATH_ROOT'), path))
 
-    # Config file already exists
+        # Update some settings
+        your_server = config.get('SERVER_NAME', 'localhost')
+        if int(public_port) == 80:
+            config.set_value('SERVER_NAME', your_server)
+        else:
+            config.set_value('SERVER_NAME', f"{your_server}:{public_port}")
+
+        whitelist = config.get('HOSTNAME_WHITELIST')# only these may access the web tool; "*" or an empty list matches everything
+        if your_server not in whitelist:
+            whitelist.append(your_server)
+            config.set_value('HOSTNAME_WHITELIST', whitelist)
+
+        api_whitelist = config.get('HOSTNAME_WHITELIST_API')# hostnames matching these are exempt from rate limiting
+        if your_server not in api_whitelist:
+            api_whitelist.append(your_server)
+            config.set_value('HOSTNAME_WHITELIST_API', api_whitelist)
+
+
+    # Config file already exists; Update .env variables if they changed 
     else:
         print('Configuration file config/config.ini already exists')
         print('Updating Docker .env variables if necessary')
@@ -121,11 +130,9 @@ if __name__ == "__main__":
         with open(CONFIG_FILE, 'w') as configfile:
             config_parser.write(configfile)
 
-        import config
-        # Check if config.py has old docker_config info
-        # TODO: remove after database config merge
-        if hasattr(config, 'DOCKER_CONFIG_FILE'):
-            if not Path(config.DOCKER_CONFIG_FILE).is_file():
-                os.makedirs(os.path.dirname(config.DOCKER_CONFIG_FILE))
-            with open(config.DOCKER_CONFIG_FILE, 'w') as configfile:
-                config_parser.write(configfile)
+        import common.config_manager as config
+        your_server = config.get('SERVER_NAME', 'localhost')
+        if int(public_port) == 80:
+          config.set_value('SERVER_NAME', your_server)
+        else:
+          config.set_value('SERVER_NAME', f"{your_server}:{public_port}")

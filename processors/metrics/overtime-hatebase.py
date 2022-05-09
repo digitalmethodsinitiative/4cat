@@ -8,8 +8,7 @@ import re
 from backend.abstract.processor import BasicProcessor
 from common.lib.helpers import UserInput, get_interval_descriptor
 
-import config
-
+import common.config_manager as config
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
 __maintainer__ = "Stijn Peeters"
@@ -116,7 +115,7 @@ class OvertimeHatefulAnalysis(BasicProcessor):
 			self.dataset.finish(0)
 			return
 
-		with open(config.PATH_ROOT + "/common/assets/hatebase/hatebase-%s.json" % language) as hatebasedata:
+		with open(config.get('PATH_ROOT') + "/common/assets/hatebase/hatebase-%s.json" % language) as hatebasedata:
 			hatebase = json.loads(hatebasedata.read())
 
 		hatebase = {term.lower(): hatebase[term] for term in hatebase}

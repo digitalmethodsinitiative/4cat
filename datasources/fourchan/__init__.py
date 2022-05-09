@@ -7,8 +7,7 @@ Initialize 4chan data source
 # backend helpers library.
 from common.lib.helpers import init_datasource as base_init_datasource
 
-import config
-
+import common.config_manager as config
 # Internal identifier for this data source
 #
 # This name is to be used whenever referring to the data source or a property
@@ -31,11 +30,12 @@ def init_datasource(database, logger, queue, name):
 	:param JobQueue queue:  Job Queue instance
 	:param string name:  ID of datasource that is being initialised
 	"""
-	interval = config.DATASOURCES[name]["interval"]
+	base_config = config.get('DATASOURCES').get(name, {})
+	interval = base_config.get("interval", 0)
 
-	if config.DATASOURCES[name].get("autoscrape", False):
-		for board in config.DATASOURCES[name]["boards"]:
-			if config.DATASOURCES[name].get("no_scrape") and board in config.DATASOURCES[name].get("no_scrape"):
+	if base_config.get("autoscrape", False):
+		for board in base_config.get("boards", []):
+			if base_config.get("no_scrape") and board in base_config.get("no_scrape"):
 				continue
 			else:
 				queue.add_job(name + "-board", {}, board, 0, interval)

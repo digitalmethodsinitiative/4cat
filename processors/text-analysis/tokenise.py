@@ -13,8 +13,7 @@ from nltk.tokenize import word_tokenize, TweetTokenizer, sent_tokenize
 from common.lib.helpers import UserInput, get_interval_descriptor
 from backend.abstract.processor import BasicProcessor
 
-import config
-
+import common.config_manager as config
 __author__ = ["Stijn Peeters", "Sal Hagen"]
 __credits__ = ["Stijn Peeters", "Sal Hagen"]
 __maintainer__ = ["Stijn Peeters", "Sal Hagen"]
@@ -168,7 +167,7 @@ class Tokenise(BasicProcessor):
 		# load word filters - words to exclude from tokenisation
 		word_filter = set()
 		for wordlist in self.parameters.get("filter", []):
-			with open(config.PATH_ROOT + "/common/assets/wordlists/%s.txt" % wordlist, encoding="utf-8") as input:
+			with open(config.get('PATH_ROOT') + "/common/assets/wordlists/%s.txt" % wordlist, encoding="utf-8") as input:
 				word_filter = set.union(word_filter, input.read().splitlines())
 
 		# Extend or limit the word filter with optionally added words

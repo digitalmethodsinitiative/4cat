@@ -22,8 +22,7 @@ import inspect
 import json
 import re
 
-import config
-
+import common.config_manager as config
 
 class OpenAPICollector:
 	"""
@@ -195,15 +194,15 @@ class OpenAPICollector:
 		"""
 		spec = {
 			"swagger": "2.0",
-			"host": config.FlaskConfig.SERVER_NAME,
+			"host": config.get("flask.server_name"),
 			"info": {
-				"title": config.TOOL_NAME_LONG + " RESTful API",
-				"description": "This API allows interfacing with the " + config.TOOL_NAME + " Capture and Analysis"
+				"title": config.get("4cat.name_long") + " RESTful API",
+				"description": "This API allows interfacing with the " + config.get("4cat.name") + " Capture and Analysis"
 							   "Toolkit, offering endpoints through which one may query our corpora via "
 							   "keyword-based search, and run further analysis on the results.",
 				"version": "1.0.0",
 				"contact": {
-					"email": config.ADMIN_EMAILS[0] if config.ADMIN_EMAILS else ""
+					"email": config.get("mail.admin_email", "")
 				}
 			},
 			"paths": {

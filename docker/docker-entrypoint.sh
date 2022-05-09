@@ -43,6 +43,9 @@ fi
 python3 docker/docker_setup.py
 
 echo 'Starting app'
+cd /usr/src/app
+
+echo 'Starting app'
 echo "4CAT is accessible at:"
 echo "http://$SERVER_NAME:$PUBLIC_PORT"
 echo ''

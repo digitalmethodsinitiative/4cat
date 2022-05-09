@@ -12,8 +12,7 @@ import datetime
 import dateutil.parser
 import csv
 import os
-import config
-
+import common.config_manager as config
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.helpers import UserInput, convert_to_int
 from backend.abstract.processor import BasicProcessor
@@ -37,14 +36,25 @@ class PixPlotGenerator(BasicProcessor):
 				  "algorithmically grouped by similarity."
 	extension = "html"  # extension of result file, used internally and in UI
 
-	# PixPlot requires a minimum number of photos to be created
-	# This is currently due to the clustering algorithm which creates 12 clusters
-	min_photos_needed = 12
-
 	references = [
 		"[PixPlot](https://pixplot.io/)",
 		"[Parameter documentation](https://pixplot.io/docs/api/parameters.html)"
 	]
+
+	# PixPlot requires a minimum number of photos to be created
+	# This is currently due to the clustering algorithm which creates 12 clusters
+	min_photos_needed = 12
+
+	config = {
+	# If you host a version of https://github.com/digitalmethodsinitiative/dmi_pix_plot, you can use a processor to publish
+	# downloaded images into a PixPlot there
+		'pix-plot.PIXPLOT_SERVER': {
+			'type': UserInput.OPTION_TEXT,
+			'default' : "",
+			'help': 'PixPlot Server Address/URL',
+			'tooltip': "",
+			},
+		}
 
 	options = {
 		"amount": {
@@ -106,11 +116,11 @@ class PixPlotGenerator(BasicProcessor):
 	def is_compatible_with(cls, module=None):
 		"""
 		Allow processor on token sets;
-		Checks if PIXPLOT_SERVER set in config.py
+		Checks if pix-plot.PIXPLOT_SERVER set
 
 		:param module: Dataset or processor to determine compatibility with
 		"""
-		return module.type.startswith("image-downloader") and hasattr(config, 'PIXPLOT_SERVER') and config.PIXPLOT_SERVER
+		return module.type.startswith("image-downloader") and config.get('pix-plot.PIXPLOT_SERVER')
 
 	def process(self):
 		"""
@@ -141,7 +151,7 @@ class PixPlotGenerator(BasicProcessor):
 		data = {'folder_name': image_label}
 
 		# Check if images have already been sent
-		filename_url = config.PIXPLOT_SERVER.rstrip('/') + '/api/list_filenames?folder_name=' + image_label
+		filename_url = config.get('pix-plot.PIXPLOT_SERVER').rstrip('/') + '/api/list_filenames?folder_name=' + image_label
 		filename_response = requests.get(filename_url)
 
 		# Check if 4CAT has access to this PixPlot server
@@ -175,13 +185,13 @@ class PixPlotGenerator(BasicProcessor):
 		self.dataset.update_status("Collecting metadata")
 		metadata_file_path = self.format_metadata(staging_area)
 		# Metadata
-		upload_url = config.PIXPLOT_SERVER.rstrip('/') + '/api/send_metadata'
+		upload_url = config.get('pix-plot.PIXPLOT_SERVER').rstrip('/') + '/api/send_metadata'
 		metadata_response = requests.post(upload_url, files={'metadata': open(metadata_file_path, 'rb')}, data=data)
 
 		# Now send photos to PixPlot
 		self.dataset.update_status("Uploading images to PixPlot")
 		# Configure upload photo url
-		upload_url = config.PIXPLOT_SERVER.rstrip('/') + '/api/send_photo'
+		upload_url = config.get('pix-plot.PIXPLOT_SERVER').rstrip('/') + '/api/send_photo'
 		images_uploaded = 0
 		estimated_num_images = len(filenames)
 		self.dataset.update_status("Uploading %i images" % (estimated_num_images))
@@ -204,7 +214,7 @@ class PixPlotGenerator(BasicProcessor):
 
 		# Request PixPlot server create PixPlot
 		self.dataset.update_status("Sending create PixPlot request")
-		create_plot_url = config.PIXPLOT_SERVER.rstrip('/') + '/api/pixplot'
+		create_plot_url = config.get('pix-plot.PIXPLOT_SERVER').rstrip('/') + '/api/pixplot'
 		# Gather info from PixPlot server response
 		create_pixplot_post_info = metadata_response.json()['create_pixplot_post_info']
 		# Create json package for creation request
@@ -228,7 +238,7 @@ class PixPlotGenerator(BasicProcessor):
 		if resp.status_code == 202:
 			# new request
 			new_request = True
-			results_url = config.PIXPLOT_SERVER.rstrip('/') + '/api/pixplot?key=' + resp.json()['key']
+			results_url = config.get('pix-plot.PIXPLOT_SERVER').rstrip('/') + '/api/pixplot?key=' + resp.json()['key']
 		elif 'already exists' in resp.json()['error']:
 			# repeat request
 			new_request = False
@@ -257,7 +267,7 @@ class PixPlotGenerator(BasicProcessor):
 				elif 'report' in result.json().keys() and result.json()['report'][-6:-1] == 'Done!':
 					# Complete without error
 					self.dataset.update_status("PixPlot Completed!")
-					self.log.info('PixPlot saved on : ' + config.PIXPLOT_SERVER)
+					self.log.info('PixPlot saved on : ' + config.get('pix-plot.PIXPLOT_SERVER'))
 					break
 				else:
 					# Something botched
@@ -266,7 +276,7 @@ class PixPlotGenerator(BasicProcessor):
 					break
 
 		# Create HTML file
-		plot_url = config.PIXPLOT_SERVER.rstrip('/') + '/plots/' + plot_label + '/index.html'
+		plot_url = config.get('pix-plot.PIXPLOT_SERVER').rstrip('/') + '/plots/' + plot_label + '/index.html'
 		html_file = self.get_html_page(plot_url)
 
 		# Write HTML file

@@ -9,8 +9,7 @@ import json
 import unicodedata
 import random
 
-import config
-
+import common.config_manager as config
 from common.lib.helpers import UserInput
 from backend.abstract.processor import BasicProcessor
 
@@ -365,8 +364,8 @@ class SigmaNetwork(BasicProcessor):
 		</html>
 		"""
 
-		server_url = "https" if config.FlaskConfig.SERVER_HTTPS else "http"
-		server_url += "://%s" % config.FlaskConfig.SERVER_NAME
+		server_url = "https" if config.get("flask.https") else "http"
+		server_url += "://%s" % config.get("flask.server_name")
 
 		if not server_url.endswith("/"):
 			server_url += "/"

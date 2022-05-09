@@ -15,8 +15,7 @@ from lxml import etree
 from lxml.cssselect import CSSSelector as css
 from io import StringIO, BytesIO
 
-import config
-
+import common.config_manager as config
 from common.lib.helpers import UserInput
 from backend.abstract.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
@@ -68,6 +67,37 @@ class ImageDownloader(BasicProcessor):
 					   "separately"
 		}
 	}
+
+	@classmethod
+	def get_options(cls, parent_dataset=None, user=None):
+		"""
+		Get processor options
+
+		Give the user the choice of where to upload the dataset, if multiple
+		TCAT servers are configured. Otherwise, no options are given since
+		there is nothing to choose.
+
+		:param DataSet parent_dataset:  Dataset that will be uploaded
+		:param User user:  User that will be uploading it
+		:return dict:  Option definition
+		"""
+		max_number_images = int(config.get('image_downloader.MAX_NUMBER_IMAGES', 1000))
+
+		return {
+			"amount": {
+				"type": UserInput.OPTION_TEXT,
+				"help": "No. of images (max %s)" % max_number_images,
+				"default": 100,
+				"min": 0,
+				"max": max_number_images
+			},
+			"columns": {
+				"type": UserInput.OPTION_TEXT,
+				"help": "Column to get image links from",
+				"default": "image_url",
+				"tooltip": "If column contains a single URL, use that URL; else, try to find image URLs in the column's content"
+			},
+		}
 
 	@classmethod
 	def is_compatible_with(cls, module=None):
@@ -179,7 +209,7 @@ class ImageDownloader(BasicProcessor):
 				md5.update(base64.b64decode(item["image_md5"]))
 				extension = item["image_file"].split(".")[-1]
 
-				local_path = Path(config.PATH_IMAGES, md5.hexdigest() + "." + extension)
+				local_path = Path(config.get('PATH_IMAGES'), md5.hexdigest() + "." + extension)
 				if local_path.exists():
 					local_path = str(local_path.absolute())
 					item_urls.add(local_path)
@@ -445,9 +475,9 @@ class ImageDownloader(BasicProcessor):
 		time.sleep(rate_limit)
 
 		# cache the image for later, if configured so
-		if config.PATH_IMAGES:
-			local_path = Path(config.PATH_IMAGES, md5.hexdigest() + "." + extension)
-			with open(local_path, 'wb') as outfile:
+		if config.get('PATH_IMAGES'):
+			local_path = Path(config.get('PATH_IMAGES'), md5.hexdigest() + "." + extension)
+			with open(local_path, 'wb') as file:
 				for chunk in image.iter_content(1024):
 					outfile.write(chunk)
 

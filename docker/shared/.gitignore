@@ -1,5 +1,4 @@
 # Ignore everything in this directory
 *
-# Except these files
+# Except this file
 !.gitignore
-!config.ini-example

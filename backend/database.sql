@@ -3,6 +3,12 @@
 -- on a fresh 4CAT install - individual data sources may also provide their
 -- own database.sql files with data source-specific tables and indices.
 
+-- 4CAT settings table
+CREATE TABLE IF NOT EXISTS settings (
+  name                   TEXT UNIQUE PRIMARY KEY,
+  value                  TEXT DEFAULT '{}'
+);
+
 -- jobs table
 CREATE TABLE IF NOT EXISTS jobs (
   id                     SERIAL PRIMARY KEY,
@@ -109,3 +115,36 @@ CREATE FUNCTION count_estimate(query text) RETURNS bigint AS $$
     RETURN rec."QUERY PLAN"->0->'Plan'->'Plan Rows';
   END;
   $$ LANGUAGE plpgsql VOLATILE STRICT;
+
+
+-- fourcat settings insert default settings
+INSERT INTO settings
+  (name, value)
+  Values
+    ('DATASOURCES', '{"bitchute": {}, "custom": {}, "douban": {}, "customimport": {}, "parler": {}, "reddit": {"boards": "*"}, "telegram": {}, "twitterv2": {"id_lookup": false}}'),
+    ('4cat.name', '"4CAT"'),
+    ('4cat.name_long', '"4CAT: Capture and Analysis Toolkit"'),
+    ('4cat.github_url', '"https://github.com/digitalmethodsinitiative/4cat"'),
+    ('path.versionfile', '".git-checked-out"'),
+    ('expire.timeout', '0'),
+    ('expire.allow_optout', 'true'),
+    ('logging.slack.level', '"WARNING"'),
+    ('logging.slack.webhook', 'null'),
+    ('mail.admin_email', 'null'),
+    ('mail.host', 'null'),
+    ('mail.ssl', 'false'),
+    ('mail.username', 'null'),
+    ('mail.password', 'null'),
+    ('mail.noreply', '"noreply@localhost"'),
+    ('SCRAPE_TIMEOUT', '5'),
+    ('SCRAPE_PROXIES', '{"http": []}'),
+    ('IMAGE_INTERVAL', '3600'),
+    ('explorer.max_posts', '100000'),
+    ('flask.flask_app', '"webtool/fourcat"'),
+    ('flask.secret_key', concat('"', substr(md5(random()::text), 0, 25), '"')),
+    ('flask.https', 'false'),
+    ('flask.server_name', '"localhost"'),
+    ('flask.autologin.name', '"Automatic login"'),
+    ('flask.autologin.hostnames', '["localhost"]'),
+    ('flask.autologin.api', '["localhost"]')
+    ON CONFLICT DO NOTHING;

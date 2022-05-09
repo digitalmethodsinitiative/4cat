@@ -9,8 +9,7 @@ from pathlib import Path
 
 from telethon import TelegramClient
 
-import config
-
+import common.config_manager as config
 from backend.abstract.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.helpers import UserInput
@@ -35,24 +34,47 @@ class TelegramImageDownloader(BasicProcessor):
                   "Note that not always all images can be retrieved. A JSON metadata file is included in the output " \
                   "archive."  # description displayed in UI
     extension = "zip"  # extension of result file, used internally and in UI
-
-    max_number_images = int(config.MAX_NUMBER_IMAGES) if hasattr(config, 'MAX_NUMBER_IMAGES') else 1000
     flawless = True
 
-    options = {
-        "amount": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "No. of images (max %s)" % max_number_images,
-            "default": 100,
-            "min": 0,
-            "max": max_number_images
-        },
-        "video-thumbnails": {
-            "type": UserInput.OPTION_TOGGLE,
-            "help": "Include videos (as thumbnails)",
-            "default": False
+    config = {
+        'image-downloader-telegram.MAX_NUMBER_IMAGES': {
+            'type': UserInput.OPTION_TEXT,
+            'default' : "1000",
+            'help': 'Max images',
+            'tooltip': "Maxmimum number of Telegram images a user can download.",
+            },
         }
-    }
+
+    @classmethod
+    def get_options(cls, parent_dataset=None, user=None):
+        """
+        Get processor options
+
+        Give the user the choice of where to upload the dataset, if multiple
+        TCAT servers are configured. Otherwise, no options are given since
+        there is nothing to choose.
+
+        :param DataSet parent_dataset:  Dataset that will be uploaded
+        :param User user:  User that will be uploading it
+        :return dict:  Option definition
+        """
+        max_number_images = int(config.get('image_downloader_telegram.MAX_NUMBER_IMAGES', 1000))
+
+        return {
+            "amount": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "No. of images (max %s)" % max_number_images,
+                "default": 100,
+                "min": 0,
+                "max": max_number_images
+            },
+            "video-thumbnails": {
+                "type": UserInput.OPTION_TOGGLE,
+                "help": "Include videos (as thumbnails)",
+                "default": False
+            }
+        }
+
 
     @classmethod
     def is_compatible_with(cls, module=None):
@@ -101,7 +123,7 @@ class TelegramImageDownloader(BasicProcessor):
         query = self.source_dataset.top_parent().parameters
         hash_base = query["api_phone"].replace("+", "") + query["api_id"] + query["api_hash"]
         session_id = hashlib.blake2b(hash_base.encode("ascii")).hexdigest()
-        session_path = Path(config.PATH_ROOT).joinpath(config.PATH_SESSIONS, session_id + ".session")
+        session_path = Path(config.get('PATH_ROOT')).joinpath(config.get('PATH_SESSIONS'), session_id + ".session")
         amount = self.parameters.get("amount")
         with_thumbnails = self.parameters.get("video-thumbnails")
         client = None
@@ -193,26 +215,3 @@ class TelegramImageDownloader(BasicProcessor):
         told they need to re-authenticate via 4CAT.
         """
         raise RuntimeError("Connection cancelled")
-
-    @classmethod
-    def get_options(cls=None, parent_dataset=None, user=None):
-        """
-        Get processor options
-
-        This method by default returns the class's "options" attribute, but
-        will lift the limit on the amount of images collected from Telegram
-        user requesting the options has been configured as such.
-
-        :param DataSet parent_dataset:  An object representing the dataset that
-        the processor would be run on
-        :param User user:  Flask user the options will be displayed for, in
-        case they are requested for display in the 4CAT web interface. This can
-        be used to show some options only to privileges users.
-        """
-        options = cls.options.copy()
-
-        if user and user.get_value("telegram.can_query_all_messages", False):
-            if "max" in options["amount"]:
-                del options["amount"]["max"]
-
-        return options

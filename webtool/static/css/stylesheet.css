@@ -157,6 +157,12 @@ fieldset {
     border-bottom: 1px dotted var(--contrast-dark);
 }
 
+fieldset legend {
+    margin-bottom: 0.5em;
+    box-sizing: border-box;
+    width: 100%;
+}
+
 p.form-notice {
     text-align: center;
     color: var(--accent-alternate);
@@ -583,7 +589,7 @@ article.with-aside {
     grid-column-gap: 1em;
 }
 
-article h2, .blocktitle {
+article h2, .blocktitle, fieldset legend {
     border-left: 0.5em solid var(--accent);
     background: var(--contrast-dark);
     color: var(--contrast-bright);
@@ -591,6 +597,7 @@ article h2, .blocktitle {
     font-size: 1.5em;
     font-weight: bold;
     padding: 0.5em 0;
+    display: block;
 }
 
 article h2 a, .blocktitle a {
@@ -601,7 +608,7 @@ h4 {
     font-weight: bold;
 }
 
-h4.blocktitle, h3.blocktitle {
+h4.blocktitle, h3.blocktitle, fieldset legend {
     border-left: 0;
     text-align: left;
     font-size: 1em;

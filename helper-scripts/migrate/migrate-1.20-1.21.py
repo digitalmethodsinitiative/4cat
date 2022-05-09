@@ -9,10 +9,13 @@ sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)) + "'/../..")
 from common.lib.database import Database
 from common.lib.logger import Logger
 
-import config
-
 log = Logger(output=True)
-db = Database(logger=log, dbname=config.DB_NAME, user=config.DB_USER, password=config.DB_PASSWORD, host=config.DB_HOST, port=config.DB_PORT, appname="4cat-migrate")
+try:
+    import config
+    db = Database(logger=log, dbname=config.DB_NAME, user=config.DB_USER, password=config.DB_PASSWORD, host=config.DB_HOST, port=config.DB_PORT, appname="4cat-migrate")
+except (SyntaxError, ImportError) as e:
+    import common.config_manager as config
+    db = Database(logger=log, dbname=config.get('DB_NAME'), user=config.get('DB_USER'), password=config.get('DB_PASSWORD'), host=config.get('DB_HOST'), port=config.get('DB_PORT'), appname="4cat-migrate")
 
 for datasource in ("4chan", "8kun", "8chan"):
 	print("  Checking for %s database tables... " % datasource, end="")
@@ -34,7 +37,7 @@ for datasource in ("4chan", "8kun", "8chan"):
 		make_primary_threads_key = True
 	else:
 		constraint_col, constraint_name = thread_constraints[0]
-		
+
 		if constraint_col == "id_seq":
 			print("  id_seq already the primary key for threads %s" % datasource)
 		else:
@@ -62,7 +65,7 @@ for datasource in ("4chan", "8kun", "8chan"):
 		make_primary_posts_key = True
 	else:
 		constraint_col, constraint_name = post_constraints[0]
-		
+
 		if constraint_col == "id_seq":
 			print("  id_seq already the primary key for posts %s" % datasource)
 		else:

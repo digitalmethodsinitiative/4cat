@@ -9,20 +9,21 @@ import psycopg2
 import markdown
 
 import backend
-import config
-
+import common.config_manager as config
 from pathlib import Path
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
-from flask import render_template, jsonify, request, abort, flash, get_flashed_messages, url_for, redirect
+from flask import render_template, jsonify, request, abort, flash, get_flashed_messages, url_for
 from flask_login import login_required, current_user
 
 from webtool import app, db
 from webtool.lib.helpers import admin_required, error, Pagination
 from webtool.lib.user import User
 
-from common.lib.helpers import call_api, send_email
+from common.lib.helpers import call_api, send_email, UserInput
+from common.lib.exceptions import QueryParametersException
+import common.lib.config_definition as config_definition
 
 
 @app.route('/admin/', defaults={'page': 1})
@@ -168,9 +169,9 @@ def reject_user():
 
     if incomplete:
         if not form_message:
-            form_answer = Path(config.PATH_ROOT, "webtool/pages/reject-template.md")
+            form_answer = Path(config.get('PATH_ROOT'), "webtool/pages/reject-template.md")
             if not form_answer.exists():
-                form_message = "No %s 4 u" % config.TOOL_NAME
+                form_message = "No %s 4 u" % config.get("4cat.name")
             else:
                 form_message = form_answer.read_text(encoding="utf-8")
                 form_message = form_message.replace("{{ name }}", name)
@@ -180,9 +181,9 @@ def reject_user():
                                incomplete=incomplete)
 
     message = MIMEMultipart("alternative")
-    message["From"] = config.NOREPLY_EMAIL
+    message["From"] = config.get('NOREPLY_EMAIL')
     message["To"] = email_address
-    message["Subject"] = "Your %s account request" % config.TOOL_NAME
+    message["Subject"] = "Your %s account request" % config.get("4cat.name")
 
     html_message = markdown.markdown(form_message)
     message.attach(MIMEText(form_message, "plain"))
@@ -273,3 +274,52 @@ def manipulate_user(mode):
 @login_required
 def delete_user():
     abort(501, "Deleting users is not possible at the moment")
+
+@app.route("/admin/settings", methods=["GET", "POST"])
+@login_required
+@admin_required
+def update_settings():
+    definition = config_definition.config_definition
+    categories = config_definition.categories
+    modules = {
+        **{datasource: definition["name"] for datasource, definition in backend.all_modules.datasources.items()},
+        **{processor.type: processor.title if hasattr(processor, "title") else processor.type for processor in backend.all_modules.processors.values()}
+    }
+
+    for processor in backend.all_modules.processors.values():
+        if hasattr(processor, "config"):
+            definition.update(processor.config)
+
+    if request.method == "POST":
+        try:
+            new_settings = UserInput.parse_all(definition, request.form.to_dict(),
+                                              silently_correct=False)
+
+            for setting, value in new_settings.items():
+                valid = config.set_value(setting, value, raw=definition[setting].get("type") == UserInput.OPTION_TEXT_JSON)
+                if valid is None:
+                    flash("Invalid value for %s" % setting)
+
+            flash("Settings saved")
+        except QueryParametersException as e:
+            flash("Invalid settings: %s" % str(e))
+
+    all_settings = config.get_all()
+    options = {}
+
+    for option in sorted({*all_settings.keys(), *definition.keys()}):
+        if definition.get(option, {}).get("type") != UserInput.OPTION_TEXT_JSON:
+            default = all_settings.get(option, definition.get(option, {}).get("default"))
+        else:
+            default = json.dumps(all_settings.get(option, definition.get(option, {}.get("default"))))
+
+        options[option] = {
+            **definition.get(option, {
+                "type": UserInput.OPTION_TEXT,
+                "help": option,
+                "default": all_settings.get(option)
+            }),
+            "default": default
+        }
+
+    return render_template("controlpanel/config.html", options=options, flashes=get_flashed_messages(), categories=categories, modules=modules)

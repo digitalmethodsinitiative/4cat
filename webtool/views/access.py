@@ -13,8 +13,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
 sys.path.insert(0, os.path.dirname(__file__) + '/../..')
-import config
-
+import common.config_manager as config
 from flask import request, abort, render_template, redirect, url_for, flash, get_flashed_messages
 from flask_login import login_user, login_required, logout_user, current_user
 from webtool import app, login_manager, db
@@ -91,7 +90,7 @@ def autologin_whitelist():
 	Checks if host name matches whitelisted hostmask. If so, the user is logged
 	in as the special "autologin" user.
 	"""
-	if not config.FlaskConfig.HOSTNAME_WHITELIST:
+	if not config.get("flask.autologin.hostnames"):
 		# if there's not whitelist, there's no point in checking it
 		return
 
@@ -115,7 +114,7 @@ def autologin_whitelist():
 
 	# uva is a special user that is automatically logged in for this request only
 	# if the hostname matches the whitelist
-	for hostmask in config.FlaskConfig.HOSTNAME_WHITELIST:
+	for hostmask in config.get("flask.autologin.hostnames"):
 		if fnmatch.filter([hostname], hostmask):
 			autologin_user = User.get_by_name(db, "autologin")
 			if not autologin_user:
@@ -133,7 +132,7 @@ def exempt_from_limit():
 
 	:return bool:  Whether the request's hostname is exempt
 	"""
-	if not config.FlaskConfig.HOSTNAME_WHITELIST_API:
+	if not config.get("flask.autologin.api"):
 		return False
 
 	try:
@@ -142,7 +141,7 @@ def exempt_from_limit():
 	except (socket.herror, socket.timeout):
 		return False
 
-	for hostmask in config.FlaskConfig.HOSTNAME_WHITELIST_API:
+	for hostmask in config.get("flask.autologin.api"):
 		if fnmatch.filter([hostname], hostmask):
 			return True
 
@@ -252,11 +251,11 @@ def request_access():
 	sent to the 4CAT admin via e-mail so they can create an account (if
 	approved)
 	"""
-	if not config.ADMIN_EMAILS:
+	if not config.get('mail.admin_email'):
 		return render_template("error.html",
                                message="No administrator e-mail is configured; the request form cannot be displayed.")
 
-	if not config.MAILHOST:
+	if not config.get('mail.server'):
 		return render_template("error.html",
                                message="No e-mail server configured; the request form cannot be displayed.")
 
@@ -265,7 +264,7 @@ def request_access():
 
 	incomplete = []
 
-	policy_template = Path(config.PATH_ROOT, "webtool/pages/access-policy.md")
+	policy_template = Path(config.get('PATH_ROOT'), "webtool/pages/access-policy.md")
 	access_policy = ""
 	if policy_template.exists():
 		access_policy = policy_template.read_text(encoding="utf-8")
@@ -281,18 +280,18 @@ def request_access():
 		else:
 			html_parser = html2text.HTML2Text()
 
-			sender = config.NOREPLY_EMAIL
+			sender = config.get('mail.noreply')
 			message = MIMEMultipart("alternative")
 			message["Subject"] = "Account request"
 			message["From"] = sender
-			message["To"] = config.ADMIN_EMAILS[0]
+			message["To"] = config.get('mail.admin_email', "")
 
 			mail = "<p>Hello! Someone requests a 4CAT Account:</p>\n"
 			for field in required:
 				mail += "<p><b>" + field + "</b>: " + request.form.get(field, "") + " </p>\n"
 
-			root_url = "https" if config.FlaskConfig.SERVER_HTTPS else "http"
-			root_url += "://%s/admin/" % config.FlaskConfig.SERVER_NAME
+			root_url = "https" if config.get("flask.https") else "http"
+			root_url += "://%s/admin/" % config.get("flask.server_name")
 			approve_url = root_url + "add-user/?format=html&email=%s" % request.form.get("email", "")
 			reject_url = root_url + "reject-user/?name=%s&email=%s" % (request.form.get("name", ""), request.form.get("email", ""))
 			mail += "<p>Use <a href=\"%s\">this link</a> to approve this request and send a password reset e-mail.</p>" % approve_url
@@ -303,7 +302,7 @@ def request_access():
 			message.attach(MIMEText(mail, "html"))
 
 			try:
-				send_email(config.ADMIN_EMAILS, message)
+				send_email(config.get('mail.admin_email'), message)
 				return render_template("error.html", title="Thank you",
                                        message="Your request has been submitted; we'll try to answer it as soon as possible.")
 			except (smtplib.SMTPException, ConnectionRefusedError, socket.timeout) as e:

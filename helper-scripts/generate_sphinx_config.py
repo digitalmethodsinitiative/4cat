@@ -21,8 +21,7 @@ import os
 import re
 
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)) + "/..")
-import config
-
+import common.config_manager as config
 
 # parse parameters
 cli = argparse.ArgumentParser()
@@ -66,7 +65,7 @@ for conf in confs:
 		print("...data source %s has no datasource identifier set. Skipping." % datasource_id)
 		continue
 
-	if datasource not in config.DATASOURCES:
+	if datasource not in config.get('DATASOURCES'):
 		# data source is not enabled
 		print("...not enabled. Skipping.")
 		continue
@@ -99,11 +98,11 @@ sphinxconf = sphinxconf.replace("%%SOURCES%%", "\n".join(sources))
 sphinxconf = sphinxconf.replace("%%INDEXES%%", "\n".join(indexes))
 sphinxconf = sphinxconf.replace("%%DATADIR%%", "../data")
 
-sphinxconf = sphinxconf.replace("%%DBLOCATION%%", str(config.DB_HOST))
-sphinxconf = sphinxconf.replace("%%DBUSER%%", str(config.DB_USER))
-sphinxconf = sphinxconf.replace("%%DBPASS%%", str(config.DB_PASSWORD.replace("#", "\\#")))
-sphinxconf = sphinxconf.replace("%%DBNAME%%", str(config.DB_NAME))
-sphinxconf = sphinxconf.replace("%%DBPORT%%", str(config.DB_PORT))
+sphinxconf = sphinxconf.replace("%%DBLOCATION%%", str(config.get('DB_HOST')))
+sphinxconf = sphinxconf.replace("%%DBUSER%%", str(config.get('DB_USER')))
+sphinxconf = sphinxconf.replace("%%DBPASS%%", str(config.get('DB_PASSWORD').replace("#", "\\#")))
+sphinxconf = sphinxconf.replace("%%DBNAME%%", str(config.get('DB_NAME')))
+sphinxconf = sphinxconf.replace("%%DBPORT%%", str(config.get('DB_PORT')))
 
 with open(args.output, "w") as output:
 	output.write(sphinxconf)

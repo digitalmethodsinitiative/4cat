@@ -9,8 +9,7 @@ from backend.abstract.processor import BasicProcessor
 from common.lib.helpers import UserInput
 from common.lib.exceptions import ProcessorInterruptedException
 
-import config
-
+import common.config_manager as config
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
 __maintainer__ = "Stijn Peeters"
@@ -72,7 +71,7 @@ class HatebaseAnalyser(BasicProcessor):
 			return
 
 		# read and convert to a way we can easily match whether any word occurs
-		with open(config.PATH_ROOT + "/common/assets/hatebase/hatebase-%s.json" % language) as hatebasedata:
+		with open(config.get('PATH_ROOT') + "/common/assets/hatebase/hatebase-%s.json" % language) as hatebasedata:
 			hatebase = json.loads(hatebasedata.read())
 
 		hatebase = {term.lower(): hatebase[term] for term in hatebase}

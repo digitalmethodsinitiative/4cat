@@ -848,29 +848,29 @@ const tooltip = {
 				tooltip_container = target;
 			}
 		});
-		tooltip_container = '#' + tooltip_container;
-		let is_standalone = $(tooltip_container).hasClass('multiple');
+		tooltip_container = $(document.getElementById(tooltip_container));
+		let is_standalone = tooltip_container.hasClass('multiple');
 
-		if ($(tooltip_container).is(':hidden')) {
-			$(tooltip_container).removeClass('force-width');
+		if (tooltip_container.is(':hidden')) {
+			tooltip_container.removeClass('force-width');
 			let position = is_standalone ? $(parent).offset() : $(parent).position();
 			let parent_width = parseFloat($(parent).css('width').replace('px', ''));
-			$(tooltip_container).show();
+			tooltip_container.show();
 
 			// figure out if this is a multiline tooltip
-			content = $(tooltip_container).html();
-			$(tooltip_container).html('1');
-			em_height = $(tooltip_container).height();
-			$(tooltip_container).html(content);
-			if($(tooltip_container).height() > em_height) {
-				$(tooltip_container).addClass('force-width');
+			content = tooltip_container.html();
+			tooltip_container.html('1');
+			em_height = tooltip_container.height();
+			tooltip_container.html(content);
+			if(tooltip_container.height() > em_height) {
+				tooltip_container.addClass('force-width');
 			}
 
 			console.log(position);
-			let width = parseFloat($(tooltip_container).css('width').replace('px', ''));
-			let height = parseFloat($(tooltip_container).css('height').replace('px', ''));
-			$(tooltip_container).css('top', (position.top - height - 5) + 'px');
-			$(tooltip_container).css('left', (position.left + (parent_width / 2) - (width / 2)) + 'px');
+			let width = parseFloat(tooltip_container.css('width').replace('px', ''));
+			let height = parseFloat(tooltip_container.css('height').replace('px', ''));
+			tooltip_container.css('top', (position.top - height - 5) + 'px');
+			tooltip_container.css('left', (position.left + (parent_width / 2) - (width / 2)) + 'px');
 		}
 	},
 
@@ -892,8 +892,8 @@ const tooltip = {
 				tooltip_container = target;
 			}
 		});
-		tooltip_container = '#' + tooltip_container;
-		$(tooltip_container).hide();
+		tooltip_container = $(document.getElementById(tooltip_container));
+		tooltip_container.hide();
 	},
 	/**
 	 * Toggle tooltip between shown and hidden
@@ -905,8 +905,8 @@ const tooltip = {
 			e.preventDefault();
 		}
 
-		let tooltip_container = $('#' + $(this).attr('aria-controls'));
-		if ($(tooltip_container).is(':hidden')) {
+		let tooltip_container = $(document.getElementById($(this).attr('aria-controls')));
+		if (tooltip_container.is(':hidden')) {
 			tooltip.show(e, this);
 		} else {
 			tooltip.hide(e, this);

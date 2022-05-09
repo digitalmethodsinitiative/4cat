@@ -6,7 +6,7 @@ import re
 
 from pathlib import Path
 
-import config
+import common.config_manager as config
 from backend.abstract.worker import BasicWorker
 from common.lib.dataset import DataSet
 from common.lib.exceptions import WorkerInterruptedException
@@ -32,7 +32,7 @@ class TempFileCleaner(BasicWorker):
         :return:
         """
 
-        result_files = Path(config.PATH_DATA).glob("*")
+        result_files = Path(config.get('PATH_DATA')).glob("*")
         for file in result_files:
             if self.interrupted:
                 raise WorkerInterruptedException("Interrupted while cleaning up orphaned result files")

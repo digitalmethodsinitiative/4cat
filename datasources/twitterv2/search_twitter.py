@@ -9,11 +9,9 @@ import json
 import re
 
 from backend.abstract.search import Search
-from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException, QueryNeedsExplicitConfirmationException
-from common.lib.helpers import convert_to_int, UserInput, timify_long
-import config
-
-
+from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException
+from common.lib.helpers import convert_to_int, UserInput
+import common.config_manager as config
 class SearchWithTwitterAPIv2(Search):
     """
     Get Tweets via the Twitter API
@@ -63,7 +61,7 @@ class SearchWithTwitterAPIv2(Search):
             "help": "API Bearer Token"
         },
     }
-    if config.DATASOURCES.get('twitterv2', {}).get('id_lookup', False):
+    if config.get('DATASOURCES').get('twitterv2', {}).get('id_lookup', False):
         options["query_type"] = {
                 "type": UserInput.OPTION_CHOICE,
                 "help": "Query type",

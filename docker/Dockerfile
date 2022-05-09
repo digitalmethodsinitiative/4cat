@@ -12,7 +12,7 @@ RUN apt-get update && apt install -y \
     python3-pip \
     unzip \
     wget \
-    xvfb 
+    xvfb
 
 WORKDIR /usr/src/app
 
@@ -43,5 +43,4 @@ RUN pip3 install gunicorn
 
 # Copy project
 # (Copy example config first, if user has own config, it will replace this)
-COPY ./config.py-example /usr/src/app/config.py
 COPY . /usr/src/app/

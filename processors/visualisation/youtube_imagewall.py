@@ -6,8 +6,7 @@ import shutil
 import pandas as pd
 import math
 
-import config
-
+import common.config_manager as config
 from pathlib import Path
 from collections import Counter
 from PIL import Image, ImageOps, ImageDraw, ImageFont
@@ -171,7 +170,7 @@ class YouTubeImageWall(BasicProcessor):
 					image_archive.extract(file + ".jpg", results_path)
 					delete_after_use = True
 			else:
-				temp_path = Path(config.PATH_ROOT, "common/assets/no-video.jpg")
+				temp_path = Path(config.get('PATH_ROOT'), "common/assets/no-video.jpg")
 
 			# Resize the image
 			image = Image.open(temp_path)
@@ -215,7 +214,7 @@ class YouTubeImageWall(BasicProcessor):
 			wall.paste(wall_old, box=(0,0))
 			# Draw the category on the side
 			# Get a font
-			font = ImageFont.truetype(config.PATH_ROOT + "/common/assets/Inconsolata-Bold.ttf", 50)
+			font = ImageFont.truetype(config.get('PATH_ROOT') + "/common/assets/Inconsolata-Bold.ttf", 50)
 			# Get a drawing context
 			draw = ImageDraw.Draw(wall)
 

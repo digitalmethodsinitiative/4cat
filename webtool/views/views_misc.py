@@ -7,8 +7,7 @@ import csv
 import json
 import markdown
 
-import config
-
+import common.config_manager as config
 from pathlib import Path
 from datetime import datetime
 
@@ -52,7 +51,7 @@ def show_frontpage():
     """
 
     # load corpus stats that are generated daily, if available
-    stats_path = Path(config.PATH_ROOT, "stats.json")
+    stats_path = Path(config.get('PATH_ROOT'), "stats.json")
     if stats_path.exists():
         with stats_path.open() as stats_file:
             stats = stats_file.read()
@@ -63,7 +62,7 @@ def show_frontpage():
     else:
         stats = None
 
-    news_path = Path(config.PATH_ROOT, "news.json")
+    news_path = Path(config.get('PATH_ROOT'), "news.json")
     if news_path.exists():
         with news_path.open() as news_file:
             news = news_file.read()
@@ -107,7 +106,7 @@ def data_overview(datasource=None):
     if datasource not in datasources:
         datasource_name = None
 
-    github_url = config.GITHUB_URL
+    github_url = config.get("4cat.github_url")
 
     # Get information for a specific data source
     datasource_id = None
@@ -172,10 +171,10 @@ def data_overview(datasource=None):
 @app.route('/get-boards/<string:datasource>/')
 @login_required
 def getboards(datasource):
-    if datasource not in config.DATASOURCES or "boards" not in config.DATASOURCES[datasource]:
+    if datasource not in config.get('DATASOURCES') or "boards" not in config.get('DATASOURCES')[datasource]:
         result = False
     else:
-        result = config.DATASOURCES[datasource]["boards"]
+        result = config.get('DATASOURCES')[datasource]["boards"]
 
     return jsonify(result)
 
@@ -194,7 +193,7 @@ def show_page(page):
     """
     page = re.sub(r"[^a-zA-Z0-9-_]*", "", page)
     page_class = "page-" + page
-    page_folder = Path(config.PATH_ROOT, "webtool", "pages")
+    page_folder = Path(config.get('PATH_ROOT'), "webtool", "pages")
     page_path = page_folder.joinpath(page + ".md")
 
     if not page_path.exists():
@@ -205,10 +204,10 @@ def show_page(page):
         page_parsed = markdown.markdown(page_raw)
         page_parsed = re.sub(r"<h2>(.*)</h2>", r"<h2><span>\1</span></h2>", page_parsed)
 
-        if config.ADMIN_EMAILS:
+        if config.get("mail.admin_email"):
             # replace this one explicitly instead of doing a generic config
             # filter, to avoid accidentally exposing config values
-            admin_email = config.ADMIN_EMAILS[0] if config.ADMIN_EMAILS else "4cat-admin@example.com"
+            admin_email = config.get("mail.admin_email", "4cat-admin@example.com")
             page_parsed = page_parsed.replace("%%ADMIN_EMAIL%%", admin_email)
 
     return render_template("page.html", body_content=page_parsed, body_class=page_class, page_name=page)

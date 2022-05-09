@@ -35,8 +35,7 @@ from backend.abstract.scraper import BasicJSONScraper
 from common.lib.exceptions import JobAlreadyExistsException
 from common.lib.helpers import strip_tags
 
-import config
-
+import common.config_manager as config
 
 class ThreadScraper4chan(BasicJSONScraper):
 	"""
@@ -190,8 +189,8 @@ class ThreadScraper4chan(BasicJSONScraper):
 		}
 
 		# this is mostly unsupported, feel free to ignore
-		if hasattr(config, "HIGHLIGHT_SLACKHOOK") and hasattr(config, "HIGHLIGHT_MATCH") and self.type == "4chan-thread":
-			for highlight in config.HIGHLIGHT_MATCH:
+		if config.get('HIGHLIGHT_SLACKHOOK') and config.get('HIGHLIGHT_MATCH') and self.type == "4chan-thread":
+			for highlight in config.get('HIGHLIGHT_MATCH'):
 				attachments = []
 				if highlight.lower() in post_data["body"].lower():
 					if not post_data["country_code"]:
@@ -217,7 +216,7 @@ class ThreadScraper4chan(BasicJSONScraper):
 					continue
 
 				try:
-					requests.post(config.HIGHLIGHT_SLACKHOOK, json.dumps({
+					requests.post(config.get('HIGHLIGHT_SLACKHOOK'), json.dumps({
 						"text": "A post mentioning '%s' was just scraped from %s/%s/:" % (highlight, self.datasource, thread["board"]),
 						"attachments": attachments
 					}))
@@ -272,11 +271,11 @@ class ThreadScraper4chan(BasicJSONScraper):
 		md5 = hashlib.md5()
 		md5.update(base64.b64decode(post["md5"]))
 
-		image_folder = Path(config.PATH_ROOT, config.PATH_IMAGES)
+		image_folder = Path(config.get('PATH_ROOT'), config.get('PATH_IMAGES'))
 		image_path = image_folder.joinpath(md5.hexdigest() + post["ext"])
 
-		if config.PATH_IMAGES and image_folder.is_dir() and not image_path.is_file():
-			claimtime = int(time.time()) + config.IMAGE_INTERVAL
+		if config.get('PATH_IMAGES') and image_folder.is_dir() and not image_path.is_file():
+			claimtime = int(time.time()) + config.get('IMAGE_INTERVAL')
 
 			try:
 				self.queue.add_job("4chan-image", remote_id=post["md5"], claim_after=claimtime, details={
