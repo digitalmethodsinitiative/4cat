@@ -113,7 +113,7 @@ class DetectTrackers(BasicProcessor):
                     if record_matches:
                         fieldnames = list(item.keys()) + ['tracker_summary'] + tracker_names
                     else:
-                        fieldnames = item.keys() + ['tracker_summary']
+                        fieldnames = list(item.keys()) + ['tracker_summary']
                     # initialise csv writer - we do this explicitly rather than
                     # using self.write_items_and_finish() because else we have
                     # to store a potentially very large amount of items in
