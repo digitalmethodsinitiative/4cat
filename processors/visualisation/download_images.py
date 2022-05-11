@@ -477,7 +477,7 @@ class ImageDownloader(BasicProcessor):
 		# cache the image for later, if configured so
 		if config.get('PATH_IMAGES'):
 			local_path = Path(config.get('PATH_IMAGES'), md5.hexdigest() + "." + extension)
-			with open(local_path, 'wb') as file:
+			with open(local_path, 'wb') as outfile:
 				for chunk in image.iter_content(1024):
 					outfile.write(chunk)
 
