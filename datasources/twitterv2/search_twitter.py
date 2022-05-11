@@ -9,9 +9,11 @@ import json
 import re
 
 from backend.abstract.search import Search
-from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException
-from common.lib.helpers import convert_to_int, UserInput
+from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException, QueryNeedsExplicitConfirmationException
+from common.lib.helpers import convert_to_int, UserInput, timify_long
 import common.config_manager as config
+
+
 class SearchWithTwitterAPIv2(Search):
     """
     Get Tweets via the Twitter API
