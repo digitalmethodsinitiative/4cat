@@ -208,7 +208,6 @@ class SearchInstagram(Search):
             "num_likes": node["like_count"],
             "num_comments": num_comments,
             "num_media": num_media,
-            "subject": ""
         }
 
         return mapped_item
