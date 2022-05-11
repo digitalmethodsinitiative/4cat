@@ -20,6 +20,9 @@ def set_or_create_setting(attribute_name, value, connection, cursor, keep_connec
     :return int: number of updated rows
     """
     try:
+        if type(value) is bytes:
+            value = value.decode("utf-8")
+            
         value = json.dumps(value)
     except ValueError:
         return None
