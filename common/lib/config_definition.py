@@ -137,7 +137,7 @@ config_definition = {
     # TODO: need to understand how code is using this for input so default can be formated correctly
     # SCRAPE_PROXIES = {"http": []}
     "SCRAPE_PROXIES": {
-        "type": UserInput.OPTION_JSON,
+        "type": UserInput.OPTION_TEXT_JSON,
         "default": "",
         "help": "List scrape proxies",
         "tooltip": "Items in this list should be formatted like 'http://111.222.33.44:1234' and seperated by commas",
