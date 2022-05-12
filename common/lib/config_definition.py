@@ -69,6 +69,7 @@ config_definition = {
     "expire.timeout": {
         "type": UserInput.OPTION_TEXT,
         "default": "0",
+        "coerce_type": int,
         "help": "Expiration timeout",
         "tooltip": "Top Level datasets automatically deleted after a period of time. 0 will not expire",
     },
