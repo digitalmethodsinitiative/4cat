@@ -177,7 +177,7 @@ class SearchTelegram(Search):
 
         session_id = SearchTelegram.create_session_id(query["api_phone"], query["api_id"], query["api_hash"])
         self.dataset.log('Telegram session id: %s' % session_id)
-        session_path = Path(config.PATH_ROOT).joinpath(config.PATH_SESSIONS, session_id + ".session")
+        session_path = Path(config.get("PATH_ROOT")).joinpath(config.get("PATH_SESSIONS"), session_id + ".session")
 
         client = None
 
