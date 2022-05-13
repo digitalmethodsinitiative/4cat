@@ -413,11 +413,6 @@ article.result > section:first-child {
 }
 
 /* processor configuration options */
-.processor-options-wrap {
-    display: inline-block;
-    width: 100%;
-}
-
 .processor-options {
     border: 0;
     padding: 0.5em 1em;
@@ -450,11 +445,32 @@ article.result > section:first-child {
 
 .processor-option-wrap {
     margin: 0.25em;
+    padding: 0.5em;
     display: flex;
     flex-wrap: wrap;
+    border-bottom: 1px var(--gray-darker) dotted;
 }
 
-.processor.option-wrap > *:not(label) {
+.processor-option-wrap:last-child {
+    border-bottom: none;
+}
+
+.processor-option-wrap > label {
+    display: flex;
+    align-items: center;
+    max-height: 1.5em;
+}
+
+.processor-option-wrap > label.option-type-toggle {
+    min-width: auto;
+}
+
+.processor-option-wrap > *:not(label) {
+    margin-left: 0.5em;
+}
+
+.processor-option-wrap button.tooltip-trigger {
+    margin-top: 0.5em;
     margin-left: 0.5em;
 }
 

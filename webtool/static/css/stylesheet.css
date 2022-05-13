@@ -329,6 +329,10 @@ nav > ul.flat > li:not(:last-child)::after {
     margin-left: 1.5em;
 }
 
+button.tooltip-trigger {
+    max-height: 1.75em;
+}
+
 button.tooltip-trigger, button.popup-trigger {
 	font-size: 0.8em;
 	position: relative;
