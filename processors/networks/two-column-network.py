@@ -210,7 +210,7 @@ class ColumnNetworker(BasicProcessor):
                         network.add_node(node_a, intervals={}, label=value_a, **({"category": column_a} if categorise else {}))
 
                     if node_b not in network.nodes():
-                        network.add_node(node_b, intervals={}, label=value_b, **({"category": column_a} if categorise else {}))
+                        network.add_node(node_b, intervals={}, label=value_b, **({"category": column_b} if categorise else {}))
 
                     if interval not in network.nodes[node_a]["intervals"]:
                         network.nodes[node_a]["intervals"][interval] = 0
