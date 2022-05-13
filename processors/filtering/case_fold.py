@@ -39,15 +39,16 @@ class AccentFoldingFilter(BasicProcessor):
                        " to the text (i.e. 北亰 is replaced with 'Bei Jing'). Folding will only replace accented "
                        "characters with their closest un-accented ASCII equivalent, e.g. á -> a."
         },
-        "columns": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "Column(s) to apply folding on",
-            "default": "body",
-        },
         "case-fold": {
             "type": UserInput.OPTION_TOGGLE,
             "help": "Also convert all text to lowercase",
             "default": False
+        },
+        "columns": {
+            "type": UserInput.OPTION_TEXT,
+            "help": "Column(s) to apply folding on",
+            "inline": True,
+            "default": "body",
         }
     }
 
@@ -127,7 +128,7 @@ class AccentFoldingFilter(BasicProcessor):
 
         if parent_dataset and parent_dataset.get_columns():
             columns = parent_dataset.get_columns()
-            options["columns"]["type"] = UserInput.OPTION_MULTI_SELECT
+            options["columns"]["type"] = UserInput.OPTION_MULTI
             options["columns"]["options"] = {v: v for v in columns}
             options["columns"]["default"] = columns
 

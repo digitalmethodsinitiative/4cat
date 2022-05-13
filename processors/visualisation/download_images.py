@@ -57,6 +57,7 @@ class ImageDownloader(BasicProcessor):
 			"type": UserInput.OPTION_TEXT,
 			"help": "Column to get image links from",
 			"default": "image_url",
+			"inline": True,
 			"tooltip": "If column contains a single URL, use that URL; else, try to find image URLs in the column's content"
 		},
 		"split-comma": {
@@ -532,7 +533,7 @@ class ImageDownloader(BasicProcessor):
 
 		if parent_dataset and parent_dataset.get_columns():
 			columns = parent_dataset.get_columns()
-			options["columns"]["type"] = UserInput.OPTION_MULTI_SELECT
+			options["columns"]["type"] = UserInput.OPTION_MULTI
 			options["columns"]["options"] = {v: v for v in columns}
 			options["columns"]["default"] = "body" if "body" in columns else sorted(columns, key=lambda k: "image" in k).pop()
 
