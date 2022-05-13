@@ -866,7 +866,6 @@ const tooltip = {
 				tooltip_container.addClass('force-width');
 			}
 
-			console.log(position);
 			let width = parseFloat(tooltip_container.css('width').replace('px', ''));
 			let height = parseFloat(tooltip_container.css('height').replace('px', ''));
 			tooltip_container.css('top', (position.top - height - 5) + 'px');
@@ -1172,7 +1171,7 @@ const multichoice = {
 			let options = $('<div class="multi-select-options ms-options-' + name + '"></div>');
 
 			for (let option in given_options) {
-				let selected = (option in given_default);
+				let selected = given_default.indexOf(option) > -1;
 				let checkbox_choice = $('<label><input type="checkbox" name="' + name + ":" + option + '"' + (selected ? ' checked="checked"' : '') + '> ' + given_options[option] + '</label>');
 
 				checkbox_choice.find('input').on('change', function () {
