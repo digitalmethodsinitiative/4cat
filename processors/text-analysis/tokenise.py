@@ -38,10 +38,15 @@ class Tokenise(BasicProcessor):
 			"[Words in Google Books word list](https://github.com/hackerb9/gwordlist)",
 			"[Words in cracklib word list](https://github.com/cracklib/cracklib/tree/master/words)",
 			"[Words in OpenTaal word list](https://github.com/OpenTaal/opentaal-wordlist)"
-
 	]
 
 	options = {
+		"columns": {
+			"type": UserInput.OPTION_TEXT,
+			"help": "Column(s) to tokenise",
+			"default": "body",
+			"tooltip": "Each enabled column will be treated as a separate item to tokenise."
+		},
 		"docs_per": {
 			"type": UserInput.OPTION_CHOICE,
 			"default": "all",
@@ -63,13 +68,13 @@ class Tokenise(BasicProcessor):
 		},
 		"grouping-per": {
 			"type": UserInput.OPTION_CHOICE,
-			"default": "post",
+			"default": "item",
 			"help": "Group tokens per",
 			"options": {
-				"post": "Post",
-				"sentence": "Sentence in post"
+				"item": "Item",
+				"sentence": "Sentence in item"
 			},
-			"tooltip": "This is relevant for some processors such as Word2Vec and Tf-idf. If you don't know what to choose, choose 'post'."
+			"tooltip": "This is relevant for some processors such as Word2Vec and Tf-idf. If you don't know what to choose, choose 'item'."
 		},
 		"stem": {
 			"type": UserInput.OPTION_TOGGLE,
@@ -117,7 +122,7 @@ class Tokenise(BasicProcessor):
 		"only_unique": {
 			"type": UserInput.OPTION_TOGGLE,
 			"default": False,
-			"help": "Only keep unique words per post",
+			"help": "Only keep unique words per item",
 			"tooltip": "Can be useful to filter out spam."
 		}
 	}
@@ -153,6 +158,7 @@ class Tokenise(BasicProcessor):
 
 		The result is valid JSON, written in chunks.
 		"""
+		columns = self.parameters.get("columns")
 		self.dataset.update_status("Building filtering automaton")
 
 		link_regex = re.compile(r"https?://[^\s]+")
@@ -206,37 +212,37 @@ class Tokenise(BasicProcessor):
 		staging_area = self.dataset.get_staging_area()
 
 		# process posts
-		self.dataset.update_status("Processing posts")
+		self.dataset.update_status("Processing items")
 		docs_per = self.parameters.get("docs_per")
-		grouping = "post" if self.parameters.get("grouping-per", "") == "post" else "sentence"
-
+		grouping = "item" if self.parameters.get("grouping-per", "") == "item" else "sentence"
 
 		# this is how we'll keep track of the subsets of tokens
 		output_files = {}
 		current_output_path = None
 		output_file_handle = None
 
+		# dummy function to pass through data (as an alternative to sent_tokenize later)
+		def dummy_function(x, *args, **kwargs):
+			return x
+
 		document_descriptor = "overall"
 		for post in self.source_dataset.iterate_items(self):
-			if not post["body"]:
-				continue
-				
 			# determine what output unit this post belongs to
 			if docs_per != "thread":
 				try:
 					document_descriptor = get_interval_descriptor(post, docs_per)
 				except ValueError as e:
-					self.dataset.update_status("%s, cannot count posts per %s" % (str(e), docs_per), is_final=True)
+					self.dataset.update_status("%s, cannot count items per %s" % (str(e), docs_per), is_final=True)
 					self.dataset.update_status(0)
 					return
 			else:
 				document_descriptor = post["thread_id"] if post["thread_id"] else "undefined"
 
 			# if told so, first split the post into separate sentences
-			if grouping == "sentence":
-				groupings = sent_tokenize(post["body"], language)
-			else:
-				groupings = [post["body"]]
+			sentence_method = sent_tokenize if grouping == "sentence" else dummy_function
+			groupings = []
+			for column in columns:
+				groupings.append(sentence_method(post[column], language))
 
 			# tokenise...
 			for document in groupings:
@@ -279,7 +285,7 @@ class Tokenise(BasicProcessor):
 					output_path = str(output_file)
 
 					if current_output_path != output_path:
-						self.dataset.update_status("Processing posts (%s)" % document_descriptor)
+						self.dataset.update_status("Processing items (%s)" % document_descriptor)
 						if output_file_handle:
 							output_file_handle.close()
 						output_file_handle = output_file.open("a")
@@ -309,3 +315,31 @@ class Tokenise(BasicProcessor):
 
 		# create zip of archive and delete temporary files and folder
 		self.write_archive_and_finish(staging_area)
+
+
+	@classmethod
+	def get_options(cls, parent_dataset=None, user=None):
+		"""
+		Get processor options
+
+		This method by default returns the class's "options" attribute, or an
+		empty dictionary. It can be redefined by processors that need more
+		fine-grained options, e.g. in cases where the availability of options
+		is partially determined by the parent dataset's parameters.
+
+		:param DataSet parent_dataset:  An object representing the dataset that
+		the processor would be run on
+		:param User user:  Flask user the options will be displayed for, in
+		case they are requested for display in the 4CAT web interface. This can
+		be used to show some options only to privileges users.
+		"""
+		options = cls.options
+
+		if parent_dataset and parent_dataset.get_columns():
+			columns = parent_dataset.get_columns()
+			options["columns"]["type"] = UserInput.OPTION_MULTI
+			options["columns"]["inline"] = True
+			options["columns"]["options"] = {v: v for v in columns}
+			options["columns"]["default"] = ["body"]
+
+		return options
