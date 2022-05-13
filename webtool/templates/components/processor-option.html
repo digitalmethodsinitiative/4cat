@@ -16,7 +16,7 @@
         {% endfor %}
         </select>
     {% elif option_settings.type == "multi" %}
-        <div class="multichoice-wrapper" style="flex-basis: 100%;">
+        <div class="multichoice-wrapper{% if option_settings.inline %} inline{% endif %}" style="flex-basis: 100%;">
             <select name="option-{{ option }}" multiple="multiple">
             {% for choice in option_settings.options %}
                 <option value="{{ choice }}"{% if choice in option_settings.default %} selected="selected"{% endif %}>{{ option_settings.options[choice] }}</option>

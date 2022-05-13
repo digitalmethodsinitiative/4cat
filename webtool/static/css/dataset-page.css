@@ -433,10 +433,17 @@ article.result > section:first-child {
     position: relative;
 }
 
-.processor-options .multichoice-wrapper label::before {
+.processor-options .multichoice-wrapper:not(.inline) label::before {
     content: '\2022';
     position: absolute;
     left: -.75em;
+}
+
+.processor-options .multichoice-wrapper.inline label {
+    display: inline-block;
+    margin: 0 0.25em 0 0;
+    background: var(--gray);
+    font-size: 0.8em;
 }
 
 .processor-options-wrap .multi-select-wrapper {
@@ -479,6 +486,11 @@ article.result > section:first-child {
     display: block;
     width: 75%;
     margin-bottom: 4px;
+}
+
+.multi-select-search input {
+    width: 18em;
+    max-width: 18em;
 }
 
 .multi-select-options {
