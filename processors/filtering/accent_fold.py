@@ -23,7 +23,8 @@ class AccentFoldingFilter(BasicProcessor):
     type = "accent-folder"  # job type ID
     category = "Filtering"  # category
     title = "Replace or transliterate accented and non-Latin characters"  # title displayed in UI
-    description = "Replaces accented latin characters with the closest un-accented ASCII equivalent, e.g. á -> a."
+    description = "Replaces non-latin characters with the closest ASCII equivalent, convertng e.g. 'á' to 'a', 'ç' " \
+                  "to 'c', et cetera. Creates a new dataset."
     extension = "csv"  # extension of result file, used internally and in UI
 
     options = {
