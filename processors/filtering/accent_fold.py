@@ -92,11 +92,17 @@ class AccentFoldingFilter(BasicProcessor):
                         "Processed %i/%i items" % (processed_items, self.source_dataset.num_rows))
 
                 for field in columns:
+                    if type(item[field]) is not str:
+                        continue
+                        
                     value = folding_method(item[field], errors="preserve")
                     item[field] = value
 
                 if casefold:
                     for field, value in item.items():
+                        if type(item[field]) is not str:
+                            continue
+
                         item[field] = item[field].lower()
 
                 writer.writerow(item)
