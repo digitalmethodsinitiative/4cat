@@ -40,18 +40,13 @@ class ImageDownloader(BasicProcessor):
 				  "is included in the output archive."  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
 
-	if hasattr(config, 'MAX_NUMBER_IMAGES'):
-		max_number_images = int(config.MAX_NUMBER_IMAGES)
-	else:
-		max_number_images = 1000
-
 	options = {
 		"amount": {
 			"type": UserInput.OPTION_TEXT,
-			"help": "No. of images (max %s)" % max_number_images,
+			"help": "No. of images (max 1000)",
 			"default": 100,
 			"min": 0,
-			"max": max_number_images
+			"max": 1000
 		},
 		"columns": {
 			"type": UserInput.OPTION_TEXT,
@@ -74,31 +69,32 @@ class ImageDownloader(BasicProcessor):
 		"""
 		Get processor options
 
-		Give the user the choice of where to upload the dataset, if multiple
-		TCAT servers are configured. Otherwise, no options are given since
-		there is nothing to choose.
+		This method by default returns the class's "options" attribute, or an
+		empty dictionary. It can be redefined by processors that need more
+		fine-grained options, e.g. in cases where the availability of options
+		is partially determined by the parent dataset's parameters.
 
-		:param DataSet parent_dataset:  Dataset that will be uploaded
-		:param User user:  User that will be uploading it
-		:return dict:  Option definition
+		:param DataSet parent_dataset:  An object representing the dataset that
+		the processor would be run on
+		:param User user:  Flask user the options will be displayed for, in
+		case they are requested for display in the 4CAT web interface. This can
+		be used to show some options only to privileges users.
 		"""
-		max_number_images = int(config.get('image_downloader.MAX_NUMBER_IMAGES', 1000))
+		options = cls.options
 
-		return {
-			"amount": {
-				"type": UserInput.OPTION_TEXT,
-				"help": "No. of images (max %s)" % max_number_images,
-				"default": 100,
-				"min": 0,
-				"max": max_number_images
-			},
-			"columns": {
-				"type": UserInput.OPTION_TEXT,
-				"help": "Column to get image links from",
-				"default": "image_url",
-				"tooltip": "If column contains a single URL, use that URL; else, try to find image URLs in the column's content"
-			},
-		}
+		# Update the amount max and help from config
+		max_number_images = int(config.get('image_downloader.MAX_NUMBER_IMAGES', 1000))
+		options['amount']['max'] = max_number_images
+		options['amount']['help'] = "No. of images (max %s)" % max_number_images
+
+		# Get the columns for the select columns option
+		if parent_dataset and parent_dataset.get_columns():
+			columns = parent_dataset.get_columns()
+			options["columns"]["type"] = UserInput.OPTION_MULTI
+			options["columns"]["options"] = {v: v for v in columns}
+			options["columns"]["default"] = "body" if "body" in columns else sorted(columns, key=lambda k: "image" in k).pop()
+
+		return options
 
 	@classmethod
 	def is_compatible_with(cls, module=None):
@@ -435,6 +431,8 @@ class ImageDownloader(BasicProcessor):
 		# get link to image from external HTML search results
 		# detect rate limiting and wait until we're good to go again
 		page = self.request_get_w_error_handling(url, headers={"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/12.1.1 Safari/605.1.15"})
+		if page.status_code == 403:
+			self.dataset.log('Forbidden response from url: %s' % url)
 		rate_limited = rate_regex.search(page.text)
 
 		while rate_limited:
@@ -512,29 +510,3 @@ class ImageDownloader(BasicProcessor):
 				self.dataset.log("Error: ConnectionError while trying to download image %s: %s" % (url, e))
 				raise FileNotFoundError()
 		return response
-
-	@classmethod
-	def get_options(cls, parent_dataset=None, user=None):
-		"""
-		Get processor options
-
-		This method by default returns the class's "options" attribute, or an
-		empty dictionary. It can be redefined by processors that need more
-		fine-grained options, e.g. in cases where the availability of options
-		is partially determined by the parent dataset's parameters.
-
-		:param DataSet parent_dataset:  An object representing the dataset that
-		the processor would be run on
-		:param User user:  Flask user the options will be displayed for, in
-		case they are requested for display in the 4CAT web interface. This can
-		be used to show some options only to privileges users.
-		"""
-		options = cls.options
-
-		if parent_dataset and parent_dataset.get_columns():
-			columns = parent_dataset.get_columns()
-			options["columns"]["type"] = UserInput.OPTION_MULTI
-			options["columns"]["options"] = {v: v for v in columns}
-			options["columns"]["default"] = "body" if "body" in columns else sorted(columns, key=lambda k: "image" in k).pop()
-
-		return options
