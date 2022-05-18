@@ -159,6 +159,9 @@ class Tokenise(BasicProcessor):
 		The result is valid JSON, written in chunks.
 		"""
 		columns = self.parameters.get("columns")
+		if type(columns) is not list:
+			columns = [columns]
+
 		self.dataset.update_status("Building filtering automaton")
 
 		link_regex = re.compile(r"https?://[^\s]+")
@@ -223,7 +226,7 @@ class Tokenise(BasicProcessor):
 
 		# dummy function to pass through data (as an alternative to sent_tokenize later)
 		def dummy_function(x, *args, **kwargs):
-			return x
+			return [x]
 
 		document_descriptor = "overall"
 		for post in self.source_dataset.iterate_items(self):
@@ -244,7 +247,7 @@ class Tokenise(BasicProcessor):
 			for column in columns:
 				value = sentence_method(post[column], language)
 				if value:
-					groupings.append(value)
+					groupings.extend(value)
 
 			# tokenise...
 			for document in groupings:
