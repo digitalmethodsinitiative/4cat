@@ -242,7 +242,9 @@ class Tokenise(BasicProcessor):
 			sentence_method = sent_tokenize if grouping == "sentence" else dummy_function
 			groupings = []
 			for column in columns:
-				groupings.append(sentence_method(post[column], language))
+				value = sentence_method(post[column], language)
+				if value:
+					groupings.append(value)
 
 			# tokenise...
 			for document in groupings:
