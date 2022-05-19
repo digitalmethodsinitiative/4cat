@@ -17,7 +17,7 @@ class ConfigManager:
     Note: some options are here until additional changes are made and they can
     be moved to more appropriate locations.
     """
-    CONFIG_FILE = Path("config/config.ini")
+    CONFIG_FILE = Path(__file__).parent.parent.joinpath("config/config.ini")
 
     # TODO: work out best structure for docker vs non-docker
     # Do not need two configs, BUT Docker config.ini has to be in shared volume for both front and backend to access it
