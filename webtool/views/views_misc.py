@@ -88,7 +88,7 @@ def show_index():
     Main tool frontend
     """
     datasources = {datasource: metadata for datasource, metadata in backend.all_modules.datasources.items() if
-                   metadata["has_worker"] and metadata["has_options"]}
+                   metadata["has_worker"] and metadata["has_options"] and datasource in config.get("DATASOURCES", {})}
 
     return render_template('create-dataset.html', datasources=datasources)
 
