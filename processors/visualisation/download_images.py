@@ -248,16 +248,28 @@ class ImageDownloader(BasicProcessor):
 			try:
 				# acquire image
 				if not url.lower().startswith("http"):
-					image, image_filename = Image.open(url)
+					# This will open filenames (e.g. locally stored images)
+					# Note possibly open other things (e.g. ftp?)
+					picture = Image.open(url)
+					if isinstance(url, Path):
+						image_filename = Path(url).name
+					else:
+						image_filename = url.split("/")[-1].split("?")[0]
 				else:
 					image, image_filename = self.get_image(url)
 
-				try:
-					picture = Image.open(image)
-				except UnidentifiedImageError:
-					picture = Image.open(image.raw)
+					try:
+						picture = Image.open(image)
+					except UnidentifiedImageError:
+						picture = Image.open(image.raw)
 
-			except (FileNotFoundError, UnidentifiedImageError, AttributeError, TypeError):
+			except FileNotFoundError as e:
+				# get_image raises FileNotFoundError for many reasons
+				failures.append(url)
+				continue
+
+			except (UnidentifiedImageError, AttributeError, TypeError) as e:
+				self.dataset.log('DEBUG: Error image %s: %s' % (url, str(e)))
 				failures.append(url)
 				continue
 
