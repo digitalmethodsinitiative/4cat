@@ -37,7 +37,7 @@ class ImageDownloader(BasicProcessor):
 	description = "Download images and store in a a zip file. May take a while to complete as images are retrieved " \
 				  "externally. Note that not always all images can be saved. For imgur galleries, only the first " \
 				  "image is saved. For animations (GIFs), only the first frame is saved if available. A JSON metadata file " \
-				  "is included in the output archive."  # description displayed in UI
+				  "is included in the output archive. \n4chan datasets should include the image_md5 column."  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
 
 	options = {
@@ -269,7 +269,7 @@ class ImageDownloader(BasicProcessor):
 				continue
 
 			except (UnidentifiedImageError, AttributeError, TypeError) as e:
-				self.dataset.log('DEBUG: Error image %s: %s' % (url, str(e)))
+				self.dataset.log('ERROR: Downloading image %s: %s' % (url, str(e)))
 				failures.append(url)
 				continue
 
@@ -298,7 +298,7 @@ class ImageDownloader(BasicProcessor):
 				downloaded_images += 1
 			except OSError as e:
 				# some images may need to be converted to RGB to be saved
-				self.dataset.log('Debug: OSError when saving image %s: %s' % (save_location, e))
+				self.dataset.log('ERROR: OSError when saving image %s: %s' % (save_location, e))
 				picture = picture.convert('RGB')
 				picture.save(str(results_path.joinpath(image_stem + '.png')))
 			except ValueError as e:
@@ -406,20 +406,18 @@ class ImageDownloader(BasicProcessor):
 
 		# Get the image!
 		if domain.endswith("4plebs.org") or domain.endswith("fireden.net") and image_url:
-			image = self.get_4chan_image(url)
+			image, image_name = self.get_4chan_image(url)
 		elif image_url:
 			image = self.request_get_w_error_handling(image_url, stream=True, timeout=20, headers={"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/12.1.1 Safari/605.1.15"})
+			# Check if we succeeded; content type should be an image
+			if image.status_code != 200 or image.headers.get("content-type", "")[:5] != "image":
+				raise FileNotFoundError()
+			image = BytesIO(image.content)
+			image_name = image_url.split("/")[-1].split("?")[0]
 		else:
 			raise FileNotFoundError()
 
-		# Use this for local saving.
-		image_name = image_url.split("/")[-1].split("?")[0]
-
-		# Check if we succeeded; content type should be an image
-		if image.status_code != 200 or image.headers.get("content-type", "")[:5] != "image":
-			raise FileNotFoundError()
-
-		return BytesIO(image.content), image_name
+		return image, image_name
 
 	def get_4chan_image(self, url):
 		"""
@@ -432,19 +430,15 @@ class ImageDownloader(BasicProcessor):
 
 		:param url:  Image URL, pointing to a 4chan mirror
 		:return Image:  Image object, or nothing if loading it failed
+		:return str:	string with the filename of the image
 		"""
 		rate_regex = re.compile(r"Search limit exceeded. Please wait ([0-9]+) seconds before attempting again.")
 		rate_limit = 1 if "fireden.net" in url else 16  # empirically verified
 
-		if isinstance(url, Path):
-			# local file
-			return Image.open(url)
-
 		# get link to image from external HTML search results
 		# detect rate limiting and wait until we're good to go again
-		page = self.request_get_w_error_handling(url, headers={"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/12.1.1 Safari/605.1.15"})
-		if page.status_code == 403:
-			self.dataset.log('Forbidden response from url: %s' % url)
+		headers = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/12.1.1 Safari/605.1.15"}
+		page = self.request_get_w_error_handling(url, headers=headers)
 		rate_limited = rate_regex.search(page.text)
 
 		while rate_limited:
@@ -453,27 +447,32 @@ class ImageDownloader(BasicProcessor):
 			page = self.request_get_w_error_handling(url)
 			rate_limited = rate_regex.search(page.content.decode("utf-8"))
 
+		if page.status_code != 200:
+			self.dataset.log('ERROR: status from url %s: %i %s' % (url, page.status_code, page.reason if hasattr(page, 'reason') else ""))
+
 		# get link to image file from HTML returned
 		try:
 			parser = etree.HTMLParser()
 			tree = etree.parse(StringIO(page.content.decode("utf-8")), parser)
 			image_url = css("a.thread_image_link")(tree)[0].get("href")
 		except IndexError as e:
-			self.dataset.log("Error: IndexError while trying to download 4chan image %s: %s" % (url, e))
+			self.dataset.log("ERROR: IndexError while trying to download 4chan image %s: %s" % (url, e))
 			raise FileNotFoundError()
 		except UnicodeDecodeError:
-			self.dataset.log("Error: 4chan image search could not be completed for image %s, skipping" % url)
+			self.dataset.log("ERROR: 4chan image search could not be completed for image %s, skipping" % url)
 			raise FileNotFoundError()
 
 		# download image itself
-		image = self.request_get_w_error_handling(image_url, stream=True)
+		image = self.request_get_w_error_handling(image_url, stream=True, headers=headers)
 
 		# if not available, the thumbnail may be
 		if image.status_code != 200:
+			self.dataset.log("DEBUG: 4chan image %s status code: %i" % (image_url, image.status_code))
 			thumbnail_url = ".".join(image_url.split(".")[:-1]) + "s." + image_url.split(".")[-1]
-			image = self.request_get_w_error_handling(thumbnail_url, stream=True)
+			image = self.request_get_w_error_handling(thumbnail_url, stream=True, headers=headers)
 
 		if image.status_code != 200:
+			self.dataset.log("DEBUG: 4chan image thumbnail %s status code: %i" % (thumbnail_url, image.status_code))
 			raise FileNotFoundError()
 
 		md5 = hashlib.md5()
