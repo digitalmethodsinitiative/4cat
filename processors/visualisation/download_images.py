@@ -299,8 +299,13 @@ class ImageDownloader(BasicProcessor):
 			except OSError as e:
 				# some images may need to be converted to RGB to be saved
 				self.dataset.log('ERROR: OSError when saving image %s: %s' % (save_location, e))
-				picture = picture.convert('RGB')
-				picture.save(str(results_path.joinpath(image_stem + '.png')))
+				try:
+					picture = picture.convert('RGB')
+					picture.save(str(results_path.joinpath(image_stem + '.png')))
+				except OSError as e:
+					self.dataset.log(f"Error '{e}' saving image for {url}, skipping")
+					failures.append(url)
+					continue
 			except ValueError as e:
 				self.dataset.log(f"Error '{e}' saving image for {url}, skipping")
 				failures.append(url)
@@ -444,7 +449,7 @@ class ImageDownloader(BasicProcessor):
 		while rate_limited:
 			self.log.debug("Rate-limited by external source. Waiting %s seconds." % rate_limited[1])
 			time.sleep(int(rate_limited[1]))
-			page = self.request_get_w_error_handling(url)
+			page = self.request_get_w_error_handling(url, headers=headers)
 			rate_limited = rate_regex.search(page.content.decode("utf-8"))
 
 		if page.status_code != 200:
@@ -456,6 +461,12 @@ class ImageDownloader(BasicProcessor):
 			tree = etree.parse(StringIO(page.content.decode("utf-8")), parser)
 			image_url = css("a.thread_image_link")(tree)[0].get("href")
 		except IndexError as e:
+			# Check if no results alert found
+			if css("div.alert")(tree):
+				if "No results found" in ' '.join([i for i in css("div.alert")(tree)[0].itertext()]):
+					self.dataset.log("ERROR: Image not found: %s" % url)
+					raise FileNotFoundError()
+			# This could indicate a change in page layout
 			self.dataset.log("ERROR: IndexError while trying to download 4chan image %s: %s" % (url, e))
 			raise FileNotFoundError()
 		except UnicodeDecodeError:
