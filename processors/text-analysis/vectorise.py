@@ -20,7 +20,7 @@ class Vectorise(BasicProcessor):
 	category = "Text analysis"  # category
 	title = "Count words"  # title displayed in UI
 	description = "Counts all tokens so they are transformed into word => frequency counts." \
-				  "This is also knonw as a bag of words."  # description displayed in UI
+				  "This is also known as a bag of words."  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
 
 	@classmethod
