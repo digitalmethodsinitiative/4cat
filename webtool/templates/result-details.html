@@ -152,6 +152,7 @@
             <div class="intro">
                 <p>The processors below manipulate the dataset you created. These manipulations range from counting posts per month to downloading images. Read the description and tooltips for more information. Some processors also have relevant references indicated with <i class="fa fa-graduation-cap" aria-hidden="true"></i>. Click on <i class="fa fa-sitemap" aria-hidden="true"></i> to see what processors can be run afterwards.</p>
                 <p>Some processors may take a while to complete.</p>
+                <p>See <a href="https://docs.google.com/document/d/1po-sOB8tDRZlvWrEayu97cGh_qsBuW0URd4md0_tv7k/edit?usp=sharing">this exercise sheet</a> for step-by-step tutorials.</p>
             </div>
             {% set cat = namespace(egory='') %}
             {% for processor in dataset.get_available_processors().values() %}
