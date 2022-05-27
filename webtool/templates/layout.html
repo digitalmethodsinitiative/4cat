@@ -31,8 +31,8 @@
 	<nav class="main-nav">
 		<ul>
 			<li><a href="{{ url_for('show_index') }}">Create dataset</a></li>
-			<li><a href="{{ url_for('show_results') }}">Past results</a></li>
-            <li><a href="{{ url_for('data_overview') }}">Data overview</a></li>
+			<li><a href="{{ url_for('show_results') }}">Datasets</a></li>
+            <li><a href="{{ url_for('data_overview') }}">Data sources</a></li>
             {% if current_user.is_authenticated and not current_user.is_special %}
                 <li><a href="{{ url_for('show_access_tokens') }}">API Access</a></li>
             {% endif %}

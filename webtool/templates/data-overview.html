@@ -4,7 +4,7 @@
     {% set datasource_name = datasources[datasource_id].name %}
 {% endif %}
 
-{% block title %}{% if datasource_id %}{{ datasource_name }} data overview{% else %}Data overview{% endif %}{% endblock %}
+{% block title %}{% if datasource_id %}{{ datasource_name }} data source{% else %}Data sources{% endif %}{% endblock %}
 
 {% block body_class %}plain-page {{ body_class }}{% endblock %}
 
@@ -13,7 +13,7 @@
     <article class="with-aside">
         <section class="data-overview">
             <div>
-                <h2><span>{% if datasource_id %}{{ datasource_name }} data overview{% else %}Data overview{% endif %}</span></h2>
+                <h2><span>{% if datasource_id %}{{ datasource_name }} data source{% else %}Data sources{% endif %}</span></h2>
             </div>
             <div class="description">
             {% if datasource_id %}
