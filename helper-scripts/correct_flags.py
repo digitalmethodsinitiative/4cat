@@ -721,10 +721,6 @@ db.commit()
 However, some of the `country_codes` and `board_flag` codes can conflict.
 Flags with potential conflicts:
 
-<<<<<<< HEAD
-=======
-- BL: Black Nationalist / San Barthélemy
->>>>>>> 6aff55c1b7923d13386d245861459ff600f2f521
 - CF: Confederate / Central African Republic
 - CM: Communist / Cameroon
 - GN: Gadsden / Guinea
@@ -759,7 +755,7 @@ with open(PATH_TO_TROLL_FLAG_IDS, "r", encoding="utf-8") as in_json:
 		"CF": "Confederate",
 		"CM": "Communist",
 		"CT": "Catalonia",
-		"DM": "Democrat"
+		"DM": "Democrat",
 		"GN": "Gadsden",
 		"GY": "Gay",
 		"JH": "Jihadi",
