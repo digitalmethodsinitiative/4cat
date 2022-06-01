@@ -221,8 +221,7 @@ class SearchWithSelenium(SeleniumScraper):
         # this is the bare minimum, else we can't narrow down the full data set
         if not query.get("query", None):
             raise QueryParametersException("Please provide a List of urls.")
-
-        urls = [url.strip() for url in query.get("query", "").split('\n')]
+        urls = [url.strip() for url in query.get("query", "").replace("\n", ",").split(',')]
         preprocessed_urls = [url for url in urls if validate_url(url)]
         if not preprocessed_urls:
             raise QueryParametersException("No Urls detected!")
