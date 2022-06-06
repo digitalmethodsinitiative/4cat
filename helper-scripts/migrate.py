@@ -38,12 +38,6 @@ if not Path(os.getcwd()).glob("4cat-daemon.py"):
 	print("This script needs to be run from the same folder as 4cat-daemon.py\n")
 	exit(1)
 
-if not Path(os.getcwd()).joinpath("config.py").exists():
-	print("config.py is missing from the 4CAT folder.")
-	print("Create a configuration file before continuing. An example is found in:")
-	print("  config.py-example.")
-	exit(1)
-
 # ---------------------------------------------
 #   Pull latest version of 4CAT from git repo
 # ---------------------------------------------
