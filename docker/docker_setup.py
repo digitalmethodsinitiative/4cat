@@ -72,7 +72,6 @@ if __name__ == "__main__":
         config_parser.add_section('SERVER')
         public_port = os.environ['PUBLIC_PORT']
         config_parser['SERVER']['public_port'] = public_port
-        config_parser['SERVER']['server_name'] = os.environ['SERVER_NAME']
 
         # Save config file
         with open(CONFIG_FILE, 'w') as configfile:
@@ -93,24 +92,24 @@ if __name__ == "__main__":
                 os.makedirs(Path(config.get('PATH_ROOT'), path))
 
         # Update some settings
-        your_server = config.get('SERVER_NAME', 'localhost')
+        your_server =  os.environ['SERVER_NAME']
         if int(public_port) == 80:
-            config.set_value('SERVER_NAME', your_server)
+            config.set_value('flask.server_name', your_server)
         else:
-            config.set_value('SERVER_NAME', f"{your_server}:{public_port}")
+            config.set_value('flask.server_name', f"{your_server}:{public_port}")
 
-        whitelist = config.get('HOSTNAME_WHITELIST')# only these may access the web tool; "*" or an empty list matches everything
+        whitelist = config.get('flask.autologin.hostnames')# only these may access the web tool; "*" or an empty list matches everything
         if your_server not in whitelist:
             whitelist.append(your_server)
-            config.set_value('HOSTNAME_WHITELIST', whitelist)
+            config.set_value('flask.autologin.hostnames', whitelist)
 
-        api_whitelist = config.get('HOSTNAME_WHITELIST_API')# hostnames matching these are exempt from rate limiting
+        api_whitelist = config.get('flask.autologin.api')# hostnames matching these are exempt from rate limiting
         if your_server not in api_whitelist:
             api_whitelist.append(your_server)
-            config.set_value('HOSTNAME_WHITELIST_API', api_whitelist)
+            config.set_value('flask.autologin.api', api_whitelist)
 
 
-    # Config file already exists; Update .env variables if they changed 
+    # Config file already exists; Update .env variables if they changed
     else:
         print('Configuration file config/config.ini already exists')
         print('Updating Docker .env variables if necessary')
@@ -123,16 +122,14 @@ if __name__ == "__main__":
 
         public_port = os.environ['PUBLIC_PORT']
         config_parser['SERVER']['public_port'] = str(public_port)
-        # TODO server_name should be defined elsewhere, but currently it is in .env file
-        config_parser['SERVER']['server_name'] = os.environ['SERVER_NAME']
 
         # Save config file
         with open(CONFIG_FILE, 'w') as configfile:
             config_parser.write(configfile)
 
         import common.config_manager as config
-        your_server = config.get('SERVER_NAME', 'localhost')
+        your_server = os.environ['SERVER_NAME']
         if int(public_port) == 80:
-          config.set_value('SERVER_NAME', your_server)
+          config.set_value('flask.server_name', your_server)
         else:
-          config.set_value('SERVER_NAME', f"{your_server}:{public_port}")
+          config.set_value('flask.server_name', f"{your_server}:{public_port}")
