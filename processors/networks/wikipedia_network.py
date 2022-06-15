@@ -17,11 +17,11 @@ __credits__ = ["Stijn Peeters", "Sal Hagen"]
 __maintainer__ = "Stijn Peeters"
 __email__ = "4cat@oilab.eu"
 
-class WikiNetwork(BasicProcessor):
+class WikiNetworker(BasicProcessor):
 	"""
 	Generate URL co-link network
 	"""
-	type = "wiki-category-network"  # job type ID
+	type = "wiki-network"  # job type ID
 	category = "Networks"  # category
 	title = "Wikipedia category network"  # title displayed in UI
 	description = "Create a GEXF network file comprised network comprised of linked-to Wikipedia pages, linked to the categories they are part of. English Wikipedia only. Will only fetch the first 10,000 links."  # description displayed in UI
@@ -36,15 +36,15 @@ class WikiNetwork(BasicProcessor):
 		}
 	}
 
-    @classmethod
-    def is_compatible_with(cls, module=None):
-        """
-        Allow processor to run on all csv and NDJSON datasets
+	@classmethod
+	def is_compatible_with(cls, module=None):
+		"""
+		Allow processor to run on all csv and NDJSON datasets
 
-        :param module: Dataset or processor to determine compatibility with
-        """
+		:param module: Dataset or processor to determine compatibility with
+		"""
 
-        return module.get_extension() in ("csv", "ndjson")
+		return module.get_extension() in ("csv", "ndjson")
 
 	def process(self):
 		"""
@@ -82,8 +82,8 @@ class WikiNetwork(BasicProcessor):
 
 			if not post["body"]:
 				continue
-			
-			wiki_links = link_regex.findall(" ".join([p[column] for column in columns]))
+
+			wiki_links = link_regex.findall(" ".join([post[column] for column in columns]))
 
 			# if the result has an explicit url per post, take that into
 			# account as well
@@ -163,7 +163,7 @@ class WikiNetwork(BasicProcessor):
 					# Add " (cat)" to the category strings.
 					# This is needed because pages can sometimes have the same name as the category.
 					# This will result in a faulty graph, since there's duplicate nodes.
-					
+
 					category += " (cat)"
 
 					if category not in all_categories:
