@@ -22,7 +22,12 @@
                         <legend>{% if fieldset.legend in categories %}{{ categories[fieldset.legend] }}{% elif fieldset.legend in modules %}Settings for '{{ modules[fieldset.legend] }}'{% else %}{{ fieldset.legend }}{% endif %}</legend>
                         {% set fieldset.open = True %}
                     {% endif %}
-                    {% set settings = options[option] %}
+                    {% if options[option].default is none %}
+                        {% set x=options[option].__setitem__("default", "") %}
+                        {% set settings = options[option] %}
+                    {% else %}
+                        {% set settings = options[option] %}
+                    {% endif %}
                     {% include 'components/datasource-option.html' %}
                 {% endfor %}
                 {% if fieldset_open %}</fieldset>{% endif %}
