@@ -155,6 +155,20 @@ class SearchWithSelenium(SeleniumScraper):
                             })
                             break
 
+                # Scrape iframes as well
+                # TODO: incorporate them into the original page?
+                iframe_links = self.get_beautiful_iframe_links(scraped_page['page_source'])
+                while iframe_links:
+                    link = iframe_links.pop(0)
+                    if self.check_exclude_link(link, scraped_urls):
+                        # Add it to be scraped next
+                        urls_to_scrape.insert(0, {
+                            'url': link,
+                            'base_url': url_obj['base_url'],
+                            'num_additional_subpages': num_additional_subpages, # Do not consider this a "link" since it should be imbedded
+                            'subpage_links': url_obj['subpage_links'] if url_obj['subpage_links'] else [], # if already subpage_links use those, else allow for scraping iframe links
+                        })
+
                 yield result
 
             else:

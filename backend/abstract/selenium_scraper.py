@@ -365,7 +365,27 @@ class SeleniumScraper(Search, metaclass=abc.ABCMeta):
                     link_url = urljoin(domain, link_url)
             else:
                 continue
-            links_to_return.append({'link_text': link_text, 
+            links_to_return.append({'link_text': link_text,
                                     'url': link_url.rstrip('/'),
                                     'original_url': original_url})
         return url_count, links_to_return
+
+    @staticmethod
+    def get_beautiful_iframe_links(page_source, beautiful_soup_parser='html.parser'):
+        """
+        takes page_source and creates BeautifulSoup entity, then looks for iframes
+        and gets their src link. This could perhaps be more robust. Selenium can
+        also switch to iframes to extract html/text, but you have to know a bit
+        more in order to select them (xpath, css, etc.).
+
+        You could then either use requests of selenium to scrape these links.
+        TODO: is it possible/desirable to insert the html source code back into
+        the original url?
+        """
+        iframe_links = []
+        soup = BeautifulSoup(page_source, beautiful_soup_parser)
+        iframes = soup.findAll('iframe')
+        if iframes:
+            for iframe in iframes:
+                iframe_links.append(iframe.get('src'))
+        return iframe_links
