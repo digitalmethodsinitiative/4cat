@@ -137,15 +137,17 @@ def exempt_from_limit():
 	if not config.get("flask.autologin.api"):
 		return False
 
+	# filter by IP address and hostname, if the latter is available
+	filterables = [request.remote_addr]
 	try:
 		socket.setdefaulttimeout(2)
 		hostname = socket.gethostbyaddr(request.remote_addr)[0]
+		filterables.append(hostname)
 	except (socket.herror, socket.timeout):
-		return False
+		pass  # no hostname for this address
 
-	for hostmask in config.get("flask.autologin.api"):
-		if fnmatch.filter([hostname], hostmask):
-			return True
+	if any([fnmatch.filter(filterables, hostmask) for hostmask in config.get("flask.autologin.api", [])]):
+		return True
 
 	return False
 

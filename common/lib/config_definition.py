@@ -180,13 +180,13 @@ config_definition = {
         "type": UserInput.OPTION_TEXT_JSON,
         "default": '["localhost"]',
         "help": "White-listed hostnames",
-        "tooltip": "A list of host names to automatically log in. Docker should include localhost and Server Name",
+        "tooltip": "A list of host names or IP addresses to automatically log in. Docker should include localhost and Server Name",
     },
     "flask.autologin.api": {
         "type": UserInput.OPTION_TEXT_JSON,
         "default": '["localhost"]',
         "help": "White-list for API",
-        "tooltip": "Host names to always allow access to API endpoints. Docker should include localhost and Server Name",
+        "tooltip": "A list of host names or IP addresses to allow access to API endpoints with no rate limiting. Docker should include localhost and Server Name",
     },
     "flask.https": {
         "type": UserInput.OPTION_TOGGLE,
@@ -198,7 +198,7 @@ config_definition = {
         "type": UserInput.OPTION_TEXT,
         "default": "Automatic login",
         "help": "Auto-login name",
-        "tooltip": "User Name for whitelisted hosts",
+        "tooltip": "Username for whitelisted hosts (automatically logged in users see this name for themselves)",
     },
     "flask.secret_key": {
         "type": UserInput.OPTION_TEXT,
