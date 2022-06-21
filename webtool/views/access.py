@@ -87,22 +87,25 @@ def banned_users():
 @app.before_request
 def autologin_whitelist():
 	"""
-	Checks if host name matches whitelisted hostmask. If so, the user is logged
-	in as the special "autologin" user.
+	Checks if host name matches whitelisted hostmask or IP. If so, the user is
+	logged in as the special "autologin" user.
 	"""
 	if not config.get("flask.autologin.hostnames"):
-		# if there's not whitelist, there's no point in checking it
+		# if there's no whitelist, there's no point in checking it
 		return
 
 	if "/static/" in request.path:
 		# never check login for static files
 		return
 
+	# filter by IP address and hostname, if the latter is available
+	filterables = [request.remote_addr]
 	try:
 		socket.setdefaulttimeout(2)
 		hostname = socket.gethostbyaddr(request.remote_addr)[0]
+		filterables.append(hostname)
 	except (socket.herror, socket.timeout):
-		return
+		pass  # no hostname for this address
 
 	if current_user:
 		if current_user.get_id() == "autologin":
@@ -112,16 +115,15 @@ def autologin_whitelist():
 			# if we're logged in as a regular user, no need for a check
 			return
 
-	# uva is a special user that is automatically logged in for this request only
-	# if the hostname matches the whitelist
-	for hostmask in config.get("flask.autologin.hostnames"):
-		if fnmatch.filter([hostname], hostmask):
-			autologin_user = User.get_by_name(db, "autologin")
-			if not autologin_user:
-				# this user should exist by default
-				abort(500)
-			autologin_user.authenticate()
-			login_user(autologin_user, remember=False)
+	# autologin is a special user that is automatically logged in for this
+	# request only if the hostname or IP matches the whitelist
+	if any([fnmatch.filter(filterables, hostmask) for hostmask in config.get("flask.autologin.hostnames", [])]):
+		autologin_user = User.get_by_name(db, "autologin")
+		if not autologin_user:
+			# this user should exist by default
+			abort(500)
+		autologin_user.authenticate()
+		login_user(autologin_user, remember=False)
 
 
 @limiter.request_filter
