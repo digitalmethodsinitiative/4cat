@@ -22,8 +22,8 @@ class SearchTikTok(Search):
     title = "Import scraped Tiktok data"  # title displayed in UI
     description = "Import Tiktok data collected with an external tool such as Zeeschuimer."  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
-    is_local = False    # Whether this datasource is locally scraped
-    is_static = False   # Whether this datasource is still updated
+    is_local = False  # Whether this datasource is locally scraped
+    is_static = False  # Whether this datasource is still updated
 
     # not available as a processor for existing datasets
     accepts = [None]
@@ -63,43 +63,47 @@ class SearchTikTok(Search):
                 # things
                 post = json.loads(line.replace("\0", ""))["data"]
 
-                hashtags = [extra["hashtagName"] for extra in post.get("textExtra", []) if "hashtagName" in extra and extra["hashtagName"]]
-
-                if type(post["author"]) is dict:
-                    # from intercepted API response
-                    user_nickname = post["author"]["uniqueId"]
-                    user_fullname = post["author"]["nickname"]
-                    user_id = post["author"]["id"]
-                else:
-                    # from embedded JSON object
-                    user_nickname = post["author"]
-                    user_fullname = post["nickname"]
-                    user_id = ""
-
-
-                mapped_item = {
-                    "id": post["id"],
-                    "thread_id": post["id"],
-                    "author": user_nickname,
-                    "author_full": user_fullname,
-                    "author_id": user_id,
-                    "author_followers": post["authorStats"]["followerCount"],
-                    "body": post["desc"],
-                    "timestamp": int(post["createTime"]),
-                    "is_duet": post["duetInfo"].get("duetFromId") != "0",
-                    "music_name": post["music"]["title"],
-                    "music_id": post["music"]["id"],
-                    "music_url": post["music"]["playUrl"],
-                    "video_url": post["video"].get("downloadAddr", ""),
-                    "tiktok_url": "https://tiktok.com/@%s/video/%s" % (user_nickname, post["id"]),
-                    "thumbnail_url": post["video"]["cover"],
-                    "likes": post["stats"]["diggCount"],
-                    "comments": post["stats"]["commentCount"],
-                    "shares": post["stats"]["shareCount"],
-                    "plays": post["stats"]["playCount"],
-                    "hashtags": ",".join(hashtags)
-                }
+                mapped_item = self.map_tiktok_item(post)
 
                 yield mapped_item
 
         path.unlink()
+
+    @staticmethod
+    def map_tiktok_item(post):
+        hashtags = [extra["hashtagName"] for extra in post.get("textExtra", []) if
+                    "hashtagName" in extra and extra["hashtagName"]]
+
+        if type(post["author"]) is dict:
+            # from intercepted API response
+            user_nickname = post["author"]["uniqueId"]
+            user_fullname = post["author"]["nickname"]
+            user_id = post["author"]["id"]
+        else:
+            # from embedded JSON object
+            user_nickname = post["author"]
+            user_fullname = post["nickname"]
+            user_id = ""
+
+        return {
+            "id": post["id"],
+            "thread_id": post["id"],
+            "author": user_nickname,
+            "author_full": user_fullname,
+            "author_id": user_id,
+            "author_followers": post["authorStats"]["followerCount"],
+            "body": post["desc"],
+            "timestamp": int(post["createTime"]),
+            "is_duet": post["duetInfo"].get("duetFromId") != "0",
+            "music_name": post["music"]["title"],
+            "music_id": post["music"]["id"],
+            "music_url": post["music"]["playUrl"],
+            "video_url": post["video"].get("downloadAddr", ""),
+            "tiktok_url": "https://tiktok.com/@%s/video/%s" % (user_nickname, post["id"]),
+            "thumbnail_url": post["video"]["cover"],
+            "likes": post["stats"]["diggCount"],
+            "comments": post["stats"]["commentCount"],
+            "shares": post["stats"]["shareCount"],
+            "plays": post["stats"]["playCount"],
+            "hashtags": ",".join(hashtags)
+        }
