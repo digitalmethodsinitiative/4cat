@@ -110,6 +110,7 @@ class RedditVoteChecker(BasicProcessor):
 			processed += 1
 			if processed % 100 == 0:
 				self.dataset.update_status("Retrieved scores for %i threads" % processed)
+				self.dataset.update_progress(processed / len(thread_ids))
 
 		# now write a new CSV with the updated scores
 		# get field names

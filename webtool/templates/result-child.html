@@ -6,7 +6,7 @@
 <li id="child-{{ item.key }}" data-dataset-key="{{ item.key }}" class="child-wrapper{% if not item.is_finished() %} running{% endif %}" data-status="{{ item.status }}">
     {# The status button for this processor #}
 
-    <div class="processor-result-indicator button-wrap {{ processors[item.type].id if not deprecated else 'deprecated' }}-button {% if 'queued' in item.status|lower %} queued-button{% endif %} {% if not item.is_finished() %} pending{% elif item.num_rows == 0 %} failed{% else %} finished {% endif %}">
+    <div class="processor-result-indicator button-wrap {{ processors[item.type].id if not deprecated else 'deprecated' }}-button {% if 'queued' in item.status|lower %} queued-button{% endif %} {% if not item.is_finished() %} pending{% elif item.num_rows == 0 %} failed{% else %} finished {% endif %}{% if item.progress and 0.0 < item.progress < 1.0 %} progress progress-{{ (item.progress * 100)|round(0)|int }}{% endif %}">
 
     <div class="button-object">
 

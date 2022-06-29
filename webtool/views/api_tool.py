@@ -426,6 +426,7 @@ def check_dataset():
 		"key": dataset_key,
 		"done": True if dataset.is_finished() else False,
 		"path": path,
+		"progress": round(dataset.get_progress() * 100),
 		"empty": (dataset.data["num_rows"] == 0),
 		"is_favourite": (db.fetchone("SELECT COUNT(*) AS num FROM users_favourites WHERE name = %s AND key = %s",
 									 (current_user.get_id(), dataset.key))["num"] > 0),
@@ -938,6 +939,7 @@ def check_processor():
 		children.append({
 			"key": dataset.key,
 			"finished": dataset.is_finished(),
+			"progress": round(dataset.get_progress() * 100),
 			"html": render_template("result-child.html", child=dataset, dataset=parent,
                                     query=dataset.get_genealogy()[0], parent_key=top_parent.key,
                                     processors=backend.all_modules.processors),

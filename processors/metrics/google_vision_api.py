@@ -107,6 +107,7 @@ class GoogleVisionAPIFetcher(BasicProcessor):
 
             done += 1
             self.dataset.update_status("Annotating image %i/%i" % (done, total))
+            self.dataset.update_progress(done / total)
 
             try:
                 annotations = self.annotate_image(image_file, api_key, features)

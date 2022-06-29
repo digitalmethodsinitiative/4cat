@@ -343,6 +343,8 @@ class SearchWithTwitterAPIv2(Search):
                     tweets += 1
                     if tweets % 500 == 0:
                         self.dataset.update_status("Received %s of ~%s tweets from the Twitter API" % ("{:,}".format(tweets), expected_tweets))
+                        if expected_tweets != "unknown":
+                            self.dataset.update_progress(tweets / expected_tweets)
 
                     yield tweet
 

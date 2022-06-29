@@ -71,6 +71,7 @@ class WildcardFilter(BasicProcessor):
 
                 if processed % 2500 == 0:
                     self.dataset.update_status("Processed %i posts (%i matching)" % (processed, matching_items))
+                    self.dataset.update_progress(processed / self.source_dataset.num_rows)
 
                 if not matcher.findall(post.get("body")):
                     continue

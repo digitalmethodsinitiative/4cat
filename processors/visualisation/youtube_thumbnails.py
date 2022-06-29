@@ -104,6 +104,7 @@ class YouTubeThumbnails(BasicProcessor):
 					urllib.request.urlretrieve(thumb_url, save_path)
 
 			self.dataset.update_status("Downloaded thumbnails for " + str(i * 50) + "/" + str(len(video_ids)))
+			self.dataset.update_progress(i / len(ids_list))
 
 		# create zip of archive and delete temporary files and folder
 		self.dataset.update_status("Compressing results into archive")

@@ -147,6 +147,7 @@ class GenerateWordEmbeddings(BasicProcessor):
 			# list per sentence - this processor is agnostic in that regard
 			token_set_name = temp_file.name
 			self.dataset.update_status("Extracting bigrams from token set %s..." % token_set_name)
+			self.dataset.update_progress(models / self.source_dataset.num_rows)
 
 			try:
 				if detect_bigrams:

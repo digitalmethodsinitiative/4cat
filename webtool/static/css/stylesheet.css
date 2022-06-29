@@ -2,6 +2,8 @@
 @import url('dataset-page.css');
 @import url('control-panel.css');
 
+@import url('progress.css');
+
 
 /** --------------------- *
             Fonts
@@ -43,6 +45,7 @@
     --highlight: #FF2231;
     --accent-alternate: #19B0A3;
     --accent-okay: #26b018;
+    --accent-okay-light: #bee0ba;
     --accent-warning: #b05d13;
     --accent-error: #ff2231;
     --gray-dark: #DFDFDF;
@@ -778,7 +781,7 @@ article section.data-overview .description {
     padding: 0.5em 1em;
 }
 
-#query-status.active {
+#query-status.active:not(.progress) {
     animation: scroll-background 2s ease infinite;
 }
 

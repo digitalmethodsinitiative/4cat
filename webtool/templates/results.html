@@ -62,7 +62,7 @@
 
                         <div class="property-container status">
                         {% if not dataset.is_finished() or dataset.num_rows == 0 %}
-                            <p class="button-like inactive"><span class="dataset-status">{% include "result-status.html" %}</span></p>
+                            <p class="button-like inactive{% if dataset.progress and 0.0 < dataset.progress < 1.0 %} progress progress-{{ (dataset.progress * 100)|round(0)|int }}{% endif %}"><span class="dataset-status">{% include "result-status.html" %}</span></p>
                         {% else %}
                             <a class="button-like" href="{{ url_for('get_result', query_file=dataset.result_file)[:-1] }}"><i class="fas fa-download" aria-hidden="true"></i> {{ dataset.get_results_path()|filesize }}, {{ dataset.result_file.split(".")[-1] }}</a>
                         {% endif %}

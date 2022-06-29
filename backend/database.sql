@@ -46,6 +46,7 @@ CREATE TABLE IF NOT EXISTS datasets (
   timestamp         integer,
   status            text,
   num_rows          integer DEFAULT 0,
+  progress          float DEFAULT 0.0,
   is_finished       boolean DEFAULT FALSE,
   is_private        boolean DEFAULT TRUE,
   software_version  text,

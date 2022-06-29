@@ -212,6 +212,8 @@ class PixPlotGenerator(BasicProcessor):
 			else:
 				self.dataset.update_status("Error with image %s: %i - %s" % (filename, response.status_code, response.reason))
 
+			self.dataset.update_progress(i / self.source_dataset.num_rows)
+
 		# Request PixPlot server create PixPlot
 		self.dataset.update_status("Sending create PixPlot request")
 		create_plot_url = config.get('pix-plot.PIXPLOT_SERVER').rstrip('/') + '/api/pixplot'

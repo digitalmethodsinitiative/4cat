@@ -130,6 +130,8 @@ class SearchBitChute(Search):
             else:
                 results.append(self.get_videos_user(session, query, csrftoken, detail))
 
+            self.dataset.update_progress(num_query / len(queries))
+
         return chain(*results)
 
     def get_videos_id(self, session, video_id, csrftoken, detail):

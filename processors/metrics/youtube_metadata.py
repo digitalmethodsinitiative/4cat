@@ -284,6 +284,7 @@ class YouTubeMetadata(BasicProcessor):
 			# Update status once in a while
 			if counter % 10 == 0:
 				self.dataset.update_status("Extracted metadata " + str(counter) + "/" + str(len(urls_metadata)))
+				self.dataset.update_progress(counter / len(urls_metadata))
 
 		# To write to csv, all dictionary items must have all the possible keys
 		# Get all the possible keys

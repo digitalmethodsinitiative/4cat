@@ -160,6 +160,7 @@ class YouTubeImageWall(BasicProcessor):
 			counter += 1
 			if counter % 50 == 0:
 				self.dataset.update_status("Placing image " + str(counter) + "/" + str(len(files)))
+				self.dataset.update_progress(counter / len(files))
 
 			# Get the thumbnail if it exists
 			# Else use a 'no video' template

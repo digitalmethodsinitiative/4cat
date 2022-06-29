@@ -260,12 +260,12 @@ article.result > section:first-child {
     color: var(--always-white);
 }
 
-.child-wrapper .button-wrap.pending {
+.pending {
     background: var(--accent-alternate);
     color: var(--always-white);
 }
 
-.child-wrapper .button-wrap.failed {
+.failed {
     background: var(--accent-error);
     color: var(--always-white);
 }

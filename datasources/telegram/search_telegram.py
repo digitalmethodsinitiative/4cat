@@ -263,9 +263,12 @@ class SearchTelegram(Search):
         no_additional_queries = False
 
         # Collect queries
+        processed = 0
         for query in queries:
             delay = 10
             retries = 0
+            processed += 1
+            self.dataset.update_progress(processed / len(queries))
 
             if no_additional_queries:
                 # Note that we are note completing this query

@@ -143,6 +143,7 @@ class ImageWallGenerator(BasicProcessor):
 				continue
 
 			self.dataset.update_status("Analysing %s (%i/%i)" % (path.name, len(dimensions), self.source_dataset.num_rows))
+			self.dataset.update_progress(len(dimensions) / self.source_dataset.num_rows / 2)
 
 			# these calculations can take ages for huge images, so resize if it is
 			# larger than the threshold
@@ -329,6 +330,7 @@ class ImageWallGenerator(BasicProcessor):
 		for path in sorted_image_files:
 			counter += 1
 			self.dataset.update_status("Rendering %s (%i/%i) to image wall" % (path, counter, len(sorted_image_files)))
+			self.dataset.update_progress(0.5 + (counter / len(sorted_image_files) / 2))
 			picture = Image.open(str(staging_area.joinpath(path)))
 
 			if tile_x == -1:

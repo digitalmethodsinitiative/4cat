@@ -51,12 +51,16 @@ class TopicModelWordExtractor(BasicProcessor):
         self.dataset.update_status("Unpacking topic models")
         staging_area = self.unpack_archive_contents(self.source_file)
         results = []
+        processed = 0
 
         for model_file in staging_area.glob("*.model"):
             if self.interrupted:
                 raise ProcessorInterruptedException("Interrupted while extracting topic model tokens")
 
             self.dataset.update_status("Extracting topics from model '%s'" % model_file.stem)
+            self.dataset.update_progress(processed / self.source_dataset.num_rows)
+            processed += 1
+
             with model_file.open("rb") as infile:
                 model = pickle.load(infile)
 

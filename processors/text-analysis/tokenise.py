@@ -228,7 +228,7 @@ class Tokenise(BasicProcessor):
 		def dummy_function(x, *args, **kwargs):
 			return [x]
 
-		document_descriptor = "overall"
+		processed = 0
 		for post in self.source_dataset.iterate_items(self):
 			# determine what output unit this post belongs to
 			if docs_per != "thread":
@@ -245,9 +245,13 @@ class Tokenise(BasicProcessor):
 			sentence_method = sent_tokenize if grouping == "sentence" else dummy_function
 			groupings = []
 			for column in columns:
-				value = sentence_method(post[column], language)
+				value = [v for v in sentence_method(post[column], language) if v is not None]
 				if value:
 					groupings.extend(value)
+
+			if processed % 500 == 0:
+				self.dataset.update_progress(processed / self.source_dataset.num_rows)
+			processed += 1
 
 			# tokenise...
 			for document in groupings:

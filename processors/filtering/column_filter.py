@@ -153,6 +153,7 @@ class ColumnFilter(BasicProcessor):
                 processed_items += 1
                 if processed_items % 500 == 0:
                     self.dataset.update_status("Processed %i items (%i matching)" % (processed_items, matching_items))
+                    self.dataset.update_progress(processed_items / matching_items)
 
                 # comparing dates is allowed on both unix timestamps and
                 # 'human' timestamps. For that reason, if we *are* indeed

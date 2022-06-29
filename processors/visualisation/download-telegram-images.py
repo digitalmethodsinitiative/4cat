@@ -180,6 +180,8 @@ class TelegramImageDownloader(BasicProcessor):
                     # it's actually unclear if images are always jpegs, but this
                     # seems to work
                     self.dataset.update_status("Downloading media %i/%i" % (media_done, total_media))
+                    self.dataset.update_progress(media_done / total_media)
+
                     path = self.staging_area.joinpath("%s-%i.jpeg" % (entity, message.id))
                     filename = path.name
                     if hasattr(message.media, "photo"):

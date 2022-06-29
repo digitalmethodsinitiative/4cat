@@ -147,6 +147,7 @@ class LexicalFilter(BasicProcessor):
 
 				if processed % 2500 == 0:
 					self.dataset.update_status("Processed %i posts (%i matching)" % (processed, matching_items))
+					self.dataset.update_progress(processed / self.source_dataset.num_rows)
 
 				# if 'partition' is false, there will just be one combined
 				# lexicon, but else we'll have different ones we can

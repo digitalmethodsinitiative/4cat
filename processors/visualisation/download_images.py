@@ -64,6 +64,17 @@ class ImageDownloader(BasicProcessor):
 		}
 	}
 
+	config = {
+		"image_downloader.MAX_NUMBER_IMAGES": {
+			"type": UserInput.OPTION_TEXT,
+			"coerce_type": int,
+			"default": 1000,
+			"help": "Max images to download",
+			"tooltip": "Only allow downloading up to this many images per batch. Increasing this can easily lead to "
+					   "very long-running processors and large datasets."
+		}
+	}
+
 	@classmethod
 	def get_options(cls, parent_dataset=None, user=None):
 		"""
@@ -244,6 +255,7 @@ class ImageDownloader(BasicProcessor):
 			processed_urls += 1
 			self.dataset.update_status("Downloaded %i/%i images; downloading from %s" %
 									   (downloaded_images, len(urls), url))
+			self.dataset.update_progress(downloaded_images / len(urls))
 
 			try:
 				# acquire image
@@ -531,4 +543,8 @@ class ImageDownloader(BasicProcessor):
 			else:
 				self.dataset.log("Error: ConnectionError while trying to download image %s: %s" % (url, e))
 				raise FileNotFoundError()
+		except requests.exceptions.InvalidSchema:
+			# not an http url, just skip
+			raise FileNotFoundError()
+
 		return response

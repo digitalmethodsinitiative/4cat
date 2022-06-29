@@ -389,6 +389,7 @@ const query = {
 
 				if (json.done) {
 					clearInterval(query.poll_interval);
+					applyProgress($('#query-status'), 100);
 					let keyword = json.label;
 
 					$('#query-results').append('<li><a href="../results/' + json.key + '">' + keyword + ' (' + json.rows + ' items)</a></li>');
@@ -400,6 +401,8 @@ const query = {
 						dots += '.';
 					}
 					$('#query-status .dots').html(dots);
+
+					applyProgress($('#query-status'), json.progress);
 
 					query.dot_ticker += 1;
 					if (query.dot_ticker > 3) {
@@ -435,9 +438,11 @@ const query = {
 						return;
 					}
 
-					let current_status = container.find('.dataset-status').html();
+					let status_field = container.find('.dataset-status')
+					let current_status = status_field.html();
+					applyProgress(status_field, json.progress);
 					if (current_status !== json.status_html) {
-						container.find('.dataset-status').html(json.status_html);
+						status_field.html(json.status_html);
 					}
 				}
 			});
@@ -1410,4 +1415,23 @@ function getRelativeURL(endpoint) {
 		root = '/';
 	}
 	return root + endpoint;
+}
+
+function applyProgress(element, progress) {
+	if(element.parent().hasClass('button-like')) {
+		element = element.parent();
+	}
+
+	let current_progress = Array(...element[0].classList).filter(z => z.indexOf('progress-') === 0)
+	for (let class_name in current_progress) {
+		class_name = current_progress[class_name];
+		element.removeClass(class_name);
+	}
+
+	if (progress && progress > 0 && progress < 100) {
+		element.addClass('progress-' + progress);
+		if(!element.hasClass('progress')) {
+			element.addClass('progress');
+		}
+	}
 }

@@ -87,6 +87,7 @@ class VectorRanker(BasicProcessor):
 			index += 1
 			vector_set_name = vector_file.stem  # we don't need the full path
 			self.dataset.update_status("Processing token set %i (%s)" % (index, vector_set_name))
+			self.dataset.update_progress(index / self.source_dataset.num_rows)
 
 			with vector_file.open("rb") as binary_tokens:
 				# these were saved as pickle dumps so we need the binary mode
