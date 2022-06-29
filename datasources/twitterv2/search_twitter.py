@@ -178,7 +178,10 @@ class SearchWithTwitterAPIv2(Search):
                     "%Y-%m-%dT%H:%M:%SZ")
 
         if type(expected_tweets) is int:
+            num_expected_tweets = expected_tweets
             expected_tweets = "{:,}".format(expected_tweets)
+        else:
+            num_expected_tweets = None
 
         tweets = 0
         for query in queries:
@@ -343,8 +346,8 @@ class SearchWithTwitterAPIv2(Search):
                     tweets += 1
                     if tweets % 500 == 0:
                         self.dataset.update_status("Received %s of ~%s tweets from the Twitter API" % ("{:,}".format(tweets), expected_tweets))
-                        if expected_tweets != "unknown":
-                            self.dataset.update_progress(tweets / expected_tweets)
+                        if num_expected_tweets is not None:
+                            self.dataset.update_progress(tweets / num_expected_tweets)
 
                     yield tweet
 
