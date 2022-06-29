@@ -241,7 +241,7 @@ def create_setting(attribute_name, value, connection=None, cursor=None, keep_con
     return updated_rows
 
 
-def set_or_create_setting(attribute_name, value, connection=None, cursor=None, keep_connection_open=False):
+def set_or_create_setting(attribute_name, value, connection=None, cursor=None, keep_connection_open=False, raw=True):
     """
     Insert OR set value for a setting
 
@@ -256,10 +256,17 @@ def set_or_create_setting(attribute_name, value, connection=None, cursor=None, k
     :param keep_connection_open: Close connection after query?
     :return int: number of updated rows
     """
-    try:
-        value = json.dumps(value)
-    except ValueError:
-        return None
+    # Check value is valid JSON
+    if raw:
+        try:
+            json.dumps(json.loads(value))
+        except json.JSONDecodeError:
+            return None
+    else:
+        try:
+            value = json.dumps(value)
+        except json.JSONDecodeError:
+            return None
 
     try:
         if not connection or not cursor:

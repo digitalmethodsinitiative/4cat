@@ -296,7 +296,8 @@ def update_settings():
                                               silently_correct=False)
 
             for setting, value in new_settings.items():
-                valid = config.set_value(setting, value, raw=definition[setting].get("type") == UserInput.OPTION_TEXT_JSON)
+                valid = config.set_or_create_setting(setting, value, raw=definition[setting].get("type") == UserInput.OPTION_TEXT_JSON)
+                print("%s: %s" % (setting, repr(valid)))
                 if valid is None:
                     flash("Invalid value for %s" % setting)
 
@@ -311,7 +312,7 @@ def update_settings():
         if definition.get(option, {}).get("type") != UserInput.OPTION_TEXT_JSON:
             default = all_settings.get(option, definition.get(option, {}).get("default"))
         else:
-            default = json.dumps(all_settings.get(option, definition.get(option, {}.get("default"))))
+            default = json.dumps(all_settings.get(option, definition.get(option, {}).get("default")))
 
         options[option] = {
             **definition.get(option, {

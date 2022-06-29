@@ -38,7 +38,7 @@ class SearchTikTokByID(Search):
     config = {
         "tiktok-urls.proxies": {
             "type": UserInput.OPTION_TEXT_JSON,
-            "default": "[]",
+            "default": [],
             "help": "Proxies for TikTok data collection"
         },
         "tiktok-urls.proxies.wait": {
