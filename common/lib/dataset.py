@@ -115,6 +115,7 @@ class DataSet(FourcatModule):
 				"software_version": get_software_version(),
 				"software_file": "",
 				"num_rows": 0,
+				"progress": 0.0,
 				"key_parent": parent
 			}
 			self.parameters = parameters
@@ -1115,7 +1116,6 @@ class DataSet(FourcatModule):
 		url_to_file = ('https://' if config.get("flask.https") else 'http://') + \
 						config.get("flask.server_name") + '/result/' + filename
 		return url_to_file
-
 
 	def __getattr__(self, attr):
 		"""
