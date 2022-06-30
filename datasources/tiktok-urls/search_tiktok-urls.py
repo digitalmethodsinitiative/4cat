@@ -87,19 +87,34 @@ class SearchTikTokByID(Search):
 
         :param dict query:  Search query parameters
         """
+
+        loop = asyncio.new_event_loop()
+        return loop.run_until_complete(self.request_metadata(query["urls"].split(",")))
+
+    def update_proxies(self):
+        """
+        Get proxies that are available
+
+        :return:
+        """
         all_proxies = config.get("tiktok-urls.proxies")
         if not all_proxies:
             # no proxies? just request directly
             all_proxies = ["__localhost__"]
 
-        self.proxy_map = {proxy: {
-            "busy": False,
-            "url": None,
-            "next_request": 0
-        } for proxy in all_proxies}
+        for proxy in all_proxies:
+            if proxy in self.proxy_map:
+                continue
+            else:
+                self.proxy_map[proxy] = {
+                    "busy": False,
+                    "url": None,
+                    "next_request": 0
+                }
 
-        loop = asyncio.new_event_loop()
-        return loop.run_until_complete(self.request_metadata(query["urls"].split(",")))
+        for proxy in list(self.proxy_map.keys()):
+            if proxy not in all_proxies:
+                del self.proxy_map[proxy]
 
     async def request_metadata(self, urls):
         """
@@ -120,17 +135,26 @@ class SearchTikTokByID(Search):
 
         results = []
         failed = 0
+        last_proxy_update = 0
         while urls or tiktok_requests:
             # give tasks time to run
             await asyncio.sleep(0)
 
+            # update proxies every 5 seconds so we can potentially update them
+            # while the scrape is running
+            if last_proxy_update < time.time():
+                self.update_proxies()
+                last_proxy_update = time.time() + 5
+
+            # find out whether there is any connection we can use to send the
+            # next request
             available_proxy = [proxy for proxy in self.proxy_map if not
-                               self.proxy_map[proxy]["busy"] and self.proxy_map[proxy]["next_request"] <= time.time()]
+            self.proxy_map[proxy]["busy"] and self.proxy_map[proxy]["next_request"] <= time.time()]
             available_proxy = available_proxy[0] if available_proxy else None
 
             if available_proxy and urls:
                 url = urls.pop(0)
-                url = url.replace("https://", "http://")
+                url = url.replace("https://", "http://")  # https is finicky, lots of blocks
 
                 if url in seen_urls:
                     finished += 1
@@ -140,47 +164,59 @@ class SearchTikTokByID(Search):
                     proxy = {"http": available_proxy,
                              "https": available_proxy} if available_proxy != "__localhost__" else None
                     tiktok_requests[url] = session.get(url, proxies=proxy, timeout=30)
+                    seen_urls.add(url)
                     self.proxy_map[available_proxy].update({
                         "busy": True,
                         "url": url
                     })
 
+            # wait for async requests to end (after cancelling) before quitting
+            # the worker
             if self.interrupted:
                 for request in tiktok_requests:
                     request.cancel()
 
+                max_timeout = time.time() + 20
+                while not all([r for r in tiktok_requests.values() if r.done()]) and time.time() < max_timeout:
+                    await asyncio.sleep(0.5)
+
                 raise WorkerInterruptedException("Interrupted while fetching TikTok metadata")
 
+            # handle received data
             for url in list(tiktok_requests.keys()):
                 request = tiktok_requests[url]
                 if not request.done():
                     continue
 
                 finished += 1
-                seen_urls.add(url)
                 used_proxy = [proxy for proxy in self.proxy_map if self.proxy_map[proxy]["url"] == url][0]
                 self.proxy_map[used_proxy].update({
                     "busy": False,
                     "next_request": time.time() + config.get("tiktok-urls.proxies.wait", 1)
                 })
 
+                # handle the exceptions we know to expect - else just raise and
+                # log
                 exception = request.exception()
                 if exception:
                     failed += 1
                     if isinstance(exception, requests.exceptions.RequestException):
-                        self.dataset.update_status("Video at %s could not be retrieved (%s: %s)" % (url, type(exception).__name__, exception))
+                        self.dataset.update_status(
+                            "Video at %s could not be retrieved (%s: %s)" % (url, type(exception).__name__, exception))
                     else:
                         raise exception
 
                 response = request.result()
                 del tiktok_requests[url]
 
+                # video may not exist
                 if response.status_code == 404:
                     failed += 1
                     self.dataset.log("Video at %s no longer exists (404), skipping" % response.url)
                     skip_to_next = True
                     continue
 
+                # haven't seen these in the wild - 403 or 429 might happen?
                 elif response.status_code != 200:
                     failed += 1
                     self.dataset.update_status(
@@ -188,6 +224,7 @@ class SearchTikTokByID(Search):
                             response.status_code, response.url), is_final=True)
                     continue
 
+                # now! try to extract the JSON from the page
                 soup = BeautifulSoup(response.text, "html.parser")
                 sigil = soup.select_one("script#SIGI_STATE")
 
@@ -200,7 +237,8 @@ class SearchTikTokByID(Search):
                     metadata = json.loads(sigil.text)
                 except json.JSONDecodeError:
                     failed += 1
-                    self.dataset.log("Embedded metadata was found for video %s, but it could not be parsed, skipping" % url)
+                    self.dataset.log(
+                        "Embedded metadata was found for video %s, but it could not be parsed, skipping" % url)
                     continue
 
                 for video in self.reformat_metadata(metadata):
