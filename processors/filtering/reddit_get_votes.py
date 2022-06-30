@@ -112,9 +112,8 @@ class RedditVoteChecker(BasicProcessor):
 				failed += 1
 
 			processed += 1
-			if processed % 100 == 0:
-				self.dataset.update_status("Retrieved scores for %i threads" % processed)
-				self.dataset.update_progress(processed / len(thread_ids))
+			self.dataset.update_status("Retrieved updated scores for %i/%i threads" % (processed, len(thread_ids)))
+			self.dataset.update_progress(processed / len(thread_ids))
 
 		# now write a new CSV with the updated scores
 		# get field names
@@ -130,12 +129,13 @@ class RedditVoteChecker(BasicProcessor):
 
 			for post in self.source_dataset.iterate_items(self):
 				# threads may be included too, so store the right score
-				if post["thread_id"] == post["id"]:
+				if post["thread_id"] == post["id"] and post["thread_id"] in thread_scores:
 					post["score"] = thread_scores[post["thread_id"]]
+				elif post["id"] in post_scores:
+					post["score"] = post_scores[post["id"]]
 				else:
 					failed += 1
 					self.dataset.log("Post %s no longer exists, skipping" % post["id"])
-					post["score"] = post_scores.get(post["id"], post["score"])
 
 				writer.writerow(post)
 				processed += 1
