@@ -18,11 +18,6 @@ if __name__ == "__main__":
     import bcrypt
     from pathlib import Path
 
-    if len(sys.argv) > 1:
-        public = False#sys.argv[1]
-    else:
-        public = False
-
     # Configuration file location
     CONFIG_FILE = 'config/config.ini'
 
@@ -112,7 +107,7 @@ if __name__ == "__main__":
     # Config file already exists; Update .env variables if they changed
     else:
         print('Configuration file config/config.ini already exists')
-        print('Updating Docker .env variables if necessary')
+        print('Checking Docker .env variables and updating if necessary')
         config_parser = configparser.ConfigParser()
         config_parser.read(CONFIG_FILE)
 
