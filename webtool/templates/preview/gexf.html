@@ -4,7 +4,8 @@
         ({{ dataset.get_results_path().name }})</title>
     <script type="text/javascript" src="{{ url_for("static", filename="js/sigma/sigma.min.js") }}"></script>
     <script type="text/javascript" src="{{ url_for("static", filename="js/sigma/graphology.min.js") }}"></script>
-    <script type="text/javascript" src="{{ url_for("static", filename="js/sigma/graphology-library.min.js") }}"></script>
+    <script type="text/javascript"
+            src="{{ url_for("static", filename="js/sigma/graphology-library.min.js") }}"></script>
     <link rel="stylesheet" type="text/css" href="{{ url_for("static", filename="css/sigma_network.css") }}">
     <link href="{{ url_for("static", filename="fontawesome/css/fontawesome.css") }}" rel="stylesheet">
     <link href="{{ url_for("static", filename="fontawesome/css/regular.css") }}" rel="stylesheet">
@@ -29,15 +30,20 @@
             <h2 class="graph-manipulation-box-header">Layout</h2>
 
             <!-- Start / stop ForceAtlas2 -->
-            <div class="graph-manipulation-subbox" id="start-force-container">
-                <button id="start-force" class="standalone-button">
+            <div class="graph-manipulation-subbox" id="start-layout-container">
+                <select name="graph-layout" id="graph-layout">
+                    <option value="fa2">ForceAtlas2</option>
+                    <option value="circlepack">Circle Pack</option>
+                </select>
+                <button id="start-layout" class="standalone-button">
                     <i id="hourglass" class='fa fa-spin fa-sync-alt invisible'></i>
                     <span class="button-text"><i class="fa fa-play"></i> Start ForceAtlas2</span>
                 </button>
-                <a href="https://graphology.github.io/standard-library/layout-forceatlas2.html#settings" class="button-byline">Documentation</a>
+                <a href="https://graphology.github.io/standard-library" rel="external" target="_blank"
+                   class="button-byline">Reference</a>
             </div>
             <!-- Other network settings -->
-            <div class="graph-manipulation-subbox">
+            <div class="graph-manipulation-subbox layout-parameters" data-layout="fa2">
                 <p><label for="gravity">Gravity: </label>
                     <input class="parameter-input" id="gravity" name="gravity" type="number" min="1" value="1">
                 </p>
@@ -52,24 +58,16 @@
                     <input class="parameter-input" id="scaling-ratio" name="scaling-ratio" type="number" min="1"
                            value="1">
                 </p>
-            </div>
-            <div class="graph-manipulation-subbox">
                 <p><label for="linlog-mode">LinLog mode: </label>
                     <input class="parameter-input" id="linlog-mode" name="linlog-mode" type="checkbox">
                 </p>
-            </div>
-            <div class="graph-manipulation-subbox">
                 <p><label for="outbound-attraction-distribution">Outbound Attraction Distribution: </label>
                     <input class="parameter-input" id="outbound-attraction-distribution"
                            name="outbound-attraction-distribution" type="checkbox">
                 </p>
-            </div>
-            <div class="graph-manipulation-subbox">
                 <p><label for="adjust-sizes">Adjust sizes: </label>
                     <input class="parameter-input" id="adjust-sizes" name="adjust-sizes" type="checkbox" value="">
                 </p>
-            </div>
-            <div class="graph-manipulation-subbox">
                 <p><label for="barnes-hut-optimise">Barnes-Hut optimise: </label>
                     <input class="parameter-input" id="barnes-hut-optimise" name="barnes-hut-optimise" type="checkbox"
                            checked>
@@ -78,8 +76,6 @@
                     <input class="parameter-input" id="barnes-hut-theta" name="barnes-hut-theta" type="number" min="0"
                            value="0.5">
                 </p>
-            </div>
-            <div class="graph-manipulation-subbox">
                 <p><label for="slow-down">Slow down: </label>
                     <input class="parameter-input" id="slow-down" name="slow-down" type="number" value="1">
                 </p>
@@ -91,48 +87,57 @@
         <!-- Visual settings -->
         <div class="graph-manipulation-box" id="visual-settings">
             <h2 class="graph-manipulation-box-header">Visual</h2>
+            <h3 class="graph-manipulation-box-header">Nodes and edges</h3>
+            <div class="graph-manipulation-subbox">
+                <p><label for="show-nodes">Show nodes: </label>
+                    <input class="parameter-input" id="show-nodes" name="show-nodes" type="checkbox" checked>
+                </p>
+                <p><label for="show-edges">Show edges: </label>
+                    <input class="parameter-input" id="show-edges" name="show-edges" type="checkbox" checked>
+                </p>
+                <p><label for="min-degree">Minimum node degree: </label>
+                    <input class="parameter-input" id="min-degree" name="min-degree" type="range" min="0" max="1"
+                           value="0" step="0.1">
+                </p>
+                <p><label for="min-node-size">Minimum node size: </label>
+                    <input class="parameter-input" id="min-node-size" name="min-node-size" type="number" min="1"
+                           value="1">
+                </p>
+                <p><label for="max-node-size">Maximum node size: </label>
+                    <input class="parameter-input" id="max-node-size" name="max-node-size" type="number" min="1"
+                           value="10">
+                </p>
+            </div>
+            <h3 class="graph-manipulation-box-header">Colours</h3>
+            <div class="graph-manipulation-subbox">
+                <p>
+                    <label for="node-colouring">Colour nodes by:</label>
+                    <select id="node-colouring" name="node-colouring">
+                        <option value="static" selected>Single colour (set below)</option>
+                        <option value="degree">Degree</option>
+                        <option value="attribute-community">Community (Louvain)</option>
+                    </select>
+                </p>
+                <p><label for="node-colour">Node colour: </label>
+                    <input class="parameter-input" id="node-colour" name="node-colour" type="color" value="#CE1B28">
+                </p>
+                <p><label for="edge-colour">Edge colour: </label>
+                    <input class="parameter-input" id="edge-colour" name="edge-colour" type="color" value="#FFA5AC">
+                </p>
+                <p><label for="label-colour">Label colour: </label>
+                    <input class="parameter-input" id="label-colour" name="label-colour" type="color" value="#00000">
+                </p>
+            </div>
             <h3 class="graph-manipulation-box-header">Labels</h3>
             <div class="graph-manipulation-subbox">
                 <p><label for="label-threshold">Labeling threshold: </label>
-                    <input id="label-threshold" type="range" min="0" max="15" step="0.5">
+                    <input class="parameter-input" id="label-threshold" name="label-threshold" type="range" min="0" max="15" step="0.5">
                 </p>
                 <p><label for="label-size">Label density: </label>
                     <input class="parameter-input" id="label-size" name="label-size" type="number" min="1" value="14">
                 </p>
                 <p><label for="label-size-type">Size labels by node size: </label>
                     <input class="parameter-input" id="label-size-type" name="label-size-type" type="checkbox">
-                </p>
-                <p><label for="label-colour">Label colour: </label>
-                    <input class="parameter-input" id="label-colour" name="label-colour" type="color" value="#00000">
-                </p>
-            </div>
-            <h3 class="graph-manipulation-box-header">Nodes and edges</h3>
-            <div class="graph-manipulation-subbox">
-                <p><label for="min-degree">Minimum degree: </label>
-                    <input class="parameter-input" id="min-degree" name="min-degree" type="range" min="0" max="1"
-                           value="0" step="0.1">
-                </p>
-                <p><label for="min-node-size">Min node size: </label>
-                    <input class="parameter-input" id="min-node-size" name="min-node-size" type="number" min="1"
-                           value="1">
-                </p>
-                <p><label for="max-node-size">Max node size: </label>
-                    <input class="parameter-input" id="max-node-size" name="max-node-size" type="number" min="1"
-                           value="10">
-                </p>
-            </div>
-            <div class="graph-manipulation-subbox">
-                <p><label for="show-nodes">Show nodes: </label>
-                    <input class="parameter-input" id="show-nodes" name="show-nodes" type="checkbox" checked>
-                </p>
-                <p><label for="node-colour">Node colour: </label>
-                    <input class="parameter-input" id="node-colour" name="node-colour" type="color" value="#CE1B28">
-                </p>
-                <p><label for="show-edges">Show edges: </label>
-                    <input class="parameter-input" id="show-edges" name="show-edges" type="checkbox" checked>
-                </p>
-                <p><label for="edge-colour">Edge colour: </label>
-                    <input class="parameter-input" id="edge-colour" name="edge-colour" type="color" value="#FFA5AC">
                 </p>
             </div>
         </div>

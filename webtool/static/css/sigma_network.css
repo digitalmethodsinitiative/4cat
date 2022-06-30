@@ -110,6 +110,11 @@ select, input {
     padding-right: 1em;
 }
 
+#graph-layout {
+    display: block;
+    margin: 0 auto 1em auto;
+}
+
 button, .button-like {
     border: 2px solid var(--contrast-dark);
     background: var(--contrast-bright);
