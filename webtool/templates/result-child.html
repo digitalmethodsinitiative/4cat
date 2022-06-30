@@ -72,7 +72,7 @@
         {# Parameters #}
         <div class="parameters">
             <ul>
-                {% if item.get_extension() == "csv" or item.get_own_processor().map_item %}
+                {% if item.get_extension() in ("gexf", "csv") or item.get_own_processor().map_item %}
                 <li>
                     <a href="{{ url_for('preview_items', key=item.key) }}"
                        data-load-from="{{ url_for('preview_items', key=item.key) }}"

@@ -58,6 +58,10 @@
 /** --------------------- *
      Basic HTML elements
   * --------------------- */
+html {
+    overflow:hidden;
+}
+
 *, body, code, select, input, textarea {
     font-family: 'Open Sans', 'Trebuchet MS', sans-serif;
 }
@@ -114,6 +118,14 @@ button, .button-like {
     font-size: inherit;
     cursor: pointer;
     padding: 0.25em 1em;
+    display: block;
+    margin: 0 auto;
+}
+
+.button-byline {
+    text-align: center;
+    font-size: 0.8em;
+    display:block;
 }
 
 button:hover, .button-like:not(.inactive):hover {

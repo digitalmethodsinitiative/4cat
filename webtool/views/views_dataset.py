@@ -240,7 +240,7 @@ def view_log(key):
     return log
 
 
-@app.route("/preview-as-table/<string:key>/")
+@app.route("/preview/<string:key>/")
 def preview_items(key):
     """
     Preview a CSV file
@@ -266,22 +266,26 @@ def preview_items(key):
         return render_template("components/error_message.html", title="Preview not available",
                                message="No preview is available for this file.")
 
-    rows = []
-    try:
-        for row in dataset.iterate_items():
-            if len(rows) > preview_size:
-                break
+    if dataset.get_extension() == "gexf":
+        return render_template("preview/gexf.html", dataset=dataset)
 
-            if len(rows) == 0:
-                rows.append(list(row.keys()))
+    else:
+        rows = []
+        try:
+            for row in dataset.iterate_items():
+                if len(rows) > preview_size:
+                    break
 
-            rows.append(list(row.values()))
+                if len(rows) == 0:
+                    rows.append(list(row.keys()))
 
-    except NotImplementedError:
-        return error(404)
+                rows.append(list(row.values()))
 
-    return render_template("result-csv-preview.html", rows=rows, max_items=preview_size,
-                           dataset=dataset)
+        except NotImplementedError:
+            return error(404)
+
+        return render_template("preview/csv.html", rows=rows, max_items=preview_size,
+                               dataset=dataset)
 
 
 """

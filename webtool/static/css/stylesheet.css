@@ -106,6 +106,18 @@ i {
     font-style: italic;
 }
 
+i.scroll {
+    animation: scroll-vertical 1.5s infinite linear;
+    overflow: hidden;
+    height: 3em;
+    padding-bottom: 2em;
+    box-sizing: border-box;
+    clip-path: polygon(0 33%, 100% 33%, 100% 66%, 0 66%);
+    margin-top: -1em;
+    margin-bottom: -1em;
+    font-weight: bold;
+}
+
 table {
     margin: 1em auto;
     font-size: inherit;
@@ -423,7 +435,7 @@ button.tooltip-trigger, button.popup-trigger {
 
 #popup .content iframe {
     width: 100%;
-    height: 100%;
+    height: 98%;
 }
 
 .csv-preview {
@@ -802,6 +814,18 @@ article section.data-overview .description {
     100% {
         background:#FFF;
     }
+}
+
+@keyframes scroll-vertical {
+  0% {
+    padding-top: 0;
+    padding-bottom: 2em;
+  }
+
+  100% {
+    padding-top: 2em;
+    padding-bottom: 0;
+  }
 }
 
 /** --------------------- *
