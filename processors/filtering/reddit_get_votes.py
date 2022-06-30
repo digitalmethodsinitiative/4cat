@@ -5,7 +5,7 @@ import shutil
 import praw, praw.exceptions
 import csv
 
-from prawcore.exceptions import Forbidden
+from prawcore.exceptions import Forbidden, NotFound
 
 from backend.abstract.processor import BasicProcessor
 from common.lib.user_input import UserInput
@@ -85,6 +85,7 @@ class RedditVoteChecker(BasicProcessor):
 		thread_scores = {}
 
 		processed = 0
+		failed = 0
 		self.dataset.update_status("Retrieving scores via Reddit API")
 		for thread_id in thread_ids:
 			if self.interrupted:
@@ -106,6 +107,9 @@ class RedditVoteChecker(BasicProcessor):
 				self.dataset.update_status("Got error 403 while getting data from Reddit. Reddit may have blocked 4CAT.", is_final=True)
 				self.dataset.finish(0)
 				return
+			except NotFound:
+				self.dataset.log("Thread %s no longer exists (404), skipping" % thread_id)
+				failed += 1
 
 			processed += 1
 			if processed % 100 == 0:
@@ -129,6 +133,8 @@ class RedditVoteChecker(BasicProcessor):
 				if post["thread_id"] == post["id"]:
 					post["score"] = thread_scores[post["thread_id"]]
 				else:
+					failed += 1
+					self.dataset.log("Post %s no longer exists, skipping" % post["id"])
 					post["score"] = post_scores.get(post["id"], post["score"])
 
 				writer.writerow(post)
@@ -137,5 +143,10 @@ class RedditVoteChecker(BasicProcessor):
 		# now comes the big trick - replace original dataset with updated one
 		shutil.move(self.dataset.get_results_path(), self.source_dataset.get_results_path())
 
-		self.dataset.update_status("Scores retrieved, parent dataset updated.")
+		if failed > 0:
+			self.dataset.update_status("Scores retrieved and dataset updated, but unable to find new scores for some "
+									   "deleted posts. Check the dataset log for details.", is_final=True)
+		else:
+			self.dataset.update_status("Scores retrieved, parent dataset updated.")
+
 		self.dataset.finish(processed)
