@@ -79,7 +79,7 @@ def get(attribute_name, default=None, connection=None, cursor=None, keep_connect
     :param connection:  Database connection, if None then a new connection will be created
     :param cursor:  Database cursor, if None then a new cursor will be created
     :param bool keep_connection_open:  Close connection after query?
-    :param bool raw:  Do not parse as JSON?
+    :param bool raw:  True returns value as JSON serialized string; False returns JSON object
     :return:  Setting value, or the provided fallback, or `None`.
     """
     if attribute_name in dir(ConfigManager):
@@ -125,6 +125,7 @@ def get_all(connection=None, cursor=None, keep_connection_open=False, raw=False)
     be created
     :param cursor: Database cursor, if None then a new cursor will be created
     :param keep_connection_open: Close connection after query?
+    :param bool raw:  True returns values as JSON serialized strings; False returns JSON objects
     :return dict:  Settings, as setting -> value. Values are decoded from JSON
     """
     try:
@@ -154,104 +155,19 @@ def get_all(connection=None, cursor=None, keep_connection_open=False, raw=False)
     return values
 
 
-def set_value(attribute_name, value, connection=None, cursor=None, keep_connection_open=False, raw=True):
-    """
-    Update setting
-
-    Updates database attribute with new value. Returns number of updated rows
-    (which ought to be either 1 for success or 0 for failure).
-
-    :param str attribute_name:  Attribute to set
-    :param value:  Value to set (will be serialised as JSON)
-    :param connection:  Database connection, if None then a new connection will be created
-    :param cursor:  Database cursor, if None then a new cursor will be created
-    :param bool keep_connection_open:  Close connection after query?
-    :param bool raw:  Do not parse as JSON?
-    :return int:  Number of updated rows
-    """
-    # Check value is valid JSON
-    if raw:
-        try:
-            json.dumps(json.loads(value))
-        except json.JSONDecodeError:
-            return None
-    else:
-        try:
-            value = json.dumps(value)
-        except json.JSONDecodeError:
-            return None
-
-    try:
-        if not connection or not cursor:
-            connection, cursor = quick_db_connect()
-        query = "UPDATE settings SET value = %s WHERE name = %s"
-        cursor.execute(query, (value, attribute_name))
-        updated_rows = cursor.rowcount
-        connection.commit()
-        if not keep_connection_open:
-            connection.close()
-    except (Exception, psycopg2.DatabaseError) as error:
-        raise ConfigException("Error setting setting {}: {}".format(attribute_name, repr(error)))
-
-    finally:
-        if connection is not None and not keep_connection_open:
-            connection.close()
-
-    return updated_rows
-
-
-def create_setting(attribute_name, value, connection=None, cursor=None, keep_connection_open=False):
-    """
-    Insert a new setting into the database.
-
-    If the setting already exists, nothing is changed.
-
-    :param str attribute_name:  Attribute to set
-    :param value:  Value to set (will be serialised as JSON)
-    :param connection: Database connection, if None then a new connection will
-    be created
-    :param cursor: Database cursor, if None then a new cursor will be created
-    :param keep_connection_open: Close connection after query?
-    :return int: number of updated rows
-    """
-    try:
-        value = json.dumps(value)
-    except ValueError:
-        return None
-
-    try:
-        if not connection or not cursor:
-            connection, cursor = quick_db_connect()
-
-        query = "INSERT INTO settings (name, value) Values (%s, %s) ON CONFLICT DO NOTHING"
-        cursor.execute(query, (attribute_name, value))
-        updated_rows = cursor.rowcount
-        connection.commit()
-
-        if not keep_connection_open:
-            connection.close()
-
-    except (Exception, psycopg2.DatabaseError) as error:
-        raise ConfigException("Error setting setting {}: {}".format(attribute_name, repr(error)))
-
-    finally:
-        if connection is not None and not keep_connection_open:
-            connection.close()
-
-    return updated_rows
-
-
-def set_or_create_setting(attribute_name, value, connection=None, cursor=None, keep_connection_open=False, raw=True):
+def set_or_create_setting(attribute_name, value, raw, overwrite_existing=True, connection=None, cursor=None, keep_connection_open=False):
     """
     Insert OR set value for a setting
 
-    If the setting exists, it is updated; if not, it is created with the given
-    value.
+    If overwrite_existing=True and the setting exists, the setting is updated; if overwrite_existing=False and the
+    setting exists the setting is not updated.
 
     :param str attribute_name:  Attribute to set
     :param value:  Value to set (will be serialised as JSON)
-    :param connection: Database connection, if None then a new connection will
-    be created
+    :param bool raw:  True for a value that is already a serialised JSON string; False if value is object that needs to
+                      be serialised into a JSON string
+    :param bool overwrite_existing: True will overwrite existing setting, False will do nothing if setting exists
+    :param connection: Database connection, if None then a new connection will be created
     :param cursor: Database cursor, if None then a new cursor will be created
     :param keep_connection_open: Close connection after query?
     :return int: number of updated rows
@@ -272,7 +188,10 @@ def set_or_create_setting(attribute_name, value, connection=None, cursor=None, k
         if not connection or not cursor:
             connection, cursor = quick_db_connect()
 
-        query = "INSERT INTO settings (name, value) Values (%s, %s) ON CONFLICT (name) DO UPDATE SET value = EXCLUDED.value"
+        if overwrite_existing:
+            query = "INSERT INTO settings (name, value) Values (%s, %s) ON CONFLICT (name) DO UPDATE SET value = EXCLUDED.value"
+        else:
+            query = "INSERT INTO settings (name, value) Values (%s, %s) ON CONFLICT DO NOTHING"
         cursor.execute(query, (attribute_name, value))
         updated_rows = cursor.rowcount
         connection.commit()
