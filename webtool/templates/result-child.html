@@ -78,7 +78,7 @@
                        data-load-from="{{ url_for('preview_items', key=item.key) }}"
                        class="property-badge permalink popup-trigger tooltip-trigger"
                        aria-controls="tooltip-preview-{{ item.key }} popup-preview-{{ item.key }}"><i
-                            class="fa fa-fw fa-search"></i> <span class="sr-only">Preview this dataset</span></a>
+                            class="fa fa-fw fa-search"></i> Preview<span class="sr-only"> this dataset</span></a>
                     <div role="dialog" id="popup-preview-{{ dataset.key }}"></div>
                     <p role="tooltip" id="tooltip-preview-{{ item.key }}" aria-hidden="true">Preview this dataset</p>
                 </li>

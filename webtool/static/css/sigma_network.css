@@ -90,6 +90,23 @@ em, strong {
     font-weight: bold;
 }
 
+#loading {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    margin-top: -1em;
+    margin-left: -7.5em;
+    width: 15em;
+    height: 2em;
+    border: 1px solid var(--contrast-dark);
+    background: var(--accent);
+    color: var(--always-white);
+    font-size: 1.25em;
+    text-align: center;
+    font-weight: bold;
+    line-height: 1.9em;
+}
+
 /** --------------------- *
             Forms
   * --------------------- */

@@ -46,10 +46,13 @@ const sigma_graph = {
         let container = document.querySelector('#graph-container');
         let source = container.getAttribute('data-source');
 
+        document.getElementById('loading').innerText = 'Downloading file...';
+
         fetch(source)
             .then((res) => res.text())
             .then((gexf) => {
                 // Parse GEXF string:
+                document.getElementById('loading').innerText = 'Initializing graph...';
                 sigma_graph.graph = graphologyLibrary.gexf.parse(graphology.Graph, gexf);
 
                 graphologyLibrary.layout.random.assign(sigma_graph.graph);
@@ -115,6 +118,7 @@ const sigma_graph = {
                 });
 
                 sigma_graph.register_handlers();
+                document.getElementById('loading').remove();
             });
     },
 
