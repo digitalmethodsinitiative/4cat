@@ -1,5 +1,4 @@
-import * as color from './color.js';
-import {hsv2rgb, rgb2hsv} from "./color.js";
+import {hsv2rgb, rgb2hsv, fetch_with_progress} from "./util.js";
 
 const forceatlas2 = graphologyLibrary.layoutForceAtlas2;
 const circlepack = graphologyLibrary.layout.circlepack;
@@ -10,7 +9,6 @@ const gradient = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0].map((fractio
     base[1] = fraction;
     return 'rgb(' + hsv2rgb(...base).map(v => parseInt(v)).join(', ') + ')';
 });
-console.log(gradient);
 
 const sigma_graph = {
     graph: null,
@@ -48,8 +46,10 @@ const sigma_graph = {
 
         document.getElementById('loading').innerText = 'Downloading file...';
 
-        fetch(source)
-            .then((res) => res.text())
+        fetch_with_progress(source, function(downloaded, total) {
+                let pct = Math.round(downloaded / total * 100);
+                document.getElementById('loading').innerText ='Downloading file (' + pct + '%)';
+            })
             .then((gexf) => {
                 // Parse GEXF string:
                 document.getElementById('loading').innerText = 'Initializing graph...';

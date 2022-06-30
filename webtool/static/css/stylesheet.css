@@ -436,6 +436,8 @@ button.tooltip-trigger, button.popup-trigger {
 #popup .content iframe {
     width: 100%;
     height: 98%;
+    position: relative;
+    top: 1%;
 }
 
 .csv-preview {

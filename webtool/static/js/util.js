@@ -9,7 +9,8 @@
  * @param   Number  b       The blue color value
  * @return  Array           The HSV representation
  */
-export function rgb2hsv(r, g, b) {
+export function rgb2hsv(r, g, b)
+{
     r /= 255, g /= 255, b /= 255;
 
     var max = Math.max(r, g, b), min = Math.min(r, g, b);
@@ -81,4 +82,42 @@ export function hsv2rgb(h, s, v) {
     }
 
     return [r * 255, g * 255, b * 255];
+}
+
+export async function fetch_with_progress(url, callback = null) {
+    // Step 1: start the fetch and obtain a reader
+    let response = await fetch(url);
+    const reader = response.body.getReader();
+
+    // Step 2: get total length
+    const contentLength = +response.headers.get('Content-Length');
+
+    // Step 3: read the data
+    let receivedLength = 0; // received that many bytes at the moment
+    let chunks = []; // array of received binary chunks (comprises the body)
+    while (true) {
+        const {done, value} = await reader.read();
+
+        if (done) {
+            break;
+        }
+
+        chunks.push(value);
+        receivedLength += value.length;
+
+        if(callback) {
+            callback(receivedLength, contentLength);
+        }
+    }
+
+    // Step 4: concatenate chunks into single Uint8Array
+    let chunksAll = new Uint8Array(receivedLength); // (4.1)
+    let position = 0;
+    for (let chunk of chunks) {
+        chunksAll.set(chunk, position); // (4.2)
+        position += chunk.length;
+    }
+
+    // Step 5: decode into a string
+    return new TextDecoder("utf-8").decode(chunksAll);
 }
