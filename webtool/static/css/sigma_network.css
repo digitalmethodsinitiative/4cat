@@ -164,14 +164,16 @@ button:hover, .button-like:not(.inactive):hover {
     line-height: 1.5;
     max-height: 97vh;
     max-width: 250px;
-	padding: 10px;
+	padding: 0;
 	z-index: 1;
     overflow-y: scroll;
     background-color: rgba(250, 250, 250, 0.8)
 }
 
 #network-name-box {
-    color: black;
+    color: var(--always-white);
+    background: var(--accent);
+    text-align: center;
     font-weight: bold;
     font-size: 18px;
 }
@@ -193,8 +195,8 @@ button:hover, .button-like:not(.inactive):hover {
 }
 
 .graph-manipulation-box {
-    margin-top: 25px;
     margin-bottom: 25px;
+    border-top: 1px solid var(--contrast-dark);
 }
 
 .graph-manipulation-box-header {
@@ -203,19 +205,26 @@ button:hover, .button-like:not(.inactive):hover {
 
 h2.graph-manipulation-box-header {
     font-weight: bold;
-    font-size: 23px;
+    font-size: 1em;
     margin-bottom: 10px;
+    background: var(--contrast-dark);
+    color: var(--always-white);
+    text-align: center;
+    border-left: 0.5em solid var(--accent);
+    padding: 0.5em 0
 }
 
 h3.graph-manipulation-box-header {
     font-size: 16px;
-    font-style: italic;
     color: var(--accent);
+    font-weight: bold;
+    padding: 0 0.5em;
 }
 
 .graph-manipulation-subbox {
     margin-top: 10px;
     margin-bottom: 10px;
+    padding: 0 0.5em;
 }
 
 .graph-manipulation-subbox > p {

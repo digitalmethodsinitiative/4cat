@@ -18,10 +18,8 @@
 <div id='control-panel'>
 
     <div id="network-name-box" class="control-panel-notice">
-        {{ dataset.get_label() }}
+        <i class="fa fa-project-diagram"></i> {{ dataset.top_parent().get_label() }} &raquo; {{ dataset.get_own_processor().title }}
     </div>
-
-    <hr>
 
     <div id="graph-manipulation">
 
@@ -82,7 +80,7 @@
             </div>
 
         </div>
-        <hr>
+
 
         <!-- Visual settings -->
         <div class="graph-manipulation-box" id="visual-settings">
@@ -95,7 +93,7 @@
                 <p><label for="show-edges">Show edges: </label>
                     <input class="parameter-input" id="show-edges" name="show-edges" type="checkbox" checked>
                 </p>
-                <p><label for="min-degree">Minimum node degree: </label>
+                <p><label for="min-degree">Minimum degree: </label>
                     <input class="parameter-input" id="min-degree" name="min-degree" type="range" min="0" max="1"
                            value="0" step="0.1">
                 </p>
