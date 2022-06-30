@@ -18,11 +18,6 @@ if __name__ == "__main__":
     import bcrypt
     from pathlib import Path
 
-    if len(sys.argv) > 1:
-        public = False#sys.argv[1]
-    else:
-        public = False
-
     # Configuration file location
     CONFIG_FILE = 'config/config.ini'
 
@@ -94,25 +89,25 @@ if __name__ == "__main__":
         # Update some settings
         your_server =  os.environ['SERVER_NAME']
         if int(public_port) == 80:
-            config.set_value('flask.server_name', your_server, raw=False)
+            config.set_or_create_setting('flask.server_name', your_server, raw=False)
         else:
-            config.set_value('flask.server_name', f"{your_server}:{public_port}", raw=False)
+            config.set_or_create_setting('flask.server_name', f"{your_server}:{public_port}", raw=False)
 
         whitelist = config.get('flask.autologin.hostnames')# only these may access the web tool; "*" or an empty list matches everything
         if your_server not in whitelist:
             whitelist.append(your_server)
-            config.set_value('flask.autologin.hostnames', whitelist, raw=False)
+            config.set_or_create_setting('flask.autologin.hostnames', whitelist, raw=False)
 
         api_whitelist = config.get('flask.autologin.api')# hostnames matching these are exempt from rate limiting
         if your_server not in api_whitelist:
             api_whitelist.append(your_server)
-            config.set_value('flask.autologin.api', api_whitelist, raw=False)
+            config.set_or_create_setting('flask.autologin.api', api_whitelist, raw=False)
 
 
     # Config file already exists; Update .env variables if they changed
     else:
         print('Configuration file config/config.ini already exists')
-        print('Updating Docker .env variables if necessary')
+        print('Checking Docker .env variables and updating if necessary')
         config_parser = configparser.ConfigParser()
         config_parser.read(CONFIG_FILE)
 
@@ -130,17 +125,17 @@ if __name__ == "__main__":
         import common.config_manager as config
         your_server = os.environ['SERVER_NAME']
         if int(public_port) == 80:
-          config.set_value('flask.server_name', your_server, raw=False)
+          config.set_or_create_setting('flask.server_name', your_server, raw=False)
         else:
-          config.set_value('flask.server_name', f"{your_server}:{public_port}", raw=False)
+          config.set_or_create_setting('flask.server_name', f"{your_server}:{public_port}", raw=False)
 
         whitelist = config.get(
             'flask.autologin.hostnames')  # only these may access the web tool; "*" or an empty list matches everything
         if your_server not in whitelist:
             whitelist.append(your_server)
-            config.set_value('flask.autologin.hostnames', whitelist, raw=False)
+            config.set_or_create_setting('flask.autologin.hostnames', whitelist, raw=False)
 
         api_whitelist = config.get('flask.autologin.api')  # hostnames matching these are exempt from rate limiting
         if your_server not in api_whitelist:
             api_whitelist.append(your_server)
-            config.set_value('flask.autologin.api', api_whitelist, raw=False)
+            config.set_or_create_setting('flask.autologin.api', api_whitelist, raw=False)

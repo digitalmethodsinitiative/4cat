@@ -22,7 +22,7 @@ def set_or_create_setting(attribute_name, value, connection, cursor, keep_connec
     try:
         if type(value) is bytes:
             value = value.decode("utf-8")
-            
+
         value = json.dumps(value)
     except ValueError:
         return None
@@ -50,17 +50,15 @@ transfer_settings = False
 config = None
 try:
     import config as old_config
+    connection = psycopg2.connect(dbname=old_config.DB_NAME, user=old_config.DB_USER, password=old_config.DB_PASSWORD, host=old_config.DB_HOST, port=old_config.DB_PORT, application_name="4cat-migrate")
     transfer_settings = True
     print("  ...Yes, prexisting settings exist.")
-except (SyntaxError, ImportError) as e:
+except (SyntaxError, ImportError, AttributeError) as e:
+    import common.config_manager as config
+    connection = psycopg2.connect(dbname=config.get('DB_NAME'), user=config.get('DB_USER'), password=config.get('DB_PASSWORD'), host=config.get('DB_HOST'), port=config.get('DB_PORT'), application_name="4cat-migrate")
     print("  ...No prexisting settings exist.")
 
 print("  Checking if settings table exists...")
-if transfer_settings:
-    connection = psycopg2.connect(dbname=old_config.DB_NAME, user=old_config.DB_USER, password=old_config.DB_PASSWORD, host=old_config.DB_HOST, port=old_config.DB_PORT, application_name="4cat-migrate")
-else:
-    import common.config_manager as config
-    connection = psycopg2.connect(dbname=config.get('DB_NAME'), user=config.get('DB_USER'), password=config.get('DB_PASSWORD'), host=config.get('DB_HOST'), port=config.get('DB_PORT'), application_name="4cat-migrate")
 cursor = connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 cursor.execute("SELECT EXISTS (SELECT * from information_schema.tables WHERE table_name=%s)", ('settings',))
 has_table = cursor.fetchone()

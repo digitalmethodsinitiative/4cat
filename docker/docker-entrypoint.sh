@@ -42,8 +42,7 @@ fi
 # Run docker_setup to update any environment variables if they were changed
 python3 docker/docker_setup.py
 
-echo 'Starting app'
-cd /usr/src/app
+python3 helper-scripts/migrate.py -y -v config/.current-version
 
 echo 'Starting app'
 echo "4CAT is accessible at:"
