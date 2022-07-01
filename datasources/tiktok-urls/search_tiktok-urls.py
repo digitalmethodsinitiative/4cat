@@ -43,7 +43,7 @@ class SearchTikTokByID(Search):
         },
         "tiktok-urls.proxies.wait": {
             "type": UserInput.OPTION_TEXT,
-            "coerce_type": int,
+            "coerce_type": float,
             "default": 1,
             "help": "Request wait",
             "tooltip": "Time to wait before sending a new request from the same IP"
@@ -135,10 +135,11 @@ class SearchTikTokByID(Search):
 
         results = []
         failed = 0
+        dupes = 0
         last_proxy_update = 0
         while urls or tiktok_requests:
             # give tasks time to run
-            await asyncio.sleep(0)
+            await asyncio.sleep(0.1)
 
             # update proxies every 5 seconds so we can potentially update them
             # while the scrape is running
@@ -158,6 +159,7 @@ class SearchTikTokByID(Search):
 
                 if url in seen_urls:
                     finished += 1
+                    dupes += 1
                     self.dataset.log("Skipping duplicate of %s" % url)
 
                 else:
@@ -246,9 +248,15 @@ class SearchTikTokByID(Search):
                     self.dataset.update_progress(finished / num_urls)
                     results.append(video)
 
-        if failed > 1:
-            self.dataset.update_status("Dataset completed, but not all URLs were available (%i URL(s) failed). See "
-                                       "dataset log for details." % failed)
+        notes = []
+        if failed:
+            notes.append("%i URL(s) failed")
+        if dupes:
+            notes.append("skipped %i duplicate(s)" % dupes)
+            
+        if notes:
+            self.dataset.update_status("Dataset completed, but not all URLs were collected (%s). See "
+                                       "dataset log for details." % ", ".join(notes), is_final=True)
 
         return results
 
@@ -296,7 +304,7 @@ class SearchTikTokByID(Search):
 
             if not re.match(r"https?://www\.tiktokv\.com/share/video/[0-9]+/", item) and \
                     not re.match(r"https?://www\.tiktok\.com/@[^/]+/video/[0-9]+.*", item):
-                raise QueryParametersException("'%s' is not a valid TikTok video URL")
+                raise QueryParametersException("'%s' is not a valid TikTok video URL" % item)
 
             sanitized_items.append(item)
 
