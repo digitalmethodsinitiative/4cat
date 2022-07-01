@@ -246,15 +246,16 @@ class SearchTikTokByID(Search):
                     continue
 
                 for video in self.reformat_metadata(metadata):
-                    self.dataset.update_status("Processed %i of %i TikTok URLs" % (finished, num_urls))
+                    self.dataset.update_status("Processed %s of %s TikTok URLs" %
+                                               ("{:,}".format(finished), "{:,}".format(num_urls)))
                     self.dataset.update_progress(finished / num_urls)
                     results.append(video)
 
         notes = []
         if failed:
-            notes.append("%i URL(s) failed")
+            notes.append("%s URL(s) failed or did not exist anymore" % "{:,}".format(failed))
         if dupes:
-            notes.append("skipped %i duplicate(s)" % dupes)
+            notes.append("skipped %s duplicate(s)" % "{:,}".format(dupes))
             
         if notes:
             self.dataset.update_status("Dataset completed, but not all URLs were collected (%s). See "
