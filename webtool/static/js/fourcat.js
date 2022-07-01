@@ -232,7 +232,7 @@ const query = {
 		// Check status of query
 		if($('body.result-page').length > 0) {
 			query.update_status();
-			setInterval(query.update_status, 4000);
+			setInterval(query.update_status, 1000);
 
 			// Check processor queue
 			query.check_processor_queue();
@@ -246,7 +246,7 @@ const query = {
 		}
 
 		//regularly check for unfinished datasets
-		setInterval(query.check_resultpage, 2000);
+		setInterval(query.check_resultpage, 1000);
 
 		// Start querying when go button is clicked
 		$('#query-form').on('submit', function (e) {
