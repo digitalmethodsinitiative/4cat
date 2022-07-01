@@ -68,6 +68,7 @@ class SearchTikTokByID(Search):
     }
 
     proxy_map = {}
+    proxy_sleep = 1
     headers = {
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
         "Accept-Encoding": "gzip, deflate, br",
@@ -98,6 +99,7 @@ class SearchTikTokByID(Search):
         :return:
         """
         all_proxies = config.get("tiktok-urls.proxies")
+        self.proxy_sleep = config.get("tiktok-urls.proxies.wait", self.proxy_sleep)
         if not all_proxies:
             # no proxies? just request directly
             all_proxies = ["__localhost__"]
@@ -194,7 +196,7 @@ class SearchTikTokByID(Search):
                 used_proxy = [proxy for proxy in self.proxy_map if self.proxy_map[proxy]["url"] == url][0]
                 self.proxy_map[used_proxy].update({
                     "busy": False,
-                    "next_request": time.time() + config.get("tiktok-urls.proxies.wait", 1)
+                    "next_request": time.time() + self.proxy_sleep
                 })
 
                 # handle the exceptions we know to expect - else just raise and
