@@ -5,8 +5,9 @@ It's prohibitively difficult to scrape data from TikTok within 4CAT itself due
 to its aggressive rate limiting. Instead, import data collected elsewhere.
 """
 from pathlib import Path
+from urllib.parse import urlparse, parse_qs
 import json
-import re
+import time
 
 from backend.abstract.search import Search
 from common.lib.helpers import UserInput
@@ -85,6 +86,15 @@ class SearchTikTok(Search):
             user_fullname = post["nickname"]
             user_id = ""
 
+        # there are various thumbnail URLs, some of them expire later than
+        # others. Try to get the highest-resolution one that hasn't expired
+        # yet
+        thumbnail_url = [url for url in (
+            post["video"]["cover"],
+            post["video"]["shareCover"].pop()
+        ) if int(parse_qs(urlparse(url).query)["x-expires"][0]) >= time.time() - 3600]
+        thumbnail_url = thumbnail_url.pop() if thumbnail_url else ""
+
         return {
             "id": post["id"],
             "thread_id": post["id"],
@@ -100,10 +110,11 @@ class SearchTikTok(Search):
             "music_url": post["music"]["playUrl"],
             "video_url": post["video"].get("downloadAddr", ""),
             "tiktok_url": "https://tiktok.com/@%s/video/%s" % (user_nickname, post["id"]),
-            "thumbnail_url": post["video"]["cover"],
+            "thumbnail_url": thumbnail_url,
             "likes": post["stats"]["diggCount"],
             "comments": post["stats"]["commentCount"],
             "shares": post["stats"]["shareCount"],
             "plays": post["stats"]["playCount"],
-            "hashtags": ",".join(hashtags)
+            "hashtags": ",".join(hashtags),
+            "stickers": "\n".join(" ".join(s["stickerText"]) for s in post.get("stickersOnItem", []))
         }
