@@ -93,7 +93,7 @@ class DateFilter(BasicProcessor):
                 processed_items += 1
                 if processed_items % 500 == 0:
                     self.dataset.update_status("Processed %i items (%i matching, %i invalid dates)" % (processed_items, matching_items, invalid_dates))
-                    self.dataset.update_progress(processed_items / matching_items)
+                    self.dataset.update_progress(processed_items / self.source_dataset.num_rows)
 
                 # Attempt to parse timestamp
                 item_date = dateutil.parser.parse(item.get(date_column_name))
