@@ -92,7 +92,7 @@ class SearchTikTok(Search):
         thumbnail_url = [url for url in (
             post["video"]["cover"],
             post["video"]["shareCover"].pop()
-        ) if int(parse_qs(urlparse(url).query)["x-expires"][0]) >= time.time() - 3600]
+        ) if int(parse_qs(urlparse(url).query).get("x-expires", [time.time()])[0]) >= time.time() - 3600]
         thumbnail_url = thumbnail_url.pop() if thumbnail_url else ""
 
         return {
@@ -116,5 +116,6 @@ class SearchTikTok(Search):
             "shares": post["stats"]["shareCount"],
             "plays": post["stats"]["playCount"],
             "hashtags": ",".join(hashtags),
-            "stickers": "\n".join(" ".join(s["stickerText"]) for s in post.get("stickersOnItem", []))
+            "stickers": "\n".join(" ".join(s["stickerText"]) for s in post.get("stickersOnItem", [])),
+            "warning": ",".join([w["text"] for w in post.get("warnInfo", [])])
         }
