@@ -139,6 +139,8 @@ class SearchTikTokByID(Search):
         failed = 0
         dupes = 0
         last_proxy_update = 0
+        retries = {}
+
         while urls or tiktok_requests:
             # give tasks time to run
             await asyncio.sleep(0.1)
@@ -210,8 +212,18 @@ class SearchTikTokByID(Search):
                     else:
                         raise exception
 
-                response = request.result()
-                del tiktok_requests[url]
+                # retry on requestexceptions
+                try:
+                    response = request.result()
+                except requests.exceptions.RequestException:
+                    if url not in retries or retries[url] < 3:
+                        if url not in retries:
+                            retries[url] = 0
+                        retries[url] += 1
+                        urls.append(url)
+                    continue
+                finally:
+                    del tiktok_requests[url]
 
                 # video may not exist
                 if response.status_code == 404:
