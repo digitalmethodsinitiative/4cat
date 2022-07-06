@@ -306,7 +306,8 @@ class SearchTikTokByID(Search):
                 continue
 
             if not re.match(r"https?://www\.tiktokv\.com/share/video/[0-9]+/", item) and \
-                    not re.match(r"https?://www\.tiktok\.com/@[^/]+/video/[0-9]+.*", item):
+                    not re.match(r"https?://www\.tiktok\.com/@[^/]+/video/[0-9]+.*", item) and \
+                    not re.match(r"https?://tiktok\.com/@[^/]+/video/[0-9]+.*", item):
                 raise QueryParametersException("'%s' is not a valid TikTok video URL" % item)
 
             sanitized_items.append(item)
