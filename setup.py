@@ -26,6 +26,7 @@ packages = [
 	"itsdangerous==2.0.1", # per issue with Flask 1.0; can likely remove when we upgrade Flask
 	"Jinja2==3.0.3", # per issue with Flask 1.0; can likely remove when we upgrade Flask
 	"lxml~=4.9.0",
+	"markdown==3.0.1",
 	"markdown2==2.4.2",
 	"nltk==3.5",
 	"networkx~=2.8.0",
