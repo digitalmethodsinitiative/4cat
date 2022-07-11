@@ -136,6 +136,8 @@ class SearchBitChute(Search):
 
     def get_videos_id(self, session, video_id, csrftoken, detail):
         dummy_video = {
+            "query_type": "video id",
+            "query": video_id,
             "id": video_id,
             "thread_id": video_id,
             "subject": "",
@@ -221,6 +223,8 @@ class SearchBitChute(Search):
 
                 link = video_element.select_one(".channel-videos-title a")
                 video = {
+                    "query_type": "user id",
+                    "query": user,
                     "id": link["href"].split("/")[-2],
                     "thread_id": link["href"].split("/")[-2],
                     "subject": link.text,
@@ -298,6 +302,8 @@ class SearchBitChute(Search):
                     raise e
 
                 video = {
+                    "query_type": "search",
+                    "query": query,
                     "id": video_data["id"],
                     "thread_id": video_data["id"],
                     "subject": video_data["name"],
@@ -460,6 +466,8 @@ class SearchBitChute(Search):
                             thumbnail_image = ""
 
                         comments.append({
+                            "query_type": video["query_type"],
+                            "query": video["query"],
                             "id": comment["id"],
                             "thread_id": video["id"],
                             "subject": "",
