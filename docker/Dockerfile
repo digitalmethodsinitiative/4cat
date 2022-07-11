@@ -47,3 +47,6 @@ WORKDIR /usr/src/app
 
 # Copy project
 COPY . /usr/src/app/
+
+# Permission
+RUN chmod +x docker/wait-for-backend.sh docker/docker-entrypoint.sh
