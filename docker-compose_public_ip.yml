@@ -4,6 +4,7 @@ services:
   db:
     container_name: 4cat_db
     image: postgres:latest
+    restart: always
     environment:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
@@ -15,6 +16,7 @@ services:
   backend:
     image: digitalmethodsinitiative/4cat:latest
     container_name: 4cat_backend
+    restart: always
     env_file:
       - .env
     depends_on:
@@ -30,6 +32,7 @@ services:
   frontend:
     image: digitalmethodsinitiative/4cat:latest
     container_name: 4cat_frontend
+    restart: always
     depends_on:
       - db
       - backend
