@@ -254,8 +254,8 @@ class ImageDownloader(BasicProcessor):
 
 			processed_urls += 1
 			self.dataset.update_status("Downloaded %i/%i images; downloading from %s" %
-									   (downloaded_images, len(urls), url))
-			self.dataset.update_progress(downloaded_images / len(urls))
+									   (downloaded_images, amount, url))
+			self.dataset.update_progress(downloaded_images / amount)
 
 			try:
 				# acquire image
