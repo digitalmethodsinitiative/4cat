@@ -236,5 +236,7 @@ categories = {
     "mail": "Mail settings & credentials",
     "logging": "Logging settings",
     "path": "File paths",
-    "DATASOURCES": "Data source configuration"
+    "DATASOURCES": "Data source configuration",
+    'image_downloader': 'Image downloader',
+    'text_from_images': 'OCR: Text from images',
 }
