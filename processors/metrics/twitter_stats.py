@@ -141,7 +141,7 @@ class TwitterStats(BasicProcessor):
                             "Number of Retweets": 0,
                             "Number of Replies": 0,
                             "Number of Quotes": 0,
-                            "Number of unique Authors": 0,
+                            "Number of unique Authors": {},
                             # "Number of unique Threads": 0,
                             "Top 10 hashtags": {},
                             "Top 10 authors": {},
