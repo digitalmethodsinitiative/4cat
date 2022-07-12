@@ -32,6 +32,7 @@
                 <select name="graph-layout" id="graph-layout">
                     <option value="fa2">ForceAtlas2</option>
                     <option value="circlepack">Circle Pack</option>
+                    <option value="noverlap">Noverlap</option>
                 </select>
                 <button id="start-layout" class="standalone-button">
                     <i id="hourglass" class='fa fa-spin fa-sync-alt invisible'></i>
@@ -75,7 +76,25 @@
                            value="0.5">
                 </p>
                 <p><label for="slow-down">Slow down: </label>
-                    <input class="parameter-input" id="slow-down" name="slow-down" type="number" value="1">
+                    <input class="parameter-input" id="slow-down" name="slow-down" type="number" value="2">
+                </p>
+            </div>
+
+            <div class="graph-manipulation-subbox layout-parameters" data-layout="noverlap">
+                <p><label for="noverlap-grid-size">Grid size: </label>
+                    <input class="parameter-input" id="noverlap-grid-size" name="noverlap-grid-size" type="number" min="1" value="20">
+                </p>
+                <p><label for="noverlap-margin">Margin: </label>
+                    <input class="parameter-input" id="noverlap-margin" name="noverlap-margin" type="number" min="1" value="5">
+                </p>
+                <p><label for="noverlap-expansion">Expansion: </label>
+                    <input class="parameter-input" id="noverlap-expansion" name="noverlap-expansion" type="number" min="0.1" value="1.1">
+                </p>
+                <p><label for="noverlap-ratio">Ratio: </label>
+                    <input class="parameter-input" id="noverlap-ratio" name="noverlap-ratio" type="number" min="0.1" value="1.0">
+                </p>
+                <p><label for="noverlap-speed">Speed: </label>
+                    <input class="parameter-input" id="noverlap-speed" name="noverlap-speed" type="number" min="1" value="3">
                 </p>
             </div>
 
@@ -99,7 +118,7 @@
                 </p>
                 <p><label for="min-node-size">Minimum node size: </label>
                     <input class="parameter-input" id="min-node-size" name="min-node-size" type="number" min="1"
-                           value="1">
+                           value="2">
                 </p>
                 <p><label for="max-node-size">Maximum node size: </label>
                     <input class="parameter-input" id="max-node-size" name="max-node-size" type="number" min="1"
@@ -120,7 +139,7 @@
                     <input class="parameter-input" id="node-colour" name="node-colour" type="color" value="#CE1B28">
                 </p>
                 <p><label for="edge-colour">Edge colour: </label>
-                    <input class="parameter-input" id="edge-colour" name="edge-colour" type="color" value="#FFA5AC">
+                    <input class="parameter-input" id="edge-colour" name="edge-colour" type="color" value="#19B0A3">
                 </p>
                 <p><label for="label-colour">Label colour: </label>
                     <input class="parameter-input" id="label-colour" name="label-colour" type="color" value="#00000">
@@ -129,7 +148,7 @@
             <h3 class="graph-manipulation-box-header">Labels</h3>
             <div class="graph-manipulation-subbox">
                 <p><label for="label-threshold">Labeling threshold: </label>
-                    <input class="parameter-input" id="label-threshold" name="label-threshold" type="range" min="0" max="15" step="0.5">
+                    <input class="parameter-input" id="label-threshold" name="label-threshold" type="range" value="0" min="0" max="15" step="0.5">
                 </p>
                 <p><label for="label-size">Label density: </label>
                     <input class="parameter-input" id="label-size" name="label-size" type="number" min="1" value="14">
