@@ -90,8 +90,8 @@ class SearchTikTok(Search):
         # others. Try to get the highest-resolution one that hasn't expired
         # yet
         thumbnail_url = [url for url in (
-            post["video"]["cover"],
-            post["video"]["shareCover"].pop()
+            post["video"].get("cover"),
+            post["video"].get("shareCover", []).pop()
         ) if int(parse_qs(urlparse(url).query).get("x-expires", [time.time()])[0]) >= time.time() - 3600]
         thumbnail_url = thumbnail_url.pop() if thumbnail_url else ""
 
