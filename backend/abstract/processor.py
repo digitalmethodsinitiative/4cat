@@ -589,7 +589,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
 		try:
 			standalone.board = top_parent.board
-		except KeyError:
+		except AttributeError:
 			standalone.board = self.type
 
 		standalone.type = top_parent.type
