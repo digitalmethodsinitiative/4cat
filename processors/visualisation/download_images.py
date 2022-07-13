@@ -181,7 +181,7 @@ class ImageDownloader(BasicProcessor):
 			item_index += 1
 
 			if item_index % 50 == 0:
-				self.dataset.update_status("Extracting image links from post %i/%i" % (item_index, self.source_dataset.num_rows))
+				self.dataset.update_status("Extracting image links from item %i/%i" % (item_index, self.source_dataset.num_rows))
 
 			# loop through all columns and process values for item
 			for column in columns:

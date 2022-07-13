@@ -29,7 +29,7 @@ class ConvertCSVToJSON(BasicProcessor):
 		:param module: Dataset or processor to determine compatibility with
 		"""
 		
-		return module.get_extension() == ".csv"
+		return module.get_extension() == "csv"
 
 	def process(self):
 		"""
