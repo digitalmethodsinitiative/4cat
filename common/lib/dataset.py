@@ -1133,7 +1133,7 @@ class DataSet(FourcatModule):
 		elif attr in self.data:
 			return self.data[attr]
 		else:
-			raise KeyError("DataSet instance has no attribute %s" % attr)
+			raise AttributeError("DataSet instance has no attribute %s" % attr)
 
 	def __setattr__(self, attr, value):
 		"""
