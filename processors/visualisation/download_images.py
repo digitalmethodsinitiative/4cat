@@ -131,7 +131,7 @@ class ImageDownloader(BasicProcessor):
 		split_comma = self.parameters.get("split-comma", False)
 
 		if amount == 0:
-			amount = self.max_number_images
+			amount = config.get('image_downloader.MAX_NUMBER_IMAGES', 1000)
 		columns = self.parameters.get("columns")
 
 		# is there anything for us to download?
