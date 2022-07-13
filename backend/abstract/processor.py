@@ -575,6 +575,14 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		"""
 		top_parent = self.source_dataset
 
+		finished = self.dataset.check_dataset_finished()
+		if finished == 'empty':
+			# No data to process, so we can't create a standalone dataset
+			return
+		elif finished is None:
+			# I cannot think of why we would create a standalone from an unfinished dataset, but I'll leave it for now
+			pass
+
 		standalone = self.dataset.copy(shallow=False)
 		standalone.body_match = "(Filtered) " + top_parent.query
 		standalone.datasource = top_parent.parameters.get("datasource", "custom")
