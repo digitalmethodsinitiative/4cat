@@ -91,10 +91,10 @@ class SearchTikTok(Search):
         # yet
         thumbnail_options = []
         if post["video"].get("cover"):
-            thumbnail_options += post["video"]["cover"]
+            thumbnail_options.append(post["video"]["cover"])
 
         if post["video"].get("shareCover"):
-            thumbnail_options += post["video"]["shareCover"].pop()
+            thumbnail_options.append(post["video"]["shareCover"].pop())
 
         thumbnail_url = [url for url in thumbnail_options if int(parse_qs(urlparse(url).query).get("x-expires", [time.time()])[0]) >= time.time() - 3600]
         thumbnail_url = thumbnail_url.pop() if thumbnail_url else ""
