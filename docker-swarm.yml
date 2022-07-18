@@ -1,0 +1,208 @@
+version: '3.6'
+
+
+
+### Docker swarm for 4cat with external database and traefik. For production is better not to use databases in docker. 
+
+volumes:
+  4cat_data: {}
+  4cat_share: {}
+  4cat_logs: {}
+  #### I had to separate the config files from frontend and backend, to connect the frontend to the backend without opening ports in the main server
+  ##### This config makes all communication from backend to frontend to be inside the docker network
+  front_end_config: {}
+  letsencrypt-certificates: {}
+
+  
+ 
+networks:
+#### Create a network for traefik before running this docker swarm, named traefik public. This is for other applications in the swarm cluster.
+  traefik-public:
+    external: True
+  #### Define an internal docker network
+  4cat:
+    driver: overlay
+  
+services:  
+   backend:
+    image: digitalmethodsinitiative/4cat:latest
+    volumes:
+      - 4cat_data:/usr/src/app/data/
+      - 4cat_share:/usr/src/app/config/
+      - 4cat_logs:/usr/src/app/logs/
+    environment:
+    ### Environment variables should be used here as the .env just substitutes for the global level not individual services. This is one of the main
+    ### differences between docker compose and docker swarm
+     - POSTGRES_USER=fourcat
+     - POSTGRES_DB=fourcat
+     - PGPASSWORD=Us@584qM7f22
+     - POSTGRES_PASSWORD=Us@584qM7f22
+     - PUBLIC_PORT=80
+     - SERVER_NAME=0.0.0.0
+     - PUBLIC_API_PORT=4444
+     - TELEGRAM_PORT=443
+
+    entrypoint: docker/docker-entrypoint.sh -p
+    extra_hosts:
+     - "db:your database ip"
+    networks:
+       4cat:  
+         aliases:
+         ###### To link to the other container
+          - 4cat_backend
+ 
+#### I wrote the config file mannually here fot this to work.
+##### config.ini should be copied from the backend container
+##### and subsitute the line api_host with
+#### api_host = 4cat_backend
+
+
+   frontend:
+    image: digitalmethodsinitiative/4cat:latest
+    depends_on:
+      - backend
+    volumes:
+    #### same
+      - 4cat_data:/usr/src/app/data/
+      - front_end_config:/usr/src/app/config/
+      - 4cat_logs:/usr/src/app/logs/
+    environment:
+     - POSTGRES_USER=fourcat
+     - POSTGRES_DB=fourcat
+     - PGPASSWORD=Us@584qM7f22
+     - POSTGRES_PASSWORD=Us@584qM7f22
+     - PUBLIC_PORT=80
+     #### Not sure about if this variable is needed.
+     - SERVER_NAME=4cat.coraldigital.mx
+    extra_hosts:
+      - "db:your database ip"
+    
+    command: ["docker/wait-for-backend.sh", "gunicorn", "--worker-tmp-dir", "/dev/shm", "--workers", "2", "--threads", "4", "--worker-class", "gthread", "--access-logfile", "/usr/src/app/logs/access_gunicorn.log", "--log-level", "debug", "--reload", "--bind", "0.0.0.0:80", "webtool:app"]
+    networks:
+      4cat:
+      traefik-public: 
+      
+    ##### Labels for traefik to pick up the frontend service  
+    deploy:
+      labels: 
+       # Enable Traefik for this service, to make it available in the public network
+        - traefik.enable=true
+        # Use the traefik-public network (declared below)
+        - traefik.docker.network=traefik-public
+        # Use the custom label "traefik.constraint-label=traefik-public"
+        # This public Traefik will only use services with this label
+        # That way you can add other internal Traefik instances per stack if needed
+        - traefik.constraint-label=traefik-public
+        # http 
+        - traefik.http.routers.4cat-http.rule=Host(`yourfqdn.com`) || Host(`www.yourfqdn.com`)
+        - traefik.http.routers.4cat-http.entrypoints=http
+        - traefik.http.routers.4cat-http.middlewares=https-redirect
+      # https 
+        - traefik.http.routers.4cat-https.rule=Host(`.yourfqdn.com`) || Host(`www.yourfqdn.com`)
+        - traefik.http.routers.4cat-https.tls.certresolver=le
+        - traefik.http.routers.4cat-https.middlewares=gzip,sslheader,buffer
+        - traefik.http.services.4cat-https.loadbalancer.server.port=80
+        
+  traefik:
+    # Use the latest v2.2.x Traefik image available
+    image: traefik:v2.5
+    ports:
+      # Listen on port 80, default for HTTP, necessary to redirect to HTTPS
+      - 80:80
+      # Listen on port 443, default for HTTPS
+      - 443:443
+  
+
+    deploy:
+      #placement:
+        #constraints:
+          # Make the traefik service run only on the node with this label
+          # as the node with it has the volume for the certificates
+        #  - node.labels.traefik-public.traefik-public-certificates == true
+      labels:
+        # Enable Traefik for this service, to make it available in the public network
+        - traefik.enable=true
+        # Use the traefik-public network (declared below)
+        - traefik.docker.network=traefik-public
+        # Use the custom label "traefik.constraint-label=traefik-public"
+        # This public Traefik will only use services with this label
+        # That way you can add other internal Traefik instances per stack if needed
+        - traefik.constraint-label=traefik-public
+        # https-redirect middleware to redirect HTTP to HTTPS
+        # It can be re-used by other stacks in other Docker Compose files
+        - traefik.http.middlewares.https-redirect.redirectscheme.scheme=https
+        - traefik.http.middlewares.https-redirect.redirectscheme.permanent=true
+        ### gzip compression
+        - traefik.http.middlewares.gzip.compress=true
+        ### SSL headers
+        - traefik.http.middlewares.sslheader.headers.customrequestheaders.X-Forwarded-Proto=https
+        ### buffering
+        - traefik.http.middlewares.buffer.buffering.memRequestBodyBytes=20971520
+        - traefik.http.middlewares.buffer.buffering.maxRequestBodyBytes=20971520
+        
+        ### 
+        # traefik-http set up only to use the middleware to redirect to https
+        # Uses the environment variable DOMAIN
+        #### This is for the traefik frontend for monitoring your services, it can be 
+        - traefik.http.routers.traefik-public-http.rule=Host(`traefik.yourdomain.com`)
+        - traefik.http.routers.traefik-public-http.entrypoints=http
+        - traefik.http.routers.traefik-public-http.middlewares=https-redirect
+        # traefik-https the actual router using HTTPS
+        # Uses the environment variable DOMAIN
+        - traefik.http.routers.traefik-public-https.rule=Host(`traefik.yourdomain.com`)
+        - traefik.http.routers.traefik-public-https.entrypoints=https
+        - traefik.http.routers.traefik-public-https.tls=true
+        # Use the special Traefik service api@internal with the web UI/Dashboard
+        - traefik.http.routers.traefik-public-https.service=api@internal
+        # Use the "le" (Let's Encrypt) resolver created below
+        - traefik.http.routers.traefik-public-https.tls.certresolver=le
+        # Enable HTTP Basic auth, using the middleware created above
+        - traefik.http.routers.traefik-public-https.middlewares=admin-auth
+        # Define the port inside of the Docker service to use
+        - traefik.http.services.traefik-public.loadbalancer.server.port=8080
+     
+        
+        
+    volumes:
+      # Add Docker as a mounted volume, so that Traefik can read the labels of other services
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      # Mount the volume to store the certificates
+      - letsencrypt-certificates:/certificates
+    command:
+       # take config from file
+      - --providers.file=true
+      - --providers.file.watch=true
+      - --providers.file.filename=/dynamic.yml
+      # Enable Docker in Traefik, so that it reads labels from Docker services
+      - --providers.docker
+      - --providers.docker=true
+      # Add a constraint to only use services with the label "traefik.constraint-label=traefik-public"
+      - --providers.docker.constraints=Label(`traefik.constraint-label`, `traefik-public`)
+      # Do not expose all Docker services, only the ones explicitly exposed
+      - --providers.docker.exposedbydefault=false
+      # Enable Docker Swarm mode
+      - --providers.docker.swarmmode
+      # Create an entrypoint "http" listening on port 80
+      - --entrypoints.http.address=:80
+      # Create an entrypoint "https" listening on port 443
+      - --entrypoints.https.address=:443
+      # Create the certificate resolver "le" for Let's Encrypt, uses the environment variable EMAIL
+      - --certificatesresolvers.le.acme.email=${EMAIL}
+      # Store the Let's Encrypt certificates in the mounted volume
+      - --certificatesresolvers.le.acme.storage=/certificates/acme.json
+      # Use the TLS Challenge for Let's Encrypt
+      - --certificatesresolvers.le.acme.tlschallenge=true
+      # Enable the access log, with HTTP requests
+      - --accesslog
+      # Enable the Traefik log, for configurations and errors
+      - --log
+      # Enable the Dashboard and API
+      - --api
+    networks:
+      # Use the public network created to be shared between Traefik and
+      # any other service that needs to be publicly available with HTTPS
+      - traefik-public
+
+
+
+        
