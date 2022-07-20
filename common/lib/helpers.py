@@ -484,14 +484,14 @@ def pad_interval(intervals, first_interval=None, last_interval=None):
 
 	all_intervals = []
 	for year in range(first_year, last_year + 1):
-		start_month = first_month if year == first_year else 1
-		end_month = last_month if year == last_year else 12
 		year_interval = str(year)
 
 		if not has_month:
 			all_intervals.append(year_interval)
 			continue
 
+		start_month = first_month if year == first_year else 1
+		end_month = last_month if year == last_year else 12
 		for month in range(start_month, end_month + 1):
 			month_interval = year_interval + "-" + str(month).zfill(2)
 
