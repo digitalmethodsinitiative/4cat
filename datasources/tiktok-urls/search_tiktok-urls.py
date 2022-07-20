@@ -245,8 +245,15 @@ class SearchTikTokByID(Search):
                 sigil = soup.select_one("script#SIGI_STATE")
 
                 if not sigil:
-                    failed += 1
-                    self.dataset.log("No embedded metadata found for video %s, skipping" % url)
+                    if url not in retries or retries[url] < 3:
+                        if url not in retries:
+                            retries[url] = 0
+                        retries[url] += 1
+                        urls.append(url)
+                        self.dataset.log("No embedded metadata found for video %s, retrying" % url)
+                    else:
+                        failed += 1
+                        self.dataset.log("No embedded metadata found for video %s, skipping" % url)
                     continue
 
                 try:
