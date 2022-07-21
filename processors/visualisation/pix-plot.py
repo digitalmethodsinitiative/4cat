@@ -275,9 +275,9 @@ class PixPlotGenerator(BasicProcessor):
 					break
 				else:
 					# Something botched
-					self.dataset.update_status("PixPlot Error")
+					self.dataset.finish_with_error("PixPlot Error on creation")
 					self.log.error("PixPlot Error: " + str(result.json()))
-					break
+					return
 
 		# Create HTML file
 		plot_url = config.get('pix-plot.PIXPLOT_SERVER').rstrip('/') + '/plots/' + plot_label + '/index.html'
