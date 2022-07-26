@@ -1,5 +1,5 @@
 """
-Twitter search within a DMI-TCAT bin
+Twitter search within a DMI-TCAT bin; connect via TCAT frontend
 """
 import requests
 import datetime
@@ -15,7 +15,7 @@ from common.lib.exceptions import QueryParametersException
 from common.lib.user_input import UserInput
 from common.lib.helpers import sniff_encoding
 
-import config
+import common.config_manager as config
 
 
 class SearchWithinTCATBins(Search):
@@ -128,7 +128,7 @@ class SearchWithinTCATBins(Search):
         options = cls.options
         print('TCAT CALLING get_options', flush=True)
 
-        instances = config.DATASOURCES.get("dmi-tcat", {}).get("instances")
+        instances = config.get('DATASOURCES').get("dmi-tcat", {}).get("instances", [])
         all_bins = {}
         for instance in instances:
             # query each configured TCAT instance for a list of bins that can
@@ -180,7 +180,7 @@ class SearchWithinTCATBins(Search):
         # instance URL again here
         # while the parameter could be marked 'sensitive', the values would
         # still show up in e.g. the HTML of the 'create dataset' form
-        available_instances = config.DATASOURCES.get("dmi-tcat", {}).get("instances", [])
+        available_instances = config.get('DATASOURCES').get("dmi-tcat", {}).get("instances", [])
         instance_url = ""
         for available_instance in available_instances:
             hostname = re.sub(r"https?://", "", available_instance).split("@").pop().rstrip("/")

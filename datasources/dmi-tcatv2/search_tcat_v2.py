@@ -15,7 +15,7 @@ from common.lib.user_input import UserInput
 from common.lib.helpers import sniff_encoding
 from backend.lib.database_mysql import MySQLDatabase
 
-import config
+import common.config_manager as config
 
 
 class SearchWithinTCATBinsV2(Search):
@@ -107,7 +107,7 @@ class SearchWithinTCATBinsV2(Search):
         bin_name = bin.split("@")[0]
         tcat_name = bin.split("@").pop()
 
-        available_instances = config.DATASOURCES.get("dmi-tcatv2", {}).get("instances", [])
+        available_instances = config.get('DATASOURCES').get("dmi-tcatv2", {}).get("instances", [])
         instance = [instance for instance in available_instances if instance.get('tcat_name') == tcat_name][0]
 
         db = MySQLDatabase(logger=self.log,
@@ -321,7 +321,7 @@ class SearchWithinTCATBinsV2(Search):
         """
 
         # todo: cache this somehow! and check for the cache
-        instances = config.DATASOURCES.get("dmi-tcatv2", {}).get("instances", [])
+        instances = config.get('DATASOURCES').get("dmi-tcatv2", {}).get("instances", [])
 
         all_bins = {}
         for instance in instances:
