@@ -4,3 +4,10 @@ This datasource interfaces with a query bin in [DMI-TCAT](https://github.com/dig
 create datasets of tweets collected by that tool. DMI-TCAT scrapes tweets as they are created and stores them in 'bins'
 of tweets matching a certain query. With this data source, 4CAT can be used to create datasets from tweets in a bin,
 and process them in the usual ways.
+
+dmi-tcat interfaces directly with the TCAT frontend and allowing users to access the
+`/analysis/mod.export_tweets.php` endpoint to request TCAT tweets.
+
+# How to enable
+Under the 4CAT Settings tab, add the following to the JSON in "Data source configuration":
+"dmi-tcat": {"instances": ["http://username:password@tcat.instance.webpage.net"]}
