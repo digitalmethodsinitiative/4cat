@@ -1,6 +1,7 @@
 """
 Generate word tree from dataset
 """
+import string
 import re
 
 from backend.abstract.processor import BasicProcessor
@@ -86,7 +87,7 @@ class MakeWordtree(BasicProcessor):
 		"strip-symbols": {
 			"type": UserInput.OPTION_TOGGLE,
 			"default": True,
-			"help": "Remove non-alphanumeric characters"
+			"help": "Remove punctuation"
 		}
 	}
 
@@ -144,6 +145,7 @@ class MakeWordtree(BasicProcessor):
 
 		# find matching posts
 		processed = 0
+		punkt_replace = re.compile(r"[" + re.escape(string.punctuation) + "]")
 		for post in self.source_dataset.iterate_items(self):
 			processed += 1
 			if processed % 500 == 0:
@@ -156,7 +158,7 @@ class MakeWordtree(BasicProcessor):
 				body = link_regex.sub("", body)
 
 			if strip_symbols:
-				body = delete_regex.sub("", body)
+				body = punkt_replace.sub("", body)
 
 			body = word_tokenize(body)
 			positions = [i for i, x in enumerate(body) if x.lower() == query.lower()]

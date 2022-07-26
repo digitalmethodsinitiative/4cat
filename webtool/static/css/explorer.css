@@ -251,6 +251,11 @@ span.page.selected {
     padding: 10px;
 }
 
+.posts .external-url.deactivated {
+    color: #cbcbcb;
+    cursor: not-allowed;
+}
+
 .quote {
     color: #ff5750;
 }

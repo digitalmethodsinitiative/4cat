@@ -20,8 +20,8 @@ class RandomFilter(BasicProcessor):
 	"""
 	type = "random-filter"  # job type ID
 	category = "Filtering"  # category
-	title = "Filter for random posts"  # title displayed in UI
-	description = "Retain a pseudo-random set of posts. This creates a new, separate csv dataset you can run analyses on."  # description displayed in UI
+	title = "Random sample"  # title displayed in UI
+	description = "Retain a pseudorandom set of posts. This creates a new dataset."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
 	# the following determines the options available to the user via the 4CAT

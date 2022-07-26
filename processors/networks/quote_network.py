@@ -20,8 +20,9 @@ class QuoteNetworkGrapher(BasicProcessor):
 	"""
 	type = "quote-network"  # job type ID
 	category = "Networks"
-	title = "Quote network"  # title displayed in UI
-	description = "Create a Gephi-compatible network of quoted posts, with each reference to another post creating an edge between those posts. Post IDs may be correlated and triangulated with the full results set."  # description displayed in UI
+	title = "Reply network"  # title displayed in UI
+	description = "Create a GEXF network file of posts replying to each other. " \
+				  "Each reference to another post creates an edge between posts. "  # description displayed in UI
 	extension = "gexf"  # extension of result file, used internally and in UI
 
 	@classmethod

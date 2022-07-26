@@ -1,6 +1,6 @@
 {
 	"ndjson": {
-		"profile_picture": "<img src='{{ author_user.profile_image_url }}'>",
+		"author_picture": "<img src='{{ author_user.profile_image_url }}'>",
 		"author": "{{ author_user.name }}",
 		"created": "{{ created_at }}",
 		"likes": "{{ public_metrics.like_count }} <i class='fas fa-heart'></i>",
@@ -45,6 +45,8 @@
 		]		
 	},
 	"csv": {
+		"author_picture": "<img src='{{ profile_image_url }}'>",
+		"author": "{{ author }}",
 		"likes": "{{ like_count }} <i class='fas fa-heart'></i>",
 		"retweets": "{{ retweet_count }} <i class='fas fa-retweet'></i>",
 		"replies": "{{ reply_count }} <i class='fas fa-reply'></i>",

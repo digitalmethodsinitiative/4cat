@@ -6,8 +6,7 @@ import time
 
 from backend.abstract.processor import BasicProcessor
 
-import config
-
+import common.config_manager as config
 __author__ = "Sal Hagen"
 __credits__ = ["Sal Hagen"]
 __maintainer__ = "Sal Hagen"
@@ -83,8 +82,6 @@ class DebateMetrics(BasicProcessor):
 			"subject": threads[thread_id]["subject"],
 			"num_posts": threads[thread_id]["count"],
 			"num_images": threads[thread_id]["images"],
-			"preview_url": "http://" + config.FlaskConfig.SERVER_NAME + "/api/" + datasource + "/" + board + "/thread/" + str(
-				thread_id) + ".json?format=html",
 			"op_replies": threads[thread_id]["op_length"]
 			# "reply_amount": ,
 			# "active_users": ,

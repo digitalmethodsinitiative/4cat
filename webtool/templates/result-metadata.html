@@ -1,3 +1,8 @@
+{% if dataset.is_private %}
+    <i class="fa fa-lock tooltip-trigger" aria-hidden="true" aria-controls="tooltip-{{ dataset.key }}-private"></i> <span class="sr-only">This dataset is private and can only be viewed by your user and instance maintainers</span>
+    <span role="tooltip" aria-hidden="true" id="tooltip-{{ dataset.key }}-private">This dataset is private and can only be viewed by your user and instance maintainers</span>
+{% endif %}
+
 {% if "pseudonymise" in dataset.parameters and dataset.parameters.pseudonymise %}
     <i class="fa fa-user-secret tooltip-trigger" aria-hidden="true" aria-controls="tooltip-{{ dataset.key }}-pseudonymised"></i> <span class="sr-only">Usernames have been pseudonymised</span>
     <span role="tooltip" aria-hidden="true" id="tooltip-{{ dataset.key }}-pseudonymised">Usernames have been pseudonymised</span>
@@ -5,20 +10,20 @@
 
 {% for parameter in dataset.parameters %}
     {% if parameter == "body_match" and dataset.parameters[parameter] %}
-        <span class="inline-label">body:</span>
+        <span class="inline-label property-badge">body</span>
         <span class="inline-query has-more" data-max-length="75">{{ dataset.parameters.body_match }}</span>
     {% elif parameter == "subject_match" and dataset.parameters[parameter] %}
-        <span class="inline-label">subject:</span>
+        <span class="inline-label property-badge">subject</span>
         <span class="inline-query has-more" data-max-length="75">{{ dataset.parameters.subject_match }}</span>
     {% elif parameter == "country_name" and dataset.parameters[parameter] != "all" %}
-        <span class="inline-label">country:</span>
+        <span class="inline-label property-badge">country</span>
         <span class="inline-query">{{ dataset.parameters.country_name|join(', ') }}</span>
-    {% elif dataset.parameters[parameter] and parameter[0:4] != "api_" and parameter not in ("jst", "mst", "copied_from", "copied_at", "pseudonymise", "user", "time", "search-scope", "search_scope", "random_amount", "scope_length", "scope_density", "country_name", "min_date", "max_date", "board", "datasource", "type", "label") %}
+    {% elif dataset.parameters[parameter] and parameter[0:4] != "api_" and parameter not in ("jst", "mst", "copied_from", "copied_at", "pseudonymise", "user", "time", "search-scope", "search_scope", "random_amount", "scope_length", "scope_density", "country_name", "min_date", "max_date", "board", "datasource", "type", "label", "expires-after") %}
         {% if not dataset.parameters[parameter]|isbool and dataset.parameters[parameter] %}
-        <span class="inline-label">{{ parameter }}:</span>
+        <span class="inline-label property-badge">{{ parameter }}</span>
         <span class="inline-query has-more" data-max-length="75">{{ dataset.parameters[parameter]|string }}</span>
         {% elif dataset.parameters[parameter] %}
-        <span class="property-badge">{{ parameter }}</span>
+        <span class="property-badge"><i class="fa fa-check" aria-hidden="true"></i> {{ parameter }}</span>
         {% endif %}
     {% endif %}
 {% endfor %}
@@ -36,15 +41,9 @@
 {% if (dataset.parameters.min_date and dataset.parameters.min_date > 0) or (dataset.parameters.max_date and dataset.parameters.max_date > 0) %}
     {% if dataset.parameters.min_date and dataset.parameters.min_date > 0 %}
         <span class="property-badge">From</span>
-        <span class="inline-query">{{ dataset.parameters.min_date|datetime }}</span>
+        <span class="inline-query">{{ dataset.parameters.min_date|datetime|safe }}</span>
     {% endif %}{% if dataset.parameters.max_date and dataset.parameters.max_date > 0 %}
     <span class="property-badge">Until</span>
-    <span class="inline-query">{{ dataset.parameters.max_date|datetime }}</span>
+    <span class="inline-query">{{ dataset.parameters.max_date|datetime|safe }}</span>
 {% endif %}
-{% endif %}
-
-{% if dataset.is_finished() and dataset.num_rows == 0 %}
-    <span class="property-badge second-tier warning">no results</span>
-{% elif not dataset.is_finished() %}
-    <span class="property-badge second-tier warning">in progress</span>
 {% endif %}

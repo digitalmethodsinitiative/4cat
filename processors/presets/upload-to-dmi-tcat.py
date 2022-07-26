@@ -4,17 +4,16 @@ Upload Twitter dataset to DMI-TCAT instance
 from backend.abstract.preset import ProcessorPreset
 from common.lib.helpers import UserInput
 
-import config
-
+import common.config_manager as config
 
 class FourcatToDmiTcatConverterAndUploader(ProcessorPreset):
     """
     Run processor pipeline to extract neologisms
     """
     type = "preset-upload-tcat"  # job type ID
-    category = "Presets"  # category. 'Presets' are always listed first in the UI.
+    category = "Combined processors"  # category. 'Combined processors' are always listed first in the UI.
     title = "Upload to DMI-TCAT"  # title displayed in UI
-    description = "Convert the dataset to a format compatible with DMI-TCAT and upload it to an available instance."  # description displayed in UI
+    description = "Convert the dataset to a TCAT-compatible format and upload it to an available TCAT server."  # description displayed in UI
     extension = "html"
 
     @classmethod
@@ -30,20 +29,20 @@ class FourcatToDmiTcatConverterAndUploader(ProcessorPreset):
         :param User user:  User that will be uploading it
         :return dict:  Option definition
         """
-        if hasattr(config, "TCAT_SERVER") and type(config.TCAT_SERVER) in (set, list, tuple) and len(config.TCAT_SERVER) > 1:
+        if config.get('tcat-auto-upload.TCAT_SERVER') and type(config.get('tcat-auto-upload.TCAT_SERVER')) in (set, list, tuple) and len(config.get('tcat-auto-upload.TCAT_SERVER')) > 1:
             return {
                 "server": {
                     "type": UserInput.OPTION_CHOICE,
                     "options": {
                         "random": "Choose one based on available capacity",
                         **{
-                            url: url for url in config.TCAT_SERVER
+                            url: url for url in config.get('tcat-auto-upload.TCAT_SERVER')
                         }
                     },
                     "default": "random",
-                    "help": "Instance to upload to",
-                    "tooltip": "Which TCAT instance to upload the dataset to. If you do not choose one, 4CAT will "
-                               "upload the dataset to the instance with the highest available capacity."
+                    "help": "Server to upload to",
+                    "tooltip": "Which TCAT server to upload the dataset to. If you do not choose one, 4CAT will "
+                               "upload the dataset to the server with the highest available capacity."
                 }
                 # todo: actually make it choose one that way instead of choosing at random
             }
@@ -58,11 +57,10 @@ class FourcatToDmiTcatConverterAndUploader(ProcessorPreset):
         :param module: Dataset or processor to determine compatibility with
         """
         return module.type == "twitterv2-search" and \
-               hasattr(config, 'TCAT_SERVER') and \
-               config.TCAT_SERVER and \
-               hasattr(config, 'TCAT_TOKEN') and \
-               hasattr(config, 'TCAT_USERNAME') and \
-               hasattr(config, 'TCAT_PASSWORD')
+               config.get('tcat-auto-upload.TCAT_SERVER') and \
+               config.get('tcat-auto-upload.TCAT_TOKEN') and \
+               config.get('tcat-auto-upload.TCAT_USERNAME') and \
+               config.get('tcat-auto-upload.TCAT_PASSWORD')
 
     def get_processor_pipeline(self):
         """

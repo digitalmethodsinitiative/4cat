@@ -58,6 +58,10 @@
 /** --------------------- *
      Basic HTML elements
   * --------------------- */
+html {
+    overflow:hidden;
+}
+
 *, body, code, select, input, textarea {
     font-family: 'Open Sans', 'Trebuchet MS', sans-serif;
 }
@@ -86,6 +90,23 @@ em, strong {
     font-weight: bold;
 }
 
+#loading {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    margin-top: -1em;
+    margin-left: -7.5em;
+    width: 15em;
+    height: 2em;
+    border: 1px solid var(--contrast-dark);
+    background: var(--accent);
+    color: var(--always-white);
+    font-size: 1.25em;
+    text-align: center;
+    font-weight: bold;
+    line-height: 1.9em;
+}
+
 /** --------------------- *
             Forms
   * --------------------- */
@@ -106,6 +127,11 @@ select, input {
     padding-right: 1em;
 }
 
+#graph-layout {
+    display: block;
+    margin: 0 auto 1em auto;
+}
+
 button, .button-like {
     border: 2px solid var(--contrast-dark);
     background: var(--contrast-bright);
@@ -114,6 +140,14 @@ button, .button-like {
     font-size: inherit;
     cursor: pointer;
     padding: 0.25em 1em;
+    display: block;
+    margin: 0 auto;
+}
+
+.button-byline {
+    text-align: center;
+    font-size: 0.8em;
+    display:block;
 }
 
 button:hover, .button-like:not(.inactive):hover {
@@ -147,14 +181,16 @@ button:hover, .button-like:not(.inactive):hover {
     line-height: 1.5;
     max-height: 97vh;
     max-width: 250px;
-	padding: 10px;
+	padding: 0;
 	z-index: 1;
     overflow-y: scroll;
     background-color: rgba(250, 250, 250, 0.8)
 }
 
 #network-name-box {
-    color: black;
+    color: var(--always-white);
+    background: var(--accent);
+    text-align: center;
     font-weight: bold;
     font-size: 18px;
 }
@@ -176,8 +212,8 @@ button:hover, .button-like:not(.inactive):hover {
 }
 
 .graph-manipulation-box {
-    margin-top: 25px;
     margin-bottom: 25px;
+    border-top: 1px solid var(--contrast-dark);
 }
 
 .graph-manipulation-box-header {
@@ -186,19 +222,26 @@ button:hover, .button-like:not(.inactive):hover {
 
 h2.graph-manipulation-box-header {
     font-weight: bold;
-    font-size: 23px;
+    font-size: 1em;
     margin-bottom: 10px;
+    background: var(--contrast-dark);
+    color: var(--always-white);
+    text-align: center;
+    border-left: 0.5em solid var(--accent);
+    padding: 0.5em 0
 }
 
 h3.graph-manipulation-box-header {
     font-size: 16px;
-    font-style: italic;
     color: var(--accent);
+    font-weight: bold;
+    padding: 0 0.5em;
 }
 
 .graph-manipulation-subbox {
     margin-top: 10px;
     margin-bottom: 10px;
+    padding: 0 0.5em;
 }
 
 .graph-manipulation-subbox > p {

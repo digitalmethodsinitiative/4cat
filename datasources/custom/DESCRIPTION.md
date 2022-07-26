@@ -1,0 +1,3 @@
+You can upload a CSV or TAB files to 4CAT. After upload, these will be available for further analysis and processing. Files need to be utf-8 encoded and must contain a header row with at least the following columns: id, thread_id, author, body, subject, timestamp.
+
+The timestamp column should be formatted in a common format (e.g. unix timestamps or YYYY-mm-dd HH:MM:SS). If your file contains hashtags, name the column tags or hashtags and make sure they are comma-separated.

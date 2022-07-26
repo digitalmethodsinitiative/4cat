@@ -1,6 +1,7 @@
 import datetime
 import markdown
 import json
+import time
 import uuid
 import math
 import os
@@ -9,17 +10,21 @@ import re
 from pathlib import Path
 from urllib.parse import urlencode, urlparse
 from webtool import app
+from common.lib.helpers import timify_long
 
-from common.lib.helpers import strip_tags
-
-import config
-
+import common.config_manager as config
 
 @app.template_filter('datetime')
-def _jinja2_filter_datetime(date, fmt=None):
+def _jinja2_filter_datetime(date, fmt=None, wrap=True):
 	date = datetime.datetime.utcfromtimestamp(date)
 	format = "%d %b %Y" if not fmt else fmt
-	return date.strftime(format)
+	formatted = date.strftime(format)
+
+	if wrap:
+		html_formatted = date.strftime("%Y-%m-%dT%H:%M:%S%z")
+		return '<time datetime="' + html_formatted + '">' + formatted + '</time>'
+	else:
+		return formatted
 
 
 @app.template_filter('numberify')
@@ -37,6 +42,18 @@ def _jinja2_filter_numberify(number):
 		return str(int(number / 1000)) + "k"
 
 	return str(number)
+
+@app.template_filter('commafy')
+def _jinja2_filter_commafy(number):
+	"""
+	Applies thousands separator to ints.
+	"""
+	try:
+		number = int(number)
+	except TypeError:
+		return number
+
+	return f"{number:,}"
 
 @app.template_filter('timify')
 def _jinja2_filter_numberify(number):
@@ -62,8 +79,16 @@ def _jinja2_filter_numberify(number):
 
 	return time_str.strip()
 
+@app.template_filter('timify_long')
+def _jinja2_filter_timify_long(number):
+	"""
+	Make a number look like an indication of time
 
-
+	:param number:  Number to convert. If the number is larger than the current
+	UNIX timestamp, decrease by that amount
+	:return str: A nice, string, for example `1 month, 3 weeks, 4 hours and 2 minutes`
+	"""
+	return timify_long(number)
 
 @app.template_filter("http_query")
 def _jinja2_filter_httpquery(data):
@@ -74,12 +99,10 @@ def _jinja2_filter_httpquery(data):
 	except TypeError:
 		return ""
 
-
 @app.template_filter('markdown')
 def _jinja2_filter_markdown(text):
 	val = markdown.markdown(text)
 	return val
-
 
 @app.template_filter('isbool')
 def _jinja2_filter_isbool(value):
@@ -93,7 +116,7 @@ def _jinja2_filter_json(data):
 @app.template_filter('config_override')
 def _jinja2_filter_conf(data, property=""):
 	try:
-		return getattr(config.FlaskConfig, property)
+		return config.get("flask." + property)
 	except AttributeError:
 		return data
 
@@ -112,6 +135,7 @@ def _jinja2_filter_filesize(file, short=False):
 	if bytes > (1024 * 1024):
 		return ("{0:" + format_precision + "}MB").format(bytes / 1024 / 1024)
 	elif bytes > 1024:
+		format_precision = ".0f"
 		return ("{0:" + format_precision + "}kB").format(bytes / 1024)
 	elif short:
 		return "%iB" % bytes
@@ -135,9 +159,10 @@ def _jinja2_filter_extension_to_noun(ext):
 
 @app.template_filter('post_field')
 def _jinja2_filter_post_field(field, post):
-	# Takes a value in between {{ two curly brackets }} and uses that
-	# as a dictionary key. It then returns the corresponding value.
-	
+	# Extracts string values between {{ two curly brackets }} and uses that
+	# as a dictionary key for the given dict. It then returns the corresponding value.
+	# Mainly used in the Explorer.
+
 	matches = False
 	formatted_field = field
 
@@ -190,15 +215,16 @@ def inject_now():
 		"""
 		return str(uuid.uuid4())
 
-	announcement_file = Path(config.PATH_ROOT, "ANNOUNCEMENT.md")
+	announcement_file = Path(config.get('PATH_ROOT'), "ANNOUNCEMENT.md")
 
 	return {
-		"__datasources_config": config.DATASOURCES,
-		"__has_https": config.FlaskConfig.SERVER_HTTPS,
+		"__datasources_config": config.get('DATASOURCES'),
+		"__has_https": config.get("flask.https"),
 		"__datenow": datetime.datetime.utcnow(),
-		"__tool_name": config.TOOL_NAME,
-		"__tool_name_long": config.TOOL_NAME_LONG,
+		"__tool_name": config.get("4cat.name"),
+		"__tool_name_long": config.get("4cat.name_long"),
 		"__announcement": announcement_file.open().read().strip() if announcement_file.exists() else None,
+		"__expire_datasets": config.get("expire.timeout"),
+		"__expire_optout": config.get("expire.allow_optout"),
 		"uniqid": uniqid
 	}
-

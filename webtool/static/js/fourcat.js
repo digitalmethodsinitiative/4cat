@@ -133,7 +133,7 @@ const processor = {
 				'data': form.serialize(),
 				'success': function (response) {
 					if (response.hasOwnProperty("messages") && response.messages.length > 0) {
-						alert(response.messages.join("\n\n"));
+						popup.alert(response.messages.join("\n\n"));
 					}
 
 					if (response.html.length > 0) {
@@ -157,6 +157,9 @@ const processor = {
 						new_element.css('height', '0px').css('border-width', '0px').css('opacity', 0);
 
 						let expand = function() {
+							if($('#child-tree-header').hasClass('collapsed')) {
+								$('#child-tree-header').attr('aria-hidden', 'false').removeClass('collapsed');
+							}
 							new_element.animate({'height': targetHeight, 'opacity': 1}, 500, false, function() { $(this).css('height', '').css('opacity', '').css('border-width', ''); });
 						}
 
@@ -170,9 +173,9 @@ const processor = {
 				'error': function (response) {
 					try {
 						response = JSON.parse(response.responseText);
-						alert('The analysis could not be queued: ' + response["error"]);
+						popup.alert('The analysis could not be queued: ' + response["error"], 'Warning');
 					} catch(Exception) {
-						alert('The analysis could not be queued: ' + response.responseText);
+						popup.alert('The analysis could not be queued: ' + response.responseText, 'Warning');
 					}
 				}
 			});
@@ -202,10 +205,13 @@ const processor = {
 			data: {key: $(this).attr('data-key')},
 			success: function(json) {
 				$('li#child-' + json.key).animate({height: 0}, 200, function() { $(this).remove(); });
+				if($('.child-list.top-level li').length === 0) {
+					$('#child-tree-header').attr('aria-hidden', 'true').addClass('collapsed');
+				}
 				query.enable_form();
 			},
 			error: function(json) {
-				alert('Could not delete dataset: ' + json.status);
+				popup.alert('Could not delete dataset: ' + json.status, 'Error');
 			}
 		});
 	}
@@ -226,7 +232,7 @@ const query = {
 		// Check status of query
 		if($('body.result-page').length > 0) {
 			query.update_status();
-			setInterval(query.update_status, 4000);
+			setInterval(query.update_status, 1000);
 
 			// Check processor queue
 			query.check_processor_queue();
@@ -240,7 +246,7 @@ const query = {
 		}
 
 		//regularly check for unfinished datasets
-		setInterval(query.check_resultpage, 2000);
+		setInterval(query.check_resultpage, 1000);
 
 		// Start querying when go button is clicked
 		$('#query-form').on('submit', function (e) {
@@ -258,7 +264,7 @@ const query = {
 		$('#datasource-form').on('change', '#forminput-board', query.custom_board_options);
 
 		// dataset label edit
-		$('.result-page .card h2').each(query.label.init);
+		$('.result-page .card h2.editable').each(query.label.init);
 		$(document).on('click', '.edit-dataset-label', query.label.handle);
 		$(document).on('keydown', '#new-dataset-label', query.label.handle);
 
@@ -288,8 +294,7 @@ const query = {
 	/**
 	 * Tool window: start a query, submit it to the backend
 	 */
-	start: function () {
-
+	start: function (extra_data=null) {
 		//check form input
 		if (!query.validate()) {
 			return;
@@ -301,6 +306,12 @@ const query = {
 		let form = $('#query-form');
 		let formdata = new FormData(form[0]);
 
+		if(extra_data) {
+			for(let key in extra_data) {
+				formdata.append(key, extra_data[key]);
+			}
+		}
+
 		// Cache cacheable values
 		let datasource = form.attr('class');
 		form.find('.cacheable input').each(function() {
@@ -309,13 +320,11 @@ const query = {
 		})
 
 		// Disable form
-		query.disable_form();
 		$('html,body').scrollTop(200);
 
 		// AJAX the query to the server
 		$('#query-status .message').html('Sending dataset parameters');
 		$.post({
-			dataType: "text",
 			url: form.attr('action'),
 			data: formdata,
 			cache: false,
@@ -324,15 +333,21 @@ const query = {
 
 			success: function (response) {
 				// If the query is rejected by the server.
-				if (response.substr(0, 14) === 'Invalid query.') {
-					alert(response);
-					query.enable_form();
+				if (response['status'] === 'error') {
+					popup.alert(response['message'], 'Error');
+				}
+
+				else if(response['status'] === 'confirm') {
+					popup.confirm(response['message'], 'Confirm', function() {
+						query.start({'frontend-confirm': true});
+					});
 				}
 
 				// If the query is accepted by the server.
 				else {
+					query.disable_form();
 					$('#query-status .message').html('Query submitted, waiting for results');
-					query.query_key = response;
+					query.query_key = response['key'];
 					query.check(query.query_key);
 
 					$('#query-status').append($('<button class="delete-link" data-key="' + query.query_key + '">Cancel</button>'));
@@ -345,6 +360,7 @@ const query = {
 			},
 			error: function (error) {
 				query.enable_form();
+				popup.alert(error['message'], 'Error');
 				$('#query-status .message').html(error);
 			}
 		});
@@ -373,17 +389,20 @@ const query = {
 
 				if (json.done) {
 					clearInterval(query.poll_interval);
+					applyProgress($('#query-status'), 100);
 					let keyword = json.label;
 
-					$('#query-results').append('<li><a href="/results/' + json.key + '">' + keyword + ' (' + json.rows + ' items)</a></li>');
+					$('#query-results').append('<li><a href="../results/' + json.key + '">' + keyword + ' (' + json.rows + ' items)</a></li>');
 					query.enable_form();
-					alert('Query for \'' + keyword + '\' complete!');
+					popup.alert('Query for \'' + keyword + '\' complete!', 'Success');
 				} else {
 					let dots = '';
 					for (let i = 0; i < query.dot_ticker; i += 1) {
 						dots += '.';
 					}
 					$('#query-status .dots').html(dots);
+
+					applyProgress($('#query-status'), json.progress);
 
 					query.dot_ticker += 1;
 					if (query.dot_ticker > 3) {
@@ -405,9 +424,13 @@ const query = {
 
 		$('.dataset-unfinished').each(function() {
 			let container = $(this);
+			let block_type = container.hasClass('full-block') ? 'full' : 'status';
 			$.getJSON({
 				url: getRelativeURL('api/check-query/'),
-				data: {key: $(this).attr('data-key')},
+				data: {
+					key: $(this).attr('data-key'),
+					block: block_type
+				},
 				success: function (json) {
 					if (json.done) {
 						//refresh
@@ -415,9 +438,11 @@ const query = {
 						return;
 					}
 
-					let current_status = container.find('.dataset-status').html();
+					let status_field = container.find('.dataset-status')
+					let current_status = status_field.html();
+					applyProgress(status_field, json.progress);
 					if (current_status !== json.status_html) {
-						container.find('.dataset-status').html(json.status_html);
+						status_field.html(json.status_html);
 					}
 				}
 			});
@@ -572,46 +597,6 @@ const query = {
 
 		let valid = true;
 
-		if ($('#check-time').is(':checked')) {
-			let min_date = $('#input-min-time').val();
-			let max_date = $('#input-max-time').val();
-			let url_max_date;
-			let url_min_date;
-
-			// Convert the minimum date string to a unix timestamp
-			if (min_date !== '') {
-				url_min_date = stringToTimestamp(min_date);
-
-				// If the string was incorrectly formatted (could be on Safari), a NaN was returned
-				if (isNaN(url_min_date)) {
-					valid = false;
-					alert('Please provide a minimum date in the format dd-mm-yyyy (like 29-11-2017).');
-				}
-			}
-
-			// Convert the maximum date string to a unix timestamp
-			if (max_date !== '' && valid) {
-				url_max_date = stringToTimestamp(max_date);
-				// If the string was incorrectly formatted (could be on Safari), a NaN was returned
-				if (isNaN(url_max_date)) {
-					valid = false;
-					alert('Please provide a maximum date in the format dd-mm-yyyy (like 29-11-2017).');
-				}
-			}
-
-			// Input can be ill-formed, like '01-12-90', resulting in negative timestamps
-			if (url_min_date < 0 || url_max_date < 0 && valid) {
-				valid = false;
-				alert('Invalid date(s). Check the bar on top with details on date ranges of 4CAT data.');
-			}
-
-			// Make sure the first date is later than or the same as the second
-			if (url_min_date >= url_max_date && url_min_date !== 0 && url_max_date !== 0 && valid) {
-				valid = false;
-				alert('The first date is later than or the same as the second.\nPlease provide a correct date range.');
-			}
-		}
-
 		// Country flag check
 		if ($('#check-country-flag').is(':checked') && ($('#body-input').val()).length < 2 && valid) {
 
@@ -619,24 +604,20 @@ const query = {
 			let country = $('#country_flag').val();
 
 			// Don't allow querying without date ranges for the common countries
-			if (common_countries.includes(country)){
-				if ($('#check-time').is(':checked')) {
+			if (common_countries.includes(country)) {
+				let min_date = $('#option-daterange-min').val();
+				let max_date = $('#option-daterange-max').val();
 
-					let min_date = stringToTimestamp($('#input-min-time').val());
-					let max_date = stringToTimestamp($('#input-max-time').val());
-
-					// Max three monhts for the common country flags without any body parameters
-					if (max_date - min_date > 7889231) {
-						valid = false;
-						alert('The date selected is more than three months. Select a date range of max. three months and try again. Only the most common country flags on 4chan/pol/ (US, UK, Canada, Australia) have a date restriction.');
-					}
+				// Max three monhts for the common country flags without any body parameters
+				if (max_date - min_date > 7889231) {
+					valid = false;
+					popup.alert('The date selected is more than three months. Select a date range of max. three months and try again. Only the most common country flags on 4chan/pol/ (US, UK, Canada, Australia) have a date restriction.', 'Error');
 				}
+
 				else {
 					valid = false;
-					$('#check-time').prop('checked', true);
-					$('#check-time').trigger('change');
 					$('#input-min-time').focus().select();
-					alert('The most common country flags on 4chan/pol/ (US, Canada, Australia) have a date restriction when you want to retreive all of their posts. Select a date range of max. three months and try again.');
+					popup.alert('The most common country flags on 4chan/pol/ (US, Canada, Australia) have a date restriction when you want to retreive all of their posts. Select a date range of max. three months and try again.', 'Error');
 				}
 			}
 		}
@@ -646,7 +627,7 @@ const query = {
 	},
 
 	/**
-	 * Update board select list for chosen datasource
+	 * Query form for chosen datasource
 	 */
 	update_form: function() {
 		datasource = $('#datasource-select').val();
@@ -669,6 +650,12 @@ const query = {
 				   }
 				});
 
+				//update data source type indicator
+				$('#datasource-type-label').html(data.type.join(", "));
+
+				// update data overview link
+				$('.data-overview-link > a').attr("href", getRelativeURL('data-overview/' + data.datasource))
+
 				query.handle_density();
 				query.custom_board_options();
 
@@ -681,7 +668,7 @@ const query = {
 			},
 			'error': function() {
 				$('#datasource-select').parents('form').trigger('reset');
-				alert('Invalid datasource selected.');
+				popup.alert('Invalid datasource selected.', 'Error');
 			}
 		});
 	},
@@ -746,6 +733,7 @@ const query = {
 		// store timestamp in hidden 'actual' input field
 		let date_obj = new Date(parseInt(date[2]), parseInt(date[1]) - 1, parseInt(date[0]));
 		let timestamp = Math.floor(date_obj.getTime() / 1000);
+		timestamp -= date_obj.getTimezoneOffset() * 60;  //correct for timezone
 
 		if (isNaN(timestamp)) {
 			// invalid date
@@ -787,7 +775,7 @@ const query = {
 			e.preventDefault();
 			let field = $(self).parent().find('input');
 			let new_label = field.val();
-			let dataset_key = $('section.result-tree').attr('data-dataset-key')
+			let dataset_key = $('article.result').attr('data-dataset-key');
 
 			$.post({
 				dataType: "json",
@@ -801,7 +789,7 @@ const query = {
 					$(self).parent().find('i.fa').removeClass('fa-check').addClass('fa-edit');
 				},
 				error: function (response) {
-					alert('Oh no! ' +response.text);
+					popup.alert('Oh no! ' +response.text, 'Error');
 				}
 			});
 		}
@@ -809,8 +797,8 @@ const query = {
 
 	convert_dataset: function(self) {
 		let datasource = $(self.target).val();
-		let dataset_key = $('section.result-tree').attr('data-dataset-key')
-
+		let dataset_key = $('article.result').attr('data-dataset-key');
+		
 		if (datasource.length > 0) {
 			$.post({
 				dataType: "json",
@@ -822,7 +810,7 @@ const query = {
 					location.reload();
 				},
 				error: function (response) {
-					alert('Oh no! ' + response.text);
+					popup.alert('Oh no! ' + response.text, 'Error');
 				}
 			});
 		}
@@ -865,27 +853,28 @@ const tooltip = {
 				tooltip_container = target;
 			}
 		});
-		tooltip_container = '#' + tooltip_container;
+		tooltip_container = $(document.getElementById(tooltip_container));
+		let is_standalone = tooltip_container.hasClass('multiple');
 
-		if ($(tooltip_container).is(':hidden')) {
-			$(tooltip_container).removeClass('force-width');
-			let position = $(parent).position();
+		if (tooltip_container.is(':hidden')) {
+			tooltip_container.removeClass('force-width');
+			let position = is_standalone ? $(parent).offset() : $(parent).position();
 			let parent_width = parseFloat($(parent).css('width').replace('px', ''));
-			$(tooltip_container).show();
+			tooltip_container.show();
 
 			// figure out if this is a multiline tooltip
-			content = $(tooltip_container).html();
-			$(tooltip_container).html('1');
-			em_height = $(tooltip_container).height();
-			$(tooltip_container).html(content);
-			if($(tooltip_container).height() > em_height) {
-				$(tooltip_container).addClass('force-width');
+			content = tooltip_container.html();
+			tooltip_container.html('1');
+			em_height = tooltip_container.height();
+			tooltip_container.html(content);
+			if(tooltip_container.height() > em_height) {
+				tooltip_container.addClass('force-width');
 			}
 
-			let width = parseFloat($(tooltip_container).css('width').replace('px', ''));
-			let height = parseFloat($(tooltip_container).css('height').replace('px', ''));
-			$(tooltip_container).css('top', (position.top - height - 5) + 'px');
-			$(tooltip_container).css('left', (position.left + (parent_width / 2) - (width / 2)) + 'px');
+			let width = parseFloat(tooltip_container.css('width').replace('px', ''));
+			let height = parseFloat(tooltip_container.css('height').replace('px', ''));
+			tooltip_container.css('top', (position.top - height - 5) + 'px');
+			tooltip_container.css('left', (position.left + (parent_width / 2) - (width / 2)) + 'px');
 		}
 	},
 
@@ -907,8 +896,8 @@ const tooltip = {
 				tooltip_container = target;
 			}
 		});
-		tooltip_container = '#' + tooltip_container;
-		$(tooltip_container).hide();
+		tooltip_container = $(document.getElementById(tooltip_container));
+		tooltip_container.hide();
 	},
 	/**
 	 * Toggle tooltip between shown and hidden
@@ -920,8 +909,8 @@ const tooltip = {
 			e.preventDefault();
 		}
 
-		let tooltip_container = $('#' + $(this).attr('aria-controls'));
-		if ($(tooltip_container).is(':hidden')) {
+		let tooltip_container = $(document.getElementById($(this).attr('aria-controls')));
+		if (tooltip_container.is(':hidden')) {
 			tooltip.show(e, this);
 		} else {
 			tooltip.hide(e, this);
@@ -936,17 +925,47 @@ const popup = {
 	/**
 	 * Set up containers and event listeners for popup
 	 */
-	 is_initialised: false,
-	 init: function() {
+	is_initialised: false,
+	current_callback: null,
+
+	init: function () {
 		$('<div id="blur"></div>').appendTo('body');
-		$('<div id="popup"><div class="content"></div><button id="popup-close"><i class="fa fa-times" aria-hidden="true"></i> <span class="sr-only">Close popup</span></button></div>').appendTo('body');
+		$('<div id="popup" role="alertdialog" aria-labelledby="popup-title" aria-describedby="popup-text"><div class="content"></div><button id="popup-close"><i class="fa fa-times" aria-hidden="true"></i> <span class="sr-only">Close popup</span></button></div>').appendTo('body');
 
 		//popups
 		$(document).on('click', '.popup-trigger', popup.show);
-		$('body').on('click', '#blur, #popup-close', popup.hide);
+		$('body').on('click', '#blur, #popup-close, .popup-close', popup.hide);
+		$('body').on('click', '.popup-execute-callback', function() { if(popup.current_callback) { popup.current_callback(); } popup.hide(); });
+		$(document).on('keyup', popup.handle_key);
 
 		popup.is_initialised = true;
-	 },
+	},
+
+	alert: function(message, title = 'Notice') {
+		if(!popup.is_initialised) {
+			popup.init();
+		}
+
+		$('#popup').removeClass('confirm').removeClass('render').addClass('alert');
+
+		let wrapper = $('<div><h2 id="popup-title">' + title + '</h2><p id="popup-text">' + message + '</p><div class="controls"><button class="popup-close"><i class="fa fa-check" aria-hidden="true"></i> OK</button></div></div>');
+		popup.render(wrapper.html(), false, false);
+	},
+
+	confirm: function(message, title = 'Confirm', callback = false) {
+		if(!popup.is_initialised) {
+			popup.init();
+		}
+
+		if(callback) {
+			popup.current_callback = callback;
+		}
+
+		$('#popup').removeClass('alert').removeClass('render').addClass('confirm');
+		let wrapper = $('<div><h2 id="popup-title">' + title + '</h2><p id="popup-text">' + message + '</p><div class="controls"><button class="popup-close"><i class="fa fa-times" aria-hidden="true"></i> Cancel</button><button class="popup-execute-callback"><i class="fa fa-check" aria-hidden="true"></i> OK</button></div></div>');
+		popup.render(wrapper.html(), false, false);
+	},
+
 	/**
 	 * Show popup, using the content of a designated container
 	 *
@@ -966,8 +985,9 @@ const popup = {
 			e.preventDefault();
 		}
 
+		$('#popup').removeClass('confirm').removeClass('alert').addClass('render');
+
 		//determine target - last aria-controls value starting with 'popup-'
-		console.log(parent);
 		let targets = $(parent).attr('aria-controls').split(' ');
 		let popup_container = '';
 		targets.forEach(function(target) {
@@ -984,7 +1004,7 @@ const popup = {
 		}
 	},
 
-	render: function (content, is_fullsize=false) {
+	render: function (content, is_fullsize=false, with_close_button=true) {
 		//copy popup contents into container
 		$('#popup .content').html(content);
 		if(is_fullsize) {
@@ -994,6 +1014,12 @@ const popup = {
 		}
 		$('#blur').attr('aria-expanded', true);
 		$('#popup').attr('aria-expanded', true);
+
+		if(with_close_button) {
+			$('#popup-close').show();
+		} else {
+			$('#popup-close').hide();
+		}
 
 		$('#popup embed').each(function () {
 			svgPanZoom(this, {contain: true});
@@ -1009,6 +1035,17 @@ const popup = {
 		$('#popup .content').html('');
 		$('#blur').attr('aria-expanded', false);
 		$('#popup').attr('aria-expanded', false);
+	 },
+
+	/**
+	 * Hide popup when escape is pressed
+	 *
+	 * @param e
+	 */
+	 handle_key: function(e) {
+		 if(e.keyCode === 27 && $('#popup').attr('aria-expanded')) {
+			 popup.hide(e);
+		 }
 	 }
 	};
 
@@ -1021,7 +1058,7 @@ const dynamic_container = {
 	 */
 	init: function() {
 		// Update dynamic containers
-		setInterval(dynamic_container.refresh, 2500);
+		setInterval(dynamic_container.refresh, 250);
 	},
 
 	refresh: function() {
@@ -1139,7 +1176,7 @@ const multichoice = {
 			let options = $('<div class="multi-select-options ms-options-' + name + '"></div>');
 
 			for (let option in given_options) {
-				let selected = (option in given_default);
+				let selected = given_default.indexOf(option) > -1;
 				let checkbox_choice = $('<label><input type="checkbox" name="' + name + ":" + option + '"' + (selected ? ' checked="checked"' : '') + '> ' + given_options[option] + '</label>');
 
 				checkbox_choice.find('input').on('change', function () {
@@ -1248,20 +1285,42 @@ const ui_helpers = {
 	 * Ask for confirmation before doing whatever happens when the event goes through
 	 *
 	 * @param e  Event that triggers confirmation
+	 * @param message  Message to display in confirmation dialog
 	 * @returns {boolean}  Confirmed or not
 	 */
-	confirm: function(e) {
-		let action = 'do this';
+	confirm: function(e, message=null) {
+		let trigger_type = $(this).prop("tagName");
 
-		if ($(this).attr('data-confirm-action')) {
-			action = $(this).attr('data-confirm-action');
+		if(!message) {
+			let action = 'do this';
+
+			if ($(this).attr('data-confirm-action')) {
+				action = $(this).attr('data-confirm-action');
+			}
+
+			message = 'Are you sure you want to ' + action + '? This cannot be undone.';
 		}
 
-		if (!confirm('Are you sure you want to ' + action + '? This cannot be undone.')) {
+		if(trigger_type === 'A') {
+			// navigate to link, but only after confirmation
 			e.preventDefault();
-			return false;
-		} else {
-			return true;
+			let url = $(this).attr('href');
+
+			popup.confirm(message, 'Please confirm', () => {
+				window.location.href = url;
+			})
+
+		} else if(trigger_type === 'BUTTON' || trigger_type === 'INPUT') {
+			// submit form, but only after confirmation
+			let form = $(this).parents('form');
+			if(!form) {
+				return true;
+			}
+
+			e.preventDefault();
+			popup.confirm(message, 'Please confirm', () => {
+				form.submit();
+			})
 		}
 	},
 
@@ -1293,7 +1352,6 @@ const ui_helpers = {
 			if($(this).attr('data-confirm-var')) {
 				html = '<input type="hidden" name="' + $(this).attr('data-confirm-var') + '" value="' + result + '">';
 			}
-			console.log(html)
 			$('<form style="display: none;"/>').attr('method', method).attr('action', url).html(html).appendTo('body').submit().remove();
 			return false;
 		}
@@ -1343,37 +1401,6 @@ const ui_helpers = {
 	}
 }
 
-
-/**
- * Convert input string to Unix timestamp
- *
- * @param str  Input string, yyyy-mm-dd ideally
- * @returns {*}  Unix timestamp
- */
-function stringToTimestamp(str) {
-	// Converts a text input to a unix timestamp.
-	// Only used in Safari (other browsers use native HTML date picker)
-	let date_regex = /^\d{4}-\d{2}-\d{2}$/;
-	let timestamp;
-	if (str.match(date_regex)) {
-		timestamp = (new Date(str).getTime() / 1000)
-	} else {
-		str = str.replace(/\//g, '-');
-		str = str.replace(/\s/g, '-');
-		let date_objects = str.split('-');
-		let year = date_objects[2];
-		let month = date_objects[1];
-		// Support for textual months
-		let testdate = Date.parse(month + "1, 2012");
-		if (!isNaN(testdate)) {
-			month = new Date(testdate).getMonth() + 1;
-		}
-		let day = date_objects[0];
-		timestamp = (new Date(year, (month - 1), day).getTime() / 1000);
-	}
-	return timestamp;
-}
-
 /**
  * Get absolute API URL to call
  *
@@ -1388,4 +1415,23 @@ function getRelativeURL(endpoint) {
 		root = '/';
 	}
 	return root + endpoint;
+}
+
+function applyProgress(element, progress) {
+	if(element.parent().hasClass('button-like')) {
+		element = element.parent();
+	}
+
+	let current_progress = Array(...element[0].classList).filter(z => z.indexOf('progress-') === 0)
+	for (let class_name in current_progress) {
+		class_name = current_progress[class_name];
+		element.removeClass(class_name);
+	}
+
+	if (progress && progress > 0 && progress < 100) {
+		element.addClass('progress-' + progress);
+		if(!element.hasClass('progress')) {
+			element.addClass('progress');
+		}
+	}
 }

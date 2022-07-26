@@ -4,7 +4,7 @@ Extract most-used images from corpus
 import hashlib
 import base64
 import re
-import config
+import common.config_manager as config
 import csv
 import shutil
 
@@ -27,9 +27,22 @@ class TopImageCounter(BasicProcessor):
     """
     type = "top-images"  # job type ID
     category = "Post metrics"  # category
-    title = "Top images"  # title displayed in UI
-    description = "Collect all images used in the data set, and sort by most used. Contains URLs through which the images may be downloaded."  # description displayed in UI
+    title = "Rank image URLs"  # title displayed in UI
+    description = "Collect all image URLs and sort by most-occurring."  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
+
+    @classmethod
+    def is_compatible_with(cls, module=None):
+        """
+        All top-level datasets, excluding Telegram, which has a different image logic
+
+        :param module: Dataset or processor to determine compatibility with
+        """
+
+        if module.is_dataset() and module.is_top_dataset() and module.type != "telegram-search":
+            return True
+        else:
+            return False
 
     def process(self):
         """
@@ -100,7 +113,7 @@ class TopImageCounter(BasicProcessor):
                 "filename": images[id]["filename"],
                 "num_posts": images[id]["count"],
                 "url_4cat": (
-                                "s" if config.FlaskConfig.SERVER_HTTPS else "") + "://" + config.FlaskConfig.SERVER_NAME + "/api/image/" +
+                                "https" if config.get("flask.https") else "http") + "://" + config.get("flask.server_name") + "/api/image/" +
                             images[id]["md5"] + "." + images[id]["filename"].split(".")[
                                 -1],
                 "url_4plebs": "https://archive.4plebs.org/_/search/image/" + images[id]["hash"].replace("/", "_"),
@@ -129,7 +142,7 @@ class TopImageCounter(BasicProcessor):
             for post in self.source_dataset.iterate_items(self):
                 post_img_links = set()  # set to only count images once per post
                 for field, value in post.items():
-                    if field == "body" or "url" in field.lower() or "image" in field.lower():
+                    if value and (field == "body" or "url" in field.lower() or "image" in field.lower()):
                         post_img_links |= set(img_link_regex.findall(value))
                         post_img_links |= set(img_domain_regex.findall(value))
 
@@ -146,7 +159,7 @@ class TopImageCounter(BasicProcessor):
                 "date": "all",
                 "item": k,
                 "value": v,
-                'ids': ','.join([link[0] for link in all_links if k in link[1]]),
+                "ids": ",".join([link[0] for link in all_links if k in link[1]]),
             } for k, v in img_ranked.items()]
 
         if not results:

@@ -1,0 +1,33 @@
+{% extends "layout.html" %}
+
+{% block title %}Complete 4CAT Setup{% endblock %}
+{% block body_class %}plain-page markdown-page {{ body_class }}{% endblock %}
+
+{% block body %}
+    <article class="small">
+    <section>
+        <h2><span>Welcome to 4CAT!</span></h2>
+        <p>Your 4CAT instance is now running. To access and manage it, you need to create an administrator account.
+            Enter your preferred username and password below to set one up.</p>
+        <p>This will only set up your initial account. To add more accounts, after logging in, use the Control Panel or
+            configure e-mail server details to enable users to request their own accounts.</p>
+
+        <form action="{{ url_for('create_first_user') }}" method="POST" class="wide">
+            {% for notice in flashes %}
+                <p class="form-notice">{{ notice }}</p>
+            {% endfor %}
+            <div class="form-element{% if "username" in incomplete %} missing{% endif %}">
+                <label for="request-username">Username</label>
+                <input type="text" name="username" id="request-username" value="{{ form.username }}">
+            </div>
+            <div class="form-element{% if "password" in incomplete %} missing{% endif %}">
+                <label for="request-password">Password</label>
+                <input type="password" name="password" id="request-password" value="{{ form.password }}">
+            </div>
+            <div class="submit-container">
+                <button>Create account</button>
+            </div>
+        </form>
+    </section>
+    </article>
+{% endblock %}

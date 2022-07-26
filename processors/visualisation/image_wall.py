@@ -27,7 +27,7 @@ class ImageWallGenerator(BasicProcessor):
 	type = "image-wall"  # job type ID
 	category = "Visual"  # category
 	title = "Image wall"  # title displayed in UI
-	description = "Put all images in an archive into a single combined image, optionally sorting and resizing them"
+	description = "Put all images in a single combined image. Images can be sorted and resized."
 	extension = "png"  # extension of result file, used internally and in UI
 
 	options = {
@@ -37,7 +37,7 @@ class ImageWallGenerator(BasicProcessor):
 			"default": 100,
 			"min": 0,
 			"max": 1000,
-			"tooltip": "'0' uses as many images as available in the source image archive (up to 1000)"
+			"tooltip": "'0' uses as many images as available in the archive (up to 1000)"
 		},
 		"tile-size": {
 			"type": UserInput.OPTION_CHOICE,
@@ -48,7 +48,7 @@ class ImageWallGenerator(BasicProcessor):
 			},
 			"default": "square",
 			"help": "Image tile size",
-			"tooltip": "'Fit height' retains image ratios but resizes them all to be the same height"
+			"tooltip": "'Fit height' retains image ratios but makes them have the same height"
 		},
 		"sort-mode": {
 			"type": UserInput.OPTION_CHOICE,
@@ -80,7 +80,7 @@ class ImageWallGenerator(BasicProcessor):
 
 		:param module: Dataset or processor to determine compatibility with
 		"""
-		return module.type == "image-downloader"
+		return module.type.startswith("image-downloader")
 
 	def process(self):
 		"""
@@ -143,10 +143,13 @@ class ImageWallGenerator(BasicProcessor):
 				continue
 
 			self.dataset.update_status("Analysing %s (%i/%i)" % (path.name, len(dimensions), self.source_dataset.num_rows))
+			self.dataset.update_progress(len(dimensions) / self.source_dataset.num_rows / 2)
 
 			# these calculations can take ages for huge images, so resize if it is
 			# larger than the threshold
 			dimensions[path.name] = (picture.width, picture.height)
+			value = 0
+			
 			if sort_mode not in ("", "random") and (picture.height > sample_max or picture.width > sample_max):
 				sample_width = int(sample_max * picture.width / max(picture.width, picture.height))
 				sample_height = int(sample_max * picture.height / max(picture.width, picture.height))
@@ -221,7 +224,11 @@ class ImageWallGenerator(BasicProcessor):
 				value = (0, 0, 0)
 
 			# converted to HSV, because RGB does not sort nicely
-			image_colours[path.name] = colorsys.rgb_to_hsv(*value)
+			if type(value) is int:
+				image_colours[path.name] = value
+			else:
+				image_colours[path.name] = colorsys.rgb_to_hsv(*value)
+
 			index += 1
 
 		# only retain the top n of the sorted list of images - this gives us
@@ -323,6 +330,7 @@ class ImageWallGenerator(BasicProcessor):
 		for path in sorted_image_files:
 			counter += 1
 			self.dataset.update_status("Rendering %s (%i/%i) to image wall" % (path, counter, len(sorted_image_files)))
+			self.dataset.update_progress(0.5 + (counter / len(sorted_image_files) / 2))
 			picture = Image.open(str(staging_area.joinpath(path)))
 
 			if tile_x == -1:

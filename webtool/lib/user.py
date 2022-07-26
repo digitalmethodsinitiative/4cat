@@ -14,8 +14,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from common.lib.helpers import send_email
 
-from webtool import db, app, config
-
+import common.config_manager as config
 
 class User:
 	"""
@@ -30,13 +29,15 @@ class User:
 
 	name = "anonymous"
 
-	def get_by_login(name, password):
+	@staticmethod
+	def get_by_login(db, name, password):
 		"""
 		Get user object, if login is correct
 
 		If the login data supplied to this method is correct, a new user object
 		that is marked as authenticated is returned.
 
+		:param db:  Database connection object
 		:param name:  User name
 		:param password:  User password
 		:return:  User object, or `None` if login was invalid
@@ -50,43 +51,78 @@ class User:
 			return None
 		else:
 			# valid login!
-			return User(user, authenticated=True)
+			return User(db, user, authenticated=True)
 
-	def get_by_name(name):
+	@staticmethod
+	def get_by_name(db, name):
 		"""
 		Get user object for given user name
 
+		:param db:  Database connection object
+		:param str name:  Username to get object for
 		:return:  User object, or `None` for invalid user name
 		"""
 		user = db.fetchone("SELECT * FROM users WHERE name = %s", (name,))
 		if not user:
 			return None
 		else:
-			return User(user)
+			return User(db, user)
 
-	def get_by_token(token):
+	@staticmethod
+	def get_by_token(db, token):
 		"""
 		Get user object for given token, if token is valid
 
+		:param db:  Database connection object
+		:param str token:  Token to get object for
 		:return:  User object, or `None` for invalid token
 		"""
 		user = db.fetchone(
 			"SELECT * FROM users WHERE register_token = %s AND (timestamp_token = 0 OR timestamp_token > %s)",
-			(token, int(time.time()) - (3 * 86400)))
+			(token, int(time.time()) - (7 * 86400)))
 		if not user:
 			return None
 		else:
-			return User(user)
+			return User(db, user)
 
-	def __init__(self, data, authenticated=False):
+	def can_access_dataset(self, dataset):
+		"""
+		Check if this user should be able to access a given dataset.
+
+		This depends mostly on the dataset's owner, which should match the
+		user if the dataset is private. If the dataset is not private, or
+		if the user is an admin or the dataset is private but assigned to
+		an anonymous user, the dataset can be accessed.
+
+		:param dataset:  The dataset to check access to
+		:return bool:
+		"""
+		if not dataset.is_private:
+			return True
+
+		elif self.is_admin:
+			return True
+
+		elif self.get_id() == dataset.owner:
+			return True
+
+		elif dataset.owner == "anonymous":
+			return True
+
+		else:
+			return False
+
+	def __init__(self, db, data, authenticated=False):
 		"""
 		Instantiate user object
 
 		Also sets the properties required by Flask-Login.
 
+		:param db:  Database connection object
 		:param data:  User data
 		:param authenticated:  Whether the user should be marked as authenticated
 		"""
+		self.db = db
 		self.data = data
 
 		if self.data["name"] != "anonymous":
@@ -99,7 +135,7 @@ class User:
 		self.userdata = json.loads(self.data.get("userdata", "{}"))
 
 		if not self.is_anonymous and self.is_authenticated:
-			db.update("users", where={"name": self.data["name"]}, data={"timestamp_seen": int(time.time())})
+			self.db.update("users", where={"name": self.data["name"]}, data={"timestamp_seen": int(time.time())})
 
 	def authenticate(self):
 		"""
@@ -127,7 +163,7 @@ class User:
 		if self.data["name"] == "anonymous":
 			return "Anonymous"
 		elif self.data["name"] == "autologin":
-			return config.FlaskConfig.HOSTNAME_WHITELIST_NAME
+			return config.get("flask.autologin.name")
 		else:
 			return self.data["name"]
 
@@ -150,8 +186,9 @@ class User:
 
 		:return:
 		"""
-		db.update("users", data={"register_token": "", "timestamp_token": 0}, where={"name": self.get_id()})
+		self.db.update("users", data={"register_token": "", "timestamp_token": 0}, where={"name": self.get_id()})
 
+	@property
 	def is_special(self):
 		"""
 		Check if user is special user
@@ -161,6 +198,7 @@ class User:
 		"""
 		return self.get_id() in ("autologin", "anonymous")
 
+	@property
 	def is_admin(self):
 		"""
 		Check if user is an administrator
@@ -169,6 +207,7 @@ class User:
 		"""
 		return self.data["is_admin"]
 
+	@property
 	def is_deactivated(self):
 		"""
 		Check if user has been deactivated
@@ -197,11 +236,12 @@ class User:
 
 		:param bool new:  Is this the first time setting a password for this
 						  account?
+		:return str:  Link for the user to set their password with
 		"""
-		if not config.MAILHOST:
+		if not config.get('mail.server'):
 			raise RuntimeError("No e-mail server configured. 4CAT cannot send any e-mails.")
 
-		if self.is_special():
+		if self.is_special:
 			raise ValueError("Cannot send password reset e-mails for a special user.")
 
 		username = self.get_id()
@@ -210,14 +250,14 @@ class User:
 		register_token = self.generate_token(regenerate=True)
 
 		# prepare welcome e-mail
-		sender = config.NOREPLY_EMAIL
+		sender = config.get('mail.noreply')
 		message = MIMEMultipart("alternative")
 		message["From"] = sender
 		message["To"] = username
 
 		# the actual e-mail...
-		url_base = config.FlaskConfig.SERVER_NAME
-		protocol = "https" if config.FlaskConfig.SERVER_HTTPS else "http"
+		url_base = config.get("flask.server_name")
+		protocol = "https" if config.get("flask.https") else "http"
 		url = "%s://%s/reset-password/?token=%s" % (protocol, url_base, register_token)
 
 		# we use slightly different e-mails depending on whether this is the first time setting a password
@@ -250,6 +290,7 @@ class User:
 		# try to send it
 		try:
 			send_email([username], message)
+			return url
 		except (smtplib.SMTPException, ConnectionRefusedError, socket.timeout) as e:
 			raise RuntimeError("Could not send password reset e-mail: %s" % e)
 
@@ -273,7 +314,7 @@ class User:
 		register_token = hashlib.sha256()
 		register_token.update(os.urandom(128))
 		register_token = register_token.hexdigest()
-		db.update("users", data={"register_token": register_token, "timestamp_token": int(time.time())},
+		self.db.update("users", data={"register_token": register_token, "timestamp_token": int(time.time())},
 				  where={"name": username})
 
 		return register_token
@@ -298,7 +339,7 @@ class User:
 		"""
 		self.userdata[key] = value
 
-		db.update("users", where={"name": self.get_id()}, data={"userdata": json.dumps(self.userdata)})
+		self.db.update("users", where={"name": self.get_id()}, data={"userdata": json.dumps(self.userdata)})
 
 	def set_password(self, password):
 		"""
@@ -312,4 +353,4 @@ class User:
 		salt = bcrypt.gensalt()
 		password_hash = bcrypt.hashpw(password.encode("ascii"), salt)
 
-		db.update("users", where={"name": self.data["name"]}, data={"password": password_hash.decode("utf-8")})
+		self.db.update("users", where={"name": self.data["name"]}, data={"password": password_hash.decode("utf-8")})

@@ -1,4 +1,6 @@
 {
+	"post_flair": "<span class='flair'>{{ post_flair }}</span>",
+	"author": "{{ author }} <span class='flair'>{{author_flair}}</span>",
 	"subreddit": "<a href='https://reddit.com/r/{{subreddit}}' target='__blank'>r/{{subreddit}}</a>",
 	"score": "<i class='fas fa-arrow-up'></i> {{score}} <i class='fas fa-arrow-down'></i>",
 	"external_url": "https://reddit.com/r/{{subreddit}}/comments/{{thread_id}}/comment/{{id}}",

@@ -5,11 +5,28 @@
 
 {% block body %}
     <article class="small">
+    {% if mode == "edit" %}
+        <section>
+            <h2><span>{{ user.name }}</span></h2>
+            <p>Actions:</p>
+            <ul>
+                <li><a href="{{ url_for("show_results") }}?user={{ user.name }}&amp;depth=all">View datasets created by this user</a></li>
+                <li><a href="{{ url_for("delete_user") }}?name={{ user.name }}">Delete this user</a></li>
+                {% if not user.password %}
+                    <li><a href="{{ url_for("reset_password") }}?token={{ user.register_token }}">Complete registration</a></li>
+                    <li><a href="{{ url_for("add_user") }}?force=1&amp;format=html&amp;email={{ user.name }}">Re-generate registration token (warning: invalidates previous registration links)</a></li>
+                {% endif %}
+            </ul>
+            <p>&nbsp;</p>
+        </section>
+    {% endif %}
         <section>
             <h2><span>{% if mode == "edit" %}Edit user '{{ user.name }}'{% else %}Create user{% endif %}</span></h2>
             {% if mode != "edit" %}
             <p>If you do not enter a password, after creating the account, a link will be generated through which the
                 password may be set by the user.</p>
+            {% elif not user.password %}
+                <p><i class="fa fa-warning" aria-hidden="true"></i> This user has not yet completed their registration and set a password.</p>
             {% endif %}
 
             <form action="{{ url_for('manipulate_user', mode=mode) }}" method="POST" class="wide">

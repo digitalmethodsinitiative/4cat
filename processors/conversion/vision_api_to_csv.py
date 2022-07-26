@@ -24,7 +24,7 @@ class ConvertVisionOutputToCSV(BasicProcessor):
     """
     type = "convert-vision-to-csv"  # job type ID
     category = "Conversion"  # category
-    title = "Convert to CSV"  # title displayed in UI
+    title = "Convert Vision results to CSV"  # title displayed in UI
     description = "Convert the Vision API output to a simplified CSV file."  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
 
@@ -96,6 +96,7 @@ class ConvertVisionOutputToCSV(BasicProcessor):
             done += 1
             if done % 25 == 0:
                 self.dataset.update_status("Processed %i/%i image files" % (done, self.source_dataset.num_rows))
+                self.dataset.update_progress(done / self.source_dataset.num_rows)
 
         for index, value in enumerate(result):
             result[index] = {**{annotation_type: "" for annotation_type in annotation_types}, **value}

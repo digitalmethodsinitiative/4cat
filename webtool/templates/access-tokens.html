@@ -33,7 +33,7 @@
                         <tr>
                             <td><code>{{ token.token }}</code></td>
                             <td>{{ token.calls }}</td>
-                            <td>{{ token.expires|datetime }}</td>
+                            <td>{{ token.expires|datetime|safe }}</td>
                         </tr>
                     {% endfor %}
                 </table>

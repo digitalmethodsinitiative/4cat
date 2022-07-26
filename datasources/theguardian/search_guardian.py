@@ -22,6 +22,8 @@ class SearchGuardian(SearchWithScope):
 	title = "The Guardian Climate Change Search"  # title displayed in UI
 	description = "Queries the VUB's The Guardian Climate Change dataset via PENELOPE for articles and comments on those articles."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
+	is_local = False	# Whether this datasource is locally scraped
+	is_static = True	# Whether this datasource is still updated
 
 	# not available as a processor for existing datasets
 	accepts = [None]

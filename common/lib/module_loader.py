@@ -4,7 +4,7 @@ Load modules and datasources dynamically
 from pathlib import Path
 import importlib
 import inspect
-import config
+import common.config_manager as config
 import pickle
 import sys
 import re
@@ -73,11 +73,11 @@ class ModuleCollector:
         """
         # look for workers and processors in pre-defined folders and datasources
 
-        paths = [Path(config.PATH_ROOT, "processors"), Path(config.PATH_ROOT, "backend", "workers"),
+        paths = [Path(config.get('PATH_ROOT'), "processors"), Path(config.get('PATH_ROOT'), "backend", "workers"),
                  *[self.datasources[datasource]["path"] for datasource in self.datasources]]
 
-        root_match = re.compile(r"^%s" % re.escape(config.PATH_ROOT))
-        root_path = Path(config.PATH_ROOT)
+        root_match = re.compile(r"^%s" % re.escape(config.get('PATH_ROOT')))
+        root_path = Path(config.get('PATH_ROOT'))
 
         for folder in paths:
             # loop through folders, and files in those folders, recursively
@@ -93,13 +93,14 @@ class ModuleCollector:
                 # try importing
                 try:
                     module = importlib.import_module(module_name)
-                except ImportError as e:
+                except (SyntaxError, ImportError) as e:
                     # this is fine, just ignore this data source and give a heads up
                     self.ignore.append(module_name)
-                    if e.name not in self.missing_modules:
-                        self.missing_modules[e.name] = [module_name]
+                    key_name = e.name if hasattr(e, "name") else module_name
+                    if key_name not in self.missing_modules:
+                        self.missing_modules[key_name] = [module_name]
                     else:
-                        self.missing_modules[e.name].append(module_name)
+                        self.missing_modules[key_name].append(module_name)
                     continue
 
                 # see if module contains the right type of content by looping
@@ -148,7 +149,7 @@ class ModuleCollector:
         `DATASOURCE` constant. The latter is taken as the ID for this
         datasource.
         """
-        for subdirectory in Path(config.PATH_ROOT, "datasources").iterdir():
+        for subdirectory in Path(config.get('PATH_ROOT'), "datasources").iterdir():
             # folder name, also the name used in config.py
             folder_name = subdirectory.parts[-1]
 
@@ -164,18 +165,13 @@ class ModuleCollector:
 
             datasource_id = datasource.DATASOURCE
 
-            if datasource_id not in config.DATASOURCES:
-                # not configured, so we're going to just ignore it
-                continue
-
             self.datasources[datasource_id] = {
-                "expire-datasets": config.DATASOURCES[datasource_id].get("expire-datasets", None),
+                "expire-datasets": config.get('DATASOURCES').get(datasource_id, {}).get("expire-datasets", None),
                 "path": subdirectory,
                 "name": datasource.NAME if hasattr(datasource, "NAME") else datasource_id,
                 "id": subdirectory.parts[-1],
                 "init": datasource.init_datasource,
-                "is_local": hasattr(datasource, "IS_LOCAL") and datasource.IS_LOCAL,
-                "is_static": hasattr(datasource, "IS_STATIC") and datasource.IS_STATIC
+                "config": {} if not hasattr(datasource, "config") else datasource.config
             }
 
         sorted_datasources = {datasource_id: self.datasources[datasource_id] for datasource_id in

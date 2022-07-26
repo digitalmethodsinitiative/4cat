@@ -11,12 +11,13 @@ class NeologismExtractor(ProcessorPreset):
 	Run processor pipeline to extract neologisms
 	"""
 	type = "preset-neologisms"  # job type ID
-	category = "Presets"  # category. 'Presets' are always listed first in the UI.
+	category = "Combined processors"  # category. 'Combined processors' are always listed first in the UI.
 	title = "Extract neologisms"  # title displayed in UI
-	description = "Follows Van Soest (2019)'s protocol to extract neologisms - hitherto unused words - " \
-				  "from the dataset. Assumes English-language data. Uses stopwords-iso as its stopword " \
-				  "filter."
+	description = "Retrieve uncommon terms by deleting all known words. Assumes English-language data. " \
+				  "Uses stopwords-iso as its stopword filter."
 	extension = "csv"
+
+	references = ["Van Soest, Jeroen. 2019. 'Language Innovation Tracker: Detecting language innovation in online discussion fora.' (MA thesis), Beuls, K. (Promotor), Van Eecke, P. (Advisor).'"]
 
 	options = {
 		"timeframe": {

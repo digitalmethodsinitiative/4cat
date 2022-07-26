@@ -62,6 +62,7 @@ class AuthorInfoRemover(BasicProcessor):
                     processed_items += 1
                     if processed_items % 500 == 0:
                         self.dataset.update_status("Processed %i items" % processed_items)
+                        self.dataset.update_progress(processed_items / self.source_dataset.num_rows)
 
                     for field in author_columns:
                         item[field] = ""
@@ -90,5 +91,5 @@ class AuthorInfoRemover(BasicProcessor):
         # replace original dataset with updated one
         shutil.move(self.dataset.get_results_path(), self.source_dataset.get_results_path())
 
-        self.dataset.update_status("Dataset updated.", is_final=True)
+        self.dataset.update_status("Author information removed, parent dataset updated.", is_final=True)
         self.dataset.finish(processed_items)

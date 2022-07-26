@@ -30,7 +30,9 @@ class SemanticFrameExtractor(BasicProcessor):
 	type = "penelope-semanticframe"  # job type ID
 	category = "Text analysis"  # category
 	title = "Semantic frames"  # title displayed in UI
-	description = "Extract semantic frames from text. This connects to the VUB's PENELOPE API to extract causal frames from the text using the framework developed by the Evolutionary and Hybrid AI (EHAI) group."  # description displayed in UI
+	description = "Extract semantic frames from text. This connects to the VUB's PENELOPE API " \
+				  "to extract causal frames from the text using the framework developed by the " \
+				  "Evolutionary and Hybrid AI (EHAI) group."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
 	@classmethod

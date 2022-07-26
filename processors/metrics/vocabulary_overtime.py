@@ -8,8 +8,7 @@ from pathlib import Path
 from backend.abstract.processor import BasicProcessor
 from common.lib.helpers import UserInput, get_interval_descriptor
 
-import config
-
+import common.config_manager as config
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
 __maintainer__ = "Stijn Peeters"
@@ -22,11 +21,12 @@ class OvertimeAnalysis(BasicProcessor):
 	"""
 	type = "overtime-vocabulary"  # job type ID
 	category = "Post metrics"  # category
-	title = "Over-time vocabulary prevalence"  # title displayed in UI
-	description = "Determines the presence over time of a particular vocabulary in the dataset. Counts how many posts match at least one word in the provided vocabularies."  # description displayed in UI
+	title = "Over-time word counts"  # title displayed in UI
+	description = "Determines the counts over time of particular set of words or phrases."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
 	references = [
+		"[Hatebase.org](https://hatebase.org)"
 		"[\"Salvaging the Internet Hate Machine: Using the discourse of radical online subcultures to identify emergent extreme speech\" - Unblished paper detailing the OILab extreme speech lexigon](https://oilab.eu/texts/4CAT_Hate_Speech_WebSci_paper.pdf)",
 		]
 
@@ -43,7 +43,7 @@ class OvertimeAnalysis(BasicProcessor):
 			"type": UserInput.OPTION_TOGGLE,
 			"default": False,
 			"help": "Track vocabularies separately",
-			"tooltip": "Instead of checking whether a post matches any of the selected vocabularies, provide separate frequencies per vocabulary."
+			"tooltip": "Provide separate frequencies per vocabulary."
 		},
 		"vocabulary": {
 			"type": UserInput.OPTION_MULTI,
@@ -88,7 +88,7 @@ class OvertimeAnalysis(BasicProcessor):
 		# load vocabularies from word lists
 		vocabularies = {}
 		for vocabulary_id in self.parameters.get("vocabulary", []):
-			vocabulary_file = Path(config.PATH_ROOT, "common/assets/wordlists/%s.txt" % vocabulary_id)
+			vocabulary_file = Path(config.get('PATH_ROOT'), "common/assets/wordlists/%s.txt" % vocabulary_id)
 			if not vocabulary_file.exists():
 				continue
 
@@ -139,6 +139,7 @@ class OvertimeAnalysis(BasicProcessor):
 				
 			if processed % 2500 == 0:
 				self.dataset.update_status("Processed %i posts" % processed)
+				self.dataset.update_progress(processed / self.source_dataset.num_rows)
 				
 			# if 'partition' is false, there will just be one combined
 			# vocabulary, but else we'll have different ones we can

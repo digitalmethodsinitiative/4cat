@@ -10,7 +10,7 @@ import re
 
 from pathlib import Path
 
-import config
+import common.config_manager as config
 import backend
 from common.lib.job import Job, JobNotFoundException
 from common.lib.helpers import get_software_version
@@ -48,7 +48,7 @@ class DataSet(FourcatModule):
 	staging_area = None
 
 	def __init__(self, parameters={}, key=None, job=None, data=None, db=None, parent=None, extension="csv",
-				 type=None):
+				 type=None, is_private=True, owner="anonymous"):
 		"""
 		Create new dataset object
 
@@ -58,7 +58,7 @@ class DataSet(FourcatModule):
 		:param db:  Database connection
 		"""
 		self.db = db
-		self.folder = Path(config.PATH_ROOT, config.PATH_DATA)
+		self.folder = Path(config.get('PATH_ROOT'), config.get('PATH_DATA'))
 		self.staging_area = []
 
 		if key is not None:
@@ -98,18 +98,24 @@ class DataSet(FourcatModule):
 			self.parameters = json.loads(self.data["parameters"])
 			self.is_new = False
 		else:
+			if config.get('expire.timeout') and not parent:
+				parameters["expires-after"] = int(time.time() + config.get('expire.timeout'))
+
 			self.data = {
 				"key": self.key,
 				"query": self.get_label(parameters, default=type),
+				"owner": owner,
 				"parameters": json.dumps(parameters),
 				"result_file": "",
 				"status": "",
 				"type": type,
 				"timestamp": int(time.time()),
 				"is_finished": False,
+				"is_private": is_private,
 				"software_version": get_software_version(),
 				"software_file": "",
 				"num_rows": 0,
+				"progress": 0.0,
 				"key_parent": parent
 			}
 			self.parameters = parameters
@@ -248,6 +254,7 @@ class DataSet(FourcatModule):
 		`map_item` method of the datasource when returning items.
 		:return generator:  A generator that yields each item as a dictionary
 		"""
+		path = self.get_results_path()
 
 		# see if an item mapping function has been defined
 		# open question if 'source_dataset' shouldn't be an attribute of the dataset
@@ -255,19 +262,16 @@ class DataSet(FourcatModule):
 		item_mapper = None
 
 		if not bypass_map_item:
-			if not processor:
-				# this loads the processor *class* instead of the *object*
-				# (which would be passed by reference). That works for the
-				# map_item method (which is static), but will not trigger the
-				# ProcessorInterruptedException, since a class cannot logically
-				# have its interrupted flag set.
-				processor = self.get_own_processor()
-
-			if hasattr(processor, "map_item"):
-				item_mapper = processor.map_item
+			own_processor = self.get_own_processor()
+			# only run item mapper if extension of processor == extension of
+			# data file, for the scenario where a csv file was uploaded and
+			# converted to an ndjson-based data source, for example
+			# todo: this is kind of ugly, and a better fix may be possible
+			extension_fits = hasattr(own_processor, "extension") and own_processor.extension == self.get_extension()
+			if hasattr(own_processor, "map_item") and extension_fits:
+				item_mapper = own_processor.map_item
 
 		# go through items one by one, optionally mapping them
-		path = self.get_results_path()
 		if path.suffix.lower() == ".csv":
 			with path.open(encoding="utf-8") as infile:
 				reader = csv.DictReader(infile)
@@ -372,7 +376,7 @@ class DataSet(FourcatModule):
 			raise RuntimeError("Cannot finish a finished dataset again")
 
 		self.db.update("datasets", where={"key": self.data["key"]},
-					   data={"is_finished": True, "num_rows": num_rows})
+					   data={"is_finished": True, "num_rows": num_rows, "progress": 1.0})
 		self.data["is_finished"] = True
 		self.data["num_rows"] = num_rows
 
@@ -392,12 +396,14 @@ class DataSet(FourcatModule):
 		self.data["is_finished"] = False
 		self.data["num_rows"] = 0
 		self.data["status"] = "Dataset is queued."
+		self.data["progress"] = 0
 
 		self.db.update("datasets", data={
 			"timestamp": self.data["timestamp"],
 			"is_finished": self.data["is_finished"],
 			"num_rows": self.data["num_rows"],
-			"status": self.data["status"]
+			"status": self.data["status"],
+			"progress": 0
 		}, where={"key": self.key})
 
 	def copy(self, shallow=True):
@@ -462,6 +468,23 @@ class DataSet(FourcatModule):
 			# already deleted, apparently
 			pass
 
+	def update_children(self, **kwargs):
+		"""
+		Update an attribute for all child datasets
+
+		Can be used to e.g. change the owner, version, finished status for all
+		datasets in a tree
+
+		:param kwargs:  Parameters corresponding to known dataset attributes
+		"""
+		children = self.db.fetchall("SELECT * FROM datasets WHERE key_parent = %s", (self.key,))
+		for child in children:
+			child = DataSet(key=child["key"], db=self.db)
+			for attr, value in kwargs.items():
+				child.__setattr__(attr, value)
+
+			child.update_children(**kwargs)
+
 	def is_finished(self):
 		"""
 		Check if dataset is finished
@@ -519,7 +542,7 @@ class DataSet(FourcatModule):
 		keys of the JSON object, this is not always possible in follow-up code
 		that uses the 'column' names, so for consistency this function acts as
 		if no column can be parsed if no `map_item` function exists.
-		
+
 		:return list:  List of dataset columns; empty list if unable to parse
 		"""
 
@@ -558,10 +581,10 @@ class DataSet(FourcatModule):
 		"""
 
 		annotation_fields = self.db.fetchone("SELECT annotation_fields FROM datasets WHERE key = %s;", (self.top_parent().key,))
-		
+
 		if annotation_fields and annotation_fields.get("annotation_fields"):
 			annotation_fields = json.loads(annotation_fields["annotation_fields"])
-		
+
 		return annotation_fields
 
 	def get_annotations(self):
@@ -571,8 +594,8 @@ class DataSet(FourcatModule):
 		"""
 
 		annotations = self.db.fetchone("SELECT annotations FROM annotations WHERE key = %s;", (self.top_parent().key,))
-		
-		if annotations:
+
+		if annotations and annotations.get("annotations"):
 			return json.loads(annotations["annotations"])
 		else:
 			return None
@@ -764,6 +787,32 @@ class DataSet(FourcatModule):
 
 		return updated > 0
 
+	def update_progress(self, progress):
+		"""
+		Update dataset progress
+
+		The progress can be used to indicate to a user how close the dataset
+		is to completion.
+
+		:param float progress:  Between 0 and 1.
+		:return:
+		"""
+		progress = min(1, max(0, progress))  # clamp
+		if type(progress) is int:
+			progress = float(progress)
+
+		self.data["progress"] = progress
+		updated = self.db.update("datasets", where={"key": self.data["key"]}, data={"progress": progress})
+		return updated > 0
+
+	def get_progress(self):
+		"""
+		Get dataset progress
+
+		:return float:  Progress, between 0 and 1
+		"""
+		return self.data["progress"]
+
 	def finish_with_error(self, error):
 		"""
 		Set error as final status, and finish with 0 results
@@ -802,14 +851,15 @@ class DataSet(FourcatModule):
 
 		return updated > 0
 
-	def delete_parameter(self, parameter):
+	def delete_parameter(self, parameter, instant=True):
 		"""
 		Delete a parameter from the dataset metadata
 
 		:param string parameter:  Parameter to delete
+		:param bool instant:  Also delete parameters in this instance object?
 		:return bool:  Update successul?
 		"""
-		parameters = self.parameters
+		parameters = self.parameters.copy()
 		if parameter in parameters:
 			del parameters[parameter]
 		else:
@@ -817,7 +867,9 @@ class DataSet(FourcatModule):
 
 		updated = self.db.update("datasets", where={"key": self.data["key"]},
 								 data={"parameters": json.dumps(parameters)})
-		self.parameters = parameters
+
+		if instant:
+			self.parameters = parameters
 
 		return updated > 0
 
@@ -828,10 +880,10 @@ class DataSet(FourcatModule):
 		:param file:  File to link within the repository
 		:return:  URL, or an empty string
 		"""
-		if not self.data["software_version"] or not config.GITHUB_URL:
+		if not self.data["software_version"] or not config.get("4cat.github_url"):
 			return ""
 
-		return config.GITHUB_URL + "/blob/" + self.data["software_version"] + self.data.get("software_file", "")
+		return config.get("4cat.github_url") + "/blob/" + self.data["software_version"] + self.data.get("software_file", "")
 
 	def top_parent(self):
 		"""
@@ -1045,25 +1097,25 @@ class DataSet(FourcatModule):
 		Also checks whether the results file exists.
 		Used for checking processor and dataset compatibility.
 
+		:return str extension:  Extension, e.g. `csv`
 		"""
-
 		if self.get_results_path().exists():
 			return self.get_results_path().suffix[1:]
+
 		return False
 
 	def get_result_url(self):
 		"""
 		Gets the 4CAT frontend URL of a dataset file.
 
-		Uses the config.py FlaskConfig attributes (i.e., SERVER_NAME and
+		Uses the FlaskConfig attributes (i.e., SERVER_NAME and
 		SERVER_HTTPS) plus hardcoded '/result/'.
 		TODO: create more dynamic method of obtaining url.
 		"""
 		filename = self.get_results_path().name
-		url_to_file = ('https://' if config.FlaskConfig.SERVER_HTTPS else 'http://') + \
-						config.FlaskConfig.SERVER_NAME + '/result/' + filename
+		url_to_file = ('https://' if config.get("flask.https") else 'http://') + \
+						config.get("flask.server_name") + '/result/' + filename
 		return url_to_file
-
 
 	def __getattr__(self, attr):
 		"""
@@ -1081,7 +1133,7 @@ class DataSet(FourcatModule):
 		elif attr in self.data:
 			return self.data[attr]
 		else:
-			raise KeyError("DataSet instance has no attribute %s" % attr)
+			raise AttributeError("DataSet instance has no attribute %s" % attr)
 
 	def __setattr__(self, attr, value):
 		"""

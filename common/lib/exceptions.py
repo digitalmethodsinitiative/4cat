@@ -1,6 +1,11 @@
 class FourcatException(Exception):
 	pass
 
+class ConfigException(FourcatException):
+	"""
+	Raised when there is a problem with the configuration settings.
+	"""
+	pass
 
 class QueueException(FourcatException):
 	"""
@@ -38,6 +43,12 @@ class JobNotFoundException(QueueException):
 class QueryParametersException(FourcatException):
 	"""
 	Raise if a dataset query has invalid parameters
+	"""
+	pass
+
+class QueryNeedsExplicitConfirmationException(FourcatException):
+	"""
+	Raise if a dataset query needs confirmation
 	"""
 	pass
 

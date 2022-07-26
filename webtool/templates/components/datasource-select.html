@@ -1,0 +1,13 @@
+ {% set groups = namespace(dynamic_header = False, static_header = False) %}
+    {% for datasource in datasources if not datasources[datasource].is_static %}
+        {% if not groups.dynamic_header %}
+            <optgroup label="(Near) Real-time">{% set groups.dynamic_header = True %}{% endif %}
+        <option value="{{ datasource }}"{% if filter and filter.datasource == datasource %} selected{% endif %}>{{ datasources[datasource].name }}</option>
+    {% endfor %}
+    {% if groups.dynamic_header %}</optgroup>{% endif %}
+    {% for datasource in datasources if datasources[datasource].is_static %}
+        {% if not groups.static_header %}
+            <optgroup label="Static (snapshot)">{% set groups.static_header = True %}{% endif %}
+        <option value="{{ datasource }}"{% if filter and filter.datasource == datasource %} selected{% endif %}>{{ datasources[datasource].name }}</option>
+    {% endfor %}
+    {% if groups.static_header %}</optgroup>{% endif %}

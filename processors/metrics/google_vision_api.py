@@ -27,7 +27,7 @@ class GoogleVisionAPIFetcher(BasicProcessor):
     Request tags and labels from the Google Vision API for a given set of images
     """
     type = "google-vision-api"  # job type ID
-    category = "Metrics"  # category
+    category = "Post metrics"  # category
     title = "Google Vision API Analysis"  # title displayed in UI
     description = "Use the Google Vision API to annotate images with tags and labels identified via machine learning. " \
                   "One request will be made per image per annotation type. Note that this is NOT a free service and " \
@@ -46,7 +46,7 @@ class GoogleVisionAPIFetcher(BasicProcessor):
 
         :param module: Dataset or processor to determine compatibility with
         """
-        return module.type == "image-downloader"
+        return module.type.startswith("image-downloader")
 
     options = {
         "amount": {
@@ -107,6 +107,7 @@ class GoogleVisionAPIFetcher(BasicProcessor):
 
             done += 1
             self.dataset.update_status("Annotating image %i/%i" % (done, total))
+            self.dataset.update_progress(done / total)
 
             try:
                 annotations = self.annotate_image(image_file, api_key, features)

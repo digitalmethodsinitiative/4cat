@@ -2,6 +2,7 @@
 Collapse post bodies into one long string
 """
 import re
+import string
 
 from backend.abstract.processor import BasicProcessor
 from common.lib.helpers import UserInput
@@ -17,8 +18,8 @@ class Stringify(BasicProcessor):
 	"""
 	type = "stringify-posts"  # job type ID
 	category = "Conversion" # category
-	title = "Merge post texts"  # title displayed in UI
-	description = "Collapses all posts in the results into one plain text string. The result can be used for word clouds, word trees, et cetera."  # description displayed in UI
+	title = "Merge texts"  # title displayed in UI
+	description = "Merges the data from the body column into a single text file. The result can be used for word clouds, word trees, etc."  # description displayed in UI
 	extension = "txt"  # extension of result file, used internally and in UI
 
 	options = {
@@ -61,7 +62,7 @@ class Stringify(BasicProcessor):
 		if strip_numbers:
 			regex += "0-9"
 		if strip_punctuation:
-			regex += "\\/()>.,&'\"“”’‘«»:;\[\]„_–"
+			regex += string.punctuation
 		
 		delete_regex = re.compile("[\n\t" + regex + "]")
 

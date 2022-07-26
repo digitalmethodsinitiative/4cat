@@ -7,8 +7,6 @@ import base64
 import json
 import time
 import re
-import csv
-import shutil
 
 from pathlib import Path
 from PIL import Image, UnidentifiedImageError
@@ -17,8 +15,7 @@ from lxml import etree
 from lxml.cssselect import CSSSelector as css
 from io import StringIO, BytesIO
 
-import config
-
+import common.config_manager as config
 from common.lib.helpers import UserInput
 from backend.abstract.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
@@ -37,32 +34,78 @@ class ImageDownloader(BasicProcessor):
 	type = "image-downloader"  # job type ID
 	category = "Visual"  # category
 	title = "Download images"  # title displayed in UI
-	description = "Download images and compress as a zip file. May take a while to complete as images are sourced " \
-				  "externally. Note that not always all images can be retrieved. For imgur galleries, only the first " \
-				  "image is saved. For animations, only the first frame is saved if available. A JSON metadata file " \
-				  "is included in the output archive."  # description displayed in UI
+	description = "Download images and store in a a zip file. May take a while to complete as images are retrieved " \
+				  "externally. Note that not always all images can be saved. For imgur galleries, only the first " \
+				  "image is saved. For animations (GIFs), only the first frame is saved if available. A JSON metadata file " \
+				  "is included in the output archive. \n4chan datasets should include the image_md5 column."  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
-
-	if hasattr(config, 'MAX_NUMBER_IMAGES'):
-		max_number_images = int(config.MAX_NUMBER_IMAGES)
-	else:
-		max_number_images = 1000
 
 	options = {
 		"amount": {
 			"type": UserInput.OPTION_TEXT,
-			"help": "No. of images (max %s)" % max_number_images,
+			"help": "No. of images (max 1000)",
 			"default": 100,
 			"min": 0,
-			"max": max_number_images
+			"max": 1000
 		},
 		"columns": {
 			"type": UserInput.OPTION_TEXT,
 			"help": "Column to get image links from",
 			"default": "image_url",
+			"inline": True,
 			"tooltip": "If column contains a single URL, use that URL; else, try to find image URLs in the column's content"
 		},
+		"split-comma": {
+			"type": UserInput.OPTION_TOGGLE,
+			"help": "Split column values by comma?",
+			"default": False,
+			"tooltip": "If enabled, columns can contain multiple URLs separated by commas, which will be considered "
+					   "separately"
+		}
 	}
+
+	config = {
+		"image_downloader.MAX_NUMBER_IMAGES": {
+			"type": UserInput.OPTION_TEXT,
+			"coerce_type": int,
+			"default": 1000,
+			"help": "Max images to download",
+			"tooltip": "Only allow downloading up to this many images per batch. Increasing this can easily lead to "
+					   "very long-running processors and large datasets."
+		}
+	}
+
+	@classmethod
+	def get_options(cls, parent_dataset=None, user=None):
+		"""
+		Get processor options
+
+		This method by default returns the class's "options" attribute, or an
+		empty dictionary. It can be redefined by processors that need more
+		fine-grained options, e.g. in cases where the availability of options
+		is partially determined by the parent dataset's parameters.
+
+		:param DataSet parent_dataset:  An object representing the dataset that
+		the processor would be run on
+		:param User user:  Flask user the options will be displayed for, in
+		case they are requested for display in the 4CAT web interface. This can
+		be used to show some options only to privileges users.
+		"""
+		options = cls.options
+
+		# Update the amount max and help from config
+		max_number_images = int(config.get('image_downloader.MAX_NUMBER_IMAGES', 1000))
+		options['amount']['max'] = max_number_images
+		options['amount']['help'] = "No. of images (max %s)" % max_number_images
+
+		# Get the columns for the select columns option
+		if parent_dataset and parent_dataset.get_columns():
+			columns = parent_dataset.get_columns()
+			options["columns"]["type"] = UserInput.OPTION_MULTI
+			options["columns"]["options"] = {v: v for v in columns}
+			options["columns"]["default"] = "body" if "body" in columns else sorted(columns, key=lambda k: "image" in k).pop()
+
+		return options
 
 	@classmethod
 	def is_compatible_with(cls, module=None):
@@ -71,7 +114,8 @@ class ImageDownloader(BasicProcessor):
 
 		:param module: Dataset or processor to determine compatibility with
 		"""
-		return module.type == "top-images" or module.type.endswith("search")
+		return (module.type == "top-images" or module.type.endswith("search")) \
+			   and module.type != "telegram-search"
 
 	def process(self):
 		"""
@@ -84,8 +128,10 @@ class ImageDownloader(BasicProcessor):
 		top_parent = self.dataset.get_genealogy()[0]
 		datasource = top_parent.parameters.get("datasource")
 		amount = self.parameters.get("amount", 100)
+		split_comma = self.parameters.get("split-comma", False)
+
 		if amount == 0:
-			amount = self.max_number_images
+			amount = config.get('image_downloader.MAX_NUMBER_IMAGES', 1000)
 		columns = self.parameters.get("columns")
 
 		# is there anything for us to download?
@@ -135,7 +181,7 @@ class ImageDownloader(BasicProcessor):
 			item_index += 1
 
 			if item_index % 50 == 0:
-				self.dataset.update_status("Extracting image links from post %i/%i" % (item_index, self.source_dataset.num_rows))
+				self.dataset.update_status("Extracting image links from item %i/%i" % (item_index, self.source_dataset.num_rows))
 
 			# loop through all columns and process values for item
 			for column in columns:
@@ -144,18 +190,22 @@ class ImageDownloader(BasicProcessor):
 					continue
 
 				# remove all whitespace from beginning and end (needed for single URL check)
-				value = ' '.join(str(value).split())
-				if re.match(r"https?://(\S+)$", value):
-					# single URL
-					item_urls.add(value)
-				else:
-					# # Debug
-					# if re.match(r"https?://[^\s]+", value):
-					# 	self.dataset.log("Debug: OLD single detect url %s" % value)
+				values = [' '.join(str(value).split())]
+				if split_comma:
+					values = values[0].split(',')
 
-					# search for image URLs in string
-					item_urls |= set(img_link_regex.findall(value))
-					item_urls |= set(img_domain_regex.findall(value))
+				for value in values:
+					if re.match(r"https?://(\S+)$", value):
+						# single URL
+						item_urls.add(value)
+					else:
+						# # Debug
+						# if re.match(r"https?://[^\s]+", value):
+						# 	self.dataset.log("Debug: OLD single detect url %s" % value)
+
+						# search for image URLs in string
+						item_urls |= set(img_link_regex.findall(value))
+						item_urls |= set(img_domain_regex.findall(value))
 
 			if external:
 				# 4chan has a module that saves images locally, so if the columns in
@@ -167,7 +217,7 @@ class ImageDownloader(BasicProcessor):
 				md5.update(base64.b64decode(item["image_md5"]))
 				extension = item["image_file"].split(".")[-1]
 
-				local_path = Path(config.PATH_IMAGES, md5.hexdigest() + "." + extension)
+				local_path = Path(config.get('PATH_IMAGES'), md5.hexdigest() + "." + extension)
 				if local_path.exists():
 					local_path = str(local_path.absolute())
 					item_urls.add(local_path)
@@ -182,6 +232,12 @@ class ImageDownloader(BasicProcessor):
 
 				[urls[item_url].append(id) for id in item_ids]
 
+		if not urls:
+			self.dataset.update_status("No image urls identified.", is_final=True)
+			self.dataset.finish(0)
+			return
+		else:
+			self.dataset.log('Collected %i image urls.' % len(urls))
 		# next, loop through images and download them - until we have as many images
 		# as required. Note that images that cannot be downloaded or parsed do
 		# not count towards that limit
@@ -197,22 +253,35 @@ class ImageDownloader(BasicProcessor):
 				raise ProcessorInterruptedException("Interrupted while downloading images.")
 
 			processed_urls += 1
-			self.dataset.update_status("Downloaded %i images; checking url for next %i/%i: %s" %
-									   (downloaded_images, processed_urls, len(urls), url))
+			self.dataset.update_status("Downloaded %i/%i images; downloading from %s" %
+									   (downloaded_images, amount, url))
+			self.dataset.update_progress(downloaded_images / amount)
 
 			try:
 				# acquire image
 				if not url.lower().startswith("http"):
-					image, image_filename = Image.open(url)
+					# This will open filenames (e.g. locally stored images)
+					# Note possibly open other things (e.g. ftp?)
+					picture = Image.open(url)
+					if isinstance(url, Path):
+						image_filename = Path(url).name
+					else:
+						image_filename = url.split("/")[-1].split("?")[0]
 				else:
 					image, image_filename = self.get_image(url)
 
-				try:
-					picture = Image.open(image)
-				except UnidentifiedImageError:
-					picture = Image.open(image.raw)
+					try:
+						picture = Image.open(image)
+					except UnidentifiedImageError:
+						picture = Image.open(image.raw)
 
-			except (FileNotFoundError, UnidentifiedImageError):
+			except FileNotFoundError as e:
+				# get_image raises FileNotFoundError for many reasons
+				failures.append(url)
+				continue
+
+			except (UnidentifiedImageError, AttributeError, TypeError) as e:
+				self.dataset.log('ERROR: Downloading image %s: %s' % (url, str(e)))
 				failures.append(url)
 				continue
 
@@ -241,9 +310,14 @@ class ImageDownloader(BasicProcessor):
 				downloaded_images += 1
 			except OSError as e:
 				# some images may need to be converted to RGB to be saved
-				self.dataset.log('Debug: OSError when saving image %s: %s' % (save_location, e))
-				picture = picture.convert('RGB')
-				picture.save(str(results_path.joinpath(image_stem + '.png')))
+				self.dataset.log('ERROR: OSError when saving image %s: %s' % (save_location, e))
+				try:
+					picture = picture.convert('RGB')
+					picture.save(str(results_path.joinpath(image_stem + '.png')))
+				except OSError as e:
+					self.dataset.log(f"Error '{e}' saving image for {url}, skipping")
+					failures.append(url)
+					continue
 			except ValueError as e:
 				self.dataset.log(f"Error '{e}' saving image for {url}, skipping")
 				failures.append(url)
@@ -254,7 +328,7 @@ class ImageDownloader(BasicProcessor):
 		metadata = {
 			url: {
 				"filename": url_file_map.get(url),
-				"success": url not in failures,
+				"success": not url_file_map.get(url) is None and url not in failures, # skipped and fails are NOT success
 				"from_dataset": self.source_dataset.key,
 				"post_ids": urls[url]
 			} for url in urls
@@ -262,6 +336,7 @@ class ImageDownloader(BasicProcessor):
 		with results_path.joinpath(".metadata.json").open("w", encoding="utf-8") as outfile:
 			json.dump(metadata, outfile)
 
+		self.dataset.log('Downloaded %i images.' % downloaded_images)
 		# finish up
 		self.dataset.update_status("Compressing images")
 		self.write_archive_and_finish(results_path)
@@ -348,20 +423,18 @@ class ImageDownloader(BasicProcessor):
 
 		# Get the image!
 		if domain.endswith("4plebs.org") or domain.endswith("fireden.net") and image_url:
-			image = self.get_4chan_image(url)
+			image, image_name = self.get_4chan_image(url)
 		elif image_url:
 			image = self.request_get_w_error_handling(image_url, stream=True, timeout=20, headers={"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/12.1.1 Safari/605.1.15"})
+			# Check if we succeeded; content type should be an image
+			if image.status_code != 200 or image.headers.get("content-type", "")[:5] != "image":
+				raise FileNotFoundError()
+			image = BytesIO(image.content)
+			image_name = image_url.split("/")[-1].split("?")[0]
 		else:
 			raise FileNotFoundError()
 
-		# Use this for local saving.
-		image_name = image_url.split("/")[-1].split("?")[0]
-
-		# Check if we succeeded; content type should be an image
-		if image.status_code != 200 or image.headers.get("content-type", "")[:5] != "image":
-			raise FileNotFoundError()
-
-		return BytesIO(image.content), image_name
+		return image, image_name
 
 	def get_4chan_image(self, url):
 		"""
@@ -374,43 +447,55 @@ class ImageDownloader(BasicProcessor):
 
 		:param url:  Image URL, pointing to a 4chan mirror
 		:return Image:  Image object, or nothing if loading it failed
+		:return str:	string with the filename of the image
 		"""
 		rate_regex = re.compile(r"Search limit exceeded. Please wait ([0-9]+) seconds before attempting again.")
 		rate_limit = 1 if "fireden.net" in url else 16  # empirically verified
 
-		if isinstance(url, Path):
-			# local file
-			return Image.open(url)
-
 		# get link to image from external HTML search results
 		# detect rate limiting and wait until we're good to go again
-		page = self.request_get_w_error_handling(url, headers={"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/12.1.1 Safari/605.1.15"})
-		rate_limited = rate_regex.search(page.content.decode("utf-8"))
+		headers = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/12.1.1 Safari/605.1.15"}
+		page = self.request_get_w_error_handling(url, headers=headers)
+		rate_limited = rate_regex.search(page.text)
 
 		while rate_limited:
 			self.log.debug("Rate-limited by external source. Waiting %s seconds." % rate_limited[1])
 			time.sleep(int(rate_limited[1]))
-			page = self.request_get_w_error_handling(url)
+			page = self.request_get_w_error_handling(url, headers=headers)
 			rate_limited = rate_regex.search(page.content.decode("utf-8"))
 
+		if page.status_code != 200:
+			self.dataset.log('ERROR: status from url %s: %i %s' % (url, page.status_code, page.reason if hasattr(page, 'reason') else ""))
+
 		# get link to image file from HTML returned
-		parser = etree.HTMLParser()
-		tree = etree.parse(StringIO(page.content.decode("utf-8")), parser)
 		try:
+			parser = etree.HTMLParser()
+			tree = etree.parse(StringIO(page.content.decode("utf-8")), parser)
 			image_url = css("a.thread_image_link")(tree)[0].get("href")
 		except IndexError as e:
-			self.dataset.log("Error: IndexError while trying to download 4chan image %s: %s" % (url, e))
+			# Check if no results alert found
+			if css("div.alert")(tree):
+				if "No results found" in ' '.join([i for i in css("div.alert")(tree)[0].itertext()]):
+					self.dataset.log("ERROR: Image not found: %s" % url)
+					raise FileNotFoundError()
+			# This could indicate a change in page layout
+			self.dataset.log("ERROR: IndexError while trying to download 4chan image %s: %s" % (url, e))
+			raise FileNotFoundError()
+		except UnicodeDecodeError:
+			self.dataset.log("ERROR: 4chan image search could not be completed for image %s, skipping" % url)
 			raise FileNotFoundError()
 
 		# download image itself
-		image = self.request_get_w_error_handling(image_url, stream=True)
+		image = self.request_get_w_error_handling(image_url, stream=True, headers=headers)
 
 		# if not available, the thumbnail may be
 		if image.status_code != 200:
+			self.dataset.log("DEBUG: 4chan image %s status code: %i" % (image_url, image.status_code))
 			thumbnail_url = ".".join(image_url.split(".")[:-1]) + "s." + image_url.split(".")[-1]
-			image = self.request_get_w_error_handling(thumbnail_url, stream=True)
+			image = self.request_get_w_error_handling(thumbnail_url, stream=True, headers=headers)
 
 		if image.status_code != 200:
+			self.dataset.log("DEBUG: 4chan image thumbnail %s status code: %i" % (thumbnail_url, image.status_code))
 			raise FileNotFoundError()
 
 		md5 = hashlib.md5()
@@ -419,16 +504,20 @@ class ImageDownloader(BasicProcessor):
 		md5.update(base64.b64decode(based_hash))
 		file_name = md5.hexdigest() + "." + extension
 
-		# cache the image for later, if configured so
-		if config.PATH_IMAGES:
-			local_path = Path(config.PATH_IMAGES, md5.hexdigest() + "." + extension)
-			with open(local_path, 'wb') as file:
-				for chunk in image.iter_content(1024):
-					file.write(chunk)
-
 		# avoid getting rate-limited by image source
 		time.sleep(rate_limit)
-		return BytesIO(image.content), file_name
+
+		# cache the image for later, if configured so
+		if config.get('PATH_IMAGES'):
+			local_path = Path(config.get('PATH_IMAGES'), md5.hexdigest() + "." + extension)
+			with open(local_path, 'wb') as outfile:
+				for chunk in image.iter_content(1024):
+					outfile.write(chunk)
+
+			with open(local_path, 'rb') as infile:
+				return BytesIO(infile.read()), file_name
+		else:
+			return BytesIO(image.content), file_name
 
 	def request_get_w_error_handling(self, url, retries=0, **kwargs):
 		"""
@@ -454,30 +543,8 @@ class ImageDownloader(BasicProcessor):
 			else:
 				self.dataset.log("Error: ConnectionError while trying to download image %s: %s" % (url, e))
 				raise FileNotFoundError()
+		except requests.exceptions.InvalidSchema:
+			# not an http url, just skip
+			raise FileNotFoundError()
+
 		return response
-
-	@classmethod
-	def get_options(cls, parent_dataset=None, user=None):
-		"""
-		Get processor options
-
-		This method by default returns the class's "options" attribute, or an
-		empty dictionary. It can be redefined by processors that need more
-		fine-grained options, e.g. in cases where the availability of options
-		is partially determined by the parent dataset's parameters.
-
-		:param DataSet parent_dataset:  An object representing the dataset that
-		the processor would be run on
-		:param User user:  Flask user the options will be displayed for, in
-		case they are requested for display in the 4CAT web interface. This can
-		be used to show some options only to privileges users.
-		"""
-		options = cls.options
-
-		if parent_dataset and parent_dataset.get_columns():
-			columns = parent_dataset.get_columns()
-			options["columns"]["type"] = UserInput.OPTION_MULTI_SELECT
-			options["columns"]["options"] = {v: v for v in columns}
-			options["columns"]["default"] = "body" if "body" in columns else sorted(columns, key=lambda k: "image" in k).pop()
-
-		return options

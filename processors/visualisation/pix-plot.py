@@ -8,11 +8,13 @@ import shutil
 import requests
 import time
 import json
+import datetime
 import dateutil.parser
 import csv
 import os
-import config
-
+from urllib.parse import unquote
+from werkzeug.utils import secure_filename
+import common.config_manager as config
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.helpers import UserInput, convert_to_int
 from backend.abstract.processor import BasicProcessor
@@ -31,19 +33,36 @@ class PixPlotGenerator(BasicProcessor):
 	"""
 	type = "pix-plot"  # job type ID
 	category = "Visual"  # category
-	title = "PixPlot"  # title displayed in UI
-	description = "Put all images in an archive into a PixPlot, which allows you to explore and visualize them."
+	title = "Create PixPlot visualisation"  # title displayed in UI
+	description = "Put all images from an archive into a PixPlot visualisation: an explorable map of images " \
+				  "algorithmically grouped by similarity."
 	extension = "html"  # extension of result file, used internally and in UI
+
+	references = [
+		"[PixPlot](https://pixplot.io/)",
+		"[Parameter documentation](https://pixplot.io/docs/api/parameters.html)"
+	]
 
 	# PixPlot requires a minimum number of photos to be created
 	# This is currently due to the clustering algorithm which creates 12 clusters
 	min_photos_needed = 12
 
+	config = {
+	# If you host a version of https://github.com/digitalmethodsinitiative/dmi_pix_plot, you can use a processor to publish
+	# downloaded images into a PixPlot there
+		'pix-plot.PIXPLOT_SERVER': {
+			'type': UserInput.OPTION_TEXT,
+			'default' : "",
+			'help': 'PixPlot Server Address/URL',
+			'tooltip': "",
+			},
+		}
+
 	options = {
 		"amount": {
 			"type": UserInput.OPTION_TEXT,
 			"help": "No. of images (max 1000)",
-			"default": 100,
+			"default": 1000,
 			"min": 0,
 			"max": 10000,
 			"tooltip": "'0' uses as many images as available in the source image archive (up to 10000)"
@@ -51,18 +70,12 @@ class PixPlotGenerator(BasicProcessor):
 		"intro-plot-options": {
 			"type": UserInput.OPTION_INFO,
 			"help": "The below options will help configure your plot. Note that full images are always available by "
-					"clicking on the thumbnails (you will also find metadata related to the source of the image here). "
-					"\nNearest neighbors (n_neighbors): small numbers identify local clusters, larger numbers "
-					"create a more global shape. Large datasets may benefit from have higher values (think how many "
-					"alike pictures could make up a cluster)."
-					"\nMinimum Distance (min_dist): determines how tightly packed images can be with one and other "
-					"(i.e., small numbers (0.0001-0.001) are tightly packed, and larger (0.05-0.2) are disperse."
-					"\nMore information and examples on parameters: "
-					"https://umap-learn.readthedocs.io/en/latest/parameters.html"
+					"clicking on the thumbnails (you will also find metadata related to the source of the image "
+					"there). Large datasets run better with smaller thumbnails."
 		},
 		"image_size": {
 			"type": UserInput.OPTION_CHOICE,
-			"help": "Thumbnail Size (large datasets run better with smaller thumbnails)",
+			"help": "Thumbnail Size",
 			"options": {
 				"10": "10px tiny",
 				"32": "32px small",
@@ -72,6 +85,12 @@ class PixPlotGenerator(BasicProcessor):
 			},
 			"default": "64"
 		},
+		"intro-plot-neighbours": {
+			"type": UserInput.OPTION_INFO,
+			"help": "Nearest neighbors (n_neighbors): small numbers identify local clusters, larger numbers "
+					"create a more global shape. Large datasets may benefit from have higher values (think how many "
+					"alike pictures could make up a cluster)."
+		},
 		"n_neighbors": {
 			"type": UserInput.OPTION_TEXT,
 			"help": "Nearest Neighbors",
@@ -80,9 +99,14 @@ class PixPlotGenerator(BasicProcessor):
 			"max": 200,
 			"default": 15
 		},
+		"intro-plot-mindist": {
+			"type": UserInput.OPTION_INFO,
+			"help": "Minimum Distance (min_dist): determines how tightly packed images can be with one and other "
+					"(i.e., small numbers (0.0001-0.001) are tightly packed, and larger (0.05-0.2) disperse."
+		},
 		"min_dist": {
 			"type": UserInput.OPTION_TEXT,
-			"help": "Minimum Distance between points (images)",
+			"help": "Minimum Distance between images",
 			"tooltip": "Small values often work best",
 			"min": 0.0001,
 			"max": 0.99,
@@ -94,11 +118,11 @@ class PixPlotGenerator(BasicProcessor):
 	def is_compatible_with(cls, module=None):
 		"""
 		Allow processor on token sets;
-		Checks if PIXPLOT_SERVER set in config.py
+		Checks if pix-plot.PIXPLOT_SERVER set
 
 		:param module: Dataset or processor to determine compatibility with
 		"""
-		return module.type == "image-downloader" and hasattr(config, 'PIXPLOT_SERVER') and config.PIXPLOT_SERVER
+		return module.type.startswith("image-downloader") and config.get('pix-plot.PIXPLOT_SERVER')
 
 	def process(self):
 		"""
@@ -119,16 +143,17 @@ class PixPlotGenerator(BasicProcessor):
 			max_images = self.get_options()["amount"]["max"]
 
 		# Get labels to send PixPlot server
+		date =  datetime.datetime.now().strftime("%Y-%m-%d-%H%M%S")
 		top_dataset = self.dataset.top_parent()
 		label_formated = ''.join(e if e.isalnum() else '_' for e in top_dataset.get_label())
 		image_label = label_formated + '-' + str(top_dataset.key)
-		plot_label = label_formated + '-' + str(self.dataset.key)
+		plot_label = date + '-' + label_formated + '-' + str(self.dataset.key)
 
 		# Folder name is PixPlot identifier and set at dataset key
 		data = {'folder_name': image_label}
 
 		# Check if images have already been sent
-		filename_url = config.PIXPLOT_SERVER.rstrip('/') + '/api/list_filenames?folder_name=' + image_label
+		filename_url = config.get('pix-plot.PIXPLOT_SERVER').rstrip('/') + '/api/list_filenames?folder_name=' + image_label
 		filename_response = requests.get(filename_url)
 
 		# Check if 4CAT has access to this PixPlot server
@@ -162,13 +187,13 @@ class PixPlotGenerator(BasicProcessor):
 		self.dataset.update_status("Collecting metadata")
 		metadata_file_path = self.format_metadata(staging_area)
 		# Metadata
-		upload_url = config.PIXPLOT_SERVER.rstrip('/') + '/api/send_metadata'
+		upload_url = config.get('pix-plot.PIXPLOT_SERVER').rstrip('/') + '/api/send_metadata'
 		metadata_response = requests.post(upload_url, files={'metadata': open(metadata_file_path, 'rb')}, data=data)
 
 		# Now send photos to PixPlot
 		self.dataset.update_status("Uploading images to PixPlot")
 		# Configure upload photo url
-		upload_url = config.PIXPLOT_SERVER.rstrip('/') + '/api/send_photo'
+		upload_url = config.get('pix-plot.PIXPLOT_SERVER').rstrip('/') + '/api/send_photo'
 		images_uploaded = 0
 		estimated_num_images = len(filenames)
 		self.dataset.update_status("Uploading %i images" % (estimated_num_images))
@@ -189,9 +214,11 @@ class PixPlotGenerator(BasicProcessor):
 			else:
 				self.dataset.update_status("Error with image %s: %i - %s" % (filename, response.status_code, response.reason))
 
+			self.dataset.update_progress(i / self.source_dataset.num_rows)
+
 		# Request PixPlot server create PixPlot
 		self.dataset.update_status("Sending create PixPlot request")
-		create_plot_url = config.PIXPLOT_SERVER.rstrip('/') + '/api/pixplot'
+		create_plot_url = config.get('pix-plot.PIXPLOT_SERVER').rstrip('/') + '/api/pixplot'
 		# Gather info from PixPlot server response
 		create_pixplot_post_info = metadata_response.json()['create_pixplot_post_info']
 		# Create json package for creation request
@@ -215,7 +242,7 @@ class PixPlotGenerator(BasicProcessor):
 		if resp.status_code == 202:
 			# new request
 			new_request = True
-			results_url = config.PIXPLOT_SERVER.rstrip('/') + '/api/pixplot?key=' + resp.json()['key']
+			results_url = config.get('pix-plot.PIXPLOT_SERVER').rstrip('/') + '/api/pixplot?key=' + resp.json()['key']
 		elif 'already exists' in resp.json()['error']:
 			# repeat request
 			new_request = False
@@ -244,16 +271,16 @@ class PixPlotGenerator(BasicProcessor):
 				elif 'report' in result.json().keys() and result.json()['report'][-6:-1] == 'Done!':
 					# Complete without error
 					self.dataset.update_status("PixPlot Completed!")
-					self.log.info('PixPlot saved on : ' + config.PIXPLOT_SERVER)
+					self.log.info('PixPlot saved on : ' + config.get('pix-plot.PIXPLOT_SERVER'))
 					break
 				else:
 					# Something botched
-					self.dataset.update_status("PixPlot Error")
+					self.dataset.finish_with_error("PixPlot Error on creation")
 					self.log.error("PixPlot Error: " + str(result.json()))
-					break
+					return
 
 		# Create HTML file
-		plot_url = config.PIXPLOT_SERVER.rstrip('/') + '/plots/' + plot_label + '/index.html'
+		plot_url = config.get('pix-plot.PIXPLOT_SERVER').rstrip('/') + '/plots/' + plot_label + '/index.html'
 		html_file = self.get_html_page(plot_url)
 
 		# Write HTML file
@@ -288,8 +315,6 @@ class PixPlotGenerator(BasicProcessor):
 		it in memory. Instead we will loop through it and build the metadata file as we go.
 
 		"""
-		# Get source file path; should be the top parent
-		source_path = self.dataset.top_parent().get_results_path()
 		# Get image data
 		with open(os.path.join(temp_path, '.metadata.json')) as file:
 			image_data = json.load(file)
@@ -310,7 +335,9 @@ class PixPlotGenerator(BasicProcessor):
 				# Check if image successfully downloaded for image
 				if data.get('success'):
 					ids = data.get('post_ids')
-					filename = data.get('filename')
+					# dmi_pix_plot API uses sercure_filename while pixplot.py (in PixPlot library) uses clean_filename
+					# Ensure our metadata filenames match results
+					filename = self.clean_filename(secure_filename(data.get('filename')))
 					for post_id in ids:
 						# Add to key
 						if post_id in post_id_image_dictionary.keys():
@@ -326,20 +353,8 @@ class PixPlotGenerator(BasicProcessor):
 										'number_of_posts': 0,
 										}
 
-			# Check if there is a map_item
-			item_mapper = None
-			parent_processor = self.all_modules.processors.get(self.dataset.top_parent().type)
-			if parent_processor:
-				if hasattr(parent_processor, "map_item"):
-					item_mapper = parent_processor.map_item
-
 			# Loop through source file
-			for post in self.source_dataset.iterate_items(self):
-
-				if item_mapper:
-					# and if so, map it
-					post = item_mapper(post)
-
+			for post in self.dataset.top_parent().iterate_items(self):
 				# Check if post contains one of the downloaded images
 				if post['id'] in post_id_image_dictionary.keys():
 					for img_name in post_id_image_dictionary[post['id']]:
@@ -358,6 +373,8 @@ class PixPlotGenerator(BasicProcessor):
 								image['description'] += '<br/><br/><b>' + key + ':</b> ' + str(value)
 
 						# PixPlot has a field limit of 131072
+						# TODO: PixPlot (dmi version) has been updated and this likely is no longer needed
+						# test first as displaying long descriptions still may have issues
 						image['description'] = image['description'][:131072]
 
 						# Add tags or hashtags
@@ -396,3 +413,14 @@ class PixPlotGenerator(BasicProcessor):
 		Returns a html string to redirect to PixPlot.
 		"""
 		return f"<head><meta http-equiv='refresh' content='0; URL={url}'></head>"
+
+	def clean_filename(self, s):
+		'''
+		Given a string that points to a filename, return a clean filename
+
+		Copied from PixPlot library to ensure resultant filenames are the same.
+		'''
+		s = unquote(os.path.basename(s))
+		invalid_chars = '<>:;,"/\\|?*[]'
+		for i in invalid_chars: s = s.replace(i, '')
+		return s

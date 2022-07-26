@@ -38,7 +38,7 @@ except psycopg2.IntegrityError:
 	print("Error: User %s already exists." % args.username)
 	sys.exit(1)
 
-user = User.get_by_name(args.username)
+user = User.get_by_name(db, args.username)
 if user is None:
 	print("Warning: User not created properly. No password reset e-mail sent.")
 	sys.exit(1)

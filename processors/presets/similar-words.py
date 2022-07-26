@@ -13,7 +13,7 @@ class SimilarWords(ProcessorPreset):
 	Run processor pipeline to find similar words
 	"""
 	type = "preset-similar-words"  # job type ID
-	category = "Presets"  # category. 'Presets' are always listed first in the UI.
+	category = "Combined processors"  # category. 'Combined processors' are always listed first in the UI.
 	title = "Find similar words"  # title displayed in UI
 	description = "Uses Word2Vec models (Mikolov et al.) to find words used in a similar context as the queried word(s). Note that this will usually not give useful results for small (<100.000 items) datasets."
 	extension = "csv"

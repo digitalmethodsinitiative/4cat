@@ -5,7 +5,7 @@ Make word clouds of columns with text and values
 
 from wordcloud import WordCloud
 
-import config
+import common.config_manager as config
 from backend.abstract.processor import BasicProcessor
 from common.lib.helpers import UserInput
 
@@ -36,7 +36,7 @@ class MakeWordCloud(BasicProcessor):
 
 	@classmethod
 	def get_options(self, parent_dataset=None, user=None):
-		
+
 		options = {}
 		if not parent_dataset:
 			return options
@@ -67,7 +67,7 @@ class MakeWordCloud(BasicProcessor):
 				}
 			}
 		return options
-		
+
 	def process(self):
 		"""
 		Render an SVG histogram/bar chart using a previous frequency analysis
@@ -118,7 +118,7 @@ class MakeWordCloud(BasicProcessor):
 
 		self.dataset.update_status("Making word cloud.")
 		cloud = WordCloud(prefer_horizontal=1, background_color="rgba(255, 255, 255, 0)", mode="RGBA", color_func=lambda *args, **kwargs: (0,0,0), width=1600, height=1000, collocations=False, max_words=max_words).generate_from_frequencies(words)
-		
+
 		# Write to svg
 		cloud = cloud.to_svg(embed_font=True)
 		file = open(self.dataset.get_results_path(), "w")

@@ -8,8 +8,7 @@ import re
 from backend.abstract.processor import BasicProcessor
 from common.lib.helpers import UserInput, get_interval_descriptor
 
-import config
-
+import common.config_manager as config
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
 __maintainer__ = "Stijn Peeters"
@@ -25,8 +24,13 @@ class OvertimeHatefulAnalysis(BasicProcessor):
 	type = "overtime-hateful"  # job type ID
 	category = "Post metrics"  # category
 	title = "Over-time offensivess trend"  # title displayed in UI
-	description = "Shows activity, engagement (e.g. views or score) and offensiveness trends over-time. Offensiveness is measured as the amount of words listed on Hatebase that occur in the dataset."  # description displayed in UI
+	description = "Extracts offensiveness trends over-time. Offensiveness is measured as the amount of words listed on Hatebase that occur in the dataset. Also includes engagement metrics."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
+
+	references = [
+		"[Hatebase.org](https://hatebase.org)",
+		"[Rogers, Richard. 2020. \"Deplatforming: Following extreme Internet celebrities to Telegram and alternative social media.\" European Journal of Culture, vol. 35, no . 3: 213-229.](https://journals.sagepub.com/doi/pdf/10.1177/0267323120922066)"
+	]
 
 	@classmethod
 	def is_compatible_with(cls, module=None):
@@ -63,9 +67,9 @@ class OvertimeHatefulAnalysis(BasicProcessor):
 			"type": UserInput.OPTION_CHOICE,
 			"default": "all",
 			"options": {
-				"all": "Ambigous and unambiguous",
-				"ambiguous": "Ambiguous terms only",
-				"unambiguous": "Unambiguous terms only"
+				"all": "Ambigous and unambiguous hate terms",
+				"ambiguous": "Ambiguous hate terms only",
+				"unambiguous": "Unambiguous hate terms only"
 			},
 			"help": "Hatebase-listed terms to consider"
 		},
@@ -111,7 +115,7 @@ class OvertimeHatefulAnalysis(BasicProcessor):
 			self.dataset.finish(0)
 			return
 
-		with open(config.PATH_ROOT + "/common/assets/hatebase/hatebase-%s.json" % language) as hatebasedata:
+		with open(config.get('PATH_ROOT') + "/common/assets/hatebase/hatebase-%s.json" % language) as hatebasedata:
 			hatebase = json.loads(hatebasedata.read())
 
 		hatebase = {term.lower(): hatebase[term] for term in hatebase}

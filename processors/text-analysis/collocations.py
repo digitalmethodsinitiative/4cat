@@ -18,8 +18,8 @@ class GetCollocations(BasicProcessor):
 	"""
 	type = "collocations"  # job type ID
 	category = "Text analysis"  # category
-	title = "Word collocations"  # title displayed in UI
-	description = "Extracts word collocations from a set of tokens."  # description displayed in UI
+	title = "Extract co-words"  # title displayed in UI
+	description = "Extracts words appearing close to each other from a set of tokens."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
 	@classmethod
@@ -37,47 +37,57 @@ class GetCollocations(BasicProcessor):
 			"type": UserInput.OPTION_CHOICE,
 			"default": 2,
 			"options": {
-				"2": "2 (~ bigrams)",
-				"3": "3 (~ trigrams)"},
-			"help": "N-size - How many words to generate collocations for"
+				"2": "2 (bigrams)",
+				"3": "3 (trigrams)"},
+			"help": "N-size - How many co-words to include"
 		},
 		"window_size": {
 			"type": UserInput.OPTION_CHOICE,
 			"default": "2",
 			"options": {"2": "2", "3": "3", "4": "4", "5": "5", "6": "6"},
-			"help": "Window size"
+			"help": "Window size",
+			"tooltip": "This sets the length of word sequences wherein words are considered co-words. For instance, " \
+					   "a window of 3 with the sentence \"the quick brown fox\" will count \"the\", \"quick\", " \
+					   "and \"brown\" as co-words, as well as \"quick\", \"brown\", and \"fox\", but not \"the\" and " \
+					   "\"fox\"."
 		},
 		"query_string": {
 			"type": UserInput.OPTION_TEXT,
 			"default": "",
-			"help": "Required words (comma-separated)"
+			"help": "Only include words next to this required word",
+			"tooltip": "May include multiple words (separate by comma)"
+
 		},
 		"forbidden_words": {
 			"type": UserInput.OPTION_TEXT,
 			"default": "",
-			"help": "Words to exclude (comma-separated)"
+			"help": "Word(s) to exclude (comma-separated)"
 		},
 		"unique": {
 			"type": UserInput.OPTION_TOGGLE,
 			"default": True,
-			"help": "Only keep unique collocations per post",
-			"tooltip": "This is useful for filtering out collocations for spammy posts. For instance, for \"dog bark dog bark dog bark\" it will only count collocations for \"bark\" and \"dog\" once."
+			"help": "Only keep unique co-word pairs per post",
+			"tooltip": "This is useful for filtering out common co-word pairs caused by spam. " \
+					   "For instance, in the sentence \"quick fox quick fox quick fox\", " \
+					   "the pair \"fox\" and \"quick\" will only be counted once."
 		},
 		"sort_words": {
 			"type": UserInput.OPTION_TOGGLE,
 			"default": False,
-			"help": "Sort collocations",
-			"tooltip": "Sorts words alphabetically. This means \"dog bark\" and \"bark dog\" will result in the latter. If required words are given, these are also put in the first column (useful for e.g. word clouds). Word order can be relevant, so this is turned off by default."
+			"help": "Sort co-word pairs",
+			"tooltip": "Sorts co-word pairs alphabetically. This means \"quick fox\" will be shuffled to \"fox quick\". " \
+			"If a required word or words are given, these are put in first so their co-words can be easily extracted. " \
+			"Word order can be relevant, so this is turned off by default."
 		},
 		"min_frequency": {
 			"type": UserInput.OPTION_TEXT,
 			"default": 1,
-			"help": "Minimum frequency of words appearing together"
+			"help": "Minimum frequency of co-words occurrences"
 		},
 		"max_output": {
 			"type": UserInput.OPTION_TEXT,
 			"default": 0,
-			"help": "Max. number of results per token set. 0 for unlimited"
+			"help": "Maximum number of top co-words to extract (0 = all)"
 		}
 	}
 

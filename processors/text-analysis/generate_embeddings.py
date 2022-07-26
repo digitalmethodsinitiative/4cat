@@ -25,8 +25,12 @@ class GenerateWordEmbeddings(BasicProcessor):
 	"""
 	type = "generate-embeddings"  # job type ID
 	category = "Text analysis"  # category
-	title = "Generate Word Embedding Models"  # title displayed in UI
-	description = "Generates Word2Vec or FastText word embedding models for the sentences, per chosen time interval. These can then be used to analyse semantic word associations within the corpus. Note that good models require large(r) datasets."  # description displayed in UI
+	title = "Generate word embedding models"  # title displayed in UI
+	description = "Generates Word2Vec or FastText word embedding models (overall or per timeframe). " \
+				  "These calculate coordinates (vectors) per word on the basis of their context. The " \
+				  "coordinates are positioned in a \"vector space\" with a large amount of dimensions (so a coordinate can " \
+				  "e.g. exist of 100 numbers). These numeric word representations can be used to extract words with similar contexts. " \
+				  "Note that good models require a lot of data."  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
 
 	references = [
@@ -61,14 +65,16 @@ class GenerateWordEmbeddings(BasicProcessor):
 			"default": "5",
 			"options": {"3": 3, "4": 4, "5": 5, "6": 6, "7": 7},
 			"help": "Window",
-			"tooltip": "Maximum distance between the current and predicted word within a sentence"
+			"tooltip": "This sets the length of word sequences taken as the context. For instance, " \
+					   "a window of 3 with the sentence \"the quick brown fox\" will \"slide\" over \"the quick brown\" " \
+					   "and \"quick brown fox\"."
 		},
 		"dimensionality": {
 			"type": UserInput.OPTION_TEXT,
 			"default": 100,
 			"min": 50,
 			"max": 1000,
-			"help": "Dimensionality of the word vectors"
+			"help": "Dimensionality of the vectors"
 		},
 		"min_count": {
 			"type": UserInput.OPTION_TEXT,
@@ -141,6 +147,7 @@ class GenerateWordEmbeddings(BasicProcessor):
 			# list per sentence - this processor is agnostic in that regard
 			token_set_name = temp_file.name
 			self.dataset.update_status("Extracting bigrams from token set %s..." % token_set_name)
+			self.dataset.update_progress(models / self.source_dataset.num_rows)
 
 			try:
 				if detect_bigrams:
@@ -151,14 +158,14 @@ class GenerateWordEmbeddings(BasicProcessor):
 
 				self.dataset.update_status("Training %s model for token set %s..." % (model_builder.__name__, token_set_name))
 				try:
-					model = model_builder(negative=use_negative, size=dimensionality, sg=use_skipgram, window=window, workers=3, min_count=min_count, max_final_vocab=max_words)
+					model = model_builder(negative=use_negative, vector_size=dimensionality, sg=use_skipgram, window=window, workers=3, min_count=min_count, max_final_vocab=max_words)
 
 					# we do not simply pass a sentences argument to model builder
 					# because we are using a generator, which exhausts, while
 					# Word2Vec needs to iterate over the sentences twice
 					# https://stackoverflow.com/a/57632747
 					model.build_vocab(self.tokens_from_file(temp_file, staging_area, phraser=bigram_transformer))
-					model.train(self.tokens_from_file(temp_file, staging_area, phraser=bigram_transformer), epochs=model.iter, total_examples=model.corpus_count)
+					model.train(self.tokens_from_file(temp_file, staging_area, phraser=bigram_transformer), epochs=1, total_examples=model.corpus_count)
 
 				except RuntimeError as e:
 					if "you must first build vocabulary before training the model" in str(e):

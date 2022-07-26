@@ -31,17 +31,12 @@ cli = argparse.ArgumentParser()
 cli.add_argument("--yes", "-y", default=False, action="store_true", help="Answer 'yes' to all prompts")
 cli.add_argument("--pull", "-p", default=False, action="store_true", help="Pull and check out the latest 4CAT version from Github before migrating")
 cli.add_argument("--repository", "-r", default="https://github.com/digitalmethodsinitiative/4cat.git", help="URL of the repository to pull from")
+cli.add_argument("--current_version_location", "-v", default=".current-version", help="File path to .current_version file")
 args = cli.parse_args()
 
 print("")
 if not Path(os.getcwd()).glob("4cat-daemon.py"):
 	print("This script needs to be run from the same folder as 4cat-daemon.py\n")
-	exit(1)
-
-if not Path(os.getcwd()).joinpath("config.py").exists():
-	print("config.py is missing from the 4CAT folder.")
-	print("Create a configuration file before continuing. An example is found in:")
-	print("  config.py-example.")
 	exit(1)
 
 # ---------------------------------------------
@@ -69,7 +64,7 @@ if args.pull:
 #     Determine current and target versions
 # ---------------------------------------------
 target_version_file = Path("VERSION")
-current_version_file = Path(".current-version")
+current_version_file = Path(args.current_version_location)
 
 if not current_version_file.exists():
 	# this is the latest version lacking version files
@@ -196,7 +191,7 @@ for file in migrate_to_run:
 print("- Copying VERSION...")
 if current_version_file.exists():
 	current_version_file.unlink()
-shutil.copy(target_version_file, ".current-version")
+shutil.copy(target_version_file, args.current_version_location)
 
 
 # ---------------------------------------------

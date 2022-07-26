@@ -9,8 +9,7 @@ from backend.abstract.processor import BasicProcessor
 from common.lib.helpers import UserInput
 from common.lib.exceptions import ProcessorInterruptedException
 
-import config
-
+import common.config_manager as config
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
 __maintainer__ = "Stijn Peeters"
@@ -26,7 +25,7 @@ class HatebaseAnalyser(BasicProcessor):
 	type = "hatebase-data"  # job type ID
 	category = "Post metrics"  # category
 	title = "Hatebase analysis"  # title displayed in UI
-	description = "Analyse all posts' content with Hatebase, assigning a score for 'offensiveness' and a propability that the post contains hate speech."  # description displayed in UI
+	description = "Assign scores for 'offensiveness' and hate speech propability to each post by using Hatebase."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
 	token_expires = 0
@@ -46,16 +45,12 @@ class HatebaseAnalyser(BasicProcessor):
 			},
 			"help": "Language"
 		},
-		"search_columns": {
-			"type": UserInput.OPTION_CHOICE,
-			"default": "both",
-			"options": {
-				"both": "Body and Subject",
-				"body": "Body only",
-				'subject' : "Subject only"
-			},
-			"help": "Columns to search"
-		},
+		"columns": {
+			"type": UserInput.OPTION_TEXT,
+			"help": "Columns to analyse",
+			"default": "body",
+			"tooltip": "The content of these columns will be analysed for presence of hatebase-listed words."
+		}
 	}
 
 	def process(self):
@@ -68,19 +63,19 @@ class HatebaseAnalyser(BasicProcessor):
 
 		# determine what vocabulary to use
 		language = self.parameters.get("language")
-		# columns to search for hate text
-		if self.parameters.get("search_columns") == 'both':
-			columns = ['body', 'subject']
-		else:
-			columns = [self.parameters.get("search_columns")]
+		columns = self.parameters.get("columns")
+
+		if not columns:
+			self.dataset.update_status("No columns selected; no data analysed.", is_final=True)
+			self.dataset.finish(0)
+			return
 
 		# read and convert to a way we can easily match whether any word occurs
-		with open(config.PATH_ROOT + "/common/assets/hatebase/hatebase-%s.json" % language) as hatebasedata:
+		with open(config.get('PATH_ROOT') + "/common/assets/hatebase/hatebase-%s.json" % language) as hatebasedata:
 			hatebase = json.loads(hatebasedata.read())
 
 		hatebase = {term.lower(): hatebase[term] for term in hatebase}
 		hatebase_regex = re.compile(r"\b(" + "|".join([re.escape(term) for term in hatebase]) + r")\b")
-
 
 		processed = 0
 		with self.dataset.get_results_path().open("w") as output:
@@ -100,6 +95,7 @@ class HatebaseAnalyser(BasicProcessor):
 				processed += 1
 				if processed % 1000 == 0:
 					self.dataset.update_status("Processing post %i" % processed)
+					self.dataset.update_progress(processed / self.source_dataset.num_rows)
 				row = {**post, **{
 					"hatebase_num": 0,
 					"hatebase_num_ambiguous": 0,
@@ -114,7 +110,7 @@ class HatebaseAnalyser(BasicProcessor):
 				terms_ambig = []
 				terms_unambig = []
 
-				post_text = ' '.join([post[x].lower() for x in columns])
+				post_text = ' '.join([post.get(c, "").lower() for c in columns])
 				for term in hatebase_regex.findall(post_text):
 					if hatebase[term]["plural_of"]:
 						if hatebase[term]["plural_of"] in terms:
@@ -149,6 +145,31 @@ class HatebaseAnalyser(BasicProcessor):
 					self.dataset.finish(0)
 					return
 
-
 		self.dataset.update_status("Finished")
 		self.dataset.finish(processed)
+
+	@classmethod
+	def get_options(cls, parent_dataset=None, user=None):
+		"""
+		Get processor options
+
+		This method by default returns the class's "options" attribute, or an
+		empty dictionary. It can be redefined by processors that need more
+		fine-grained options, e.g. in cases where the availability of options
+		is partially determined by the parent dataset's parameters.
+
+		:param DataSet parent_dataset:  An object representing the dataset that
+		the processor would be run on
+		:param User user:  Flask user the options will be displayed for, in
+		case they are requested for display in the 4CAT web interface. This can
+		be used to show some options only to privileges users.
+		"""
+		options = cls.options
+
+		if parent_dataset and parent_dataset.get_columns():
+			columns = parent_dataset.get_columns()
+			options["columns"]["type"] = UserInput.OPTION_MULTI_SELECT
+			options["columns"]["options"] = {v: v for v in columns}
+			options["columns"]["default"] = "body" if "body" in columns else sorted(columns).pop()
+
+		return options

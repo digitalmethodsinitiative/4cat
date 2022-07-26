@@ -26,6 +26,8 @@ class SearchBitChute(Search):
     title = "Search BitChute"  # title displayed in UI
     description = "Retrieve BitChute videos"  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
+    is_local = False # Whether this datasource is locally scraped
+    is_static = False   # Whether this datasource is still updated
 
     # not available as a processor for existing datasets
     accepts = [None]
@@ -128,10 +130,14 @@ class SearchBitChute(Search):
             else:
                 results.append(self.get_videos_user(session, query, csrftoken, detail))
 
+            self.dataset.update_progress(num_query / len(queries))
+
         return chain(*results)
 
     def get_videos_id(self, session, video_id, csrftoken, detail):
         dummy_video = {
+            "query_type": "video id",
+            "query": video_id,
             "id": video_id,
             "thread_id": video_id,
             "subject": "",
@@ -217,6 +223,8 @@ class SearchBitChute(Search):
 
                 link = video_element.select_one(".channel-videos-title a")
                 video = {
+                    "query_type": "user id",
+                    "query": user,
                     "id": link["href"].split("/")[-2],
                     "thread_id": link["href"].split("/")[-2],
                     "subject": link.text,
@@ -287,9 +295,15 @@ class SearchBitChute(Search):
                     video_data["published"] = "1970-01-01"
                 # this is only included as '5 months ago' and so forth, not exact date
                 # so use dateparser to at least approximate the date
-                dt = dateparser.parse(video_data["published"])
+                try:
+                    dt = dateparser.parse(video_data["published"])
+                except Exception as e:
+                    self.log.warning('dateparser.parse error reading video_data["published"]: %s' % str(video_data['published']))
+                    raise e
 
                 video = {
+                    "query_type": "search",
+                    "query": query,
                     "id": video_data["id"],
                     "thread_id": video_data["id"],
                     "subject": video_data["name"],
@@ -360,7 +374,11 @@ class SearchBitChute(Search):
                     return (video, [])
 
                 elif "Contains Incitement to Hatred" in video_page.text:
-                    video["category"] = "moderated-incitement"
+                    video["category"] = "moderated-incitement-hatred"
+                    return (video, [])
+
+                elif "Threats or Incitement to Violence" in video_page.text:
+                    video["category"] = "moderated-incitement-violence"
                     return (video, [])
 
                 elif "Platform Misuse" in video_page.text:
@@ -373,6 +391,10 @@ class SearchBitChute(Search):
 
                 elif "Copyright</h4>" in video_page.text:
                     video["category"] = "moderated-copyright"
+                    return (video, [])
+
+                elif "Contains Holocaust Denial" in video_page.text:
+                    video["category"] = "moderated-holocaust-denial"
                     return (video, [])
 
                 else:
@@ -415,7 +437,7 @@ class SearchBitChute(Search):
             counts = self.request_from_bitchute(video_session, "POST", "https://www.bitchute.com/video/%s/counts/" % video["id"], data={"csrfmiddlewaretoken": video_csfrtoken})
 
             if detail == "comments":
-                # if comments are also to be scraped, this is anothe request to make, which returns
+                # if comments are also to be scraped, this is another request to make, which returns
                 # a convenient JSON response with all the comments to the video
                 # we need yet another token for this, which we can extract from a bit of inline
                 # javascript on the page
@@ -444,6 +466,8 @@ class SearchBitChute(Search):
                             thumbnail_image = ""
 
                         comments.append({
+                            "query_type": video["query_type"],
+                            "query": video["query"],
                             "id": comment["id"],
                             "thread_id": video["id"],
                             "subject": "",
@@ -535,7 +559,7 @@ class SearchBitChute(Search):
                     raise NotImplemented()
 
                 if request.status_code >= 300:
-                    raise ValueError("Response %i from BitChut for URL %s, need to retry" % (request.status_code, url))
+                    raise ValueError("Response %i from BitChute for URL %s, need to retry" % (request.status_code, url))
 
                 response = request.json()
                 return response

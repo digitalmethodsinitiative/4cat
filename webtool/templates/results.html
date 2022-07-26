@@ -8,8 +8,25 @@
         <form action="{{ url_for("show_results") }}" method="GET">
             <input type="hidden" name="depth" value="{{ depth }}">
             <ul>
-                <li><input aria-label="Query filter" placeholder="Filter queries..." name="filter"
+                <li><input aria-label="Filter by query or label" placeholder="Filter datasets..." name="filter"
                            value="{{ filter.filter }}"></li>
+            {% if current_user.is_admin %}
+                <li><input aria-label="User" placeholder="User..." name="user"
+                           value="{{ filter.user }}"></li>
+                <li>
+                    <select aria-label="Sort datasets by" name="sort_by">
+                        <option value="timestamp"{% if filter.sort_by == "timestamp" %} selected{% endif %}>Sort by date</option>
+                        <option value="num_rows"{% if filter.sort_by == "num_rows" %} selected{% endif %}>Sort by size</option>
+                    </select>
+                </li>
+            {% endif %}
+                <li>
+                    <select name="datasource" aria-label="Data source">
+                        <option value="all"{% if filter.datasource == "all" %} selected{% endif %}>All data sources</option>
+                    {% include 'components/datasource-select.html' %}
+                    </select>
+                </li>
+                <li><label><input type="checkbox" name="hide_empty" {% if filter.hide_empty %} checked="checked"{% endif %}> Hide empty datasets</label></li>
             </ul>
             <button>Filter</button>
         </form>
@@ -45,7 +62,7 @@
 
                         <div class="property-container status">
                         {% if not dataset.is_finished() or dataset.num_rows == 0 %}
-                            <p class="button-like inactive"><span class="dataset-status">{% include "result-status.html" %}</span></p>
+                            <p class="button-like inactive{% if dataset.progress and dataset.progress > 0 and not dataset.is_finished() %} progress progress-{{ (dataset.progress * 100)|round(0)|int }}{% endif %}"><span class="dataset-status">{% include "result-status.html" %}</span></p>
                         {% else %}
                             <a class="button-like" href="{{ url_for('get_result', query_file=dataset.result_file)[:-1] }}"><i class="fas fa-download" aria-hidden="true"></i> {{ dataset.get_results_path()|filesize }}, {{ dataset.result_file.split(".")[-1] }}</a>
                         {% endif %}

@@ -1,5 +1,6 @@
 from dateutil.parser import parse as parse_datetime
 from common.lib.exceptions import QueryParametersException
+import json
 
 import re
 
@@ -19,6 +20,7 @@ class UserInput:
     OPTION_MULTI_SELECT = "multi_select"  # multiple values out of a dropdown list (select multiple)
     OPTION_INFO = "info"  # just a bit of text, not actual input
     OPTION_TEXT_LARGE = "textarea"  # longer text
+    OPTION_TEXT_JSON = "json"  # text, but should be valid JSON
     OPTION_DATE = "date"  # a single date
     OPTION_DATERANGE = "daterange"  # a beginning and end date
     OPTION_DIVIDER = "divider"  # meta-option, divides related sets of options
@@ -163,6 +165,15 @@ class UserInput:
                     return settings.get("default", "")
             else:
                 return choice
+
+        elif input_type == UserInput.OPTION_TEXT_JSON:
+            # needs to be parsed as JSON
+            try:
+                redumped_value = json.dumps(json.loads(choice))
+            except json.JSONDecodeError:
+                raise QueryParametersException("Invalid JSON value '%s'" % choice)
+
+            return redumped_value
 
         elif input_type in (UserInput.OPTION_TEXT, UserInput.OPTION_TEXT_LARGE):
             # text string

@@ -1,0 +1,49 @@
+{
+	"subject": "{{ subject }}",
+	"likes Facebook": "{{ likes }} <i class='fas fa-thumbs-up'></i>",
+	"likes Instagram": "{{ num_likes }} <i class='fas fa-heart'></i>",
+	"comments Facebook": "{{ comments }} <i class='fas fa-comment'></i>",
+	"comments Instagram": "{{ num_comments }} <i class='fas fa-comment'></i>",
+	"external_url": "{{ url }}",
+	"sort_options": [
+		{
+			"key": "unix_timestamp",
+			"label": "Old to new"
+		},
+		{
+			"key": "unix_timestamp",
+			"label": "New to old",
+			"descending": true
+		},
+		{
+			"key": "likes",
+			"label": "Likes (Facebook)",
+			"force_int": true,
+			"descending": true
+		},
+		{
+			"key": "comments",
+			"label": "Comments (Facebook)",
+			"force_int": true,
+			"descending": true
+		},
+		{
+			"key": "interactions",
+			"label": "Interactions (Facebook)",
+			"force_int": true,
+			"descending": true
+		},
+		{
+			"key": "num_likes",
+			"label": "Likes (Instagram)",
+			"force_int": true,
+			"descending": true
+		},
+		{
+			"key": "num_comments",
+			"label": "Comments (Instagram)",
+			"force_int": true,
+			"descending": true
+		}
+	]
+}

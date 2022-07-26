@@ -17,7 +17,7 @@ class CowordNetworker(ProcessorPreset):
     type = "preset-coword-network"  # job type ID
     category = "Networks"  # category
     title = "Co-word network"  # title displayed in UI
-    description = "Create a Gephi-compatible network comprised of co-words, with edges between " \
+    description = "Create a GEXF network file of word co-occurences. Edges denote " \
                   "words that appear close to each other. Edges and nodes are weighted by the " \
                   "amount of co-word occurrences."  # description displayed in UI
     extension = "gexf"  # extension of result file, used internally and in UI

@@ -31,6 +31,15 @@ body {
 	font-size: 14px;
 }
 
+.content .posts .post header .flair {
+	font-size: 10px;
+	color: black;
+	background-color: #EDEFF1;
+	border-radius: 2px;
+	padding: 2px;
+	vertical-align: middle;
+}
+
 .content .posts .post {
 	display: table;
 	min-height: auto;

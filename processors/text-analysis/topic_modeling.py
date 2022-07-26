@@ -24,7 +24,9 @@ class TopicModeler(BasicProcessor):
     type = "topic-modeller"  # job type ID
     category = "Text analysis"  # category
     title = "Generate topic models"  # title displayed in UI
-    description = "Creates topic models per token set using Latent Dirichlet Allocation (LDA). For a given number of topics, tokens are assigned a relevance weight per topic, which can be used to find clusters of related words."  # description displayed in UI
+    description = "Creates topic models per tokenset using Latent Dirichlet Allocation (LDA). " \
+                  "For a given number of topics, tokens are assigned a relevance weight per topic, " \
+                  "which can be used to find clusters of related words."  # description displayed in UI
     extension = "zip"  # extension of result file, used internally and in UI
 
     options = {
@@ -97,6 +99,8 @@ class TopicModeler(BasicProcessor):
         for token_file in self.iterate_archive_contents(self.source_file):
             index += 1
             self.dataset.update_status("Processing token set %i (%s)" % (index, token_file.stem))
+            self.dataset.update_progress(index / self.source_dataset.num_rows)
+
             if self.interrupted:
                 raise ProcessorInterruptedException("Interrupted while topic modeling")
 
@@ -111,7 +115,7 @@ class TopicModeler(BasicProcessor):
                 vectors = vectoriser.fit_transform(tokens)
             except ValueError as e:
                 # 'no words left' after pruning, so nothing to model with
-                self.dataset.update_status(e, is_final=True)
+                self.dataset.update_status(str(e), is_final=True)
                 self.dataset.finish(0)
                 return
 

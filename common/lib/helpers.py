@@ -1,24 +1,27 @@
 """
 Miscellaneous helper functions for the 4CAT backend
 """
+import calendar
 import subprocess
 import datetime
 import smtplib
 import socket
 import copy
+import time
 import json
+import math
 import csv
 import re
 import os
 
+from collections.abc import MutableMapping
 from pathlib import Path
 from html.parser import HTMLParser
 from werkzeug.datastructures import FileStorage
 from calendar import monthrange
 
 from common.lib.user_input import UserInput
-import config
-
+import common.config_manager as config
 
 def init_datasource(database, logger, queue, name):
 	"""
@@ -107,7 +110,7 @@ def get_software_version():
 
 	:return str:  4CAT version
 	"""
-	versionpath = Path(config.PATH_ROOT, config.PATH_VERSION)
+	versionpath = Path(config.get('PATH_ROOT'), config.get('path.versionfile'))
 
 	if versionpath.exists() and not versionpath.is_file():
 		return ""
@@ -118,7 +121,7 @@ def get_software_version():
 		# the currently checked-out commit
 		try:
 			cwd = os.getcwd()
-			os.chdir(config.PATH_ROOT)
+			os.chdir(config.get('PATH_ROOT'))
 			show = subprocess.run(["git", "show"], stderr=subprocess.PIPE, stdout=subprocess.PIPE)
 			os.chdir(cwd)
 			if show.returncode != 0:
@@ -174,6 +177,60 @@ def expand_short_number(text):
 		else:
 			raise ValueError("Unknown multiplier '%s' in number '%s'" % (multiplier_bit, text))
 
+
+def timify_long(number):
+	"""
+	Make a number look like an indication of time
+
+	:param number:  Number to convert. If the number is larger than the current
+	UNIX timestamp, decrease by that amount
+	:return str: A nice, string, for example `1 month, 3 weeks, 4 hours and 2 minutes`
+	"""
+	number = int(number)
+
+	components = []
+	if number > time.time():
+		number = time.time() - number
+
+	month_length = 30.42 * 86400
+	months = math.floor(number / month_length)
+	if months:
+		components.append("%i month%s" % (months, "s" if months != 1 else ""))
+		number -= (months * month_length)
+
+	week_length = 7 * 86400
+	weeks = math.floor(number / week_length)
+	if weeks:
+		components.append("%i week%s" % (weeks, "s" if weeks != 1 else ""))
+		number -= (weeks * week_length)
+
+	day_length = 86400
+	days = math.floor(number / day_length)
+	if days:
+		components.append("%i day%s" % (days, "s" if days != 1 else ""))
+		number -= (days * day_length)
+
+	hour_length = 3600
+	hours = math.floor(number / hour_length)
+	if hours:
+		components.append("%i hour%s" % (hours, "s" if hours != 1 else ""))
+		number -= (hours * hour_length)
+
+	minute_length = 60
+	minutes = math.floor(number / minute_length)
+	if minutes:
+		components.append("%i minute%s" % (minutes, "s" if minutes != 1 else ""))
+
+	if not components:
+		components.append("less than a minute")
+
+	last_str = components.pop()
+	time_str = ""
+	if components:
+		time_str = ", ".join(components)
+		time_str += " and "
+
+	return time_str + last_str
 
 def get_yt_compatible_ids(yt_ids):
 	"""
@@ -279,7 +336,7 @@ def call_api(action, payload=None):
 	"""
 	connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 	connection.settimeout(15)
-	connection.connect((config.API_HOST, config.API_PORT))
+	connection.connect((config.get('API_HOST'), config.get('API_PORT')))
 
 	msg = json.dumps({"request": action, "payload": payload})
 	connection.sendall(msg.encode("ascii", "ignore"))
@@ -344,6 +401,12 @@ def get_interval_descriptor(item, interval):
 		return str(timestamp.year) + "-" + str(timestamp.month).zfill(2)
 	elif interval == "week":
 		return str(timestamp.isocalendar()[0]) + "-" + str(timestamp.isocalendar()[1]).zfill(2)
+	elif interval == "hour":
+		return str(timestamp.year) + "-" + str(timestamp.month).zfill(2) + "-" + str(timestamp.day).zfill(
+			2) + " " + str(timestamp.hour).zfill(2)
+	elif interval == "minute":
+		return str(timestamp.year) + "-" + str(timestamp.month).zfill(2) + "-" + str(timestamp.day).zfill(
+			2) + " " + str(timestamp.hour).zfill(2) + ":" + str(timestamp.minute).zfill(2)
 	else:
 		return str(timestamp.year) + "-" + str(timestamp.month).zfill(2) + "-" + str(timestamp.day).zfill(2)
 
@@ -351,6 +414,8 @@ def get_interval_descriptor(item, interval):
 def pad_interval(intervals, first_interval=None, last_interval=None):
 	"""
 	Pad an interval so all intermediate intervals are filled
+
+	Warning, ugly code (PRs very welcome)
 
 	:param dict intervals:  A dictionary, with dates (YYYY{-MM}{-DD}) as keys
 	and a numerical value.
@@ -364,7 +429,6 @@ def pad_interval(intervals, first_interval=None, last_interval=None):
 	# first determine the boundaries of the interval
 	# these may be passed as parameters, or they can be inferred from the
 	# interval given
-
 	if first_interval:
 		first_interval = str(first_interval)
 		first_year = int(first_interval[0:4])
@@ -372,6 +436,11 @@ def pad_interval(intervals, first_interval=None, last_interval=None):
 			first_month = int(first_interval[5:7])
 		if len(first_interval) > 7:
 			first_day = int(first_interval[8:10])
+		if len(first_interval) > 10:
+			first_hour = int(first_interval[11:13])
+		if len(first_interval) > 13:
+			first_minute = int(first_interval[14:16])
+
 	else:
 		first_year = min([int(i[0:4]) for i in intervals])
 		if len(test_key) > 4:
@@ -379,6 +448,13 @@ def pad_interval(intervals, first_interval=None, last_interval=None):
 		if len(test_key) > 7:
 			first_day = min(
 				[int(i[8:10]) for i in intervals if int(i[0:4]) == first_year and int(i[5:7]) == first_month])
+		if len(test_key) > 10:
+			first_hour = min(
+				[int(i[11:13]) for i in intervals if int(i[0:4]) == first_year and int(i[5:7]) == first_month and int(i[8:10]) == first_day])
+		if len(test_key) > 13:
+			first_minute = min(
+				[int(i[14:16]) for i in intervals if int(i[0:4]) == first_year and int(i[5:7]) == first_month and int(i[8:10]) == first_day and int(i[11:13]) == first_hour])
+
 	if last_interval:
 		last_interval = str(last_interval)
 		last_year = int(last_interval[0:4])
@@ -386,6 +462,10 @@ def pad_interval(intervals, first_interval=None, last_interval=None):
 			last_month = int(last_interval[5:7])
 		if len(last_interval) > 7:
 			last_day = int(last_interval[8:10])
+		if len(last_interval) > 10:
+			last_hour = int(last_interval[11:13])
+		if len(last_interval) > 13:
+			last_minute = int(last_interval[14:16])
 	else:
 		last_year = max([int(i[0:4]) for i in intervals])
 		if len(test_key) > 4:
@@ -393,39 +473,66 @@ def pad_interval(intervals, first_interval=None, last_interval=None):
 		if len(test_key) > 7:
 			last_day = max(
 				[int(i[8:10]) for i in intervals if int(i[0:4]) == last_year and int(i[5:7]) == last_month])
+		if len(test_key) > 10:
+			last_hour = max(
+				[int(i[11:13]) for i in intervals if int(i[0:4]) == last_year and int(i[5:7]) == last_month and int(i[8:10]) == last_day])
+		if len(test_key) > 13:
+			last_minute = max(
+				[int(i[14:16]) for i in intervals if int(i[0:4]) == last_year and int(i[5:7]) == last_month and int(i[8:10]) == last_day and int(i[11:13]) == last_hour])
 
-	if re.match(r"^[0-9]{4}$", test_key):
-		# years are quite straightforward
-		for year in range(first_year, last_year + 1):
-			if str(year) not in intervals:
-				intervals[str(year)] = 0
-				missing += 1
+	has_month = re.match(r"^[0-9]{4}-[0-9]", test_key)
+	has_day = re.match(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}", test_key)
+	has_hour = re.match(r"^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}", test_key)
+	has_minute = re.match(r"^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}", test_key)
 
-	elif re.match(r"^[0-9]{4}-[0-9]{2}(-[0-9]{2})?", test_key):
-		# more granular intervals require the following monstrosity to
-		# ensure all intervals are available for every single graph
-		has_day = re.match(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}", test_key)
+	all_intervals = []
+	for year in range(first_year, last_year + 1):
+		year_interval = str(year)
 
-		for year in range(first_year, last_year + 1):
-			start_month = first_month if year == first_year else 1
-			end_month = last_month if year == last_year else 12
+		if not has_month:
+			all_intervals.append(year_interval)
+			continue
 
-			for month in range(start_month, end_month + 1):
-				key = str(year) + "-" + str(month).zfill(2)
-				if not has_day:
-					if key not in intervals:
-						intervals[key] = 0
-						missing += 1
-				else:
-					start_day = first_day if year == first_year and month == first_month else 1
-					end_day = last_day if year == last_year and month == last_month else \
-						monthrange(year, month)[1]
+		start_month = first_month if year == first_year else 1
+		end_month = last_month if year == last_year else 12
+		for month in range(start_month, end_month + 1):
+			month_interval = year_interval + "-" + str(month).zfill(2)
 
-					for day in range(start_day, end_day + 1):
-						day_key = key + "-" + str(day).zfill(2)
-						if day_key not in intervals:
-							intervals[day_key] = 0
-							missing += 1
+			if not has_day:
+				all_intervals.append(month_interval)
+				continue
+
+			start_day = first_day if all((year == first_year, month == first_month)) else 1
+			end_day = last_day if all((year == last_year, month == last_month)) else monthrange(year, month)[1]
+			for day in range(start_day, end_day + 1):
+				day_interval = month_interval + "-" + str(day).zfill(2)
+
+				if not has_hour:
+					all_intervals.append(day_interval)
+					continue
+
+				start_hour = first_hour if all((year == first_year, month == first_month, day == first_day)) else 0
+				end_hour = last_hour if all((year == last_year, month == last_month, day == last_day)) else 23
+				for hour in range(start_hour, end_hour + 1):
+					hour_interval = day_interval + " " + str(hour).zfill(2)
+
+					if not has_minute:
+						all_intervals.append(hour_interval)
+						continue
+
+					start_minute = first_minute if all(
+						(year == first_year, month == first_month, day == first_day, hour == first_hour)) else 0
+					end_minute = last_minute if all(
+						(year == last_year, month == last_month, day == last_day, hour == last_hour)) else 59
+
+					for minute in range(start_minute, end_minute + 1):
+						minute_interval = hour_interval + ":" + str(minute).zfill(2)
+						all_intervals.append(minute_interval)
+
+	for interval in all_intervals:
+		if interval not in intervals:
+			intervals[interval] = 0
+			missing += 1
 
 	# sort while we're at it
 	intervals = {key: intervals[key] for key in sorted(intervals)}
@@ -551,13 +658,38 @@ def send_email(recipient, message):
 	:param list recipient:  Recipient e-mail addresses
 	:param MIMEMultipart message:  Message to send
 	"""
-	connector = smtplib.SMTP_SSL if hasattr(config, "MAIL_SSL") and config.MAIL_SSL else smtplib.SMTP
+	connector = smtplib.SMTP_SSL if config.get('mail.ssl') else smtplib.SMTP
 
-	with connector(config.MAILHOST) as smtp:
-		if hasattr(config, "MAIL_USERNAME") and hasattr(config, "MAIL_PASSWORD") and config.MAIL_USERNAME and config.MAIL_PASSWORD:
+	with connector(config.get('mail.server')) as smtp:
+		if config.get('mail.username') and config.get('mail.password'):
 			smtp.ehlo()
-			smtp.login(config.MAIL_USERNAME, config.MAIL_PASSWORD)
+			smtp.login(config.get('mail.username'), config.get('mail.password'))
 		if type(message) == str:
-			smtp.sendmail(config.NOREPLY_EMAIL, recipient, message)
+			smtp.sendmail(config.get('mail.noreply'), recipient, message)
 		else:
-			smtp.sendmail(config.NOREPLY_EMAIL, recipient, message.as_string())
+			smtp.sendmail(config.get('mail.noreply'), recipient, message.as_string())
+
+def flatten_dict(d: MutableMapping, parent_key: str = '', sep: str = '.'):
+	"""
+	Return a flattened dictionary where nested dictionary objects are given new
+	keys using the partent key combined using the seperator with the child key.
+
+	Lists will be converted to json strings via json.dumps()
+
+	:param MutableMapping d:  Dictionary like object
+	:param str partent_key: The original parent key prepending future nested keys
+	:param str sep: A seperator string used to combine parent and child keys
+	:return dict:  A new dictionary with the no nested values
+	"""
+
+	def _flatten_dict_gen(d, parent_key, sep):
+		for k, v in d.items():
+			new_key = parent_key + sep + k if parent_key else k
+			if isinstance(v, MutableMapping):
+				yield from flatten_dict(v, new_key, sep=sep).items()
+			elif isinstance(v, list):
+				yield new_key, json.dumps([flatten_dict(item, new_key, sep=sep) if isinstance(item, MutableMapping) else item for item in v])
+			else:
+				yield new_key, v
+
+	return dict(_flatten_dict_gen(d, parent_key, sep))

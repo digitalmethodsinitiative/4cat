@@ -211,7 +211,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		result, copying it to another dataset, and so on.
 		"""
 		if self.dataset.data["num_rows"] > 0:
-			self.dataset.update_status("Dataset saved.")
+			self.dataset.update_status("Dataset completed.")
 
 		if not self.dataset.is_finished():
 			self.dataset.finish()
@@ -223,15 +223,26 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		for next in self.parameters.get("next", []):
 			next_parameters = next.get("parameters", {})
 			next_type = next.get("type", "")
-			available_processors = self.dataset.get_available_processors()
+			try:
+				available_processors = self.dataset.get_available_processors()
+			except ValueError:
+				self.log.info("Trying to queue next processor, but parent dataset no longer exists, halting")
+				break
 
 			# run it only if the post-processor is actually available for this query
 			if self.dataset.data["num_rows"] <= 0:
 				self.log.info("Not running follow-up processor of type %s for dataset %s, no input data for follow-up" % (next_type, self.dataset.key))
 
 			elif next_type in available_processors:
-				next_analysis = DataSet(parameters=next_parameters, type=next_type, db=self.db, parent=self.dataset.key,
-										extension=available_processors[next_type].extension)
+				next_analysis = DataSet(
+					parameters=next_parameters,
+					type=next_type,
+					db=self.db,
+					parent=self.dataset.key,
+					extension=available_processors[next_type].extension,
+					is_private=self.dataset.is_private,
+					owner=self.dataset.owner
+				)
 				self.queue.add_job(next_type, remote_id=next_analysis.key)
 			else:
 				self.log.warning("Dataset %s (of type %s) wants to run processor %s next, but it is incompatible" % (self.dataset.key, self.type, next_type))
@@ -331,7 +342,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		parent_path = which_parent.get_results_path()
 
 		if len(new_data) != which_parent.num_rows:
-			raise ProcessorException('Must have new data point for each record')
+			raise ProcessorException('Must have new data point for each record: parent dataset: %i, new data points: %i' % (which_parent.num_rows, len(new_data)))
 
 		self.dataset.update_status("Adding new field %s to the source file" % field_name)
 
@@ -564,13 +575,21 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		"""
 		top_parent = self.source_dataset
 
+		finished = self.dataset.check_dataset_finished()
+		if finished == 'empty':
+			# No data to process, so we can't create a standalone dataset
+			return
+		elif finished is None:
+			# I cannot think of why we would create a standalone from an unfinished dataset, but I'll leave it for now
+			pass
+
 		standalone = self.dataset.copy(shallow=False)
 		standalone.body_match = "(Filtered) " + top_parent.query
 		standalone.datasource = top_parent.parameters.get("datasource", "custom")
 
 		try:
 			standalone.board = top_parent.board
-		except KeyError:
+		except AttributeError:
 			standalone.board = self.type
 
 		standalone.type = top_parent.type

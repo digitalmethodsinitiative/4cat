@@ -2,6 +2,8 @@
 @import url('dataset-page.css');
 @import url('control-panel.css');
 
+@import url('progress.css');
+
 
 /** --------------------- *
             Fonts
@@ -43,6 +45,7 @@
     --highlight: #FF2231;
     --accent-alternate: #19B0A3;
     --accent-okay: #26b018;
+    --accent-okay-light: #bee0ba;
     --accent-warning: #b05d13;
     --accent-error: #ff2231;
     --gray-dark: #DFDFDF;
@@ -86,7 +89,32 @@ code {
     font-weight: bold;
 }
 
+pre {
+    font-family: monospace;
+    margin: 1em 1em;
+    background: var(--gray);
+    color: var(--accent-alternate);
+    overflow: auto;
+    padding: 0.5em;
+}
+
 em, strong {
+    font-weight: bold;
+}
+
+i {
+    font-style: italic;
+}
+
+i.scroll {
+    animation: scroll-vertical 1.5s infinite linear;
+    overflow: hidden;
+    height: 3em;
+    padding-bottom: 2em;
+    box-sizing: border-box;
+    clip-path: polygon(0 33%, 100% 33%, 100% 66%, 0 66%);
+    margin-top: -1em;
+    margin-bottom: -1em;
     font-weight: bold;
 }
 
@@ -142,6 +170,12 @@ input[type=radio], input[type=checkbox] {
 
 fieldset {
     border-bottom: 1px dotted var(--contrast-dark);
+}
+
+fieldset legend {
+    margin-bottom: 0.5em;
+    box-sizing: border-box;
+    width: 100%;
 }
 
 p.form-notice {
@@ -209,6 +243,13 @@ article.small .form-element > *:not([type=radio], [type=checkbox]) {
 .submit-container {
     text-align: center;
     padding: 1em;
+}
+
+.data-overview-link {
+    display: block;
+    font-size: 13px;
+    position: absolute;
+    margin-top: -3px;
 }
 
 button, .button-like {
@@ -299,6 +340,14 @@ nav > ul.flat > li:not(:last-child)::after {
     min-width: 25em;
 }
 
+*[role=tooltip] ul {
+    margin-left: 1.5em;
+}
+
+button.tooltip-trigger {
+    max-height: 1.75em;
+}
+
 button.tooltip-trigger, button.popup-trigger {
 	font-size: 0.8em;
 	position: relative;
@@ -327,9 +376,9 @@ button.tooltip-trigger, button.popup-trigger {
     padding: 1em;
     box-sizing: border-box;
     border: 2px solid var(--contrast-dark);
+    max-width: 960px;
     width: 50%;
     height: 50%;
-    max-width: 960px;
     margin-right: -50%;
     transform: translate(-50%, -50%);
     top: 50%;
@@ -340,6 +389,37 @@ button.tooltip-trigger, button.popup-trigger {
     width: 90%;
     height: 90%;
     max-width: 90%;
+}
+
+#popup.alert, #popup.confirm {
+    padding: 0;
+    width: auto;
+    height: auto;
+    min-width: 20em;
+}
+
+#popup.confirm h2, #popup.alert h2 {
+    background: var(--contrast-dark);
+    color: var(--contrast-bright);
+    text-align: center;
+    font-size: 1em;
+    padding: 0.5em;
+}
+
+#popup.confirm .controls, #popup.alert .controls {
+    display: flex;
+    column-gap: 1em;
+    justify-content: center;
+    padding: 0.75em;
+    position: absolute;
+    bottom: 0;
+    width: 100%;
+}
+
+#popup.confirm p, #popup.alert p {
+    text-align: center;
+    padding: 1em;
+    margin-bottom: 4em;
 }
 
 #popup .content {
@@ -355,7 +435,9 @@ button.tooltip-trigger, button.popup-trigger {
 
 #popup .content iframe {
     width: 100%;
-    height: 100%;
+    height: 98%;
+    position: relative;
+    top: 1%;
 }
 
 .csv-preview {
@@ -379,7 +461,7 @@ button.tooltip-trigger, button.popup-trigger {
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0, 0, 0, 0.25);
+    background: rgba(0, 0, 0, 0.35);
 }
 
 #blur[aria-expanded=true] {
@@ -528,7 +610,7 @@ article.with-aside {
     grid-column-gap: 1em;
 }
 
-article h2, .blocktitle {
+article h2, .blocktitle, fieldset legend {
     border-left: 0.5em solid var(--accent);
     background: var(--contrast-dark);
     color: var(--contrast-bright);
@@ -536,6 +618,7 @@ article h2, .blocktitle {
     font-size: 1.5em;
     font-weight: bold;
     padding: 0.5em 0;
+    display: block;
 }
 
 article h2 a, .blocktitle a {
@@ -546,7 +629,7 @@ h4 {
     font-weight: bold;
 }
 
-h4.blocktitle, h3.blocktitle {
+h4.blocktitle, h3.blocktitle, fieldset legend {
     border-left: 0;
     text-align: left;
     font-size: 1em;
@@ -594,8 +677,17 @@ article section ul, article aside ul {
     margin-left: 2.5em;
 }
 
+article section ul.nobullet, article aside ul.nobullet {
+    list-style: none;
+    margin-left: auto;
+}
+
 article section li p, article aside li p {
     margin-left: 0;
+}
+
+article section.data-overview .description {
+    padding: 1em 0;
 }
 
 /** --------------------- *
@@ -703,7 +795,7 @@ article section li p, article aside li p {
     padding: 0.5em 1em;
 }
 
-#query-status.active {
+#query-status.active:not(.progress) {
     animation: scroll-background 2s ease infinite;
 }
 
@@ -726,6 +818,18 @@ article section li p, article aside li p {
     }
 }
 
+@keyframes scroll-vertical {
+  0% {
+    padding-top: 0;
+    padding-bottom: 2em;
+  }
+
+  100% {
+    padding-top: 2em;
+    padding-bottom: 0;
+  }
+}
+
 /** --------------------- *
   Pages -> Queue
   * --------------------- */
@@ -737,16 +841,12 @@ article section li p, article aside li p {
 /** --------------------- *
   Pages -> Results metadata
   * --------------------- */
-.inline-label {
-    color: var(--accent-alternate);
-}
-
 .inline-query {
     overflow-wrap: anywhere;
 }
 
 .property-badge {
-    font-size: 0.6em;
+    font-size: 0.8em;
     display: inline;
     border: 1px solid var(--contrast-dark);
     border-radius: 2px;
@@ -755,6 +855,11 @@ article section li p, article aside li p {
     top: -1px;
 	vertical-align: baseline;
     cursor: default;
+}
+
+.property-badge.fullsize {
+    font-size: 0.8em;
+    margin-right: 0.5em;
 }
 
 a.property-badge {

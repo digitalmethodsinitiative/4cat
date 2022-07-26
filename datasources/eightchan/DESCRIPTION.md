@@ -1,0 +1,1 @@
+The 8chan data source exists of archived data and data scraped when the imageboard was still online. See the graph below for what data per board is available on this 4CAT instance.
