@@ -328,7 +328,7 @@ class ImageDownloader(BasicProcessor):
 		metadata = {
 			url: {
 				"filename": url_file_map.get(url),
-				"success": url not in failures,
+				"success": not url_file_map.get(url) is None and url not in failures, # skipped and fails are NOT success
 				"from_dataset": self.source_dataset.key,
 				"post_ids": urls[url]
 			} for url in urls

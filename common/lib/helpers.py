@@ -14,6 +14,7 @@ import csv
 import re
 import os
 
+from collections.abc import MutableMapping
 from pathlib import Path
 from html.parser import HTMLParser
 from werkzeug.datastructures import FileStorage
@@ -484,14 +485,14 @@ def pad_interval(intervals, first_interval=None, last_interval=None):
 
 	all_intervals = []
 	for year in range(first_year, last_year + 1):
-		start_month = first_month if year == first_year else 1
-		end_month = last_month if year == last_year else 12
 		year_interval = str(year)
 
 		if not has_month:
 			all_intervals.append(year_interval)
 			continue
 
+		start_month = first_month if year == first_year else 1
+		end_month = last_month if year == last_year else 12
 		for month in range(start_month, end_month + 1):
 			month_interval = year_interval + "-" + str(month).zfill(2)
 
@@ -665,3 +666,28 @@ def send_email(recipient, message):
 			smtp.sendmail(config.get('mail.noreply'), recipient, message)
 		else:
 			smtp.sendmail(config.get('mail.noreply'), recipient, message.as_string())
+
+def flatten_dict(d: MutableMapping, parent_key: str = '', sep: str = '.'):
+	"""
+	Return a flattened dictionary where nested dictionary objects are given new
+	keys using the partent key combined using the seperator with the child key.
+
+	Lists will be converted to json strings via json.dumps()
+
+	:param MutableMapping d:  Dictionary like object
+	:param str partent_key: The original parent key prepending future nested keys
+	:param str sep: A seperator string used to combine parent and child keys
+	:return dict:  A new dictionary with the no nested values
+	"""
+
+	def _flatten_dict_gen(d, parent_key, sep):
+		for k, v in d.items():
+			new_key = parent_key + sep + k if parent_key else k
+			if isinstance(v, MutableMapping):
+				yield from flatten_dict(v, new_key, sep=sep).items()
+			elif isinstance(v, list):
+				yield new_key, json.dumps([flatten_dict(item, new_key, sep=sep) if isinstance(item, MutableMapping) else item for item in v])
+			else:
+				yield new_key, v
+
+	return dict(_flatten_dict_gen(d, parent_key, sep))
