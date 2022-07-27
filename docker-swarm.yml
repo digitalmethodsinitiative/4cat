@@ -1,7 +1,5 @@
 version: '3.6'
 
-
-
 ### Docker swarm for 4cat with external database and traefik. For production is better not to use databases in docker. 
 
 volumes:
@@ -10,7 +8,6 @@ volumes:
   4cat_logs: {}
   #### I had to separate the config files from frontend and backend, to connect the frontend to the backend without opening ports in the main server
   ##### This config makes all communication from backend to frontend to be inside the docker network
-  front_end_config: {}
   letsencrypt-certificates: {}
 
   
@@ -45,16 +42,14 @@ services:
     entrypoint: docker/docker-entrypoint.sh
     extra_hosts:
      - "db:your database ip"
+    
     networks:
        4cat:  
          aliases:
-         ###### To link to the other container
+         ###### To link to the other container and for the container to find itself  in the network with the config.ini file. 
           - 4cat_backend
  
-#### I wrote the config file mannually here fot this to work.
-##### config.ini should be copied from the backend container
-##### and subsitute the line api_host with
-#### api_host = 4cat_backend
+#### The config.ini should contain the line api_host with  api_host = 4cat_backend
 
 
    frontend:
@@ -64,7 +59,7 @@ services:
     volumes:
     #### same
       - 4cat_data:/usr/src/app/data/
-      - front_end_config:/usr/src/app/config/
+      - 4cat_share:/usr/src/app/config/
       - 4cat_logs:/usr/src/app/logs/
     environment:
      - POSTGRES_USER=fourcat
