@@ -35,10 +35,10 @@ services:
     ### differences between docker compose and docker swarm
      - POSTGRES_USER=fourcat
      - POSTGRES_DB=fourcat
-     - PGPASSWORD=Us@584qM7f22
-     - POSTGRES_PASSWORD=Us@584qM7f22
+     - PGPASSWORD=yourpassword
+     - POSTGRES_PASSWORD=yourpassword
      - PUBLIC_PORT=80
-     - SERVER_NAME=0.0.0.0
+     - SERVER_NAME=yourfqdn.com ### same as the one in the traefik config below. 
      - PUBLIC_API_PORT=4444
      - TELEGRAM_PORT=443
 
@@ -69,8 +69,8 @@ services:
     environment:
      - POSTGRES_USER=fourcat
      - POSTGRES_DB=fourcat
-     - PGPASSWORD=Us@584qM7f22
-     - POSTGRES_PASSWORD=Us@584qM7f22
+     - PGPASSWORD=yourpassword
+     - POSTGRES_PASSWORD=yourpassword
      - PUBLIC_PORT=80
      #### Not sure about if this variable is needed.
      - SERVER_NAME=4cat.coraldigital.mx
