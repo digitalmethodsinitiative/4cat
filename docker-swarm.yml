@@ -42,7 +42,7 @@ services:
      - PUBLIC_API_PORT=4444
      - TELEGRAM_PORT=443
 
-    entrypoint: docker/docker-entrypoint.sh -p
+    entrypoint: docker/docker-entrypoint.sh
     extra_hosts:
      - "db:your database ip"
     networks:
