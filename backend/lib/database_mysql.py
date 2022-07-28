@@ -4,8 +4,7 @@ Database wrapper
 import pymysql.connections as mysqlconnections
 import pymysql
 
-import config
-
+import common.config_manager as config
 
 class MySQLDatabase:
 	"""
@@ -23,12 +22,6 @@ class MySQLDatabase:
 		"""
 		Set up database connection
 		"""
-		dbname = config.DB_NAME if not dbname else dbname
-		user = config.DB_USER if not user else user
-		password = config.DB_PASSWORD if not password else password
-		host = config.DB_HOST if not host else host
-		port = config.DB_PORT if not port else port
-
 		self.connection = mysqlconnections.Connection(database=dbname, user=user, password=password, host=host, port=port)
 		self.cursor = self.connection.cursor(pymysql.cursors.DictCursor)
 		self.log = logger

@@ -4,7 +4,7 @@ Load modules and datasources dynamically
 from pathlib import Path
 import importlib
 import inspect
-import config
+import common.config_manager as config
 import pickle
 import sys
 import re
@@ -73,11 +73,11 @@ class ModuleCollector:
         """
         # look for workers and processors in pre-defined folders and datasources
 
-        paths = [Path(config.PATH_ROOT, "processors"), Path(config.PATH_ROOT, "backend", "workers"),
+        paths = [Path(config.get('PATH_ROOT'), "processors"), Path(config.get('PATH_ROOT'), "backend", "workers"),
                  *[self.datasources[datasource]["path"] for datasource in self.datasources]]
 
-        root_match = re.compile(r"^%s" % re.escape(config.PATH_ROOT))
-        root_path = Path(config.PATH_ROOT)
+        root_match = re.compile(r"^%s" % re.escape(config.get('PATH_ROOT')))
+        root_path = Path(config.get('PATH_ROOT'))
 
         for folder in paths:
             # loop through folders, and files in those folders, recursively
@@ -149,7 +149,7 @@ class ModuleCollector:
         `DATASOURCE` constant. The latter is taken as the ID for this
         datasource.
         """
-        for subdirectory in Path(config.PATH_ROOT, "datasources").iterdir():
+        for subdirectory in Path(config.get('PATH_ROOT'), "datasources").iterdir():
             # folder name, also the name used in config.py
             folder_name = subdirectory.parts[-1]
 
@@ -165,16 +165,13 @@ class ModuleCollector:
 
             datasource_id = datasource.DATASOURCE
 
-            if datasource_id not in config.DATASOURCES:
-                # not configured, so we're going to just ignore it
-                continue
-
             self.datasources[datasource_id] = {
-                "expire-datasets": config.DATASOURCES[datasource_id].get("expire-datasets", None),
+                "expire-datasets": config.get('DATASOURCES').get(datasource_id, {}).get("expire-datasets", None),
                 "path": subdirectory,
                 "name": datasource.NAME if hasattr(datasource, "NAME") else datasource_id,
                 "id": subdirectory.parts[-1],
-                "init": datasource.init_datasource
+                "init": datasource.init_datasource,
+                "config": {} if not hasattr(datasource, "config") else datasource.config
             }
 
         sorted_datasources = {datasource_id: self.datasources[datasource_id] for datasource_id in

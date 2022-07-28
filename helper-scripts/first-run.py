@@ -39,4 +39,7 @@ import nltk
 nltk_downloads = ("wordnet", "punkt")
 for package in nltk_downloads:
     # if it already exists, .download() will just NOP
-    nltk.download(package)
+    try:
+        nltk.download(package)
+    except FileExistsError:
+        pass 

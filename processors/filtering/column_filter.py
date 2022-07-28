@@ -171,6 +171,7 @@ class ColumnFilter(BasicProcessor):
                 processed_items += 1
                 if processed_items % 500 == 0:
                     self.dataset.update_status("Processed %i items (%i matching)" % (processed_items, matching_items))
+                    self.dataset.update_progress(processed_items / self.source_dataset.num_rows)
 
                 # Get column to be used in search for matches
                 item_column = item.get(column)

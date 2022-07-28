@@ -11,7 +11,7 @@ import re
 from backend.abstract.search import Search
 from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException, QueryNeedsExplicitConfirmationException
 from common.lib.helpers import convert_to_int, UserInput, timify_long
-import config
+import common.config_manager as config
 
 
 class SearchWithTwitterAPIv2(Search):
@@ -63,7 +63,7 @@ class SearchWithTwitterAPIv2(Search):
             "help": "API Bearer Token"
         },
     }
-    if config.DATASOURCES.get('twitterv2', {}).get('id_lookup', False):
+    if config.get('DATASOURCES').get('twitterv2', {}).get('id_lookup', False):
         options["query_type"] = {
                 "type": UserInput.OPTION_CHOICE,
                 "help": "Query type",
@@ -178,7 +178,10 @@ class SearchWithTwitterAPIv2(Search):
                     "%Y-%m-%dT%H:%M:%SZ")
 
         if type(expected_tweets) is int:
+            num_expected_tweets = expected_tweets
             expected_tweets = "{:,}".format(expected_tweets)
+        else:
+            num_expected_tweets = None
 
         tweets = 0
         for query in queries:
@@ -343,6 +346,8 @@ class SearchWithTwitterAPIv2(Search):
                     tweets += 1
                     if tweets % 500 == 0:
                         self.dataset.update_status("Received %s of ~%s tweets from the Twitter API" % ("{:,}".format(tweets), expected_tweets))
+                        if num_expected_tweets is not None:
+                            self.dataset.update_progress(tweets / num_expected_tweets)
 
                     yield tweet
 

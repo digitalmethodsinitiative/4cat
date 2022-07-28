@@ -2,6 +2,8 @@
 @import url('dataset-page.css');
 @import url('control-panel.css');
 
+@import url('progress.css');
+
 
 /** --------------------- *
             Fonts
@@ -43,6 +45,7 @@
     --highlight: #FF2231;
     --accent-alternate: #19B0A3;
     --accent-okay: #26b018;
+    --accent-okay-light: #bee0ba;
     --accent-warning: #b05d13;
     --accent-error: #ff2231;
     --gray-dark: #DFDFDF;
@@ -103,6 +106,18 @@ i {
     font-style: italic;
 }
 
+i.scroll {
+    animation: scroll-vertical 1.5s infinite linear;
+    overflow: hidden;
+    height: 3em;
+    padding-bottom: 2em;
+    box-sizing: border-box;
+    clip-path: polygon(0 33%, 100% 33%, 100% 66%, 0 66%);
+    margin-top: -1em;
+    margin-bottom: -1em;
+    font-weight: bold;
+}
+
 table {
     margin: 1em auto;
     font-size: inherit;
@@ -155,6 +170,12 @@ input[type=radio], input[type=checkbox] {
 
 fieldset {
     border-bottom: 1px dotted var(--contrast-dark);
+}
+
+fieldset legend {
+    margin-bottom: 0.5em;
+    box-sizing: border-box;
+    width: 100%;
 }
 
 p.form-notice {
@@ -323,6 +344,10 @@ nav > ul.flat > li:not(:last-child)::after {
     margin-left: 1.5em;
 }
 
+button.tooltip-trigger {
+    max-height: 1.75em;
+}
+
 button.tooltip-trigger, button.popup-trigger {
 	font-size: 0.8em;
 	position: relative;
@@ -410,7 +435,9 @@ button.tooltip-trigger, button.popup-trigger {
 
 #popup .content iframe {
     width: 100%;
-    height: 100%;
+    height: 98%;
+    position: relative;
+    top: 1%;
 }
 
 .csv-preview {
@@ -583,7 +610,7 @@ article.with-aside {
     grid-column-gap: 1em;
 }
 
-article h2, .blocktitle {
+article h2, .blocktitle, fieldset legend {
     border-left: 0.5em solid var(--accent);
     background: var(--contrast-dark);
     color: var(--contrast-bright);
@@ -591,6 +618,7 @@ article h2, .blocktitle {
     font-size: 1.5em;
     font-weight: bold;
     padding: 0.5em 0;
+    display: block;
 }
 
 article h2 a, .blocktitle a {
@@ -601,7 +629,7 @@ h4 {
     font-weight: bold;
 }
 
-h4.blocktitle, h3.blocktitle {
+h4.blocktitle, h3.blocktitle, fieldset legend {
     border-left: 0;
     text-align: left;
     font-size: 1em;
@@ -767,7 +795,7 @@ article section.data-overview .description {
     padding: 0.5em 1em;
 }
 
-#query-status.active {
+#query-status.active:not(.progress) {
     animation: scroll-background 2s ease infinite;
 }
 
@@ -788,6 +816,18 @@ article section.data-overview .description {
     100% {
         background:#FFF;
     }
+}
+
+@keyframes scroll-vertical {
+  0% {
+    padding-top: 0;
+    padding-bottom: 2em;
+  }
+
+  100% {
+    padding-top: 2em;
+    padding-bottom: 0;
+  }
 }
 
 /** --------------------- *

@@ -20,7 +20,7 @@ class Vectorise(BasicProcessor):
 	category = "Text analysis"  # category
 	title = "Count words"  # title displayed in UI
 	description = "Counts all tokens so they are transformed into word => frequency counts." \
-				  "This is also knonw as a bag of words."  # description displayed in UI
+				  "This is also known as a bag of words."  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
 
 	@classmethod
@@ -49,6 +49,7 @@ class Vectorise(BasicProcessor):
 			index += 1
 			vector_set_name = token_file.stem  # we don't need the full path
 			self.dataset.update_status("Processing token set %i (%s)" % (index, vector_set_name))
+			self.dataset.update_progress(index / self.source_dataset.num_rows)
 
 			# we support both pickle and json dumps of vectors
 			token_unpacker = pickle if vector_set_name.split(".")[-1] == "pb" else json

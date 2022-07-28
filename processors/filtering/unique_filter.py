@@ -80,6 +80,7 @@ class UniqueFilter(BasicProcessor):
 
 				if processed % 2500 == 0:
 					self.dataset.update_status("Processed %i posts (%i unique)" % (processed, unique))
+					self.dataset.update_progress(processed / self.source_dataset.num_rows)
 
 				processed += 1
 

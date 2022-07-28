@@ -13,8 +13,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
 sys.path.insert(0, os.path.dirname(__file__) + '/../..')
-import config
-
+import common.config_manager as config
 from flask import request, abort, render_template, redirect, url_for, flash, get_flashed_messages
 from flask_login import login_user, login_required, logout_user, current_user
 from webtool import app, login_manager, db
@@ -88,22 +87,25 @@ def banned_users():
 @app.before_request
 def autologin_whitelist():
 	"""
-	Checks if host name matches whitelisted hostmask. If so, the user is logged
-	in as the special "autologin" user.
+	Checks if host name matches whitelisted hostmask or IP. If so, the user is
+	logged in as the special "autologin" user.
 	"""
-	if not config.FlaskConfig.HOSTNAME_WHITELIST:
-		# if there's not whitelist, there's no point in checking it
+	if not config.get("flask.autologin.hostnames"):
+		# if there's no whitelist, there's no point in checking it
 		return
 
 	if "/static/" in request.path:
 		# never check login for static files
 		return
 
+	# filter by IP address and hostname, if the latter is available
+	filterables = [request.remote_addr]
 	try:
 		socket.setdefaulttimeout(2)
 		hostname = socket.gethostbyaddr(request.remote_addr)[0]
+		filterables.append(hostname)
 	except (socket.herror, socket.timeout):
-		return
+		pass  # no hostname for this address
 
 	if current_user:
 		if current_user.get_id() == "autologin":
@@ -113,16 +115,15 @@ def autologin_whitelist():
 			# if we're logged in as a regular user, no need for a check
 			return
 
-	# uva is a special user that is automatically logged in for this request only
-	# if the hostname matches the whitelist
-	for hostmask in config.FlaskConfig.HOSTNAME_WHITELIST:
-		if fnmatch.filter([hostname], hostmask):
-			autologin_user = User.get_by_name(db, "autologin")
-			if not autologin_user:
-				# this user should exist by default
-				abort(500)
-			autologin_user.authenticate()
-			login_user(autologin_user, remember=False)
+	# autologin is a special user that is automatically logged in for this
+	# request only if the hostname or IP matches the whitelist
+	if any([fnmatch.filter(filterables, hostmask) for hostmask in config.get("flask.autologin.hostnames", [])]):
+		autologin_user = User.get_by_name(db, "autologin")
+		if not autologin_user:
+			# this user should exist by default
+			abort(500)
+		autologin_user.authenticate()
+		login_user(autologin_user, remember=False)
 
 
 @limiter.request_filter
@@ -133,18 +134,20 @@ def exempt_from_limit():
 
 	:return bool:  Whether the request's hostname is exempt
 	"""
-	if not config.FlaskConfig.HOSTNAME_WHITELIST_API:
+	if not config.get("flask.autologin.api"):
 		return False
 
+	# filter by IP address and hostname, if the latter is available
+	filterables = [request.remote_addr]
 	try:
 		socket.setdefaulttimeout(2)
 		hostname = socket.gethostbyaddr(request.remote_addr)[0]
+		filterables.append(hostname)
 	except (socket.herror, socket.timeout):
-		return False
+		pass  # no hostname for this address
 
-	for hostmask in config.FlaskConfig.HOSTNAME_WHITELIST_API:
-		if fnmatch.filter([hostname], hostmask):
-			return True
+	if any([fnmatch.filter(filterables, hostmask) for hostmask in config.get("flask.autologin.api", [])]):
+		return True
 
 	return False
 
@@ -252,11 +255,11 @@ def request_access():
 	sent to the 4CAT admin via e-mail so they can create an account (if
 	approved)
 	"""
-	if not config.ADMIN_EMAILS:
+	if not config.get('mail.admin_email'):
 		return render_template("error.html",
                                message="No administrator e-mail is configured; the request form cannot be displayed.")
 
-	if not config.MAILHOST:
+	if not config.get('mail.server'):
 		return render_template("error.html",
                                message="No e-mail server configured; the request form cannot be displayed.")
 
@@ -265,7 +268,7 @@ def request_access():
 
 	incomplete = []
 
-	policy_template = Path(config.PATH_ROOT, "webtool/pages/access-policy.md")
+	policy_template = Path(config.get('PATH_ROOT'), "webtool/pages/access-policy.md")
 	access_policy = ""
 	if policy_template.exists():
 		access_policy = policy_template.read_text(encoding="utf-8")
@@ -281,18 +284,18 @@ def request_access():
 		else:
 			html_parser = html2text.HTML2Text()
 
-			sender = config.NOREPLY_EMAIL
+			sender = config.get('mail.noreply')
 			message = MIMEMultipart("alternative")
 			message["Subject"] = "Account request"
 			message["From"] = sender
-			message["To"] = config.ADMIN_EMAILS[0]
+			message["To"] = config.get('mail.admin_email', "")
 
 			mail = "<p>Hello! Someone requests a 4CAT Account:</p>\n"
 			for field in required:
 				mail += "<p><b>" + field + "</b>: " + request.form.get(field, "") + " </p>\n"
 
-			root_url = "https" if config.FlaskConfig.SERVER_HTTPS else "http"
-			root_url += "://%s/admin/" % config.FlaskConfig.SERVER_NAME
+			root_url = "https" if config.get("flask.https") else "http"
+			root_url += "://%s/admin/" % config.get("flask.server_name")
 			approve_url = root_url + "add-user/?format=html&email=%s" % request.form.get("email", "")
 			reject_url = root_url + "reject-user/?name=%s&email=%s" % (request.form.get("name", ""), request.form.get("email", ""))
 			mail += "<p>Use <a href=\"%s\">this link</a> to approve this request and send a password reset e-mail.</p>" % approve_url
@@ -303,7 +306,7 @@ def request_access():
 			message.attach(MIMEText(mail, "html"))
 
 			try:
-				send_email(config.ADMIN_EMAILS, message)
+				send_email(config.get('mail.admin_email'), message)
 				return render_template("error.html", title="Thank you",
                                        message="Your request has been submitted; we'll try to answer it as soon as possible.")
 			except (smtplib.SMTPException, ConnectionRefusedError, socket.timeout) as e:

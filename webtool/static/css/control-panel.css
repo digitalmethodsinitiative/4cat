@@ -43,3 +43,20 @@ table.user-table .actions {
 .user-panel .view-controls ul li:first-child {
     text-align: left;
 }
+
+.settings fieldset {
+    border: 0;
+}
+
+.settings article {
+    max-width: 50%;
+}
+
+.settings .form-element label {
+    min-width: 15em;
+}
+
+.settings input[type=text] {
+    width: 25em;
+    max-width: 25em;
+}

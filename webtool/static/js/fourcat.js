@@ -232,7 +232,7 @@ const query = {
 		// Check status of query
 		if($('body.result-page').length > 0) {
 			query.update_status();
-			setInterval(query.update_status, 4000);
+			setInterval(query.update_status, 1000);
 
 			// Check processor queue
 			query.check_processor_queue();
@@ -246,7 +246,7 @@ const query = {
 		}
 
 		//regularly check for unfinished datasets
-		setInterval(query.check_resultpage, 2000);
+		setInterval(query.check_resultpage, 1000);
 
 		// Start querying when go button is clicked
 		$('#query-form').on('submit', function (e) {
@@ -389,6 +389,7 @@ const query = {
 
 				if (json.done) {
 					clearInterval(query.poll_interval);
+					applyProgress($('#query-status'), 100);
 					let keyword = json.label;
 
 					$('#query-results').append('<li><a href="../results/' + json.key + '">' + keyword + ' (' + json.rows + ' items)</a></li>');
@@ -400,6 +401,8 @@ const query = {
 						dots += '.';
 					}
 					$('#query-status .dots').html(dots);
+
+					applyProgress($('#query-status'), json.progress);
 
 					query.dot_ticker += 1;
 					if (query.dot_ticker > 3) {
@@ -435,9 +438,11 @@ const query = {
 						return;
 					}
 
-					let current_status = container.find('.dataset-status').html();
+					let status_field = container.find('.dataset-status')
+					let current_status = status_field.html();
+					applyProgress(status_field, json.progress);
 					if (current_status !== json.status_html) {
-						container.find('.dataset-status').html(json.status_html);
+						status_field.html(json.status_html);
 					}
 				}
 			});
@@ -848,29 +853,28 @@ const tooltip = {
 				tooltip_container = target;
 			}
 		});
-		tooltip_container = '#' + tooltip_container;
-		let is_standalone = $(tooltip_container).hasClass('multiple');
+		tooltip_container = $(document.getElementById(tooltip_container));
+		let is_standalone = tooltip_container.hasClass('multiple');
 
-		if ($(tooltip_container).is(':hidden')) {
-			$(tooltip_container).removeClass('force-width');
+		if (tooltip_container.is(':hidden')) {
+			tooltip_container.removeClass('force-width');
 			let position = is_standalone ? $(parent).offset() : $(parent).position();
 			let parent_width = parseFloat($(parent).css('width').replace('px', ''));
-			$(tooltip_container).show();
+			tooltip_container.show();
 
 			// figure out if this is a multiline tooltip
-			content = $(tooltip_container).html();
-			$(tooltip_container).html('1');
-			em_height = $(tooltip_container).height();
-			$(tooltip_container).html(content);
-			if($(tooltip_container).height() > em_height) {
-				$(tooltip_container).addClass('force-width');
+			content = tooltip_container.html();
+			tooltip_container.html('1');
+			em_height = tooltip_container.height();
+			tooltip_container.html(content);
+			if(tooltip_container.height() > em_height) {
+				tooltip_container.addClass('force-width');
 			}
 
-			console.log(position);
-			let width = parseFloat($(tooltip_container).css('width').replace('px', ''));
-			let height = parseFloat($(tooltip_container).css('height').replace('px', ''));
-			$(tooltip_container).css('top', (position.top - height - 5) + 'px');
-			$(tooltip_container).css('left', (position.left + (parent_width / 2) - (width / 2)) + 'px');
+			let width = parseFloat(tooltip_container.css('width').replace('px', ''));
+			let height = parseFloat(tooltip_container.css('height').replace('px', ''));
+			tooltip_container.css('top', (position.top - height - 5) + 'px');
+			tooltip_container.css('left', (position.left + (parent_width / 2) - (width / 2)) + 'px');
 		}
 	},
 
@@ -892,8 +896,8 @@ const tooltip = {
 				tooltip_container = target;
 			}
 		});
-		tooltip_container = '#' + tooltip_container;
-		$(tooltip_container).hide();
+		tooltip_container = $(document.getElementById(tooltip_container));
+		tooltip_container.hide();
 	},
 	/**
 	 * Toggle tooltip between shown and hidden
@@ -905,8 +909,8 @@ const tooltip = {
 			e.preventDefault();
 		}
 
-		let tooltip_container = $('#' + $(this).attr('aria-controls'));
-		if ($(tooltip_container).is(':hidden')) {
+		let tooltip_container = $(document.getElementById($(this).attr('aria-controls')));
+		if (tooltip_container.is(':hidden')) {
 			tooltip.show(e, this);
 		} else {
 			tooltip.hide(e, this);
@@ -1172,7 +1176,7 @@ const multichoice = {
 			let options = $('<div class="multi-select-options ms-options-' + name + '"></div>');
 
 			for (let option in given_options) {
-				let selected = (option in given_default);
+				let selected = given_default.indexOf(option) > -1;
 				let checkbox_choice = $('<label><input type="checkbox" name="' + name + ":" + option + '"' + (selected ? ' checked="checked"' : '') + '> ' + given_options[option] + '</label>');
 
 				checkbox_choice.find('input').on('change', function () {
@@ -1411,4 +1415,23 @@ function getRelativeURL(endpoint) {
 		root = '/';
 	}
 	return root + endpoint;
+}
+
+function applyProgress(element, progress) {
+	if(element.parent().hasClass('button-like')) {
+		element = element.parent();
+	}
+
+	let current_progress = Array(...element[0].classList).filter(z => z.indexOf('progress-') === 0)
+	for (let class_name in current_progress) {
+		class_name = current_progress[class_name];
+		element.removeClass(class_name);
+	}
+
+	if (progress && progress > 0 && progress < 100) {
+		element.addClass('progress-' + progress);
+		if(!element.hasClass('progress')) {
+			element.addClass('progress');
+		}
+	}
 }

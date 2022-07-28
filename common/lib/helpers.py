@@ -14,14 +14,14 @@ import csv
 import re
 import os
 
+from collections.abc import MutableMapping
 from pathlib import Path
 from html.parser import HTMLParser
 from werkzeug.datastructures import FileStorage
 from calendar import monthrange
 
 from common.lib.user_input import UserInput
-import config
-
+import common.config_manager as config
 
 def init_datasource(database, logger, queue, name):
 	"""
@@ -108,7 +108,7 @@ def get_software_version():
 
 	:return str:  4CAT version
 	"""
-	versionpath = Path(config.PATH_ROOT, config.PATH_VERSION)
+	versionpath = Path(config.get('PATH_ROOT'), config.get('path.versionfile'))
 
 	if versionpath.exists() and not versionpath.is_file():
 		return ""
@@ -119,7 +119,7 @@ def get_software_version():
 		# the currently checked-out commit
 		try:
 			cwd = os.getcwd()
-			os.chdir(config.PATH_ROOT)
+			os.chdir(config.get('PATH_ROOT'))
 			show = subprocess.run(["git", "show"], stderr=subprocess.PIPE, stdout=subprocess.PIPE)
 			os.chdir(cwd)
 			if show.returncode != 0:
@@ -334,7 +334,7 @@ def call_api(action, payload=None):
 	"""
 	connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 	connection.settimeout(15)
-	connection.connect((config.API_HOST, config.API_PORT))
+	connection.connect((config.get('API_HOST'), config.get('API_PORT')))
 
 	msg = json.dumps({"request": action, "payload": payload})
 	connection.sendall(msg.encode("ascii", "ignore"))
@@ -485,14 +485,14 @@ def pad_interval(intervals, first_interval=None, last_interval=None):
 
 	all_intervals = []
 	for year in range(first_year, last_year + 1):
-		start_month = first_month if year == first_year else 1
-		end_month = last_month if year == last_year else 12
 		year_interval = str(year)
 
 		if not has_month:
 			all_intervals.append(year_interval)
 			continue
 
+		start_month = first_month if year == first_year else 1
+		end_month = last_month if year == last_year else 12
 		for month in range(start_month, end_month + 1):
 			month_interval = year_interval + "-" + str(month).zfill(2)
 
@@ -656,17 +656,16 @@ def send_email(recipient, message):
 	:param list recipient:  Recipient e-mail addresses
 	:param MIMEMultipart message:  Message to send
 	"""
-	connector = smtplib.SMTP_SSL if hasattr(config, "MAIL_SSL") and config.MAIL_SSL else smtplib.SMTP
+	connector = smtplib.SMTP_SSL if config.get('mail.ssl') else smtplib.SMTP
 
-	with connector(config.MAILHOST) as smtp:
-		if hasattr(config, "MAIL_USERNAME") and hasattr(config, "MAIL_PASSWORD") and config.MAIL_USERNAME and config.MAIL_PASSWORD:
+	with connector(config.get('mail.server')) as smtp:
+		if config.get('mail.username') and config.get('mail.password'):
 			smtp.ehlo()
-			smtp.login(config.MAIL_USERNAME, config.MAIL_PASSWORD)
+			smtp.login(config.get('mail.username'), config.get('mail.password'))
 		if type(message) == str:
-			smtp.sendmail(config.NOREPLY_EMAIL, recipient, message)
+			smtp.sendmail(config.get('mail.noreply'), recipient, message)
 		else:
 			smtp.sendmail(config.NOREPLY_EMAIL, recipient, message.as_string())
-
 
 def validate_url(x):
 	"""
@@ -686,3 +685,28 @@ def validate_url(x):
 		return all([result.scheme, result.netloc])
 	else:
 		return False
+
+def flatten_dict(d: MutableMapping, parent_key: str = '', sep: str = '.'):
+	"""
+	Return a flattened dictionary where nested dictionary objects are given new
+	keys using the partent key combined using the seperator with the child key.
+
+	Lists will be converted to json strings via json.dumps()
+
+	:param MutableMapping d:  Dictionary like object
+	:param str partent_key: The original parent key prepending future nested keys
+	:param str sep: A seperator string used to combine parent and child keys
+	:return dict:  A new dictionary with the no nested values
+	"""
+
+	def _flatten_dict_gen(d, parent_key, sep):
+		for k, v in d.items():
+			new_key = parent_key + sep + k if parent_key else k
+			if isinstance(v, MutableMapping):
+				yield from flatten_dict(v, new_key, sep=sep).items()
+			elif isinstance(v, list):
+				yield new_key, json.dumps([flatten_dict(item, new_key, sep=sep) if isinstance(item, MutableMapping) else item for item in v])
+			else:
+				yield new_key, v
+
+	return dict(_flatten_dict_gen(d, parent_key, sep))

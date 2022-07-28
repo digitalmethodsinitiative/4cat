@@ -7,10 +7,6 @@ import re
 
 from pathlib import Path
 
-import config
-
-from common.lib.helpers import call_api
-
 cli = argparse.ArgumentParser()
 cli.add_argument("--interactive", "-i", default=False, help="Run 4CAT in interactive mode (not in the background).",
                  action="store_true")
@@ -58,11 +54,16 @@ if not args.no_version_check:
         print("  %s helper-scripts/migrate.py" % sys.executable)
         exit(0)
 
+# we can only import this here, because the version check above needs to be
+# done first, as it may detect that the user needs to migrate first before
+# the config manager can be run properly
+import common.config_manager as config
+from common.lib.helpers import call_api
 # ---------------------------------------------
 #     Check validity of configuration file
 # (could be expanded to check for other values)
 # ---------------------------------------------
-if not config.ANONYMISATION_SALT or config.ANONYMISATION_SALT == "REPLACE_THIS":
+if not config.get('ANONYMISATION_SALT') or config.get('ANONYMISATION_SALT') == "REPLACE_THIS":
     print(
         "You need to set a random value for anonymisation in config.py before you can run 4CAT. Look for the ANONYMISATION_SALT option.")
     sys.exit(1)
@@ -94,7 +95,7 @@ else:
     from daemon import pidfile
 
 # determine PID file
-lockfile = Path(config.PATH_ROOT, config.PATH_LOCKFILE, "4cat.pid")  # pid file location
+lockfile = Path(config.get('PATH_ROOT'), config.get('PATH_LOCKFILE'), "4cat.pid")  # pid file location
 
 
 # ---------------------------------------------
@@ -259,7 +260,7 @@ elif command == "status":
         print("4CAT Backend Daemon is currently up and running.")
 
         # fetch more detailed status via internal API
-        if not config.API_PORT:
+        if not config.get('API_PORT'):
             sys.exit(0)
 
         print("\n     Active workers:\n-------------------------")

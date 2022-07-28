@@ -8,8 +8,7 @@ from pathlib import Path
 from backend.abstract.processor import BasicProcessor
 from common.lib.helpers import UserInput, get_interval_descriptor
 
-import config
-
+import common.config_manager as config
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
 __maintainer__ = "Stijn Peeters"
@@ -89,7 +88,7 @@ class OvertimeAnalysis(BasicProcessor):
 		# load vocabularies from word lists
 		vocabularies = {}
 		for vocabulary_id in self.parameters.get("vocabulary", []):
-			vocabulary_file = Path(config.PATH_ROOT, "common/assets/wordlists/%s.txt" % vocabulary_id)
+			vocabulary_file = Path(config.get('PATH_ROOT'), "common/assets/wordlists/%s.txt" % vocabulary_id)
 			if not vocabulary_file.exists():
 				continue
 
@@ -140,6 +139,7 @@ class OvertimeAnalysis(BasicProcessor):
 				
 			if processed % 2500 == 0:
 				self.dataset.update_status("Processed %i posts" % processed)
+				self.dataset.update_progress(processed / self.source_dataset.num_rows)
 				
 			# if 'partition' is false, there will just be one combined
 			# vocabulary, but else we'll have different ones we can

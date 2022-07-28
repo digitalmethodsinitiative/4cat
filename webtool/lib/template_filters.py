@@ -12,8 +12,7 @@ from urllib.parse import urlencode, urlparse
 from webtool import app
 from common.lib.helpers import timify_long
 
-import config
-
+import common.config_manager as config
 
 @app.template_filter('datetime')
 def _jinja2_filter_datetime(date, fmt=None, wrap=True):
@@ -117,7 +116,7 @@ def _jinja2_filter_json(data):
 @app.template_filter('config_override')
 def _jinja2_filter_conf(data, property=""):
 	try:
-		return getattr(config.FlaskConfig, property)
+		return config.get("flask." + property)
 	except AttributeError:
 		return data
 
@@ -163,7 +162,7 @@ def _jinja2_filter_post_field(field, post):
 	# Extracts string values between {{ two curly brackets }} and uses that
 	# as a dictionary key for the given dict. It then returns the corresponding value.
 	# Mainly used in the Explorer.
-	
+
 	matches = False
 	formatted_field = field
 
@@ -216,17 +215,16 @@ def inject_now():
 		"""
 		return str(uuid.uuid4())
 
-	announcement_file = Path(config.PATH_ROOT, "ANNOUNCEMENT.md")
+	announcement_file = Path(config.get('PATH_ROOT'), "ANNOUNCEMENT.md")
 
 	return {
-		"__datasources_config": config.DATASOURCES,
-		"__has_https": config.FlaskConfig.SERVER_HTTPS,
+		"__datasources_config": config.get('DATASOURCES'),
+		"__has_https": config.get("flask.https"),
 		"__datenow": datetime.datetime.utcnow(),
-		"__tool_name": config.TOOL_NAME,
-		"__tool_name_long": config.TOOL_NAME_LONG,
+		"__tool_name": config.get("4cat.name"),
+		"__tool_name_long": config.get("4cat.name_long"),
 		"__announcement": announcement_file.open().read().strip() if announcement_file.exists() else None,
-		"__expire_datasets": config.EXPIRE_DATASETS if hasattr(config, "EXPIRE_DATASETS") else None,
-		"__expire_optout": config.EXPIRE_ALLOW_OPTOUT if hasattr(config, "EXPIRE_ALLOW_OPTOUT") else None,
+		"__expire_datasets": config.get("expire.timeout"),
+		"__expire_optout": config.get("expire.allow_optout"),
 		"uniqid": uniqid
 	}
-

@@ -156,6 +156,7 @@ class ColumnNetworker(BasicProcessor):
             processed += 1
             if processed % 500 == 0:
                 self.dataset.update_status("Processed %i items (%i nodes found)" % (processed, len(network.nodes)))
+                self.dataset.update_progress(processed / self.source_dataset.num_rows)
 
             # both columns need to have a value for an edge to be possible
             if not item.get(column_a) or not item.get(column_b):
@@ -210,7 +211,7 @@ class ColumnNetworker(BasicProcessor):
                         network.add_node(node_a, intervals={}, label=value_a, **({"category": column_a} if categorise else {}))
 
                     if node_b not in network.nodes():
-                        network.add_node(node_b, intervals={}, label=value_b, **({"category": column_a} if categorise else {}))
+                        network.add_node(node_b, intervals={}, label=value_b, **({"category": column_b} if categorise else {}))
 
                     if interval not in network.nodes[node_a]["intervals"]:
                         network.nodes[node_a]["intervals"][interval] = 0

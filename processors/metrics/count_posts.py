@@ -78,6 +78,7 @@ class CountPosts(BasicProcessor):
 
 				if counter % 2500 == 0:
 					self.dataset.update_status("Counted through " + str(counter) + " posts.")
+					self.dataset.update_progress(counter / self.source_dataset.num_rows)
 
 			# pad interval if needed, this is useful if the result is to be
 			# visualised as a histogram, for example

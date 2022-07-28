@@ -12,8 +12,7 @@ from psycopg2.extras import execute_values
 from common.lib.exceptions import DatabaseQueryInterruptedException
 
 
-import config
-
+import common.config_manager as config
 
 class Database:
 	"""
@@ -43,11 +42,11 @@ class Database:
 		:param port:  Database port
 		:param appname:  App name, mostly useful to trace connections in pg_stat_activity
 		"""
-		dbname = config.DB_NAME if not dbname else dbname
-		user = config.DB_USER if not user else user
-		password = config.DB_PASSWORD if not password else password
-		host = config.DB_HOST if not host else host
-		port = config.DB_PORT if not port else port
+		dbname = config.get('DB_NAME') if not dbname else dbname
+		user = config.get('DB_USER') if not user else user
+		password = config.get('DB_PASSWORD') if not password else password
+		host = config.get('DB_HOST') if not host else host
+		port = config.get('DB_PORT') if not port else port
 
 		self.appname = "4CAT" if not appname else "4CAT-%s" % appname
 

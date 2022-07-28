@@ -13,7 +13,7 @@ import re
 from pathlib import Path
 
 from backend.abstract.search import Search
-from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException
+from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException, ProcessorException
 from common.lib.helpers import convert_to_int, UserInput
 
 from datetime import datetime
@@ -23,8 +23,7 @@ from telethon.tl.functions.channels import GetFullChannelRequest
 from telethon.tl.functions.users import GetFullUserRequest
 from telethon.tl.types import User
 
-import config
-
+import common.config_manager as config
 
 class SearchTelegram(Search):
     """
@@ -116,6 +115,20 @@ class SearchTelegram(Search):
             "type": UserInput.OPTION_TOGGLE,
             "help": "Save session:",
             "default": False
+        },
+        "resolve-entities-intro": {
+            "type": UserInput.OPTION_INFO,
+            "help": "4CAT can resolve the references to channels and user and replace the numeric ID with the full "
+                    "user, channel or group metadata. Doing so allows one to discover e.g. new relevant groups and "
+                    "figure out where or who a message was forwarded from. However, this increases query time and "
+                    "for large datasets, increases the chance you will be rate-limited and your dataset isn't able "
+                    "to finish capturing. It will also dramatically increase the disk space needed to store the "
+                    "data, so only enable this if you really need it!"
+        },
+        "resolve-entities": {
+            "type": UserInput.OPTION_TOGGLE,
+            "help": "Resolve references",
+            "default": False,
         }
     }
 
@@ -164,7 +177,7 @@ class SearchTelegram(Search):
 
         session_id = SearchTelegram.create_session_id(query["api_phone"], query["api_id"], query["api_hash"])
         self.dataset.log('Telegram session id: %s' % session_id)
-        session_path = Path(config.PATH_ROOT).joinpath(config.PATH_SESSIONS, session_id + ".session")
+        session_path = Path(config.get("PATH_ROOT")).joinpath(config.get("PATH_SESSIONS"), session_id + ".session")
 
         client = None
 
@@ -250,9 +263,12 @@ class SearchTelegram(Search):
         no_additional_queries = False
 
         # Collect queries
+        processed = 0
         for query in queries:
             delay = 10
             retries = 0
+            processed += 1
+            self.dataset.update_progress(processed / len(queries))
 
             if no_additional_queries:
                 # Note that we are note completing this query
@@ -449,9 +465,16 @@ class SearchTelegram(Search):
         attachment_filename = ""
 
         if attachment_type == "contact":
-            attachment = message["media"]["contact"]
-            attachment_data = json.dumps({property: attachment.get(property) for property in
-                                          ("phone_number", "first_name", "last_name", "vcard", "user_id")})
+            contact_data = ["phone_number", "first_name", "last_name", "vcard", "user_id"]
+            if message["media"].get('contact', False):
+                # Old datastructure
+                attachment = message["media"]["contact"]
+            elif all([property in message["media"].keys() for property in contact_data]):
+                # New datastructure 2022/7/25
+                attachment = message["media"]
+            else:
+                raise ProcessorException('Cannot find contact data; Telegram datastructure may have changed')
+            attachment_data = json.dumps({property: attachment.get(property) for property in contact_data})
 
         elif attachment_type == "document":
             # videos, etc
@@ -700,7 +723,7 @@ class SearchTelegram(Search):
             "api_hash": query.get("api_hash"),
             "api_phone": query.get("api_phone"),
             "save-session": query.get("save-session"),
-            "resolve-entities": query.get("resolve-entities") if privileged else False,
+            "resolve-entities": query.get("resolve-entities"),
             "min_date": min_date,
             "max_date": max_date
         }
@@ -742,22 +765,7 @@ class SearchTelegram(Search):
             if "max" in options["max_posts"]:
                 del options["max_posts"]["max"]
 
-            options["query-intro"]["help"] = "You can collect messages from multiple entities (channels or groups). Separate with commas or line breaks."
-
-            options["resolve-entities-intro"] = {
-                "type": UserInput.OPTION_INFO,
-                "help": "4CAT can resolve the references to channels and user and replace the numeric ID with the full "
-                        "user, channel or group metadata. Doing so allows one to discover e.g. new relevant groups and "
-                        "figure out where or who a message was forwarded from. However, this increases query time and "
-                        "for large datasets, increases the chance you will be rate-limited and your dataset isn't able "
-                        "to finish capturing. It will also dramatically increase the disk space needed to store the "
-                        "data, so only enable this if you really need it!"
-            }
-
-            options["resolve-entities"] = {
-                "type": UserInput.OPTION_TOGGLE,
-                "help": "Resolve references",
-                "default": False,
-            }
+            options["query-intro"]["help"] = "You can collect messages from multiple entities (channels or groups). " \
+                                             "Separate with commas or line breaks."
 
         return options

@@ -12,8 +12,7 @@ from googleapiclient.errors import HttpError
 from backend.abstract.processor import BasicProcessor
 from common.lib.helpers import UserInput, get_yt_compatible_ids
 
-import config
-
+import common.config_manager as config
 __author__ = "Sal Hagen"
 __credits__ = ["Sal Hagen"]
 __maintainer__ = "Sal Hagen"
@@ -87,7 +86,7 @@ class YouTubeMetadata(BasicProcessor):
 		"""
 
 		# First check if there's a YouTube Developer API key in config
-		if not config.YOUTUBE_DEVELOPER_KEY:
+		if not config.get('api.youtube.key'):
 			self.dataset.update_status("No API key found")
 			self.dataset.finish(0)
 			return
@@ -270,7 +269,7 @@ class YouTubeMetadata(BasicProcessor):
 
 			# Store data from original post file for cross-referencing
 			metadata["referenced_urls"] = ','.join(youtube_item["urls_referenced"])
-			metadata["referenced_by"] = ','.join(youtube_item["referenced_by"])
+			metadata["referenced_by"] = ','.join([str(n) for n in youtube_item["referenced_by"]])
 			metadata["count"] = youtube_item["count"]
 
 			# Add api data if the request for the item was succesfull
@@ -285,6 +284,7 @@ class YouTubeMetadata(BasicProcessor):
 			# Update status once in a while
 			if counter % 10 == 0:
 				self.dataset.update_status("Extracted metadata " + str(counter) + "/" + str(len(urls_metadata)))
+				self.dataset.update_progress(counter / len(urls_metadata))
 
 		# To write to csv, all dictionary items must have all the possible keys
 		# Get all the possible keys
@@ -419,7 +419,7 @@ class YouTubeMetadata(BasicProcessor):
 		if custom_key:
 			api_key = custom_key
 		else:
-			api_key = config.YOUTUBE_DEVELOPER_KEY
+			api_key = config.get('api.youtube.key')
 
 		for i, ids_string in enumerate(ids_list):
 
@@ -428,7 +428,7 @@ class YouTubeMetadata(BasicProcessor):
 
 			try:
 				# Use YouTubeDL and the YouTube API to request video data
-				youtube = build(config.YOUTUBE_API_SERVICE_NAME, config.YOUTUBE_API_VERSION,
+				youtube = build(config.get('api.youtube.name'), config.get('api.youtube.version'),
 												developerKey=api_key)
 			# Catch invalid API keys
 			except HttpError as e:

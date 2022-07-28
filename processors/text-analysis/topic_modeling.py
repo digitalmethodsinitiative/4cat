@@ -99,6 +99,8 @@ class TopicModeler(BasicProcessor):
         for token_file in self.iterate_archive_contents(self.source_file):
             index += 1
             self.dataset.update_status("Processing token set %i (%s)" % (index, token_file.stem))
+            self.dataset.update_progress(index / self.source_dataset.num_rows)
+
             if self.interrupted:
                 raise ProcessorInterruptedException("Interrupted while topic modeling")
 

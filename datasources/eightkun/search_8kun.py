@@ -3,7 +3,7 @@
 """
 from datasources.fourchan.search_4chan import Search4Chan
 
-import config
+import common.config_manager as config
 from common.lib.helpers import UserInput
 
 
@@ -34,9 +34,9 @@ class Search8Kun(Search4Chan):
 		},
 		"board": {
 			"type": UserInput.OPTION_CHOICE,
-			"options": {b: b for b in config.DATASOURCES[prefix].get("boards", [])},
+			"options": {b: b for b in config.get('DATASOURCES').get(prefix, {}).get("boards", [])},
 			"help": "Board",
-			"default": config.DATASOURCES[prefix].get("boards", [""])[0]
+			"default": config.get('DATASOURCES').get(prefix, {}).get("boards", [""])[0]
 		},
 		"body_match": {
 			"type": UserInput.OPTION_TEXT,

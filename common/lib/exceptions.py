@@ -1,6 +1,11 @@
 class FourcatException(Exception):
 	pass
 
+class ConfigException(FourcatException):
+	"""
+	Raised when there is a problem with the configuration settings.
+	"""
+	pass
 
 class QueueException(FourcatException):
 	"""

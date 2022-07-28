@@ -130,10 +130,14 @@ class SearchBitChute(Search):
             else:
                 results.append(self.get_videos_user(session, query, csrftoken, detail))
 
+            self.dataset.update_progress(num_query / len(queries))
+
         return chain(*results)
 
     def get_videos_id(self, session, video_id, csrftoken, detail):
         dummy_video = {
+            "query_type": "video id",
+            "query": video_id,
             "id": video_id,
             "thread_id": video_id,
             "subject": "",
@@ -219,6 +223,8 @@ class SearchBitChute(Search):
 
                 link = video_element.select_one(".channel-videos-title a")
                 video = {
+                    "query_type": "user id",
+                    "query": user,
                     "id": link["href"].split("/")[-2],
                     "thread_id": link["href"].split("/")[-2],
                     "subject": link.text,
@@ -289,9 +295,15 @@ class SearchBitChute(Search):
                     video_data["published"] = "1970-01-01"
                 # this is only included as '5 months ago' and so forth, not exact date
                 # so use dateparser to at least approximate the date
-                dt = dateparser.parse(video_data["published"])
+                try:
+                    dt = dateparser.parse(video_data["published"])
+                except Exception as e:
+                    self.log.warning('dateparser.parse error reading video_data["published"]: %s' % str(video_data['published']))
+                    raise e
 
                 video = {
+                    "query_type": "search",
+                    "query": query,
                     "id": video_data["id"],
                     "thread_id": video_data["id"],
                     "subject": video_data["name"],
@@ -454,6 +466,8 @@ class SearchBitChute(Search):
                             thumbnail_image = ""
 
                         comments.append({
+                            "query_type": video["query_type"],
+                            "query": video["query"],
                             "id": comment["id"],
                             "thread_id": video["id"],
                             "subject": "",

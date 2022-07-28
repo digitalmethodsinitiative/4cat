@@ -10,7 +10,7 @@ import re
 
 from pathlib import Path
 
-import config
+import common.config_manager as config
 import backend
 from common.lib.job import Job, JobNotFoundException
 from common.lib.helpers import get_software_version
@@ -58,7 +58,7 @@ class DataSet(FourcatModule):
 		:param db:  Database connection
 		"""
 		self.db = db
-		self.folder = Path(config.PATH_ROOT, config.PATH_DATA)
+		self.folder = Path(config.get('PATH_ROOT'), config.get('PATH_DATA'))
 		self.staging_area = []
 
 		if key is not None:
@@ -98,8 +98,8 @@ class DataSet(FourcatModule):
 			self.parameters = json.loads(self.data["parameters"])
 			self.is_new = False
 		else:
-			if hasattr(config, "EXPIRE_DATASETS") and config.EXPIRE_DATASETS and not parent:
-				parameters["expires-after"] = int(time.time() + config.EXPIRE_DATASETS)
+			if config.get('expire.timeout') and not parent:
+				parameters["expires-after"] = int(time.time() + config.get('expire.timeout'))
 
 			self.data = {
 				"key": self.key,
@@ -115,6 +115,7 @@ class DataSet(FourcatModule):
 				"software_version": get_software_version(),
 				"software_file": "",
 				"num_rows": 0,
+				"progress": 0.0,
 				"key_parent": parent
 			}
 			self.parameters = parameters
@@ -375,7 +376,7 @@ class DataSet(FourcatModule):
 			raise RuntimeError("Cannot finish a finished dataset again")
 
 		self.db.update("datasets", where={"key": self.data["key"]},
-					   data={"is_finished": True, "num_rows": num_rows})
+					   data={"is_finished": True, "num_rows": num_rows, "progress": 1.0})
 		self.data["is_finished"] = True
 		self.data["num_rows"] = num_rows
 
@@ -395,12 +396,14 @@ class DataSet(FourcatModule):
 		self.data["is_finished"] = False
 		self.data["num_rows"] = 0
 		self.data["status"] = "Dataset is queued."
+		self.data["progress"] = 0
 
 		self.db.update("datasets", data={
 			"timestamp": self.data["timestamp"],
 			"is_finished": self.data["is_finished"],
 			"num_rows": self.data["num_rows"],
-			"status": self.data["status"]
+			"status": self.data["status"],
+			"progress": 0
 		}, where={"key": self.key})
 
 	def copy(self, shallow=True):
@@ -784,6 +787,32 @@ class DataSet(FourcatModule):
 
 		return updated > 0
 
+	def update_progress(self, progress):
+		"""
+		Update dataset progress
+
+		The progress can be used to indicate to a user how close the dataset
+		is to completion.
+
+		:param float progress:  Between 0 and 1.
+		:return:
+		"""
+		progress = min(1, max(0, progress))  # clamp
+		if type(progress) is int:
+			progress = float(progress)
+
+		self.data["progress"] = progress
+		updated = self.db.update("datasets", where={"key": self.data["key"]}, data={"progress": progress})
+		return updated > 0
+
+	def get_progress(self):
+		"""
+		Get dataset progress
+
+		:return float:  Progress, between 0 and 1
+		"""
+		return self.data["progress"]
+
 	def finish_with_error(self, error):
 		"""
 		Set error as final status, and finish with 0 results
@@ -851,10 +880,10 @@ class DataSet(FourcatModule):
 		:param file:  File to link within the repository
 		:return:  URL, or an empty string
 		"""
-		if not self.data["software_version"] or not config.GITHUB_URL:
+		if not self.data["software_version"] or not config.get("4cat.github_url"):
 			return ""
 
-		return config.GITHUB_URL + "/blob/" + self.data["software_version"] + self.data.get("software_file", "")
+		return config.get("4cat.github_url") + "/blob/" + self.data["software_version"] + self.data.get("software_file", "")
 
 	def top_parent(self):
 		"""
@@ -1079,15 +1108,14 @@ class DataSet(FourcatModule):
 		"""
 		Gets the 4CAT frontend URL of a dataset file.
 
-		Uses the config.py FlaskConfig attributes (i.e., SERVER_NAME and
+		Uses the FlaskConfig attributes (i.e., SERVER_NAME and
 		SERVER_HTTPS) plus hardcoded '/result/'.
 		TODO: create more dynamic method of obtaining url.
 		"""
 		filename = self.get_results_path().name
-		url_to_file = ('https://' if config.FlaskConfig.SERVER_HTTPS else 'http://') + \
-						config.FlaskConfig.SERVER_NAME + '/result/' + filename
+		url_to_file = ('https://' if config.get("flask.https") else 'http://') + \
+						config.get("flask.server_name") + '/result/' + filename
 		return url_to_file
-
 
 	def __getattr__(self, attr):
 		"""
@@ -1105,7 +1133,7 @@ class DataSet(FourcatModule):
 		elif attr in self.data:
 			return self.data[attr]
 		else:
-			raise KeyError("DataSet instance has no attribute %s" % attr)
+			raise AttributeError("DataSet instance has no attribute %s" % attr)
 
 	def __setattr__(self, attr, value):
 		"""

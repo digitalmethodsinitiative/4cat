@@ -4,8 +4,7 @@ Get YouTube metadata from video links posted
 import time
 import urllib.request
 
-import config
-
+import common.config_manager as config
 from apiclient.discovery import build
 
 from backend.abstract.processor import BasicProcessor
@@ -65,8 +64,8 @@ class YouTubeThumbnails(BasicProcessor):
 		results_path = self.dataset.get_staging_area()
 
 		# Use YouTubeDL and the YouTube API to request video data
-		youtube = build(config.YOUTUBE_API_SERVICE_NAME, config.YOUTUBE_API_VERSION,
-											developerKey=config.YOUTUBE_DEVELOPER_KEY)
+		youtube = build(config.get('api.youtube.name'), config.get('api.youtube.version'),
+											developerKey=config.get('api.youtube.key'))
 		
 		ids_list = get_yt_compatible_ids(video_ids)
 		retries = 0
@@ -105,6 +104,7 @@ class YouTubeThumbnails(BasicProcessor):
 					urllib.request.urlretrieve(thumb_url, save_path)
 
 			self.dataset.update_status("Downloaded thumbnails for " + str(i * 50) + "/" + str(len(video_ids)))
+			self.dataset.update_progress(i / len(ids_list))
 
 		# create zip of archive and delete temporary files and folder
 		self.dataset.update_status("Compressing results into archive")

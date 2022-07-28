@@ -62,6 +62,7 @@ class AuthorInfoRemover(BasicProcessor):
                     processed_items += 1
                     if processed_items % 500 == 0:
                         self.dataset.update_status("Processed %i items" % processed_items)
+                        self.dataset.update_progress(processed_items / self.source_dataset.num_rows)
 
                     for field in author_columns:
                         item[field] = ""

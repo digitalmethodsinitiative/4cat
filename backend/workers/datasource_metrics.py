@@ -8,8 +8,7 @@ from datetime import datetime, time, timezone
 
 from backend.abstract.worker import BasicWorker
 
-import config
-
+import common.config_manager as config
 class DatasourceMetrics(BasicWorker):
 	"""
 	Calculate metrics for local datasources
@@ -47,8 +46,11 @@ class DatasourceMetrics(BasicWorker):
 			""")
 
 		added_datasources = [row["datasource"] for row in self.db.fetchall("SELECT DISTINCT(datasource) FROM metrics")]
+		enabled_datasources = config.get("DATASOURCES", {})
 
 		for datasource_id in self.all_modules.datasources:
+			if datasource_id not in enabled_datasources:
+				continue
 
 			datasource = self.all_modules.workers.get(datasource_id + "-search")
 			if not datasource:
@@ -56,15 +58,11 @@ class DatasourceMetrics(BasicWorker):
 
 			is_local = True if hasattr(datasource, "is_local") and datasource.is_local else False
 			is_static = True if hasattr(datasource, "is_static") and datasource.is_static else False
-			
+
 			# Only update local datasources
 			if is_local:
+				boards = enabled_datasources[datasource_id].get("boards", [""])
 
-				boards = config.DATASOURCES[datasource_id].get("boards")
-
-				if not boards:
-					boards = [""]
-				
 				# If a datasource is static (so not updated) and it
 				# is already present in the metrics table, we don't
 				# need to update its metrics anymore.
@@ -96,7 +94,7 @@ class DatasourceMetrics(BasicWorker):
 						# If the datasource is dynamic, we also only update days
 						# that haven't been added yet - these are heavy queries.
 						if not is_static:
-							
+
 							days_added = self.db.fetchall("SELECT date FROM metrics WHERE datasource = '%s' AND board = '%s' AND metric = 'posts_per_day';" % (datasource_id, board))
 
 							if days_added:
@@ -113,7 +111,7 @@ class DatasourceMetrics(BasicWorker):
 								after_timestamp = int(last_day_added.timestamp())
 
 								time_sql += " AND timestamp > " + str(after_timestamp) + " "
-						
+
 						self.log.info("Calculating metric posts_per_day for datasource %s%s" % (datasource_id, "/" + board))
 
 						# Get those counts
@@ -123,16 +121,16 @@ class DatasourceMetrics(BasicWorker):
 							WHERE %s AND %s
 							GROUP BY metric, datasource, board, date;
 							""" % (datasource_id, posts_table, board_sql, time_sql)
-						
+
 						# Add to metrics table
 						rows = [dict(row) for row in self.db.fetchall(query)]
-						
+
 						if rows:
 							for row in rows:
 								self.db.insert("metrics", row)
 
 					# -------------------------------
-					#   no other metrics added yet 
+					#   no other metrics added yet
 					# -------------------------------
 
 		self.job.finish()

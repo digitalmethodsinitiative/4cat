@@ -124,8 +124,8 @@ class SimilarWord2VecWords(BasicProcessor):
 							"input": word,
 							"item": similar_word[0],
 							"value": similar_word[1],
-							"input_occurences": model.vocab[word].count,
-							"item_occurences": model.vocab[similar_word[0]].count,
+							"input_occurences": model.get_vecattr(word, "count"),
+							"item_occurences": model.get_vecattr(similar_word[0], "count"),
 							"depth": level
 						})
 
