@@ -43,6 +43,7 @@ packages = [
 	"requests~=2.27",
 	"requests_futures",
 	"scikit_learn==0.24.1",
+	"selenium==4.3.0",
 	"spacy==3.0.5",
 	"svgwrite~=1.4.0",
 	"Telethon~=1.24.0",

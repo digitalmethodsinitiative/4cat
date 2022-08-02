@@ -32,6 +32,8 @@ FROM python:3.8-slim AS build-image
 COPY --from=compile-image /opt/venv /opt/venv
 # Make virtual env available
 ENV PATH="/opt/venv/bin:$PATH"
+# python stdout and stderr to terminal
+ENV PYTHONUNBUFFERED=1
 
 RUN apt-get update && apt install -y \
     # Called in docker-entrypoint.sh:

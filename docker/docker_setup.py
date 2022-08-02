@@ -139,3 +139,15 @@ if __name__ == "__main__":
         if your_server not in api_whitelist:
             api_whitelist.append(your_server)
             config.set_or_create_setting('flask.autologin.api', api_whitelist, raw=False)
+
+    if config.get('selenium.browser') == 'firefox' and not config.get('selenium.installed'):
+        print('Installing geckodriver and firefox')
+        import subprocess
+        interpreter = sys.executable
+        result = subprocess.run([interpreter, Path(config.get('PATH_ROOT')).joinpath("docker/install_selenium.py")])
+        if result.returncode != 0:
+            print("Error installing selenium")
+            print(result.stderr.decode("ascii"))
+            exit(1)
+        else:
+            config.set_or_create_setting('selenium.installed', True, raw=False)
