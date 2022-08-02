@@ -71,4 +71,4 @@ if __name__ == "__main__":
 	command = f"rm {FIREFOX_SETUP}"
 	run_command(command, "Error removing temp download files")
 
-	print("Installation complete")
+	print("Firefox and Geckodriver installation complete")
