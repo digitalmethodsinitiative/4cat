@@ -225,6 +225,18 @@ config_definition = {
         "help": "YouTube API Key",
         "tooltip": "The developer key from your API console",
     },
+    "selenium.browser": {
+    "type": UserInput.OPTION_TEXT,
+    "default": "",
+    "help": "Browser type ('firefox' or 'chrome')",
+    "tooltip": "This must corespond to the installed webdriver; Docker installs firefox when backend container restarts if this is set to 'firefox'",
+    },
+    "selenium.selenium_executable_path": {
+    "type": UserInput.OPTION_TEXT,
+    "default": "",
+    "help": "Path to webdriver (geckodriver or chromedriver)",
+    "tooltip": "Docker installs to /usr/local/bin/geckodriver",
+    },
 }
 
 categories = {
@@ -239,4 +251,5 @@ categories = {
     "DATASOURCES": "Data source configuration",
     'image_downloader': 'Image downloader',
     'text_from_images': 'OCR: Text from images',
+    "selenium": "Selenium Scraper settings",
 }

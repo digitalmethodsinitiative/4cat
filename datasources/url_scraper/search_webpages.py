@@ -85,6 +85,7 @@ class SearchWithSelenium(SeleniumScraper):
 
             attempts = 0
             success = False
+            scraped_page = {}
             while attempts < 2:
                 attempts += 1
                 try:
@@ -92,7 +93,7 @@ class SearchWithSelenium(SeleniumScraper):
                 except Exception as e:
                     self.dataset.log('Url %s unable to be scraped with error: %s' % (url, str(e)))
                     self.restart_selenium()
-                    scraped_page['error'] = 'SCAPE ERROR:\n' + str(e) + '\n'
+                    result['error'] = 'SCRAPE ERROR:\n' + str(e) + '\n'
                     continue
 
                 # Check for results and collect text

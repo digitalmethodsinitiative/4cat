@@ -8,7 +8,7 @@ import csv
 
 from backend.abstract.processor import BasicProcessor
 from common.lib.helpers import UserInput
-import config
+import common.config_manager as config
 
 __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl"]
@@ -46,7 +46,7 @@ class DetectTrackers(BasicProcessor):
         }
     }
 
-    tracker_file = os.path.join(config.PATH_ROOT, 'common/assets/bugs.json')
+    tracker_file = os.path.join(config.get('PATH_ROOT'), 'common/assets/bugs.json')
 
     @classmethod
     def is_compatible_with(cls, module=None):

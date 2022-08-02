@@ -1,23 +1,25 @@
 import abc
-from selenium import webdriver
-from selenium.common.exceptions import WebDriverException, SessionNotCreatedException, UnexpectedAlertPresentException
 from urllib.parse import urlparse, urljoin
 from bs4 import BeautifulSoup
 from bs4.element import Comment
 
 from backend.abstract.search import Search
 from common.lib.exceptions import ProcessorException
-import config
+import common.config_manager as config
 
-if hasattr(config, 'SELENIUM_BROWSER') and hasattr(config, 'SELENIUM_EXECUTABLE_PATH'):
-    if config.SELENIUM_BROWSER == 'chrome':
+if config.get('selenium.browser') and config.get('selenium.selenium_executable_path'):
+    from selenium import webdriver
+    from selenium.webdriver.common.by import By
+    from selenium.common.exceptions import WebDriverException, SessionNotCreatedException, UnexpectedAlertPresentException
+
+    if config.get('selenium.browser') == 'chrome':
         from selenium.webdriver.chrome.options import Options
-    elif config.SELENIUM_BROWSER == 'firefox':
+    elif config.get('selenium.browser') == 'firefox':
         from selenium.webdriver.firefox.options import Options
     else:
-        # TODO raise some sort of error; stop class from being used
-        pass
-
+        raise ImportError('selenium.browser only works with "chrome" or "firefox"')
+else:
+    raise ImportError('Selenium not set up')
 
 class SeleniumScraper(Search, metaclass=abc.ABCMeta):
     """
@@ -85,7 +87,7 @@ class SeleniumScraper(Search, metaclass=abc.ABCMeta):
                 try:
                     links = self.collect_links()
                 except Exception as e:
-                    if hasattr('dataset', self):
+                    if hasattr(self, 'dataset'):
                         self.dataset.log('Error collecting links for url %s: %s' % (url, str(e)))
                     links = None
                     result['collect_links_error': e]
@@ -100,7 +102,7 @@ class SeleniumScraper(Search, metaclass=abc.ABCMeta):
         if self.driver is None:
             raise ProcessorException('Selenium Drive not yet started: Cannot collect links')
 
-        elems = self.driver.find_elements_by_xpath("//a[@href]")
+        elems = self.driver.find_elements(By.XPATH, "//a[@href]")
         return [elem.get_attribute("href") for elem in elems]
 
     def check_exclude_link(self, link, previously_used_links, base_url=None, bad_url_list=['mailto:', 'javascript']):
@@ -168,28 +170,28 @@ class SeleniumScraper(Search, metaclass=abc.ABCMeta):
         options = Options()
         options.headless = True
         options.add_argument('--headless')
-        options.add_argument("--remote-debugging-port=9222")
+        # options.add_argument("--remote-debugging-port=9222")
         options.add_argument('--no-sandbox')
         options.add_argument("--disable-gpu")
         options.add_argument("--disable-dev-shm-usage")
         options.add_argument("--disable-browser-side-navigation")
 
         try:
-            if hasattr(config, 'SELENIUM_BROWSER') and hasattr(config, 'SELENIUM_EXECUTABLE_PATH'):
-                if config.SELENIUM_BROWSER == 'chrome':
-                    self.driver = webdriver.Chrome(executable_path=config.SELENIUM_EXECUTABLE_PATH, options=options)
-                elif config.SELENIUM_BROWSER == 'firefox':
-                    self.driver = webdriver.Firefox(executable_path=config.SELENIUM_EXECUTABLE_PATH, options=options)
-                else:
-                    raise ProcessorException('Selenium Scraper not configured')
-
+            if config.get('selenium.browser') == 'chrome':
+                self.driver = webdriver.Chrome(executable_path=config.get('selenium.selenium_executable_path'), options=options)
+            elif config.get('selenium.browser') == 'firefox':
+                self.driver = webdriver.Firefox(executable_path=config.get('selenium.selenium_executable_path'), options=options)
+            else:
+                self.dataset.update_status("Selenium Scraper not configured")
+                raise ProcessorException("Selenium Scraper not configured; browser must be 'firefox' or 'chrome'")
         except (SessionNotCreatedException, WebDriverException) as e:
-            if "binary not found" in str(e):
-                raise ProcessorException("Chromium binary is not available.")
+            self.dataset.update_status("Selenium Scraper not configured")
             if "only supports Chrome" in str(e):
                 raise ProcessorException("Your chromedriver version is incompatible with your Chromium version:\n  (%s)" % e)
+            elif "Message: '' executable may have wrong" in str(e):
+                raise ProcessorException('Webdriver not installed or path to executable incorrect (%s)' % str(e))
             else:
-                raise ProcessorException("Could not connect to Chromium (%s)." % e)
+                raise ProcessorException("Could not connect to browser (%s)." % str(e))
 
     def quit_selenium(self):
         """

@@ -15,7 +15,7 @@ from common.lib.exceptions import QueryParametersException, ProcessorInterrupted
 from common.lib.helpers import validate_url
 from common.lib.user_input import UserInput
 
-import config
+import common.config_manager as config
 
 class SearchWebArchiveWithSelenium(SeleniumScraper):
     """
@@ -93,9 +93,9 @@ class SearchWebArchiveWithSelenium(SeleniumScraper):
         self.dataset.log('query: ' + str(query))
         http_request = self.parameters.get("http_request") == 'both'
         if http_request:
-            self.dataset.update_status('Scraping Web Archives with Selenium %s and HTTP Requests' % config.SELENIUM_BROWSER)
+            self.dataset.update_status('Scraping Web Archives with Selenium %s and HTTP Requests' % config.get('selenium.browser'))
         else:
-            self.dataset.update_status('Scraping Web Archives with Selenium %s' % config.SELENIUM_BROWSER)
+            self.dataset.update_status('Scraping Web Archives with Selenium %s' % config.get('selenium.browser'))
         scrape_additional_subpages = self.parameters.get("subpages")
 
         urls_to_scrape = [{'url':url['url'], 'base_url':url['base_url'], 'year':url['year'], 'num_additional_subpages': scrape_additional_subpages, 'subpage_links':[]} for url in query.get('preprocessed_urls')]
