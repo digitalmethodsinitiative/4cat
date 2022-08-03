@@ -35,6 +35,10 @@ class BoardScraper4chan(BasicJSONScraper):
 			return False
 
 		for page in data:
+			if page.get('threads') is None:
+				self.log.error(
+					"No thread data from board scrape of %s/%s/" % (self.datasource, self.job.data["remote_id"]))
+				return False
 			for thread in page["threads"]:
 				self.position += 1
 				new_threads += self.save_thread(thread)
