@@ -15,7 +15,7 @@ class TwitterStats(BasicProcessor):
     Collect Twitter statistics. Build to emulate TCAT statistic.
     """
     type = "twitter-stats"  # job type ID
-    category = "Post metrics"  # category
+    category = "Twitter Analysis"  # category
     title = "Twitter Statistics"  # title displayed in UI
     description = "Contains the number of tweets, number of tweets with links, number of tweets with hashtags, number of tweets with mentions, number of retweets, and number of replies"  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
