@@ -20,8 +20,8 @@ class TwitterStats(BasicProcessor):
     """
     type = "twitter-user-stats"  # job type ID
     category = "Twitter Analysis"  # category
-    title = "User statistics"  # title displayed in UI
-    description = "Calculates the min, max, average, Q1, median, Q3, and trimmed mean for: number of tweets per user, urls per user, number of followers, number of users following, and user's total number of tweets per time interval"  # description displayed in UI
+    title = "Aggregated User Statistics"  # title displayed in UI
+    description = "Calculates aggregate statistics for users grouped by interval (min, max, average, Q1, median, Q3, and trimmed mean): number of tweets per user, urls per user, number of followers, number of users following, and user's total number of tweets"  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
 
     options = {
