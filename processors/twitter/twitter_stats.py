@@ -1,5 +1,5 @@
 """
-Collapse post bodies into one long string
+Twitter APIv2 general tweet statistics
 """
 from common.lib.helpers import UserInput, pad_interval, get_interval_descriptor
 from backend.abstract.processor import BasicProcessor
@@ -12,7 +12,7 @@ __email__ = "4cat@oilab.eu"
 
 class TwitterStats(BasicProcessor):
     """
-    Collect Twitter statistics. Build to emulate TCAT statistic.
+    Collect Twitter statistics. Built to emulate TCAT statistic.
     """
     type = "twitter-stats"  # job type ID
     category = "Twitter Analysis"  # category

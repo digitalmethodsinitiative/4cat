@@ -1,9 +1,7 @@
 """
-Collapse post bodies into one long string
+Twitter APIv2 individual user statistics
 """
 import datetime
-import numpy as np
-from scipy import stats
 
 from common.lib.helpers import UserInput, pad_interval, get_interval_descriptor
 from backend.abstract.processor import BasicProcessor
