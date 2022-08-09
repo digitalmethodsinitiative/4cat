@@ -1,8 +1,8 @@
 """
 Twitter APIv2 general tweet statistics
 """
-from common.lib.helpers import UserInput, pad_interval, get_interval_descriptor
-from backend.abstract.processor import BasicProcessor
+from common.lib.helpers import UserInput
+from processors.twitter.base_twitter_stats import TwitterStatsBase
 
 __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl"]
@@ -10,7 +10,7 @@ __maintainer__ = "Dale Wahl"
 __email__ = "4cat@oilab.eu"
 
 
-class TwitterStats(BasicProcessor):
+class TwitterStats(TwitterStatsBase):
     """
     Collect Twitter statistics. Built to emulate TCAT statistic.
     """
@@ -45,126 +45,111 @@ class TwitterStats(BasicProcessor):
         """
         return module.type == "twitterv2-search"
 
-    def process(self):
+    def map_data(self, post):
         """
-        This takes a 4CAT twitter dataset file as input, and outputs a csv.
+        Maps a post to collect aggregate data. Returns a key for grouping data, a dictionary of sum data that can
+        be added up when encountered again, a dictionary of static data that should be updated, and a dictionary of
+        list data that should be appended to.
+
+        E.g. number of tweets might be summed over interval, a username of tweeter will be static, and a list of
+        hashtags used might be collected (appended to a list).
         """
-        # OrderedDict because dates and headers should have order
-        intervals = {}
+        # To further group intervals, name the category (e.g. "hashtags")
+        group_by_key_category = False
 
-        timeframe = self.parameters.get("timeframe")
+        # Can be a string (representing the record e.g. author_name) or a list of strings (which will each get a separate record e.g. list of hashtags)
+        group_by_keys = None
 
-        first_interval = "9999"
-        last_interval = "0000"
+        hashtags = [tag["tag"] for tag in post.get("entities", {}).get("hashtags", [])]
+        mentions = [tag["username"] for tag in post.get("entities", {}).get("mentions", [])]
+        num_urls = len([tag["expanded_url"] for tag in post.get("entities", {}).get("urls", [])])
+        num_images = len(
+            [item["url"] for item in post.get("attachments", {}).get("media_keys", []) if
+             type(item) is dict and item.get("type") == "photo"])
 
-        self.dataset.update_status("Processing posts")
-        with self.dataset.get_results_path().open("w") as results:
-            counter = 0
+        # Map the data in the post to either be summed (by grouping and interval)
+        sum_map = {
+            "Number of Tweets": 1,
+            "Number of Tweets with links": 1 if num_urls > 0 else 0,
+            "Number of Tweets with hashtags": 1 if len(hashtags) > 0 else 0,
+            "Number of Tweets with mentions": 1 if len(mentions) > 0 else 0,
+            "Number of Tweets with images": 1 if num_images > 0 else 0,
+            "Number of Retweets": 1 if any([ref.get("type") == "retweeted" for ref in post.get("referenced_tweets", [])]) else 0,
+            "Number of Replies": 1 if any([ref.get("type") == "replied_to" for ref in post.get("referenced_tweets", [])]) else 0,
+            "Number of Quotes": 1 if any([ref.get("type") == "quoted" for ref in post.get("referenced_tweets", [])]) else 0,
+        }
+        # These are user-specific metrics and not per tweet/post like above
+        static_map = {}
+        # These keys contain sets of items (e.g. hashtags)
+        list_map = {
+            "Authors": [str(post.get("author_user").get("username"))],
+            "Hashtags": hashtags,
+            "Mentions": mentions,
+        }
 
-            for post in self.source_dataset.iterate_items(self):
-                try:
-                    date = get_interval_descriptor(post, timeframe)
-                except ValueError as e:
-                    self.dataset.update_status("%s, cannot count posts per %s" % (str(e), timeframe), is_final=True)
-                    self.dataset.update_status(0)
-                    return
+        return group_by_key_category, group_by_keys, sum_map, static_map, list_map
 
-                # Add a counts for the respective timeframe
-                if date not in intervals:
-                    intervals[date] = {
-                        "Number of Tweets": 1,
-                        "Number of Tweets with links": 1 if post.get("urls") else 0,
-                        "Number of Tweets with hashtags": 1 if post.get("hashtags") else 0,
-                        "Number of Tweets with mentions": 1 if post.get("mentions") else 0,
-                        "Number of Tweets with images": 1 if post.get("images") else 0,
-                        "Number of Retweets": 1 if post.get("is_retweet") == 'yes' else 0,
-                        "Number of Replies": 1 if post.get("is_reply") == 'yes' else 0,
-                        "Number of Quotes": 1 if post.get("is_quote_tweet") == 'yes' else 0,
-                        "Number of unique Authors": {post.get('author')},
-                        # "Number of unique Threads": {post.get('thread_id')},
-                        "Top 10 hashtags": {},
-                        "Top 10 authors": {post.get('author'): 1},
-                        "Top 10 mentions": {},
-                    }
-                else:
-                    intervals[date]["Number of Tweets"] += 1
-                    intervals[date]["Number of Tweets with links"] += 1 if post.get("urls") else 0
-                    intervals[date]["Number of Tweets with hashtags"] += 1 if post.get("hashtags") else 0
-                    intervals[date]["Number of Tweets with mentions"] += 1 if post.get("mentions") else 0
-                    intervals[date]["Number of Tweets with images"] += 1 if post.get("images") else 0
-                    intervals[date]["Number of Retweets"] += 1 if post.get("is_retweet") == 'yes' else 0
-                    intervals[date]["Number of Replies"] += 1 if post.get("is_reply") == 'yes' else 0
-                    intervals[date]["Number of Quotes"] += 1 if post.get("is_quote_tweet") == 'yes' else 0
-                    intervals[date]["Number of unique Authors"].add(post.get('author'))
-                    # intervals[date]["Number of unique Threads"].add(post.get('thread_id'))
-                    if post.get('author') not in intervals[date]["Top 10 authors"]:
-                        intervals[date]["Top 10 authors"][post.get('author')] = 1
-                    else:
-                        intervals[date]["Top 10 authors"][post.get('author')] += 1
+    def padding_map(self):
+        """
+        Returns the base dictionary to be used if there are no values in a certain interval.
+        """
+        return {
+            "Number of Tweets": 0,
+            "Number of Tweets with links": 0,
+            "Number of Tweets with hashtags": 0,
+            "Number of Tweets with mentions": 0,
+            "Number of Tweets with images": 0,
+            "Number of Retweets": 0,
+            "Number of Replies": 0,
+            "Number of Quotes": 0,
+            "Authors": {},
+            "Hashtags": {},
+            "Mentions": {},
+        }
 
-                if post.get("hashtags"):
-                    for hashtag in post.get("hashtags").split(','):
-                        if hashtag not in intervals[date]["Top 10 hashtags"]:
-                            intervals[date]["Top 10 hashtags"][hashtag] = 1
-                        else:
-                            intervals[date]["Top 10 hashtags"][hashtag] += 1
+    def modify_intervals(self, key, data):
+        """
+        Modify the intervals on a second loop once all the data has been collected. This is particularly useful for
+        lists or sets of items that were collected.
+        """
+        # Count the number of unique authors
+        data['Number of unique Authors'] = len(set(data['Authors']))
 
-                if post.get("mentions"):
-                    for mention in post.get("mentions").split(','):
-                        if mention not in intervals[date]["Top 10 mentions"]:
-                            intervals[date]["Top 10 mentions"][mention] = 1
-                        else:
-                            intervals[date]["Top 10 mentions"][mention] += 1
+        # Tally authors, hashtags, and mentions
+        top_authors = {}
+        for author in data['Authors']:
+            if author in top_authors:
+                top_authors[author] += 1
+            else:
+                top_authors[author] = 1
+        sorted_authors = ["%s: %s" % (k, v) for k, v in
+                          sorted(top_authors.items(), key=lambda item: item[1], reverse=True)]
+        data["Top 10 authors"] = ', '.join(sorted_authors[:10])
 
-                first_interval = min(first_interval, date)
-                last_interval = max(last_interval, date)
+        top_hashtags = {}
+        for tag in data['Hashtags']:
+            if tag in top_hashtags:
+                top_hashtags[tag] += 1
+            else:
+                top_hashtags[tag] = 1
+        sorted_tags = ["%s: %s" % (k, v) for k, v in
+                       sorted(top_hashtags.items(), key=lambda item: item[1], reverse=True)]
+        data["Top 10 hashtags"] = ', '.join(sorted_tags[:10])
 
-                counter += 1
+        top_mentions = {}
+        for mention in data['Mentions']:
+            if mention in top_mentions:
+                top_mentions[mention] += 1
+            else:
+                top_mentions[mention] = 1
+        sorted_mentions = ["%s: %s" % (k, v) for k, v in
+                           sorted(top_mentions.items(), key=lambda item: item[1], reverse=True)]
+        data["Top 10 mentions"] = ', '.join(sorted_mentions[:10])
 
-                if counter % 2500 == 0:
-                    self.dataset.update_status("Processed through " + str(counter) + " posts.")
+        # Remove unnecessary keys
+        data.pop('Created at Timestamp')
+        data.pop("Authors")
+        data.pop("Hashtags")
+        data.pop("Mentions")
 
-            # pad interval if needed, this is useful if the result is to be
-            # visualised as a histogram, for example
-            if self.parameters.get("pad") and timeframe != "all":
-                missing, intervals = pad_interval(intervals, first_interval, last_interval)
-
-                # Convert 0 values to dict
-                for k, v in intervals.items():
-                    if isinstance(v, int):
-                        intervals[k] = {
-                            "Number of Tweets": 0,
-                            "Number of Tweets with links": 0,
-                            "Number of Tweets with hashtags": 0,
-                            "Number of Tweets with mentions": 0,
-                            "Number of Tweets with images": 0,
-                            "Number of Retweets": 0,
-                            "Number of Replies": 0,
-                            "Number of Quotes": 0,
-                            "Number of unique Authors": {},
-                            # "Number of unique Threads": 0,
-                            "Top 10 hashtags": {},
-                            "Top 10 authors": {},
-                            "Top 10 mentions": {},
-                        }
-
-            rows = []
-            for interval, data in intervals.items():
-                data["Number of unique Authors"] = len(data["Number of unique Authors"])
-                # data["Number of unique Threads"] = len(data["Number of unique Threads"])
-
-                sorted_tags = ["%s: %s" % (k, v) for k, v in
-                               sorted(data["Top 10 hashtags"].items(), key=lambda item: item[1], reverse=True)]
-                data["Top 10 hashtags"] = ', '.join(sorted_tags[:10])
-
-                sorted_authors = ["%s: %s" % (k, v) for k, v in
-                                   sorted(data["Top 10 authors"].items(), key=lambda item: item[1], reverse=True)]
-                data["Top 10 authors"] = ', '.join(sorted_authors[:10])
-
-                sorted_mentions = ["%s: %s" % (k, v) for k, v in
-                                   sorted(data["Top 10 mentions"].items(), key=lambda item: item[1], reverse=True)]
-                data["Top 10 mentions"] = ', '.join(sorted_mentions[:10])
-
-                rows.append({**{"date": interval}, **data})
-
-        self.write_csv_items_and_finish(rows)
+        return data

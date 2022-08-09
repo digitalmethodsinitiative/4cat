@@ -89,7 +89,7 @@ class TwitterStatsBase(BasicProcessor):
                         for key, value in sum_map.items():
                             intervals[date][group_by_key][key] += value
                         for key, value in list_map.items():
-                            intervals[date][group_by_key][key].update(value)
+                            intervals[date][group_by_key][key].extend(value)
 
                         # Methodology question: which stat is best to use? Most recent? Largest? Smallest? Likely they will be identical or minimally different.
                         # Using most recent for now.
@@ -111,7 +111,7 @@ class TwitterStatsBase(BasicProcessor):
                     for key, value in sum_map.items():
                         intervals[date][key] += value
                     for key, value in list_map.items():
-                        intervals[date][key].update(value)
+                        intervals[date][key].extend(value)
 
                     # Methodology question: which stat is best to use? Most recent? Largest? Smallest? Likely they will be identical or minimally different.
                     # Using most recent for now.
@@ -144,6 +144,7 @@ class TwitterStatsBase(BasicProcessor):
                     group_data = self.modify_intervals(group_key, group_data)
                     rows.append({**{"date": interval, group_by_keys_category: group_key}, **group_data})
             else:
+                data = self.modify_intervals(interval, data)
                 rows.append({**{"date": interval}, **data})
 
         self.write_csv_items_and_finish(rows)
@@ -174,14 +175,14 @@ class TwitterStatsBase(BasicProcessor):
         # To further group intervals, name the category (e.g. "hashtags")
         group_by_key_category = False
 
-        # Can be a string (representing the record e.g. author_name) or a list of strings (which will each get a separate record e.g. list of hashtags)
-        group_by_keys = None
+        # Can be a string (representing the record e.g. author_name) or a set of strings (which will each get a separate record e.g. list of hashtags)
+        group_by_keys = set()
 
         # Map the data in the post to either be summed (by grouping and interval)
         sum_map = {}
         # These are user-specific metrics and not per tweet/post like above
         static_map = {}
-        # These keys contain sets of items (e.g. hashtags)
+        # These keys contain list of items (e.g. hashtags)
         list_map = {}
 
         return group_by_key_category, group_by_keys, sum_map, static_map, list_map

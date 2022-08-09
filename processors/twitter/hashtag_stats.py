@@ -1,8 +1,6 @@
 """
 Twitter APIv2 hashtag statistics
 """
-import copy
-
 from common.lib.helpers import UserInput
 from processors.twitter.base_twitter_stats import TwitterStatsBase
 
@@ -64,15 +62,15 @@ class TwitterHashtagStats(TwitterStatsBase):
         """
         group_by_key_bool = 'hashtag'
 
-        hashtags = set([tag["tag"] for tag in post.get("entities", {}).get("hashtags", [])])
-        mentions = set([tag["username"] for tag in post.get("entities", {}).get("mentions", [])])
+        hashtags = [tag["tag"] for tag in post.get("entities", {}).get("hashtags", [])]
+        mentions = [tag["username"] for tag in post.get("entities", {}).get("mentions", [])]
 
         if self.parameters.get("include_quoted_text"):
             # Add referenced tweet data to the collected information
             for ref_tweet in post.get('referenced_tweets', []):
                 if ref_tweet.get('type') in ['retweeted', 'quoted']:
-                    hashtags.update([tag['tag'] for tag in ref_tweet.get('entities', {}).get('hashtags', [])])
-                    mentions.update([tag['username'] for tag in ref_tweet.get('entities', {}).get('mentions', [])])
+                    hashtags.extend([tag['tag'] for tag in ref_tweet.get('entities', {}).get('hashtags', [])])
+                    mentions.extend([tag['username'] for tag in ref_tweet.get('entities', {}).get('mentions', [])])
 
         sum_map = {
                     "Number of Tweets containing Hashtag": 1,
@@ -85,12 +83,12 @@ class TwitterHashtagStats(TwitterStatsBase):
         static_map = {}
 
         list_map = {
-            'Users of Hashtag': {copy.deepcopy(post["author_user"]["username"])},
+            'Users of Hashtag': [post["author_user"]["username"]],
             "Mentions": mentions,
             "Hashtags": hashtags,
         }
 
-        return group_by_key_bool, hashtags, sum_map, static_map, list_map
+        return group_by_key_bool, set(hashtags), sum_map, static_map, list_map
 
     def modify_intervals(self, key, data):
         """
@@ -100,18 +98,20 @@ class TwitterHashtagStats(TwitterStatsBase):
         # Ensure that all lists are sets (i.e. contain only unique values)
         data['Users of Hashtag'] = set(data['Users of Hashtag'])
         data['Mentions'] = set(data['Mentions'])
-        # Remove key (i.e. this particular hashtag) from list of hashtags in a given tweet
-        data['Hashtags'].remove(key)
         data['Hashtags'] = set(data['Hashtags'])
+        # Remove key (i.e. this particular hashtag) from set of hashtags in a given tweet
+        data['Hashtags'].remove(key)
 
         # Collect Aggregate data
-        data['Number of Users w/ Tweets containing Hashtag'] = len(data['Users of Hashtag'])
-        data['Number of Mentions in Tweets containing Hashtag'] = len(data['Mentions'])
-        data['Number of Other Hashtags in Tweets containing Hashtag'] = len(data['Hashtags'])
+        data['Number of Unique Users w/ Tweets using Hashtag'] = len(data['Users of Hashtag'])
+        data['Number of Unique Mentions used in Tweets w/ Hashtag'] = len(data['Mentions'])
+        data['Number of Other Unique Hashtags used in Tweets w/ Hashtag'] = len(data['Hashtags'])
 
         # Rename and format lists
         data['Users w/ Tweets containing Hashtag'] = ', '.join(data.pop('Users of Hashtag'))
         data['Mentions in Tweets containing Hashtag'] = ', '.join(data.pop('Mentions'))
         data['Other Hashtags in Tweets containing Hashtag'] = ', '.join(data.pop('Hashtags'))
+
+        data.pop('Created at Timestamp')
 
         return data
