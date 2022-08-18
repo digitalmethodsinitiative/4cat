@@ -184,3 +184,10 @@ class ImageTextDetector(BasicProcessor):
             return None
 
         return response
+
+    @staticmethod
+    def map_item(item):
+        """
+        For preview frontend
+        """
+        return {'filename': item.get('filename'), 'text':item.get('simplified_text').get('raw_text')}
