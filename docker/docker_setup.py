@@ -59,6 +59,7 @@ if __name__ == "__main__":
         # Per the Docker .env file; required for docker-entrypoint.sh and db setup
 
         # Database configuration
+        config_parser['DATABASE']['db_host'] = os.environ['POSTGRES_HOST']
         config_parser['DATABASE']['db_name'] = os.environ['POSTGRES_DB']
         config_parser['DATABASE']['db_user'] = os.environ['POSTGRES_USER']
         config_parser['DATABASE']['db_password'] = os.environ['POSTGRES_PASSWORD']
