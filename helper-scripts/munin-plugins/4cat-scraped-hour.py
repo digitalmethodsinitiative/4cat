@@ -12,7 +12,7 @@ import os
 
 os.chdir("/opt/4cat")
 sys.path.append("/opt/4cat")
-from config import DATASOURCES, DB_NAME, DB_USER, DB_PASSWORD, DB_HOST, DB_PORT
+from config import DATASOURCES, DB_NAME, DB_USER, DB_PASSWORD, DB_HOST, DB_PORT, DB_SSLMODE
 
 if len(sys.argv) > 1 and sys.argv[1] == "config":
 	print("graph_title 4CAT Posts scraped per hour")
@@ -36,7 +36,7 @@ for platform in DATASOURCES:
 		continue
 	queries.append("(SELECT COUNT(*) FROM posts_%s WHERE timestamp > %i) AS scraped_%s" % (platform, cutoff, platform))
 
-connection = psycopg2.connect(dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD, host=DB_HOST, port=DB_PORT)
+connection = psycopg2.connect(dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD, host=DB_HOST, port=DB_PORT, sslmode=DB_SSLMODE)
 cursor = connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 query = "SELECT " + ", ".join(queries)
 

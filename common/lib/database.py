@@ -30,7 +30,7 @@ class Database:
 	interruptable_timeout = 86400  # if a query takes this long, it should be cancelled. see also fetchall_interruptable()
 	interruptable_job = None
 
-	def __init__(self, logger, dbname=None, user=None, password=None, host=None, port=None, appname=None):
+	def __init__(self, logger, dbname=None, user=None, password=None, host=None, port=None, appname=None, sslmode=None):
 		"""
 		Set up database connection
 
@@ -47,10 +47,11 @@ class Database:
 		password = config.get('DB_PASSWORD') if not password else password
 		host = config.get('DB_HOST') if not host else host
 		port = config.get('DB_PORT') if not port else port
+		sslmode = config.get('DB_SSLMODE') if not sslmode else sslmode
 
 		self.appname = "4CAT" if not appname else "4CAT-%s" % appname
 
-		self.connection = psycopg2.connect(dbname=dbname, user=user, password=password, host=host, port=port, application_name=self.appname)
+		self.connection = psycopg2.connect(dbname=dbname, user=user, password=password, host=host, port=port, application_name=self.appname, sslmode=sslmode)
 		self.cursor = self.connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 		self.log = logger
 
