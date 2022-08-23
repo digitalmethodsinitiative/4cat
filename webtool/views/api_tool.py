@@ -248,7 +248,8 @@ def import_dataset():
 		parameters={"datasource": platform},
 		type=worker.type,
 		db=db,
-		owner=current_user.get_id()
+		owner=current_user.get_id(),
+		extension=worker.extension
 	)
 	dataset.update_status("Importing uploaded file...")
 
