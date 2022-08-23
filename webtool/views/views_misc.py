@@ -137,6 +137,9 @@ def data_overview(datasource=None):
         if is_static:
             labels.append("static")
 
+        if hasattr(worker_class, "is_from_extension"):
+            labels.append("extension")
+
         # Get daily post counts for local datasource to display in a graph
         if is_local == "local":
 

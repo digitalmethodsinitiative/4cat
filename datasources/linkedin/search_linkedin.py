@@ -21,12 +21,14 @@ class SearchLinkedIn(Search):
     title = "Import scraped LinkedIn data"  # title displayed in UI
     description = "Import LinkedIn data collected with an external tool such as Zeeschuimer."  # description displayed in UI
     extension = "ndjson"  # extension of result file, used internally and in UI
-    is_local = False    # Whether this datasource is locally scraped
-    is_static = False   # Whether this datasource is still updated
+    is_from_extension = True
 
     # not available as a processor for existing datasets
     accepts = [None]
-    options = {}
+    references = [
+        "[Zeeschuimer browser extension](https://github.com/digitalmethodsinitiative/zeeschuimer)",
+        "[Worksheet: Capturing TikTok data with Zeeschuimer and 4CAT](https://tinyurl.com/nmrw-zeeschuimer-tiktok) (also explains general usage of Zeeschuimer)"
+    ]
 
     def get_items(self, query):
         """
