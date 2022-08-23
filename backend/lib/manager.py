@@ -43,6 +43,8 @@ class WorkerManager:
 			signal.signal(signal.SIGTERM, self.abort)
 			signal.signal(signal.SIGINT, self.request_interrupt)
 
+		# datasources are initialized here; the init_datasource functions found in their respective __init__.py files
+		# are called which, in the case of scrapers, also adds the scrape jobs to the queue.
 		self.validate_datasources()
 
 		# queue a job for the api handler so it will be run

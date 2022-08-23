@@ -13,7 +13,7 @@ import re
 from pathlib import Path
 
 from backend.abstract.search import Search
-from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException
+from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException, ProcessorException
 from common.lib.helpers import convert_to_int, UserInput
 
 from datetime import datetime
@@ -465,9 +465,16 @@ class SearchTelegram(Search):
         attachment_filename = ""
 
         if attachment_type == "contact":
-            attachment = message["media"]["contact"]
-            attachment_data = json.dumps({property: attachment.get(property) for property in
-                                          ("phone_number", "first_name", "last_name", "vcard", "user_id")})
+            contact_data = ["phone_number", "first_name", "last_name", "vcard", "user_id"]
+            if message["media"].get('contact', False):
+                # Old datastructure
+                attachment = message["media"]["contact"]
+            elif all([property in message["media"].keys() for property in contact_data]):
+                # New datastructure 2022/7/25
+                attachment = message["media"]
+            else:
+                raise ProcessorException('Cannot find contact data; Telegram datastructure may have changed')
+            attachment_data = json.dumps({property: attachment.get(property) for property in contact_data})
 
         elif attachment_type == "document":
             # videos, etc

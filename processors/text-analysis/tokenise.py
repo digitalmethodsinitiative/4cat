@@ -189,7 +189,7 @@ class Tokenise(BasicProcessor):
 
 		# Add rejected words to filter
 		if self.parameters.get("reject_words"):
-			reject_words = [str(word).strip() for word in self.parameters["reject_words"].split(",")]
+			reject_words = [str(word).strip().lower() for word in self.parameters["reject_words"].split(",")]
 			word_filter.update(reject_words)
 
 		# Use an Aho-Corasick trie to filter tokens - significantly faster

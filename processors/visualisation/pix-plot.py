@@ -12,6 +12,8 @@ import datetime
 import dateutil.parser
 import csv
 import os
+from urllib.parse import unquote
+from werkzeug.utils import secure_filename
 import common.config_manager as config
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.helpers import UserInput, convert_to_int
@@ -273,9 +275,9 @@ class PixPlotGenerator(BasicProcessor):
 					break
 				else:
 					# Something botched
-					self.dataset.update_status("PixPlot Error")
+					self.dataset.finish_with_error("PixPlot Error on creation")
 					self.log.error("PixPlot Error: " + str(result.json()))
-					break
+					return
 
 		# Create HTML file
 		plot_url = config.get('pix-plot.PIXPLOT_SERVER').rstrip('/') + '/plots/' + plot_label + '/index.html'
@@ -333,7 +335,9 @@ class PixPlotGenerator(BasicProcessor):
 				# Check if image successfully downloaded for image
 				if data.get('success'):
 					ids = data.get('post_ids')
-					filename = data.get('filename')
+					# dmi_pix_plot API uses sercure_filename while pixplot.py (in PixPlot library) uses clean_filename
+					# Ensure our metadata filenames match results
+					filename = self.clean_filename(secure_filename(data.get('filename')))
 					for post_id in ids:
 						# Add to key
 						if post_id in post_id_image_dictionary.keys():
@@ -409,3 +413,14 @@ class PixPlotGenerator(BasicProcessor):
 		Returns a html string to redirect to PixPlot.
 		"""
 		return f"<head><meta http-equiv='refresh' content='0; URL={url}'></head>"
+
+	def clean_filename(self, s):
+		'''
+		Given a string that points to a filename, return a clean filename
+
+		Copied from PixPlot library to ensure resultant filenames are the same.
+		'''
+		s = unquote(os.path.basename(s))
+		invalid_chars = '<>:;,"/\\|?*[]'
+		for i in invalid_chars: s = s.replace(i, '')
+		return s

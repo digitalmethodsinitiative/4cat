@@ -1,3 +1,11 @@
+# This docker-compose_public_ip.yml is specifically for quickly setting up
+# 4CAT on a server and hosting AT THE IP address. I.e. http://1.2.3.4
+# It was made to quickly deploy on SURF's research cloud
+# https://www.surf.nl/en/research-it
+
+# The issue this "solves" is allowing 4CAT to be deployed on an unknown
+# IP address which is only provided by SURF after 4CAT deployment.
+
 version: '3.6'
 
 services:
@@ -27,6 +35,7 @@ services:
       - 4cat_data:/usr/src/app/data/
       - 4cat_share:/usr/src/app/config/
       - 4cat_logs:/usr/src/app/logs/
+    # The -p sets your SERVER_NAME to your public IP
     entrypoint: docker/docker-entrypoint.sh -p
 
   frontend:

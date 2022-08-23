@@ -89,6 +89,9 @@ class LinguisticFeatures(BasicProcessor):
 				else:
 					body = post["body"]
 				posts.append(body)
+			else:
+				self.dataset.log('Warning: Post %s has no body from which to extract entities' % post.get('id'))
+				posts.append("")
 
 		# Process the text in batches
 		if len(posts) < 100000:
