@@ -101,10 +101,10 @@ def data_overview(datasource=None):
     Main tool frontend
     """
     datasources = {datasource: metadata for datasource, metadata in backend.all_modules.datasources.items() if
-                   metadata["has_worker"] and metadata["has_options"]}
+                   metadata["has_worker"] and datasource in config.get("DATASOURCES")}
 
     if datasource not in datasources:
-        datasource_name = None
+        datasource = None
 
     github_url = config.get("4cat.github_url")
 
