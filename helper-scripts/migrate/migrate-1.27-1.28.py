@@ -1,4 +1,4 @@
-# Add 'is_deactivated' column to user table
+# Add notifications tables and indexes
 import sys
 import os
 
@@ -10,15 +10,34 @@ log = Logger(output=True)
 import common.config_manager as config
 db = Database(logger=log, dbname=config.get('DB_NAME'), user=config.get('DB_USER'), password=config.get('DB_PASSWORD'), host=config.get('DB_HOST'), port=config.get('DB_PORT'), appname="4cat-migrate")
 
-print("  Checking if datasets table has a column 'progress'...")
-has_column = db.fetchone("SELECT COUNT(*) AS num FROM information_schema.columns WHERE table_name = 'datasets' AND column_name = 'progress'")
-if has_column["num"] == 0:
-    print("  ...No, adding.")
-    db.execute("ALTER TABLE datasets ADD COLUMN progress FLOAT DEFAULT 0.0")
-    db.commit()
+print("  Checking if 'users_notifications' table exists...")
+table = db.fetchone("SELECT EXISTS ( SELECT FROM information_schema.tables WHERE table_schema = %s AND table_name = %s )", ("public", "users_notification"))
 
-    # make existing datasets all non-private, as they were before
-    db.execute("UPDATE datasets SET progress = 1 WHERE is_finished = TRUE")
+if not table["exists"]:
+    print("  ...No, adding.")
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS users_notifications (
+        id                  SERIAL PRIMARY KEY,
+        user                TEXT,
+        notification        TEXT,
+        timestamp_expires   INTEGER,
+        allow_dismiss       BOOLEAN DEFAULT TRUE);
+    """)
+
+    db.execute("""
+        CREATE INDEX IF NOT EXISTS users_notifications_name
+          ON users_notifications (
+            username
+          );
+    """)
+
+    db.execute("""
+        CREATE INDEX IF NOT EXISTS users_notifications_name
+          ON users_notifications (
+            username
+          );
+    """)
+
     db.commit()
 else:
     print("  ...Yes, nothing to update.")
