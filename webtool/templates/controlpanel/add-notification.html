@@ -9,7 +9,9 @@
             <h2><span>Add notification</span></h2>
             <p>You can use Markdown in notifications. You can use '!everyone' as a recipient to show the notification to
                 everyone, or '!admins' to show the notification to other admins.</p>
-            <p>For expiration time, enter amount of seconds. When empty, the notification will not expire.</p>
+            <p>For expiration time, enter amount of seconds. When empty, the notification will not expire. Note that
+                if a notification is sent to everyone and made dismissable, any user can dismiss it and that will delete
+                the notification for all users (so you probably shouldn't do that).</p>
 
             <form action="{{ url_for('create_notification') }}" method="POST" class="wide">
                 {% for notice in flashes %}

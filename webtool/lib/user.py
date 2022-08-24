@@ -385,11 +385,9 @@ class User:
 
         :param int notification_id:  ID of the notification to dismiss
         """
-        self.db.delete("users_notifications", {
-            "username": self.get_id(),
-            "allow_dismiss": True,
-            "id": notification_id
-        })
+        self.db.execute("DELETE FROM users_notifications WHERE id IN ( SELECT n.id FROM users_notifications AS n, users AS u "
+            "WHERE u.name = %s AND n.id = %s"
+            "AND (u.name = n.username OR (u.is_admin AND n.username = '!admins') OR n.username = '!everyone'))", (self.get_id(), notification_id))
 
     def get_notifications(self):
         """
