@@ -18,6 +18,8 @@ class DatasetExpirer(BasicWorker):
 	type = "expire-datasets"
 	max_workers = 1
 
+	ensure_job = {"remote_id": "localhost", "interval": 300}
+
 	def work(self):
 		"""
 		Go through all datasources, and if it is configured to automatically
