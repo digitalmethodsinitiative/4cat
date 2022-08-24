@@ -53,13 +53,17 @@ class SearchLinkedIn(Search):
         # annoyingly, posts don't come with a timestamp
         # approximate it by using the time of collection and the "time ago"
         # included with the post (e.g. 'published 18h ago')
-        time_collected = int(node["timestamp_collected"] / 1000)  # milliseconds
-        time_ago = node["data"]["actor"]["subDescription"]["text"]
-        timestamp = int(time_collected - SearchLinkedIn.parse_time_ago(time_ago))
         post = node["data"]
 
+        if not post.get("actor"):
+            return {}
+
+        time_collected = int(node["timestamp_collected"] / 1000)  # milliseconds
+        time_ago = post["actor"]["subDescription"]["text"] if post["actor"].get("subDescription") else ""
+        timestamp = int(time_collected - SearchLinkedIn.parse_time_ago(time_ago))
+
         # extact username from profile URL link
-        username = post["actor"]["navigationContext"]["actionTarget"].split("/in/").pop().split("?")[0]
+        username = post["actor"]["navigationContext"]["actionTarget"].split("linkedin.com/").pop().split("?")[0]
 
         # images are stored in some convoluted way
         # there are multiple URLs for various thumbnails, use the one for the
@@ -72,10 +76,16 @@ class SearchLinkedIn(Search):
                 url = image_data["rootUrl"] + artifacts[0]["fileIdentifyingUrlPathSegment"]
                 images.append(url)
 
+        author = SearchLinkedIn.get_author(post)
+
         # the ID is in the format 'urn:li:activity:6960882777168695296'
         # retain the numerical part as the item ID for 4CAT
-        url_id = post["entityUrn"].split("(")[1].split(",")[0]
-        item_id = url_id.split(":").pop()
+        # sometimes posts seem to be combined, e.g.:
+        # urn:li:aggregate:(urn:li:activity:3966023054712791616,urn:li:activity:3965915018238312449)
+        # effectively both IDs seem to refer to the same post, so just take the
+        # first one
+        urn = "urn:li:activity:" + post["updateMetadata"]["urn"].split("urn:li:activity:")[1].split(",")[0].split(")")[0]
+        item_id = urn.split(":").pop()
 
         mapped_item = {
             "id": item_id,
@@ -84,20 +94,64 @@ class SearchLinkedIn(Search):
             "timestamp": datetime.datetime.utcfromtimestamp(timestamp).strftime("%Y-%m-%d %H:%M:%S"),
             "timestamp_collected": datetime.datetime.utcfromtimestamp(time_collected).strftime("%Y-%m-%d %H:%M:%S"),
             "timestamp_ago": time_ago.split("•")[0].strip(),
-            "author": username,
-            "author_name": post["actor"]["name"]["text"],
-            "author_description": post["actor"]["description"]["text"],
+            "is_promoted": "yes" if not re.findall(r"[0-9]", time_ago) else "no",
+            **{("author_" + k).replace("_username", ""): v for k, v in author.items()},
             "hashtags": ",".join([tag["trackingUrn"].split(":").pop() for tag in post["commentary"]["text"].get("attributes", []) if tag["type"] == "HASHTAG"]) if post["commentary"] else "",
             "image_urls": ",".join(images),
-            "post_url": "https://www.linkedin.com/feed/update/" + url_id,
+            "post_url": "https://www.linkedin.com/feed/update/" + urn,
             "likes": post["*socialDetail"]["likes"]["paging"]["total"],
             "comments": post["*socialDetail"]["comments"]["paging"]["total"],
             "shares": post["*socialDetail"]["totalShares"],
+            "inclusion_context": post["header"]["text"]["text"] if post.get("header") else "",
             "unix_timestamp": timestamp,
             "unix_timestamp_collected": time_collected
         }
 
         return mapped_item
+
+    @staticmethod
+    def get_author(post):
+        """
+        Extract author information from post
+
+        This is a bit complicated because it works differently for companies
+        and users and some fields are not always present. Hence, a separate
+        method.
+
+        :param dict post:  Post data
+        :return dict:  Author information
+        """
+        author = {
+            "username": post["actor"]["navigationContext"]["actionTarget"].split("linkedin.com/").pop().split("?")[0],
+            "name": post["actor"]["name"]["text"],
+            "description": post["actor"].get("description", {}).get("text", ""),
+            "pronouns": "",
+            "avatar_url": "",
+            "is_company": "no",
+            "url": post["actor"]["navigationContext"]["actionTarget"].split("?")[0],
+        }
+
+        # likewise for author avatars
+        if post["actor"]["name"]["attributes"]:
+            if "*miniProfile" in post["actor"]["name"]["attributes"][0]:
+                author_profile = post["actor"]["name"]["attributes"][0]["*miniProfile"]
+                if author_profile["picture"]:
+                    avatar_artifacts = sorted(author_profile["picture"]["artifacts"], key=lambda x: x["width"], reverse=True)
+                    author.update({"avatar_url": author_profile["picture"]["rootUrl"] + avatar_artifacts[0]["fileIdentifyingUrlPathSegment"]})
+
+                if author_profile.get("customPronoun"):
+                    author.update({"pronouns": author_profile.get("customPronoun")})
+                elif author_profile.get("standardizedPronoun"):
+                    author.update({"pronouns": author_profile.get("standardizedPronoun").lower()})
+
+            elif "*miniCompany" in post["actor"]["name"]["attributes"][0]:
+                author_profile = post["actor"]["name"]["attributes"][0]["*miniCompany"]
+                avatar_artifacts = sorted(author_profile["logo"]["artifacts"], key=lambda x: x["width"], reverse=True)
+
+                author.update({"is_company": "yes"})
+                author.update({"avatar_url": author_profile["logo"]["rootUrl"] + avatar_artifacts[0]["fileIdentifyingUrlPathSegment"]})
+
+        return author
 
     @staticmethod
     def parse_time_ago(time_ago):
