@@ -9,8 +9,10 @@ import re
 
 from pathlib import Path
 from urllib.parse import urlencode, urlparse
-from webtool import app
+from webtool import app, db
 from common.lib.helpers import timify_long
+
+from flask_login import current_user
 
 import common.config_manager as config
 
@@ -215,7 +217,7 @@ def inject_now():
 		"""
 		return str(uuid.uuid4())
 
-	announcement_file = Path(config.get('PATH_ROOT'), "ANNOUNCEMENT.md")
+	notifications = current_user.get_notifications()
 
 	return {
 		"__datasources_config": config.get('DATASOURCES'),
@@ -223,7 +225,7 @@ def inject_now():
 		"__datenow": datetime.datetime.utcnow(),
 		"__tool_name": config.get("4cat.name"),
 		"__tool_name_long": config.get("4cat.name_long"),
-		"__announcement": announcement_file.open().read().strip() if announcement_file.exists() else None,
+		"__notifications": notifications,
 		"__expire_datasets": config.get("expire.timeout"),
 		"__expire_optout": config.get("expire.allow_optout"),
 		"uniqid": uniqid

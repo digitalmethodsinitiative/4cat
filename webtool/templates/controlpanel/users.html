@@ -11,10 +11,7 @@
                 <button>Filter</button>
             </form>
         </nav>
-        {% for notice in flashes %}
-            <p class="form-notice">{{ notice|safe }}</p>
-        {% endfor %}
-        <table class="fullwidth user-table">
+        <table class="fullwidth user-table cp-table">
             <colgroup>
                 <col class="name">
                 <col class="actions">

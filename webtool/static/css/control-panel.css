@@ -10,23 +10,27 @@
     padding: 1em;
 }
 
-table.fullwidth.user-table {
+table.fullwidth.cp-table {
     width: 100%;
 }
 
-.user-table .button-like {
+.cp-table .button-like {
     padding: 0 0.5em;
 }
 
-table.user-table td {
+table.cp-table td {
     padding: 0.25em;
 }
 
-table.user-table .actions {
+table.cp-table .actions {
     width: 8em;
 }
 
-.user-table td:nth-child(2) {
+table td[colspan] {
+    text-align: center;
+}
+
+.user-table td:nth-child(2), .notification-table td:nth-child(3) {
     text-align: center;
 }
 

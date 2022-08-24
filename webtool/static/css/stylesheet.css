@@ -529,6 +529,10 @@ h1 a {
     text-decoration: underline;
 }
 
+.site-announcement + .site-announcement {
+    border-top: 1px solid var(--contrast-dark);
+}
+
 .site-announcement {
     text-align: center;
     background: var(--accent);
@@ -546,6 +550,10 @@ h1 a {
 .site-announcement a {
     color: inherit;
     text-decoration: underline;
+}
+
+.site-announcement p {
+    display: inline-block;
 }
 
 
