@@ -76,7 +76,7 @@ def show_frontpage():
     else:
         news = None
 
-    datasources = backend.all_modules.datasources
+    datasources = {k: v for k, v in backend.all_modules.datasources.items() if k in config.get("DATASOURCES")}
 
     return render_template("frontpage.html", stats=stats, news=news, datasources=datasources)
 
