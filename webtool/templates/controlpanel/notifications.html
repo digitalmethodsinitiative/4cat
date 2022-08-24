@@ -21,7 +21,13 @@
             {% for notification in notifications %}
                 <tr>
                     <td>{{ notification.username }}</td>
-                    <td><span class="has-more" data-max-length="75">{{ notification.notification|markdown|safe }}</span></td>
+                    <td>
+                        {% if notification.timestamp_expires %}
+                            <i class="fa fa-clock tooltip-trigger" aria-controls="tooltip-expires-{{ notification.id }}" aria-hidden="true"></i><span class="sr-only">Notification will expire at {{ notification.timestamp_expires|datetime("%-d %b %Y %H:%M", wrap=True) }}</span>
+                            <p role="tooltip" class="multiple" id="tooltip-expires-{{ notification.id }}" aria-hidden="true">Notification will expire at {{ notification.timestamp_expires|datetime("%-d %b %Y %H:%M", wrap=False) }}</p>
+                        {% endif %}
+                        <span class="has-more" data-max-length="75">{{ notification.notification|markdown|safe }}</span>
+                    </td>
                     <td><a class="button-like" href="{{ url_for("delete_notification", notification_id=notification.id) }}"><i
                                     class="fa fa-times" aria-hidden="true"></i><span class="sr-only">Delete notification</span></a>
                 </tr>

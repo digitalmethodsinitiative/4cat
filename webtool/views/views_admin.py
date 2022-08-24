@@ -357,8 +357,8 @@ def create_notification():
             db.insert("users_notifications", {
                 "username": params["username"],
                 "notification": params["notification"],
-                "timestamp_expires": expires,
-                "allow_dismiss": not not params.get("allow_dismiss")})
+                "timestamp_expires": int(time.time() + expires) if expires else None,
+                "allow_dismiss": not not params.get("allow_dismiss")}, safe=True)
             flash("Notification added")
             return redirect(url_for("admin_frontpage"))
 

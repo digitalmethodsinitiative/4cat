@@ -14,6 +14,12 @@ table.fullwidth.cp-table {
     width: 100%;
 }
 
+.cp-table p {
+    display: inline-block;
+    padding: 0;
+    margin: 0;
+}
+
 .cp-table .button-like {
     padding: 0 0.5em;
 }
