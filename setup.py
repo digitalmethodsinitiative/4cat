@@ -31,6 +31,7 @@ packages = [
 	"nltk==3.5",
 	"networkx~=2.8.0",
 	"numpy>=1.19.2",
+	"packaging",
 	"pandas==1.2.3",
 	"Pillow~=9.1",
 	"praw~=7.0",
