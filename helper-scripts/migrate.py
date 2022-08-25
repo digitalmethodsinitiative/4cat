@@ -25,7 +25,39 @@ import re
 from pathlib import Path
 
 
+def get_versions(target_version_file, current_version_file):
+	"""
+	Get versions
+
+	:return tuple:  (target version readable, target version comparable, current version r, current version c)
+	"""
+	if not current_version_file.exists():
+		# this is the latest version lacking version files
+		current_version = "1.9"
+	else:
+		with current_version_file.open() as handle:
+			current_version = re.split(r"\s", handle.read())[0].strip()
+
+	if not target_version_file.exists():
+		print("No VERSION file available. Cannot determine what version to migrate to.\n")
+		exit(1)
+
+	with target_version_file.open() as handle:
+		target_version = re.split(r"\s", handle.read())[0].strip()
+
+	current_version_c = make_version_comparable(current_version)
+	target_version_c = make_version_comparable(target_version)
+
+	return (target_version, target_version_c, current_version, current_version_c)
+
+
 def make_version_comparable(version):
+	"""
+	Make a version comparable with normal operators
+
+	:param str version:
+	:return str:
+	"""
 	version = version.strip().split(".")
 	return version[0].zfill(3) + "." + version[1].zfill(3)
 
@@ -70,23 +102,7 @@ if args.pull and not args.release:
 # ---------------------------------------------
 target_version_file = Path("VERSION")
 current_version_file = Path(args.current_version_location)
-
-if not current_version_file.exists():
-	# this is the latest version lacking version files
-	current_version = "1.9"
-else:
-	with current_version_file.open() as handle:
-		current_version = re.split(r"\s", handle.read())[0].strip()
-
-if not target_version_file.exists():
-	print("No VERSION file available. Cannot determine what version to migrate to.\n")
-	exit(1)
-
-with target_version_file.open() as handle:
-	target_version = re.split(r"\s", handle.read())[0].strip()
-
-current_version_c = make_version_comparable(current_version)
-target_version_c = make_version_comparable(target_version)
+target_version, target_version_c, current_version, current_version_c = get_versions(target_version_file, current_version_file)
 
 interpreter = sys.executable
 migrate_to_run = []
@@ -139,6 +155,9 @@ if args.release:
 		print(result.stdout.decode("ascii"))
 
 	print("...done\n")
+
+	# versions might have changed!
+	target_version, target_version_c, current_version, current_version_c = get_versions(target_version_file, current_version_file)
 
 # ---------------------------------------------
 #                Start migration
