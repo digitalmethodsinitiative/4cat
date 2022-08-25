@@ -466,7 +466,7 @@ def trigger_restart(mode):
         # restart the daemon as part of the upgrade)
         os.chdir(config.get("PATH_ROOT"))
         if is_upgrade:
-            command = sys.executable + " helper-scripts/migrate.py --release --repository '%s' --yes --restart" % config.get("4cat.github_url")
+            command = sys.executable + " helper-scripts/migrate.py --release --repository %s --yes --restart" % shlex.quote(config.get("4cat.github_url"))
         else:
             command = sys.executable + " 4cat-daemon.py force-restart"
 
