@@ -418,10 +418,10 @@ def delete_notification(notification_id):
     return redirect(redirect_url)
 
 
-@app.route("/admin/trigger-restart/<mode>/")
+@app.route("/admin/trigger-restart/", methods=["POST", "GET"])
 @login_required
 @admin_required
-def trigger_restart(mode):
+def trigger_restart():
     """
     Trigger a 4CAT upgrade
 
@@ -436,10 +436,6 @@ def trigger_restart(mode):
 
     :param str mode:  Restart or upgrade?
     """
-    current_cdw = os.getcwd()
-    is_upgrade = mode == "upgrade"
-    action = "Upgrade" if is_upgrade else "Restart"
-
     # figure out the versions we are dealing with
     if Path(config.get("PATH_ROOT"), ".current-version").exists():
         current_version = Path(config.get("PATH_ROOT"), ".current-version").open().readline().strip()
@@ -454,41 +450,52 @@ def trigger_restart(mode):
 
     # upgrade is available if we have all info and the release is newer than
     # the currently checked out code
+    is_action = False
     if github_version == "unknown" or code_version == "unknown" or \
             packaging.version.parse(current_version) >= packaging.version.parse(github_version):
         can_upgrade = False
     else:
         can_upgrade = True
 
-    if mode in ("restart", "upgrade"):
-        # run a shell command
-        # either just restart the daemon or run migrate.py (which will also
-        # restart the daemon as part of the upgrade)
-        os.chdir(config.get("PATH_ROOT"))
-        if is_upgrade:
-            command = sys.executable + " helper-scripts/migrate.py --release --repository %s --yes --restart" % shlex.quote(config.get("4cat.github_url"))
-        else:
-            command = sys.executable + " 4cat-daemon.py force-restart"
+    if request.method == "POST":
+        print(request.form.to_dict())
+        # run upgrade or restart via shell commands
+        mode = request.form.get("action")
+        current_cdw = os.getcwd()
+        is_action = True
+        action = "Upgrade" if mode == "upgrade" else "Restart"
 
-        # log file for displaying in the web interface
-        log_file = Path(config.get("PATH_ROOT"), config.get("PATH_LOGS"), "restart.log")
-        wsgi_file = Path(config.get("PATH_ROOT"), "webtool", "4cat.wsgi")
-        log_stream = log_file.open("w")
+        if mode in ("restart", "upgrade"):
+            # run a shell command
+            # either just restart the daemon or run migrate.py (which will also
+            # restart the daemon as part of the upgrade)
+            os.chdir(config.get("PATH_ROOT"))
+            if mode == "upgrade":
+                command = sys.executable + " helper-scripts/migrate.py --release --repository %s --yes --restart" % shlex.quote(config.get("4cat.github_url"))
+            else:
+                command = sys.executable + " 4cat-daemon.py --no-version-check force-restart"
 
-        try:
-            subprocess.run(shlex.split(command), stdout=log_stream, stderr=subprocess.STDOUT, text=True, check=True)
-            flash("%s successful." % action)
-            wsgi_file.touch()
-            return redirect(url_for("trigger_restart", mode="choose"))
+            # log file for displaying in the web interface
+            log_file = Path(config.get("PATH_ROOT"), config.get("PATH_LOGS"), "restart.log")
+            wsgi_file = Path(config.get("PATH_ROOT"), "webtool", "4cat.wsgi")
+            log_stream = log_file.open("w")
 
-        except subprocess.CalledProcessError as e:
-            # this is bad :(
-            flash("%s unsuccessful (%s). Check log files for details. You may need to manually restart 4CAT." % (action, e))
+            try:
+                response = subprocess.run(shlex.split(command), stdout=log_stream, stderr=subprocess.STDOUT, text=True, check=True)
+                if response.returncode != 0:
+                    raise RuntimeError("Unexpected return code %s" % str(response.returncode))
 
-        finally:
-            os.chdir(current_cdw)
+                flash("%s successful." % action)
+                wsgi_file.touch()
 
-    return render_template("controlpanel/restart.html", flashes=get_flashed_messages(), is_upgrade=is_upgrade,
+            except (RuntimeError, subprocess.CalledProcessError) as e:
+                # this is bad :(
+                flash("%s unsuccessful (%s). Check log files for details. You may need to manually restart 4CAT." % (action, e))
+
+            finally:
+                os.chdir(current_cdw)
+
+    return render_template("controlpanel/restart.html", flashes=get_flashed_messages(), is_action=is_action,
                            can_upgrade=can_upgrade, current_version=current_version, tagged_version=github_version)
 
 @app.route("/admin/restart-log/")

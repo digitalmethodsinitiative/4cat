@@ -52,7 +52,7 @@ if not args.no_version_check:
     if current_version != target_version:
         print("Version change detected. You should run the following command to update 4CAT before (re)starting:")
         print("  %s helper-scripts/migrate.py" % sys.executable)
-        exit(0)
+        exit(1)
 
 # we can only import this here, because the version check above needs to be
 # done first, as it may detect that the user needs to migrate first before

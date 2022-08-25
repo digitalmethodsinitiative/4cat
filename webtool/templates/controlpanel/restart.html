@@ -21,7 +21,7 @@
                 relevant upgrade scripts will be run with default settings.</p>
 
             <p>Restarting is relatively safe, upgrading always has a risk of breaking things. The web interface may be
-                unresponsive during the process. You can read the process log below. Don't upgrade on Friday
+                unresponsive during the process. Do not refresh the page until it is finished. Don't upgrade on Friday
                 afternoons :-)</p>
 
             <p>You are currently running 4CAT version <code>{{ current_version }}</code>.<br>
@@ -29,24 +29,26 @@
 
             <p>{% if can_upgrade %}You can upgrade 4CAT.{% else %}No upgrades are currently available.{% endif %}</p>
 
-            <div class="button-container">
-                <a class="button-like" href="{{ url_for("trigger_restart", mode="restart") }}">
+            <form action="{{ url_for("trigger_restart") }}" method="POST" class="button-container">
+                <button name="action" value="restart">
                     <i class="fa fa-power-off" aria-hidden="true"></i> Restart
-                </a>
+                </button>
 
                 {% if can_upgrade %}
-                    <a class="button-like" href="{{ url_for("trigger_restart", mode="upgrade") }}">
+                    <button name="action" value="upgrade">
                         <i class="fa fa-wrench" aria-hidden="true"></i> Upgrade (danger!)
-                    </a>
+                    </button>
                 {% endif %}
-            </div>
+            </form>
         </section>
 
+    {% if is_action %}
         <section>
             <h2><span>Process log</span></h2>
             <pre id="upgrade-log" class="content-container" data-source="{{ url_for("restart_log") }}" data-interval="3">
                 Process output will be logged here.
             </pre>
         </section>
+    {% endif %}
     </article>
 {% endblock %}
