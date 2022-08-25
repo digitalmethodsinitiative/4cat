@@ -166,18 +166,17 @@ def stop(force=False):
     Sends a SIGTERM signal - this is intercepted by the daemon after which it
     shuts down gracefully.
 
-    :param int signal:  Kill signal, defaults to 15/SIGTERM
+    :param bool force:  send SIGKILL if process does not quit quickly enough?
 
     :return bool:   True if the backend was running (and a shut down signal was
                     sent, False if not.
-
     """
     killed = False
 
     if lockfile.is_file():
         # see if the listed process is actually running right now
-        with lockfile.open() as file:
-            pid = int(file.read().strip())
+        with lockfile.open() as infile:
+            pid = int(infile.read().strip())
 
         if pid not in psutil.pids():
             print("...error: 4CAT Backend Daemon is not running, but a PID file exists. Has it crashed?")
@@ -191,12 +190,13 @@ def stop(force=False):
         starttime = time.time()
         while pid in psutil.pids():
             nowtime = time.time()
-            if nowtime - starttime > 60 and not killed:
+            if nowtime - starttime > 60:
                 # give up if it takes too long
-                if force == True:
+                if force == True and not killed:
                     os.system("kill -9 %s" % str(pid))
                     print("...error: the 4CAT backend daemon did not quit within 60 seconds. Sending SIGKILL...")
                     killed = True
+                    starttime = time.time()
                 else:
                     print(
                         "...error: the 4CAT backend daemon did not quit within 60 seconds. A worker may not have quit (yet).")
@@ -218,11 +218,11 @@ def stop(force=False):
 # ---------------------------------------------
 #   Show manual, if command does not exists
 # ---------------------------------------------
-manual = """Usage: python(3) backend.py <start|stop|restart|force-restart|status>
+manual = """Usage: python(3) backend.py <start|stop|restart|force-restart|force-stop|status>
 
 Starts, stops or restarts the 4CAT backend daemon.
 """
-if args.command not in ("start", "stop", "restart", "status", "force-restart"):
+if args.command not in ("start", "stop", "restart", "status", "force-restart", "force-stop"):
     print(manual)
     sys.exit(1)
 
@@ -248,10 +248,10 @@ elif command == "start":
     # start...but only if there currently is no running backend process
     print("Starting 4CAT Backend Daemon...")
     start()
-elif command == "stop":
+elif command in ("stop", "force-stop"):
     # stop
     print("Stopping 4CAT Backend Daemon...")
-    stop()
+    sys.exit(0 if stop(force=(command == "force-stop")) else 1)
 elif command == "status":
     # show whether the daemon is currently running
     if not pid:
