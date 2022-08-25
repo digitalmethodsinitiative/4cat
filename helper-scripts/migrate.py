@@ -76,6 +76,38 @@ if not Path(os.getcwd()).glob("4cat-daemon.py"):
 	print("This script needs to be run from the same folder as 4cat-daemon.py\n")
 	exit(1)
 
+print("           4CAT migration agent           ")
+print("------------------------------------------")
+print("Interactive:             " + "yes" if not args.yes else "no")
+print("Pull code from master:   " + "yes" if args.pull else "no")
+print("Pull latest release:     " + "yes" if args.release else "no")
+print("Restart after migration: " + "yes" if args.restart else "no")
+print("Repository URL:          " + args.repository)
+print("Version file:            " + args.current_version_location)
+
+# ---------------------------------------------
+#      Try to stop 4CAT if it is running
+# ---------------------------------------------
+interpreter = sys.executable
+
+print("\nWARNING: Migration can take quite a while. 4CAT will not be available during migration.")
+print("If 4CAT is still running, it will be shut down now (forcibly if necessary).")
+
+if not args.yes:
+	print("  Do you want to continue [y/n]? ", end="")
+	if input("").lower() != "y":
+		exit(0)
+
+print("- Making sure 4CAT is stopped... ")
+result = subprocess.run([interpreter, "4cat-daemon.py", "--no-version-check", "force-stop"], stdout=subprocess.PIPE,
+						stderr=subprocess.PIPE)
+if "4CAT Backend stopped" not in result.stdout.decode("utf-8"):
+	print("  ...could not shut down 4CAT. Please make sure it is stopped and re-run this script.")
+	print(result.stdout.decode("utf-8"))
+	print(result.stderr.decode("utf-8"))
+	exit(1)
+print("  ...done")
+
 # ---------------------------------------------
 #   Pull latest version of 4CAT from git repo
 # ---------------------------------------------
@@ -104,7 +136,6 @@ target_version_file = Path("VERSION")
 current_version_file = Path(args.current_version_location)
 target_version, target_version_c, current_version, current_version_c = get_versions(target_version_file, current_version_file)
 
-interpreter = sys.executable
 migrate_to_run = []
 
 # ---------------------------------------------
@@ -162,8 +193,6 @@ if args.release:
 # ---------------------------------------------
 #                Start migration
 # ---------------------------------------------
-print("4CAT migration agent")
-print("------------------------------------------")
 print("Version last migrated to: %s" % current_version)
 print("Code version: %s" % target_version)
 
@@ -200,27 +229,6 @@ else:
 	print("The following migration scripts will be run:")
 	for file in migrate_to_run:
 		print("  %s" % file.name)
-
-# ---------------------------------------------
-#      Try to stop 4CAT if it is running
-# ---------------------------------------------
-print("\nWARNING: Migration can take quite a while. 4CAT will not be available during migration.")
-print("If 4CAT is still running, it will be shut down now (forcibly if necessary).")
-
-if not args.yes:
-	print("  Do you want to continue [y/n]? ", end="")
-	if input("").lower() != "y":
-		exit(0)
-
-print("- Making sure 4CAT is stopped... ")
-result = subprocess.run([interpreter, "4cat-daemon.py", "--no-version-check", "force-stop"], stdout=subprocess.PIPE,
-						stderr=subprocess.PIPE)
-if "4CAT Backend stopped" not in result.stdout.decode("utf-8"):
-	print("  ...could not shut down 4CAT. Please make sure it is stopped and re-run this script.")
-	print(result.stdout.decode("utf-8"))
-	print(result.stderr.decode("utf-8"))
-	exit(1)
-print("  ...done")
 
 # ---------------------------------------------
 #                    Run pip
