@@ -2,11 +2,18 @@
 4CAT Web Tool views - pages to be viewed by the user
 """
 import re
+import os
+import sys
 import time
 import json
+import shlex
 import smtplib
+import requests
 import psycopg2
-import markdown
+import markdown2
+import subprocess
+import packaging.version
+
 
 import backend
 import common.config_manager as config
@@ -14,14 +21,14 @@ from pathlib import Path
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
-from flask import render_template, jsonify, request, abort, flash, get_flashed_messages, url_for, redirect
+from flask import render_template, jsonify, request, abort, flash, get_flashed_messages, url_for, redirect, send_file
 from flask_login import login_required, current_user
 
 from webtool import app, db
 from webtool.lib.helpers import admin_required, error, Pagination
 from webtool.lib.user import User
 
-from common.lib.helpers import call_api, send_email, UserInput
+from common.lib.helpers import call_api, send_email, UserInput, get_github_version
 from common.lib.exceptions import QueryParametersException
 import common.lib.config_definition as config_definition
 
@@ -186,7 +193,7 @@ def reject_user():
     message["To"] = email_address
     message["Subject"] = "Your %s account request" % config.get("4cat.name")
 
-    html_message = markdown.markdown(form_message)
+    html_message = markdown2.markdown(form_message)
     message.attach(MIMEText(form_message, "plain"))
     message.attach(MIMEText(html_message, "html"))
 
@@ -203,6 +210,12 @@ def reject_user():
 @login_required
 @admin_required
 def manipulate_user(mode):
+    """
+    Edit or create a user
+
+    :param str mode: Edit an existing user or create a new one?
+    :return:
+    """
     if not current_user.is_authenticated or not current_user.is_admin:
         return error(403, message="This page is off-limits to you.")
 
@@ -274,12 +287,22 @@ def manipulate_user(mode):
 @app.route("/admin/delete-user")
 @login_required
 def delete_user():
+    """
+    Delete a user
+
+    To be implemented - need to figure out which traces of a user to delete...
+
+    :return:
+    """
     abort(501, "Deleting users is not possible at the moment")
 
 @app.route("/admin/settings", methods=["GET", "POST"])
 @login_required
 @admin_required
 def update_settings():
+    """
+    Update 4CAT settings
+    """
     definition = config_definition.config_definition
     categories = config_definition.categories
     modules = {
@@ -327,8 +350,14 @@ def update_settings():
     return render_template("controlpanel/config.html", options=options, flashes=get_flashed_messages(), categories=categories, modules=modules)
 
 @app.route("/create-notification/", methods=["GET", "POST"])
+@login_required
+@admin_required
 def create_notification():
+    """
+    Create new notification
 
+    :return:
+    """
     incomplete = []
     params = {}
     if request.method == "POST":
@@ -369,7 +398,17 @@ def create_notification():
 
 
 @app.route("/delete-notification/<int:notification_id>")
+@login_required
+@admin_required
 def delete_notification(notification_id):
+    """
+    Delete notification
+
+    Deletes a notification with the given ID
+
+    :param notification_id:  ID of notification to delete
+    :return:
+    """
     db.execute("DELETE FROM users_notifications WHERE id = %s", (notification_id,))
 
     redirect_url = request.headers.get("Referer")
@@ -377,3 +416,94 @@ def delete_notification(notification_id):
         redirect_url = url_for("admin_frontpage")
 
     return redirect(redirect_url)
+
+
+@app.route("/admin/trigger-restart/<mode>/")
+@login_required
+@admin_required
+def trigger_restart(mode):
+    """
+    Trigger a 4CAT upgrade
+
+    Calls the migrate.py script with parameters to make it check out the latest
+    4CAT release available from the configured repository, and restart the
+    daemon and front-end.
+
+    One issue is that restarting the front-end is not always possible, because
+    it depends on how the server is set up. In practice, the 4cat.wsgi file is
+    touched, so if the server is set up to reload when that file updates (as is
+    common in e.g. mod_wsgi) it should trigger a reload.
+
+    :param str mode:  Restart or upgrade?
+    """
+    current_cdw = os.getcwd()
+    is_upgrade = mode == "upgrade"
+    action = "Upgrade" if is_upgrade else "Restart"
+
+    # figure out the versions we are dealing with
+    if Path(config.get("PATH_ROOT"), ".current-version").exists():
+        current_version = Path(config.get("PATH_ROOT"), ".current-version").open().readline().strip()
+    else:
+        current_version = "unknown"
+
+    code_version = Path(config.get("PATH_ROOT"), "VERSION").open().readline().strip()
+    try:
+        github_version = get_github_version()[0]
+    except (json.JSONDecodeError, requests.RequestException):
+        github_version = "unknown"
+
+    # upgrade is available if we have all info and the release is newer than
+    # the currently checked out code
+    if github_version == "unknown" or code_version == "unknown" or \
+            packaging.version.parse(current_version) >= packaging.version.parse(github_version):
+        can_upgrade = False
+    else:
+        can_upgrade = True
+
+    if mode in ("restart", "upgrade"):
+        # run a shell command
+        # either just restart the daemon or run migrate.py (which will also
+        # restart the daemon as part of the upgrade)
+        os.chdir(config.get("PATH_ROOT"))
+        if is_upgrade:
+            command = sys.executable + " helper-scripts/migrate.py --release --repository '%s' --yes --restart" % config.get("4cat.github_url")
+        else:
+            command = sys.executable + " 4cat-daemon.py force-restart"
+
+        # log file for displaying in the web interface
+        log_file = Path(config.get("PATH_ROOT"), config.get("PATH_LOGS"), "restart.log")
+        wsgi_file = Path(config.get("PATH_ROOT"), "webtool", "4cat.wsgi")
+        log_stream = log_file.open("w")
+
+        try:
+            subprocess.run(shlex.split(command), stdout=log_stream, stderr=subprocess.STDOUT, text=True, check=True)
+            flash("%s successful." % action)
+            wsgi_file.touch()
+            return redirect(url_for("trigger_restart", mode="choose"))
+
+        except subprocess.CalledProcessError as e:
+            # this is bad :(
+            flash("%s unsuccessful (%s). Check log files for details. You may need to manually restart 4CAT." % (action, e))
+
+        finally:
+            os.chdir(current_cdw)
+
+    return render_template("controlpanel/restart.html", flashes=get_flashed_messages(), is_upgrade=is_upgrade,
+                           can_upgrade=can_upgrade, current_version=current_version, tagged_version=github_version)
+
+@app.route("/admin/restart-log/")
+@login_required
+@admin_required
+def restart_log():
+    """
+    Retrieve the remote restart log file
+
+    Useful to display in the web interface to keep track of how this is going!
+
+    :return:
+    """
+    log_file = Path(config.get("PATH_ROOT"), config.get("PATH_LOGS"), "restart.log")
+    if log_file.exists():
+        return send_file(log_file)
+    else:
+        return "Not Found", 404

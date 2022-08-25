@@ -272,6 +272,11 @@ button:hover, .button-like:not(.inactive):hover {
     border-color: var(--gray-dark);
 }
 
+.button-container {
+    padding: 1em;
+    text-align: center;
+}
+
 .form-intro {
     margin-top: 1em;
 }
