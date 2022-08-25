@@ -78,10 +78,10 @@ if not Path(os.getcwd()).glob("4cat-daemon.py"):
 
 print("           4CAT migration agent           ")
 print("------------------------------------------")
-print("Interactive:             " + "yes" if not args.yes else "no")
-print("Pull code from master:   " + "yes" if args.pull else "no")
-print("Pull latest release:     " + "yes" if args.release else "no")
-print("Restart after migration: " + "yes" if args.restart else "no")
+print("Interactive:             " + ("yes" if not args.yes else "no"))
+print("Pull code from master:   " + ("yes" if args.pull else "no"))
+print("Pull latest release:     " + ("yes" if args.release else "no"))
+print("Restart after migration: " + ("yes" if args.restart else "no"))
 print("Repository URL:          " + args.repository)
 print("Version file:            " + args.current_version_location)
 
@@ -112,7 +112,7 @@ print("  ...done")
 #   Pull latest version of 4CAT from git repo
 # ---------------------------------------------
 if args.pull and not args.release:
-	print("Pulling latest commit from git repository %s..." % args.repository)
+	print("- Pulling latest commit from git repository %s..." % args.repository)
 	command = "git pull %s master" % args.repository
 	result = subprocess.run(shlex.split(command), stdout=subprocess.PIPE,
 						stderr=subprocess.PIPE)
@@ -123,11 +123,11 @@ if args.pull and not args.release:
 		exit(1)
 
 	if "Already up to date" in str(result.stdout):
-		print("Latest version is already checked out.")
+		print("  ...latest version is already checked out.")
 	else:
 		print(result.stdout.decode("ascii"))
 
-	print("...done\n")
+	print("  ...done\n")
 
 # ---------------------------------------------
 #     Determine current and target versions
@@ -142,13 +142,13 @@ migrate_to_run = []
 #          Check out latest release
 # ---------------------------------------------
 if args.release:
-	print("Pulling latest release from git repository %s..." % args.repository)
+	print("- Pulling latest release from git repository %s..." % args.repository)
 	repo_id = "/".join(args.repository.split("/")[-2:]).split(".git")[0]
 	api_url = "https://api.github.com/repos/%s/releases/latest" % repo_id
 
 	try:
 		tag = requests.get(api_url, timeout=5).json()["tag_name"]
-		print("Latest release is tagged %s." % tag)
+		print("  ...latest release is tagged %s." % tag)
 	except (requests.RequestException, json.JSONDecodeError, KeyError):
 		print("Error while retrieving latest release tag via GitHub API. Check that the repository URL is correct.")
 		exit(1)
@@ -162,7 +162,6 @@ if args.release:
 
 	tag_ref = shlex.quote("refs/tags/" + tag)
 	command = "git fetch %s %s" % (args.repository, tag_ref)
-	print(command)
 	result = subprocess.run(shlex.split(command), stdout=subprocess.PIPE,
 						stderr=subprocess.PIPE, cwd=os.getcwd())
 
@@ -181,11 +180,11 @@ if args.release:
 		exit(1)
 
 	if "Already up to date" in str(result.stdout):
-		print("Latest release is already checked out.")
+		print("  ...latest release is already checked out.")
 	else:
 		print(result.stdout.decode("ascii"))
 
-	print("...done\n")
+	print("  ...done\n")
 
 	# versions might have changed!
 	target_version, target_version_c, current_version, current_version_c = get_versions(target_version_file, current_version_file)
@@ -193,8 +192,8 @@ if args.release:
 # ---------------------------------------------
 #                Start migration
 # ---------------------------------------------
-print("Version last migrated to: %s" % current_version)
-print("Code version: %s" % target_version)
+print("- Version last migrated to: %s" % current_version)
+print("- Code version: %s" % target_version)
 
 if current_version == target_version:
 	print("Already up to date.\n")
@@ -221,14 +220,14 @@ for file in migrate_files:
 		migrate_to_run.append(file)
 
 if not migrate_to_run:
-	print("No migration scripts to run.")
+	print("- No migration scripts to run.")
 else:
 	# oldest versions first
 	migrate_to_run = sorted(migrate_to_run, key=lambda x: make_version_comparable(x.stem.split("-")[1]))
 
-	print("The following migration scripts will be run:")
+	print("- The following migration scripts will be run:")
 	for file in migrate_to_run:
-		print("  %s" % file.name)
+		print("  - %s" % file.name)
 
 # ---------------------------------------------
 #                    Run pip
@@ -293,15 +292,15 @@ try:
 except LookupError:
 	nltk.download("wordnet")
 
-print("\nMigration scripts finished.")
-print("It is recommended to re-generate your Sphinx configuration and index files to account for database updates.")
-print("You can now safely restart 4CAT.\n")
+print("\n- Migration scripts finished.")
+print("  It is recommended to re-generate your Sphinx configuration and index files to account for database updates.")
+print("  You can now safely restart 4CAT.\n")
 
 if args.restart:
-	print("Triggering a WSGI reload by touching 4cat.wsgi...")
+	print("- Triggering a WSGI reload by touching 4cat.wsgi...")
 	Path("webtool/4cat.wsgi").touch()
 
-	print("Trying to restart daemon...")
+	print("- Trying to restart daemon...")
 	result = subprocess.run([interpreter, "4cat-daemon.py", "start"], stdout=subprocess.PIPE,
 							stderr=subprocess.PIPE)
 
@@ -311,4 +310,4 @@ if args.restart:
 		print(result.stderr.decode("ascii"))
 		exit(1)
 	else:
-		print("...done.")
+		print("  ...done.")
