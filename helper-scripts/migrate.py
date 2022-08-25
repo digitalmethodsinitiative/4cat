@@ -204,7 +204,7 @@ else:
 # ---------------------------------------------
 #      Try to stop 4CAT if it is running
 # ---------------------------------------------
-print("WARNING: Migration can take quite a while. 4CAT will not be available during migration.")
+print("\nWARNING: Migration can take quite a while. 4CAT will not be available during migration.")
 print("If 4CAT is still running, it will be shut down now (forcibly if necessary).")
 
 if not args.yes:
@@ -212,13 +212,13 @@ if not args.yes:
 	if input("").lower() != "y":
 		exit(0)
 
-print("- Making sure 4CAT is stopped... ", end="")
+print("- Making sure 4CAT is stopped... ")
 result = subprocess.run([interpreter, "4cat-daemon.py", "--no-version-check", "force-stop"], stdout=subprocess.PIPE,
 						stderr=subprocess.PIPE)
 if "error" in result.stdout.decode("utf-8"):
-	print("could not shut down 4CAT. Please make sure it is stopped and re-run this script.\n")
+	print("  ...could not shut down 4CAT. Please make sure it is stopped and re-run this script.\n")
 	exit(1)
-print(" done")
+print("  ...done")
 
 # ---------------------------------------------
 #                    Run pip
@@ -266,6 +266,7 @@ print("- Copying VERSION...")
 if current_version_file.exists():
 	current_version_file.unlink()
 shutil.copy(target_version_file, args.current_version_location)
+print("  ...done")
 
 
 # ---------------------------------------------
@@ -296,7 +297,8 @@ if args.restart:
 
 	if "error" in result.stdout.decode("utf-8"):
 		print("Could not start 4CAT daemon. Please inspect the error message and restart it manually:\n")
+		print(result.stdout.decode("utf-8"))
 		print(result.stderr.decode("ascii"))
 		exit(1)
 	else:
-		print("Done.")
+		print("...done.")
