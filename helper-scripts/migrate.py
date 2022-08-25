@@ -31,6 +31,7 @@ cli = argparse.ArgumentParser()
 cli.add_argument("--yes", "-y", default=False, action="store_true", help="Answer 'yes' to all prompts")
 cli.add_argument("--pull", "-p", default=False, action="store_true", help="Pull and check out the latest 4CAT version from Github before migrating")
 cli.add_argument("--repository", "-r", default="https://github.com/digitalmethodsinitiative/4cat.git", help="URL of the repository to pull from")
+cli.add_argument("--release", "-l", default=False, action="store_true", help="Pull and check out the latest 4CAT release from Github before migrating")
 cli.add_argument("--current_version_location", "-v", default=".current-version", help="File path to .current_version file")
 args = cli.parse_args()
 
