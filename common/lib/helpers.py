@@ -150,7 +150,7 @@ def get_github_version():
     if not repo_url.endswith("/"):
         repo_url += "/"
 
-    repo_id = re.sub(r"/$", "", re.sub(r"^https?://(www\.)?github\.com/", "", repo_url))
+    repo_id = re.sub(r"(\.git)?/?$", "", re.sub(r"^https?://(www\.)?github\.com/", "", repo_url))
 
     api_url = "https://api.github.com/repos/%s/releases/latest" % repo_id
     response = requests.get(api_url, timeout=5)
