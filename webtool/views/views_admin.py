@@ -24,7 +24,7 @@ from email.mime.text import MIMEText
 from flask import render_template, jsonify, request, abort, flash, get_flashed_messages, url_for, redirect, send_file
 from flask_login import login_required, current_user
 
-from webtool import app, db
+from webtool import app, db, queue
 from webtool.lib.helpers import admin_required, error, Pagination
 from webtool.lib.user import User
 
@@ -461,39 +461,85 @@ def trigger_restart():
         print(request.form.to_dict())
         # run upgrade or restart via shell commands
         mode = request.form.get("action")
-        current_cdw = os.getcwd()
         is_action = True
         action = "Upgrade" if mode == "upgrade" else "Restart"
 
-        if mode in ("restart", "upgrade"):
+        # this log file is used to keep track of the progress, and will also
+        # be viewable in the web interface
+        log_file = Path(config.get("PATH_ROOT"), config.get("PATH_LOGS"), "restart.log")
+        log_stream = log_file.open("w")
+
+        if config.get("USING_DOCKER"):
+            # when using docker the backend is running in a separate container
+            # so we can't run the relevant scripts directly from here
+            # instead, queue a job and keep track of its progress via its log
+            # file
+            docker_ok = False
+            log_stream.write("Telling back-end container to %s via job queue...\n" % mode)
+            queue.add_job("restart-4cat", {}, action)
+
+            start_time = time.time()
+            backend_log = []
+            timeout = True
+            while start_time > time.time() - (10 * 60):  # 10 minutes timeout
+                with Path("backend_log").open() as infile:
+                    new_lines = infile.readlines()[len(backend_log):]
+
+                log_stream.writelines(new_lines)
+                backend_log.extend(new_lines)
+
+                last_line = new_lines[-1]
+                if last_line.startswith("[4CAT] Success"):
+                    docker_ok = True
+                    timeout = False
+                    break
+                elif last_line.startswith("[4CAT] Error"):
+                    timeout = False
+                    break
+
+            if not docker_ok:
+                message = "Back-end upgrade and/or restart failed. You may need to restart the Docker container manually."
+                flash(message + " See process log for details.")
+
+                if timeout:
+                    log_stream.write("Timed out waiting for 4CAT to restart.")
+                log_stream.write(message)
+
+        elif mode == "upgrade" or (mode == "restart" and not config.get("USING_DOCKER")):
             # run a shell command
             # either just restart the daemon or run migrate.py (which will also
-            # restart the daemon as part of the upgrade)
-            os.chdir(config.get("PATH_ROOT"))
+            # restart the daemon as part of the upgrade). When using docker,
+            # this runs in the front-end container, so in that case don't bother
+            # with the daemon (which isn't in that container)
             if mode == "upgrade":
-                command = sys.executable + " helper-scripts/migrate.py --release --repository %s --yes --restart" % shlex.quote(config.get("4cat.github_url"))
+                command = sys.executable + " helper-scripts/migrate.py --release --repository %s --yes" % shlex.quote(config.get("4cat.github_url"))
+                if not config.get("USING_DOCKER"):
+                    command += " --restart"  # restart daemon afterwards
+
             else:
+                # restarting the daemon from here only works if we're not in
+                # a docker container (else the restart is triggered above via
+                # the queued job)
                 command = sys.executable + " 4cat-daemon.py --no-version-check force-restart"
 
-            # log file for displaying in the web interface
-            log_file = Path(config.get("PATH_ROOT"), config.get("PATH_LOGS"), "restart.log")
-            wsgi_file = Path(config.get("PATH_ROOT"), "webtool", "4cat.wsgi")
-            log_stream = log_file.open("w")
-
             try:
-                response = subprocess.run(shlex.split(command), stdout=log_stream, stderr=subprocess.STDOUT, text=True, check=True)
+                response = subprocess.run(shlex.split(command), stdout=log_stream, stderr=subprocess.STDOUT, text=True,
+                                          check=True, cwd=config.get("PATH_ROOT"))
                 if response.returncode != 0:
                     raise RuntimeError("Unexpected return code %s" % str(response.returncode))
 
                 flash("%s successful." % action)
-                wsgi_file.touch()
 
             except (RuntimeError, subprocess.CalledProcessError) as e:
                 # this is bad :(
                 flash("%s unsuccessful (%s). Check log files for details. You may need to manually restart 4CAT." % (action, e))
 
-            finally:
-                os.chdir(current_cdw)
+        # trigger a Flask reload here
+        # many ways to do this...
+        # touch the WSGI file, which in some setups will be enough to trigger
+        # a reload
+        wsgi_file = Path(config.get("PATH_ROOT"), "webtool", "4cat.wsgi")
+        wsgi_file.touch()
 
     return render_template("controlpanel/restart.html", flashes=get_flashed_messages(), is_action=is_action,
                            can_upgrade=can_upgrade, current_version=current_version, tagged_version=github_version)
