@@ -76,8 +76,9 @@ class FourcatRestarterAndUpgrader(BasicWorker):
                 # the tricky part is that this command will interrupt the
                 # daemon, i.e. this worker!
                 # so we'll never get to actually send a response, if all goes
-                # well.
-                response = subprocess.run(shlex.split(command), stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                # well. but the file descriptor that stdout is piped to remains
+                # open, somehow, so we can use that to keep track of the output
+                response = subprocess.run(shlex.split(command), stdout=log_stream, stderr=subprocess.STDOUT,
                                           check=True, cwd=config.get("PATH_ROOT"))
                 if response.returncode != 0:
                     raise RuntimeError("Unexpected return code %s" % str(response.returncode))
