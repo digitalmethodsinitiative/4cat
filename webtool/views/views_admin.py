@@ -14,7 +14,6 @@ import markdown2
 import subprocess
 import packaging.version
 
-
 import backend
 import common.config_manager as config
 from pathlib import Path
@@ -42,17 +41,20 @@ def admin_frontpage(page):
     filter = request.args.get("filter", "")
 
     filter_bit = ""
-    replacements= []
+    replacements = []
     if filter:
         filter_bit = "WHERE name LIKE %s"
         replacements = ["%" + filter + "%"]
 
     num_users = db.fetchone("SELECT COUNT(*) FROM USERS " + filter_bit, replacements)["count"]
-    users = db.fetchall("SELECT * FROM users " + filter_bit + "ORDER BY is_admin DESC, name ASC LIMIT 20 OFFSET %i" % offset, replacements)
+    users = db.fetchall(
+        "SELECT * FROM users " + filter_bit + "ORDER BY is_admin DESC, name ASC LIMIT 20 OFFSET %i" % offset,
+        replacements)
     notifications = db.fetchall("SELECT * FROM users_notifications ORDER BY username ASC, id ASC")
     pagination = Pagination(page, 20, num_users, "admin_frontpage")
 
-    return render_template("controlpanel/frontpage.html", notifications=notifications, users=users, filter={"filter": filter}, pagination=pagination, flashes=get_flashed_messages())
+    return render_template("controlpanel/frontpage.html", notifications=notifications, users=users,
+                           filter={"filter": filter}, pagination=pagination, flashes=get_flashed_messages())
 
 
 @app.route("/admin/worker-status/")
@@ -113,7 +115,8 @@ def add_user():
                     response["success"] = True
                     response = {**response, **{
                         "message": "An e-mail containing a link through which the registration can be completed has "
-                                   "been sent to %s.\n\nTheir registration link is [%s](%s)" % (username, token, token)}}
+                                   "been sent to %s.\n\nTheir registration link is [%s](%s)" % (
+                                   username, token, token)}}
                 except RuntimeError as e:
                     response = {**response, **{
                         "message": "User was created but the registration e-mail could not be sent to them (%s)." % e}}
@@ -123,7 +126,7 @@ def add_user():
                 response = {**response, **{
                     "message": 'Error: User %s already exists. If you want to re-create the user and re-send the '
                                'registration e-mail, use [this link](/admin/add-user?email=%s&force=1&format=%s).' % (
-                        username, username, fmt)}}
+                                   username, username, fmt)}}
             else:
                 # if a user does not use their token in time, maybe you want to
                 # be a benevolent admin and give them another change, without
@@ -135,7 +138,8 @@ def add_user():
                     url = user.email_token(new=True)
                     response["success"] = True
                     response = {**response, **{
-                        "message": "A new registration e-mail has been sent to %s. The registration link is [%s](%s)" % (username, url, url) }}
+                        "message": "A new registration e-mail has been sent to %s. The registration link is [%s](%s)" % (
+                        username, url, url)}}
                 except RuntimeError as e:
                     response = {**response, **{
                         "message": "Token was reset but registration e-mail could not be sent (%s)." % e}}
@@ -266,7 +270,8 @@ def manipulate_user(mode):
                     else:
                         token = user.generate_token(None, regenerate=True)
                         link = url_for("reset_password", _external=True) + "?token=%s" % token
-                        flash('User created. %s can set a password via<br><a href="%s">%s</a>.' % (user_data["name"], link, link))
+                        flash('User created. %s can set a password via<br><a href="%s">%s</a>.' % (
+                        user_data["name"], link, link))
 
                     # show the edit form for the user next
                     mode = "edit"
@@ -276,13 +281,14 @@ def manipulate_user(mode):
                     flash("A user with this e-mail address already exists.")
                     incomplete.append("name")
 
-
             if not incomplete:
                 flash("User data saved")
         else:
             flash("Pleasure ensure all fields contain a valid value.")
 
-    return render_template("controlpanel/user.html", user=user, incomplete=incomplete, flashes=get_flashed_messages(), mode=mode)
+    return render_template("controlpanel/user.html", user=user, incomplete=incomplete, flashes=get_flashed_messages(),
+                           mode=mode)
+
 
 @app.route("/admin/delete-user")
 @login_required
@@ -296,6 +302,7 @@ def delete_user():
     """
     abort(501, "Deleting users is not possible at the moment")
 
+
 @app.route("/admin/settings", methods=["GET", "POST"])
 @login_required
 @admin_required
@@ -307,7 +314,8 @@ def update_settings():
     categories = config_definition.categories
     modules = {
         **{datasource: definition["name"] for datasource, definition in backend.all_modules.datasources.items()},
-        **{processor.type: processor.title if hasattr(processor, "title") else processor.type for processor in backend.all_modules.processors.values()}
+        **{processor.type: processor.title if hasattr(processor, "title") else processor.type for processor in
+           backend.all_modules.processors.values()}
     }
 
     for processor in backend.all_modules.processors.values():
@@ -317,10 +325,11 @@ def update_settings():
     if request.method == "POST":
         try:
             new_settings = UserInput.parse_all(definition, request.form.to_dict(),
-                                              silently_correct=False)
+                                               silently_correct=False)
 
             for setting, value in new_settings.items():
-                valid = config.set_or_create_setting(setting, value, raw=definition[setting].get("type") == UserInput.OPTION_TEXT_JSON)
+                valid = config.set_or_create_setting(setting, value,
+                                                     raw=definition[setting].get("type") == UserInput.OPTION_TEXT_JSON)
                 print("%s: %s" % (setting, repr(valid)))
                 if valid is None:
                     flash("Invalid value for %s" % setting)
@@ -347,7 +356,9 @@ def update_settings():
             "default": default
         }
 
-    return render_template("controlpanel/config.html", options=options, flashes=get_flashed_messages(), categories=categories, modules=modules)
+    return render_template("controlpanel/config.html", options=options, flashes=get_flashed_messages(),
+                           categories=categories, modules=modules)
+
 
 @app.route("/create-notification/", methods=["GET", "POST"])
 @login_required
@@ -394,7 +405,8 @@ def create_notification():
         else:
             flash("Please ensure all fields contain a valid value.")
 
-    return render_template("controlpanel/add-notification.html", incomplete=incomplete, flashes=get_flashed_messages(), notification=params)
+    return render_template("controlpanel/add-notification.html", incomplete=incomplete, flashes=get_flashed_messages(),
+                           notification=params)
 
 
 @app.route("/delete-notification/<int:notification_id>")
@@ -460,99 +472,90 @@ def trigger_restart():
     if request.method == "POST":
         # run upgrade or restart via shell commands
         mode = request.form.get("action")
-        is_action = True
-        action = "Upgrade" if mode == "upgrade" else "Restart"
+        if mode not in ("upgrade", "restart"):
+            return error(406, message="Invalid mode")
 
         # this log file is used to keep track of the progress, and will also
         # be viewable in the web interface
-        log_file = Path(config.get("PATH_ROOT"), config.get("PATH_LOGS"), "restart.log")
-        log_stream = log_file.open("w")
+        log_stream = Path(config.get("PATH_ROOT"), config.get("PATH_LOGS"), "restart.log").open("w")
 
-        if config.get("USING_DOCKER"):
-            # when using docker the backend is running in a separate container
-            # so we can't run the relevant scripts directly from here
-            # instead, queue a job and keep track of its progress via its log
-            # file
-            docker_ok = False
-            log_stream.write("Telling back-end container to %s via job queue...\n" % mode)
-            queue.add_job("restart-4cat", {}, action)
+        log_stream.write("Telling 4CAT to %s via job queue...\n" % mode)
+        queue.add_job("restart-4cat", {}, mode)
 
-            start_time = time.time()
-            backend_log_file = Path(config.get("PATH_ROOT"), config.get("PATH_LOGS"), "restart-backend.log")
-            backend_log = []
-            timeout = True
-            while start_time > time.time() - (10 * 60):  # 10 minutes timeout
-                time.sleep(0.25)
-                if not backend_log_file.exists():
-                    # give the backend some time
-                    continue
+        start_time = time.time()
+        backend_log_file = Path(config.get("PATH_ROOT"), config.get("PATH_LOGS"), "restart-backend.log")
+        backend_log = []
 
-                with backend_log_file.open() as infile:
-                    new_lines = infile.read().strip().split("\n")[len(backend_log):]
+        timeout = True
+        worker_ok = False
+        docker_ok = False
 
-                if new_lines:
-                    log_stream.write("\n".join(new_lines) + "\n")
-                    backend_log.extend(new_lines)
-                    last_line = new_lines[-1]
+        while start_time > time.time() - (10 * 60):  # 10 minutes timeout
+            # wait for worker to complete
+            time.sleep(0.25)
+            if not backend_log_file.exists():
+                # give the backend some time
+                continue
 
-                    if last_line.startswith("[4CAT] Success"):
-                        docker_ok = True
-                        timeout = False
-                        break
-                    elif last_line.startswith("[4CAT] Error"):
-                        timeout = False
-                        break
+            with backend_log_file.open() as infile:
+                new_lines = infile.read().strip().split("\n")[len(backend_log):]
 
-            if not docker_ok:
-                message = "Back-end upgrade and/or restart failed. You may need to restart the Docker container manually."
-                flash(message + " See process log for details.")
+            if new_lines:
+                log_stream.write("\n".join(new_lines) + "\n")
+                backend_log.extend(new_lines)
+                last_line = new_lines[-1]
 
-                if timeout:
-                    log_stream.write("Timed out waiting for 4CAT to restart.\n")
-                log_stream.write(message)
+                if last_line.startswith("[4CAT] Success"):
+                    worker_ok = True
+                    timeout = False
+                    break
+                elif last_line.startswith("[4CAT] Error"):
+                    timeout = False
+                    break
 
-        # run a shell command
-        # either just restart the daemon or run migrate.py (which will also
-        # restart the daemon as part of the upgrade). When using docker,
-        # this runs in the front-end container, so in that case don't bother
-        # with the daemon (which isn't in that container)
-        command = ""
-        if mode == "upgrade":
+        if not worker_ok:
+            message = "Upgrade and/or restart failed. You may need to restart 4CAT or the container manually."
+            flash(message + " See process log for details.")
+
+            if timeout:
+                log_stream.write("Timed out waiting for 4CAT to restart.\n")
+
+            log_stream.write(message)
+
+        if worker_ok and mode == "upgrade" and config.get("USING_DOCKER"):
+            # if we're in Docker, the front-end container (in which this code
+            # runs) will not have upgraded yet! because it uses a separate
+            # checked out repository
+            # so run the relevant shell commands here as well
             command = sys.executable + " helper-scripts/migrate.py --release --repository %s --yes" % shlex.quote(
-                config.get("4cat.github_url"))
-            if not config.get("USING_DOCKER"):
-                command += " --restart"  # restart daemon afterwards
+                    config.get("4cat.github_url"))
 
-        elif not config.get("USING_DOCKER"):
-            # restarting the daemon from here only works if we're not in
-            # a docker container (else the restart is triggered above via
-            # the queued job)
-            command = sys.executable + " 4cat-daemon.py --no-version-check force-restart"
-
-        if command:
             try:
                 response = subprocess.run(shlex.split(command), stdout=log_stream, stderr=subprocess.STDOUT, text=True,
                                           check=True, cwd=config.get("PATH_ROOT"), stdin=subprocess.DEVNULL)
                 if response.returncode != 0:
                     raise RuntimeError("Unexpected return code %s" % str(response.returncode))
 
-                flash("%s successful." % action)
+                flash("%s successful." % mode.title())
+                docker_ok = True
 
             except (RuntimeError, subprocess.CalledProcessError) as e:
                 # this is bad :(
-                flash("%s unsuccessful (%s). Check log files for details. You may need to manually restart 4CAT." % (action, e))
+                flash("%s unsuccessful (%s). Check log files for details. You may need to manually restart 4CAT." % (
+                    mode.title(), e))
 
-        # trigger a Flask reload here
-        # many ways to do this...
-        # touch the WSGI file, which in some setups will be enough to trigger
-        # a reload
-        log_stream.write("Attempting to restart front-end...\n")
-        wsgi_file = Path(config.get("PATH_ROOT"), "webtool", "4cat.wsgi")
-        wsgi_file.touch()
-        log_stream.write("Done. %s successful.\n" % action)
+        if worker_ok and (not config.get("USING_DOCKER") or docker_ok):
+            # trigger a Flask reload - many ways to do this...
+            # touch the WSGI file, which in some setups will be enough to trigger
+            # a reload
+            log_stream.write("Attempting to restart front-end...\n")
+            wsgi_file = Path(config.get("PATH_ROOT"), "webtool", "4cat.wsgi")
+            wsgi_file.touch()
+            log_stream.write("Done. %s successful.\n" % mode.title())
 
-    return render_template("controlpanel/restart.html", flashes=get_flashed_messages(), is_action=is_action,
+    return render_template("controlpanel/restart.html", flashes=get_flashed_messages(),
                            can_upgrade=can_upgrade, current_version=current_version, tagged_version=github_version)
+
 
 @app.route("/admin/restart-log/")
 @login_required
