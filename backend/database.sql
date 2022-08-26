@@ -110,7 +110,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS unique_favourite
 -- notifications
 CREATE TABLE IF NOT EXISTS users_notifications (
     id                  SERIAL PRIMARY KEY,
-    user                TEXT,
+    username            TEXT,
     notification        TEXT,
     timestamp_expires   INTEGER,
     allow_dismiss       BOOLEAN DEFAULT TRUE
