@@ -31,7 +31,7 @@ def run(as_daemon=True):
 		print(indent + "|                                                               |")
 		print(indent + "|                                                               |")
 		print(indent + "+---------------------------------------------------------------+")
-		print(indent + "|                  press q + enter to shut down                 |")
+		print(indent + "|                   use ctrl + c to shut down                   |")
 		print(indent + "|                                                               |")
 		print(indent + "| WARNING: Not running as a daemon.  Quitting this process will |")
 		print(indent + "|                 shut down the backend as well.                |")

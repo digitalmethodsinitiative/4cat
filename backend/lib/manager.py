@@ -5,7 +5,6 @@ import signal
 import time
 
 from backend import all_modules
-from backend.lib.keyboard import KeyPoller
 from common.lib.exceptions import JobClaimedException
 
 
@@ -35,11 +34,7 @@ class WorkerManager:
 		self.db = database
 		self.log = logger
 
-		if not as_daemon:
-			# listen for input if running interactively
-			self.key_poller = KeyPoller(manager=self)
-			self.key_poller.start()
-		else:
+		if as_daemon:
 			signal.signal(signal.SIGTERM, self.abort)
 			signal.signal(signal.SIGINT, self.request_interrupt)
 
@@ -112,7 +107,10 @@ class WorkerManager:
 		properly ends.
 		"""
 		while self.looping:
-			self.delegate()
+			try:
+				self.delegate()
+			except KeyboardInterrupt:
+				self.looping = False
 
 		self.log.info("Telling all workers to stop doing whatever they're doing...")
 		for jobtype in self.worker_pool:
