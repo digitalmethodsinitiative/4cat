@@ -458,7 +458,6 @@ def trigger_restart():
         can_upgrade = True
 
     if request.method == "POST":
-        print(request.form.to_dict())
         # run upgrade or restart via shell commands
         mode = request.form.get("action")
         is_action = True
@@ -483,14 +482,19 @@ def trigger_restart():
             backend_log = []
             timeout = True
             while start_time > time.time() - (10 * 60):  # 10 minutes timeout
-                with backend_log_file.open() as infile:
-                    new_lines = infile.readlines()[len(backend_log):]
+                time.sleep(0.25)
+                if not backend_log_file.exists():
+                    # give the backend some time
+                    continue
 
-                log_stream.writelines(new_lines)
-                backend_log.extend(new_lines)
+                with backend_log_file.open() as infile:
+                    new_lines = infile.read().strip().split("\n")[len(backend_log):]
 
                 if new_lines:
+                    log_stream.write("\n".join(new_lines) + "\n")
+                    backend_log.extend(new_lines)
                     last_line = new_lines[-1]
+
                     if last_line.startswith("[4CAT] Success"):
                         docker_ok = True
                         timeout = False
@@ -504,29 +508,31 @@ def trigger_restart():
                 flash(message + " See process log for details.")
 
                 if timeout:
-                    log_stream.write("Timed out waiting for 4CAT to restart.")
+                    log_stream.write("Timed out waiting for 4CAT to restart.\n")
                 log_stream.write(message)
 
-        elif mode == "upgrade" or (mode == "restart" and not config.get("USING_DOCKER")):
-            # run a shell command
-            # either just restart the daemon or run migrate.py (which will also
-            # restart the daemon as part of the upgrade). When using docker,
-            # this runs in the front-end container, so in that case don't bother
-            # with the daemon (which isn't in that container)
-            if mode == "upgrade":
-                command = sys.executable + " helper-scripts/migrate.py --release --repository %s --yes" % shlex.quote(config.get("4cat.github_url"))
-                if not config.get("USING_DOCKER"):
-                    command += " --restart"  # restart daemon afterwards
+        # run a shell command
+        # either just restart the daemon or run migrate.py (which will also
+        # restart the daemon as part of the upgrade). When using docker,
+        # this runs in the front-end container, so in that case don't bother
+        # with the daemon (which isn't in that container)
+        command = ""
+        if mode == "upgrade":
+            command = sys.executable + " helper-scripts/migrate.py --release --repository %s --yes" % shlex.quote(
+                config.get("4cat.github_url"))
+            if not config.get("USING_DOCKER"):
+                command += " --restart"  # restart daemon afterwards
 
-            else:
-                # restarting the daemon from here only works if we're not in
-                # a docker container (else the restart is triggered above via
-                # the queued job)
-                command = sys.executable + " 4cat-daemon.py --no-version-check force-restart"
+        elif not config.get("USING_DOCKER"):
+            # restarting the daemon from here only works if we're not in
+            # a docker container (else the restart is triggered above via
+            # the queued job)
+            command = sys.executable + " 4cat-daemon.py --no-version-check force-restart"
 
+        if command:
             try:
                 response = subprocess.run(shlex.split(command), stdout=log_stream, stderr=subprocess.STDOUT, text=True,
-                                          check=True, cwd=config.get("PATH_ROOT"))
+                                          check=True, cwd=config.get("PATH_ROOT"), stdin=subprocess.DEVNULL)
                 if response.returncode != 0:
                     raise RuntimeError("Unexpected return code %s" % str(response.returncode))
 
@@ -540,8 +546,10 @@ def trigger_restart():
         # many ways to do this...
         # touch the WSGI file, which in some setups will be enough to trigger
         # a reload
+        log_stream.write("Attempting to restart front-end...\n")
         wsgi_file = Path(config.get("PATH_ROOT"), "webtool", "4cat.wsgi")
         wsgi_file.touch()
+        log_stream.write("Done. %s successful.\n" % action)
 
     return render_template("controlpanel/restart.html", flashes=get_flashed_messages(), is_action=is_action,
                            can_upgrade=can_upgrade, current_version=current_version, tagged_version=github_version)
