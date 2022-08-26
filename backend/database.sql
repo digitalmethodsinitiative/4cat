@@ -121,10 +121,10 @@ CREATE INDEX IF NOT EXISTS users_notifications_name
     username
   );
 
-"CREATE UNIQUE INDEX IF NOT EXISTS users_notifications_unique
+CREATE UNIQUE INDEX IF NOT EXISTS users_notifications_unique
   ON users_notifications (
     username, notification
-  );"
+  );
 
 -- used to quickly update table counts
 CREATE FUNCTION count_estimate(query text) RETURNS bigint AS $$
