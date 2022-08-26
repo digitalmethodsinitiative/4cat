@@ -98,15 +98,18 @@ if not args.yes:
 	if input("").lower() != "y":
 		exit(0)
 
-print("- Making sure 4CAT is stopped... ")
-result = subprocess.run([interpreter, "4cat-daemon.py", "--no-version-check", "force-stop"], stdout=subprocess.PIPE,
-						stderr=subprocess.PIPE)
-if result.returncode != 0:
-	print("  ...could not shut down 4CAT. Please make sure it is stopped and re-run this script.")
-	print(result.stdout.decode("utf-8"))
-	print(result.stderr.decode("utf-8"))
-	exit(1)
-print("  ...done")
+if not Path("backend/4cat.pid").exists():
+	print("- No PID file found, assuming 4CAT is not running")
+else:
+	print("- Making sure 4CAT is stopped... ")
+	result = subprocess.run([interpreter, "4cat-daemon.py", "--no-version-check", "force-stop"], stdout=subprocess.PIPE,
+							stderr=subprocess.PIPE)
+	if result.returncode != 0:
+		print("  ...could not shut down 4CAT. Please make sure it is stopped and re-run this script.")
+		print(result.stdout.decode("utf-8"))
+		print(result.stderr.decode("utf-8"))
+		exit(1)
+	print("  ...done")
 
 # ---------------------------------------------
 #   Pull latest version of 4CAT from git repo
