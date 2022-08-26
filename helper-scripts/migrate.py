@@ -101,7 +101,7 @@ if not args.yes:
 print("- Making sure 4CAT is stopped... ")
 result = subprocess.run([interpreter, "4cat-daemon.py", "--no-version-check", "force-stop"], stdout=subprocess.PIPE,
 						stderr=subprocess.PIPE)
-if "4CAT Backend stopped" not in result.stdout.decode("utf-8"):
+if result.returncode != 0:
 	print("  ...could not shut down 4CAT. Please make sure it is stopped and re-run this script.")
 	print(result.stdout.decode("utf-8"))
 	print(result.stderr.decode("utf-8"))
