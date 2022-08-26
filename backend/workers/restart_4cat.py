@@ -11,6 +11,7 @@ from pathlib import Path
 import common.config_manager as config
 
 from backend.abstract.worker import BasicWorker
+from common.lib.exceptions import WorkerInterruptedException
 
 
 class FourcatRestarterAndUpgrader(BasicWorker):
@@ -45,28 +46,30 @@ class FourcatRestarterAndUpgrader(BasicWorker):
         is_resuming = self.job.data["attempts"] > 0
 
         log_file = Path(config.get("PATH_ROOT"), config.get("PATH_LOGS"), "restart-backend.log")
-        if not log_file.exists():
-            log_stream = log_file.open("w")
-            log_stream.write("Initiating 4CAT restart worker\n")
-        else:
-            log_stream = log_file.open("a")
 
         if is_resuming:
             # 4CAT was restarted
             # The log file is used by other parts of 4CAT to see how it went,
             # so use it to report the outcome.
+            log_stream = log_file.open("a")
             log_stream.write("4CAT restarted.\n")
             version_file = Path(config.get("PATH_ROOT"), ".current_version")
+
             if version_file.exists():
                 log_stream.write("4CAT is now running version %s.\n" % version_file.open().readline().strip())
+
             log_stream.write("[4CAT] Success. 4CAT restarted and/or upgraded.")
+            self.job.finish()
 
         else:
+            log_stream = log_file.open("w")
+            log_stream.write("Initiating 4CAT restart worker\n")
+
             # trigger a restart and/or upgrade
             # returns a JSON with a 'status' key and a message, the message
             # being the process output
             os.chdir(config.get("PATH_ROOT"))
-            if self.job.remote_id == "upgrade":
+            if self.job.data["remote_id"] == "upgrade":
                 command = sys.executable + " helper-scripts/migrate.py --release --repository %s --yes --restart" % \
                           shlex.quote(config.get("4cat.github_url"))
             else:
@@ -78,16 +81,31 @@ class FourcatRestarterAndUpgrader(BasicWorker):
                 # so we'll never get to actually send a response, if all goes
                 # well. but the file descriptor that stdout is piped to remains
                 # open, somehow, so we can use that to keep track of the output
-                response = subprocess.run(shlex.split(command), stdout=log_stream, stderr=subprocess.STDOUT,
-                                          check=True, cwd=config.get("PATH_ROOT"))
-                if response.returncode != 0:
-                    raise RuntimeError("Unexpected return code %s" % str(response.returncode))
+                # stdin needs to be /dev/null here because else when 4CAT
+                # restarts and we re-attempt to make a daemon, it will fail
+                # when trying to close the stdin file descriptor of the
+                # subprocess (man, that was a fun bug to hunt down)
+                process = subprocess.Popen(shlex.split(command), cwd=config.get("PATH_ROOT"),
+                                           stdout=log_stream, stderr=log_stream, stdin=subprocess.DEVNULL)
 
-                # if we reach this, 4CAT was never restarted, and so the job failed
-                log_stream.write(response.stdout.decode("utf-8"))
-                log_stream.write("\n[4CAT] Error while restarting 4CAT. Unexpected outcome of restart call. 4CAT was "
-                                 "not restarted properly. You may need to do so manually.")
-                self.job.finish()
+                while not self.interrupted:
+                    # basically wait for either the process to quit or 4CAT to
+                    # be restarted (hopefully the latter)
+                    try:
+                        process.wait(1)
+                    except subprocess.TimeoutExpired:
+                        pass
+
+                if process.returncode is not None:
+                    # if we reach this, 4CAT was never restarted, and so the job failed
+                    log_stream.write(process.communicate().decode("utf-8"))
+                    log_stream.write("\nUnexpected outcome of restart call (%s)." % (repr(process.returncode)))
+
+                    raise RuntimeError()
+                else:
+                    # interrupted before the process could finish (as it should)
+                    self.log.info("Restart triggered. Restarting 4CAT.")
+                    raise WorkerInterruptedException()
 
             except (RuntimeError, subprocess.CalledProcessError) as e:
                 log_stream.write(e)
