@@ -479,23 +479,25 @@ def trigger_restart():
             queue.add_job("restart-4cat", {}, action)
 
             start_time = time.time()
+            backend_log_file = Path(config.get("PATH_ROOT"), config.get("PATH_LOGS"), "restart-backend.log")
             backend_log = []
             timeout = True
             while start_time > time.time() - (10 * 60):  # 10 minutes timeout
-                with Path("backend_log").open() as infile:
+                with backend_log_file.open() as infile:
                     new_lines = infile.readlines()[len(backend_log):]
 
                 log_stream.writelines(new_lines)
                 backend_log.extend(new_lines)
 
-                last_line = new_lines[-1]
-                if last_line.startswith("[4CAT] Success"):
-                    docker_ok = True
-                    timeout = False
-                    break
-                elif last_line.startswith("[4CAT] Error"):
-                    timeout = False
-                    break
+                if new_lines:
+                    last_line = new_lines[-1]
+                    if last_line.startswith("[4CAT] Success"):
+                        docker_ok = True
+                        timeout = False
+                        break
+                    elif last_line.startswith("[4CAT] Error"):
+                        timeout = False
+                        break
 
             if not docker_ok:
                 message = "Back-end upgrade and/or restart failed. You may need to restart the Docker container manually."
