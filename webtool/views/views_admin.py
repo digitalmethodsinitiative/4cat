@@ -1,6 +1,7 @@
 """
 4CAT Web Tool views - pages to be viewed by the user
 """
+import datetime
 import re
 import os
 import sys
@@ -435,7 +436,7 @@ def delete_notification(notification_id):
 @admin_required
 def trigger_restart():
     """
-    Trigger a 4CAT upgrade
+    Trigger a 4CAT upgrade or restart
 
     Calls the migrate.py script with parameters to make it check out the latest
     4CAT release available from the configured repository, and restart the
@@ -462,23 +463,20 @@ def trigger_restart():
 
     # upgrade is available if we have all info and the release is newer than
     # the currently checked out code
-    is_action = False
-    if github_version == "unknown" or code_version == "unknown" or \
-            packaging.version.parse(current_version) >= packaging.version.parse(github_version):
-        can_upgrade = False
-    else:
-        can_upgrade = True
+    can_upgrade = not (github_version == "unknown" or code_version == "unknown" or packaging.version.parse(
+        current_version) >= packaging.version.parse(github_version))
 
     if request.method == "POST":
         # run upgrade or restart via shell commands
         mode = request.form.get("action")
         if mode not in ("upgrade", "restart"):
-            return error(406, message="Invalid mode")
+            return "Invalid mode", 400
 
         # this log file is used to keep track of the progress, and will also
         # be viewable in the web interface
         log_stream = Path(config.get("PATH_ROOT"), config.get("PATH_LOGS"), "restart.log").open("w")
 
+        log_stream.write("%s initiated at server timestamp %s\n" % (mode.title(), datetime.datetime.now().strftime("%c")))
         log_stream.write("Telling 4CAT to %s via job queue...\n" % mode)
         queue.add_job("restart-4cat", {}, mode)
 
@@ -488,7 +486,7 @@ def trigger_restart():
 
         timeout = True
         worker_ok = False
-        docker_ok = False
+        docker_ok = True
 
         while start_time > time.time() - (10 * 60):  # 10 minutes timeout
             # wait for worker to complete
@@ -527,6 +525,7 @@ def trigger_restart():
             # runs) will not have upgraded yet! because it uses a separate
             # checked out repository
             # so run the relevant shell commands here as well
+            docker_ok = False
             command = sys.executable + " helper-scripts/migrate.py --release --repository %s --yes" % shlex.quote(
                     config.get("4cat.github_url"))
 
@@ -535,8 +534,6 @@ def trigger_restart():
                                           check=True, cwd=config.get("PATH_ROOT"), stdin=subprocess.DEVNULL)
                 if response.returncode != 0:
                     raise RuntimeError("Unexpected return code %s" % str(response.returncode))
-
-                flash("%s successful." % mode.title())
                 docker_ok = True
 
             except (RuntimeError, subprocess.CalledProcessError) as e:
@@ -552,6 +549,7 @@ def trigger_restart():
             wsgi_file = Path(config.get("PATH_ROOT"), "webtool", "4cat.wsgi")
             wsgi_file.touch()
             log_stream.write("Done. %s successful.\n" % mode.title())
+            flash("%s successful." % mode.title())
 
     return render_template("controlpanel/restart.html", flashes=get_flashed_messages(),
                            can_upgrade=can_upgrade, current_version=current_version, tagged_version=github_version)
