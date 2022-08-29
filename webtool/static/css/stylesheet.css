@@ -275,6 +275,11 @@ button:hover, .button-like:not(.inactive):hover {
 .button-container {
     padding: 1em;
     text-align: center;
+    list-style: none;
+}
+
+.button-container li {
+    display: inline-block;
 }
 
 .form-intro {
