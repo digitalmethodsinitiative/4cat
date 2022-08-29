@@ -46,22 +46,19 @@ class FourcatRestarterAndUpgrader(BasicWorker):
         is_resuming = self.job.data["attempts"] > 0
 
         log_file = Path(config.get("PATH_ROOT"), config.get("PATH_LOGS"), "restart-backend.log")
-        self.log.info("Restart worker initiated.")
 
         if is_resuming:
             # 4CAT was restarted
             # The log file is used by other parts of 4CAT to see how it went,
             # so use it to report the outcome.
-            log_stream = log_file.open("a")
-            log_stream.write("4CAT restarted.\n")
-            version_file = Path(config.get("PATH_ROOT"), "config/.current-version")
-            self.log.info("Restart worker resumed after restarting 4CAT, finishing log.")
+            with log_file.open("a") as log_stream:
+                log_stream.write("4CAT restarted.\n")
+                with Path(config.get("PATH_ROOT"), "config/.current-version").open() as infile:
+                    log_stream.write("4CAT is now running version %s.\n" % infile.readline().strip())
 
-            if version_file.exists():
-                log_stream.write("4CAT is now running version %s.\n" % version_file.open().readline().strip())
+                log_stream.write("[Worker] Success. 4CAT restarted and/or upgraded.\n")
 
-            log_stream.write("[Worker] Success. 4CAT restarted and/or upgraded.\n")
-            log_stream.close()
+            self.log.info("Restart worker resumed after restarting 4CAT, restart successful.")
             self.job.finish()
 
         else:
