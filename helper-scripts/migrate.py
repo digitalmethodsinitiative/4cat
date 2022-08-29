@@ -199,7 +199,7 @@ if args.release:
 		exit(1)
 
 	tag_ref = shlex.quote("refs/tags/" + tag)
-	command = "git fetch %s %s" % (args.repository, tag_ref)
+	command = "git pull %s %s" % (args.repository, tag_ref)
 	result = subprocess.run(shlex.split(command), stdout=subprocess.PIPE,
 						stderr=subprocess.PIPE, cwd=cwd)
 
@@ -208,14 +208,14 @@ if args.release:
 		print(result.stderr.decode("ascii"))
 		exit(1)
 
-	command = "git checkout --force %s" % tag_ref
-	result = subprocess.run(shlex.split(command), stdout=subprocess.PIPE,
-						stderr=subprocess.PIPE, cwd=cwd)
+	#command = "git checkout --force %s" % tag_ref
+	#result = subprocess.run(shlex.split(command), stdout=subprocess.PIPE,
+	#					stderr=subprocess.PIPE, cwd=cwd)
 
-	if result.returncode != 0:
-		print("Error while checking out tag %s with git. Check that the repository URL is correct." % tag)
-		print(result.stderr.decode("ascii"))
-		exit(1)
+	#if result.returncode != 0:
+	#	print("Error while checking out tag %s with git. Check that the repository URL is correct." % tag)
+	#	print(result.stderr.decode("ascii"))
+	#	exit(1)
 
 	if "Already up to date" in str(result.stdout):
 		print("  ...latest release is already checked out.")
