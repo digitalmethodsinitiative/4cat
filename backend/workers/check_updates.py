@@ -15,7 +15,7 @@ class UpdateChecker(BasicWorker):
 
     Checks the configured Github repository (if any) for the latest packaged
     release. If the tag of that release is newer than the current version (per
-    the .current_version file), a notification is shown to 4CAT admins in the
+    the .current-version file), a notification is shown to 4CAT admins in the
     web interface. Once the current version is updated the notification is
     automatically removed.
     """
@@ -26,7 +26,7 @@ class UpdateChecker(BasicWorker):
     ensure_job = {"remote_id": config.get("4cat.github_url"), "interval": 10800}
 
     def work(self):
-        versionfile = Path(config.get("PATH_ROOT"), ".current-version")
+        versionfile = Path(config.get("PATH_ROOT"), "config/.current-version")
         repo_url = config.get("4cat.github_url")
 
         if not versionfile.exists() or not repo_url:

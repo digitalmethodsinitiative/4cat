@@ -25,8 +25,8 @@ result = subprocess.run([sys.executable, str(first_run)], stdout=subprocess.PIPE
 
 if result.returncode != 0:
     print("Unexpected error while preparing 4CAT. You may need to re-install 4CAT.")
-    print("stdout:\n".join(["  " + line for line in result.stdout.decode("utf-8").split("\n")]))
-    print("stderr:\n".join(["  " + line for line in result.stderr.decode("utf-8").split("\n")]))
+    print("stdout:\n" + "\n".join(["  " + line for line in result.stdout.decode("utf-8").split("\n")]))
+    print("stderr:\n" + "\n".join(["  " + line for line in result.stderr.decode("utf-8").split("\n")]))
     exit(1)
 
 # ---------------------------------------------
@@ -34,7 +34,7 @@ if result.returncode != 0:
 # ---------------------------------------------
 if not args.no_version_check:
     target_version_file = Path("VERSION")
-    current_version_file = Path(".current-version")
+    current_version_file = Path("config/.current-version")
 
     if not current_version_file.exists():
         # this is the latest version lacking version files
@@ -50,7 +50,9 @@ if not args.no_version_check:
             target_version = re.split(r"\s", handle.read())[0].strip()
 
     if current_version != target_version:
-        print("Version change detected. You should run the following command to update 4CAT before (re)starting:")
+        print("Migrated version: %s" % current_version)
+        print("Code version: %s" % target_version)
+        print("Upgrade detected. You should run the following command to update 4CAT before (re)starting:")
         print("  %s helper-scripts/migrate.py" % sys.executable)
         exit(1)
 

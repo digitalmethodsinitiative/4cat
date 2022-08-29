@@ -46,6 +46,7 @@ class FourcatRestarterAndUpgrader(BasicWorker):
         is_resuming = self.job.data["attempts"] > 0
 
         log_file = Path(config.get("PATH_ROOT"), config.get("PATH_LOGS"), "restart-backend.log")
+        self.log.info("Restart worker initiated.")
 
         if is_resuming:
             # 4CAT was restarted
@@ -53,7 +54,8 @@ class FourcatRestarterAndUpgrader(BasicWorker):
             # so use it to report the outcome.
             log_stream = log_file.open("a")
             log_stream.write("4CAT restarted.\n")
-            version_file = Path(config.get("PATH_ROOT"), ".current_version")
+            version_file = Path(config.get("PATH_ROOT"), "config/.current-version")
+            self.log.info("Restart worker resumed after restarting 4CAT, finishing log.")
 
             if version_file.exists():
                 log_stream.write("4CAT is now running version %s.\n" % version_file.open().readline().strip())
@@ -64,6 +66,7 @@ class FourcatRestarterAndUpgrader(BasicWorker):
         else:
             log_stream = log_file.open("w")
             log_stream.write("Initiating 4CAT restart worker\n")
+            self.log.info("New restart initiated.")
 
             # trigger a restart and/or upgrade
             # returns a JSON with a 'status' key and a message, the message
@@ -93,12 +96,12 @@ class FourcatRestarterAndUpgrader(BasicWorker):
                     # be restarted (hopefully the latter)
                     try:
                         process.wait(1)
+                        break
                     except subprocess.TimeoutExpired:
                         pass
 
                 if process.returncode is not None:
                     # if we reach this, 4CAT was never restarted, and so the job failed
-                    log_stream.write(process.communicate().decode("utf-8"))
                     log_stream.write("\nUnexpected outcome of restart call (%s).\n" % (repr(process.returncode)))
 
                     raise RuntimeError()
@@ -108,7 +111,8 @@ class FourcatRestarterAndUpgrader(BasicWorker):
                     raise WorkerInterruptedException()
 
             except (RuntimeError, subprocess.CalledProcessError) as e:
-                log_stream.write(e)
+                log_stream.write(str(e))
                 log_stream.write("[Worker] Error while restarting 4CAT. The script returned a non-standard error code "
                                  "(see above). You may need to restart 4CAT manually.\n")
+                self.log.error("Error restarting 4CAT. See %s for details." % log_stream.name)
                 self.job.finish()

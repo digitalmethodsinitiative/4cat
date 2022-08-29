@@ -98,7 +98,6 @@ cli.add_argument("--pull", "-p", default=False, action="store_true", help="Pull 
 cli.add_argument("--release", "-l", default=False, action="store_true", help="Pull and check out the latest 4CAT release from Github before migrating")
 cli.add_argument("--repository", "-r", default="https://github.com/digitalmethodsinitiative/4cat.git", help="URL of the repository to pull from")
 cli.add_argument("--restart", "-x", default=False, action="store_true", help="Try to restart the 4CAT daemon after finishing migration, and 'touch' the WSGI file to trigger a front-end reload")
-cli.add_argument("--current_version_location", "-v", default=".current-version", help="File path to .current_version file")
 args = cli.parse_args()
 
 print("")
@@ -113,7 +112,14 @@ print("Pull code from master:   " + ("yes" if args.pull else "no"))
 print("Pull latest release:     " + ("yes" if args.release else "no"))
 print("Restart after migration: " + ("yes" if args.restart else "no"))
 print("Repository URL:          " + args.repository)
-print("Version file:            " + args.current_version_location)
+
+# ---------------------------------------------
+#          Account for new location of
+#          .current-version since 1.29
+# ---------------------------------------------
+if Path(".current-version").exists() and not Path("config/.current-version").exists():
+	print("Moving .current-version to new location")
+	Path(".current-version").rename(Path("config/.current-version"))
 
 # ---------------------------------------------
 #      Try to stop 4CAT if it is running
@@ -166,7 +172,7 @@ if args.pull and not args.release:
 #     Determine current and target versions
 # ---------------------------------------------
 target_version_file = Path("VERSION")
-current_version_file = Path(args.current_version_location)
+current_version_file = Path("config/.current_version")
 target_version, target_version_c, current_version, current_version_c = get_versions(target_version_file, current_version_file)
 
 migrate_to_run = []
@@ -311,7 +317,7 @@ for file in migrate_to_run:
 print("- Copying VERSION...")
 if current_version_file.exists():
 	current_version_file.unlink()
-shutil.copy(target_version_file, args.current_version_location)
+shutil.copy(target_version_file, current_version_file)
 print("  ...done")
 
 
