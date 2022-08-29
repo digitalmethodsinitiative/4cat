@@ -74,9 +74,6 @@ def finish(args):
 	print("  You can now safely restart 4CAT.\n")
 
 	if args.restart:
-		print("- Triggering a WSGI reload by touching 4cat.wsgi...")
-		Path("webtool/4cat.wsgi").touch()
-
 		print("- Trying to restart daemon...")
 		result = subprocess.run([interpreter, "4cat-daemon.py", "start"], stdout=subprocess.PIPE,
 								stderr=subprocess.PIPE)
@@ -101,9 +98,11 @@ cli.add_argument("--restart", "-x", default=False, action="store_true", help="Tr
 args = cli.parse_args()
 
 print("")
-if not Path(os.getcwd()).glob("4cat-daemon.py"):
+cwd = Path(os.getcwd())
+if not cwd.glob("4cat-daemon.py"):
 	print("This script needs to be run from the same folder as 4cat-daemon.py\n")
 	exit(1)
+
 
 print("           4CAT migration agent           ")
 print("------------------------------------------")
@@ -117,9 +116,9 @@ print("Repository URL:          " + args.repository)
 #          Account for new location of
 #          .current-version since 1.29
 # ---------------------------------------------
-if Path(".current-version").exists() and not Path("config/.current-version").exists():
+if cwd.joinpath(".current-version").exists() and not cwd.joinpath("config/.current-version").exists():
 	print("Moving .current-version to new location")
-	Path(".current-version").rename(Path("config/.current-version"))
+	cwd.joinpath(".current-version").rename(cwd.joinpath("config/.current-version"))
 
 # ---------------------------------------------
 #      Try to stop 4CAT if it is running
@@ -134,12 +133,12 @@ if not args.yes:
 	if input("").lower() != "y":
 		exit(0)
 
-if not Path("backend/4cat.pid").exists():
+if not cwd.joinpath("backend/4cat.pid").exists():
 	print("- No PID file found, assuming 4CAT is not running")
 else:
 	print("- Making sure 4CAT is stopped... ")
 	result = subprocess.run([interpreter, "4cat-daemon.py", "--no-version-check", "force-stop"], stdout=subprocess.PIPE,
-							stderr=subprocess.PIPE)
+							stderr=subprocess.PIPE, cwd=cwd)
 	if result.returncode != 0:
 		print("  ...could not shut down 4CAT. Please make sure it is stopped and re-run this script.")
 		print(result.stdout.decode("utf-8"))
@@ -154,7 +153,7 @@ if args.pull and not args.release:
 	print("- Pulling latest commit from git repository %s..." % args.repository)
 	command = "git pull %s master" % args.repository
 	result = subprocess.run(shlex.split(command), stdout=subprocess.PIPE,
-						stderr=subprocess.PIPE)
+						stderr=subprocess.PIPE, cwd=cwd)
 
 	if result.returncode != 0:
 		print("Error while pulling latest version with git. Check that the repository URL is correct.")
@@ -171,8 +170,8 @@ if args.pull and not args.release:
 # ---------------------------------------------
 #     Determine current and target versions
 # ---------------------------------------------
-target_version_file = Path("VERSION")
-current_version_file = Path("config/.current_version")
+target_version_file = cwd.joinpath("VERSION")
+current_version_file = cwd.joinpath("config/.current-version")
 target_version, target_version_c, current_version, current_version_c = get_versions(target_version_file, current_version_file)
 
 migrate_to_run = []
@@ -202,7 +201,7 @@ if args.release:
 	tag_ref = shlex.quote("refs/tags/" + tag)
 	command = "git fetch %s %s" % (args.repository, tag_ref)
 	result = subprocess.run(shlex.split(command), stdout=subprocess.PIPE,
-						stderr=subprocess.PIPE, cwd=os.getcwd())
+						stderr=subprocess.PIPE, cwd=cwd)
 
 	if result.returncode != 0:
 		print("Error while pulling latest release with git. Check that the repository URL is correct.")
@@ -211,7 +210,7 @@ if args.release:
 
 	command = "git checkout --force %s" % tag_ref
 	result = subprocess.run(shlex.split(command), stdout=subprocess.PIPE,
-						stderr=subprocess.PIPE, cwd=os.getcwd())
+						stderr=subprocess.PIPE, cwd=cwd)
 
 	if result.returncode != 0:
 		print("Error while checking out tag %s with git. Check that the repository URL is correct." % tag)
@@ -248,7 +247,7 @@ if current_version_c > target_version_c:
 # ---------------------------------------------
 #      Collect relevant migration scripts
 # ---------------------------------------------
-migrate_files = Path(".").glob("helper-scripts/migrate/migrate-*.py")
+migrate_files = cwd.glob("helper-scripts/migrate/migrate-*.py")
 for file in migrate_files:
 	migrate_minimum = make_version_comparable(file.stem.split("-")[1])
 	migrate_target = make_version_comparable(file.stem.split("-")[2])
@@ -272,7 +271,7 @@ else:
 print("- Running pip to install any new dependencies (this could take a moment)...")
 try:
 	pip = subprocess.run([interpreter, "-m", "pip", "install", "-r", "requirements.txt"],
-								stderr=subprocess.STDOUT, stdout=subprocess.PIPE, check=True)
+								stderr=subprocess.STDOUT, stdout=subprocess.PIPE, check=True, cwd=cwd)
 	for line in pip.stdout.decode("utf-8").split("\n"):
 		if line.startswith("Requirement already satisfied:"):
 			# eliminate some noise in the output
@@ -296,7 +295,7 @@ for file in migrate_to_run:
 	print("- Migrating to %s via %s..." % (file_target, file.name))
 	time.sleep(0.25)
 	try:
-		result = subprocess.run([interpreter, str(file.resolve())], stderr=subprocess.PIPE)
+		result = subprocess.run([interpreter, str(file.resolve())], stderr=subprocess.PIPE, cwd=cwd)
 		if result.returncode != 0:
 			raise RuntimeError(result.stderr.decode("utf-8"))
 	except Exception as e:
