@@ -13,6 +13,7 @@ db_port = 5432
 db_user = fourcat
 db_name = fourcat
 db_password = supers3cr3t
+db_sslmode = prefer
 
 # 4CAT has an API (available from localhost) that can be used for monitoring
 # and will listen for requests on the following port. "0" disables the API.

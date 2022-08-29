@@ -37,6 +37,7 @@ class ConfigManager:
     DB_USER = config_reader["DATABASE"].get("db_user")
     DB_NAME = config_reader["DATABASE"].get("db_name")
     DB_PASSWORD = config_reader["DATABASE"].get("db_password")
+    DB_SSLMODE = config_reader["DATABASE"].get("db_sslmode")
 
     API_HOST = config_reader["API"].get("api_host")
     API_PORT = config_reader["API"].getint("api_port")
@@ -63,7 +64,7 @@ def quick_db_connect():
     """
     connection = psycopg2.connect(dbname=ConfigManager.DB_NAME, user=ConfigManager.DB_USER,
                                   password=ConfigManager.DB_PASSWORD, host=ConfigManager.DB_HOST,
-                                  port=ConfigManager.DB_PORT)
+                                  port=ConfigManager.DB_PORT, sslmode=ConfigManager.DB_SSLMODE)
     cursor = connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     return connection, cursor
 

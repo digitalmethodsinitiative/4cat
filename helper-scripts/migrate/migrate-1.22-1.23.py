@@ -12,10 +12,10 @@ from common.lib.logger import Logger
 log = Logger(output=True)
 try:
     import config
-    db = Database(logger=log, dbname=config.DB_NAME, user=config.DB_USER, password=config.DB_PASSWORD, host=config.DB_HOST, port=config.DB_PORT, appname="4cat-migrate")
+    db = Database(logger=log, dbname=config.DB_NAME, user=config.DB_USER, password=config.DB_PASSWORD, host=config.DB_HOST, port=config.DB_PORT, sslmode=config.DB_SSLMODE, appname="4cat-migrate")
 except (SyntaxError, ImportError, AttributeError) as e:
     import common.config_manager as config
-    db = Database(logger=log, dbname=config.get('DB_NAME'), user=config.get('DB_USER'), password=config.get('DB_PASSWORD'), host=config.get('DB_HOST'), port=config.get('DB_PORT'), appname="4cat-migrate")
+    db = Database(logger=log, dbname=config.get('DB_NAME'), user=config.get('DB_USER'), password=config.get('DB_PASSWORD'), host=config.get('DB_HOST'), port=config.DB_PORT, sslmode=config.get('DB_SSLMODE'), appname="4cat-migrate")
 
 # Add 'annotation_fields' column to datasets table.
 print("  Checking if required columns exist... ", end="")
