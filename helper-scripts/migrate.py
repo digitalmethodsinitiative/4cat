@@ -184,8 +184,6 @@ if args.release:
 
 	if "Already up to date" in str(result.stdout):
 		print("  ...latest release is already checked out.")
-	else:
-		print(result.stdout.decode("ascii"))
 
 	print("  ...done\n")
 
