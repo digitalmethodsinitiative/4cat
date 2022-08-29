@@ -58,7 +58,7 @@ class FourcatRestarterAndUpgrader(BasicWorker):
             if version_file.exists():
                 log_stream.write("4CAT is now running version %s.\n" % version_file.open().readline().strip())
 
-            log_stream.write("[4CAT] Success. 4CAT restarted and/or upgraded.\n")
+            log_stream.write("[Worker] Success. 4CAT restarted and/or upgraded.\n")
             self.job.finish()
 
         else:
@@ -109,6 +109,6 @@ class FourcatRestarterAndUpgrader(BasicWorker):
 
             except (RuntimeError, subprocess.CalledProcessError) as e:
                 log_stream.write(e)
-                log_stream.write("[4CAT] Error while restarting 4CAT. The script returned a non-standard error code "
+                log_stream.write("[Worker] Error while restarting 4CAT. The script returned a non-standard error code "
                                  "(see above). You may need to restart 4CAT manually.\n")
                 self.job.finish()
