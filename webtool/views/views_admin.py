@@ -474,14 +474,17 @@ def trigger_restart():
 
         # this log file is used to keep track of the progress, and will also
         # be viewable in the web interface
+        backend_log_file = Path(config.get("PATH_ROOT"), config.get("PATH_LOGS"), "restart-backend.log")
         log_stream = Path(config.get("PATH_ROOT"), config.get("PATH_LOGS"), "restart.log").open("w")
+        with backend_log_file.open("w") as outfile:
+            outfile.truncate()
 
         log_stream.write("%s initiated at server timestamp %s\n" % (mode.title(), datetime.datetime.now().strftime("%c")))
         log_stream.write("Telling 4CAT to %s via job queue...\n" % mode)
+        log_stream.flush()
         queue.add_job("restart-4cat", {}, mode)
 
         start_time = time.time()
-        backend_log_file = Path(config.get("PATH_ROOT"), config.get("PATH_LOGS"), "restart-backend.log")
         backend_log = []
 
         timeout = True
@@ -503,11 +506,11 @@ def trigger_restart():
                 backend_log.extend(new_lines)
                 last_line = new_lines[-1]
 
-                if last_line.startswith("[4CAT] Success"):
+                if last_line.startswith("[Worker] Success"):
                     worker_ok = True
                     timeout = False
                     break
-                elif last_line.startswith("[4CAT] Error"):
+                elif last_line.startswith("[Worker] Error"):
                     timeout = False
                     break
 
