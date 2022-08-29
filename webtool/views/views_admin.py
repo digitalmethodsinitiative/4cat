@@ -554,6 +554,8 @@ def trigger_restart():
             log_stream.write("Done. %s successful.\n" % mode.title())
             flash("%s successful." % mode.title())
 
+        log_stream.close()
+
     return render_template("controlpanel/restart.html", flashes=get_flashed_messages(),
                            can_upgrade=can_upgrade, current_version=current_version, tagged_version=github_version)
 

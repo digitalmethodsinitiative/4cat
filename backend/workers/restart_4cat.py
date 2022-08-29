@@ -61,6 +61,7 @@ class FourcatRestarterAndUpgrader(BasicWorker):
                 log_stream.write("4CAT is now running version %s.\n" % version_file.open().readline().strip())
 
             log_stream.write("[Worker] Success. 4CAT restarted and/or upgraded.\n")
+            log_stream.close()
             self.job.finish()
 
         else:
@@ -116,3 +117,6 @@ class FourcatRestarterAndUpgrader(BasicWorker):
                                  "(see above). You may need to restart 4CAT manually.\n")
                 self.log.error("Error restarting 4CAT. See %s for details." % log_stream.name)
                 self.job.finish()
+
+            finally:
+                log_stream.close()
