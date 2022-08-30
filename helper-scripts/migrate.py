@@ -180,7 +180,7 @@ migrate_to_run = []
 #          Check out latest release
 # ---------------------------------------------
 if args.release:
-	print("- Pulling latest release from git repository %s..." % args.repository)
+	print("- Finding latest release in remote git repository %s..." % args.repository)
 	repo_id = "/".join(args.repository.split("/")[-2:]).split(".git")[0]
 	api_url = "https://api.github.com/repos/%s/releases/latest" % repo_id
 
@@ -198,8 +198,16 @@ if args.release:
 		print("Cannot upgrade code, halting.")
 		exit(1)
 
+	fetch = subprocess.run(shlex.split("git fetch --all %s" % args.repository), stdout=subprocess.PIPE,
+						stderr=subprocess.PIPE, cwd=cwd)
+
+	if fetch.returncode != 0:
+		print("Error while fetching latest tags with git. Check that the repository URL is correct.")
+		print(fetch.stderr.decode("ascii"))
+		exit(1)
+
 	tag_ref = shlex.quote("refs/tags/" + tag)
-	command = "git pull %s %s" % (args.repository, tag_ref)
+	command = "git pull --force %s %s" % (args.repository, tag_ref)
 	result = subprocess.run(shlex.split(command), stdout=subprocess.PIPE,
 						stderr=subprocess.PIPE, cwd=cwd)
 
