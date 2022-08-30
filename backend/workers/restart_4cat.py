@@ -52,13 +52,18 @@ class FourcatRestarterAndUpgrader(BasicWorker):
             # The log file is used by other parts of 4CAT to see how it went,
             # so use it to report the outcome.
             with log_file.open("a") as log_stream:
+                self.log.info("Position: %i" % log_stream.tell())
                 log_stream.write("4CAT restarted.\n")
                 with Path(config.get("PATH_ROOT"), "config/.current-version").open() as infile:
                     log_stream.write("4CAT is now running version %s.\n" % infile.readline().strip())
 
                 log_stream.write("[Worker] Success. 4CAT restarted and/or upgraded.\n")
+                self.log.info("Position: %i" % log_stream.tell())
 
             self.log.info("Restart worker resumed after restarting 4CAT, restart successful.")
+            self.log.info("Position: %i" % log_stream.tell())
+            log_stream.close()
+            self.log.info("Position: %i" % log_stream.tell())
             self.job.finish()
 
         else:
