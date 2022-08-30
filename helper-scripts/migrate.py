@@ -95,6 +95,7 @@ cli.add_argument("--pull", "-p", default=False, action="store_true", help="Pull 
 cli.add_argument("--release", "-l", default=False, action="store_true", help="Pull and check out the latest 4CAT release from Github before migrating")
 cli.add_argument("--repository", "-r", default="https://github.com/digitalmethodsinitiative/4cat.git", help="URL of the repository to pull from")
 cli.add_argument("--restart", "-x", default=False, action="store_true", help="Try to restart the 4CAT daemon after finishing migration, and 'touch' the WSGI file to trigger a front-end reload")
+cli.add_argument("--no-migrate", "-m", default=False, action="store_true", help="Do not run scripts to upgrade between minor versions. Use if you only want to use migrate to e.g. upgrade dependencies.")
 args = cli.parse_args()
 
 print("")
@@ -113,12 +114,17 @@ print("Restart after migration: " + ("yes" if args.restart else "no"))
 print("Repository URL:          " + args.repository)
 
 # ---------------------------------------------
-#          Account for new location of
-#          .current-version since 1.29
+#    Ensure existence of current version file
 # ---------------------------------------------
-if cwd.joinpath(".current-version").exists() and not cwd.joinpath("config/.current-version").exists():
+target_version_file = cwd.joinpath("VERSION")
+current_version_file = cwd.joinpath("config/.current-version")
+if not current_version_file.exists() and cwd.joinpath(".current-version").exists():
 	print("Moving .current-version to new location")
-	cwd.joinpath(".current-version").rename(cwd.joinpath("config/.current-version"))
+	cwd.joinpath(".current-version").rename(current_version_file)
+
+if not current_version_file.exists():
+	print("Creating .current-version file ")
+	shutil.copy(target_version_file, current_version_file)
 
 # ---------------------------------------------
 #      Try to stop 4CAT if it is running
@@ -170,10 +176,7 @@ if args.pull and not args.release:
 # ---------------------------------------------
 #     Determine current and target versions
 # ---------------------------------------------
-target_version_file = cwd.joinpath("VERSION")
-current_version_file = cwd.joinpath("config/.current-version")
 target_version, target_version_c, current_version, current_version_c = get_versions(target_version_file, current_version_file)
-
 migrate_to_run = []
 
 # ---------------------------------------------
@@ -198,16 +201,26 @@ if args.release:
 		print("Cannot upgrade code, halting.")
 		exit(1)
 
-	fetch = subprocess.run(shlex.split("git fetch --all %s" % args.repository), stdout=subprocess.PIPE,
-						stderr=subprocess.PIPE, cwd=cwd)
+	print("  ...ensuring repository %s is a known remote" % args.repository)
+	remote = subprocess.run(shlex.split("git remote add 4cat_migrate %s" % args.repository), stdout=subprocess.PIPE,
+						stderr=subprocess.PIPE, cwd=cwd, text=True)
+	if remote.stderr:
+		if remote.stderr.strip() != "error: remote 4cat_migrate already exists.":
+			print("Error while adding git remote for %s" % args.repository)
+			print(remote.stderr)
+			exit(1)
+
+	print("  ...fetching tags from repository")
+	fetch = subprocess.run(shlex.split("git fetch --all"), stderr=subprocess.PIPE, cwd=cwd, text=True)
 
 	if fetch.returncode != 0:
 		print("Error while fetching latest tags with git. Check that the repository URL is correct.")
-		print(fetch.stderr.decode("ascii"))
+		print(fetch.stderr)
 		exit(1)
 
+	print("  ...checking out latest release")
 	tag_ref = shlex.quote("refs/tags/" + tag)
-	command = "git pull --force %s %s" % (args.repository, tag_ref)
+	command = "git checkout --force %s" % tag_ref
 	result = subprocess.run(shlex.split(command), stdout=subprocess.PIPE,
 						stderr=subprocess.PIPE, cwd=cwd)
 
