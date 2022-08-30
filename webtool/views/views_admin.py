@@ -450,8 +450,8 @@ def trigger_restart():
     :param str mode:  Restart or upgrade?
     """
     # figure out the versions we are dealing with
-    if Path(config.get("PATH_ROOT"), ".current-version").exists():
-        current_version = Path(config.get("PATH_ROOT"), ".current-version").open().readline().strip()
+    if Path(config.get("PATH_ROOT"), "config/.current-version").exists():
+        current_version = Path(config.get("PATH_ROOT"), "config/.current-version").open().readline().strip()
     else:
         current_version = "unknown"
 
@@ -553,6 +553,8 @@ def trigger_restart():
             wsgi_file.touch()
             log_stream.write("Done. %s successful.\n" % mode.title())
             flash("%s successful." % mode.title())
+
+        log_stream.close()
 
     return render_template("controlpanel/restart.html", flashes=get_flashed_messages(),
                            can_upgrade=can_upgrade, current_version=current_version, tagged_version=github_version)
