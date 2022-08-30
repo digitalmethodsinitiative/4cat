@@ -8,6 +8,7 @@ import sys
 import time
 import json
 import shlex
+import signal
 import smtplib
 import requests
 import psycopg2
@@ -544,15 +545,20 @@ def trigger_restart():
                 flash("%s unsuccessful (%s). Check log files for details. You may need to manually restart 4CAT." % (
                     mode.title(), e))
 
-        if worker_ok and (not config.get("USING_DOCKER") or docker_ok):
+        if worker_ok and docker_ok:
             # trigger a Flask reload - many ways to do this...
-            # touch the WSGI file, which in some setups will be enough to trigger
-            # a reload
             log_stream.write("Attempting to restart front-end...\n")
-            wsgi_file = Path(config.get("PATH_ROOT"), "webtool", "4cat.wsgi")
-            wsgi_file.touch()
+            if config.get("USING_DOCKER"):
+                # touch the WSGI file, which in some setups will be enough to trigger
+                # a reload
+                wsgi_file = Path(config.get("PATH_ROOT"), "webtool", "4cat.wsgi")
+                wsgi_file.touch()
+            else:
+                # send a SIGHUP to gunicorn
+                os.kill(os.getpid(), signal.SIGHUP)
             log_stream.write("Done. %s successful.\n" % mode.title())
             flash("%s successful." % mode.title())
+
 
         log_stream.close()
 
