@@ -14,6 +14,7 @@ from Github and restarts the backend and frontend.
 import subprocess
 import requests
 import argparse
+import logging
 import shutil
 import shlex
 import time
@@ -39,7 +40,6 @@ def get_versions(target_version_file, current_version_file):
 			current_version = re.split(r"\s", handle.read())[0].strip()
 
 	if not target_version_file.exists():
-		print("No VERSION file available. Cannot determine what version to migrate to.\n")
 		exit(1)
 
 	with target_version_file.open() as handle:
@@ -62,7 +62,7 @@ def make_version_comparable(version):
 	return version[0].zfill(3) + "." + version[1].zfill(3)
 
 
-def finish(args):
+def finish(args, logger):
 	"""
 	Finish migration
 
@@ -70,21 +70,20 @@ def finish(args):
 	this is made a function that can be called from any point in the script to
 	wrap up and exit.
 	"""
-	print("\n- Migration finished.")
-	print("  You can now safely restart 4CAT.\n")
+	logger.info("\nMigration finished. You can now safely restart 4CAT.\n")
 
 	if args.restart:
-		print("- Trying to restart daemon...")
+		logger.info("- Trying to restart daemon...")
 		result = subprocess.run([interpreter, "4cat-daemon.py", "start"], stdout=subprocess.PIPE,
 								stderr=subprocess.PIPE)
 
 		if "error" in result.stdout.decode("utf-8"):
-			print("Could not start 4CAT daemon. Please inspect the error message and restart it manually:\n")
-			print(result.stdout.decode("utf-8"))
-			print(result.stderr.decode("ascii"))
+			logger.info("Could not start 4CAT daemon. Please inspect the error message and restart it manually:\n")
+			logger.info(result.stdout.decode("utf-8"))
+			logger.info(result.stderr.decode("ascii"))
 			exit(1)
 		else:
-			print("  ...done.")
+			logger.info("  ...done.")
 
 	exit(0)
 
@@ -96,6 +95,8 @@ cli.add_argument("--release", "-l", default=False, action="store_true", help="Pu
 cli.add_argument("--repository", "-r", default="https://github.com/digitalmethodsinitiative/4cat.git", help="URL of the repository to pull from")
 cli.add_argument("--restart", "-x", default=False, action="store_true", help="Try to restart the 4CAT daemon after finishing migration, and 'touch' the WSGI file to trigger a front-end reload")
 cli.add_argument("--no-migrate", "-m", default=False, action="store_true", help="Do not run scripts to upgrade between minor versions. Use if you only want to use migrate to e.g. upgrade dependencies.")
+cli.add_argument("--current-version", "-v", default="config/.current-version", help="File path to .current-version file, relative to the 4CAT root")
+cli.add_argument("--output", "-o", default="", help="By default migrate.py will send output to stdout. If this argument is set, it will write to the given path instead.")
 args = cli.parse_args()
 
 print("")
@@ -104,26 +105,35 @@ if not cwd.glob("4cat-daemon.py"):
 	print("This script needs to be run from the same folder as 4cat-daemon.py\n")
 	exit(1)
 
+# set up logging
+logger = logging.getLogger("migrate")
+logger.setLevel(logging.INFO)
+if args.output:
+	handler = logging.FileHandler(args.output)
+else:
+	handler = logging.StreamHandler(sys.stdout)
+logger.addHandler(handler)
 
-print("           4CAT migration agent           ")
-print("------------------------------------------")
-print("Interactive:             " + ("yes" if not args.yes else "no"))
-print("Pull code from master:   " + ("yes" if args.pull else "no"))
-print("Pull latest release:     " + ("yes" if args.release else "no"))
-print("Restart after migration: " + ("yes" if args.restart else "no"))
-print("Repository URL:          " + args.repository)
+logger.info("           4CAT migration agent           ")
+logger.info("------------------------------------------")
+logger.info("Interactive:             " + ("yes" if not args.yes else "no"))
+logger.info("Pull code from master:   " + ("yes" if args.pull else "no"))
+logger.info("Pull latest release:     " + ("yes" if args.release else "no"))
+logger.info("Restart after migration: " + ("yes" if args.restart else "no"))
+logger.info("Repository URL:          " + args.repository)
+logger.info(".current-version path:   " + args.current_version)
 
 # ---------------------------------------------
 #    Ensure existence of current version file
 # ---------------------------------------------
 target_version_file = cwd.joinpath("VERSION")
-current_version_file = cwd.joinpath("config/.current-version")
+current_version_file = cwd.joinpath(args.current_version)
 if not current_version_file.exists() and cwd.joinpath(".current-version").exists():
-	print("Moving .current-version to new location")
+	logger.info("Moving .current-version to new location")
 	cwd.joinpath(".current-version").rename(current_version_file)
 
 if not current_version_file.exists():
-	print("Creating .current-version file ")
+	logger.info("Creating .current-version file ")
 	shutil.copy(target_version_file, current_version_file)
 
 # ---------------------------------------------
@@ -131,47 +141,47 @@ if not current_version_file.exists():
 # ---------------------------------------------
 interpreter = sys.executable
 
-print("\nWARNING: Migration can take quite a while. 4CAT will not be available during migration.")
-print("If 4CAT is still running, it will be shut down now (forcibly if necessary).")
+logger.info("\nWARNING: Migration can take quite a while. 4CAT will not be available during migration.")
+logger.info("If 4CAT is still running, it will be shut down now (forcibly if necessary).")
 
 if not args.yes:
-	print("  Do you want to continue [y/n]? ", end="")
+	print("  ...do you want to continue [y/n]? ", end="")
 	if input("").lower() != "y":
 		exit(0)
 
 if not cwd.joinpath("backend/4cat.pid").exists():
-	print("- No PID file found, assuming 4CAT is not running")
+	logger.info("\n- No PID file found, assuming 4CAT is not running")
 else:
-	print("- Making sure 4CAT is stopped... ")
+	logger.info("- Making sure 4CAT is stopped... ")
 	result = subprocess.run([interpreter, "4cat-daemon.py", "--no-version-check", "force-stop"], stdout=subprocess.PIPE,
 							stderr=subprocess.PIPE, cwd=cwd)
 	if result.returncode != 0:
-		print("  ...could not shut down 4CAT. Please make sure it is stopped and re-run this script.")
-		print(result.stdout.decode("utf-8"))
-		print(result.stderr.decode("utf-8"))
+		logger.info("  ...could not shut down 4CAT. Please make sure it is stopped and re-run this script.")
+		logger.info(result.stdout.decode("utf-8"))
+		logger.info(result.stderr.decode("utf-8"))
 		exit(1)
-	print("  ...done")
+	logger.info("  ...done")
 
 # ---------------------------------------------
 #   Pull latest version of 4CAT from git repo
 # ---------------------------------------------
 if args.pull and not args.release:
-	print("- Pulling latest commit from git repository %s..." % args.repository)
+	logger.info("- Pulling latest commit from git repository %s..." % args.repository)
 	command = "git pull %s master" % args.repository
 	result = subprocess.run(shlex.split(command), stdout=subprocess.PIPE,
 						stderr=subprocess.PIPE, cwd=cwd)
 
 	if result.returncode != 0:
-		print("Error while pulling latest version with git. Check that the repository URL is correct.")
-		print(result.stderr.decode("ascii"))
+		logger.info("Error while pulling latest version with git. Check that the repository URL is correct.")
+		logger.info(result.stderr.decode("ascii"))
 		exit(1)
 
 	if "Already up to date" in str(result.stdout):
-		print("  ...latest version is already checked out.")
+		logger.info("  ...latest version is already checked out.")
 	else:
-		print(result.stdout.decode("ascii"))
+		logger.info(result.stdout.decode("ascii"))
 
-	print("  ...done\n")
+	logger.info("  ...done\n")
 
 # ---------------------------------------------
 #     Determine current and target versions
@@ -183,50 +193,50 @@ migrate_to_run = []
 #          Check out latest release
 # ---------------------------------------------
 if args.release:
-	print("- Finding latest release in remote git repository %s..." % args.repository)
+	logger.info("- Finding latest release in remote git repository %s..." % args.repository)
 	repo_id = "/".join(args.repository.split("/")[-2:]).split(".git")[0]
 	api_url = "https://api.github.com/repos/%s/releases/latest" % repo_id
 
 	try:
 		tag = requests.get(api_url, timeout=5).json()["tag_name"]
-		print("  ...latest release is tagged %s." % tag)
+		logger.info("  ...latest release is tagged %s." % tag)
 	except (requests.RequestException, json.JSONDecodeError, KeyError):
-		print("Error while retrieving latest release tag via GitHub API. Check that the repository URL is correct.")
+		logger.info("Error while retrieving latest release tag via GitHub API. Check that the repository URL is correct.")
 		exit(1)
 
 	tag_version = make_version_comparable(re.sub(r"^v", "", tag))
 	if tag_version <= current_version_c:
-		print("Latest release available from GitHub (%s) is older than or equivalent to currently checked out version "
+		logger.info("  ...latest release available from GitHub (%s) is older than or equivalent to currently checked out version "
 			  "(%s)." % (tag_version, current_version_c))
-		print("Cannot upgrade code, halting.")
-		exit(1)
+		logger.info("  ...upgrade not necessary, skipping.")
+		finish(args, logger)
 
-	print("  ...ensuring repository %s is a known remote" % args.repository)
+	logger.info("  ...ensuring repository %s is a known remote" % args.repository)
 	remote = subprocess.run(shlex.split("git remote add 4cat_migrate %s" % args.repository), stdout=subprocess.PIPE,
 						stderr=subprocess.PIPE, cwd=cwd, text=True)
 	if remote.stderr:
 		if remote.stderr.strip() != "error: remote 4cat_migrate already exists.":
-			print("Error while adding git remote for %s" % args.repository)
-			print(remote.stderr)
+			logger.info("Error while adding git remote for %s" % args.repository)
+			logger.info(remote.stderr)
 			exit(1)
 
-	print("  ...fetching tags from repository")
-	fetch = subprocess.run(shlex.split("git fetch --all"), stderr=subprocess.PIPE, cwd=cwd, text=True)
+	logger.info("  ...fetching tags from repository")
+	fetch = subprocess.run(shlex.split("git fetch --all"), stderr=subprocess.PIPE, stdout=subprocess.PIPE, cwd=cwd, text=True)
 
 	if fetch.returncode != 0:
-		print("Error while fetching latest tags with git. Check that the repository URL is correct.")
-		print(fetch.stderr)
+		logger.info("Error while fetching latest tags with git. Check that the repository URL is correct.")
+		logger.info(fetch.stderr)
 		exit(1)
 
-	print("  ...checking out latest release")
+	logger.info("  ...checking out latest release")
 	tag_ref = shlex.quote("refs/tags/" + tag)
-	command = "git checkout --force %s" % tag_ref
+	command = "git checkout --force %s VERSION" % tag_ref
 	result = subprocess.run(shlex.split(command), stdout=subprocess.PIPE,
 						stderr=subprocess.PIPE, cwd=cwd)
 
 	if result.returncode != 0:
-		print("Error while pulling latest release with git. Check that the repository URL is correct.")
-		print(result.stderr.decode("ascii"))
+		logger.info("Error while pulling latest release with git. Check that the repository URL is correct.")
+		logger.info(result.stderr.decode("ascii"))
 		exit(1)
 
 	#command = "git checkout --force %s" % tag_ref
@@ -234,14 +244,14 @@ if args.release:
 	#					stderr=subprocess.PIPE, cwd=cwd)
 
 	#if result.returncode != 0:
-	#	print("Error while checking out tag %s with git. Check that the repository URL is correct." % tag)
-	#	print(result.stderr.decode("ascii"))
+	#	logger.info("Error while checking out tag %s with git. Check that the repository URL is correct." % tag)
+	#	logger.info(result.stderr.decode("ascii"))
 	#	exit(1)
 
 	if "Already up to date" in str(result.stdout):
-		print("  ...latest release is already checked out.")
+		logger.info("  ...latest release is already checked out.")
 
-	print("  ...done\n")
+	logger.info("  ...done")
 
 	# versions might have changed!
 	target_version, target_version_c, current_version, current_version_c = get_versions(target_version_file, current_version_file)
@@ -249,20 +259,20 @@ if args.release:
 # ---------------------------------------------
 #                Start migration
 # ---------------------------------------------
-print("- Version last migrated to: %s" % current_version)
-print("- Code version: %s" % target_version)
+logger.info("- Version last migrated to: %s" % current_version)
+logger.info("- Code version: %s" % target_version)
 
 if current_version == target_version:
-	print("  ...already up to date.")
-	finish(args)
+	logger.info("  ...already up to date.")
+	finish(args, logger)
 
 if current_version_c[0:3] != target_version_c[0:3]:
-	print("  ...cannot migrate between different major versions.")
+	logger.info("  ...cannot migrate between different major versions.")
 	exit(1)
 
 if current_version_c > target_version_c:
-	print("  ...checked out version is older than version last migrated to. Cannot migrate to older version.")
-	print("WARNING: 4CAT may not function correctly. Consider re-installing.")
+	logger.info("  ...checked out version is older than version last migrated to. Cannot migrate to older version.")
+	logger.info("WARNING: 4CAT may not function correctly. Consider re-installing.")
 	exit(1)
 
 # ---------------------------------------------
@@ -277,19 +287,19 @@ for file in migrate_files:
 		migrate_to_run.append(file)
 
 if not migrate_to_run:
-	print("- No migration scripts to run.")
+	logger.info("- No migration scripts to run.")
 else:
 	# oldest versions first
 	migrate_to_run = sorted(migrate_to_run, key=lambda x: make_version_comparable(x.stem.split("-")[1]))
 
-	print("- The following migration scripts will be run:")
+	logger.info("- The following migration scripts will be run:")
 	for file in migrate_to_run:
-		print("  - %s" % file.name)
+		logger.info("  - %s" % file.name)
 
 # ---------------------------------------------
 #                    Run pip
 # ---------------------------------------------
-print("- Running pip to install any new dependencies (this could take a moment)...")
+logger.info("- Running pip to install any new dependencies (this could take a moment)...")
 try:
 	pip = subprocess.run([interpreter, "-m", "pip", "install", "-r", "requirements.txt"],
 								stderr=subprocess.STDOUT, stdout=subprocess.PIPE, check=True, cwd=cwd)
@@ -297,48 +307,48 @@ try:
 		if line.startswith("Requirement already satisfied:"):
 			# eliminate some noise in the output
 			continue
-		print("  " + line)
+		logger.info("  " + line)
 except subprocess.CalledProcessError as e:
-	print(e)
-	print("\n  Error running pip. You may need to run this script with elevated privileges (e.g. sudo).\n")
+	logger.info(e)
+	logger.info("\n  Error running pip. You may need to run this script with elevated privileges (e.g. sudo).\n")
 	exit(1)
-print("  ...done")
+logger.info("  ...done")
 
 # ---------------------------------------------
 #       Run individual migration scripts
 # ---------------------------------------------
 if migrate_to_run:
-	print("\n- Starting migration...")
-	print("  %i scripts will be run." % len(migrate_to_run))
+	logger.info("\n- Starting migration...")
+	logger.info("  %i scripts will be run." % len(migrate_to_run))
 
 for file in migrate_to_run:
 	file_target = file.stem.split("-")[2]
-	print("- Migrating to %s via %s..." % (file_target, file.name))
+	logger.info("- Migrating to %s via %s..." % (file_target, file.name))
 	time.sleep(0.25)
 	try:
 		result = subprocess.run([interpreter, str(file.resolve())], stderr=subprocess.PIPE, cwd=cwd)
 		if result.returncode != 0:
 			raise RuntimeError(result.stderr.decode("utf-8"))
 	except Exception as e:
-		print("\n  Unexpected error while running %s. Migration halted." % file.name)
-		print("  The following exception occurred:\n")
-		print(e)
-		print("\n")
+		logger.info("\n  Unexpected error while running %s. Migration halted." % file.name)
+		logger.info("  The following exception occurred:\n")
+		logger.info(e)
+		logger.info("\n")
 		exit(1)
-	print("  ...done")
+	logger.info("  ...done")
 
-	print("- Storing intermediate version file...")
+	logger.info("- Storing intermediate version file...")
 	with current_version_file.open("w") as output:
 		output.write(file_target)
 
 # ---------------------------------------------
 #            Update version data
 # ---------------------------------------------
-print("- Copying VERSION...")
+logger.info("- Copying VERSION...")
 if current_version_file.exists():
 	current_version_file.unlink()
 shutil.copy(target_version_file, current_version_file)
-print("  ...done")
+logger.info("  ...done")
 
 
 # ---------------------------------------------
@@ -349,13 +359,13 @@ import nltk
 try:
 	nltk.data.find('tokenizers/punkt')
 except LookupError:
-	nltk.download('punkt')
+	nltk.download('punkt', quiet=True)
 try:
 	nltk.data.find('corpora/wordnet')
 except LookupError:
-	nltk.download("wordnet")
+	nltk.download("wordnet", quiet=True)
 
 # ---------------------------------------------
 #            Done! Wrap up and finish
 # ---------------------------------------------
-finish(args)
+finish(args, logger)

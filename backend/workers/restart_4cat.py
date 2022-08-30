@@ -45,39 +45,49 @@ class FourcatRestarterAndUpgrader(BasicWorker):
         # after 4cat has been restarted
         is_resuming = self.job.data["attempts"] > 0
 
-        log_file = Path(config.get("PATH_ROOT"), config.get("PATH_LOGS"), "restart-backend.log")
+        # this file will keep the output of the process started to restart or
+        # upgrade 4cat
+        log_file_backend = Path(config.get("PATH_ROOT"), config.get("PATH_LOGS"), "restart-backend.log")
+
+        # this file has the log of the restart worker itself and is checked by
+        # the frontend to see how far we are
+        log_file_restart = Path(config.get("PATH_ROOT"), config.get("PATH_LOGS"), "restart.log")
+        log_stream_restart = log_file_restart.open("a")
+
+        self.log.info("Initiating restart job %s, %s attempts so far" % (str(self.job.data["id"]), str(self.job.data["attempts"])))
 
         if is_resuming:
             # 4CAT was restarted
             # The log file is used by other parts of 4CAT to see how it went,
             # so use it to report the outcome.
-            with log_file.open("a") as log_stream:
-                self.log.info("Position: %i" % log_stream.tell())
-                log_stream.write("4CAT restarted.\n")
-                with Path(config.get("PATH_ROOT"), "config/.current-version").open() as infile:
-                    log_stream.write("4CAT is now running version %s.\n" % infile.readline().strip())
+            log_stream_restart.write("4CAT restarted.\n")
+            with Path(config.get("PATH_ROOT"), "config/.current-version").open() as infile:
+                log_stream_restart.write("4CAT is now running version %s.\n" % infile.readline().strip())
 
-                log_stream.write("[Worker] Success. 4CAT restarted and/or upgraded.\n")
-                self.log.info("Position: %i" % log_stream.tell())
+            with log_file_backend.open() as infile:
+                # copy output of started process to restart log
+                log_stream_restart.write(infile.read() + "\n")
+
+            # log_file_backend.unlink()  # no longer necessary
+            log_stream_restart.write("[Worker] Success. 4CAT restarted and/or upgraded.\n")
+            log_stream_restart.close()
 
             self.log.info("Restart worker resumed after restarting 4CAT, restart successful.")
-            self.log.info("Position: %i" % log_stream.tell())
-            log_stream.close()
-            self.log.info("Position: %i" % log_stream.tell())
             self.job.finish()
 
         else:
-            log_stream = log_file.open("w")
-            log_stream.write("Initiating 4CAT restart worker\n")
+            log_stream_restart.write("Initiating 4CAT restart worker\n")
             self.log.info("New restart initiated.")
 
             # trigger a restart and/or upgrade
             # returns a JSON with a 'status' key and a message, the message
             # being the process output
             os.chdir(config.get("PATH_ROOT"))
+            #if log_file_backend.exists():
+            #    log_file_backend.unlink()
             if self.job.data["remote_id"] == "upgrade":
-                command = sys.executable + " helper-scripts/migrate.py --release --repository %s --yes --restart" % \
-                          shlex.quote(config.get("4cat.github_url"))
+                command = sys.executable + " helper-scripts/migrate.py --release --repository %s --yes --restart --output %s" % \
+                          (shlex.quote(config.get("4cat.github_url")), shlex.quote(str(log_file_backend)))
             else:
                 command = sys.executable + " 4cat-daemon.py --no-version-check force-restart"
 
@@ -91,21 +101,24 @@ class FourcatRestarterAndUpgrader(BasicWorker):
                 # restarts and we re-attempt to make a daemon, it will fail
                 # when trying to close the stdin file descriptor of the
                 # subprocess (man, that was a fun bug to hunt down)
+                log_stream_backend = log_file_backend.open("a")
+                self.log.info("Running command %s" % command)
                 process = subprocess.Popen(shlex.split(command), cwd=config.get("PATH_ROOT"),
-                                           stdout=log_stream, stderr=log_stream, stdin=subprocess.DEVNULL)
+                                           stdout=log_stream_backend, stderr=log_stream_backend, stdin=subprocess.DEVNULL)
 
                 while not self.interrupted:
                     # basically wait for either the process to quit or 4CAT to
                     # be restarted (hopefully the latter)
                     try:
                         process.wait(1)
+                        log_stream_backend.close()
                         break
                     except subprocess.TimeoutExpired:
                         pass
 
                 if process.returncode is not None:
                     # if we reach this, 4CAT was never restarted, and so the job failed
-                    log_stream.write("\nUnexpected outcome of restart call (%s).\n" % (repr(process.returncode)))
+                    log_stream_restart.write("\nUnexpected outcome of restart call (%s).\n" % (repr(process.returncode)))
 
                     raise RuntimeError()
                 else:
@@ -114,11 +127,11 @@ class FourcatRestarterAndUpgrader(BasicWorker):
                     raise WorkerInterruptedException()
 
             except (RuntimeError, subprocess.CalledProcessError) as e:
-                log_stream.write(str(e))
-                log_stream.write("[Worker] Error while restarting 4CAT. The script returned a non-standard error code "
+                log_stream_restart.write(str(e))
+                log_stream_restart.write("[Worker] Error while restarting 4CAT. The script returned a non-standard error code "
                                  "(see above). You may need to restart 4CAT manually.\n")
-                self.log.error("Error restarting 4CAT. See %s for details." % log_stream.name)
+                self.log.error("Error restarting 4CAT. See %s for details." % log_stream_restart.name)
                 self.job.finish()
 
             finally:
-                log_stream.close()
+                log_stream_restart.close()

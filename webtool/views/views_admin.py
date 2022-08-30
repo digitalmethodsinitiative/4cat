@@ -8,6 +8,7 @@ import sys
 import time
 import json
 import shlex
+import shutil
 import signal
 import smtplib
 import requests
@@ -451,8 +452,9 @@ def trigger_restart():
     :param str mode:  Restart or upgrade?
     """
     # figure out the versions we are dealing with
-    if Path(config.get("PATH_ROOT"), "config/.current-version").exists():
-        current_version = Path(config.get("PATH_ROOT"), "config/.current-version").open().readline().strip()
+    current_version_file = Path(config.get("PATH_ROOT"), "config/.current-version")
+    if current_version_file.exists():
+        current_version = current_version_file.open().readline().strip()
     else:
         current_version = "unknown"
 
@@ -475,52 +477,52 @@ def trigger_restart():
 
         # this log file is used to keep track of the progress, and will also
         # be viewable in the web interface
-        backend_log_file = Path(config.get("PATH_ROOT"), config.get("PATH_LOGS"), "restart-backend.log")
-        log_stream = Path(config.get("PATH_ROOT"), config.get("PATH_LOGS"), "restart.log").open("w")
-        with backend_log_file.open("w") as outfile:
-            outfile.truncate()
-
-        log_stream.write("%s initiated at server timestamp %s\n" % (mode.title(), datetime.datetime.now().strftime("%c")))
-        log_stream.write("Telling 4CAT to %s via job queue...\n" % mode)
-        log_stream.flush()
-        queue.add_job("restart-4cat", {}, mode)
+        restart_log_file = Path(config.get("PATH_ROOT"), config.get("PATH_LOGS"), "restart.log")
+        with restart_log_file.open("a") as outfile:
+            outfile.write("%s initiated at server timestamp %s\n" % (mode.title(), datetime.datetime.now().strftime("%c")))
+            outfile.write("Telling 4CAT to %s via job queue...\n" % mode)
 
         start_time = time.time()
-        backend_log = []
 
         timeout = True
         worker_ok = False
         docker_ok = True
 
+        # this file will be updated when the upgrade runs
+        # and it is shared between containers, but we will need to upgrade the
+        # front-end separately - so keep a local copy for the latter step
+        if config.get("USING_DOCKER") and mode == "upgrade":
+            frontend_version_file = current_version_file.with_name(".current-version-frontend")
+            shutil.copy(current_version_file, frontend_version_file)
+
+        queue.add_job("restart-4cat", {}, mode)
         while start_time > time.time() - (10 * 60):  # 10 minutes timeout
             # wait for worker to complete
             time.sleep(0.25)
-            if not backend_log_file.exists():
-                # give the backend some time
-                continue
 
-            with backend_log_file.open() as infile:
-                new_lines = infile.read().strip().split("\n")[len(backend_log):]
+            with restart_log_file.open() as infile:
+                lines = infile.read().strip().split("\n")
 
-            if new_lines:
-                log_stream.write("\n".join(new_lines) + "\n")
-                backend_log.extend(new_lines)
-                last_line = new_lines[-1]
-
-                if last_line.startswith("[Worker] Success"):
+                if lines[-1].startswith("[Worker] Success"):
                     worker_ok = True
                     timeout = False
                     break
-                elif last_line.startswith("[Worker] Error"):
+                elif lines[-1].startswith("[Worker] Error"):
                     timeout = False
                     break
 
+        log_stream = restart_log_file.open("a")  # resume writing
         if not worker_ok:
             message = "Upgrade and/or restart failed. You may need to restart 4CAT or the container manually."
             flash(message + " See process log for details.")
 
             if timeout:
-                log_stream.write("Timed out waiting for 4CAT to restart.\n")
+                log_stream.write("Timed out waiting for 4CAT to restart. Restart log below:\n")
+                backend_log_file = restart_log_file.with_stem("restart-backend")
+                if backend_log_file.exists():
+                    # include partial restart log
+                    with backend_log_file.open() as infile:
+                        log_stream.write(infile.read())
 
             log_stream.write(message)
 
@@ -530,8 +532,11 @@ def trigger_restart():
             # checked out repository
             # so run the relevant shell commands here as well
             docker_ok = False
-            command = sys.executable + " helper-scripts/migrate.py --release --repository %s --yes" % shlex.quote(
-                    config.get("4cat.github_url"))
+            log_stream.write("Updating code for front-end Docker container\n")
+            log_stream.flush()
+
+            command = sys.executable + " helper-scripts/migrate.py --release --repository %s --yes --current-version %s" % (shlex.quote(
+                    config.get("4cat.github_url")), shlex.quote(str(frontend_version_file)))
 
             try:
                 response = subprocess.run(shlex.split(command), stdout=log_stream, stderr=subprocess.STDOUT, text=True,
@@ -545,25 +550,60 @@ def trigger_restart():
                 flash("%s unsuccessful (%s). Check log files for details. You may need to manually restart 4CAT." % (
                     mode.title(), e))
 
+            frontend_version_file.unlink()
+
         if worker_ok and docker_ok:
             # trigger a Flask reload - many ways to do this...
+            # note that after this is done any further code will not run so
+            # make sure to only trigger it as the very last step in the process
+            flash("%s successful." % mode.title())
+            log_stream.write("Done. %s successful.\n" % mode.title())
             log_stream.write("Attempting to restart front-end...\n")
-            if config.get("USING_DOCKER"):
+
+            if not config.get("USING_DOCKER"):
                 # touch the WSGI file, which in some setups will be enough to trigger
                 # a reload
-                wsgi_file = Path(config.get("PATH_ROOT"), "webtool", "4cat.wsgi")
-                wsgi_file.touch()
+                log_stream.write("Touching 4cat.wsgi.\n")
+                log_stream.close()
             else:
                 # send a SIGHUP to gunicorn
-                os.kill(os.getpid(), signal.SIGHUP)
-            log_stream.write("Done. %s successful.\n" % mode.title())
-            flash("%s successful." % mode.title())
+                log_stream.write("Sending SIGHUP to Gunicorn.\n")
+                log_stream.close()
 
-
-        log_stream.close()
+            return redirect(url_for("trigger_restart_frontend"))
 
     return render_template("controlpanel/restart.html", flashes=get_flashed_messages(),
                            can_upgrade=can_upgrade, current_version=current_version, tagged_version=github_version)
+
+@app.route("/admin/trigger-frontend-restart/")
+@login_required
+@admin_required
+def trigger_restart_frontend():
+    """
+    Trigger a restart of the 4CAT front-end
+
+    This cannot be done in the function above (`trigger_restart`) because
+    interrupting Flask may cause it to re-process the POST request that
+    initiated the restart (seems to be the case with Gunicorn at least) which
+    will lead to an infinite loop of restarts!
+
+    Instead, after preparing everything, redirect to this URL which will
+    restart the Flask app in isolation with as few side-effects as possible.
+
+    Afterwards, return the user to the restart page. This doesn't loop because
+    the redirect is not a POST request.
+    """
+    if config.get("USING_DOCKER"):
+        # gunicorn
+        os.kill(os.getpid(), signal.SIGHUP)
+    else:
+        # mod_wsgi?
+        wsgi_file = Path(config.get("PATH_ROOT"), "webtool", "4cat.wsgi")
+        wsgi_file.touch()
+
+    # this may never be reached - since we're interrupting Flask - but no harm
+    # done either way
+    return redirect(url_for("trigger_restart"))
 
 
 @app.route("/admin/restart-log/")
