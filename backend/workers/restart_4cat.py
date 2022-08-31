@@ -129,9 +129,8 @@ class FourcatRestarterAndUpgrader(BasicWorker):
                 log_stream_restart.close()
 
         else:
-            # 4CAT was restarted
-            # The log file is used by other parts of 4CAT to see how it went,
-            # so use it to report the outcome.
+            # 4CAT back-end was restarted - now check the results and make the
+            # front-end restart or upgrade too
             self.log.info("Restart worker resumed after restarting 4CAT, restart successful.")
             log_stream_restart.write("4CAT restarted.\n")
             with Path(config.get("PATH_ROOT"), "config/.current-version").open() as infile:
@@ -144,6 +143,8 @@ class FourcatRestarterAndUpgrader(BasicWorker):
 
                 log_file_backend.unlink()
 
+            # we're gonna use some specific Flask routes to trigger this, i.e.
+            # we're interacting with the front-end through HTTP
             api_host = "https://" if config.get("flask.https") else "http://"
             api_host += "4cat_frontend:5000" if config.get("USING_DOCKER") else config.get("flask.server_name")
 
