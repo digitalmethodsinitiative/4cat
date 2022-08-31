@@ -60,7 +60,75 @@ class FourcatRestarterAndUpgrader(BasicWorker):
         log_file_restart = Path(config.get("PATH_ROOT"), config.get("PATH_LOGS"), "restart.log")
         log_stream_restart = log_file_restart.open("a")
 
-        if is_resuming:
+        if not is_resuming:
+            log_stream_restart.write("Initiating 4CAT restart worker\n")
+            self.log.info("New restart initiated.")
+
+            # this lock file will ensure that people don't start two
+            # simultaneous upgrades or something
+            with lock_file.open("w") as outfile:
+                hasher = hashlib.blake2b()
+                hasher.update(str(uuid.uuid4()).encode("utf-8"))
+                outfile.write(hasher.hexdigest())
+
+            # trigger a restart and/or upgrade
+            # returns a JSON with a 'status' key and a message, the message
+            # being the process output
+            if log_file_backend.exists():
+                log_file_backend.unlink()
+
+            if self.job.data["remote_id"] == "upgrade":
+                command = sys.executable + " helper-scripts/migrate.py --release --repository %s --yes --restart --output %s" % \
+                          (shlex.quote(config.get("4cat.github_url")), shlex.quote(str(log_file_backend)))
+            else:
+                command = sys.executable + " 4cat-daemon.py --no-version-check force-restart"
+
+            try:
+                # the tricky part is that this command will interrupt the
+                # daemon, i.e. this worker!
+                # so we'll never get to actually send a response, if all goes
+                # well. but the file descriptor that stdout is piped to remains
+                # open, somehow, so we can use that to keep track of the output
+                # stdin needs to be /dev/null here because else when 4CAT
+                # restarts and we re-attempt to make a daemon, it will fail
+                # when trying to close the stdin file descriptor of the
+                # subprocess (man, that was a fun bug to hunt down)
+                log_stream_backend = log_file_backend.open("a")
+                self.log.info("Running command %s" % command)
+                process = subprocess.Popen(shlex.split(command), cwd=config.get("PATH_ROOT"),
+                                           stdout=log_stream_backend, stderr=log_stream_backend, stdin=subprocess.DEVNULL)
+
+                while not self.interrupted:
+                    # basically wait for either the process to quit or 4CAT to
+                    # be restarted (hopefully the latter)
+                    try:
+                        process.wait(1)
+                        log_stream_backend.close()
+                        break
+                    except subprocess.TimeoutExpired:
+                        pass
+
+                if process.returncode is not None:
+                    # if we reach this, 4CAT was never restarted, and so the job failed
+                    log_stream_restart.write("\nUnexpected outcome of restart call (%s).\n" % (repr(process.returncode)))
+
+                    raise RuntimeError()
+                else:
+                    # interrupted before the process could finish (as it should)
+                    self.log.info("Restart triggered. Restarting 4CAT.\n")
+                    raise WorkerInterruptedException()
+
+            except (RuntimeError, subprocess.CalledProcessError) as e:
+                log_stream_restart.write(str(e))
+                log_stream_restart.write("[Worker] Error while restarting 4CAT. The script returned a non-standard error code "
+                                 "(see above). You may need to restart 4CAT manually.\n")
+                self.log.error("Error restarting 4CAT. See %s for details." % log_stream_restart.name)
+                self.job.finish()
+
+            finally:
+                log_stream_restart.close()
+
+        else:
             # 4CAT was restarted
             # The log file is used by other parts of 4CAT to see how it went,
             # so use it to report the outcome.
@@ -147,71 +215,3 @@ class FourcatRestarterAndUpgrader(BasicWorker):
             log_stream_restart.close()
             lock_file.unlink()
             self.job.finish()
-
-        else:
-            log_stream_restart.write("Initiating 4CAT restart worker\n")
-            self.log.info("New restart initiated.")
-
-            # this lock file will ensure that people don't start two
-            # simultaneous upgrades or something
-            with lock_file.open("w") as outfile:
-                hasher = hashlib.blake2b()
-                hasher.update(str(uuid.uuid4()).encode("utf-8"))
-                outfile.write(hasher.hexdigest())
-
-            # trigger a restart and/or upgrade
-            # returns a JSON with a 'status' key and a message, the message
-            # being the process output
-            if log_file_backend.exists():
-                log_file_backend.unlink()
-
-            if self.job.data["remote_id"] == "upgrade":
-                command = sys.executable + " helper-scripts/migrate.py --release --repository %s --yes --restart --output %s" % \
-                          (shlex.quote(config.get("4cat.github_url")), shlex.quote(str(log_file_backend)))
-            else:
-                command = sys.executable + " 4cat-daemon.py --no-version-check force-restart"
-
-            try:
-                # the tricky part is that this command will interrupt the
-                # daemon, i.e. this worker!
-                # so we'll never get to actually send a response, if all goes
-                # well. but the file descriptor that stdout is piped to remains
-                # open, somehow, so we can use that to keep track of the output
-                # stdin needs to be /dev/null here because else when 4CAT
-                # restarts and we re-attempt to make a daemon, it will fail
-                # when trying to close the stdin file descriptor of the
-                # subprocess (man, that was a fun bug to hunt down)
-                log_stream_backend = log_file_backend.open("a")
-                self.log.info("Running command %s" % command)
-                process = subprocess.Popen(shlex.split(command), cwd=config.get("PATH_ROOT"),
-                                           stdout=log_stream_backend, stderr=log_stream_backend, stdin=subprocess.DEVNULL)
-
-                while not self.interrupted:
-                    # basically wait for either the process to quit or 4CAT to
-                    # be restarted (hopefully the latter)
-                    try:
-                        process.wait(1)
-                        log_stream_backend.close()
-                        break
-                    except subprocess.TimeoutExpired:
-                        pass
-
-                if process.returncode is not None:
-                    # if we reach this, 4CAT was never restarted, and so the job failed
-                    log_stream_restart.write("\nUnexpected outcome of restart call (%s).\n" % (repr(process.returncode)))
-
-                    raise RuntimeError()
-                else:
-                    # interrupted before the process could finish (as it should)
-                    self.log.info("Restart triggered. Restarting 4CAT.\n")
-                    raise WorkerInterruptedException()
-
-            except (RuntimeError, subprocess.CalledProcessError) as e:
-                log_stream_restart.write(str(e))
-                log_stream_restart.write("[Worker] Error while restarting 4CAT. The script returned a non-standard error code "
-                                 "(see above). You may need to restart 4CAT manually.\n")
-                self.log.error("Error restarting 4CAT. See %s for details." % log_stream_restart.name)
-                self.job.finish()
-
-            finally:
-                log_stream_restart.close()
