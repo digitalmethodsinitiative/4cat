@@ -8,7 +8,6 @@ import subprocess
 import threading
 import requests
 import datetime
-import socket
 import signal
 import shutil
 import shlex
@@ -21,10 +20,10 @@ from pathlib import Path
 from flask import render_template, request, flash, get_flashed_messages, jsonify
 
 import common.config_manager as config
-from flask_login import login_required, current_user
+from flask_login import login_required
 
 from webtool import app, queue
-from webtool.lib.helpers import admin_required
+from webtool.lib.helpers import admin_required, check_restart_request
 
 from common.lib.helpers import get_github_version
 
@@ -63,11 +62,18 @@ def trigger_restart():
     can_upgrade = not (github_version == "unknown" or code_version == "unknown" or packaging.version.parse(
         current_version) >= packaging.version.parse(github_version))
 
-    if request.method == "POST":
+    lock_file = Path(config.get("PATH_ROOT"), "config/restart.lock")
+    if request.method == "POST" and lock_file.exists():
+        flash("A restart is already in progress. Wait for it to complete. Check the process log for more details.")
+
+    elif request.method == "POST":
         # run upgrade or restart via shell commands
         mode = request.form.get("action")
         if mode not in ("upgrade", "restart"):
             return "Invalid mode", 400
+
+        # ensure lockfile exists - will be written to later by worker
+        lock_file.touch()
 
         # this log file is used to keep track of the progress, and will also
         # be viewable in the web interface
@@ -88,7 +94,7 @@ def trigger_restart():
         queue.add_job("restart-4cat", {}, mode)
         flash("%s initiated. Check process log for progress." % mode.title())
 
-    return render_template("controlpanel/restart.html", flashes=get_flashed_messages(),
+    return render_template("controlpanel/restart.html", flashes=get_flashed_messages(), in_progress=lock_file.exists(),
                            can_upgrade=can_upgrade, current_version=current_version, tagged_version=github_version)
 
 
@@ -110,15 +116,8 @@ def upgrade_frontend():
     been updated by the back-end at this point to reflect the newer version
     after that container's upgrade.
     """
-    request_is_from_backend = False
-    try:
-        request_from_backend = socket.gethostbyaddr(request.remote_addr)
-        request_is_from_backend = request_from_backend[0] == "4cat_backend.4cat-docker_default"
-    except OSError:
-        pass
-
-    if not config.get("USING_DOCKER") or not request_is_from_backend:
-        # this route only makes sense in a Docker context
+    # this route only makes sense in a Docker context
+    if not config.get("USING_DOCKER") or not check_restart_request():
         return app.login_manager.unauthorized()
 
     restart_log_file = Path(config.get("PATH_ROOT"), config.get("PATH_LOGS"), "restart.log")
@@ -176,13 +175,9 @@ def trigger_restart_frontend():
 
         return kill_function
 
-    # a token stored in the lockfile is used to authenticate requests
-    lock_file = Path(config.get("PATH_ROOT"), "config/restart.lock")
-    if not lock_file.exists():
-        return jsonify({"status": "error", "message": "No restart in progress"})
-
-    with lock_file.open() as infile:
-        request_is_legit = request.form.get("token") == infile.read()
+    # ensure a restart is in progress and the request is from the backend
+    if not check_restart_request():
+        return app.login_manager.unauthorized()
 
     # we support restarting with gunicorn and apache/mod_wsgi
     # nginx would usually be a front for gunicorn so that use case is also
@@ -191,18 +186,11 @@ def trigger_restart_frontend():
     # we currently do not support these (but they may be easy to add)
     if "gunicorn" in os.environ.get("SERVER_SOFTWARE", ""):
         # gunicorn
-        if not request_is_legit:
-            # gunicorn is used in our docker setup, let those requests through
-            return app.login_manager.unauthorized()
-
         kill_thread = threading.Thread(target=server_killer(os.getpid(), signal.SIGHUP))
         kill_thread.start()
 
     elif os.environ.get("APACHE_PID_FILE", "") != "":
         # apache
-        if not request_is_legit:
-            return app.login_manager.unauthorized()
-
         # mod_wsgi? touching the file is always safe
         wsgi_file = Path(config.get("PATH_ROOT"), "webtool", "4cat.wsgi")
         wsgi_file.touch()

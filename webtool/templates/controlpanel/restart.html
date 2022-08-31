@@ -29,15 +29,21 @@
             <p>You are currently running 4CAT version <code>{{ current_version }}</code>.<br>
                 The latest release available is <code>{{ tagged_version }}</code>.</p>
 
-            <p>{% if can_upgrade %}You can upgrade 4CAT.{% else %}No upgrades are currently available.{% endif %}</p>
+            <p>{% if in_progress %}
+                    A restart or upgrade is currently in progress.
+                {% elif can_upgrade %}
+                    You can upgrade 4CAT.
+                {% else %}
+                    No upgrades are currently available.
+                {% endif %}</p>
 
             <form action="{{ url_for("trigger_restart") }}" method="POST" class="button-container">
-                <button name="action" value="restart">
+                <button name="action" value="restart"{% if in_progress %} disabled="disabled"{% endif %}>
                     <i class="fa fa-power-off" aria-hidden="true"></i> Restart
                 </button>
 
                 {% if can_upgrade %}
-                    <button name="action" value="upgrade">
+                    <button name="action" value="upgrade"{% if in_progress %} disabled="disabled"{% endif %}>
                         <i class="fa fa-wrench" aria-hidden="true"></i> Upgrade (danger!)
                     </button>
                 {% endif %}

@@ -162,9 +162,9 @@ class FourcatRestarterAndUpgrader(BasicWorker):
             # trigger a restart and/or upgrade
             # returns a JSON with a 'status' key and a message, the message
             # being the process output
-            os.chdir(config.get("PATH_ROOT"))
-            #if log_file_backend.exists():
-            #    log_file_backend.unlink()
+            if log_file_backend.exists():
+                log_file_backend.unlink()
+
             if self.job.data["remote_id"] == "upgrade":
                 command = sys.executable + " helper-scripts/migrate.py --release --repository %s --yes --restart --output %s" % \
                           (shlex.quote(config.get("4cat.github_url")), shlex.quote(str(log_file_backend)))

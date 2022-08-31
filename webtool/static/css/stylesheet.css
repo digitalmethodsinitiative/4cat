@@ -262,6 +262,15 @@ button, .button-like {
     padding: 0.25em 1em;
 }
 
+button[disabled], .button-like.disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+button[disabled]:hover, .button-like.disabled:hover {
+    opacity: 1;
+}
+
 button:hover, .button-like:not(.inactive):hover {
     background: var(--accent);
     color: var(--contrast-bright);
