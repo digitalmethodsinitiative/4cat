@@ -4,6 +4,7 @@ Restart 4CAT and optionally upgrade it to the latest release
 import subprocess
 import requests
 import shlex
+import json
 import time
 import sys
 import os
@@ -102,8 +103,10 @@ class FourcatRestarterAndUpgrader(BasicWorker):
             log_stream_restart.flush()
             try:
                 restart_url = api_host + "/admin/trigger-frontend-restart/"
-                requests.post(restart_url, timeout=5)
-            except requests.RequestException:
+                response = requests.post(restart_url, timeout=5).json()
+                if response.get("status") != "OK":
+                    log_stream_restart.write(response.get("message"))
+            except (json.JSONDecodeError, requests.RequestException):
                 # this may happen because the server restarts and interrupts
                 # the request
                 pass

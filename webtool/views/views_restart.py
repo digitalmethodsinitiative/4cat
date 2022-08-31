@@ -1,5 +1,6 @@
 import packaging.version
 import subprocess
+import threading
 import requests
 import datetime
 import socket
@@ -66,7 +67,7 @@ def trigger_restart():
         # this log file is used to keep track of the progress, and will also
         # be viewable in the web interface
         restart_log_file = Path(config.get("PATH_ROOT"), config.get("PATH_LOGS"), "restart.log")
-        with restart_log_file.open("a") as outfile:
+        with restart_log_file.open("w") as outfile:
             outfile.write(
                 "%s initiated at server timestamp %s\n" % (mode.title(), datetime.datetime.now().strftime("%c")))
             outfile.write("Telling 4CAT to %s via job queue...\n" % mode)
@@ -153,49 +154,66 @@ def trigger_restart_frontend():
     """
     Trigger a restart of the 4CAT front-end
 
-    This cannot be done in the function above (`trigger_restart`) because
-    interrupting Flask may cause it to re-process the POST request that
-    initiated the restart (seems to be the case with Gunicorn at least) which
-    will lead to an infinite loop of restarts!
+    How to do this depends on what server software is used. The two most common
+    options are supported (gunicorn and mod_wsgi).
 
-    Instead, after preparing everything, redirect to this URL which will
-    restart the Flask app in isolation with as few side-effects as possible.
-
-    Afterwards, return the user to the restart page. This doesn't loop because
-    the redirect is not a POST request.
+    If restarting is not supported a JSON is returned explaining so. In that
+    case the user needs to restart the server in some other way.
     """
-    if config.get("USING_DOCKER"):
+    # this route may be requested procedurally
+    # if it's requested from docker, waive the admin privileges requirement
+    request_is_from_docker = False
+    try:
+        request_from_backend = socket.gethostbyaddr(request.remote_addr)
+        request_is_from_docker = request_from_backend[0] == "4cat_backend.4cat-docker_default"
+    except OSError:
+        pass
+
+    def server_killer(pid, sig):
+        """
+        Helper function. Gives Flask time to complete the request before
+        sending the signal.
+        """
+        def kill_function():
+            time.sleep(1)
+            os.kill(pid, sig)
+
+        return kill_function
+
+    # we support restarting with gunicorn and apache/mod_wsgi
+    # nginx would usually be a front for gunicorn so that use case is also
+    # covered
+    # flask additionally lists waitress and uwsgi as standalone wsgi servers
+    # we currently do not support these (but they may be easy to add)
+    if "gunicorn" in os.environ.get("SERVER_SOFTWARE", ""):
         # gunicorn
-        # use a thread here, to give this particular request a moment to finish
-        # gracefully (since the SIGHUP will restart gunicorn and kill open
-        # requests)
-        request_is_from_backend = False
-        try:
-            request_from_backend = socket.gethostbyaddr(request.remote_addr)
-            request_is_from_backend = request_from_backend[0] == "4cat_backend.4cat-docker_default"
-        except OSError:
-            pass
-        if not request_is_from_backend:
+        if not current_user.is_admin and not request_is_from_docker:
+            # gunicorn is used in our docker setup, let those requests through
             return app.login_manager.unauthorized()
 
-        def kill_gunicorn():
-            time.sleep(1)
-            os.kill(os.getpid(), signal.SIGHUP)
-
-        import threading
-        kill_thread = threading.Thread(target=kill_gunicorn)
+        kill_thread = threading.Thread(target=server_killer(os.getpid(), signal.SIGHUP))
         kill_thread.start()
 
-    else:
+    elif os.environ.get("APACHE_PID_FILE", "") != "":
+        # apache
         if not current_user.is_admin:
             return app.login_manager.unauthorized()
 
-        # mod_wsgi?
+        # mod_wsgi? touching the file is always safe
         wsgi_file = Path(config.get("PATH_ROOT"), "webtool", "4cat.wsgi")
         wsgi_file.touch()
 
-    # up to whatever called this to monitor gunicorn for restarting
-    return jsonify({"status": "OK"})
+        # send a signal to apache to reload if running in daemon mode
+        if os.environ.get("mod_wsgi.process_group") not in (None, ""):
+            kill_thread = threading.Thread(target=server_killer(os.getpid(), signal.SIGINT))
+            kill_thread.start()
+
+    else:
+        return jsonify({"status": "error", "message": "4CAT is not hosted with Gunicorn or mod_wsgi. Cannot restart "
+                                                      "4CAT's front-end remotely - you have to do so manually."})
+
+    # up to whatever called this to monitor for restarting
+    return jsonify({"status": "OK", "message": ""})
 
 
 @app.route("/admin/restart-log/")
