@@ -3,9 +3,11 @@ Restart 4CAT and optionally upgrade it to the latest release
 """
 import subprocess
 import requests
+import hashlib
 import shlex
 import json
 import time
+import uuid
 import sys
 import os
 
@@ -51,6 +53,7 @@ class FourcatRestarterAndUpgrader(BasicWorker):
         # this file will keep the output of the process started to restart or
         # upgrade 4cat
         log_file_backend = Path(config.get("PATH_ROOT"), config.get("PATH_LOGS"), "restart-backend.log")
+        lock_file = Path(config.get("PATH_ROOT"), "config/restart.lock")
 
         # this file has the log of the restart worker itself and is checked by
         # the frontend to see how far we are
@@ -83,7 +86,9 @@ class FourcatRestarterAndUpgrader(BasicWorker):
                 upgrade_ok = False
                 upgrade_timeout = False
                 try:
-                    frontend_upgrade = requests.post(api_host + "/admin/trigger-frontend-upgrade/", timeout=(10 * 60))
+                    upgrade_url = api_host + "/admin/trigger-frontend-upgrade/"
+                    with lock_file.open() as infile:
+                        frontend_upgrade = requests.post(upgrade_url, data={"token": infile.read()}, timeout=(10 * 60))
                     upgrade_ok = frontend_upgrade.json()["status"] == "OK"
                 except requests.RequestException:
                     pass
@@ -96,6 +101,7 @@ class FourcatRestarterAndUpgrader(BasicWorker):
                         log_stream_restart.write("Upgrade timed out.")
                     log_stream_restart.write("Error upgrading front-end container. You may need to upgrade and restart"
                                              "containers manually.\n")
+                    lock_file.unlink()
                     return self.job.finish()
 
             # restart front-end
@@ -103,7 +109,9 @@ class FourcatRestarterAndUpgrader(BasicWorker):
             log_stream_restart.flush()
             try:
                 restart_url = api_host + "/admin/trigger-frontend-restart/"
-                response = requests.post(restart_url, timeout=5).json()
+                with lock_file.open() as infile:
+                    response = requests.post(restart_url, data={"token": infile.read()}, timeout=5).json()
+
                 if response.get("status") != "OK":
                     log_stream_restart.write(response.get("message"))
             except (json.JSONDecodeError, requests.RequestException):
@@ -137,11 +145,19 @@ class FourcatRestarterAndUpgrader(BasicWorker):
                 self.log.info("Front-end is available. Restart complete.")
 
             log_stream_restart.close()
+            lock_file.unlink()
             self.job.finish()
 
         else:
             log_stream_restart.write("Initiating 4CAT restart worker\n")
             self.log.info("New restart initiated.")
+
+            # this lock file will ensure that people don't start two
+            # simultaneous upgrades or something
+            with lock_file.open("w") as outfile:
+                hasher = hashlib.blake2b()
+                hasher.update(str(uuid.uuid4()).encode("utf-8"))
+                outfile.write(hasher.hexdigest())
 
             # trigger a restart and/or upgrade
             # returns a JSON with a 'status' key and a message, the message

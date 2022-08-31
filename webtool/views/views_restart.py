@@ -1,3 +1,8 @@
+"""
+Routes for restarting 4CAT
+
+This is a relatively complex set of routes so they get their own file!
+"""
 import packaging.version
 import subprocess
 import threading
@@ -13,7 +18,7 @@ import sys
 import os
 
 from pathlib import Path
-from flask import render_template, request, flash, get_flashed_messages, url_for, redirect, send_file, jsonify
+from flask import render_template, request, flash, get_flashed_messages, jsonify
 
 import common.config_manager as config
 from flask_login import login_required, current_user
@@ -160,15 +165,6 @@ def trigger_restart_frontend():
     If restarting is not supported a JSON is returned explaining so. In that
     case the user needs to restart the server in some other way.
     """
-    # this route may be requested procedurally
-    # if it's requested from docker, waive the admin privileges requirement
-    request_is_from_docker = False
-    try:
-        request_from_backend = socket.gethostbyaddr(request.remote_addr)
-        request_is_from_docker = request_from_backend[0] == "4cat_backend.4cat-docker_default"
-    except OSError:
-        pass
-
     def server_killer(pid, sig):
         """
         Helper function. Gives Flask time to complete the request before
@@ -180,6 +176,14 @@ def trigger_restart_frontend():
 
         return kill_function
 
+    # a token stored in the lockfile is used to authenticate requests
+    lock_file = Path(config.get("PATH_ROOT"), "config/restart.lock")
+    if not lock_file.exists():
+        return jsonify({"status": "error", "message": "No restart in progress"})
+
+    with lock_file.open() as infile:
+        request_is_legit = request.form.get("token") == infile.read()
+
     # we support restarting with gunicorn and apache/mod_wsgi
     # nginx would usually be a front for gunicorn so that use case is also
     # covered
@@ -187,7 +191,7 @@ def trigger_restart_frontend():
     # we currently do not support these (but they may be easy to add)
     if "gunicorn" in os.environ.get("SERVER_SOFTWARE", ""):
         # gunicorn
-        if not current_user.is_admin and not request_is_from_docker:
+        if not request_is_legit:
             # gunicorn is used in our docker setup, let those requests through
             return app.login_manager.unauthorized()
 
@@ -196,7 +200,7 @@ def trigger_restart_frontend():
 
     elif os.environ.get("APACHE_PID_FILE", "") != "":
         # apache
-        if not current_user.is_admin:
+        if not request_is_legit:
             return app.login_manager.unauthorized()
 
         # mod_wsgi? touching the file is always safe
