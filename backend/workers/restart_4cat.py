@@ -123,6 +123,7 @@ class FourcatRestarterAndUpgrader(BasicWorker):
                 log_stream_restart.write("[Worker] Error while restarting 4CAT. The script returned a non-standard error code "
                                  "(see above). You may need to restart 4CAT manually.\n")
                 self.log.error("Error restarting 4CAT. See %s for details." % log_stream_restart.name)
+                lock_file.unlink()
                 self.job.finish()
 
             finally:
