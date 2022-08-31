@@ -594,8 +594,13 @@ def trigger_restart_frontend():
     the redirect is not a POST request.
     """
     if config.get("USING_DOCKER"):
+        import threading
+        def kill_gunicorn():
+            time.sleep(1)
+            os.kill(os.getpid(), signal.SIGHUP)
         # gunicorn
-        os.kill(os.getpid(), signal.SIGHUP)
+        kill_thread = threading.Thread(target=kill_gunicorn)
+        kill_thread.start()
     else:
         # mod_wsgi?
         wsgi_file = Path(config.get("PATH_ROOT"), "webtool", "4cat.wsgi")
