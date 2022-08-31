@@ -1081,13 +1081,13 @@ const dynamic_container = {
 			}
 
 			let container = $(this);
+			container.attr('data-last-call', Math.floor(Date.now() / 1000));
 			$.get({'url': url, 'success': function(response) {
 				if(response === container.html()) {
 					return;
 				}
 				container.html(response);
-				container.attr('data-last-call', Math.floor(Date.now() / 1000));
-			}, 'error': function() { container.attr('data-last-call', Math.floor(Date.now() / 1000)); }})
+			}});
 		});
 	}
 };

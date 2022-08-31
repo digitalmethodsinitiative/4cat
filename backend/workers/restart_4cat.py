@@ -2,7 +2,9 @@
 Restart 4CAT and optionally upgrade it to the latest release
 """
 import subprocess
+import requests
 import shlex
+import time
 import sys
 import os
 
@@ -54,25 +56,84 @@ class FourcatRestarterAndUpgrader(BasicWorker):
         log_file_restart = Path(config.get("PATH_ROOT"), config.get("PATH_LOGS"), "restart.log")
         log_stream_restart = log_file_restart.open("a")
 
-        self.log.info("Initiating restart job %s, %s attempts so far" % (str(self.job.data["id"]), str(self.job.data["attempts"])))
-
         if is_resuming:
             # 4CAT was restarted
             # The log file is used by other parts of 4CAT to see how it went,
             # so use it to report the outcome.
+            self.log.info("Restart worker resumed after restarting 4CAT, restart successful.")
             log_stream_restart.write("4CAT restarted.\n")
             with Path(config.get("PATH_ROOT"), "config/.current-version").open() as infile:
                 log_stream_restart.write("4CAT is now running version %s.\n" % infile.readline().strip())
 
-            with log_file_backend.open() as infile:
+            if log_file_backend.exists():
                 # copy output of started process to restart log
-                log_stream_restart.write(infile.read() + "\n")
+                with log_file_backend.open() as infile:
+                    log_stream_restart.write(infile.read() + "\n")
 
-            # log_file_backend.unlink()  # no longer necessary
-            log_stream_restart.write("[Worker] Success. 4CAT restarted and/or upgraded.\n")
+                log_file_backend.unlink()
+
+            api_host = "https://" if config.get("flask.https") else "http://"
+            api_host += "4cat_frontend:5000" if config.get("USING_DOCKER") else config.get("flask.server_name")
+
+            if self.job.data["remote_id"] == "upgrade" and config.get("USING_DOCKER"):
+                # when using Docker, the front-end needs to update separately
+                log_stream_restart.write("Telling front-end Docker container to upgrade...\n")
+                log_stream_restart.close()  # close, because front-end will be writing to it
+                upgrade_ok = False
+                upgrade_timeout = False
+                try:
+                    frontend_upgrade = requests.post(api_host + "/admin/trigger-frontend-upgrade/", timeout=(10 * 60))
+                    upgrade_ok = frontend_upgrade.json()["status"] == "OK"
+                except requests.RequestException:
+                    pass
+                except TimeoutError:
+                    upgrade_timeout = True
+
+                log_stream_restart = log_file_restart.open("a")
+                if not upgrade_ok:
+                    if upgrade_timeout:
+                        log_stream_restart.write("Upgrade timed out.")
+                    log_stream_restart.write("Error upgrading front-end container. You may need to upgrade and restart"
+                                             "containers manually.\n")
+                    return self.job.finish()
+
+            # restart front-end
+            log_stream_restart.write("Asking front-end to restart itself...\n")
+            log_stream_restart.flush()
+            try:
+                restart_url = api_host + "/admin/trigger-frontend-restart/"
+                requests.post(restart_url, timeout=5)
+            except requests.RequestException:
+                # this may happen because the server restarts and interrupts
+                # the request
+                pass
+
+            # wait for front-end to come online after a restart
+            time.sleep(3)  # give some time for the restart to trigger
+            start_time = time.time()
+            frontend_ok = False
+            while time.time() < start_time + 60:
+                try:
+                    frontend = requests.get(api_host + "/", timeout=5)
+                    if frontend.status_code != 200:
+                        time.sleep(2)
+                        continue
+                    frontend_ok = True
+                    break
+                except requests.RequestException as e:
+                    time.sleep(1)
+                    continue
+
+            # too bad
+            if not frontend_ok:
+                log_stream_restart.write("Timed out waiting for front-end to restart. You may need to restart it "
+                                         "manually.\n")
+                self.log.error("Front-end did not come back online after restart")
+            else:
+                log_stream_restart.write("Front-end is available. Restart complete.")
+                self.log.info("Front-end is available. Restart complete.")
+
             log_stream_restart.close()
-
-            self.log.info("Restart worker resumed after restarting 4CAT, restart successful.")
             self.job.finish()
 
         else:
@@ -123,7 +184,7 @@ class FourcatRestarterAndUpgrader(BasicWorker):
                     raise RuntimeError()
                 else:
                     # interrupted before the process could finish (as it should)
-                    self.log.info("Restart triggered. Restarting 4CAT.")
+                    self.log.info("Restart triggered. Restarting 4CAT.\n")
                     raise WorkerInterruptedException()
 
             except (RuntimeError, subprocess.CalledProcessError) as e:
