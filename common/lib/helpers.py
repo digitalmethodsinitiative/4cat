@@ -687,36 +687,6 @@ def send_email(recipient, message):
         else:
             smtp.sendmail(config.get('mail.noreply'), recipient, message.as_string())
 
-<<<<<<< HEAD
-	with connector(config.get('mail.server')) as smtp:
-		if config.get('mail.username') and config.get('mail.password'):
-			smtp.ehlo()
-			smtp.login(config.get('mail.username'), config.get('mail.password'))
-		if type(message) == str:
-			smtp.sendmail(config.get('mail.noreply'), recipient, message)
-		else:
-			smtp.sendmail(config.NOREPLY_EMAIL, recipient, message.as_string())
-
-def validate_url(x):
-	"""
-	Checks that a string is a valid url. Uses urlparse from urllib.parse to check that there is both a proper scheme
-	and netloc (host) for the url.
-
-	Returns False if type of x is not a string.
-
-	:param str x:  string representing a url
-	:return bool:  True if string is valid url, False if not
-	"""
-	if type(x) == str:
-		# if x.count('http://') > 1 or x.count('https://') > 1:
-		# 	# check for errors in spliting urls
-		# 	return False
-		result = urlparse(x)
-		return all([result.scheme, result.netloc])
-	else:
-		return False
-=======
->>>>>>> master
 
 def flatten_dict(d: MutableMapping, parent_key: str = '', sep: str = '.'):
     """
