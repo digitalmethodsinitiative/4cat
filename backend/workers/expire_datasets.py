@@ -6,22 +6,28 @@ import time
 from backend.abstract.worker import BasicWorker
 from common.lib.dataset import DataSet
 
-class DatasetExpirer(BasicWorker):
+class ThingExpirer(BasicWorker):
 	"""
-	Delete old datasets
+	Delete old items
 
-	This may be useful for two reasons: to conserve disk space and if the user
-	agreement of a particular data source does not allow storing scraped or
-	extracted data for longer than a given amount of time, as is the case for
-	e.g. Tumblr.
+	Deletes expired datasets. This may be useful for two reasons: to conserve
+	disk space and if the user agreement of a particular data source does not
+	allow storing scraped or extracted data for longer than a given amount of
+	time, as is the case for e.g. Tumblr.
+
+	Also deletes expired notifications.
 	"""
 	type = "expire-datasets"
 	max_workers = 1
 
+	ensure_job = {"remote_id": "localhost", "interval": 300}
+
 	def work(self):
 		"""
 		Go through all datasources, and if it is configured to automatically
-		delete old datasets, do so for all qualifying datasets
+		delete old datasets, do so for all qualifying datasets.
+
+		Next, delete all expired notifications.
 		:return:
 		"""
 		datasets = []
@@ -52,5 +58,7 @@ class DatasetExpirer(BasicWorker):
 			dataset.delete()
 			self.log.info("Deleting dataset %s/%s (expired per configuration)" % (dataset.parameters.get("datasource", "unknown"), dataset.key))
 
+		# and now, notifications
+		self.db.execute("DELETE FROM users_notifications WHERE timestamp_expires IS NOT NULL AND timestamp_expires < %s" % (int(time.time()),))
 
 		self.job.finish()

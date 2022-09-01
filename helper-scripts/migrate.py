@@ -31,6 +31,7 @@ cli = argparse.ArgumentParser()
 cli.add_argument("--yes", "-y", default=False, action="store_true", help="Answer 'yes' to all prompts")
 cli.add_argument("--pull", "-p", default=False, action="store_true", help="Pull and check out the latest 4CAT version from Github before migrating")
 cli.add_argument("--repository", "-r", default="https://github.com/digitalmethodsinitiative/4cat.git", help="URL of the repository to pull from")
+cli.add_argument("--release", "-l", default=False, action="store_true", help="Pull and check out the latest 4CAT release from Github before migrating")
 cli.add_argument("--current_version_location", "-v", default=".current-version", help="File path to .current_version file")
 args = cli.parse_args()
 
@@ -55,6 +56,47 @@ if args.pull:
 
 	if "Already up to date" in str(result.stdout):
 		print("Latest version is already checked out.")
+	else:
+		print(result.stdout.decode("ascii"))
+
+	print("...done\n")
+
+# ---------------------------------------------
+#          Check out latest release
+# ---------------------------------------------
+if args.release:
+	print("Pulling latest release git repository %s..." % args.repository)
+	repo_id = "/".join(args.repository.split("/")[-2:]).split(".git")[0]
+	api_url = "https://api.github.com/repos/%s/releases/latest" % repo_id
+	print("Fetching latest release tag from %s..." % api_url)
+
+	try:
+		tag = requests.get(api_url, timeout=5).json()["tag_name"]
+		print("Latest release is tagged %s." % tag)
+	except (requests.RequestException, json.JSONDecodeError, KeyError):
+		print("Error while retrieving latest release tag via GitHub API. Check that the repository URL is correct.")
+		exit(1)
+
+	command = "git fetch %s %s" % (args.repository, tag)
+	result = subprocess.run(command.split(" "), stdout=subprocess.PIPE,
+						stderr=subprocess.PIPE)
+
+	if result.returncode != 0:
+		print("Error while pulling latest release with git. Check that the repository URL is correct.")
+		print(result.stderr.decode("ascii"))
+		exit(1)
+
+	command = "git checkout --force %s" % tag
+	result = subprocess.run(command.split(" "), stdout=subprocess.PIPE,
+						stderr=subprocess.PIPE)
+
+	if result.returncode != 0:
+		print("Error while checking out tag %s with git. Check that the repository URL is correct." % tag)
+		print(result.stderr.decode("ascii"))
+		exit(1)
+
+	if "Already up to date" in str(result.stdout):
+		print("Latest release is already checked out.")
 	else:
 		print(result.stdout.decode("ascii"))
 

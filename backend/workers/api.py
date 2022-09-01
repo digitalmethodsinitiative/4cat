@@ -13,6 +13,8 @@ class InternalAPI(BasicWorker):
 	type = "api"
 	max_workers = 1
 
+	ensure_job = {"remote_id": "localhost"}
+
 	host = config.get('API_HOST')
 	port = config.get('API_PORT')
 

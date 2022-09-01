@@ -73,7 +73,7 @@
                                 if "board" in dataset.parameters and dataset.parameters.board %}/
                                 {{ dataset.parameters.board }}/{% endif %}</{% if github_link %}a{% else %}span{% endif %}>
                         {% if dataset.parameters.datasource in datasources %}
-                            {{ datasources[dataset.parameters.datasource].name }}
+                            {{ datasources[dataset.parameters.datasource].name }} (<a href="{{ url_for("data_overview", datasource=dataset.parameters.datasource) }}">details</a>)
                         {% endif %}
                         </dd>
                     </div>

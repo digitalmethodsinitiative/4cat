@@ -14,7 +14,7 @@ from pathlib import Path
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
-from flask import render_template, jsonify, request, abort, flash, get_flashed_messages, url_for
+from flask import render_template, jsonify, request, abort, flash, get_flashed_messages, url_for, redirect
 from flask_login import login_required, current_user
 
 from webtool import app, db
@@ -42,9 +42,10 @@ def admin_frontpage(page):
 
     num_users = db.fetchone("SELECT COUNT(*) FROM USERS " + filter_bit, replacements)["count"]
     users = db.fetchall("SELECT * FROM users " + filter_bit + "ORDER BY is_admin DESC, name ASC LIMIT 20 OFFSET %i" % offset, replacements)
+    notifications = db.fetchall("SELECT * FROM users_notifications ORDER BY username ASC, id ASC")
     pagination = Pagination(page, 20, num_users, "admin_frontpage")
 
-    return render_template("controlpanel/frontpage.html", users=users, filter={"filter": filter}, pagination=pagination, flashes=get_flashed_messages())
+    return render_template("controlpanel/frontpage.html", notifications=notifications, users=users, filter={"filter": filter}, pagination=pagination, flashes=get_flashed_messages())
 
 
 @app.route("/admin/worker-status/")
@@ -324,3 +325,55 @@ def update_settings():
         }
 
     return render_template("controlpanel/config.html", options=options, flashes=get_flashed_messages(), categories=categories, modules=modules)
+
+@app.route("/create-notification/", methods=["GET", "POST"])
+def create_notification():
+
+    incomplete = []
+    params = {}
+    if request.method == "POST":
+        params = request.form.to_dict()
+
+        if not params["notification"]:
+            incomplete.append("notification")
+
+        if not params["username"]:
+            incomplete.append("username")
+
+        recipient = User.get_by_name(db, params["username"])
+        if not recipient and params["username"] not in ("!everyone", "!admins"):
+            flash("User '%s' does not exist" % params["username"])
+            incomplete.append("username")
+
+        if params["expires"]:
+            try:
+                expires = int(params["expires"])
+            except ValueError:
+                incomplete.append("expires")
+        else:
+            expires = None
+
+        if not incomplete:
+            db.insert("users_notifications", {
+                "username": params["username"],
+                "notification": params["notification"],
+                "timestamp_expires": int(time.time() + expires) if expires else None,
+                "allow_dismiss": not not params.get("allow_dismiss")}, safe=True)
+            flash("Notification added")
+            return redirect(url_for("admin_frontpage"))
+
+        else:
+            flash("Please ensure all fields contain a valid value.")
+
+    return render_template("controlpanel/add-notification.html", incomplete=incomplete, flashes=get_flashed_messages(), notification=params)
+
+
+@app.route("/delete-notification/<int:notification_id>")
+def delete_notification(notification_id):
+    db.execute("DELETE FROM users_notifications WHERE id = %s", (notification_id,))
+
+    redirect_url = request.headers.get("Referer")
+    if not redirect_url:
+        redirect_url = url_for("admin_frontpage")
+
+    return redirect(redirect_url)

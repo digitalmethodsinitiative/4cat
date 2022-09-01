@@ -107,6 +107,25 @@ CREATE UNIQUE INDEX IF NOT EXISTS unique_favourite
     key
   );
 
+-- notifications
+CREATE TABLE IF NOT EXISTS users_notifications (
+    id                  SERIAL PRIMARY KEY,
+    user                TEXT,
+    notification        TEXT,
+    timestamp_expires   INTEGER,
+    allow_dismiss       BOOLEAN DEFAULT TRUE
+);
+
+CREATE INDEX IF NOT EXISTS users_notifications_name
+  ON users_notifications (
+    username
+  );
+
+"CREATE UNIQUE INDEX IF NOT EXISTS users_notifications_unique
+  ON users_notifications (
+    username, notification
+  );"
+
 -- used to quickly update table counts
 CREATE FUNCTION count_estimate(query text) RETURNS bigint AS $$
   DECLARE

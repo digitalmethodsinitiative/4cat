@@ -38,27 +38,28 @@ The following platforms are supported through other tools, from which you can
 import data into 4CAT for analysis:
 
 * Facebook (via [CrowdTangle](https://www.crowdtangle.com) exports)
-* Instagram (via CrowdTangle)
+* Instagram (via
+  [Zeeschuimer](https://github.com/digitalmethodsinitiative/zeeschuimer) or CrowdTangle)
 * TikTok (via
   [Zeeschuimer](https://github.com/digitalmethodsinitiative/zeeschuimer) or
   [tiktok-scraper](https://github.com/drawrowfly/tiktok-scraper))
 
 A number of other platforms have built-in support that is untested, or requires
-e.g. special API access. You can view the [full list of data
-sources](https://github.com/digitalmethodsinitiative/4cat/tree/master/datasources)
+e.g. special API access. You can view the [data sources in our wiki](https://github.com/digitalmethodsinitiative/4cat/wiki/Available-data-sources) or review [the data
+sources' code](https://github.com/digitalmethodsinitiative/4cat/tree/master/datasources)
 in the GitHub repository.
 
 ## Install
-You can install 4CAT locally or on a server via Docker or manually. Copying our docker-compose_prod.yml file and using
+You can install 4CAT locally or on a server via Docker or manually. Copying our `docker-compose.yml file`, `.env` file, and using
 
 ```
-docker-compose -f docker-compose_prod.yml up
+docker-compose up -d
 ```
 
-will pull the lastest version from Docker Hub, but detailed and alternative installation instructions are available
+will pull the lastest version from Docker Hub. Detailed and alternative installation instructions are available
 [in our
 wiki](https://github.com/digitalmethodsinitiative/4cat/wiki/Installing-4CAT).
-Currently 4chan, 8chan, and 8kun require additional steps; please see the wiki.
+Currently scraping of 4chan, 8chan, and 8kun require additional steps; please see the wiki.
 
 Please check our
 [issues](https://github.com/digitalmethodsinitiative/4cat/issues) and create
