@@ -248,7 +248,8 @@ def check_restart_request():
 		return False
 
 	with lock_file.open() as infile:
-		request_is_legit = request.form.get("token") == infile.read()
+		token = infile.read().strip()
+		request_is_legit = token and request.form.get("token") == token
 
 	return request_is_legit
 

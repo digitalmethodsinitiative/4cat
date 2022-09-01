@@ -82,7 +82,6 @@ def trigger_restart():
             outfile.write(
                 "%s initiated at server timestamp %s\n" % (mode.title(), datetime.datetime.now().strftime("%c")))
             outfile.write("Telling 4CAT to %s via job queue...\n" % mode)
-
         # this file will be updated when the upgrade runs
         # and it is shared between containers, but we will need to upgrade the
         # front-end separately - so keep a local copy for the latter step
