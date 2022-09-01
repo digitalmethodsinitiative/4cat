@@ -90,7 +90,6 @@ def finish(args, logger):
 
 cli = argparse.ArgumentParser()
 cli.add_argument("--yes", "-y", default=False, action="store_true", help="Answer 'yes' to all prompts")
-cli.add_argument("--pull", "-p", default=False, action="store_true", help="Pull and check out the latest 4CAT master branch commit from Github before migrating")
 cli.add_argument("--release", "-l", default=False, action="store_true", help="Pull and check out the latest 4CAT release from Github before migrating")
 cli.add_argument("--repository", "-r", default="https://github.com/digitalmethodsinitiative/4cat.git", help="URL of the repository to pull from")
 cli.add_argument("--restart", "-x", default=False, action="store_true", help="Try to restart the 4CAT daemon after finishing migration, and 'touch' the WSGI file to trigger a front-end reload")
@@ -163,27 +162,6 @@ else:
 	logger.info("  ...done")
 
 # ---------------------------------------------
-#   Pull latest version of 4CAT from git repo
-# ---------------------------------------------
-if args.pull and not args.release:
-	logger.info("- Pulling latest commit from git repository %s..." % args.repository)
-	command = "git pull %s master" % args.repository
-	result = subprocess.run(shlex.split(command), stdout=subprocess.PIPE,
-						stderr=subprocess.PIPE, cwd=cwd)
-
-	if result.returncode != 0:
-		logger.info("Error while pulling latest version with git. Check that the repository URL is correct.")
-		logger.info(result.stderr.decode("ascii"))
-		exit(1)
-
-	if "Already up to date" in str(result.stdout):
-		logger.info("  ...latest version is already checked out.")
-	else:
-		logger.info(result.stdout.decode("ascii"))
-
-	logger.info("  ...done\n")
-
-# ---------------------------------------------
 #     Determine current and target versions
 # ---------------------------------------------
 target_version, target_version_c, current_version, current_version_c = get_versions(target_version_file, current_version_file)
@@ -230,7 +208,7 @@ if args.release:
 
 	logger.info("  ...checking out latest release")
 	tag_ref = shlex.quote("refs/tags/" + tag)
-	command = "git checkout --force %s VERSION" % tag_ref
+	command = "git checkout --force %s" % tag_ref
 	result = subprocess.run(shlex.split(command), stdout=subprocess.PIPE,
 						stderr=subprocess.PIPE, cwd=cwd)
 
@@ -238,15 +216,6 @@ if args.release:
 		logger.info("Error while pulling latest release with git. Check that the repository URL is correct.")
 		logger.info(result.stderr.decode("ascii"))
 		exit(1)
-
-	#command = "git checkout --force %s" % tag_ref
-	#result = subprocess.run(shlex.split(command), stdout=subprocess.PIPE,
-	#					stderr=subprocess.PIPE, cwd=cwd)
-
-	#if result.returncode != 0:
-	#	logger.info("Error while checking out tag %s with git. Check that the repository URL is correct." % tag)
-	#	logger.info(result.stderr.decode("ascii"))
-	#	exit(1)
 
 	if "Already up to date" in str(result.stdout):
 		logger.info("  ...latest release is already checked out.")
