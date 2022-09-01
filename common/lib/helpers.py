@@ -687,6 +687,7 @@ def send_email(recipient, message):
         else:
             smtp.sendmail(config.get('mail.noreply'), recipient, message.as_string())
 
+<<<<<<< HEAD
 def validate_url(x):
 	"""
 	Checks that a string is a valid url. Uses urlparse from urllib.parse to check that there is both a proper scheme
@@ -705,6 +706,8 @@ def validate_url(x):
 		return all([result.scheme, result.netloc])
 	else:
 		return False
+=======
+>>>>>>> 7520991b0331ba651e256a39762aceae490f0278
 
 def flatten_dict(d: MutableMapping, parent_key: str = '', sep: str = '.'):
     """
