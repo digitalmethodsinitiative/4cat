@@ -141,6 +141,7 @@ if __name__ == "__main__":
             config.set_or_create_setting('flask.autologin.api', api_whitelist, raw=False)
 
     if config.get('selenium.browser') == 'firefox' and not config.get('selenium.installed'):
+        # This currently requires the DOCKER container to be restarted!
         print('Installing geckodriver and firefox')
         import subprocess
         interpreter = sys.executable
