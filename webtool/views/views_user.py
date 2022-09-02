@@ -191,7 +191,7 @@ def create_first_user():
                                flashes=get_flashed_messages())
 
     if request.form.get("phone-home"):
-        with Path(config.get("path.root"), ".current-version").open() as outfile:
+        with Path(config.get("path.root"), "config/.current-version").open() as outfile:
             version = outfile.read(64).split("\n")[0].strip()
 
         payload = {"version": version}

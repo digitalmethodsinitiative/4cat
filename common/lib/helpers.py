@@ -3,6 +3,7 @@ Miscellaneous helper functions for the 4CAT backend
 """
 import calendar
 import subprocess
+import requests
 import datetime
 import smtplib
 import socket
@@ -135,6 +136,33 @@ def get_software_version():
             return version
     except OSError:
         return ""
+
+
+def get_github_version():
+    """
+    Get latest release tag version from GitHub
+
+    Will raise a ValueError if it cannot retrieve information from GitHub.
+
+    :return tuple:  Version, e.g. `1.26`, and release URL.
+    """
+    repo_url = config.get("4cat.github_url")
+    if not repo_url.endswith("/"):
+        repo_url += "/"
+
+    repo_id = re.sub(r"(\.git)?/?$", "", re.sub(r"^https?://(www\.)?github\.com/", "", repo_url))
+
+    api_url = "https://api.github.com/repos/%s/releases/latest" % repo_id
+    response = requests.get(api_url, timeout=5)
+    response = response.json()
+    if response.get("message") == "Not Found":
+        raise ValueError("Invalid GitHub URL or repository name")
+
+    latest_tag = response.get("tag_name", "unknown")
+    if latest_tag.startswith("v"):
+        latest_tag = re.sub(r"^v", "", latest_tag)
+
+    return (latest_tag, response.get("html_url"))
 
 
 def convert_to_int(value, default=0):

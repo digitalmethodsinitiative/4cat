@@ -56,7 +56,7 @@ packages = [
 
 # Some packages don't run on Windows
 unix_packages = [
-	"python-daemon==2.3.0"
+	"python-daemon==2.3.1"
 ]
 
 if os.name != "nt":

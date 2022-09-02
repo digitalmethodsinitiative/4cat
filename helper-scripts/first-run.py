@@ -26,7 +26,7 @@ if not version_file.exists():
     print("VERSION file not found. You should re-install 4CAT before continuing.", file=sys.stderr)
     exit(1)
 
-current_version_file = version_file.with_name(".current-version")
+current_version_file = version_file.parent.joinpath("config/.current-version")
 if current_version_file.exists():
     # this file does not exist by default, so if it does, that means we don't
     # need to do further on-boarding since 4CAT has already been run

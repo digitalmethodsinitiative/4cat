@@ -76,7 +76,7 @@ if not config.get("flask.secret_key") or config.get("flask.secret_key") == "REPL
 app.config.from_mapping({
     "FLASK_APP": config.get("flask.flask_app"),
     "SECRET_KEY": config.get("flask.secret_key"),
-    "SERVER_NAME": config.get("flask.server_name"),
+    "SERVER_NAME": config.get("flask.server_name") if not config.get("USING_DOCKER") else None,
     "SERVER_HTTPS": config.get("flask.https"),
     "HOSTNAME_WHITELIST": config.get("flask.autologin.hostnames"),
     "HOSTNAME_WHITELIST_NAME": config.get("flask.autologin.name"),
@@ -87,11 +87,14 @@ login_manager.init_app(app)
 login_manager.login_view = "show_login"
 
 # import all views
+import webtool.views.views_admin
+import webtool.views.views_restart
+import webtool.views.views_user
+
 import webtool.views.views_misc
 import webtool.views.views_dataset
-import webtool.views.views_admin
 import webtool.views.views_processors
-import webtool.views.views_user
+
 import webtool.views.api_explorer
 import webtool.views.api_standalone
 import webtool.views.api_tool

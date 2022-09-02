@@ -4,6 +4,8 @@
 import shutil
 import os
 
+from pathlib import Path
+
 from common.lib.queue import JobQueue
 from common.lib.database import Database
 from backend.lib.manager import WorkerManager
@@ -12,7 +14,13 @@ from common.lib.logger import Logger
 import common.config_manager as config
 
 def run(as_daemon=True):
-	if not as_daemon:
+	pidfile = Path(config.get('PATH_ROOT'), config.get('PATH_LOCKFILE'), "4cat.pid")
+
+	if as_daemon:
+		with pidfile.open("w") as outfile:
+			outfile.write(str(os.getpid()))
+
+	else:
 		indent_spaces = round(shutil.get_terminal_size().columns / 2) - 33
 		indent = "".join([" " for i in range(0, indent_spaces)]) if indent_spaces > 0 else ""
 		print("\n\n")
@@ -31,7 +39,7 @@ def run(as_daemon=True):
 		print(indent + "|                                                               |")
 		print(indent + "|                                                               |")
 		print(indent + "+---------------------------------------------------------------+")
-		print(indent + "|                  press q + enter to shut down                 |")
+		print(indent + "|                   use ctrl + c to shut down                   |")
 		print(indent + "|                                                               |")
 		print(indent + "| WARNING: Not running as a daemon.  Quitting this process will |")
 		print(indent + "|                 shut down the backend as well.                |")
@@ -43,6 +51,8 @@ def run(as_daemon=True):
 		log = Logger(output=not as_daemon, filename='backend_4cat.log')
 	else:
 		log = Logger(output=not as_daemon)
+
+	log.info("4CAT Backend started, logger initialised")
 	db = Database(logger=log, appname="main")
 	queue = JobQueue(logger=log, database=db)
 
@@ -51,5 +61,12 @@ def run(as_daemon=True):
 	queue.release_all()
 
 	# make it happen
+	# this is blocking until the back-end is shut down
 	WorkerManager(logger=log, database=db, queue=queue, as_daemon=as_daemon)
+
+	# clean up pidfile, if running as daemon
+	if as_daemon:
+		if pidfile.exists():
+			pidfile.unlink()
+
 	log.info("4CAT Backend shut down.")
