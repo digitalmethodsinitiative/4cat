@@ -649,6 +649,24 @@ class SearchWithTwitterAPIv2(Search):
                         # should only ever be one, but this verifies that there IS one and not NONE
                         tweet["text"] = "RT @" + retweeting_users[0] + ": " + retweeted_body
 
+            # Retweet entities are only included in the retweet if they occur in the first 140 characters
+            hashtags = ",".join(set([tag["tag"] for tag in tweet.get("entities", {}).get("hashtags", [])] + [tag["tag"] for tag in retweeted_tweet.get("entities", {}).get("hashtags", [])]))
+            mentions = ",".join(set([tag["username"] for tag in tweet.get("entities", {}).get("mentions", [])] + [tag["username"] for tag in retweeted_tweet.get("entities", {}).get("mentions", [])]))
+            urls = ",".join(set([tag["expanded_url"] for tag in tweet.get("entities", {}).get("urls", [])] + [tag["expanded_url"] for tag in retweeted_tweet.get("entities", {}).get("urls", [])]))
+            # Images appear to be inheritted by retweets, but just in case
+            images = ",".join(set([item["url"] for item in tweet.get("attachments", {}).get("media_keys", []) if
+                               type(item) is dict and item.get("type") == "photo"] + [item["url"] for item in retweeted_tweet.get("attachments", {}).get("media_keys", []) if
+                                                  type(item) is dict and item.get("type") == "photo"]))
+        else:
+            # Not a retweet then entities should be sufficient
+            # Note: open question on quotes and replies as to whether containing hashtags or mentions of their referenced tweets makes sense 
+            hashtags = ",".join([tag["tag"] for tag in tweet.get("entities", {}).get("hashtags", [])])
+            mentions = ",".join([tag["username"] for tag in tweet.get("entities", {}).get("mentions", [])])
+            urls = ",".join([tag["expanded_url"] for tag in tweet.get("entities", {}).get("urls", [])])
+            images = ",".join(item["url"] for item in tweet.get("attachments", {}).get("media_keys", []) if
+                               type(item) is dict and item.get("type") == "photo")
+
+
         return {
             "id": tweet["id"],
             "thread_id": tweet.get("conversation_id", tweet["id"]),
@@ -668,11 +686,10 @@ class SearchWithTwitterAPIv2(Search):
                 [ref.get("type") == "quoted" for ref in tweet.get("referenced_tweets", [])]) else "no",
             "is_reply": "yes" if any(
                 [ref.get("type") == "replied_to" for ref in tweet.get("referenced_tweets", [])]) else "no",
-            "hashtags": ",".join([tag["tag"] for tag in tweet.get("entities", {}).get("hashtags", [])]),
-            "urls": ",".join([tag["expanded_url"] for tag in tweet.get("entities", {}).get("urls", [])]),
-            "images": ",".join(item["url"] for item in tweet.get("attachments", {}).get("media_keys", []) if
-                               type(item) is dict and item.get("type") == "photo"),
-            "mentions": ",".join([tag["username"] for tag in tweet.get("entities", {}).get("mentions", [])]),
+            "hashtags": hashtags,
+            "urls": urls,
+            "images": images,
+            "mentions": mentions,
             "reply_to": "".join(
                 [mention["username"] for mention in tweet.get("entities", {}).get("mentions", [])[:1]]) if any(
                 [ref.get("type") == "replied_to" for ref in tweet.get("referenced_tweets", [])]) else ""
