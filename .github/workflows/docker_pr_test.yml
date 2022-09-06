@@ -1,0 +1,19 @@
+# This will keep the tag:latest up-to-date with all commits and pull requests
+
+name: Test PR for Docker build and run
+
+# Controls when the workflow will run
+on:
+  # Triggers the workflow on pull request events but only for the "master" branch
+  pull_request:
+    branches: [ "master" ]
+jobs:
+  test_docker_build:
+    name: Test docker-compose up with build
+    runs-on: ubuntu-latest
+    steps:
+      runs-on: ubuntu-latest
+      steps:
+        - uses: actions/checkout@v2
+        - name: Run docker-compose up
+          run: docker-compose -f docker-compose_build.yml up -d
