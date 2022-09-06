@@ -324,7 +324,6 @@ def queue_dataset():
 
 			# then validate for this particular datasource
 			sanitised_query = {"frontend-confirm": has_confirm, **sanitised_query}
-			print(sanitised_query)
 			sanitised_query = search_worker.validate_query(sanitised_query, request, current_user)
 		except QueryParametersException as e:
 			return jsonify({"status": "error", "message": "Invalid query. %s" % e})
@@ -845,7 +844,6 @@ def queue_processor(key=None, processor=None):
 	try:
 		dataset = DataSet(key=key, db=db)
 	except TypeError:
-		print("KEY", key)
 		return error(404, error="Not a valid dataset key.")
 
 	if not current_user.can_access_dataset(dataset):
@@ -854,8 +852,6 @@ def queue_processor(key=None, processor=None):
 	# check if processor is available for this dataset
 	available_processors = dataset.get_available_processors()
 	if processor not in available_processors:
-		print(processor)
-		print(available_processors)
 		return error(404, error="This processor is not available for this dataset or has already been run.")
 
 	# create a dataset now
