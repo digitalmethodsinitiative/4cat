@@ -61,7 +61,12 @@ class TwitterStatsBase(BasicProcessor):
                 return
 
             # Map the data in the post to either be summed (by grouping and interval) or updated (keeping most recent)
-            group_by_keys_category, group_by_keys, sum_map, static_map, list_map = self.map_data(post)
+            try:
+                group_by_keys_category, group_by_keys, sum_map, static_map, list_map = self.map_data(post)
+            except ProcessorException as e:
+                self.dataset.update_status(str(e), is_final=True)
+                self.dataset.update_status(0)
+                return
 
             # Additional groupings in intervals
             if group_by_keys_category is not False:

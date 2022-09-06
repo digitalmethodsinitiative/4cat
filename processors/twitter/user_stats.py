@@ -7,6 +7,7 @@ from scipy import stats
 
 from common.lib.helpers import UserInput, pad_interval, get_interval_descriptor
 from backend.abstract.processor import BasicProcessor
+from common.lib.exceptions import ProcessorException
 
 __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl"]
@@ -56,7 +57,12 @@ class TwitterStats(BasicProcessor):
         self.dataset.update_status("Processing posts")
         # Iterate through each post and collect data for each interval
         # Abstracted to use in child classes
-        data_types, intervals = self.collect_intervals()
+        try:
+            data_types, intervals = self.collect_intervals()
+        except ProcessorException as e:
+            self.dataset.update_status(str(e), is_final=True)
+            self.dataset.update_status(0)
+            return
 
         rows = []
         for interval, data in intervals.items():
@@ -105,11 +111,11 @@ class TwitterStats(BasicProcessor):
                 post["timestamp"] = tweet_time.strftime("%Y-%m-%d %H:%M:%S")
                 date = get_interval_descriptor(post, timeframe)
             except ValueError as e:
-                self.dataset.update_status("%s, cannot count posts per %s" % (str(e), timeframe), is_final=True)
-                self.dataset.update_status(0)
-                return
+                raise ProcessorException("%s, cannot count posts per %s" % (str(e), timeframe))
 
             author = post.get("author_user").get("username")
+            if author == 'REDACTED':
+                raise ProcessorException("Author information has been removed; cannot calculate user stats")
 
             # Add a counts for the respective timeframe
             if date not in intervals:

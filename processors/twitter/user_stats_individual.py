@@ -3,6 +3,7 @@ Twitter APIv2 individual user statistics
 """
 from common.lib.helpers import UserInput
 from processors.twitter.base_twitter_stats import TwitterStatsBase
+from common.lib.exceptions import ProcessorException
 
 __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl"]
@@ -56,6 +57,9 @@ class TwitterStats(TwitterStatsBase):
         """
         group_by_key_category = "Username"
         group_by_key = str(post.get("author_user").get("username"))
+        if group_by_key == 'REDACTED':
+            # Cannot calculate user stats when users have been removed!
+            raise ProcessorException("Author information has been removed; cannot calculate user stats")
 
         num_urls = len([tag["expanded_url"] for tag in post.get("entities", {}).get("urls", [])])
         num_hashtags = len([tag["tag"] for tag in post.get("entities", {}).get("hashtags", [])])
