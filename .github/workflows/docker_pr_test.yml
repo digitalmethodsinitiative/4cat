@@ -12,8 +12,6 @@ jobs:
     name: Test docker-compose up with build
     runs-on: ubuntu-latest
     steps:
-      runs-on: ubuntu-latest
-      steps:
-        - uses: actions/checkout@v2
-        - name: Run docker-compose up
-          run: docker-compose -f docker-compose_build.yml up -d
+      - uses: actions/checkout@v2
+      - name: Run docker-compose up
+        run: docker-compose -f docker-compose_build.yml up -d
