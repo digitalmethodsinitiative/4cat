@@ -24,6 +24,8 @@ class TwitterStatsBase(BasicProcessor):
     description = "This is a class to help other twitter classes"  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
 
+    sorted = False
+
 
     @classmethod
     def is_compatible_with(cls, module=None):
@@ -144,13 +146,19 @@ class TwitterStatsBase(BasicProcessor):
 
         rows = []
         for interval, data in intervals.items():
+            interval_rows = []
             if group_by_keys_category:
                 for group_key, group_data in data.items():
                     group_data = self.modify_intervals(group_key, group_data)
-                    rows.append({**{"date": interval, group_by_keys_category: group_key}, **group_data})
+                    interval_rows.append({**{"date": interval, group_by_keys_category: group_key}, **group_data})
             else:
                 data = self.modify_intervals(interval, data)
-                rows.append({**{"date": interval}, **data})
+                interval_rows.append({**{"date": interval}, **data})
+
+            if self.sorted:
+                interval_rows = sorted(interval_rows, key=lambda d: d[self.sorted], reverse=True)
+
+            rows += interval_rows
 
         self.write_csv_items_and_finish(rows)
 
@@ -188,6 +196,6 @@ class TwitterStatsBase(BasicProcessor):
         # These are user-specific metrics and not per tweet/post like above
         static_map = {}
         # These keys contain list of items (e.g. hashtags)
-        list_map = {}
+        list_map = list()
 
         return group_by_key_category, group_by_keys, sum_map, static_map, list_map
