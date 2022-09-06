@@ -43,9 +43,14 @@
             <li><a href="{{ url_for('show_page', page='faq') }}"><abbr title="Frequently Asked Questions">FAQ</abbr></a></li>
 			<li><a href="{{ url_for('show_frontpage') }}">About</a></li>
 		</ul>
-    {% if __announcement %}
-        <div class="site-announcement">{{ __announcement|markdown|safe }}</div>
-    {% endif %}
+    {% for notification in __notifications %}
+        <div class="site-announcement">
+            {{ notification.notification|markdown|safe }}
+            {% if notification.allow_dismiss %}
+                <a href="{{ url_for("dismiss_notification", notification_id=notification.id) }}"><i class="fa fa-times" aria-hidden="true"></i><span class="sr-only">Dismiss notification</span></a>
+            {% endif %}
+        </div>
+    {% endfor %}
 	</nav>
 
 	{% block body %}

@@ -69,14 +69,14 @@ openapi = OpenAPICollector(app)
 limiter = Limiter(app, key_func=get_remote_address)
 
 # make sure a secret key was set in the config file, for secure session cookies
-if config.get("flask.secret_key") == "REPLACE_THIS":
-    raise Exception("You need to set a FLASK_SECRET in config.py before running the web tool.")
+if not config.get("flask.secret_key") or config.get("flask.secret_key") == "REPLACE_THIS":
+    raise Exception("You need to set the flask.secret_key setting running the web tool.")
 
 # initialize login manager
 app.config.from_mapping({
     "FLASK_APP": config.get("flask.flask_app"),
     "SECRET_KEY": config.get("flask.secret_key"),
-    "SERVER_NAME": config.get("flask.server_name"),
+    "SERVER_NAME": config.get("flask.server_name") if not config.get("USING_DOCKER") else None,
     "SERVER_HTTPS": config.get("flask.https"),
     "HOSTNAME_WHITELIST": config.get("flask.autologin.hostnames"),
     "HOSTNAME_WHITELIST_NAME": config.get("flask.autologin.name"),
@@ -87,11 +87,14 @@ login_manager.init_app(app)
 login_manager.login_view = "show_login"
 
 # import all views
+import webtool.views.views_admin
+import webtool.views.views_restart
+import webtool.views.views_user
+
 import webtool.views.views_misc
 import webtool.views.views_dataset
-import webtool.views.views_admin
 import webtool.views.views_processors
-import webtool.views.access
+
 import webtool.views.api_explorer
 import webtool.views.api_standalone
 import webtool.views.api_tool

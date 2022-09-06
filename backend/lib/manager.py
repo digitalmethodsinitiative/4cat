@@ -5,7 +5,6 @@ import signal
 import time
 
 from backend import all_modules
-from backend.lib.keyboard import KeyPoller
 from common.lib.exceptions import JobClaimedException
 
 
@@ -35,24 +34,18 @@ class WorkerManager:
 		self.db = database
 		self.log = logger
 
-		if not as_daemon:
-			# listen for input if running interactively
-			self.key_poller = KeyPoller(manager=self)
-			self.key_poller.start()
-		else:
+		if as_daemon:
 			signal.signal(signal.SIGTERM, self.abort)
 			signal.signal(signal.SIGINT, self.request_interrupt)
 
+		# datasources are initialized here; the init_datasource functions found in their respective __init__.py files
+		# are called which, in the case of scrapers, also adds the scrape jobs to the queue.
 		self.validate_datasources()
 
-		# queue a job for the api handler so it will be run
-		self.queue.add_job("api", remote_id="localhost")
-
-		# queue worker that deletes expired datasets every so often
-		self.queue.add_job("expire-datasets", remote_id="localhost", interval=300)
-
-		# queue worker that calculates datasource metrics every day
-		self.queue.add_job("datasource-metrics", remote_id="localhost", interval=86400)
+		# queue jobs for workers that always need one
+		for worker_name, worker in all_modules.workers.items():
+			if hasattr(worker, "ensure_job"):
+				self.queue.add_job(jobtype=worker_name, **worker.ensure_job)
 
 		self.log.info('4CAT Started')
 
@@ -114,7 +107,10 @@ class WorkerManager:
 		properly ends.
 		"""
 		while self.looping:
-			self.delegate()
+			try:
+				self.delegate()
+			except KeyboardInterrupt:
+				self.looping = False
 
 		self.log.info("Telling all workers to stop doing whatever they're doing...")
 		for jobtype in self.worker_pool:

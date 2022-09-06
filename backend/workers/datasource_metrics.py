@@ -18,6 +18,8 @@ class DatasourceMetrics(BasicWorker):
 	type = "datasource-metrics"
 	max_workers = 1
 
+	ensure_job = {"remote_id": "localhost", "interval": 86400}
+
 	def work(self):
 		"""
 		Go through all local datasources, and update the posts per day
