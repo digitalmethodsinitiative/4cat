@@ -2,7 +2,6 @@
 4CAT Web Tool views - pages to be viewed by the user
 """
 import re
-import os
 import csv
 import json
 import markdown
@@ -13,7 +12,7 @@ from datetime import datetime
 
 import backend
 
-from flask import render_template, jsonify, abort
+from flask import render_template, jsonify, Response
 from flask_login import login_required, current_user
 
 from webtool import app, db
@@ -24,7 +23,17 @@ csv.field_size_limit(1024 * 1024 * 1024)
 
 @app.route("/robots.txt")
 def robots():
-    with Path(config.get("PATH_ROOT"), "webtool/static/robots.txt") as infile:
+    """
+    Display robots.txt
+
+    Default to blocking everything, because the tool will (should) usually be
+    run as an internal resource.
+    """
+    robots = Path(config.get("PATH_ROOT"), "webtool/static/robots.txt")
+    if not robots.exists():
+        return Response("User-agent: *\nDisallow: /", mimetype='text/plain')
+
+    with robots.open() as infile:
         return infile.read()
 
 
