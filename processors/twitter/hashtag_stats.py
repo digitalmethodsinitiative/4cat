@@ -17,8 +17,10 @@ class TwitterHashtagStats(TwitterStatsBase):
     type = "twitter-hashtag-stats"  # job type ID
     category = "Twitter Analysis"  # category
     title = "Hashtag Statistics"  # title displayed in UI
-    description = "Lists users and their number of tweets, number of followers, number of friends, how many times they are listed, their UTC time offset, whether the user has a verified account and how many times they appear in the data set."  # description displayed in UI
+    description = "Lists how many tweets contain hashtags, how many times those tweets have been retweeted/replied to/liked/quoted, and information about unique users and hashtags used alongside each hashtag.\nFor retweets and quotes, hashtags from the original tweet are included in the retweet/quote."  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
+
+    sorted = 'Number of Tweets containing Hashtag'
 
     options = {
         "timeframe": {
@@ -28,12 +30,7 @@ class TwitterHashtagStats(TwitterStatsBase):
                         "hour": "Hour", "minute": "Minute"},
             "help": "Produce counts per"
         },
-        "include_quoted_text": {
-            "type": UserInput.OPTION_TOGGLE,
-            "default": False,
-            "help": "Include retweeted and quoted text in the analysis",
-            "tooltip": "A user may retweet a tweet containing hashtags, mentions, links, etc. This will include that information in the analysis."
-        },
+
         # Padding would require padding for all authors/users to make any sense! That's a bit more complex that existing code allows
         # Disabling for now
         # "pad": {
@@ -62,15 +59,15 @@ class TwitterHashtagStats(TwitterStatsBase):
         """
         group_by_key_bool = 'hashtag'
 
-        hashtags = [tag["tag"] for tag in post.get("entities", {}).get("hashtags", [])]
-        mentions = [tag["username"] for tag in post.get("entities", {}).get("mentions", [])]
+        # Use set as hashtag/mention is either in tweet or not AND adding it from the reference tweet should not duplicate
+        hashtags = set([tag["tag"] for tag in post.get("entities", {}).get("hashtags", [])])
+        mentions = set([tag["username"] for tag in post.get("entities", {}).get("mentions", [])])
 
-        if self.parameters.get("include_quoted_text"):
-            # Add referenced tweet data to the collected information
-            for ref_tweet in post.get('referenced_tweets', []):
-                if ref_tweet.get('type') in ['retweeted', 'quoted']:
-                    hashtags.extend([tag['tag'] for tag in ref_tweet.get('entities', {}).get('hashtags', [])])
-                    mentions.extend([tag['username'] for tag in ref_tweet.get('entities', {}).get('mentions', [])])
+        # Update hashtags and mentions
+        for ref_tweet in post.get('referenced_tweets', []):
+            if ref_tweet.get('type') in ['retweeted', 'quoted']:
+                hashtags.update([tag['tag'] for tag in ref_tweet.get('entities', {}).get('hashtags', [])])
+                mentions.update([tag['username'] for tag in ref_tweet.get('entities', {}).get('mentions', [])])
 
         sum_map = {
                     "Number of Tweets containing Hashtag": 1,
@@ -84,11 +81,11 @@ class TwitterHashtagStats(TwitterStatsBase):
 
         list_map = {
             'Users of Hashtag': [post["author_user"]["username"]],
-            "Mentions": mentions,
-            "Hashtags": hashtags,
+            "Mentions": list(mentions),
+            "Hashtags": list(hashtags),
         }
 
-        return group_by_key_bool, set(hashtags), sum_map, static_map, list_map
+        return group_by_key_bool, hashtags, sum_map, static_map, list_map
 
     def modify_intervals(self, key, data):
         """
