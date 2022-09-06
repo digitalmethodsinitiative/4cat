@@ -9,6 +9,7 @@
         {% for notice in flashes %}
             <p class="form-notice">{{ notice|safe }}</p>
         {% endfor %}
+            {% include "controlpanel/controls.html" %}
             {% include "controlpanel/notifications.html" %}
             {% include "controlpanel/users.html" %}
         </section>

@@ -1,12 +1,7 @@
 """
 General helper functions for Flask templating and 4CAT views
 """
-import importlib
 import datetime
-import inspect
-import glob
-import sys
-import os
 import re
 import csv
 
@@ -15,7 +10,7 @@ from math import ceil
 from calendar import monthrange
 from flask_login import current_user
 from flask import (current_app, request, jsonify)
-from backend.abstract.processor import BasicProcessor
+from pathlib import Path
 
 import common.config_manager as config
 csv.field_size_limit(1024 * 1024 * 1024)
@@ -237,6 +232,26 @@ def format_chan_post(post):
 	post = re.sub(r"&gt;&gt;([0-9]+)", "<span class=\"quote\"><a href=\"#post-\\1\">&gt;&gt;\\1</a></span>", post)
 	post = re.sub(r"^&gt;([^\n]+)", "<span class=\"greentext\">&gt;\\1</span>", post, flags=re.MULTILINE)
 	return post
+
+
+def check_restart_request():
+	"""
+	Check if a restart request is legit
+
+	These requests authenticate a bit differently: they require a special token
+	to be passed which should match the content of the current restart lock
+	file. This ensures a restart is in progress and the request belongs to that
+	specific restart.
+	"""
+	lock_file = Path(config.get("PATH_ROOT"), "config/restart.lock")
+	if not lock_file.exists():
+		return False
+
+	with lock_file.open() as infile:
+		token = infile.read().strip()
+		request_is_legit = token and request.form.get("token") == token
+
+	return request_is_legit
 
 
 def admin_required(func):

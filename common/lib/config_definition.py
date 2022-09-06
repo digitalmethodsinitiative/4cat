@@ -174,7 +174,10 @@ config_definition = {
         "type": UserInput.OPTION_TEXT,
         "default": "localhost",
         "help": "Host name",
-        "tooltip": "e.g., my4CAT.com, localhost, 127.0.0.1. Default is localhost; For Docker PUBLIC_PORT is set in your .env file",
+        "tooltip": "e.g., my4CAT.com, localhost, 127.0.0.1. Default is localhost; when running 4CAT in Docker this "
+                   "setting is ignored as any domain/port binding should be handled outside of the Docker container"
+                   "; the Docker container itself will serve on any domain name on the port configured in the .env "
+                   "file."
     },
     "flask.autologin.hostnames": {
         "type": UserInput.OPTION_TEXT_JSON,

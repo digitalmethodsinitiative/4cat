@@ -42,7 +42,7 @@ else
 fi
 
 # Run migrate prior to setup (old builds pre 1.26 may not have config_manager)
-python3 helper-scripts/migrate.py -y -v config/.current-version
+python3 helper-scripts/migrate.py -y
 
 # Run docker_setup to update any environment variables if they were changed
 python3 docker/docker_setup.py
