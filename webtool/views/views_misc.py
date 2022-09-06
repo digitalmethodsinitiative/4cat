@@ -24,8 +24,8 @@ csv.field_size_limit(1024 * 1024 * 1024)
 
 @app.route("/robots.txt")
 def robots():
-    with open(os.path.dirname(os.path.abspath(__file__)) + "/static/robots.txt") as robotstxt:
-        return robotstxt.read()
+    with Path(config.get("PATH_ROOT"), "webtool/static/robots.txt") as infile:
+        return infile.read()
 
 
 @app.route("/access-tokens/")
