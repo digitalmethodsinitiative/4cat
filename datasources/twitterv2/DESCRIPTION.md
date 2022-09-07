@@ -27,8 +27,7 @@ gathers both the retweet and the original tweet and reformats the retweet text s
 
 This also affects mentions, hashtags, and other data as only those contained in the first 140 characters are provided
 by Twitter API v2 with the retweet. Additional hashtags, mentions, etc. are taken from the original tweet and added
-to the retweet by 4CAT. *This is true when using our analysis methods; 4CAT stores the data from Twitter API v2
-as similar as possible to how it was received when downloading the ndjson file.*
+to the retweet for 4CAT analysis methods. *4CAT stores the data from Twitter API v2 as similar as possible to the format in which it was received which you can obtain by downloading the ndjson file.*
 
 *Example 1*
 
@@ -68,5 +67,4 @@ Compared with the original tweet referenced below:
 <br>
 Because the mentioned users are in the first 140 characters of the original tweet, they are also listed as mentions in the retweet.
 
-*Due to this discrepancy, for retweets all mentions and hashtags of the original tweet are considered as mentions and hashtags*
-*of the retweet.* A user on Twitter will after all see all mentions and hashtags when viewing a retweet.
+The key difference here is that example one the retweet contains none of the hashtags or mentions from the original tweet (they are beyond the first 140 characters) while the second retweet example does return mentions from the original tweet. *Due to this discrepancy, for retweets all mentions and hashtags of the original tweet are considered as mentions and hashtags of the retweet.* A user on Twitter will see all mentions and hashtags when viewing a retweet and the retweet would be a part of any network around those mentions and hashtags.
