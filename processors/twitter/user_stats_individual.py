@@ -3,6 +3,7 @@ Twitter APIv2 individual user statistics
 """
 from common.lib.helpers import UserInput
 from processors.twitter.base_twitter_stats import TwitterStatsBase
+from common.lib.exceptions import ProcessorException
 
 __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl"]
@@ -19,6 +20,8 @@ class TwitterStats(TwitterStatsBase):
     title = "Individual User Statistics"  # title displayed in UI
     description = "Lists users and their number of tweets, number of followers, number of friends, how many times they are listed, their UTC time offset, whether the user has a verified account and how many times they appear in the data set."  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
+
+    sorted = "Tweets (in interval)"
 
     options = {
         "timeframe": {
@@ -56,11 +59,25 @@ class TwitterStats(TwitterStatsBase):
         """
         group_by_key_category = "Username"
         group_by_key = str(post.get("author_user").get("username"))
+        if group_by_key == 'REDACTED':
+            # Cannot calculate user stats when users have been removed!
+            raise ProcessorException("Author information has been removed; cannot calculate user stats")
 
-        num_urls = len([tag["expanded_url"] for tag in post.get("entities", {}).get("urls", [])])
-        num_hashtags = len([tag["tag"] for tag in post.get("entities", {}).get("hashtags", [])])
-        num_mentions = len(
-            [tag["username"] for tag in post.get("entities", {}).get("mentions", [])])
+        # Use set as hashtag/mention is either in tweet or not AND adding it from the reference tweet should not duplicate
+        hashtags = set([tag["tag"] for tag in post.get("entities", {}).get("hashtags", [])])
+        mentions = set([tag["username"] for tag in post.get("entities", {}).get("mentions", [])])
+        urls = set([tag["expanded_url"] for tag in post.get("entities", {}).get("urls", [])])
+
+        # Update hashtags and mentions
+        for ref_tweet in post.get('referenced_tweets', []):
+            if ref_tweet.get('type') in ['retweeted', 'quoted']:
+                hashtags.update([tag['tag'] for tag in ref_tweet.get('entities', {}).get('hashtags', [])])
+                mentions.update([tag['username'] for tag in ref_tweet.get('entities', {}).get('mentions', [])])
+                urls.update([tag["expanded_url"] for tag in post.get("entities", {}).get("urls", [])])
+
+        num_urls = len(urls)
+        num_hashtags = len(hashtags)
+        num_mentions = len(mentions)
         num_images = len(
             [item["url"] for item in post.get("attachments", {}).get("media_keys", []) if
              type(item) is dict and item.get("type") == "photo"])

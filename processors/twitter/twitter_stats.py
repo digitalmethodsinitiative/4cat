@@ -60,12 +60,19 @@ class TwitterStats(TwitterStatsBase):
         # Can be a string (representing the record e.g. author_name) or a list of strings (which will each get a separate record e.g. list of hashtags)
         group_by_keys = None
 
-        hashtags = [tag["tag"] for tag in post.get("entities", {}).get("hashtags", [])]
-        mentions = [tag["username"] for tag in post.get("entities", {}).get("mentions", [])]
+        # Use set as hashtag/mention is either in tweet or not AND adding it from the reference tweet should not duplicate
+        hashtags = set([tag["tag"] for tag in post.get("entities", {}).get("hashtags", [])])
+        mentions = set([tag["username"] for tag in post.get("entities", {}).get("mentions", [])])
         num_urls = len([tag["expanded_url"] for tag in post.get("entities", {}).get("urls", [])])
         num_images = len(
             [item["url"] for item in post.get("attachments", {}).get("media_keys", []) if
              type(item) is dict and item.get("type") == "photo"])
+
+        # Update hashtags and mentions
+        for ref_tweet in post.get('referenced_tweets', []):
+            if ref_tweet.get('type') in ['retweeted', 'quoted']:
+                hashtags.update([tag['tag'] for tag in ref_tweet.get('entities', {}).get('hashtags', [])])
+                mentions.update([tag['username'] for tag in ref_tweet.get('entities', {}).get('mentions', [])])
 
         # Map the data in the post to either be summed (by grouping and interval)
         sum_map = {
@@ -80,11 +87,12 @@ class TwitterStats(TwitterStatsBase):
         }
         # These are user-specific metrics and not per tweet/post like above
         static_map = {}
-        # These keys contain sets of items (e.g. hashtags)
+        # These keys contain lists of items (e.g. hashtags)
         list_map = {
             "Authors": [str(post.get("author_user").get("username"))],
-            "Hashtags": hashtags,
-            "Mentions": mentions,
+            # These are counted BY value so a list should be used
+            "Hashtags": list(hashtags),
+            "Mentions": list(mentions),
         }
 
         return group_by_key_category, group_by_keys, sum_map, static_map, list_map
@@ -102,9 +110,9 @@ class TwitterStats(TwitterStatsBase):
             "Number of Retweets": 0,
             "Number of Replies": 0,
             "Number of Quotes": 0,
-            "Authors": {},
-            "Hashtags": {},
-            "Mentions": {},
+            "Authors": [],
+            "Hashtags": [],
+            "Mentions": [],
         }
 
     def modify_intervals(self, key, data):

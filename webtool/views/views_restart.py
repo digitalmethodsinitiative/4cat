@@ -183,19 +183,23 @@ def trigger_restart_frontend():
     # covered
     # flask additionally lists waitress and uwsgi as standalone wsgi servers
     # we currently do not support these (but they may be easy to add)
+    message = ""
     if "gunicorn" in os.environ.get("SERVER_SOFTWARE", ""):
         # gunicorn
+        message = "Detected Flask running in Gunicorn, sending SIGUP."
         kill_thread = threading.Thread(target=server_killer(os.getpid(), signal.SIGHUP))
         kill_thread.start()
 
     elif os.environ.get("APACHE_PID_FILE", "") != "":
         # apache
         # mod_wsgi? touching the file is always safe
+        message = "Detected Flask running in mod_wsgi, touching 4cat.wsgi."
         wsgi_file = Path(config.get("PATH_ROOT"), "webtool", "4cat.wsgi")
         wsgi_file.touch()
 
         # send a signal to apache to reload if running in daemon mode
         if os.environ.get("mod_wsgi.process_group") not in (None, ""):
+            message = "Detected Flask running in mod_wsgi as daemon, sending SIGINT."
             kill_thread = threading.Thread(target=server_killer(os.getpid(), signal.SIGINT))
             kill_thread.start()
 
@@ -204,7 +208,7 @@ def trigger_restart_frontend():
                                                       "4CAT's front-end remotely - you have to do so manually."})
 
     # up to whatever called this to monitor for restarting
-    return jsonify({"status": "OK", "message": ""})
+    return jsonify({"status": "OK", "message": message})
 
 
 @app.route("/admin/restart-log/")

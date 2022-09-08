@@ -228,6 +228,9 @@ class Tokenise(BasicProcessor):
 		def dummy_function(x, *args, **kwargs):
 			return [x]
 
+		# Collect metadata
+		metadata = {'parameters':{'columns':columns, 'grouped_by':grouping, 'intervals':set()}}
+		multiple_docs_per_post = True if grouping == 'sentence' or len(columns) > 1 else False
 		processed = 0
 		for post in self.source_dataset.iterate_items(self):
 			# determine what output unit this post belongs to
@@ -240,6 +243,17 @@ class Tokenise(BasicProcessor):
 					return
 			else:
 				document_descriptor = post["thread_id"] if post["thread_id"] else "undefined"
+
+			# Prep metadata
+			# document_numbers lists the indexes for documents found in filename relating to this post/item
+			# It should only have one index if grouped_by is "item", but may have more if grouped_by is "sentence" or multiple columns are provided
+			metadata['parameters']['intervals'].add(document_descriptor)
+			metadata[post.get('id')] = {
+								'interval': document_descriptor,
+								'filename': document_descriptor + ".json",
+								'document_numbers': [],
+								'documents': {}, # Only needed if there are more than one document per post/item
+								}
 
 			# if told so, first split the post into separate sentences
 			sentence_method = sent_tokenize if grouping == "sentence" else dummy_function
@@ -309,6 +323,9 @@ class Tokenise(BasicProcessor):
 						output_file_handle.write(",\n")
 
 					output_file_handle.write(json.dumps(post_tokens))
+					metadata[post.get('id')]['document_numbers'].append(output_files[output_path])
+					if multiple_docs_per_post:
+						metadata[post.get('id')]['documents'][output_files[output_path]] = document
 					output_files[output_path] += 1
 
 		if output_file_handle:
@@ -321,6 +338,11 @@ class Tokenise(BasicProcessor):
 		for output_path in output_files:
 			with open(output_path, "a") as file_handle:
 				file_handle.write("\n]")
+
+		# Save the metadata in our staging area
+		metadata['parameters']['intervals'] = list(metadata['parameters']['intervals'])
+		with staging_area.joinpath(".token_metadata.json").open("w", encoding="utf-8") as outfile:
+			json.dump(metadata, outfile)
 
 		# create zip of archive and delete temporary files and folder
 		self.write_archive_and_finish(staging_area)
