@@ -232,7 +232,7 @@ const query = {
 		// Check status of query
 		if($('body.result-page').length > 0) {
 			query.update_status();
-			setInterval(query.update_status, 4000);
+			setInterval(query.update_status, 1000);
 
 			// Check processor queue
 			query.check_processor_queue();
@@ -246,7 +246,7 @@ const query = {
 		}
 
 		//regularly check for unfinished datasets
-		setInterval(query.check_resultpage, 2000);
+		setInterval(query.check_resultpage, 1000);
 
 		// Start querying when go button is clicked
 		$('#query-form').on('submit', function (e) {
@@ -389,6 +389,7 @@ const query = {
 
 				if (json.done) {
 					clearInterval(query.poll_interval);
+					applyProgress($('#query-status'), 100);
 					let keyword = json.label;
 
 					$('#query-results').append('<li><a href="../results/' + json.key + '">' + keyword + ' (' + json.rows + ' items)</a></li>');
@@ -400,6 +401,8 @@ const query = {
 						dots += '.';
 					}
 					$('#query-status .dots').html(dots);
+
+					applyProgress($('#query-status'), json.progress);
 
 					query.dot_ticker += 1;
 					if (query.dot_ticker > 3) {
@@ -435,9 +438,11 @@ const query = {
 						return;
 					}
 
-					let current_status = container.find('.dataset-status').html();
+					let status_field = container.find('.dataset-status')
+					let current_status = status_field.html();
+					applyProgress(status_field, json.progress);
 					if (current_status !== json.status_html) {
-						container.find('.dataset-status').html(json.status_html);
+						status_field.html(json.status_html);
 					}
 				}
 			});
@@ -1076,13 +1081,13 @@ const dynamic_container = {
 			}
 
 			let container = $(this);
+			container.attr('data-last-call', Math.floor(Date.now() / 1000));
 			$.get({'url': url, 'success': function(response) {
 				if(response === container.html()) {
 					return;
 				}
 				container.html(response);
-				container.attr('data-last-call', Math.floor(Date.now() / 1000));
-			}, 'error': function() { container.attr('data-last-call', Math.floor(Date.now() / 1000)); }})
+			}});
 		});
 	}
 };
@@ -1410,4 +1415,23 @@ function getRelativeURL(endpoint) {
 		root = '/';
 	}
 	return root + endpoint;
+}
+
+function applyProgress(element, progress) {
+	if(element.parent().hasClass('button-like')) {
+		element = element.parent();
+	}
+
+	let current_progress = Array(...element[0].classList).filter(z => z.indexOf('progress-') === 0)
+	for (let class_name in current_progress) {
+		class_name = current_progress[class_name];
+		element.removeClass(class_name);
+	}
+
+	if (progress && progress > 0 && progress < 100) {
+		element.addClass('progress-' + progress);
+		if(!element.hasClass('progress')) {
+			element.addClass('progress');
+		}
+	}
 }

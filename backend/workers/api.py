@@ -13,6 +13,8 @@ class InternalAPI(BasicWorker):
 	type = "api"
 	max_workers = 1
 
+	ensure_job = {"remote_id": "localhost"}
+
 	host = config.get('API_HOST')
 	port = config.get('API_PORT')
 
@@ -58,8 +60,8 @@ class InternalAPI(BasicWorker):
 				self.manager.log.error("OS refused listening at port %i! Local API not available." % self.port)
 				return
 
-		server.listen(5)
-		server.settimeout(5)
+		server.listen()
+		server.settimeout(2)
 		self.manager.log.info("Local API listening for requests at %s:%s" % (self.host, self.port))
 
 		# continually listen for new connections

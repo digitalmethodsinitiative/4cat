@@ -6,7 +6,7 @@
 <li id="child-{{ item.key }}" data-dataset-key="{{ item.key }}" class="child-wrapper{% if not item.is_finished() %} running{% endif %}" data-status="{{ item.status }}">
     {# The status button for this processor #}
 
-    <div class="processor-result-indicator button-wrap {{ processors[item.type].id if not deprecated else 'deprecated' }}-button {% if 'queued' in item.status|lower %} queued-button{% endif %} {% if not item.is_finished() %} pending{% elif item.num_rows == 0 %} failed{% else %} finished {% endif %}">
+    <div class="processor-result-indicator button-wrap {{ processors[item.type].id if not deprecated else 'deprecated' }}-button {% if 'queued' in item.status|lower %} queued-button{% endif %} {% if not item.is_finished() %} pending{% elif item.num_rows == 0 %} failed{% else %} finished {% endif %}{% if item.progress and item.progress > 0 and not item.is_finished() %} progress progress-{{ (item.progress * 100)|round(0)|int }}{% endif %}">
 
     <div class="button-object">
 
@@ -72,13 +72,13 @@
         {# Parameters #}
         <div class="parameters">
             <ul>
-                {% if item.get_extension() == "csv" or item.get_own_processor().map_item %}
+                {% if item.get_extension() in ("gexf", "csv") or item.get_own_processor().map_item %}
                 <li>
                     <a href="{{ url_for('preview_items', key=item.key) }}"
                        data-load-from="{{ url_for('preview_items', key=item.key) }}"
                        class="property-badge permalink popup-trigger tooltip-trigger"
                        aria-controls="tooltip-preview-{{ item.key }} popup-preview-{{ item.key }}"><i
-                            class="fa fa-fw fa-search"></i> <span class="sr-only">Preview this dataset</span></a>
+                            class="fa fa-fw fa-search"></i> Preview<span class="sr-only"> this dataset</span></a>
                     <div role="dialog" id="popup-preview-{{ dataset.key }}"></div>
                     <p role="tooltip" id="tooltip-preview-{{ item.key }}" aria-hidden="true">Preview this dataset</p>
                 </li>

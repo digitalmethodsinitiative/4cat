@@ -1,0 +1,44 @@
+{% extends "layout.html" %}
+
+{% block title %}Add notification{% endblock %}
+{% block body_class %}plain-page frontpage admin {{ body_class }}{% endblock %}
+
+{% block body %}
+    <article class="small">
+        <section>
+            <h2><span>Add notification</span></h2>
+            <p>You can use Markdown in notifications. You can use '!everyone' as a recipient to show the notification to
+                everyone, or '!admins' to show the notification to other admins.</p>
+            <p>For expiration time, enter amount of seconds. When empty, the notification will not expire. Note that
+                if a notification is sent to everyone and made dismissable, any user can dismiss it and that will delete
+                the notification for all users (so you probably shouldn't do that).</p>
+
+            <form action="{{ url_for('create_notification') }}" method="POST" class="wide">
+                {% for notice in flashes %}
+                    <p class="form-notice">{{ notice|safe }}</p>
+                {% endfor %}
+                <div class="form-element{% if "username" in incomplete %} missing{% endif %}">
+                    <label for="notification-username">Username</label>
+                    <input type="text" name="username" id="notification-username" value="{% if notification.username %}{{ notification.username }}{% else %}!everyone{% endif %}">
+                </div>
+                <div class="form-element{% if "notification" in incomplete %} missing{% endif %}">
+                    <label for="notification-notification">Notification</label>
+                    <textarea rows="10" cols="50" id="notification-notification" name="notification">{{ notification.notification }}</textarea>
+                </div>
+                <div class="form-element">
+                    <label for="notification-allow_dismiss">Dismissable?</label>
+                    <input type="checkbox" id="notification-allow_dismiss" name="allow_dismiss"{% if notification.allow_dismiss %} checked{% endif %}>
+                </div>
+                <div class="form-element{% if "expires" in incomplete %} missing{% endif %}">
+                    <label for="notification-expires">Expire after</label>
+                    <input type="text" name="expires" id="notification-expires" value="{{ notification.expires }}">
+                </div>
+                <div class="submit-container">
+                    <button>
+                        <i class="fa fa-comment" aria-hidden="true"></i> Create
+                    </button>
+                </div>
+            </form>
+        </section>
+    </article>
+{% endblock %}

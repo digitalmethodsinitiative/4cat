@@ -2,7 +2,6 @@
 4CAT Web Tool views - pages to be viewed by the user
 """
 import re
-import os
 import csv
 import json
 import markdown
@@ -13,7 +12,7 @@ from datetime import datetime
 
 import backend
 
-from flask import render_template, jsonify, abort
+from flask import render_template, jsonify, Response
 from flask_login import login_required, current_user
 
 from webtool import app, db
@@ -24,8 +23,18 @@ csv.field_size_limit(1024 * 1024 * 1024)
 
 @app.route("/robots.txt")
 def robots():
-    with open(os.path.dirname(os.path.abspath(__file__)) + "/static/robots.txt") as robotstxt:
-        return robotstxt.read()
+    """
+    Display robots.txt
+
+    Default to blocking everything, because the tool will (should) usually be
+    run as an internal resource.
+    """
+    robots = Path(config.get("PATH_ROOT"), "webtool/static/robots.txt")
+    if not robots.exists():
+        return Response("User-agent: *\nDisallow: /", mimetype='text/plain')
+
+    with robots.open() as infile:
+        return infile.read()
 
 
 @app.route("/access-tokens/")
@@ -76,7 +85,7 @@ def show_frontpage():
     else:
         news = None
 
-    datasources = backend.all_modules.datasources
+    datasources = {k: v for k, v in backend.all_modules.datasources.items() if k in config.get("DATASOURCES")}
 
     return render_template("frontpage.html", stats=stats, news=news, datasources=datasources)
 
@@ -101,10 +110,10 @@ def data_overview(datasource=None):
     Main tool frontend
     """
     datasources = {datasource: metadata for datasource, metadata in backend.all_modules.datasources.items() if
-                   metadata["has_worker"] and metadata["has_options"]}
+                   metadata["has_worker"] and datasource in config.get("DATASOURCES")}
 
     if datasource not in datasources:
-        datasource_name = None
+        datasource = None
 
     github_url = config.get("4cat.github_url")
 
@@ -136,6 +145,9 @@ def data_overview(datasource=None):
 
         if is_static:
             labels.append("static")
+
+        if hasattr(worker_class, "is_from_extension"):
+            labels.append("extension")
 
         # Get daily post counts for local datasource to display in a graph
         if is_local == "local":

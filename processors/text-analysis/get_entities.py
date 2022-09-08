@@ -123,7 +123,8 @@ class ExtractNouns(BasicProcessor):  # TEMPORARILY DISABLED
                     self.add_field_to_parent(field_name='named_entities',
                                              # Format like "Apple:ORG, Gates:PERSON, ..." and add to the row
                                              new_data=[", ".join([":".join(post_entities) for post_entities in entity]) for entity in li_entities],
-                                             which_parent=self.dataset.top_parent())
+                                             which_parent=self.dataset.top_parent(),
+                                             update_existing=True)
 
                 all_entities = []
                 # Convert to lower and filter out one-letter words. Join the words with the entities so we can group easily.

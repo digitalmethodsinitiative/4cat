@@ -1,9 +1,18 @@
+# This docker-compose_public_ip.yml is specifically for quickly setting up
+# 4CAT on a server and hosting AT THE IP address. I.e. http://1.2.3.4
+# It was made to quickly deploy on SURF's research cloud
+# https://www.surf.nl/en/research-it
+
+# The issue this "solves" is allowing 4CAT to be deployed on an unknown
+# IP address which is only provided by SURF after 4CAT deployment.
+
 version: '3.6'
 
 services:
   db:
     container_name: 4cat_db
     image: postgres:latest
+    restart: unless-stopped
     environment:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
@@ -13,8 +22,9 @@ services:
       - 4cat_db:/var/lib/postgresql/data/
 
   backend:
-    image: digitalmethodsinitiative/4cat:latest
+    image: digitalmethodsinitiative/4cat:${DOCKER_TAG}
     container_name: 4cat_backend
+    restart: unless-stopped
     env_file:
       - .env
     depends_on:
@@ -25,11 +35,13 @@ services:
       - 4cat_data:/usr/src/app/data/
       - 4cat_share:/usr/src/app/config/
       - 4cat_logs:/usr/src/app/logs/
+    # The -p sets your SERVER_NAME to your public IP
     entrypoint: docker/docker-entrypoint.sh -p
 
   frontend:
-    image: digitalmethodsinitiative/4cat:latest
+    image: digitalmethodsinitiative/4cat:${DOCKER_TAG}
     container_name: 4cat_frontend
+    restart: unless-stopped
     depends_on:
       - db
       - backend
@@ -40,7 +52,7 @@ services:
       - 4cat_data:/usr/src/app/data/
       - 4cat_share:/usr/src/app/config/
       - 4cat_logs:/usr/src/app/logs/
-    entrypoint: gunicorn --worker-tmp-dir /dev/shm --workers=2 --threads=4 --worker-class=gthread --access-logfile /usr/src/app/logs/access_gunicorn.log --log-level=info --reload --bind 0.0.0.0:5000 webtool:app
+    command: ["docker/wait-for-backend.sh", "gunicorn", "--worker-tmp-dir", "/dev/shm", "--workers", "2", "--threads", "4", "--worker-class", "gthread", "--access-logfile", "/usr/src/app/logs/access_gunicorn.log", "--log-level", "info", "--bind", "0.0.0.0:5000", "webtool:app"]
 
 volumes:
   4cat_db: {}

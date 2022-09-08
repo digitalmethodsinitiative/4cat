@@ -1,33 +1,19 @@
-FROM python:3.8-buster
+FROM python:3.8-slim AS compile-image
 
 RUN apt-get update && apt install -y \
-    curl \
-    git \
-    gawk \
+    # General requirements:
     libpq-dev \
-    netcat \
-    postgresql-client \
-    postgresql-server-dev-all \
     python3-dev \
-    python3-pip \
-    unzip \
-    wget \
-    xvfb
+    python3-pip
 
+# Set working directory
 WORKDIR /usr/src/app
 
-# Install google chrome
-RUN wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
-RUN dpkg -i google-chrome-stable_current_amd64.deb; apt-get -fy install
+# Make and use virtual environment
+RUN python3 -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
 
-ENV DISPLAY=:99
-ENV CHROME_BIN=/usr/bin/google-chrome
-
-# install chromedriver
-RUN wget -O /tmp/chromedriver.zip http://chromedriver.storage.googleapis.com/`curl -sS chromedriver.storage.googleapis.com/LATEST_RELEASE`/chromedriver_linux64.zip
-RUN unzip /tmp/chromedriver.zip chromedriver -d /usr/local/bin/
-
-# install dependencies
+# Install dependencies
 RUN pip3 install --upgrade pip
 COPY ./requirements.txt /usr/src/app/requirements.txt
 COPY ./setup.py /usr/src/app/setup.py
@@ -38,9 +24,29 @@ RUN mkdir /usr/src/app/webtool
 RUN mkdir /usr/src/app/datasources
 RUN pip3 install -r requirements.txt
 
-# Frontend requirements
+# Install frontend Docker requirements
 RUN pip3 install gunicorn
 
+# Build image from compile-image
+FROM python:3.8-slim AS build-image
+COPY --from=compile-image /opt/venv /opt/venv
+# Make virtual env available
+ENV PATH="/opt/venv/bin:$PATH"
+
+RUN apt-get update && apt install -y \
+    # Called in docker-entrypoint.sh:
+    curl \
+    netcat \
+    postgresql-client \
+    postgresql-server-dev-all \
+    # Called by 4CAT:
+    git
+
+# Set working directory
+WORKDIR /usr/src/app
+
 # Copy project
-# (Copy example config first, if user has own config, it will replace this)
 COPY . /usr/src/app/
+
+# Permission
+RUN chmod +x docker/wait-for-backend.sh docker/docker-entrypoint.sh

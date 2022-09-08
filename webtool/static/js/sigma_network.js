@@ -1,465 +1,524 @@
-var sigmaconfig = {
-	defaultLabelColor: "#0e0e0e",
-	defaultNodeColor: "#CE1B28",
-	edgeColor: "default",
-	defaultEdgeColor: "#FFA5AC",
-	enableHovering: false,
-	defaultLabelAlignment: "right",
-	minEdgeSize: 0.1,
-	maxEdgeSize: 1,
-	minNodeSize: 5,
-	maxNodeSize: 20,
-	defaultLabelSize: 10,
-	labelSize: "fixed",
-	labelSizeRatio: 2,
-	labelThreshold: 3,
-	verbose: true
-};
+import {hsv2rgb, rgb2hsv, fetch_with_progress} from "./util.js";
 
-var fa2config = {
-	worker: true,
-	barnesHutOptimize: false,
-	barnesHutTheta: 0.5,
-	edgeWeightInfluence: 0,
-	scalingRatio: 1,
-	startingIterations: 10,
-	iterationsPerRender: 10,
-	strongGravityMode: false,
-	slowDown: 1,
-};
-
-var animation_running = false;
-var graph_manipulation_disabled = false;
-var current_json;
-
-// Create an empty, global sigma instance
-var s = new sigma({
-	container: 'graph-container',
-	settings: sigmaconfig
+const forceatlas2 = graphologyLibrary.layoutForceAtlas2;
+const circlepack = graphologyLibrary.layout.circlepack;
+const fa2worker = graphologyLibrary.FA2Layout;
+const noverlapworker = graphologyLibrary.NoverlapLayout;
+const palette = ["#0274e1", "#8fbd35", "#fe80ec", "#00aa4e", "#820017", "#00760e", "#c14218", "#ffac42"]
+const gradient = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0].map((fraction) => {
+    let base = rgb2hsv(206, 27, 40);  // 4cat red
+    base[1] = fraction;
+    return 'rgb(' + hsv2rgb(...base).map(v => parseInt(v)).join(', ') + ')';
 });
 
-function init_network(source_file) {
+const sigma_graph = {
+    // store the graph here
+    graph: null,
+    sigma: null,
 
-	render_new_network(source_file);
+    // metrics, to determine communities, et cetera
+    stats: {},
+    top_communities: null,
+    attribute_map: {},
 
-	// Notify what model is visualised here
-	$("#network-name-box").text(source_file.split("/").slice(-1));
+    // state, changed by user interaction
+    state: {hoveredNeighbors: undefined, hoveredNode: null},
 
+    /**
+     * Map nodes to top list of attribute values
+     *
+     * Determines the top x values of a given node attribute for all nodes,
+     * where x is the amount of colours available in the palette. In other
+     * words, this returns a list of values, and if a node has a value in the
+     * list, its colour should correspond to the palette entry of the same
+     * index as its position in that list.
+     *
+     * @param attribute  Name of the attribute to map
+     */
+    map_attribute: function (attribute) {
+        let values = {};
+        sigma_graph.graph.nodes().map((node) => {
+            let value = sigma_graph.graph.getNodeAttribute(node, attribute);
+            if (!(value in values)) {
+                values[value] = 0;
+            }
+            values[value] += 1;
+        });
+
+        // I hate javascript
+        let value_count = [...Object.values(values)];
+        value_count = value_count.sort((a, b) => a - b).reverse().slice(0, palette.length);
+        let top_values = []
+        let min_size = value_count.pop();
+        for (let num in values) {
+            if (values[num] >= min_size) {
+                top_values.push(String(num));
+            }
+        }
+        sigma_graph.attribute_map[attribute] = top_values.slice(0, palette.length);
+    },
+
+    /**
+     * Init SigmaJS graph
+     *
+     * Sets up the renderer and calls further init methods
+     */
+    init: function () {
+        let container = document.querySelector('#graph-container');
+        let source = container.getAttribute('data-source');
+
+        document.getElementById('loading').innerText = 'Downloading file...';
+
+        fetch_with_progress(source, function(downloaded, total) {
+                let pct = Math.round(downloaded / total * 100);
+                document.getElementById('loading').innerText ='Downloading file (' + pct + '%)';
+            })
+            .then((gexf) => {
+                // Parse GEXF string:
+                document.getElementById('loading').innerText = 'Initializing graph...';
+                sigma_graph.graph = graphologyLibrary.gexf.parse(graphology.Graph, gexf);
+
+                // first assign random positions, because the nodes need *an*
+                // initial position
+                graphologyLibrary.layout.random.assign(sigma_graph.graph);
+
+                // calculate some stats, which we can later use to cluster or
+                // highlight nodes, et cetera
+                let degrees = sigma_graph.graph.nodes().map(function (n) {
+                    return sigma_graph.graph.degree(n);
+                });
+                sigma_graph.stats.max_degree = Math.max(...degrees);
+                sigma_graph.stats.min_degree = Math.min(...degrees);
+
+                // always calculate the communities in the network with the
+                // Louvain algorithm, so we can colour nodes by community
+                graphologyLibrary.communitiesLouvain.assign(sigma_graph.graph, {resolution: 1});
+                this.map_attribute('community');
+
+                // start rendering!
+                sigma_graph.sigma = new Sigma(sigma_graph.graph, container, {
+                    minCameraRatio: 0.1,
+                    maxCameraRatio: 10,
+                    labelRenderedSizeThreshold: 1,
+
+                    /**
+                     * Label renderer
+                     *
+                     * Nothing too fancy, just a custom function to implement
+                     * degree-proportional node sizes
+                     *
+                     * @param context
+                     * @param data
+                     * @param settings
+                     */
+                    labelRenderer: function drawLabel(context, data, settings) {
+                        if (!data.label) return;
+
+                        let size = settings.labelSize,
+                            font = settings.labelFont,
+                            weight = settings.labelWeight,
+                            color = settings.labelColor.color;
+
+                        if (document.querySelector('#label-size-type').checked) {
+                            let range = size * 3;
+                            let ratio = (data.degree - sigma_graph.stats.min_degree) / (sigma_graph.stats.max_degree - sigma_graph.stats.min_degree);
+                            size += (ratio * range);
+                        }
+
+                        context.font = `${weight} ${size}px sans-serif`;
+                        context.fillStyle = color;
+                        context.fillText(data.label, data.x + data.size + 3, data.y + size / 3);
+                    },
+
+                    /**
+                     * Node reducer
+                     *
+                     * Colours node according to the required attribute, or
+                     * hides them if necessary
+                     *
+                     * @param node
+                     * @param data
+                     * @returns {*}
+                     */
+                    nodeReducer: function (node, data) {
+                        // hide nodes if they are
+                        let mode = document.getElementById('node-colouring').value;
+                        let threshold = parseFloat(document.querySelector('#min-degree').value);
+                        let degree = sigma_graph.graph.degree(node);
+                        threshold = sigma_graph.stats.min_degree + ((sigma_graph.stats.max_degree - sigma_graph.stats.min_degree) * threshold);
+
+                        if (degree < threshold) {
+                            // hide nodes completely if degree is too low
+                            data.hidden = true;
+
+                        } else if (sigma_graph.state.hoveredNeighbors && !sigma_graph.state.hoveredNeighbors.has(node) && sigma_graph.state.hoveredNode !== node) {
+                            // make nodes gray and transparent if they are not the hovered node or its neighbour
+                            data.color = 'rgba(246, 246, 246, 128)';
+                            data.label = '';
+
+                        } else if (mode.indexOf('attribute-') === 0) {
+                            // use attribute to give node a distinct partition colour
+                            let attribute = mode.split('attribute-').pop();
+                            if (!(attribute in sigma_graph.attribute_map)) {
+                                sigma_graph.map_attribute(attribute);
+                            }
+                            let value = String(data[attribute]);
+                            let index = sigma_graph.attribute_map[attribute].indexOf(value);
+                            if (index !== -1) {
+                                data.color = palette[index];
+                            } else {
+                                data.color = 'rgb(192, 192, 192)';
+                            }
+
+                        } else if (mode === 'degree') {
+                            // use degree to colour node more or less bright
+                            let ratio = (degree - sigma_graph.stats.min_degree) / (sigma_graph.stats.max_degree - sigma_graph.stats.min_degree);
+                            let index = Math.round(ratio * gradient.length);
+                            data.color = gradient[index];
+                        }
+
+                        data.degree = degree;
+                        return data;
+                    },
+
+                    /**
+                     * Edge reducer
+                     *
+                     * Simply hide edge for unhovered nodes, if one is hovered
+                     * @param edge
+                     * @param data
+                     * @returns {*}
+                     */
+                    edgeReducer: function(edge, data) {
+                        if (sigma_graph.state.hoveredNode && !sigma_graph.graph.hasExtremity(edge, sigma_graph.state.hoveredNode)) {
+                            data.hidden = true;
+                        }
+                        return data;
+                    }
+                });
+
+                sigma_graph.register_handlers();
+                document.getElementById('loading').remove();
+            });
+    },
+
+    /**
+     * Register event handlers
+     *
+     * Sets up the interactive controls and graph manipulation
+     */
+    register_handlers: function () {
+        document.getElementById('start-layout').addEventListener('click', sigma_graph.layout.toggle);
+        document.querySelectorAll('#network-settings input').forEach(function (control) {
+            control.addEventListener('input', () => { sigma_graph[sigma_graph.layout.layout].update_settings(); });
+        })
+
+        document.getElementById('graph-layout').addEventListener('input', sigma_graph.layout.change);
+
+        document.querySelectorAll('#visual-settings input, #visual-settings select').forEach(function (control) {
+            control.addEventListener('input', sigma_graph.update_visual_settings);
+        })
+
+        //highlight neighbours of hovered node
+        sigma_graph.sigma.on("enterNode", ({node}) => {
+            sigma_graph.set_hovered(node);
+        });
+        sigma_graph.sigma.on("leaveNode", () => {
+            sigma_graph.set_hovered(undefined);
+        });
+
+        // figure out categories we can colour by
+        let extra_categories = [];
+        sigma_graph.graph.forEachNode((node) => {
+            let attributes = sigma_graph.graph.getNodeAttributes(node);
+            for (let attribute in attributes) {
+                if (['label', 'x', 'y', 'community'].indexOf(attribute) === -1 && extra_categories.indexOf(attribute) === -1) {
+                    extra_categories.push(attribute);
+                }
+            }
+        });
+        extra_categories.forEach((category) => {
+            let option = document.createElement('option');
+            option.setAttribute('value', 'attribute-' + category);
+            option.innerText = 'Node attribute: ' + category;
+            document.getElementById('node-colouring').appendChild(option);
+        })
+
+
+        sigma_graph.update_visual_settings();
+    },
+
+    /**
+     * Set hovered nodes
+     *
+     * Used in the node and edge reducers to hide far away nodes when the user
+     * hovers one
+     *
+     * @param node
+     */
+    set_hovered: function(node) {
+        if (node) {
+            sigma_graph.state.hoveredNode = node;
+            sigma_graph.state.hoveredNeighbors = new Set(sigma_graph.graph.neighbors(node));
+        } else {
+            sigma_graph.state.hoveredNode = undefined;
+            sigma_graph.state.hoveredNeighbors = undefined;
+        }
+
+        // Refresh rendering:
+        sigma_graph.sigma.refresh();
+    },
+
+    /**
+     * Update renderer settings
+     *
+     * Changes the SigmaJS settings for node, edge aesthetics based on the
+     * values entered in the interface.
+     */
+    update_visual_settings: function () {
+        sigma_graph.sigma.setSetting("labelRenderedSizeThreshold", document.getElementById('label-threshold').value);
+        //sigma_graph.sigma.setSetting("labelSize", document.querySelector('#label-size').value);
+        sigma_graph.sigma.setSetting("labelColor", {color: document.getElementById('label-colour').value});
+
+        // node sizes
+        let min_size = parseFloat(document.getElementById('min-node-size').value);
+        let max_size = parseFloat(document.getElementById('max-node-size').value);
+        sigma_graph.graph.forEachNode((node) => {
+            let degree = sigma_graph.graph.degree(node);
+            let range = max_size - min_size;
+            let ratio = (degree - sigma_graph.stats.min_degree) / (sigma_graph.stats.max_degree - sigma_graph.stats.min_degree);
+            let size = min_size + (ratio * range);
+            sigma_graph.graph.setNodeAttribute(node, "size", size,);
+        });
+
+        let show_edges = document.getElementById('show-edges').checked;
+        let edge_colour = show_edges ? document.getElementById('edge-colour').value : 'rgba(0, 0, 0, 255)';
+        sigma_graph.sigma.setSetting("defaultEdgeColor", edge_colour);
+
+        let show_nodes = document.getElementById('show-nodes').checked;
+        let node_color = show_nodes ? document.getElementById('node-colour').value : 'rgba(0, 0, 0, 255)';
+        sigma_graph.sigma.setSetting("defaultNodeColor", node_color);
+
+        sigma_graph.sigma.refresh();
+    },
+
+    /**
+     * Layout options
+     */
+    layout: {
+        layout: 'fa2',
+
+        /**
+         * Toggle layout, i.e. start or stop the application of it.
+         */
+        toggle: function () {
+            sigma_graph[sigma_graph.layout.layout].toggle();
+        },
+
+        /**
+         * Change active layout
+         *
+         * Stops and un-initialises the currently active layout and activates
+         * the one newly chosen.
+         */
+        change: function () {
+            let choice = document.getElementById('graph-layout').value;
+            if (choice !== sigma_graph.layout.layout) {
+                if (sigma_graph[sigma_graph.layout.layout].hasOwnProperty('uninit')) {
+                    console.log('Uniniting ' + sigma_graph.layout.layout)
+                    sigma_graph[sigma_graph.layout.layout].uninit();
+                }
+                document.querySelectorAll('.layout-parameters').forEach((element) => {
+                    if (element.getAttribute('data-layout') !== choice) {
+                        element.style.display = 'none';
+                    } else {
+                        element.style.display = 'block';
+                    }
+                });
+                sigma_graph.layout.layout = choice;
+                sigma_graph[choice].init();
+            }
+
+        }
+    },
+
+    /**
+     * ForceAtlas 2 layout
+     */
+    fa2: {
+        have_init: false,
+        layout: null,
+        continuous: true,
+
+        init: function () {
+            const settings = forceatlas2.inferSettings(sigma_graph.graph);
+            sigma_graph.fa2.layout = new fa2worker(sigma_graph.graph, {
+                settings: sigma_graph.fa2.get_settings()
+            });
+            sigma_graph.fa2.have_init = true;
+            document.querySelector('#start-layout span').innerHTML = '<i class="fa fa-play"></i> Start ForceAtlas2';
+        },
+
+        start: function () {
+            if (!sigma_graph.fa2.have_init) {
+                sigma_graph.fa2.init();
+            }
+
+            sigma_graph.fa2.layout.start();
+            document.querySelector('#start-layout span').innerHTML = '<i class="fa fa-sync fa-spin"></i> Stop ForceAtlas2';
+        },
+
+        stop: function () {
+            sigma_graph.fa2.layout.stop();
+            document.querySelector('#start-layout span').innerHTML = '<i class="fa fa-play"></i> Start ForceAtlas2';
+        },
+
+        toggle: function () {
+            if (sigma_graph.fa2.layout && sigma_graph.fa2.layout.isRunning()) {
+                sigma_graph.fa2.stop();
+            } else {
+                sigma_graph.fa2.start();
+            }
+        },
+
+        uninit: function () {
+            if (sigma_graph.fa2.have_init) {
+                sigma_graph.fa2.layout.kill();
+                sigma_graph.fa2.have_init = false;
+            }
+        },
+
+        update_settings() {
+            if (!sigma_graph.fa2.have_init) {
+                sigma_graph.fa2.init();
+            }
+
+            let is_running = sigma_graph.fa2.layout.isRunning();
+
+            sigma_graph.fa2.uninit();
+
+            if (is_running) {
+                sigma_graph.fa2.start();
+            } else {
+                sigma_graph.fa2.init();
+            }
+        },
+
+        get_settings: function () {
+            return {
+                adjustSizes: document.getElementById('adjust-sizes').checked,
+                barnesHutOptimize: document.getElementById('barnes-hut-optimise').checked,
+                barnesHutTheta: parseFloat(document.getElementById('barnes-hut-theta').value),
+                edgeWeightInfluence: parseFloat(document.getElementById('edge-weight-influence').value),
+                gravity: parseFloat(document.getElementById('gravity').value),
+                linLogMode: document.getElementById('linlog-mode').checked,
+                outboundAttractionDistribution: document.getElementById('outbound-attraction-distribution').checked,
+                scalingRatio: parseFloat(document.getElementById('scaling-ratio').value),
+                slowDown: parseFloat(document.getElementById('slow-down').value),
+                strongGravityMode: document.getElementById('strong-gravity').checked
+            }
+        }
+    },
+
+    /**
+     * Noverlap layout
+     *
+     * Mostly a copy of the ForceAtlas 2 methods, apart from get_settings
+     */
+    noverlap: {
+        have_init: false,
+        layout: null,
+        continuous: true,
+
+        init: function () {
+            const settings = forceatlas2.inferSettings(sigma_graph.graph);
+            sigma_graph.noverlap.layout = new noverlapworker(sigma_graph.graph, {
+                settings: sigma_graph.noverlap.get_settings()
+            });
+            sigma_graph.noverlap.have_init = true;
+            document.querySelector('#start-layout span').innerHTML = '<i class="fa fa-play"></i> Start Noverlap';
+        },
+
+        start: function () {
+            if (!sigma_graph.noverlap.have_init) {
+                sigma_graph.noverlap.init();
+            }
+
+            sigma_graph.noverlap.layout.start();
+            document.querySelector('#start-layout span').innerHTML = '<i class="fa fa-sync fa-spin"></i> Stop Noverlap';
+        },
+
+        stop: function () {
+            sigma_graph.noverlap.layout.stop();
+            document.querySelector('#start-layout span').innerHTML = '<i class="fa fa-play"></i> Start Noverlap';
+        },
+
+        toggle: function () {
+            if (sigma_graph.noverlap.layout && sigma_graph.noverlap.layout.isRunning()) {
+                sigma_graph.noverlap.stop();
+            } else {
+                sigma_graph.noverlap.start();
+            }
+        },
+
+        uninit: function () {
+            if (sigma_graph.noverlap.have_init) {
+                sigma_graph.noverlap.layout.kill();
+                sigma_graph.noverlap.have_init = false;
+            }
+        },
+
+        update_settings() {
+            if (!sigma_graph.noverlap.have_init) {
+                sigma_graph.noverlap.init();
+            }
+
+            let is_running = sigma_graph.noverlap.layout.isRunning();
+
+            sigma_graph.noverlap.uninit();
+
+            if (is_running) {
+                sigma_graph.noverlap.start();
+            } else {
+                sigma_graph.noverlap.init();
+            }
+        },
+
+        get_settings: function () {
+            return {
+                gridSize: parseFloat(document.getElementById('noverlap-grid-size').value),
+                margin: parseFloat(document.getElementById('noverlap-margin').value),
+                expansion: parseFloat(document.getElementById('noverlap-expansion').value),
+                ratio: parseFloat(document.getElementById('noverlap-ratio').value),
+                speed: parseFloat(document.getElementById('noverlap-speed').value)
+            }
+        }
+    },
+
+    /**
+     * Circle pack layout
+     *
+     * Simple!
+     */
+    circlepack: {
+        have_init: false,
+        continuous: false,
+
+        init: function () {
+            document.querySelector('#start-layout span').innerHTML = '<i class="fa fa-shapes"></i> Apply Circle Pack';
+        },
+
+        toggle: function () {
+            circlepack.assign(sigma_graph.graph, {
+                hierarchyAttributes: ['degree', 'community']
+            });
+        }
+    }
 }
 
-function render_new_network(source_file) {
-	
-	// Load the gexf file into the existing sigma instance
-	sigma.parsers.gexf(
-		source_file,
-		s,
-		function() {
-			s.refresh()
-		}
-	);
+// run it....
+if (document.readyState !== 'loading') {
+    sigma_graph.init();
+} else {
+    document.addEventListener('DOMContentLoaded', sigma_graph.init);
 }
-
-function change_network(update_json) {
-	/*
-	DEPRACATED: Dynamic changing of networks not supported at the moment.
-
-	Changes the network layout without rendering an entirely new graph.
-	Also makes for nice transitions so graphs can be "animated".
-	*/
-
-	// Get data that's already in the graph
-	var existing_nodes_ids = s.graph.nodes().map(value => value.id);
-
-	// Keep track of the edges and nodes added to know what to remove afterwards
-	var nodes_added = [];
-	var edges_added = [];
-
-	var restart_fa2 = false;
-
-	// FA2 will have to be killed if we're changing the graph's nodes and edges
-	if (s.isForceAtlas2Running) {
-		var restart_fa2 = true;
-		stop_force_atlas();
-	}
-	s.killForceAtlas2();
-
-	// Loop through new nodes
-	for (var i = 0; i < update_json["nodes"].length; i++) {
-
-		node = update_json["nodes"][i];
-		nodes_added.push(node["id"]);
-
-		// If the node is not in the graph yet, add it!
-		if (! existing_nodes_ids.includes(node["id"])) {
-			s.graph.addNode({
-				id: node["id"],
-				size: node["size"],
-				label: node["label"],
-				x: (Math.random() * 20), // random between 0 and 20
-				y: (Math.random() * 20)
-			});
-		}
-		// If it's already in there, possibly change its attributes
-		else {
-			// Only size for now
-			s.graph.nodes(node["id"]).size = parseFloat(node["size"]);
-		}
-	}
-
-	// Clean nodes and edges that are not in the new network
-	for (node_id of existing_nodes_ids) {
-		if (! nodes_added.includes(node_id)) {
-			delete_node_ids.push(node_id)
-			s.graph.dropNode(node_id); // also removes edges!
-		}
-	}
-
-	// Loop through new edges
-	var existing_edges_ids = s.graph.edges().map(value => value.id);
-
-	for (var i = 0; i < update_json["edges"].length; i++) {
-
-		edge = update_json["edges"][i];
-		edges_added.push(edge["id"]);
-
-		// If the edge is not in the graph yet, add it!
-		if (! existing_edges_ids.includes(edge["id"])) {
-			s.graph.addEdge({
-				id: edge["id"],
-				label: edge["label"],
-				size: edge["size"],
-				source: edge["source"],
-				target: edge["target"]
-			});
-		}
-		// If it's already in there, change its attributes
-		else {
-			// Only size for now
-			s.graph.edges(edge["id"]).size = parseFloat(edge["size"]);
-		}
-	}
-	
-	s.refresh();
-
-	if (restart_fa2) {
-		start_force_atlas();
-	}
-}
-
-function min_degree_filter(min_degree) {
-	/*
-	Filters the json of the network for a minimum degree range
-	(where degree refers to the amount of edges a node has)
-	*/
-
-	// FA2 will have to be killed if we're changing the graph's nodes and edges
-	if (s.isForceAtlas2Running) {
-		var restart_fa2 = true;
-		stop_force_atlas();
-	}
-	s.killForceAtlas2();
-
-	var min_degree = parseInt(min_degree);
-
-	// Loop through nodes
-	s.graph.nodes().forEach(function(node){
-
-		// Node is a reference to your node in the graph
-		degree = s.graph.degree(node.id);
-		
-		if (degree < min_degree) {
-			node.hidden = true;
-		}
-		else {
-			node.hidden = false;
-		}
-	});
-
-	s.refresh();
-}
-
-function create_slider(length) {
-	// Creates an HTML slider based on the amount of w2v models returned from the server
-	// Remove the old slider if it exists
-
-	// Hide the date change slider and animate buttons if there's only one model
-	if (length < 2) {
-		$("#slider-container").hide();
-	}
-	else {
-		$("#time-slider").attr("max", length);
-	}
-}
-
-function toggle_force_atlas() {
-	/*
-	Start/stop the ForceAtlas2 algorithm from running
-	*/
-
-	if (s.isForceAtlas2Running()) {
-		$("#start-force").removeClass("running");
-		$("#start-force > .button-text").text("Start ForceAtlas2");
-		$("#start-force > i").addClass("invisible");
-		s.stopForceAtlas2();
-	}
-	else {
-		$("#start-force").addClass("running");
-		$("#start-force > .button-text").text("Stop ForceAtlas2");
-		$("#start-force > i").removeClass("invisible");
-		s.startForceAtlas2(fa2config);
-	}
-}
-
-function stop_force_atlas() {
-	$("#start-force").removeClass("running");
-	$("#start-force > .button-text").text("Start ForceAtlas2");
-	$("#start-force > i").addClass("invisible");
-	s.stopForceAtlas2();
-}
-
-function start_force_atlas() {
-	$("#start-force").addClass("running");
-	$("#start-force > .button-text").text("Stop ForceAtlas2");
-	$("#start-force > i").removeClass("invisible");
-	s.startForceAtlas2(fa2config);
-}
-
-function change_date(index) {
-	/*
-	DEPRACATED: Dynamic changing of networks not supported at the moment.
-	Change the nodes in the graph on the basis of a new object
-	*/
-
-	$("#network-name-box").text(Object.keys(core_json)[index]);
-
-	change_network(core_json[Object.keys(core_json)[index]]);
-}
-
-function start_animation(json, index) {
-	/*
-	DEPRACATED: Dynamic changing of networks not supported at the moment.
-	Animate networks over time
-	*/
-
-	animation_running = true;
-	graph_manipulation_disabled = true;
-
-	$("#btn-animate-slider > i").removeClass("invisible");
-	$("#btn-animate-slider > .button-text").text("Stop animation");
-
-	date_amount = Object.keys(json).length;
-	current_date = index;
-
-	// Initiate new graphs every 3 seconds
-	animate_network = setInterval(function() {
-
-		// Trigger the slider to change
-		current_date++;
-		$("#time-slider").val(current_date)
-
-		// Change the network
-		change_date(current_date - 1)
-
-		// Stop if we're at the last graph
-		if (current_date >= date_amount) {
-			stop_animation();
-		}
-
-		}, 3000);
-	}
-
-function stop_animation() {
-	/*
-	DEPRACATED: Dynamic changing of networks not supported at the moment.
-	Stop the network animation
-	*/
-
-	animation_running = false;
-	graph_manipulation_disabled = false;
-	clearInterval(animate_network);
-	$("#btn-animate-slider > i").addClass("invisible");
-	$("#btn-animate-slider > .button-text").text("Start animation");
-}
-
-function change_graph_settings(e) {
-	/*
-	Change the graph settings on user input
-	*/
-
-	// Some content validation - make sure number inputs are actually numbers
-	if (e.type == "number") {
-		e_value = parseFloat(e.value);
-
-		if (isNaN(e_value)) {
-			$("#parameter-alert-box").text("Invalid value for " + e.name)
-			setInterval(function() {
-				$("#parameter-alert-box").text("")
-			}, 5000);
-			return
-		}
-	}
-
-	/* Switch for various inputs */
-	switch(e.name) {
-
-		/* Force Atlas 2 settings */
-		case "gravity":
-		fa2config["gravity"] = e_value;
-		break;
-
-		case "strong-gravity":
-		fa2config["strongGravityMode"] = e.checked;
-		break;
-
-		case "edge-weight-influence":
-		fa2config["edgeWeightInfluence"] = e_value;
-		break;
-
-		case "scaling-ratio":
-		fa2config["scalingRatio"] = e_value;
-		break;
-
-		case "linlog-mode":
-		fa2config["linLogMode"] = e.checked;
-		break;
-
-		case "outbound-attraction-distribution":
-		fa2config["outboundAttractionDistribution"] = e.checked;
-		break;
-
-		case "adjust-sizes":
-		fa2config["adjustSizes"] = e.checked;
-		break;
-
-		case "barnes-hut-optimise":
-		fa2config["barnesHutOptimize"] = e.checked;
-		break;
-
-		case "barnes-hut-theta":
-		fa2config["barnesHutTheta"] = e_value;
-		break;
-
-		case "slow-down":
-		fa2config["slowDown"] = e_value;
-		
-		/* Visual settings */
-
-		/* labels */
-		case "show-labels":
-		s.settings("drawLabels", e.checked);
-		break;
-
-		case "label-size":
-		s.settings("labelSizeRatio", e.value);
-		break;
-
-		case "label-size-type":
-		if (e.checked) {
-			s.settings("labelSize", "proportional");
-		}
-		else {
-			s.settings("labelSize", "fixed");
-		}
-		break;
-
-		case "label-threshold":
-		s.settings("labelThreshold", e.value);
-		break;
-
-		case "label-colour":
-		s.settings("defaultLabelColor", e.value);
-		break;
-
-		/* nodes and edges */
-		case "min-degree":
-		min_degree_filter(e.value)
-		break;
-
-		case "min-node-size":
-		s.settings("minNodeSize", e_value);
-		break;
-
-		case "max-node-size":
-		s.settings("maxNodeSize", e_value);
-		break;
-
-		case "min-edge-size":
-		s.settings("minEdgeSize", e_value);
-		break;
-
-		case "min-edge-size":
-		s.settings("minEdgeSize", e_value);
-		break;
-
-		case "node-colour":
-		s.settings("defaultNodeColor", e.value);
-		break;
-
-		case "edge-colour":
-		s.settings("defaultEdgeColor", e.value);
-		break;
-
-		default:
-	}
-	
-	// Re-initialise
-	s.configForceAtlas2(fa2config);
-	s.refresh();
-
-}
-
-function disable_graph_manipulation() {
-	/*
-	Disable manipulating the graph, e.g. with edge sizes.
-	*/
-}
-
-function save_to_svg() {
-	/*
-	Saves the graph to an SVG file.
-	*/
-	
-	s.toSVG({
-		labels: true,
-		classes: false,
-		data: true,
-		download: true,
-		filename: $("#file-name").val()
-	});
-}
-
-/* Handlers */
-
-// ForceAtlas2 toggle button
-$("#start-force").on("click", function(){
-	toggle_force_atlas();
-});
-
-// Update the network if the slider changes
-$("#slider-container").on("change", "#time-slider", function(){
-	if (animation_running) {
-		stop_animation();
-	}
-	change_date((this.value - 1));
-});
-
-// Animate network animation
-$("#slider-container").on("click", "#btn-animate-slider", function(){
-	if (!animation_running) {
-		var slider_value = $("#time-slider").val();
-		start_animation(core_json, slider_value);
-	}
-	else {
-		stop_animation();
-	}
-});
-
-// Change network settings / looks
-$(".parameter-input").on("change", function(){
-	change_graph_settings(this);
-});
-
-// Save to csv button
-$("#save-svg").on("click", function(){
-	save_to_svg();
-});

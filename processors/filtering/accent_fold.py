@@ -90,11 +90,12 @@ class AccentFoldingFilter(BasicProcessor):
                 if processed_items % 500 == 0:
                     self.dataset.update_status(
                         "Processed %i/%i items" % (processed_items, self.source_dataset.num_rows))
+                    self.dataset.update_progress((processed_items / self.source_dataset.num_rows))
 
                 for field in columns:
                     if type(item[field]) is not str:
                         continue
-                        
+
                     value = folding_method(item[field], errors="preserve")
                     item[field] = value
 

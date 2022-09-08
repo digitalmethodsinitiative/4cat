@@ -95,6 +95,7 @@ class HatebaseAnalyser(BasicProcessor):
 				processed += 1
 				if processed % 1000 == 0:
 					self.dataset.update_status("Processing post %i" % processed)
+					self.dataset.update_progress(processed / self.source_dataset.num_rows)
 				row = {**post, **{
 					"hatebase_num": 0,
 					"hatebase_num_ambiguous": 0,

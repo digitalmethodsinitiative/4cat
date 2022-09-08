@@ -259,8 +259,11 @@ class RankFlowRenderer(BasicProcessor):
 		flow_ids = {}
 
 		# go through all periods and draw boxes and flows
+		processed = 0
 		for period in items:
 			self.dataset.update_status("Rendering items for period %s" % period)
+			self.dataset.update_progress(processed / len(items))
+			processed += 1
 			# reset Y coordinate, i.e. start at top
 			box_start_y = margin_height + (fontsize_normal * 1.5)
 

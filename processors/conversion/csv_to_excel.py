@@ -5,6 +5,7 @@ import csv
 
 from backend.abstract.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
+from common.lib.dataset import DataSet
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -30,8 +31,13 @@ class ConvertCSVToMacExcel(BasicProcessor):
 
 		:param module: Dataset or processor to determine compatibility with
 		"""
-		
-		return module.get_extension() in ["csv", "ndjson"] and module.type != cls.type
+		if module.type == cls.type:
+			return False
+
+		if module.get_extension() == "csv":
+			return True
+		elif module.get_extension() == "ndjson":
+			return (module.__class__ is DataSet and hasattr(module.get_own_processor(), "map_item")) or hasattr(module, "map_item")
 
 	def process(self):
 		"""

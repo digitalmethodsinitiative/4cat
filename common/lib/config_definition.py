@@ -174,19 +174,22 @@ config_definition = {
         "type": UserInput.OPTION_TEXT,
         "default": "localhost",
         "help": "Host name",
-        "tooltip": "e.g., my4CAT.com, localhost, 127.0.0.1. Default is localhost; For Docker PUBLIC_PORT is set in your .env file",
+        "tooltip": "e.g., my4CAT.com, localhost, 127.0.0.1. Default is localhost; when running 4CAT in Docker this "
+                   "setting is ignored as any domain/port binding should be handled outside of the Docker container"
+                   "; the Docker container itself will serve on any domain name on the port configured in the .env "
+                   "file."
     },
     "flask.autologin.hostnames": {
         "type": UserInput.OPTION_TEXT_JSON,
         "default": '["localhost"]',
         "help": "White-listed hostnames",
-        "tooltip": "A list of host names to automatically log in. Docker should include localhost and Server Name",
+        "tooltip": "A list of host names or IP addresses to automatically log in. Docker should include localhost and Server Name",
     },
     "flask.autologin.api": {
         "type": UserInput.OPTION_TEXT_JSON,
         "default": '["localhost"]',
         "help": "White-list for API",
-        "tooltip": "Host names to always allow access to API endpoints. Docker should include localhost and Server Name",
+        "tooltip": "A list of host names or IP addresses to allow access to API endpoints with no rate limiting. Docker should include localhost and Server Name",
     },
     "flask.https": {
         "type": UserInput.OPTION_TOGGLE,
@@ -198,7 +201,7 @@ config_definition = {
         "type": UserInput.OPTION_TEXT,
         "default": "Automatic login",
         "help": "Auto-login name",
-        "tooltip": "User Name for whitelisted hosts",
+        "tooltip": "Username for whitelisted hosts (automatically logged in users see this name for themselves)",
     },
     "flask.secret_key": {
         "type": UserInput.OPTION_TEXT,
@@ -236,5 +239,7 @@ categories = {
     "mail": "Mail settings & credentials",
     "logging": "Logging settings",
     "path": "File paths",
-    "DATASOURCES": "Data source configuration"
+    "DATASOURCES": "Data source configuration",
+    'image_downloader': 'Image downloader',
+    'text_from_images': 'OCR: Text from images',
 }

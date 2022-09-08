@@ -1,0 +1,62 @@
+{% extends "layout.html" %}
+
+{% block title %}Restart/Upgrade 4CAT{% endblock %}
+{% block body_class %}plain-page frontpage admin {{ body_class }}{% endblock %}
+
+{% block body %}
+    <article class="small">
+        <section>
+            <h2><span>Restart/Upgrade 4CAT</span></h2>
+
+            {% for notice in flashes %}
+                <p class="form-notice">{{ notice|safe }}</p>
+            {% endfor %}
+
+            <p>Use the buttons below to restart or upgrade 4CAT. Restarting will stop and start the backend daemon and
+                attempt to trigger a restart of the web interface.</p>
+
+            <p>Upgrading will pull the latest release from the 4CAT GitHub repository (you can configure a different URL
+                in the 4CAT settings). If the release is newer than the code currently running, it will be installed and
+                4CAT will be upgraded to the newest version. Afterwards 4CAT will be restarted and if necessary the
+                relevant upgrade scripts will be run with default settings.</p>
+
+            <p>Restarting is relatively safe, upgrading always has a risk of breaking things. The web interface may be
+                unresponsive during the process. Do not refresh the page until it is finished. This may take op to ten
+                minutes.</p>
+
+            <p>Don't upgrade on Friday afternoons :-)</p>
+
+            <p>You are currently running 4CAT version <code>{{ current_version }}</code>.<br>
+                The latest release available is <code>{{ tagged_version }}</code>.</p>
+
+            <p>{% if in_progress %}
+                    A restart or upgrade is currently in progress.
+                {% elif can_upgrade %}
+                    You can upgrade 4CAT.
+                {% else %}
+                    No upgrades are currently available.
+                {% endif %}</p>
+
+            <form action="{{ url_for("trigger_restart") }}" method="POST" class="button-container">
+                <button name="action" value="restart"{% if in_progress %} disabled="disabled"{% endif %}>
+                    <i class="fa fa-power-off" aria-hidden="true"></i> Restart
+                </button>
+
+                {% if can_upgrade %}
+                    <button name="action" value="upgrade"{% if in_progress %} disabled="disabled"{% endif %}>
+                        <i class="fa fa-wrench" aria-hidden="true"></i> Upgrade (danger!)
+                    </button>
+                {% endif %}
+            </form>
+        </section>
+
+        <section>
+            <h2><span>Process log</span></h2>
+            <p>Below is the contents of <code>restart.log</code>. Check the timestamp at the top as this may also show
+                the log of a previous restart/upgrade attempt.</p>
+            <pre id="upgrade-log" class="content-container" data-source="{{ url_for("restart_log") }}" data-interval="3">
+                Process output will be logged here.
+            </pre>
+        </section>
+    </article>
+{% endblock %}

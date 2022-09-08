@@ -37,13 +37,15 @@ else
   echo "Creating Database"
   # Seed DB
   cd /usr/src/app && psql --host=db --port=5432 --user=$POSTGRES_USER --dbname=$POSTGRES_DB < backend/database.sql
+  # No database exists, new build, no need to migrate so create .current-version file
+  cp VERSION config/.current-version
 fi
+
+# Run migrate prior to setup (old builds pre 1.26 may not have config_manager)
+python3 helper-scripts/migrate.py -y
 
 # Run docker_setup to update any environment variables if they were changed
 python3 docker/docker_setup.py
-
-echo 'Starting app'
-cd /usr/src/app
 
 echo 'Starting app'
 echo "4CAT is accessible at:"

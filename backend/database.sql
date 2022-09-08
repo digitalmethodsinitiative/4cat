@@ -46,6 +46,7 @@ CREATE TABLE IF NOT EXISTS datasets (
   timestamp         integer,
   status            text,
   num_rows          integer DEFAULT 0,
+  progress          float DEFAULT 0.0,
   is_finished       boolean DEFAULT FALSE,
   is_private        boolean DEFAULT TRUE,
   software_version  text,
@@ -104,6 +105,25 @@ CREATE UNIQUE INDEX IF NOT EXISTS unique_favourite
   ON users_favourites (
     name,
     key
+  );
+
+-- notifications
+CREATE TABLE IF NOT EXISTS users_notifications (
+    id                  SERIAL PRIMARY KEY,
+    username            TEXT,
+    notification        TEXT,
+    timestamp_expires   INTEGER,
+    allow_dismiss       BOOLEAN DEFAULT TRUE
+);
+
+CREATE INDEX IF NOT EXISTS users_notifications_name
+  ON users_notifications (
+    username
+  );
+
+CREATE UNIQUE INDEX IF NOT EXISTS users_notifications_unique
+  ON users_notifications (
+    username, notification
   );
 
 -- used to quickly update table counts

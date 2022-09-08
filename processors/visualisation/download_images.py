@@ -64,6 +64,17 @@ class ImageDownloader(BasicProcessor):
 		}
 	}
 
+	config = {
+		"image_downloader.MAX_NUMBER_IMAGES": {
+			"type": UserInput.OPTION_TEXT,
+			"coerce_type": int,
+			"default": 1000,
+			"help": "Max images to download",
+			"tooltip": "Only allow downloading up to this many images per batch. Increasing this can easily lead to "
+					   "very long-running processors and large datasets."
+		}
+	}
+
 	@classmethod
 	def get_options(cls, parent_dataset=None, user=None):
 		"""
@@ -120,7 +131,7 @@ class ImageDownloader(BasicProcessor):
 		split_comma = self.parameters.get("split-comma", False)
 
 		if amount == 0:
-			amount = self.max_number_images
+			amount = config.get('image_downloader.MAX_NUMBER_IMAGES', 1000)
 		columns = self.parameters.get("columns")
 
 		# is there anything for us to download?
@@ -170,7 +181,7 @@ class ImageDownloader(BasicProcessor):
 			item_index += 1
 
 			if item_index % 50 == 0:
-				self.dataset.update_status("Extracting image links from post %i/%i" % (item_index, self.source_dataset.num_rows))
+				self.dataset.update_status("Extracting image links from item %i/%i" % (item_index, self.source_dataset.num_rows))
 
 			# loop through all columns and process values for item
 			for column in columns:
@@ -243,7 +254,8 @@ class ImageDownloader(BasicProcessor):
 
 			processed_urls += 1
 			self.dataset.update_status("Downloaded %i/%i images; downloading from %s" %
-									   (downloaded_images, len(urls), url))
+									   (downloaded_images, amount, url))
+			self.dataset.update_progress(downloaded_images / amount)
 
 			try:
 				# acquire image
@@ -316,7 +328,7 @@ class ImageDownloader(BasicProcessor):
 		metadata = {
 			url: {
 				"filename": url_file_map.get(url),
-				"success": url not in failures,
+				"success": not url_file_map.get(url) is None and url not in failures, # skipped and fails are NOT success
 				"from_dataset": self.source_dataset.key,
 				"post_ids": urls[url]
 			} for url in urls
@@ -531,4 +543,8 @@ class ImageDownloader(BasicProcessor):
 			else:
 				self.dataset.log("Error: ConnectionError while trying to download image %s: %s" % (url, e))
 				raise FileNotFoundError()
+		except requests.exceptions.InvalidSchema:
+			# not an http url, just skip
+			raise FileNotFoundError()
+
 		return response
