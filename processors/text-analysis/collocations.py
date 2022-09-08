@@ -117,12 +117,12 @@ class GetCollocations(BasicProcessor):
 			min_frequency = int(self.parameters.get("min_frequency", 0))
 		except (ValueError, TypeError) as e:
 			min_frequency = 0
-		 
+
 		query_string = self.parameters.get("query_string", "").replace(" ", "")
 
 		# n_size smaller than window_size does not make sense
 		n_size = min(n_size, window_size)
-		
+
 		if query_string:
 			query_string = query_string.lower().split(',')
 		else:
@@ -144,6 +144,9 @@ class GetCollocations(BasicProcessor):
 
 		# Go through all archived token sets and generate collocations for each
 		for token_file in self.iterate_archive_contents(self.source_file):
+			if token_file.name == '.token_metadata.json':
+				# Skip metadata
+				continue
 			# we support both pickle and json dumps of vectors
 			token_unpacker = pickle if token_file.suffix == "pb" else json
 
@@ -240,10 +243,10 @@ class GetCollocations(BasicProcessor):
 		:param str, forbidden_words:	possible list of words to exclude from the results
 		:param bool, unique:			Whether to filter for unique collocations per post.
 
-		:return: list of tuples with collocations 
-		
+		:return: list of tuples with collocations
+
 		"""
-		
+
 		# Two-word collocations (~ bigrams)
 		if n_size == 2:
 			finder = BigramCollocationFinder.from_words(tokens, window_size=window_size)
@@ -256,7 +259,7 @@ class GetCollocations(BasicProcessor):
 				# Filter out two times the occurance of the same query string
 				duplicate_filter = lambda w1, w2: (w1 in query_string and w2 in query_string)
 				finder.apply_ngram_filter(duplicate_filter)
-			
+
 			# Filter out forbidden words
 			if forbidden_words:
 				forbidden_words_filter = lambda w1, w2: any(string in (w1, w2) for string in forbidden_words)
@@ -270,7 +273,7 @@ class GetCollocations(BasicProcessor):
 			if query_string:
 				word_filter = lambda w1, w2, w3: not any(string in (w1, w2, w3) for string in query_string)
 				finder.apply_ngram_filter(word_filter)
-			
+
 			# Filter out forbidden words
 			if forbidden_words:
 				forbidden_words_filter = word_filter = lambda w1, w2, w3: any(string in (w1, w2, w3) for string in forbidden_words)

@@ -21,7 +21,7 @@ __email__ = "4cat@oilab.eu"
 
 class TfIdf(BasicProcessor):
 	"""
-	
+
 	Get tf-idf terms
 
 	"""
@@ -106,12 +106,12 @@ class TfIdf(BasicProcessor):
 		library = self.parameters.get("library", "gensim")
 
 		if "-" not in self.parameters.get("n_size"):
-			n_size = convert_to_int(self.parameters.get("n_size", 1), 1) 
+			n_size = convert_to_int(self.parameters.get("n_size", 1), 1)
 			n_size = (n_size, n_size) # needs to be a tuple for sklearn.
 		else:
 			n_size_split = self.parameters.get("n_size").split("-")
 			n_size = (convert_to_int(n_size_split[0]), convert_to_int(n_size_split[1]))
-		
+
 		min_occurrences = convert_to_int(self.parameters.get("min_occurrences", 1), 1)
 		max_occurrences = convert_to_int(self.parameters.get("min_occurrences", -1), -1)
 		max_output = convert_to_int(self.parameters.get("max_output", 10), 10)
@@ -124,6 +124,9 @@ class TfIdf(BasicProcessor):
 
 		# Go through all archived token sets and generate collocations for each
 		for token_file in self.iterate_archive_contents(self.source_file):
+			if token_file.name == '.token_metadata.json':
+				# Skip metadata
+				continue
 			# Get the date
 			date_string = token_file.stem
 			dates.append(date_string)
@@ -215,7 +218,7 @@ class TfIdf(BasicProcessor):
 		for i, doc in enumerate(vector):
 			doc_results = [[dict_tokens[id], freq] for id, freq in doc]
 			doc_results.sort(key = lambda x: x[1], reverse=True) # Sort on score
-			
+
 			for word, score in doc_results[:top_n]:
 				result = {}
 				result["item"] = word
@@ -238,7 +241,7 @@ class TfIdf(BasicProcessor):
 
 		:returns dict, results
 		"""
-		
+
 		# Vectorise
 		self.dataset.update_status("Vectorizing")
 		tfidf_vectorizer = TfidfVectorizer(min_df=min_occurrences, max_df=max_occurrences, ngram_range=ngram_range,
