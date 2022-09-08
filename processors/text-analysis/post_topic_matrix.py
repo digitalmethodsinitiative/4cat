@@ -89,12 +89,6 @@ class TopicModelWordExtractor(BasicProcessor):
             else:
                 model_column_names += [interval + '_topic_' + str(i+1) for i in range(model_metadata_parameters.get('topics'))]
 
-        # Check if multiple documents exist per post/item
-        if token_metadata_parameters.get('grouped_by') != 'item' or len(token_metadata_parameters.get('columns')) > 1:
-            multiple_docs_per_post = True
-        else:
-            multiple_docs_per_post = False
-
         # Start writing result file
         self.dataset.update_status("Collecting model predictions")
         index = 0
