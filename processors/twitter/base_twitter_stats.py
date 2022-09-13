@@ -143,6 +143,7 @@ class TwitterStatsBase(BasicProcessor):
             for k, v in intervals.items():
                 if isinstance(v, int):
                     intervals[k] = self.padding_map()
+                    intervals[k].update({"Created at Timestamp": None})
 
         rows = []
         for interval, data in intervals.items():
@@ -165,6 +166,10 @@ class TwitterStatsBase(BasicProcessor):
     def padding_map(self):
         """
         Returns the base dictionary to be used if there are no values in a certain interval.
+
+        Note: key "Created at Timestamp" with value None is automatically added to dictionary after padding_map; this value
+        is used when comparing static data in the map_data function below. The key can be removed in the modify_intervals if
+        not desired in output.
         """
         return {}
 
