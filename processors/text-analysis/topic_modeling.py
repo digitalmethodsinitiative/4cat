@@ -118,7 +118,7 @@ class TopicModeler(BasicProcessor):
                 tokens = json.load(binary_tokens)
 
             self.dataset.update_status("Vectorising token set '%s'" % token_file.stem)
-            vectoriser = vectoriser_class(tokenizer=lambda token: token, lowercase=False, min_df=min_df, max_df=max_df)
+            vectoriser = vectoriser_class(tokenizer=token_helper, lowercase=False, min_df=min_df, max_df=max_df)
 
             try:
                 vectors = vectoriser.fit_transform(tokens)
@@ -145,6 +145,14 @@ class TopicModeler(BasicProcessor):
 
             with staging_area.joinpath("%s.model" % token_file.stem).open("wb") as outfile:
                 pickle.dump(model, outfile)
+
+            # Storing vectors and vectoriser for LDA visualisation
+            self.dataset.update_status("Storing vectors and vectoriser for token set '%s'" % token_file.stem)
+            with staging_area.joinpath("%s.vectors" % token_file.stem).open("wb") as outfile:
+                pickle.dump(vectors, outfile)
+
+            with staging_area.joinpath("%s.vectoriser" % token_file.stem).open("wb") as outfile:
+                pickle.dump(vectoriser, outfile)
 
             # Collect Metadata
             model_topics = {}
@@ -174,3 +182,9 @@ class TopicModeler(BasicProcessor):
 
         self.dataset.update_status("Compressing generated model files")
         self.write_archive_and_finish(staging_area)
+
+def token_helper(token):
+    """
+    pickle requires named functions
+    """
+    return token
