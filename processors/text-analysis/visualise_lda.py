@@ -63,7 +63,7 @@ class VisualiseLDA(BasicProcessor):
             with model_file.with_suffix(".vectoriser").open("rb") as infile:
                 vectoriser = pickle.load(infile)
 
-            LDAvis_prepared = pyLDAvis.sklearn.prepare(model, vectors, vectoriser)
+            LDAvis_prepared = pyLDAvis.sklearn.prepare(model, vectors, vectoriser, sort_topics=False)
             self.dataset.update_status("Saving LDA visualisation for '%s'" % model_file.stem)
             pyLDAvis.save_html(LDAvis_prepared, str(staging_area.joinpath('%s.html' % model_file.stem)))
 
