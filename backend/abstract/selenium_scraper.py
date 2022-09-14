@@ -21,7 +21,8 @@ if config.get('selenium.browser') and config.get('selenium.selenium_executable_p
 else:
     raise ImportError('Selenium not set up')
 
-class SeleniumScraper(Search, metaclass=abc.ABCMeta):
+
+class SeleniumWrapper(metaclass=abc.ABCMeta):
     """
     Selenium Scraper class
 
@@ -48,19 +49,9 @@ class SeleniumScraper(Search, metaclass=abc.ABCMeta):
         :return dict: A dictionary containing basic results from scrape including final_url, page_title, and page_source.
                       Returns false if no movement was detected
         """
-        try:
-            self.reset_current_page()
-            self.driver.get(url)
-        except Exception as e:
-            self.log.warning("Selenium driver.get() on url %s exception: %s" % (url, str(e)))
-            self.restart_selenium()
-            try:
-                # try again
-                self.reset_current_page()
-                self.driver.get(url)
-            except Exception as e:
-                self.log.error("Selenium driver.get() on url %s exception: %s" % (url, str(e)))
-                return False
+
+        self.reset_current_page()
+        self.driver.get(url)
 
         if self.check_for_movement():
 
@@ -68,7 +59,7 @@ class SeleniumScraper(Search, metaclass=abc.ABCMeta):
             return results
 
         else:
-            return False
+            raise Exception("Failed to navigate to new page; check url is not the same as previous url")
 
     def collect_results(self, url, extract_links=False, title_404_strings='default'):
 
@@ -90,7 +81,7 @@ class SeleniumScraper(Search, metaclass=abc.ABCMeta):
                     if hasattr(self, 'dataset'):
                         self.dataset.log('Error collecting links for url %s: %s' % (url, str(e)))
                     links = None
-                    result['collect_links_error': e]
+                    result['collect_links_error'] = e
             result['links'] = links
 
         return result
@@ -116,7 +107,7 @@ class SeleniumScraper(Search, metaclass=abc.ABCMeta):
         :param str base_url:                substring to ensure is part of link
         :return bool:                       True if link should NOT be excluded else False
         """
-        if link not in previously_used_links and \
+        if link and link not in previously_used_links and \
             not any([bad_url in link[:10] for bad_url in bad_url_list]):
                 if base_url is None:
                     return True
@@ -126,41 +117,6 @@ class SeleniumScraper(Search, metaclass=abc.ABCMeta):
                     return False
         else:
             return False
-
-    def search(self, query):
-        """
-        Search for items matching the given query
-
-        The real work is done by the get_items() method of the descending
-        class. This method just provides some scaffolding and post-processing
-        of results via `after_search()`, if it is defined.
-
-        :param dict query:  Query parameters
-        :return:  Iterable of matching items, or None if there are no results.
-        """
-        self.start_selenium()
-        # Returns to default position; i.e., 'data:,'
-        self.reset_current_page()
-        # Sets timeout to 60
-        self.set_page_load_timeout()
-
-        # Normal Search function to be used To be implemented by descending classes!
-        try:
-            posts = self.get_items(query)
-        except Exception as e:
-            # Ensure Selenium always quits
-            self.quit_selenium()
-            raise e
-
-        if not posts:
-            return None
-
-        # search workers may define an 'after_search' hook that is called after
-        # the query is first completed
-        if hasattr(self, "after_search") and callable(self.after_search):
-            posts = self.after_search(posts)
-
-        return posts
 
     def start_selenium(self):
         """
@@ -182,10 +138,12 @@ class SeleniumScraper(Search, metaclass=abc.ABCMeta):
             elif config.get('selenium.browser') == 'firefox':
                 self.driver = webdriver.Firefox(executable_path=config.get('selenium.selenium_executable_path'), options=options)
             else:
-                self.dataset.update_status("Selenium Scraper not configured")
+                if hasattr(self, 'dataset'):
+                    self.dataset.update_status("Selenium Scraper not configured")
                 raise ProcessorException("Selenium Scraper not configured; browser must be 'firefox' or 'chrome'")
         except (SessionNotCreatedException, WebDriverException) as e:
-            self.dataset.update_status("Selenium Scraper not configured")
+            if hasattr(self, 'dataset'):
+                self.dataset.update_status("Selenium Scraper not configured")
             if "only supports Chrome" in str(e):
                 raise ProcessorException("Your chromedriver version is incompatible with your Chromium version:\n  (%s)" % e)
             elif "Message: '' executable may have wrong" in str(e):
@@ -203,14 +161,6 @@ class SeleniumScraper(Search, metaclass=abc.ABCMeta):
             self.driver.quit()
         except:
             pass
-
-    def clean_up(self):
-        """
-        Ensures Selenium webdriver and Chrome browser and closed whether processor completes successfully or not.
-        """
-        super().clean_up()
-
-        self.quit_selenium()
 
     def restart_selenium(self):
         """
@@ -391,3 +341,55 @@ class SeleniumScraper(Search, metaclass=abc.ABCMeta):
             for iframe in iframes:
                 iframe_links.append(iframe.get('src'))
         return iframe_links
+
+
+class SeleniumScraper(SeleniumWrapper, Search, metaclass=abc.ABCMeta):
+    """
+    Selenium Scraper class
+
+    Selenium utilizes a chrome webdriver and chrome browser to navigate and scrape the web. This processor can be used
+    to initialize that browser and navigate it as needed. It replaces search to allow you to utilize the Selenium driver
+    and ensure the webdriver and browser are properly closed out upon completion.
+    """
+
+    def search(self, query):
+        """
+        Search for items matching the given query
+
+        The real work is done by the get_items() method of the descending
+        class. This method just provides some scaffolding and post-processing
+        of results via `after_search()`, if it is defined.
+
+        :param dict query:  Query parameters
+        :return:  Iterable of matching items, or None if there are no results.
+        """
+        self.start_selenium()
+        # Returns to default position; i.e., 'data:,'
+        self.reset_current_page()
+        # Sets timeout to 60
+        self.set_page_load_timeout()
+
+        # Normal Search function to be used To be implemented by descending classes!
+        try:
+            posts = self.get_items(query)
+        except Exception as e:
+            # Ensure Selenium always quits
+            self.quit_selenium()
+            raise e
+
+        if not posts:
+            return None
+
+        # search workers may define an 'after_search' hook that is called after
+        # the query is first completed
+        if hasattr(self, "after_search") and callable(self.after_search):
+            posts = self.after_search(posts)
+
+        return posts
+    def clean_up(self):
+        """
+        Ensures Selenium webdriver and Chrome browser and closed whether processor completes successfully or not.
+        """
+        super().clean_up()
+
+        self.quit_selenium()
