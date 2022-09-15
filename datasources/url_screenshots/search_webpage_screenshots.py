@@ -60,7 +60,6 @@ class ScreenshotWithSelenium(SeleniumScraper):
         :return:
         """
         self.dataset.log('Query: %s' % str(query))
-        self.dataset.log('Parameters: %s' % str(self.parameters))
         urls_to_scrape = query.get('urls')
         ignore_cookies = self.parameters.get("ignore-cookies")
         wait = self.parameters.get("wait-time")
