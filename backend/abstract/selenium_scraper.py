@@ -1,5 +1,6 @@
 import abc
-from urllib.parse import urlparse, urljoin
+import os
+from urllib.parse import urljoin
 from bs4 import BeautifulSoup
 from bs4.element import Comment
 
@@ -10,6 +11,8 @@ import common.config_manager as config
 if config.get('selenium.browser') and config.get('selenium.selenium_executable_path'):
     from selenium import webdriver
     from selenium.webdriver.common.by import By
+    from selenium.webdriver.support import expected_conditions as EC
+    from selenium.webdriver.support.ui import WebDriverWait
     from selenium.common.exceptions import WebDriverException, SessionNotCreatedException, UnexpectedAlertPresentException
 
     if config.get('selenium.browser') == 'chrome':
@@ -33,6 +36,7 @@ class SeleniumWrapper(metaclass=abc.ABCMeta):
 
     driver = None
     last_scraped_url = None
+    browser = None
 
     def simple_scrape_page(self, url, extract_links=False, title_404_strings='default'):
         """
@@ -122,6 +126,7 @@ class SeleniumWrapper(metaclass=abc.ABCMeta):
         """
         Start a headless browser
         """
+        self.browser = config.get('selenium.browser')
         # TODO review and compare Chrome vs Firefox options
         options = Options()
         options.headless = True
@@ -133,9 +138,9 @@ class SeleniumWrapper(metaclass=abc.ABCMeta):
         options.add_argument("--disable-browser-side-navigation")
 
         try:
-            if config.get('selenium.browser') == 'chrome':
+            if self.browser == 'chrome':
                 self.driver = webdriver.Chrome(executable_path=config.get('selenium.selenium_executable_path'), options=options)
-            elif config.get('selenium.browser') == 'firefox':
+            elif self.browser == 'firefox':
                 self.driver = webdriver.Firefox(executable_path=config.get('selenium.selenium_executable_path'), options=options)
             else:
                 if hasattr(self, 'dataset'):
@@ -242,6 +247,38 @@ class SeleniumWrapper(metaclass=abc.ABCMeta):
 
         params = {'cmd': 'Page.setDownloadBehavior', 'params': {'behavior': 'allow', 'downloadPath': download_dir}}
         return self.driver.execute("send_command", params)
+
+    def enable_firefox_extension(self, path_to_extension, temporary=True):
+        """
+        Enables Firefox extension.
+        """
+        if self.browser != 'firefox':
+            raise Exception('Cannot add firefox extension to non firefox browser!')
+        if self.driver is None:
+            raise Exception('Must start firefox before installing extension!')
+        self.driver.install_addon(os.path.abspath(path_to_extension), temporary=temporary)
+
+    def save_screenshot(self, path, wait=2):
+        # Save current screen size
+        original_size = self.driver.get_window_size()
+
+        # Wait 30 up to 30 seconds for 'body' to load
+        WebDriverWait(self.driver, 30).until(EC.presence_of_element_located((By.TAG_NAME, 'body')))
+
+        # Gather and adjust screen size
+        required_width = self.driver.execute_script('return document.body.parentNode.scrollWidth')
+        required_height = self.driver.execute_script('return document.body.parentNode.scrollHeight')
+        self.driver.set_window_size(required_width, required_height)
+
+        # Wait for page to load
+        time.sleep(wait)
+
+        # Take screenshot
+        # driver.save_screenshot(path)  # has scrollbar
+        self.driver.find_element(By.TAG_NAME, "body").screenshot(str(path))  # avoids scrollbar
+
+        # Return to previous size (might not be necessary)
+        self.driver.set_window_size(original_size['width'], original_size['height'])
 
     # Some BeautifulSoup helper functions
     @staticmethod
