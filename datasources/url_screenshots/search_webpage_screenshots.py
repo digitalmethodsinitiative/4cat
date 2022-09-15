@@ -47,8 +47,8 @@ class ScreenshotWithSelenium(SeleniumScraper):
         "ignore-cookies": {
             "type": UserInput.OPTION_TOGGLE,
             "help": "Attempt to ignore cookie requests",
-            "default": False,
-            "tooltip": "If enabled, a firefox extension [i don't care about cookies](https://addons.mozilla.org/nl/firefox/addon/i-dont-care-about-cookies/) will be used"
+            "default": True,
+            "tooltip": 'If enabled, a firefox extension will attempt to "agree" to any cookie requests'
         },
     }
 
@@ -133,7 +133,7 @@ class ScreenshotWithSelenium(SeleniumScraper):
                 result['final_url'] = self.driver.current_url
                 result['subject'] = self.driver.title
 
-            # Record result data 
+            # Record result data
             metadata[url] = result
 
         with results_path.joinpath(".metadata.json").open("w", encoding="utf-8") as outfile:
@@ -168,4 +168,6 @@ class ScreenshotWithSelenium(SeleniumScraper):
 
         return {
             "urls": preprocessed_urls,
+            "wait-time": query.get("wait-time"),
+            "ignore-cookies": query.get("ignore-cookies"),
             }
