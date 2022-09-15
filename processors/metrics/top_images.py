@@ -40,7 +40,7 @@ class TopImageCounter(BasicProcessor):
         """
 
         if module.is_dataset() and module.is_top_dataset() and module.type != "telegram-search":
-            return True
+            return module.get_extension() in ("csv", "ndjson")
         else:
             return False
 

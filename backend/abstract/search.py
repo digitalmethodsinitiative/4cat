@@ -1,4 +1,5 @@
 import hashlib
+import zipfile
 import shutil
 import random
 import json
@@ -65,35 +66,37 @@ class Search(BasicProcessor, ABC):
 		# Execute the relevant query (string-based, random, countryflag-based)
 		try:
 			if query_parameters.get("file"):
-				posts = self.import_from_file(query_parameters.get("file"))
+				items = self.import_from_file(query_parameters.get("file"))
 			else:
-				posts = self.search(query_parameters)
+				items = self.search(query_parameters)
 		except WorkerInterruptedException:
 			raise ProcessorInterruptedException("Interrupted while collecting data, trying again later.")
 
 		# Write posts to csv and update the DataBase status to finished
-		num_posts = 0
-		if posts:
+		num_items = 0
+		if items:
 			self.dataset.update_status("Writing posts to result file")
 			if not hasattr(self, "extension") or self.extension == "csv":
-				num_posts = self.items_to_csv(posts, results_file)
+				num_items = self.items_to_csv(items, results_file)
 			elif self.extension == "ndjson":
-				num_posts = self.items_to_ndjson(posts, results_file)
+				num_items = self.items_to_ndjson(items, results_file)
+			elif self.extension == "zip":
+				num_items = self.items_to_archive(items, results_file)
 			else:
 				raise NotImplementedError("Datasource query cannot be saved as %s file" % self.extension)
 
 			self.dataset.update_status("Query finished, results are available.")
-		elif posts is not None:
+		elif items is not None:
 			self.dataset.update_status("Query finished, no results found.")
 
-		# queue predefined post-processors
-		if num_posts > 0 and query_parameters.get("next", []):
+		# queue predefined processors
+		if num_items > 0 and query_parameters.get("next", []):
 			for next in query_parameters.get("next"):
 				next_parameters = next.get("parameters", {})
 				next_type = next.get("type", "")
 				available_processors = self.dataset.get_available_processors()
 
-				# run it only if the post-processor is actually available for this query
+				# run it only if the processor is actually available for this query
 				if next_type in available_processors:
 					next_analysis = DataSet(parameters=next_parameters, type=next_type, db=self.db,
 											parent=self.dataset.key,
@@ -112,30 +115,30 @@ class Search(BasicProcessor, ABC):
 				with open(query_parameters.get("copy_to"), "w") as empty_file:
 					empty_file.write("")
 
-		self.dataset.finish(num_rows=num_posts)
+		self.dataset.finish(num_rows=num_items)
 
 	def search(self, query):
 		"""
 		Search for items matching the given query
 
 		The real work is done by the get_items() method of the descending
-		class. This method just provides some scaffolding and post-processing
+		class. This method just provides some scaffolding and processing
 		of results via `after_search()`, if it is defined.
 
 		:param dict query:  Query parameters
 		:return:  Iterable of matching items, or None if there are no results.
 		"""
-		posts = self.get_items(query)
+		items = self.get_items(query)
 
-		if not posts:
+		if not items:
 			return None
 
 		# search workers may define an 'after_search' hook that is called after
 		# the query is first completed
 		if hasattr(self, "after_search") and callable(self.after_search):
-			posts = self.after_search(posts)
+			items = self.after_search(items)
 
-		return posts
+		return items
 
 	@abstractmethod
 	def get_items(self, query):
@@ -318,6 +321,23 @@ class Search(BasicProcessor, ABC):
 
 		return processed
 
+	def items_to_archive(self, items, filepath):
+		"""
+		Save retrieved items as an archive
+
+		Assumes that items is an iterable with one item, a Path object
+		referring to a folder containing files to be archived. The folder will
+		be removed afterwards.
+
+		:param items:
+		:param filepath:  Where to store the archive
+		:return int:  Number of items
+		"""
+		items = list(items)
+		self.write_archive_and_finish(items[0], None, zipfile.ZIP_STORED, False)
+		return len(items)
+
+
 class CheckCache():
 	"""
 	Handler for the hasher
@@ -350,8 +370,8 @@ class SearchWithScope(Search, ABC):
 	given matching item occurs. This subclass allows for the following
 	additional search modes:
 
-	- All posts in a thread containing a matching post
-	- All posts in a thread containing at least x% matching posts
+	- All items in a thread containing a matching item
+	- All items in a thread containing at least x% matching items
 	"""
 
 	def search(self, query):
@@ -368,11 +388,11 @@ class SearchWithScope(Search, ABC):
 		mode = self.get_search_mode(query)
 
 		if mode == "simple":
-			posts = self.get_items_simple(query)
+			items = self.get_items_simple(query)
 		else:
-			posts = self.get_items_complex(query)
+			items = self.get_items_complex(query)
 
-		if not posts:
+		if not items:
 			return None
 
 		# handle the various search scope options after retrieving initial post
@@ -382,7 +402,7 @@ class SearchWithScope(Search, ABC):
 			# proportion of posts matches
 			# first, get amount of posts for all threads in which matching
 			# posts occur and that are long enough
-			thread_ids = tuple([post["thread_id"] for post in posts])
+			thread_ids = tuple([item["thread_id"] for item in items])
 			self.dataset.update_status("Retrieving thread metadata for %i threads" % len(thread_ids))
 			try:
 				min_length = int(query.get("scope_length", 30))
@@ -394,7 +414,7 @@ class SearchWithScope(Search, ABC):
 			# determine how many matching posts occur per thread in the initial
 			# data set
 			posts_per_thread = {}
-			for post in posts:
+			for post in items:
 				if post["thread_id"] not in posts_per_thread:
 					posts_per_thread[post["thread_id"]] = 0
 
@@ -426,14 +446,14 @@ class SearchWithScope(Search, ABC):
 
 			if qualifying_thread_ids:
 				self.dataset.update_status("Fetching all posts in %i threads" % len(qualifying_thread_ids))
-				posts = self.fetch_threads(tuple(qualifying_thread_ids))
+				items = self.fetch_threads(tuple(qualifying_thread_ids))
 			else:
 				self.dataset.update_status("No threads matched the full thread search parameters.")
 				return None
 
 		elif query.get("search_scope", None) == "full-threads":
 			# get all post in threads containing at least one matching post
-			thread_ids = tuple(set([post["thread_id"] for post in posts]))
+			thread_ids = tuple(set([post["thread_id"] for post in items]))
 			if len(thread_ids) > 25000:
 				self.dataset.update_status(
 					"Too many matching threads (%i) to get full thread data for, aborting. Please try again with a narrower query." % len(
@@ -441,7 +461,7 @@ class SearchWithScope(Search, ABC):
 				return None
 
 			self.dataset.update_status("Retrieving all posts from %i threads" % len(thread_ids))
-			posts = self.fetch_threads(thread_ids)
+			items = self.fetch_threads(thread_ids)
 
 		elif mode == "complex":
 			# create a random sample subset of all posts if requested. for
@@ -451,18 +471,18 @@ class SearchWithScope(Search, ABC):
 				try:
 					self.dataset.update_status("Creating random sample")
 					sample_size = int(query.get("sample_size", 5000))
-					posts = list(posts)
-					random.shuffle(posts)
-					return posts[0:sample_size]
+					items = list(items)
+					random.shuffle(items)
+					return items[0:sample_size]
 				except ValueError:
 					pass
 
 		# search workers may define an 'after_search' hook that is called after
 		# the query is first completed
 		if hasattr(self, "after_search") and callable(self.after_search):
-			posts = self.after_search(posts)
+			items = self.after_search(items)
 
-		return posts
+		return items
 
 	def get_items(self, query):
 		"""

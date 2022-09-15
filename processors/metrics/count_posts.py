@@ -36,6 +36,16 @@ class CountPosts(BasicProcessor):
 		}
 	}
 
+	@classmethod
+	def is_compatible_with(cls, module=None):
+		"""
+		Allow processor to run on all csv and NDJSON datasets
+
+		:param module: Dataset or processor to determine compatibility with
+		"""
+
+		return module.get_extension() in ("csv", "ndjson")
+
 
 	def process(self):
 		"""

@@ -14,6 +14,16 @@ class MonthlyHistogramCreator(ProcessorPreset):
 	description = "Generates a histogram with the number of posts per month."  # description displayed in UI
 	extension = "svg"
 
+	@classmethod
+	def is_compatible_with(cls, module=None):
+		"""
+		Allow processor to run on all csv and NDJSON datasets
+
+		:param module: Dataset or processor to determine compatibility with
+		"""
+
+		return module.get_extension() in ("csv", "ndjson")
+
 	def get_processor_pipeline(self):
 		"""
 		This queues a series of post-processors to visualise over-time

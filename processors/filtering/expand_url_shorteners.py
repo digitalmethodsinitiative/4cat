@@ -135,8 +135,7 @@ class UrlUnshortener(BasicProcessor):
 
         :param module: Dataset or processor to determine compatibility with
         """
-        if module.is_dataset():
-            if module.get_extension() == "csv":
+        if module.is_dataset() and module.get_extension() == "csv":
                 # csv can just be sniffed for the presence of a column
                 with module.get_results_path().open(encoding="utf-8") as infile:
                     reader = csv.DictReader(infile)
