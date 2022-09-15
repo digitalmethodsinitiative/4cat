@@ -228,5 +228,8 @@ def inject_now():
 		"__notifications": notifications,
 		"__expire_datasets": config.get("expire.timeout"),
 		"__expire_optout": config.get("expire.allow_optout"),
-		"uniqid": uniqid
+		"uniqid": uniqid,
+		**{
+			("__config_%s" % field.replace(".", "_")): value for field, value in config.get_all().items()
+		}
 	}

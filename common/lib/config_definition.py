@@ -79,6 +79,18 @@ config_definition = {
         "help": "Allow opt-out",
         "tooltip": "Allow users to opt-out of automatic deletion. Note that if users are allowed to opt out, data sources can still force the expiration of datasets created through that data source. This cannot be overridden by the user.",
     },
+    "expire.offer_hashing": {
+        "type": UserInput.OPTION_TOGGLE,
+        "default": True,
+        "help": "Offer pseudonymisation",
+        "tooltip": "Add a checkbox to the 'create dataset' forum to allow users to toggle pseudonymisation."
+    },
+    "expire.offer_private": {
+        "type": UserInput.OPTION_TOGGLE,
+        "default": True,
+        "help": "Offer create as private",
+        "tooltip": "Add a checkbox to the 'create dataset' forum to allow users to make a dataset private."
+    },
     "logging.slack.level": {
         "type": UserInput.OPTION_CHOICE,
         "default": "WARNING",
