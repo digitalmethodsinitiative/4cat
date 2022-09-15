@@ -133,8 +133,8 @@ class SeleniumWrapper(metaclass=abc.ABCMeta):
         self.browser = config.get('selenium.browser')
         # TODO review and compare Chrome vs Firefox options
         options = Options()
-        #options.headless = True
-        #options.add_argument('--headless')
+        options.headless = True
+        options.add_argument('--headless')
         # options.add_argument("--remote-debugging-port=9222")
         options.add_argument('--no-sandbox')
         options.add_argument("--disable-gpu")
