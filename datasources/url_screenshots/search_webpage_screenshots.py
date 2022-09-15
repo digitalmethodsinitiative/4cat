@@ -121,6 +121,7 @@ class ScreenshotWithSelenium(SeleniumScraper):
                     os.setxattr(results_path.joinpath(filename), 'user.url', url.encode())
                     screenshots += 1
                     success = True
+                    break
                 else:
                     # No page was reached...
                     result['error'].append("Driver was not able to navigate to page")
