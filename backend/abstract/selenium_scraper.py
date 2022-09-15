@@ -15,6 +15,7 @@ if config.get('selenium.browser') and config.get('selenium.selenium_executable_p
     from selenium.webdriver.support import expected_conditions as EC
     from selenium.webdriver.support.ui import WebDriverWait
     from selenium.common.exceptions import WebDriverException, SessionNotCreatedException, UnexpectedAlertPresentException
+    from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 
     if config.get('selenium.browser') == 'chrome':
         from selenium.webdriver.chrome.options import Options
@@ -123,20 +124,25 @@ class SeleniumWrapper(metaclass=abc.ABCMeta):
         else:
             return False
 
-    def start_selenium(self):
+    def start_selenium(self, eager=False):
         """
         Start a headless browser
+
+        :param bool:  Eager loading?
         """
         self.browser = config.get('selenium.browser')
         # TODO review and compare Chrome vs Firefox options
         options = Options()
-        options.headless = True
-        options.add_argument('--headless')
+        #options.headless = True
+        #options.add_argument('--headless')
         # options.add_argument("--remote-debugging-port=9222")
         options.add_argument('--no-sandbox')
         options.add_argument("--disable-gpu")
         options.add_argument("--disable-dev-shm-usage")
         options.add_argument("--disable-browser-side-navigation")
+
+        if eager:
+            options.set_capability("pageLoadStrategy", "eager")
 
         try:
             if self.browser == 'chrome':
@@ -259,24 +265,33 @@ class SeleniumWrapper(metaclass=abc.ABCMeta):
             raise Exception('Must start firefox before installing extension!')
         self.driver.install_addon(os.path.abspath(path_to_extension), temporary=temporary)
 
-    def save_screenshot(self, path, wait=2):
+    def save_screenshot(self, path, wait=2, width=None, height=None, viewport_only=False):
         # Save current screen size
         original_size = self.driver.get_window_size()
+        dom_width = self.driver.execute_script('return document.body.parentNode.scrollWidth')
+        dom_height = self.driver.execute_script('return document.body.parentNode.scrollHeight')
 
         # Wait 30 up to 30 seconds for 'body' to load
         WebDriverWait(self.driver, 30).until(EC.presence_of_element_located((By.TAG_NAME, 'body')))
 
         # Gather and adjust screen size
-        required_width = self.driver.execute_script('return document.body.parentNode.scrollWidth')
-        required_height = self.driver.execute_script('return document.body.parentNode.scrollHeight')
-        self.driver.set_window_size(required_width, required_height)
+        if not width:
+            width = dom_width
+
+        if not height:
+            height = dom_height
+
+        self.driver.set_window_size(width, height)
 
         # Wait for page to load
         time.sleep(wait)
 
         # Take screenshot
-        # driver.save_screenshot(path)  # has scrollbar
-        self.driver.find_element(By.TAG_NAME, "body").screenshot(str(path))  # avoids scrollbar
+        if viewport_only:
+            self.driver.execute_script("return document.body.style.overflow = 'hidden';")
+            self.driver.save_screenshot(str(path))  # has scrollbar
+        else:
+            self.driver.find_element(By.TAG_NAME, "body").screenshot(str(path))  # avoids scrollbar
 
         # Return to previous size (might not be necessary)
         self.driver.set_window_size(original_size['width'], original_size['height'])
@@ -401,7 +416,7 @@ class SeleniumScraper(SeleniumWrapper, Search, metaclass=abc.ABCMeta):
         :param dict query:  Query parameters
         :return:  Iterable of matching items, or None if there are no results.
         """
-        self.start_selenium()
+        self.start_selenium(eager=(hasattr(self, "eager_selenium") and self.eager_selenium))
         # Returns to default position; i.e., 'data:,'
         self.reset_current_page()
         # Sets timeout to 60
