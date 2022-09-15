@@ -68,7 +68,12 @@ class ScreenshotURLs(BasicProcessor):
             options["columns"]["type"] = UserInput.OPTION_MULTI
             options["columns"]["inline"] = True
             options["columns"]["options"] = {v: v for v in columns}
-            options["columns"]["default"] = ["body"]
+            options["columns"]["default"] = ['body']
+            for default in ['url', 'urls', 'links']:
+                if default in columns:
+                    options["columns"]["default"] = [default]
+                    break
+
 
         # extensions = config.get('selenium.firefox_extensions')
         # if 'i_dont_care_about_cookies' in extensions and extensions['extensions'].get('path'):
