@@ -72,7 +72,7 @@ class ScreenshotWithSelenium(SeleniumScraper):
         # Enable Firefox extension: i don't care about cookies
         if ignore_cookies:
             # TODO: fix this up to use our config and error handle a shitty extension
-            self.driver.enable_firefox_extension('/usr/src/app/jid1-KKzOGWgsW3Ao4Q@jetpack.xpi')
+            self.enable_firefox_extension('/usr/src/app/jid1-KKzOGWgsW3Ao4Q@jetpack.xpi')
 
         screenshots = 0
         processed_urls = 0
@@ -142,7 +142,7 @@ class ScreenshotWithSelenium(SeleniumScraper):
         self.dataset.log('Screenshots taken: %i' % screenshots)
         # finish up
         self.dataset.update_status("Compressing images")
-        self.write_archive_and_finish(results_path, finish=False)
+        return results_path
 
     @staticmethod
     def validate_query(query, request, user):
