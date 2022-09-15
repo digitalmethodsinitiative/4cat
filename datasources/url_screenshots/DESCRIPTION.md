@@ -1,5 +1,3 @@
-## Screenshot Generator
-
 This data source uses [Selenium](https://selenium-python.readthedocs.io/) in combination with
 a [Firefox webdriver](https://github.com/mozilla/geckodriver/releases) and Firefox for linux
 to make screenshots of web pages.
