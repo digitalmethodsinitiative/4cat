@@ -3,15 +3,17 @@ Selenium Webpage Screenshot Scraper
 
 Currently designed around Firefox, but can also work with Chrome; results may vary
 """
-from hashlib import sha256
 import datetime
+import ural
 import json
+import time
 import os
+import re
 
 from backend.abstract.selenium_scraper import SeleniumScraper
 from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException
-from common.lib.helpers import validate_url
 from common.lib.user_input import UserInput
+from common.lib.helpers import convert_to_int
 
 
 class ScreenshotWithSelenium(SeleniumScraper):
@@ -22,34 +24,70 @@ class ScreenshotWithSelenium(SeleniumScraper):
     extension = "zip"
     max_workers = 1
 
+    eager_selenium = True
+
     options = {
         "intro-1": {
             "type": UserInput.OPTION_INFO,
-            "help": "This data source uses [Selenium](https://selenium-python.readthedocs.io/) in combination with "
-                    "a [Firefox webdriver](https://github.com/mozilla/geckodriver/releases) and Firefox for linux "
-                    "to take screenshots of webpages. "
+            "help": "This data opens the given URLs in a Firefox browser and takes screenshots according to the given"
+                    "parameters. The screenshots can then be downloaded as a .zip archive."
         },
         "query-info": {
             "type": UserInput.OPTION_INFO,
-            "help": "Please enter a list of urls one per line."
+            "help": "Please enter a list of urls, one per line. Invalid URLs will be ignored. URLs need to include a "
+                    "protocol, i.e. they need to start with `http://` or `https://`."
         },
         "query": {
             "type": UserInput.OPTION_TEXT_LARGE,
-            "help": "List of urls"
+            "help": "List of URLs"
+        },
+        "capture": {
+            "type": UserInput.OPTION_CHOICE,
+            "help": "Capture region",
+            "options": {
+                "viewport": "Capture only browser window (viewport)",
+                "all": "Capture entire page"
+            },
+            "default": "above"
+        },
+        "resolution": {
+            "type": UserInput.OPTION_CHOICE,
+            "help": "Window size",
+            "tooltip": "Note that the browser interface is included in this resolution (as it would be in 'reality'). " 
+                       "Screenshots will be slightly smaller than the selected size as they do not include the "
+                       "interface.",
+            "options": {
+                "1024x786": "1024x786",
+                "1280x720": "1280x720 (720p)",
+                "1920x1080": "1920x1080 (1080p)",
+                "1440x900": "1440x900",
+            },
+            "default": "1280x720"
         },
         "wait-time": {
             "type": UserInput.OPTION_TEXT,
-            "help": "Time in seconds to wait for page to load",
-            "default": 2,
+            "help": "Load time",
+            "tooltip": "Wait this many seconds before taking the screenshot, to allow the page to finish loading "
+                       "first. If the page finishes loading earlier, the screenshot is taken immediately.",
+            "default": 6,
             "min": 0,
-            "max": 5,
+            "max": 60,
         },
-        "ignore-cookies": {
-            "type": UserInput.OPTION_TOGGLE,
-            "help": "Attempt to ignore cookie requests",
-            "default": True,
-            "tooltip": 'If enabled, a firefox extension will attempt to "agree" to any cookie requests'
+        "pause-time": {
+            "type": UserInput.OPTION_TEXT,
+            "help": "Pause time",
+            "tooltip": "After each screenshot, wait this many seconds before taking the next one. Increasing this can "
+                       "help if a site seems to be blocking the screenshot generator due to repeat requests.",
+            "default": 0,
+            "min": 0,
+            "max": 15,
         },
+        #"ignore-cookies": {
+        #    "type": UserInput.OPTION_TOGGLE,
+        #    "help": "Attempt to ignore cookie walls",
+        #    "default": False,
+        #    "tooltip": 'If enabled, a firefox extension will attempt to "agree" to any cookie walls automatically.'
+        #},
     }
 
     def get_items(self, query):
@@ -60,9 +98,15 @@ class ScreenshotWithSelenium(SeleniumScraper):
         :return:
         """
         self.dataset.log('Query: %s' % str(query))
-        urls_to_scrape = query.get('urls')
-        ignore_cookies = self.parameters.get("ignore-cookies")
+        urls_to_scrape = query.get('query')
+        ignore_cookies = False  # self.parameters.get("ignore-cookies")
+        capture = self.parameters.get("capture")
+        resolution = self.parameters.get("resolution", "1024x786")
+        pause = self.parameters.get("pause-time")
         wait = self.parameters.get("wait-time")
+
+        width = convert_to_int(resolution.split("x")[0], 1024)
+        height = convert_to_int(resolution.split("x").pop(), 786) if capture == "viewport" else None
 
         # Staging area
         results_path = self.dataset.get_staging_area()
@@ -74,19 +118,30 @@ class ScreenshotWithSelenium(SeleniumScraper):
             self.enable_firefox_extension('/usr/src/app/jid1-KKzOGWgsW3Ao4Q@jetpack.xpi')
 
         screenshots = 0
-        processed_urls = 0
-        total_urls = len(urls_to_scrape)
+        done = 0
         # Do not scrape the same site twice
         scraped_urls = set()
+        total_urls = len(urls_to_scrape)
         metadata = {}
+
         while urls_to_scrape:
             if self.interrupted:
-                raise ProcessorInterruptedException("Interrupted while scraping urls from the Web Archive")
+                raise ProcessorInterruptedException("Interrupted while making screenshots")
+
             # Grab first url
             url = urls_to_scrape.pop(0)
+            if url in scraped_urls:
+                done += 1
+                continue
+
+            self.dataset.update_progress(done / total_urls)
+            self.dataset.update_status("Capturing screenshot %i of %i" % (done + 1, total_urls))
+
+            scraped_urls.add(url)
+            filename = re.sub(r"[^0-9a-z]+", "_", url.lower()) + ".png"
             result = {
                 "url": url,
-                "filename": None,
+                "filename": filename,
                 "timestamp": None,
                 "error": [],
                 "final_url": None,
@@ -102,22 +157,30 @@ class ScreenshotWithSelenium(SeleniumScraper):
                     self.driver.get(url)
                 except Exception as e:
                     # TODO: This is way too broad and should be handled in the SeleniumWrapper
-                    self.dataset.log("Error collectiong %s: %s" % (url, str(e)))
+                    self.dataset.log("Error collecting screenshot for %s: %s" % (url, str(e)))
                     result['error'].append("Attempt %i: %s" % (attempts, str(e)))
                     continue
 
+                start_time = time.time()
+                while time.time() < start_time + wait:
+                    if self.driver.execute_script("return (document.readyState == 'complete');"):
+                        break
+                    time.sleep(0.1)
+
                 if self.check_for_movement():
-                    hash = sha256(url.encode()).hexdigest()[:13]
-                    filename = f'{hash}.png'
                     try:
-                        self.save_screenshot(results_path.joinpath(filename))
+                        self.save_screenshot(results_path.joinpath(filename), width=width, height=height, viewport_only=(capture == "viewport"))
                     except Exception as e:
                         self.dataset.log("Error saving screenshot for %s: %s" % (url, str(e)))
                         result['error'].append("Attempt %i: %s" % (attempts, str(e)))
                         continue
+
                     result['filename'] = filename
-                    # Update file attribute with url
-                    os.setxattr(results_path.joinpath(filename), 'user.url', url.encode())
+
+                    # Update file attribute with url if supported
+                    if hasattr(os, "setxattr"):
+                        os.setxattr(results_path.joinpath(filename), 'user.url', url.encode())
+
                     screenshots += 1
                     success = True
                     break
@@ -133,13 +196,19 @@ class ScreenshotWithSelenium(SeleniumScraper):
                 result['final_url'] = self.driver.current_url
                 result['subject'] = self.driver.title
 
+            if pause:
+                time.sleep(pause)
+
             # Record result data
             metadata[url] = result
+            done += 1
 
         with results_path.joinpath(".metadata.json").open("w", encoding="utf-8") as outfile:
             json.dump(metadata, outfile)
 
         self.dataset.log('Screenshots taken: %i' % screenshots)
+        if screenshots != done:
+            self.dataset.log("%i URLs could not be screenshotted")
         # finish up
         self.dataset.update_status("Compressing images")
         return results_path
@@ -161,13 +230,25 @@ class ScreenshotWithSelenium(SeleniumScraper):
         # this is the bare minimum, else we can't narrow down the full data set
         if not query.get("query", None):
             raise QueryParametersException("Please provide a List of urls.")
+
         urls = [url.strip() for url in query.get("query", "").replace("\n", ",").split(',')]
-        preprocessed_urls = [url for url in urls if validate_url(url)]
+        preprocessed_urls = [url for url in urls if ural.is_url(url, require_protocol=True, tld_aware=True, only_http_https=True, allow_spaces_in_path=False)]
+
+        # wayback machine toolbar remover
+        # temporary inclusion to make student life easier
+        detoolbarred_urls = []
+        for url in preprocessed_urls:
+            if re.findall(r"archive\.org/web/[0-9]+/", url):
+                url = re.sub(r"archive\.org/web/([0-9]+)/", "archive.org/web/\\1if_/", url)
+
+            detoolbarred_urls.append(url)
+
+        preprocessed_urls = detoolbarred_urls
+
         if not preprocessed_urls:
-            raise QueryParametersException("No Urls detected!")
+            raise QueryParametersException("No valid URLs provided - please enter one valid URL per line.")
 
         return {
-            "urls": preprocessed_urls,
-            "wait-time": query.get("wait-time"),
-            "ignore-cookies": query.get("ignore-cookies"),
-            }
+            **query,
+            "query": preprocessed_urls
+        }

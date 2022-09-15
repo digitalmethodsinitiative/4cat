@@ -9,4 +9,4 @@ from common.lib.helpers import init_datasource
 
 # Internal identifier for this data source
 DATASOURCE = "url_screenshots"
-NAME = "Selenium Url Screenshots"
+NAME = "Screenshot Generator"
