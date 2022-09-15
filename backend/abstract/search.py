@@ -5,6 +5,7 @@ import random
 import json
 import math
 import csv
+import os
 import copy
 
 from pathlib import Path
@@ -333,9 +334,9 @@ class Search(BasicProcessor, ABC):
 		:param filepath:  Where to store the archive
 		:return int:  Number of items
 		"""
-		items = list(items)
+		num_items = os.listdir(items)
 		self.write_archive_and_finish(items[0], None, zipfile.ZIP_STORED, False)
-		return len(items)
+		return num_items
 
 
 class CheckCache():
