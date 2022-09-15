@@ -335,7 +335,7 @@ class Search(BasicProcessor, ABC):
 		:return int:  Number of items
 		"""
 		num_items = len(os.listdir(items))
-		self.write_archive_and_finish(items[0], None, zipfile.ZIP_STORED, False)
+		self.write_archive_and_finish(items, None, zipfile.ZIP_STORED, False)
 		return num_items
 
 
