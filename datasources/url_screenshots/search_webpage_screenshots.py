@@ -29,13 +29,10 @@ class ScreenshotWithSelenium(SeleniumScraper):
     options = {
         "intro-1": {
             "type": UserInput.OPTION_INFO,
-            "help": "This data opens the given URLs in a Firefox browser and takes screenshots according to the given"
-                    "parameters. The screenshots can then be downloaded as a .zip archive."
-        },
-        "query-info": {
-            "type": UserInput.OPTION_INFO,
-            "help": "Please enter a list of urls, one per line. Invalid URLs will be ignored. URLs need to include a "
-                    "protocol, i.e. they need to start with `http://` or `https://`."
+            "help": "The given URLs are opened (remotely) in a Firefox browser and screenshots are then taken "
+                    "according to the given parameters. The screenshots can then be downloaded as a .zip archive.\n\n"
+                    "Please enter a list of urls, one per line. Invalid URLs will be ignored and duplicate URLs will "
+                    "be skipped. URLs need to include a protocol, i.e. they need to start with `http://` or `https://`."
         },
         "query": {
             "type": UserInput.OPTION_TEXT_LARGE,
@@ -48,14 +45,14 @@ class ScreenshotWithSelenium(SeleniumScraper):
                 "viewport": "Capture only browser window (viewport)",
                 "all": "Capture entire page"
             },
-            "default": "above"
+            "default": "viewport"
         },
         "resolution": {
             "type": UserInput.OPTION_CHOICE,
             "help": "Window size",
             "tooltip": "Note that the browser interface is included in this resolution (as it would be in 'reality'). " 
                        "Screenshots will be slightly smaller than the selected size as they do not include the "
-                       "interface.",
+                       "interface. Only effective when capturing the browser viewport.",
             "options": {
                 "1024x786": "1024x786",
                 "1280x720": "1280x720 (720p)",
