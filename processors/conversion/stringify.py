@@ -45,6 +45,16 @@ class Stringify(BasicProcessor):
 		}
 	}
 
+	@classmethod
+	def is_compatible_with(cls, module=None):
+		"""
+		Allow processor to run on all csv and NDJSON datasets
+
+		:param module: Dataset or processor to determine compatibility with
+		"""
+
+		return module.get_extension() in ("csv", "ndjson")
+
 	def process(self):
 		"""
 		This takes a 4CAT results file as input, and outputs a plain text file
