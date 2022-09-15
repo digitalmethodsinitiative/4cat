@@ -229,16 +229,24 @@ config_definition = {
         "tooltip": "The developer key from your API console",
     },
     "selenium.browser": {
-    "type": UserInput.OPTION_TEXT,
-    "default": "",
-    "help": "Browser type ('firefox' or 'chrome')",
-    "tooltip": "This must corespond to the installed webdriver; Docker installs firefox when backend container restarts if this is set to 'firefox'",
+        "type": UserInput.OPTION_TEXT,
+        "default": "",
+        "help": "Browser type ('firefox' or 'chrome')",
+        "tooltip": "This must corespond to the installed webdriver; Docker installs firefox when backend container restarts if this is set to 'firefox'",
     },
     "selenium.selenium_executable_path": {
-    "type": UserInput.OPTION_TEXT,
-    "default": "",
-    "help": "Path to webdriver (geckodriver or chromedriver)",
-    "tooltip": "Docker installs to /usr/local/bin/geckodriver",
+        "type": UserInput.OPTION_TEXT,
+        "default": "",
+        "help": "Path to webdriver (geckodriver or chromedriver)",
+        "tooltip": "Docker installs to /usr/local/bin/geckodriver",
+    },
+    "selenium.firefox_extensions": {
+        "type": UserInput.OPTION_TEXT_JSON,
+        "default": json.dumps({
+            "i_dont_care_about_cookies": {"path": "", "always_enabled": False},
+            }),
+        "help": "Firefox Extensions",
+        "tooltip": "Can be used by certain processors and datasources",
     },
 }
 
