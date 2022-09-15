@@ -334,7 +334,7 @@ class Search(BasicProcessor, ABC):
 		:param filepath:  Where to store the archive
 		:return int:  Number of items
 		"""
-		num_items = os.listdir(items)
+		num_items = len(os.listdir(items))
 		self.write_archive_and_finish(items[0], None, zipfile.ZIP_STORED, False)
 		return num_items
 
