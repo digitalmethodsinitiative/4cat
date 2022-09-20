@@ -50,7 +50,7 @@ class ScreenshotWithSelenium(SeleniumScraper):
         "resolution": {
             "type": UserInput.OPTION_CHOICE,
             "help": "Window size",
-            "tooltip": "Note that the browser interface is included in this resolution (as it would be in 'reality'). " 
+            "tooltip": "Note that the browser interface is included in this resolution (as it would be in 'reality'). "
                        "Screenshots will be slightly smaller than the selected size as they do not include the "
                        "interface. Only effective when capturing the browser viewport.",
             "options": {
@@ -205,7 +205,7 @@ class ScreenshotWithSelenium(SeleniumScraper):
 
         self.dataset.log('Screenshots taken: %i' % screenshots)
         if screenshots != done:
-            self.dataset.log("%i URLs could not be screenshotted")
+            self.dataset.log("%i URLs could not be screenshotted" % (done - screenshots)) # this can also happens if two provided urls are the same
         # finish up
         self.dataset.update_status("Compressing images")
         return results_path
