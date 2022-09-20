@@ -185,8 +185,8 @@ class ColumnNetworker(BasicProcessor):
             values_b = [values_b]
 
             if split_comma:
-                values_a = [v.strip() for v in values_a.pop().split(",")]
-                values_b = [v.strip() for v in values_b.pop().split(",")]
+                values_a = [value.strip() for value_groups in values_a for value in value_groups.split(",")]
+                values_b = [value.strip() for value_groups in values_b for value in value_groups.split(",")]
 
             try:
                 interval = get_interval_descriptor(item, interval_type)
@@ -307,7 +307,7 @@ class ColumnNetworker(BasicProcessor):
                 del component[item]["intervals"]
 
         self.dataset.update_status("Writing network file")
-        
+
         nx.write_gexf(network, self.dataset.get_results_path())
         self.dataset.finish(len(network.nodes))
 
