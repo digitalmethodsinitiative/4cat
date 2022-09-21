@@ -15,7 +15,7 @@ __maintainer__ = "Dale Wahl"
 __email__ = "4cat@oilab.eu"
 
 
-class TwitterStats(BasicProcessor):
+class TwitterUserStats(BasicProcessor):
     """
     Collect Twitter statistics. Build to emulate TCAT statistic.
     """
@@ -198,7 +198,7 @@ class TwitterStats(BasicProcessor):
         return data_types, intervals
 
 
-class TwitterStatsVis(TwitterStats):
+class TwitterStatsVis(TwitterUserStats):
     """
     Collect Twitter statistics and create boxplots to visualise.
     """

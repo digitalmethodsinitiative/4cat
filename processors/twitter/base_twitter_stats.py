@@ -75,7 +75,7 @@ class TwitterStatsBase(BasicProcessor):
                 if type(group_by_keys) is str:
                     group_by_keys = [group_by_keys]
                 elif type(group_by_keys) is not set:
-                    raise ProcessorException("group_by_keys must be a string or list")
+                    raise ProcessorException("group_by_keys must be a string, list, or set")
 
                 # Add a counts for the respective timeframe
                 if date not in intervals:

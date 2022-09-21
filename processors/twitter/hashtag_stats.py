@@ -17,7 +17,7 @@ class TwitterHashtagStats(TwitterStatsBase):
     type = "twitter-hashtag-stats"  # job type ID
     category = "Twitter Analysis"  # category
     title = "Hashtag Statistics"  # title displayed in UI
-    description = "Lists how many tweets contain hashtags, how many times those tweets have been retweeted/replied to/liked/quoted, and information about unique users and hashtags used alongside each hashtag.\nFor retweets and quotes, hashtags from the original tweet are included in the retweet/quote."  # description displayed in UI
+    description = "Lists by hashtag how many tweets contain hashtags, how many times those tweets have been retweeted/replied to/liked/quoted, and information about unique users and hashtags used alongside each hashtag.\nFor retweets and quotes, hashtags from the original tweet are included in the retweet/quote."  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
 
     sorted = 'Number of Tweets containing Hashtag'
