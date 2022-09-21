@@ -6,7 +6,7 @@ import datetime
 
 from common.lib.helpers import pad_interval, get_interval_descriptor
 from backend.abstract.processor import BasicProcessor
-from common.lib.exceptions import ProcessorException
+from common.lib.exceptions import ProcessorException, ProcessorInterruptedException
 
 __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl"]
@@ -53,6 +53,9 @@ class TwitterStatsBase(BasicProcessor):
         data_types = None
         # Iterate through each post and collect data for each interval
         for post in self.source_dataset.iterate_items(self, bypass_map_item=True):
+            if self.interrupted:
+                raise ProcessorInterruptedException("Interrupted while processing Tweets")
+
             try:
                 tweet_time = datetime.datetime.strptime(post["created_at"], "%Y-%m-%dT%H:%M:%S.000Z")
                 post["timestamp"] = tweet_time.strftime("%Y-%m-%d %H:%M:%S")
@@ -147,6 +150,9 @@ class TwitterStatsBase(BasicProcessor):
 
         rows = []
         for interval, data in intervals.items():
+            if self.interrupted:
+                raise ProcessorInterruptedException("Interrupted while processing Tweets")
+
             interval_rows = []
             if group_by_keys_category:
                 for group_key, group_data in data.items():
