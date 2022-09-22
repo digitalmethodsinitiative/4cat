@@ -667,7 +667,6 @@ class SearchWithTwitterAPIv2(Search):
             images = ",".join(item["url"] for item in tweet.get("attachments", {}).get("media_keys", []) if
                                type(item) is dict and item.get("type") == "photo")
 
-
         return {
             "id": tweet["id"],
             "thread_id": tweet.get("conversation_id", tweet["id"]),
@@ -693,5 +692,7 @@ class SearchWithTwitterAPIv2(Search):
             "mentions": mentions,
             "reply_to": "".join(
                 [mention["username"] for mention in tweet.get("entities", {}).get("mentions", [])[:1]]) if any(
-                [ref.get("type") == "replied_to" for ref in tweet.get("referenced_tweets", [])]) else ""
+                [ref.get("type") == "replied_to" for ref in tweet.get("referenced_tweets", [])]) else "",
+            "long_lat": ', '.join([str(x) for x in tweet.get('geo', {}).get('coordinates', {}).get('coordinates', [])]),
+            'place_name': tweet.get('geo', {}).get('place', {}).get('full_name', ''),
         }
