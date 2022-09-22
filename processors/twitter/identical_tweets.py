@@ -17,7 +17,7 @@ class TwitterIdenticalTweets(TwitterStatsBase):
     type = "twitter-identical-tweets"  # job type ID
     category = "Twitter Analysis"  # category
     title = "Identical Tweet Frequency"  # title displayed in UI
-    description = "Contains tweets and the number of times they have been (re)tweeted indentically."  # description displayed in UI
+    description = "Groups tweets by text and counts the number of times they have been (re)tweeted indentically."  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
 
     sorted = 'Number of Identical Tweets'
