@@ -16,7 +16,7 @@ import backend
 from backend.abstract.worker import BasicWorker
 from common.lib.dataset import DataSet
 from common.lib.fourcat_module import FourcatModule
-from common.lib.helpers import get_software_version
+from common.lib.helpers import get_software_version, remove_nuls
 from common.lib.exceptions import WorkerInterruptedException, ProcessorInterruptedException, ProcessorException
 
 csv.field_size_limit(1024 * 1024 * 1024)
@@ -522,6 +522,8 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 			for row in data:
 				if self.interrupted:
 					raise ProcessorInterruptedException("Interrupted while writing results file")
+
+				row = remove_nuls(row)
 				writer.writerow(row)
 
 		self.dataset.update_status("Finished")
