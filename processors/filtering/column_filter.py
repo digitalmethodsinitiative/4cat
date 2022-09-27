@@ -64,6 +64,7 @@ class ColumnFilter(BasicProcessor):
         }
     }
 
+
     @classmethod
     def is_compatible_with(cls, module=None):
         """
@@ -97,7 +98,7 @@ class ColumnFilter(BasicProcessor):
         creates a new dataset containing the matching values
         """
         # Set file extension to parent dataset type
-        self.extension = self.source_dataset.get_extension()
+        self.extension = self.dataset.data['result_file'] = self.source_dataset.get_extension()
 
         # Filter posts
         matching_posts = self.filter_items()
@@ -116,6 +117,7 @@ class ColumnFilter(BasicProcessor):
         elif self.extension == "ndjson":
             with self.dataset.get_results_path().open("w", encoding="utf-8", newline="") as outfile:
                 for post in matching_posts:
+
                     outfile.write(json.dumps(post) + "\n")
                     num_posts += 1
         else:
