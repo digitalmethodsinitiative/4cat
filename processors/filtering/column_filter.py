@@ -26,7 +26,6 @@ class ColumnFilter(BasicProcessor):
     title = "Filter by value"  # title displayed in UI
     description = "A generic filter that checks whether a value in a selected column matches a custom requirement. " \
                   "This will create a new dataset."
-    extension = None
 
     options = {
         "column": {},
@@ -69,10 +68,11 @@ class ColumnFilter(BasicProcessor):
     @classmethod
     def is_compatible_with(cls, module=None):
         """
-        Allow processor on CSV files
+        Allow processor on top datasets.
 
         :param module: Dataset or processor to determine compatibility with
         """
+        # TODO: processor could run on any 'csv' or 'ndjson' file
         return module.is_top_dataset()
 
     @classmethod
@@ -98,12 +98,15 @@ class ColumnFilter(BasicProcessor):
         Reads a file, filtering items that match in the required way, and
         creates a new dataset containing the matching values
         """
+        # Get parent extension
+        parent_extension = self.source_dataset.get_extension()
+
         # Filter posts
         matching_posts = self.filter_items()
 
         # Write the posts
         num_posts = 0
-        if self.dataset.get_extension() == "csv":
+        if parent_extension == "csv":
             with self.dataset.get_results_path().open("w", encoding="utf-8") as outfile:
                 writer = None
                 for post in matching_posts:
@@ -112,14 +115,14 @@ class ColumnFilter(BasicProcessor):
                         writer.writeheader()
                     writer.writerow(post)
                     num_posts += 1
-        elif self..dataset.get_extension() == "ndjson":
+        elif parent_extension == "ndjson":
             with self.dataset.get_results_path().open("w", encoding="utf-8", newline="") as outfile:
                 for post in matching_posts:
 
                     outfile.write(json.dumps(post) + "\n")
                     num_posts += 1
         else:
-            raise NotImplementedError("Datasource query cannot be saved as %s file" % self.extension)
+            raise NotImplementedError("Parent datasource of type %s cannot be filtered" % parent_extension)
 
         if num_posts == 0:
             self.dataset.update_status("No items matched your criteria", is_final=True)
