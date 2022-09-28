@@ -46,6 +46,9 @@ class Vectorise(BasicProcessor):
 		# go through all archived token sets and vectorise them
 		index = 0
 		for token_file in self.iterate_archive_contents(self.source_file):
+			if token_file.name == '.token_metadata.json':
+				# Skip metadata
+				continue
 			index += 1
 			vector_set_name = token_file.stem  # we don't need the full path
 			self.dataset.update_status("Processing token set %i (%s)" % (index, vector_set_name))

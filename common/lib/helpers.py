@@ -14,6 +14,7 @@ import math
 import csv
 import re
 import os
+import io
 
 from collections.abc import MutableMapping
 from pathlib import Path
@@ -591,15 +592,45 @@ def is_rankable(dataset):
         return len(set(reader.fieldnames) & {"date", "value", "item", "word_1"}) >= 3
 
 
-def gdf_escape(string):
+def remove_nuls(value):
     """
-    Escape string for usage in GDF file
+    Remove \0 from a value
 
-    :param str string:  String to escape
-    :return str:  Escaped string
+    The CSV library cries about a null byte when it encounters one :( :( :(
+    poor little csv cannot handle a tiny little null byte
+
+    So remove them from the data because they should not occur in utf-8 data
+    anyway.
+
+    :param value:  Value to remove nulls from. For dictionaries, sets, tuples
+    and lists all items are parsed recursively.
+    :return value:  Cleaned value
     """
-    return "'" + string.replace("'", "\\'").replace("\n", "\\n") + "'"
+    if type(value) is dict:
+        for field in value:
+            value[field] = remove_nuls(value[field])
+    elif type(value) is list:
+        value = [remove_nuls(item) for item in value]
+    elif type(value) is tuple:
+        value = tuple([remove_nuls(item) for item in value])
+    elif type(value) is set:
+        value = set([remove_nuls(item) for item in value])
+    elif type(value) is str:
+        value = value.replace("\0", "")
 
+    return value
+
+
+class NullAwareTextIOWrapper(io.TextIOWrapper):
+    """
+    TextIOWrapper that skips null bytes
+
+    This can be used as a file reader that silently discards any null bytes it
+    encounters.
+    """
+    def __next__(self):
+        value = super().__next__()
+        return remove_nuls(value)
 
 def dict_search_and_update(item, keyword_matches, function):
     """

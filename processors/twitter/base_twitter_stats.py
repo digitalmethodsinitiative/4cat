@@ -6,7 +6,7 @@ import datetime
 
 from common.lib.helpers import pad_interval, get_interval_descriptor
 from backend.abstract.processor import BasicProcessor
-from common.lib.exceptions import ProcessorException
+from common.lib.exceptions import ProcessorException, ProcessorInterruptedException
 
 __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl"]
@@ -53,6 +53,9 @@ class TwitterStatsBase(BasicProcessor):
         data_types = None
         # Iterate through each post and collect data for each interval
         for post in self.source_dataset.iterate_items(self, bypass_map_item=True):
+            if self.interrupted:
+                raise ProcessorInterruptedException("Interrupted while processing Tweets")
+
             try:
                 tweet_time = datetime.datetime.strptime(post["created_at"], "%Y-%m-%dT%H:%M:%S.000Z")
                 post["timestamp"] = tweet_time.strftime("%Y-%m-%d %H:%M:%S")
@@ -75,7 +78,7 @@ class TwitterStatsBase(BasicProcessor):
                 if type(group_by_keys) is str:
                     group_by_keys = [group_by_keys]
                 elif type(group_by_keys) is not set:
-                    raise ProcessorException("group_by_keys must be a string or list")
+                    raise ProcessorException("group_by_keys must be a string, list, or set")
 
                 # Add a counts for the respective timeframe
                 if date not in intervals:
@@ -143,9 +146,13 @@ class TwitterStatsBase(BasicProcessor):
             for k, v in intervals.items():
                 if isinstance(v, int):
                     intervals[k] = self.padding_map()
+                    intervals[k].update({"Created at Timestamp": None})
 
         rows = []
         for interval, data in intervals.items():
+            if self.interrupted:
+                raise ProcessorInterruptedException("Interrupted while processing Tweets")
+
             interval_rows = []
             if group_by_keys_category:
                 for group_key, group_data in data.items():
@@ -165,6 +172,10 @@ class TwitterStatsBase(BasicProcessor):
     def padding_map(self):
         """
         Returns the base dictionary to be used if there are no values in a certain interval.
+
+        Note: key "Created at Timestamp" with value None is automatically added to dictionary after padding_map; this value
+        is used when comparing static data in the map_data function below. The key can be removed in the modify_intervals if
+        not desired in output.
         """
         return {}
 

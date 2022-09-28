@@ -15,7 +15,7 @@ __maintainer__ = "Dale Wahl"
 __email__ = "4cat@oilab.eu"
 
 
-class TwitterStats(BasicProcessor):
+class TwitterUserStats(BasicProcessor):
     """
     Collect Twitter statistics. Build to emulate TCAT statistic.
     """
@@ -86,6 +86,8 @@ class TwitterStats(BasicProcessor):
 
                 rows.append({**{"date": interval, "data_type": data_type}, **row})
 
+        if bool(self.dataset.top_parent().parameters.get("pseudonymise", None)):
+            self.dataset.update_status('Dataset previously was pseudonymised; not all metrics could be calculated.', is_final=True)
         self.write_csv_items_and_finish(rows)
 
     def collect_intervals(self):
@@ -104,6 +106,10 @@ class TwitterStats(BasicProcessor):
 
         counter = 0
         data_types = None
+
+        pseudonymised_dataset = bool(self.dataset.top_parent().parameters.get("pseudonymise", None))
+        if pseudonymised_dataset:
+            self.dataset.update_status("Pseudonymised dataset; not all metrics can be calculated.")
 
         for post in self.source_dataset.iterate_items(self, bypass_map_item=True):
             try:
@@ -135,12 +141,13 @@ class TwitterStats(BasicProcessor):
                     "Number of Images": len(
                         [item["url"] for item in post.get("attachments", {}).get("media_keys", []) if
                          type(item) is dict and item.get("type") == "photo"]),
-                    "Number User is Following": post.get("author_user").get('public_metrics').get('following_count'),
-                    "Number Followers of User": post.get("author_user").get('public_metrics').get('followers_count'),
-                    "Number of Tweets (account lifetime)": post.get("author_user").get('public_metrics').get(
-                        'tweet_count'),
                     "Created at Timestamp": int(tweet_time.timestamp()),
                 }
+                if not pseudonymised_dataset:
+                    intervals[date][author]["Number User is Following"] = post.get("author_user").get('public_metrics').get('following_count'),
+                    intervals[date][author]["Number Followers of User"] = post.get("author_user").get('public_metrics').get('followers_count'),
+                    intervals[date][author]["Number of Tweets (account lifetime)"] = post.get("author_user").get('public_metrics').get(
+                        'tweet_count'),
 
                 # Convenience for easy adding to above
                 if not data_types:
@@ -169,12 +176,13 @@ class TwitterStats(BasicProcessor):
                 if int(tweet_time.timestamp()) > intervals[date][author]["Created at Timestamp"]:
                     intervals[date][author]["Created at Timestamp"] = int(
                         datetime.datetime.strptime(post["created_at"], "%Y-%m-%dT%H:%M:%S.000Z").timestamp())
-                    intervals[date][author]["Number User is Following"] = post.get("author_user").get(
-                        'public_metrics').get('following_count')
-                    intervals[date][author]["Number Followers of User"] = post.get("author_user").get(
-                        'public_metrics').get('followers_count')
-                    intervals[date][author]["Number of Tweets (account lifetime)"] = post.get("author_user").get(
-                        'public_metrics').get('tweet_count')
+                    if not pseudonymised_dataset:
+                        intervals[date][author]["Number User is Following"] = post.get("author_user").get(
+                            'public_metrics').get('following_count')
+                        intervals[date][author]["Number Followers of User"] = post.get("author_user").get(
+                            'public_metrics').get('followers_count')
+                        intervals[date][author]["Number of Tweets (account lifetime)"] = post.get("author_user").get(
+                            'public_metrics').get('tweet_count')
 
             first_interval = min(first_interval, date)
             last_interval = max(last_interval, date)
@@ -198,7 +206,7 @@ class TwitterStats(BasicProcessor):
         return data_types, intervals
 
 
-class TwitterStatsVis(TwitterStats):
+class TwitterStatsVis(TwitterUserStats):
     """
     Collect Twitter statistics and create boxplots to visualise.
     """

@@ -140,6 +140,9 @@ class GenerateWordEmbeddings(BasicProcessor):
 		# go through all archived token sets and vectorise them
 		models = 0
 		for temp_file in self.iterate_archive_contents(self.source_file):
+			if temp_file.name == '.token_metadata.json':
+				# Skip metadata
+				continue
 			# use the "list of lists" as input for the word2vec model
 			# by default the tokeniser generates one list of tokens per
 			# post... which may actually be preferable for short
@@ -241,7 +244,7 @@ class GenerateWordEmbeddings(BasicProcessor):
 					line = line.strip()
 					if line[-1] == ",":
 						line = line[:-1]
-						
+
 					token_set = json.loads(line)
 					if phraser:
 						yield phraser[token_set]

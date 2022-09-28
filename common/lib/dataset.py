@@ -13,7 +13,7 @@ from pathlib import Path
 import common.config_manager as config
 import backend
 from common.lib.job import Job, JobNotFoundException
-from common.lib.helpers import get_software_version
+from common.lib.helpers import get_software_version, NullAwareTextIOWrapper
 from common.lib.fourcat_module import FourcatModule
 from common.lib.exceptions import ProcessorInterruptedException
 
@@ -273,8 +273,9 @@ class DataSet(FourcatModule):
 
 		# go through items one by one, optionally mapping them
 		if path.suffix.lower() == ".csv":
-			with path.open(encoding="utf-8") as infile:
-				reader = csv.DictReader(infile)
+			with path.open("rb") as infile:
+				wrapped_infile = NullAwareTextIOWrapper(infile, encoding="utf-8")
+				reader = csv.DictReader(wrapped_infile)
 
 				for item in reader:
 					if hasattr(processor, "interrupted") and processor.interrupted:

@@ -42,9 +42,10 @@ class SearchWithTwitterAPIv2(Search):
                     "token](https://developer.twitter.com/en/docs/authentication/oauth-2-0). The bearer token **will "
                     "be sent to the 4CAT server**, where it will be deleted after data collection has started. "
                     "\n\nPlease refer to the [Twitter API documentation]("
-                    "https://developer.twitter.com/en/docs/twitter-api/tweets/search/quick-start/full-archive-search) "
+                    "https://developer.twitter.com/en/docs/twitter-api/tweets/search/integrate/build-a-query) "
                     "documentation for more information about this API endpoint and the syntax you can use in your "
-                    "search query. Note that any tweets retrieved with 4CAT will count towards your monthly Tweet "
+                    "search query. You can also test queries with Twitter's [Query Builder](https://developer.twitter.com/apitools/query?query=)."
+                    "Note that any tweets retrieved with 4CAT will count towards your monthly Tweet "
                     "retrieval cap."
         },
         "api_type": {
@@ -666,7 +667,6 @@ class SearchWithTwitterAPIv2(Search):
             images = ",".join(item["url"] for item in tweet.get("attachments", {}).get("media_keys", []) if
                                type(item) is dict and item.get("type") == "photo")
 
-
         return {
             "id": tweet["id"],
             "thread_id": tweet.get("conversation_id", tweet["id"]),
@@ -692,5 +692,7 @@ class SearchWithTwitterAPIv2(Search):
             "mentions": mentions,
             "reply_to": "".join(
                 [mention["username"] for mention in tweet.get("entities", {}).get("mentions", [])[:1]]) if any(
-                [ref.get("type") == "replied_to" for ref in tweet.get("referenced_tweets", [])]) else ""
+                [ref.get("type") == "replied_to" for ref in tweet.get("referenced_tweets", [])]) else "",
+            "long_lat": ', '.join([str(x) for x in tweet.get('geo', {}).get('coordinates', {}).get('coordinates', [])]),
+            'place_name': tweet.get('geo', {}).get('place', {}).get('full_name', ''),
         }

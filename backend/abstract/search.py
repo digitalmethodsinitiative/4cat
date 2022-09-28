@@ -12,7 +12,7 @@ from abc import ABC, abstractmethod
 import common.config_manager as config
 from common.lib.dataset import DataSet
 from backend.abstract.processor import BasicProcessor
-from common.lib.helpers import strip_tags, dict_search_and_update
+from common.lib.helpers import strip_tags, dict_search_and_update, remove_nuls
 from common.lib.exceptions import WorkerInterruptedException, ProcessorInterruptedException
 
 
@@ -272,6 +272,8 @@ class Search(BasicProcessor, ABC):
 					author_fields = [field for field in row.keys() if "author" in field]
 					for author_field in author_fields:
 						row[author_field] = check_cache.update_cache(row[author_field])
+
+				row = remove_nuls(row)
 				writer.writerow(row)
 
 		return processed

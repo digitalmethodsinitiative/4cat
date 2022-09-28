@@ -1,0 +1,84 @@
+/* 
+
+See https://github.com/digitalmethodsinitiative/4cat/wiki/Exploring-and-annotating-datasets for information on how to add custom CSS.
+ 
+ */
+
+body {
+	background-color: white;
+}
+
+.posts .post {
+	position: relative;
+	background-color: white;
+	max-width: 620px;
+	border: 1px solid #d6d6d6;
+	border-radius: 10px;
+	min-height: 50px;
+}
+
+.posts .post header {
+	display: inline-block;
+	line-height: 1.7em;
+	margin-bottom: 5px;
+	border: none;
+	color: rgb(104, 119, 130);
+}
+
+.posts .post header .post_id {
+	display: none;
+}
+
+.posts .post header .author {
+	color: black;
+}
+
+.posts .post header .profile_picture {
+	float: left;
+	margin-right: 15px;
+}
+
+.posts .post header .profile_picture img {
+	border-radius: 100px;
+	width: 50px;
+}
+
+.posts .post header .profile_picture:after {
+	display: none;
+}
+
+.posts .post article {
+	margin: 0;
+	padding: 0;
+}
+
+.posts .post.op {
+	background-color: white;
+	color: black;
+}
+
+.posts .post .post-content {
+	display: inline-block;
+}
+
+.posts .post .post-image {
+	margin-bottom: 10px;
+}
+
+.posts .post .post-image img {
+	border-radius: 10px;
+}
+
+.posts .external-url {
+	color: rgb(104, 119, 130);
+}
+
+.posts .post.op .post-annotations, .posts .post .post-annotations {
+	border-radius: 10px;
+	background-color: rgb(241, 249, 255);
+	color: #474747;
+}
+
+span.hashtag {
+	color: rgb(29, 155, 240);
+}

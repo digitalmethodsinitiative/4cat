@@ -163,13 +163,16 @@ def trigger_restart_frontend():
     If restarting is not supported a JSON is returned explaining so. In that
     case the user needs to restart the server in some other way.
     """
-    def server_killer(pid, sig):
+    def server_killer(pid, sig, touch_path=False):
         """
         Helper function. Gives Flask time to complete the request before
         sending the signal.
         """
         def kill_function():
-            time.sleep(1)
+            if touch_path:
+                touch_path.touch()
+
+            time.sleep(2)
             os.kill(pid, sig)
 
         return kill_function
@@ -194,13 +197,11 @@ def trigger_restart_frontend():
         # apache
         # mod_wsgi? touching the file is always safe
         message = "Detected Flask running in mod_wsgi, touching 4cat.wsgi."
-        wsgi_file = Path(config.get("PATH_ROOT"), "webtool", "4cat.wsgi")
-        wsgi_file.touch()
 
         # send a signal to apache to reload if running in daemon mode
         if os.environ.get("mod_wsgi.process_group") not in (None, ""):
             message = "Detected Flask running in mod_wsgi as daemon, sending SIGINT."
-            kill_thread = threading.Thread(target=server_killer(os.getpid(), signal.SIGINT))
+            kill_thread = threading.Thread(target=server_killer(os.getpid(), signal.SIGINT, touch=Path(config.get("PATH_ROOT"), "webtool", "4cat.wsgi")))
             kill_thread.start()
 
     else:

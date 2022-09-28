@@ -1,4 +1,4 @@
-                                                            ---
+---
 name: Bug report
 about: Create a report to help us improve
 title: ''
@@ -20,13 +20,9 @@ Steps to reproduce the behavior:
 **Expected behavior**
 A clear and concise description of what you expected to happen.
 
-**Screenshots**
-If applicable, add screenshots to help explain your problem.
+**4CAT Environment**
+ - How are you accessing 4CAT? [e.g. 4cat.oilab.nl or your own server/desktop]
+ - If accessing via your own server/desktop, what is the environment and are you using Docker?
 
-**Environment:**
- - OS (if bug relates server/backend/install): [e.g~~. ubuntu 16.04~~]
- - Browser (if bug relates to frontend): [e.g. chrome, safari]
- - Version [e.g. 1.22; check the VERSION file in your 4CAT installation]
-
-**Additional context**
-Add any other context about the problem here.
+**Screenshots, links to datasets, and any additional context**
+If your 4CAT is available online (e.g. 4cat.oilab.nl) and it is related to a specific dataset, please post the link.
