@@ -26,6 +26,7 @@ class ColumnFilter(BasicProcessor):
     title = "Filter by value"  # title displayed in UI
     description = "A generic filter that checks whether a value in a selected column matches a custom requirement. " \
                   "This will create a new dataset."
+    extension = None
 
     options = {
         "column": {},
@@ -97,15 +98,12 @@ class ColumnFilter(BasicProcessor):
         Reads a file, filtering items that match in the required way, and
         creates a new dataset containing the matching values
         """
-        # Set file extension to parent dataset type
-        self.extension = self.dataset.data['result_file'] = self.source_dataset.get_extension()
-
         # Filter posts
         matching_posts = self.filter_items()
 
         # Write the posts
         num_posts = 0
-        if self.extension == "csv":
+        if self.dataset.get_extension() == "csv":
             with self.dataset.get_results_path().open("w", encoding="utf-8") as outfile:
                 writer = None
                 for post in matching_posts:
@@ -114,7 +112,7 @@ class ColumnFilter(BasicProcessor):
                         writer.writeheader()
                     writer.writerow(post)
                     num_posts += 1
-        elif self.extension == "ndjson":
+        elif self..dataset.get_extension() == "ndjson":
             with self.dataset.get_results_path().open("w", encoding="utf-8", newline="") as outfile:
                 for post in matching_posts:
 
