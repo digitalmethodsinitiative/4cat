@@ -860,11 +860,23 @@ def queue_processor(key=None, processor=None):
 	except QueryParametersException as e:
 		return error(400, error=str(e))
 
+	# Resolve extension
+	if available_processors[processor].extension is None:
+		parent_extension = dataset.get_extension()
+		if parent_extension is not None:
+			print('TESTING: grabbing parent extension %s' % str(parent_extension))
+			extension = parent_extension
+		else:
+			# This is a fallback since I don't know what would happen if I sent a None somewhere
+			extension = 'csv'
+	else:
+		extension = available_processors[processor].extension
+
 	# private or not is inherited from parent dataset
 	analysis = DataSet(parent=dataset.key,
 					   parameters=options,
 					   db=db,
-					   extension=available_processors[processor].extension,
+					   extension=extension,
 					   type=processor,
 					   is_private=dataset.is_private,
 					   owner=current_user.get_id()
