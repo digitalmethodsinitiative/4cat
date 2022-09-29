@@ -169,6 +169,7 @@ class ColumnFilter(BasicProcessor):
                                 match_values]
         self.dataset.log('Criteria: column - %s, style - %s, multiple - %s, function - %s, values - %s' % (str(column), str(match_style), str(match_multiple), str(match_function), ' & '.join(match_values)))
         # Collect item_mapper for use with filter
+        item_mapper = None
         own_processor = self.source_dataset.get_own_processor()
         if hasattr(own_processor, "map_item"):
             item_mapper = own_processor.map_item
