@@ -706,7 +706,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		:return str|None:  Dataset extension (without leading `.`) or `None`.
 		"""
 		if self.is_filter():
-			if dataset is not None:
+			if dataset is not None and dataset.get_parent() is not None:
 				# Filters should use the same extension as the parent dataset
 				return dataset.get_parent().get_extension()
 			else:
