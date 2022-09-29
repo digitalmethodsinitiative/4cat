@@ -697,7 +697,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		return False
 
 	@classmethod
-	def get_extension(self):
+	def get_extension(self, dataset=None):
 		"""
 		Return the extension of the processor's dataset
 
@@ -705,10 +705,18 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
 		:return str|None:  Dataset extension (without leading `.`) or `None`.
 		"""
-
-		if self.extension and not self.is_filter():
+		if self.is_filter():
+			if dataset is not None:
+				# Filters should use the same extension as the parent dataset
+				return dataset.get_parent().get_extension()
+			else:
+				# No dataset provided, unable to determine extension of parent dataset
+				return None
+		elif self.extension:
+			# Use explicitly defined extension in class (Processor class defaults to "csv")
 			return self.extension
-		return None
+		else:
+			return None
 
 	@classmethod
 	def is_rankable(cls, multiple_items=True):

@@ -47,7 +47,7 @@ class DataSet(FourcatModule):
 	no_status_updates = False
 	staging_area = None
 
-	def __init__(self, parameters={}, key=None, job=None, data=None, db=None, parent=None, extension="csv",
+	def __init__(self, parameters={}, key=None, job=None, data=None, db=None, parent=None, extension=None,
 				 type=None, is_private=True, owner="anonymous"):
 		"""
 		Create new dataset object
@@ -121,6 +121,11 @@ class DataSet(FourcatModule):
 			self.parameters = parameters
 
 			self.db.insert("datasets", data=self.data)
+			# Find desired extension from processor if not explicitly set
+			if extension is None:
+				extension = self.get_own_processor().get_extension(dataset=self)
+				if not extension:
+					extension = 'csv'
 			self.reserve_result_file(parameters, extension)
 
 		# retrieve analyses and processors that may be run for this dataset
