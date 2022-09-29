@@ -864,7 +864,7 @@ def queue_processor(key=None, processor=None):
 	analysis = DataSet(parent=dataset.key,
 					   parameters=options,
 					   db=db,
-					   extension=available_processors[processor].get_extension(dataset=dataset),
+					   extension=available_processors[processor].get_extension(parent_dataset=dataset),
 					   type=processor,
 					   is_private=dataset.is_private,
 					   owner=current_user.get_id()

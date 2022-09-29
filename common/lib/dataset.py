@@ -121,11 +121,17 @@ class DataSet(FourcatModule):
 			self.parameters = parameters
 
 			self.db.insert("datasets", data=self.data)
+
 			# Find desired extension from processor if not explicitly set
 			if extension is None:
-				extension = self.get_own_processor().get_extension(dataset=self)
+				own_processor = self.get_own_processor()
+				if own_processor.is_filter() and parent is not None:
+					# Filters use parent dataset type
+					extension = own_processor.get_extension(parent_dataset=parent)
+				# Still no extension, default to 'csv'
 				if not extension:
 					extension = 'csv'
+			# Reserve filename and update data['result_file']
 			self.reserve_result_file(parameters, extension)
 
 		# retrieve analyses and processors that may be run for this dataset
