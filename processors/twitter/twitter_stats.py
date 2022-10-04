@@ -14,7 +14,7 @@ class TwitterStats(TwitterStatsBase):
     """
     Collect Twitter statistics. Built to emulate TCAT statistic.
     """
-    type = "twitter-stats"  # job type ID
+    type = "twitter-0-stats"  # job type ID
     category = "Twitter Analysis"  # category
     title = "Twitter Statistics"  # title displayed in UI
     description = "Contains the number of tweets, number of tweets with links, number of tweets with hashtags, number of tweets with mentions, number of retweets, and number of replies"  # description displayed in UI
