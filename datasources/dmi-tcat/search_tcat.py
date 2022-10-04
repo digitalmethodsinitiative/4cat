@@ -126,7 +126,6 @@ class SearchWithinTCATBins(Search):
         be used to show some options only to privileges users.
         """
         options = cls.options
-        print('TCAT CALLING get_options', flush=True)
 
         instances = config.get('DATASOURCES').get("dmi-tcat", {}).get("instances", [])
         all_bins = {}
