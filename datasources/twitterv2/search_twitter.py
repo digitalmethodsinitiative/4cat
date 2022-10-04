@@ -22,6 +22,7 @@ class SearchWithTwitterAPIv2(Search):
     queries.
     """
     type = "twitterv2-search"  # job ID
+    title = "Twitter API (v2)"
     extension = "ndjson"
     is_local = False    # Whether this datasource is locally scraped
     is_static = False   # Whether this datasource is still updated
@@ -33,75 +34,34 @@ class SearchWithTwitterAPIv2(Search):
         "[Twitter API documentation](https://developer.twitter.com/en/docs/twitter-api)"
     ]
 
-    options = {
-        "intro-1": {
-            "type": UserInput.OPTION_INFO,
-            "help": "This data source uses either the Standard 7-day historical Search endpoint or the full-archive "
-                    "search endpoint of the Twitter API, v2. To use the latter, you must have access to the Academic "
-                    "Research track of the Twitter API. In either case, you will need to provide a valid [bearer "
-                    "token](https://developer.twitter.com/en/docs/authentication/oauth-2-0). The bearer token **will "
-                    "be sent to the 4CAT server**, where it will be deleted after data collection has started. "
-                    "\n\nPlease refer to the [Twitter API documentation]("
-                    "https://developer.twitter.com/en/docs/twitter-api/tweets/search/integrate/build-a-query) "
-                    "documentation for more information about this API endpoint and the syntax you can use in your "
-                    "search query. You can also test queries with Twitter's [Query Builder](https://developer.twitter.com/apitools/query?query=)."
-                    "Note that any tweets retrieved with 4CAT will count towards your monthly Tweet "
-                    "retrieval cap."
-        },
-        "api_type": {
-            "type": UserInput.OPTION_CHOICE,
-            "help": "API track",
-            "options": {
-                "all": "Academic: Full-archive search",
-                "recent": "Standard: Recent search (Tweets published in last 7 days)",
-            },
-            "default": "all"
-        },
-        "api_bearer_token": {
+    config = {
+        "twitterv2-search.academic_api_key": {
             "type": UserInput.OPTION_TEXT,
-            "sensitive": True,
-            "cache": True,
-            "help": "API Bearer Token"
+            "default": "",
+            "help": "Academic API Key",
+            "tooltip": "An API key for the Twitter v2 Academic API. If "
+                       "provided, the user will not need to enter their own "
+                       "key to retrieve tweets. Note that this API key should "
+                       "have access to the Full Archive Search endpoint."
         },
+        "twitterv2-search.max_tweets": {
+            "type": UserInput.OPTION_TEXT,
+            "default": 0,
+            "min": 0,
+            "max": 10_000_000,
+            "help": "Max tweets per dataset",
+            "tooltip": "4CAT will never retrieve more than this amount of "
+                       "tweets per dataset. Enter '0' for unlimited tweets."
+        },
+        "twitterv2-search.id_lookup": {
+            "type": UserInput.OPTION_TOGGLE,
+            "default": False,
+            "help": "Allow lookup by ID",
+            "tooltip": "If enabled, allow users to enter a list of tweet IDs "
+                       "to retrieve. This is disabled by default because it "
+                       "can be confusing to novice users."
+        }
     }
-    if config.get('DATASOURCES').get('twitterv2', {}).get('id_lookup', False):
-        options["query_type"] = {
-                "type": UserInput.OPTION_CHOICE,
-                "help": "Query type",
-                "tooltip": "Note: Num of Tweets and Date fields ignored with 'Tweets by ID' lookup",
-                "options": {
-                    "query": "Search query",
-                    "id_lookup": "Tweets by ID (list IDs seperated by commas or one per line)",
-                },
-                "default": "query"
-            }
-
-    options.update({
-        'query': {
-                "type": UserInput.OPTION_TEXT_LARGE,
-                "help": "Query"
-            },
-        "amount": {
-                "type": UserInput.OPTION_TEXT,
-                "help": "Tweets to retrieve",
-                "tooltip": "0 = unlimited (be careful!)",
-                "min": 0,
-                "max": 10000000,
-                "default": 10
-            },
-        "divider-2": {
-                "type": UserInput.OPTION_DIVIDER
-            },
-        'daterange-info': {
-                "type": UserInput.OPTION_INFO,
-                "help": "By default, Twitter returns tweets up til 30 days ago. If you want to go back further, you "
-                        "need to explicitly set a date range."
-            },
-        "daterange": {
-                "type": UserInput.OPTION_DATERANGE,
-                "help": "Date range"
-            },
-    })
 
     def get_items(self, query):
         """
@@ -114,7 +74,9 @@ class SearchWithTwitterAPIv2(Search):
         error_report = []
         # this is pretty sensitive so delete it immediately after storing in
         # memory
-        bearer_token = self.parameters.get("api_bearer_token")
+        have_api_key = config.get("twitterv2-search.academic_api_key")
+        bearer_token = self.parameters.get("api_bearer_token") if not have_api_key else have_api_key
+        api_type = query.get("api_type") if not have_api_key else "all"
         auth = {"Authorization": "Bearer %s" % bearer_token}
         expected_tweets = query.get("expected-tweets", "unknown")
 
@@ -146,7 +108,7 @@ class SearchWithTwitterAPIv2(Search):
             "media.fields": ",".join(media_fields),
         }
 
-        if self.parameters.get("query_type", "query") == 'id_lookup':
+        if self.parameters.get("query_type", "query") == "id_lookup" and config.get("twitterv2-search.id_lookup"):
             endpoint = "https://api.twitter.com/2/tweets"
 
             tweet_ids = self.parameters.get("query", []).split(',')
@@ -163,7 +125,7 @@ class SearchWithTwitterAPIv2(Search):
 
         else:
             # Query to all or search
-            endpoint = "https://api.twitter.com/2/tweets/search/" + query.get("api_type")
+            endpoint = "https://api.twitter.com/2/tweets/search/" + api_type
 
             queries = [self.parameters.get("query", "")]
 
@@ -186,7 +148,7 @@ class SearchWithTwitterAPIv2(Search):
 
         tweets = 0
         for query in queries:
-            if self.parameters.get("query_type", "query") == 'id_lookup':
+            if self.parameters.get("query_type", "query") == "id_lookup" and config.get("twitterv2-search.id_lookup"):
                 params['ids'] = query
             else:
                 params['query'] = query
@@ -352,7 +314,7 @@ class SearchWithTwitterAPIv2(Search):
 
                     yield tweet
 
-                if self.parameters.get("query_type", "query") == 'id_lookup':
+                if self.parameters.get("query_type", "query") == "id_lookup" and config.get("twitterv2-search.id_lookup"):
                     # If id_lookup return errors in collecting tweets
                     for tweet_error in api_response.get("errors", []):
                         tweet_id = str(tweet_error.get('resource_id'))
@@ -491,6 +453,111 @@ class SearchWithTwitterAPIv2(Search):
 
         return modified_tweet
 
+    @classmethod
+    def get_options(cls, parent_dataset=None, user=None):
+        """
+        Get Twitter data source options
+
+        These are somewhat dynamic, because depending on settings users may or
+        may not need to provide their own API key, and may or may not be able
+        to enter a list of tweet IDs as their query. Hence the method.
+
+        :param parent_dataset:  Should always be None
+        :param user:  User to provide options for
+        :return dict:  Data source options
+        """
+        have_api_key = config.get("twitterv2-search.academic_api_key")
+        max_tweets = config.get("twitterv2-search.max_tweets")
+
+        if have_api_key:
+            intro_text = ("This data source uses the full-archive search endpoint of the Twitter API (v2) to retrieve "
+                          "historic tweets that match a given query.")
+
+        else:
+            intro_text = ("This data source uses either the Standard 7-day historical Search endpoint or the "
+                          "full-archive search endpoint of the Twitter API, v2. To use the latter, you must have "
+                          "access  to the Academic Research track of the Twitter API. In either case, you will need to "
+                          "provide a  valid [bearer "
+                          "token](https://developer.twitter.com/en/docs/authentication/oauth-2-0). The  bearer token "
+                          "**will be sent to the 4CAT server**, where it will be deleted after data collection has "
+                          "started. Note that any tweets retrieved  with 4CAT will count towards your monthly Tweet "
+                          "retrieval cap.")
+
+        intro_text += ("\n\nPlease refer to the [Twitter API documentation]("
+                          "https://developer.twitter.com/en/docs/twitter-api/tweets/search/integrate/build-a-query) "
+                          "documentation for more information about this API endpoint and the syntax you can use in your "
+                          "search query. You can also test queries with Twitter's [Query "
+                          "Builder](https://developer.twitter.com/apitools/query?query=).")
+
+        options = {
+            "intro-1": {
+                "type": UserInput.OPTION_INFO,
+                "help": intro_text
+            },
+        }
+
+        if not have_api_key:
+            options.update({
+                "api_type": {
+                    "type": UserInput.OPTION_CHOICE,
+                    "help": "API track",
+                    "options": {
+                        "all": "Academic: Full-archive search",
+                        "recent": "Standard: Recent search (Tweets published in last 7 days)",
+                    },
+                    "default": "all"
+                },
+                "api_bearer_token": {
+                    "type": UserInput.OPTION_TEXT,
+                    "sensitive": True,
+                    "cache": True,
+                    "help": "API Bearer Token"
+                },
+            })
+
+        if config.get("twitterv2.id_lookup"):
+            options.update({
+                "query_type": {
+                    "type": UserInput.OPTION_CHOICE,
+                    "help": "Query type",
+                    "tooltip": "Note: Num of Tweets and Date fields ignored with 'Tweets by ID' lookup",
+                    "options": {
+                        "query": "Search query",
+                        "id_lookup": "Tweets by ID (list IDs seperated by commas or one per line)",
+                    },
+                    "default": "query"
+                }
+            })
+
+        options.update({
+            "query": {
+                "type": UserInput.OPTION_TEXT_LARGE,
+                "help": "Query"
+            },
+            "amount": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Tweets to retrieve",
+                "tooltip": "0 = unlimited (be careful!)" if not max_tweets else ("0 = maximum (%s)" % str(max_tweets)),
+                "min": 0,
+                "max": max_tweets if max_tweets else 10_000_000,
+                "default": 10
+            },
+            "divider-2": {
+                "type": UserInput.OPTION_DIVIDER
+            },
+            "daterange-info": {
+                "type": UserInput.OPTION_INFO,
+                "help": "By default, Twitter returns tweets up til 30 days ago. If you want to go back further, you "
+                        "need to explicitly set a date range."
+            },
+            "daterange": {
+                "type": UserInput.OPTION_DATERANGE,
+                "help": "Date range"
+            },
+        })
+
+        return options
+
     @staticmethod
     def validate_query(query, request, user):
         """
@@ -509,17 +576,21 @@ class SearchWithTwitterAPIv2(Search):
         :param User user:  User object of user who has submitted the query
         :return dict:  Safe query parameters
         """
+        have_api_key = config.get("twitterv2-search.academic_api_key")
+        max_tweets = config.get("twitterv2-search.max_tweets", 10_000_000)
+
         # this is the bare minimum, else we can't narrow down the full data set
         if not query.get("query", None):
             raise QueryParametersException("Please provide a query.")
 
-        if not query.get("api_bearer_token", None):
-            raise QueryParametersException("Please provide a valid bearer token.")
+        if not have_api_key:
+            if not query.get("api_bearer_token", None):
+                raise QueryParametersException("Please provide a valid bearer token.")
 
-        if len(query.get("query")) > 1024 and query.get('query_type', 'query') != 'id_lookup':
+        if len(query.get("query")) > 1024 and query.get("query_type", "query") != "id_lookup":
             raise QueryParametersException("Twitter API queries cannot be longer than 1024 characters.")
 
-        if query.get('query_type', 'query') == 'id_lookup':
+        if query.get("query_type", "query") == "id_lookup" and config.get("twitterv2-search.id_lookup"):
             # reformat queries to be a comma-separated list with no wrapping
             # whitespace
             whitespace = re.compile(r"\s+")
@@ -540,10 +611,10 @@ class SearchWithTwitterAPIv2(Search):
             "query": twitter_query,
             "api_bearer_token": query.get("api_bearer_token"),
             "api_type": query.get("api_type"),
-            "query_type": query.get('query_type', 'query'),
+            "query_type": query.get("query_type", "query"),
             "min_date": after,
             "max_date": before,
-            "amount": query.get("amount")
+            "amount": max(1, min(max_tweets, convert_to_int(query.get("amount"), 10)))
         }
 
         # figure out how many tweets we expect to get back - we can use this
