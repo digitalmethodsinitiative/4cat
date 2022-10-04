@@ -22,7 +22,7 @@ class TwitterAggregatedStats(BasicProcessor):
     type = "twitter-aggregated-stats"  # job type ID
     category = "Twitter Analysis"  # category
     title = "Aggregated Statistics"  # title displayed in UI
-    description = "Calculates aggregate statistics for tweet author, tweet type, tweet source, place name, language and groups by interval (min, max, average, Q1, median, Q3, and trimmed mean): number of tweets, urls, hashtags, mentions, etc."  # description displayed in UI
+    description = "Group tweets by category and count tweets per timeframe and then calculate aggregate group statistics (i.e. min, max, average, Q1, median, Q3, and trimmed mean): number of tweets, urls, hashtags, mentions, etc. \nUse for example to find the distribution of the number of tweets per author and compare across time."  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
 
     num_of_different_categories = None
@@ -132,11 +132,6 @@ class TwitterAggregatedStats(BasicProcessor):
         counter = 0
         data_types = None
 
-        if category == 'user':
-            pseudonymised_dataset = bool(self.dataset.top_parent().parameters.get("pseudonymise", None))
-            if pseudonymised_dataset:
-                self.dataset.update_status("Pseudonymised dataset; not all metrics can be calculated.")
-
         for post in self.source_dataset.iterate_items(self, bypass_map_item=True):
             try:
                 tweet_time = datetime.datetime.strptime(post["created_at"], "%Y-%m-%dT%H:%M:%S.000Z")
@@ -187,12 +182,6 @@ class TwitterAggregatedStats(BasicProcessor):
                          type(item) is dict and item.get("type") == "photo"]),
                     "Created at Timestamp": int(tweet_time.timestamp()),
                 }
-                if category == 'author' and not pseudonymised_dataset:
-                    # Author specific data
-                    intervals[date][post_category]["Number User is Following"] = post.get("author_user").get('public_metrics').get('following_count'),
-                    intervals[date][post_category]["Number Followers of User"] = post.get("author_user").get('public_metrics').get('followers_count'),
-                    intervals[date][post_category]["Number of Tweets (account lifetime)"] = post.get("author_user").get('public_metrics').get(
-                        'tweet_count'),
 
                 # Convenience for easy adding to above
                 if not data_types:
@@ -214,20 +203,6 @@ class TwitterAggregatedStats(BasicProcessor):
                 intervals[date][post_category]["Number of Images"] += len(
                     [item["url"] for item in post.get("attachments", {}).get("media_keys", []) if
                      type(item) is dict and item.get("type") == "photo"])
-
-                # These are user-specific metrics and not per tweet/post like above
-                # Methodology question: which stat is best to use? Most recent? Largest? Smallest? Likely they will be identical or minimally different.
-                # Using most recent for now.
-                if int(tweet_time.timestamp()) > intervals[date][post_category]["Created at Timestamp"]:
-                    intervals[date][post_category]["Created at Timestamp"] = int(
-                        datetime.datetime.strptime(post["created_at"], "%Y-%m-%dT%H:%M:%S.000Z").timestamp())
-                    if category == 'author' and not pseudonymised_dataset:
-                        intervals[date][post_category]["Number User is Following"] = post.get("author_user").get(
-                            'public_metrics').get('following_count')
-                        intervals[date][post_category]["Number Followers of User"] = post.get("author_user").get(
-                            'public_metrics').get('followers_count')
-                        intervals[date][post_category]["Number of Tweets (account lifetime)"] = post.get("author_user").get(
-                            'public_metrics').get('tweet_count')
 
             first_interval = min(first_interval, date)
             last_interval = max(last_interval, date)
