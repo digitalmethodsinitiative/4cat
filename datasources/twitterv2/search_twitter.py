@@ -614,7 +614,7 @@ class SearchWithTwitterAPIv2(Search):
             "query_type": query.get("query_type", "query"),
             "min_date": after,
             "max_date": before,
-            "amount": max(1, min(max_tweets, convert_to_int(query.get("amount"), 10)))
+            "amount": max(0, min(max_tweets, convert_to_int(query.get("amount"), 10)))
         }
 
         # figure out how many tweets we expect to get back - we can use this
