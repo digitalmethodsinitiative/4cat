@@ -151,7 +151,6 @@ INSERT INTO settings
     ('logging.slack.level', '"WARNING"'),
     ('logging.slack.webhook', 'null'),
     ('mail.admin_email', 'null'),
-    ('mail.host', 'null'),
     ('mail.ssl', 'false'),
     ('mail.username', 'null'),
     ('mail.password', 'null'),
