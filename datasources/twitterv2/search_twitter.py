@@ -660,7 +660,7 @@ class SearchWithTwitterAPIv2(Search):
                                                   type(item) is dict and item.get("type") == "photo"]))
         else:
             # Not a retweet then entities should be sufficient
-            # Note: open question on quotes and replies as to whether containing hashtags or mentions of their referenced tweets makes sense 
+            # Note: open question on quotes and replies as to whether containing hashtags or mentions of their referenced tweets makes sense
             hashtags = ",".join([tag["tag"] for tag in tweet.get("entities", {}).get("hashtags", [])])
             mentions = ",".join([tag["username"] for tag in tweet.get("entities", {}).get("mentions", [])])
             urls = ",".join([tag["expanded_url"] for tag in tweet.get("entities", {}).get("urls", [])])
@@ -672,6 +672,7 @@ class SearchWithTwitterAPIv2(Search):
             "thread_id": tweet.get("conversation_id", tweet["id"]),
             "timestamp": tweet_time.strftime("%Y-%m-%d %H:%M:%S"),
             "unix_timestamp": int(tweet_time.timestamp()),
+            'link': "https://twitter.com/%s/status/%s" % (tweet.get('author_user').get('username'), tweet.get('id')),
             "subject": tweet.get('subject', ""),
             "body": tweet["text"],
             "author": tweet["author_user"]["username"],
