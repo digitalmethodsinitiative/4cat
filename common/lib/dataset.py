@@ -314,6 +314,34 @@ class DataSet(FourcatModule):
 		else:
 			raise NotImplementedError("Cannot iterate through %s file" % path.suffix)
 
+	def iterate_mapped_items(self, processor=None):
+		"""
+		Wrapper for iterate_items that returns both the original item and the mapped item (or else the same identical item).
+		No extension check is performed here as the point is to be able to handle the original object and save as an appropriate
+		filetype.
+
+		:param BasicProcessor processor:  A reference to the processor
+		iterating the dataset.
+		:return generator:  A generator that yields a tuple with the unmapped item followed by the mapped item
+		"""
+		# Collect item_mapper for use with filter
+		item_mapper = None
+		own_processor = self.get_own_processor()
+		if hasattr(own_processor, "map_item"):
+			item_mapper = own_processor.map_item
+
+		# Loop through items
+		for item in self.iterate_items(processor=processor, bypass_map_item=True):
+			# Save original to yield
+			original_item = item.copy()
+
+			# Map item for filter
+			if item_mapper:
+				mapped_item = item_mapper(item)
+
+			# Yield the two items
+			yield original_item, mapped_item
+
 	def get_item_keys(self, processor=None):
 		"""
 		Get item attribute names

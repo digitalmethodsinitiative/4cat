@@ -2,22 +2,18 @@
 Filter posts by a given column
 """
 import re
-import csv
-import json
 import datetime
 
-from backend.abstract.processor import BasicProcessor
+from processors.filtering.base_filter import BaseFilter
 from common.lib.helpers import UserInput
 
 __author__ = "Stijn Peeters"
-__credits__ = ["Stijn Peeters"]
+__credits__ = ["Stijn Peeters", "Dale Wahl"]
 __maintainer__ = "Stijn Peeters"
 __email__ = "4cat@oilab.eu"
 
-csv.field_size_limit(1024 * 1024 * 1024)
 
-
-class ColumnFilter(BasicProcessor):
+class ColumnFilter(BaseFilter):
     """
     Retain only posts where a given column matches a given value
     """
@@ -72,7 +68,7 @@ class ColumnFilter(BasicProcessor):
 
         :param module: Dataset or processor to determine compatibility with
         """
-        # TODO: processor could run on any 'csv' or 'ndjson' file
+        # TODO: could run on any ndjson or csv IF adjustments were made to `get_options()`
         return module.is_top_dataset()
 
     @classmethod
@@ -93,45 +89,13 @@ class ColumnFilter(BasicProcessor):
         
         return options
 
-    def process(self):
-        """
-        Reads a file, filtering items that match in the required way, and
-        creates a new dataset containing the matching values
-        """
-        # Get parent extension
-        parent_extension = self.source_dataset.get_extension()
-
-        # Filter posts
-        matching_posts = self.filter_items()
-
-        # Write the posts
-        num_posts = 0
-        if parent_extension == "csv":
-            with self.dataset.get_results_path().open("w", encoding="utf-8") as outfile:
-                writer = None
-                for post in matching_posts:
-                    if not writer:
-                        writer = csv.DictWriter(outfile, fieldnames=post.keys())
-                        writer.writeheader()
-                    writer.writerow(post)
-                    num_posts += 1
-        elif parent_extension == "ndjson":
-            with self.dataset.get_results_path().open("w", encoding="utf-8", newline="") as outfile:
-                for post in matching_posts:
-
-                    outfile.write(json.dumps(post) + "\n")
-                    num_posts += 1
-        else:
-            raise NotImplementedError("Parent datasource of type %s cannot be filtered" % parent_extension)
-
-        if num_posts == 0:
-            self.dataset.update_status("No items matched your criteria", is_final=True)
-
-        self.dataset.finish(num_posts)
-
     def filter_items(self):
         """
-        Create a generator to iterate through items that can be passed to create either a csv or ndjson
+        Create a generator to iterate through items that can be passed to create either a csv or ndjson. Use
+        `for original_item, mapped_item in self.source_dataset.iterate_mapped_items(self)` to iterate through items
+        and yield `original_item`.
+
+        :return generator:
         """
         self.dataset.update_status("Searching for matching posts")
         # Get match column parameters
@@ -168,23 +132,11 @@ class ColumnFilter(BasicProcessor):
                 match_values = [datetime.datetime.strptime(value, "%Y-%m-%d %H:%M:%S").timestamp() for value in
                                 match_values]
         self.dataset.log('Criteria: column - %s, style - %s, multiple - %s, function - %s, values - %s' % (str(column), str(match_style), str(match_multiple), str(match_function), ' & '.join(match_values)))
-        # Collect item_mapper for use with filter
-        item_mapper = None
-        own_processor = self.source_dataset.get_own_processor()
-        if hasattr(own_processor, "map_item"):
-            item_mapper = own_processor.map_item
 
         matching_items = 0
         processed_items = 0
         date_compare = None
-        for item in self.source_dataset.iterate_items(self, bypass_map_item=True):
-            # Save original to yield
-            original_item = item.copy()
-
-            # Map item for filter
-            if item_mapper:
-                item = item_mapper(item)
-
+        for original_item, mapped_item in self.source_dataset.iterate_mapped_items(self):
             processed_items += 1
             if processed_items % 500 == 0:
                 self.dataset.update_status("Processed %i items (%i matching)" % (processed_items, matching_items))
@@ -195,14 +147,14 @@ class ColumnFilter(BasicProcessor):
             # comparing dates, do some pre-processing to make sure we can
             # actually compare the value properly.
             if match_style in ("before", "after"):
-                if re.match(r"[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}", item.get(column)):
-                    date_compare = datetime.datetime.strptime(item.get(column), "%Y-%m-%d %H:%M:%S").timestamp()
+                if re.match(r"[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}", mapped_item.get(column)):
+                    date_compare = datetime.datetime.strptime(mapped_item.get(column), "%Y-%m-%d %H:%M:%S").timestamp()
                 else:
                     try:
-                        date_compare = int(item.get(column))
+                        date_compare = int(mapped_item.get(column))
                     except ValueError:
                         self.dataset.update_status(
-                            "Invalid date value '%s', cannot determine if before or after" % item.get(column),
+                            "Invalid date value '%s', cannot determine if before or after" % mapped_item.get(column),
                             is_final=True)
                         self.dataset.finish(0)
                         return
@@ -212,14 +164,14 @@ class ColumnFilter(BasicProcessor):
             # when there is only a single value to compare to, and
             # short-circuiting for 'any' matches - not clear if worth it.
             matches = False
-            if match_style == "exact" and match_function([item.get(column) == value for value in match_values]):
+            if match_style == "exact" and match_function([mapped_item.get(column) == value for value in match_values]):
                 matches = True
-            elif match_style == "exact-not" and match_function([item.get(column) != value for value in match_values]):
+            elif match_style == "exact-not" and match_function([mapped_item.get(column) != value for value in match_values]):
                 matches = True
-            elif match_style == "contains" and match_function([value in item.get(column) for value in match_values]):
+            elif match_style == "contains" and match_function([value in mapped_item.get(column) for value in match_values]):
                 matches = True
             elif match_style == "contains-not" and match_function(
-                    [value not in item.get(column) for value in match_values]):
+                    [value not in mapped_item.get(column) for value in match_values]):
                 matches = True
             elif match_style == "after" and match_function([value <= date_compare for value in match_values]):
                 matches = True
@@ -231,10 +183,10 @@ class ColumnFilter(BasicProcessor):
                 # values
                 try:
                     if match_style == "greater-than" and match_function(
-                            [float(value) < float(item.get(column)) for value in match_values]):
+                            [float(value) < float(mapped_item.get(column)) for value in match_values]):
                         matches = True
                     elif match_style == "less-than" and match_function(
-                            [float(value) > float(item.get(column)) for value in match_values]):
+                            [float(value) > float(mapped_item.get(column)) for value in match_values]):
                         matches = True
                 except (TypeError, ValueError):
                     # do not match
@@ -243,9 +195,3 @@ class ColumnFilter(BasicProcessor):
             if matches:
                 yield original_item
                 matching_items += 1
-
-    def after_process(self):
-        super().after_process()
-
-        # Request standalone
-        self.create_standalone()
