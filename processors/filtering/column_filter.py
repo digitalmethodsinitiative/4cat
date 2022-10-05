@@ -60,7 +60,6 @@ class ColumnFilter(BaseFilter):
         }
     }
 
-
     @classmethod
     def is_compatible_with(cls, module=None):
         """

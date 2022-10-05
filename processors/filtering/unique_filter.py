@@ -20,7 +20,6 @@ class UniqueFilter(BaseFilter):
 	category = "Filtering"  # category
 	title = "Filter for unique posts"  # title displayed in UI
 	description = "Retain posts with a unique body text. Only keeps the first encounter of a text. Useful for filtering spam. This creates a new dataset."  # description displayed in UI
-	extension = "csv"  # extension of result file, used internally and in UI
 
 	# the following determines the options available to the user via the 4CAT
 	# interface.
