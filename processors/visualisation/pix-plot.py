@@ -206,7 +206,7 @@ class PixPlotGenerator(BasicProcessor):
 				break
 			with open(os.path.join(staging_area, filename), 'rb') as image:
 				response = requests.post(upload_url, files={'image': image}, data=data, timeout=120)
-				
+
 			if response.status_code == 200:
 				images_uploaded += 1
 				if images_uploaded % 100 == 0:

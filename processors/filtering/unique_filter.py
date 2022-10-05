@@ -2,9 +2,8 @@
 Filter by unique posts
 """
 import hashlib
-import csv
 
-from backend.abstract.processor import BasicProcessor
+from processors.filtering.base_filter import BaseFilter
 from common.lib.helpers import UserInput
 
 __author__ = "Sal Hagen"
@@ -12,10 +11,8 @@ __credits__ = ["Sal Hagen"]
 __maintainer__ = "Sal Hagen"
 __email__ = "4cat@oilab.eu"
 
-csv.field_size_limit(1024 * 1024 * 1024)
 
-
-class UniqueFilter(BasicProcessor):
+class UniqueFilter(BaseFilter):
 	"""
 	Retain only posts matching a given lexicon
 	"""
@@ -36,11 +33,23 @@ class UniqueFilter(BasicProcessor):
 		}
 	}
 
-	def process(self):
+	@classmethod
+	def is_compatible_with(cls, module=None):
 		"""
-		Reads a CSV file, hashes the posts, and only keeps those it didn't encounter yet.
-		"""
+		Allow processor on NDJSON and CSV files
 
+		:param module: Dataset or processor to determine compatibility with
+		"""
+		return module.is_top_dataset() and module.get_extension() in ("csv", "ndjson")
+
+	def filter_items(self):
+		"""
+		Create a generator to iterate through items that can be passed to create either a csv or ndjson. Use
+		`for original_item, mapped_item in self.source_dataset.iterate_mapped_items(self)` to iterate through items
+		and yield `original_item`.
+
+		:return generator:
+		"""
 		# now for the real deal
 		self.dataset.update_status("Reading source file")
 
@@ -51,44 +60,26 @@ class UniqueFilter(BasicProcessor):
 		hashes = set()
 
 		# iterate through posts and see if they match
-		with self.dataset.get_results_path().open("w", encoding="utf-8") as output:
-			# get header row, we need to copy it for the output
-			fieldnames = self.source_dataset.get_item_keys(self)
+		for original_item, mapped_item in self.source_dataset.iterate_mapped_items(self):
 
-			# start the output file
-			writer = csv.DictWriter(output, fieldnames=fieldnames)
-			writer.writeheader()
+			if not mapped_item.get("body", None):
+				continue
 
-			# iterate through posts and see if they match
-			for post in self.source_dataset.iterate_items(self):
+			body = mapped_item["body"].strip()
+			if not self.parameters.get("case_sensitive", False):
+				body = body.lower()
 
-				if not post.get("body", None):
-					continue
+			hash_object = hashlib.md5(body.encode("utf-8"))
+			md5_hash = hash_object.hexdigest()
 
-				body = post["body"].strip()
-				if not self.parameters.get("case_sensitive", False):
-					body = body.lower()
+			if md5_hash not in hashes:
+				unique += 1
+				yield original_item
 
-				hash_object = hashlib.md5(body.encode("utf-8"))
-				md5_hash = hash_object.hexdigest()
+			hashes.add(md5_hash)
 
-				if md5_hash not in hashes:
-					writer.writerow(post)
-					unique += 1
+			if processed % 2500 == 0:
+				self.dataset.update_status("Processed %i posts (%i unique)" % (processed, unique))
+				self.dataset.update_progress(processed / self.source_dataset.num_rows)
 
-				hashes.add(md5_hash)
-
-				if processed % 2500 == 0:
-					self.dataset.update_status("Processed %i posts (%i unique)" % (processed, unique))
-					self.dataset.update_progress(processed / self.source_dataset.num_rows)
-
-				processed += 1
-
-		self.dataset.update_status("New dataset created with %i unique post(s)" % unique, is_final=True)
-		self.dataset.finish(unique)
-
-	def after_process(self):
-		super().after_process()
-
-		# Request standalone
-		self.create_standalone()
+			processed += 1
