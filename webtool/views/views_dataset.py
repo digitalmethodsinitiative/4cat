@@ -269,6 +269,9 @@ def preview_items(key):
     if dataset.get_extension() == "gexf":
         return render_template("preview/gexf.html", dataset=dataset)
 
+    elif dataset.get_extension() in ("svg", "png", "jpeg", "jpg", "gif", "webp"):
+        return render_template("preview/image.html", dataset=dataset)
+
     else:
         rows = []
         try:

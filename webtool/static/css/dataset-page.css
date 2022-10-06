@@ -606,3 +606,32 @@ embed.details-only {
 .csv-preview td:last-child, th:last-child {
     border-right: 0;
 }
+
+html.image-preview {
+    height: 100%;
+}
+
+body.image-preview {
+    padding: 0;
+    height: 100%;
+}
+
+.image-preview-container {
+    text-align: center;
+    height: 100%;
+}
+
+#image-zoom {
+    display: none;
+}
+
+.image-preview img {
+    margin: 0 auto;
+    max-height: 100%;
+    cursor: zoom-in;
+}
+
+#image-zoom:checked + label img {
+    max-height: none;
+    cursor: zoom-out;
+}
