@@ -125,8 +125,7 @@ class DataSet(FourcatModule):
 			# Find desired extension from processor if not explicitly set
 			if extension is None:
 				own_processor = self.get_own_processor()
-				if own_processor.is_filter() and parent is not None:
-					# Filters use parent dataset type
+				if own_processor:
 					extension = own_processor.get_extension(parent_dataset=parent)
 				# Still no extension, default to 'csv'
 				if not extension:

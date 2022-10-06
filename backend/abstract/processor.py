@@ -719,6 +719,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 			# Use explicitly defined extension in class (Processor class defaults to "csv")
 			return self.extension
 		else:
+			# A non filter processor updated the base Processor extension to None/False?
 			return None
 
 	@classmethod
