@@ -126,7 +126,7 @@ def add_user():
                 # be a benevolent admin and give them another change, without
                 # having them go through the whole signup again
                 user = User.get_by_name(db, username)
-                db.update("users", data={"timestamp_token": int(time.time())}, where={"name": username})
+                db.update("users", data={"password": "", "timestamp_token": int(time.time())}, where={"name": username})
 
                 try:
                     url = user.email_token(new=True)
