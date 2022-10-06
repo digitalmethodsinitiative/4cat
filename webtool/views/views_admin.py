@@ -274,6 +274,7 @@ def manipulate_user(mode):
                 except psycopg2.IntegrityError:
                     flash("A user with this e-mail address already exists.")
                     incomplete.append("name")
+                    db.rollback()
 
             if not incomplete:
                 flash("User data saved")
