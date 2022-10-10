@@ -620,7 +620,7 @@ class SearchWithTwitterAPIv2(Search):
         # figure out how many tweets we expect to get back - we can use this
         # to dissuade users from running huge queries that will take forever
         # to process
-        if params["query_type"] == "query" and params["api_type"] == "all":
+        if params["query_type"] == "query" and (params["api_type"] == "all" or have_api_key):
             count_url = "https://api.twitter.com/2/tweets/counts/all"
             count_params = {
                 "granularity": "day",
@@ -635,7 +635,7 @@ class SearchWithTwitterAPIv2(Search):
             if before:
                 count_params["end_time"] = datetime.datetime.fromtimestamp(before).strftime("%Y-%m-%dT%H:%M:%SZ")
 
-            bearer_token = params.get("api_bearer_token")
+            bearer_token = params.get("api_bearer_token") if not have_api_key else have_api_key
 
             expected_tweets = 0
             while True:
@@ -670,19 +670,34 @@ class SearchWithTwitterAPIv2(Search):
                     # we can still continue without the expected tweets
                     break
 
+            warning = ""
             if expected_tweets:
-                if params["amount"] > 0:
-                    # if the user specified a number of tweets to return...
-                    expected_tweets = min(expected_tweets, params["amount"])
+                collectible_tweets = min(max_tweets, params["amount"])
+                if collectible_tweets == 0:
+                    collectible_tweets = max_tweets
 
-                expected_seconds = int(expected_tweets / 30)  # seems to be about this
+                if collectible_tweets < expected_tweets:
+                    warning += ", but only %s will be collected. " % "{:,}".format(collectible_tweets)
+
+                if collectible_tweets > 0:
+                    real_expected_tweets = min(expected_tweets, collectible_tweets)
+                else:
+                    real_expected_tweets = expected_tweets
+
+                expected_seconds = int(real_expected_tweets / 30)  # seems to be about this
                 expected_time = timify_long(expected_seconds)
                 params["expected-tweets"] = expected_tweets
 
-                if expected_seconds > 1800 and not query.get("frontend-confirm"):
-                    raise QueryNeedsExplicitConfirmationException(
-                        "This query will return approximately %s tweets. This will take a long time (approximately %s)."
-                        " Are you sure you want to run this query?" % ("{:,}".format(expected_tweets), expected_time))
+                if expected_seconds > 900:
+                    if warning:
+                        warning += "Additionally, c" if warning else ". C"
+                    warning += "ollection will take approximately %s." % expected_time
+
+            if warning and not query.get("frontend-confirm"):
+                warning = "This query matches approximately %s tweets%s" % ("{:,}".format(expected_tweets), warning)
+                warning += " Do you want to continue?"
+                raise QueryNeedsExplicitConfirmationException(warning)
+
         return params
 
     @staticmethod
