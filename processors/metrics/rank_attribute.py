@@ -227,7 +227,7 @@ class AttributeRanker(BasicProcessor):
 		values = []
 		for attribute in attributes:
 			if split_comma:
-				item_values = [str(v).strip() for v in post.get(attribute, "").split(",") if str(v).strip()]
+				item_values = [v.strip() for v in str(post.get(attribute, "")).split(",") if v.strip()]
 			else:
 				item_values = [post.get(attribute, "")] if post.get(attribute, "") else []
 
