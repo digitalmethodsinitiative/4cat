@@ -337,6 +337,8 @@ class DataSet(FourcatModule):
 			# Map item for filter
 			if item_mapper:
 				mapped_item = item_mapper(item)
+			else:
+				mapped_item = original_item
 
 			# Yield the two items
 			yield original_item, mapped_item
