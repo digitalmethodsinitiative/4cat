@@ -183,7 +183,7 @@ class FourcatRestarterAndUpgrader(BasicWorker):
                     response = requests.post(restart_url, data={"token": infile.read()}, timeout=5).json()
 
                 if response.get("message"):
-                    log_stream_restart.write(response.get("message"))
+                    log_stream_restart.write(response.get("message") + "\n")
             except (json.JSONDecodeError, requests.RequestException):
                 # this may happen because the server restarts and interrupts
                 # the request

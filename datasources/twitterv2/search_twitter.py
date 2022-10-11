@@ -620,7 +620,7 @@ class SearchWithTwitterAPIv2(Search):
         # figure out how many tweets we expect to get back - we can use this
         # to dissuade users from running huge queries that will take forever
         # to process
-        if params["query_type"] == "query" and params["api_type"] == "all":
+        if params["query_type"] == "query" and (params["api_type"] == "all" or have_api_key):
             count_url = "https://api.twitter.com/2/tweets/counts/all"
             count_params = {
                 "granularity": "day",
@@ -635,7 +635,7 @@ class SearchWithTwitterAPIv2(Search):
             if before:
                 count_params["end_time"] = datetime.datetime.fromtimestamp(before).strftime("%Y-%m-%dT%H:%M:%SZ")
 
-            bearer_token = params.get("api_bearer_token")
+            bearer_token = params.get("api_bearer_token") if not have_api_key else have_api_key
 
             expected_tweets = 0
             while True:
@@ -670,19 +670,34 @@ class SearchWithTwitterAPIv2(Search):
                     # we can still continue without the expected tweets
                     break
 
+            warning = ""
             if expected_tweets:
-                if params["amount"] > 0:
-                    # if the user specified a number of tweets to return...
-                    expected_tweets = min(expected_tweets, params["amount"])
+                collectible_tweets = min(max_tweets, params["amount"])
+                if collectible_tweets == 0:
+                    collectible_tweets = max_tweets
 
-                expected_seconds = int(expected_tweets / 30)  # seems to be about this
+                if collectible_tweets < expected_tweets:
+                    warning += ", but only %s will be collected. " % "{:,}".format(collectible_tweets)
+
+                if collectible_tweets > 0:
+                    real_expected_tweets = min(expected_tweets, collectible_tweets)
+                else:
+                    real_expected_tweets = expected_tweets
+
+                expected_seconds = int(real_expected_tweets / 30)  # seems to be about this
                 expected_time = timify_long(expected_seconds)
                 params["expected-tweets"] = expected_tweets
 
-                if expected_seconds > 1800 and not query.get("frontend-confirm"):
-                    raise QueryNeedsExplicitConfirmationException(
-                        "This query will return approximately %s tweets. This will take a long time (approximately %s)."
-                        " Are you sure you want to run this query?" % ("{:,}".format(expected_tweets), expected_time))
+                if expected_seconds > 900:
+                    if warning:
+                        warning += "Additionally, c" if warning else ". C"
+                    warning += "ollection will take approximately %s." % expected_time
+
+            if warning and not query.get("frontend-confirm"):
+                warning = "This query matches approximately %s tweets%s" % ("{:,}".format(expected_tweets), warning)
+                warning += " Do you want to continue?"
+                raise QueryNeedsExplicitConfirmationException(warning)
+
         return params
 
     @staticmethod
@@ -703,6 +718,13 @@ class SearchWithTwitterAPIv2(Search):
         """
         tweet_time = datetime.datetime.strptime(tweet["created_at"], "%Y-%m-%dT%H:%M:%S.000Z")
 
+        media_urls = {url['media_key']: url for url in tweet.get('entities', {}).get('urls', []) if url.get('media_key')}
+        hashtags = [tag["tag"] for tag in tweet.get("entities", {}).get("hashtags", [])]
+        mentions = [tag["username"] for tag in tweet.get("entities", {}).get("mentions", [])]
+        urls = [tag["expanded_url"] for tag in tweet.get("entities", {}).get("urls", [])]
+        images = [item["url"] for item in tweet.get("attachments", {}).get("media_keys", []) if type(item) is dict and item.get("type") == "photo"]
+        video_keys = [item["media_key"] for item in tweet.get("attachments", {}).get("media_keys", []) if type(item) is dict and item.get("type") == "video"]
+
         # by default, the text of retweets is returned as "RT [excerpt of
         # retweeted tweet]". Since we have the full tweet text, we can complete
         # the excerpt:
@@ -722,21 +744,16 @@ class SearchWithTwitterAPIv2(Search):
                         tweet["text"] = "RT @" + retweeting_users[0] + ": " + retweeted_body
 
             # Retweet entities are only included in the retweet if they occur in the first 140 characters
-            hashtags = ",".join(set([tag["tag"] for tag in tweet.get("entities", {}).get("hashtags", [])] + [tag["tag"] for tag in retweeted_tweet.get("entities", {}).get("hashtags", [])]))
-            mentions = ",".join(set([tag["username"] for tag in tweet.get("entities", {}).get("mentions", [])] + [tag["username"] for tag in retweeted_tweet.get("entities", {}).get("mentions", [])]))
-            urls = ",".join(set([tag["expanded_url"] for tag in tweet.get("entities", {}).get("urls", [])] + [tag["expanded_url"] for tag in retweeted_tweet.get("entities", {}).get("urls", [])]))
-            # Images appear to be inheritted by retweets, but just in case
-            images = ",".join(set([item["url"] for item in tweet.get("attachments", {}).get("media_keys", []) if
-                               type(item) is dict and item.get("type") == "photo"] + [item["url"] for item in retweeted_tweet.get("attachments", {}).get("media_keys", []) if
-                                                  type(item) is dict and item.get("type") == "photo"]))
-        else:
-            # Not a retweet then entities should be sufficient
             # Note: open question on quotes and replies as to whether containing hashtags or mentions of their referenced tweets makes sense
-            hashtags = ",".join([tag["tag"] for tag in tweet.get("entities", {}).get("hashtags", [])])
-            mentions = ",".join([tag["username"] for tag in tweet.get("entities", {}).get("mentions", [])])
-            urls = ",".join([tag["expanded_url"] for tag in tweet.get("entities", {}).get("urls", [])])
-            images = ",".join(item["url"] for item in tweet.get("attachments", {}).get("media_keys", []) if
-                               type(item) is dict and item.get("type") == "photo")
+            [hashtags.append(tag["tag"]) for tag in retweeted_tweet.get("entities", {}).get("hashtags", [])]
+            [mentions.append(tag["username"]) for tag in retweeted_tweet.get("entities", {}).get("mentions", [])]
+            [urls.append(tag["expanded_url"]) for tag in retweeted_tweet.get("entities", {}).get("urls", [])]
+            # Images appear to be inheritted by retweets, but just in case
+            [images.append(item["url"]) for item in retweeted_tweet.get("attachments", {}).get("media_keys", []) if type(item) is dict and item.get("type") == "photo"]
+            [video_keys.append(item["media_key"]) for item in retweeted_tweet.get("attachments", {}).get("media_keys", []) if type(item) is dict and item.get("type") == "video"]
+            media_urls.update({url['media_key']: url for url in retweeted_tweet.get('entities', {}).get('urls', []) if url.get('media_key')})
+
+        videos = ",".join(set([media_urls[key].get('expanded_url') for key in video_keys if key in media_urls]))
 
         return {
             "id": tweet["id"],
@@ -758,10 +775,11 @@ class SearchWithTwitterAPIv2(Search):
                 [ref.get("type") == "quoted" for ref in tweet.get("referenced_tweets", [])]) else "no",
             "is_reply": "yes" if any(
                 [ref.get("type") == "replied_to" for ref in tweet.get("referenced_tweets", [])]) else "no",
-            "hashtags": hashtags,
-            "urls": urls,
-            "images": images,
-            "mentions": mentions,
+            "hashtags": ','.join(set(hashtags)),
+            "urls": ','.join(set(urls)),
+            "images": ','.join(set(images)),
+            "videos": videos,
+            "mentions": ','.join(set(mentions)),
             "reply_to": "".join(
                 [mention["username"] for mention in tweet.get("entities", {}).get("mentions", [])[:1]]) if any(
                 [ref.get("type") == "replied_to" for ref in tweet.get("referenced_tweets", [])]) else "",
