@@ -718,6 +718,13 @@ class SearchWithTwitterAPIv2(Search):
         """
         tweet_time = datetime.datetime.strptime(tweet["created_at"], "%Y-%m-%dT%H:%M:%S.000Z")
 
+        media_urls = {url['media_key']: url for url in tweet.get('entities', {}).get('urls', []) if url.get('media_key')}
+        hashtags = [tag["tag"] for tag in tweet.get("entities", {}).get("hashtags", [])]
+        mentions = [tag["username"] for tag in tweet.get("entities", {}).get("mentions", [])]
+        urls = [tag["expanded_url"] for tag in tweet.get("entities", {}).get("urls", [])]
+        images = [item["url"] for item in tweet.get("attachments", {}).get("media_keys", []) if type(item) is dict and item.get("type") == "photo"]
+        video_keys = [item["media_key"] for item in tweet.get("attachments", {}).get("media_keys", []) if type(item) is dict and item.get("type") == "video"]
+
         # by default, the text of retweets is returned as "RT [excerpt of
         # retweeted tweet]". Since we have the full tweet text, we can complete
         # the excerpt:
@@ -737,21 +744,16 @@ class SearchWithTwitterAPIv2(Search):
                         tweet["text"] = "RT @" + retweeting_users[0] + ": " + retweeted_body
 
             # Retweet entities are only included in the retweet if they occur in the first 140 characters
-            hashtags = ",".join(set([tag["tag"] for tag in tweet.get("entities", {}).get("hashtags", [])] + [tag["tag"] for tag in retweeted_tweet.get("entities", {}).get("hashtags", [])]))
-            mentions = ",".join(set([tag["username"] for tag in tweet.get("entities", {}).get("mentions", [])] + [tag["username"] for tag in retweeted_tweet.get("entities", {}).get("mentions", [])]))
-            urls = ",".join(set([tag["expanded_url"] for tag in tweet.get("entities", {}).get("urls", [])] + [tag["expanded_url"] for tag in retweeted_tweet.get("entities", {}).get("urls", [])]))
-            # Images appear to be inheritted by retweets, but just in case
-            images = ",".join(set([item["url"] for item in tweet.get("attachments", {}).get("media_keys", []) if
-                               type(item) is dict and item.get("type") == "photo"] + [item["url"] for item in retweeted_tweet.get("attachments", {}).get("media_keys", []) if
-                                                  type(item) is dict and item.get("type") == "photo"]))
-        else:
-            # Not a retweet then entities should be sufficient
             # Note: open question on quotes and replies as to whether containing hashtags or mentions of their referenced tweets makes sense
-            hashtags = ",".join([tag["tag"] for tag in tweet.get("entities", {}).get("hashtags", [])])
-            mentions = ",".join([tag["username"] for tag in tweet.get("entities", {}).get("mentions", [])])
-            urls = ",".join([tag["expanded_url"] for tag in tweet.get("entities", {}).get("urls", [])])
-            images = ",".join(item["url"] for item in tweet.get("attachments", {}).get("media_keys", []) if
-                               type(item) is dict and item.get("type") == "photo")
+            [hashtags.append(tag["tag"]) for tag in retweeted_tweet.get("entities", {}).get("hashtags", [])]
+            [mentions.append(tag["username"]) for tag in retweeted_tweet.get("entities", {}).get("mentions", [])]
+            [urls.append(tag["expanded_url"]) for tag in retweeted_tweet.get("entities", {}).get("urls", [])]
+            # Images appear to be inheritted by retweets, but just in case
+            [images.append(item["url"]) for item in retweeted_tweet.get("attachments", {}).get("media_keys", []) if type(item) is dict and item.get("type") == "photo"]
+            [video_keys.append(item["media_key"]) for item in retweeted_tweet.get("attachments", {}).get("media_keys", []) if type(item) is dict and item.get("type") == "video"]
+            media_urls.update({url['media_key']: url for url in retweeted_tweet.get('entities', {}).get('urls', []) if url.get('media_key')})
+
+        videos = ",".join(set([media_urls[key].get('expanded_url') for key in video_keys if key in media_urls]))
 
         return {
             "id": tweet["id"],
@@ -773,10 +775,11 @@ class SearchWithTwitterAPIv2(Search):
                 [ref.get("type") == "quoted" for ref in tweet.get("referenced_tweets", [])]) else "no",
             "is_reply": "yes" if any(
                 [ref.get("type") == "replied_to" for ref in tweet.get("referenced_tweets", [])]) else "no",
-            "hashtags": hashtags,
-            "urls": urls,
-            "images": images,
-            "mentions": mentions,
+            "hashtags": ','.join(set(hashtags)),
+            "urls": ','.join(set(urls)),
+            "images": ','.join(set(images)),
+            "videos": videos,
+            "mentions": ','.join(set(mentions)),
             "reply_to": "".join(
                 [mention["username"] for mention in tweet.get("entities", {}).get("mentions", [])[:1]]) if any(
                 [ref.get("type") == "replied_to" for ref in tweet.get("referenced_tweets", [])]) else "",
