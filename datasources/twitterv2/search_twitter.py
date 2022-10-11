@@ -75,6 +75,7 @@ class SearchWithTwitterAPIv2(Search):
         # this is pretty sensitive so delete it immediately after storing in
         # memory
         have_api_key = config.get("twitterv2-search.academic_api_key")
+        max_tweets = config.get("twitterv2-search.max_tweets")
         bearer_token = self.parameters.get("api_bearer_token") if not have_api_key else have_api_key
         api_type = query.get("api_type") if not have_api_key else "all"
         auth = {"Authorization": "Bearer %s" % bearer_token}
@@ -613,9 +614,14 @@ class SearchWithTwitterAPIv2(Search):
             "api_type": query.get("api_type"),
             "query_type": query.get("query_type", "query"),
             "min_date": after,
-            "max_date": before,
-            "amount": max(0, min(max_tweets, convert_to_int(query.get("amount"), 10)))
+            "max_date": before
         }
+
+        # never query more tweets than allowed
+        tweets_to_collect = convert_to_int(query.get("amount"), 10)
+        if max_tweets and (tweets_to_collect > max_tweets or tweets_to_collect == 0):
+            tweets_to_collect = max_tweets
+        params["amount"] = tweets_to_collect
 
         # figure out how many tweets we expect to get back - we can use this
         # to dissuade users from running huge queries that will take forever
@@ -697,6 +703,8 @@ class SearchWithTwitterAPIv2(Search):
                 warning = "This query matches approximately %s tweets%s" % ("{:,}".format(expected_tweets), warning)
                 warning += " Do you want to continue?"
                 raise QueryNeedsExplicitConfirmationException(warning)
+
+            params["amount"] = min(max_tweets, expected_tweets)
 
         return params
 

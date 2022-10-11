@@ -9,6 +9,9 @@ is expected to take more than 30 minutes to collect. It is often a good idea to 
 queries or narrow date ranges) and then only create a larger dataset if you are confident that it will be manageable and
 useful for your analysis.
 
+If you hit your Twitter API quota while creating a dataset, the dataset will be finished with the tweets that have been
+collected so far and a warning will be logged.
+
 ### Query syntax
 Check the [API documentation](https://developer.twitter.com/en/docs/twitter-api/tweets/search/integrate/build-a-query)
 for available query syntax and operators. This information is crucial to what data you collect. Important operators for
