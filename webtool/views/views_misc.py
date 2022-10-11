@@ -133,7 +133,7 @@ def data_overview(datasource=None):
         # Get description
         description_path = Path(datasources[datasource_id].get("path"), "DESCRIPTION.md")
         if description_path.exists():
-            with description_path.open() as description_file:
+            with description_path.open(encoding="utf-8") as description_file:
                 description = description_file.read()
 
         # Status labels to display in query form
