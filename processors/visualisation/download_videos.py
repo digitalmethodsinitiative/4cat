@@ -2,21 +2,12 @@
 Download images linked in dataset
 """
 import requests
-import hashlib
-import base64
 import json
-import time
 import re
-
 from pathlib import Path
-from PIL import Image, UnidentifiedImageError
-
-from lxml import etree
-from lxml.cssselect import CSSSelector as css
-from io import StringIO, BytesIO
 
 import common.config_manager as config
-from common.lib.helpers import UserInput
+from common.lib.helpers import UserInput, validate_url
 from backend.abstract.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
 
@@ -24,6 +15,7 @@ __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl"]
 __maintainer__ = "Dale Wahl"
 __email__ = "4cat@oilab.eu"
+
 
 class VideoDownloader(BasicProcessor):
 	"""
@@ -88,7 +80,7 @@ class VideoDownloader(BasicProcessor):
 		"""
 		Allow on tiktok-search only for dev
 		"""
-		return module.type == "tiktok-search"
+		return module.type == "tiktok-search" # or module.type == "twitterv2-search"
 
 	def process(self):
 		"""
@@ -101,7 +93,15 @@ class VideoDownloader(BasicProcessor):
 		split_comma = self.parameters.get("split-comma", False)
 		if amount == 0:
 			amount = config.get('image_downloader.MAX_NUMBER_IMAGES', 1000)
-		columns = self.parameters.get("columns", ['video_url'])
+		columns = self.parameters.get("columns", ['video_url', 'videos'])
+
+		#TODO: Forcing module type settings for testing
+		if self.type == "twitterv2-search":
+			columns = ['videos']
+			split_comma = True
+		elif self.type == "tiktok-search":
+			columns = ['video_url']
+			split_comma = False
 
 		# Check processor able to run
 		if self.source_dataset.num_rows == 0:
@@ -113,14 +113,6 @@ class VideoDownloader(BasicProcessor):
 			self.dataset.update_status("No columns selected; no videos extracted.", is_final=True)
 			self.dataset.finish(0)
 			return
-
-		# Redex for identifyin video URLs within strings
-		# # for video URL extraction, we use the following heuristic:
-		# # Makes sure that it gets "http://site.com/img.jpg", but also
-		# # more complicated ones like
-		# # https://preview.redd.it/3thfhsrsykb61.gif?format=mp4&s=afc1e4568789d2a0095bd1c91c5010860ff76834
-		# vid_link_regex = re.compile(
-		# 	r"(?:www\.|https?:\/\/)[^\s\(\)\]\[,']*\.(?:png|jpg|jpeg|gif|gifv)[^\s\(\)\]\[,']*", re.IGNORECASE)
 
 		# Prepare staging area for videos and video tracking
 		results_path = self.dataset.get_staging_area()
@@ -148,12 +140,13 @@ class VideoDownloader(BasicProcessor):
 				for value in values:
 					if re.match(r"https?://(\S+)$", value):
 						# single URL
-						item_urls.add(value)
+						if validate_url(value):
+							item_urls.add(value)
 					else:
 						# search for video URLs in string
-						# item_urls |= set(vid_link_regex.findall(value))
-						self.dataset.log('Not a url: %s' % value)
-						continue
+						video_links = self.identify_video_links(value)
+						if video_links:
+							item_urls |= set(video_links)
 
 			for item_url in item_urls:
 				if item_url not in urls:
@@ -180,32 +173,47 @@ class VideoDownloader(BasicProcessor):
 				raise ProcessorInterruptedException("Interrupted while downloading videos.")
 
 			# Open stream
-			response = requests.get(url, stream=True)
-			if response.status_code != 200:
-				self.dataset.log('could not obtain %s: %s; %s' % (url, str(response.reason), str(response.headers)))
-				urls[url]['success'] = False
-				continue
+			with requests.get(url, stream=True) as response:
+				if response.status_code != 200:
+					message = 'Unable to obtain URL %s with reason: %s; and headers: %s' % (url, str(response.reason), str(response.headers))
+					self.dataset.log(message)
+					urls[url]['success'] = False
+					urls[url]['error'] = message
+					continue
 
-			# Create filename
-			filename = re.sub(r"[^0-9a-z]+", "_", url.lower())[:100] # no folder shenanigans
-			# TODO: where do I get this???
-			extension = '.mp4'
-			# Ensure unique filename
-			video_filepath = Path(filename + extension)
-			save_location = results_path.joinpath(video_filepath)
-			while save_location.exists():
-				save_location = results_path.joinpath(filename + "-" + str(index) + save_location.suffix.lower())
-				index += 1
+				# Verify video
+				#TODO: test/research other possible ways to verify video links
+				if 'video' not in response.headers['Content-Type'].lower():
+					message = 'Url %s does not appear to be a video; Content-Type: %s' % (url, response.headers['Content-Type'])
+					self.dataset.log(message)
+					urls[url]['success'] = False
+					urls[url]['error'] = message
+					continue
 
-			# Download video
-			with open(results_path.joinpath(save_location), 'wb') as f:
-				for chunk in response.iter_content(chunk_size=1024 * 1024):
-					if chunk:
-						f.write(chunk)
+				# Create filename
+				filename = re.sub(r"[^0-9a-z]+", "_", url.lower())[:100]  # [:100] is to avoid folder length shenanigans
+				extension = response.headers['Content-Type'].split('/')[-1]
 
-			# Add metadata
-			urls[url]['filename'] = save_location.name
-			urls[url]['success'] = True
+				# DEBUG Content-Type
+				if extension not in ['mp4', 'mp3']:
+					self.dataset.log('DEBUG: Content-Type for url %s: %s' % (url, response.headers['Content-Type']))
+
+				# Ensure unique filename
+				video_filepath = Path(filename + '.' + extension)
+				save_location = results_path.joinpath(video_filepath)
+				while save_location.exists():
+					save_location = results_path.joinpath(filename + "-" + str(index) + save_location.suffix.lower())
+					index += 1
+
+				# Download video
+				with open(results_path.joinpath(save_location), 'wb') as f:
+					for chunk in response.iter_content(chunk_size=1024 * 1024):
+						if chunk:
+							f.write(chunk)
+
+				# Add metadata
+				urls[url]['filename'] = save_location.name
+				urls[url]['success'] = True
 
 			# Update status
 			downloaded_videos += 1
@@ -220,13 +228,44 @@ class VideoDownloader(BasicProcessor):
 				"success": data.get('success'),
 				"from_dataset": self.source_dataset.key,
 				# sets() are not JSON serializable...
-				"post_ids": list(data.get('ids'))
+				"post_ids": list(data.get('ids')),
+				"errors": data.get('error', ''),
 			} for url, data in urls.items()
 		}
 		with results_path.joinpath(".metadata.json").open("w", encoding="utf-8") as outfile:
 			json.dump(metadata, outfile)
 
 		# Finish up
-		self.dataset.log('Downloaded %i videos.' % downloaded_videos)
-		self.dataset.update_status("Compressing videos")
+		self.dataset.update_status('Downloaded %i videos. Check log and .metadata.json for individual video results.' % downloaded_videos, is_final=True)
 		self.write_archive_and_finish(results_path)
+
+	def identify_video_links(self, text):
+		"""
+		Search string of text for URLs that may contain video links.
+
+		:param str text:  string that may contain URLs
+		:return list:  	  list containing validated URLs to videos
+		"""
+		# Redex for identifying video URLs within strings
+		# # for video URL extraction, we use the following heuristic:
+		# # Makes sure that it gets "http://site.com/img.jpg", but also
+		# # more complicated ones like
+		# # https://preview.redd.it/3thfhsrsykb61.gif?format=mp4&s=afc1e4568789d2a0095bd1c91c5010860ff76834
+		# vid_link_regex = re.compile(
+		# 	r"(?:www\.|https?:\/\/)[^\s\(\)\]\[,']*\.(?:png|jpg|jpeg|gif|gifv)[^\s\(\)\]\[,']*", re.IGNORECASE)
+
+		# Currently just extracting all links
+		# Could also try: https://stackoverflow.com/questions/161738/what-is-the-best-regular-expression-to-check-if-a-string-is-a-valid-url
+		vid_link_regex = re.compile(r"(https?):\/\/[a - z0 - 9\.:].* ?(?=\s)",  re.IGNORECASE)
+		possible_links = vid_link_regex.findall(text)
+
+		# Validate URLs
+		# validated_links = [url for url in possible_links if validate_url(url)]
+		validated_links = []
+		for url in possible_links:
+			if validate_url(url):
+				validated_links.append(url)
+			else:
+				# DEBUG: this is to check our regex works as intended
+				self.dataset.log('Possible URL identified, but did not validate: %s' % url)
+		return validated_links

@@ -1,8 +1,8 @@
 """
 Miscellaneous helper functions for the 4CAT backend
 """
-import calendar
 import subprocess
+from urllib.parse import urlparse
 import requests
 import datetime
 import smtplib
@@ -772,3 +772,18 @@ def flatten_dict(d: MutableMapping, parent_key: str = '', sep: str = '.'):
                 yield new_key, v
 
     return dict(_flatten_dict_gen(d, parent_key, sep))
+
+
+def validate_url(x):
+    """
+    Checks that a string is a valid url. Uses urlparse from urllib.parse to check that there is both a proper scheme
+    and netloc (host) for the url.
+
+    :param str x:  string representing a url
+    :return bool:  True if string is valid url, False if not
+    """
+    if type(x) == str:
+        result = urlparse(x)
+        return all([result.scheme, result.netloc])
+    else:
+        raise ValueError('Must provide type str not type %s' % type(x))
