@@ -110,7 +110,7 @@ class HatebaseAnalyser(BasicProcessor):
 				terms_ambig = []
 				terms_unambig = []
 
-				post_text = ' '.join([post.get(c, "").lower() for c in columns])
+				post_text = ' '.join([str(post.get(c, "")).lower() for c in columns])
 				for term in hatebase_regex.findall(post_text):
 					if hatebase[term]["plural_of"]:
 						if hatebase[term]["plural_of"] in terms:
