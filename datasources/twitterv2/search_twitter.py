@@ -98,7 +98,16 @@ class SearchWithTwitterAPIv2(Search):
         "in_reply_to_user_id", "referenced_tweets.id", "referenced_tweets.id.author_id")
         media_fields = (
         "duration_ms", "height", "media_key", "non_public_metrics", "organic_metrics", "preview_image_url",
-        "promoted_metrics", "public_metrics", "type", "url", "width")
+        "promoted_metrics", "public_metrics", "type", "url", "width", "variants", "alt_text")
+
+        if api_type == 'recent':
+            # Essential and Elevated do not have access to all expansions. As of 2022-10-12, requesting them returns
+            # error objects instead of incomplete objects (e.g. data['error'] instead of data['media'] if the
+            # non-public_metrics expansion is requested. These are modified via trial and error as a complete list
+            # does not appear available.
+            # https://developer.twitter.com/en/docs/twitter-api/getting-started/about-twitter-api#v2-access-level
+            media_fields = ("duration_ms", "height", "media_key", "preview_image_url", "public_metrics", "type", "url",
+                            "width", "variants", "alt_text")
 
         params = {
             "expansions": ",".join(expansions),
@@ -726,12 +735,11 @@ class SearchWithTwitterAPIv2(Search):
         """
         tweet_time = datetime.datetime.strptime(tweet["created_at"], "%Y-%m-%dT%H:%M:%S.000Z")
 
-        media_urls = {url['media_key']: url for url in tweet.get('entities', {}).get('urls', []) if url.get('media_key')}
         hashtags = [tag["tag"] for tag in tweet.get("entities", {}).get("hashtags", [])]
         mentions = [tag["username"] for tag in tweet.get("entities", {}).get("mentions", [])]
         urls = [tag["expanded_url"] for tag in tweet.get("entities", {}).get("urls", [])]
         images = [item["url"] for item in tweet.get("attachments", {}).get("media_keys", []) if type(item) is dict and item.get("type") == "photo"]
-        video_keys = [item["media_key"] for item in tweet.get("attachments", {}).get("media_keys", []) if type(item) is dict and item.get("type") == "video"]
+        video_items = [item for item in tweet.get("attachments", {}).get("media_keys", []) if type(item) is dict and item.get("type") == "video"]
 
         # by default, the text of retweets is returned as "RT [excerpt of
         # retweeted tweet]". Since we have the full tweet text, we can complete
@@ -758,10 +766,13 @@ class SearchWithTwitterAPIv2(Search):
             [urls.append(tag["expanded_url"]) for tag in retweeted_tweet.get("entities", {}).get("urls", [])]
             # Images appear to be inheritted by retweets, but just in case
             [images.append(item["url"]) for item in retweeted_tweet.get("attachments", {}).get("media_keys", []) if type(item) is dict and item.get("type") == "photo"]
-            [video_keys.append(item["media_key"]) for item in retweeted_tweet.get("attachments", {}).get("media_keys", []) if type(item) is dict and item.get("type") == "video"]
-            media_urls.update({url['media_key']: url for url in retweeted_tweet.get('entities', {}).get('urls', []) if url.get('media_key')})
+            [video_items.append(item) for item in retweeted_tweet.get("attachments", {}).get("media_keys", []) if type(item) is dict and item.get("type") == "video"]
 
-        videos = ",".join(set([media_urls[key].get('expanded_url') for key in video_keys if key in media_urls]))
+        videos = []
+        for video in video_items:
+            variants = sorted(video.get('variants', []), key=lambda d: d.get('bit_rate', 0), reverse=True)
+            if variants:
+                videos.append(variants[0].get('url'))
 
         return {
             "id": tweet["id"],
@@ -786,7 +797,7 @@ class SearchWithTwitterAPIv2(Search):
             "hashtags": ','.join(set(hashtags)),
             "urls": ','.join(set(urls)),
             "images": ','.join(set(images)),
-            "videos": videos,
+            "videos": ','.join(set(videos)),
             "mentions": ','.join(set(mentions)),
             "reply_to": "".join(
                 [mention["username"] for mention in tweet.get("entities", {}).get("mentions", [])[:1]]) if any(
