@@ -97,17 +97,8 @@ class SearchWithTwitterAPIv2(Search):
         "attachments.poll_ids", "attachments.media_keys", "author_id", "entities.mentions.username", "geo.place_id",
         "in_reply_to_user_id", "referenced_tweets.id", "referenced_tweets.id.author_id")
         media_fields = (
-        "duration_ms", "height", "media_key", "non_public_metrics", "organic_metrics", "preview_image_url",
-        "promoted_metrics", "public_metrics", "type", "url", "width", "variants", "alt_text")
-
-        if api_type == 'recent':
-            # Essential and Elevated do not have access to all expansions. As of 2022-10-12, requesting them returns
-            # error objects instead of incomplete objects (e.g. data['error'] instead of data['media'] if the
-            # non-public_metrics expansion is requested. These are modified via trial and error as a complete list
-            # does not appear available.
-            # https://developer.twitter.com/en/docs/twitter-api/getting-started/about-twitter-api#v2-access-level
-            media_fields = ("duration_ms", "height", "media_key", "preview_image_url", "public_metrics", "type", "url",
-                            "width", "variants", "alt_text")
+        "duration_ms", "height", "media_key", "preview_image_url", "public_metrics", "type", "url", "width", "variants",
+        "alt_text")
 
         params = {
             "expansions": ",".join(expansions),
