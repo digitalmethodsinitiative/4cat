@@ -130,7 +130,8 @@ class ColumnFilter(BaseFilter):
             else:
                 match_values = [datetime.datetime.strptime(value, "%Y-%m-%d %H:%M:%S").timestamp() for value in
                                 match_values]
-        self.dataset.log('Criteria: column - %s, style - %s, multiple - %s, function - %s, values - %s' % (str(column), str(match_style), str(match_multiple), str(match_function), ' & '.join(match_values)))
+
+        # self.dataset.log('Criteria: column - %s, style - %s, multiple - %s, function - %s, values - %s' % (str(column), str(match_style), str(match_multiple), str(match_function), ' & '.join(match_values)))
 
         matching_items = 0
         processed_items = 0

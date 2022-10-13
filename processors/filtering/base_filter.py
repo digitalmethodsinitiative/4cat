@@ -68,6 +68,9 @@ class BaseFilter(BasicProcessor):
         if num_posts == 0:
             self.dataset.update_status("No items matched your criteria", is_final=True)
 
+        if self.dataset.is_finished():
+            self.dataset.log("Processor already marked dataset as finished prior to saving file!")
+            return
         self.dataset.finish(num_posts)
 
     def after_process(self):
