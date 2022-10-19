@@ -75,7 +75,6 @@ class SearchWithTwitterAPIv2(Search):
         # this is pretty sensitive so delete it immediately after storing in
         # memory
         have_api_key = config.get("twitterv2-search.academic_api_key")
-        max_tweets = config.get("twitterv2-search.max_tweets")
         bearer_token = self.parameters.get("api_bearer_token") if not have_api_key else have_api_key
         api_type = query.get("api_type") if not have_api_key else "all"
         auth = {"Authorization": "Bearer %s" % bearer_token}
@@ -708,9 +707,8 @@ class SearchWithTwitterAPIv2(Search):
                 warning += " Do you want to continue?"
                 raise QueryNeedsExplicitConfirmationException(warning)
 
-           
-            params["amount"] = min(params["amount"], expected_tweets)
-        
+            params["amount"] = min(params["amount"], max_tweets, expected_tweets)
+
         return params
 
     @staticmethod

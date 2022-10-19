@@ -10,7 +10,7 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
 from backend.abstract.processor import BasicProcessor
-from common.lib.helpers import UserInput, get_yt_compatible_ids
+from common.lib.helpers import UserInput
 
 import common.config_manager as config
 __author__ = "Sal Hagen"
@@ -407,7 +407,7 @@ class YouTubeMetadata(BasicProcessor):
 
 		"""
 		
-		ids_list = get_yt_compatible_ids(ids)
+		ids_list = self.get_yt_compatible_ids(ids)
 
 		if object_type != "video" and object_type != "channel":
 			return "No valid YouTube object type (currently only 'channel' and 'video' are supported)"
@@ -549,6 +549,38 @@ class YouTubeMetadata(BasicProcessor):
 			self.dataset.update_status("Got metadata from " + str(i * 50) + "/" + str(len(ids)) + " " + object_type + " YouTube URLs")
 
 		return results
+
+	def get_yt_compatible_ids(self, yt_ids):
+		"""
+		:param yt_ids list, a list of strings
+		:returns list, a ist of joined strings in pairs of 50
+
+		Takes a list of IDs and returns list of joined strings
+		in pairs of fifty. This should be done for the YouTube API
+		that requires a comma-separated string and can only return
+		max fifty results.
+		"""
+
+		# If there's only one item, return a single list item
+		if isinstance(yt_ids, str):
+			return [yt_ids]
+
+		ids = []
+		last_i = 0
+		for i, yt_id in enumerate(yt_ids):
+
+			# Add a joined string per fifty videos
+			if i % 50 == 0 and i != 0:
+				ids_string = ",".join(yt_ids[last_i:i])
+				ids.append(ids_string)
+				last_i = i
+
+			# If the end of the list is reached, add the last data
+			elif i == (len(yt_ids) - 1):
+				ids_string = ",".join(yt_ids[last_i:i])
+				ids.append(ids_string)
+
+		return ids
 
 	def after_process(self):
 		"""
