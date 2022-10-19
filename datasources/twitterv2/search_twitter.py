@@ -131,6 +131,7 @@ class SearchWithTwitterAPIv2(Search):
             queries = [self.parameters.get("query", "")]
 
             amount = convert_to_int(self.parameters.get("amount"), 10)
+
             params['max_results'] = max(10, min(amount, 100)) if amount > 0 else 100  # 100 = upper limit, 10 = lower
 
             if self.parameters.get("min_date"):
@@ -155,6 +156,7 @@ class SearchWithTwitterAPIv2(Search):
                 params['query'] = query
             self.dataset.log("Search parameters: %s" % repr(params))
             while True:
+                
                 if self.interrupted:
                     raise ProcessorInterruptedException("Interrupted while getting tweets from the Twitter API")
 
@@ -299,6 +301,7 @@ class SearchWithTwitterAPIv2(Search):
 
                 # Loop through and collect tweets
                 for tweet in api_response.get("data", []):
+
                     if 0 < amount <= tweets:
                         break
 
@@ -619,6 +622,7 @@ class SearchWithTwitterAPIv2(Search):
 
         # never query more tweets than allowed
         tweets_to_collect = convert_to_int(query.get("amount"), 10)
+
         if max_tweets and (tweets_to_collect > max_tweets or tweets_to_collect == 0):
             tweets_to_collect = max_tweets
         params["amount"] = tweets_to_collect
@@ -704,8 +708,9 @@ class SearchWithTwitterAPIv2(Search):
                 warning += " Do you want to continue?"
                 raise QueryNeedsExplicitConfirmationException(warning)
 
-            params["amount"] = min(max_tweets, expected_tweets)
-
+           
+            params["amount"] = min(params["amount"], expected_tweets)
+        
         return params
 
     @staticmethod
