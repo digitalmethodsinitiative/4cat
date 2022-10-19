@@ -27,7 +27,7 @@ class Search4Chan(SearchWithScope):
 	is_static = False	# Whether this datasource is still updated
 
 	# Columns to return in csv
-	return_cols = ['thread_id', 'id', 'timestamp', 'body', 'subject', 'author', 'image_file', 'image_md5',
+	return_cols = ['thread_id', 'id', 'timestamp', 'board', 'body', 'subject', 'author', 'image_file', 'image_md5',
 				   'country_name', 'country_code']
 
 
@@ -514,9 +514,11 @@ class Search4Chan(SearchWithScope):
 			except ValueError:
 				pass
 
+		board = None
 		if query.get("board", None) and query["board"] != "*":
 			where.append("board = %s")
 			replacements.append(query["board"])
+			board = query["board"]
 
 		if use_sphinx:
 			# escape full text matches and convert quotes
@@ -577,8 +579,10 @@ class Search4Chan(SearchWithScope):
 		postgres_where = []
 		postgres_replacements = []
 
-		# postgres_where.append("board = %s")
-		# postgres_replacements.append(query.get("board"))
+		# Limit post IDs to those of a certain board
+		if board:
+			postgres_where.append("board = %s")
+			postgres_replacements.append(query.get("board"))
 
 		posts_full = self.fetch_posts(tuple([post["post_id"] for post in posts]), postgres_where, postgres_replacements)
 
