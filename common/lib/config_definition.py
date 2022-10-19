@@ -109,7 +109,7 @@ config_definition = {
         "default": "0",
         "coerce_type": int,
         "help": "SMTP port",
-        "tooltip": 'SMTP port to connect to for sending e-mail alerts. "0" defaults to "465"',
+        "tooltip": 'SMTP port to connect to for sending e-mail alerts. "0" defaults to "465" for SMTP_SSL or OS default for SMTP.',
     },
     "mail.ssl": {
         "type": UserInput.OPTION_TOGGLE,
