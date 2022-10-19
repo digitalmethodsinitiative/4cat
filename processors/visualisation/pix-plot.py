@@ -146,7 +146,7 @@ class PixPlotGenerator(BasicProcessor):
 		date =  datetime.datetime.now().strftime("%Y-%m-%d-%H%M%S")
 		top_dataset = self.dataset.top_parent()
 		label_formated = ''.join(e if e.isalnum() else '_' for e in top_dataset.get_label())
-		image_label = label_formated + '-' + str(top_dataset.key)
+		image_label = datetime.datetime.fromtimestamp(self.source_dataset.timestamp).strftime("%Y-%m-%d-%H%M%S") + '-' + label_formated + '-' + str(top_dataset.key)
 		plot_label = date + '-' + label_formated + '-' + str(self.dataset.key)
 
 		# Folder name is PixPlot identifier and set at dataset key
@@ -154,7 +154,7 @@ class PixPlotGenerator(BasicProcessor):
 
 		# Check if images have already been sent
 		filename_url = config.get('pix-plot.PIXPLOT_SERVER').rstrip('/') + '/api/list_filenames?folder_name=' + image_label
-		filename_response = requests.get(filename_url)
+		filename_response = requests.get(filename_url, timeout=30)
 
 		# Check if 4CAT has access to this PixPlot server
 		if filename_response.status_code == 403:
@@ -188,7 +188,7 @@ class PixPlotGenerator(BasicProcessor):
 		metadata_file_path = self.format_metadata(staging_area)
 		# Metadata
 		upload_url = config.get('pix-plot.PIXPLOT_SERVER').rstrip('/') + '/api/send_metadata'
-		metadata_response = requests.post(upload_url, files={'metadata': open(metadata_file_path, 'rb')}, data=data)
+		metadata_response = requests.post(upload_url, files={'metadata': open(metadata_file_path, 'rb')}, data=data, timeout=120)
 
 		# Now send photos to PixPlot
 		self.dataset.update_status("Uploading images to PixPlot")
@@ -204,9 +204,9 @@ class PixPlotGenerator(BasicProcessor):
 
 			if i > max_images:
 				break
+			with open(os.path.join(staging_area, filename), 'rb') as image:
+				response = requests.post(upload_url, files={'image': image}, data=data, timeout=120)
 
-			response = requests.post(upload_url, files={'image': open(os.path.join(staging_area, filename), 'rb')},
-									 data=data)
 			if response.status_code == 200:
 				images_uploaded += 1
 				if images_uploaded % 100 == 0:
@@ -237,7 +237,7 @@ class PixPlotGenerator(BasicProcessor):
 		json_data['timeout'] = 21600
 
 		# Send; receives response that process has started
-		resp = requests.post(create_plot_url, json=json_data)
+		resp = requests.post(create_plot_url, json=json_data, timeout=30)
 
 		if resp.status_code == 202:
 			# new request
@@ -263,7 +263,7 @@ class PixPlotGenerator(BasicProcessor):
 
 			# Send request to check status every 60 seconds
 			if int(time.time() - start_time) % 60 == 0:
-				result = requests.get(results_url)
+				result = requests.get(results_url, timeout=30)
 				self.log.debug(str(result.json()))
 				if 'status' in result.json().keys() and result.json()['status'] == 'running':
 					# Still running

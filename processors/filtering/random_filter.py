@@ -1,10 +1,9 @@
 """
 Filter by pseudo-random posts
 """
-import csv
 import random
 
-from backend.abstract.processor import BasicProcessor
+from processors.filtering.base_filter import BaseFilter
 from common.lib.helpers import UserInput
 
 __author__ = "Sal Hagen"
@@ -12,9 +11,8 @@ __credits__ = ["Sal Hagen"]
 __maintainer__ = "Sal Hagen"
 __email__ = "4cat@oilab.eu"
 
-csv.field_size_limit(1024 * 1024 * 1024)
 
-class RandomFilter(BasicProcessor):
+class RandomFilter(BaseFilter):
 	"""
 	Retain a pseudo-random amount of posts
 	"""
@@ -22,10 +20,8 @@ class RandomFilter(BasicProcessor):
 	category = "Filtering"  # category
 	title = "Random sample"  # title displayed in UI
 	description = "Retain a pseudorandom set of posts. This creates a new dataset."  # description displayed in UI
-	extension = "csv"  # extension of result file, used internally and in UI
 
-	# the following determines the options available to the user via the 4CAT
-	# interface.
+	# the following determines the options available to the user via the 4CAT interface
 	options = {
 		"sample_size": {
 			"type": UserInput.OPTION_TEXT,
@@ -34,12 +30,23 @@ class RandomFilter(BasicProcessor):
 		}
 	}
 
-	def process(self):
+	@classmethod
+	def is_compatible_with(cls, module=None):
 		"""
-		Creates a pseudo-random list of numbers within the range of a dataset length.
-		Then reads a CSV file and only keeps those aligning with the list integers.
-		"""
+		Allow processor on NDJSON and CSV files
 
+		:param module: Dataset or processor to determine compatibility with
+		"""
+		return module.is_top_dataset() and module.get_extension() in ("csv", "ndjson")
+
+	def filter_items(self):
+		"""
+		Create a generator to iterate through items that can be passed to create either a csv or ndjson. Use
+		`for original_item, mapped_item in self.source_dataset.iterate_mapped_items(self)` to iterate through items
+		and yield `original_item`.
+
+		:return generator:
+		"""
 		# now for the real deal
 		self.dataset.update_status("Reading source file")
 
@@ -70,41 +77,21 @@ class RandomFilter(BasicProcessor):
 
 		# keep some stats
 		posts_to_keep = sorted(random.sample(range(0, dataset_size), sample_size))
+		count = 0  # To check whether we've reachted the matching row
+		written = 0  # Serves as an index for the next matching row
+		match_row = posts_to_keep[0]  # The row count of the first matching row
 
-		# iterate through posts and see if they match
-		with self.dataset.get_results_path().open("w", encoding="utf-8", newline="") as output:
-			
-			# get header row, we need to copy it for the output
-			fieldnames = self.source_dataset.get_item_keys(self)
+		# Iterate through posts and keep those in the match list
+		for original_item, mapped_item in self.source_dataset.iterate_mapped_items(self):
 
-			# start the output file
-			writer = csv.DictWriter(output, fieldnames=fieldnames)
-			writer.writeheader()
+			# Yield on match
+			if count == match_row:
+				written += 1
+				if count != (dataset_size - 1) and written < sample_size:
+					match_row = posts_to_keep[written]
+				yield original_item
 
-			count = 0 # To check whether we've reachted the matching row
-			written = 0 # Serves as an index for the next matching row
-			match_row = posts_to_keep[0] # The row count of the first matching row 
-
-			# Iterate through posts and keep those in the match list
-			for post in self.source_dataset.iterate_items(self):
-				
-				# Write on match
-				if count == match_row:
-					writer.writerow(post)
-					written += 1
-					if count != (dataset_size - 1) and written < sample_size:
-						match_row = posts_to_keep[written]
-				
-				count += 1
-
-				if written % 2500 == 0:
+				if written % int(sample_size/10) == 0:
 					self.dataset.update_status("Wrote %i posts" % written)
 
-		self.dataset.update_status("New dataset created with %i random rows" % written, is_final=True)
-		self.dataset.finish(written)
-
-	def after_process(self):
-		super().after_process()
-
-		# Request standalone
-		self.create_standalone()
+			count += 1

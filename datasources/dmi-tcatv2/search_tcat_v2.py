@@ -77,7 +77,6 @@ class SearchWithinTCATBinsV2(Search):
         be used to show some options only to privileges users.
         """
         options = cls.options
-        print('TCAT CALLING get_options', flush=True)
 
         # Collect Metadata from TCAT instances
         all_bins = cls.collect_tcat_metadata()

@@ -1,8 +1,9 @@
 # ![](https://github.com/digitalmethodsinitiative/4cat/tree/master/common/assets/logo_readme.png) 4CAT: Capture and Analysis Toolkit
 
 [![DOI: 10.5281/zenodo.4742622](https://zenodo.org/badge/DOI/10.5281/zenodo.4742622.svg)](https://doi.org/10.5281/zenodo.4742622)
+[![DOI: 10.5117/CCR2022.2.007.HAGE](https://zenodo.org/badge/DOI/10.5117/ccr2022.2.007.hage.svg)](https://doi.org/10.5117/CCR2022.2.007.HAGE)
 [![License: MPL 2.0](https://img.shields.io/badge/license-MPL--2.0-informational)](https://github.com/digitalmethodsinitiative/4cat/blob/master/LICENSE)
-[![Requires Python 3.8](https://img.shields.io/badge/python-v3.8-blue)](https://www.python.org/)
+[![Requires Python 3.8](https://img.shields.io/badge/py-v3.8-blue)](https://www.python.org/)
 [![Docker image status](https://github.com/digitalmethodsinitiative/4cat/actions/workflows/docker_latest.yml/badge.svg)](https://github.com/digitalmethodsinitiative/4cat/actions/workflows/docker_latest.yml)
 
 <p align="center"><img alt="A screenshot of 4CAT, displaying its 'Create Dataset' interface" src="common/assets/screenshot1.png"><img alt="A screenshot of 4CAT, displaying a network visualisation of a dataset" src="common/assets/screenshot2.png"></p>
@@ -15,7 +16,7 @@ researchers, students and journalists interested using Digital Methods in their
 work.
 
 In 4CAT, you create a dataset from a given platform according to a given set of
-parameters; the result of this (usually a CSV file containing matching items)
+parameters; the result of this (usually a CSV or JSON file containing matching items)
 can then be downloaded or analysed further with a suite of analytical
 'processors', which range from simple frequency charts to more advanced analyses
 such as the generation and visualisation of word embedding models.
@@ -26,23 +27,19 @@ sources](https://github.com/digitalmethodsinitiative/4cat/wiki/How-to-make-a-dat
 using 4CAT's Python API. The following data sources are currently supported
 actively:
 
-* 4chan
-* 8kun
-* Bitchute
-* Parler
+* 4chan and 8kun
+* BitChute
 * Reddit
 * Telegram
-* Twitter API (Academic and regular tracks)
+* Tumblr
+* Twitter API v2 (Academic and regular tracks)
 
 The following platforms are supported through other tools, from which you can
 import data into 4CAT for analysis:
 
-* Facebook (via [CrowdTangle](https://www.crowdtangle.com) exports)
-* Instagram (via
+* Facebook and Instagram (via [CrowdTangle](https://www.crowdtangle.com) exports)
+* Instagram, TikTok and LinkedIn (via
   [Zeeschuimer](https://github.com/digitalmethodsinitiative/zeeschuimer) or CrowdTangle)
-* TikTok (via
-  [Zeeschuimer](https://github.com/digitalmethodsinitiative/zeeschuimer) or
-  [tiktok-scraper](https://github.com/drawrowfly/tiktok-scraper))
 
 A number of other platforms have built-in support that is untested, or requires
 e.g. special API access. You can view the [data sources in our wiki](https://github.com/digitalmethodsinitiative/4cat/wiki/Available-data-sources) or review [the data

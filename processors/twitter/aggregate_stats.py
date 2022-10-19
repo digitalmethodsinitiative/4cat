@@ -15,17 +15,31 @@ __maintainer__ = "Dale Wahl"
 __email__ = "4cat@oilab.eu"
 
 
-class TwitterUserStats(BasicProcessor):
+class TwitterAggregatedStats(BasicProcessor):
     """
     Collect Twitter statistics. Build to emulate TCAT statistic.
     """
-    type = "twitter-user-stats"  # job type ID
+    type = "twitter-aggregated-stats"  # job type ID
     category = "Twitter Analysis"  # category
-    title = "Aggregated User Statistics"  # title displayed in UI
-    description = "Calculates aggregate statistics for users grouped by interval (min, max, average, Q1, median, Q3, and trimmed mean): number of tweets per user, urls per user, number of followers, number of users following, and user's total number of tweets"  # description displayed in UI
+    title = "Aggregated Statistics"  # title displayed in UI
+    description = "Group tweets by category and count tweets per timeframe and then calculate aggregate group statistics (i.e. min, max, average, Q1, median, Q3, and trimmed mean): number of tweets, urls, hashtags, mentions, etc. \nUse for example to find the distribution of the number of tweets per author and compare across time."  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
 
+    num_of_different_categories = None
+
     options = {
+        "category": {
+            "type": UserInput.OPTION_CHOICE,
+            "default": "user",
+            "options": {
+                        "user": "Tweet Author",
+                        "type": "Tweet type (tweet, quote, retweet, reply)",
+                        "source": "Source of Tweet",
+                        "place": "Place Name (if known)",
+                        "language": "Language (Twitter's guess)",
+                        },
+            "help": "Group by"
+        },
         "timeframe": {
             "type": UserInput.OPTION_CHOICE,
             "default": "month",
@@ -40,6 +54,7 @@ class TwitterUserStats(BasicProcessor):
             "tooltip": "Makes the counts continuous. For example, if there are posts in May and July but not June, June will be included with 0 posts."
         }
     }
+
 
     @classmethod
     def is_compatible_with(cls, module=None):
@@ -64,6 +79,13 @@ class TwitterUserStats(BasicProcessor):
             self.dataset.update_status(0)
             return
 
+        # Format header
+        if len(self.num_of_different_categories) <= 5:
+            header_subtext = ', '.join(self.num_of_different_categories)
+        else:
+            header_subtext = '%i total' % len(self.num_of_different_categories)
+        header_category = '%s (%s)' % (self.parameters.get("category"), str(header_subtext))
+
         rows = []
         for interval, data in intervals.items():
             for data_type in data_types:
@@ -84,7 +106,7 @@ class TwitterUserStats(BasicProcessor):
                 row['Q3'] = np.percentile(values, 75)
                 row['25%_trimmed_mean'] = stats.trim_mean(values, 0.25)
 
-                rows.append({**{"date": interval, "data_type": data_type}, **row})
+                rows.append({**{"date": interval, 'category': header_category, "data_type": data_type}, **row})
 
         if bool(self.dataset.top_parent().parameters.get("pseudonymise", None)):
             self.dataset.update_status('Dataset previously was pseudonymised; not all metrics could be calculated.', is_final=True)
@@ -99,6 +121,9 @@ class TwitterUserStats(BasicProcessor):
         # OrderedDict because dates and headers should have order
         intervals = {}
 
+        category = self.parameters.get("category")
+        self.num_of_different_categories = set()
+
         timeframe = self.parameters.get("timeframe")
 
         first_interval = "9999"
@@ -106,10 +131,6 @@ class TwitterUserStats(BasicProcessor):
 
         counter = 0
         data_types = None
-
-        pseudonymised_dataset = bool(self.dataset.top_parent().parameters.get("pseudonymise", None))
-        if pseudonymised_dataset:
-            self.dataset.update_status("Pseudonymised dataset; not all metrics can be calculated.")
 
         for post in self.source_dataset.iterate_items(self, bypass_map_item=True):
             try:
@@ -119,17 +140,35 @@ class TwitterUserStats(BasicProcessor):
             except ValueError as e:
                 raise ProcessorException("%s, cannot count posts per %s" % (str(e), timeframe))
 
-            author = post.get("author_user").get("username")
-            if author == 'REDACTED':
-                raise ProcessorException("Author information has been removed; cannot calculate user stats")
+            if category == 'user':
+                post_category = post.get("author_user").get("username")
+                if post_category == 'REDACTED':
+                    raise ProcessorException("Author information has been removed; cannot calculate user stats")
+            elif category == 'type':
+                # Identify tweet type(s)
+                tweet_types = [ref.get("type") for ref in post.get("referenced_tweets", [])]
+                type_results = ['retweet' if "retweeted" in tweet_types else '',
+                                'quote' if "quoted" in tweet_types else '',
+                                'reply' if "replied_to" in tweet_types else '']
+                type_results.sort()
+                post_category = '-'.join([r for r in type_results if r]) if any(type_results) else 'tweet'
+            elif category == 'source':
+                post_category = post.get("source", 'Unknown')
+            elif category == 'place':
+                post_category = post.get('geo', {}).get('place', {}).get('full_name', 'Unknown')
+            elif category == 'language':
+                post_category = post.get("lang", "Unknown")
+            else:
+                raise ProcessorException("Category '%s' not yet implemented" % category)
+            self.num_of_different_categories.add(post_category)
 
             # Add a counts for the respective timeframe
             if date not in intervals:
                 intervals[date] = {}
 
-            if author not in intervals[date]:
-                intervals[date][author] = {
-                    "Number of Tweets": 1,
+            if post_category not in intervals[date]:
+                intervals[date][post_category] = {
+                    "Number of Tweets per %s" % category: 1,
                     "Total Retweets of Tweets": post.get('public_metrics').get('retweet_count'),
                     "Total Replies of Tweets": post.get('public_metrics').get('reply_count'),
                     "Total Likes of Tweets": post.get('public_metrics').get('like_count'),
@@ -143,46 +182,27 @@ class TwitterUserStats(BasicProcessor):
                          type(item) is dict and item.get("type") == "photo"]),
                     "Created at Timestamp": int(tweet_time.timestamp()),
                 }
-                if not pseudonymised_dataset:
-                    intervals[date][author]["Number User is Following"] = post.get("author_user").get('public_metrics').get('following_count'),
-                    intervals[date][author]["Number Followers of User"] = post.get("author_user").get('public_metrics').get('followers_count'),
-                    intervals[date][author]["Number of Tweets (account lifetime)"] = post.get("author_user").get('public_metrics').get(
-                        'tweet_count'),
 
                 # Convenience for easy adding to above
                 if not data_types:
-                    data_types = list(intervals[date][author].keys())
+                    data_types = list(intervals[date][post_category].keys())
                     self.dataset.log("Data being collected per author: %s" % data_types)
 
             else:
-                intervals[date][author]["Number of Tweets"] += 1
-                intervals[date][author]["Total Retweets of Tweets"] += post.get('public_metrics').get('retweet_count')
-                intervals[date][author]["Total Replies of Tweets"] += post.get('public_metrics').get('reply_count')
-                intervals[date][author]["Total Likes of Tweets"] += post.get('public_metrics').get('like_count')
-                intervals[date][author]["Total Quotes of Tweets"] += post.get('public_metrics').get('quote_count')
-                intervals[date][author]["Number of URLs"] += len(
+                intervals[date][post_category]["Number of Tweets per %s" % category] += 1
+                intervals[date][post_category]["Total Retweets of Tweets"] += post.get('public_metrics').get('retweet_count')
+                intervals[date][post_category]["Total Replies of Tweets"] += post.get('public_metrics').get('reply_count')
+                intervals[date][post_category]["Total Likes of Tweets"] += post.get('public_metrics').get('like_count')
+                intervals[date][post_category]["Total Quotes of Tweets"] += post.get('public_metrics').get('quote_count')
+                intervals[date][post_category]["Number of URLs"] += len(
                     [tag["expanded_url"] for tag in post.get("entities", {}).get("urls", [])])
-                intervals[date][author]["Number of Hashtags"] += len(
+                intervals[date][post_category]["Number of Hashtags"] += len(
                     [tag["tag"] for tag in post.get("entities", {}).get("hashtags", [])])
-                intervals[date][author]["Number of Mentions"] += len(
+                intervals[date][post_category]["Number of Mentions"] += len(
                     [tag["username"] for tag in post.get("entities", {}).get("mentions", [])])
-                intervals[date][author]["Number of Images"] += len(
+                intervals[date][post_category]["Number of Images"] += len(
                     [item["url"] for item in post.get("attachments", {}).get("media_keys", []) if
                      type(item) is dict and item.get("type") == "photo"])
-
-                # These are user-specific metrics and not per tweet/post like above
-                # Methodology question: which stat is best to use? Most recent? Largest? Smallest? Likely they will be identical or minimally different.
-                # Using most recent for now.
-                if int(tweet_time.timestamp()) > intervals[date][author]["Created at Timestamp"]:
-                    intervals[date][author]["Created at Timestamp"] = int(
-                        datetime.datetime.strptime(post["created_at"], "%Y-%m-%dT%H:%M:%S.000Z").timestamp())
-                    if not pseudonymised_dataset:
-                        intervals[date][author]["Number User is Following"] = post.get("author_user").get(
-                            'public_metrics').get('following_count')
-                        intervals[date][author]["Number Followers of User"] = post.get("author_user").get(
-                            'public_metrics').get('followers_count')
-                        intervals[date][author]["Number of Tweets (account lifetime)"] = post.get("author_user").get(
-                            'public_metrics').get('tweet_count')
 
             first_interval = min(first_interval, date)
             last_interval = max(last_interval, date)
@@ -206,14 +226,14 @@ class TwitterUserStats(BasicProcessor):
         return data_types, intervals
 
 
-class TwitterStatsVis(TwitterUserStats):
+class TwitterAggregatedStatsVis(TwitterAggregatedStats):
     """
     Collect Twitter statistics and create boxplots to visualise.
     """
-    type = "twitter-user-stats-vis"  # job type ID
+    type = "twitter-aggregated-stats-vis"  # job type ID
     category = "Twitter Analysis"  # category
-    title = "Aggregated User Statistics Visualization"  # title displayed in UI
-    description = "Gathers Aggregated User Statistics data and creates Box Plots visualising the spread of intervals. A large number of intervals will not properly display. "  # description displayed in UI
+    title = "Aggregated Statistics Visualization"  # title displayed in UI
+    description = "Gathers Aggregated Statistics data and creates Box Plots visualising the spread of intervals. A large number of intervals will not properly display. "  # description displayed in UI
     extension = "png"  # extension of result file, used internally and in UI
 
     references = [
@@ -222,7 +242,7 @@ class TwitterStatsVis(TwitterUserStats):
 
     @classmethod
     def get_options(cls, parent_dataset=None, user=None):
-        options = cls.options
+        options = cls.options.copy()
 
         options["show_outliers"] = {
             "type": UserInput.OPTION_TOGGLE,
@@ -245,13 +265,20 @@ class TwitterStatsVis(TwitterUserStats):
         This takes a 4CAT twitter dataset file as input, and outputs a csv.
         """
         import matplotlib.pyplot as plt
-
         self.dataset.update_status("Processing posts")
         data_types, intervals = self.collect_intervals()
 
+        # Format header
+        category = self.parameters.get("category")
+        if len(self.num_of_different_categories) <= 5:
+            header_subtext = ', '.join(self.num_of_different_categories)
+        else:
+            header_subtext = '%i total' % len(self.num_of_different_categories)
+        header_category = '%s (%s)' % (category, str(header_subtext))
+
+        # Collect visualization data for each chart
         vis_data = {data_type: {'intervals': [], 'data': []} for data_type in data_types if
                     data_type not in ['Created at Timestamp']}
-
         counter = 0
         for interval, data in intervals.items():
             for data_type in data_types:
@@ -274,7 +301,7 @@ class TwitterStatsVis(TwitterUserStats):
 
         for index, (data_type, data) in enumerate(vis_data.items()):
             axs[index].boxplot(data['data'], sym='+' if self.parameters.get("show_outliers") else '')
-            axs[index].set_title(data_type)
+            axs[index].set_title('%s per %s' % (data_type, header_category))
             axs[index].set_xticklabels(data['intervals'])
 
             if self.parameters.get("label_median"):
