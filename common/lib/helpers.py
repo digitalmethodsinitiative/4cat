@@ -737,7 +737,7 @@ def send_email(recipient, message):
     """
     connector = smtplib.SMTP_SSL if config.get('mail.ssl') else smtplib.SMTP
 
-    with connector(config.get('mail.server')) as smtp:
+    with connector(config.get('mail.server'), port=config.get('mail.port', 0)) as smtp:
         if config.get('mail.username') and config.get('mail.password'):
             smtp.ehlo()
             smtp.login(config.get('mail.username'), config.get('mail.password'))

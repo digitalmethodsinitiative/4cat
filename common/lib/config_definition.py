@@ -104,6 +104,13 @@ config_definition = {
         "help": "SMTP server",
         "tooltip": "SMTP server to connect to for sending e-mail alerts.",
     },
+    "mail.port": {
+        "type": UserInput.OPTION_TEXT,
+        "default": "0",
+        "coerce_type": int,
+        "help": "SMTP port",
+        "tooltip": 'SMTP port to connect to for sending e-mail alerts. "0" defaults to "465"',
+    },
     "mail.ssl": {
         "type": UserInput.OPTION_TOGGLE,
         "default": False,
