@@ -55,6 +55,7 @@ class VideoHasher(BasicProcessor):
 			"type": UserInput.OPTION_TEXT,
 			"help": "Number of frames extracted per second to extract from video",
 			"tooltip": "The default value is 1 frame per second. For 1 frame per 5 seconds pass 0.2 (1/5). For 5 fps pass 5. For short videos, more frames per second lead to less collision (unsimilar videos being marked as similar), but require more time (2 fps is double the time of 1 fps).",
+			"coerce_type": float,
 			"default": 1,
 			"min": 0,
 			"max": 5,
@@ -100,6 +101,8 @@ class VideoHasher(BasicProcessor):
 		# Prepare staging area for videos and video tracking
 		staging_area = self.dataset.get_staging_area()
 		self.dataset.log('Staging directory location: %s' % staging_area)
+		if store_video_collages:
+			staging_area.joinpath('collages/').mkdir(exist_ok=True)
 		video_hashes = {}
 		video_metadata = None
 		total_possible_videos = self.source_dataset.num_rows - 1  # for the metadata file that is included in archives
@@ -115,7 +118,7 @@ class VideoHasher(BasicProcessor):
 				with open(path) as file:
 					video_metadata = json.load(file)
 				continue
-
+			self.dataset.log(str(path))
 			try:
 				videohash = VideoHash(path=str(path), frame_interval=frame_interval)
 			except FFmpegNotFound:
@@ -129,10 +132,11 @@ class VideoHasher(BasicProcessor):
 			# 	video_hashes[path.name] = {'error': error}
 			# 	continue
 
+
 			video_hashes[path.name] = {'videohash': videohash}
 
 			if store_video_collages:
-				videohash.image.save(staging_area.joinpath(path.stem + '.jpg'))
+				videohash.image.save(staging_area.joinpath('collages/' + path.stem + '.jpg'))
 				video_hashes[path.name]['video_collage_filename'] = path.stem + '.jpg'
 
 			# Remove temp files used to make video hash
@@ -148,10 +152,10 @@ class VideoHasher(BasicProcessor):
 			# TODO: This would be better as its own processor, but creating the collages twice seems counterproductive
 			# Perhaps we can instead somehow utilize the processor pipeline to feed results into a second processor?
 			self.dataset.update_status("Compressing video collages into archive")
-			files = staging_area.glob("*")
+			files = staging_area.joinpath('collages/').glob("*")
 			done = 0
 			# Update suffix for zipped images
-			video_collage_results_path = self.dataset.get_results_path().with_suffix('zip')
+			video_collage_results_path = self.dataset.get_results_path().with_suffix('.zip')
 			self.dataset.log('Video collages stored here: %s' % video_collage_results_path)
 			with zipfile.ZipFile(video_collage_results_path, "w", compression=zipfile.ZIP_STORED) as zip:
 				for output_path in files:
