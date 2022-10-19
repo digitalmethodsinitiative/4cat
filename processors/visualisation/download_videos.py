@@ -80,7 +80,7 @@ class VideoDownloader(BasicProcessor):
 		"""
 		Allow on tiktok-search only for dev
 		"""
-		return module.type == "tiktok-search" # or module.type == "twitterv2-search"
+		return module.type == "tiktok-search" or module.type == "twitterv2-search"
 
 	def process(self):
 		"""
