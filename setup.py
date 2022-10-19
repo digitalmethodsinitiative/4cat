@@ -52,6 +52,7 @@ packages = [
 	"unidecode~=1.3",
 	"Werkzeug==0.15.5",
 	"wordcloud~=1.8",
+	"videohash==3.0.1",
 	"en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.0.0/en_core_web_sm-3.0.0.tar.gz#egg=en_core_web_sm"
 ]
 
