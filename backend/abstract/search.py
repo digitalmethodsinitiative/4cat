@@ -68,6 +68,7 @@ class Search(BasicProcessor, ABC):
 				posts = self.import_from_file(query_parameters.get("file"))
 			else:
 				posts = self.search(query_parameters)
+
 		except WorkerInterruptedException:
 			raise ProcessorInterruptedException("Interrupted while collecting data, trying again later.")
 
@@ -75,12 +76,12 @@ class Search(BasicProcessor, ABC):
 		num_posts = 0
 		if posts:
 			self.dataset.update_status("Writing posts to result file")
-			if not hasattr(self, "extension") or self.extension == "csv":
-				num_posts = self.items_to_csv(posts, results_file)
-			elif self.extension == "ndjson":
+			if results_file.suffix == ".ndjson":
 				num_posts = self.items_to_ndjson(posts, results_file)
+			elif results_file.suffix == ".csv":
+				num_posts = self.items_to_csv(posts, results_file)
 			else:
-				raise NotImplementedError("Datasource query cannot be saved as %s file" % self.extension)
+				raise NotImplementedError("Datasource query cannot be saved as %s file" % results_file.suffix)
 
 			self.dataset.update_status("Query finished, results are available.")
 		elif posts is not None:

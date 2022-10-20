@@ -2,7 +2,7 @@
 Google Vision API co-label network
 """
 from backend.abstract.processor import BasicProcessor
-from common.lib.helpers import UserInput, gdf_escape
+from common.lib.helpers import UserInput
 from common.lib.exceptions import ProcessorInterruptedException
 
 __author__ = "Stijn Peeters"
@@ -65,6 +65,9 @@ class VisionTagNetworker(BasicProcessor):
         pair_separator = ":::::"
         nodes = {}
         edges = {}
+
+        def gdf_escape(value):
+            return "'" + value.replace("'", "\'") + "'"
 
         try:
             min_confidence = float(self.parameters.get("min_confidence", 0))

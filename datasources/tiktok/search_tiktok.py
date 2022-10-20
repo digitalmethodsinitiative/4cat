@@ -22,7 +22,7 @@ class SearchTikTok(Search):
     category = "Search"  # category
     title = "Import scraped Tiktok data"  # title displayed in UI
     description = "Import Tiktok data collected with an external tool such as Zeeschuimer."  # description displayed in UI
-    extension = "csv"  # extension of result file, used internally and in UI
+    extension = "ndjson"  # extension of result file, used internally and in UI
     is_from_extension = True
 
     # not available as a processor for existing datasets
@@ -65,16 +65,12 @@ class SearchTikTok(Search):
 
                 # remove NUL bytes here because they trip up a lot of other
                 # things
-                post = json.loads(line.replace("\0", ""))["data"]
-
-                mapped_item = self.map_tiktok_item(post)
-
-                yield mapped_item
+                yield json.loads(line.replace("\0", ""))["data"]
 
         path.unlink()
 
     @staticmethod
-    def map_tiktok_item(post):
+    def map_item(post):
         hashtags = [extra["hashtagName"] for extra in post.get("textExtra", []) if
                     "hashtagName" in extra and extra["hashtagName"]]
 

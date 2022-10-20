@@ -21,7 +21,7 @@ class SearchInstagram(Search):
     category = "Search"  # category
     title = "Import scraped Instagram data"  # title displayed in UI
     description = "Import Instagram data collected with an external tool such as Zeeschuimer."  # description displayed in UI
-    extension = "csv"  # extension of result file, used internally and in UI
+    extension = "ndjson"  # extension of result file, used internally and in UI
     is_from_extension = True
 
     # not available as a processor for existing datasets
@@ -73,18 +73,21 @@ class SearchInstagram(Search):
                 if self.interrupted:
                     raise WorkerInterruptedException()
 
-                post = json.loads(line)
-                node = post["data"]
-                is_graph_response = "__typename" in node
-
-                if is_graph_response:
-                    yield self.parse_graph_item(node)
-                else:
-                    yield self.parse_itemlist_item(node)
+                yield json.loads(line.replace("\0", ""))["data"]
 
         path.unlink()
 
-    def parse_graph_item(self, node):
+    @staticmethod
+    def map_item(item):
+        is_graph_response = "__typename" in item
+
+        if is_graph_response:
+            return SearchInstagram.parse_graph_item(item)
+        else:
+            return SearchInstagram.parse_itemlist_item(item)
+
+    @staticmethod
+    def parse_graph_item(node):
         """
         Parse Instagram post in Graph format
 
@@ -149,28 +152,29 @@ class SearchInstagram(Search):
 
         return mapped_item
 
-    def parse_itemlist_item(self, node):
+    @staticmethod
+    def parse_itemlist_item(node):
         """
         Parse Instagram post in 'item list' format
 
         :param node:  Data as received from Instagram
         :return dict:  Mapped item
         """
-        num_media = 1 if node["media_type"] != self.MEDIA_TYPE_CAROUSEL else len(node["carousel_media"])
+        num_media = 1 if node["media_type"] != SearchInstagram.MEDIA_TYPE_CAROUSEL else len(node["carousel_media"])
         caption = "" if not node.get("caption") else node["caption"]["text"]
 
         # get media url
         # for carousels, get the first media item, for videos, get the video
         # url, for photos, get the highest resolution
-        if node["media_type"] == self.MEDIA_TYPE_CAROUSEL:
+        if node["media_type"] == SearchInstagram.MEDIA_TYPE_CAROUSEL:
             media_node = node["carousel_media"][0]
         else:
             media_node = node
 
-        if media_node["media_type"] == self.MEDIA_TYPE_VIDEO:
+        if media_node["media_type"] == SearchInstagram.MEDIA_TYPE_VIDEO:
             media_url = media_node["video_versions"][0]["url"]
             display_url = media_node["image_versions2"]["candidates"][0]["url"]
-        elif media_node["media_type"] == self.MEDIA_TYPE_PHOTO:
+        elif media_node["media_type"] == SearchInstagram.MEDIA_TYPE_PHOTO:
             media_url = media_node["image_versions2"]["candidates"][0]["url"]
             display_url = media_url
         else:
@@ -178,8 +182,8 @@ class SearchInstagram(Search):
             display_url = ""
 
         # type, 'mixed' means carousel with video and photo
-        type_map = {self.MEDIA_TYPE_PHOTO: "photo", self.MEDIA_TYPE_VIDEO: "video"}
-        if node["media_type"] != self.MEDIA_TYPE_CAROUSEL:
+        type_map = {SearchInstagram.MEDIA_TYPE_PHOTO: "photo", SearchInstagram.MEDIA_TYPE_VIDEO: "video"}
+        if node["media_type"] != SearchInstagram.MEDIA_TYPE_CAROUSEL:
             media_type = type_map.get(node["media_type"], "unknown")
         else:
             media_types = set([s["media_type"] for s in node["carousel_media"]])

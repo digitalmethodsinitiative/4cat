@@ -75,7 +75,6 @@ class SearchWithTwitterAPIv2(Search):
         # this is pretty sensitive so delete it immediately after storing in
         # memory
         have_api_key = config.get("twitterv2-search.academic_api_key")
-        max_tweets = config.get("twitterv2-search.max_tweets")
         bearer_token = self.parameters.get("api_bearer_token") if not have_api_key else have_api_key
         api_type = query.get("api_type") if not have_api_key else "all"
         auth = {"Authorization": "Bearer %s" % bearer_token}
@@ -97,17 +96,8 @@ class SearchWithTwitterAPIv2(Search):
         "attachments.poll_ids", "attachments.media_keys", "author_id", "entities.mentions.username", "geo.place_id",
         "in_reply_to_user_id", "referenced_tweets.id", "referenced_tweets.id.author_id")
         media_fields = (
-        "duration_ms", "height", "media_key", "non_public_metrics", "organic_metrics", "preview_image_url",
-        "promoted_metrics", "public_metrics", "type", "url", "width", "variants", "alt_text")
-
-        if api_type == 'recent':
-            # Essential and Elevated do not have access to all expansions. As of 2022-10-12, requesting them returns
-            # error objects instead of incomplete objects (e.g. data['error'] instead of data['media'] if the
-            # non-public_metrics expansion is requested. These are modified via trial and error as a complete list
-            # does not appear available.
-            # https://developer.twitter.com/en/docs/twitter-api/getting-started/about-twitter-api#v2-access-level
-            media_fields = ("duration_ms", "height", "media_key", "preview_image_url", "public_metrics", "type", "url",
-                            "width", "variants", "alt_text")
+        "duration_ms", "height", "media_key", "preview_image_url", "public_metrics", "type", "url", "width", "variants",
+        "alt_text")
 
         params = {
             "expansions": ",".join(expansions),
@@ -140,6 +130,7 @@ class SearchWithTwitterAPIv2(Search):
             queries = [self.parameters.get("query", "")]
 
             amount = convert_to_int(self.parameters.get("amount"), 10)
+
             params['max_results'] = max(10, min(amount, 100)) if amount > 0 else 100  # 100 = upper limit, 10 = lower
 
             if self.parameters.get("min_date"):
@@ -164,6 +155,7 @@ class SearchWithTwitterAPIv2(Search):
                 params['query'] = query
             self.dataset.log("Search parameters: %s" % repr(params))
             while True:
+                
                 if self.interrupted:
                     raise ProcessorInterruptedException("Interrupted while getting tweets from the Twitter API")
 
@@ -308,6 +300,7 @@ class SearchWithTwitterAPIv2(Search):
 
                 # Loop through and collect tweets
                 for tweet in api_response.get("data", []):
+
                     if 0 < amount <= tweets:
                         break
 
@@ -628,6 +621,7 @@ class SearchWithTwitterAPIv2(Search):
 
         # never query more tweets than allowed
         tweets_to_collect = convert_to_int(query.get("amount"), 10)
+
         if max_tweets and (tweets_to_collect > max_tweets or tweets_to_collect == 0):
             tweets_to_collect = max_tweets
         params["amount"] = tweets_to_collect
@@ -713,7 +707,7 @@ class SearchWithTwitterAPIv2(Search):
                 warning += " Do you want to continue?"
                 raise QueryNeedsExplicitConfirmationException(warning)
 
-            params["amount"] = min(max_tweets, expected_tweets)
+            params["amount"] = min(params["amount"], max_tweets, expected_tweets)
 
         return params
 
