@@ -762,6 +762,9 @@ class SearchWithTwitterAPIv2(Search):
             [images.append(item["url"]) for item in retweeted_tweet.get("attachments", {}).get("media_keys", []) if type(item) is dict and item.get("type") == "photo"]
             [video_items.append(item) for item in retweeted_tweet.get("attachments", {}).get("media_keys", []) if type(item) is dict and item.get("type") == "video"]
 
+        is_quoted = any([ref.get("type") == "quoted" for ref in tweet.get("referenced_tweets", [])])
+        is_reply = any([ref.get("type") == "replied_to" for ref in tweet.get("referenced_tweets", [])])
+
         videos = []
         for video in video_items:
             variants = sorted(video.get('variants', []), key=lambda d: d.get('bit_rate', 0), reverse=True)
@@ -784,10 +787,11 @@ class SearchWithTwitterAPIv2(Search):
             "possibly_sensitive": "yes" if tweet.get("possibly_sensitive") else "no",
             **tweet["public_metrics"],
             "is_retweet": "yes" if is_retweet else "no",
-            "is_quote_tweet": "yes" if any(
-                [ref.get("type") == "quoted" for ref in tweet.get("referenced_tweets", [])]) else "no",
-            "is_reply": "yes" if any(
-                [ref.get("type") == "replied_to" for ref in tweet.get("referenced_tweets", [])]) else "no",
+            "retweeted_user": "" if not is_retweet else retweeted_tweet["author_user"]["username"],
+            "is_quote_tweet": "yes" if is_quoted else "no",
+            "quoted_user": "" if not is_quoted else [ref for ref in tweet["referenced_tweets"] if ref["type"] == "quoted"].pop().get("author_user", {}).get("username", ""),
+            "is_reply": "yes" if is_reply else "no",
+            "replied_user": "" if not is_reply else [ref for ref in tweet["referenced_tweets"] if ref["type"] == "replied_to"].pop().get("author_user", {}).get("username", ""),
             "hashtags": ','.join(set(hashtags)),
             "urls": ','.join(set(urls)),
             "images": ','.join(set(images)),
