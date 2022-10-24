@@ -505,25 +505,24 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
 		:param data: A list or tuple of dictionaries, all with the same keys
 		"""
-		if not (isinstance(data, typing.List) or isinstance(data, typing.Tuple)) or isinstance(data, str):
-			raise TypeError("write_csv_items requires a list or tuple of dictionaries as argument")
+		if not (isinstance(data, typing.List) or isinstance(data, typing.Tuple) or callable(data)) or isinstance(data, str):
+			raise TypeError("write_csv_items requires a list or tuple of dictionaries as argument (%s given)" % type(data))
 
 		if not data:
 			raise ValueError("write_csv_items requires a dictionary with at least one item")
 
-		if not isinstance(data[0], dict):
-			raise TypeError("write_csv_items requires a list or tuple of dictionaries as argument")
-
 		self.dataset.update_status("Writing results file")
+		writer = False
 		with self.dataset.get_results_path().open("w", encoding="utf-8", newline='') as results:
-			writer = csv.DictWriter(results, fieldnames=data[0].keys())
-			writer.writeheader()
-
 			for row in data:
 				if self.interrupted:
 					raise ProcessorInterruptedException("Interrupted while writing results file")
 
 				row = remove_nuls(row)
+				if not writer:
+					writer = csv.DictWriter(results, fieldnames=row.keys())
+					writer.writeheader()
+
 				writer.writerow(row)
 
 		self.dataset.update_status("Finished")

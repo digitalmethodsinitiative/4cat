@@ -129,7 +129,8 @@ class DataSet(FourcatModule):
 					extension = own_processor.get_extension(parent_dataset=parent)
 				# Still no extension, default to 'csv'
 				if not extension:
-					extension = 'csv'
+					extension = "csv"
+
 			# Reserve filename and update data['result_file']
 			self.reserve_result_file(parameters, extension)
 
