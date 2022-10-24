@@ -685,10 +685,9 @@ class SearchWithTwitterAPIv2(Search):
                 if collectible_tweets == 0:
                     collectible_tweets = max_tweets
 
-                if collectible_tweets < expected_tweets:
-                    warning += ", but only %s will be collected. " % "{:,}".format(collectible_tweets)
-
                 if collectible_tweets > 0:
+                    if collectible_tweets < expected_tweets:
+                        warning += ", but only %s will be collected. " % "{:,}".format(collectible_tweets)
                     real_expected_tweets = min(expected_tweets, collectible_tweets)
                 else:
                     real_expected_tweets = expected_tweets
