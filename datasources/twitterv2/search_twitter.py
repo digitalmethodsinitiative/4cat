@@ -706,7 +706,9 @@ class SearchWithTwitterAPIv2(Search):
                 warning += " Do you want to continue?"
                 raise QueryNeedsExplicitConfirmationException(warning)
 
-            params["amount"] = min(params["amount"], max_tweets, expected_tweets)
+            params["amount"] = min(params["amount"], expected_tweets)
+            if max_tweets:
+                params["amount"] = min(max_tweets, params["amount"])
 
         return params
 
