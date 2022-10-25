@@ -120,5 +120,6 @@ class SearchTikTok(Search):
             "plays": post["stats"]["playCount"],
             "hashtags": ",".join(hashtags),
             "stickers": "\n".join(" ".join(s["stickerText"]) for s in post.get("stickersOnItem", [])),
+            "effects": ",".join([e["name"] for e in post.get("effectStickers", [])]),
             "warning": ",".join([w["text"] for w in post.get("warnInfo", [])])
         }
