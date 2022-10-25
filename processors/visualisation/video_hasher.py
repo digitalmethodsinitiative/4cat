@@ -99,13 +99,8 @@ class VideoHasher(BasicProcessor):
 		store_video_collages = self.parameters.get("store_video_collages", False)
 		update_parent = self.parameters.get("update_parent", False)
 
-		self.dataset.update_status("Extract all videos")
-		# TEST: There is a quality issue when iteratiting via iterate_archive_contents
-		staging_area = self.unpack_archive_contents(self.source_file)
-		video_filenames = os.listdir(staging_area)
-
 		# Prepare staging area for videos and video tracking
-		# staging_area = self.dataset.get_staging_area()
+		staging_area = self.dataset.get_staging_area()
 		self.dataset.log('Staging directory location: %s' % staging_area)
 		if store_video_collages:
 			staging_area.joinpath('collages/').mkdir(exist_ok=True)
@@ -116,9 +111,7 @@ class VideoHasher(BasicProcessor):
 		processed_videos = 0
 
 		self.dataset.update_status("Creating video hashes")
-		# for path in self.iterate_archive_contents(self.source_file, staging_area):
-		for path in video_filenames:
-			path = staging_area.joinpath(path)
+		for path in self.iterate_archive_contents(self.source_file, staging_area):
 			if self.interrupted:
 				raise ProcessorInterruptedException("Interrupted while determining image wall order")
 
@@ -147,22 +140,11 @@ class VideoHasher(BasicProcessor):
 					video_hashes[path.name] = {'error': error}
 					continue
 
-			# except Exception as e:
-			# 	error = 'Error with video %s: %s' % (str(path), str(e))
-			# 	self.dataset.log(error)
-			# 	video_hashes[path.name] = {'error': error}
-			# 	continue
-
-
 			video_hashes[path.name] = {'videohash': videohash}
 
-			# if store_video_collages:
-			# 	shutil.copy(videohash.collage_path, staging_area.joinpath('collages/' + path.stem + '.jpg'))
-			# 	# videohash.image.save(staging_area.joinpath('collages/' + path.stem + '.jpg'))
-			# 	video_hashes[path.name]['video_collage_filename'] = path.stem + '.jpg'
-
-			# Remove temp files used to make video hash
-			# videohash.delete_storage_path()
+			if store_video_collages:
+				shutil.copy(videohash.collage_path, staging_area.joinpath('collages/' + path.stem + '.jpg'))
+				video_hashes[path.name]['video_collage_filename'] = path.stem + '.jpg'
 
 			processed_videos += 1
 			self.dataset.update_status(
@@ -174,29 +156,9 @@ class VideoHasher(BasicProcessor):
 			# TODO: This would be better as its own processor, but creating the collages twice seems counterproductive
 			# Perhaps we can instead somehow utilize the processor pipeline to feed results into a second processor?
 			self.dataset.update_status("Compressing video collages into archive")
-			# files = staging_area.glob("*")
-			# files = staging_area.joinpath('collages/').glob("*")
-			done = 0
-			# Update suffix for zipped images
-			video_collage_results_path = self.dataset.get_results_path().with_suffix('.zip')
-			self.dataset.log('Video collages stored here: %s' % video_collage_results_path)
-			with zipfile.ZipFile(video_collage_results_path, "w", compression=zipfile.ZIP_STORED) as zip:
-				# setup file paths variable
-				filePaths = []
-
-				# Read all directory, subdirectories and file lists
-				for root, directories, files in os.walk(staging_area):
-					for filename in files:
-						# Create the full filepath by using os module.
-						filePath = os.path.join(root, filename)
-						filePaths.append(filePath)
-
-				for output_path in filePaths:
-					zip.write(output_path)
-					done += 1
-			# This should be taken care of in after_process()
-			shutil.rmtree(staging_area)
-			self.dataset.update_status("Compressed %i video collages into archive" % done)
+			from shutil import make_archive
+			make_archive(self.dataset.get_results_path().with_suffix(''), "zip", staging_area.joinpath('collages/'))
+			self.dataset.log('Video collages stored here: %s' % self.dataset.get_results_path().with_suffix('.zip'))
 
 		# Write output file
 		num_posts = 0
