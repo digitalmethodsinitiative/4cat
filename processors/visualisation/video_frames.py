@@ -90,18 +90,23 @@ class VideoFrames(BasicProcessor):
 		self.dataset.log('Staging directory location: %s' % staging_area)
 
 		self.dataset.update_status("Extract all videos")
-		# with zipfile.ZipFile(self.source_file, 'r') as zipped_file:
-		# 	zipped_file.extractall(staging_area)
-		directory = '/usr/src/app/test/'
-		video_filenames = os.listdir(directory)
-		self.dataset.log('Number of videos: %i\nFirst five:\n%s' % (len(video_filenames), ',\n'.join(video_filenames[:5])))
+		with zipfile.ZipFile(self.source_file, 'r') as zipped_file:
+			zipped_file.extractall(staging_area)
+		video_filenames = os.listdir(staging_area)
+
+		# # FORCE use of already unzipped videos
+		# directory = '/usr/src/app/test/'
+		# video_filenames = os.listdir(directory)
 
 		total_possible_videos = self.source_dataset.num_rows - 1  # for the metadata file that is included in archives
+		self.dataset.log(
+			'Number of videos: %i\nFirst five:\n%s' % (total_possible_videos, ',\n'.join(video_filenames[:5])))
 		processed_videos = 0
 
 		self.dataset.update_status("Creating video frames")
 		for path in video_filenames:
-			path = Path(directory).joinpath(path)
+			path = staging_area.joinpath(path)
+			# path = Path(directory).joinpath(path)
 			if self.interrupted:
 				raise ProcessorInterruptedException("Interrupted while determining image wall order")
 
@@ -113,18 +118,18 @@ class VideoFrames(BasicProcessor):
 
 			video_dir = staging_area.joinpath(path.stem)
 			os.mkdir(video_dir)
-			command = [
-				'ffmpeg',
-				"-i",
-				str(path),
-				"-s",
-				"144x144",
-				"-r",
-				str(frame_interval),
-				str(video_dir) + "/video_frame_%07d.jpeg",
-			]
+			# command = [
+			# 	'ffmpeg',
+			# 	"-i",
+			# 	str(path),
+			# 	"-s",
+			# 	"144x144",
+			# 	"-r",
+			# 	str(frame_interval),
+			# 	str(video_dir) + "/video_frame_%07d.jpeg",
+			# ]
 
-			command = f"ffmpeg -i {path} -s 144x144 -r {frame_interval} {video_dir}/video_frame_%07d.jpeg"
+			command = f"/usr/bin/ffmpeg -i {path} -s 144x144 -r {frame_interval} {video_dir}/video_frame_%07d.jpeg"
 			try:
 				result = subprocess.run(shlex.split(command), stdout=PIPE, stderr=PIPE)
 				# process = Popen(command, stdout=PIPE, stderr=PIPE)
