@@ -740,9 +740,9 @@ def send_email(recipient, message):
     context = ssl.create_default_context()
 
     # Decide which connection type
-    with smtplib.SMTP_SSL(config.get('mail.server'), port=config.get('mail.port', 0), context=context) if config.get('mail.ssl') else smtplib.SMTP(config.get('mail.server'), port=config.get('mail.port', 0)) as server:
-        if not config.get('mail.ssl'):
-            # smtplib.SMTP starts SSL here
+    with smtplib.SMTP_SSL(config.get('mail.server'), port=config.get('mail.port', 0), context=context) if config.get('mail.ssl') == 'ssl' else smtplib.SMTP(config.get('mail.server'), port=config.get('mail.port', 0)) as server:
+        if config.get('mail.ssl') == 'tls':
+            # smtplib.SMTP adds TLS context here
             server.starttls(context=context)
 
         # Log in
