@@ -5,6 +5,7 @@ This processor also requires ffmpeg to be installed in 4CAT's backend
 https://ffmpeg.org/
 """
 import json
+import os
 import shutil
 import zipfile
 
@@ -98,18 +99,26 @@ class VideoHasher(BasicProcessor):
 		store_video_collages = self.parameters.get("store_video_collages", False)
 		update_parent = self.parameters.get("update_parent", False)
 
+		self.dataset.update_status("Extract all videos")
+		# TEST: There is a quality issue when iteratiting via iterate_archive_contents
+		staging_area = self.unpack_archive_contents(self.source_file)
+		video_filenames = os.listdir(staging_area)
+
 		# Prepare staging area for videos and video tracking
-		staging_area = self.dataset.get_staging_area()
+		# staging_area = self.dataset.get_staging_area()
 		self.dataset.log('Staging directory location: %s' % staging_area)
 		if store_video_collages:
 			staging_area.joinpath('collages/').mkdir(exist_ok=True)
+
 		video_hashes = {}
 		video_metadata = None
 		total_possible_videos = self.source_dataset.num_rows - 1  # for the metadata file that is included in archives
 		processed_videos = 0
 
 		self.dataset.update_status("Creating video hashes")
-		for path in self.iterate_archive_contents(self.source_file, staging_area):
+		# for path in self.iterate_archive_contents(self.source_file, staging_area):
+		for path in video_filenames:
+			path = staging_area.joinpath(path)
 			if self.interrupted:
 				raise ProcessorInterruptedException("Interrupted while determining image wall order")
 
@@ -118,14 +127,26 @@ class VideoHasher(BasicProcessor):
 				with open(path) as file:
 					video_metadata = json.load(file)
 				continue
-			self.dataset.log(str(path))
+
 			try:
-				videohash = VideoHash(path=str(path), frame_interval=frame_interval)
+				videohash = VideoHash(path=str(path), storage_path=str(staging_area), frame_interval=frame_interval, do_not_copy=True)
 			except FFmpegNotFound:
 				self.log.error('ffmpeg must be installed for video_hash.py processor to be used.')
 				self.dataset.update_status("FFmpeg software not found. Please contact 4CAT maintainers.", is_final=True)
 				self.dataset.finish(0)
 				return
+			except UnicodeDecodeError as e:
+				# This seems to occur randomly and can be resolved by retrying
+				error = 'Error with video %s (%s): Retrying...' % (str(path), str(e))
+				self.dataset.log(error)
+				try:
+					videohash = VideoHash(path=str(path), storage_path=str(staging_area), frame_interval=frame_interval, do_not_copy=True)
+				except UnicodeDecodeError as e:
+					error = 'Error repeated with video %s: %s' % (str(path), str(e))
+					self.dataset.log(error)
+					video_hashes[path.name] = {'error': error}
+					continue
+
 			# except Exception as e:
 			# 	error = 'Error with video %s: %s' % (str(path), str(e))
 			# 	self.dataset.log(error)
@@ -135,12 +156,13 @@ class VideoHasher(BasicProcessor):
 
 			video_hashes[path.name] = {'videohash': videohash}
 
-			if store_video_collages:
-				videohash.image.save(staging_area.joinpath('collages/' + path.stem + '.jpg'))
-				video_hashes[path.name]['video_collage_filename'] = path.stem + '.jpg'
+			# if store_video_collages:
+			# 	shutil.copy(videohash.collage_path, staging_area.joinpath('collages/' + path.stem + '.jpg'))
+			# 	# videohash.image.save(staging_area.joinpath('collages/' + path.stem + '.jpg'))
+			# 	video_hashes[path.name]['video_collage_filename'] = path.stem + '.jpg'
 
 			# Remove temp files used to make video hash
-			videohash.delete_storage_path()
+			# videohash.delete_storage_path()
 
 			processed_videos += 1
 			self.dataset.update_status(
@@ -152,15 +174,25 @@ class VideoHasher(BasicProcessor):
 			# TODO: This would be better as its own processor, but creating the collages twice seems counterproductive
 			# Perhaps we can instead somehow utilize the processor pipeline to feed results into a second processor?
 			self.dataset.update_status("Compressing video collages into archive")
-			files = staging_area.joinpath('collages/').glob("*")
+			# files = staging_area.glob("*")
+			# files = staging_area.joinpath('collages/').glob("*")
 			done = 0
 			# Update suffix for zipped images
 			video_collage_results_path = self.dataset.get_results_path().with_suffix('.zip')
 			self.dataset.log('Video collages stored here: %s' % video_collage_results_path)
 			with zipfile.ZipFile(video_collage_results_path, "w", compression=zipfile.ZIP_STORED) as zip:
-				for output_path in files:
-					zip.write(output_path, output_path.name)
-					output_path.unlink()
+				# setup file paths variable
+				filePaths = []
+
+				# Read all directory, subdirectories and file lists
+				for root, directories, files in os.walk(staging_area):
+					for filename in files:
+						# Create the full filepath by using os module.
+						filePath = os.path.join(root, filename)
+						filePaths.append(filePath)
+
+				for output_path in filePaths:
+					zip.write(output_path)
 					done += 1
 			# This should be taken care of in after_process()
 			shutil.rmtree(staging_area)
