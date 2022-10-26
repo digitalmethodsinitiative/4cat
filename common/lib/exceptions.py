@@ -4,7 +4,7 @@ class FourcatException(Exception):
 	"""
 	Base 4CAT exception class
 	"""
-	def __init__(self, message, frame=None):
+	def __init__(self, message="", frame=None):
 		"""
 		Exception constructor
 
