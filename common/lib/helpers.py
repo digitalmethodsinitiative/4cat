@@ -2,6 +2,7 @@
 Miscellaneous helper functions for the 4CAT backend
 """
 import calendar
+import ssl
 import subprocess
 import requests
 import datetime
@@ -735,16 +736,26 @@ def send_email(recipient, message):
     :param list recipient:  Recipient e-mail addresses
     :param MIMEMultipart message:  Message to send
     """
-    connector = smtplib.SMTP_SSL if config.get('mail.ssl') else smtplib.SMTP
+    # Create a secure SSL context
+    context = ssl.create_default_context()
 
-    with connector(config.get('mail.server'), port=config.get('mail.port', 0)) as smtp:
+    # Decide which connection type
+    with smtplib.SMTP_SSL(config.get('mail.server'), port=config.get('mail.port', 0), context=context) if config.get('mail.ssl') == 'ssl' else smtplib.SMTP(config.get('mail.server'), port=config.get('mail.port', 0)) as server:
+        if config.get('mail.ssl') == 'tls':
+            # smtplib.SMTP adds TLS context here
+            server.starttls(context=context)
+
+        # Log in
         if config.get('mail.username') and config.get('mail.password'):
-            smtp.ehlo()
-            smtp.login(config.get('mail.username'), config.get('mail.password'))
+            server.ehlo()
+            server.login(config.get('mail.username'), config.get('mail.password'))
+
+        # Send message
         if type(message) == str:
-            smtp.sendmail(config.get('mail.noreply'), recipient, message)
+            server.sendmail(config.get('mail.noreply'), recipient, message)
         else:
-            smtp.sendmail(config.get('mail.noreply'), recipient, message.as_string())
+            server.sendmail(config.get('mail.noreply'), recipient, message.as_string())
+
 
 
 def flatten_dict(d: MutableMapping, parent_key: str = '', sep: str = '.'):
