@@ -433,7 +433,15 @@ class SearchTelegram(Search):
         :param Message message:  Message to parse
         :return dict:  4CAT-compatible item object
         """
-        thread = message["_chat"]["username"]
+        if message["_chat"]["username"]:
+            # chats can apparently not have usernames???
+            # truly telegram objects are way too lenient for their own good
+            thread = message["_chat"]["username"]
+        elif message["_chat"]["title"]:
+            thread = re.sub(r"\s", "", message["_chat"]["title"])
+        else:
+            # just give up
+            thread = "unknown"
 
         # determine username
         # API responses only include the user *ID*, not the username, and to
