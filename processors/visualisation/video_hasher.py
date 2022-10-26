@@ -5,9 +5,7 @@ This processor also requires ffmpeg to be installed in 4CAT's backend
 https://ffmpeg.org/
 """
 import json
-import os
 import shutil
-import zipfile
 
 from videohash import VideoHash
 from videohash.exceptions import FFmpegNotFound
@@ -128,17 +126,6 @@ class VideoHasher(BasicProcessor):
 				self.dataset.update_status("FFmpeg software not found. Please contact 4CAT maintainers.", is_final=True)
 				self.dataset.finish(0)
 				return
-			except UnicodeDecodeError as e:
-				# This seems to occur randomly and can be resolved by retrying
-				error = 'Error with video %s (%s): Retrying...' % (str(path), str(e))
-				self.dataset.log(error)
-				try:
-					videohash = VideoHash(path=str(path), storage_path=str(staging_area), frame_interval=frame_interval, do_not_copy=True)
-				except UnicodeDecodeError as e:
-					error = 'Error repeated with video %s: %s' % (str(path), str(e))
-					self.dataset.log(error)
-					video_hashes[path.name] = {'error': error}
-					continue
 
 			video_hashes[path.name] = {'videohash': videohash}
 
