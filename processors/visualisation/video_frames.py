@@ -6,6 +6,7 @@ https://ffmpeg.org/
 """
 import json
 import os
+import shutil
 import subprocess
 import zipfile
 from pathlib import Path
@@ -25,12 +26,12 @@ class VideoFrames(BasicProcessor):
 	"""
 	Video Frame Extracter
 
-
+	Uses ffmpeg to extract a certain number of frames per second at different sizes and saves them in an archive.
 	"""
 	type = "video-frames"  # job type ID
 	category = "Visual"  # category
 	title = "Extract frames from videos"  # title displayed in UI
-	description = "IN DEVELOPMENT: ffmpeg video frame test."  # description displayed in UI
+	description = "Extract frames from videos"  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
 
 	options = {
@@ -42,6 +43,17 @@ class VideoFrames(BasicProcessor):
 			"default": 1,
 			"min": 0,
 			"max": 5,
+		},
+		"frame_size": {
+			"type": UserInput.OPTION_CHOICE,
+			"default": "medium",
+			"options": {
+				"no_modify": "Do not modify",
+				"144x144": "Tiny (144x144)",
+				"432x432": "Medium (432x432)",
+				"1026x1026": "Large (1026x1026)",
+			},
+			"help": "Size of extracted frames"
 		},
 	}
 
@@ -65,46 +77,45 @@ class VideoFrames(BasicProcessor):
 
 		# Collect parameters
 		frame_interval = self.parameters.get("frame_interval", 1.0)
+		frame_size = self.parameters.get("frame_size", "no_modify")
 
 		# Prepare staging area for videos and video tracking
 		staging_area = self.dataset.get_staging_area()
 		self.dataset.log('Staging directory location: %s' % staging_area)
-
-		self.dataset.update_status("Extract all videos")
-		with zipfile.ZipFile(self.source_file, 'r') as zipped_file:
-			zipped_file.extractall(staging_area)
-		video_filenames = os.listdir(staging_area)
 
 		# Output folder
 		output_directory = staging_area.joinpath('frames')
 		output_directory.mkdir(exist_ok=True)
 
 		total_possible_videos = self.source_dataset.num_rows - 1  # for the metadata file that is included in archives
-		self.dataset.log(
-			'Number of videos: %i\nFirst five:\n%s' % (total_possible_videos, ',\n'.join(video_filenames[:5])))
 		processed_videos = 0
 
 		self.dataset.update_status("Extracting video frames")
-		for video in video_filenames:
+		for path in self.iterate_archive_contents(self.source_file, staging_area):
 			if self.interrupted:
 				raise ProcessorInterruptedException("Interrupted while determining image wall order")
 
-			path = staging_area.joinpath(video)
-
-			# Check for metadata JSON
-			if video == '.metadata.json':
-				# Keep it and move on
-				with open(path) as file:
-					video_metadata = json.load(file)
+			# Check for 4CAT's metadata JSON and copy it
+			if path.name == '.metadata.json':
+				shutil.copy(path, output_directory)
 				continue
 
 			vid_name = path.stem
 			video_dir = output_directory.joinpath(vid_name)
 			video_dir.mkdir(exist_ok=True)
 
-			command = f"ffmpeg -i {path} -s 144x144 -r {frame_interval} {video_dir}/video_frame_%07d.jpeg"
+			command = [
+				'ffmpeg',
+				"-i",
+				str(path),
+				"-r",
+				str(frame_interval),
+			]
+			if frame_size != 'no_modify':
+				command += ['-s', frame_size]
+			command += [str(video_dir) + "/video_frame_%07d.jpeg"]
 
-			result = subprocess.run(shlex.split(command), stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+			result = subprocess.run(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
 			# Capture logs
 			ffmpeg_output = result.stdout.decode("utf-8")
@@ -128,7 +139,12 @@ class VideoFrames(BasicProcessor):
 			self.dataset.update_progress(processed_videos / total_possible_videos)
 
 		# Finish up
+		# We've created a directory and folder structure here as opposed to a single folder with single files as
+		# expected by self.write_archive_and_finish() so we use make_archive instead
 		from shutil import make_archive
 		make_archive(self.dataset.get_results_path().with_suffix(''), "zip", output_directory)
+
+		# Remove staging area
+		shutil.rmtree(staging_area)
 
 		self.dataset.finish(processed_videos)
