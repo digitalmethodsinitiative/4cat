@@ -75,10 +75,6 @@ class VideoFrames(BasicProcessor):
 			zipped_file.extractall(staging_area)
 		video_filenames = os.listdir(staging_area)
 
-		# FORCE use of already unzipped videos
-		# directory = Path('/usr/src/app/test/')
-		# video_filenames = os.listdir(directory)
-
 		# Output folder
 		output_directory = staging_area.joinpath('frames')
 		output_directory.mkdir(exist_ok=True)
@@ -94,7 +90,6 @@ class VideoFrames(BasicProcessor):
 				raise ProcessorInterruptedException("Interrupted while determining image wall order")
 
 			path = staging_area.joinpath(video)
-			# path = directory.joinpath(video)
 
 			# Check for metadata JSON
 			if video == '.metadata.json':
@@ -107,19 +102,9 @@ class VideoFrames(BasicProcessor):
 			video_dir = output_directory.joinpath(vid_name)
 			video_dir.mkdir(exist_ok=True)
 
-			# command = [
-			# 	'ffmpeg',
-			# 	"-i",
-			# 	str(path),
-			# 	"-s",
-			# 	"144x144",
-			# 	"-r",
-			# 	str(frame_interval),
-			# 	str(video_dir) + "/video_frame_%07d.jpeg",
-			# ]
 			command = f"ffmpeg -i {path} -s 144x144 -r {frame_interval} {video_dir}/video_frame_%07d.jpeg"
 
-			result = subprocess.run(shlex.split(command), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+			result = subprocess.run(shlex.split(command), stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
 			# Capture logs
 			ffmpeg_output = result.stdout.decode("utf-8")
