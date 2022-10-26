@@ -6,15 +6,10 @@ https://ffmpeg.org/
 """
 import json
 import os
-import shutil
 import subprocess
 import zipfile
 from pathlib import Path
 import shlex
-from subprocess import Popen, PIPE
-
-from videohash import VideoHash
-from videohash.exceptions import FFmpegNotFound
 
 from backend.abstract.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
@@ -28,22 +23,9 @@ __email__ = "4cat@oilab.eu"
 
 class VideoFrames(BasicProcessor):
 	"""
-	Video Hasher
+	Video Frame Extracter
 
-	Converts videos into 64 bit hashes which can be used to identify near duplicate videos. The accuracy of these hashes
-	can very greatly depending on the number of frames per second collected from each video.
 
-	After creating an image collage from the collected video frames, the videohash library relies on two main aspects:
-	Discrete Wavelet Transformation of the image (https://en.wikipedia.org/wiki/Discrete_wavelet_transform) and the
-	dominant color. The collage being divided into 64 "images" or "pixels" and ultimately defined by those two aspects
-	(one "image"/"pixel" per bit).
-
-	Increasing the frames per second has proven necessary for short videos (if there are ultimately less than 64 frames,
-	there will essentially be black frames that will be shared with every other video with less than 64 frames). It also
-	seems necessary to collect the same frames per second for comparison between videos as variation in this will cause
-	different frames to be collected per video (more testing needs to be done here). Additionally, short videos often
-	do not have much differentiating information particularly if there is little difference between frames (i.e. no
-	"scene" changes) and have lead to unwanted collision in tests.
 	"""
 	type = "video-frames"  # job type ID
 	category = "Visual"  # category
@@ -77,13 +59,12 @@ class VideoFrames(BasicProcessor):
 		"""
 		# Check processor able to run
 		if self.source_dataset.num_rows == 0:
-			self.dataset.update_status("No videos to compare.", is_final=True)
+			self.dataset.update_status("No videos from which to extract frames.", is_final=True)
 			self.dataset.finish(0)
 			return
 
 		# Collect parameters
-		frame_interval = self.parameters.get("frame_interval", 1)
-		self.dataset.log('Frames per seconds: %f' % frame_interval)
+		frame_interval = self.parameters.get("frame_interval", 1.0)
 
 		# Prepare staging area for videos and video tracking
 		staging_area = self.dataset.get_staging_area()
@@ -94,30 +75,38 @@ class VideoFrames(BasicProcessor):
 			zipped_file.extractall(staging_area)
 		video_filenames = os.listdir(staging_area)
 
-		# # FORCE use of already unzipped videos
-		# directory = '/usr/src/app/test/'
+		# FORCE use of already unzipped videos
+		# directory = Path('/usr/src/app/test/')
 		# video_filenames = os.listdir(directory)
+
+		# Output folder
+		output_directory = staging_area.joinpath('frames')
+		output_directory.mkdir(exist_ok=True)
 
 		total_possible_videos = self.source_dataset.num_rows - 1  # for the metadata file that is included in archives
 		self.dataset.log(
 			'Number of videos: %i\nFirst five:\n%s' % (total_possible_videos, ',\n'.join(video_filenames[:5])))
 		processed_videos = 0
 
-		self.dataset.update_status("Creating video frames")
-		for path in video_filenames:
-			path = staging_area.joinpath(path)
-			# path = Path(directory).joinpath(path)
+		self.dataset.update_status("Extracting video frames")
+		for video in video_filenames:
 			if self.interrupted:
 				raise ProcessorInterruptedException("Interrupted while determining image wall order")
 
-			if path.name == '.metadata.json':
+			path = staging_area.joinpath(video)
+			# path = directory.joinpath(video)
+
+			# Check for metadata JSON
+			if video == '.metadata.json':
 				# Keep it and move on
 				with open(path) as file:
 					video_metadata = json.load(file)
 				continue
 
-			video_dir = staging_area.joinpath(path.stem)
-			os.mkdir(video_dir)
+			vid_name = path.stem
+			video_dir = output_directory.joinpath(vid_name)
+			video_dir.mkdir(exist_ok=True)
+
 			# command = [
 			# 	'ffmpeg',
 			# 	"-i",
@@ -128,45 +117,14 @@ class VideoFrames(BasicProcessor):
 			# 	str(frame_interval),
 			# 	str(video_dir) + "/video_frame_%07d.jpeg",
 			# ]
+			command = f"ffmpeg -i {path} -s 144x144 -r {frame_interval} {video_dir}/video_frame_%07d.jpeg"
 
-			command = f"/usr/bin/ffmpeg -i {path} -s 144x144 -r {frame_interval} {video_dir}/video_frame_%07d.jpeg"
-			try:
-				result = subprocess.run(shlex.split(command), stdout=PIPE, stderr=PIPE)
-				# process = Popen(command, stdout=PIPE, stderr=PIPE)
-			except UnicodeDecodeError as e:
-				# This seems to occur randomly and can be resolved by retrying
-				error = 'Error with video %s (%s): Retrying...' % (str(path), str(e))
-				self.dataset.log(error)
-				try:
-					result = subprocess.run(shlex.split(command), stdout=PIPE, stderr=PIPE)
-					# process = Popen(command, stdout=PIPE, stderr=PIPE)
-				except UnicodeDecodeError as e:
-					error = 'Error repeated with video %s: %s' % (str(path), str(e))
-					self.dataset.log(error)
-					continue
+			result = subprocess.run(shlex.split(command), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
-			try:
-				ffmpeg_output = result.stdout.decode("utf-8")
-				ffmpeg_error = result.stderr.decode("utf-8")
-			except UnicodeDecodeError as e:
-				error = 'Error decoding results for video %s: %s' % (str(path), str(e))
-				self.dataset.log(error)
+			# Capture logs
+			ffmpeg_output = result.stdout.decode("utf-8")
+			ffmpeg_error = result.stderr.decode("utf-8")
 
-			if result.returncode != 0:
-				self.dataset.log("Ran command: %s" % ' '.join(shlex.split(command)))
-				error = 'Error Return Code with video %s: %s' % (str(path), str(result.returncode))
-				self.dataset.log(error)
-
-			# output, error = process.communicate()
-
-			# try:
-			# 	ffmpeg_output = output.decode()
-			# 	ffmpeg_error = error.decode()
-			# except UnicodeDecodeError as e:
-			# 	error = 'Error with video %s (%s): Retrying...' % (str(path), str(e))
-			# 	self.dataset.log(error)
-
-			# Save the output report
 			if ffmpeg_output:
 				with open(video_dir.joinpath('ffmpeg_output.log'), 'w') as outfile:
 					outfile.write(ffmpeg_output)
@@ -175,6 +133,10 @@ class VideoFrames(BasicProcessor):
 				with open(video_dir.joinpath('ffmpeg_error.log'), 'w') as outfile:
 					outfile.write(ffmpeg_error)
 
+			if result.returncode != 0:
+				error = 'Error Return Code with video %s: %s' % (vid_name, str(result.returncode))
+				self.dataset.log(error)
+
 			processed_videos += 1
 			self.dataset.update_status(
 				"Created frames for %i of %i videos" % (processed_videos, total_possible_videos))
@@ -182,6 +144,6 @@ class VideoFrames(BasicProcessor):
 
 		# Finish up
 		from shutil import make_archive
-		make_archive(self.dataset.get_results_path().with_suffix(''), "zip", staging_area)
+		make_archive(self.dataset.get_results_path().with_suffix(''), "zip", output_directory)
 
 		self.dataset.finish(processed_videos)
