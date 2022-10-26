@@ -171,39 +171,44 @@ class TelegramImageDownloader(BasicProcessor):
         # todo: investigate if we can directly instantiate a MessageMediaPhoto instead of fetching messages
         media_done = 1
         for entity, message_ids in messages_with_photos.items():
-            async for message in client.iter_messages(entity=entity, ids=message_ids):
-                if self.interrupted:
-                    raise ProcessorInterruptedException("Interrupted while downloading images")
+            try:
+                async for message in client.iter_messages(entity=entity, ids=message_ids):
+                    if self.interrupted:
+                        raise ProcessorInterruptedException("Interrupted while downloading images")
 
-                success = False
-                try:
-                    # it's actually unclear if images are always jpegs, but this
-                    # seems to work
-                    self.dataset.update_status("Downloading media %i/%i" % (media_done, total_media))
-                    self.dataset.update_progress(media_done / total_media)
+                    success = False
+                    try:
+                        # it's actually unclear if images are always jpegs, but this
+                        # seems to work
+                        self.dataset.update_status("Downloading media %i/%i" % (media_done, total_media))
+                        self.dataset.update_progress(media_done / total_media)
 
-                    path = self.staging_area.joinpath("%s-%i.jpeg" % (entity, message.id))
-                    filename = path.name
-                    if hasattr(message.media, "photo"):
-                        await message.download_media(str(path))
-                    else:
-                        # video thumbnail
-                        await client.download_media(message, str(path), thumb=-1)
-                    msg_id = message.id
-                    success = True
-                except (AttributeError, RuntimeError, ValueError, TypeError) as e:
-                    filename = "%s-index-%i" % (entity, media_done)
-                    msg_id = str(message.id) if hasattr(message, "id") else "with index %i" % media_done
-                    self.dataset.log("Could not download image for message %s (%s)" % (msg_id, str(e)))
-                    self.flawless = False
+                        path = self.staging_area.joinpath("%s-%i.jpeg" % (entity, message.id))
+                        filename = path.name
+                        if hasattr(message.media, "photo"):
+                            await message.download_media(str(path))
+                        else:
+                            # video thumbnail
+                            await client.download_media(message, str(path), thumb=-1)
+                        msg_id = message.id
+                        success = True
+                    except (AttributeError, RuntimeError, ValueError, TypeError) as e:
+                        filename = "%s-index-%i" % (entity, media_done)
+                        msg_id = str(message.id) if hasattr(message, "id") else "with index %i" % media_done
+                        self.dataset.log("Could not download image for message %s (%s)" % (msg_id, str(e)))
+                        self.flawless = False
 
-                media_done += 1
-                self.metadata[filename] = {
-                    "filename": filename,
-                    "success": success,
-                    "from_dataset": self.source_dataset.key,
-                    "post_ids": [msg_id]
-                }
+                    media_done += 1
+                    self.metadata[filename] = {
+                        "filename": filename,
+                        "success": success,
+                        "from_dataset": self.source_dataset.key,
+                        "post_ids": [msg_id]
+                    }
+                    
+            except ValueError as e:
+                self.dataset.log("Couldn't retrieve images for %s, it probably does not exist anymore (%s)" % (entity, str(e)))
+                self.flawless = False
 
     @staticmethod
     def cancel_start():
