@@ -114,23 +114,6 @@ class SlackLogHandler(WebHookLogHandler):
         frames = traceback.extract_stack()[:-9]
         location = "`%s`" % "` → `".join([frame.filename.split("/")[-1] + ":" + str(frame.lineno) for frame in frames])
 
-        # try to read some metadata from the offending file
-        bad_line = None
-        module_owner = None
-        try:
-            with Path(record.frame.filename).open() as infile:
-                bad_line = infile.readlines()[record.frame.lineno - 1]
-                bad_location = record.frame.filename.split("/")[-1] + ":" + str(record.frame.lineno)
-        except IndexError:
-            pass
-
-        try:
-            module = SourceFileLoader(record.frame.filename.split("/")[-1].split(".")[0], record.frame.filename).load_module()
-            if "__maintainer__" in dir(module):
-                module_owner = module.__maintainer__
-        except ImportError as e:
-            pass
-
         # prepare slack webhook payload
         fields = [{
             "title": "Stack trace:",
@@ -138,19 +121,27 @@ class SlackLogHandler(WebHookLogHandler):
             "short": False
         }]
 
-        if bad_line:
-            fields.append({
-                "title": "Code (`" + bad_location + "`):",
-                "value": "```" + bad_line.strip() + "```",
-                "short": False
-            })
+        # try to read some metadata from the offending file
+        try:
+            with Path(record.frame.filename).open() as infile:
+                fields.append({
+                    "title": "Code (`" + record.frame.filename.split("/")[-1] + ":" + str(record.frame.lineno) + "`):",
+                    "value": "```" + infile.readlines()[record.frame.lineno - 1].strip() + "```",
+                    "short": False
+                })
+        except IndexError:
+            pass
 
-        if module_owner:
-            fields.append({
-                "title": "Code maintainer:",
-                "value": module_owner,
-                "short": False
-            })
+        try:
+            module = SourceFileLoader(record.frame.filename.split("/")[-1].split(".")[0], record.frame.filename).load_module()
+            if "__maintainer__" in dir(module):
+                fields.append({
+                    "title": "Code maintainer:",
+                    "value": module.__maintainer__,
+                    "short": False
+                })
+        except ImportError:
+            pass
 
         return {
             "text": ":bell: 4CAT %s logged on `%s`:" % (record.levelname.lower(), platform.uname().node),
