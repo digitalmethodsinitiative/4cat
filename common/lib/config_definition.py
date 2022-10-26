@@ -112,10 +112,11 @@ config_definition = {
         "tooltip": 'SMTP port to connect to for sending e-mail alerts. "0" defaults to "465" for SMTP_SSL or OS default for SMTP.',
     },
     "mail.ssl": {
-        "type": UserInput.OPTION_TOGGLE,
-        "default": False,
-        "help": "SMTP over SSL",
-        "tooltip": "Use SSL to connect to e-mail server?",
+        "type": UserInput.OPTION_CHOICE,
+        "default": "ssl",
+        "options": {"ssl": "SSL", "tls": "TLS", "none": "None"},
+        "help": "SMTP over SSL, TLS, or None",
+        "tooltip": "Security to use to connect to e-mail server",
     },
     "mail.username": {
         "type": UserInput.OPTION_TEXT,
