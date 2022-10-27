@@ -23,7 +23,7 @@ class HashSimilarityNetworker(BasicProcessor):
     """
     type = "hash-similarity-network"
     category = "Networks"
-    title = "Hash Similarity network"
+    title = "Hash Similarity network to identify near duplicate hashes"
     description = "Calculate similarity of hashes and create a GEXF network file."
     extension = "gexf"
 
