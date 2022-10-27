@@ -41,8 +41,8 @@ class VideoHasher(BasicProcessor):
 	"""
 	type = "video-hashes"  # job type ID
 	category = "Visual"  # category
-	title = "Create Video hashes"  # title displayed in UI
-	description = "IN DEVELOPMENT: Creates video hashes (64 bits; identifiers) to identify near duplicate videos in a dataset. Uses video only (no audio; see references). This process can take a long time depending on video length, amount, and frames per second."  # description displayed in UI
+	title = "Create Video hashes to identify near duplicate videos"  # title displayed in UI
+	description = "Creates video hashes (64 bits/identifiers) to identify near duplicate videos in a dataset based on hash similarity. Uses video only (no audio; see references). This process can take a long time depending on video length, amount, and frames per second."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
 	references = [
