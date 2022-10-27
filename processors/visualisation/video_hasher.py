@@ -41,9 +41,9 @@ class VideoHasher(BasicProcessor):
 	"""
 	type = "video-hashes"  # job type ID
 	category = "Visual"  # category
-	title = "Identify near duplicate videos"  # title displayed in UI
-	description = "IN DEVELOPMENT: Creates video hashes (64 bits; identifiers) to identify near duplicate videos in a dataset. Only utilizes the video and does not consider audio (see references). This process can take a long time depending on video length, amount, and frames per second."  # description displayed in UI
-	extension = "ndjson"  # extension of result file, used internally and in UI
+	title = "Create Video hashes"  # title displayed in UI
+	description = "IN DEVELOPMENT: Creates video hashes (64 bits; identifiers) to identify near duplicate videos in a dataset. Uses video only (no audio; see references). This process can take a long time depending on video length, amount, and frames per second."  # description displayed in UI
+	extension = "csv"  # extension of result file, used internally and in UI
 
 	references = [
 		"[Video Hash](https://github.com/akamhy/videohash#readme)",
@@ -76,7 +76,7 @@ class VideoHasher(BasicProcessor):
 	@classmethod
 	def is_compatible_with(cls, module=None):
 		"""
-		Allow on tiktok-search only for dev
+		Allow on videos only
 		"""
 		return module.type == "video-downloader"
 
@@ -150,47 +150,48 @@ class VideoHasher(BasicProcessor):
 		# Write output file
 		num_posts = 0
 		post_id_to_results = {}
+		rows = []
 		if video_metadata is None:
 			# Not good, but let's store the video_hashes and note the error
 			self.dataset.update_status("Error connecting video hashes to original dataset", is_final=True)
-			with self.dataset.get_results_path().open("w", encoding="utf-8", newline="") as outfile:
-				for filename, data in video_hashes.items():
-					video_hash = data.get('videohash')
-					item = {
-						'filename': filename,
-						'video_hash': video_hash.hash,
-						'video_duration': video_hash.video_duration,
-						'video_collage_filename': data.get('video_collage_filename'),
-					}
-					outfile.write(json.dumps(item) + "\n")
-					num_posts += 1
+
+			for filename, data in video_hashes.items():
+				video_hash = data.get('videohash')
+				rows.append({
+					'id': filename,  # best if all datasets have unique identifier
+					'filename': filename,
+					'video_hash': video_hash.hash,
+					'video_duration': video_hash.video_duration,
+					'video_collage_filename': data.get('video_collage_filename'),
+				})
+				num_posts += 1
 		else:
 			self.dataset.update_status("Saving video hash results")
 			with self.dataset.get_results_path().open("w", encoding="utf-8", newline="") as outfile:
 				for url, data in video_metadata.items():
-					if video_hashes[data.get('filename')].get('error'):
-						data.update({
-								'url': url,
-								'error': video_hashes[data.get('filename')].get('error'),
-							})
-					else:
-						video_hash = video_hashes[data.get('filename')].get('videohash')
-						data.update({
-							'url': url,
-							'video_hash': video_hash.hash,
-							'video_duration': video_hash.video_duration,
-							'video_collage_filename': video_hashes[data.get('filename')].get('video_collage_filename'),
-						})
+					video_hash = video_hashes[data.get('filename')].get('videohash')
+					data.update({
+						'id': data.get('filename'),  # best if all datasets have unique identifier
+						'url': url,
+						'video_hash': video_hash.hash,
+						'video_duration': video_hash.video_duration,
+						'video_collage_filename': video_hashes[data.get('filename')].get('video_collage_filename'),
+						'video_count': len(data.get('post_ids', [])),
+					})
 
-						if update_parent:
-							for post_id in data.get('post_ids', []):
-								# Posts can have multiple videos
-								if post_id in post_id_to_results.keys():
-									post_id_to_results[post_id].append((url, video_hash.hash))
-								else:
-									post_id_to_results[post_id] = [(url, video_hash.hash)]
+					if update_parent:
+						for post_id in data.get('post_ids', []):
+							# Posts can have multiple videos
+							if post_id in post_id_to_results.keys():
+								post_id_to_results[post_id].append((url, video_hash.hash))
+							else:
+								post_id_to_results[post_id] = [(url, video_hash.hash)]
 
-					outfile.write(json.dumps(data) + "\n")
+					# List types are not super fun for CSV
+					if 'post_ids' in data:
+						data['post_ids'] = ','.join(data['post_ids'])
+
+					rows.append(data)
 					num_posts += 1
 
 		if update_parent and video_metadata:
@@ -209,4 +210,4 @@ class VideoHasher(BasicProcessor):
 		# Finish up
 		self.dataset.update_status(
 			'Created %i video hashes%s.' % (num_posts, ' and stored video collages' if store_video_collages else ''))
-		self.dataset.finish(num_posts)
+		self.write_csv_items_and_finish(rows)
