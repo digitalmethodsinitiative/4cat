@@ -191,11 +191,11 @@ def create_first_user():
                                flashes=get_flashed_messages())
 
     if request.form.get("phone-home"):
-        with Path(config.get("path.root"), "config/.current-version").open() as outfile:
+        with Path(config.get("PATH_ROOT"), "config/.current-version").open() as outfile:
             version = outfile.read(64).split("\n")[0].strip()
 
         payload = {"version": version}
-        requests.post(config.get("phone_home_url"), payload)
+        requests.post(config.get("4cat.phone_home_url"), payload)
 
     db.insert("users", data={"name": username})
     db.commit()
@@ -277,7 +277,7 @@ def request_access():
 
     incomplete = []
 
-    policy_template = Path(config.get('PATH_ROOT'), "webtool/pages/access-policy.md")
+    policy_template = Path(config.get("PATH_ROOT"), "webtool/pages/access-policy.md")
     access_policy = ""
     if policy_template.exists():
         access_policy = policy_template.read_text(encoding="utf-8")
@@ -293,7 +293,7 @@ def request_access():
         else:
             html_parser = html2text.HTML2Text()
 
-            sender = config.get('mail.noreply')
+            sender = config.get("mail.noreply")
             message = MIMEMultipart("alternative")
             message["Subject"] = "Account request"
             message["From"] = sender
