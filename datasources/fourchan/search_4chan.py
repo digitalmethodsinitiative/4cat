@@ -61,6 +61,15 @@ class Search4Chan(SearchWithScope):
 			"type": UserInput.OPTION_TEXT,
 			"help": "Subject contains"
 		},
+		"deleted_posts": {
+			"type": UserInput.OPTION_INFO,
+			"help": "Posts deleted by moderators may be excluded. <strong>Note:</strong> this does not yet work for deleted OPs and thread removals."
+		},
+		"get_deleted": {
+			"type": UserInput.OPTION_TOGGLE,
+			"default": False,
+			"help": "Include deleted posts"
+		},
 		"country_name": {
 			"type": UserInput.OPTION_MULTI_SELECT,
 			"help": "Poster country",
@@ -545,19 +554,26 @@ class Search4Chan(SearchWithScope):
 			where.append("MATCH(%s)")
 			replacements.append(" ".join(match))
 
+		# Adjust the query if we don't want deleted posts.
+		join = ""
+		if not query.get("get_deleted"):
+			join = " LEFT JOIN posts_%s_deleted ON posts_%s.id_seq = posts_%s_deleted.id_seq " %  tuple([self.prefix] * 3)
+			where.append("posts_%s_deleted.id_seq IS NULL" % self.prefix)
+
 		# query Sphinx
 		self.dataset.update_status("Searching for matches")
 
 		where = " AND ".join(where)
 
 		if use_sphinx:
-			posts = self.fetch_sphinx(where, replacements)
+			posts = self.fetch_sphinx(join, where, replacements)
 		# Query the postgres table immediately if we're not using sphinx.
 		else:
 			columns = ", ".join(self.return_cols)
 			if self.interrupted:
 				raise ProcessorInterruptedException("Interrupted while fetching post data")
-			query = "SELECT " + columns + " FROM posts_" + self.prefix + " WHERE " + where + " ORDER BY id ASC"
+
+			query = "SELECT " + columns + " FROM posts_" + self.prefix + join + " WHERE " + where + " ORDER BY id ASC"
 			posts = self.db.fetchall_interruptable(self.queue, query, replacements)
 
 		if posts is None:
@@ -614,11 +630,14 @@ class Search4Chan(SearchWithScope):
 		string = string.replace("@", "\\@")
 		return string
 
-	def fetch_posts(self, post_ids, where=None, replacements=None):
+	def fetch_posts(self, post_ids, join="", where=None, replacements=None):
 		"""
 		Fetch post data from database
 
 		:param list post_ids:  List of post IDs to return data for
+		:param join, str: A potential JOIN statement
+		:param where, list: A potential WHERE statemement
+		:param replacements, list: The values to add in the JOIN and WHERE statements
 		:return list: List of posts, with a dictionary representing the database record for each post
 		"""
 		if not where:
@@ -634,8 +653,9 @@ class Search4Chan(SearchWithScope):
 		if self.interrupted:
 			raise ProcessorInterruptedException("Interrupted while fetching post data")
 
-		query = "SELECT " + columns + " FROM posts_" + self.prefix + " WHERE " + " AND ".join(
+		query = "SELECT " + columns + " FROM posts_" + self.prefix + " " + join + " WHERE " + " AND ".join(
 			where) + " ORDER BY id ASC"
+
 		return self.db.fetchall_interruptable(self.queue, query, replacements)
 
 	def fetch_threads(self, thread_ids):
@@ -654,12 +674,13 @@ class Search4Chan(SearchWithScope):
 			"SELECT " + columns + " FROM posts_" + self.prefix + " WHERE thread_id IN %s ORDER BY thread_id ASC, id ASC",
 											  (thread_ids,))
 
-	def fetch_sphinx(self, where, replacements):
+	def fetch_sphinx(self, where, replacements, join=""):
 		"""
 		Query Sphinx for matching post IDs
 
 		:param str where:  Drop-in WHERE clause (without the WHERE keyword) for the Sphinx query
 		:param list replacements:  Values to use for parameters in the WHERE clause that should be parsed
+		:param str join:  Drop-in JOIN clause (with the JOIN keyword) for the Sphinx query
 		:return list:  List of matching posts; each post as a dictionary with `thread_id` and `post_id` as keys
 		"""
 
@@ -673,7 +694,7 @@ class Search4Chan(SearchWithScope):
 
 		results = []
 		try:
-			sql = "SELECT thread_id, post_id FROM `" + self.prefix + "_posts` WHERE " + where + " LIMIT 5000000 OPTION max_matches = 5000000, ranker = none, boolean_simplify = 1, sort_method = kbuffer, cutoff = 5000000"
+			sql = "SELECT thread_id, post_id FROM `" + self.prefix + "_posts` " + join + " WHERE " + where + " LIMIT 5000000 OPTION max_matches = 5000000, ranker = none, boolean_simplify = 1, sort_method = kbuffer, cutoff = 5000000"
 			parsed_query = sphinx.mogrify(sql, replacements)
 			self.log.info("Running Sphinx query %s " % parsed_query)
 			self.running_query = parsed_query
