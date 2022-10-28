@@ -4,6 +4,7 @@ Import scraped Instagram data
 It's prohibitively difficult to scrape data from Instagram within 4CAT itself
 due to its aggressive rate limiting. Instead, import data collected elsewhere.
 """
+import datetime
 from pathlib import Path
 import json
 import re
@@ -135,9 +136,9 @@ class SearchInstagram(Search):
             "parent_id": node["shortcode"],
             "body": caption,
             "author": node["owner"]["username"],
+            "timestamp": datetime.datetime.fromtimestamp(node["taken_at_timestamp"]).strftime("%Y-%m-%d %H:%M:%S"),
             "author_fullname": node["owner"].get("full_name", ""),
             "author_avatar_url": node["owner"].get("profile_pic_url", ""),
-            "timestamp": node["taken_at_timestamp"],
             "type": media_type,
             "url": "https://www.instagram.com/p/" + node["shortcode"],
             "image_url": node["display_url"],
@@ -147,7 +148,8 @@ class SearchInstagram(Search):
             #     [u["node"]["user"]["username"] for u in node["edge_media_to_tagged_user"]["edges"]]),
             "num_likes": node["edge_media_preview_like"]["count"],
             "num_comments": node.get("edge_media_preview_comment", {}).get("count", 0),
-            "num_media": num_media
+            "num_media": num_media,
+            "unix_timestamp": node["taken_at_timestamp"]
         }
 
         return mapped_item
@@ -204,7 +206,7 @@ class SearchInstagram(Search):
             "author": node["user"]["username"],
             "author_fullname": node["user"]["full_name"],
             "author_avatar_url": node["user"]["profile_pic_url"],
-            "timestamp": node["taken_at"],
+            "timestamp": datetime.datetime.fromtimestamp(node["taken_at"]).strftime("%Y-%m-%d %H:%M:%S"),
             "type": media_type,
             "url": "https://www.instagram.com/p/" + node["code"],
             "image_url": display_url,
@@ -215,6 +217,7 @@ class SearchInstagram(Search):
             "num_likes": node["like_count"],
             "num_comments": num_comments,
             "num_media": num_media,
+            "unix_timestamp": node["taken_at"]
         }
 
         return mapped_item
