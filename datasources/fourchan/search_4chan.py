@@ -566,7 +566,7 @@ class Search4Chan(SearchWithScope):
 		where = " AND ".join(where)
 
 		if use_sphinx:
-			posts = self.fetch_sphinx(join, where, replacements)
+			posts = self.fetch_sphinx(where, replacements, join=join)
 		# Query the postgres table immediately if we're not using sphinx.
 		else:
 			columns = ", ".join(self.return_cols)
