@@ -111,7 +111,7 @@ class VideoHasher(BasicProcessor):
 		self.dataset.update_status("Creating video hashes")
 		for path in self.iterate_archive_contents(self.source_file, staging_area):
 			if self.interrupted:
-				raise ProcessorInterruptedException("Interrupted while determining image wall order")
+				raise ProcessorInterruptedException("Interrupted while creating video hashes")
 
 			if path.name == '.metadata.json':
 				# Keep it and move on
