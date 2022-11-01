@@ -2,6 +2,7 @@
 Log handler
 """
 import traceback
+import importlib
 import platform
 import logging
 import time
@@ -10,6 +11,7 @@ import json
 from pathlib import Path
 
 from logging.handlers import RotatingFileHandler, HTTPHandler
+from importlib.machinery import SourceFileLoader
 
 import common.config_manager as config
 
@@ -107,21 +109,47 @@ class SlackLogHandler(WebHookLogHandler):
             color = "#3CC619"  # green
 
         # simple stack trace
-        location = "`%s`" % "` → `".join(
-            [frame.filename.split("/")[-1] + ":" + str(frame.lineno) for frame in traceback.extract_stack()[:-9]])
+        # the last 9 frames are not specific to the exception (general logging code etc)
+        # the frame before that is where the exception was raised
+        frames = traceback.extract_stack()[:-9]
+        location = "`%s`" % "` → `".join([frame.filename.split("/")[-1] + ":" + str(frame.lineno) for frame in frames])
 
         # prepare slack webhook payload
+        fields = [{
+            "title": "Stack trace:",
+            "value": location,
+            "short": False
+        }]
+
+        # try to read some metadata from the offending file
+        try:
+            with Path(record.frame.filename).open() as infile:
+                fields.append({
+                    "title": "Code (`" + record.frame.filename.split("/")[-1] + ":" + str(record.frame.lineno) + "`):",
+                    "value": "```" + infile.readlines()[record.frame.lineno - 1].strip() + "```",
+                    "short": False
+                })
+        except IndexError:
+            pass
+
+        try:
+            module = SourceFileLoader(record.frame.filename.split("/")[-1].split(".")[0], record.frame.filename).load_module()
+            if "__maintainer__" in dir(module):
+                fields.append({
+                    "title": "Code maintainer:",
+                    "value": module.__maintainer__,
+                    "short": False
+                })
+        except ImportError:
+            pass
+
         return {
             "text": ":bell: 4CAT %s logged on `%s`:" % (record.levelname.lower(), platform.uname().node),
             "mrkdwn_in": ["text"],
             "attachments": [{
                 "color": color,
-                "text": record.message + "\n",
-                "fields": [{
-                    "title": "Stack trace",
-                    "value": location,
-                    "short": False
-                }]
+                "text": record.message,
+                "fields": fields
             }]
         }
 
@@ -181,66 +209,75 @@ class Logger:
             slack_handler.setLevel(self.levels.get(config.get("logging.slack.level"), self.alert_level))
             self.logger.addHandler(slack_handler)
 
-    def log(self, message, level=logging.INFO):
+    def log(self, message, level=logging.INFO, frame=None):
         """
         Log message
 
         :param message:  Message to log
         :param level:  Severity level, should be a logger.* constant
+        :param frame:  Traceback frame. If no frame is given, it is
+        extrapolated
         """
         if self.print_logs and level > logging.DEBUG:
             print("LOG: %s" % message)
 
         # logging can include the full stack trace in the log, but that's a
         # bit excessive - instead, only include the location the log was called
-        frame = traceback.extract_stack()[-3]
+        if not frame:
+            frame = traceback.extract_stack()[-3]
         location = frame.filename.split("/")[-1] + ":" + str(frame.lineno)
-        self.logger.log(level, message, extra={"location": location})
+        self.logger.log(level, message, extra={"location": location, "frame": frame})
 
-    def debug(self, message):
+    def debug(self, message, frame=None):
         """
         Log DEBUG level message
 
         :param message: Message to log
+        :param frame:  Traceback frame relating to the error
         """
-        self.log(message, logging.DEBUG)
+        self.log(message, logging.DEBUG, frame)
 
-    def info(self, message):
+    def info(self, message, frame=None):
         """
         Log INFO level message
 
         :param message: Message to log
+        :param frame:  Traceback frame relating to the error
         """
         self.log(message, logging.INFO)
 
-    def warning(self, message):
+    def warning(self, message, frame=None):
         """
         Log WARNING level message
 
         :param message: Message to log
+        :param frame:  Traceback frame relating to the error
         """
-        self.log(message, logging.WARN)
+        self.log(message, logging.WARN, frame)
 
-    def error(self, message):
+    def error(self, message, frame=None):
         """
         Log ERROR level message
 
         :param message: Message to log
+        :param frame:  Traceback frame relating to the error
         """
-        self.log(message, logging.ERROR)
+        self.log(message, logging.ERROR, frame)
 
-    def critical(self, message):
+    def critical(self, message, frame=None):
         """
         Log CRITICAL level message
 
         :param message: Message to log
+        :param frame:  Traceback frame relating to the error
         """
-        self.log(message, logging.CRITICAL)
+        self.log(message, logging.CRITICAL, frame)
 
-    def fatal(self, message):
+    def fatal(self, message, frame=None):
         """
         Log FATAL level message
 
         :param message: Message to log
+        :param frame:  Traceback frame relating to the error
         """
-        self.log(message, logging.FATAL)
+        self.log(message, logging.FATAL, frame)

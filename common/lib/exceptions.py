@@ -1,5 +1,25 @@
+import traceback
+
 class FourcatException(Exception):
-	pass
+	"""
+	Base 4CAT exception class
+	"""
+	def __init__(self, message="", frame=None):
+		"""
+		Exception constructor
+
+		Takes an optional extra argument, `frame`, the traceback frame of the
+		offending code.
+
+		:param str message:  Exception message
+		:param frame:  Traceback frame. If omitted, the frame is extrapolated
+		from the context.
+		"""
+		super().__init__(message)
+		if not frame:
+			frame = traceback.extract_stack()[-2]
+
+		self.frame = frame
 
 class ConfigException(FourcatException):
 	"""

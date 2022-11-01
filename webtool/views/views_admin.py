@@ -175,7 +175,7 @@ def reject_user():
 
     if incomplete:
         if not form_message:
-            form_answer = Path(config.get('PATH_ROOT'), "webtool/pages/reject-template.md")
+            form_answer = Path(config.get("PATH_ROOT"), "webtool/pages/reject-template.md")
             if not form_answer.exists():
                 form_message = "No %s 4 u" % config.get("4cat.name")
             else:
@@ -187,7 +187,7 @@ def reject_user():
                                incomplete=incomplete)
 
     message = MIMEMultipart("alternative")
-    message["From"] = config.get('NOREPLY_EMAIL')
+    message["From"] = config.get("mail.noreply")
     message["To"] = email_address
     message["Subject"] = "Your %s account request" % config.get("4cat.name")
 

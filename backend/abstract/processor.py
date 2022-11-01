@@ -183,6 +183,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 			except Exception as e:
 				self.dataset.log("Processor crashed (%s), trying again later" % str(e))
 				frames = traceback.extract_tb(e.__traceback__)
+				last_frame = frames[-1]
 				frames = [frame.filename.split("/").pop() + ":" + str(frame.lineno) for frame in frames[1:]]
 				location = "->".join(frames)
 
@@ -195,7 +196,8 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 				# remove any result files that have been created so far
 				self.remove_files()
 
-				raise ProcessorException("Processor %s raised %s while processing dataset %s%s in %s:\n   %s\n" % (self.type, e.__class__.__name__, self.dataset.key, parent_key, location, str(e)))
+				raise ProcessorException("Processor %s raised %s while processing dataset %s%s in %s:\n   %s\n" % (
+				self.type, e.__class__.__name__, self.dataset.key, parent_key, location, str(e)), frame=last_frame)
 		else:
 			# dataset already finished, job shouldn't be open anymore
 			self.log.warning("Job %s/%s was queued for a dataset already marked as finished, deleting..." % (self.job.data["jobtype"], self.job.data["remote_id"]))
