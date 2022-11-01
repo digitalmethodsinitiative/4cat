@@ -87,7 +87,7 @@ class VisualiseLDA(BasicProcessor):
             try:
                 pyLDAvis.save_html(LDAvis_prepared, str(staging_area.joinpath('%s.html' % model_file.stem)))
             except TypeError as e:
-                if 'Object of type complex is not JSON serializable' in e:
+                if 'Object of type complex is not JSON serializable' in str(e):
                     # Known issue: model contains complex (i.e. imaginary numbers). Possibly another type of dimensionality reduction can fix the issue or reducing number of topics.
                     # https://github.com/bmabey/pyLDAvis/issues/69
                     self.dataset.update_status("Data incompatible with dimensionality reduction method (appears to contain imaginary numbers). Try a different reduction method or decrease number of topics.", is_final=True)
