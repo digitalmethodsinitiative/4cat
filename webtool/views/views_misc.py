@@ -85,9 +85,11 @@ def show_frontpage():
     else:
         news = None
 
-    datasources = {k: v for k, v in backend.all_modules.datasources.items() if k in config.get("DATASOURCES")}
+    datasources = {k: v for k, v in backend.all_modules.datasources.items() if k in config.get("DATASOURCES") and not v["importable"]}
+    importables = {k: v for k, v in backend.all_modules.datasources.items() if v["importable"]}
+    print(importables)
 
-    return render_template("frontpage.html", stats=stats, news=news, datasources=datasources)
+    return render_template("frontpage.html", stats=stats, news=news, datasources=datasources, importables=importables)
 
 
 @app.route('/create-dataset/')
