@@ -1,5 +1,5 @@
 """
-Download images linked in dataset
+Download videos linked in dataset
 """
 import requests
 import json
@@ -26,7 +26,7 @@ class VideoDownloader(BasicProcessor):
 	type = "video-downloader"  # job type ID
 	category = "Visual"  # category
 	title = "Download videos"  # title displayed in UI
-	description = "IN DEVELOPMENT: currently requires direct to video links"  # description displayed in UI
+	description = 'Basic video downloader that extracts http links and checks to see if they link directly to video content. Works best on sources with "video_url" columns such as Twitter and TikTok or "media_url" like Instagram.'  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
 
 	options = {
@@ -37,50 +37,51 @@ class VideoDownloader(BasicProcessor):
 			"min": 0,
 			"max": 1000
 		},
-	# 	"columns": {
-	# 		"type": UserInput.OPTION_TEXT,
-	# 		"help": "Column to get image links from",
-	# 		"default": "video_url",
-	# 		"inline": True,
-	# 		"tooltip": "If column contains a single URL, use that URL; else, try to find image URLs in the column's content"
-	# 	},
-	# 	"split-comma": {
-	# 		"type": UserInput.OPTION_TOGGLE,
-	# 		"help": "Split column values by comma?",
-	# 		"default": False,
-	# 		"tooltip": "If enabled, columns can contain multiple URLs separated by commas, which will be considered "
-	# 				   "separately"
-	# 	}
+		"columns": {
+			"type": UserInput.OPTION_TEXT,
+			"help": "Column to get image links from",
+			"default": "video_url",
+			"inline": True,
+			"tooltip": "If column contains a single URL, use that URL; else, try to find image URLs in the column's content"
+		},
+		"split-comma": {
+			"type": UserInput.OPTION_TOGGLE,
+			"help": "Split column values by comma?",
+			"default": False,
+			"tooltip": "If enabled, columns can contain multiple URLs separated by commas, which will be considered "
+					   "separately"
+		}
 	}
 
-	# @classmethod
-	# def get_options(cls, parent_dataset=None, user=None):
-	# 	"""
-	# 	Updating columns with actual columns and setting max_number_videos per
-	# 	the max number of images allowed.
-	# 	"""
-	# 	options = cls.options
-	#
-	# 	# Update the amount max and help from config
-	# 	max_number_videos = int(config.get('image_downloader.MAX_NUMBER_IMAGES', 1000))
-	# 	options['amount']['max'] = max_number_videos
-	# 	options['amount']['help'] = "No. of videos (max %s)" % max_number_videos
-	#
-	# 	# Get the columns for the select columns option
-	# 	if parent_dataset and parent_dataset.get_columns():
-	# 		columns = parent_dataset.get_columns()
-	# 		options["columns"]["type"] = UserInput.OPTION_MULTI
-	# 		options["columns"]["options"] = {v: v for v in columns}
-	# 		options["columns"]["default"] = "video_url" if "video_url" in columns else sorted(columns, key=lambda k: "video" in k).pop()
-	#
-	# 	return options
+	@classmethod
+	def get_options(cls, parent_dataset=None, user=None):
+		"""
+		Updating columns with actual columns and setting max_number_videos per
+		the max number of images allowed.
+		"""
+		options = cls.options
+
+		# Update the amount max and help from config
+		max_number_videos = int(config.get('image_downloader.MAX_NUMBER_IMAGES', 1000))
+		options['amount']['max'] = max_number_videos
+		options['amount']['help'] = "No. of videos (max %s)" % max_number_videos
+
+		# Get the columns for the select columns option
+		if parent_dataset and parent_dataset.get_columns():
+			columns = parent_dataset.get_columns()
+			options["columns"]["type"] = UserInput.OPTION_MULTI
+			options["columns"]["options"] = {v: v for v in columns}
+			options["columns"]["default"] = "video_url" if "video_url" in columns else sorted(columns, key=lambda k: "video" in k).pop()
+
+		return options
 
 	@classmethod
 	def is_compatible_with(cls, module=None):
 		"""
 		Allow on tiktok-search only for dev
 		"""
-		return module.type == "tiktok-search" or module.type == "twitterv2-search"
+		return module.type.endswith("search")
+		# return module.type == "tiktok-search" or module.type == "twitterv2-search"
 
 	def process(self):
 		"""
@@ -164,6 +165,7 @@ class VideoDownloader(BasicProcessor):
 
 		# Loop through video URLs and download
 		downloaded_videos = 0
+		failed_downloads = 0
 		total_possible_videos = min(len(urls), amount)
 		for url in urls:
 			# Stop processing if worker has been asked to stop or max downloads reached
@@ -179,15 +181,17 @@ class VideoDownloader(BasicProcessor):
 					self.dataset.log(message)
 					urls[url]['success'] = False
 					urls[url]['error'] = message
+					failed_downloads += 1
 					continue
 
 				# Verify video
 				#TODO: test/research other possible ways to verify video links
 				if 'video' not in response.headers['Content-Type'].lower():
+					# Log in metadata file
 					message = 'Url %s does not appear to be a video; Content-Type: %s' % (url, response.headers['Content-Type'])
-					self.dataset.log(message)
 					urls[url]['success'] = False
 					urls[url]['error'] = message
+					failed_downloads += 1
 					continue
 
 				# Create filename
@@ -196,7 +200,7 @@ class VideoDownloader(BasicProcessor):
 
 				# DEBUG Content-Type
 				if extension not in ['mp4', 'mp3']:
-					self.dataset.log('DEBUG: Content-Type for url %s: %s' % (url, response.headers['Content-Type']))
+					self.dataset.log('DEBUG: Odd extension type %s; Content-Type for url %s: %s' % (extension, url, response.headers['Content-Type']))
 
 				# Ensure unique filename
 				video_filepath = Path(filename + '.' + extension)
@@ -236,7 +240,7 @@ class VideoDownloader(BasicProcessor):
 			json.dump(metadata, outfile)
 
 		# Finish up
-		self.dataset.update_status('Downloaded %i videos. Check log and .metadata.json for individual video results.' % downloaded_videos, is_final=True)
+		self.dataset.update_status('Downloaded %i videos. %i URLs did not link directly to videos or failed. Check .metadata.json for individual video results.' % (downloaded_videos, failed_downloads), is_final=True)
 		self.write_archive_and_finish(results_path)
 
 	def identify_video_links(self, text):
