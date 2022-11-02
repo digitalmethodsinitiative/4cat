@@ -108,15 +108,7 @@ class VideoDownloader(BasicProcessor):
 		split_comma = self.parameters.get("split-comma", False)
 		if amount == 0:
 			amount = config.get('image_downloader.MAX_NUMBER_IMAGES', 1000)
-		columns = self.parameters.get("columns", ['video_url', 'videos'])
-
-		#TODO: Forcing module type settings for testing
-		if self.type == "twitterv2-search":
-			columns = ['videos']
-			split_comma = True
-		elif self.type == "tiktok-search":
-			columns = ['video_url']
-			split_comma = False
+		columns = self.parameters.get("columns")
 
 		# Check processor able to run
 		if self.source_dataset.num_rows == 0:
