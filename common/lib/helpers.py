@@ -785,6 +785,30 @@ def flatten_dict(d: MutableMapping, parent_key: str = '', sep: str = '.'):
     return dict(_flatten_dict_gen(d, parent_key, sep))
 
 
+def sets_to_lists(d: MutableMapping):
+    """
+    Return a dictionary where all nested dictionary sets are converted to lists.
+
+    :param MutableMapping d:  Dictionary like object
+    :return dict:  A new dictionary with the no nested sets
+    """
+
+    def _check_list(l):
+        return [sets_to_lists(item) if isinstance(item, MutableMapping) else _check_list(item) if isinstance(item, (
+        set, list)) else item for item in l]
+
+    def _sets_to_lists_gen(d):
+        for k, v in d.items():
+            if isinstance(v, MutableMapping):
+                yield k, sets_to_lists(v)
+            elif isinstance(v, (list, set)):
+                yield k, _check_list(v)
+            else:
+                yield k, v
+
+    return dict(_sets_to_lists_gen(d))
+
+
 def validate_url(x):
     """
     Checks that a string is a valid url. Uses urlparse from urllib.parse to check that there is both a proper scheme
