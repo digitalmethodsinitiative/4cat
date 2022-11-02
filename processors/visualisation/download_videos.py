@@ -71,7 +71,21 @@ class VideoDownloader(BasicProcessor):
 			columns = parent_dataset.get_columns()
 			options["columns"]["type"] = UserInput.OPTION_MULTI
 			options["columns"]["options"] = {v: v for v in columns}
-			options["columns"]["default"] = "video_url" if "video_url" in columns else sorted(columns, key=lambda k: "video" in k).pop()
+
+			# Figure out default column
+			if "video_url" in columns:
+				options["columns"]["default"] = "video_url"
+			elif "media_urls" in columns:
+				options["columns"]["default"] = "media_urls"
+			elif "video" in "".join(columns):
+				# Grab first video column
+				options["columns"]["default"] = sorted(columns, key=lambda k: "video" in k).pop()
+			elif "url" in columns or "urls" in columns:
+				# Grab first url column
+				options["columns"]["default"] = sorted(columns, key=lambda k: "url" in k).pop()
+			else:
+				# Give up
+				options["columns"]["default"] = "body"
 
 		return options
 
