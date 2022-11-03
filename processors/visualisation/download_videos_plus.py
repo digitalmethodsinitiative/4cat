@@ -10,7 +10,7 @@ from yt_dlp import DownloadError
 import common.config_manager as config
 from common.lib.helpers import UserInput, validate_url, sets_to_lists
 from backend.abstract.processor import BasicProcessor
-from common.lib.exceptions import ProcessorInterruptedException
+from common.lib.exceptions import ProcessorInterruptedException, ProcessorException
 
 __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl"]
@@ -59,6 +59,12 @@ class VideoDownloaderPlus(BasicProcessor):
 					   "separately"
 		}
 	}
+
+	def __init__(self, logger, job, queue=None, manager=None, modules=None):
+		super().__init__(logger, job, queue, manager, modules)
+		self.max_videos_per_url = 5
+		self.videos_downloaded_from_url = 0
+		self.url_filenames = None
 
 	@classmethod
 	def get_options(cls, parent_dataset=None, user=None):
@@ -110,80 +116,37 @@ class VideoDownloaderPlus(BasicProcessor):
 		with one column with image hashes, one with the first file name used
 		for the image, and one with the amount of times the image was used
 		"""
-		# Collect parameters
-		amount = self.parameters.get("amount", 100)
-		split_comma = self.parameters.get("split-comma", False)
-		if amount == 0:
-			amount = config.get('image_downloader.MAX_NUMBER_IMAGES', 1000)
-		columns = self.parameters.get("columns")
-		if type(columns) == str:
-			columns = [columns]
-
 		# Check processor able to run
 		if self.source_dataset.num_rows == 0:
-			self.dataset.update_status("No videos to download.", is_final=True)
+			self.dataset.update_status("No data from which to extract video URLs.", is_final=True)
 			self.dataset.finish(0)
 			return
 
-		if not columns:
-			self.dataset.update_status("No columns selected; no videos extracted.", is_final=True)
+		# Collect URLs
+		try:
+			urls = self.collect_video_urls()
+		except ProcessorException as e:
+			self.dataset.update_status(str(e), is_final=True)
 			self.dataset.finish(0)
 			return
+		self.dataset.log('Collected %i video urls.' % len(urls))
 
 		# Prepare staging area for videos and video tracking
 		results_path = self.dataset.get_staging_area()
 		self.dataset.log('Staging directory location: %s' % results_path)
-		urls = {}
 
-		# first, get URLs to download images from
-		self.dataset.update_status("Reading source file")
-		for index, post in enumerate(self.source_dataset.iterate_items(self)):
-			item_urls = set()
-			if index % 50 == 0:
-				self.dataset.update_status("Extracting video links from item %i/%i" % (index, self.source_dataset.num_rows))
-
-			# loop through all columns and process values for item
-			for column in columns:
-				value = post.get(column)
-				if not value:
-					continue
-
-				# remove all whitespace from beginning and end (needed for single URL check)
-				values = [str(value).strip()]
-				if split_comma:
-					values = values[0].split(',')
-
-				for value in values:
-					if re.match(r"https?://(\S+)$", value):
-						# single URL
-						if validate_url(value):
-							item_urls.add(value)
-					else:
-						# search for video URLs in string
-						video_links = self.identify_video_links(value)
-						if video_links:
-							item_urls |= set(video_links)
-
-			for item_url in item_urls:
-				if item_url not in urls:
-					urls[item_url] = {'ids': {post.get('id')}}
-				else:
-					urls[item_url]['ids'].add(post.get('id'))
-
-		# Check if urls were identified
-		if not urls:
-			self.dataset.update_status("No video urls identified.", is_final=True)
-			self.dataset.finish(0)
-			return
-		else:
-			self.dataset.log('Collected %i video urls.' % len(urls))
-
+		# Set up yt_dlp options
 		ydl_opts = {
 			"logger": self.log,
 			"outtmpl": str(results_path) + '/%(uploader)s_%(title)s.%(ext)s',
 			"socket_timeout": 30,
-			"progress_hooks": [self.my_hook],
+			"progress_hooks": [self.yt_dlp_monitor],  # This function ensures no more than self.max_videos_per_url downloaded and can be used to monitor progress
 		}
+
+		# Collect parameters
+		amount = self.parameters.get("amount", 100)
+		if amount == 0:
+			amount = config.get('image_downloader.MAX_NUMBER_IMAGES', 1000)
 
 		# Loop through video URLs and download
 		downloaded_videos = 0
@@ -198,9 +161,9 @@ class VideoDownloaderPlus(BasicProcessor):
 					raise ProcessorInterruptedException("Interrupted while downloading videos.")
 
 				self.dataset.update_status("Downloading: %s" % url)
-				if 'youtube.com/c/' in url:
+				if any([sub_url in url for sub_url in ['youtube.com/c/', 'youtube.com/channel/']]):
 					# HAHAHA.... NO. Do not download channels. Might be a better way to ensure we catch this...
-					message = 'Skipping downloading all vids from YouTube CHANNEL: %s' % url
+					message = 'Skipping... will not download all vids from YouTube CHANNEL: %s' % url
 					urls[url]['success'] = False
 					urls[url]['error'] = message
 					failed_downloads += 1
@@ -209,7 +172,13 @@ class VideoDownloaderPlus(BasicProcessor):
 
 				# Take it away yt-dlp
 				try:
+					# Count and use self.yt_dlp_monitor() to ensure sure we don't download videos forever...
+					self.videos_downloaded_from_url = 0
+					self.url_filenames = []
 					info = ydl.extract_info(url)
+				except MaxVideosDownloaded:
+					# Raised when already downloaded max number of videos per URL as defined in self.max_videos_per_url
+					pass
 				except DownloadError as e:
 					message = 'DownloadError: %s' % str(e)
 					urls[url]['success'] = False
@@ -218,10 +187,10 @@ class VideoDownloaderPlus(BasicProcessor):
 					self.dataset.update_status(message)
 					continue
 
-				video_metadata = json.dumps(ydl.sanitize_info(info))
-
 				# Add metadata
-				urls[url]['metadata'] = video_metadata
+				# TODO: What does "info" from ydl look like if there are multiple videos per url? Docs are silent...
+				urls[url]['metadata'] = ydl.sanitize_info(info)
+				urls[url]['filenames'] = self.url_filenames
 				# Probably?
 				urls[url]['success'] = True
 
@@ -245,21 +214,67 @@ class VideoDownloaderPlus(BasicProcessor):
 		self.dataset.update_status('Downloaded %i videos. %i URLs did not link directly to videos or failed. Check .metadata.json for individual video results.' % (downloaded_videos, failed_downloads), is_final=True)
 		self.write_archive_and_finish(results_path)
 
-	def my_hook(self, d):
+	def yt_dlp_monitor(self, d):
 		"""
 		Can be used to gather information from yt-dlp while downloading
 		"""
-		for key in ['automatic_captions',]:
-			if key in d.keys():
-				d.pop(key)
+		if d['status'] == 'finished':  # "downloading", "error", or "finished"
+			self.videos_downloaded_from_url += 1
+			self.url_filenames.append(d.get('filename'))
+		if self.videos_downloaded_from_url >= self.max_videos_per_url:
+			raise MaxVideosDownloaded('Max videos for URL reached.')
 
-		if d.get('info_dict') and d['info_dict'].get('fragments'):
-			d['info_dict'].pop('fragments')
+	def collect_video_urls(self):
+		urls = {}
+		split_comma = self.parameters.get("split-comma", False)
+		columns = self.parameters.get("columns")
+		if type(columns) == str:
+			columns = [columns]
 
-		for k, v in d.items():
-			self.dataset.log(str(k) + ': ' + str(v) + '\n')
+		if not columns:
+			raise ProcessorException("No columns selected; cannot collect video urls.")
 
-	def identify_video_links(self, text):
+		self.dataset.update_status("Reading source file")
+		for index, post in enumerate(self.source_dataset.iterate_items(self)):
+			item_urls = set()
+			if index % 250 == 0:
+				self.dataset.update_status(
+					"Extracting video links from item %i/%i" % (index, self.source_dataset.num_rows))
+
+			# loop through all columns and process values for item
+			for column in columns:
+				value = post.get(column)
+				if not value:
+					continue
+
+				# remove all whitespace from beginning and end (needed for single URL check)
+				values = [str(value).strip()]
+				if split_comma:
+					values = values[0].split(',')
+
+				for value in values:
+					if re.match(r"https?://(\S+)$", value):
+						# single URL
+						if validate_url(value):
+							item_urls.add(value)
+					else:
+						# search for video URLs in string
+						video_links = self.identify_video_urls_in_string(value)
+						if video_links:
+							item_urls |= set(video_links)
+
+			for item_url in item_urls:
+				if item_url not in urls:
+					urls[item_url] = {'ids': {post.get('id')}}
+				else:
+					urls[item_url]['ids'].add(post.get('id'))
+
+		if not urls:
+			raise ProcessorException("No video urls identified in provided data.")
+		else:
+			return urls
+
+	def identify_video_urls_in_string(self, text):
 		"""
 		Search string of text for URLs that may contain video links.
 
@@ -289,3 +304,10 @@ class VideoDownloaderPlus(BasicProcessor):
 				# DEBUG: this is to check our regex works as intended
 				self.dataset.log('Possible URL identified, but did not validate: %s' % url)
 		return validated_links
+
+
+class MaxVideosDownloaded(ProcessorException):
+	"""
+	Raise if processor throws an exception
+	"""
+	pass
