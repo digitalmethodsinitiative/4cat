@@ -1,6 +1,8 @@
 """
 Download videos linked in dataset via yt-dlp
 """
+from pathlib import Path
+
 import yt_dlp
 import json
 import re
@@ -65,6 +67,8 @@ class VideoDownloaderPlus(BasicProcessor):
 		self.max_videos_per_url = 5
 		self.videos_downloaded_from_url = 0
 		self.url_filenames = None
+		self.last_dl_status = None
+		self.last_post_process_status = None
 
 	@classmethod
 	def get_options(cls, parent_dataset=None, user=None):
@@ -140,7 +144,8 @@ class VideoDownloaderPlus(BasicProcessor):
 			"logger": self.log,
 			"outtmpl": str(results_path) + '/%(uploader)s_%(title)s.%(ext)s',
 			"socket_timeout": 30,
-			"progress_hooks": [self.yt_dlp_monitor],  # This function ensures no more than self.max_videos_per_url downloaded and can be used to monitor progress
+			"postprocessor_hooks": [self.yt_dlp_post_monitor],# This function ensures no more than self.max_videos_per_url downloaded and can be used to monitor progress
+			"progress_hooks": [self.yt_dlp_monitor],
 		}
 
 		# Collect parameters
@@ -175,6 +180,8 @@ class VideoDownloaderPlus(BasicProcessor):
 					# Count and use self.yt_dlp_monitor() to ensure sure we don't download videos forever...
 					self.videos_downloaded_from_url = 0
 					self.url_filenames = []
+					self.last_dl_status = None
+					self.last_post_process_status = None
 					info = ydl.extract_info(url)
 				except MaxVideosDownloaded:
 					# Raised when already downloaded max number of videos per URL as defined in self.max_videos_per_url
@@ -191,8 +198,8 @@ class VideoDownloaderPlus(BasicProcessor):
 				# TODO: What does "info" from ydl look like if there are multiple videos per url? Docs are silent...
 				urls[url]['metadata'] = ydl.sanitize_info(info)
 				urls[url]['filenames'] = self.url_filenames
-				# Probably?
-				urls[url]['success'] = True
+				# Check that download and processing finished
+				urls[url]['success'] = all([self.last_dl_status.get('status') == 'finished', self.last_post_process_status.get('status') == 'finished'])
 
 				# Update status
 				downloaded_videos += 1
@@ -218,11 +225,26 @@ class VideoDownloaderPlus(BasicProcessor):
 		"""
 		Can be used to gather information from yt-dlp while downloading
 		"""
+		self.last_dl_status = d
+
+		# Make sure we can stop downloads
+		if self.interrupted:
+			raise ProcessorInterruptedException("Interrupted while downloading videos.")
+
+	def yt_dlp_post_monitor(self, d):
+		"""
+		Can be used to gather information from yt-dlp while post processing the downloads
+		"""
+		self.last_post_process_status = d
 		if d['status'] == 'finished':  # "downloading", "error", or "finished"
 			self.videos_downloaded_from_url += 1
-			self.url_filenames.append(d.get('filename'))
+			self.url_filenames.append(Path(d.get('info_dict').get('_filename')).name)
 		if self.videos_downloaded_from_url >= self.max_videos_per_url:
 			raise MaxVideosDownloaded('Max videos for URL reached.')
+
+		# Make sure we can stop downloads
+		if self.interrupted:
+			raise ProcessorInterruptedException("Interrupted while downloading videos.")
 
 	def collect_video_urls(self):
 		urls = {}
