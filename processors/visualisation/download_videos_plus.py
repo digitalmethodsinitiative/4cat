@@ -218,7 +218,7 @@ class VideoDownloaderPlus(BasicProcessor):
 			json.dump(metadata, outfile)
 
 		# Finish up
-		self.dataset.update_status('Downloaded %i videos. %i URLs did not link directly to videos or failed. Check .metadata.json for individual video results.' % (downloaded_videos, failed_downloads), is_final=True)
+		self.dataset.update_status('Downloaded %i videos.' % downloaded_videos + ' %i URLs failed.' % failed_downloads if failed_downloads > 0 else '' + ' Check .metadata.json for individual results.', is_final=True)
 		self.write_archive_and_finish(results_path)
 
 	def yt_dlp_monitor(self, d):
