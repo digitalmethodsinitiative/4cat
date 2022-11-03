@@ -237,9 +237,9 @@ class VideoDownloaderPlus(BasicProcessor):
 		self.dataset.update_status("Reading source file")
 		for index, post in enumerate(self.source_dataset.iterate_items(self)):
 			item_urls = set()
-			if index % 250 == 0:
+			if index + 1 % 250 == 0:
 				self.dataset.update_status(
-					"Extracting video links from item %i/%i" % (index, self.source_dataset.num_rows))
+					"Extracting video links from item %i/%i" % (index + 1, self.source_dataset.num_rows))
 
 			# loop through all columns and process values for item
 			for column in columns:
