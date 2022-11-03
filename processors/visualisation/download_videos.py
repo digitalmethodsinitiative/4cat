@@ -211,9 +211,10 @@ class VideoDownloader(BasicProcessor):
 				# Ensure unique filename
 				video_filepath = Path(filename + '.' + extension)
 				save_location = results_path.joinpath(video_filepath)
+				filename_index = 0
 				while save_location.exists():
-					save_location = results_path.joinpath(filename + "-" + str(index) + save_location.suffix.lower())
-					index += 1
+					save_location = results_path.joinpath(filename + "-" + str(filename_index) + save_location.suffix.lower())
+					filename_index += 1
 
 				# Download video
 				with open(results_path.joinpath(save_location), 'wb') as f:
