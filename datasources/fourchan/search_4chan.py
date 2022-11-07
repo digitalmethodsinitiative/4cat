@@ -504,6 +504,12 @@ class Search4Chan(SearchWithScope):
 		replacements = []
 		match = []
 
+		# and we'll already save some stuff for hte postgres query
+		postgres_where = []
+		postgres_replacements = []
+		join = ""
+		postgres_join = ""
+
 		# Option wether to use sphinx for text searches
 		use_sphinx = config.get('DATASOURCES').get("4chan", {}).get("use_sphinx", True)
 
@@ -523,12 +529,14 @@ class Search4Chan(SearchWithScope):
 			except ValueError:
 				pass
 
+		# Limit to posts of a certain board
 		board = None
 		if query.get("board", None) and query["board"] != "*":
 			where.append("board = %s")
 			replacements.append(query["board"])
-			board = query["board"]
-
+			postgres_where.append("board = %s")
+			postgres_replacements.append(query["board"])
+			
 		if use_sphinx:
 			# escape full text matches and convert quotes
 			if query.get("body_match", None):
@@ -554,24 +562,23 @@ class Search4Chan(SearchWithScope):
 			where.append("MATCH(%s)")
 			replacements.append(" ".join(match))
 
-		# Adjust the query if we don't want deleted posts.
-		join = ""
-		if not query.get("get_deleted"):
-			join = " LEFT JOIN posts_%s_deleted ON posts_%s.id_seq = posts_%s_deleted.id_seq " %  tuple([self.prefix] * 3)
-			where.append("posts_%s_deleted.id_seq IS NULL" % self.prefix)
-
 		# query Sphinx
 		self.dataset.update_status("Searching for matches")
 
 		where = " AND ".join(where)
 
 		if use_sphinx:
-			posts = self.fetch_sphinx(where, replacements, join=join)
+			posts = self.fetch_sphinx(where, replacements)
 		# Query the postgres table immediately if we're not using sphinx.
 		else:
 			columns = ", ".join(self.return_cols)
 			if self.interrupted:
 				raise ProcessorInterruptedException("Interrupted while fetching post data")
+
+			# Duplicate code, but will soon be changed anyway...
+			if not query.get("get_deleted"):
+				join = " LEFT JOIN posts_%s_deleted ON posts_%s.id_seq = posts_%s_deleted.id_seq " % tuple([self.prefix] * 3)
+				where += " AND posts_%s_deleted.id_seq IS NULL" % self.prefix
 
 			query = "SELECT " + columns + " FROM posts_" + self.prefix + join + " WHERE " + where + " ORDER BY id ASC"
 			posts = self.db.fetchall_interruptable(self.queue, query, replacements)
@@ -583,25 +590,24 @@ class Search4Chan(SearchWithScope):
 			self.dataset.update_status("Query finished, but no results were found.")
 			return None
 
-		if not use_sphinx:
+		# we don't need to do further processing if we didn't use sphinx or don't have to check for deleted posts
+		if not use_sphinx or query.get("deleted"):
 			return posts
 
-		# query posts database
-		self.dataset.update_status("Found %i matches. Collecting post data" % len(posts))
+		# else we query the posts database
+		self.dataset.update_status("Found %i initial matches. Collecting post data" % len(posts))
 		datafetch_start = time.time()
 		self.log.info("Collecting post data from database")
 		columns = ", ".join(self.return_cols)
 
-		postgres_where = []
-		postgres_replacements = []
+		# Do a JOIN if we don't want deleted posts.
+		postgres_join = ""
+		if not query.get("get_deleted"):
+			postgres_join = " LEFT JOIN posts_%s_deleted ON posts_%s.id_seq = posts_%s_deleted.id_seq " % tuple([self.prefix] * 3)
+			postgres_where.append("posts_%s_deleted.id_seq IS NULL" % self.prefix)
 
-		# Limit post IDs to those of a certain board
-		if board:
-			postgres_where.append("board = %s")
-			postgres_replacements.append(query.get("board"))
-
-		posts_full = self.fetch_posts(tuple([post["post_id"] for post in posts]), postgres_where, postgres_replacements)
-
+		posts_full = self.fetch_posts(tuple([post["post_id"] for post in posts]), join=postgres_join, where=postgres_where, replacements=postgres_replacements)
+		
 		self.dataset.update_status("Post data collected")
 		self.log.info("Full posts query finished in %i seconds." % (time.time() - datafetch_start))
 
@@ -693,6 +699,7 @@ class Search4Chan(SearchWithScope):
 		sphinx = self.get_sphinx_handler()
 
 		results = []
+
 		try:
 			sql = "SELECT thread_id, post_id FROM `" + self.prefix + "_posts` " + join + " WHERE " + where + " LIMIT 5000000 OPTION max_matches = 5000000, ranker = none, boolean_simplify = 1, sort_method = kbuffer, cutoff = 5000000"
 			parsed_query = sphinx.mogrify(sql, replacements)
@@ -728,7 +735,6 @@ class Search4Chan(SearchWithScope):
 					"Error during query. Please try a narrow query and double-check your syntax.", is_final=True)
 				self.log.error("Sphinx crash during query %s: %s" % (self.dataset.key, e))
 			return None
-
 
 		self.log.info("Sphinx query finished in %i seconds, %i results." % (time.time() - sphinx_start, len(results)))
 		return results
