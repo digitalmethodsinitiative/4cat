@@ -156,7 +156,7 @@ class SearchTelegram(Search):
             self.dataset.delete_parameter("api_id", instant=True)
 
         if not self.flawless:
-            self.dataset.update_status("Dataset completed, but some requested entities were unavailable (they may have"
+            self.dataset.update_status("Dataset completed, but some requested entities were unavailable (they may have "
                                        "been private). View the log file for details.", is_final=True)
 
         return results
