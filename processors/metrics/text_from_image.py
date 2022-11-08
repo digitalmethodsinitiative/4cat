@@ -24,10 +24,10 @@ class ImageTextDetector(BasicProcessor):
     title = "Extract Text from Images"  # title displayed in UI
     description = """
     Uses optical character recognition (OCR) to extract text from images via machine learning.
-    
-    This processor first detects areas of an image that may contain text with the pretrained 
+
+    This processor first detects areas of an image that may contain text with the pretrained
     Character-Region Awareness For Text (CRAFT) detection model and then attempts to predict the
-    text inside each area using Keras' implementation of a Convolutional Recurrent Neural 
+    text inside each area using Keras' implementation of a Convolutional Recurrent Neural
     Network (CRNN) for text recognition. Once words are predicted, an algorythm attempts to
     sort them into likely groupings based on locations within the original image.
     """
@@ -43,8 +43,8 @@ class ImageTextDetector(BasicProcessor):
         "text_from_images.DMI_OCR_SERVER": {
             "type": UserInput.OPTION_TEXT,
             "default": "",
-            "help": "URL to the DMI OCR server",
-            "tooltip": "URL to the [DMI OCR server](https://github.com/digitalmethodsinitiative/ocr_server); e.g. http://pixplot.digitalmethods.net/ocr/",
+            "help": 'URL to the OCR server',
+            "tooltip": "URL to the API endpoint of a version of the DMI OCR server (more info at https://github.com/digitalmethodsinitiative/ocr_server)",
         }
     }
 

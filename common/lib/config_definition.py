@@ -249,5 +249,5 @@ categories = {
     "path": "File paths",
     "DATASOURCES": "Data source configuration",
     'image_downloader': 'Image downloader',
-    'text_from_images': 'OCR: Text from images',
+    'text_from_images': 'OCR: Extract text from images (https://github.com/digitalmethodsinitiative/ocr_server)',
 }
