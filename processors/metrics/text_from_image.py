@@ -28,7 +28,7 @@ class ImageTextDetector(BasicProcessor):
     This processor first detects areas of an image that may contain text with the pretrained
     Character-Region Awareness For Text (CRAFT) detection model and then attempts to predict the
     text inside each area using Keras' implementation of a Convolutional Recurrent Neural
-    Network (CRNN) for text recognition. Once words are predicted, an algorythm attempts to
+    Network (CRNN) for text recognition. Once words are predicted, an algorithm attempts to
     sort them into likely groupings based on locations within the original image.
     """
     extension = "ndjson"  # extension of result file, used internally and in UI
