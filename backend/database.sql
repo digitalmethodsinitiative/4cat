@@ -138,6 +138,7 @@ CREATE FUNCTION count_estimate(query text) RETURNS bigint AS $$
 
 
 -- fourcat settings insert default settings
+-- TODO SHOULD BE ABLE TO REMOVE; all these should have corresponding values in common/lib/config_definitions given defaults
 INSERT INTO settings
   (name, value)
   Values

@@ -1,5 +1,12 @@
 """
 Request image text detection from DMI OCR server
+
+The DMI OCR Server can be downloaded seperately here:
+https://github.com/digitalmethodsinitiative/ocr_server#readme
+
+Note: if using a Docker hosted OCR Server, the setting in 4CAT Settings for
+URL to the OCR server should be "http://host.docker.internal:4000" (or whatever
+port you chose).
 """
 import requests
 import json
@@ -20,7 +27,7 @@ class ImageTextDetector(BasicProcessor):
     Send images to DMI OCR server for OCR analysis
     """
     type = "text-from-images"  # job type ID
-    category = "Post metrics"  # category
+    category = "Conversion"  # category
     title = "Extract Text from Images"  # title displayed in UI
     description = """
     Uses optical character recognition (OCR) to extract text from images via machine learning.
@@ -34,7 +41,9 @@ class ImageTextDetector(BasicProcessor):
     extension = "ndjson"  # extension of result file, used internally and in UI
 
     references = [
-        "[Keras OCR Documentation]( https://keras-ocr.readthedocs.io/en/latest/)",
+        "[DMI OCR Server](https://github.com/digitalmethodsinitiative/ocr_server#readme)",
+        "[Paddle OCR model](https://github.com/PaddlePaddle/PaddleOCR#readme)"
+        "[Keras OCR model]( https://keras-ocr.readthedocs.io/en/latest/)",
         "[CRAFT text detection model](https://github.com/clovaai/CRAFT-pytorch)",
         "[Keras CRNN text recognition model](https://github.com/kurapan/CRNN)"
     ]
@@ -53,6 +62,15 @@ class ImageTextDetector(BasicProcessor):
             "type": UserInput.OPTION_TEXT,
             "help": "Images to process (0 = all)",
             "default": 0
+        },
+        "model_type": {
+            "type": UserInput.OPTION_CHOICE,
+            "default": "paddle_ocr",
+            "options": {
+                "paddle_ocr": "Paddle OCR model",
+                "keras_ocr": "Keras OCR model",
+            },
+            "help": "See references for additional information about models and their utility"
         },
         "update_original": {
             "type": UserInput.OPTION_TOGGLE,
@@ -85,6 +103,7 @@ class ImageTextDetector(BasicProcessor):
         update_original = self.parameters.get("update_original", False)
         if update_original:
             # We need to unpack the archive to get the metadata
+            # If we use the file from iterate_archive_contents() we may not have the metadata for the first few files
             staging_area = self.unpack_archive_contents(self.source_file)
             # Load the metadata from the archive
             with open(os.path.join(staging_area, '.metadata.json')) as file:
@@ -103,6 +122,9 @@ class ImageTextDetector(BasicProcessor):
         for image_file in self.iterate_archive_contents(self.source_file, staging_area=staging_area):
             if self.interrupted:
                 raise ProcessorInterruptedException("Interrupted while fetching data from Google Vision API")
+
+            if path.name == '.metadata.json':
+                continue
 
             done += 1
             self.dataset.update_status("Annotating image %i/%i" % (done, total))
@@ -163,14 +185,20 @@ class ImageTextDetector(BasicProcessor):
         """
         server = config.get('text_from_images.DMI_OCR_SERVER', '')
 
+        # Get model_type if available
+        parameters = {}
+        model_type = self.parameters.get("model_type")
+        if model_type:
+            parameters['model_type'] = model_type
+
         if not server:
             raise ProcessorException('DMI OCR server not configured')
 
         with image_file.open("rb") as infile:
             try:
-                api_request = requests.post(server + 'api/detect_text', files={'image': infile})
+                api_request = requests.post(server.rstrip('/') + '/api/detect_text', files={'image': infile}, data=parameters)
             except (requests.RequestException, ConnectionError) as e:
-                self.dataset.update_status("Skipping image %s due to %s (%s)" % (image_file.name, e.__name__, str(e)))
+                self.dataset.update_status("Skipping image %s: %s" % (image_file.name, str(e)))
                 return None
 
         if api_request.status_code != 200:
