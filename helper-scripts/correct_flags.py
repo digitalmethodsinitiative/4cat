@@ -37,7 +37,9 @@ troll_names = {
 	"KP": "North Korea",
 	"KN": "Kekistani",
 	"MF": "Muslim",
+	"MZ": "Task Force Z",
 	"NB": "National Bolshevik",
+	"NT": "NATO",
 	"NZ": "Nazi",
 	"OB": "Obama",
 	"PC": "Hippie",
@@ -50,7 +52,7 @@ troll_names = {
 	"TR": "Tree Hugger",
 	"TX": "Texan",
 	"UN": "United Nations",
-	"WP": "White Supremacist"
+	"WP": "White Supremacist",
 }
 
 with open(PATH_TO_4PLEBS_DUMP, encoding="utf-8") as in_csv:
@@ -441,7 +443,7 @@ db.commit()
 We can fill in all the names of country codes that can only refer to a country or troll country.
 """
 
-print("Settings `country_names` for posts after 13 June 2017.")
+print("Setting `country_names` for posts after 13 June 2017.")
 
 query_update_country_names = """
 		UPDATE posts_4chan
@@ -602,7 +604,6 @@ query_update_country_names = """
 			WHEN country_code = 'MW' THEN 'Malawi'
 			WHEN country_code = 'MX' THEN 'Mexico'
 			WHEN country_code = 'MY' THEN 'Malaysia'
-			WHEN country_code = 'MZ' THEN 'Mozambique'
 			WHEN country_code = 'NA' THEN 'Namibia'
 			WHEN country_code = 'NC' THEN 'New Caledonia'
 			WHEN country_code = 'NE' THEN 'Niger'
@@ -696,6 +697,7 @@ query_update_country_names = """
 			WHEN country_code = 'JH' THEN 'Jihadi'
 			WHEN country_code = 'KP' THEN 'North Korea'
 			WHEN country_code = 'NB' THEN 'National Bolshevik'
+			WHEN country_code = 'NT' THEN 'NATO'
 			WHEN country_code = 'OB' THEN 'Obama'
 			WHEN country_code = 'PC' THEN 'Hippie'
 			WHEN country_code = 'RB' THEN 'Rebel'
@@ -761,7 +763,9 @@ with open(PATH_TO_TROLL_FLAG_IDS, "r", encoding="utf-8") as in_json:
 		"JH": "Jihadi",
 		"KN": "Kekistani",
 		"MF": "Muslim",
+		"MZ": "Task Force Z",
 		"NB": "National Bolshevik",
+		"NT": "NATO",
 		"NZ": "Nazi",
 		"PC": "Hippie",
 		"PR": "Pirate",
@@ -801,6 +805,7 @@ query_update_leftovers = ("""
 			WHEN country_code = 'PR' THEN 'Puerto Rico'
 			WHEN country_code = 'RE' THEN 'Réunion'
 			WHEN country_code = 'MF' THEN 'Saint Martin'
+			WHEN country_code = 'MZ' THEN 'Mozambique'
 			WHEN country_code = 'TR' THEN 'Turkey'
 			WHEN country_code = 'TM' THEN 'Turkmenistan'
 			WHEN country_code = 'GY' THEN 'Guyana'
@@ -846,7 +851,9 @@ query_update_troll_codes = """
 			WHEN country_name = 'Kekistani' THEN 't_KN'
 			WHEN country_name = 'Libertarian' THEN 't_RP'
 			WHEN country_name = 'Muslim' THEN 't_MF'
+			WHEN country_name = 'Task Force Z' THEN 't_MZ'
 			WHEN country_name = 'National Bolshevik' THEN 't_NB'
+			WHEN country_name = 'NATO' THEN 'n_NT'
 			WHEN country_name = 'Nazi' THEN 't_NZ'
 			WHEN country_name = 'North Korea' THEN 'KP'
 			WHEN country_name = 'Obama' THEN 't_OB'
@@ -861,7 +868,7 @@ query_update_troll_codes = """
 			WHEN country_name = 'White Supremacist' THEN 't_WP'
 			ELSE country_code
 		END 
-		WHERE board = 'pol' AND country_name IN ('Anarchist','Anarcho-Capitalist','Black Nationalist','Black Lives Matter','Catalonia','Commie','Communist','Confederate','Democrat', 'DEUS VULT','European','Europe','Fascist','Gadsden','Gay','LGBT','Hippie','Jihadi','Kekistani','Libertarian','Muslim','National Bolshevik','Nazi','Obama','Pirate','Rebel','Republican','Tea Partier','Templar','Texan','Tree Hugger','United Nations','White Supremacist');
+		WHERE board = 'pol' AND country_name IN ('Anarchist','Anarcho-Capitalist','Black Nationalist','Black Lives Matter','Catalonia','Commie','Communist','Confederate','Democrat', 'DEUS VULT','European','Europe','Fascist','Gadsden','Gay','LGBT','Hippie','Jihadi','Kekistani','Libertarian','Muslim','National Bolshevik','NATO','Nazi','Obama','Pirate','Rebel','Republican','Task Force Z','Tea Partier','Templar','Texan','Tree Hugger','United Nations','White Supremacist');
 		"""
 
 db.execute(query_update_troll_codes)
