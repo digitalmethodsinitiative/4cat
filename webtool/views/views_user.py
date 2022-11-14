@@ -21,7 +21,7 @@ from webtool import app, login_manager, db
 from webtool.views.api_tool import limiter
 from webtool.lib.user import User
 from webtool.lib.helpers import error
-from common.lib.helpers import send_email
+from common.lib.helpers import send_email, get_software_version
 
 from pathlib import Path
 
@@ -197,6 +197,7 @@ def create_first_user():
 
         payload = {
             "version": version,
+            "commit": get_software_version(),
             "role": request.form.get("purpose", ""),
             "affiliation": request.form.get("affiliation", ""),
             "email": request.form.get("email", "")

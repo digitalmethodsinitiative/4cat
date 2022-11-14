@@ -29,23 +29,24 @@
 
         {% if phone_home_url %}
         <fieldset>
-            <p class="form-intro">The following fields are <em>optional</em>, but filling them in is greatly appreciated
-                as it helps us (the 4CAT developers at the <a href="https://digitalmethods.net">Digital Methods
-                    Initiative</a>) justify and find funding for on-going development. We only store the data you enter
-                below, and the approximate geographic location of the IP address it is sent from (but not the IP address
-                itself). This is a <em>one-time</em> 'ping': no information will be sent during later 4CAT usage.</p>
-            <p>If you enter contact information, we may contact you to learn more about how you are using 4CAT, but we
-                will <em>never</em> send any automated newsletters or mailings. For more information, you can contact us
-                at <a href="mailto:4cat@oilab.eu">4cat@oilab.eu</a>.</p>
-
-            <div class="form-element full-width">
+            <div class="form-element full-width form-intro">
                 <label for="request-phonehome">
                     <input type="checkbox" id="request-phonehome" class="toggle-button" name="phonehome"{% if form.phonehome %} checked="checked"{% endif %} aria-controls="phone-home-fields">
-                    Send information to the 4CAT developers
+                    Let the 4CAT developers know you've installed it
                 </label>
             </div>
 
+            <p>Letting us (the 4CAT developers at the <a href="https://digitalmethods.net">Digital
+                Methods Initiative</a>) know that you have installed 4CAT is <em>optional but greatly appreciated</em>
+                as it helps us justify and find funding for on-going development. We only store the data you enter, and
+                the approximate geographic location of the IP address it is sent from (but not the IP address itself)
+                This is a <em>one-time</em> 'ping': no information will be sent during later 4CAT usage.</p>
+            <p>If you enter contact information, we may contact you to learn more about how you are using 4CAT, but we
+                will <em>never</em> send any automated newsletters or mailings. You can check our website for
+                <a href="{{ phone_home_url }}">more information</a> on what we do with this data.</p>
+
             <div id="phone-home-fields" aria-expanded="false">
+            <p>The following fields are optional.</p>
             <div class="form-element full-width">
                 <label for="request-role">What best describes your role?</label>
                 <select name="role" id="request-role">
