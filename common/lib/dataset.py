@@ -1004,7 +1004,7 @@ class DataSet(FourcatModule):
 			return ",".join([dataset.key for dataset in self.genealogy])
 		else:
 			# Collect keys only
-			key_parent = self.key_parent
+			key_parent = self.key  # Start at the bottom
 			genealogy = []
 
 			while key_parent:
