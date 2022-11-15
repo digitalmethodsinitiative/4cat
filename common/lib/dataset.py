@@ -1128,7 +1128,7 @@ class DataSet(FourcatModule):
 		Used for checking processor and dataset compatibility,
 		which needs to handle both processors and datasets.
 		"""
-		if self.get_parent():
+		if self.key_parent:
 			return False
 		return True
 
