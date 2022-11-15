@@ -1,7 +1,6 @@
 import collections
 import datetime
 import hashlib
-import random
 import shutil
 import json
 import time
@@ -999,9 +998,28 @@ class DataSet(FourcatModule):
 
 		:return str: Nav link
 		"""
-		genealogy = self.get_genealogy()
+		if self.genealogy:
+			return ",".join([dataset.key for dataset in self.genealogy])
+		else:
+			# Collect keys only
+			key_parent = self.key_parent
+			genealogy = []
 
-		return ",".join([dataset.key for dataset in genealogy])
+			while key_parent:
+				try:
+					parent = self.db.fetchone("SELECT key_parent FROM datasets WHERE key = %s", (key_parent,))
+				except TypeError:
+					break
+
+				key_parent = parent["key_parent"]
+				if key_parent:
+					genealogy.append(key_parent)
+				else:
+					break
+
+			genealogy.reverse()
+			genealogy.append(self.key)
+			return ",".join(genealogy)
 
 	def get_compatible_processors(self):
 		"""
