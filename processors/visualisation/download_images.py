@@ -172,6 +172,11 @@ class ImageDownloader(BasicProcessor):
 		self.dataset.update_status("Reading source file")
 		item_index = 0
 		for item in self.source_dataset.iterate_items(self):
+			# note that we do not check if the amount of URLs exceeds the max
+			# `amount` of images; images may fail, so the limit is on the
+			# amount of downloaded images, not the amount of potentially
+			# downloadable image URLs
+
 			item_urls = set()
 			if 'ids' in item.keys():
 				item_ids = [id for id in item.get('ids').split(',')]
@@ -238,6 +243,7 @@ class ImageDownloader(BasicProcessor):
 			return
 		else:
 			self.dataset.log('Collected %i image urls.' % len(urls))
+
 		# next, loop through images and download them - until we have as many images
 		# as required. Note that images that cannot be downloaded or parsed do
 		# not count towards that limit

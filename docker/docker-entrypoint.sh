@@ -41,6 +41,9 @@ else
   cp VERSION config/.current-version
 fi
 
+# If backend did gracefully shutdown, PID lockfile remains; Remove lockfile
+rm -f ./backend/4cat.pid
+
 # Run migrate prior to setup (old builds pre 1.26 may not have config_manager)
 python3 helper-scripts/migrate.py -y
 
@@ -51,9 +54,6 @@ echo 'Starting app'
 echo "4CAT is accessible at:"
 echo "http://$SERVER_NAME:$PUBLIC_PORT"
 echo ''
-
-# If backend did not close in time, PID lockfile remains; Remove lockfile
-rm -f ./backend/4cat.pid
 
 # Start 4CAT backend
 python3 4cat-daemon.py start

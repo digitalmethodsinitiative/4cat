@@ -58,6 +58,15 @@
                     {% endfor %}
                 {% endif %}
             </ul>
+        {% if importables %}
+            <p><br>The following datasource{% if importables|length != 1 %}s{% endif %} can be captured via <a href="https://github.com/digitalmethodsinitiative/zeeschuimer">Zeeschuimer</a>:</p>
+            <ul>
+            {% for datasource in importables %}
+                <li>{{ importables[datasource].name }}</li>
+            {% endfor %}
+            </ul>
+            <br>
+        {% endif %}
         </aside>
     </article>
 {% endblock %}

@@ -269,6 +269,13 @@ class Tokenise(BasicProcessor):
 			sentence_method = sent_tokenize if grouping == "sentence" else dummy_function
 			groupings = []
 			for column in columns:
+				column_value = post.get(column)
+				# Possible to only check ones? Not if column is blank/None for some rows, but not all.
+				if column_value is not None and type(column_value) != str:
+					self.dataset.update_status("Column %s contains non text values and cannot be tokenized" % column, is_final=True)
+					self.dataset.update_status(0)
+					return
+
 				value = [v for v in sentence_method(post[column], language) if v is not None]
 				if value:
 					groupings.extend(value)

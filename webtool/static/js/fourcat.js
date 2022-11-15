@@ -323,7 +323,7 @@ const query = {
 		$('html,body').scrollTop(200);
 
 		// AJAX the query to the server
-		$('#query-status .message').html('Sending dataset parameters');
+		$('#query-status .message').html('Preparing data capture (do not close your browser)');
 		$.post({
 			url: form.attr('action'),
 			data: formdata,

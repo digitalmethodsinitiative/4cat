@@ -2,10 +2,9 @@
 Filter posts by a given column
 """
 import re
-import csv
 import datetime
 
-from backend.abstract.processor import BasicProcessor
+from processors.filtering.base_filter import BaseFilter
 from common.lib.helpers import UserInput
 
 __author__ = "Stijn Peeters"
@@ -13,10 +12,8 @@ __credits__ = ["Stijn Peeters", "Dale Wahl"]
 __maintainer__ = "Stijn Peeters"
 __email__ = "4cat@oilab.eu"
 
-csv.field_size_limit(1024 * 1024 * 1024)
 
-
-class ColumnFilter(BasicProcessor):
+class ColumnFilter(BaseFilter):
     """
     Retain only posts where a given column matches a given value
     """
@@ -25,7 +22,6 @@ class ColumnFilter(BasicProcessor):
     title = "Filter by value"  # title displayed in UI
     description = "A generic filter that checks whether a value in a selected column matches a custom requirement. " \
                   "This will create a new dataset."
-    extension = "csv"  # extension of result file, used internally and in UI
 
     options = {
         "column": {},
@@ -78,11 +74,12 @@ class ColumnFilter(BasicProcessor):
     @classmethod
     def is_compatible_with(cls, module=None):
         """
-        Allow processor on CSV files
+        Allow processor on top datasets.
 
         :param module: Dataset or processor to determine compatibility with
         """
-        return module.is_top_dataset() and module.get_extension() in ("csv", "ndjson")
+        # TODO: could run on any ndjson or csv IF adjustments were made to `get_options()`
+        return module.is_top_dataset()
 
     @classmethod
     def get_options(cls, parent_dataset=None, user=None):
@@ -102,10 +99,13 @@ class ColumnFilter(BasicProcessor):
 
         return options
 
-    def process(self):
+    def filter_items(self):
         """
-        Reads a CSV file, filtering items that match in the required way, and
-        creates a new dataset containing the matching values
+        Create a generator to iterate through items that can be passed to create either a csv or ndjson. Use
+        `for original_item, mapped_item in self.source_dataset.iterate_mapped_items(self)` to iterate through items
+        and yield `original_item`.
+
+        :return generator:
         """
         num_of_surrounding_characters_to_select = 25
         column = self.parameters.get("column", "")
@@ -144,16 +144,27 @@ class ColumnFilter(BasicProcessor):
                 match_values = [datetime.datetime.strptime(value, "%Y-%m-%d %H:%M:%S").timestamp() for value in
                                 match_values]
 
+        # self.dataset.log('Criteria: column - %s, style - %s, multiple - %s, function - %s, values - %s' % (str(column), str(match_style), str(match_multiple), str(match_function), ' & '.join(match_values)))
+
         matching_items = 0
         processed_items = 0
         with self.dataset.get_results_path().open("w", encoding="utf-8") as outfile:
             writer = None
 
-            for item in self.source_dataset.iterate_items(self):
-                if not writer:
-                    # first iteration, check if column actually exists
-                    if column not in item.keys():
-                        self.dataset.update_status("Column '%s' not found in dataset" % column, is_final=True)
+            # comparing dates is allowed on both unix timestamps and
+            # 'human' timestamps. For that reason, if we *are* indeed
+            # comparing dates, do some pre-processing to make sure we can
+            # actually compare the value properly.
+            if match_style in ("before", "after"):
+                if re.match(r"[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}", mapped_item.get(column)):
+                    date_compare = datetime.datetime.strptime(mapped_item.get(column), "%Y-%m-%d %H:%M:%S").timestamp()
+                else:
+                    try:
+                        date_compare = int(mapped_item.get(column))
+                    except ValueError:
+                        self.dataset.update_status(
+                            "Invalid date value '%s', cannot determine if before or after" % mapped_item.get(column),
+                            is_final=True)
                         self.dataset.finish(0)
                         return
 

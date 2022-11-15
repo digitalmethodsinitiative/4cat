@@ -14,7 +14,7 @@ from abc import ABC, abstractmethod
 import common.config_manager as config
 from common.lib.dataset import DataSet
 from backend.abstract.processor import BasicProcessor
-from common.lib.helpers import strip_tags, dict_search_and_update
+from common.lib.helpers import strip_tags, dict_search_and_update, remove_nuls
 from common.lib.exceptions import WorkerInterruptedException, ProcessorInterruptedException
 
 
@@ -42,7 +42,7 @@ class Search(BasicProcessor, ABC):
 
 	#: This attribute is only used by search workers that collect data from a
 	#: local database, to determine the name of the table to collect the data
-	#: from. If this is `4chan`, for example, posts are read from
+	#: from. If this is `4chan`, for example, items are read from
 	#: `posts_4chan`.
 	prefix = ""
 
@@ -84,7 +84,7 @@ class Search(BasicProcessor, ABC):
 			elif self.extension == "zip":
 				num_items = self.items_to_archive(items, results_file)
 			else:
-				raise NotImplementedError("Datasource query cannot be saved as %s file" % self.extension)
+				raise NotImplementedError("Datasource query cannot be saved as %s file" % results_file.suffix)
 
 			self.dataset.update_status("Query finished, results are available.")
 		elif items is not None:
@@ -276,6 +276,8 @@ class Search(BasicProcessor, ABC):
 					author_fields = [field for field in row.keys() if "author" in field]
 					for author_field in author_fields:
 						row[author_field] = check_cache.update_cache(row[author_field])
+
+				row = remove_nuls(row)
 				writer.writerow(row)
 
 		return processed
@@ -396,7 +398,7 @@ class SearchWithScope(Search, ABC):
 		if not items:
 			return None
 
-		# handle the various search scope options after retrieving initial post
+		# handle the various search scope options after retrieving initial item
 		# list
 		if query.get("search_scope", None) == "dense-threads":
 			# dense threads - all posts in all threads in which the requested
@@ -412,14 +414,14 @@ class SearchWithScope(Search, ABC):
 
 			thread_sizes = self.get_thread_sizes(thread_ids, min_length)
 
-			# determine how many matching posts occur per thread in the initial
+			# determine how many matching items occur per thread in the initial
 			# data set
-			posts_per_thread = {}
-			for post in items:
-				if post["thread_id"] not in posts_per_thread:
-					posts_per_thread[post["thread_id"]] = 0
+			items_per_thread = {}
+			for item in items:
+				if item["thread_id"] not in items_per_thread:
+					items_per_thread[item["thread_id"]] = 0
 
-				posts_per_thread[post["thread_id"]] += 1
+				items_per_thread[item["thread_id"]] += 1
 
 			# keep all thread IDs where that amount is more than the requested
 			# density
@@ -431,12 +433,12 @@ class SearchWithScope(Search, ABC):
 			except (ValueError, TypeError):
 				percentage = 0.15
 
-			for thread_id in posts_per_thread:
+			for thread_id in items_per_thread:
 				if thread_id not in thread_sizes:
 					# thread not long enough
 					continue
-				required_posts = math.ceil(percentage * thread_sizes[thread_id])
-				if posts_per_thread[thread_id] >= required_posts:
+				required_items = math.ceil(percentage * thread_sizes[thread_id])
+				if items_per_thread[thread_id] >= required_items:
 					qualifying_thread_ids.add(thread_id)
 
 			if len(qualifying_thread_ids) > 25000:
@@ -446,28 +448,28 @@ class SearchWithScope(Search, ABC):
 				return None
 
 			if qualifying_thread_ids:
-				self.dataset.update_status("Fetching all posts in %i threads" % len(qualifying_thread_ids))
+				self.dataset.update_status("Fetching all items in %i threads" % len(qualifying_thread_ids))
 				items = self.fetch_threads(tuple(qualifying_thread_ids))
 			else:
 				self.dataset.update_status("No threads matched the full thread search parameters.")
 				return None
 
 		elif query.get("search_scope", None) == "full-threads":
-			# get all post in threads containing at least one matching post
-			thread_ids = tuple(set([post["thread_id"] for post in items]))
+			# get all items in threads containing at least one matching item
+			thread_ids = tuple(set([item["thread_id"] for item in items]))
 			if len(thread_ids) > 25000:
 				self.dataset.update_status(
 					"Too many matching threads (%i) to get full thread data for, aborting. Please try again with a narrower query." % len(
 						thread_ids))
 				return None
 
-			self.dataset.update_status("Retrieving all posts from %i threads" % len(thread_ids))
+			self.dataset.update_status("Retrieving all items from %i threads" % len(thread_ids))
 			items = self.fetch_threads(thread_ids)
 
 		elif mode == "complex":
-			# create a random sample subset of all posts if requested. for
+			# create a random sample subset of all items if requested. for
 			# complex queries, this can usually only be done at this point;
-			# for simple queries, this is handled in get_posts_simple
+			# for simple queries, this is handled in get_items_simple
 			if query.get("search_scope", None) == "random-sample":
 				try:
 					self.dataset.update_status("Creating random sample")
@@ -538,7 +540,7 @@ class SearchWithScope(Search, ABC):
 	@abstractmethod
 	def fetch_posts(self, post_ids, where=None, replacements=None):
 		"""
-		Get posts for given IDs
+		Get items for given IDs
 
 		:param Iterable post_ids:  Post IDs to e.g. match against a database
 		:param where:  Deprecated, do not use
@@ -550,7 +552,7 @@ class SearchWithScope(Search, ABC):
 	@abstractmethod
 	def fetch_threads(self, thread_ids):
 		"""
-		Get posts for given thread IDs
+		Get items for given thread IDs
 
 		:param Iterable thread_ids:  Thread IDs to e.g. match against a database
 		:return Iterable[dict]:  Post objects

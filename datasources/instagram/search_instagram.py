@@ -4,6 +4,7 @@ Import scraped Instagram data
 It's prohibitively difficult to scrape data from Instagram within 4CAT itself
 due to its aggressive rate limiting. Instead, import data collected elsewhere.
 """
+import datetime
 from pathlib import Path
 import json
 import re
@@ -21,7 +22,7 @@ class SearchInstagram(Search):
     category = "Search"  # category
     title = "Import scraped Instagram data"  # title displayed in UI
     description = "Import Instagram data collected with an external tool such as Zeeschuimer."  # description displayed in UI
-    extension = "csv"  # extension of result file, used internally and in UI
+    extension = "ndjson"  # extension of result file, used internally and in UI
     is_from_extension = True
 
     # not available as a processor for existing datasets
@@ -73,18 +74,21 @@ class SearchInstagram(Search):
                 if self.interrupted:
                     raise WorkerInterruptedException()
 
-                post = json.loads(line)
-                node = post["data"]
-                is_graph_response = "__typename" in node
-
-                if is_graph_response:
-                    yield self.parse_graph_item(node)
-                else:
-                    yield self.parse_itemlist_item(node)
+                yield json.loads(line.replace("\0", ""))["data"]
 
         path.unlink()
 
-    def parse_graph_item(self, node):
+    @staticmethod
+    def map_item(item):
+        is_graph_response = "__typename" in item
+
+        if is_graph_response:
+            return SearchInstagram.parse_graph_item(item)
+        else:
+            return SearchInstagram.parse_itemlist_item(item)
+
+    @staticmethod
+    def parse_graph_item(node):
         """
         Parse Instagram post in Graph format
 
@@ -132,9 +136,9 @@ class SearchInstagram(Search):
             "parent_id": node["shortcode"],
             "body": caption,
             "author": node["owner"]["username"],
+            "timestamp": datetime.datetime.fromtimestamp(node["taken_at_timestamp"]).strftime("%Y-%m-%d %H:%M:%S"),
             "author_fullname": node["owner"].get("full_name", ""),
             "author_avatar_url": node["owner"].get("profile_pic_url", ""),
-            "timestamp": node["taken_at_timestamp"],
             "type": media_type,
             "url": "https://www.instagram.com/p/" + node["shortcode"],
             "image_url": node["display_url"],
@@ -144,33 +148,35 @@ class SearchInstagram(Search):
             #     [u["node"]["user"]["username"] for u in node["edge_media_to_tagged_user"]["edges"]]),
             "num_likes": node["edge_media_preview_like"]["count"],
             "num_comments": node.get("edge_media_preview_comment", {}).get("count", 0),
-            "num_media": num_media
+            "num_media": num_media,
+            "unix_timestamp": node["taken_at_timestamp"]
         }
 
         return mapped_item
 
-    def parse_itemlist_item(self, node):
+    @staticmethod
+    def parse_itemlist_item(node):
         """
         Parse Instagram post in 'item list' format
 
         :param node:  Data as received from Instagram
         :return dict:  Mapped item
         """
-        num_media = 1 if node["media_type"] != self.MEDIA_TYPE_CAROUSEL else len(node["carousel_media"])
+        num_media = 1 if node["media_type"] != SearchInstagram.MEDIA_TYPE_CAROUSEL else len(node["carousel_media"])
         caption = "" if not node.get("caption") else node["caption"]["text"]
 
         # get media url
         # for carousels, get the first media item, for videos, get the video
         # url, for photos, get the highest resolution
-        if node["media_type"] == self.MEDIA_TYPE_CAROUSEL:
+        if node["media_type"] == SearchInstagram.MEDIA_TYPE_CAROUSEL:
             media_node = node["carousel_media"][0]
         else:
             media_node = node
 
-        if media_node["media_type"] == self.MEDIA_TYPE_VIDEO:
+        if media_node["media_type"] == SearchInstagram.MEDIA_TYPE_VIDEO:
             media_url = media_node["video_versions"][0]["url"]
             display_url = media_node["image_versions2"]["candidates"][0]["url"]
-        elif media_node["media_type"] == self.MEDIA_TYPE_PHOTO:
+        elif media_node["media_type"] == SearchInstagram.MEDIA_TYPE_PHOTO:
             media_url = media_node["image_versions2"]["candidates"][0]["url"]
             display_url = media_url
         else:
@@ -178,8 +184,8 @@ class SearchInstagram(Search):
             display_url = ""
 
         # type, 'mixed' means carousel with video and photo
-        type_map = {self.MEDIA_TYPE_PHOTO: "photo", self.MEDIA_TYPE_VIDEO: "video"}
-        if node["media_type"] != self.MEDIA_TYPE_CAROUSEL:
+        type_map = {SearchInstagram.MEDIA_TYPE_PHOTO: "photo", SearchInstagram.MEDIA_TYPE_VIDEO: "video"}
+        if node["media_type"] != SearchInstagram.MEDIA_TYPE_CAROUSEL:
             media_type = type_map.get(node["media_type"], "unknown")
         else:
             media_types = set([s["media_type"] for s in node["carousel_media"]])
@@ -200,7 +206,7 @@ class SearchInstagram(Search):
             "author": node["user"]["username"],
             "author_fullname": node["user"]["full_name"],
             "author_avatar_url": node["user"]["profile_pic_url"],
-            "timestamp": node["taken_at"],
+            "timestamp": datetime.datetime.fromtimestamp(node["taken_at"]).strftime("%Y-%m-%d %H:%M:%S"),
             "type": media_type,
             "url": "https://www.instagram.com/p/" + node["code"],
             "image_url": display_url,
@@ -211,6 +217,7 @@ class SearchInstagram(Search):
             "num_likes": node["like_count"],
             "num_comments": num_comments,
             "num_media": num_media,
+            "unix_timestamp": node["taken_at"]
         }
 
         return mapped_item

@@ -48,7 +48,7 @@ packages = [
 	"selenium==4.3.0",
 	"spacy==3.0.5",
 	"svgwrite~=1.4.0",
-	"Telethon~=1.24.0",
+	"Telethon~=1.25.2",
 	"ural~=0.33",
 	"unidecode~=1.3",
 	"Werkzeug==0.15.5",

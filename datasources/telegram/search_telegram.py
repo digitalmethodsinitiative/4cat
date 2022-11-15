@@ -156,7 +156,7 @@ class SearchTelegram(Search):
             self.dataset.delete_parameter("api_id", instant=True)
 
         if not self.flawless:
-            self.dataset.update_status("Dataset completed, but some requested entities were unavailable (they may have"
+            self.dataset.update_status("Dataset completed, but some requested entities were unavailable (they may have "
                                        "been private). View the log file for details.", is_final=True)
 
         return results
@@ -433,7 +433,15 @@ class SearchTelegram(Search):
         :param Message message:  Message to parse
         :return dict:  4CAT-compatible item object
         """
-        thread = message["_chat"]["username"]
+        if message["_chat"]["username"]:
+            # chats can apparently not have usernames???
+            # truly telegram objects are way too lenient for their own good
+            thread = message["_chat"]["username"]
+        elif message["_chat"]["title"]:
+            thread = re.sub(r"\s", "", message["_chat"]["title"])
+        else:
+            # just give up
+            thread = "unknown"
 
         # determine username
         # API responses only include the user *ID*, not the username, and to

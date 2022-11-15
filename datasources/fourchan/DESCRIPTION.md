@@ -1,5 +1,7 @@
 4chan data is scraped internally by 4CAT. Depending on the installation, earlier data may be imported from data dumps uploaded by the archive [4plebs](https://archive.4plebs.org) or other archives like archived.moe. Contact the administrators for details on this.
 
+<code>Deleted posts</code> are determined by whether they disappeared from the thread chain before the thread was archived. At the moment, OPs are not (accurately) checked for deletion. The replies to a deleted OP also not (yet) seen as deleted.
+
 Results are limited to 5 million items maximum. Note that large queries can take a long time to complete!
 
 ### Importing archived data

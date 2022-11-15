@@ -2,9 +2,8 @@
 Filter posts by lexicon
 """
 import re
-import csv
 
-from backend.abstract.processor import BasicProcessor
+from processors.filtering.base_filter import BaseFilter
 from common.lib.helpers import UserInput
 
 __author__ = "Stijn Peeters"
@@ -12,10 +11,8 @@ __credits__ = ["Stijn Peeters"]
 __maintainer__ = "Stijn Peeters"
 __email__ = "4cat@oilab.eu"
 
-csv.field_size_limit(1024 * 1024 * 1024)
 
-
-class WildcardFilter(BasicProcessor):
+class WildcardFilter(BaseFilter):
     """
     Retain only posts matching a given list of keywords
     """
@@ -23,10 +20,8 @@ class WildcardFilter(BasicProcessor):
     category = "Filtering"  # category
     title = "Filter by wildcard"  # title displayed in UI
     description = "Retains only posts that contain certain words or phrases. Input may contain a wildcard *, which matches all text in between. This creates a new dataset."  # description displayed in UI
-    extension = "csv"  # extension of result file, used internally and in UI
 
-    # the following determines the options available to the user via the 4CAT
-    # interface.
+    # the following determines the options available to the user via the 4CAT interface
     options = {
         "match": {
             "type": UserInput.OPTION_TEXT,
@@ -39,16 +34,19 @@ class WildcardFilter(BasicProcessor):
     @classmethod
     def is_compatible_with(cls, module=None):
         """
-        Allow processor to run on all csv and NDJSON datasets
+        Allow processor on NDJSON and CSV files
 
         :param module: Dataset or processor to determine compatibility with
         """
+        return module.is_top_dataset() and module.get_extension() in ("csv", "ndjson")
 
-        return module.get_extension() in ("csv", "ndjson")
-
-    def process(self):
+    def filter_items(self):
         """
-        Reads a CSV file, and retains posts matching the provided filter
+        Create a generator to iterate through items that can be passed to create either a csv or ndjson. Use
+        `for original_item, mapped_item in self.source_dataset.iterate_mapped_items(self)` to iterate through items
+        and yield `original_item`.
+
+        :return generator:
         """
 
         matches = [match.strip().replace("*", "[^\s]*") for match in self.parameters.get("match").split(",")]
@@ -64,36 +62,18 @@ class WildcardFilter(BasicProcessor):
         processed = 0
         matching_items = 0
 
-        with self.dataset.get_results_path().open("w", encoding="utf-8") as output:
-            # get header row, we need to copy it for the output
-            fieldnames = self.source_dataset.get_item_keys(self)
+        # iterate through posts and see if they match
+        for original_item, mapped_item in self.source_dataset.iterate_mapped_items(self):
+            processed += 1
+            if not mapped_item.get("body", None):
+                continue
 
-            # start the output file
-            fieldnames.append("matching_lexicons")
-            writer = csv.DictWriter(output, fieldnames=fieldnames)
-            writer.writeheader()
+            if processed % 2500 == 0:
+                self.dataset.update_status("Processed %i posts (%i matching)" % (processed, matching_items))
+                self.dataset.update_progress(processed / self.source_dataset.num_rows)
 
-            # iterate through posts and see if they match
-            for post in self.source_dataset.iterate_items(self):
-                processed += 1
-                if not post.get("body", None):
-                    continue
+            if not matcher.findall(mapped_item.get("body")):
+                continue
 
-                if processed % 2500 == 0:
-                    self.dataset.update_status("Processed %i posts (%i matching)" % (processed, matching_items))
-                    self.dataset.update_progress(processed / self.source_dataset.num_rows)
-
-                if not matcher.findall(post.get("body")):
-                    continue
-
-                writer.writerow(post)
-                matching_items += 1
-
-        self.dataset.update_status("New dataset created with %i matching item(s)" % matching_items, is_final=True)
-        self.dataset.finish(matching_items)
-
-    def after_process(self):
-        super().after_process()
-
-        # Request standalone
-        self.create_standalone()
+            matching_items += 1
+            yield original_item

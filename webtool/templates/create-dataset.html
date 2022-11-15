@@ -12,7 +12,7 @@
 
             <form id="query-form" action="{{ url_for('queue_dataset') }}" method="POST" enctype="multipart/form-data">
                 <fieldset class="datasource-form">
-                    <p><br>Please be considerate of other users; 4CAT is a shared resource and large dataset queries may
+                    <p><br>Please be considerate of other users; {{ __tool_name }} is a shared resource and large dataset queries may
                         prevent others from using it if they take a very long time to complete. We recommend to start
                         with smaller date ranges and specific queries and then cast a wider net if needed.</p>
                 {%  if __expire_datasets %}
@@ -52,11 +52,11 @@
                     <div class="form-element">
                         <label for="data-make-private">Make private:</label>
                         <div class="filter-parameters">
-                            <label><input type="checkbox" name="make-private" id="data-make-private"> Make dataset private</label>
+                            <label><input type="checkbox" name="make-private" id="data-make-private" checked="checked"> Make dataset private</label>
                         </div>
 
                         <button class="tooltip-trigger" aria-controls="tooltip-dataset-private" aria-label="Extended help for option">?</button>
-                        <p role="tooltip" id="tooltip-dataset-private">This will only hide your dataset from other users. It will NOT encrypt your data and instance maintainers will still be able to view it. If you are working with sensitive data, you should consider running your own 4CAT instance.</p>
+                        <p role="tooltip" id="tooltip-dataset-private">This will only hide your dataset from other users. It will NOT encrypt your data and instance maintainers will still be able to view it. If you are working with sensitive data, you should consider running your own tool instance.</p>
                     </div>
 {% endif %}
                     <div class="form-element">

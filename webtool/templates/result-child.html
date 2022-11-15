@@ -72,7 +72,7 @@
         {# Parameters #}
         <div class="parameters">
             <ul>
-                {% if item.get_extension() in ("gexf", "csv") or item.get_own_processor().map_item %}
+                {% if item.get_extension() in ("gexf", "csv", "svg", "jpeg", "jpg", "png", "gif", "webp") or item.get_own_processor().map_item %}
                 <li>
                     <a href="{{ url_for('preview_items', key=item.key) }}"
                        data-load-from="{{ url_for('preview_items', key=item.key) }}"
@@ -83,7 +83,7 @@
                     <p role="tooltip" id="tooltip-preview-{{ item.key }}" aria-hidden="true">Preview this dataset</p>
                 </li>
                 {% endif %}
-                {% if dataset.get_log_path().exists() and current_user.is_authenticated %}
+                {% if item.get_log_path().exists() and current_user.is_authenticated %}
                 <li>
                     <a href="{{ url_for('view_log', key=item.key) }}"
                        data-load-from="{{ url_for('view_log', key=item.key) }}"

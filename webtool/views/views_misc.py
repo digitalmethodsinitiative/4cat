@@ -85,9 +85,11 @@ def show_frontpage():
     else:
         news = None
 
-    datasources = {k: v for k, v in backend.all_modules.datasources.items() if k in config.get("DATASOURCES")}
+    datasources = {k: v for k, v in backend.all_modules.datasources.items() if k in config.get("DATASOURCES") and not v["importable"]}
+    importables = {k: v for k, v in backend.all_modules.datasources.items() if v["importable"]}
+    print(importables)
 
-    return render_template("frontpage.html", stats=stats, news=news, datasources=datasources)
+    return render_template("frontpage.html", stats=stats, news=news, datasources=datasources, importables=importables)
 
 
 @app.route('/create-dataset/')
@@ -133,7 +135,7 @@ def data_overview(datasource=None):
         # Get description
         description_path = Path(datasources[datasource_id].get("path"), "DESCRIPTION.md")
         if description_path.exists():
-            with description_path.open() as description_file:
+            with description_path.open(encoding="utf-8") as description_file:
                 description = description_file.read()
 
         # Status labels to display in query form

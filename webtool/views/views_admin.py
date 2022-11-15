@@ -126,7 +126,7 @@ def add_user():
                 # be a benevolent admin and give them another change, without
                 # having them go through the whole signup again
                 user = User.get_by_name(db, username)
-                db.update("users", data={"timestamp_token": int(time.time())}, where={"name": username})
+                db.update("users", data={"password": "", "timestamp_token": int(time.time())}, where={"name": username})
 
                 try:
                     url = user.email_token(new=True)
@@ -175,7 +175,7 @@ def reject_user():
 
     if incomplete:
         if not form_message:
-            form_answer = Path(config.get('PATH_ROOT'), "webtool/pages/reject-template.md")
+            form_answer = Path(config.get("PATH_ROOT"), "webtool/pages/reject-template.md")
             if not form_answer.exists():
                 form_message = "No %s 4 u" % config.get("4cat.name")
             else:
@@ -187,7 +187,7 @@ def reject_user():
                                incomplete=incomplete)
 
     message = MIMEMultipart("alternative")
-    message["From"] = config.get('NOREPLY_EMAIL')
+    message["From"] = config.get("mail.noreply")
     message["To"] = email_address
     message["Subject"] = "Your %s account request" % config.get("4cat.name")
 
@@ -274,6 +274,7 @@ def manipulate_user(mode):
                 except psycopg2.IntegrityError:
                     flash("A user with this e-mail address already exists.")
                     incomplete.append("name")
+                    db.rollback()
 
             if not incomplete:
                 flash("User data saved")

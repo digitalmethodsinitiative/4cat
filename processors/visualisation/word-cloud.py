@@ -120,7 +120,7 @@ class MakeWordCloud(BasicProcessor):
 		cloud = WordCloud(prefer_horizontal=1, background_color="rgba(255, 255, 255, 0)", mode="RGBA", color_func=lambda *args, **kwargs: (0,0,0), width=1600, height=1000, collocations=False, max_words=max_words).generate_from_frequencies(words)
 
 		# Write to svg
-		cloud = cloud.to_svg(embed_font=True)
+		cloud = cloud.to_svg()
 		file = open(self.dataset.get_results_path(), "w")
 		file.write(cloud)
 		self.dataset.finish(1)

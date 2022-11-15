@@ -16,7 +16,7 @@ import backend
 from backend.abstract.worker import BasicWorker
 from common.lib.dataset import DataSet
 from common.lib.fourcat_module import FourcatModule
-from common.lib.helpers import get_software_version
+from common.lib.helpers import get_software_version, remove_nuls
 from common.lib.exceptions import WorkerInterruptedException, ProcessorInterruptedException, ProcessorException
 
 csv.field_size_limit(1024 * 1024 * 1024)
@@ -183,6 +183,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 			except Exception as e:
 				self.dataset.log("Processor crashed (%s), trying again later" % str(e))
 				frames = traceback.extract_tb(e.__traceback__)
+				last_frame = frames[-1]
 				frames = [frame.filename.split("/").pop() + ":" + str(frame.lineno) for frame in frames[1:]]
 				location = "->".join(frames)
 
@@ -195,7 +196,8 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 				# remove any result files that have been created so far
 				self.remove_files()
 
-				raise ProcessorException("Processor %s raised %s while processing dataset %s%s in %s:\n   %s\n" % (self.type, e.__class__.__name__, self.dataset.key, parent_key, location, str(e)))
+				raise ProcessorException("Processor %s raised %s while processing dataset %s%s in %s:\n   %s\n" % (
+				self.type, e.__class__.__name__, self.dataset.key, parent_key, location, str(e)), frame=last_frame)
 		else:
 			# dataset already finished, job shouldn't be open anymore
 			self.log.warning("Job %s/%s was queued for a dataset already marked as finished, deleting..." % (self.job.data["jobtype"], self.job.data["remote_id"]))
@@ -522,6 +524,8 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 			for row in data:
 				if self.interrupted:
 					raise ProcessorInterruptedException("Interrupted while writing results file")
+
+				row = remove_nuls(row)
 				writer.writerow(row)
 
 		self.dataset.update_status("Finished")
@@ -699,18 +703,30 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		return False
 
 	@classmethod
-	def get_extension(self):
+	def get_extension(self, parent_dataset=None):
 		"""
 		Return the extension of the processor's dataset
 
 		Used for processor compatibility checks.
 
+		:param DataSet parent_dataset:  An object representing the dataset that
+		  the processor would be run on
 		:return str|None:  Dataset extension (without leading `.`) or `None`.
 		"""
-
-		if self.extension and not self.is_filter():
+		if self.is_filter():
+			if parent_dataset is not None:
+				# Filters should use the same extension as the parent dataset
+				return parent_dataset.get_extension()
+			else:
+				# No dataset provided, unable to determine extension of parent dataset
+				# if self.is_filter(): originally returned None, so maintaining that outcome. BUT we may want to fall back on the processor extension instead
+				return None
+		elif self.extension:
+			# Use explicitly defined extension in class (Processor class defaults to "csv")
 			return self.extension
-		return None
+		else:
+			# A non filter processor updated the base Processor extension to None/False?
+			return None
 
 	@classmethod
 	def is_rankable(cls, multiple_items=True):

@@ -408,9 +408,9 @@ class SearchReddit(Search):
             "author": thread["author"],
             "author_flair": thread.get("author_flair_text", ""),
             "post_flair": thread.get("link_flair_text", ""),
-            "image_file": thread["url"] if image_match.search(thread["url"]) else "",
-            "domain": thread["domain"],
-            "url": thread["url"],
+            "image_file": thread.get("url", "") if image_match.search(thread.get("url", "")) else "",
+            "domain": thread.get("domain", ""),
+            "url": thread.get("url", ""),
             "image_md5": "",
             "subreddit": thread["subreddit"],
             "parent": "",
@@ -422,7 +422,7 @@ class SearchReddit(Search):
         Call pushshift API and don't crash (immediately) if it fails
 
         Will also try to respect the rate limit, waiting before making a
-        request until it will not violet the rate limit.
+        request until it will not violate the rate limit.
 
         :param args:
         :param kwargs:

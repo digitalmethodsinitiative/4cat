@@ -185,8 +185,8 @@ class ColumnNetworker(BasicProcessor):
             values_b = [values_b]
 
             if split_comma:
-                values_a = [v.strip() for v in values_a.pop().split(",")]
-                values_b = [v.strip() for v in values_b.pop().split(",")]
+                values_a = [value.strip() for value_groups in values_a for value in value_groups.split(",")]
+                values_b = [value.strip() for value_groups in values_b for value in value_groups.split(",")]
 
             try:
                 interval = get_interval_descriptor(item, interval_type)
@@ -204,33 +204,52 @@ class ColumnNetworker(BasicProcessor):
                     if not allow_loops and node_a == node_b:
                         continue
 
-                    # keep a list of intervals the node occurs in in the node
-                    # attributes. Use a dictionary to also record per-interval
-                    # frequency
-                    if node_a not in network.nodes():
-                        network.add_node(node_a, intervals={}, label=value_a, **({"category": column_a} if categorise else {}))
+                    if interval_type != "overall":
+                        # keep a list of intervals the node occurs in in the node
+                        # attributes. Use a dictionary to also record per-interval
+                        # frequency
+                        if node_a not in network.nodes():
+                            network.add_node(node_a, intervals={}, label=value_a, **({"category": column_a} if categorise else {}))
 
-                    if node_b not in network.nodes():
-                        network.add_node(node_b, intervals={}, label=value_b, **({"category": column_b} if categorise else {}))
+                        if node_b not in network.nodes():
+                            network.add_node(node_b, intervals={}, label=value_b, **({"category": column_b} if categorise else {}))
 
-                    if interval not in network.nodes[node_a]["intervals"]:
-                        network.nodes[node_a]["intervals"][interval] = 0
+                        if interval not in network.nodes[node_a]["intervals"]:
+                            network.nodes[node_a]["intervals"][interval] = 0
 
-                    if interval not in network.nodes[node_b]["intervals"]:
-                        network.nodes[node_b]["intervals"][interval] = 0
+                        if interval not in network.nodes[node_b]["intervals"]:
+                            network.nodes[node_b]["intervals"][interval] = 0
 
-                    network.nodes[node_a]["intervals"][interval] += 1
-                    network.nodes[node_b]["intervals"][interval] += 1
+                        network.nodes[node_a]["intervals"][interval] += 1
+                        network.nodes[node_b]["intervals"][interval] += 1
 
-                    # Use the same method to determine per-interval edge weight
-                    edge = (node_a, node_b)
-                    if edge not in network.edges():
-                        network.add_edge(node_a, node_b, intervals={})
+                        # Use the same method to determine per-interval edge weight
+                        edge = (node_a, node_b)
+                        if edge not in network.edges():
+                            network.add_edge(node_a, node_b, intervals={})
 
-                    if interval not in network.edges[edge]["intervals"]:
-                        network.edges[edge]["intervals"][interval] = 0
+                        if interval not in network.edges[edge]["intervals"]:
+                            network.edges[edge]["intervals"][interval] = 0
 
-                    network.edges[edge]["intervals"][interval] += 1
+                        network.edges[edge]["intervals"][interval] += 1
+
+                    else:
+                        # Not dealing with intervals
+                        # Note: we could just use weight here, but if we use frequency there is some consistency
+                        if node_a not in network.nodes():
+                            network.add_node(node_a, label=value_a, frequency=1, **({"category": column_a} if categorise else {}))
+                        else:
+                            network.nodes[node_a]["frequency"] += 1
+                        if node_b not in network.nodes():
+                            network.add_node(node_b, label=value_b, frequency=1, **({"category": column_b} if categorise else {}))
+                        else:
+                            network.nodes[node_b]["frequency"] += 1
+
+                        edge = (node_a, node_b)
+                        if edge not in network.edges():
+                            network.add_edge(node_a, node_b, frequency=1)
+                        else:
+                            network.edges[edge]['frequency'] += 1
 
         if not network.edges():
             self.dataset.update_status("No edges could be created for the given parameters", is_final=True)
@@ -300,14 +319,14 @@ class ColumnNetworker(BasicProcessor):
                     component[item]["spells"] = spells
                     component[item]["frequency"] = weights
 
-        # the "intervals" key is no longer needed since it has been gexf-ified
-        # in the 'spells' and 'frequency' keys
-        for component in (network.nodes, network.edges):
-            for item in component:
-                del component[item]["intervals"]
+            # the "intervals" key is no longer needed since it has been gexf-ified
+            # in the 'spells' and 'frequency' keys
+            for component in (network.nodes, network.edges):
+                for item in component:
+                    del component[item]["intervals"]
 
         self.dataset.update_status("Writing network file")
-        
+
         nx.write_gexf(network, self.dataset.get_results_path())
         self.dataset.finish(len(network.nodes))
 
