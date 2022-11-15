@@ -32,8 +32,43 @@ class TopicModelWordExtractor(BasicProcessor):
             "default": False,
             "help": "Include top 5 words in topic header",
             "tooltip": 'This may be useful in better understanding your topics.',
-        }
+        },
+        "columns": {
+            "type": UserInput.OPTION_TEXT,
+            "help": "Extra column(s) to include from original data",
+            "default": "id",
+            "tooltip": "Note: 'id', 'thread_id', 'timestamp', 'author', 'body' and any tokenized columns are always included."
+        },
     }
+
+    @classmethod
+    def get_options(cls, parent_dataset=None, user=None):
+        """
+        Get processor options
+
+        This method by default returns the class's "options" attribute, or an
+        empty dictionary. It can be redefined by processors that need more
+        fine-grained options, e.g. in cases where the availability of options
+        is partially determined by the parent dataset's parameters.
+
+        :param DataSet parent_dataset:  An object representing the dataset that
+        the processor would be run on
+        :param User user:  Flask user the options will be displayed for, in
+        case they are requested for display in the 4CAT web interface. This can
+        be used to show some options only to privileges users.
+        """
+        options = cls.options
+
+        if parent_dataset:
+            top_dataset = parent_dataset.top_parent()
+            if top_dataset.get_columns():
+                columns = top_dataset.get_columns()
+                options["columns"]["type"] = UserInput.OPTION_MULTI
+                options["columns"]["inline"] = True
+                options["columns"]["options"] = {v: v for v in columns}
+                options["columns"]["default"] = ["body"]
+
+        return options
 
     @classmethod
     def is_compatible_with(cls, module=None):
@@ -74,7 +109,7 @@ class TopicModelWordExtractor(BasicProcessor):
         model_metadata_parameters = model_metadata.pop('parameters')
 
         # Collect column names of matrix
-        post_column_names = list(set(['id', 'thread_id', 'timestamp', 'author', 'body'] + token_metadata_parameters.get('columns')))
+        post_column_names = list(set(['id', 'thread_id', 'timestamp', 'author', 'body'] + self.parameters.get('columns', []) + token_metadata_parameters.get('columns')))
         model_column_names = ['post_id', 'document_id', 'interval']
         # Check if multiple documents exist per post/item and add 'document' column if needed
         if token_metadata_parameters.get('grouped_by') != 'item' or len(token_metadata_parameters.get('columns')) > 1:
