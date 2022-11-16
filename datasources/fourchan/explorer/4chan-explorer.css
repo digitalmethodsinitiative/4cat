@@ -63,6 +63,10 @@ body {
 	font-weight: 700;
 }
 
+.posts li.post .deleted {
+	
+}
+
 .posts li.post .post-content {
 	display: block;
 	margin: 15px;

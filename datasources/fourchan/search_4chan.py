@@ -28,8 +28,7 @@ class Search4Chan(SearchWithScope):
 
 	# Columns to return in csv
 	return_cols = ['thread_id', 'id', 'timestamp', 'board', 'body', 'subject', 'author', 'image_file', 'image_md5',
-				   'country_name', 'country_code']
-
+				   'country_name', 'country_code', 'timestamp_deleted']
 
 	references = [
 		"[4chan API](https://github.com/4chan/4chan-API)",
@@ -63,7 +62,7 @@ class Search4Chan(SearchWithScope):
 		},
 		"deleted_posts": {
 			"type": UserInput.OPTION_INFO,
-			"help": "Posts deleted by moderators may be excluded. <strong>Note:</strong> this does not yet work for deleted OPs and thread removals."
+			"help": "Posts deleted by moderators may be excluded. <strong>Note:</strong> replies to deleted OPs are seen as not deleted."
 		},
 		"get_deleted": {
 			"type": UserInput.OPTION_TOGGLE,
@@ -76,285 +75,287 @@ class Search4Chan(SearchWithScope):
 			"board_specific": ["pol", "sp", "int"],
 			"tooltip": "The IP-derived flag attached to posts. Can be an actual country or \"meme flag\". Leave empty for all.",
 			"options": {
-				"Armenia|Albania|Andorra|Austria|Belarus|Belgium|Bosnia and Herzegovina|Bulgaria|Croatia|Cyprus|Czech Republic|Denmark|Estonia|Finland|France|Germany|Greece|Hungary|Iceland|Republic of Ireland|Italy|Kosovo|Latvia|Liechtenstein|Lithuania|Luxembourg|Republic of Macedonia|North Macedonia|Macedonia|Malta|Moldova|Monaco|Montenegro|Netherlands|The Netherlands|Norway|Poland|Portugal|Romania|Russia|San Marino|Serbia|Slovakia|Slovenia|Spain|Sweden|Switzerland|Turkey|Ukraine|United Kingdom|Vatican City": "<span class='flag flag-eu' title='Afghanistan'></span> European countries",
-				"Afghanistan": "<span class='flag flag-af' title='Afghanistan'></span> Afghanistan",
-				"Aland Islands|Aland": "<span class='flag flag-ax' title='Aland / Aland Islands'></span> Aland Islands",
-				"Albania": "<span class='flag flag-al' title='Albania'></span> Albania",
-				"Algeria": "<span class='flag flag-dz' title='Algeria'></span> Algeria",
-				"American Samoa": "<span class='flag flag-as title='American Samoa's'></span> American Samoa",
-				"Andorra": "<span class='flag flag-ad' title='Andorra'></span> Andorra",
-				"Angola": "<span class='flag flag-ao' title='Angola'></span> Angola",
-				"Anguilla": "<span class='flag flag-ai' title='Anguilla'></span> Anguilla",
-				"Antarctica": "<span class='flag flag-aq' title='Antarctica'></span> Antarctica",
-				"Antigua and Barbuda": "<span class='flag flag-ag' title='Antigua and Barbuda'></span> Antigua and Barbuda",
-				"Argentina": "<span class='flag flag-ar' title='Argentina'></span> Argentina",
-				"Armenia": "<span class='flag flag-am' title='Armenia'></span> Armenia",
-				"Aruba": "<span class='flag flag-aw' title='Aruba'></span> Aruba",
-				"Asia/Pacific Region": "<span class='flag flag-ap' title='Asia/Pacific Region'></span> Asia/Pacific Region",
-				"Australia": "<span class='flag flag-au' title='Australia'></span> Australia",
-				"Austria": "<span class='flag flag-at' title='Austria'></span> Austria",
-				"Azerbaijan": "<span class='flag flag-az' title='Azerbaijan'></span> Azerbaijan",
-				"Bahamas": "<span class='flag flag-bs' title='Bahamas'></span> Bahamas",
-				"Bahrain": "<span class='flag flag-bh' title='Bahrain'></span> Bahrain",
-				"Bangladesh": "<span class='flag flag-bd' title='Bangladesh'></span> Bangladesh",
-				"Barbados": "<span class='flag flag-bb' title='Barbados'></span> Barbados",
-				"Belarus": "<span class='flag flag-by' title='Belarus'></span> Belarus",
-				"Belgium": "<span class='flag flag-be' title='Belgium'></span> Belgium",
-				"Belize": "<span class='flag flag-bz' title='Belize'></span> Belize",
-				"Benin": "<span class='flag flag-bj' title='Benin'></span> Benin",
-				"Bermuda": "<span class='flag flag-bm' title='Bermuda'></span> Bermuda",
-				"Bhutan": "<span class='flag flag-bt' title='Bhutan'></span> Bhutan",
-				"Bolivia": "<span class='flag flag-bo' title='Bolivia'></span> Bolivia",
-				"Bonaire, Sint Eustatius and Saba": "<span class='flag flag-bq' title='Bonaire, Sint Eustatius and Saba'></span> Bonaire, Sint Eustatius and Saba",
-				"Bosnia and Herzegovina": "<span class='flag flag-ba' title='Bosnia and Herzegovina'></span> Bosnia and Herzegovina",
-				"Botswana": "<span class='flag flag-bw' title='Botswana'></span> Botswana",
-				"Bouvet Island": "<span class='flag flag-bv' title='Bouvet Island'></span> Bouvet Island",
-				"Brazil": "<span class='flag flag-br' title='Brazil'></span> Brazil",
-				"British Indian Ocean Territory": "<span class='flag flag-io' title='British Indian Ocean Territory'></span> British Indian Ocean Territory",
-				"British Virgin Islands": "<span class='flag flag-vg' title='British Virgin Islands'></span> British Virgin Islands",
-				"Brunei": "<span class='flag flag-bn' title='Brunei'></span> Brunei",
-				"Bulgaria": "<span class='flag flag-bg' title='Bulgaria'></span> Bulgaria",
-				"Burkina Faso": "<span class='flag flag-bf' title='Burkina Faso'></span> Burkina Faso",
-				"Burundi": "<span class='flag flag-bi' title='Burundi'></span> Burundi",
-				"Cambodia": "<span class='flag flag-kh' title='Cambodia'></span> Cambodia",
-				"Cameroon": "<span class='flag flag-cm' title='Cameroon'></span> Cameroon",
-				"Canada": "<span class='flag flag-ca' title='Canada'></span> Canada",
-				"Cape Verde": "<span class='flag flag-cv' title='Cape Verde'></span> Cape Verde",
-				"Cayman Islands": "<span class='flag flag-ky' title='Cayman Islands'></span> Cayman Islands",
-				"Central African Republic": "<span class='flag flag-cf' title='Central African Republic'></span> Central African Republic",
-				"Chad": "<span class='flag flag-td' title='Chad'></span> Chad",
-				"Chile": "<span class='flag flag-cl' title='Chile'></span> Chile",
-				"China": "<span class='flag flag-cn' title='China'></span> China",
-				"Christmas Island": "<span class='flag flag-cx' title='Christmas Island'></span> Christmas Island",
-				"Cocos (Keeling) Islands": "<span class='flag flag-cc' title='Cocos (Keeling) Islands'></span> Cocos (Keeling) Islands",
-				"Colombia": "<span class='flag flag-co' title='Colombia'></span> Colombia",
-				"Comoros": "<span class='flag flag-km' title='Comoros'></span> Comoros",
-				"Congo|Democratic Republic of the Congo": "<span class='flag flag-cd' title='Congo'></span> Congo",
-				"Cook Islands": "<span class='flag flag-ck' title='Cook Islands'></span> Cook Islands",
-				"Costa Rica": "<span class='flag flag-cr' title='Costa Rica'></span> Costa Rica",
-				"Croatia": "<span class='flag flag-hr' title='Croatia'></span> Croatia",
-				"Cuba": "<span class='flag flag-cu' title='Cuba'></span> Cuba",
-				"Curaçao|Curacao": "<span class='flag flag-cw' title='Curaçao'></span> Curaçao",
-				"Cyprus": "<span class='flag flag-cy' title='Cyprus'></span> Cyprus",
-				"Czech Republic": "<span class='flag flag-cz' title='Czech Republic'></span> Czech Republic",
-				"Côte d'Ivoire|Ivory Coast": "<span class='flag flag-ci' title='Côte d'Ivoire'></span> Côte d'Ivoire",
-				"Denmark": "<span class='flag flag-dk' title='Denmark'></span> Denmark",
-				"Djibouti": "<span class='flag flag-dj' title='Djibouti'></span> Djibouti",
-				"Dominica": "<span class='flag flag-dm' title='Dominica'></span> Dominica",
-				"Dominican Republic": "<span class='flag flag-do' title='Dominican Republic'></span> Dominican Republic",
-				"Ecuador": "<span class='flag flag-ec' title='Ecuador'></span> Ecuador",
-				"Egypt": "<span class='flag flag-eg' title='Egypt'></span> Egypt",
-				"El Salvador": "<span class='flag flag-sv' title='El Salvador'></span> El Salvador",
-				"Equatorial Guinea": "<span class='flag flag-gq' title='Equatorial Guinea'></span> Equatorial Guinea",
-				"Eritrea": "<span class='flag flag-er' title='Eritrea'></span> Eritrea",
-				"Estonia": "<span class='flag flag-ee' title='Estonia'></span> Estonia",
-				"Ethiopia": "<span class='flag flag-et' title='Ethiopia'></span> Ethiopia",
-				"Falkland Islands|Falkland Islands (Malvinas)": "<span class='flag flag-fk' title='Falkland Islands'></span> Falkland Islands",
-				"Faroe Islands": "<span class='flag flag-fo' title='Faroe Islands'></span> Faroe Islands",
-				"Fiji Islands": "<span class='flag flag-fj' title='Fiji Islands'></span> Fiji Islands",
-				"Finland": "<span class='flag flag-fi' title='Finland'></span> Finland",
-				"France": "<span class='flag flag-fr' title='France'></span> France",
-				"French Guiana": "<span class='flag flag-gf' title='French Guiana'></span> French Guiana",
-				"French Polynesia": "<span class='flag flag-pf' title='French Polynesia'></span> French Polynesia",
-				"Gabon": "<span class='flag flag-ga' title='Gabon'></span> Gabon",
-				"Gambia": "<span class='flag flag-gm' title='Gambia'></span> Gambia",
-				"Georgia": "<span class='flag flag-ge' title='Georgia'></span> Georgia",
-				"Germany": "<span class='flag flag-de' title='Germany'></span> Germany",
-				"Ghana": "<span class='flag flag-gh' title='Ghana'></span> Ghana",
-				"Gibraltar": "<span class='flag flag-gi' title='Gibraltar'></span> Gibraltar",
-				"Greece": "<span class='flag flag-gr' title='Greece'></span> Greece",
-				"Greenland": "<span class='flag flag-gl' title='Greenland'></span> Greenland",
-				"Grenada": "<span class='flag flag-gd' title='Grenada'></span> Grenada",
-				"Guadeloupe": "<span class='flag flag-gp' title='Guadeloupe'></span> Guadeloupe",
-				"Guam": "<span class='flag flag-gu' title='Guam'></span> Guam",
-				"Guatemala": "<span class='flag flag-gt' title='Guatemala'></span> Guatemala",
-				"Guernsey": "<span class='flag flag-gg' title='Guernsey'></span> Guernsey",
-				"Guinea-Bissau": "<span class='flag flag-gw' title='Guinea-Bissau'></span> Guinea-Bissau",
-				"Guinea|French Guinea": "<span class='flag flag-gn' title='Guinea'></span> Guinea / French Guinea",
-				"Guyana|Guiana": "<span class='flag flag-gy' title='Guyana'></span> Guyana",
-				"Haiti": "<span class='flag flag-ht' title='Haiti'></span> Haiti",
-				"Heard Island and McDonald Islands": "<span class='flag flag-hm' title='Heard Island and McDonald Islands'></span> Heard Island and McDonald Islands",
-				"Holy See (Vatican City State)": "<span class='flag flag-va' title='Holy See (Vatican City State)'></span> Holy See (Vatican City State)",
-				"Honduras": "<span class='flag flag-hn' title='Honduras'></span> Honduras",
-				"Hong Kong": "<span class='flag flag-hk' title='Hong Kong'></span> Hong Kong",
-				"Hungary": "<span class='flag flag-hu' title='Hungary'></span> Hungary",
-				"Iceland": "<span class='flag flag-is' title='Iceland'></span> Iceland",
-				"India": "<span class='flag flag-in' title='India'></span> India",
-				"Indonesia": "<span class='flag flag-id' title='Indonesia'></span> Indonesia",
-				"Iran": "<span class='flag flag-ir' title='Iran'></span> Iran",
-				"Iraq": "<span class='flag flag-iq' title='Iraq'></span> Iraq",
-				"Ireland": "<span class='flag flag-ie' title='Ireland'></span> Ireland",
-				"Isle of Man": "<span class='flag flag-im' title='Isle of Man'></span> Isle of Man",
-				"Israel": "<span class='flag flag-il' title='Israel'></span> Israel",
-				"Italy": "<span class='flag flag-it' title='Italy'></span> Italy",
-				"Jamaica": "<span class='flag flag-jm' title='Jamaica'></span> Jamaica",
-				"Japan": "<span class='flag flag-jp' title='Japan'></span> Japan",
-				"Jersey": "<span class='flag flag-je' title='Jersey'></span> Jersey",
-				"Jordan": "<span class='flag flag-jo' title='Jordan'></span> Jordan",
-				"Kazakhstan": "<span class='flag flag-kz' title='Kazakhstan'></span> Kazakhstan",
-				"Kenya": "<span class='flag flag-ke' title='Kenya'></span> Kenya",
-				"Kiribati": "<span class='flag flag-ki' title='Kiribati'></span> Kiribati",
-				"Kosovo": "<span class='flag flag-xk' title='Kosovo'></span> Kosovo",
-				"Kuwait": "<span class='flag flag-kw' title='Kuwait'></span> Kuwait",
-				"Kyrgyzstan": "<span class='flag flag-kg' title='Kyrgyzstan'></span> Kyrgyzstan",
-				"Laos|Lao People's Democratic Republic": "<span class='flag flag-la' title='Laos'></span> Laos",
-				"Latvia": "<span class='flag flag-lv' title='Latvia'></span> Latvia",
-				"Lebanon": "<span class='flag flag-lb' title='Lebanon'></span> Lebanon",
-				"Lesotho": "<span class='flag flag-ls' title='Lesotho'></span> Lesotho",
-				"Liberia": "<span class='flag flag-lr' title='Liberia'></span> Liberia",
-				"Libya": "<span class='flag flag-ly' title='Libya'></span> Libya",
-				"Liechtenstein": "<span class='flag flag-li' title='Liechtenstein'></span> Liechtenstein",
-				"Lithuania": "<span class='flag flag-lt' title='Lithuania'></span> Lithuania",
-				"Luxembourg": "<span class='flag flag-lu' title='Luxembourg'></span> Luxembourg",
-				"Macau|Macao": "<span class='flag flag-mo' title='Macao'></span> Macao",
-				"Macedonia": "<span class='flag flag-mk' title='Macedonia'></span> Macedonia",
-				"Madagascar": "<span class='flag flag-mg' title='Madagascar'></span> Madagascar",
-				"Malawi": "<span class='flag flag-mw' title='Malawi'></span> Malawi",
-				"Malaysia": "<span class='flag flag-my' title='Malaysia'></span> Malaysia",
-				"Maldives": "<span class='flag flag-mv' title='Maldives'></span> Maldives",
-				"Mali": "<span class='flag flag-ml' title='Mali'></span> Mali",
-				"Malta": "<span class='flag flag-mt' title='Malta'></span> Malta",
-				"Marshall Islands": "<span class='flag flag-mh' title='Marshall Islands'></span> Marshall Islands",
-				"Martinique": "<span class='flag flag-mq' title='Martinique'></span> Martinique",
-				"Mauritania": "<span class='flag flag-mr' title='Mauritania'></span> Mauritania",
-				"Mauritius": "<span class='flag flag-mu' title='Mauritius'></span> Mauritius",
-				"Mayotte": "<span class='flag flag-yt' title='Mayotte'></span> Mayotte",
-				"Mexico": "<span class='flag flag-mx' title='Mexico'></span> Mexico",
-				"Micronesia|Federated States of Micronesia": "<span class='flag flag-fm' title='Federated States of Micronesia'></span> Federated States of Micronesia",
-				"Moldova|Moldova, Republic of": "<span class='flag flag-md' title='Moldova'></span> Moldova",
-				"Monaco": "<span class='flag flag-mc' title='Monaco'></span> Monaco",
-				"Mongolia": "<span class='flag flag-mn' title='Mongolia'></span> Mongolia",
-				"Montenegro": "<span class='flag flag-me' title='Montenegro'></span> Montenegro",
-				"Montserrat": "<span class='flag flag-ms' title='Montserrat'></span> Montserrat",
-				"Morocco": "<span class='flag flag-ma' title='Morocco'></span> Morocco",
-				"Mozambique": "<span class='flag flag-mz' title='Mozambique'></span> Mozambique",
-				"Myanmar": "<span class='flag flag-mm' title='Myanmar'></span> Myanmar",
-				"Namibia": "<span class='flag flag-na' title='Namibia'></span> Namibia",
-				"Nauru": "<span class='flag flag-nr' title='Nauru'></span> Nauru",
-				"Nepal": "<span class='flag flag-np' title='Nepal'></span> Nepal",
-				"Netherlands": "<span class='flag flag-nl' title='Netherlands'></span> Netherlands",
-				"New Caledonia": "<span class='flag flag-nc' title='New Caledonia'></span> New Caledonia",
-				"New Zealand": "<span class='flag flag-nz' title='New Zealand'></span> New Zealand",
-				"Nicaragua": "<span class='flag flag-ni' title='Nicaragua'></span> Nicaragua",
-				"Niger": "<span class='flag flag-ne' title='Niger'></span> Niger",
-				"Nigeria": "<span class='flag flag-ng' title='Nigeria'></span> Nigeria",
-				"Niue": "<span class='flag flag-nu' title='Niue'></span> Niue",
-				"Norfolk Island": "<span class='flag flag-au' title='Norfolk Island'></span> Norfolk Island",
-				"Northern Mariana Islands": "<span class='flag flag-mp' title='Northern Mariana Islands'></span> Northern Mariana Islands",
-				"Norway": "<span class='flag flag-no' title='Norway'></span> Norway",
-				"Oman": "<span class='flag flag-om' title='Oman'></span> Oman",
-				"Pakistan": "<span class='flag flag-pk' title='Pakistan'></span> Pakistan",
-				"Palau": "<span class='flag flag-pw' title='Palau'></span> Palau",
-				"Palestine|Palestinian Territory": "<span class='flag flag-ps' title='Palestine'></span> Palestine",
-				"Panama": "<span class='flag flag-pa' title='Panama'></span> Panama",
-				"Papua New Guinea": "<span class='flag flag-pg' title='Papua New Guinea'></span> Papua New Guinea",
-				"Paraguay": "<span class='flag flag-py' title='Paraguay'></span> Paraguay",
-				"Peru": "<span class='flag flag-pe' title='Peru'></span> Peru",
-				"Philippines": "<span class='flag flag-ph' title='Philippines'></span> Philippines",
-				"Pitcairn": "<span class='flag flag-pn' title='Pitcairn'></span> Pitcairn",
-				"Poland": "<span class='flag flag-pl' title='Poland'></span> Poland",
-				"Portugal": "<span class='flag flag-pt' title='Portugal'></span> Portugal",
-				"Puerto Rico": "<span class='flag flag-pr' title='Puerto Rico'></span> Puerto Rico",
-				"Qatar": "<span class='flag flag-qa' title='Qatar'></span> Qatar",
-				"Reunion|Réunion": "<span class='flag flag-re' title='Reunion'></span> Reunion",
-				"Romania": "<span class='flag flag-ro' title='Romania'></span> Romania",
-				"Russian Federation": "<span class='flag flag-ru' title='Russian Federation'></span> Russian Federation",
-				"Rwanda": "<span class='flag flag-rw' title='Rwanda'></span> Rwanda",
-				"Saint Barthélemy": "<span class='flag flag-bl' title='Saint Barthélemy'></span> Saint Barthélemy",
-				"Saint Helena|Saint Helena, Ascension, and Tristan da Cunha": "<span class='flag flag-sh' title='Saint Helena, Ascension, and Tristan da Cunha'></span> Saint Helena, Ascension, and Tristan da Cunha",
-				"Saint Kitts and Nevis": "<span class='flag flag-kn' title='Saint Kitts and Nevis'></span> Saint Kitts and Nevis",
-				"Saint Lucia": "<span class='flag flag-lc' title='Saint Lucia'></span> Saint Lucia",
-				"Saint Martin": "<span class='flag flag-mf' title='Saint Martin'></span> Saint Martin",
-				"Saint Pierre and Miquelon": "<span class='flag flag-pm' title='Saint Pierre and Miquelon'></span> Saint Pierre and Miquelon",
-				"Saint Vincent and the Grenadines": "<span class='flag flag-vc' title='Saint Vincent and the Grenadines'></span> Saint Vincent and the Grenadines",
-				"Samoa": "<span class='flag flag-ws' title='Samoa'></span> Samoa",
-				"San Marino": "<span class='flag flag-sm' title='San Marino'></span> San Marino",
-				"Sao Tome and Principe": "<span class='flag flag-st' title='Sao Tome and Principe'></span> Sao Tome and Principe",
-				"Satellite Provider":  "<span class='flag flag-a2' title='Satellite Provider'></span> Satellite Provider",
-				"Satellite Provider": "<span class='flag flag-a2' title='Satellite Provider'></span> Satellite Provider",
-				"Saudi Arabia": "<span class='flag flag-sa' title='Saudi Arabia'></span> Saudi Arabia",
-				"Senegal": "<span class='flag flag-sn' title='Senegal'></span> Senegal",
-				"Serbia": "<span class='flag flag-rs' title='Serbia'></span> Serbia",
-				"Seychelles": "<span class='flag flag-sc' title='Seychelles'></span> Seychelles",
-				"Sierra Leone": "<span class='flag flag-sl' title='Sierra Leone'></span> Sierra Leone",
-				"Singapore": "<span class='flag flag-sg' title='Singapore'></span> Singapore",
-				"Sint Maarten": "<span class='flag flag-sx' title='Sint Maarten'></span> Sint Maarten",
-				"Slovakia": "<span class='flag flag-sk' title='Slovakia'></span> Slovakia",
-				"Slovenia": "<span class='flag flag-si' title='Slovenia'></span> Slovenia",
-				"Solomon Islands": "<span class='flag flag-sb' title='Solomon Islands'></span> Solomon Islands",
-				"Somalia": "<span class='flag flag-so' title='Somalia'></span> Somalia",
-				"South Africa": "<span class='flag flag-za' title='South Africa'></span> South Africa",
-				"South Korea|Korea, Republic of": "<span class='flag flag-kr' title='South Korea'></span> South Korea",
-				"South Sudan": "<span class='flag flag-ss' title='South Sudan'></span> South Sudan",
-				"Spain": "<span class='flag flag-es' title='Spain'></span> Spain",
-				"Sri Lanka": "<span class='flag flag-lk' title='Sri Lanka'></span> Sri Lanka",
-				"Sudan": "<span class='flag flag-sd' title='Sudan'></span> Sudan",
-				"Suriname": "<span class='flag flag-sr' title='Suriname'></span> Suriname",
-				"Svalbard and Jan Mayen": "<span class='flag flag-sj' title='Svalbard and Jan Mayen'></span> Svalbard and Jan Mayen",
-				"Swaziland": "<span class='flag flag-sz' title='Swaziland'></span> Swaziland",
-				"Sweden": "<span class='flag flag-se' title='Sweden'></span> Sweden",
-				"Switzerland": "<span class='flag flag-ch' title='Switzerland'></span> Switzerland",
-				"Syrian Arab Republic|Syria": "<span class='flag flag-sy' title='Syria'></span> Syria",
-				"Taiwan": "<span class='flag flag-tw' title='Taiwan'></span> Taiwan",
-				"Tajikistan": "<span class='flag flag-tj' title='Tajikistan'></span> Tajikistan",
-				"Tanzania": "<span class='flag flag-tz' title='Tanzani'></span> Tanzania",
-				"Thailand": "<span class='flag flag-th' title='Thailand'></span> Thailand",
-				"The Democratic Republic of the Congo": "<span class='flag flag-cd' title='The Democratic Republic of the Congo'></span> The Democratic Republic of the Congo",
-				"Timor-Leste": "<span class='flag flag-tl' title='Timor-Leste'></span> Timor-Leste",
-				"Togo": "<span class='flag flag-tg' title='Togo'></span> Togo",
-				"Tokelau": "<span class='flag flag-tk' title='Tokelau'></span> Tokelau",
-				"Tonga": "<span class='flag flag-to' title='Tonga'></span> Tonga",
-				"Trinidad and Tobago": "<span class='flag flag-tt' title='Trinidad and Tobago'></span> Trinidad and Tobago",
-				"Tunisia": "<span class='flag flag-tn' title='Tunisia'></span> Tunisia",
-				"Turkey": "<span class='flag flag-tr' title='Turkey'></span> Turkey",
-				"Turkmenistan": "<span class='flag flag-tm' title='Turkmenistan'></span> Turkmenistan",
-				"Turks and Caicos Islands": "<span class='flag flag-tc' title='Turks and Caicos Islands'></span> Turks and Caicos Islands",
-				"Tuvalu": "<span class='flag flag-tv' title='Tuvalu'></span> Tuvalu",
-				"U.S. Virgin Islands": "<span class='flag flag-vi' title='U.S. Virgin Islands'></span> U.S. Virgin Islands",
-				"Uganda": "<span class='flag flag-ug' title='Uganda'></span> Uganda",
-				"Ukraine": "<span class='flag flag-ua' title='Ukraine'></span> Ukraine",
-				"United Arab Emirates": "<span class='flag flag-ae' title='United Arab Emirates'></span> United Arab Emirates",
-				"United Kingdom": "<span class='flag flag-gb' title='United Kingdom'></span> United Kingdom",
-				"United States Minor Outlying Islands": "<span class='flag flag-um' title='United States Minor Outlying Islands'></span> United States Minor Outlying Islands",
-				"United States": "<span class='flag flag-us' title='United States'></span> United States",
-				"Unknown": "<span class='flag flag-xx' title='Unknown'></span> Unknown",
-				"Uruguay": "<span class='flag flag-uy' title='Uruguay'></span> Uruguay",
-				"Uzbekistan": "<span class='flag flag-uz' title='Uzbekistan'></span> Uzbekistan",
-				"Vanuatu": "<span class='flag flag-vu' title='Vanuatu'></span> Vanuatu",
-				"Venezuela": "<span class='flag flag-ve' title='Venezuela'></span> Venezuela",
-				"Vietnam": "<span class='flag flag-vn' title='Vietnam'></span> Vietnam",
-				"Virgin Islands, U.S.": "<span class='flag flag-vi' title='Virgin Islands, U.S.'></span> Virgin Islands, U.S.",
-				"Wallis and Futuna": "<span class='flag flag-wf' title='Wallis and Futuna'></span> Wallis and Futuna",
-				"Western Sahara": "<span class='flag flag-eh' title='Western Sahara'></span> Western Sahara",
-				"Yemen": "<span class='flag flag-ye' title='Yemen'></span> Yemen",
-				"Zambia": "<span class='flag flag-zm' title='Zambia'></span> Zambia",
-				"Zimbabwe": "<span class='flag flag-zw' title='Zimbabwe'></span> Zimbabwe",
-				"Anarchist": "<span class='trollflag trollflag-an' title='Anarchist'></span> Anarchist",
-				"Anarcho-Capitalist": "<span class='trollflag trollflag-ac' title='Anarcho-Capitalist'></span> Anarcho-Capitalist",
-				"Black Nationalist|Black Lives Matter": "<span class='trollflag trollflag-bl' title='Black Nationalist'></span> Black Nationalist / Black Lives Matter",
-				"Catalonia": "<span class='trollflag trollflag-ct' title='Catalonia'></span> Catalonia",
-				"Commie|Communist": "<span class='trollflag trollflag-cm' title='Commie'></span> Commie / Communist",
-				"Confederate": "<span class='trollflag trollflag-cf' title='Confederate'></span> Confederate",
-				"Democrat": "<span class='trollflag trollflag-dm' title='Democrat'></span> Democrat",
-				"Europe|European": "<span class='trollflag trollflag-eu' title='European'></span> Europe / European",
-				"Fascist": "<span class='trollflag trollflag-fc' title='Fascist'></span> Fascist",
-				"Gadsden": "<span class='trollflag trollflag-gn' title='Gadsden'></span> Gadsden",
-				"Gay|LGBT": "<span class='trollflag trollflag-gy' title='Gay'></span> Gay / LGBT",
-				"Hippie": "<span class='trollflag trollflag-pc' title='Hippie'></span> Hippie",
-				"Jihadi": "<span class='trollflag trollflag-jh' title='Jihadi'></span> Jihadi",
-				"Kekistani": "<span class='trollflag trollflag-kn' title='Kekistani'></span> Kekistani",
-				"Muslim": "<span class='trollflag trollflag-mf' title='Muslim'></span> Muslim",
-				"National Bolshevik": "<span class='trollflag trollflag-nb' title='National Bolshevik'></span> National Bolshevik",
-				"Nazi": "<span class='trollflag trollflag-nz' title='Nazi'></span> Nazi",
+				"Armenia|Albania|Andorra|Austria|Belarus|Belgium|Bosnia and Herzegovina|Bulgaria|Croatia|Cyprus|Czech Republic|Denmark|Estonia|Finland|France|Germany|Greece|Hungary|Iceland|Republic of Ireland|Italy|Kosovo|Latvia|Liechtenstein|Lithuania|Luxembourg|Republic of Macedonia|North Macedonia|Macedonia|Malta|Moldova|Monaco|Montenegro|Netherlands|The Netherlands|Norway|Poland|Portugal|Romania|Russia|San Marino|Serbia|Slovakia|Slovenia|Spain|Sweden|Switzerland|Turkey|Ukraine|United Kingdom|Vatican City": "European countries",
+				"Afghanistan": "<span class='flag flag-AF' title='Afghanistan'></span> Afghanistan",
+				"Aland Islands|Aland": "<span class='flag flag-AX' title='Aland / Aland Islands'></span> Aland Islands",
+				"Albania": "<span class='flag flag-AL' title='Albania'></span> Albania",
+				"Algeria": "<span class='flag flag-DZ' title='Algeria'></span> Algeria",
+				"American Samoa": "<span class='flag flag-AS title='American Samoa's'></span> American Samoa",
+				"Andorra": "<span class='flag flag-AD' title='Andorra'></span> Andorra",
+				"Angola": "<span class='flag flag-AO' title='Angola'></span> Angola",
+				"Anguilla": "<span class='flag flag-AI' title='Anguilla'></span> Anguilla",
+				"Antarctica": "<span class='flag flag-AQ' title='Antarctica'></span> Antarctica",
+				"Antigua and Barbuda": "<span class='flag flag-AG' title='Antigua and Barbuda'></span> Antigua and Barbuda",
+				"Argentina": "<span class='flag flag-AR' title='Argentina'></span> Argentina",
+				"Armenia": "<span class='flag flag-AM' title='Armenia'></span> Armenia",
+				"Aruba": "<span class='flag flag-AW' title='Aruba'></span> Aruba",
+				"Asia/Pacific Region": "<span class='flag flag-AP' title='Asia/Pacific Region'></span> Asia/Pacific Region",
+				"Australia": "<span class='flag flag-AU' title='Australia'></span> Australia",
+				"Austria": "<span class='flag flag-AT' title='Austria'></span> Austria",
+				"Azerbaijan": "<span class='flag flag-AZ' title='Azerbaijan'></span> Azerbaijan",
+				"Bahamas": "<span class='flag flag-BS' title='Bahamas'></span> Bahamas",
+				"Bahrain": "<span class='flag flag-BH' title='Bahrain'></span> Bahrain",
+				"Bangladesh": "<span class='flag flag-BD' title='Bangladesh'></span> Bangladesh",
+				"Barbados": "<span class='flag flag-BB' title='Barbados'></span> Barbados",
+				"Belarus": "<span class='flag flag-BY' title='Belarus'></span> Belarus",
+				"Belgium": "<span class='flag flag-BE' title='Belgium'></span> Belgium",
+				"Belize": "<span class='flag flag-BZ' title='Belize'></span> Belize",
+				"Benin": "<span class='flag flag-BJ' title='Benin'></span> Benin",
+				"Bermuda": "<span class='flag flag-BM' title='Bermuda'></span> Bermuda",
+				"Bhutan": "<span class='flag flag-BT' title='Bhutan'></span> Bhutan",
+				"Bolivia": "<span class='flag flag-BO' title='Bolivia'></span> Bolivia",
+				"Bonaire, Sint Eustatius and Saba": "<span class='flag flag-BQ' title='Bonaire, Sint Eustatius and Saba'></span> Bonaire, Sint Eustatius and Saba",
+				"Bosnia and Herzegovina": "<span class='flag flag-BA' title='Bosnia and Herzegovina'></span> Bosnia and Herzegovina",
+				"Botswana": "<span class='flag flag-BW' title='Botswana'></span> Botswana",
+				"Bouvet Island": "<span class='flag flag-BV' title='Bouvet Island'></span> Bouvet Island",
+				"Brazil": "<span class='flag flag-BR' title='Brazil'></span> Brazil",
+				"British Indian Ocean Territory": "<span class='flag flag-IO' title='British Indian Ocean Territory'></span> British Indian Ocean Territory",
+				"British Virgin Islands": "<span class='flag flag-VG' title='British Virgin Islands'></span> British Virgin Islands",
+				"Brunei": "<span class='flag flag-BN' title='Brunei'></span> Brunei",
+				"Bulgaria": "<span class='flag flag-BG' title='Bulgaria'></span> Bulgaria",
+				"Burkina Faso": "<span class='flag flag-BF' title='Burkina Faso'></span> Burkina Faso",
+				"Burundi": "<span class='flag flag-BI' title='Burundi'></span> Burundi",
+				"Cambodia": "<span class='flag flag-KH' title='Cambodia'></span> Cambodia",
+				"Cameroon": "<span class='flag flag-CM' title='Cameroon'></span> Cameroon",
+				"Canada": "<span class='flag flag-CA' title='Canada'></span> Canada",
+				"Cape Verde": "<span class='flag flag-CV' title='Cape Verde'></span> Cape Verde",
+				"Cayman Islands": "<span class='flag flag-KY' title='Cayman Islands'></span> Cayman Islands",
+				"Central African Republic": "<span class='flag flag-CF' title='Central African Republic'></span> Central African Republic",
+				"Chad": "<span class='flag flag-TD' title='Chad'></span> Chad",
+				"Chile": "<span class='flag flag-CL' title='Chile'></span> Chile",
+				"China": "<span class='flag flag-CN' title='China'></span> China",
+				"Christmas Island": "<span class='flag flag-CX' title='Christmas Island'></span> Christmas Island",
+				"Cocos (Keeling) Islands": "<span class='flag flag-CC' title='Cocos (Keeling) Islands'></span> Cocos (Keeling) Islands",
+				"Colombia": "<span class='flag flag-CO' title='Colombia'></span> Colombia",
+				"Comoros": "<span class='flag flag-KM' title='Comoros'></span> Comoros",
+				"Congo|Democratic Republic of the Congo": "<span class='flag flag-CD' title='Congo'></span> Congo",
+				"Cook Islands": "<span class='flag flag-CK' title='Cook Islands'></span> Cook Islands",
+				"Costa Rica": "<span class='flag flag-CR' title='Costa Rica'></span> Costa Rica",
+				"Croatia": "<span class='flag flag-HR' title='Croatia'></span> Croatia",
+				"Cuba": "<span class='flag flag-CU' title='Cuba'></span> Cuba",
+				"Curaçao|Curacao": "<span class='flag flag-CW' title='Curaçao'></span> Curaçao",
+				"Cyprus": "<span class='flag flag-CY' title='Cyprus'></span> Cyprus",
+				"Czech Republic": "<span class='flag flag-CZ' title='Czech Republic'></span> Czech Republic",
+				"Côte d'Ivoire|Ivory Coast": "<span class='flag flag-CI' title='Côte d'Ivoire'></span> Côte d'Ivoire",
+				"Denmark": "<span class='flag flag-DK' title='Denmark'></span> Denmark",
+				"Djibouti": "<span class='flag flag-DJ' title='Djibouti'></span> Djibouti",
+				"Dominica": "<span class='flag flag-DM' title='Dominica'></span> Dominica",
+				"Dominican Republic": "<span class='flag flag-DO' title='Dominican Republic'></span> Dominican Republic",
+				"Ecuador": "<span class='flag flag-EC' title='Ecuador'></span> Ecuador",
+				"Egypt": "<span class='flag flag-EG' title='Egypt'></span> Egypt",
+				"El Salvador": "<span class='flag flag-SV' title='El Salvador'></span> El Salvador",
+				"Equatorial Guinea": "<span class='flag flag-GQ' title='Equatorial Guinea'></span> Equatorial Guinea",
+				"Eritrea": "<span class='flag flag-ER' title='Eritrea'></span> Eritrea",
+				"Estonia": "<span class='flag flag-EE' title='Estonia'></span> Estonia",
+				"Ethiopia": "<span class='flag flag-ET' title='Ethiopia'></span> Ethiopia",
+				"Falkland Islands|Falkland Islands (Malvinas)": "<span class='flag flag-FK' title='Falkland Islands'></span> Falkland Islands",
+				"Faroe Islands": "<span class='flag flag-FO' title='Faroe Islands'></span> Faroe Islands",
+				"Fiji Islands": "<span class='flag flag-FJ' title='Fiji Islands'></span> Fiji Islands",
+				"Finland": "<span class='flag flag-FI' title='Finland'></span> Finland",
+				"France": "<span class='flag flag-FR' title='France'></span> France",
+				"French Guiana": "<span class='flag flag-GF' title='French Guiana'></span> French Guiana",
+				"French Polynesia": "<span class='flag flag-PF' title='French Polynesia'></span> French Polynesia",
+				"Gabon": "<span class='flag flag-GA' title='Gabon'></span> Gabon",
+				"Gambia": "<span class='flag flag-GM' title='Gambia'></span> Gambia",
+				"Georgia": "<span class='flag flag-GE' title='Georgia'></span> Georgia",
+				"Germany": "<span class='flag flag-DE' title='Germany'></span> Germany",
+				"Ghana": "<span class='flag flag-GH' title='Ghana'></span> Ghana",
+				"Gibraltar": "<span class='flag flag-GI' title='Gibraltar'></span> Gibraltar",
+				"Greece": "<span class='flag flag-GR' title='Greece'></span> Greece",
+				"Greenland": "<span class='flag flag-GL' title='Greenland'></span> Greenland",
+				"Grenada": "<span class='flag flag-GD' title='Grenada'></span> Grenada",
+				"Guadeloupe": "<span class='flag flag-GP' title='Guadeloupe'></span> Guadeloupe",
+				"Guam": "<span class='flag flag-GU' title='Guam'></span> Guam",
+				"Guatemala": "<span class='flag flag-GT' title='Guatemala'></span> Guatemala",
+				"Guernsey": "<span class='flag flag-GG' title='Guernsey'></span> Guernsey",
+				"Guinea-Bissau": "<span class='flag flag-GW' title='Guinea-Bissau'></span> Guinea-Bissau",
+				"Guinea|French Guinea": "<span class='flag flag-GN' title='Guinea'></span> Guinea / French Guinea",
+				"Guyana|Guiana": "<span class='flag flag-GY' title='Guyana'></span> Guyana",
+				"Haiti": "<span class='flag flag-HT' title='Haiti'></span> Haiti",
+				"Heard Island and McDonald Islands": "<span class='flag flag-HM' title='Heard Island and McDonald Islands'></span> Heard Island and McDonald Islands",
+				"Holy See (Vatican City State)": "<span class='flag flag-VA' title='Holy See (Vatican City State)'></span> Holy See (Vatican City State)",
+				"Honduras": "<span class='flag flag-HN' title='Honduras'></span> Honduras",
+				"Hong Kong": "<span class='flag flag-HK' title='Hong Kong'></span> Hong Kong",
+				"Hungary": "<span class='flag flag-HU' title='Hungary'></span> Hungary",
+				"Iceland": "<span class='flag flag-IS' title='Iceland'></span> Iceland",
+				"India": "<span class='flag flag-IN' title='India'></span> India",
+				"Indonesia": "<span class='flag flag-ID' title='Indonesia'></span> Indonesia",
+				"Iran": "<span class='flag flag-IR' title='Iran'></span> Iran",
+				"Iraq": "<span class='flag flag-IQ' title='Iraq'></span> Iraq",
+				"Ireland": "<span class='flag flag-IE' title='Ireland'></span> Ireland",
+				"Isle of Man": "<span class='flag flag-IM' title='Isle of Man'></span> Isle of Man",
+				"Israel": "<span class='flag flag-IL' title='Israel'></span> Israel",
+				"Italy": "<span class='flag flag-IT' title='Italy'></span> Italy",
+				"Jamaica": "<span class='flag flag-JM' title='Jamaica'></span> Jamaica",
+				"Japan": "<span class='flag flag-JP' title='Japan'></span> Japan",
+				"Jersey": "<span class='flag flag-JE' title='Jersey'></span> Jersey",
+				"Jordan": "<span class='flag flag-JO' title='Jordan'></span> Jordan",
+				"Kazakhstan": "<span class='flag flag-KZ' title='Kazakhstan'></span> Kazakhstan",
+				"Kenya": "<span class='flag flag-KE' title='Kenya'></span> Kenya",
+				"Kiribati": "<span class='flag flag-KI' title='Kiribati'></span> Kiribati",
+				"Kosovo": "<span class='flag flag-XK' title='Kosovo'></span> Kosovo",
+				"Kuwait": "<span class='flag flag-KW' title='Kuwait'></span> Kuwait",
+				"Kyrgyzstan": "<span class='flag flag-KG' title='Kyrgyzstan'></span> Kyrgyzstan",
+				"Laos|Lao People's Democratic Republic": "<span class='flag flag-LA' title='Laos'></span> Laos",
+				"Latvia": "<span class='flag flag-LV' title='Latvia'></span> Latvia",
+				"Lebanon": "<span class='flag flag-LB' title='Lebanon'></span> Lebanon",
+				"Lesotho": "<span class='flag flag-LS' title='Lesotho'></span> Lesotho",
+				"Liberia": "<span class='flag flag-LR' title='Liberia'></span> Liberia",
+				"Libya": "<span class='flag flag-LY' title='Libya'></span> Libya",
+				"Liechtenstein": "<span class='flag flag-LI' title='Liechtenstein'></span> Liechtenstein",
+				"Lithuania": "<span class='flag flag-LT' title='Lithuania'></span> Lithuania",
+				"Luxembourg": "<span class='flag flag-LU' title='Luxembourg'></span> Luxembourg",
+				"Macau|Macao": "<span class='flag flag-MO' title='Macao'></span> Macao",
+				"Macedonia": "<span class='flag flag-MK' title='Macedonia'></span> Macedonia",
+				"Madagascar": "<span class='flag flag-MG' title='Madagascar'></span> Madagascar",
+				"Malawi": "<span class='flag flag-MW' title='Malawi'></span> Malawi",
+				"Malaysia": "<span class='flag flag-MY' title='Malaysia'></span> Malaysia",
+				"Maldives": "<span class='flag flag-MV' title='Maldives'></span> Maldives",
+				"Mali": "<span class='flag flag-ML' title='Mali'></span> Mali",
+				"Malta": "<span class='flag flag-MT' title='Malta'></span> Malta",
+				"Marshall Islands": "<span class='flag flag-MH' title='Marshall Islands'></span> Marshall Islands",
+				"Martinique": "<span class='flag flag-MQ' title='Martinique'></span> Martinique",
+				"Mauritania": "<span class='flag flag-MR' title='Mauritania'></span> Mauritania",
+				"Mauritius": "<span class='flag flag-MU' title='Mauritius'></span> Mauritius",
+				"Mayotte": "<span class='flag flag-YT' title='Mayotte'></span> Mayotte",
+				"Mexico": "<span class='flag flag-MX' title='Mexico'></span> Mexico",
+				"Micronesia|Federated States of Micronesia": "<span class='flag flag-FM' title='Federated States of Micronesia'></span> Federated States of Micronesia",
+				"Moldova|Moldova, Republic of": "<span class='flag flag-MD' title='Moldova'></span> Moldova",
+				"Monaco": "<span class='flag flag-MC' title='Monaco'></span> Monaco",
+				"Mongolia": "<span class='flag flag-MN' title='Mongolia'></span> Mongolia",
+				"Montenegro": "<span class='flag flag-ME' title='Montenegro'></span> Montenegro",
+				"Montserrat": "<span class='flag flag-MS' title='Montserrat'></span> Montserrat",
+				"Morocco": "<span class='flag flag-MA' title='Morocco'></span> Morocco",
+				"Mozambique": "<span class='flag flag-MZ' title='Mozambique'></span> Mozambique",
+				"Myanmar": "<span class='flag flag-MM' title='Myanmar'></span> Myanmar",
+				"Namibia": "<span class='flag flag-NA' title='Namibia'></span> Namibia",
+				"Nauru": "<span class='flag flag-NR' title='Nauru'></span> Nauru",
+				"Nepal": "<span class='flag flag-NP' title='Nepal'></span> Nepal",
+				"Netherlands": "<span class='flag flag-NL' title='Netherlands'></span> Netherlands",
+				"New Caledonia": "<span class='flag flag-NC' title='New Caledonia'></span> New Caledonia",
+				"New Zealand": "<span class='flag flag-NZ' title='New Zealand'></span> New Zealand",
+				"Nicaragua": "<span class='flag flag-NI' title='Nicaragua'></span> Nicaragua",
+				"Niger": "<span class='flag flag-NE' title='Niger'></span> Niger",
+				"Nigeria": "<span class='flag flag-NG' title='Nigeria'></span> Nigeria",
+				"Niue": "<span class='flag flag-NU' title='Niue'></span> Niue",
+				"Norfolk Island": "<span class='flag flag-AU' title='Norfolk Island'></span> Norfolk Island",
+				"Northern Mariana Islands": "<span class='flag flag-MP' title='Northern Mariana Islands'></span> Northern Mariana Islands",
+				"Norway": "<span class='flag flag-NO' title='Norway'></span> Norway",
+				"Oman": "<span class='flag flag-OM' title='Oman'></span> Oman",
+				"Pakistan": "<span class='flag flag-PK' title='Pakistan'></span> Pakistan",
+				"Palau": "<span class='flag flag-PW' title='Palau'></span> Palau",
+				"Palestine|Palestinian Territory": "<span class='flag flag-PS' title='Palestine'></span> Palestine",
+				"Panama": "<span class='flag flag-PA' title='Panama'></span> Panama",
+				"Papua New Guinea": "<span class='flag flag-PG' title='Papua New Guinea'></span> Papua New Guinea",
+				"Paraguay": "<span class='flag flag-PY' title='Paraguay'></span> Paraguay",
+				"Peru": "<span class='flag flag-PE' title='Peru'></span> Peru",
+				"Philippines": "<span class='flag flag-PH' title='Philippines'></span> Philippines",
+				"Pitcairn": "<span class='flag flag-PN' title='Pitcairn'></span> Pitcairn",
+				"Poland": "<span class='flag flag-PL' title='Poland'></span> Poland",
+				"Portugal": "<span class='flag flag-PT' title='Portugal'></span> Portugal",
+				"Puerto Rico": "<span class='flag flag-PR' title='Puerto Rico'></span> Puerto Rico",
+				"Qatar": "<span class='flag flag-QA' title='Qatar'></span> Qatar",
+				"Reunion|Réunion": "<span class='flag flag-RE' title='Reunion'></span> Reunion",
+				"Romania": "<span class='flag flag-RO' title='Romania'></span> Romania",
+				"Russian Federation": "<span class='flag flag-RU' title='Russian Federation'></span> Russian Federation",
+				"Rwanda": "<span class='flag flag-RW' title='Rwanda'></span> Rwanda",
+				"Saint Barthélemy": "<span class='flag flag-BL' title='Saint Barthélemy'></span> Saint Barthélemy",
+				"Saint Helena|Saint Helena, Ascension, and Tristan da Cunha": "<span class='flag flag-SH' title='Saint Helena, Ascension, and Tristan da Cunha'></span> Saint Helena, Ascension, and Tristan da Cunha",
+				"Saint Kitts and Nevis": "<span class='flag flag-KN' title='Saint Kitts and Nevis'></span> Saint Kitts and Nevis",
+				"Saint Lucia": "<span class='flag flag-LC' title='Saint Lucia'></span> Saint Lucia",
+				"Saint Martin": "<span class='flag flag-MF' title='Saint Martin'></span> Saint Martin",
+				"Saint Pierre and Miquelon": "<span class='flag flag-PM' title='Saint Pierre and Miquelon'></span> Saint Pierre and Miquelon",
+				"Saint Vincent and the Grenadines": "<span class='flag flag-VC' title='Saint Vincent and the Grenadines'></span> Saint Vincent and the Grenadines",
+				"Samoa": "<span class='flag flag-WS' title='Samoa'></span> Samoa",
+				"San Marino": "<span class='flag flag-SM' title='San Marino'></span> San Marino",
+				"Sao Tome and Principe": "<span class='flag flag-ST' title='Sao Tome and Principe'></span> Sao Tome and Principe",
+				"Satellite Provider":  "<span class='flag flag-A2' title='Satellite Provider'></span> Satellite Provider",
+				"Satellite Provider": "<span class='flag flag-A2' title='Satellite Provider'></span> Satellite Provider",
+				"Saudi Arabia": "<span class='flag flag-SA' title='Saudi Arabia'></span> Saudi Arabia",
+				"Senegal": "<span class='flag flag-SN' title='Senegal'></span> Senegal",
+				"Serbia": "<span class='flag flag-RS' title='Serbia'></span> Serbia",
+				"Seychelles": "<span class='flag flag-SC' title='Seychelles'></span> Seychelles",
+				"Sierra Leone": "<span class='flag flag-SL' title='Sierra Leone'></span> Sierra Leone",
+				"Singapore": "<span class='flag flag-SG' title='Singapore'></span> Singapore",
+				"Sint Maarten": "<span class='flag flag-SX' title='Sint Maarten'></span> Sint Maarten",
+				"Slovakia": "<span class='flag flag-SK' title='Slovakia'></span> Slovakia",
+				"Slovenia": "<span class='flag flag-SI' title='Slovenia'></span> Slovenia",
+				"Solomon Islands": "<span class='flag flag-SB' title='Solomon Islands'></span> Solomon Islands",
+				"Somalia": "<span class='flag flag-SO' title='Somalia'></span> Somalia",
+				"South Africa": "<span class='flag flag-ZA' title='South Africa'></span> South Africa",
+				"South Korea|Korea, Republic of": "<span class='flag flag-KR' title='South Korea'></span> South Korea",
+				"South Sudan": "<span class='flag flag-SS' title='South Sudan'></span> South Sudan",
+				"Spain": "<span class='flag flag-ES' title='Spain'></span> Spain",
+				"Sri Lanka": "<span class='flag flag-LK' title='Sri Lanka'></span> Sri Lanka",
+				"Sudan": "<span class='flag flag-SD' title='Sudan'></span> Sudan",
+				"Suriname": "<span class='flag flag-SR' title='Suriname'></span> Suriname",
+				"Svalbard and Jan Mayen": "<span class='flag flag-SJ' title='Svalbard and Jan Mayen'></span> Svalbard and Jan Mayen",
+				"Swaziland": "<span class='flag flag-SZ' title='Swaziland'></span> Swaziland",
+				"Sweden": "<span class='flag flag-SE' title='Sweden'></span> Sweden",
+				"Switzerland": "<span class='flag flag-CH' title='Switzerland'></span> Switzerland",
+				"Syrian Arab Republic|Syria": "<span class='flag flag-SY' title='Syria'></span> Syria",
+				"Taiwan": "<span class='flag flag-TW' title='Taiwan'></span> Taiwan",
+				"Tajikistan": "<span class='flag flag-TJ' title='Tajikistan'></span> Tajikistan",
+				"Tanzania": "<span class='flag flag-TZ' title='Tanzani'></span> Tanzania",
+				"Thailand": "<span class='flag flag-TH' title='Thailand'></span> Thailand",
+				"The Democratic Republic of the Congo": "<span class='flag flag-CD' title='The Democratic Republic of the Congo'></span> The Democratic Republic of the Congo",
+				"Timor-Leste": "<span class='flag flag-TL' title='Timor-Leste'></span> Timor-Leste",
+				"Togo": "<span class='flag flag-TG' title='Togo'></span> Togo",
+				"Tokelau": "<span class='flag flag-TK' title='Tokelau'></span> Tokelau",
+				"Tonga": "<span class='flag flag-TO' title='Tonga'></span> Tonga",
+				"Trinidad and Tobago": "<span class='flag flag-TT' title='Trinidad and Tobago'></span> Trinidad and Tobago",
+				"Tunisia": "<span class='flag flag-TN' title='Tunisia'></span> Tunisia",
+				"Turkey": "<span class='flag flag-TR' title='Turkey'></span> Turkey",
+				"Turkmenistan": "<span class='flag flag-TM' title='Turkmenistan'></span> Turkmenistan",
+				"Turks and Caicos Islands": "<span class='flag flag-TC' title='Turks and Caicos Islands'></span> Turks and Caicos Islands",
+				"Tuvalu": "<span class='flag flag-TV' title='Tuvalu'></span> Tuvalu",
+				"U.S. Virgin Islands": "<span class='flag flag-VI' title='U.S. Virgin Islands'></span> U.S. Virgin Islands",
+				"Uganda": "<span class='flag flag-UG' title='Uganda'></span> Uganda",
+				"Ukraine": "<span class='flag flag-UA' title='Ukraine'></span> Ukraine",
+				"United Arab Emirates": "<span class='flag flag-AE' title='United Arab Emirates'></span> United Arab Emirates",
+				"United Kingdom": "<span class='flag flag-GB' title='United Kingdom'></span> United Kingdom",
+				"United States Minor Outlying Islands": "<span class='flag flag-UM' title='United States Minor Outlying Islands'></span> United States Minor Outlying Islands",
+				"United States": "<span class='flag flag-US' title='United States'></span> United States",
+				"Unknown": "<span class='flag flag-XX' title='Unknown'></span> Unknown",
+				"Uruguay": "<span class='flag flag-UY' title='Uruguay'></span> Uruguay",
+				"Uzbekistan": "<span class='flag flag-UZ' title='Uzbekistan'></span> Uzbekistan",
+				"Vanuatu": "<span class='flag flag-VU' title='Vanuatu'></span> Vanuatu",
+				"Venezuela": "<span class='flag flag-VE' title='Venezuela'></span> Venezuela",
+				"Vietnam": "<span class='flag flag-VN' title='Vietnam'></span> Vietnam",
+				"Virgin Islands, U.S.": "<span class='flag flag-VI' title='Virgin Islands, U.S.'></span> Virgin Islands, U.S.",
+				"Wallis and Futuna": "<span class='flag flag-WF' title='Wallis and Futuna'></span> Wallis and Futuna",
+				"Western Sahara": "<span class='flag flag-EH' title='Western Sahara'></span> Western Sahara",
+				"Yemen": "<span class='flag flag-YE' title='Yemen'></span> Yemen",
+				"Zambia": "<span class='flag flag-ZM' title='Zambia'></span> Zambia",
+				"Zimbabwe": "<span class='flag flag-ZW' title='Zimbabwe'></span> Zimbabwe",
+				"Anarchist": "<span class='flag flag-t_AN' title='Anarchist'></span> Anarchist",
+				"Anarcho-Capitalist": "<span class='flag flag-t_AC' title='Anarcho-Capitalist'></span> Anarcho-Capitalist",
+				"Black Nationalist|Black Lives Matter": "<span class='flag flag-t_BL' title='Black Nationalist'></span> Black Nationalist / Black Lives Matter",
+				"Catalonia": "<span class='flag flag-t_CT' title='Catalonia'></span> Catalonia",
+				"Commie|Communist": "<span class='flag flag-t_CM' title='Commie'></span> Commie / Communist",
+				"Confederate": "<span class='flag flag-t_CF' title='Confederate'></span> Confederate",
+				"Democrat": "<span class='flag flag-t_DM' title='Democrat'></span> Democrat",
+				"Europe|European": "<span class='flag flag-t_EU' title='European'></span> Europe / European",
+				"Fascist": "<span class='flag flag-t_FC' title='Fascist'></span> Fascist",
+				"Gadsden": "<span class='flag flag-t_GN' title='Gadsden'></span> Gadsden",
+				"Gay|LGBT": "<span class='flag flag-t_GY' title='Gay'></span> Gay / LGBT",
+				"Hippie": "<span class='flag flag-t_PC' title='Hippie'></span> Hippie",
+				"Jihadi": "<span class='flag flag-t_JH' title='Jihadi'></span> Jihadi",
+				"Kekistani": "<span class='flag flag-t_KN' title='Kekistani'></span> Kekistani",
+				"Muslim": "<span class='flag flag-t_MF' title='Muslim'></span> Muslim",
+				"National Bolshevik": "<span class='flag flag-t_NB' title='National Bolshevik'></span> National Bolshevik",
+				"NATO": "<span class='flag flag-t_NT' title='NATO'></span> NATO",
+				"Nazi": "<span class='flag flag-t_NZ' title='Nazi'></span> Nazi",
 				"Obama": "Obama",
-				"Pirate": "<span class='trollflag trollflag-pr' title='Pirate'></span> Pirate",
+				"Pirate": "<span class='flag flag-t_PR' title='Pirate'></span> Pirate",
 				"Rebel": "Rebel",
-				"Republican": "<span class='trollflag trollflag-re' title='Republican'></span> Republican",
-				"Templar|DEUS VULT": "<span class='trollflag trollflag-tm' title='Templar / DEUS VULT'></span> Templar / DEUS VULT",
+				"Republican": "<span class='flag flag-t_RE' title='Republican'></span> Republican",
+				"Templar|DEUS VULT": "<span class='flag flag-t_TM' title='Templar / DEUS VULT'></span> Templar / DEUS VULT",
 				"Texan": "Texan",
-				"Tree Hugger": "<span class='trollflag trollflag-tr' title='Tree Hugger'></span> Tree Hugger",
-				"United Nations": "<span class='trollflag trollflag-un' title='United Nations'></span> United Nations",
-				"White Supremacist": "<span class='trollflag trollflag-wp' title='White Supremacist'></span> White Supremacist",
+				"Task Force Z": "<span class='flag flag-t_MZ' title='Task Force Z'></span> Task Force Z",
+				"Tree Hugger": "<span class='flag flag-t_TR' title='Tree Hugger'></span> Tree Hugger",
+				"United Nations": "<span class='flag flag-t_UN' title='United Nations'></span> United Nations",
+				"White Supremacist": "<span class='flag flag-t_WP' title='White Supremacist'></span> White Supremacist",
 				},
 			"default": ""
 		},
@@ -412,7 +413,7 @@ class Search4Chan(SearchWithScope):
 
 		if query.get("min_date", 0):
 			try:
-				where.append("p.timestamp >= %s")
+				where.append("timestamp >= %s")
 				replacements.append(int(query.get("min_date")))
 			except ValueError:
 				pass
@@ -420,7 +421,7 @@ class Search4Chan(SearchWithScope):
 		if query.get("max_date", 0):
 			try:
 				replacements.append(int(query.get("max_date")))
-				where.append("p.timestamp < %s")
+				where.append("timestamp < %s")
 			except ValueError:
 				pass
 
@@ -433,15 +434,20 @@ class Search4Chan(SearchWithScope):
 				for c in country_name:
 					country_names.append(c)
 
-			where.append("p.country_name IN %s")
+			where.append("country_name IN %s")
 
 			replacements.append(tuple(country_names))
 
-		sql_query = ("SELECT p.*, t.board " \
-					 "FROM posts_" + self.prefix + " AS p " \
-					 "LEFT JOIN threads_" + self.prefix + " AS t " \
-					 "ON t.id = p.thread_id " \
-					 "WHERE t.board = %s ")
+
+		sql_query = ("SELECT " + ",".join(self.return_cols) +
+					 " FROM posts_" + self.prefix +
+					 " LEFT JOIN posts_" + self.prefix + "_deleted" +
+					 " ON posts_" + self.prefix + ".id_seq = posts_" + self.prefix + "_deleted.id_seq" \
+					 " WHERE board = %s ")
+
+		# Exclude deleted posts
+		if not query.get("get_deleted"):
+			where.append("posts_%s_deleted.id_seq IS NULL" % self.prefix)
 
 		if where:
 			sql_query += " AND " + " AND ".join(where)
@@ -471,7 +477,7 @@ class Search4Chan(SearchWithScope):
 						return None
 
 					valid_query_ids = "(" + ",".join(valid_query_ids) + ")"
-					sql_query = "SELECT * FROM (" + sql_query + "AND p.id IN " + valid_query_ids + ") AS full_table ORDER BY full_table.timestamp ASC"
+					sql_query = "SELECT * FROM (" + sql_query + "AND id IN " + valid_query_ids + ") ORDER BY timestamp ASC"
 
 				else:
 					self.dataset.update_status("No 4chan post IDs inserted.")
@@ -481,7 +487,7 @@ class Search4Chan(SearchWithScope):
 				pass
 
 		else:
-			sql_query += " ORDER BY p.timestamp ASC"
+			sql_query += " ORDER BY timestamp ASC"
 
 		return self.db.fetchall_interruptable(self.queue, sql_query, replacements)
 
@@ -575,12 +581,14 @@ class Search4Chan(SearchWithScope):
 			if self.interrupted:
 				raise ProcessorInterruptedException("Interrupted while fetching post data")
 
+			# Join on the posts_{datasource}_deleted table so we can also retrieve whether the post was deleted
+			join = " LEFT JOIN posts_%s_deleted ON posts_%s.id_seq = posts_%s_deleted.id_seq " % tuple([self.prefix] * 3)
+			
 			# Duplicate code, but will soon be changed anyway...
 			if not query.get("get_deleted"):
-				join = " LEFT JOIN posts_%s_deleted ON posts_%s.id_seq = posts_%s_deleted.id_seq " % tuple([self.prefix] * 3)
 				where += " AND posts_%s_deleted.id_seq IS NULL" % self.prefix
 
-			query = "SELECT " + columns + " FROM posts_" + self.prefix + join + " WHERE " + where + " ORDER BY id ASC"
+			query = "SELECT " + columns + "FROM posts_" + self.prefix + join + " WHERE " + where + " ORDER BY id ASC"
 			posts = self.db.fetchall_interruptable(self.queue, query, replacements)
 
 		if posts is None:
@@ -600,10 +608,9 @@ class Search4Chan(SearchWithScope):
 		self.log.info("Collecting post data from database")
 		columns = ", ".join(self.return_cols)
 
-		# Do a JOIN if we don't want deleted posts.
-		postgres_join = ""
+		# Do a JOIN so we can check for deleted posts.
+		postgres_join = " LEFT JOIN posts_%s_deleted ON posts_%s.id_seq = posts_%s_deleted.id_seq " % tuple([self.prefix] * 3)
 		if not query.get("get_deleted"):
-			postgres_join = " LEFT JOIN posts_%s_deleted ON posts_%s.id_seq = posts_%s_deleted.id_seq " % tuple([self.prefix] * 3)
 			postgres_where.append("posts_%s_deleted.id_seq IS NULL" % self.prefix)
 
 		posts_full = self.fetch_posts(tuple([post["post_id"] for post in posts]), join=postgres_join, where=postgres_where, replacements=postgres_replacements)
@@ -627,7 +634,7 @@ class Search4Chan(SearchWithScope):
 		:param str string:  String to escape
 		:return str: Escaped string
 		"""
-
+	
 		# Convert curly quotes
 		string = string.replace("“", "\"").replace("”", "\"")
 		# Escape forward slashes
@@ -652,7 +659,7 @@ class Search4Chan(SearchWithScope):
 		if not replacements:
 			replacements = []
 
-		columns = ", ".join(self.return_cols)
+		columns = ", ".join(self.return_cols) 
 		where.append("id IN %s")
 		replacements.append(post_ids)
 
@@ -676,9 +683,17 @@ class Search4Chan(SearchWithScope):
 		if self.interrupted:
 			raise ProcessorInterruptedException("Interrupted while fetching thread data")
 
+		# Exclude deleted posts
+		exclude_deleted = ""
+		if self.parameters.get("get_deleted") is False:
+			exclude_deleted = "AND posts_" + self.prefix + "_deleted.id_seq IS NULL"
+
 		return self.db.fetchall_interruptable(self.queue,
-			"SELECT " + columns + " FROM posts_" + self.prefix + " WHERE thread_id IN %s ORDER BY thread_id ASC, id ASC",
-											  (thread_ids,))
+			"SELECT " + columns + " FROM posts_" + self.prefix + " \
+			LEFT JOIN posts_" + self.prefix + "_deleted ON posts_" + self.prefix + ".id_seq \
+			 = posts_" + self.prefix + "_deleted.id_seq \
+			WHERE thread_id IN %s " + exclude_deleted + " \
+			ORDER BY thread_id ASC, id ASC", (thread_ids,))
 
 	def fetch_sphinx(self, where, replacements, join=""):
 		"""
