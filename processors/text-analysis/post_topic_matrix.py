@@ -22,7 +22,7 @@ class TopicModelWordExtractor(BasicProcessor):
     """
     type = "document_topic_matrix"  # job type ID
     category = "Text analysis"  # category
-    title = "Post/Topic matrix"  # title displayed in UI
+    title = "Post/Topic matrix (predict which posts belong to which topics)"  # title displayed in UI
     description = "Uses the LDA model to predict to which topic each item or sentence belongs and creates a CSV file showing this information. Each line represents one 'document'; if tokens are grouped per 'item' and only one column is used (e.g. only the 'body' column), there is one row per post/item, otherwise a post may be represented by multiple rows (for each sentence and/or column used)."  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
 
@@ -111,6 +111,7 @@ class TopicModelWordExtractor(BasicProcessor):
         # Collect column names of matrix
         post_column_names = list(set(['id', 'thread_id', 'timestamp', 'author', 'body'] + self.parameters.get('columns', []) + token_metadata_parameters.get('columns')))
         model_column_names = ['post_id', 'document_id', 'interval']
+
         # Check if multiple documents exist per post/item and add 'document' column if needed
         if token_metadata_parameters.get('grouped_by') != 'item' or len(token_metadata_parameters.get('columns')) > 1:
             model_column_names.append('document')
@@ -164,9 +165,9 @@ class TopicModelWordExtractor(BasicProcessor):
                         combined_data['document'] = token_data['documents'][str(document_number)]
 
                     doc_predictions = model_data['predictions'][str(document_number)]
+                    combined_data['top_topic(s)'] = ', '.join([str(int(key) + 1) for key, value in doc_predictions.items() if value == max(doc_predictions.values())])  # add one to topic key here as well
                     for i, topic in enumerate(related_topic_columns):
                         combined_data[topic] = doc_predictions[str(i)]
-
 
                     writer.writerow(combined_data)
                     index += 1
