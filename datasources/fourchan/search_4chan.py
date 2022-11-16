@@ -477,7 +477,7 @@ class Search4Chan(SearchWithScope):
 						return None
 
 					valid_query_ids = "(" + ",".join(valid_query_ids) + ")"
-					sql_query = "SELECT * FROM (" + sql_query + "AND id IN " + valid_query_ids + ") ORDER BY timestamp ASC"
+					sql_query = "SELECT * FROM (" + sql_query + " AND id IN " + valid_query_ids + ") ORDER BY timestamp ASC"
 
 				else:
 					self.dataset.update_status("No 4chan post IDs inserted.")
