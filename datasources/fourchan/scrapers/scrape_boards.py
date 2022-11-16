@@ -2,6 +2,8 @@
 4Chan board scraper - indexes threads and queues them for scraping
 """
 
+import json
+
 from backend.abstract.scraper import BasicJSONScraper
 from common.lib.exceptions import JobAlreadyExistsException
 
@@ -129,28 +131,36 @@ class BoardScraper4chan(BasicJSONScraper):
 		
 		# We're updating checking threads that
 		# 1) are not in the index
-		# 2) are not more than an hour old
+		# 2) are not more than an hour old; we already covered older ones in the regular scrape,
+		#	 and if not, it's likely that 4CAT wasn't running at the time, so we can't verify
+		#	 whether the thread is archived or deleted.
 		# 3) have 0 as a value for both `timestamp_deleted` and `timestamp_archived`
-		unindexed_threads = self.db.fetchall("SELECT id FROM threads_" + self.prefix + " WHERE board = %s AND timestamp_deleted = 0 AND timestamp_archived = 0 AND timestamp_modified > (EXTRACT(epoch FROM NOW()) - 3600)	AND id NOT IN %s",
+		unindexed_threads = self.db.fetchall("SELECT id FROM threads_" + self.prefix + " WHERE board = %s AND timestamp_deleted = 0 AND timestamp_archived = 0 AND timestamp_modified > (EXTRACT(epoch FROM NOW()) - 3600) AND id NOT IN %s",
 			(board_id, tuple(index_thread_ids)))
 		
 		if unindexed_threads:
 
 			to_check = 0
-
+			
 			for thread in unindexed_threads:
-				# schedule a job for scraping the thread's posts,
+				# Schedule a job for scraping the thread's posts,
 				# which also updates its deleted/archived status 
 				try:
+					# Add a new thread job if it isn't in the jobs table anymore
 					jobtype = self.prefix + "-thread"
-					self.queue.add_job(jobtype=jobtype, remote_id=str(thread["id"]), details={"board": board_id})
-					to_check += 1
+					query = "SELECT remote_id FROM jobs WHERE remote_id = '%s' AND details = '%s';" % (str(thread["id"]), json.dumps({"board": board_id}))
+					remote_id = self.db.fetchone(query)
+					
+					if not remote_id:
+						self.queue.add_job(jobtype=jobtype, remote_id=str(thread["id"]), details={"board": board_id})
+						to_check += 1
+
 				except JobAlreadyExistsException:
 					# this might happen if the workers can't keep up with the queue
 					pass
 
-			#if to_check:
-			#	self.log.info("Board scrape for %s/%s/ yielded %s threads that disappeared from the index, updating status" % (self.datasource, self.job.data["remote_id"], to_check))
+			if to_check:
+				self.log.info("Board scrape for %s/%s/ yielded %s threads that disappeared from the index, updating their status" % (self.datasource, self.job.data["remote_id"], to_check))
 
 	def get_url(self):
 		"""

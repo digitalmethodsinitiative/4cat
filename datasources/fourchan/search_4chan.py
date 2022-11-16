@@ -28,8 +28,7 @@ class Search4Chan(SearchWithScope):
 
 	# Columns to return in csv
 	return_cols = ['thread_id', 'id', 'timestamp', 'board', 'body', 'subject', 'author', 'image_file', 'image_md5',
-				   'country_name', 'country_code']
-
+				   'country_name', 'country_code', 'timestamp_deleted']
 
 	references = [
 		"[4chan API](https://github.com/4chan/4chan-API)",
@@ -63,7 +62,7 @@ class Search4Chan(SearchWithScope):
 		},
 		"deleted_posts": {
 			"type": UserInput.OPTION_INFO,
-			"help": "Posts deleted by moderators may be excluded. <strong>Note:</strong> this does not yet work for deleted OPs and thread removals."
+			"help": "Posts deleted by moderators may be excluded. <strong>Note:</strong> replies to deleted OPs are seen as not deleted."
 		},
 		"get_deleted": {
 			"type": UserInput.OPTION_TOGGLE,
@@ -414,7 +413,7 @@ class Search4Chan(SearchWithScope):
 
 		if query.get("min_date", 0):
 			try:
-				where.append("p.timestamp >= %s")
+				where.append("timestamp >= %s")
 				replacements.append(int(query.get("min_date")))
 			except ValueError:
 				pass
@@ -422,7 +421,7 @@ class Search4Chan(SearchWithScope):
 		if query.get("max_date", 0):
 			try:
 				replacements.append(int(query.get("max_date")))
-				where.append("p.timestamp < %s")
+				where.append("timestamp < %s")
 			except ValueError:
 				pass
 
@@ -435,15 +434,20 @@ class Search4Chan(SearchWithScope):
 				for c in country_name:
 					country_names.append(c)
 
-			where.append("p.country_name IN %s")
+			where.append("country_name IN %s")
 
 			replacements.append(tuple(country_names))
 
-		sql_query = ("SELECT p.*, t.board " \
-					 "FROM posts_" + self.prefix + " AS p " \
-					 "LEFT JOIN threads_" + self.prefix + " AS t " \
-					 "ON t.id = p.thread_id " \
-					 "WHERE t.board = %s ")
+
+		sql_query = ("SELECT " + ",".join(self.return_cols) +
+					 " FROM posts_" + self.prefix +
+					 " LEFT JOIN posts_" + self.prefix + "_deleted" +
+					 " ON posts_" + self.prefix + ".id_seq = posts_" + self.prefix + "_deleted.id_seq" \
+					 " WHERE board = %s ")
+
+		# Exclude deleted posts
+		if not query.get("get_deleted"):
+			where.append("posts_%s_deleted.id_seq IS NULL" % self.prefix)
 
 		if where:
 			sql_query += " AND " + " AND ".join(where)
@@ -473,7 +477,7 @@ class Search4Chan(SearchWithScope):
 						return None
 
 					valid_query_ids = "(" + ",".join(valid_query_ids) + ")"
-					sql_query = "SELECT * FROM (" + sql_query + "AND p.id IN " + valid_query_ids + ") AS full_table ORDER BY full_table.timestamp ASC"
+					sql_query = "SELECT * FROM (" + sql_query + "AND id IN " + valid_query_ids + ") ORDER BY timestamp ASC"
 
 				else:
 					self.dataset.update_status("No 4chan post IDs inserted.")
@@ -483,7 +487,7 @@ class Search4Chan(SearchWithScope):
 				pass
 
 		else:
-			sql_query += " ORDER BY p.timestamp ASC"
+			sql_query += " ORDER BY timestamp ASC"
 
 		return self.db.fetchall_interruptable(self.queue, sql_query, replacements)
 
@@ -577,12 +581,14 @@ class Search4Chan(SearchWithScope):
 			if self.interrupted:
 				raise ProcessorInterruptedException("Interrupted while fetching post data")
 
+			# Join on the posts_{datasource}_deleted table so we can also retrieve whether the post was deleted
+			join = " LEFT JOIN posts_%s_deleted ON posts_%s.id_seq = posts_%s_deleted.id_seq " % tuple([self.prefix] * 3)
+			
 			# Duplicate code, but will soon be changed anyway...
 			if not query.get("get_deleted"):
-				join = " LEFT JOIN posts_%s_deleted ON posts_%s.id_seq = posts_%s_deleted.id_seq " % tuple([self.prefix] * 3)
 				where += " AND posts_%s_deleted.id_seq IS NULL" % self.prefix
 
-			query = "SELECT " + columns + " FROM posts_" + self.prefix + join + " WHERE " + where + " ORDER BY id ASC"
+			query = "SELECT " + columns + "FROM posts_" + self.prefix + join + " WHERE " + where + " ORDER BY id ASC"
 			posts = self.db.fetchall_interruptable(self.queue, query, replacements)
 
 		if posts is None:
@@ -602,10 +608,9 @@ class Search4Chan(SearchWithScope):
 		self.log.info("Collecting post data from database")
 		columns = ", ".join(self.return_cols)
 
-		# Do a JOIN if we don't want deleted posts.
-		postgres_join = ""
+		# Do a JOIN so we can check for deleted posts.
+		postgres_join = " LEFT JOIN posts_%s_deleted ON posts_%s.id_seq = posts_%s_deleted.id_seq " % tuple([self.prefix] * 3)
 		if not query.get("get_deleted"):
-			postgres_join = " LEFT JOIN posts_%s_deleted ON posts_%s.id_seq = posts_%s_deleted.id_seq " % tuple([self.prefix] * 3)
 			postgres_where.append("posts_%s_deleted.id_seq IS NULL" % self.prefix)
 
 		posts_full = self.fetch_posts(tuple([post["post_id"] for post in posts]), join=postgres_join, where=postgres_where, replacements=postgres_replacements)
@@ -629,7 +634,7 @@ class Search4Chan(SearchWithScope):
 		:param str string:  String to escape
 		:return str: Escaped string
 		"""
-
+	
 		# Convert curly quotes
 		string = string.replace("“", "\"").replace("”", "\"")
 		# Escape forward slashes
@@ -654,7 +659,7 @@ class Search4Chan(SearchWithScope):
 		if not replacements:
 			replacements = []
 
-		columns = ", ".join(self.return_cols)
+		columns = ", ".join(self.return_cols) 
 		where.append("id IN %s")
 		replacements.append(post_ids)
 
@@ -678,9 +683,17 @@ class Search4Chan(SearchWithScope):
 		if self.interrupted:
 			raise ProcessorInterruptedException("Interrupted while fetching thread data")
 
+		# Exclude deleted posts
+		exclude_deleted = ""
+		if self.parameters.get("get_deleted") is False:
+			exclude_deleted = "AND posts_" + self.prefix + "_deleted.id_seq IS NULL"
+
 		return self.db.fetchall_interruptable(self.queue,
-			"SELECT " + columns + " FROM posts_" + self.prefix + " WHERE thread_id IN %s ORDER BY thread_id ASC, id ASC",
-											  (thread_ids,))
+			"SELECT " + columns + " FROM posts_" + self.prefix + " \
+			LEFT JOIN posts_" + self.prefix + "_deleted ON posts_" + self.prefix + ".id_seq \
+			 = posts_" + self.prefix + "_deleted.id_seq \
+			WHERE thread_id IN %s " + exclude_deleted + " \
+			ORDER BY thread_id ASC, id ASC", (thread_ids,))
 
 	def fetch_sphinx(self, where, replacements, join=""):
 		"""

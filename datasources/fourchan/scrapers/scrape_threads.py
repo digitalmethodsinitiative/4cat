@@ -395,12 +395,29 @@ class ThreadScraper4chan(BasicJSONScraper):
 		If the resource could not be found, that indicates the whole thread has
 		been deleted.
 		"""
+
 		self.datasource = self.type.split("-")[0]
 		thread_db_id = self.job.data["remote_id"].split("/").pop()
+
+		board = self.job.details["board"]
+		remote_id = self.job.data["remote_id"]
+
+		# Insert `timestamp_deleted` to threads table.
 		self.log.info(
-			"Thread %s/%s/%s was deleted, marking as such" % (self.datasource, self.job.details["board"], self.job.data["remote_id"]))
+			"Thread %s/%s/%s was deleted, marking as such" % (self.datasource, board, remote_id))
 		self.db.update("threads_" + self.prefix, data={"timestamp_deleted": self.init_time},
 					   where={"id": thread_db_id, "timestamp_deleted": 0})
+		
+		# We're also adding the OP id to the posts_{datasource}_deleted table.
+		# For this we first need the id_seq of the post.
+		id_seq = self.db.fetchone("SELECT id_seq FROM posts_" + self.prefix + " WHERE board = %s AND id = %s AND thread_id = %s", (board, thread_db_id, thread_db_id))
+
+		if id_seq:
+			# Then add it to the posts_{datasource}_deleted table.
+			self.db.insert("posts_" + self.prefix + "_deleted", data={"id_seq": id_seq["id_seq"], "timestamp_deleted": self.init_time})
+		else:
+			self.log.info("Thread OP %s/%s/%s wasn't found in the posts table, unable to mark as deleted" % (self.datasource, board, remote_id))
+
 		self.job.finish()
 
 	def get_url(self):
