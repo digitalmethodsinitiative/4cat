@@ -74,6 +74,8 @@ troll_codes = {
 	"WP": "White Supremacist"
 }
 
+troll_names = ["Anarcho-Capitalist","Anarchist","Black Lives Matter","Black Nationalist","BLM","Confederate","Catalonia","Commie","Communist","Democrat","European","Fascist","Gadsden","Gay","LGBT","Jihadi","North Korea","Kekistani","Muslim","Task Force Z","National Bolshevik","NATO","Nazi","Obama","Hippie","Pirate","Rebel","Republican","Libertarian","Templar","DEUS VULT","Tea Partier","Tree Hugger","Texan","United Nations","White Supremacist"]
+
 country_codes = {
 	"A2": "Satellite Provider",
 	"AD": "Andorra",
@@ -325,6 +327,8 @@ country_codes = {
 	"ZW": "Zimbabwe"
 }
 
+def get_troll_names():
+	return troll_names
 
 def get_country_name(country_code, timestamp):
 	"""
