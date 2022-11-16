@@ -414,7 +414,7 @@ class ThreadScraper4chan(BasicJSONScraper):
 
 		if id_seq:
 			# Then add it to the posts_{datasource}_deleted table.
-			self.db.insert("posts_" + self.prefix + "_deleted", data={"id_seq": id_seq["id_seq"], "timestamp_deleted": self.init_time})
+			self.db.insert("posts_" + self.prefix + "_deleted", data={"id_seq": id_seq["id_seq"], "timestamp_deleted": self.init_time}, safe=True)
 		else:
 			self.log.info("Thread OP %s/%s/%s wasn't found in the posts table, unable to mark as deleted" % (self.datasource, board, remote_id))
 
