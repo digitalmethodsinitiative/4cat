@@ -89,6 +89,7 @@ country_codes = {
 	"AP": "Asia/Pacific Region",
 	"AQ": "Antarctica",
 	"AS": "American Samoa's",
+	"AR": "Argentina",
 	"AT": "Austria",
 	"AU": "Australia",
 	"AW": "Aruba",

@@ -189,6 +189,7 @@ query_update_country_flags = """
 			WHEN country_code = 'AP' THEN 'Asia/Pacific Region'
 			WHEN country_code = 'AQ' THEN 'Antarctica'
 			WHEN country_code = 'AS' THEN 'American Samoa''s'
+			WHEN country_code = 'AR' THEN 'Argentina'
 			WHEN country_code = 'AT' THEN 'Austria'
 			WHEN country_code = 'AU' THEN 'Australia'
 			WHEN country_code = 'AW' THEN 'Aruba'
