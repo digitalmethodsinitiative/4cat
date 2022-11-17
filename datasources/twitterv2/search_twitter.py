@@ -772,7 +772,7 @@ class SearchWithTwitterAPIv2(Search):
             if variants:
                 videos.append(variants[0].get('url'))
 
-        return {
+        new_tweet = {
             "id": tweet["id"],
             "thread_id": tweet.get("conversation_id", tweet["id"]),
             "timestamp": tweet_time.strftime("%Y-%m-%d %H:%M:%S"),
@@ -804,3 +804,9 @@ class SearchWithTwitterAPIv2(Search):
             "long_lat": ', '.join([str(x) for x in tweet.get('geo', {}).get('coordinates', {}).get('coordinates', [])]),
             'place_name': tweet.get('geo', {}).get('place', {}).get('full_name', ''),
         }
+
+        for fourcat_column in ['4cat_extracted_urls']:
+            if fourcat_column in tweet.keys():
+                new_tweet[fourcat_column] = tweet.get(fourcat_column)
+
+        return new_tweet
