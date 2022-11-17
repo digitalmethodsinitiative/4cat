@@ -5,9 +5,9 @@ CREATE TABLE IF NOT EXISTS threads_4chan (
   id_seq             SERIAL PRIMARY KEY,  -- sequential ID for easier indexing
   board              text,
   timestamp          integer DEFAULT 0, -- first known timestamp for this thread, i.e. timestamp of first post
-  timestamp_archived integer DEFAULT 0,
+  timestamp_archived integer DEFAULT 0, -- timestamp this thread was archived
   timestamp_scraped  integer, -- last timestamp this thread was scraped
-  timestamp_deleted  integer DEFAULT 0,  -- timestamp this thread was no longer scrapeable
+  timestamp_deleted  integer DEFAULT 0,  -- timestamp this thread was no longer scrapeable (404)
   timestamp_modified integer, -- last timestamp this thread was modified (reported by 4chan)
   post_last          bigint, -- ID of last post in this thread
   num_unique_ips     integer DEFAULT 0,
@@ -33,6 +33,11 @@ CREATE INDEX IF NOT EXISTS threads_timestamp
 CREATE INDEX IF NOT EXISTS threads_seq
   ON threads_4chan (
     id_seq
+  );
+
+CREATE INDEX IF NOT EXISTS threads_archiving_4chan
+  ON threads_4chan (
+    timestamp_deleted, timestamp_archived, timestamp_modified, board
   );
 
 -- posts

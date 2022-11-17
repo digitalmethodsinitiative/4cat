@@ -170,6 +170,14 @@ def _jinja2_filter_post_field(field, post):
 
 	for key in re.findall(r"\{\{(.*?)\}\}", str(field)):
 
+		original_key = key
+
+		# We're also gonna extract any other filters present
+		extra_filters = []
+		if "|" in key:
+			extra_filters = key.split("|")[1:]
+			key = key.split("|")[0]
+
 		# They keys can also be subfields (e.g. "author.username")
 		# So we're splitting and looping until we get the value.
 		keys = key.split(".")
@@ -186,7 +194,12 @@ def _jinja2_filter_post_field(field, post):
 		if not val and val != 0:
 			return ""
 
-		formatted_field = formatted_field.replace("{{" + key + "}}", str(val))
+		# Apply further builtin filters, if present (e.g. lower)
+		for extra_filter in extra_filters:
+			extra_filter = extra_filter.strip()
+			val = app.jinja_env.filters[extra_filter](val)
+		
+		formatted_field = formatted_field.replace("{{" + original_key + "}}", str(val))
 
 	return formatted_field
 

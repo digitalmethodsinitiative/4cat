@@ -140,9 +140,6 @@ with open(args.input, encoding="utf-8") as inputfile:
 			"unsorted_data": post.get("unsorted_data", "")
 		}
 
-		if post_data["image_md5"]:
-			print(post_data)
-
 		new_post = db.insert("posts_4chan", post_data, commit=False, safe=safe, constraints=["id", "board"])
 
 		posts_added += new_post
