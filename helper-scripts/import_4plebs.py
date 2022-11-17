@@ -232,7 +232,6 @@ with open(args.input, encoding="utf-8") as inputfile:
 		# sticky threads as "deleted", which we don't want, so we're skipping replies to sticky OPs for now.
 		if int(post["deleted"]) == 1:
 			if not (int(post["op"]) == 1 and int(threads[post["thread_num"]]["is_sticky"]) == 1):
-				print("added deleted post %s" % post["num"])
 				deleted_ids.add(int(post["num"]))
 		
 		# Also update the deletion data in the thread data
