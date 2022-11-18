@@ -301,7 +301,6 @@ class ThreadScraper4chan(BasicJSONScraper):
 		:param int last_post:  ID of last post in thread
 		:param int num_replies:  Number of posts in thread (including OP)
 		:param int archived:	Timestamp of when the thread was archived
-		:param int deleted:		Timestamp of when the thread was deleted
 		:return: Thread data (dict), updated, or `None` if no further work is needed
 		"""
 		# we need the following to check whether the thread has changed since the last scrape
