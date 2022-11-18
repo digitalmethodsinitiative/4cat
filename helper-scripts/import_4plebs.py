@@ -7,13 +7,14 @@ import json
 import time
 import sys
 import csv
+import json
 import re
 import os
-import pickle
 
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)) + "/..")
 from common.lib.database import Database
 from common.lib.logger import Logger
+from pol_flags import get_country_name, get_troll_names
 
 
 class FourPlebs(csv.Dialect):
@@ -67,16 +68,18 @@ def commit(posts, post_fields, db, datasource, fast=False):
 			sys.exit(1)
 
 	else:
+
 		db.execute("START TRANSACTION")
 		for post in posts:
-			db.insert("posts_" + datasource, data={post_fields[i]: post[i] for i in range(0, len(post))}, safe=True, commit=False)
+			db.insert("posts_" + datasource, data={post_fields[i]: post[i] for i in range(0, len(post))}, safe=True, constraints=("id", "board"), commit=False)
+
 		db.commit()
 
 
 # set up
 link_regex = re.compile(">>([0-9]+)")
-post_fields = ("id", "timestamp", "timestamp_deleted", "thread_id", "body", "author",
-			   "author_type_id", "author_trip", "subject", "country_name", "country_code", "image_file",
+post_fields = ("id", "thread_id", "board", "timestamp", "body", "author",
+			   "author_type_id", "author_trip", "subject", "country_code", "country_name", "image_file",
 			   "image_4chan", "image_md5", "image_dimensions", "image_filesize",
 			   "semantic_url", "unsorted_data")
 
@@ -109,33 +112,40 @@ if args.skip > 0:
 if args.fast:
 	print("Fast mode enabled.")
 
+if args.board == "pol":
+	troll_names = get_troll_names()
+
 with open(args.input, encoding="utf-8") as inputfile:
 	postscsv = csv.DictReader(inputfile, fieldnames=FourPlebs.columns, dialect=FourPlebs)
 
 	postbuffer = []
-	threads = {}
+	deleted_ids = set() # We insert deleted posts separately because we
+						# need their `id_seq` for the posts_{datasource}_deleted table
+	threads = {} # To insert thread information to the threads_{datasource} table
 	posts = 0
-	skipped = 0
 
 	for csvpost in postscsv:
 		posts += 1
 
 		if posts < args.skip:
+			if posts % 1000000 == 0:
+				print("Skipped %s/%s rows (%.2f%%)..." % (posts, args.skip, (posts / args.skip) * 100))
 			continue
 
 		if posts >= args.end:
 			break
 
-		print("\rPost %s" % posts, end="")
 		if int(csvpost["subnum"]) > 0:
 			# skip ghost posts
 			continue
 
-		post = csvpost
+		post = sanitize(csvpost)
+
 		if post["thread_num"] not in threads:
 			threads[post["thread_num"]] = {
 				"timestamp": int(time.time()),
 				"timestamp_modified": 0,
+				"timestamp_deleted": 0,
 				"timestamp_archived": 0,
 				"is_sticky": 0,
 				"is_closed": 0,
@@ -159,17 +169,54 @@ with open(args.input, encoding="utf-8") as inputfile:
 			sys.exit(1)
 
 		post_id = int(post["num"])
+
+		# Set country name of post. This is a bit tricky because we have to differentiate
+		# on troll and geo flags. These also change over time.
+		country_code = ""
+		country_name = ""
+
+		if args.board == 'pol':
+
+			if post["poster_country"] or post["exif"]:
+				
+				exif = json.loads(post["exif"]) if post.get("exif") else ""
+				
+				if not post["poster_country"]:
+					country_code = exif["troll_country"]
+				else:
+					country_code = post["poster_country"]
+
+				# Older entries don't always have exif data, so let's extract the country name ourselves.
+				if int(post["timestamp"]) < 1418515200:
+					country_name = get_country_name(country_code, post["timestamp"])
+
+				# We can assume it's a troll country if it's in "troll country"
+				elif "troll_country" in exif:
+					country_name = get_country_name("t_" + country_code, post["timestamp"])
+
+				# For the leftover geo codes we're going to get the names straight away.
+				# This might cause some ambiguous country codes to be misallocated (e.g.
+				# TR as "Tree Hugger" instead of "Turkey", but there doesn't seem to be 
+				# another way apart from querying the 4plebs API.
+				else:
+					country_name = get_country_name(country_code, post["timestamp"])
+
+				# We're prepending a `t_` to troll codes to avoid ambiguous codes
+				if country_name in troll_names:
+					country_code = "t_" + country_code
+
 		postdata = (
 			post["num"],  # id
-			post["timestamp"],  # timestamp
-			post["deleted"] if int(post["deleted"]) > 1 else 0,  # timestamp_deleted
 			post["thread_num"],  # thread_id
+			args.board, # board
+			post["timestamp"],  # timestamp
 			post["comment"],  # body
 			post["name"],  # author
 			post["capcode"],  # author_type_id
 			post["trip"],  # author_trip
 			post["title"],  # subject
-			post["poster_country"],  # country_code
+			country_code,  # country_code
+			country_name,  # country_name
 			post["media_filename"],  # image_file
 			post["media_orig"],  # image_4chan
 			post["media_hash"],  # image_md5
@@ -179,20 +226,40 @@ with open(args.input, encoding="utf-8") as inputfile:
 			"",  # semantic_url
 			"{}"  # unsorted_data
 		)
+
+		# If the post is deleted, we're going to add it to the post_{datasource}_deleted table
+		# which is used to filter out deleted posts. 4plebs sees comments over 1000 replies for
+		# sticky threads as "deleted", which we don't want, so we're skipping replies to sticky OPs for now.
+		if int(post["deleted"]) == 1:
+			if not (int(post["op"]) == 1 and int(threads[post["thread_num"]]["is_sticky"]) == 1):
+				deleted_ids.add(int(post["num"]))
+		
+		# Also update the deletion data in the thread data
+		if int(post["thread_num"]) in deleted_ids:
+			threads[post["thread_num"]]["timestamp_deleted"] = max(threads[post["thread_num"]]["timestamp_modified"],
+																int(post["timestamp"]))
+		
 		postbuffer.append(postdata)
 
-		# for speed, we only commit every so many posts
+		# For speed, we only commit every so many posts
 		if len(postbuffer) % args.batch == 0:
 			print("\nCommitting posts %i-%i to database." % (posts - args.batch, posts))
 			commit(postbuffer, post_fields, db, args.datasource, fast=args.fast)
 			postbuffer = []
+			break
+
+	# Insert deleted posts, and get their id_seq to use in the posts_{datasource}_deleted table
+	if deleted_ids:
+		print("\nAlso committing %i deleted posts to posts_%s_deleted table." % (len(deleted_ids), args.datasource))
+		for deleted_id in deleted_ids:
+			result = db.fetchone("SELECT id_seq, timestamp FROM posts_" + args.datasource + " WHERE id = %s AND board = '%s' " % (deleted_id, args.board))
+			db.insert("posts_" + args.datasource + "_deleted", {"id_seq": result["id_seq"], "timestamp_deleted": result["timestamp"]}, safe=True)
+		deleted_ids = set()
 
 	# commit remainder
-	print("\nSkipped %i post IDs that were already known." % skipped)
 	print("Committing final posts.")
 	commit(postbuffer, post_fields, db, args.datasource, fast=args.fast)
 
-pickle.dump(threads, open("threads.p", "wb"))
 
 # update threads
 print("Updating threads.")
@@ -213,13 +280,16 @@ for thread_id in threads:
 	if not exists:
 		db.insert("threads_" + args.datasource, thread)
 
+	# We don't know if we have all the thread data here (things might be cutoff)
+	# so do some quick checks if values are higher/newer than before
 	else:
 		if thread["timestamp"] < exists["timestamp"]:
 			thread["is_sticky"] = exists["is_sticky"]
 			thread["is_closed"] = exists["is_closed"]
 		thread["post_last"] = max(int(thread.get("post_last") or 0), int(exists.get("post_last") or 0))
+		thread["timestamp_deleted"] = max(int(thread.get("timestamp_deleted") or 0), int(exists.get("timestamp_deleted") or 0))
+		thread["timestamp_archived"] = max(int(thread.get("timestamp_archived") or 0), int(exists.get("timestamp_archived") or 0))
 		thread["timestamp_modified"] = max(int(thread.get("timestamp_modified") or 0), int(exists.get("timestamp_modified") or 0))
-		thread["timestamp_modified"] = max(int(thread.get("timestamp_archived") or 0), int(exists.get("timestamp_archived") or 0))
 		thread["timestamp"] = min(int(thread.get("timestamp") or 0), int(exists.get("timestamp") or 0))
 
 		db.update("threads_" + args.datasource, data=thread, where={"id": thread_id})

@@ -28,8 +28,7 @@ class Search4Chan(SearchWithScope):
 
 	# Columns to return in csv
 	return_cols = ['thread_id', 'id', 'timestamp', 'board', 'body', 'subject', 'author', 'image_file', 'image_md5',
-				   'country_name', 'country_code']
-
+				   'country_name', 'country_code', 'timestamp_deleted']
 
 	references = [
 		"[4chan API](https://github.com/4chan/4chan-API)",
@@ -63,7 +62,7 @@ class Search4Chan(SearchWithScope):
 		},
 		"deleted_posts": {
 			"type": UserInput.OPTION_INFO,
-			"help": "Posts deleted by moderators may be excluded. <strong>Note:</strong> this does not yet work for deleted OPs and thread removals."
+			"help": "Posts deleted by moderators may be excluded. Note that replies to a deleted OP are not marked as deleted."
 		},
 		"get_deleted": {
 			"type": UserInput.OPTION_TOGGLE,
@@ -76,7 +75,7 @@ class Search4Chan(SearchWithScope):
 			"board_specific": ["pol", "sp", "int"],
 			"tooltip": "The IP-derived flag attached to posts. Can be an actual country or \"meme flag\". Leave empty for all.",
 			"options": {
-				"Armenia|Albania|Andorra|Austria|Belarus|Belgium|Bosnia and Herzegovina|Bulgaria|Croatia|Cyprus|Czech Republic|Denmark|Estonia|Finland|France|Germany|Greece|Hungary|Iceland|Republic of Ireland|Italy|Kosovo|Latvia|Liechtenstein|Lithuania|Luxembourg|Republic of Macedonia|North Macedonia|Macedonia|Malta|Moldova|Monaco|Montenegro|Netherlands|The Netherlands|Norway|Poland|Portugal|Romania|Russia|San Marino|Serbia|Slovakia|Slovenia|Spain|Sweden|Switzerland|Turkey|Ukraine|United Kingdom|Vatican City": "<span class='flag flag-eu' title='Afghanistan'></span> European countries",
+				"Armenia|Albania|Andorra|Austria|Belarus|Belgium|Bosnia and Herzegovina|Bulgaria|Croatia|Cyprus|Czech Republic|Denmark|Estonia|Finland|France|Germany|Greece|Hungary|Iceland|Republic of Ireland|Italy|Kosovo|Latvia|Liechtenstein|Lithuania|Luxembourg|Republic of Macedonia|North Macedonia|Macedonia|Malta|Moldova|Monaco|Montenegro|Netherlands|The Netherlands|Norway|Poland|Portugal|Romania|Russia|San Marino|Serbia|Slovakia|Slovenia|Spain|Sweden|Switzerland|Turkey|Ukraine|United Kingdom|Vatican City": "European countries",
 				"Afghanistan": "<span class='flag flag-af' title='Afghanistan'></span> Afghanistan",
 				"Aland Islands|Aland": "<span class='flag flag-ax' title='Aland / Aland Islands'></span> Aland Islands",
 				"Albania": "<span class='flag flag-al' title='Albania'></span> Albania",
@@ -329,32 +328,34 @@ class Search4Chan(SearchWithScope):
 				"Yemen": "<span class='flag flag-ye' title='Yemen'></span> Yemen",
 				"Zambia": "<span class='flag flag-zm' title='Zambia'></span> Zambia",
 				"Zimbabwe": "<span class='flag flag-zw' title='Zimbabwe'></span> Zimbabwe",
-				"Anarchist": "<span class='trollflag trollflag-an' title='Anarchist'></span> Anarchist",
-				"Anarcho-Capitalist": "<span class='trollflag trollflag-ac' title='Anarcho-Capitalist'></span> Anarcho-Capitalist",
-				"Black Nationalist|Black Lives Matter": "<span class='trollflag trollflag-bl' title='Black Nationalist'></span> Black Nationalist / Black Lives Matter",
-				"Catalonia": "<span class='trollflag trollflag-ct' title='Catalonia'></span> Catalonia",
-				"Commie|Communist": "<span class='trollflag trollflag-cm' title='Commie'></span> Commie / Communist",
-				"Confederate": "<span class='trollflag trollflag-cf' title='Confederate'></span> Confederate",
-				"Democrat": "<span class='trollflag trollflag-dm' title='Democrat'></span> Democrat",
-				"Europe|European": "<span class='trollflag trollflag-eu' title='European'></span> Europe / European",
-				"Fascist": "<span class='trollflag trollflag-fc' title='Fascist'></span> Fascist",
-				"Gadsden": "<span class='trollflag trollflag-gn' title='Gadsden'></span> Gadsden",
-				"Gay|LGBT": "<span class='trollflag trollflag-gy' title='Gay'></span> Gay / LGBT",
-				"Hippie": "<span class='trollflag trollflag-pc' title='Hippie'></span> Hippie",
-				"Jihadi": "<span class='trollflag trollflag-jh' title='Jihadi'></span> Jihadi",
-				"Kekistani": "<span class='trollflag trollflag-kn' title='Kekistani'></span> Kekistani",
-				"Muslim": "<span class='trollflag trollflag-mf' title='Muslim'></span> Muslim",
-				"National Bolshevik": "<span class='trollflag trollflag-nb' title='National Bolshevik'></span> National Bolshevik",
-				"Nazi": "<span class='trollflag trollflag-nz' title='Nazi'></span> Nazi",
+				"Anarchist": "<span class='flag flag-t_an' title='Anarchist'></span> Anarchist",
+				"Anarcho-Capitalist": "<span class='flag flag-t_ac' title='Anarcho-Capitalist'></span> Anarcho-Capitalist",
+				"Black Nationalist|Black Lives Matter": "<span class='flag flag-t_bl' title='Black Nationalist'></span> Black Nationalist / Black Lives Matter",
+				"Catalonia": "<span class='flag flag-t_ct' title='Catalonia'></span> Catalonia",
+				"Commie|Communist": "<span class='flag flag-t_cm' title='Commie'></span> Commie / Communist",
+				"Confederate": "<span class='flag flag-t_cf' title='Confederate'></span> Confederate",
+				"Democrat": "<span class='flag flag-t_dm' title='Democrat'></span> Democrat",
+				"Europe|European": "<span class='flag flag-t_eu' title='European'></span> Europe / European",
+				"Fascist": "<span class='flag flag-t_fc' title='Fascist'></span> Fascist",
+				"Gadsden": "<span class='flag flag-t_gn' title='Gadsden'></span> Gadsden",
+				"Gay|LGBT": "<span class='flag flag-t_gy' title='Gay'></span> Gay / LGBT",
+				"Hippie": "<span class='flag flag-t_pc' title='Hippie'></span> Hippie",
+				"Jihadi": "<span class='flag flag-t_jh' title='Jihadi'></span> Jihadi",
+				"Kekistani": "<span class='flag flag-t_kn' title='Kekistani'></span> Kekistani",
+				"Muslim": "<span class='flag flag-t_mf' title='Muslim'></span> Muslim",
+				"National Bolshevik": "<span class='flag flag-t_nb' title='National Bolshevik'></span> National Bolshevik",
+				"NATO": "<span class='flag flag-t_nt' title='NATO'></span> NATO",
+				"Nazi": "<span class='flag flag-t_nz' title='Nazi'></span> Nazi",
 				"Obama": "Obama",
-				"Pirate": "<span class='trollflag trollflag-pr' title='Pirate'></span> Pirate",
+				"Pirate": "<span class='flag flag-t_pr' title='Pirate'></span> Pirate",
 				"Rebel": "Rebel",
-				"Republican": "<span class='trollflag trollflag-re' title='Republican'></span> Republican",
-				"Templar|DEUS VULT": "<span class='trollflag trollflag-tm' title='Templar / DEUS VULT'></span> Templar / DEUS VULT",
+				"Republican": "<span class='flag flag-t_re' title='Republican'></span> Republican",
+				"Templar|DEUS VULT": "<span class='flag flag-t_tm' title='Templar / DEUS VULT'></span> Templar / DEUS VULT",
 				"Texan": "Texan",
-				"Tree Hugger": "<span class='trollflag trollflag-tr' title='Tree Hugger'></span> Tree Hugger",
-				"United Nations": "<span class='trollflag trollflag-un' title='United Nations'></span> United Nations",
-				"White Supremacist": "<span class='trollflag trollflag-wp' title='White Supremacist'></span> White Supremacist",
+				"Task Force Z": "<span class='flag flag-t_mz' title='Task Force Z'></span> Task Force Z",
+				"Tree Hugger": "<span class='flag flag-t_tr' title='Tree Hugger'></span> Tree Hugger",
+				"United Nations": "<span class='flag flag-t_un' title='United Nations'></span> United Nations",
+				"White Supremacist": "<span class='flag flag-t_wp' title='White Supremacist'></span> White Supremacist",
 				},
 			"default": ""
 		},
@@ -412,7 +413,7 @@ class Search4Chan(SearchWithScope):
 
 		if query.get("min_date", 0):
 			try:
-				where.append("p.timestamp >= %s")
+				where.append("timestamp >= %s")
 				replacements.append(int(query.get("min_date")))
 			except ValueError:
 				pass
@@ -420,7 +421,7 @@ class Search4Chan(SearchWithScope):
 		if query.get("max_date", 0):
 			try:
 				replacements.append(int(query.get("max_date")))
-				where.append("p.timestamp < %s")
+				where.append("timestamp < %s")
 			except ValueError:
 				pass
 
@@ -433,15 +434,20 @@ class Search4Chan(SearchWithScope):
 				for c in country_name:
 					country_names.append(c)
 
-			where.append("p.country_name IN %s")
+			where.append("country_name IN %s")
 
 			replacements.append(tuple(country_names))
 
-		sql_query = ("SELECT p.*, t.board " \
-					 "FROM posts_" + self.prefix + " AS p " \
-					 "LEFT JOIN threads_" + self.prefix + " AS t " \
-					 "ON t.id = p.thread_id " \
-					 "WHERE t.board = %s ")
+
+		sql_query = ("SELECT " + ",".join(self.return_cols) +
+					 " FROM posts_" + self.prefix +
+					 " LEFT JOIN posts_" + self.prefix + "_deleted" +
+					 " ON posts_" + self.prefix + ".id_seq = posts_" + self.prefix + "_deleted.id_seq" \
+					 " WHERE board = %s ")
+
+		# Exclude deleted posts
+		if not query.get("get_deleted"):
+			where.append("posts_%s_deleted.id_seq IS NULL" % self.prefix)
 
 		if where:
 			sql_query += " AND " + " AND ".join(where)
@@ -471,7 +477,7 @@ class Search4Chan(SearchWithScope):
 						return None
 
 					valid_query_ids = "(" + ",".join(valid_query_ids) + ")"
-					sql_query = "SELECT * FROM (" + sql_query + "AND p.id IN " + valid_query_ids + ") AS full_table ORDER BY full_table.timestamp ASC"
+					sql_query = "SELECT * FROM (" + sql_query + " AND id IN " + valid_query_ids + ") ORDER BY timestamp ASC"
 
 				else:
 					self.dataset.update_status("No 4chan post IDs inserted.")
@@ -481,7 +487,7 @@ class Search4Chan(SearchWithScope):
 				pass
 
 		else:
-			sql_query += " ORDER BY p.timestamp ASC"
+			sql_query += " ORDER BY timestamp ASC"
 
 		return self.db.fetchall_interruptable(self.queue, sql_query, replacements)
 
@@ -575,12 +581,14 @@ class Search4Chan(SearchWithScope):
 			if self.interrupted:
 				raise ProcessorInterruptedException("Interrupted while fetching post data")
 
+			# Join on the posts_{datasource}_deleted table so we can also retrieve whether the post was deleted
+			join = " LEFT JOIN posts_%s_deleted ON posts_%s.id_seq = posts_%s_deleted.id_seq " % tuple([self.prefix] * 3)
+			
 			# Duplicate code, but will soon be changed anyway...
 			if not query.get("get_deleted"):
-				join = " LEFT JOIN posts_%s_deleted ON posts_%s.id_seq = posts_%s_deleted.id_seq " % tuple([self.prefix] * 3)
 				where += " AND posts_%s_deleted.id_seq IS NULL" % self.prefix
 
-			query = "SELECT " + columns + " FROM posts_" + self.prefix + join + " WHERE " + where + " ORDER BY id ASC"
+			query = "SELECT " + columns + "FROM posts_" + self.prefix + join + " WHERE " + where + " ORDER BY id ASC"
 			posts = self.db.fetchall_interruptable(self.queue, query, replacements)
 
 		if posts is None:
@@ -600,10 +608,9 @@ class Search4Chan(SearchWithScope):
 		self.log.info("Collecting post data from database")
 		columns = ", ".join(self.return_cols)
 
-		# Do a JOIN if we don't want deleted posts.
-		postgres_join = ""
+		# Do a JOIN so we can check for deleted posts.
+		postgres_join = " LEFT JOIN posts_%s_deleted ON posts_%s.id_seq = posts_%s_deleted.id_seq " % tuple([self.prefix] * 3)
 		if not query.get("get_deleted"):
-			postgres_join = " LEFT JOIN posts_%s_deleted ON posts_%s.id_seq = posts_%s_deleted.id_seq " % tuple([self.prefix] * 3)
 			postgres_where.append("posts_%s_deleted.id_seq IS NULL" % self.prefix)
 
 		posts_full = self.fetch_posts(tuple([post["post_id"] for post in posts]), join=postgres_join, where=postgres_where, replacements=postgres_replacements)
@@ -627,7 +634,7 @@ class Search4Chan(SearchWithScope):
 		:param str string:  String to escape
 		:return str: Escaped string
 		"""
-
+	
 		# Convert curly quotes
 		string = string.replace("“", "\"").replace("”", "\"")
 		# Escape forward slashes
@@ -652,7 +659,7 @@ class Search4Chan(SearchWithScope):
 		if not replacements:
 			replacements = []
 
-		columns = ", ".join(self.return_cols)
+		columns = ", ".join(self.return_cols) 
 		where.append("id IN %s")
 		replacements.append(post_ids)
 
@@ -676,9 +683,17 @@ class Search4Chan(SearchWithScope):
 		if self.interrupted:
 			raise ProcessorInterruptedException("Interrupted while fetching thread data")
 
+		# Exclude deleted posts
+		exclude_deleted = ""
+		if self.parameters.get("get_deleted") is False:
+			exclude_deleted = "AND posts_" + self.prefix + "_deleted.id_seq IS NULL"
+
 		return self.db.fetchall_interruptable(self.queue,
-			"SELECT " + columns + " FROM posts_" + self.prefix + " WHERE thread_id IN %s ORDER BY thread_id ASC, id ASC",
-											  (thread_ids,))
+			"SELECT " + columns + " FROM posts_" + self.prefix + " \
+			LEFT JOIN posts_" + self.prefix + "_deleted ON posts_" + self.prefix + ".id_seq \
+			 = posts_" + self.prefix + "_deleted.id_seq \
+			WHERE thread_id IN %s " + exclude_deleted + " \
+			ORDER BY thread_id ASC, id ASC", (thread_ids,))
 
 	def fetch_sphinx(self, where, replacements, join=""):
 		"""

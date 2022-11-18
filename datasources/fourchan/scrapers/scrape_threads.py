@@ -89,10 +89,12 @@ class ThreadScraper4chan(BasicJSONScraper):
 			self.log.warning("OP in %s/%s is missing required fields %s, ignoring" % (self.datasource, self.job.data["remote_id"], repr(missing)))
 			return False
 
-		# check if thread exists and has new data
+		# check if thread exists in the db and has new data
 		last_reply = max([post["time"] for post in data["posts"] if "time" in post])
 		last_post = max([post["no"] for post in data["posts"] if "no" in post])
-		thread = self.register_thread(first_post, last_reply, last_post, num_replies=len(data["posts"]))
+		archived = first_post.get("archived_on", 0)
+
+		thread = self.register_thread(first_post, last_reply, last_post, len(data["posts"]), archived)
 
 		if not thread:
 			self.log.info("Thread %s/%s/%s scraped, but no changes found" % (self.datasource, self.job.details["board"], first_post["no"]))
@@ -287,7 +289,7 @@ class ThreadScraper4chan(BasicJSONScraper):
 			except JobAlreadyExistsException:
 				pass
 
-	def register_thread(self, first_post, last_reply, last_post, num_replies):
+	def register_thread(self, first_post, last_reply, last_post, num_replies, archived):
 		"""
 		Check if thread exists
 
@@ -298,6 +300,7 @@ class ThreadScraper4chan(BasicJSONScraper):
 		:param int last_reply:  Timestamp of last reply in thread
 		:param int last_post:  ID of last post in thread
 		:param int num_replies:  Number of posts in thread (including OP)
+		:param int archived:	Timestamp of when the thread was archived
 		:return: Thread data (dict), updated, or `None` if no further work is needed
 		"""
 		# we need the following to check whether the thread has changed since the last scrape
@@ -305,7 +308,7 @@ class ThreadScraper4chan(BasicJSONScraper):
 		# account for 8chan-style cyclical ID
 		thread_db_id = str(first_post["id"] if "id" in first_post and self.type != "4chan-thread" else first_post["no"])
 		thread = self.db.fetchone("SELECT * FROM threads_" + self.prefix + " WHERE id = %s", (thread_db_id,))
-
+		
 		if not thread:
 			# This very rarely happens, but sometimes the thread is not yet in the database, somehow
 			# In this case, a thread with the bare minimum of metadata is created - more extensive
@@ -313,9 +316,11 @@ class ThreadScraper4chan(BasicJSONScraper):
 			thread = self.add_thread(first_post, last_reply, last_post)
 			return thread
 
-		if thread["num_replies"] == num_replies and num_replies != -1 and thread["timestamp_modified"] == last_reply:
+		# We don't have to check if there's no changes in the number of replies
+		# and if the thread still has the same timestamps for deletion/archival.
+		if (thread["num_replies"] == num_replies and num_replies != -1 and thread["timestamp_modified"] == last_reply) and (thread["timestamp_archived"] == archived):
 			# no updates, no need to check posts any further
-			self.log.debug("No new messages in thread %s/%s/%s" % (self.datasource, self.job.data["remote_id"], first_post["no"]))
+			self.log.debug("No changes in thread %s/%s/%s" % (self.datasource, self.job.data["remote_id"], first_post["no"]))
 			return None
 		else:
 			return thread
@@ -389,12 +394,29 @@ class ThreadScraper4chan(BasicJSONScraper):
 		If the resource could not be found, that indicates the whole thread has
 		been deleted.
 		"""
+
 		self.datasource = self.type.split("-")[0]
 		thread_db_id = self.job.data["remote_id"].split("/").pop()
+
+		board = self.job.details["board"]
+		remote_id = self.job.data["remote_id"]
+
+		# Insert `timestamp_deleted` to threads table.
 		self.log.info(
-			"Thread %s/%s/%s was deleted, marking as such" % (self.datasource, self.job.details["board"], self.job.data["remote_id"]))
+			"Thread %s/%s/%s was deleted, marking as such" % (self.datasource, board, remote_id))
 		self.db.update("threads_" + self.prefix, data={"timestamp_deleted": self.init_time},
 					   where={"id": thread_db_id, "timestamp_deleted": 0})
+		
+		# We're also adding the OP id to the posts_{datasource}_deleted table.
+		# For this we first need the id_seq of the post.
+		id_seq = self.db.fetchone("SELECT id_seq FROM posts_" + self.prefix + " WHERE board = %s AND id = %s AND thread_id = %s", (board, thread_db_id, thread_db_id))
+
+		if id_seq:
+			# Then add it to the posts_{datasource}_deleted table.
+			self.db.insert("posts_" + self.prefix + "_deleted", data={"id_seq": id_seq["id_seq"], "timestamp_deleted": self.init_time}, safe=True)
+		else:
+			self.log.info("Thread OP %s/%s/%s wasn't found in the posts table, unable to mark as deleted" % (self.datasource, board, remote_id))
+
 		self.job.finish()
 
 	def get_url(self):
