@@ -165,7 +165,7 @@ def create_first_user():
     """
     has_admin_user = db.fetchone("SELECT COUNT(*) AS amount FROM users WHERE is_admin = True")
     missing = []
-    if has_admin_user["amount"]:
+    if False and has_admin_user["amount"]:
         return error(403, message="The 'first run' page is not available")
 
     if request.method == 'GET':

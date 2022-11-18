@@ -65,8 +65,13 @@ def show_results(page):
         filters["hide_empty"] = True
 
     # handle 'depth'; all, own datasets, or favourites?
+    # 'all' is limited to admins
     depth = request.args.get("depth", "own")
-    if depth not in ("own", "favourites", "all"):
+    available_depths = ("own", "favourites")
+    if current_user.is_admin:
+        available_depths.append("all")
+
+    if depth not in available_depths:
         depth = "own"
 
     if depth == "own":
