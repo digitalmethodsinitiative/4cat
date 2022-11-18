@@ -48,7 +48,7 @@ class DatasourceMetrics(BasicWorker):
 			""")
 
 		added_datasources = [row["datasource"] for row in self.db.fetchall("SELECT DISTINCT(datasource) FROM metrics")]
-		enabled_datasources = config.get("DATASOURCES", {})
+		enabled_datasources = config.get("4cat.datasources", {})
 
 		for datasource_id in self.all_modules.datasources:
 			if datasource_id not in enabled_datasources:

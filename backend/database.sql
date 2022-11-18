@@ -142,7 +142,7 @@ CREATE FUNCTION count_estimate(query text) RETURNS bigint AS $$
 INSERT INTO settings
   (name, value)
   Values
-    ('DATASOURCES', '{"bitchute": {}, "custom": {}, "douban": {}, "customimport": {}, "parler": {}, "reddit": {"boards": "*"}, "telegram": {}, "twitterv2": {"id_lookup": false}}'),
+    ('4cat.datasources', '["bitchute", "custom", "douban", "customimport", "reddit", "telegram", "twitterv2"]'),
     ('4cat.name', '"4CAT"'),
     ('4cat.name_long', '"4CAT: Capture and Analysis Toolkit"'),
     ('4cat.github_url', '"https://github.com/digitalmethodsinitiative/4cat"'),

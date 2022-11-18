@@ -9,20 +9,9 @@ from common.lib.helpers import UserInput
 import json
 
 config_definition = {
-    "DATASOURCES": {
+    "4cat.datasources": {
         "type": UserInput.OPTION_TEXT_JSON,
-        "default": json.dumps({
-            "bitchute": {},
-            "custom": {},
-            "douban": {},
-            "customimport": {},
-            "parler": {},
-            "reddit": {
-                "boards": "*",
-            },
-            "telegram": {},
-            "twitterv2": {"id_lookup": False}
-        }),
+        "default": json.dumps(["bitchute", "custom", "douban", "customimport", "reddit", "telegram", "twitterv2"]),
         "help": "Data Sources",
         "tooltip": "Data sources object defining enabled datasources and their settings",
     },
@@ -77,7 +66,17 @@ config_definition = {
         "type": UserInput.OPTION_TOGGLE,
         "default": True,
         "help": "Allow opt-out",
-        "tooltip": "Allow users to opt-out of automatic deletion. Note that if users are allowed to opt out, data sources can still force the expiration of datasets created through that data source. This cannot be overridden by the user.",
+        "tooltip": "Allow users to opt-out of automatic deletion. Note that if users are allowed to opt out, data "
+                   "sources can still force the expiration of datasets created through that data source. This cannot "
+                   "be overridden by the user.",
+    },
+    "expire.datasources": {
+        "type": UserInput.OPTION_TEXT_JSON,
+        "default": "{}",
+        "help": "Data source-specific expiration",
+        "tooltip": "Allows setting expiration settings per datasource. This always overrides the above settings. This "
+                   "is stored as a JSON object but is more conveniently configured via the 'Configure data sources' "
+                   "page."
     },
     "logging.slack.level": {
         "type": UserInput.OPTION_CHOICE,
@@ -247,7 +246,6 @@ categories = {
     "mail": "Mail settings & credentials",
     "logging": "Logging settings",
     "path": "File paths",
-    "DATASOURCES": "Data source configuration",
     'image_downloader': 'Image downloader',
     'text_from_images': 'OCR: Text from images',
 }

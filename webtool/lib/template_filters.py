@@ -233,7 +233,7 @@ def inject_now():
 	notifications = current_user.get_notifications()
 
 	return {
-		"__datasources_config": config.get('DATASOURCES'),
+		"__datasources_config": config.get('4cat.datasources'),
 		"__has_https": config.get("flask.https"),
 		"__datenow": datetime.datetime.utcnow(),
 		"__tool_name": config.get("4cat.name"),
