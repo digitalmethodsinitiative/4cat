@@ -177,10 +177,10 @@ with open(args.input, encoding="utf-8") as inputfile:
 
 		if args.board == 'pol':
 
-			if post["poster_country"] or post["exif"]:
-				
-				exif = json.loads(post["exif"]) if post.get("exif") else ""
-				
+			exif = json.loads(post["exif"]) if post.get("exif") else ""
+			
+			if post["poster_country"] or (exif and exif.get("troll_country")):
+								
 				if not post["poster_country"]:
 					country_code = exif["troll_country"]
 				else:
