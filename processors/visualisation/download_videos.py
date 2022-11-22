@@ -29,6 +29,30 @@ class VideoDownloader(BasicProcessor):
 	description = 'Basic video downloader that extracts http links and checks to see if they link directly to video content. Works best on sources with "video_url" columns such as Twitter and TikTok or "media_url" like Instagram.'  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
 
+	config = {
+		"video_downloader.MAX_NUMBER_VIDEOS": {
+			"type": UserInput.OPTION_TEXT,
+			"coerce_type": int,
+			"default": 1000,
+			"help": "Max number of videos to download",
+			"tooltip": "Only allow downloading up to this many videos per batch. Increasing this can easily lead to "
+					   "very long-running processors and large datasets."
+		},
+		"video_downloader.MAX_VIDEO_SIZE": {
+			"type": UserInput.OPTION_TEXT,
+			"coerce_type": int,
+			"default": 100,
+			"help": "Max allowed MB size of a single video for download",
+			"tooltip": "Size in MB/Megabytes; default 100. 0 will allow videos of ANY size to be downloaded."
+		},
+		"video_downloader.DOWNLOAD_UNKNOWN_SIZE": {
+			"type": UserInput.OPTION_TOGGLE,
+			"default": True,
+			"help": "Allow download of unknown size",
+			"tooltip": "Video size is not always availalbe before downloading. If True, users may choose to download unknown sizes."
+		},
+	}
+
 	options = {
 		"amount": {
 			"type": UserInput.OPTION_TEXT,
@@ -44,13 +68,21 @@ class VideoDownloader(BasicProcessor):
 			"inline": True,
 			"tooltip": "If column contains a single URL, use that URL; else, try to find image URLs in the column's content"
 		},
+		"max_video_size": {
+			"type": UserInput.OPTION_TEXT,
+			"help": "Max videos size (in MB/Megabytes)",
+			"default": 100,
+			"min": 1,
+			"max": 100,
+			"tooltip": "Max of 100 MB set by 4CAT administrators",
+		},
 		"split-comma": {
 			"type": UserInput.OPTION_TOGGLE,
 			"help": "Split column values by comma?",
 			"default": False,
 			"tooltip": "If enabled, columns can contain multiple URLs separated by commas, which will be considered "
 					   "separately"
-		}
+		},
 	}
 
 	@classmethod
@@ -62,9 +94,15 @@ class VideoDownloader(BasicProcessor):
 		options = cls.options
 
 		# Update the amount max and help from config
-		max_number_videos = int(config.get('image_downloader.MAX_NUMBER_IMAGES', 1000))
+		max_number_videos = int(config.get('video_downloader.MAX_NUMBER_VIDEOS', 100))
 		options['amount']['max'] = max_number_videos
 		options['amount']['help'] = "No. of videos (max %s)" % max_number_videos
+		# And update the max size and help from config
+		max_video_size = int(config.get('video_downloader.MAX_VIDEO_SIZE', 100))
+		options['max_video_size']['max'] = max_video_size
+		options['max_video_size']['default'] = options['amount']['default'] if options['amount']['default'] <= max_video_size or max_video_size == 0 else max_video_size
+		options["max_video_size"]["tooltip"] = f"Max of {max_video_size} MB set by 4CAT administrators" if max_video_size != 0 else "Set to 0 if all sizes are to be downloaded."
+		options['max_video_size']['min'] = 1 if max_video_size != 0 else 0
 
 		# Get the columns for the select columns option
 		if parent_dataset and parent_dataset.get_columns():
@@ -105,10 +143,19 @@ class VideoDownloader(BasicProcessor):
 		"""
 		# Collect parameters
 		amount = self.parameters.get("amount", 100)
+		max_video_size = self.parameters.get("max_video_size",
+											 100) * 1000000  # Multiply MB * 1000000 as Content-Length is in Bytes
+		if max_video_size == 0:
+			all_sizes = True
+		else:
+			all_sizes = False
+		allow_unknown_sizes = config.get('video_downloader.DOWNLOAD_UNKNOWN_SIZE', False)
 		split_comma = self.parameters.get("split-comma", False)
 		if amount == 0:
 			amount = config.get('image_downloader.MAX_NUMBER_IMAGES', 1000)
 		columns = self.parameters.get("columns")
+		if type(columns) == str:
+			columns = [columns]
 
 		# Check processor able to run
 		if self.source_dataset.num_rows == 0:
@@ -153,6 +200,7 @@ class VideoDownloader(BasicProcessor):
 						# search for video URLs in string
 						video_links = self.identify_video_links(value)
 						if video_links:
+							self.dataset.log(f'Multiple urls: {",".join(video_links)}')
 							item_urls |= set(video_links)
 
 			for item_url in item_urls:
@@ -206,7 +254,7 @@ class VideoDownloader(BasicProcessor):
 
 				# DEBUG Content-Type
 				if extension not in ['mp4', 'mp3']:
-					self.dataset.log('DEBUG: Odd extension type %s; Content-Type for url %s: %s' % (extension, url, response.headers['Content-Type']))
+					self.dataset.log('DEBUG: Odd extension type %s; Notify 4CAT maintainers if video. Content-Type for url %s: %s' % (extension, url, response.headers['Content-Type']))
 
 				# Ensure unique filename
 				video_filepath = Path(filename + '.' + extension)
@@ -215,6 +263,23 @@ class VideoDownloader(BasicProcessor):
 				while save_location.exists():
 					save_location = results_path.joinpath(filename + "-" + str(filename_index) + save_location.suffix.lower())
 					filename_index += 1
+
+				self.dataset.log(f'HEADERS: {response.headers.get("Content-Length")}')
+				# Check video size
+				if not all_sizes:
+					if response.headers.get("Content-Length", False):
+						if int(response.headers.get("Content-Length")) > max_video_size:
+							urls[url]['success'] = False
+							urls[url]['error'] = f"Video size {response.headers.get('Content-Length')} larger than maximum allowed per 4CAT"
+							continue
+						else:
+							# Size appropriate
+							pass
+					# Size unknown
+					elif not allow_unknown_sizes:
+						urls[url]['success'] = False
+						urls[url]['error'] = f"Video size unknown; not allowed to download per 4CAT settings"
+						continue
 
 				# Download video
 				with open(results_path.joinpath(save_location), 'wb') as f:
