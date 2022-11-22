@@ -62,7 +62,7 @@ class Search4Chan(SearchWithScope):
 		},
 		"deleted_posts": {
 			"type": UserInput.OPTION_INFO,
-			"help": "Posts deleted by moderators may be excluded. <strong>Note:</strong> replies to deleted OPs are seen as not deleted."
+			"help": "Posts deleted by moderators may be excluded. Note that replies to a deleted OP are not marked as deleted."
 		},
 		"get_deleted": {
 			"type": UserInput.OPTION_TOGGLE,
