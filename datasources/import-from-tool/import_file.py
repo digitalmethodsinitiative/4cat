@@ -479,7 +479,6 @@ class ImportFromExternalTool(BasicProcessor):
 						"hashtags": ",".join(hashtags),
 					})
 
-
 		file.close()
 
 		dataset.finish(done)

@@ -71,9 +71,9 @@ class VideoDownloader(BasicProcessor):
 		"max_video_size": {
 			"type": UserInput.OPTION_TEXT,
 			"help": "Max videos size (in MB/Megabytes)",
+			"coerce_type": int,
 			"default": 100,
 			"min": 1,
-			"max": 100,
 			"tooltip": "Max of 100 MB set by 4CAT administrators",
 		},
 		"split-comma": {
@@ -99,10 +99,16 @@ class VideoDownloader(BasicProcessor):
 		options['amount']['help'] = "No. of videos (max %s)" % max_number_videos
 		# And update the max size and help from config
 		max_video_size = int(config.get('video_downloader.MAX_VIDEO_SIZE', 100))
-		options['max_video_size']['max'] = max_video_size
-		options['max_video_size']['default'] = options['amount']['default'] if options['amount']['default'] <= max_video_size or max_video_size == 0 else max_video_size
-		options["max_video_size"]["tooltip"] = f"Max of {max_video_size} MB set by 4CAT administrators" if max_video_size != 0 else "Set to 0 if all sizes are to be downloaded."
-		options['max_video_size']['min'] = 1 if max_video_size != 0 else 0
+		if max_video_size == 0:
+			# Allow video of any size
+			options["max_video_size"]["tooltip"] = "Set to 0 if all sizes are to be downloaded."
+			options['max_video_size']['min'] = 0
+		else:
+			# Limit video size
+			options["max_video_size"]["max"] = max_video_size
+			options['max_video_size']['default'] = options['amount']['default'] if options['amount']['default'] <= max_video_size else max_video_size
+			options["max_video_size"]["tooltip"] = f"Max of {max_video_size} MB set by 4CAT administrators"
+			options['max_video_size']['min'] = 1
 
 		# Get the columns for the select columns option
 		if parent_dataset and parent_dataset.get_columns():
@@ -143,6 +149,8 @@ class VideoDownloader(BasicProcessor):
 		"""
 		# Collect parameters
 		amount = self.parameters.get("amount", 100)
+		if amount == 0:
+			amount = config.get('video_downloader.MAX_NUMBER_VIDEOS', 1000)
 		max_video_size = self.parameters.get("max_video_size",
 											 100) * 1000000  # Multiply MB * 1000000 as Content-Length is in Bytes
 		if max_video_size == 0:
@@ -151,8 +159,6 @@ class VideoDownloader(BasicProcessor):
 			all_sizes = False
 		allow_unknown_sizes = config.get('video_downloader.DOWNLOAD_UNKNOWN_SIZE', False)
 		split_comma = self.parameters.get("split-comma", False)
-		if amount == 0:
-			amount = config.get('image_downloader.MAX_NUMBER_IMAGES', 1000)
 		columns = self.parameters.get("columns")
 		if type(columns) == str:
 			columns = [columns]
@@ -264,7 +270,6 @@ class VideoDownloader(BasicProcessor):
 					save_location = results_path.joinpath(filename + "-" + str(filename_index) + save_location.suffix.lower())
 					filename_index += 1
 
-				self.dataset.log(f'HEADERS: {response.headers.get("Content-Length")}')
 				# Check video size
 				if not all_sizes:
 					if response.headers.get("Content-Length", False):
