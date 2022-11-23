@@ -181,7 +181,7 @@ class VideoHasher(BasicProcessor):
 							'url': url,
 							'video_hash': video_hash.hash,
 							'video_duration': video_hash.video_duration,
-							'video_collage_filename': video_hashes[data.get('filename')].get('video_collage_filename'),
+							'video_collage_filename': video_hashes[file.get('filename')].get('video_collage_filename'),
 							'video_count': len(data.get('post_ids', [])),
 						})
 
