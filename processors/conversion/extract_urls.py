@@ -52,6 +52,12 @@ class ExtractURLs(BasicProcessor):
             "help": "Only return rows with URLs",
             "tooltip": "If selected, only rows with URLs are added to the new dataset, else all rows are retained",
         },
+        "extra_columns": {
+            "type": UserInput.OPTION_TEXT,
+            "help": "Extra column(s) to include from original data",
+            "default": [],
+            "tooltip": "Columns such as 'author', 'tag', or 'hashtag' may be helpful in future processors such as network analysis. Note 'id' is always included."
+        },
     }
 
     @classmethod
@@ -74,6 +80,15 @@ class ExtractURLs(BasicProcessor):
             options["columns"]["options"] = {v: v for v in columns}
             options["columns"]["default"] = "body" if "body" in columns else sorted(columns,
                                                                                     key=lambda k: "text" in k).pop()
+        # Extra columns from top dataset
+        if parent_dataset:
+            top_dataset = parent_dataset.top_parent()
+            if top_dataset.get_columns():
+                extra_columns = top_dataset.get_columns()
+                options["extra_columns"]["type"] = UserInput.OPTION_MULTI
+                options["extra_columns"]["inline"] = True
+                options["extra_columns"]["options"] = {v: v for v in extra_columns}
+
         return options
 
     def process(self):
@@ -91,9 +106,12 @@ class ExtractURLs(BasicProcessor):
             columns = [columns]
         expand_urls = self.parameters.get("expand_urls", False)
         return_matches_only = self.parameters.get("return_matches_only", True)
+        extra_columns = self.parameters.get("extra_columns", [])
+        if type(extra_columns) == str:
+            extra_columns = [extra_columns]
 
         # Create fieldnames
-        fieldnames = ["id", "number_unique_urls", "extracted_urls"] + ["extracted_from_" + column for column in columns]
+        fieldnames = ["id", "number_unique_urls", "extracted_urls"] + extra_columns + ["extracted_from_" + column for column in columns]
 
         # Avoid requesting the same URL multiple times
         cache = {}
@@ -138,6 +156,9 @@ class ExtractURLs(BasicProcessor):
 
                 if (return_matches_only and row["extracted_urls"]) or not return_matches_only:
                     row["number_unique_urls"] = len(row["extracted_urls"])
+                    # Add extra columns
+                    for column in extra_columns:
+                        row[column] = item.get(column)
                     # Edit list/sets
                     for column in fieldnames:
                         if column in row.keys() and type(row[column]) in [list, set]:
