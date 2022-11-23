@@ -246,6 +246,7 @@ class VideoDownloaderPlus(BasicProcessor):
 		metadata = {
 			url: {
 				"from_dataset": self.source_dataset.key,
+				"post_ids": list(data.get('ids')),
 				**sets_to_lists(data)  # TODO: This some shenanigans until I can figure out what to do with the info returned
 			} for url, data in urls.items()
 		}
