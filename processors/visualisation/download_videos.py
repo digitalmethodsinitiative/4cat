@@ -26,7 +26,7 @@ class VideoDownloader(BasicProcessor):
 	type = "video-downloader"  # job type ID
 	category = "Visual"  # category
 	title = "Download videos"  # title displayed in UI
-	description = 'Basic video downloader that extracts http links and checks to see if they link directly to video content. Works best on sources with "video_url" columns such as Twitter and TikTok or "media_url" like Instagram.'  # description displayed in UI
+	description = "Download videos from URLs and store in a zip file. May take a while to complete as videos are retrieved externally. Works best on sources with \"video_url\" columns such as Twitter and TikTok or \"media_url\" like Instagram."  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
 
 	config = {
@@ -35,21 +35,21 @@ class VideoDownloader(BasicProcessor):
 			"coerce_type": int,
 			"default": 1000,
 			"help": "Max number of videos to download",
-			"tooltip": "Only allow downloading up to this many videos per batch. Increasing this can easily lead to "
-					   "very long-running processors and large datasets."
+			"tooltip": "Only allow downloading up to this many videos per batch. Increasing this can lead to "
+					   "long-running processors and large datasets."
 		},
 		"video_downloader.MAX_VIDEO_SIZE": {
 			"type": UserInput.OPTION_TEXT,
 			"coerce_type": int,
 			"default": 100,
 			"help": "Max allowed MB size of a single video for download",
-			"tooltip": "Size in MB/Megabytes; default 100. 0 will allow videos of ANY size to be downloaded."
+			"tooltip": "Size in MB/Megabytes; default 100. 0 will allow any size."
 		},
 		"video_downloader.DOWNLOAD_UNKNOWN_SIZE": {
 			"type": UserInput.OPTION_TOGGLE,
 			"default": True,
 			"help": "Allow download of unknown size",
-			"tooltip": "Video size is not always availalbe before downloading. If True, users may choose to download unknown sizes."
+			"tooltip": "Video size is not always available before downloading. If True, users may choose to download unknown sizes."
 		},
 	}
 
@@ -63,10 +63,10 @@ class VideoDownloader(BasicProcessor):
 		},
 		"columns": {
 			"type": UserInput.OPTION_TEXT,
-			"help": "Column to get image links from",
+			"help": "Column to get video links from",
 			"default": "video_url",
 			"inline": True,
-			"tooltip": "If column contains a single URL, use that URL; else, try to find image URLs in the column's content"
+			"tooltip": "If column contains a single URL, use that URL; else, try to extract video URLs."
 		},
 		"max_video_size": {
 			"type": UserInput.OPTION_TEXT,
@@ -78,7 +78,7 @@ class VideoDownloader(BasicProcessor):
 		},
 		"split-comma": {
 			"type": UserInput.OPTION_TOGGLE,
-			"help": "Split column values by comma?",
+			"help": "Split column values by comma",
 			"default": False,
 			"tooltip": "If enabled, columns can contain multiple URLs separated by commas, which will be considered "
 					   "separately"
@@ -94,21 +94,21 @@ class VideoDownloader(BasicProcessor):
 		options = cls.options
 
 		# Update the amount max and help from config
-		max_number_videos = int(config.get('video_downloader.MAX_NUMBER_VIDEOS', 100))
-		options['amount']['max'] = max_number_videos
-		options['amount']['help'] = "No. of videos (max %s)" % max_number_videos
+		max_number_videos = int(config.get("video_downloader.MAX_NUMBER_VIDEOS", 100))
+		options["amount"]["max"] = max_number_videos
+		options["amount"]["help"] = "No. of videos (max %s)" % max_number_videos
 		# And update the max size and help from config
-		max_video_size = int(config.get('video_downloader.MAX_VIDEO_SIZE', 100))
+		max_video_size = int(config.get("video_downloader.MAX_VIDEO_SIZE", 100))
 		if max_video_size == 0:
 			# Allow video of any size
 			options["max_video_size"]["tooltip"] = "Set to 0 if all sizes are to be downloaded."
-			options['max_video_size']['min'] = 0
+			options["max_video_size"]["min"] = 0
 		else:
 			# Limit video size
 			options["max_video_size"]["max"] = max_video_size
-			options['max_video_size']['default'] = options['amount']['default'] if options['amount']['default'] <= max_video_size else max_video_size
+			options["max_video_size"]["default"] = options["amount"]["default"] if options["amount"]["default"] <= max_video_size else max_video_size
 			options["max_video_size"]["tooltip"] = f"Max of {max_video_size} MB set by 4CAT administrators"
-			options['max_video_size']['min'] = 1
+			options["max_video_size"]["min"] = 1
 
 		# Get the columns for the select columns option
 		if parent_dataset and parent_dataset.get_columns():
@@ -150,14 +150,14 @@ class VideoDownloader(BasicProcessor):
 		# Collect parameters
 		amount = self.parameters.get("amount", 100)
 		if amount == 0:
-			amount = config.get('video_downloader.MAX_NUMBER_VIDEOS', 1000)
+			amount = config.get("video_downloader.MAX_NUMBER_VIDEOS", 1000)
 		max_video_size = self.parameters.get("max_video_size",
 											 100) * 1000000  # Multiply MB * 1000000 as Content-Length is in Bytes
 		if max_video_size == 0:
 			all_sizes = True
 		else:
 			all_sizes = False
-		allow_unknown_sizes = config.get('video_downloader.DOWNLOAD_UNKNOWN_SIZE', False)
+		allow_unknown_sizes = config.get("video_downloader.DOWNLOAD_UNKNOWN_SIZE", False)
 		split_comma = self.parameters.get("split-comma", False)
 		columns = self.parameters.get("columns")
 		if type(columns) == str:
@@ -176,7 +176,7 @@ class VideoDownloader(BasicProcessor):
 
 		# Prepare staging area for videos and video tracking
 		results_path = self.dataset.get_staging_area()
-		self.dataset.log('Staging directory location: %s' % results_path)
+		self.dataset.log("Staging directory location: %s" % results_path)
 		urls = {}
 
 		# first, get URLs to download images from
@@ -195,7 +195,7 @@ class VideoDownloader(BasicProcessor):
 				# remove all whitespace from beginning and end (needed for single URL check)
 				values = [str(value).strip()]
 				if split_comma:
-					values = values[0].split(',')
+					values = values[0].split(",")
 
 				for value in values:
 					if re.match(r"https?://(\S+)$", value):
@@ -206,14 +206,14 @@ class VideoDownloader(BasicProcessor):
 						# search for video URLs in string
 						video_links = self.identify_video_links(value)
 						if video_links:
-							self.dataset.log(f'Multiple urls: {",".join(video_links)}')
+							self.dataset.log(f"Multiple urls: {','.join(video_links)}")
 							item_urls |= set(video_links)
 
 			for item_url in item_urls:
 				if item_url not in urls:
-					urls[item_url] = {'ids': {post.get('id')}}
+					urls[item_url] = {"ids": {post.get("id")}}
 				else:
-					urls[item_url]['ids'].add(post.get('id'))
+					urls[item_url]["ids"].add(post.get("id"))
 
 		# Check if urls were identified
 		if not urls:
@@ -221,7 +221,7 @@ class VideoDownloader(BasicProcessor):
 			self.dataset.finish(0)
 			return
 		else:
-			self.dataset.log('Collected %i video urls.' % len(urls))
+			self.dataset.log("Collected %i video urls." % len(urls))
 
 		# Loop through video URLs and download
 		downloaded_videos = 0
@@ -235,66 +235,75 @@ class VideoDownloader(BasicProcessor):
 				raise ProcessorInterruptedException("Interrupted while downloading videos.")
 
 			# Open stream
-			with requests.get(url, stream=True) as response:
-				if response.status_code != 200:
-					message = 'Unable to obtain URL %s with reason: %s; and headers: %s' % (url, str(response.reason), str(response.headers))
-					self.dataset.log(message)
-					urls[url]['success'] = False
-					urls[url]['error'] = message
-					failed_downloads += 1
-					continue
-
-				# Verify video
-				#TODO: test/research other possible ways to verify video links
-				if 'video' not in response.headers['Content-Type'].lower():
-					# Log in metadata file
-					message = 'Url %s does not appear to be a video; Content-Type: %s' % (url, response.headers['Content-Type'])
-					urls[url]['success'] = False
-					urls[url]['error'] = message
-					failed_downloads += 1
-					continue
-
-				# Create filename
-				filename = re.sub(r"[^0-9a-z]+", "_", url.lower())[:100]  # [:100] is to avoid folder length shenanigans
-				extension = response.headers['Content-Type'].split('/')[-1]
-
-				# DEBUG Content-Type
-				if extension not in ['mp4', 'mp3']:
-					self.dataset.log('DEBUG: Odd extension type %s; Notify 4CAT maintainers if video. Content-Type for url %s: %s' % (extension, url, response.headers['Content-Type']))
-
-				# Ensure unique filename
-				video_filepath = Path(filename + '.' + extension)
-				save_location = results_path.joinpath(video_filepath)
-				filename_index = 0
-				while save_location.exists():
-					save_location = results_path.joinpath(filename + "-" + str(filename_index) + save_location.suffix.lower())
-					filename_index += 1
-
-				# Check video size
-				if not all_sizes:
-					if response.headers.get("Content-Length", False):
-						if int(response.headers.get("Content-Length")) > max_video_size:
-							urls[url]['success'] = False
-							urls[url]['error'] = f"Video size {response.headers.get('Content-Length')} larger than maximum allowed per 4CAT"
-							continue
-						else:
-							# Size appropriate
-							pass
-					# Size unknown
-					elif not allow_unknown_sizes:
-						urls[url]['success'] = False
-						urls[url]['error'] = f"Video size unknown; not allowed to download per 4CAT settings"
+			try:
+				with requests.get(url, stream=True) as response:
+					if response.status_code != 200:
+						message = "Unable to obtain URL %s with reason: %s; and headers: %s" % (url, str(response.reason), str(response.headers))
+						self.dataset.log(message)
+						urls[url]["success"] = False
+						urls[url]["error"] = message
+						failed_downloads += 1
 						continue
 
-				# Download video
-				with open(results_path.joinpath(save_location), 'wb') as f:
-					for chunk in response.iter_content(chunk_size=1024 * 1024):
-						if chunk:
-							f.write(chunk)
+					# Verify video
+					#TODO: test/research other possible ways to verify video links
+					if "video" not in response.headers["Content-Type"].lower():
+						# Log in metadata file
+						message = "Url %s does not appear to be a video; Content-Type: %s" % (url, response.headers["Content-Type"])
+						urls[url]["success"] = False
+						urls[url]["error"] = message
+						failed_downloads += 1
+						continue
 
-				# Add metadata
-				urls[url]['filename'] = save_location.name
-				urls[url]['success'] = True
+					# Create filename
+					filename = re.sub(r"[^0-9a-z]+", "_", url.lower())[:100]  # [:100] is to avoid folder length shenanigans
+					extension = response.headers["Content-Type"].split("/")[-1]
+
+					# DEBUG Content-Type
+					if extension not in ["mp4", "mp3"]:
+						self.dataset.log("DEBUG: Odd extension type %s; Notify 4CAT maintainers if video. Content-Type for url %s: %s" % (extension, url, response.headers["Content-Type"]))
+
+					# Ensure unique filename
+					video_filepath = Path(filename + "." + extension)
+					save_location = results_path.joinpath(video_filepath)
+					filename_index = 0
+					while save_location.exists():
+						save_location = results_path.joinpath(filename + "-" + str(filename_index) + save_location.suffix.lower())
+						filename_index += 1
+
+					# Check video size
+					if not all_sizes:
+						if response.headers.get("Content-Length", False):
+							if int(response.headers.get("Content-Length")) > max_video_size:
+								urls[url]["success"] = False
+								urls[url]["error"] = f"Video size {response.headers.get('Content-Length')} larger than maximum allowed per 4CAT"
+								continue
+							else:
+								# Size appropriate
+								pass
+						# Size unknown
+						elif not allow_unknown_sizes:
+							urls[url]["success"] = False
+							urls[url]["error"] = f"Video size unknown; not allowed to download per 4CAT settings"
+							continue
+
+					# Download video
+					with open(results_path.joinpath(save_location), "wb") as f:
+						for chunk in response.iter_content(chunk_size=1024 * 1024):
+							if chunk:
+								f.write(chunk)
+
+					# Add metadata
+					urls[url]["filename"] = save_location.name
+					urls[url]["success"] = True
+			
+			except requests.exceptions.SSLError:
+				message = "Unable to obtain URL %s due to SSL error." % url
+				urls[url]["success"] = False
+				urls[url]["error"] = message
+				failed_downloads += 1
+				self.dataset.log(message)
+				continue
 
 			# Update status
 			downloaded_videos += 1
@@ -305,19 +314,19 @@ class VideoDownloader(BasicProcessor):
 		# Save some metadata to be able to connect the videos to their source
 		metadata = {
 			url: {
-				"filename": data.get('filename'),
-				"success": data.get('success'),
+				"filename": data.get("filename"),
+				"success": data.get("success"),
 				"from_dataset": self.source_dataset.key,
 				# sets() are not JSON serializable...
-				"post_ids": list(data.get('ids')),
-				"errors": data.get('error', ''),
+				"post_ids": list(data.get("ids")),
+				"errors": data.get("error", ""),
 			} for url, data in urls.items()
 		}
 		with results_path.joinpath(".metadata.json").open("w", encoding="utf-8") as outfile:
 			json.dump(metadata, outfile)
 
 		# Finish up
-		self.dataset.update_status('Downloaded %i videos. %i URLs did not link directly to videos or failed. Check .metadata.json for individual video results.' % (downloaded_videos, failed_downloads), is_final=True)
+		self.dataset.update_status("Downloaded %i videos. %i URLs did not link directly to videos or failed. Check .metadata.json for individual video results." % (downloaded_videos, failed_downloads), is_final=True)
 		self.write_archive_and_finish(results_path)
 
 	def identify_video_links(self, text):
@@ -327,14 +336,6 @@ class VideoDownloader(BasicProcessor):
 		:param str text:  string that may contain URLs
 		:return list:  	  list containing validated URLs to videos
 		"""
-		# Redex for identifying video URLs within strings
-		# # for video URL extraction, we use the following heuristic:
-		# # Makes sure that it gets "http://site.com/img.jpg", but also
-		# # more complicated ones like
-		# # https://preview.redd.it/3thfhsrsykb61.gif?format=mp4&s=afc1e4568789d2a0095bd1c91c5010860ff76834
-		# vid_link_regex = re.compile(
-		# 	r"(?:www\.|https?:\/\/)[^\s\(\)\]\[,']*\.(?:png|jpg|jpeg|gif|gifv)[^\s\(\)\]\[,']*", re.IGNORECASE)
-
 		# Currently just extracting all links
 		# Could also try: https://stackoverflow.com/questions/161738/what-is-the-best-regular-expression-to-check-if-a-string-is-a-valid-url
 		vid_link_regex = re.compile(r"(https?):\/\/[a - z0 - 9\.:].* ?(?=\s)",  re.IGNORECASE)
@@ -348,5 +349,5 @@ class VideoDownloader(BasicProcessor):
 				validated_links.append(url)
 			else:
 				# DEBUG: this is to check our regex works as intended
-				self.dataset.log('Possible URL identified, but did not validate: %s' % url)
+				self.dataset.log("Possible URL identified, but did not validate: %s" % url)
 		return validated_links
