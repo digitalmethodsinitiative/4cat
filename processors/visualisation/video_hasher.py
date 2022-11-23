@@ -176,13 +176,15 @@ class VideoHasher(BasicProcessor):
 						if not file.get("success"):
 							continue
 						video_hash = video_hashes[file.get('filename')].get('videohash')
-						data.update({
+						row = {
 							'id': file.get('filename'),  # best if all datasets have unique identifier
 							'url': url,
+							"from_dataset": data.get("from_dataset"),
 							'video_hash': video_hash.hash,
 							'video_duration': video_hash.video_duration,
-							'video_collage_filename': video_hashes[file.get('filename')].get('video_collage_filename'),
 							'video_count': len(data.get('post_ids', [])),
+							"post_ids": ','.join(data.get("post_ids", [])),
+							'video_collage_filename': video_hashes[file.get('filename')].get('video_collage_filename'),
 						})
 
 						if update_parent:
@@ -193,11 +195,7 @@ class VideoHasher(BasicProcessor):
 								else:
 									post_id_to_results[post_id] = [(url, video_hash.hash)]
 
-						# List types are not super fun for CSV
-						if 'post_ids' in data:
-							data['post_ids'] = ','.join(data['post_ids'])
-
-						rows.append(data)
+						rows.append(row)
 						num_posts += 1
 
 		if update_parent and video_metadata:

@@ -225,8 +225,9 @@ class VideoSceneDetector(BasicProcessor):
 							rows.append({
 								'id': file.get('filename') + '_scene_' + str(i+1),  # best if all datasets have unique identifier
 								'url': url,
+								"from_dataset": video_data.get("from_dataset"),
 								**scene,
-								**video_data,
+								"post_ids": ','.join(video_data.get("post_ids", [])),
 							})
 							num_posts += 1
 
