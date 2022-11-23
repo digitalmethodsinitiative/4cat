@@ -93,7 +93,7 @@ class ExtractURLs(BasicProcessor):
         return_matches_only = self.parameters.get("return_matches_only", True)
 
         # Create fieldnames
-        fieldnames = ["id", "extracted_urls"] + ["extracted_from_" + column for column in columns]
+        fieldnames = ["id", "number_unique_urls", "extracted_urls"] + ["extracted_from_" + column for column in columns]
 
         # Avoid requesting the same URL multiple times
         cache = {}
@@ -137,6 +137,7 @@ class ExtractURLs(BasicProcessor):
                     row["extracted_urls"] |= set(identified_urls)
 
                 if (return_matches_only and row["extracted_urls"]) or not return_matches_only:
+                    row["number_unique_urls"] = len(row["extracted_urls"])
                     # Edit list/sets
                     for column in fieldnames:
                         if column in row.keys() and type(row[column]) in [list, set]:
@@ -146,7 +147,7 @@ class ExtractURLs(BasicProcessor):
 
                 processed_items += 1
                 if processed_items % (total_items / 10) == 0:
-                    self.dataset.update_status(f"Extracted {url_matches_found} URLs from {processed_items}/{total_items} items")
+                    self.dataset.update_status(f"Processed {processed_items}/{total_items} items; {url_matches_found} items with url(s)")
                     self.dataset.update_progress(processed_items / total_items)
 
         self.dataset.finish(url_matches_found)
