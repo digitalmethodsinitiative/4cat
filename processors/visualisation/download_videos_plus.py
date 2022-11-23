@@ -53,6 +53,13 @@ class VideoDownloaderPlus(BasicProcessor):
 			"inline": True,
 			"tooltip": "If column contains a single URL, use that URL; else, try to find image URLs in the column's content"
 		},
+		"max_video_size": {
+			"type": UserInput.OPTION_TEXT,
+			"help": "Max videos size (in MB/Megabytes)",
+			"default": 100,
+			"min": 1,
+			"tooltip": "Max of 100 MB set by 4CAT administrators",
+		},
 		"split-comma": {
 			"type": UserInput.OPTION_TOGGLE,
 			"help": "Split column values by comma?",
@@ -79,9 +86,21 @@ class VideoDownloaderPlus(BasicProcessor):
 		options = cls.options
 
 		# Update the amount max and help from config
-		max_number_videos = int(config.get('image_downloader.MAX_NUMBER_IMAGES', 1000))
+		max_number_videos = int(config.get('video_downloader.MAX_NUMBER_VIDEOS', 100))
 		options['amount']['max'] = max_number_videos
 		options['amount']['help'] = "No. of videos (max %s)" % max_number_videos
+		# And update the max size and help from config
+		max_video_size = int(config.get('video_downloader.MAX_VIDEO_SIZE', 100))
+		if max_video_size == 0:
+			# Allow video of any size
+			options["max_video_size"]["tooltip"] = "Set to 0 if all sizes are to be downloaded."
+			options['max_video_size']['min'] = 0
+		else:
+			# Limit video size
+			options["max_video_size"]["max"] = max_video_size
+			options['max_video_size']['default'] = options['amount']['default'] if options['amount']['default'] <= max_video_size else max_video_size
+			options["max_video_size"]["tooltip"] = f"Max of {max_video_size} MB set by 4CAT administrators"
+			options['max_video_size']['min'] = 1
 
 		# Get the columns for the select columns option
 		if parent_dataset and parent_dataset.get_columns():
@@ -140,8 +159,9 @@ class VideoDownloaderPlus(BasicProcessor):
 		self.dataset.log('Staging directory location: %s' % results_path)
 
 		# Set up yt_dlp options
+		#-f "(bestvideo[filesize<2G]/bestvideo[filesize_approx<2G])+bestaudio/(best[filesize<2G]/best[filesize_approx<2G])"
 		ydl_opts = {
-			"logger": self.log,
+			# "logger": self.log,  # This will dump any errors to our logger if desired
 			"outtmpl": str(results_path) + '/%(uploader)s_%(title)s.%(ext)s',
 			"socket_timeout": 30,
 			"postprocessor_hooks": [self.yt_dlp_post_monitor],# This function ensures no more than self.max_videos_per_url downloaded and can be used to monitor progress
@@ -151,7 +171,19 @@ class VideoDownloaderPlus(BasicProcessor):
 		# Collect parameters
 		amount = self.parameters.get("amount", 100)
 		if amount == 0:
-			amount = config.get('image_downloader.MAX_NUMBER_IMAGES', 1000)
+			amount = config.get('video_downloader.MAX_NUMBER_VIDEOS', 100)
+
+		# YT-DLP by default attempts to download the best quality videos
+		allow_unknown_sizes = config.get('video_downloader.DOWNLOAD_UNKNOWN_SIZE', False)
+		max_video_size = self.parameters.get("max_video_size", 100)
+		max_size = str(max_video_size) + "M"
+		if not max_video_size == 0:
+			if allow_unknown_sizes:
+				ydl_opts["format"] = f"[filesize<?{max_size}]/[filesize_approx<?{max_size}]"
+			else:
+				# Direct links do not appear to have a size via yt-dlp
+				# TODO: check Content-Length ourselves? Obviously this will not work on many different sites for which yt-dlp is designed
+				ydl_opts["format"] = f"[filesize<{max_size}]/[filesize_approx<{max_size}]"
 
 		# Loop through video URLs and download
 		downloaded_videos = 0
@@ -187,7 +219,10 @@ class VideoDownloaderPlus(BasicProcessor):
 					# Raised when already downloaded max number of videos per URL as defined in self.max_videos_per_url
 					pass
 				except DownloadError as e:
-					message = 'DownloadError: %s' % str(e)
+					if "Requested format is not available" in str(e):
+						message = f"No format available for video (filesize less than {max_size}" + " and unknown sizes not allowed)" if not allow_unknown_sizes else ")"
+					else:
+						message = 'DownloadError: %s' % str(e)
 					urls[url]['success'] = False
 					urls[url]['error'] = message
 					failed_downloads += 1
