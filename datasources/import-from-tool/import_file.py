@@ -34,9 +34,9 @@ class ImportFromExternalTool(BasicProcessor):
 			"options": {
 				"instagram-crowdtangle": "Instagram (CrowdTangle export)",
 				"facebook-crowdtangle": "Facebook (CrowdTangle export)",
-				"facebook-crowdtangle-old": "Facebook (CrowdTangle export, old format)",
 				"instagram-dmi-scraper": "Instagram (DMI Instagram scraper)",
-				"tiktok": "TikTok (drawrowfly/tiktok-scraper)"
+				"tiktok": "TikTok (drawrowfly/tiktok-scraper)",
+				"youtube_video_list": "YouTube Data Tools: Video List",
 			},
 			"default": "instagram-crowdtangle"
 		},
@@ -53,13 +53,6 @@ class ImportFromExternalTool(BasicProcessor):
 		"instagram-dmi-scraper": (
 			"id", "thread_id", "parent_id", "body", "author", "timestamp", "type", "url", "thumbnail_url", "hashtags",
 			"usertags", "mentioned", "num_likes", "num_comments", "subject"
-		),
-		# todo: remove this one somewhere past june 2021
-		"facebook-crowdtangle-old": (
-			"User Name", "Facebook Id", "Likes at Posting", "Followers at Posting", "Created", "Type",
-			"Likes", "Comments", "Shares", "Love", "Wow", "Haha", "Sad", "Angry", "Care", "Video Share Status",
-			"Post Views", "Total Views", "Total Views For All Crossposts", "Video Length", "URL", "Message", "Link",
-			"Final Link", "Image Text", "Link Text", "Description", "Sponsor Id", "Sponsor Name", "Total Interactions"
 		),
 		"facebook-crowdtangle": (
 			"Page Name", "User Name", "Facebook Id", "Page Category", "Page Admin Top Country", "Page Description",
@@ -80,7 +73,8 @@ class ImportFromExternalTool(BasicProcessor):
 			"shares.count", "reactions.summary.total_count", "like.summary.total_count", "love.summary.total_count",
 			"haha.summary.total_count", "wow.summary.total_count", "sad.summary.total_count",
 			"angry.summary.total_count", "message"
-		)
+		),
+		"youtube_video_list": ("publishedAt", "videoId", "channelId", "channelTitle", "videoDescription"),
 	}
 
 	def process(self):
@@ -227,74 +221,6 @@ class ImportFromExternalTool(BasicProcessor):
 						"num_comments": item["Comments"],
 						"subject": item["Title"]}
 					)
-
-		elif platform == "facebook-crowdtangle-old":
-			# todo: remove this one somewhere after june 2021
-			with dataset.get_results_path().open("w", encoding="utf-8", newline="") as output_csv:
-				wrapped_upload = io.TextIOWrapper(file, encoding=encoding)
-				reader = csv.DictReader(wrapped_upload)
-
-				entity_name = "Page Name" if "Page Name" in reader.fieldnames else "Group Name"
-
-				writer = csv.DictWriter(output_csv, fieldnames=(
-					"id", "thread_id", "body", "author", "timestamp", "unix_timestamp", "page_id",
-					"page_name", "page_likes", "page_followers", "page_shared_from", "type", "interactions", "likes",
-					"comments", "shares", "likes_love", "likes_wow", "likes_haha", "likes_sad", "likes_angry",
-					"likes_care", "views_post", "views_total", "views_total_crossposts", "video_length", "video_status",
-					"url", "url_original", "body_image", "body_link", "body_description", "hashtags", "sponsor_id",
-					"sponsor_name"))
-				writer.writeheader()
-
-				dataset.update_status("Sorting by date...")
-				posts = sorted(reader, key=lambda x: x["Created"])
-
-				dataset.update_status("Processing posts...")
-				for item in posts:
-					done += 1
-					hashtags = hashtag.findall(item["Message"])
-
-					date = datetime.datetime.strptime(" ".join(item["Created"].split(" ")[:2]), "%Y-%m-%d %H:%M:%S")
-
-					is_from_elsewhere = item["Link"].find("https://www.facebook.com/" + item["User Name"]) < 0
-					shared_page = item["Link"].split("/")[3] if is_from_elsewhere and item["Link"].find("https://www.facebook.com/") == 0 else ""
-
-					writer.writerow({
-						"id": item["URL"].split("/")[-1],
-						"thread_id": item["URL"].split("/")[-1],
-						"body": item["Message"],
-						"author": item["User Name"],
-						"timestamp": date.strftime('%Y-%m-%d %H:%M:%S'),
-						"unix_timestamp": int(date.timestamp()),
-						"page_name": item[entity_name],
-						"page_likes": item["Likes at Posting"],
-						"page_id": item["Facebook Id"],
-						"page_followers": item["Followers at Posting"],
-						"page_shared_from": shared_page,
-						"type": item["Type"],
-						"interactions": int(re.sub(r"[^0-9]", "", item["Total Interactions"])) if item["Total Interactions"] else 0,
-						"comments": item["Comments"],
-						"shares": item["Shares"],
-						"likes": item["Likes"],
-						"likes_love": item["Love"],
-						"likes_wow": item["Wow"],
-						"likes_haha": item["Haha"],
-						"likes_sad": item["Sad"],
-						"likes_angry": item["Angry"],
-						"likes_care": item["Care"],
-						"views_post": item["Post Views"],
-						"views_total": item["Total Views"],
-						"views_total_crossposts": item["Total Views For All Crossposts"],
-						"video_length": "" if item["Video Length"] == "N/A" else item["Video Length"],
-						"video_status": item["Video Share Status"],
-						"url": item["URL"],
-						"hashtags": ",".join(hashtags),
-						"url_original": item["Link"],
-						"body_image": item["Image Text"],
-						"body_link": item["Link Text"],
-						"body_description": item["Description"],
-						"sponsor_id": item["Sponsor Id"],
-						"sponsor_name": item["Sponsor Name"]
-					})
 
 		elif platform == "facebook-crowdtangle":
 			with dataset.get_results_path().open("w", encoding="utf-8", newline="") as output_csv:
@@ -478,6 +404,46 @@ class ImportFromExternalTool(BasicProcessor):
 						"amount_plays": item["playCount"],
 						"hashtags": ",".join(hashtags),
 					})
+
+		elif platform == "youtube_video_list":
+			with dataset.get_results_path().open("w", encoding="utf-8", newline="") as output_csv:
+				# Read in the file
+				wrapped_upload = io.TextIOWrapper(file, encoding=encoding)
+				reader = csv.DictReader(wrapped_upload)
+
+				# Collect fieldnames
+				original_fields = reader.fieldnames
+
+				# Collect metadata
+				sanitized_filename = dataset.parameters.get("filename")
+				collection_date = '_'.join(sanitized_filename.split('_')[2:]).replace(".csv","")
+
+				dataset.update_status("Sorting by position...")
+				posts = sorted(reader, key=lambda x: int(x["position"]))
+
+				# Write new CSV headers
+				writer = csv.DictWriter(output_csv, fieldnames=tuple(["id", "thread_id", "author", "body", "timestamp", "unix_timestamp"] + list(original_fields) + ['source_filename', 'date_collected']))
+				writer.writeheader()
+
+				dataset.update_status("Processing posts...")
+				for item in posts:
+					# Map data to required columns
+					date = datetime.datetime.strptime(item["publishedAt"], "%Y-%m-%dT%H:%M:%SZ")  # ex. 2022-11-11T05:30:01Z
+					new_item = {
+						"id": item.get('videoId'),
+						"thread_id": item.get('channelId'),
+						"author": item.get('channelTitle'),
+						"body": item.get('videoDescription'),
+						"timestamp": date.strftime('%Y-%m-%d %H:%M:%S'),
+						"unix_timestamp": int(date.timestamp()),
+						**item,
+						"source_filename": sanitized_filename,
+						"date_collected": collection_date,
+					}
+
+					# Write the row
+					writer.writerow(new_item)
+					done += 1
 
 		file.close()
 
