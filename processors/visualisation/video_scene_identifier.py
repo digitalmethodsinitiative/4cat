@@ -28,8 +28,8 @@ class VideoSceneDetector(BasicProcessor):
 	extension = "csv"  # extension of result file, used internally and in UI
 
 	references = [
-		"PySceneDetect: https://github.com/Breakthrough/PySceneDetect",
-		"Detection Algorithms: https://scenedetect.com/projects/Manual/en/latest/api/detectors.html"
+		"[PySceneDetect](https://github.com/Breakthrough/PySceneDetect)",
+		"[Detection Algorithms](https://scenedetect.com/projects/Manual/en/latest/api/detectors.html)"
 	]
 
 	options = {
@@ -115,7 +115,7 @@ class VideoSceneDetector(BasicProcessor):
 		"""
 		Allow on videos
 		"""
-		return module.type == "video-downloader"
+		return module.type in ["video-downloader", "video-downloader-plus"]
 
 	def process(self):
 		"""
@@ -212,18 +212,19 @@ class VideoSceneDetector(BasicProcessor):
 		else:
 			self.dataset.update_status("Saving video scene results")
 			for url, video_data in video_metadata.items():
-				# List types are not super fun for CSV
-				if 'post_ids' in video_data:
-					video_data['post_ids'] = ','.join(video_data['post_ids'])
+				if video_data.get('success'):
+					# List types are not super fun for CSV
+					if 'post_ids' in video_data:
+						video_data['post_ids'] = ','.join(video_data['post_ids'])
 
-				for i, scene in enumerate(collected_scenes[video_data.get('filename')]):
-					rows.append({
-						'id': video_data.get('filename') + '_scene_' + str(i+1),  # best if all datasets have unique identifier
-						'url': url,
-						**scene,
-						**video_data,
-					})
-					num_posts += 1
+					for i, scene in enumerate(collected_scenes[video_data.get('filename')]):
+						rows.append({
+							'id': video_data.get('filename') + '_scene_' + str(i+1),  # best if all datasets have unique identifier
+							'url': url,
+							**scene,
+							**video_data,
+						})
+						num_posts += 1
 
 		self.dataset.update_status(
 			'Detected %i scenes in %i videos' % (num_posts, processed_videos))

@@ -78,7 +78,7 @@ class VideoHasher(BasicProcessor):
 		"""
 		Allow on videos only
 		"""
-		return module.type == "video-downloader"
+		return module.type in ["video-downloader", "video-downloader-plus"]
 
 	def process(self):
 		"""
@@ -169,30 +169,36 @@ class VideoHasher(BasicProcessor):
 			self.dataset.update_status("Saving video hash results")
 			with self.dataset.get_results_path().open("w", encoding="utf-8", newline="") as outfile:
 				for url, data in video_metadata.items():
-					video_hash = video_hashes[data.get('filename')].get('videohash')
-					data.update({
-						'id': data.get('filename'),  # best if all datasets have unique identifier
-						'url': url,
-						'video_hash': video_hash.hash,
-						'video_duration': video_hash.video_duration,
-						'video_collage_filename': video_hashes[data.get('filename')].get('video_collage_filename'),
-						'video_count': len(data.get('post_ids', [])),
-					})
+					if not data.get("success"):
+						continue
+					files = data.get('files') if 'files' in data else [{"filename": data.get("filename"), "success":True}]
+					for file in files:
+						if not file.get("success"):
+							continue
+						video_hash = video_hashes[file.get('filename')].get('videohash')
+						data.update({
+							'id': file.get('filename'),  # best if all datasets have unique identifier
+							'url': url,
+							'video_hash': video_hash.hash,
+							'video_duration': video_hash.video_duration,
+							'video_collage_filename': video_hashes[data.get('filename')].get('video_collage_filename'),
+							'video_count': len(data.get('post_ids', [])),
+						})
 
-					if update_parent:
-						for post_id in data.get('post_ids', []):
-							# Posts can have multiple videos
-							if post_id in post_id_to_results.keys():
-								post_id_to_results[post_id].append((url, video_hash.hash))
-							else:
-								post_id_to_results[post_id] = [(url, video_hash.hash)]
+						if update_parent:
+							for post_id in data.get('post_ids', []):
+								# Posts can have multiple videos
+								if post_id in post_id_to_results.keys():
+									post_id_to_results[post_id].append((url, video_hash.hash))
+								else:
+									post_id_to_results[post_id] = [(url, video_hash.hash)]
 
-					# List types are not super fun for CSV
-					if 'post_ids' in data:
-						data['post_ids'] = ','.join(data['post_ids'])
+						# List types are not super fun for CSV
+						if 'post_ids' in data:
+							data['post_ids'] = ','.join(data['post_ids'])
 
-					rows.append(data)
-					num_posts += 1
+						rows.append(data)
+						num_posts += 1
 
 		if update_parent and video_metadata:
 			updated_rows = []

@@ -62,7 +62,7 @@ class VideoFrames(BasicProcessor):
 		"""
 		Allow on tiktok-search only for dev
 		"""
-		return module.type == "video-downloader"
+		return module.type in ["video-downloader", "video-downloader-plus"]
 
 	def process(self):
 		"""
