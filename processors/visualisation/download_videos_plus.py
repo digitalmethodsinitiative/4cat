@@ -30,12 +30,12 @@ class VideoDownloaderPlus(BasicProcessor):
 	type = "video-downloader-plus"  # job type ID
 	category = "Visual"  # category
 	title = "Download videos plus"  # title displayed in UI
-	description = "IN DEVELOPMENT: Uses yt-dlp to download a variety of links to video hosting sites."  # description displayed in UI
+	description = "Uses YT-DLP to download a variety of links to video hosting sites (see references)."  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
 
 	references = [
-		"YT-DLP python package: https://github.com/yt-dlp/yt-dlp/#readme",
-		"Supported sites: https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md",
+		"[YT-DLP python package](https://github.com/yt-dlp/yt-dlp/#readme)",
+		"[Supported sites](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md)",
 	]
 
 	options = {
@@ -73,7 +73,7 @@ class VideoDownloaderPlus(BasicProcessor):
 		super().__init__(logger, job, queue, manager, modules)
 		self.max_videos_per_url = 5
 		self.videos_downloaded_from_url = 0
-		self.url_filenames = None
+		self.url_files = None
 		self.last_dl_status = None
 		self.last_post_process_status = None
 
@@ -211,7 +211,7 @@ class VideoDownloaderPlus(BasicProcessor):
 				try:
 					# Count and use self.yt_dlp_monitor() to ensure sure we don't download videos forever...
 					self.videos_downloaded_from_url = 0
-					self.url_filenames = []
+					self.url_files = []
 					self.last_dl_status = None
 					self.last_post_process_status = None
 					info = ydl.extract_info(url)
@@ -232,7 +232,7 @@ class VideoDownloaderPlus(BasicProcessor):
 				# Add metadata
 				# TODO: What does "info" from ydl look like if there are multiple videos per url? Docs are silent...
 				urls[url]['metadata'] = ydl.sanitize_info(info)
-				urls[url]['filenames'] = self.url_filenames
+				urls[url]['files'] = self.url_files
 				# Check that download and processing finished
 				urls[url]['success'] = all([self.last_dl_status.get('status') == 'finished', self.last_post_process_status.get('status') == 'finished'])
 
@@ -273,7 +273,7 @@ class VideoDownloaderPlus(BasicProcessor):
 		self.last_post_process_status = d
 		if d['status'] == 'finished':  # "downloading", "error", or "finished"
 			self.videos_downloaded_from_url += 1
-			self.url_filenames.append(Path(d.get('info_dict').get('_filename')).name)
+			self.url_files.append({"filename": Path(d.get('info_dict').get('_filename')).name, "success":True})
 		if self.videos_downloaded_from_url >= self.max_videos_per_url:
 			raise MaxVideosDownloaded('Max videos for URL reached.')
 
