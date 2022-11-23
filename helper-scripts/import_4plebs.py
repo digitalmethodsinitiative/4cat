@@ -170,12 +170,13 @@ with open(args.input, encoding="utf-8") as inputfile:
 
 		post_id = int(post["num"])
 
+		
 		# Set country name of post. This is a bit tricky because we have to differentiate
 		# on troll and geo flags. These also change over time.
 		country_code = ""
 		country_name = ""
 
-		if args.board == 'pol':
+		if args.board == "pol" or args.board == "int":
 
 			exif = json.loads(post["exif"]) if post.get("exif") else ""
 			
@@ -243,9 +244,13 @@ with open(args.input, encoding="utf-8") as inputfile:
 
 		# For speed, we only commit every so many posts
 		if len(postbuffer) % args.batch == 0:
-			print("\nCommitting posts %i-%i to database." % (posts - args.batch, posts))
+			print("Committing posts %i-%i to database." % (posts - args.batch, posts))
 			commit(postbuffer, post_fields, db, args.datasource, fast=args.fast)
 			postbuffer = []
+
+# commit remainder
+print("Committing final posts.")
+commit(postbuffer, post_fields, db, args.datasource, fast=args.fast)
 
 # Insert deleted posts, and get their id_seq to use in the posts_{datasource}_deleted table
 if deleted_ids:
@@ -254,11 +259,6 @@ if deleted_ids:
 		result = db.fetchone("SELECT id_seq, timestamp FROM posts_" + args.datasource + " WHERE id = %s AND board = '%s' " % (deleted_id, args.board))
 		db.insert("posts_" + args.datasource + "_deleted", {"id_seq": result["id_seq"], "timestamp_deleted": result["timestamp"]}, safe=True)
 	deleted_ids = set()
-
-# commit remainder
-print("Committing final posts.")
-commit(postbuffer, post_fields, db, args.datasource, fast=args.fast)
-
 
 # update threads
 print("Updating threads.")
@@ -300,3 +300,5 @@ db.execute(
 db.execute(
 	"UPDATE threads_" + args.datasource + " AS t SET num_images = ( SELECT COUNT(*) FROM posts_" + args.datasource + " AS p WHERE p.thread_id = t.id AND image_file != '') WHERE t.id IN %s AND board = %s",
 	(tuple(threads.keys()), args.board,))
+
+print("Done!")
