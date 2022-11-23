@@ -3,12 +3,13 @@ Extract URLs from columns
 
 Optionally expand shortened URLs (from Stijn's expand_url_shorteners)
 """
+import csv
 import re
 import time
 import requests
 
 from common.lib.exceptions import ProcessorInterruptedException
-from processors.filtering.base_filter import BaseFilter
+from backend.abstract.processor import BasicProcessor
 from common.lib.helpers import UserInput
 from processors.filtering.expand_url_shorteners import UrlUnshortener
 
@@ -17,16 +18,19 @@ __credits__ = ["Stijn Peeters", "Dale Wahl"]
 __maintainer__ = "Dale Wahl"
 __email__ = "4cat@oilab.eu"
 
+csv.field_size_limit(1024 * 1024 * 1024)
 
-class ExtractURLs(BaseFilter):
+
+class ExtractURLs(BasicProcessor):
     """
     Retain only posts where a given column matches a given value
     """
     type = "extract-urls-filter"  # job type ID
     category = "Conversion"  # category
     title = "Extract URLs (and optionally expand)"  # title displayed in UI
-    description = "Extract any URLs from selected column and, optionally, expand any shortened URLs. This will create" \
+    description = "Extract any URLs from selected column(s) and, optionally, expand any shortened URLs. This will create" \
                   " a new dataset."
+    extension = "csv"
 
     options = {
         "columns": {
@@ -72,68 +76,80 @@ class ExtractURLs(BaseFilter):
                                                                                     key=lambda k: "text" in k).pop()
         return options
 
-    def filter_items(self):
+    def process(self):
         """
-        Create a generator to iterate through items that can be passed to create either a csv or ndjson. Use
-        `for original_item, mapped_item in self.source_dataset.iterate_mapped_items(self)` to iterate through items
-        and yield `original_item`.
+        Extract URLs and optionally excand them from URL shorteners
 
-        :return generator:
+        Replaces redirect URLs on a best-effort basis. Redirects with a status
+        code outside the 200-399 range are ignored.
         """
         self.dataset.update_status("Searching for URLs")
 
         # Get match column parameters
         columns = self.parameters.get("columns", [])
+        if type(columns) == str:
+            columns = [columns]
         expand_urls = self.parameters.get("expand_urls", False)
         return_matches_only = self.parameters.get("return_matches_only", True)
+
+        # Create fieldnames
+        fieldnames = ["id", "extracted_urls"] + ["extracted_from_" + column for column in columns]
 
         # Avoid requesting the same URL multiple times
         cache = {}
 
-        processed_items = 0
-        total_items = self.source_dataset.num_rows
-        for original_item, mapped_item in self.source_dataset.iterate_mapped_items(self):
-            if self.interrupted:
-                raise ProcessorInterruptedException("Interrupted while iterating through items")
+        # write a new file with the updated links
+        with self.dataset.get_results_path().open("w", encoding="utf-8", newline="") as output:
+            writer = csv.DictWriter(output, fieldnames=fieldnames)
+            writer.writeheader()
 
-            all_item_urls = set()
+            processed_items = 0
+            url_matches_found = 0
+            total_items = self.source_dataset.num_rows
+            for item in self.source_dataset.iterate_items(self):
+                if self.interrupted:
+                    raise ProcessorInterruptedException("Interrupted while iterating through items")
 
-            for column in columns:
-                value = mapped_item.get(column)
-                if not value:
-                    continue
-                if type(value) != str:
-                    self.dataset.update_status(f"Column \"{column}\" is not text and will be ignored.")
-                    # Remove from future
-                    columns.remove(column)
-                    continue
+                row = {
+                    "id": item["id"],
+                    "extracted_urls": set(),
+                }
 
-                # Check for links
-                identified_urls = self.identify_links(value)
+                for column in columns:
+                    value = item.get(column)
+                    if not value:
+                        continue
+                    if type(value) != str:
+                        self.dataset.update_status(f"Column \"{column}\" is not text and will be ignored.")
+                        # Remove from future
+                        columns.remove(column)
+                        continue
 
-                if expand_urls:
-                    new_urls = []
-                    for url in identified_urls:
-                        new_url = self.resolve_redirect(url=url, redirect_domains=UrlUnshortener.redirect_domains, cache=cache)
-                        new_urls.append(new_url)
-                        if new_url != url:
-                            self.dataset.log(f"It's working! Updated {url} to {new_url}")
-                    identified_urls = new_urls
-                    #identified_urls = [self.resolve_redirect(url=url, redirect_domains=UrlUnshortener.redirect_domains, cache=cache) for url in identified_urls]
+                    # Check for links
+                    identified_urls = self.identify_links(value)
 
-                # Add identified links
-                all_item_urls |= set(identified_urls)
+                    # Expand url shorteners
+                    if expand_urls:
+                        identified_urls = [self.resolve_redirect(url=url, redirect_domains=UrlUnshortener.redirect_domains, cache=cache) for url in identified_urls]
 
-            processed_items += 1
-            if processed_items % (total_items / 10) == 0:
-                self.dataset.update_status(f"Extracted URLs from {processed_items}/{total_items} items")
-                self.dataset.update_progress(processed_items / total_items)
+                    # Add identified links
+                    row["extracted_from_"+column] = identified_urls
+                    row["extracted_urls"] |= set(identified_urls)
 
-            # To yield or not to yield, that is the question
-            if (return_matches_only and all_item_urls) or not return_matches_only:
-                original_item['4cat_extracted_urls'] = ','.join(all_item_urls)
-                yield original_item
+                if (return_matches_only and row["extracted_urls"]) or not return_matches_only:
+                    # Edit list/sets
+                    for column in fieldnames:
+                        if type(row[column]) in [list, set]:
+                            row[column] = ','.join(row[column])
+                    writer.writerow(row)
+                    url_matches_found += 1
 
+                processed_items += 1
+                if processed_items % (total_items / 10) == 0:
+                    self.dataset.update_status(f"Extracted {url_matches_found} URLs from {processed_items}/{total_items} items")
+                    self.dataset.update_progress(processed_items / total_items)
+
+        self.dataset.finish(url_matches_found)
 
     @staticmethod
     def resolve_redirect(url, redirect_domains, cache={}, depth=0):
