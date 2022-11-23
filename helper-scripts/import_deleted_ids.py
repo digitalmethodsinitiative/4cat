@@ -26,19 +26,17 @@ cli.add_argument("-d", "--datasource", type=str, default="4chan", help="Data sou
 args = cli.parse_args()
 
 db = Database(logger=Logger(), appname="4chan-import")
-board = "pol"
+
 posts = 0
 posts_not_found = 0
 threads = 0
 batch = 100000
-
 
 if not os.path.exists(args.input):
 	print("File not found: %s" % args.input)
 	sys.exit(1)
 
 print("Opening %s." % args.input)
-
 
 with open(args.input, "r", encoding="utf-8") as in_txt:
 
@@ -59,7 +57,6 @@ with open(args.input, "r", encoding="utf-8") as in_txt:
 		# encountered in the first place, and we need an `id_seq` field.
 		if not post:
 			posts_not_found += 1
-			#print("Post %s/%s/%s not in database" % (args.datasource, args.board, post_id,))
 		else:
 			if not timestamp_deleted:
 				timestamp_deleted = post["timestamp"]
