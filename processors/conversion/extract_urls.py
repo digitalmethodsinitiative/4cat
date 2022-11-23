@@ -139,7 +139,7 @@ class ExtractURLs(BasicProcessor):
                 if (return_matches_only and row["extracted_urls"]) or not return_matches_only:
                     # Edit list/sets
                     for column in fieldnames:
-                        if type(row[column]) in [list, set]:
+                        if column in row.keys() and type(row[column]) in [list, set]:
                             row[column] = ','.join(row[column])
                     writer.writerow(row)
                     url_matches_found += 1
