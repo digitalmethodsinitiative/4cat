@@ -1,5 +1,5 @@
 """
-Download images linked in dataset
+Hashes videos so they can be compared to others.
 
 This processor also requires ffmpeg to be installed in 4CAT's backend
 https://ffmpeg.org/
