@@ -65,8 +65,13 @@ def show_results(page):
         filters["hide_empty"] = True
 
     # handle 'depth'; all, own datasets, or favourites?
+    # 'all' is limited to admins
     depth = request.args.get("depth", "own")
-    if depth not in ("own", "favourites", "all"):
+    available_depths = ["own", "favourites"]
+    if current_user.is_admin:
+        available_depths.append("all")
+
+    if depth not in available_depths:
         depth = "own"
 
     if depth == "own":
@@ -156,7 +161,7 @@ def get_result(query_file):
     :rmime: text/csv
     """
     directory = config.get('PATH_ROOT') + "/" + config.get('PATH_DATA')
-    return send_from_directory(directory=directory, filename=query_file)
+    return send_from_directory(directory=directory, path=query_file)
 
 
 @app.route('/mapped-result/<string:key>/')

@@ -16,15 +16,14 @@ packages = [
 	"cssselect~=1.1.0",
 	"datedelta~=1.4.0",
 	"dateparser~=1.1.0",
-	"Flask==1.1.0",
+	"flag",
+	"Flask~=2.2",
 	"Flask_Limiter==1.0.1",
-	"Flask_Login==0.4.1",
+	"Flask_Login~=0.6",
 	"gensim>=4.1.0, <4.2",
 	"google_api_python_client==2.0.2",
 	"html2text==2020.*",
 	"ImageHash~=4.2.0",
-	"itsdangerous==2.0.1", # per issue with Flask 1.0; can likely remove when we upgrade Flask
-	"Jinja2==3.0.3", # per issue with Flask 1.0; can likely remove when we upgrade Flask
 	"lxml~=4.9.0",
 	"markdown==3.0.1",
 	"markdown2==2.4.2",
@@ -45,14 +44,14 @@ packages = [
 	"requests~=2.27",
 	"requests_futures",
 	"scikit_learn==0.24.1",
-	"spacy==3.0.5",
+	"spacy==3.4.3",
 	"svgwrite~=1.4.0",
 	"Telethon~=1.25.2",
 	"ural~=0.33",
 	"unidecode~=1.3",
-	"Werkzeug==0.15.5",
+	"Werkzeug~=2.2",
 	"wordcloud~=1.8",
-	"en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.0.0/en_core_web_sm-3.0.0.tar.gz#egg=en_core_web_sm"
+	"en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.4.1/en_core_web_sm-3.4.1.tar.gz#egg=en_core_web_sm"
 ]
 
 # Some packages don't run on Windows
