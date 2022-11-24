@@ -121,10 +121,6 @@ class DetectTrackers(BasicProcessor):
                     writer = csv.DictWriter(outfile, fieldnames=fieldnames)
                     writer.writeheader()
 
-                processed_items += 1
-                if processed_items % 500 == 0:
-                    self.dataset.update_status("Processed %i items (%i with trackers detected)" % (processed_items, matching_items))
-
                 # Get column to be used in search for matches
                 item_column = item.get(column)
 
@@ -151,6 +147,12 @@ class DetectTrackers(BasicProcessor):
                 if item['tracker_summary']:
                     writer.writerow(item)
                     matching_items += 1
+
+                processed_items += 1
+                if processed_items % 50 == 0:
+                    self.dataset.update_status(
+                        "Processed %i items (%i with trackers detected)" % (processed_items, matching_items))
+                    self.dataset.update_progress(processed_items / self.source_dataset.num_rows)
 
         if matching_items == 0:
             self.dataset.update_status("No items matched your criteria", is_final=True)
