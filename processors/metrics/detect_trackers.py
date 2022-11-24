@@ -22,8 +22,8 @@ class DetectTrackers(BasicProcessor):
     """
     Detect tracker scripts (from a collection) within collected HTML
     """
-    type = "tracker-filter"  # job type ID
-    category = "Filtering"  # category
+    type = "tracker-extractor"  # job type ID
+    category = "Post Metrics"  # category
     title = "Detect Trackers"  # title displayed in UI
     description = "Uses a collection of scripts identified as belonging to" \
                   " different trackers and detects them in HTML. " \
@@ -86,9 +86,6 @@ class DetectTrackers(BasicProcessor):
         """
 
         column = self.parameters.get("column", "")
-        match_style = 'contains'
-        match_multiple = 'any'
-        match_function = any if match_multiple == "any" else all
         record_matches = True if self.parameters.get("record-matches") == 'yes' else False
 
         self.dataset.update_status('Loading trackers...')
@@ -126,6 +123,7 @@ class DetectTrackers(BasicProcessor):
 
                 # Compare each tracker with item_column
                 item['tracker_summary'] = {}
+                # TODO: change output to not include all item columns; this originally was a filter but broke with filter updates
                 for tracker in trackers:
                     if tracker in item_column:
                         # Add to summary
@@ -159,19 +157,15 @@ class DetectTrackers(BasicProcessor):
 
         self.dataset.finish(matching_items)
 
-    def after_process(self):
-        super().after_process()
-
-        # Request standalone
-        self.create_standalone()
-
-    # TODO: Look at better way to load the trackers; this seems to not use all available trackers
     def load_trackers(self, location_of_tracker_file):
         """
         This takes a json database of scripts and names of the company/organization
         that uses them and reformats it to be used by our script. This may be
         unnecessary, but it already existed (https://github.com/digitalmethodsinitiative/tools/blob/master/beta/trackerTracker/ghostery/update.py)
         so porting seemed easier.
+
+        TODO: Look at better way to load the trackers; this misses a few trackers of unknown type (perhaps category did not exist?)
+
         """
         from collections.abc import MutableMapping
         import json
