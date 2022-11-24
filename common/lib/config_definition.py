@@ -268,6 +268,12 @@ config_definition = {
         "help": "Firefox Extensions",
         "tooltip": "Can be used by certain processors and datasources",
     },
+    "selenium.installed": {
+        "type": UserInput.OPTION_TOGGLE,
+        "default": False,
+        "help": "Has Selenium been installed",
+        "tooltip": "Toggling off will cause a Docker instance to attempt to reinstall Selenium",
+    },
 }
 
 categories = {
