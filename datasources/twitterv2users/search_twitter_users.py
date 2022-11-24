@@ -95,6 +95,7 @@ class SearchUsersWithTwitterAPIv2(Search):
         done = 0
         previous_request = 0
         missing = []
+        skipped = 0
         expected = len(users)
 
         while users:
@@ -210,9 +211,14 @@ class SearchUsersWithTwitterAPIv2(Search):
 
                 if "errors" in api_response:
                     for error in api_response["errors"]:
+                        print(chunk)
                         if "detail" in error:
                             processor.dataset.log("Received an error from the Twitter API: " + error["detail"])
                         if "resource_id" in error:
+                            # this is annoying - we give twitter a username, but if the username
+                            # is protected, twitter only says that the *user id of that user* is
+                            # missing. and we need to remove the offending username from the
+                            # query to progress.
                             missing.append(error["resource_id"])
 
                 if "data" not in api_response:
@@ -225,6 +231,11 @@ class SearchUsersWithTwitterAPIv2(Search):
                 for user in api_response["data"]:
                     if user["username"] in chunk:
                         chunk.remove(user["username"])
+
+                    if user.get("protected"):
+                        missing.append(user["username"])
+                        continue
+
                     yield user
 
                 # paginate (when querying followers or followees)
@@ -238,8 +249,8 @@ class SearchUsersWithTwitterAPIv2(Search):
 
         if missing and search_param:
             msg = "users were" if len(missing) != 0 else "user was"
-            processor.dataset.log("The following user profile(s) were not retrieved (the accounts may no longer exist): " + ", ".join(missing))
-            processor.dataset.update_status("Dataset completed, but %s %s missing (check dataset log for details)." % (msg, "{:,}".format(len(missing))), is_final=True)
+            processor.dataset.log("The following user profile(s) were not retrieved (the account(s) may be protected no longer exist): " + ", ".join(missing))
+            processor.dataset.update_status("Dataset completed, but %s %s missing (check dataset log for details)." % ("{:,}".format(len(missing)), msg), is_final=True)
 
     @classmethod
     def get_options(cls, parent_dataset=None, user=None):
@@ -257,7 +268,7 @@ class SearchUsersWithTwitterAPIv2(Search):
         max_users = config.get("twitterv2-search-user.max_users")
 
         intro_text = ("This data source uses the user lookup endpoint of the Twitter API (v2) to retrieve "
-                          "details for a given list of Twitter usernames.")
+                          "details for a given list of Twitter usernames. Note that protected users will be ignored.")
 
         if not have_api_key:
             intro_text += ("\n\nA valid [bearer "
