@@ -491,7 +491,7 @@ def keep_dataset(key):
     if not config.get("expire.allow_optout"):
         return render_template("error.html", title="Dataset cannot be kept",
                                message="All datasets are scheduled for automatic deletion. This cannot be "
-                                       "overridden.", 403)
+                                       "overridden."), 403
     if not dataset.key_parent:
         # top-level dataset
         # check if data source forces expiration - in that case, the user

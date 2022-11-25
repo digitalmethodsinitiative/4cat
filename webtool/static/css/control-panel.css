@@ -70,3 +70,12 @@ table td[colspan] {
     width: 25em;
     max-width: 25em;
 }
+
+.datasource-form .form-element {
+    min-height: auto;
+}
+
+.datasource-form fieldset {
+    padding-top: 0.5em;
+    padding-bottom: 0.5em;
+}

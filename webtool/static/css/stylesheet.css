@@ -143,6 +143,10 @@ table th {
     padding: 0 1em;
 }
 
+*[aria-expanded=false] {
+    height: 0;
+    overflow: hidden;
+}
 
 /** --------------------- *
             Forms
@@ -199,6 +203,10 @@ p.form-notice {
 article.small .form-element {
     display: grid;
     grid-template-columns: 34% 66%;
+}
+
+.form-element.wide, article.small .form-element.wide {
+    display: block;
 }
 
 .form-element > *:not(input, select, button) {
@@ -285,6 +293,7 @@ button:hover, .button-like:not(.inactive):hover {
     padding: 1em;
     text-align: center;
     list-style: none;
+    margin-left: 0;
 }
 
 .button-container li {
