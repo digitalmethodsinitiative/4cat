@@ -30,18 +30,17 @@
 	<h1><span><a href="{{ url_for('show_frontpage') }}">{% block site_header %}{{ __tool_name_long }}{% endblock %}</a></span></h1>
 	<nav class="main-nav">
 		<ul>
-			<li><a href="{{ url_for('show_index') }}">Create dataset</a></li>
-			<li><a href="{{ url_for('show_results') }}">Datasets</a></li>
-            <li><a href="{{ url_for('data_overview') }}">Data sources</a></li>
+			<li><a href="{{ url_for('show_index') }}"><i class="fa fa-plus-circle" aria-hidden="true"></i> Create dataset</a></li>
+			<li><a href="{{ url_for('show_results') }}"><i class="fa fa-database" aria-hidden="true"></i> Datasets</a></li>
+            <li><a href="{{ url_for('data_overview') }}"><i class="fa fa-cloud" aria-hidden="true"></i> Data sources</a></li>
             {% if current_user.is_authenticated and not current_user.is_special %}
-                <li><a href="{{ url_for('show_access_tokens') }}">API Access</a></li>
+                <li><a href="{{ url_for('show_access_tokens') }}"><i class="fa fa-plug" aria-hidden="true"></i> API Access</a></li>
             {% endif %}
             {% if current_user.is_authenticated and current_user.is_admin %}
-                <li><a href="{{ url_for('admin_frontpage') }}">Control Panel</a></li>
-                <li><a href="{{ url_for('update_settings') }}">4CAT settings</a></li>
+                <li><a href="{{ url_for('admin_frontpage') }}"><i class="fa fa-cog" aria-hidden="true"></i> Control Panel</a></li>
             {% endif %}
-            <li><a href="{{ url_for('show_page', page='faq') }}"><abbr title="Frequently Asked Questions">FAQ</abbr></a></li>
-			<li><a href="{{ url_for('show_frontpage') }}">About</a></li>
+            <li><a href="{{ url_for('show_page', page='faq') }}"><i class="fa fa-question" aria-hidden="true"></i> <abbr title="Frequently Asked Questions">FAQ</abbr></a></li>
+			<li><a href="{{ url_for('show_frontpage') }}"><i class="fa fa-info-circle" aria-hidden="true"></i> About</a></li>
 		</ul>
     {% for notification in __notifications %}
         <div class="site-announcement">
