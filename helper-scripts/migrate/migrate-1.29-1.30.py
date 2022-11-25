@@ -51,9 +51,10 @@ if config.get("IMAGE_INTERVAL"):
     config.set_or_create_setting("fourchan.image_interval", config.get("IMAGE_INTERVAL", 60), raw=False)
     config.delete_setting("IMAGE_INTERVAL")
 
-print("  - WARN_EMAILS, WARN_INTERVAL -> removed")
+print("  - WARN_EMAILS, WARN_INTERVAL, image_downloader_telegram.MAX_NUMBER_IMAGES -> removed")
 config.delete_setting("WARN_EMAILS")
 config.delete_setting("WARN_INTERVAL")
+config.delete_setting("image_downloader_telegram.MAX_NUMBER_IMAGES")
 
 print("  Creating new indexes for enabled imageboard datasources...")
 
