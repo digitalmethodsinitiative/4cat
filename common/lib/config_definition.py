@@ -13,7 +13,8 @@ config_definition = {
         "type": UserInput.OPTION_TEXT_JSON,
         "default": json.dumps(["bitchute", "custom", "douban", "customimport", "reddit", "telegram", "twitterv2"]),
         "help": "Data Sources",
-        "tooltip": "Data sources object defining enabled datasources and their settings",
+        "tooltip": "A list of enabled data sources that people can choose from when creating a dataset page. It is "
+                   "recommended to manage this via the 'Data sources' button in the Control Panel."
     },
     # Configure how the tool is to be named in its web interface. The backend will
     # always refer to "4CAT" - the name of the software, and a "powered by 4CAT"
@@ -74,9 +75,8 @@ config_definition = {
         "type": UserInput.OPTION_TEXT_JSON,
         "default": "{}",
         "help": "Data source-specific expiration",
-        "tooltip": "Allows setting expiration settings per datasource. This always overrides the above settings. This "
-                   "is stored as a JSON object but is more conveniently configured via the 'Configure data sources' "
-                   "page."
+        "tooltip": "Allows setting expiration settings per datasource. This always overrides the above settings. It is "
+                   "recommended to manage this via the 'Data sources' button in the Control Panel."
     },
     "logging.slack.level": {
         "type": UserInput.OPTION_CHOICE,

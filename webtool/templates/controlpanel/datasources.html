@@ -16,7 +16,7 @@
             <p>Some data sources offer further settings which may be configured in the
                 <a href="{{ url_for('update_settings') }}">Settings panel</a>.</p>
 
-            <form action="{{ url_for('toggle_datasources') }}" method="POST" class="wide datasource-form">
+            <form action="{{ url_for('toggle_datasources') }}" method="POST" class="wide datasource-toggle-form">
                 {% for notice in flashes %}
                     <p class="form-notice">{{ notice|safe }}</p>
                 {% endfor %}

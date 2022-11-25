@@ -71,11 +71,11 @@ table td[colspan] {
     max-width: 25em;
 }
 
-.datasource-form .form-element {
+.datasource-toggle-form .form-element {
     min-height: auto;
 }
 
-.datasource-form fieldset {
+.datasource-toggle-form fieldset {
     padding-top: 0.5em;
     padding-bottom: 0.5em;
 }
