@@ -43,7 +43,7 @@ class ThingExpirer(BasicWorker):
 			if not expiration.get(datasource_id):
 				continue
 
-			cutoff = time.time() - expiration[datasource_id].get("timeout")
+			cutoff = time.time() - int(expiration[datasource_id].get("timeout"))
 			datasets += self.db.fetchall(
 				"SELECT key FROM datasets WHERE key_parent = '' AND parameters::json->>'datasource' = %s AND timestamp < %s",
 				(datasource_id, cutoff))
