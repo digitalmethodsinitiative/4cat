@@ -170,17 +170,18 @@ with open(args.input, encoding="utf-8") as inputfile:
 
 		post_id = int(post["num"])
 
+		
 		# Set country name of post. This is a bit tricky because we have to differentiate
 		# on troll and geo flags. These also change over time.
 		country_code = ""
 		country_name = ""
 
-		if args.board == 'pol':
+		if args.board == "pol" or args.board == "int":
 
-			if post["poster_country"] or post["exif"]:
-				
-				exif = json.loads(post["exif"]) if post.get("exif") else ""
-				
+			exif = json.loads(post["exif"]) if post.get("exif") else ""
+			
+			if post["poster_country"] or (exif and exif.get("troll_country")):
+								
 				if not post["poster_country"]:
 					country_code = exif["troll_country"]
 				else:
@@ -243,23 +244,21 @@ with open(args.input, encoding="utf-8") as inputfile:
 
 		# For speed, we only commit every so many posts
 		if len(postbuffer) % args.batch == 0:
-			print("\nCommitting posts %i-%i to database." % (posts - args.batch, posts))
+			print("Committing posts %i-%i to database." % (posts - args.batch, posts))
 			commit(postbuffer, post_fields, db, args.datasource, fast=args.fast)
 			postbuffer = []
-			break
 
-	# Insert deleted posts, and get their id_seq to use in the posts_{datasource}_deleted table
-	if deleted_ids:
-		print("\nAlso committing %i deleted posts to posts_%s_deleted table." % (len(deleted_ids), args.datasource))
-		for deleted_id in deleted_ids:
-			result = db.fetchone("SELECT id_seq, timestamp FROM posts_" + args.datasource + " WHERE id = %s AND board = '%s' " % (deleted_id, args.board))
-			db.insert("posts_" + args.datasource + "_deleted", {"id_seq": result["id_seq"], "timestamp_deleted": result["timestamp"]}, safe=True)
-		deleted_ids = set()
+# commit remainder
+print("Committing final posts.")
+commit(postbuffer, post_fields, db, args.datasource, fast=args.fast)
 
-	# commit remainder
-	print("Committing final posts.")
-	commit(postbuffer, post_fields, db, args.datasource, fast=args.fast)
-
+# Insert deleted posts, and get their id_seq to use in the posts_{datasource}_deleted table
+if deleted_ids:
+	print("\nAlso committing %i deleted posts to posts_%s_deleted table." % (len(deleted_ids), args.datasource))
+	for deleted_id in deleted_ids:
+		result = db.fetchone("SELECT id_seq, timestamp FROM posts_" + args.datasource + " WHERE id = %s AND board = '%s' " % (deleted_id, args.board))
+		db.insert("posts_" + args.datasource + "_deleted", {"id_seq": result["id_seq"], "timestamp_deleted": result["timestamp"]}, safe=True)
+	deleted_ids = set()
 
 # update threads
 print("Updating threads.")
@@ -275,7 +274,7 @@ for thread_id in threads:
 
 	thread["is_sticky"] = True if thread["is_sticky"] == 1 else False
 	thread["is_closed"] = True if thread["is_closed"] == 1 else False
-	exists = db.fetchone("SELECT * FROM threads_" + args.datasource + " WHERE id = %s", (thread_id,))
+	exists = db.fetchone("SELECT * FROM threads_" + args.datasource + " WHERE id = %s AND board = %s", (thread_id, args.board,))
 
 	if not exists:
 		db.insert("threads_" + args.datasource, thread)
@@ -292,12 +291,14 @@ for thread_id in threads:
 		thread["timestamp_modified"] = max(int(thread.get("timestamp_modified") or 0), int(exists.get("timestamp_modified") or 0))
 		thread["timestamp"] = min(int(thread.get("timestamp") or 0), int(exists.get("timestamp") or 0))
 
-		db.update("threads_" + args.datasource, data=thread, where={"id": thread_id})
+		db.update("threads_" + args.datasource, data=thread, where={"id": thread_id, "board": args.board})
 
 print("Updating thread statistics.")
 db.execute(
-	"UPDATE threads_" + args.datasource + " AS t SET num_replies = ( SELECT COUNT(*) FROM posts_" + args.datasource + " AS p WHERE p.thread_id = t.id) WHERE t.id IN %s",
-	(tuple(threads.keys()),))
+	"UPDATE threads_" + args.datasource + " AS t SET num_replies = ( SELECT COUNT(*) FROM posts_" + args.datasource + " AS p WHERE p.thread_id = t.id) WHERE t.id IN %s AND board = %s",
+	(tuple(threads.keys()), args.board,))
 db.execute(
-	"UPDATE threads_" + args.datasource + " AS t SET num_images = ( SELECT COUNT(*) FROM posts_" + args.datasource + " AS p WHERE p.thread_id = t.id AND image_file != '') WHERE t.id IN %s",
-	(tuple(threads.keys()),))
+	"UPDATE threads_" + args.datasource + " AS t SET num_images = ( SELECT COUNT(*) FROM posts_" + args.datasource + " AS p WHERE p.thread_id = t.id AND image_file != '') WHERE t.id IN %s AND board = %s",
+	(tuple(threads.keys()), args.board,))
+
+print("Done!")

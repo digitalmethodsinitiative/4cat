@@ -198,6 +198,14 @@ class SearchInstagram(Search):
         else:
             num_comments = -1
 
+        location = {"name": "", "latlong": "", "city": ""}
+        if node.get("location"):
+            location["name"] = node["location"].get("name")
+            print(node["location"])
+            location["latlong"] = str(node["location"]["lat"]) + "," + str(node["location"]["lng"]) if node[
+                "location"].get("lat") else ""
+            location["city"] = node["location"].get("city")
+
         mapped_item = {
             "id": node["code"],
             "thread_id": node["code"],
@@ -217,6 +225,9 @@ class SearchInstagram(Search):
             "num_likes": node["like_count"],
             "num_comments": num_comments,
             "num_media": num_media,
+            "location_name": location["name"],
+            "location_latlong": location["latlong"],
+            "location_city": location["city"],
             "unix_timestamp": node["taken_at"]
         }
 
