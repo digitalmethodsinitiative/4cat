@@ -254,15 +254,19 @@ commit(postbuffer, post_fields, db, args.datasource, fast=args.fast)
 
 # Insert deleted posts, and get their id_seq to use in the posts_{datasource}_deleted table
 if deleted_ids:
-	print("\nAlso committing %i deleted posts to posts_%s_deleted table." % (len(deleted_ids), args.datasource))
+	print("Also committing %i deleted posts to posts_%s_deleted table." % (len(deleted_ids), args.datasource))
 	for deleted_id in deleted_ids:
 		result = db.fetchone("SELECT id_seq, timestamp FROM posts_" + args.datasource + " WHERE id = %s AND board = '%s' " % (deleted_id, args.board))
 		db.insert("posts_" + args.datasource + "_deleted", {"id_seq": result["id_seq"], "timestamp_deleted": result["timestamp"]}, safe=True)
 	deleted_ids = set()
 
 # update threads
-print("Updating threads.")
-for thread_id in threads:
+print("Updating %s threads." % len(threads))
+threads_comitted = 0
+thread_ids = set(threads.keys())
+
+for thread_id in thread_ids:
+	threads_comitted += 1
 	thread = threads[thread_id]
 
 	thread["id"] = thread_id
@@ -293,12 +297,19 @@ for thread_id in threads:
 
 		db.update("threads_" + args.datasource, data=thread, where={"id": thread_id, "board": args.board})
 
+	# Delete threads from dictionary to free up some RAM
+	del threads[thread_id]
+
+	if threads_comitted % 100000 == 0:
+		print("%s threads committed" % threads_comitted)
+		db.commit()
+
 print("Updating thread statistics.")
 db.execute(
 	"UPDATE threads_" + args.datasource + " AS t SET num_replies = ( SELECT COUNT(*) FROM posts_" + args.datasource + " AS p WHERE p.thread_id = t.id) WHERE t.id IN %s AND board = %s",
-	(tuple(threads.keys()), args.board,))
+	(tuple(thread_ids), args.board,))
 db.execute(
 	"UPDATE threads_" + args.datasource + " AS t SET num_images = ( SELECT COUNT(*) FROM posts_" + args.datasource + " AS p WHERE p.thread_id = t.id AND image_file != '') WHERE t.id IN %s AND board = %s",
-	(tuple(threads.keys()), args.board,))
+	(tuple(thread_ids), args.board,))
 
 print("Done!")
