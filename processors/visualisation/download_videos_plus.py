@@ -36,15 +36,15 @@ def url_to_filename(url, extension, directory):
 
 class VideoDownloaderPlus(BasicProcessor):
 	"""
-	Outsourcing video downloads to yt-dlp (https://github.com/yt-dlp/yt-dlp/#readme) which attempts to keep up with
-	a plethora of sites: https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md
-
 	Downloads videos and saves as zip archive
+
+	Attempts to download videos directly, but if that fails, uses YT_DLP. (https://github.com/yt-dlp/yt-dlp/#readme)
+	which attempts to keep up with a plethora of sites: https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md
 	"""
 	type = "video-downloader-plus"  # job type ID
 	category = "Visual"  # category
 	title = "Download videos plus"  # title displayed in UI
-	description = "Uses YT-DLP to download a variety of links to video hosting sites (see references)."  # description displayed in UI
+	description = "Download videos from URLs and store in a zip file. May take a while to complete as videos are retrieved externally."  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
 
 	references = [
@@ -77,7 +77,7 @@ class VideoDownloaderPlus(BasicProcessor):
 		"split-comma": {
 			"type": UserInput.OPTION_TOGGLE,
 			"help": "Split column values by comma?",
-			"default": False,
+			"default": True,
 			"tooltip": "If enabled, columns can contain multiple URLs separated by commas, which will be considered "
 					   "separately"
 		}
@@ -165,7 +165,7 @@ class VideoDownloaderPlus(BasicProcessor):
 			self.dataset.update_status(str(e), is_final=True)
 			self.dataset.finish(0)
 			return
-		self.dataset.log('Collected %i video urls.' % len(urls))
+		self.dataset.log('Collected %i urls.' % len(urls))
 
 		# Prepare staging area for videos and video tracking
 		results_path = self.dataset.get_staging_area()
@@ -174,7 +174,6 @@ class VideoDownloaderPlus(BasicProcessor):
 		# Set up yt_dlp options
 		ydl_opts = {
 			# "logger": self.log,  # This will dump any errors to our logger if desired
-			"outtmpl": str(results_path) + '/%(uploader)s_%(title)s.%(ext)s',
 			"socket_timeout": 30,
 			"postprocessor_hooks": [self.yt_dlp_post_monitor],# This function ensures no more than self.max_videos_per_url downloaded and can be used to monitor progress
 			"progress_hooks": [self.yt_dlp_monitor],
@@ -199,56 +198,64 @@ class VideoDownloaderPlus(BasicProcessor):
 		downloaded_videos = 0
 		failed_downloads = 0
 		total_possible_videos = min(len(urls), amount)
-		with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-			for url in urls:
-				# Stop processing if worker has been asked to stop or max downloads reached
-				if downloaded_videos >= amount:
-					break
-				if self.interrupted:
-					raise ProcessorInterruptedException("Interrupted while downloading videos.")
 
-				# REJECT CERTAIN URLS
-				if any([sub_url in url for sub_url in ['youtube.com/c/', 'youtube.com/channel/']]):
-					# HAHAHA.... NO. Do not download channels. Might be a better way to ensure we catch this...
-					message = 'Skipping... will not download all vids from YouTube CHANNEL: %s' % url
-					urls[url]['success'] = False
-					urls[url]['error'] = message
-					failed_downloads += 1
-					self.dataset.update_status(message)
-					continue
+		for url in urls:
+			# Stop processing if worker has been asked to stop or max downloads reached
+			if downloaded_videos >= amount:
+				break
+			if self.interrupted:
+				raise ProcessorInterruptedException("Interrupted while downloading videos.")
 
-				self.dataset.update_status("Downloading: %s" % url)
-				# First we'll try to see if we can directly download the URL
-				try:
-					filename = self.download_video_with_requests(url, results_path, max_video_size)
-					urls[url]["files"] = [{
-										"filename": filename,
-										"metadata": {},
-										"success": True
-										}]
-					success = True
-				except requests.exceptions.SSLError:
-					message = "Unable to obtain URL %s due to SSL error." % url
-					self.dataset.log(message)
-					urls[url]["success"] = False
-					urls[url]["error"] = message
-					failed_downloads += 1
-					continue
-				except FilesizeException as e:
-					self.dataset.log(str(e))
-					urls[url]["success"] = False
-					urls[url]["error"] = str(e)
-					failed_downloads += 1
-					continue
-				except FailedDownload:
-					# Take it away yt-dlp
+			# REJECT CERTAIN URLS
+			if any([sub_url in url for sub_url in ['youtube.com/c/', 'youtube.com/channel/']]):
+				# HAHAHA.... NO. Do not download channels. Might be a better way to ensure we catch this...
+				message = 'Skipping... will not download all vids from YouTube CHANNEL: %s' % url
+				urls[url]['success'] = False
+				urls[url]['error'] = message
+				failed_downloads += 1
+				self.dataset.update_status(message)
+				continue
+
+			# First we'll try to see if we can directly download the URL
+			try:
+				filename = self.download_video_with_requests(url, results_path, max_video_size)
+				urls[url]["files"] = [{
+									"filename": filename,
+									"metadata": {},
+									"success": True
+									}]
+				success = True
+				num_vids_downloaded = 1
+			except requests.exceptions.SSLError:
+				message = "Unable to obtain URL %s due to SSL error." % url
+				self.dataset.log(message)
+				urls[url]["success"] = False
+				urls[url]["error"] = message
+				failed_downloads += 1
+				continue
+			except (FilesizeException, FailedDownload, NotAVideo) as e:
+				# FilesizeException raised when file size is too large or unknown filesize (and that is disabled in 4CAT settings)
+				# FailedDownload raised when response other than 200 received
+				# NotAVideo raised due to specific Content-Type known to not be a video (or a webpage/html that could lead to a video via YT-DLP)
+				self.dataset.log(str(e))
+				urls[url]["success"] = False
+				urls[url]["error"] = str(e)
+				failed_downloads += 1
+				continue
+			except VideoStreamUnavailable as e:
+				# Take it away yt-dlp
+				# Update filename
+				ydl_opts["outtmpl"] = str(results_path) + '/' + re.sub(r"[^0-9a-z]+", "_", url.lower())[:100] + '_%(autonumber)s.%(ext)s'
+				with yt_dlp.YoutubeDL(ydl_opts) as ydl:
 					try:
 						# Count and use self.yt_dlp_monitor() to ensure sure we don't download videos forever...
 						self.videos_downloaded_from_url = 0
 						self.url_files = []
-						self.last_dl_status = None
-						self.last_post_process_status = None
+						self.last_dl_status = {}
+						self.last_post_process_status = {}
+						self.dataset.update_status("Downloading via yt-dlp: %s" % url)
 						info = ydl.extract_info(url)
+						num_vids_downloaded = self.videos_downloaded_from_url
 					except MaxVideosDownloaded:
 						# Raised when already downloaded max number of videos per URL as defined in self.max_videos_per_url
 						pass
@@ -263,19 +270,19 @@ class VideoDownloaderPlus(BasicProcessor):
 						self.dataset.update_status(message)
 						continue
 
-					# Add file data collected by YT-DLP
-					urls[url]['files'] = self.url_files
+				# Add file data collected by YT-DLP
+				urls[url]['files'] = self.url_files
 
-					# Check that download and processing finished
-					success = all([self.last_dl_status.get('status') == 'finished', self.last_post_process_status.get('status') == 'finished'])
+				# Check that download and processing finished
+				success = all([self.last_dl_status.get('status') == 'finished', self.last_post_process_status.get('status') == 'finished'])
 
-				urls[url]["success"] = success
+			urls[url]["success"] = success
 
-				# Update status
-				downloaded_videos += 1
-				self.dataset.update_status(
-					"Downloaded %i/%i videos: %s" % (downloaded_videos, total_possible_videos, url))
-				self.dataset.update_progress(downloaded_videos / total_possible_videos)
+			# Update status
+			downloaded_videos += num_vids_downloaded
+			self.dataset.update_status(
+				"Downloaded %i/%i videos: %s" % (downloaded_videos, total_possible_videos, url))
+			self.dataset.update_progress(downloaded_videos / total_possible_videos)
 
 		# Save some metadata to be able to connect the videos to their source
 		metadata = {
@@ -328,9 +335,12 @@ class VideoDownloaderPlus(BasicProcessor):
 				raise FailedDownload("Unable to obtain URL %s with reason: %s; and headers: %s" % (url, str(response.reason), str(response.headers)))
 
 			# Verify video
-			# TODO: test/research other possible ways to verify video links
-			if "video" not in response.headers["Content-Type"].lower():
-				raise FailedDownload("Url %s does not appear to be a video; Content-Type: %s" % (url, response.headers["Content-Type"]))
+			# YT-DLP will download images; so we raise them differently
+			# TODO: test/research other possible ways to verify video links; watch for additional YT-DLP oddities
+			if "image" in response.headers["Content-Type"].lower():
+				raise NotAVideo("Not a Video: %s; Content-Type: %s" % (url, response.headers["Content-Type"]))
+			elif "video" not in response.headers["Content-Type"].lower():
+				raise VideoStreamUnavailable("Possibly video, but unable to download via requests: %s; Content-Type: %s" % (url, response.headers["Content-Type"]))
 
 			extension = response.headers["Content-Type"].split("/")[-1]
 			# DEBUG Content-Type
@@ -342,7 +352,7 @@ class VideoDownloaderPlus(BasicProcessor):
 			# Ensure unique filename
 			save_location = url_to_filename(url, extension, results_path)
 
-			# Check video size
+			# Check video size (after ensuring it is actually a video above)
 			if not max_video_size == 0:
 				if response.headers.get("Content-Length", False):
 					if int(response.headers.get("Content-Length")) > (max_video_size * 1000000):  # Use Bytes!
@@ -352,12 +362,13 @@ class VideoDownloaderPlus(BasicProcessor):
 					FilesizeException("Video size unknown; not allowed to download per 4CAT settings")
 
 			# Download video
+			self.dataset.update_status("Downloading via requests: %s" % url)
 			with open(results_path.joinpath(save_location), "wb") as f:
 				for chunk in response.iter_content(chunk_size=1024 * 1024):
 					if chunk:
 						f.write(chunk)
 
-			# Add metadata
+			# Return filename to add to metadata
 			return save_location.name
 
 	def collect_video_urls(self):
@@ -442,6 +453,20 @@ class MaxVideosDownloaded(ProcessorException):
 
 
 class FailedDownload(ProcessorException):
+	"""
+	Raise if processor throws an exception
+	"""
+	pass
+
+
+class VideoStreamUnavailable(ProcessorException):
+	"""
+	Raise if processor throws an exception
+	"""
+	pass
+
+
+class NotAVideo(ProcessorException):
 	"""
 	Raise if processor throws an exception
 	"""
