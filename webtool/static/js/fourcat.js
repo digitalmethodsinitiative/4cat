@@ -360,7 +360,11 @@ const query = {
 			},
 			error: function (error) {
 				query.enable_form();
-				popup.alert(error['message'], 'Error');
+				if(!error['message']) {
+					popup.alert('There was an issue while trying to connect to the 4CAT backend. It may not be running.', 'Error');
+				} else {
+					popup.alert(error['message'], 'Error');
+				}
 				$('#query-status .message').html(error);
 			}
 		});
