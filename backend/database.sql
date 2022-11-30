@@ -149,6 +149,7 @@ INSERT INTO settings
     ('path.versionfile', '".git-checked-out"'),
     ('expire.timeout', '0'),
     ('expire.allow_optout', 'true'),
+    ('expire.datasources', '{"tumblr": {"timeout": 259200, "allow_optout": false}}')
     ('logging.slack.level', '"WARNING"'),
     ('logging.slack.webhook', 'null'),
     ('mail.admin_email', 'null'),
