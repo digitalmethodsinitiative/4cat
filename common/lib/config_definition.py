@@ -9,22 +9,12 @@ from common.lib.helpers import UserInput
 import json
 
 config_definition = {
-    "DATASOURCES": {
+    "4cat.datasources": {
         "type": UserInput.OPTION_TEXT_JSON,
-        "default": json.dumps({
-            "bitchute": {},
-            "custom": {},
-            "douban": {},
-            "customimport": {},
-            "parler": {},
-            "reddit": {
-                "boards": "*",
-            },
-            "telegram": {},
-            "twitterv2": {"id_lookup": False}
-        }),
+        "default": json.dumps(["bitchute", "custom", "douban", "customimport", "reddit", "telegram", "twitterv2"]),
         "help": "Data Sources",
-        "tooltip": "Data sources object defining enabled datasources and their settings",
+        "tooltip": "A list of enabled data sources that people can choose from when creating a dataset page. It is "
+                   "recommended to manage this via the 'Data sources' button in the Control Panel."
     },
     # Configure how the tool is to be named in its web interface. The backend will
     # always refer to "4CAT" - the name of the software, and a "powered by 4CAT"
@@ -77,7 +67,16 @@ config_definition = {
         "type": UserInput.OPTION_TOGGLE,
         "default": True,
         "help": "Allow opt-out",
-        "tooltip": "Allow users to opt-out of automatic deletion. Note that if users are allowed to opt out, data sources can still force the expiration of datasets created through that data source. This cannot be overridden by the user.",
+        "tooltip": "Allow users to opt-out of automatic deletion. Note that if users are allowed to opt out, data "
+                   "sources can still force the expiration of datasets created through that data source. This cannot "
+                   "be overridden by the user.",
+    },
+    "expire.datasources": {
+        "type": UserInput.OPTION_TEXT_JSON,
+        "default": "{}",
+        "help": "Data source-specific expiration",
+        "tooltip": "Allows setting expiration settings per datasource. This always overrides the above settings. It is "
+                   "recommended to manage this via the 'Data sources' button in the Control Panel."
     },
     "logging.slack.level": {
         "type": UserInput.OPTION_CHOICE,
@@ -247,7 +246,6 @@ categories = {
     "mail": "Mail settings & credentials",
     "logging": "Logging settings",
     "path": "File paths",
-    "DATASOURCES": "Data source configuration",
     'image_downloader': 'Image downloader',
     'text_from_images': 'OCR: Text from images',
 }

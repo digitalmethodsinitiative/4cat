@@ -134,7 +134,7 @@ def datasource_form(datasource_id):
 	if datasource_id not in backend.all_modules.datasources:
 		return error(404, message="Datasource '%s' does not exist" % datasource_id)
 
-	if datasource_id not in config.get('DATASOURCES'):
+	if datasource_id not in config.get('4cat.datasources'):
 		return error(404, message="Datasource '%s' does not exist" % datasource_id)
 
 	datasource = backend.all_modules.datasources[datasource_id]
@@ -163,8 +163,7 @@ def datasource_form(datasource_id):
 	javascript_path = datasource["path"].joinpath("webtool", "tool.js")
 	has_javascript = javascript_path.exists()
 
-	html = render_template_string(form, datasource_id=datasource_id,
-								  datasource_config=config.get('DATASOURCES')[datasource_id], datasource=datasource)
+	html = render_template_string(form, datasource_id=datasource_id, datasource=datasource)
 
 	return jsonify({
 		"status": "success",
@@ -194,7 +193,7 @@ def datasource_script(datasource_id):
 	if datasource_id not in backend.all_modules.datasources:
 		return error(404, message="Datasource '%s' does not exist" % datasource_id)
 
-	if datasource_id not in config.get('DATASOURCES'):
+	if datasource_id not in config.get('4cat.datasources'):
 		return error(404, message="Datasource '%s' does not exist" % datasource_id)
 
 	datasource = backend.all_modules.datasources[datasource_id]

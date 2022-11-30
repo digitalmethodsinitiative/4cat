@@ -143,6 +143,10 @@ table th {
     padding: 0 1em;
 }
 
+*[aria-expanded=false] {
+    height: 0;
+    overflow: hidden;
+}
 
 /** --------------------- *
             Forms
@@ -188,7 +192,8 @@ p.form-notice {
     display: flex;
     align-items: center;
     min-height: 3.5em;
-    margin: 0 1em 0.5em 1em;
+    margin: 0 0 0.5em 0;
+    padding: 0 0.5em;
 }
 
 .optional-form-element {
@@ -199,6 +204,10 @@ p.form-notice {
 article.small .form-element {
     display: grid;
     grid-template-columns: 34% 66%;
+}
+
+.form-element.wide, article.small .form-element.wide {
+    display: block;
 }
 
 .form-element > *:not(input, select, button) {
@@ -285,6 +294,7 @@ button:hover, .button-like:not(.inactive):hover {
     padding: 1em;
     text-align: center;
     list-style: none;
+    margin-left: 0;
 }
 
 .button-container li {
@@ -298,6 +308,25 @@ button:hover, .button-like:not(.inactive):hover {
 .form-footer {
     text-align: center;
     padding-bottom: 1em;
+}
+
+h3, h2, legend {
+    position: relative;
+}
+
+h3 button, h2 button, legend button {
+    border: 0;
+    border-radius: 0;
+    position: absolute;
+    right: 0;
+    top: 0;
+    margin: 0;
+    padding: calc(0.5em + 1px);
+}
+
+h2 button {
+    padding: calc(0.5em + 1px);
+    font-size: 0.8em;
 }
 
 /** --------------------- *

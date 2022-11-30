@@ -166,7 +166,7 @@ class ModuleCollector:
             datasource_id = datasource.DATASOURCE
 
             self.datasources[datasource_id] = {
-                "expire-datasets": config.get('DATASOURCES').get(datasource_id, {}).get("expire-datasets", None),
+                "expire-datasets": config.get("expire.datasources", {}).get(datasource_id, None),
                 "path": subdirectory,
                 "name": datasource.NAME if hasattr(datasource, "NAME") else datasource_id,
                 "id": subdirectory.parts[-1],

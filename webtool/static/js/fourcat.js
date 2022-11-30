@@ -1394,11 +1394,19 @@ const ui_helpers = {
 
 			// Also collapse underlying panels that are still open
 			$(target).find('*[aria-expanded=true]').attr('aria-expanded', false);
+
+			if($(this).find('i.fa.fa-minus')) {
+				$(this).find('i.fa.fa-minus').addClass('fa-plus').removeClass('fa-minus');
+			}
 		} else {
 			$(target).css('visibility', 'hidden').css('position', 'absolute').css('display', 'block').attr('aria-expanded', true);
 			let targetHeight = $(target).height();
 			$(target).css('aria-expanded', false).css('position', '').css('display', '').css('visibility', '').css('height', 0);
 			$(target).attr('aria-expanded', true).animate({"height": targetHeight}, 250, function() { $(this).css('height', '')});
+
+			if($(this).find('i.fa.fa-plus')) {
+				$(this).find('i.fa.fa-plus').addClass('fa-minus').removeClass('fa-plus');
+			}
 		}
 	}
 }

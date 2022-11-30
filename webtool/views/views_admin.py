@@ -354,6 +354,38 @@ def update_settings():
     return render_template("controlpanel/config.html", options=options, flashes=get_flashed_messages(),
                            categories=categories, modules=modules)
 
+@app.route("/admin/toggle-datasources/", methods=["GET", "POST"])
+@login_required
+@admin_required
+def toggle_datasources():
+    if request.method == "POST":
+        # enabled datasources is just a list of datasources with a check in the form
+        datasources = [datasource for datasource in backend.all_modules.datasources if request.form.get("enable-" + datasource)]
+        config.set_or_create_setting("4cat.datasources", datasources, raw=False)
+
+        # process per-datasource dataset expiration settings
+        expires = {}
+        for datasource in datasources:
+            if request.form.get("expire-" + datasource) or request.form.get("optout-" + datasource) == "on":
+                expires[datasource] = {}
+
+                if request.form.get("expire-" + datasource):
+                    expires[datasource]["timeout"] = request.form.get("expire-" + datasource)
+
+                expires[datasource]["allow_optout"] = (request.form.get("optout-" + datasource) == "on")
+
+        config.set_or_create_setting("expire.datasources", expires, raw=False)
+        flash("Enabled data sources updated.")
+
+    datasources = {
+        datasource: {
+            **info,
+            "enabled": datasource in config.get("4cat.datasources"),
+            "expires": config.get("expire.datasources").get(datasource, {})
+        }
+        for datasource, info in backend.all_modules.datasources.items()}
+
+    return render_template("controlpanel/datasources.html", datasources=datasources, flashes=get_flashed_messages())
 
 @app.route("/create-notification/", methods=["GET", "POST"])
 @login_required
