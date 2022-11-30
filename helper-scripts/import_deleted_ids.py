@@ -1,11 +1,14 @@
 """
-Reads a text file with deleted post IDs on every line,
-and inserts these into the database (if they're not
-there already). Inserts into posts_{datasource}_deleted as
+Imports IDs of deleted posts.
+
+Requires a text file with deleted post IDs on every line.
+This script inserts these into the database if they're not
+there already. Registers IDs to posts_{datasource}_deleted as
 well as threads_{datasource} if it concerns a deleted OP.
 
 The text file should have an ID on every line, with an optional
 timestamp of deletion after a space (e.g. '349543818 1637922696').
+
 """
 
 import os
@@ -21,11 +24,11 @@ from common.lib.logger import Logger
 cli = argparse.ArgumentParser()
 cli.add_argument("-i", "--input", required=True, help="text file to read from - should have a post ID on every line, "
 						"and optionally a timestamp of deletion after a space (e.g. '349543818 1637922696').")
-cli.add_argument("-b", "--board", required=True, help="What board the post IDs belong to, e.g. 'pol'")
-cli.add_argument("-d", "--datasource", type=str, default="4chan", help="Data source ID")
+cli.add_argument("-b", "--board", required=True, help="What board the post IDs belong to, e.g. 'mu'")
+cli.add_argument("-d", "--datasource", required=True, type=str, default="4chan", help="Data source ID")
 args = cli.parse_args()
 
-db = Database(logger=Logger(), appname="4chan-import")
+db = Database(logger=Logger(), appname="deleted-import")
 
 posts = 0
 posts_not_found = 0
