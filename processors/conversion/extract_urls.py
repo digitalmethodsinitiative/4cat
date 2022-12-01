@@ -7,6 +7,7 @@ import csv
 import re
 import time
 import requests
+from ural import urls_from_text
 
 from common.lib.exceptions import ProcessorInterruptedException
 from backend.abstract.processor import BasicProcessor
@@ -50,6 +51,13 @@ class ExtractURLs(BasicProcessor):
             "default": True,
             "help": "Only return rows with URLs",
             "tooltip": "If selected, only rows with URLs are added to the new dataset, else all rows are retained",
+        },
+        "split-comma": {
+            "type": UserInput.OPTION_TOGGLE,
+            "help": "Split column values by comma?",
+            "default": True,
+            "tooltip": "If enabled, columns can contain multiple URLs separated by commas, which will be considered "
+                   "separately"
         },
     }
 
@@ -246,7 +254,7 @@ class ExtractURLs(BasicProcessor):
                         continue
 
                     # Check for links
-                    identified_urls = self.identify_links(value)
+                    identified_urls = self.identify_links(value, self.parameters.get("split-comma", True))
 
                     # Expand url shorteners
                     if expand_urls:
@@ -333,15 +341,21 @@ class ExtractURLs(BasicProcessor):
         return url
 
     @staticmethod
-    def identify_links(text):
+    def identify_links(text, split_comma=True):
         """
         Search string of text for URLs that may contain links.
 
-        :param str text:  string that may contain URLs
-        :return list:  	  list containing validated URLs to videos
+        :param str text:            string that may contain URLs
+        :param bool split_comma:    if True text will be split by commas
+        :return list:  	            list of identified URLs
         """
+        if split_comma:
+            texts = text.split(",")
+        else:
+            texts = [text]
+
         # Extracting all links
-        # From https://stackoverflow.com/questions/6038061/regular-expression-to-find-urls-within-a-string
-        link_regex = re.compile(r"(http|ftp|https):\/\/([\w_-]+(?:(?:\.[\w_-]+)+))([\w.,@?^=%&:\/~+#-]*[\w@?^=%&\/~+#-])", re.IGNORECASE)
-        # Could also try: https://stackoverflow.com/questions/161738/what-is-the-best-regular-expression-to-check-if-a-string-is-a-valid-url
-        return [f"{url[0]}://{url[1]}{url[2]}" for url in link_regex.findall(text)]
+        urls = set()
+        for string in texts:
+            urls |= set([url for url in urls_from_text(string)])
+        return list(urls)
