@@ -697,9 +697,7 @@ class SearchWithTwitterAPIv2(Search):
                 params["expected-tweets"] = expected_tweets
 
                 if expected_seconds > 900:
-                    if warning:
-                        warning += "Additionally, c" if warning else ". C"
-                    warning += "ollection will take approximately %s." % expected_time
+                    warning += ". Collection will take approximately %s." % expected_time
 
             if warning and not query.get("frontend-confirm"):
                 warning = "This query matches approximately %s tweets%s" % ("{:,}".format(expected_tweets), warning)
