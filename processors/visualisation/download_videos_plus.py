@@ -9,6 +9,7 @@ import yt_dlp
 import json
 import re
 from yt_dlp import DownloadError
+from ural import urls_from_text
 
 import common.config_manager as config
 from common.lib.helpers import UserInput, validate_url, sets_to_lists
@@ -52,6 +53,8 @@ class VideoDownloaderPlus(BasicProcessor):
 		"[Supported sites](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md)",
 	]
 
+	known_channels = ['youtube.com/c/', 'youtube.com/channel/']
+
 	options = {
 		"amount": {
 			"type": UserInput.OPTION_TEXT,
@@ -74,18 +77,26 @@ class VideoDownloaderPlus(BasicProcessor):
 			"min": 1,
 			"tooltip": "Max of 100 MB set by 4CAT administrators",
 		},
+		"channel_videos": {
+			"type": UserInput.OPTION_TEXT,
+			"help": "Download multiple videos per link?",
+			"default": 0,
+			"min": 0,
+			"max": 5,
+			"tooltip": "If more than 0, links leading to multiple videos will be downloaded (e.g. a YouTube user's channel)"
+		},
 		"split-comma": {
 			"type": UserInput.OPTION_TOGGLE,
-			"help": "Split column values by comma?",
+			"help": "Split column values by comma",
 			"default": True,
 			"tooltip": "If enabled, columns can contain multiple URLs separated by commas, which will be considered "
 					   "separately"
-		}
+		},
 	}
 
 	def __init__(self, logger, job, queue=None, manager=None, modules=None):
 		super().__init__(logger, job, queue, manager, modules)
-		self.max_videos_per_url = 5
+		self.max_videos_per_url = 1
 		self.videos_downloaded_from_url = 0
 		self.url_files = None
 		self.last_dl_status = None
@@ -175,6 +186,8 @@ class VideoDownloaderPlus(BasicProcessor):
 		ydl_opts = {
 			# "logger": self.log,  # This will dump any errors to our logger if desired
 			"socket_timeout": 30,
+			# TODO: if yt-dlp archive is used, it does not return anything or raise an error; how to then connect the URL to the previously downloaded video?! A second request without download_archive and download=False can get the `info` but need to then use that info to tie to the filename!
+			# "download_archive": str(results_path.joinpath("video_archive")),
 			"postprocessor_hooks": [self.yt_dlp_post_monitor],# This function ensures no more than self.max_videos_per_url downloaded and can be used to monitor progress
 			"progress_hooks": [self.yt_dlp_monitor],
 		}
@@ -183,6 +196,7 @@ class VideoDownloaderPlus(BasicProcessor):
 		amount = self.parameters.get("amount", 100)
 		if amount == 0:
 			amount = config.get('video_downloader.MAX_NUMBER_VIDEOS', 100)
+		self.max_videos_per_url = self.parameters.get("channel_videos", 0)
 
 		# YT-DLP by default attempts to download the best quality videos
 		allow_unknown_sizes = config.get('video_downloader.DOWNLOAD_UNKNOWN_SIZE', False)
@@ -198,7 +212,6 @@ class VideoDownloaderPlus(BasicProcessor):
 		downloaded_videos = 0
 		failed_downloads = 0
 		total_possible_videos = min(len(urls), amount)
-
 		for url in urls:
 			# Stop processing if worker has been asked to stop or max downloads reached
 			if downloaded_videos >= amount:
@@ -206,10 +219,9 @@ class VideoDownloaderPlus(BasicProcessor):
 			if self.interrupted:
 				raise ProcessorInterruptedException("Interrupted while downloading videos.")
 
-			# REJECT CERTAIN URLS
-			if any([sub_url in url for sub_url in ['youtube.com/c/', 'youtube.com/channel/']]):
-				# HAHAHA.... NO. Do not download channels. Might be a better way to ensure we catch this...
-				message = 'Skipping... will not download all vids from YouTube CHANNEL: %s' % url
+			# Reject known channels; unknown will still download
+			if self.max_videos_per_url == 0 and any([sub_url in url for sub_url in self.known_channels]):
+				message = 'Skipping known channel: %s' % url
 				urls[url]['success'] = False
 				urls[url]['error'] = message
 				failed_downloads += 1
@@ -288,7 +300,6 @@ class VideoDownloaderPlus(BasicProcessor):
 		metadata = {
 			url: {
 				"from_dataset": self.source_dataset.key,
-				"post_ids": list(data.get('ids')),
 				**sets_to_lists(data)  # TODO: This some shenanigans until I can figure out what to do with the info returned
 			} for url, data in urls.items()
 		}
@@ -332,13 +343,13 @@ class VideoDownloaderPlus(BasicProcessor):
 		# Open stream
 		with requests.get(url, stream=True) as response:
 			if response.status_code != 200:
-				raise FailedDownload("Unable to obtain URL %s with reason: %s; and headers: %s" % (url, str(response.reason), str(response.headers)))
+				raise FailedDownload("Code %i; Unable to obtain URL %s with reason: %s" % (response.status_code, url, str(response.reason)))
 
 			# Verify video
 			# YT-DLP will download images; so we raise them differently
 			# TODO: test/research other possible ways to verify video links; watch for additional YT-DLP oddities
 			if "image" in response.headers["Content-Type"].lower():
-				raise NotAVideo("Not a Video: %s; Content-Type: %s" % (url, response.headers["Content-Type"]))
+				raise NotAVideo("Not a Video (%s): %s" % (response.headers["Content-Type"], url))
 			elif "video" not in response.headers["Content-Type"].lower():
 				raise VideoStreamUnavailable("Possibly video, but unable to download via requests: %s; Content-Type: %s" % (url, response.headers["Content-Type"]))
 
@@ -373,7 +384,6 @@ class VideoDownloaderPlus(BasicProcessor):
 
 	def collect_video_urls(self):
 		urls = {}
-		split_comma = self.parameters.get("split-comma", False)
 		columns = self.parameters.get("columns")
 		if type(columns) == str:
 			columns = [columns]
@@ -394,27 +404,15 @@ class VideoDownloaderPlus(BasicProcessor):
 				if not value:
 					continue
 
-				# remove all whitespace from beginning and end (needed for single URL check)
-				values = [str(value).strip()]
-				if split_comma:
-					values = values[0].split(',')
-
-				for value in values:
-					if re.match(r"https?://(\S+)$", value):
-						# single URL
-						if validate_url(value):
-							item_urls.add(value)
-					else:
-						# search for video URLs in string
-						video_links = self.identify_video_urls_in_string(value)
-						if video_links:
-							item_urls |= set(video_links)
+				video_links = self.identify_video_urls_in_string(value)
+				if video_links:
+					item_urls |= set(video_links)
 
 			for item_url in item_urls:
 				if item_url not in urls:
-					urls[item_url] = {'ids': {post.get('id')}}
+					urls[item_url] = {'post_ids': {post.get('id')}}
 				else:
-					urls[item_url]['ids'].add(post.get('id'))
+					urls[item_url]['post_ids'].add(post.get('id'))
 
 		if not urls:
 			raise ProcessorException("No video urls identified in provided data.")
@@ -428,21 +426,17 @@ class VideoDownloaderPlus(BasicProcessor):
 		:param str text:  string that may contain URLs
 		:return list:  	  list containing validated URLs to videos
 		"""
-		# Currently just extracting all links
-		# Could also try: https://stackoverflow.com/questions/161738/what-is-the-best-regular-expression-to-check-if-a-string-is-a-valid-url
-		vid_link_regex = re.compile(r"(https?):\/\/[a - z0 - 9\.:].* ?(?=\s)",  re.IGNORECASE)
-		possible_links = vid_link_regex.findall(text)
+		split_comma = self.parameters.get("split-comma", True)
+		if split_comma:
+			texts = text.split(",")
+		else:
+			texts = [text]
 
-		# Validate URLs
-		# validated_links = [url for url in possible_links if validate_url(url)]
-		validated_links = []
-		for url in possible_links:
-			if validate_url(url):
-				validated_links.append(url)
-			else:
-				# DEBUG: this is to check our regex works as intended
-				self.dataset.log('Possible URL identified, but did not validate: %s' % url)
-		return validated_links
+		# Currently extracting all links
+		urls = set()
+		for string in texts:
+			urls |= set([url for url in urls_from_text(string)])
+		return list(urls)
 
 
 class MaxVideosDownloaded(ProcessorException):
