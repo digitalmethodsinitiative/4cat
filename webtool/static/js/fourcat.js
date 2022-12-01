@@ -282,8 +282,9 @@ const query = {
     enable_form: function () {
         $('#query-status .delete-link').remove();
         $('#query-status .status_message .dots').html('');
-        $('#query-status .message').html('Waiting for input...');
+        $('#query-status .message').html('Enter dataset parameters to begin.');
         $('#query-form fieldset').prop('disabled', false);
+        $('#query-form .datasource-extra-input').remove();
         $('#query-status').removeClass('active');
     },
 
@@ -369,7 +370,12 @@ const query = {
                     query.start({'frontend-confirm': true, ...response['keep']}, true);
                 }
                 else if (response['status'] === 'extra-form') {
-                    $(response['html']).appendTo('#datasource-form');
+                    $('#query-status .message').html('Enter dataset parameters to continue.');
+                    let extra_elements = $(response['html']);
+                    extra_elements.addClass('datasource-extra-input').css('height', 0).appendTo('#datasource-form');
+                    extra_elements.animate({'height': 0}, 250, function () {
+                        $(this).css('height', '');
+                    }).addClass('flash-once');
                 }
                 else {
                     query.disable_form();

@@ -28,10 +28,9 @@ class SearchCustom(BasicProcessor):
 		"intro": {
 			"type": UserInput.OPTION_INFO,
 			"help": "You can upload a CSV or TAB file here that, after upload, will be available for further analysis "
-					"and processing. Files need to be utf-8 encoded and must contain a header row with at least the "
-					"following columns: `id`, `thread_id`, `author`, `body`, and `timestamp`.\n\nThe "
-					"`timestamp` column should be formatted in a common format (e.g. unix timestamps or `YYYY-mm-dd HH:MM:SS`). "
-					"If your file contains hashtags, name the column `tags` or `hashtags` and make sure they are comma-separated."
+					"and processing. Files need to be [UTF-8](https://en.wikipedia.org/wiki/UTF-8)-encoded and must "
+					"contain a header row. For each item, columns describing its ID, author, timestamp, and content are "
+					"expected. You can select which column holds which value after uploading the file."
 		},
 		"data_upload": {
 			"type": UserInput.OPTION_FILE,
@@ -39,8 +38,9 @@ class SearchCustom(BasicProcessor):
 		},
 		"strip_html": {
 			"type": UserInput.OPTION_TOGGLE,
-			"help": "Strip HTML tags from item text?",
-			"default": False
+			"help": "Strip HTML?",
+			"default": False,
+			"tooltip": "Removes HTML tags from the column identified as containing the item content ('body' by default)"
 		}
 	}
 
@@ -75,12 +75,12 @@ class SearchCustom(BasicProcessor):
 		items = 0
 		skipped = 0
 
-		# two passes
-		# first apply the mapping, then sort
+		# figure out what the columns in the imported csv will be
 		fieldnames = list(self.required_columns) + [field for field in reader.fieldnames if field not in self.required_columns]
 		if "unix_timestamp" not in fieldnames:
 			fieldnames.append("unix_timestamp")
 
+		# write to the result file
 		with self.dataset.get_results_path().open("w", encoding="utf-8", newline="") as output_csv:
 			writer = csv.DictWriter(output_csv, fieldnames=fieldnames)
 			writer.writeheader()
@@ -109,6 +109,9 @@ class SearchCustom(BasicProcessor):
 					skipped += 1
 					continue
 
+				if self.parameters.get("strip_html"):
+					row["body"] = strip_tags(row["body"])
+
 				writer.writerow(row)
 				items += 1
 
@@ -118,6 +121,7 @@ class SearchCustom(BasicProcessor):
 				"CSV file imported, but %i items were skipped because their date could not be parsed." % skipped,
 				is_final=True)
 
+		temp_file.unlink()
 		self.dataset.finish(items)
 
 	def validate_query(query, request, user):
