@@ -318,7 +318,6 @@ const query = {
                 if (pair[1] instanceof File) {
                     let content = await FileReaderPromise(pair[1]);
                     if (content.byteLength > snippet_size) {
-                        console.log('Sampling ' + pair[0])
                         content = content.slice(0, snippet_size);
                         let snippet = new File([content], pair[1].name);
                         formdata.set(pair[0], snippet)
