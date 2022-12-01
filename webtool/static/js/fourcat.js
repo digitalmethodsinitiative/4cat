@@ -352,7 +352,7 @@ const query = {
 
 					$('#query-status').append($('<button class="delete-link" data-key="' + query.query_key + '">Cancel</button>'));
 
-					// poll results every 2000 ms after submitting
+					// poll results every 4000 ms after submitting
 					query.poll_interval = setInterval(function () {
 						query.check(query.query_key);
 					}, 4000);
