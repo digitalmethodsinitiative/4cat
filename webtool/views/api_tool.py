@@ -374,13 +374,9 @@ def queue_dataset():
 	if request.form.get("label"):
 		dataset.update_label(request.form.get("label"))
 
-	needs_job = True
 	if hasattr(search_worker, "after_create"):
-		needs_job = search_worker.after_create(sanitised_query, dataset, request)
-
-	if needs_job:
-		queue.add_job(jobtype=search_worker_id, remote_id=dataset.key)
-
+		search_worker.after_create(sanitised_query, dataset, request)
+	queue.add_job(jobtype=search_worker_id, remote_id=dataset.key)
 	return jsonify({"status": "success", "message": "", "key": dataset.key})
 
 

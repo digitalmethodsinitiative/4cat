@@ -10,8 +10,8 @@ from dateutil.parser import parse as parse_datetime
 from datetime import datetime
 
 from backend.abstract.processor import BasicProcessor
-from common.lib.exceptions import QueryParametersException
-from common.lib.helpers import get_software_version, strip_tags, sniff_encoding, UserInput
+from common.lib.exceptions import QueryParametersException, QueryNeedsFurtherInputException
+from common.lib.helpers import strip_tags, sniff_encoding, UserInput
 
 
 class SearchCustom(BasicProcessor):
@@ -20,8 +20,8 @@ class SearchCustom(BasicProcessor):
 	title = "Custom Dataset Upload"  # title displayed in UI
 	description = "Upload your own CSV file to be used as a dataset"  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
-	is_local = False	# Whether this datasource is locally scraped
-	is_static = False	# Whether this datasource is still updated
+	is_local = False  # Whether this datasource is locally scraped
+	is_static = False  # Whether this datasource is still updated
 
 	max_workers = 1
 	options = {
@@ -37,11 +37,6 @@ class SearchCustom(BasicProcessor):
 			"type": UserInput.OPTION_FILE,
 			"help": "File"
 		},
-		"time_col": {
-			"type": UserInput.OPTION_TEXT,
-			"help": "Name of date column",
-			"default": "timestamp"
-		},
 		"strip_html": {
 			"type": UserInput.OPTION_TOGGLE,
 			"help": "Strip HTML tags from item text?",
@@ -49,15 +44,81 @@ class SearchCustom(BasicProcessor):
 		}
 	}
 
+	# these columns need to be present or mapped to when uploading a csv file
+	required_columns = {
+		"id": "A value that uniquely identifies the item, like a numerical ID.",
+		"thread_id": "A value that uniquely identifies the sub-collection an item is a part of, e.g. a forum thread. If this does not apply to your dataset you can use the same value as for 'id' here.",
+		"author": "A value that identifies the author of the item. If the option to pseudonymise data is selected below, this field will be pseudonymised.",
+		"body": "The 'content' of the item, e.g. a post's text.",
+		"timestamp": "The time the item was made or posted. 4CAT will try to interpret this value, but for the best results use YYYY-MM-DD HH:MM:SS notation."
+	}
+
 	def process(self):
 		"""
-		Run custom search
+		Process uploaded CSV file
 
-		All work is done while uploading the data, so this just has to 'finish'
-		the job.
+		Applies the provided mapping and makes sure the file is in a format
+		4CAT will understand.
 		"""
+		temp_file = self.dataset.get_results_path().with_suffix(".importing")
+		with temp_file.open("rb") as infile:
+			# detect encoding - UTF-8 with or without BOM
+			encoding = sniff_encoding(infile)
 
-		self.job.finish()
+		infile = temp_file.open("r", encoding=encoding)
+		sample = infile.read(1024 * 1024)
+		dialect = csv.Sniffer().sniff(sample, delimiters=(",", ";", "\t"))
+
+		# With validated csvs, save as is but make sure the raw file is sorted
+		infile.seek(0)
+		reader = csv.DictReader(infile, dialect=dialect)
+		items = 0
+		skipped = 0
+
+		# two passes
+		# first apply the mapping, then sort
+		fieldnames = list(self.required_columns) + [field for field in reader.fieldnames if field not in self.required_columns]
+		if "unix_timestamp" not in fieldnames:
+			fieldnames.append("unix_timestamp")
+
+		with self.dataset.get_results_path().open("w", encoding="utf-8", newline="") as output_csv:
+			writer = csv.DictWriter(output_csv, fieldnames=fieldnames)
+			writer.writeheader()
+			for row in reader:
+				for field in self.required_columns:
+					mapping = self.parameters.get("mapping-" + field)
+					if mapping and mapping != field:
+						row[field] = row[mapping]
+
+				# ensure that timestamp is YYYY-MM-DD HH:MM:SS and that there
+				# is a unix timestamp. this will override the columns if they
+				# already exist! but it is necessary for 4CAT to handle the
+				# data in processors etc and should be an equivalent value.
+				try:
+					if row["timestamp"].isdecimal():
+						timestamp = datetime.fromtimestamp(float(row["timestamp"]))
+					else:
+						timestamp = parse_datetime(row["timestamp"])
+
+					row["timestamp"] = timestamp.strftime("%Y-%m-%d %H:%M:%S")
+					row["unix_timestamp"] = int(timestamp.timestamp())
+
+				except ValueError:
+					# skip rows without a valid timestamp - this may happen
+					# despite validation because only a sample is validated
+					skipped += 1
+					continue
+
+				writer.writerow(row)
+				items += 1
+
+		infile.close()
+		if skipped:
+			self.dataset.update_status(
+				"CSV file imported, but %i items were skipped because their date could not be parsed." % skipped,
+				is_final=True)
+
+		self.dataset.finish(items)
 
 	def validate_query(query, request, user):
 		"""
@@ -71,7 +132,6 @@ class SearchCustom(BasicProcessor):
 		:param User user:  User object of user who has submitted the query
 		:return dict:  Safe query parameters
 		"""
-
 		# do we have an uploaded file?
 		if "option-data_upload" not in request.files:
 			raise QueryParametersException("No file was offered for upload.")
@@ -90,35 +150,77 @@ class SearchCustom(BasicProcessor):
 		# With validated csvs, save as is but make sure the raw file is sorted
 		reader = csv.DictReader(wrapped_file, dialect=dialect)
 
+		# we know that the CSV file is a CSV file now, next verify whether
+		# we know what each column means
 		try:
 			fields = reader.fieldnames
 		except UnicodeDecodeError:
 			raise QueryParametersException("Uploaded file is not a well-formed CSV or TAB file.")
 
-		# check if all required fields are present
-		required = ("id", "thread_id", "author", "body", "timestamp")
-		missing = []
-		for field in required:
-			if field not in reader.fieldnames:
-				missing.append(field)
+		incomplete_mapping = list(SearchCustom.required_columns.keys())
+		for field in SearchCustom.required_columns:
+			if request.form.get("option-mapping-%s" % field):
+				incomplete_mapping.remove(field)
 
-		if missing:
+		# offer the user a number of select boxes where they can indicate the
+		# mapping for each column
+		if incomplete_mapping:
+			raise QueryNeedsFurtherInputException({
+				"mapping-info": {
+					"type": UserInput.OPTION_INFO,
+					"help": "Please confirm which column in the CSV file maps to each required value."
+				},
+				**{
+					"mapping-%s" % mappable_column: {
+						"type": UserInput.OPTION_CHOICE,
+						"options": {
+							"": "",
+							**{column: column for column in fields}
+						},
+						"default": mappable_column if mappable_column in fields else "",
+						"help": mappable_column,
+						"tooltip": SearchCustom.required_columns[mappable_column]
+					} for mappable_column in incomplete_mapping
+				}})
+
+		# the mappings do need to point to a column in the csv file
+		missing_mapping = []
+		column_mapping = {}
+		for field in SearchCustom.required_columns:
+			mapping_field = "option-mapping-%s" % field
+			if request.form.get(mapping_field) not in fields or not request.form.get(mapping_field):
+				missing_mapping.append(field)
+			else:
+				column_mapping["mapping-" + field] = request.form.get(mapping_field)
+
+		if missing_mapping:
 			raise QueryParametersException(
-				"The following required columns are not present in the csv file: %s" % ", ".join(missing))
+				"You need to indicate which column in the CSV file holds the corresponding value for the following columns: %s" % ", ".join(
+					missing_mapping))
 
+		# the timestamp column needs to be parseable
+		timestamp_column = request.form.get("mapping-timestamp")
 		try:
 			row = reader.__next__()
+			if timestamp_column not in row:
+				# incomplete row because we are analysing a sample
+				# stop parsing because no complete rows will follow
+				raise StopIteration
+
 			try:
 
 				if row["timestamp"].isdecimal():
-					datetime.fromtimestamp(float(row["timestamp"]))
+					datetime.fromtimestamp(float(row[timestamp_column]))
 				else:
-					parse_datetime(row["timestamp"])
+					parse_datetime(row[timestamp_column])
 			except ValueError:
-				raise QueryParametersException("Your 'timestamp' column does not use a recognisable format (yyyy-mm-dd hh:mm:ss is recommended)")
+				raise QueryParametersException(
+					"Your 'timestamp' column does not use a recognisable format (yyyy-mm-dd hh:mm:ss is recommended)")
+
 		except StopIteration:
 			pass
 
+		# ok, we're done with the file
 		wrapped_file.detach()
 
 		# Whether to strip the HTML tags
@@ -129,78 +231,31 @@ class SearchCustom(BasicProcessor):
 		# return metadata - the filename is sanitised and serves no purpose at
 		# this point in time, but can be used to uniquely identify a dataset
 		disallowed_characters = re.compile(r"[^a-zA-Z0-9._+-]")
-		return {"filename": disallowed_characters.sub("", file.filename), "time": time.time(), "datasource": "custom", "board": "upload", "strip_html": strip_html}
+		return {
+			"filename": disallowed_characters.sub("", file.filename),
+			"time": time.time(),
+			"datasource": "custom",
+			"board": "upload",
+			"strip_html": strip_html,
+			**column_mapping,
+		}
 
 	def after_create(query, dataset, request):
 		"""
 		Hook to execute after the dataset for this source has been created
 
-		In this case, it is used to save the uploaded file to the dataset's
-		result path, and finalise the dataset metadata.
+		In this case, put the file in a temporary location so it can be
+		processed properly by the related Job later.
 
 		:param dict query:  Sanitised query parameters
 		:param DataSet dataset:  Dataset created for this query
 		:param request:  Flask request submitted for its creation
 		"""
-
-		strip_html = query.get("strip_html")
-
 		file = request.files["option-data_upload"]
-
 		file.seek(0)
-
-		# detect encoding - UTF-8 with or without BOM
-		encoding = sniff_encoding(file)
-
-		wrapped_file = io.TextIOWrapper(file, encoding=encoding)
-		sample = wrapped_file.read(1024 * 1024)
-		wrapped_file.seek(0)
-		dialect = csv.Sniffer().sniff(sample, delimiters=(",", ";", "\t"))
-
-		# With validated csvs, save as is but make sure the raw file is sorted
-		reader = csv.DictReader(wrapped_file, dialect=dialect)
-		with dataset.get_results_path().open("w", encoding="utf-8", newline="") as output_csv:
-			# Sort by timestamp
-			# note that this relies on the timestamp format to be sortable
-			# but the alternative - first converting timestamps and then
-			# sorting - would be quite intensive
-			dataset.update_status("Sorting file by date")
-			sorted_reader = sorted(reader, key=lambda row:row["timestamp"] if isinstance(row["timestamp"], str) else "")
-
-			dataset.update_status("Writing to file")
-			fieldnames = list(reader.fieldnames)
-			if "unix_timestamp" not in fieldnames:
-				fieldnames.append("unix_timestamp")
-
-			writer = csv.DictWriter(output_csv, fieldnames=fieldnames)
-			writer.writeheader()
-			for row in sorted_reader:
-				try:
-					if row["timestamp"].isdecimal():
-						sanitised_time = datetime.fromtimestamp(float(row["timestamp"]))
-					else:
-						sanitised_time = parse_datetime(row["timestamp"])
-					row["timestamp"] = sanitised_time.strftime("%Y-%m-%d %H:%I:%S")
-					row["unix_timestamp"] = sanitised_time.timestamp()
-				except (TypeError, ValueError, OverflowError):
-					# bad format, skip
-					# an OverflowError occurs if for whatever reason the field contains a huge
-					# number?
-					continue
-
-				if strip_html:
-					row["body"] = strip_tags(row["body"])
-				writer.writerow(row)
-
-		file.close()
-
-		with dataset.get_results_path().open(encoding="utf-8") as input:
-			if file.filename.endswith(".tab"):
-				reader = csv.DictReader(input, delimiter="\t", quoting=csv.QUOTE_NONE)
-			else:
-				reader = csv.DictReader(input)
-
-			dataset.finish(sum(1 for line in reader))
-			dataset.update_status("Result processed")
-
-		dataset.update_version(get_software_version())
+		with dataset.get_results_path().with_suffix(".importing").open("wb") as outfile:
+			while True:
+				chunk = file.read(1024)
+				if len(chunk) == 0:
+					break
+				outfile.write(chunk)
