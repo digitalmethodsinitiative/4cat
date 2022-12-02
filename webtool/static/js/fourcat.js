@@ -371,11 +371,19 @@ const query = {
                 }
                 else if (response['status'] === 'extra-form') {
                     $('#query-status .message').html('Enter dataset parameters to continue.');
+                    let target_top = $('#datasource-form')[0].offsetTop + $('#datasource-form')[0].offsetHeight - 50;
+
                     let extra_elements = $(response['html']);
-                    extra_elements.addClass('datasource-extra-input').css('height', 0).appendTo('#datasource-form');
-                    extra_elements.animate({'height': 0}, 250, function () {
-                        $(this).css('height', '');
-                    }).addClass('flash-once');
+                    extra_elements.addClass('datasource-extra-input').css('visibility', 'hidden').css('position', 'absolute').css('display', 'block').appendTo('#datasource-form');
+                    let targetHeight = extra_elements.height();
+                    console.log(targetHeight);
+                    extra_elements.css('position', '').css('display', '').css('visibility', '').css('height', 0);
+
+                    $('html,body').animate({scrollTop: target_top + 'px'}, 500, false, function() {
+                        extra_elements.animate({'height': targetHeight}, 250, function () {
+                            $(this).css('height', '').addClass('flash-once');
+                        });
+                    });
                 }
                 else {
                     query.disable_form();

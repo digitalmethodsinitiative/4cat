@@ -253,6 +253,10 @@ article.small .form-element > *:not([type=radio], [type=checkbox]) {
     margin-left: 0.5em;
 }
 
+.datasource-extra-input {
+    overflow: hidden;
+}
+
 .submit-container {
     text-align: center;
     padding: 1em;
