@@ -376,7 +376,6 @@ const query = {
                     let extra_elements = $(response['html']);
                     extra_elements.addClass('datasource-extra-input').css('visibility', 'hidden').css('position', 'absolute').css('display', 'block').appendTo('#datasource-form');
                     let targetHeight = extra_elements.height();
-                    console.log(targetHeight);
                     extra_elements.css('position', '').css('display', '').css('visibility', '').css('height', 0);
 
                     $('html,body').animate({scrollTop: target_top + 'px'}, 500, false, function() {
