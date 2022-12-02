@@ -370,6 +370,8 @@ const query = {
                     query.start({'frontend-confirm': true, ...response['keep']}, true);
                 }
                 else if (response['status'] === 'extra-form') {
+                    // new form elements to fill in
+                    // some fancy css juggling to make it obvious that these need to be completed
                     $('#query-status .message').html('Enter dataset parameters to continue.');
                     let target_top = $('#datasource-form')[0].offsetTop + $('#datasource-form')[0].offsetHeight - 50;
 
