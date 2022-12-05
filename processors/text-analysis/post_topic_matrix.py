@@ -110,7 +110,7 @@ class TopicModelWordExtractor(BasicProcessor):
 
         # Collect column names of matrix
         post_column_names = list(set(['id', 'thread_id', 'timestamp', 'author', 'body'] + self.parameters.get('columns', []) + token_metadata_parameters.get('columns')))
-        model_column_names = ['post_id', 'document_id', 'interval']
+        model_column_names = ['post_id', 'document_id', 'interval', 'top_topic(s)']
 
         # Check if multiple documents exist per post/item and add 'document' column if needed
         if token_metadata_parameters.get('grouped_by') != 'item' or len(token_metadata_parameters.get('columns')) > 1:
