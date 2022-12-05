@@ -285,7 +285,7 @@ class ToolImporter:
                 # this ensures that the required columns are always the first
                 # columns, and the rest is in original order
                 for field, value in row.items():
-                    if field not in mapped_row:
+                    if field not in mapped_row and field:
                         mapped_row[field] = value
 
             except ValueError:
@@ -340,7 +340,7 @@ class ToolImporter:
             "columns": {"id", "isReplyTo", "authorName", "text", "publishedAt"},
             "mapper": import_ytdt_commentlist
         },
-        "none": {
+        "custom": {
             "name": "Custom/other",
             "columns": {
                 "id": "A value that uniquely identifies the item, like a numerical ID.",

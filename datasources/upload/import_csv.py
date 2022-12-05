@@ -13,11 +13,11 @@ from backend.abstract.processor import BasicProcessor
 from common.lib.exceptions import QueryParametersException, QueryNeedsFurtherInputException
 from common.lib.helpers import strip_tags, sniff_encoding, UserInput
 
-from datasources.custom.import_helpers import ToolImporter
+from datasources.upload.import_formats import ToolImporter
 
 
 class SearchCustom(BasicProcessor):
-    type = "custom-search"  # job ID
+    type = "upload-search"  # job ID
     category = "Search"  # category
     title = "Custom Dataset Upload"  # title displayed in UI
     description = "Upload your own CSV file to be used as a dataset"  # description displayed in UI
@@ -46,7 +46,7 @@ class SearchCustom(BasicProcessor):
             "options": {
                 tool: info["name"] for tool, info in ToolImporter.tools.items()
             },
-            "default": "none"
+            "default": "custom"
         },
         "strip_html": {
             "type": UserInput.OPTION_TOGGLE,
@@ -243,8 +243,8 @@ class SearchCustom(BasicProcessor):
         return {
             "filename": disallowed_characters.sub("", file.filename),
             "time": time.time(),
-            "datasource": "custom",
-            "board": "upload",
+            "datasource": "upload",
+            "board": query.get("format", "custom").replace("_", "-"),
             "format": query.get("format"),
             "strip_html": strip_html,
             **column_mapping,
