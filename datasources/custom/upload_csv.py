@@ -31,8 +31,10 @@ class SearchCustom(BasicProcessor):
             "type": UserInput.OPTION_INFO,
             "help": "You can upload a CSV or TAB file here that, after upload, will be available for further analysis "
                     "and processing. Files need to be [UTF-8](https://en.wikipedia.org/wiki/UTF-8)-encoded and must "
-                    "contain a header row. For each item, columns describing its ID, author, timestamp, and content "
-                    "are expected. You can select which column holds which value after uploading the file."
+                    "contain a header row.\n\n"
+                    "You can indicate what format the file has or upload one with arbitrary structure. In the latter "
+                    "case, for each item, columns describing its ID, author, timestamp, and content are expected. You "
+                    "can select which column holds which value after uploading the file."
         },
         "data_upload": {
             "type": UserInput.OPTION_FILE,
@@ -109,6 +111,7 @@ class SearchCustom(BasicProcessor):
                 is_final=True)
 
         temp_file.unlink()
+        self.dataset.delete_parameter("filename")
         self.dataset.finish(done)
 
     def validate_query(query, request, user):

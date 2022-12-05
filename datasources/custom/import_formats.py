@@ -263,23 +263,30 @@ class ToolImporter:
         """
         # write to the result file
         for row in reader:
+            mapped_row = {}
             for field in columns:
                 mapping = parameters.get("mapping-" + field)
-                if mapping and mapping != field:
-                    row[field] = row[mapping]
+                if mapping:
+                    mapped_row[field] = row[mapping]
 
             # ensure that timestamp is YYYY-MM-DD HH:MM:SS and that there
             # is a unix timestamp. this will override the columns if they
             # already exist! but it is necessary for 4CAT to handle the
             # data in processors etc and should be an equivalent value.
             try:
-                if row["timestamp"].isdecimal():
-                    timestamp = datetime.fromtimestamp(float(row["timestamp"]))
+                if mapped_row["timestamp"].isdecimal():
+                    timestamp = datetime.fromtimestamp(float(mapped_row["timestamp"]))
                 else:
-                    timestamp = parse_datetime(row["timestamp"])
+                    timestamp = parse_datetime(mapped_row["timestamp"])
 
-                row["timestamp"] = timestamp.strftime("%Y-%m-%d %H:%M:%S")
-                row["unix_timestamp"] = int(timestamp.timestamp())
+                mapped_row["timestamp"] = timestamp.strftime("%Y-%m-%d %H:%M:%S")
+                mapped_row["unix_timestamp"] = int(timestamp.timestamp())
+
+                # this ensures that the required columns are always the first
+                # columns, and the rest is in original order
+                for field, value in row.items():
+                    if field not in mapped_row:
+                        mapped_row[field] = value
 
             except ValueError:
                 # skip rows without a valid timestamp - this may happen
@@ -287,7 +294,7 @@ class ToolImporter:
                 yield ToolImporter.InvalidImportedItem()
                 continue
 
-            yield row
+            yield mapped_row
 
     # tools that are supported for importing
     # defined here (instead of at the top) so we can refer to the methods
@@ -334,7 +341,7 @@ class ToolImporter:
             "mapper": import_ytdt_commentlist
         },
         "none": {
-            "name": "None/other",
+            "name": "Custom/other",
             "columns": {
                 "id": "A value that uniquely identifies the item, like a numerical ID.",
                 "thread_id": "A value that uniquely identifies the sub-collection an item is a part of, e.g. a forum "
