@@ -168,9 +168,19 @@ def _jinja2_filter_post_field(field, post):
 	matches = False
 	formatted_field = field
 
-	for key in re.findall(r"\{\{(.*?)\}\}", str(field)):
+	field = str(field)
+	
+	for key in re.findall(r"\{\{(.*?)\}\}", field):
 
 		original_key = key
+
+		# Remove possible slice stings so we get the original key
+		string_slice = None
+		if "[" in original_key and "]" in original_key:
+			string_slice = re.search(r"\[(.*?)\]", original_key)
+			if string_slice:
+				string_slice = string_slice.group(1)
+				key = key.replace("[" + string_slice + "]", "")
 
 		# We're also gonna extract any other filters present
 		extra_filters = []
@@ -193,12 +203,44 @@ def _jinja2_filter_post_field(field, post):
 		# We see 0 as a valid value - e.g. '0 retweets'.
 		if not val and val != 0:
 			return ""
-
-		# Apply further builtin filters, if present (e.g. lower)
-		for extra_filter in extra_filters:
-			extra_filter = extra_filter.strip()
-			val = app.jinja_env.filters[extra_filter](val)
 		
+		# Support some basic string slicing
+		if string_slice:
+			field = field.replace("[" + string_slice + "]", "")
+			if ":" not in string_slice:
+				string_slice = slice(int(string_slice), int(string_slice) + 1)
+			else:
+				sl = string_slice.split(":")
+				if not sl[0] and sl[0] != "0":
+					sl1 = 0
+					sl2 = sl[1]
+				elif not sl[-1]:
+					sl1 = sl[0]
+					sl2 = len(st)
+				else:
+					sl1 = sl[0]
+					sl2 = sl[1]
+				string_slice = slice(int(sl1), int(sl2))
+
+		# Apply further filters, if present (e.g. lower)
+		for extra_filter in extra_filters:
+			
+			extra_filter = extra_filter.strip()
+
+			# We're going to parse possible parameters to pass to the filter
+			# These are passed as unnamed variables to the function.
+			params = ()
+			if "(" in extra_filter:
+				params = extra_filter.split("(")[-1][:-1].strip()
+				extra_filter = extra_filter.split("(")[0]
+				params = [p.strip() for p in params.split(",")]
+				params = [post[param] for param in params]
+			
+			val = app.jinja_env.filters[extra_filter](val, *params)
+
+		if string_slice:
+			val = val[string_slice]
+
 		formatted_field = formatted_field.replace("{{" + original_key + "}}", str(val))
 
 	return formatted_field
