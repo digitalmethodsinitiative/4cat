@@ -185,7 +185,7 @@ def _jinja2_filter_4chan_image(image_4chan, post_id, board, image_md5):
 			pass
 		try:
 			api_json = json.loads(api_json.content)
-			img_link = api_json.get("media", {}).get("thumb_link", page_url)
+			img_link = api_json.get("media", {}).get("thumb_link", "")
 		except json.JSONDecodeError:
 			pass
 		if img_link:
