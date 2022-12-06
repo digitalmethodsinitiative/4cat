@@ -6,6 +6,7 @@ import uuid
 import math
 import os
 import re
+import requests
 
 from pathlib import Path
 from urllib.parse import urlencode, urlparse
@@ -158,6 +159,61 @@ def _jinja2_filter_extension_to_noun(ext):
 		return "file"
 	else:
 		return "item"
+
+@app.template_filter('4chan_image')
+def _jinja2_filter_4chan_image(image_4chan, post_id, board, image_md5):
+
+	plebs_boards = ["adv","f","hr","mlpol","mo","o","pol","s4s","sp","tg","trv","tv","x"]
+	archivedmoe_boards = ["3","a","aco","adv","an","asp","b","bant","biz","c","can","cgl","ck","cm","co","cock","con","d","diy","e","f","fa","fap","fit","fitlit","g","gd","gif","h","hc","his","hm","hr","i","ic","int","jp","k","lgbt","lit","m","mlp","mlpol","mo","mtv","mu","n","news","o","out","outsoc","p","po","pol","pw","q","qa","qb","qst","r","r9k","s","s4s","sci","soc","sp","spa","t","tg","toy","trash","trv","tv","u","v","vg","vint","vip","vm","vmg","vp","vr","vrpg","vst","vt","w","wg","wsg","wsr","x","xs","y"]
+
+	headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:61.0) Gecko/20100101 Firefox/61.0"}
+
+	img_link = None
+	thumb_link = image_4chan.split(".")
+	thumb_link = thumb_link[0][:4] + "/" + thumb_link[0][4:6] + "/" + thumb_link[0] + "s." + thumb_link[1]
+
+	# If the board is archived by 4plebs, check that site first
+	if board in plebs_boards:
+
+		# First we're going to try to get the image link through the 4plebs API.
+		api_url = "https://archive.4plebs.org/_/api/chan/post/?board=%s&num=%s" % (board, post_id)
+		try:
+			api_json = requests.get(api_url, headers=headers)
+		except requests.RequestException as e:
+		 	pass
+		if api_json.status_code != 200:
+			pass
+		try:
+			api_json = json.loads(api_json.content)
+			img_link = api_json.get("media", {}).get("thumb_link", page_url)
+		except json.JSONDecodeError:
+			pass
+		if img_link:
+			return img_link
+
+		# If that doesn't work, we can check whether we can retrieve the image directly.
+		# 4plebs has a back-referral system so that some filenames are translated.
+		# This means direct linking won't work for every image without API retrieval.
+		# So only show if we get a 200 status code.
+		img_page = requests.get("https://img.4plebs.org/boards/%s/thumb/%s" % (board, thumb_link), headers=headers)
+		if img_page.status_code == 200:
+			return "https://img.4plebs.org/boards/%s/thumb/%s" % (board, thumb_link)
+
+	# If the board is archived by archivedmoe, we can also check this resource
+	if board in archivedmoe_boards:
+		img_page = requests.get("https://archived.moe/files/%s/thumb/%s" % (board, thumb_link), headers=headers)
+		if img_page.status_code == 200:
+			return img_page
+
+	# If we couldn't retrieve the thumbnail yet, then we'll just give a search link
+	# and display it as a hidden image.
+	image_md5 = image_md5.replace("/", "_")
+	if board in plebs_boards:
+		return "retrieve:http://archive.4plebs.org/_/search/image/" + image_md5
+	# Archivedmoe as a last resort - has a lot of boards
+	return "retrieve:https://archived.moe/_/search/image/" + image_md5
+
+
 
 @app.template_filter('post_field')
 def _jinja2_filter_post_field(field, post):
