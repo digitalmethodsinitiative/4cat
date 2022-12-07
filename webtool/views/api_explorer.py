@@ -653,8 +653,8 @@ def get_custom_fields(datasource, filetype=None):
 		with open(json_path, "r", encoding="utf-8") as json_file:
 			try:
 				custom_fields = json.load(json_file)
-			except ValueError:
-				return "invalid"
+			except ValueError as e:
+				return ("invalid", e)
 	else:
 		custom_fields = None
 

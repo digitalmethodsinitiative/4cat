@@ -1,10 +1,10 @@
 {
 	"subject": "{{ subject }}",
 	"board": "/{{ board }}/",
-	"image": "http://i.4pcdn.org/{{ board }}/{{ image_file }}",
-	"country": "<span class='flag flag-{{ country_code | lower}}' title='{{ country_name }}'></span>",
+	"image": "{{ image_4chan | 4chan_image(id, board, image_md5) }}",
+	"country": "<span class='flag flag-{{ country_code | lower }}' title='{{ country_name }}'></span>",
 	"deleted": "<span class='deleted' title='This post was deleted by a moderator on {{ timestamp_deleted }}'><i class='fa fa-trash'></i></span>",
-	"external_url": "https://archive.4plebs.org/{{board}}/thread/{{thread_id}}#{{id}}",
+	"external_url": "https://archive.4plebs.org/{{ board }}/thread/{{ thread_id} }#{{ id }}",
 	"sort_options": [
 		{
 			"key": "timestamp",
