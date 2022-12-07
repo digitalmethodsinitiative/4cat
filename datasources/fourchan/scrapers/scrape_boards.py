@@ -51,8 +51,8 @@ class BoardScraper4chan(BasicJSONScraper):
 
 		self.log.info("Board scrape for %s/%s/ yielded %i new threads" % (self.datasource, self.job.data["remote_id"], new_threads))
 
-		# Also update threads that are not archived or closed, but were also not in the index.
-		# These were either archived or deleted by moderators, and we should mark them as such.
+		# Also update threads that were not yet seen as not archived or closed, but were also not in the index.
+		# These were either archived or deleted by moderators.
 		self.update_unindexed_threads(index_thread_ids)
 
 	def save_thread(self, thread):
