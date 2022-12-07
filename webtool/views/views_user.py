@@ -192,13 +192,13 @@ def create_first_user():
                                flashes=get_flashed_messages())
 
     if phone_home_url and request.form.get("phonehome"):
-        with Path(config.get("path.root"), "config/.current-version").open() as outfile:
+        with Path(config.get("PATH_ROOT"), "config/.current-version").open() as outfile:
             version = outfile.read(64).split("\n")[0].strip()
 
         payload = {
             "version": version,
             "commit": get_software_version(),
-            "role": request.form.get("purpose", ""),
+            "role": request.form.get("role", ""),
             "affiliation": request.form.get("affiliation", ""),
             "email": request.form.get("email", "")
         }
