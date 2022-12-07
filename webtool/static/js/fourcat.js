@@ -352,7 +352,7 @@ const query = {
 
 					$('#query-status').append($('<button class="delete-link" data-key="' + query.query_key + '">Cancel</button>'));
 
-					// poll results every 2000 ms after submitting
+					// poll results every 4000 ms after submitting
 					query.poll_interval = setInterval(function () {
 						query.check(query.query_key);
 					}, 4000);
@@ -360,7 +360,11 @@ const query = {
 			},
 			error: function (error) {
 				query.enable_form();
-				popup.alert(error['message'], 'Error');
+				if(!error['message']) {
+					popup.alert('There was an issue while trying to connect to the 4CAT backend. It may not be running.', 'Error');
+				} else {
+					popup.alert(error['message'], 'Error');
+				}
 				$('#query-status .message').html(error);
 			}
 		});
@@ -1394,11 +1398,19 @@ const ui_helpers = {
 
 			// Also collapse underlying panels that are still open
 			$(target).find('*[aria-expanded=true]').attr('aria-expanded', false);
+
+			if($(this).find('i.fa.fa-minus')) {
+				$(this).find('i.fa.fa-minus').addClass('fa-plus').removeClass('fa-minus');
+			}
 		} else {
 			$(target).css('visibility', 'hidden').css('position', 'absolute').css('display', 'block').attr('aria-expanded', true);
 			let targetHeight = $(target).height();
 			$(target).css('aria-expanded', false).css('position', '').css('display', '').css('visibility', '').css('height', 0);
 			$(target).attr('aria-expanded', true).animate({"height": targetHeight}, 250, function() { $(this).css('height', '')});
+
+			if($(this).find('i.fa.fa-plus')) {
+				$(this).find('i.fa.fa-plus').addClass('fa-minus').removeClass('fa-plus');
+			}
 		}
 	}
 }

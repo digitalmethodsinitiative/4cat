@@ -16,8 +16,8 @@
 				{% set post_count = max_posts %}
 			{% endif %}
 			<p>Showing posts {{ offset + 1 }} - {{ post_count if (offset + limit) > post_count else (offset + limit) }} ({{ post_count }} in total).</p>
-		{% if custom_fields and custom_fields == "invalid" %}
-			<p><strong>Invalid custom fields JSON - can't show posts properly</strong></p>
+		{% if custom_fields and custom_fields[0] == "invalid" %}
+			<p><strong>Invalid custom fields JSON - can't show posts properly ({{ custom_fields[1] }}).</strong></p>
 		{% endif %}
 		{% if custom_fields and 'sort_options' in custom_fields %}
 		<div id="sort-options">

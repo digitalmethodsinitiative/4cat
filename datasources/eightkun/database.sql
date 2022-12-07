@@ -5,9 +5,9 @@ CREATE TABLE IF NOT EXISTS threads_8kun (
   id_seq             SERIAL PRIMARY KEY,  -- sequential ID for easier indexing
   board              text,
   timestamp          integer DEFAULT 0, -- first known timestamp for this thread, i.e. timestamp of first post
-  timestamp_archived integer DEFAULT 0,
+  timestamp_archived integer DEFAULT 0, -- timestamp this thread was archived
   timestamp_scraped  integer, -- last timestamp this thread was scraped
-  timestamp_deleted  integer DEFAULT 0,  -- timestamp this thread was no longer scrapeable
+  timestamp_deleted  integer DEFAULT 0,  -- timestamp this thread was no longer scrapeable (404)
   timestamp_modified integer, -- last timestamp this thread was modified (reported by 8kun)
   post_last          bigint, -- ID of last post in this thread
   num_unique_ips     integer DEFAULT 0,
@@ -34,6 +34,11 @@ CREATE INDEX IF NOT EXISTS threads_timestamp_8kun
 CREATE INDEX IF NOT EXISTS threads_seq_8kun
   ON threads_8kun (
     id_seq
+  );
+
+CREATE INDEX IF NOT EXISTS threads_archiving_8kun
+  ON threads_8kun (
+    timestamp_deleted, timestamp_archived, timestamp_modified, board
   );
 
 -- posts

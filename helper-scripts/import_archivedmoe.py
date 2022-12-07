@@ -1,15 +1,21 @@
 """
-Import 4chan data from 4plebs data dumps
+Import 4chan csv data from archived.moe csv dumps.
+
+Several of these are downloadable here: https://archive.org/details/archivedmoe_db_201908.
+
+For /v/, make sure to download this one: https://archive.org/download/archivedmoe_db_201908/v.csv.bz2
+
 """
+
 import argparse
-import psycopg2
 import json
 import time
-import sys
 import csv
-import json
-import re
+import sys
 import os
+import re
+
+from pathlib import Path
 
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)) + "/..")
 from common.lib.database import Database
@@ -17,55 +23,14 @@ from common.lib.logger import Logger
 from chan_flags import get_country_name, get_troll_names
 
 
-class FourPlebs(csv.Dialect):
-	"""
-	CSV Dialect as used in 4plebs database dumps - to be used with Python CSV functions
-	"""
-	delimiter = ","
-	doublequote = False
-	escapechar = "\\"
-	lineterminator = "\n"
-	quotechar = '"'
-	quoting = csv.QUOTE_ALL
-	skipinitialspace = False
-	strict = True
-
-	columns = ["num", "subnum", "thread_num", "op", "timestamp", "timestamp_expired", "preview_orig", "preview_w",
-			   "preview_h", "media_filename", "media_w", "media_h", "media_size", "media_hash", "media_orig", "spoiler",
-			   "deleted", "capcode", "email", "name", "trip", "title", "comment", "sticky", "locked", "poster_hash",
-			   "poster_country", "exif"]
-
-def sanitize(post):
-	"""
-	Sanitize post data
-
-	:param dict post:  Post data, from a DictReader
-	:return dict:  Post data, but cleaned and sanitized
-	"""
-	if isinstance(post, dict):
-		return {key: sanitize(post[key]) for key in post}
-	else:
-		if isinstance(post, str):
-			post = post.strip()
-			post = post.replace("\\\\", "\\")
-
-		if post == "N":
-			post = ""
-
-		return post
-
 def commit(posts, post_fields, db, datasource, fast=False):
 	posts_added = 0
-	
+
 	if fast:
 		post_fields_sql = ", ".join(post_fields)
-		try:
-			db.execute_many("INSERT INTO posts_" + datasource + " (" + post_fields_sql + ") VALUES %s", replacements=posts)
-			db.commit()
-		except psycopg2.IntegrityError as e:
-			print(repr(e))
-			print(e)
-			sys.exit(1)		
+		db.execute_many("INSERT INTO posts_" + datasource + " (" + post_fields_sql + ") VALUES %s", replacements=posts)
+		db.commit()
+		
 		posts_added = len(posts)
 
 	else:
@@ -73,6 +38,7 @@ def commit(posts, post_fields, db, datasource, fast=False):
 		db.execute("START TRANSACTION")
 		for post in posts:
 			new_post = db.insert("posts_" + datasource, data={post_fields[i]: post[i] for i in range(0, len(post))}, safe=True, constraints=("id", "board"), commit=False)
+
 			if new_post:
 				posts_added += 1
 
@@ -80,12 +46,11 @@ def commit(posts, post_fields, db, datasource, fast=False):
 
 	return posts_added
 
-# set up
-link_regex = re.compile(">>([0-9]+)")
-post_fields = ("id", "thread_id", "board", "timestamp", "body", "author",
-			   "author_type_id", "author_trip", "subject", "country_code", "country_name", "image_file",
-			   "image_4chan", "image_md5", "image_dimensions", "image_filesize",
-			   "semantic_url", "unsorted_data")
+# setup
+post_fields = ("id", "thread_id", "board", "timestamp", "subject", "body",
+				"author", "author_trip", "author_type_id",
+				"country_name", "country_code", "image_file", "image_4chan",
+				"image_md5", "image_filesize", "image_dimensions")
 
 boards = ("a","b","c","d","e","f","g","gif","h","hr","k","m","o","p","r","s","t",
 			"u","v","vg","vm","vmg","vr","vrpg","vst","w","wg","i","ic","r9k","s4s",
@@ -96,9 +61,9 @@ boards = ("a","b","c","d","e","f","g","gif","h","hr","k","m","o","p","r","s","t"
 
 # parse parameters
 cli = argparse.ArgumentParser()
-cli.add_argument("-i", "--input", required=True, help="CSV file to read from - should be a 4plebs data dump")
-cli.add_argument("-d", "--datasource", type=str, default="4chan", help="Data source ID")
-cli.add_argument("-b", "--board", required=True, help="What board the posts belong to, e.g. 'pol'")
+cli.add_argument("-i", "--input", required=True, help="File to read from, containing a CSV dump")
+cli.add_argument("-d", "--datasource", type=str, required=True, help="Datasource ID")
+cli.add_argument("-b", "--board", type=str, required=True, help="Board name")
 cli.add_argument("-a", "--batch", type=int, default=1000000,
 				 help="Size of post batches; every so many posts, they are saved to the database")
 cli.add_argument("-s", "--skip", type=int, default=0, help="How many posts to skip")
@@ -118,7 +83,10 @@ if args.board not in boards:
 	print("%s is not a valid 4chan board name." % args.board)
 	sys.exit(1)
 
-db = Database(logger=Logger(), appname="4chan-import")
+logger = Logger()
+db = Database(logger=logger, appname="4chan-import")
+
+csvnone = re.compile(r"^N$")
 
 print("Opening %s." % args.input)
 if args.skip > 0:
@@ -126,23 +94,32 @@ if args.skip > 0:
 
 if args.fast:
 	print("Fast mode enabled.")
-
-if args.board in ("pol"):
-	troll_names = get_troll_names()
+	safe = True
 
 with open(args.input, encoding="utf-8") as inputfile:
-	postscsv = csv.DictReader(inputfile, fieldnames=FourPlebs.columns, dialect=FourPlebs)
+
+	if args.board == "v":
+		# The /v/ dump has no headers and slightly different column ordering.
+		# The unknown ones are irrelevant, so we're just calling them 'unknown_x'
+		fieldnames = ("num", "subnum", "thread_num", "op", "timestamp", "timestamp_expired", "preview_orig", "preview_w", "preview_h", "media_filename", "media_w", "media_h", "media_size", "media_hash", "media_orig", "spoiler", "deleted", "author_type_id", "email", "name", "trip", "title", "comment", "sticky", "locked", "unknown_8", "unknown_9", "unknown_10", "unknown_11", "unknown_12", "unknown_13", "unknown_14")
+	else:
+		fieldnames = ("num", "subnum", "thread_num", "op", "timestamp", "timestamp_expired", "preview_orig", "preview_w", "preview_h", "media_filename", "media_w", "media_h", "media_size", "media_hash", "media_orig", "spoiler", "deleted", "capcode", "email", "name", "trip", "title", "comment", "sticky", "locked", "poster_hash", "poster_country", "exif")
+
+	postscsv = csv.DictReader(inputfile, fieldnames=fieldnames, doublequote=False, escapechar="\\", strict=True)
+	
+	# Skip header
+	next(postscsv, None)
 
 	postbuffer = []
 	deleted_ids = set() # We insert deleted posts separately because we
 						# need their `id_seq` for the posts_{datasource}_deleted table
-	threads = {} # To insert thread information to the threads_{datasource} table
+	threads = {}		# To insert thread information to the threads_{datasource} table
 	posts = 0
 	threads_added = 0
 	posts_added = 0
 
-	for csvpost in postscsv:
-
+	for post in postscsv:
+		
 		posts += 1
 
 		if posts < args.skip:
@@ -152,10 +129,10 @@ with open(args.input, encoding="utf-8") as inputfile:
 
 		if posts >= args.end:
 			break
+		
+		post = {k: csvnone.sub("", post[k]) if post[k] else None for k in post}
 
-		post = sanitize(csvpost)
-
-		if int(csvpost["subnum"]) > 0:
+		if post["subnum"] != "0":
 			# skip ghost posts
 			continue
 
@@ -188,7 +165,7 @@ with open(args.input, encoding="utf-8") as inputfile:
 		
 		# Set OP data
 		if post["thread_num"] == post["num"]:
-			thread["timestamp"] = int(post["timestamp"])
+			threads[post["thread_num"]]["timestamp"] = int(post["timestamp"])
 			thread["is_sticky"] = True if int(post["sticky"]) != 0 else False
 			thread["is_closed"] = True if int(post["locked"]) != 0 else False
 
@@ -198,14 +175,12 @@ with open(args.input, encoding="utf-8") as inputfile:
 
 		threads[post["thread_num"]] = thread
 
-		post_id = int(post["num"])
-		
 		# Set country name of post. This is a bit tricky because we have to differentiate
 		# on troll and geo flags. These also change over time.
 		country_code = post["poster_country"]
 		country_name = ""
 
-		if args.board in ("pol"):
+		if args.board in ("pol", "int", "bant"):
 
 			exif = json.loads(post["exif"]) if post.get("exif") else ""
 			
@@ -230,42 +205,40 @@ with open(args.input, encoding="utf-8") as inputfile:
 					country_name = get_country_name(country_code, post["timestamp"], args.board)
 
 				# We're prepending a `t_` to troll codes to avoid ambiguous codes
-				if country_name in troll_names:
+				if args.board == "pol" and country_name in troll_names:
 					country_code = "t_" + country_code
 
-		elif country_code and args.board in ("bant", "int"):
-			country_name = get_country_name(country_code)
 
-		postdata = (
-			post["num"],  # id
-			post["thread_num"],  # thread_id
+		post_data = (
+			post["num"], # id
+			post["thread_num"], # thread_id
 			args.board, # board
-			post["timestamp"],  # timestamp
-			post["comment"],  # body
-			post["name"],  # author
-			post["capcode"],  # author_type_id
-			post["trip"],  # author_trip
-			post["title"],  # subject
-			country_code,  # country_code
-			country_name,  # country_name
-			post["media_filename"],  # image_file
-			post["media_orig"],  # image_4chan
-			post["media_hash"],  # image_md5
-			json.dumps({"w": post["media_w"], "h": post["media_h"]}) if post["media_filename"] != "" else "",
-			# image_dimensions
-			post["media_size"],  # image_filesize
-			"",  # semantic_url
-			"{}"  # unsorted_data
+			post["timestamp"], # timestamp
+			post["title"], # subject
+			post["comment"], # body
+			post["name"], # author
+			post["trip"], # author_trip
+			post["capcode"], # author_type_id
+			country_name, # country_name
+			country_code, # country_code
+			post["media_filename"], # image_file
+			post["media_orig"], # image_4chan
+			post["media_hash"], # image_md5
+			post["media_size"], # image_filesize
+			json.dumps({"w": post["media_w"], "h": post["media_h"]}) if post["media_filename"] != "" else "", # image_dimensions
 		)
 
+		# Fix stupid NUL bytes bug.
+		#post_data = (str(v).replace("\x00", "") for v in post_data)
+		
 		# If the post is deleted, we're going to add it to the post_{datasource}_deleted table
 		# which is used to filter out deleted posts. 4plebs sees comments over 1000 replies for
 		# sticky threads as "deleted", which we don't want, so we're skipping replies to sticky OPs for now.
 		if int(post["deleted"]):
 			if not (int(post["op"]) == 1 and int(thread["is_sticky"]) == 1):
 				deleted_ids.add(int(post["num"]))
-		
-		postbuffer.append(postdata)
+
+		postbuffer.append(post_data)
 
 		# For speed, we only commit every so many posts
 		if len(postbuffer) % args.batch == 0:
@@ -278,6 +251,8 @@ with open(args.input, encoding="utf-8") as inputfile:
 print("Committing final posts.")
 commit(postbuffer, post_fields, db, args.datasource, fast=args.fast)
 
+db.commit()
+
 # Insert deleted posts, and get their id_seq to use in the posts_{datasource}_deleted table
 if deleted_ids:
 	print("Also committing %i deleted posts to posts_%s_deleted table." % (len(deleted_ids), args.datasource))
@@ -285,6 +260,7 @@ if deleted_ids:
 		result = db.fetchone("SELECT id_seq, timestamp FROM posts_" + args.datasource + " WHERE id = %s AND board = '%s' " % (deleted_id, args.board))
 		db.insert("posts_" + args.datasource + "_deleted", {"id_seq": result["id_seq"], "timestamp_deleted": result["timestamp"]}, safe=True)
 	deleted_ids = set()
+
 
 # update threads
 print("Updating %s threads." % len(threads))
@@ -309,9 +285,9 @@ for thread_id in thread_ids:
 			thread["is_sticky"] = exists["is_sticky"]
 			thread["is_closed"] = exists["is_closed"]
 		if thread["timestamp"] == 0:
-			thread["timestamp"] = exist["timestamp"]
+			thread["timestamp"] = exists["timestamp"]
 		else:
-			thread["timestamp"] = min(thread["timestamp"], int(exist["timestamp"]))
+			thread["timestamp"] = min(thread["timestamp"], int(exists["timestamp"]))
 
 		thread["post_last"] = max(int(thread.get("post_last") or 0), int(exists.get("post_last") or 0))
 		thread["timestamp_deleted"] = max(int(thread.get("timestamp_deleted") or 0), int(exists.get("timestamp_deleted") or 0))

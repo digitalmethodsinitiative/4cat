@@ -20,7 +20,6 @@ import io
 from collections.abc import MutableMapping
 from pathlib import Path
 from html.parser import HTMLParser
-from werkzeug.datastructures import FileStorage
 from calendar import monthrange
 
 from common.lib.user_input import UserInput
@@ -84,7 +83,7 @@ def sniff_encoding(file):
 
     Currently only distinguishes UTF-8 and UTF-8 with BOM
 
-    :param FileStorage file:
+    :param file:
     :return:
     """
     if hasattr(file, "getbuffer"):
