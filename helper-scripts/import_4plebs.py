@@ -305,13 +305,20 @@ for thread_id in thread_ids:
 	# We don't know if we have all the thread data here (things might be cutoff)
 	# so do some quick checks if values are higher/newer than before
 	else:
-		if thread["timestamp"] < exists["timestamp"]:
-			thread["is_sticky"] = exists["is_sticky"]
-			thread["is_closed"] = exists["is_closed"]
-		if thread["timestamp"] == 0:
-			thread["timestamp"] = exist["timestamp"]
+
+		if thread["timestamp"] == 0 or int(exists["timestamp"]) == 0:
+			thread["timestamp"] = max(thread["timestamp"], int(exists["timestamp"]))
 		else:
-			thread["timestamp"] = min(thread["timestamp"], int(exist["timestamp"]))
+			thread["timestamp"] = min(thread["timestamp"], int(exists["timestamp"]))
+
+
+		if thread["timestamp_scraped"] == 0 or int(exists["timestamp_scraped"]) == 0:
+			thread["timestamp_scraped"] = max(thread["timestamp_scraped"], int(exists["timestamp_scraped"]))
+		else:
+			thread["timestamp_scraped"] = min(thread["timestamp_scraped"], int(exists["timestamp_scraped"]))
+		
+		thread["is_sticky"] = True if thread["is_sticky"] else exists["is_sticky"]
+		thread["is_closed"] = True if thread["is_closed"] else exists["is_closed"]
 
 		thread["post_last"] = max(int(thread.get("post_last") or 0), int(exists.get("post_last") or 0))
 		thread["timestamp_deleted"] = max(int(thread.get("timestamp_deleted") or 0), int(exists.get("timestamp_deleted") or 0))
