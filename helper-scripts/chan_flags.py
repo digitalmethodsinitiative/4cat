@@ -332,7 +332,7 @@ country_codes = {
 def get_troll_names():
 	return troll_names
 
-def get_country_name(country_code, timestamp):
+def get_country_name(country_code, timestamp, board):
 	"""
 	:param country_code, str:	The two-letter country code based on ISO 3166-1 alpha-2.
 	:param timestamp, int:		Epoch timestamp of the post.
@@ -348,19 +348,24 @@ def get_country_name(country_code, timestamp):
 	if "T_" in country_code:
 		return troll_codes.get(country_code.replace("T_", ""), "")
 	
-	# Pre-2014 flags were from a static list, so lookup there.
-	if timestamp < 1418515200:
-		return first_codes.get(country_code, "")
+	# /pol/ has some changing flags
+	if board == 'pol':
+		# Pre-2014 flags were from a static list, so lookup there.
+		if timestamp < 1418515200:
+			return first_codes.get(country_code, "")
 
-	# After 15 December 2014 and before 13 June 2017, only geoflags were available,
-	# so no troll flags, no conflicts.
-	elif 1418515200 >= timestamp > 1497312000:
-		return country_codes.get(country_code, "")
-
-	# For the merged situation post-2017, we're going to return troll flags for
-	# ambiguous ones. These are generally used more often.
-	else:
-		if country_code in troll_codes:
-			return troll_codes[country_code]
-		else:
+		# After 15 December 2014 and before 13 June 2017, only geoflags were available,
+		# so no troll flags, no conflicts.
+		elif 1418515200 >= timestamp > 1497312000:
 			return country_codes.get(country_code, "")
+
+		# For the merged situation post-2017, we're going to return troll flags for
+		# ambiguous ones. These are generally used more often.
+		else:
+			if country_code in troll_codes:
+				return troll_codes[country_code]
+			else:
+				return country_codes.get(country_code, "")
+
+	else:
+		return country_codes.get(country_code, "")
