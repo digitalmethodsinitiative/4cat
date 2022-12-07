@@ -146,6 +146,7 @@ INSERT INTO settings
     ('4cat.name', '"4CAT"'),
     ('4cat.name_long', '"4CAT: Capture and Analysis Toolkit"'),
     ('4cat.github_url', '"https://github.com/digitalmethodsinitiative/4cat"'),
+    ('4cat.phone_home_url', '"https://ping.4cat.nl"'),
     ('path.versionfile', '".git-checked-out"'),
     ('expire.timeout', '0'),
     ('expire.allow_optout', 'true'),

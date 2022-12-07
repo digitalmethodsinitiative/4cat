@@ -65,7 +65,7 @@ config_definition = {
     },
     "4cat.phone_home_url": {
         "type": UserInput.OPTION_TEXT,
-        "default": "https://toolhosting.digitalmethods.net/4cat-ping",
+        "default": "https://ping.4cat.nl",
         "help": "Phone home URL",
         "tooltip": "This URL is called once - when 4CAT is installed. If the installing user consents, information "
                    "is sent to this URL to help the 4CAT developers (the Digital Methods Initiative) keep track of how "
