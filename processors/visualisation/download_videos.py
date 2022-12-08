@@ -254,9 +254,12 @@ class VideoDownloaderPlus(BasicProcessor):
 			# Check for repeated timeouts
 			if consecutive_timeouts > 5 and self.downloaded_videos == 0:
 				if use_yt_dlp:
-					raise ProcessorException("Video Downloader has timed out %i consecutive times and no videos downloaded; try deselecting the non-direct videos setting")
+					message = "Video Downloader has timed out %i consecutive times and no videos downloaded; try deselecting the non-direct videos setting"
 				else:
-					raise ProcessorException("Video Downloader has timed out %i consecutive times and no videos downloaded; contact 4CAT administrator")
+					message = "Video Downloader has timed out %i consecutive times and no videos downloaded; contact 4CAT administrator"
+				self.dataset.update_status(message, is_final=True)
+				self.dataset.finish(0)
+				return
 
 			# Reject known channels; unknown will still download!
 			if not download_channels and any([sub_url in url for sub_url in self.known_channels]):
