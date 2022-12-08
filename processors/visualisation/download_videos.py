@@ -254,9 +254,9 @@ class VideoDownloaderPlus(BasicProcessor):
 			# Check for repeated timeouts
 			if consecutive_timeouts > 5 and self.downloaded_videos == 0:
 				if use_yt_dlp:
-					message = "Video Downloader has timed out %i consecutive times and no videos downloaded; try deselecting the non-direct videos setting"
+					message = "Video Downloader has timed out %i consecutive times and no videos downloaded; try deselecting the non-direct videos setting" % consecutive_timeouts
 				else:
-					message = "Video Downloader has timed out %i consecutive times and no videos downloaded; contact 4CAT administrator"
+					message = "Video Downloader has timed out %i consecutive times and no videos downloaded; contact 4CAT administrator" % consecutive_timeouts
 				self.dataset.update_status(message, is_final=True)
 				self.dataset.finish(0)
 				return
