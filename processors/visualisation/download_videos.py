@@ -353,7 +353,7 @@ class VideoDownloaderPlus(BasicProcessor):
 
 			# Update status
 			self.downloaded_videos += self.videos_downloaded_from_url
-			self.dataset.log(
+			self.dataset.update_status(
 				"Downloaded %i/%i videos" % (self.downloaded_videos, self.total_possible_videos) + '; %i URLs failed.' % failed_downloads if failed_downloads > 0 else '')
 			self.dataset.update_progress(self.downloaded_videos / self.total_possible_videos)
 
