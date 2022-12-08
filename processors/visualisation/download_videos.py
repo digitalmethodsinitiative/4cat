@@ -290,7 +290,7 @@ class VideoDownloaderPlus(BasicProcessor):
 						self.url_files = []
 						self.last_dl_status = {}
 						self.last_post_process_status = {}
-						self.dataset.log("Downloading %i/%i via yt-dlp: %s" % (self.downloaded_videos, self.total_possible_videos, url))
+						self.dataset.log("Downloading %i/%i via yt-dlp: %s" % (self.downloaded_videos+1, self.total_possible_videos, url))
 						try:
 							info = ydl.extract_info(url)
 						except MaxVideosDownloaded:
@@ -439,7 +439,7 @@ class VideoDownloaderPlus(BasicProcessor):
 
 			# Download video
 			self.dataset.log(
-				"Downloading %i/%i via requests: %s" % (self.downloaded_videos, self.total_possible_videos, url))
+				"Downloading %i/%i via requests: %s" % (self.downloaded_videos+1, self.total_possible_videos, url))
 			with open(results_path.joinpath(save_location), "wb") as f:
 				for chunk in response.iter_content(chunk_size=1024 * 1024):
 					if chunk:
