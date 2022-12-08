@@ -220,7 +220,14 @@ class VideoDownloaderPlus(BasicProcessor):
 		amount = self.parameters.get("amount", 100)
 		if amount == 0:
 			amount = config.get('video_downloader.MAX_NUMBER_VIDEOS', 100)
+		# Set a maximum amount of videos that can be downloaded per URL and set if known channels should be downloaded at all
 		self.max_videos_per_url = self.parameters.get("channel_videos", 0)
+		if self.max_videos_per_url == 0:
+			# TODO: how to ensure unknown channels/playlists are not downloaded? Is it possible with yt-dlp?
+			self.max_videos_per_url = 1  # Ensure unknown channels only end up with one video downloaded
+			download_channels = False
+		else:
+			download_channels = True
 
 		# YT-DLP by default attempts to download the best quality videos
 		allow_unknown_sizes = config.get('video_downloader.DOWNLOAD_UNKNOWN_SIZE', False)
@@ -235,6 +242,7 @@ class VideoDownloaderPlus(BasicProcessor):
 		# Loop through video URLs and download
 		self.downloaded_videos = 0
 		failed_downloads = 0
+		consecutive_timeouts = 0
 		self.total_possible_videos = min(len(urls), amount)
 		yt_dlp_archive_map = {}
 		for url in urls:
@@ -243,9 +251,15 @@ class VideoDownloaderPlus(BasicProcessor):
 				break
 			if self.interrupted:
 				raise ProcessorInterruptedException("Interrupted while downloading videos.")
+			# Check for repeated timeouts
+			if consecutive_timeouts > 5 and self.downloaded_videos == 0:
+				if use_yt_dlp:
+					raise ProcessorException("Video Downloader has timed out %i consecutive times and no videos downloaded; try deselecting the non-direct videos setting")
+				else:
+					raise ProcessorException("Video Downloader has timed out %i consecutive times and no videos downloaded; contact 4CAT administrator")
 
-			# Reject known channels; unknown will still download
-			if self.max_videos_per_url == 0 and any([sub_url in url for sub_url in self.known_channels]):
+			# Reject known channels; unknown will still download!
+			if not download_channels and any([sub_url in url for sub_url in self.known_channels]):
 				message = 'Skipping known channel: %s' % url
 				urls[url]['success'] = False
 				urls[url]['error'] = message
@@ -264,12 +278,20 @@ class VideoDownloaderPlus(BasicProcessor):
 									}]
 				success = True
 				self.videos_downloaded_from_url = 1
-			except requests.exceptions.SSLError:
-				message = "Unable to obtain URL %s due to SSL error." % url
+			except requests.exceptions.SSLError as e:
+				message = "SSL error: %s" % str(e)
 				self.dataset.log(message)
 				urls[url]["success"] = False
 				urls[url]["error"] = message
 				failed_downloads += 1
+				continue
+			except requests.exceptions.Timeout as e:
+				message = "Timeout error: %s" % str(e)
+				self.dataset.log(message)
+				urls[url]["success"] = False
+				urls[url]["error"] = message
+				failed_downloads += 1
+				consecutive_timeouts += 1
 				continue
 			except (FilesizeException, FailedDownload, NotAVideo) as e:
 				# FilesizeException raised when file size is too large or unknown filesize (and that is disabled in 4CAT settings)
@@ -318,6 +340,10 @@ class VideoDownloaderPlus(BasicProcessor):
 							# LiveVideoException raised when a video is known to be live
 							if "Requested format is not available" in str(e):
 								message = f"No format available for video (filesize less than {max_size}" + " and unknown sizes not allowed)" if not allow_unknown_sizes else ")"
+							elif "Unable to download webpage: The read operation timed out" in str(e):
+								# Certain sites fail repeatedly (22-12-8 TikTok has this issue)
+								consecutive_timeouts += 1
+								message = 'DownloadError: %s' % str(e)
 							else:
 								message = 'DownloadError: %s' % str(e)
 							urls[url]['success'] = False
@@ -350,6 +376,8 @@ class VideoDownloaderPlus(BasicProcessor):
 					continue
 
 			urls[url]["success"] = success
+			if success:
+				consecutive_timeouts = 0
 
 			# Update status
 			self.downloaded_videos += self.videos_downloaded_from_url
@@ -379,7 +407,7 @@ class VideoDownloaderPlus(BasicProcessor):
 
 		# Check if Max Video Downloads already reached
 		if self.videos_downloaded_from_url != 0 and self.videos_downloaded_from_url >= self.max_videos_per_url:
-			# DO NOT RAISE ON 0!
+			# DO NOT RAISE ON 0! (22-12-8 max_videos_per_url should no longer ever be 0)
 			raise MaxVideosDownloaded('Max videos for URL reached.')
 
 		# Make sure we can stop downloads
