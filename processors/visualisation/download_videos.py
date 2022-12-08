@@ -23,9 +23,9 @@ class VideoDownloader(BasicProcessor):
 
 	Downloads videos and saves as zip archive
 	"""
-	type = "video-downloader"  # job type ID
+	type = "video-downloader-OLD"  # job type ID
 	category = "Visual"  # category
-	title = "Download videos"  # title displayed in UI
+	title = "Download videos (OLD)"  # title displayed in UI
 	description = "Download videos from URLs and store in a zip file. May take a while to complete as videos are retrieved externally. Works best on sources with \"video_url\" columns such as Twitter and TikTok or \"media_url\" like Instagram."  # description displayed in UI
 	extension = "zip"  # extension of result file, used internally and in UI
 
