@@ -112,7 +112,11 @@ class SearchCustom(BasicProcessor):
 
         temp_file.unlink()
         self.dataset.delete_parameter("filename")
-        self.dataset.finish(done)
+        if skipped and not done:
+            self.dataset.finish_with_error("No valid items could be found in the uploaded file. The column containing "
+                                           "the item's timestamp may be in a format that cannot be parsed properly.")
+        else:
+            self.dataset.finish(done)
 
     def validate_query(query, request, user):
         """
@@ -222,7 +226,7 @@ class SearchCustom(BasicProcessor):
                     datetime.fromtimestamp(float(row[timestamp_column]))
                 else:
                     parse_datetime(row[timestamp_column])
-            except ValueError:
+            except (ValueError, OSError):
                 raise QueryParametersException(
                     "Your 'timestamp' column does not use a recognisable format (yyyy-mm-dd hh:mm:ss is recommended)")
 

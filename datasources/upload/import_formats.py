@@ -284,6 +284,7 @@ def map_csv_items(reader, columns, dataset, parameters):
         except (ValueError, OSError):
             # skip rows without a valid timestamp - this may happen
             # despite validation because only a sample is validated
+            # this is an OSError on Windows sometimes???
             yield InvalidImportedItem()
             continue
 
