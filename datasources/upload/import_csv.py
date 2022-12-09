@@ -166,7 +166,7 @@ class SearchCustom(BasicProcessor):
 
         incomplete_mapping = list(tool_format["columns"])
         for field in tool_format["columns"]:
-            if tool_format.get("allow_user_mapping", False) and request.form.get("option-mapping-%s" % field):
+            if tool_format.get("allow_user_mapping", False) and "option-mapping-%s" % field in request.form:
                 incomplete_mapping.remove(field)
             elif not tool_format.get("allow_user_mapping", False) and field in fields:
                 incomplete_mapping.remove(field)
