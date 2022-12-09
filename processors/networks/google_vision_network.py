@@ -5,6 +5,8 @@ from backend.abstract.processor import BasicProcessor
 from common.lib.helpers import UserInput
 from common.lib.exceptions import ProcessorInterruptedException
 
+import networkx as nx
+
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
 __maintainer__ = "Stijn Peeters"
@@ -21,7 +23,7 @@ class VisionTagNetworker(BasicProcessor):
     description = "Create a GEXF network file comprised of all annotations returned by the" \
                   "Google Vision API. Labels returned by the API are nodes. Labels occurring on the same image form" \
                   "edges."
-    extension = "gdf"  # extension of result file, used internally and in UI
+    extension = "gexf"  # extension of result file, used internally and in UI
 
     options = {
         "min_confidence": {
@@ -61,13 +63,9 @@ class VisionTagNetworker(BasicProcessor):
         Generates a GDF co-annotation graph.
         """
         include = [*self.parameters.get("include", []), "file_name"]
-        print(include)
-        pair_separator = ":::::"
-        nodes = {}
-        edges = {}
-
-        def gdf_escape(value):
-            return "'" + value.replace("'", "\'") + "'"
+        network_parameters = {"generated_by": "4CAT Capture & Analysis Toolkit",
+                              "source_dataset_id": self.source_dataset.key}
+        network = nx.Graph(**network_parameters)
 
         try:
             min_confidence = float(self.parameters.get("min_confidence", 0))
@@ -75,7 +73,7 @@ class VisionTagNetworker(BasicProcessor):
             min_confidence = 0
 
         for annotations in self.source_dataset.iterate_items(self):
-            file_annotations = []
+            file_annotations = {}
 
             annotations = {atype: annotations[atype] for atype in include if atype in annotations}
             if not annotations:
@@ -92,8 +90,9 @@ class VisionTagNetworker(BasicProcessor):
                     # handle web entities separately, since they're structured a bit
                     # differently
                     for entity in [e["description"] for e in tags.get("webEntities", []) if "description" in e]:
-                        file_annotations.append({"type"
-                                                 : "webEntity", "label": entity, "confidence": -1})
+                        node_id = "webEntity:" + entity
+                        file_annotations[node_id] = {"node_id": node_id, "category": "webEntity", "label": entity,
+                                                     "confidence": -1}
                 else:
                     # handle the other features here, since they all have a similar
                     # structure
@@ -103,14 +102,14 @@ class VisionTagNetworker(BasicProcessor):
                         if min_confidence and "score" in tag and tag["score"] < min_confidence:
                             # skip if we're not so sure of the accuracy
                             continue
-                        file_annotations.append(
-                            {"type": short_type, "label": tag[label_field], "confidence": float(tag.get("score", -1))})
+                        node_id = short_type + ":" + tag[label_field]
+                        file_annotations[node_id] = {"node_id": node_id, "category": short_type, "label":
+                            tag[label_field], "confidence": float(tag.get("score", -1))}
 
             # save with a label of the format 'landmark:Eiffel Tower'
-            for annotation in file_annotations:
-                label = "%s:%s" % (annotation["type"], annotation["label"])
-                if label not in nodes:
-                    nodes[label] = annotation
+            for node_id, annotation in file_annotations.items():
+                if node_id not in network.nodes():
+                    network.add_node(node_id, **annotation)
 
             # save pairs
             for from_annotation in file_annotations:
@@ -118,26 +117,11 @@ class VisionTagNetworker(BasicProcessor):
                     if from_annotation == to_annotation:
                         continue
 
-                    from_label = "%s:%s" % (from_annotation["type"], from_annotation["label"])
-                    to_label = "%s:%s" % (to_annotation["type"], to_annotation["label"])
-                    pair = sorted([from_label, to_label])  # sorted, because not directional
-                    pair = pair_separator.join(pair)
+                    edge = (from_annotation, to_annotation)
+                    if edge in network.edges():
+                        network[from_annotation][to_annotation]["weight"] += 1
+                    else:
+                        network.add_edge(*edge, weight=1)
 
-                    if pair not in edges:
-                        edges[pair] = 0
-
-                    edges[pair] += 1
-
-        # write GDF file
-        self.dataset.update_status("Writing to Gephi-compatible file")
-        with self.dataset.get_results_path().open("w", encoding="utf-8") as results:
-            results.write("nodedef>name VARCHAR,label VARCHAR,category VARCHAR\n")
-            for node_id, node in nodes.items():
-                results.write("%s,%s,%s\n" % (gdf_escape(node_id), gdf_escape(node["label"]), gdf_escape(node["type"])))
-
-            results.write("edgedef>from VARCHAR, to VARCHAR, weight INTEGER\n")
-            for edge, weight in edges.items():
-                pair = edge.split(pair_separator)
-                results.write("%s,%s,%i\n" % (gdf_escape(pair[0]), gdf_escape(pair[1]), weight))
-
-        self.dataset.finish(len(nodes))
+        nx.write_gexf(network, self.dataset.get_results_path())
+        self.dataset.finish(len(network.nodes()))
