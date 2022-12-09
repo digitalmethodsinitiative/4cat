@@ -268,7 +268,7 @@ def map_csv_items(reader, columns, dataset, parameters):
         # data in processors etc and should be an equivalent value.
         try:
             if mapped_row["timestamp"].isdecimal():
-                timestamp = datetime.fromtimestamp(float(mapped_row["timestamp"]))
+                timestamp = datetime.datetime.fromtimestamp(float(mapped_row["timestamp"]))
             else:
                 timestamp = parse_datetime(mapped_row["timestamp"])
 
