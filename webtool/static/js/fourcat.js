@@ -353,12 +353,7 @@ const query = {
 
         fetch(form.attr('action'), { method: 'POST', body: formdata })
             .then(function(response) {
-                try {
-                    return response.json();
-                } catch(SyntaxError) {
-                    popup.alert('4CAT could not process the file you are trying to upload.', 'Error');
-                    console.log(response);
-                }
+                return response.json();
             })
             .then(function(response) {
                 if (response['status'] === 'error') {
@@ -404,6 +399,9 @@ const query = {
                         query.check(query.query_key);
                     }, 4000);
                 }
+            })
+            .catch(function(e) {
+                 popup.alert('4CAT could not process the file you are trying to upload.', 'Error');
             });
     },
 

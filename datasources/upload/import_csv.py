@@ -151,6 +151,8 @@ class SearchCustom(BasicProcessor):
         except UnicodeDecodeError:
             raise QueryParametersException("The uploaded file does not seem to be a CSV file encoded with UTF-8. "
                                            "Save the file in the proper format and try again.")
+        except csv.Error:
+            raise QueryParametersException("Uploaded file is not a well-formed CSV or TAB file.")
 
         # With validated csvs, save as is but make sure the raw file is sorted
         reader = csv.DictReader(wrapped_file, dialect=dialect)
