@@ -20,7 +20,7 @@ table.fullwidth.cp-table {
     margin: 0;
 }
 
-.cp-table .button-like {
+.cp-table .button-like, .cp-table button {
     padding: 0 0.5em;
 }
 

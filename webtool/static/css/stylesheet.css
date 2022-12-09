@@ -151,6 +151,10 @@ table th {
 /** --------------------- *
             Forms
   * --------------------- */
+form.inline {
+    display: inline-block;
+}
+
 select, input, textarea {
     background: var(--gray);
     border: 1px solid var(--gray);
