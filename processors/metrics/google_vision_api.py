@@ -109,6 +109,10 @@ class GoogleVisionAPIFetcher(BasicProcessor):
             self.dataset.update_status("Annotating image %i/%i" % (done, total))
             self.dataset.update_progress(done / total)
 
+            if image_file.name.startswith("."):
+                self.dataset.log(f"Skipping file {image_file.name}, probably not an image.")
+                continue
+
             try:
                 annotations = self.annotate_image(image_file, api_key, features)
             except RuntimeError:
