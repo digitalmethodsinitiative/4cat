@@ -27,7 +27,7 @@ class Search4Chan(SearchWithScope):
 	is_static = False  # Whether this datasource is still updated
 
 	# Columns to return in csv
-	return_cols = ['thread_id', 'id', 'timestamp', 'board', 'body', 'subject', 'author', 'image_file', 'image_md5',
+	return_cols = ['thread_id', 'id', 'timestamp', 'board', 'body', 'subject', 'author', 'image_file', 'image_4chan', 'image_md5',
 				   'country_name', 'country_code', 'timestamp_deleted']
 
 	references = [

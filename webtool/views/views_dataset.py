@@ -497,11 +497,11 @@ def keep_dataset(key):
         # check if data source forces expiration - in that case, the user
         # cannot reset this
         datasource = dataset.parameters.get("datasource")
-        datasource_expiration = config.get("expire.datasources", {}).get(datasource)
-        if not datasource_expiration.get("allow_optout") or not config.get("expire.allow_optout"):
+        datasource_expiration = config.get("expire.datasources", {}).get(datasource, {})
+        if (datasource_expiration and not datasource_expiration.get("allow_optout")) or not config.get("expire.allow_optout"):
             return render_template("error.html", title="Dataset cannot be kept",
                                    message="All datasets of this data source (%s) are scheduled for automatic "
-                                           "deletion. This cannot be overridden." % datasource["name"]), 403
+                                           "deletion. This cannot be overridden." % datasource), 403
 
     dataset.delete_parameter("expires-after")
     flash("Dataset expiration data removed. The dataset will no longer be deleted automatically.")

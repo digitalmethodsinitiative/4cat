@@ -2,6 +2,7 @@
 Download images linked in dataset
 """
 import requests
+import binascii
 import hashlib
 import base64
 import json
@@ -504,11 +505,16 @@ class ImageDownloader(BasicProcessor):
 			self.dataset.log("DEBUG: 4chan image thumbnail %s status code: %i" % (thumbnail_url, image.status_code))
 			raise FileNotFoundError()
 
-		md5 = hashlib.md5()
-		based_hash = url.split("/")[-1].split(".")[0].replace("_", "/")
-		extension = image_url.split(".")[-1].lower()
-		md5.update(base64.b64decode(based_hash))
-		file_name = md5.hexdigest() + "." + extension
+		try:
+			md5 = hashlib.md5()
+			based_hash = url.split("/")[-1].split(".")[0].replace("_", "/")
+			extension = image_url.split(".")[-1].lower()
+			md5.update(base64.b64decode(based_hash))
+			file_name = md5.hexdigest() + "." + extension
+		except binascii.Error:
+			# raised if the base64 value is not actually base64
+			# in which case we can't re-generate the hash
+			raise FileNotFoundError()
 
 		# avoid getting rate-limited by image source
 		time.sleep(rate_limit)

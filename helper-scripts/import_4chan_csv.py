@@ -28,7 +28,7 @@ def commit(posts, post_fields, db, datasource, fast=False):
 	if fast:
 		post_fields_sql = ", ".join(post_fields)
 		try:
-			db.execute_many("INSERT INTO posts_" + datasource + " (" + post_fields_sql + ") VALUES %s", posts)
+			db.execute_many("INSERT INTO posts_" + datasource + " (" + post_fields_sql + ") VALUES %s", replacements=posts)
 			db.commit()
 		except psycopg2.IntegrityError as e:
 			print(repr(e))
@@ -48,13 +48,20 @@ def commit(posts, post_fields, db, datasource, fast=False):
 
 	return posts_added
 
+boards = ("a","b","c","d","e","f","g","gif","h","hr","k","m","o","p","r","s","t",
+			"u","v","vg","vm","vmg","vr","vrpg","vst","w","wg","i","ic","r9k","s4s",
+			"vip","qa","cm","hm","lgbt","y","3","aco","adv","an","bant","biz","cgl"
+			"ck","co","diy","fa","fit","gd","hc","his","int","jp","lit","mlp","mu",
+			"n","news","out","po","pol","pw","qst","sci","soc","sp","tg","toy","trv",
+			"tv","vp","vt","wsg","wsr","x","xs")
+
 # parse parameters
 cli = argparse.ArgumentParser()
 cli.add_argument("-i", "--input", required=True, help="File to read from, containing a CSV dump")
 cli.add_argument("-d", "--datasource", type=str, required=True, help="Datasource ID")
+cli.add_argument("-b", "--board", type=str, required=True, help="Board name")
 cli.add_argument("-a", "--batch", type=int, default=1000000,
 				 help="Size of post batches; every so many posts, they are saved to the database")
-cli.add_argument("-b", "--board", type=str, required=True, help="Board name")
 cli.add_argument("-s", "--skip", type=int, default=0, help="How many posts to skip")
 cli.add_argument("-e", "--end", type=int, default=sys.maxsize,
 				 help="At which post to stop processing. Starts counting at 0 (so not affected by --skip)")
@@ -70,6 +77,10 @@ if not Path(args.input).exists() or not Path(args.input).is_file():
 
 print("Opening %s." % args.input)
 
+if args.board not in boards:
+	print("%s is not a valid 4chan board name." % args.board)
+	sys.exit(1)
+
 if args.skip > 0:
 	print("Skipping %i posts." % args.skip)
 
@@ -81,34 +92,26 @@ db = Database(logger=logger, appname="queue-dump")
 
 csvnone = re.compile(r"^N$")
 
-thread_keys = set()
-
-deleted_ids = set() # We insert deleted posts separately because we
-				# need their `id_seq` for the posts_{datasource}_deleted table
-
 post_fields = ("id", "board", "thread_id", "timestamp", "subject", "body", "author", "author_type", "author_type_id", "author_trip", "country_code", "country_name", "image_file", "image_url", "image_4chan", "image_md5", "image_dimensions", "image_filesize", "semantic_url", "unsorted_data")
 
 
 with open(args.input, encoding="utf-8") as inputfile:
 
-	reader = csv.DictReader(inputfile)
-	fieldnames = reader.fieldnames
+	postscsv = csv.DictReader(inputfile)
+	fieldnames = postscsv.fieldnames
 	
 	# Skip headers
-	next(reader, None)
+	next(postscsv, None)
 
 	postbuffer = []
+	deleted_ids = set() # We insert deleted posts separately because we
+						# need their `id_seq` for the posts_{datasource}_deleted table
 	threads = {}
 	posts = 0
 	threads_added = 0
 	posts_added = 0
 
-	# We keep count of what threads we have last encounterd.
-	# This is done to prevent RAM hogging: we're inserting threads
-	# we haven't seen in a while to the db and removing them from this dict. 
-	threads_last_seen = {}
-
-	for post in reader:
+	for post in postscsv:
 
 		posts += 1
 
@@ -127,8 +130,7 @@ with open(args.input, encoding="utf-8") as inputfile:
 		# We collect thread data first
 		if post["thread_id"] not in threads:
 			threads_added += 1
-			thread_keys.add(int(post["thread_id"]))
-			thread = {
+			threads[post["thread_id"]] = {
 				"id": post["thread_id"],
 				"board": post["board"],
 				"timestamp": 0,
@@ -136,30 +138,27 @@ with open(args.input, encoding="utf-8") as inputfile:
 				"timestamp_modified": 0,
 				"timestamp_deleted": 0,
 				"num_unique_ips": -1,
-				"num_images": 0,
-				"num_replies": 0,
-				"limit_bump": False,
-				"limit_image": False,
-				"is_sticky": False,
-				"is_closed": False,
-				"post_last": 0
+				"post_last": 0,
+				"num_images": 0, 		# These rows are not
+				"num_replies": 0, 		# available in the dump.
+				"limit_bump": False,	# We will try to retrieve
+				"limit_image": False,	# the data from the threads
+				"is_sticky": False,		# table, but if it's absent
+				"is_closed": False		# they will remain as such.
 			}
-		else:
-			thread = threads[post["thread_id"]]
+		thread = threads[post["thread_id"]]
 
-		# Keep track of some OP data
+		# Update thread data
+		thread["post_last"] = max(thread["post_last"], int(post["id"]))
+		thread["timestamp_modified"] = max(thread["timestamp_modified"], int(post["timestamp"]))
+		
+		# Set the OP data
 		if post["thread_id"] == post["id"]:
 			thread["timestamp"] = int(post["timestamp"])
-			# Mark thread as deleted if the OP was removed
+
+			# Mark thread as deleted if the OP was deleted
 			if post.get("timestamp_deleted"):
 				thread["timestamp_deleted"] = max(int(thread.get("timestamp_modified") or 0), int(post["timestamp"]))
-
-		if post["image_file"]:
-			thread["num_images"] += 1
-
-		thread["num_replies"] += 1
-		thread["post_last"] = max(int(thread.get("post_last") or 0), int(post["id"]))
-		thread["timestamp_modified"] = max(int(thread.get("timestamp_modified") or 0), int(post["timestamp"]))
 
 		threads[post["thread_id"]] = thread
 
@@ -213,11 +212,16 @@ if deleted_ids:
 	db.commit()
 
 # update threads
-print("Updating threads.")
+print("Updating %s threads." % len(threads))
+threads_comitted = 0
+thread_ids = set(threads.keys())
 
-for thread_id in threads:
+for thread_id in thread_ids:
+	threads_comitted += 1
 	thread = threads[thread_id]
 
+	# Check if the thread exists first.
+	# If so, we might need to change some data.
 	exists = db.fetchone("SELECT * FROM threads_" + args.datasource + " WHERE id = %s AND board = %s", (thread_id, args.board,))
 
 	if not exists:
@@ -226,25 +230,43 @@ for thread_id in threads:
 	# We don't know if we have all the thread data here (things might be cutoff)
 	# so do some quick checks if values are higher/newer than before
 	else:
-		thread["is_sticky"] = True if (exists["is_sticky"] or thread["is_sticky"]) else False
-		thread["is_closed"] = True if (exists["is_sticky"] or thread["is_sticky"]) else False
+		
+		if thread["timestamp"] == 0 or int(exists["timestamp"]) == 0:
+			thread["timestamp"] = max(thread["timestamp"], int(exists["timestamp"]))
+		else:
+			thread["timestamp"] = min(thread["timestamp"], int(exists["timestamp"]))
+
+		thread["is_sticky"] = True if thread["is_sticky"] else exists["is_sticky"]
+		thread["is_closed"] = True if thread["is_closed"] else exists["is_closed"]
+			
+		if thread["timestamp_scraped"] == 0 or int(exists["timestamp_scraped"]) == 0:
+			thread["timestamp_scraped"] = max(thread["timestamp_scraped"], int(exists["timestamp_scraped"]))
+		else:
+			thread["timestamp_scraped"] = min(thread["timestamp_scraped"], int(exists["timestamp_scraped"]))
+
 		thread["post_last"] = max(int(thread.get("post_last") or 0), int(exists.get("post_last") or 0))
 		thread["timestamp_deleted"] = max(int(thread.get("timestamp_deleted") or 0), int(exists.get("timestamp_deleted") or 0))
 		thread["timestamp_archived"] = max(int(thread.get("timestamp_archived") or 0), int(exists.get("timestamp_archived") or 0))
 		thread["timestamp_modified"] = max(int(thread.get("timestamp_modified") or 0), int(exists.get("timestamp_modified") or 0))
-		thread["timestamp"] = min(int(thread.get("timestamp") or 0), int(exists.get("timestamp") or 0))
 
 		db.update("threads_" + args.datasource, data=thread, where={"id": thread_id, "board": args.board})
-	db.commit()
+
+	# Delete threads from dictionary to free up some RAM
+	del threads[thread_id]
+
+	if threads_comitted % 100000 == 0:
+		print("%s threads committed" % threads_comitted)
+		db.commit()
+
+db.commit()
 
 print("Updating thread statistics.")
 db.execute(
 	"UPDATE threads_" + args.datasource + " AS t SET num_replies = ( SELECT COUNT(*) FROM posts_" + args.datasource + " AS p WHERE p.thread_id = t.id) WHERE t.id IN %s AND board = %s",
-	(tuple(thread_keys), args.board,))
+	(tuple(thread_ids), args.board,))
 db.execute(
 	"UPDATE threads_" + args.datasource + " AS t SET num_images = ( SELECT COUNT(*) FROM posts_" + args.datasource + " AS p WHERE p.thread_id = t.id AND image_file != '') WHERE t.id IN %s AND board = %s",
-	(tuple(thread_keys), args.board,))
+	(tuple(thread_ids), args.board,))
 
 db.commit()
-
-print("Done")
+print("Done!")
