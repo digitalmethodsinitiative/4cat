@@ -17,9 +17,9 @@ class VisionTagNetworker(BasicProcessor):
     """
     type = "vision-label-network"  # job type ID
     category = "Networks"  # category
-    title = "Google Vision API Label network"  # title displayed in UI
+    title = "Google Vision API Co-Label network"  # title displayed in UI
     description = "Create a GEXF network file comprised of all annotations returned by the" \
-                  "Google Vision API. Labels returned by the API are nodes. Labels occurring on the same image are" \
+                  "Google Vision API. Labels returned by the API are nodes. Labels occurring on the same image form" \
                   "edges."
     extension = "gdf"  # extension of result file, used internally and in UI
 
