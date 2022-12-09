@@ -1325,6 +1325,11 @@ const ui_helpers = {
             }
             $(this).replaceWith('<div class="expandable">' + full_value.substring(0, max_length) + '<span class="sr-only">' + full_value.substring(max_length) + '</span><a href="#">...more</a></div>');
         });
+
+        // special case - cannot really genericise this
+        $('body').on('change', '#forminput-data_upload', function() {
+            $('.datasource-extra-input').remove();
+        });
     },
 
     /**
