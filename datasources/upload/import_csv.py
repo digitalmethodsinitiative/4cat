@@ -6,14 +6,14 @@ import csv
 import re
 import io
 
+import datasources.upload.import_formats as import_formats
+
 from dateutil.parser import parse as parse_datetime
 from datetime import datetime
 
 from backend.abstract.processor import BasicProcessor
 from common.lib.exceptions import QueryParametersException, QueryNeedsFurtherInputException
 from common.lib.helpers import strip_tags, sniff_encoding, UserInput
-
-from datasources.upload.import_formats import ToolImporter
 
 
 class SearchCustom(BasicProcessor):
@@ -44,7 +44,7 @@ class SearchCustom(BasicProcessor):
             "type": UserInput.OPTION_CHOICE,
             "help": "CSV format",
             "options": {
-                tool: info["name"] for tool, info in ToolImporter.tools.items()
+                tool: info["name"] for tool, info in import_formats.tools.items()
             },
             "default": "custom"
         },
@@ -75,7 +75,7 @@ class SearchCustom(BasicProcessor):
         # With validated csvs, save as is but make sure the raw file is sorted
         infile.seek(0)
         reader = csv.DictReader(infile, dialect=dialect)
-        tool_format = ToolImporter.tools.get(self.parameters.get("format"))
+        tool_format = import_formats.tools.get(self.parameters.get("format"))
 
         if tool_format.get("columns") and not tool_format.get("allow_user_mapping") and set(reader.fieldnames) & \
                 set(tool_format["columns"]) != set(tool_format["columns"]):
@@ -86,9 +86,9 @@ class SearchCustom(BasicProcessor):
         done = 0
         skipped = 0
         with self.dataset.get_results_path().open("w", encoding="utf-8", newline="") as output_csv:
-            # mapper is defined in ToolImporter
+            # mapper is defined in import_formats
             for item in tool_format["mapper"](reader, tool_format["columns"], self.dataset, self.parameters):
-                if isinstance(item, ToolImporter.InvalidImportedItem):
+                if isinstance(item, import_formats.InvalidImportedItem):
                     # if the mapper returns this class, the item is not written
                     skipped += 1
                     continue
@@ -134,7 +134,7 @@ class SearchCustom(BasicProcessor):
         if not file:
             raise QueryParametersException("No file was offered for upload.")
 
-        if query.get("format") not in ToolImporter.tools:
+        if query.get("format") not in import_formats.tools:
             raise QueryParametersException("Cannot import CSV from tool %s" % str(query.get("format")))
 
         encoding = sniff_encoding(file)
@@ -158,7 +158,7 @@ class SearchCustom(BasicProcessor):
         except UnicodeDecodeError:
             raise QueryParametersException("Uploaded file is not a well-formed CSV or TAB file.")
 
-        tool_format = ToolImporter.tools.get(query.get("format"))
+        tool_format = import_formats.tools.get(query.get("format"))
 
         incomplete_mapping = list(tool_format["columns"])
         for field in tool_format["columns"]:
