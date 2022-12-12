@@ -9,6 +9,7 @@ from datetime import datetime, time, timezone
 from backend.abstract.worker import BasicWorker
 
 import common.config_manager as config
+
 class DatasourceMetrics(BasicWorker):
 	"""
 	Calculate metrics for local datasources
@@ -63,7 +64,15 @@ class DatasourceMetrics(BasicWorker):
 
 			# Only update local datasources
 			if is_local:
-				boards = enabled_datasources[datasource_id].get("boards", [""])
+
+				# Some translating..
+				settings_id = datasource_id
+				if datasource_id == "4chan":
+					settings_id = "fourchan"
+				elif datasource_id == "8chan":
+					settings_id = "eightchan"
+				
+				boards = [b for b in config.get(settings_id + ".boards", [])]
 
 				# If a datasource is static (so not updated) and it
 				# is already present in the metrics table, we don't
