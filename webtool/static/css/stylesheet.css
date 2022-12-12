@@ -118,6 +118,10 @@ i.scroll {
     font-weight: bold;
 }
 
+.flash-once {
+    animation: flash-once 1 0.5s linear;
+}
+
 table {
     margin: 1em auto;
     font-size: inherit;
@@ -251,6 +255,10 @@ article.small .form-element > *:not([type=radio], [type=checkbox]) {
 
 .form-element button.tooltip-trigger {
     margin-left: 0.5em;
+}
+
+.datasource-extra-input {
+    overflow: hidden;
 }
 
 .submit-container {
@@ -864,6 +872,18 @@ article section.data-overview .description {
     display: block;
     max-width: 7em;
     clear: both;
+}
+
+@keyframes flash-once {
+    100% {
+        background: transparent;
+    }
+    0% {
+        background: var(--accent)
+    }
+    100% {
+        background: transparent;
+    }
 }
 
 @keyframes scroll-background {
