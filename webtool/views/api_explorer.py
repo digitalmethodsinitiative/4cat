@@ -179,7 +179,7 @@ def explorer_thread(datasource, board, thread_id):
 
 	if not datasource:
 		return error(404, error="No datasource provided")
-	if datasource not in config.get('DATASOURCES'):
+	if datasource not in config.get('4cat.datasources'):
 		return error(404, error="Invalid data source")
 	if not board:
 		return error(404, error="No board provided")
@@ -224,7 +224,7 @@ def explorer_post(datasource, board, thread_id):
 
 	if not datasource:
 		return error(404, error="No datasource provided")
-	if datasource not in config.get('DATASOURCES'):
+	if datasource not in config.get('4cat.datasources'):
 		return error(404, error="Invalid data source")
 	if not board:
 		return error(404, error="No board provided")
@@ -482,7 +482,7 @@ def get_boards(datasource):
 
 	:return-error 404: If the datasource does not exist.
 	"""
-	if datasource not in config.get('DATASOURCES'):
+	if datasource not in config.get('4cat.datasources'):
 		return error(404, error="Invalid data source")
 
 	boards = db.fetchall("SELECT DISTINCT board FROM threads_" + datasource)
@@ -653,8 +653,8 @@ def get_custom_fields(datasource, filetype=None):
 		with open(json_path, "r", encoding="utf-8") as json_file:
 			try:
 				custom_fields = json.load(json_file)
-			except ValueError:
-				return "invalid"
+			except ValueError as e:
+				return ("invalid", e)
 	else:
 		custom_fields = None
 

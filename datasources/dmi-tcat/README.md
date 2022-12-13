@@ -9,5 +9,4 @@ dmi-tcat interfaces directly with the TCAT frontend and allowing users to access
 `/analysis/mod.export_tweets.php` endpoint to request TCAT tweets.
 
 # How to enable
-Under the 4CAT Settings tab, add the following to the JSON in "Data source configuration":
-"dmi-tcat": {"instances": ["http://username:password@tcat.instance.webpage.net"]}
+Under the 4CAT Settings tab, look for the "DMI-TCAT Search (HTTP)" settings where the instances to connect to can be configured.

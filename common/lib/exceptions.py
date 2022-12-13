@@ -60,17 +60,31 @@ class JobNotFoundException(QueueException):
 	"""
 	pass
 
-class QueryParametersException(FourcatException):
+class QueryException(FourcatException):
+	"""
+	Raise if there is an issue with form input while creating a dataset
+	"""
+	pass
+
+class QueryParametersException(QueryException):
 	"""
 	Raise if a dataset query has invalid parameters
 	"""
 	pass
 
-class QueryNeedsExplicitConfirmationException(FourcatException):
+class QueryNeedsExplicitConfirmationException(QueryException):
 	"""
 	Raise if a dataset query needs confirmation
 	"""
 	pass
+
+class QueryNeedsFurtherInputException(QueryException):
+	"""
+	Raise if a dataset requires further user input
+	"""
+	def __init__(self, config):
+		super(QueryNeedsFurtherInputException, self).__init__()
+		self.config = config
 
 class WorkerInterruptedException(FourcatException):
 	"""

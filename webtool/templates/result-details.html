@@ -44,7 +44,7 @@
             {% if timestamp_expires %}
                 <div class="fullwidth notice">
                     <strong>Note:</strong> this dataset will no longer be available
-                    after {{ timestamp_expires|datetime("%d %b %Y, %H:%M")|safe }}. {% if not expires_by_datasource and can_unexpire %} You can <a href="{{ url_for("keep_dataset", key=dataset.key) }}">cancel deletion</a>.{% endif %}
+                    after {{ timestamp_expires|datetime("%d %b %Y, %H:%M")|safe }}. {% if can_unexpire %} You can <a href="{{ url_for("keep_dataset", key=dataset.key) }}">cancel deletion</a>.{% endif %}
 
                 </div>
             {% endif %}
@@ -70,8 +70,7 @@
                         <{% if github_link %}a href="{{ github_link }}" rel="external" target="_blank"{% else %}span{% endif %} class="property-badge fullsize" >
                         {% if github_link %}<i class="fab fa-fw fa-github" aria-hidden="true"></i>{% endif %}
                             {{ dataset.parameters.datasource }}{%
-                                if "board" in dataset.parameters and dataset.parameters.board %}/
-                                {{ dataset.parameters.board }}/{% endif %}</{% if github_link %}a{% else %}span{% endif %}>
+                                if "board" in dataset.parameters and dataset.parameters.board %}/{{ dataset.parameters.board }}/{% endif %}</{% if github_link %}a{% else %}span{% endif %}>
                         {% if dataset.parameters.datasource in datasources %}
                             {{ datasources[dataset.parameters.datasource].name }} (<a href="{{ url_for("data_overview", datasource=dataset.parameters.datasource) }}">details</a>)
                         {% endif %}

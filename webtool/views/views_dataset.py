@@ -337,14 +337,19 @@ def show_result(key):
     # if the datasource is configured for it, this dataset may be deleted at some point
     datasource = dataset.parameters.get("datasource", "")
     datasources = backend.all_modules.datasources
+    datasource_expiration = config.get("expire.datasources", {}).get(datasource, {})
     expires_datasource = False
-    can_unexpire = config.get('expire.allow_optout') and (
-                current_user.is_admin or dataset.owner == current_user.get_id())
-    if datasource in datasources and datasources[datasource].get("expire-datasets", None):
-        timestamp_expires = dataset.timestamp + int(datasources[datasource].get("expire-datasets"))
+    can_unexpire = ((config.get('expire.allow_optout') and  \
+                           datasource_expiration.get("allow_optout", True)) or datasource_expiration.get("allow_optout", False)) \
+                   and (current_user.is_admin or dataset.owner == current_user.get_id())
+
+    if datasource_expiration and datasource_expiration.get("timeout"):
+        timestamp_expires = dataset.timestamp + int(datasource_expiration.get("timeout"))
         expires_datasource = True
+
     elif dataset.parameters.get("expires-after"):
         timestamp_expires = dataset.parameters.get("expires-after")
+
     else:
         timestamp_expires = None
 
@@ -483,16 +488,20 @@ def keep_dataset(key):
     except TypeError:
         return error(404, message="Dataset not found.")
 
+    if not config.get("expire.allow_optout"):
+        return render_template("error.html", title="Dataset cannot be kept",
+                               message="All datasets are scheduled for automatic deletion. This cannot be "
+                                       "overridden."), 403
     if not dataset.key_parent:
         # top-level dataset
         # check if data source forces expiration - in that case, the user
         # cannot reset this
-        datasources = backend.all_modules.datasources
         datasource = dataset.parameters.get("datasource")
-        if datasource in datasources and datasources[datasource].get("expire-datasets"):
+        datasource_expiration = config.get("expire.datasources", {}).get(datasource, {})
+        if (datasource_expiration and not datasource_expiration.get("allow_optout")) or not config.get("expire.allow_optout"):
             return render_template("error.html", title="Dataset cannot be kept",
-                                   message="All datasets of this data source (%s) are scheduled for automatic deletion. This cannot be overridden." %
-                                           datasource["name"]), 403
+                                   message="All datasets of this data source (%s) are scheduled for automatic "
+                                           "deletion. This cannot be overridden." % datasource), 403
 
     dataset.delete_parameter("expires-after")
     flash("Dataset expiration data removed. The dataset will no longer be deleted automatically.")

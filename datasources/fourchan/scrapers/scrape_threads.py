@@ -277,7 +277,7 @@ class ThreadScraper4chan(BasicJSONScraper):
 		image_path = image_folder.joinpath(md5.hexdigest() + post["ext"])
 
 		if config.get('PATH_IMAGES') and image_folder.is_dir() and not image_path.is_file():
-			claimtime = int(time.time()) + config.get('IMAGE_INTERVAL')
+			claimtime = int(time.time()) + int(config.get("fourchan.image_interval"))
 
 			try:
 				self.queue.add_job("4chan-image", remote_id=post["md5"], claim_after=claimtime, details={

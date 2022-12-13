@@ -9,20 +9,7 @@ PostgreSQL user before enabling this dataset.
 
 ## Scraping data
 The scraper requires very little configuration; you only need to set the boards
-to scrape. This can be done in `config.py` in the `DATASOURCES` configuration
-variable:
-
-```
-# Data source configuration
-DATASOURCES = {
-	"4chan": {  # should correspond to DATASOURCE in the data source's __init__.py
-		"interval": 60,  # scrape interval for boards
-		"boards": ["pol", "v"], # boards to scrape and query
-		"autoscrape": True,  # automatically start scraping when 4CAT is started
-    "no_scrape": ["v"] # add if you want a board to be queryable, but not scape new data from it
-	}
-}
-```
+to scrape. This can be done in the 4CAT settings panel.
 
 ## Full-text search
 This data source also requires a full-text search engine to allow for keyword

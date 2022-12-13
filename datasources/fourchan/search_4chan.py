@@ -23,11 +23,11 @@ class Search4Chan(SearchWithScope):
 	type = "4chan-search"  # job ID
 	sphinx_index = "4chan"  # prefix for sphinx indexes for this data source. Should usually match sphinx.conf
 	prefix = "4chan"  # table identifier for this datasource; see below for usage
-	is_local = True	# Whether this datasource is locally scraped
-	is_static = False	# Whether this datasource is still updated
+	is_local = True  # Whether this datasource is locally scraped
+	is_static = False  # Whether this datasource is still updated
 
 	# Columns to return in csv
-	return_cols = ['thread_id', 'id', 'timestamp', 'board', 'body', 'subject', 'author', 'image_file', 'image_md5',
+	return_cols = ['thread_id', 'id', 'timestamp', 'board', 'body', 'subject', 'author', 'image_file', 'image_4chan', 'image_md5',
 				   'country_name', 'country_code', 'timestamp_deleted']
 
 	references = [
@@ -48,9 +48,9 @@ class Search4Chan(SearchWithScope):
 		},
 		"board": {
 			"type": UserInput.OPTION_CHOICE,
-			"options": {b: b for b in config.get('DATASOURCES').get(prefix, {}).get("boards", [])},
+			"options": {b: b for b in config.get("fourchan.boards", [])},
 			"help": "Board",
-			"default": config.get('DATASOURCES').get(prefix, {}).get("boards", [""])[0]
+			"default": config.get("fourchan.boards", [""])[0]
 		},
 		"body_match": {
 			"type": UserInput.OPTION_TEXT,
@@ -398,6 +398,16 @@ class Search4Chan(SearchWithScope):
 		}
 	}
 
+	config = {
+		"fourchan.boards": {
+			"type": UserInput.OPTION_TEXT_JSON,
+			"help": "Boards to index",
+			"tooltip": "These boards will be scraped and made available for searching. Provide as a JSON-formatted "
+					   "list of strings, e.g. ['pol', 'v'].",
+			"default": "[]"
+		}
+	}
+
 	def get_items_simple(self, query):
 		"""
 		Fast-lane for simpler queries that don't need the intermediate step
@@ -517,7 +527,7 @@ class Search4Chan(SearchWithScope):
 		postgres_join = ""
 
 		# Option wether to use sphinx for text searches
-		use_sphinx = config.get('DATASOURCES').get("4chan", {}).get("use_sphinx", True)
+		use_sphinx = config.get("fourchan.use_sphinx", True)
 
 		if query.get("min_date", None):
 			try:

@@ -23,6 +23,7 @@ from webtool.lib.user import User
 
 from common.lib.helpers import call_api, send_email, UserInput
 from common.lib.exceptions import QueryParametersException
+from common.lib.dataset import DataSet
 import common.config_manager as config
 import common.lib.config_definition as config_definition
 
@@ -204,6 +205,54 @@ def reject_user():
     return render_template("error.html", message="Rejection sent to %s." % email_address, title="Rejection sent")
 
 
+@app.route("/admin/delete-user", methods=["POST"])
+@login_required
+@admin_required
+def delete_user():
+    """
+    Delete a user
+
+    :return:
+    """
+    username = request.form.get("name")
+    user = User.get_by_name(db=db, name=username)
+    if not username:
+        return render_template("error.html", message=f"User {username} does not exist.",
+                               title="User not found"), 404
+
+    if user.is_special:
+        return render_template("error.html", message=f"User {username} cannot be deleted.",
+                               title="User cannot be deleted"), 403
+
+    if user.get_id() == current_user.get_id():
+        return render_template("error.html", message=f"You cannot delete your own account.",
+                               title="User cannot be deleted"), 403
+
+    # first delete favourites and notifications and api tokens
+    db.delete("users_favourites", where={"name": username}, commit=False),
+    db.delete("users_notifications", where={"username": username}, commit=False)
+    db.delete("access_tokens", where={"name": username}, commit=False)
+
+    # find datasets and delete
+    datasets = db.fetchall("SELECT * FROM datasets WHERE owner = %s", (username,))
+
+    # delete any jobs related to deleted datasets
+    if datasets:
+        db.delete("jobs", where={"remote_id": [d["key"] for d in datasets]}, commit=False)
+
+    # delete the datasets themselves
+    for dataset in datasets:
+        dataset = DataSet(data=dataset, db=db)
+        dataset.delete(commit=False)
+
+    # and finally the user
+    db.delete("users", where={"name": username}, commit=False)
+    db.commit()
+
+    flash(f"User {username} and their datasets have been deleted.")
+    return redirect(url_for("admin_frontpage"))
+
+
 @app.route("/admin/<string:mode>-user/", methods=["GET", "POST"])
 @login_required
 @admin_required
@@ -285,19 +334,6 @@ def manipulate_user(mode):
                            mode=mode)
 
 
-@app.route("/admin/delete-user")
-@login_required
-def delete_user():
-    """
-    Delete a user
-
-    To be implemented - need to figure out which traces of a user to delete...
-
-    :return:
-    """
-    abort(501, "Deleting users is not possible at the moment")
-
-
 @app.route("/admin/settings", methods=["GET", "POST"])
 @login_required
 @admin_required
@@ -354,6 +390,38 @@ def update_settings():
     return render_template("controlpanel/config.html", options=options, flashes=get_flashed_messages(),
                            categories=categories, modules=modules)
 
+@app.route("/admin/toggle-datasources/", methods=["GET", "POST"])
+@login_required
+@admin_required
+def toggle_datasources():
+    if request.method == "POST":
+        # enabled datasources is just a list of datasources with a check in the form
+        datasources = [datasource for datasource in backend.all_modules.datasources if request.form.get("enable-" + datasource)]
+        config.set_or_create_setting("4cat.datasources", datasources, raw=False)
+
+        # process per-datasource dataset expiration settings
+        expires = {}
+        for datasource in datasources:
+            if request.form.get("expire-" + datasource) or request.form.get("optout-" + datasource) == "on":
+                expires[datasource] = {}
+
+                if request.form.get("expire-" + datasource):
+                    expires[datasource]["timeout"] = request.form.get("expire-" + datasource)
+
+                expires[datasource]["allow_optout"] = (request.form.get("optout-" + datasource) == "on")
+
+        config.set_or_create_setting("expire.datasources", expires, raw=False)
+        flash("Enabled data sources updated.")
+
+    datasources = {
+        datasource: {
+            **info,
+            "enabled": datasource in config.get("4cat.datasources"),
+            "expires": config.get("expire.datasources").get(datasource, {})
+        }
+        for datasource, info in backend.all_modules.datasources.items()}
+
+    return render_template("controlpanel/datasources.html", datasources=datasources, flashes=get_flashed_messages())
 
 @app.route("/create-notification/", methods=["GET", "POST"])
 @login_required

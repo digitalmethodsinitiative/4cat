@@ -5,7 +5,7 @@ import shutil
 import praw, praw.exceptions
 import csv
 
-from prawcore.exceptions import Forbidden, NotFound
+from prawcore.exceptions import Forbidden, NotFound, PrawcoreException
 
 from backend.abstract.processor import BasicProcessor
 from common.lib.user_input import UserInput
@@ -99,8 +99,8 @@ class RedditVoteChecker(BasicProcessor):
 
 				for comment in thread.comments.list():
 					post_scores[comment.id] = comment.score
-			except praw.exceptions.PRAWException:
-				self.dataset.update_status("Error while communicating with Reddit.")
+			except (praw.exceptions.PRAWException, PrawcoreException) as e:
+				self.dataset.update_status("Error while communicating with Reddit, halting processor. (%s)" % str(e))
 				self.dataset.finish(0)
 				return
 			except Forbidden:

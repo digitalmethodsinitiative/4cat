@@ -5,6 +5,7 @@ import time
 
 from backend.abstract.worker import BasicWorker
 from common.lib.dataset import DataSet
+import common.config_manager as config
 
 class ThingExpirer(BasicWorker):
 	"""
@@ -31,6 +32,7 @@ class ThingExpirer(BasicWorker):
 		:return:
 		"""
 		datasets = []
+		expiration = config.get("expire.datasources", {})
 
 		# first get datasets for which the data source specifies that they need
 		# to be deleted after a certain amount of time
@@ -38,10 +40,10 @@ class ThingExpirer(BasicWorker):
 			datasource = self.all_modules.datasources[datasource_id]
 
 			# default = never expire
-			if not datasource.get("expire-datasets", None):
+			if not expiration.get(datasource_id):
 				continue
 
-			cutoff = time.time() - datasource.get("expire-datasets")
+			cutoff = time.time() - int(expiration[datasource_id].get("timeout"))
 			datasets += self.db.fetchall(
 				"SELECT key FROM datasets WHERE key_parent = '' AND parameters::json->>'datasource' = %s AND timestamp < %s",
 				(datasource_id, cutoff))

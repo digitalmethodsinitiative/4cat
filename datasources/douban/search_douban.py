@@ -202,7 +202,7 @@ class SearchDouban(Search):
                             "author_id":
                                 comment.select_one(".user-face a").get("href").split("/people/").pop().split("/")[0],
                             "author_avatar": comment.select_one(".user-face img").get("src").replace("/u", "/ul"),
-                            "timestamp": int(datetime.datetime.strptime(comment.select_one(".pubtime").text,
+                            "timestamp": int(datetime.datetime.strptime(comment.select_one(".pubtime").text.strip()[:19],
                                                                         "%Y-%m-%d %H:%M:%S").timestamp()),
                             "likes": convert_to_int(
                                 re.sub(r"[^0-9]", "", comment.select_one(".comment-vote.lnk-fav").text), 0),

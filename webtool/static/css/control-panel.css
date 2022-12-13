@@ -20,7 +20,7 @@ table.fullwidth.cp-table {
     margin: 0;
 }
 
-.cp-table .button-like {
+.cp-table .button-like, .cp-table button {
     padding: 0 0.5em;
 }
 
@@ -69,4 +69,13 @@ table td[colspan] {
 .settings input[type=text] {
     width: 25em;
     max-width: 25em;
+}
+
+.datasource-toggle-form .form-element {
+    min-height: auto;
+}
+
+.datasource-toggle-form fieldset {
+    padding-top: 0.5em;
+    padding-bottom: 0.5em;
 }

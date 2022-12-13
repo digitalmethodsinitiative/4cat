@@ -485,21 +485,23 @@ class DataSet(FourcatModule):
 
 		return copy
 
-	def delete(self):
+	def delete(self, commit=True):
 		"""
 		Delete the dataset, and all its children
 
 		Deletes both database records and result files. Note that manipulating
 		a dataset object after it has been deleted is undefined behaviour.
+
+		:param commit bool:  Commit SQL DELETE query?
 		"""
 		# first, recursively delete children
 		children = self.db.fetchall("SELECT * FROM datasets WHERE key_parent = %s", (self.key,))
 		for child in children:
 			child = DataSet(key=child["key"], db=self.db)
-			child.delete()
+			child.delete(commit=commit)
 
 		# delete from database
-		self.db.execute("DELETE FROM datasets WHERE key = %s", (self.key,))
+		self.db.delete("datasets", where={"key": self.key}, commit=commit)
 
 		# delete from drive
 		try:

@@ -4,13 +4,13 @@ Import scraped TikTok data
 It's prohibitively difficult to scrape data from TikTok within 4CAT itself due
 to its aggressive rate limiting. Instead, import data collected elsewhere.
 """
+from datetime import datetime
 from pathlib import Path
 from urllib.parse import urlparse, parse_qs
 import json
 import time
 
 from backend.abstract.search import Search
-from common.lib.helpers import UserInput
 from common.lib.exceptions import WorkerInterruptedException
 
 
@@ -74,15 +74,19 @@ class SearchTikTok(Search):
         hashtags = [extra["hashtagName"] for extra in post.get("textExtra", []) if
                     "hashtagName" in extra and extra["hashtagName"]]
 
-        if type(post["author"]) is dict:
+        if type(post.get("author")) is dict:
             # from intercepted API response
             user_nickname = post["author"]["uniqueId"]
             user_fullname = post["author"]["nickname"]
             user_id = post["author"]["id"]
-        else:
+        elif post.get("author"):
             # from embedded JSON object
             user_nickname = post["author"]
             user_fullname = post["nickname"]
+            user_id = ""
+        else:
+            user_nickname = ""
+            user_fullname = ""
             user_id = ""
 
         # there are various thumbnail URLs, some of them expire later than
@@ -104,9 +108,10 @@ class SearchTikTok(Search):
             "author": user_nickname,
             "author_full": user_fullname,
             "author_id": user_id,
-            "author_followers": post["authorStats"]["followerCount"],
+            "author_followers": post.get("authorStats", {}).get("followerCount", ""),
             "body": post["desc"],
-            "timestamp": int(post["createTime"]),
+            "timestamp": datetime.utcfromtimestamp(int(post["createTime"])).strftime('%Y-%m-%d %H:%M:%S'),
+            "unix_timestamp": int(post["createTime"]),
             "is_duet": post["duetInfo"].get("duetFromId") != "0",
             "music_name": post["music"]["title"],
             "music_id": post["music"]["id"],
