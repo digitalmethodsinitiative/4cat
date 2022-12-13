@@ -185,7 +185,7 @@ class VideoHasher(BasicProcessor):
 							'video_count': len(data.get('post_ids', [])),
 							"post_ids": ','.join(data.get("post_ids", [])),
 							'video_collage_filename': video_hashes[file.get('filename')].get('video_collage_filename'),
-						})
+						}
 
 						if update_parent:
 							for post_id in data.get('post_ids', []):
