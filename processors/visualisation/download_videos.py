@@ -56,6 +56,30 @@ class VideoDownloaderPlus(BasicProcessor):
 
 	known_channels = ['youtube.com/c/', 'youtube.com/channel/']
 
+	config = {
+		"video_downloader.MAX_NUMBER_VIDEOS": {
+			"type": UserInput.OPTION_TEXT,
+			"coerce_type": int,
+			"default": 1000,
+			"help": "Max number of videos to download",
+			"tooltip": "Only allow downloading up to this many videos per batch. Increasing this can lead to "
+					   "long-running processors and large datasets."
+		},
+		"video_downloader.MAX_VIDEO_SIZE": {
+			"type": UserInput.OPTION_TEXT,
+			"coerce_type": int,
+			"default": 100,
+			"help": "Max allowed MB size per video",
+			"tooltip": "Size in MB/Megabytes; default 100. 0 will allow any size."
+		},
+		"video_downloader.DOWNLOAD_UNKNOWN_SIZE": {
+			"type": UserInput.OPTION_TOGGLE,
+			"default": True,
+			"help": "Allow video download of unknown size",
+			"tooltip": "Video size is not always available before downloading. If True, users may choose to download unknown sizes."
+		},
+	}
+
 	options = {
 		"amount": {
 			"type": UserInput.OPTION_TEXT,
