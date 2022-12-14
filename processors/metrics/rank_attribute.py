@@ -88,12 +88,21 @@ class AttributeRanker(BasicProcessor):
 			"tooltip": "Frequencies will be multiplied by the value in this column (e.g. 'views')."
 		},
 		"to-lowercase": {
-            "type": UserInput.OPTION_TOGGLE,
-            "default": True,
-            "help": "Convert values to lowercase",
-            "tooltip": "Merges values with varying cases"
-        }
+			"type": UserInput.OPTION_TOGGLE,
+			"default": True,
+			"help": "Convert values to lowercase",
+			"tooltip": "Merges values with varying cases"
+		}
 	}
+
+	@classmethod
+	def is_compatible_with(cls, module=None):
+		"""
+		Allow processor on top image rankings
+
+		:param module: Dataset or processor to determine compatibility with
+		"""
+		return module.get_extension() in ["csv", "ndjson"]
 
 	def process(self):
 		"""
