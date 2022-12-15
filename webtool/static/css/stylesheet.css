@@ -645,25 +645,25 @@ article, .block, .article-ish {
 }
 
 @media (min-width: 576px) {
-  article, .block, .article-ish {
+  article, .block, .article-ish, .site-announcement p {
     max-width: 540px;
   }
 }
 
 @media (min-width: 768px) {
-  article, .block, .article-ish{
+  article, .block, .article-ish, .site-announcement p {
     max-width: 720px;
   }
 }
 
 @media (min-width: 992px) {
-  article, .block, .article-ish {
+  article, .block, .article-ish, .site-announcement p {
     max-width: 960px;
   }
 }
 
 @media (min-width: 1200px) {
-  article, .block, .article-ish {
+  article, .block, .article-ish, .site-announcement p {
     max-width: 1140px;
   }
 }

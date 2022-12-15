@@ -34,7 +34,7 @@ def robots():
         return Response("User-agent: *\nDisallow: /", mimetype='text/plain')
 
     with robots.open() as infile:
-        return infile.read()
+        return Response(response=infile.read(), status=200, mimetype="text/plain")
 
 
 @app.route("/access-tokens/")

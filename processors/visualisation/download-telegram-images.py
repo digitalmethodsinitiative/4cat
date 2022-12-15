@@ -58,7 +58,7 @@ class TelegramImageDownloader(BasicProcessor):
         :param User user:  User that will be uploading it
         :return dict:  Option definition
         """
-        max_number_images = int(config.get('image_downloader_telegram.MAX_NUMBER_IMAGES', 1000))
+        max_number_images = int(config.get('image-downloader-telegram.MAX_NUMBER_IMAGES', 1000))
 
         return {
             "amount": {
