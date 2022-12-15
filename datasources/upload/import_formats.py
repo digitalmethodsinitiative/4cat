@@ -333,7 +333,8 @@ tools = {
     "youtube_comment_list": {
         "name": "YouTube comments (via YouTube Data Tools' Video Info module)",
         "columns": {"id", "isReplyTo", "authorName", "text", "publishedAt"},
-        "mapper": import_ytdt_commentlist
+        "mapper": import_ytdt_commentlist,
+        "csv_dialect": {"doublequote": True}
     },
     "custom": {
         "name": "Custom/other",

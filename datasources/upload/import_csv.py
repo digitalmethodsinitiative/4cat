@@ -63,19 +63,25 @@ class SearchCustom(BasicProcessor):
         Applies the provided mapping and makes sure the file is in a format
         4CAT will understand.
         """
+        tool_format = import_formats.tools.get(self.parameters.get("format"))
         temp_file = self.dataset.get_results_path().with_suffix(".importing")
         with temp_file.open("rb") as infile:
             # detect encoding - UTF-8 with or without BOM
             encoding = sniff_encoding(infile)
 
+        # figure out the csv dialect
+        # the sniffer is not perfect and sometimes makes mistakes
+        # for some formats we already know the dialect, so we can override its
+        # guess and set the properties as defined in import_formats.py
         infile = temp_file.open("r", encoding=encoding)
         sample = infile.read(1024 * 1024)
         dialect = csv.Sniffer().sniff(sample, delimiters=(",", ";", "\t"))
+        for prop in tool_format.get("csv_dialect", {}):
+            setattr(dialect, prop, tool_format["csv_dialect"][prop])
 
         # With validated csvs, save as is but make sure the raw file is sorted
         infile.seek(0)
         reader = csv.DictReader(infile, dialect=dialect)
-        tool_format = import_formats.tools.get(self.parameters.get("format"))
 
         if tool_format.get("columns") and not tool_format.get("allow_user_mapping") and set(reader.fieldnames) & \
                 set(tool_format["columns"]) != set(tool_format["columns"]):
@@ -142,12 +148,21 @@ class SearchCustom(BasicProcessor):
             raise QueryParametersException("Cannot import CSV from tool %s" % str(query.get("format")))
 
         encoding = sniff_encoding(file)
+        tool_format = import_formats.tools.get(query.get("format"))
 
         try:
             wrapped_file = io.TextIOWrapper(file, encoding=encoding)
             sample = wrapped_file.read(1024 * 1024)
             wrapped_file.seek(0)
+            if not csv.Sniffer().has_header(sample):
+                raise QueryParametersException("The uploaded file does not seem to have a header row. CSV files need "
+                                               "a header row to be compatible with 4CAT.")
             dialect = csv.Sniffer().sniff(sample, delimiters=(",", ";", "\t"))
+
+            # override the guesses for specific formats if defiend so in
+            # import_formats.py
+            for prop in tool_format.get("csv_dialect", {}):
+                setattr(dialect, prop, tool_format["csv_dialect"][prop])
         except UnicodeDecodeError:
             raise QueryParametersException("The uploaded file does not seem to be a CSV file encoded with UTF-8. "
                                            "Save the file in the proper format and try again.")
@@ -163,8 +178,6 @@ class SearchCustom(BasicProcessor):
             fields = reader.fieldnames
         except UnicodeDecodeError:
             raise QueryParametersException("Uploaded file is not a well-formed CSV or TAB file.")
-
-        tool_format = import_formats.tools.get(query.get("format"))
 
         incomplete_mapping = list(tool_format["columns"])
         for field in tool_format["columns"]:
