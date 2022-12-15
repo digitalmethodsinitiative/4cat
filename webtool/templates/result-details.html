@@ -144,9 +144,11 @@
     </section>
 
     {% if dataset.num_rows > 0 and dataset.get_available_processors()|length > 0 and current_user.is_authenticated %}
-        <section class="analysis-gallery">
+        <section class="analysis-gallery available-processors">
 
-            <h3 class="blocktitle section-subheader"><span>Processors</span></h3>
+            <h3 class="blocktitle section-subheader">
+                <span>Processors</span>
+            </h3>
             {% set part = "main" %}
             <div class="intro">
                 <p>The processors below manipulate the dataset you created. These manipulations range from counting posts per month to downloading images. Read the description and tooltips for more information. Some processors also have relevant references indicated with <i class="fa fa-graduation-cap" aria-hidden="true"></i>. Click on <i class="fa fa-sitemap" aria-hidden="true"></i> to see what processors can be run afterwards.</p>
@@ -158,7 +160,7 @@
                 {% if processor.category != cat.egory %}
                     {% if cat.egory != '' %}</ol>{% endif %}
                     {% set cat.egory = processor.category %}
-                    <h4 class="blocktitle section-subheader"><span>{{ processor.category }}</span></h4>
+                    <h4 class="blocktitle section-subheader category-subheader"><span>{{ processor.category }}</span></h4>
                     <ol class="processor-list child-list">
                 {% endif %}
                 {% set git_url = dataset.get_version_url("backend/processors/" + processor.filepath) %}

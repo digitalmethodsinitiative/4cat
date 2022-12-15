@@ -57,6 +57,31 @@ const result_page = {
                 $('#child-' + breadcrumb + ' > .processor-expand > button').trigger('click');
             }, 25);
         }
+
+        $('<label class="filter-processors"><i class="fa fa-search" aria-hidden="true"></i><span class="sr-only">Filter:</span> <input type="text" id="processor-filter" placeholder="Filter"></label>').appendTo('.available-processors .section-subheader:first-child');
+        $('body').on('keyup', '#processor-filter', result_page.filterProcessors);
+    },
+
+    filterProcessors: function (e) {
+        let filter = $(this).val().toLowerCase();
+        $('.available-processors .processor-list > li').each(function (processor) {
+            let name = $(this).find('h4').text().toLowerCase();
+            let description = $(this).find('header p').text().toLowerCase();
+            if (name.indexOf(filter) < 0 && description.indexOf(filter) < 0) {
+                $(this).hide();
+            } else {
+                $(this).show();
+            }
+        })
+        // hide headers with no items
+        $('.available-processors .category-subheader').each(function (header) {
+            let processors = $(this).next().find('li:not(:hidden)');
+            if(!processors.length) {
+                $(this).hide();
+            } else {
+                $(this).show();
+            }
+        });
     },
 
 
@@ -345,31 +370,28 @@ const query = {
 
         // AJAX the query to the server
         // first just to validate - then for real (if validated)
-        if(!for_real) {
+        if (!for_real) {
             $('#query-status .message').html('Validating dataset parameters (do not close your browser)');
         } else {
             $('#query-status .message').html('Starting data collection (do not close your browser)');
         }
 
-        fetch(form.attr('action'), { method: 'POST', body: formdata })
-            .then(function(response) {
+        fetch(form.attr('action'), {method: 'POST', body: formdata})
+            .then(function (response) {
                 return response.json();
             })
-            .then(function(response) {
+            .then(function (response) {
                 if (response['status'] === 'error') {
                     popup.alert(response['message'], 'Error');
-                }
-                else if (response['status'] === 'confirm') {
+                } else if (response['status'] === 'confirm') {
                     popup.confirm(response['message'], 'Confirm', function () {
                         // re-send, but this time for real
                         query.start({'frontend-confirm': true}, true);
                     });
-                }
-                else if (response['status'] === 'validated') {
+                } else if (response['status'] === 'validated') {
                     // parameters OK, start for real
                     query.start({'frontend-confirm': true, ...response['keep']}, true);
-                }
-                else if (response['status'] === 'extra-form') {
+                } else if (response['status'] === 'extra-form') {
                     // new form elements to fill in
                     // some fancy css juggling to make it obvious that these need to be completed
                     $('#query-status .message').html('Enter dataset parameters to continue.');
@@ -380,13 +402,12 @@ const query = {
                     let targetHeight = extra_elements.height();
                     extra_elements.css('position', '').css('display', '').css('visibility', '').css('height', 0);
 
-                    $('html,body').animate({scrollTop: target_top + 'px'}, 500, false, function() {
+                    $('html,body').animate({scrollTop: target_top + 'px'}, 500, false, function () {
                         extra_elements.animate({'height': targetHeight}, 250, function () {
                             $(this).css('height', '').addClass('flash-once');
                         });
                     });
-                }
-                else {
+                } else {
                     query.disable_form();
                     $('#query-status .message').html('Query submitted, waiting for results');
                     query.query_key = response['key'];
@@ -400,8 +421,8 @@ const query = {
                     }, 4000);
                 }
             })
-            .catch(function(e) {
-                 popup.alert('4CAT could not process the file you are trying to upload.', 'Error');
+            .catch(function (e) {
+                popup.alert('4CAT could not process the file you are trying to upload.', 'Error');
             });
     },
 
@@ -1325,7 +1346,7 @@ const ui_helpers = {
         });
 
         // special case - cannot really genericise this
-        $('body').on('change', '#forminput-data_upload', function() {
+        $('body').on('change', '#forminput-data_upload', function () {
             $('.datasource-extra-input').remove();
         });
     },
