@@ -487,7 +487,7 @@ class Search4Chan(SearchWithScope):
 						return None
 
 					valid_query_ids = "(" + ",".join(valid_query_ids) + ")"
-					sql_query = "SELECT * FROM (" + sql_query + " AND id IN " + valid_query_ids + ") ORDER BY timestamp ASC"
+					sql_query = "SELECT * FROM (" + sql_query + " AND id IN " + valid_query_ids + ") AS ids ORDER BY timestamp ASC"
 
 				else:
 					self.dataset.update_status("No 4chan post IDs inserted.")
@@ -809,7 +809,7 @@ class Search4Chan(SearchWithScope):
 		"""
 
 		# this is the bare minimum, else we can't narrow down the full data set
-		if not user.is_admin and not user.get_value("4chan.can_query_without_keyword", False) and not query.get("body_match", None) and not query.get("subject_match", None) and query.get("search_scope",	"") != "random-sample":
+		if not user.is_admin and not user.get_value("4chan.can_query_without_keyword", False) and not query.get("body_match", None) and not query.get("subject_match", None) and query.get("search_scope", "") != "random-sample" and query.get("search_scope","") != "match-ids":
 			raise QueryParametersException("Please provide a message or subject search query")
 
 		query["min_date"], query["max_date"] = query["daterange"]
