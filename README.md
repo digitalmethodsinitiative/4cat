@@ -39,13 +39,14 @@ The following platforms are supported through other tools, from which you can
 import data into 4CAT for analysis:
 
 * Facebook and Instagram (via [CrowdTangle](https://www.crowdtangle.com) exports)
-* Instagram, TikTok and LinkedIn (via
+* Instagram, TikTok, LinkedIn and Parler (via
   [Zeeschuimer](https://github.com/digitalmethodsinitiative/zeeschuimer) or CrowdTangle)
 
 A number of other platforms have built-in support that is untested, or requires
 e.g. special API access. You can view the [data sources in our wiki](https://github.com/digitalmethodsinitiative/4cat/wiki/Available-data-sources) or review [the data
 sources' code](https://github.com/digitalmethodsinitiative/4cat/tree/master/datasources)
-in the GitHub repository.
+in the GitHub repository. It is also possible to import your own CSV files into 
+4CAT for analysis.
 
 ## Install
 You can install 4CAT locally or on a server via Docker or manually. Copying our `docker-compose.yml file`, `.env` file, and using
@@ -63,14 +64,10 @@ Please check our
 [issues](https://github.com/digitalmethodsinitiative/4cat/issues) and create
 one if you experience any problems (pull requests are also very welcome).
 
-## Components
-4CAT consists of several components, each in a separate folder:
+## Modules
+4CAT is a modular tool and easy to extend. The following two folders in the 
+repository are of interest for this: 
 
-- `backend`: A standalone daemon that collects and processes data, as queued via
-  the tool's web interface or API.
-- `webtool`: A Flask app that provides a web front-end to search and analyze
-  the stored data with.
-- `common`: Assets and libraries.
 - `datasources`: Data source definitions. This is a set of configuration
   options, database definitions and python scripts to process this data with.
   If you want to set up your own data sources, refer to the
