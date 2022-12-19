@@ -9,7 +9,7 @@ from backend.abstract.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
 
 __author__ = "Dale Wahl"
-__credits__ = ["Dale Wahl"]
+__credits__ = ["Dale Wahl", "Stijn Peeters"]
 __maintainer__ = "Dale Wahl"
 __email__ = "4cat@oilab.eu"
 
@@ -22,7 +22,8 @@ class ConvertNDJSONtoCSV(BasicProcessor):
 	type = "convert-ndjson-csv"  # job type ID
 	category = "Conversion"  # category
 	title = "Convert NDJSON file to CSV"  # title displayed in UI
-	description = "Change a NDJSON file to a CSV file."  # description displayed in UI
+	description = "Create a CSV file from an NDJSON file. Note that some data may be lost as CSV files cannot " \
+				  "contain nested data."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
 	@classmethod
@@ -32,62 +33,49 @@ class ConvertNDJSONtoCSV(BasicProcessor):
 
 		:param module: Dataset or processor to determine compatibility with
 		"""
-		if module.get_extension() == "ndjson":
-			return True
+		return module.get_extension() == "ndjson"
 
 	def process(self):
 		"""
 		This takes a NDJSON file as input, flattens the dictionaries, and writes the same data as a CSV file
 		"""
-		posts = 0
-		self.dataset.update_status("Converting posts")
+		processed = 0
+		total_items = self.source_dataset.num_rows
+		self.dataset.update_status("Converting file")
 
-		# First create a temporary NDJSON file and collect all possible keys
-		# I cannot think of a way to do this without looping twice, but this way
-		# we do not have to flatten the dictionaries twice
-		all_keys = set()
-		staging_area = self.dataset.get_staging_area()
-		with staging_area.joinpath('temp.ndjson').open("w") as output:
+		# We first collect all possible columns for the csv file, then
+		# for each item make sure there is a value for all the columns (in the
+		# second step)
+		all_keys = list()
+		for item in self.source_dataset.iterate_items(self):
+			if self.interrupted:
+				raise ProcessorInterruptedException("Interrupted while writing temporary results to file")
 
-			# Check if source_dataset has map_item function
-			if hasattr(self.source_dataset.get_own_processor(), "map_item"):
-				use_item_mapper = True
-				item_mapper = self.source_dataset.get_own_processor().map_item
-				# Add these specific keys
-				[all_keys.add(key) for key in self.source_dataset.get_item_keys()]
-			else:
-				use_item_mapper = False
+			# Flatten the dict
+			# if map_item was used this does (effectively) nothing, if it
+			# wasn't this makes sure the values are all scalar
+			item = flatten_dict(item)
 
-			for post in self.source_dataset.iterate_items(self, bypass_map_item=True):
-				if self.interrupted:
-					raise ProcessorInterruptedException("Interrupted while writing temporary results to file")
+			# why not use a set() and |? because we want to preserve the key
+			# order as much as possible
+			for field in item.keys():
+				if field not in all_keys:
+					all_keys.append(field)
 
-				# Flatten the dict
-				item = flatten_dict(post)
-				# Add any new keys to all_keys
-				[all_keys.add(key) for key in item.keys()]
-
-				if use_item_mapper:
-					#then add that shit too
-					item.update(item_mapper(post))
-
-				# Write this new json to our temp file
-				output.write(json.dumps(item) + "\n")
-
-
-		# Create CSV file with the new dialect
-		with self.dataset.get_results_path().open("w") as output:
-			writer = csv.DictWriter(output, fieldnames=all_keys, lineterminator='\n')
+		# Create CSV file
+		with self.dataset.get_results_path().open("w", newline="") as output:
+			writer = csv.DictWriter(output, fieldnames=all_keys)
 			writer.writeheader()
 
-			with staging_area.joinpath('temp.ndjson').open("r") as infile:
-				for line in infile:
-					if self.interrupted:
-						raise ProcessorInterruptedException("Interrupted while writing results to file")
-					item = json.loads(line)
-					writer.writerow(item)
-					posts += 1
+			for item in self.source_dataset.iterate_items(self):
+				writer.writerow({key: item.get(key, "") for key in all_keys})
+				processed += 1
+
+				if processed % 100 == 0:
+					self.dataset.update_status(
+						f"Processed {processed}/{total_items} items")
+					self.dataset.update_progress(processed / total_items)
 
 		# done!
 		self.dataset.update_status("Finished.")
-		self.dataset.finish(num_rows=posts)
+		self.dataset.finish(num_rows=processed)
