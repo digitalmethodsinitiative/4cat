@@ -435,14 +435,18 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 			archive_contents = sorted(archive_file.namelist())
 
 			for archived_file in archive_contents:
+				info = archive_file.getinfo(archived_file)
+				if info.is_dir():
+					continue
+
 				if self.interrupted:
 					if hasattr(self, "staging_area"):
 						shutil.rmtree(self.staging_area)
 					raise ProcessorInterruptedException("Interrupted while iterating zip file contents")
 
-				file_name = archived_file.split("/")[-1]
-				temp_file = staging_area.joinpath(file_name)
-				archive_file.extract(file_name, staging_area)
+				# file_name = archived_file.split("/")[-1]
+				temp_file = staging_area.joinpath(archived_file)
+				archive_file.extract(archived_file, staging_area)
 
 				yield temp_file
 				if hasattr(self, "staging_area"):
