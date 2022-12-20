@@ -70,7 +70,8 @@ class VideoDownloaderPlus(BasicProcessor):
             "help": "Column to get video links from",
             "default": "video_url",
             "inline": True,
-            "tooltip": "If column contains a single URL, use that URL; else, try to find image URLs in the column's content"
+            "tooltip": "If the column contains a single URL, use that URL; else, try to find image URLs in the "
+                       "column's content"
         },
         "max_video_size": {
             "type": UserInput.OPTION_TEXT,
@@ -209,15 +210,21 @@ class VideoDownloaderPlus(BasicProcessor):
     @classmethod
     def is_compatible_with(cls, module=None):
         """
-        Allow on tiktok-search only for dev
+        Determine compatibility
+
+        Compatible with any top-level dataset. Could run on any type of dataset
+        in principle, but any links to videos are likely to come from the top
+        dataset anyway.
+
+        :param str module:  Module ID to determine compatibility with
+        :return bool:
         """
         return module.type.endswith("search")
 
     def process(self):
         """
-        This takes a 4CAT results file as input, and outputs a new CSV file
-        with one column with image hashes, one with the first file name used
-        for the image, and one with the amount of times the image was used
+        This takes a 4CAT results file as input, and downloads video files
+        referenced therein according to the processor parameters.
         """
         # Check processor able to run
         if self.source_dataset.num_rows == 0:
@@ -232,11 +239,11 @@ class VideoDownloaderPlus(BasicProcessor):
             self.dataset.update_status(str(e), is_final=True)
             self.dataset.finish(0)
             return
+
         self.dataset.log('Collected %i urls.' % len(urls))
 
         # Prepare staging area for videos and video tracking
         results_path = self.dataset.get_staging_area()
-        self.dataset.log('Staging directory location: %s' % results_path)
 
         # YT-DLP advanced filter
         def dmi_match_filter(vid_info, *, incomplete):
@@ -268,10 +275,11 @@ class VideoDownloaderPlus(BasicProcessor):
 
         # Collect parameters
         amount = self.parameters.get("amount", 100)
-        if amount == 0:
+        if amount == 0:  # unlimited
             amount = config.get('video_downloader.MAX_NUMBER_VIDEOS', 100)
 
-        # Set a maximum amount of videos that can be downloaded per URL and set if known channels should be downloaded at all
+        # Set a maximum amount of videos that can be downloaded per URL and set
+        # if known channels should be downloaded at all
         self.max_videos_per_url = self.parameters.get("channel_videos", 0)
         if self.max_videos_per_url == 0:
             # TODO: how to ensure unknown channels/playlists are not downloaded? Is it possible with yt-dlp?
@@ -305,9 +313,11 @@ class VideoDownloaderPlus(BasicProcessor):
             # Check for repeated timeouts
             if consecutive_timeouts > 5 and self.downloaded_videos == 0:
                 if use_yt_dlp:
-                    message = "Video Downloader has timed out %i consecutive times and no videos downloaded; try deselecting the non-direct videos setting" % consecutive_timeouts
+                    message = "Video Downloader has timed out %i consecutive times and no videos downloaded; try " \
+                              "deselecting the non-direct videos setting" % consecutive_timeouts
                 else:
-                    message = "Video Downloader has timed out %i consecutive times and no videos downloaded; contact 4CAT administrator" % consecutive_timeouts
+                    message = "Video Downloader has timed out %i consecutive times and no videos downloaded; contact " \
+                              "4CAT administrator." % consecutive_timeouts
                 self.dataset.update_status(message, is_final=True)
                 self.dataset.finish(0)
                 return
@@ -439,9 +449,8 @@ class VideoDownloaderPlus(BasicProcessor):
 
             # Update status
             self.downloaded_videos += self.videos_downloaded_from_url
-            self.dataset.update_status(
-                "Downloaded %i/%i videos" % (self.downloaded_videos,
-                                             self.total_possible_videos) + '; %i URLs failed.' % failed_downloads if failed_downloads > 0 else '')
+            self.dataset.update_status(f"Downloaded {self.downloaded_videos}/{self.total_possible_videos} videos; "
+                                       f"%i URLs failed." % failed_downloads if failed_downloads > 0 else '')
             self.dataset.update_progress(self.downloaded_videos / self.total_possible_videos)
 
         # Save some metadata to be able to connect the videos to their source
@@ -494,12 +503,21 @@ class VideoDownloaderPlus(BasicProcessor):
             raise ProcessorInterruptedException("Interrupted while downloading videos.")
 
     def download_video_with_requests(self, url, results_path, max_video_size):
+        """
+        Download a video with the Python requests library
+
+        This is preferred if possible, because it is simpler
+
+        :param str url:
+        :param results_path:
+        :param int max_video_size:
+        :return str:  File name
+        """
         # Open stream
         user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:107.0) Gecko/20100101 Firefox/107.0"
         with requests.get(url, stream=True, timeout=20, headers={"User-Agent": user_agent}) as response:
             if response.status_code != 200:
-                raise FailedDownload("Unable to obtain URL (Code %i / Reason %s): %s" % (
-                response.status_code, str(response.reason), url))
+                raise FailedDownload(f"Unable to obtain URL (Code {response.status_code} / Reason {response.reason}): {url}")
 
             # Verify video
             # YT-DLP will download images; so we raise them differently
@@ -507,15 +525,14 @@ class VideoDownloaderPlus(BasicProcessor):
             if "image" in response.headers["Content-Type"].lower():
                 raise NotAVideo("Not a Video (%s): %s" % (response.headers["Content-Type"], url))
             elif "video" not in response.headers["Content-Type"].lower():
-                raise VideoStreamUnavailable("Does not appear to be a direct to video link: %s; Content-Type: %s" % (
-                url, response.headers["Content-Type"]))
+                raise VideoStreamUnavailable(f"Does not appear to be a direct to video link: {url}; "
+                                             f"Content-Type: {response.headers['Content-Type']}")
 
             extension = response.headers["Content-Type"].split("/")[-1]
             # DEBUG Content-Type
             if extension not in ["mp4", "mp3"]:
-                self.dataset.log(
-                    "DEBUG: Odd extension type %s; Notify 4CAT maintainers if video. Content-Type for url %s: %s" % (
-                        extension, url, response.headers["Content-Type"]))
+                self.dataset.log(f"DEBUG: Odd extension type {extension}; Notify 4CAT maintainers if video. "
+                                 f"Content-Type for url {url}: {response.headers['Content-Type']}")
 
             # Ensure unique filename
             save_location = url_to_filename(url, extension, results_path)
@@ -542,6 +559,12 @@ class VideoDownloaderPlus(BasicProcessor):
             return save_location.name
 
     def collect_video_urls(self):
+        """
+        Extract video URLs from a dataset
+
+        :return dict:  Dict with URLs as keys and a dict with a "post_ids" key
+        as value
+        """
         urls = {}
         columns = self.parameters.get("columns")
         if type(columns) == str:
