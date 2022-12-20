@@ -1,13 +1,11 @@
 """
-Download images linked in dataset
+Hashes videos so they can be compared to others.
 
 This processor also requires ffmpeg to be installed in 4CAT's backend
 https://ffmpeg.org/
 """
 import json
-import os
 import shutil
-import zipfile
 
 from videohash import VideoHash
 from videohash.exceptions import FFmpegNotFound
@@ -43,9 +41,9 @@ class VideoHasher(BasicProcessor):
 	"""
 	type = "video-hashes"  # job type ID
 	category = "Visual"  # category
-	title = "Identify near duplicate videos"  # title displayed in UI
-	description = "IN DEVELOPMENT: Creates video hashes (64 bits; identifiers) to identify near duplicate videos in a dataset. Only utilizes the video and does not consider audio (see references). This process can take a long time depending on video length, amount, and frames per second."  # description displayed in UI
-	extension = "ndjson"  # extension of result file, used internally and in UI
+	title = "Create Video hashes to identify near duplicate videos"  # title displayed in UI
+	description = "Creates video hashes (64 bits/identifiers) to identify near duplicate videos in a dataset based on hash similarity. Uses video only (no audio; see references). This process can take a long time depending on video length, amount, and frames per second."  # description displayed in UI
+	extension = "csv"  # extension of result file, used internally and in UI
 
 	references = [
 		"[Video Hash](https://github.com/akamhy/videohash#readme)",
@@ -78,9 +76,9 @@ class VideoHasher(BasicProcessor):
 	@classmethod
 	def is_compatible_with(cls, module=None):
 		"""
-		Allow on tiktok-search only for dev
+		Allow on videos only
 		"""
-		return module.type == "video-downloader"
+		return module.type in ["video-downloader", "video-downloader-plus"]
 
 	def process(self):
 		"""
@@ -113,7 +111,7 @@ class VideoHasher(BasicProcessor):
 		self.dataset.update_status("Creating video hashes")
 		for path in self.iterate_archive_contents(self.source_file, staging_area):
 			if self.interrupted:
-				raise ProcessorInterruptedException("Interrupted while determining image wall order")
+				raise ProcessorInterruptedException("Interrupted while creating video hashes")
 
 			if path.name == '.metadata.json':
 				# Keep it and move on
@@ -128,17 +126,6 @@ class VideoHasher(BasicProcessor):
 				self.dataset.update_status("FFmpeg software not found. Please contact 4CAT maintainers.", is_final=True)
 				self.dataset.finish(0)
 				return
-			except UnicodeDecodeError as e:
-				# This seems to occur randomly and can be resolved by retrying
-				error = 'Error with video %s (%s): Retrying...' % (str(path), str(e))
-				self.dataset.log(error)
-				try:
-					videohash = VideoHash(path=str(path), storage_path=str(staging_area), frame_interval=frame_interval, do_not_copy=True)
-				except UnicodeDecodeError as e:
-					error = 'Error repeated with video %s: %s' % (str(path), str(e))
-					self.dataset.log(error)
-					video_hashes[path.name] = {'error': error}
-					continue
 
 			video_hashes[path.name] = {'videohash': videohash}
 
@@ -163,37 +150,42 @@ class VideoHasher(BasicProcessor):
 		# Write output file
 		num_posts = 0
 		post_id_to_results = {}
+		rows = []
 		if video_metadata is None:
 			# Not good, but let's store the video_hashes and note the error
 			self.dataset.update_status("Error connecting video hashes to original dataset", is_final=True)
-			with self.dataset.get_results_path().open("w", encoding="utf-8", newline="") as outfile:
-				for filename, data in video_hashes.items():
-					video_hash = data.get('videohash')
-					item = {
-						'filename': filename,
-						'video_hash': video_hash.hash,
-						'video_duration': video_hash.video_duration,
-						'video_collage_filename': data.get('video_collage_filename'),
-					}
-					outfile.write(json.dumps(item) + "\n")
-					num_posts += 1
+
+			for filename, data in video_hashes.items():
+				video_hash = data.get('videohash')
+				rows.append({
+					'id': filename,  # best if all datasets have unique identifier
+					'filename': filename,
+					'video_hash': video_hash.hash,
+					'video_duration': video_hash.video_duration,
+					'video_collage_filename': data.get('video_collage_filename'),
+				})
+				num_posts += 1
 		else:
 			self.dataset.update_status("Saving video hash results")
 			with self.dataset.get_results_path().open("w", encoding="utf-8", newline="") as outfile:
 				for url, data in video_metadata.items():
-					if video_hashes[data.get('filename')].get('error'):
-						data.update({
-								'url': url,
-								'error': video_hashes[data.get('filename')].get('error'),
-							})
-					else:
-						video_hash = video_hashes[data.get('filename')].get('videohash')
-						data.update({
+					if not data.get("success"):
+						continue
+					files = data.get('files') if 'files' in data else [{"filename": data.get("filename"), "success":True}]
+					for file in files:
+						if not file.get("success"):
+							continue
+						video_hash = video_hashes[file.get('filename')].get('videohash')
+						row = {
+							'id': file.get('filename'),  # best if all datasets have unique identifier
 							'url': url,
+							"from_dataset": data.get("from_dataset"),
 							'video_hash': video_hash.hash,
 							'video_duration': video_hash.video_duration,
-							'video_collage_filename': video_hashes[data.get('filename')].get('video_collage_filename'),
-						})
+							'video_count': len(data.get('post_ids', [])),
+							"post_ids": ','.join(data.get("post_ids", [])),
+							'video_collage_filename': video_hashes[file.get('filename')].get('video_collage_filename'),
+						}
 
 						if update_parent:
 							for post_id in data.get('post_ids', []):
@@ -203,8 +195,8 @@ class VideoHasher(BasicProcessor):
 								else:
 									post_id_to_results[post_id] = [(url, video_hash.hash)]
 
-					outfile.write(json.dumps(data) + "\n")
-					num_posts += 1
+						rows.append(row)
+						num_posts += 1
 
 		if update_parent and video_metadata:
 			updated_rows = []
@@ -222,4 +214,4 @@ class VideoHasher(BasicProcessor):
 		# Finish up
 		self.dataset.update_status(
 			'Created %i video hashes%s.' % (num_posts, ' and stored video collages' if store_video_collages else ''))
-		self.dataset.finish(num_posts)
+		self.write_csv_items_and_finish(rows)
