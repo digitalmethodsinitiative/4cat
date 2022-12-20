@@ -6,15 +6,18 @@ import json
 import io
 
 from PIL import Image
-from svgwrite.container import SVG
+from svgwrite.container import SVG, Hyperlink
 from svgwrite.shapes import Rect
 from svgwrite.text import Text
 from svgwrite.image import Image as ImageElement
+
+from ural import is_url
 
 from backend.abstract.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.user_input import UserInput
 from common.lib.helpers import get_4cat_canvas
+from common.lib.dataset import DataSet
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -106,6 +109,8 @@ class VideoStripes(BasicProcessor):
             else:
                 video = str(file.parent.name)
 
+            labels = self.get_video_labels(metadata)
+
             # at the end of each stripe (or at the end of the archive) add a
             # footer to it and paint to the canvas
             if video != previous_video or not looping:
@@ -114,13 +119,20 @@ class VideoStripes(BasicProcessor):
                 if previous_video is not None or not looping:
                     # draw the video filename/label on top of the rendered
                     # frame thumbnails
-                    video_label = previous_video
+                    video_label = labels.get(previous_video, previous_video)
                     footersize = (fontsize * (len(video_label) + 2) * 0.5925, fontsize * 2)
                     footer_shape = SVG(insert=(0, base_height - footersize[1]), size=footersize)
                     footer_shape.add(Rect(insert=(0, 0), size=("100%", "100%"), fill="#000"))
-                    footer_shape.add(
-                        Text(insert=("50%", "50%"), text=video_label, dominant_baseline="middle",
-                             text_anchor="middle", fill="#FFF", style="font-size:%ipx" % fontsize))
+                    label_element = Text(insert=("50%", "50%"), text=video_label, dominant_baseline="middle",
+                             text_anchor="middle", fill="#FFF", style="font-size:%ipx" % fontsize)
+
+                    # if the label is a URL, make it clickable
+                    if is_url(video_label):
+                        link = Hyperlink(href=video_label, style="cursor:pointer;")
+                        link.add(label_element)
+                        footer_shape.add(link)
+                    else:
+                        footer_shape.add(label_element)
 
                     # sometimes the label is larger than the rendered frames!
                     stripe["width"] = max(stripe_widths[previous_video], footersize[0])
@@ -163,3 +175,50 @@ class VideoStripes(BasicProcessor):
         canvas.save(pretty=True)
         self.dataset.log("Saved to " + str(self.dataset.get_results_path()))
         return self.dataset.finish(len(stripe_widths))
+
+    def get_video_labels(self, metadata):
+        """
+        Determine appropriate labels for each video
+
+        Iterates through the parent dataset (from which the video came) to
+        determine an appropriate label. There is a generalised heuristic and
+        some data source-specific pathways.
+
+        :param metadata:  Metadata as parsed from the 'Extract Frames' JSON
+        :return dict:  Filename -> label mapping
+        """
+        mapping_dataset = {}
+        mapping_ids = {}
+        labels = {}
+
+        if not metadata:
+            return {}
+
+        for url, data in metadata.items():
+            for filename in [f["filename"] for f in data["files"]]:
+                filename = ".".join(filename.split(".")[:-1])
+                mapping_ids[filename] = data["post_ids"]
+                if data["from_dataset"] not in mapping_dataset:
+                    mapping_dataset[data["from_dataset"]] = []
+                mapping_dataset[data["from_dataset"]].append(filename)
+                labels[filename] = filename
+
+        for dataset, urls in mapping_dataset.items():
+            dataset = DataSet(key=dataset, db=self.db)
+
+            # determine appropriate label
+            # is this the right place? should it be in the datasource?
+            if dataset.type == "tiktok-search":
+                mapper = lambda item: item.get("tiktok_url")
+            else:
+                mapper = lambda item: item.get("id")
+
+            for item in dataset.iterate_items(self):
+                for filename in urls:
+                    if item["id"] in mapping_ids[filename]:
+                        labels[filename] = mapper(item)
+
+        return labels
+
+
+
