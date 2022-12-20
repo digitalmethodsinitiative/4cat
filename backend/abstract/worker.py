@@ -120,7 +120,7 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
 
 			self.abort()
 		except ProcessorException as e:
-			self.log.error(str(e))
+			self.log.error(str(e), frame=e.frame)
 			self.job.add_status("Crash during execution")
 		except Exception as e:
 			frames = traceback.extract_tb(e.__traceback__)

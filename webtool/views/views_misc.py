@@ -34,7 +34,7 @@ def robots():
         return Response("User-agent: *\nDisallow: /", mimetype='text/plain')
 
     with robots.open() as infile:
-        return infile.read()
+        return Response(response=infile.read(), status=200, mimetype="text/plain")
 
 
 @app.route("/access-tokens/")
@@ -85,9 +85,11 @@ def show_frontpage():
     else:
         news = None
 
-    datasources = {k: v for k, v in backend.all_modules.datasources.items() if k in config.get("DATASOURCES")}
+    datasources = {k: v for k, v in backend.all_modules.datasources.items() if k in config.get("4cat.datasources") and not v["importable"]}
+    importables = {k: v for k, v in backend.all_modules.datasources.items() if v["importable"]}
+    print(importables)
 
-    return render_template("frontpage.html", stats=stats, news=news, datasources=datasources)
+    return render_template("frontpage.html", stats=stats, news=news, datasources=datasources, importables=importables)
 
 
 @app.route('/create-dataset/')
@@ -97,7 +99,7 @@ def show_index():
     Main tool frontend
     """
     datasources = {datasource: metadata for datasource, metadata in backend.all_modules.datasources.items() if
-                   metadata["has_worker"] and metadata["has_options"] and datasource in config.get("DATASOURCES", {})}
+                   metadata["has_worker"] and metadata["has_options"] and datasource in config.get("4cat.datasources", {})}
 
     return render_template('create-dataset.html', datasources=datasources)
 
@@ -110,7 +112,7 @@ def data_overview(datasource=None):
     Main tool frontend
     """
     datasources = {datasource: metadata for datasource, metadata in backend.all_modules.datasources.items() if
-                   metadata["has_worker"] and datasource in config.get("DATASOURCES")}
+                   metadata["has_worker"] and datasource in config.get("4cat.datasources")}
 
     if datasource not in datasources:
         datasource = None
@@ -183,10 +185,10 @@ def data_overview(datasource=None):
 @app.route('/get-boards/<string:datasource>/')
 @login_required
 def getboards(datasource):
-    if datasource not in config.get('DATASOURCES') or "boards" not in config.get('DATASOURCES')[datasource]:
+    if datasource not in config.get("4cat.datasources"):
         result = False
     else:
-        result = config.get('DATASOURCES')[datasource]["boards"]
+        result = config.get(datasource + ".boards", False)
 
     return jsonify(result)
 

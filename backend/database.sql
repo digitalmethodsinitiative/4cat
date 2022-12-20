@@ -138,16 +138,18 @@ CREATE FUNCTION count_estimate(query text) RETURNS bigint AS $$
 
 
 -- fourcat settings insert default settings
+-- TODO SHOULD BE ABLE TO REMOVE; all these should have corresponding values in common/lib/config_definitions given defaults
 INSERT INTO settings
   (name, value)
   Values
-    ('DATASOURCES', '{"bitchute": {}, "custom": {}, "douban": {}, "customimport": {}, "parler": {}, "reddit": {"boards": "*"}, "telegram": {}, "twitterv2": {"id_lookup": false}}'),
+    ('4cat.datasources', '["bitchute", "custom", "douban", "customimport", "reddit", "telegram", "twitterv2"]'),
     ('4cat.name', '"4CAT"'),
     ('4cat.name_long', '"4CAT: Capture and Analysis Toolkit"'),
     ('4cat.github_url', '"https://github.com/digitalmethodsinitiative/4cat"'),
     ('path.versionfile', '".git-checked-out"'),
     ('expire.timeout', '0'),
     ('expire.allow_optout', 'true'),
+    ('expire.datasources', '{"tumblr": {"timeout": 259200, "allow_optout": false}}'),
     ('logging.slack.level', '"WARNING"'),
     ('logging.slack.webhook', 'null'),
     ('mail.admin_email', 'null'),
@@ -155,9 +157,7 @@ INSERT INTO settings
     ('mail.username', 'null'),
     ('mail.password', 'null'),
     ('mail.noreply', '"noreply@localhost"'),
-    ('SCRAPE_TIMEOUT', '5'),
-    ('SCRAPE_PROXIES', '{"http": []}'),
-    ('IMAGE_INTERVAL', '3600'),
+    ('fourchan.image_interval', '3600'),
     ('explorer.max_posts', '100000'),
     ('flask.flask_app', '"webtool/fourcat"'),
     ('flask.secret_key', concat('"', substr(md5(random()::text), 0, 25), '"')),

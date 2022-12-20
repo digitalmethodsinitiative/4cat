@@ -1,7 +1,6 @@
 import collections
 import datetime
 import hashlib
-import random
 import shutil
 import json
 import time
@@ -486,21 +485,23 @@ class DataSet(FourcatModule):
 
 		return copy
 
-	def delete(self):
+	def delete(self, commit=True):
 		"""
 		Delete the dataset, and all its children
 
 		Deletes both database records and result files. Note that manipulating
 		a dataset object after it has been deleted is undefined behaviour.
+
+		:param commit bool:  Commit SQL DELETE query?
 		"""
 		# first, recursively delete children
 		children = self.db.fetchall("SELECT * FROM datasets WHERE key_parent = %s", (self.key,))
 		for child in children:
 			child = DataSet(key=child["key"], db=self.db)
-			child.delete()
+			child.delete(commit=commit)
 
 		# delete from database
-		self.db.execute("DELETE FROM datasets WHERE key = %s", (self.key,))
+		self.db.delete("datasets", where={"key": self.key}, commit=commit)
 
 		# delete from drive
 		try:
@@ -999,9 +1000,28 @@ class DataSet(FourcatModule):
 
 		:return str: Nav link
 		"""
-		genealogy = self.get_genealogy()
+		if self.genealogy:
+			return ",".join([dataset.key for dataset in self.genealogy])
+		else:
+			# Collect keys only
+			key_parent = self.key  # Start at the bottom
+			genealogy = []
 
-		return ",".join([dataset.key for dataset in genealogy])
+			while key_parent:
+				try:
+					parent = self.db.fetchone("SELECT key_parent FROM datasets WHERE key = %s", (key_parent,))
+				except TypeError:
+					break
+
+				key_parent = parent["key_parent"]
+				if key_parent:
+					genealogy.append(key_parent)
+				else:
+					break
+
+			genealogy.reverse()
+			genealogy.append(self.key)
+			return ",".join(genealogy)
 
 	def get_compatible_processors(self):
 		"""
@@ -1128,7 +1148,7 @@ class DataSet(FourcatModule):
 		Used for checking processor and dataset compatibility,
 		which needs to handle both processors and datasets.
 		"""
-		if self.get_parent():
+		if self.key_parent:
 			return False
 		return True
 

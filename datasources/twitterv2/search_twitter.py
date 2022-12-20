@@ -685,10 +685,9 @@ class SearchWithTwitterAPIv2(Search):
                 if collectible_tweets == 0:
                     collectible_tweets = max_tweets
 
-                if collectible_tweets < expected_tweets:
-                    warning += ", but only %s will be collected. " % "{:,}".format(collectible_tweets)
-
                 if collectible_tweets > 0:
+                    if collectible_tweets < expected_tweets:
+                        warning += ", but only %s will be collected. " % "{:,}".format(collectible_tweets)
                     real_expected_tweets = min(expected_tweets, collectible_tweets)
                 else:
                     real_expected_tweets = expected_tweets
@@ -698,16 +697,16 @@ class SearchWithTwitterAPIv2(Search):
                 params["expected-tweets"] = expected_tweets
 
                 if expected_seconds > 900:
-                    if warning:
-                        warning += "Additionally, c" if warning else ". C"
-                    warning += "ollection will take approximately %s." % expected_time
+                    warning += ". Collection will take approximately %s." % expected_time
 
             if warning and not query.get("frontend-confirm"):
                 warning = "This query matches approximately %s tweets%s" % ("{:,}".format(expected_tweets), warning)
                 warning += " Do you want to continue?"
                 raise QueryNeedsExplicitConfirmationException(warning)
 
-            params["amount"] = min(params["amount"], max_tweets, expected_tweets)
+            params["amount"] = min(params["amount"], expected_tweets)
+            if max_tweets:
+                params["amount"] = min(max_tweets, params["amount"])
 
         return params
 
@@ -762,6 +761,9 @@ class SearchWithTwitterAPIv2(Search):
             [images.append(item["url"]) for item in retweeted_tweet.get("attachments", {}).get("media_keys", []) if type(item) is dict and item.get("type") == "photo"]
             [video_items.append(item) for item in retweeted_tweet.get("attachments", {}).get("media_keys", []) if type(item) is dict and item.get("type") == "video"]
 
+        is_quoted = any([ref.get("type") == "quoted" for ref in tweet.get("referenced_tweets", [])])
+        is_reply = any([ref.get("type") == "replied_to" for ref in tweet.get("referenced_tweets", [])])
+
         videos = []
         for video in video_items:
             variants = sorted(video.get('variants', []), key=lambda d: d.get('bit_rate', 0), reverse=True)
@@ -784,10 +786,11 @@ class SearchWithTwitterAPIv2(Search):
             "possibly_sensitive": "yes" if tweet.get("possibly_sensitive") else "no",
             **tweet["public_metrics"],
             "is_retweet": "yes" if is_retweet else "no",
-            "is_quote_tweet": "yes" if any(
-                [ref.get("type") == "quoted" for ref in tweet.get("referenced_tweets", [])]) else "no",
-            "is_reply": "yes" if any(
-                [ref.get("type") == "replied_to" for ref in tweet.get("referenced_tweets", [])]) else "no",
+            "retweeted_user": "" if not is_retweet else retweeted_tweet["author_user"]["username"],
+            "is_quote_tweet": "yes" if is_quoted else "no",
+            "quoted_user": "" if not is_quoted else [ref for ref in tweet["referenced_tweets"] if ref["type"] == "quoted"].pop().get("author_user", {}).get("username", ""),
+            "is_reply": "yes" if is_reply else "no",
+            "replied_user": "" if not is_reply else [ref for ref in tweet["referenced_tweets"] if ref["type"] == "replied_to"].pop().get("author_user", {}).get("username", ""),
             "hashtags": ','.join(set(hashtags)),
             "urls": ','.join(set(urls)),
             "images": ','.join(set(images)),

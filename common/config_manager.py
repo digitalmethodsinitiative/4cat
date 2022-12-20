@@ -207,3 +207,26 @@ def set_or_create_setting(attribute_name, value, raw, overwrite_existing=True, c
             connection.close()
 
     return updated_rows
+
+
+def delete_setting(attribute_name):
+    """
+    Delete a setting from the database
+
+    :poram str attribute_name:  Name of the setting to delete
+    :return int:  Affected rows
+    """
+    try:
+        connection, cursor = quick_db_connect()
+        cursor.execute("DELETE FROM settings WHERE name = %s", (attribute_name,))
+        updated_rows = cursor.rowcount
+        connection.commit()
+
+        return updated_rows
+
+    except (Exception, psycopg2.DatabaseError) as error:
+        raise ConfigException("Error setting setting {}: {}".format(attribute_name, repr(error)))
+
+    finally:
+        if connection is not None:
+            connection.close()

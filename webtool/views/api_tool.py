@@ -24,7 +24,7 @@ from werkzeug.utils import secure_filename
 from webtool import app, db, log, openapi, limiter, queue
 from webtool.lib.helpers import error
 
-from common.lib.exceptions import QueryParametersException, JobNotFoundException, QueryNeedsExplicitConfirmationException
+from common.lib.exceptions import QueryParametersException, JobNotFoundException, QueryNeedsExplicitConfirmationException, QueryNeedsFurtherInputException
 from common.lib.queue import JobQueue
 from common.lib.job import Job
 from common.lib.dataset import DataSet
@@ -134,7 +134,7 @@ def datasource_form(datasource_id):
 	if datasource_id not in backend.all_modules.datasources:
 		return error(404, message="Datasource '%s' does not exist" % datasource_id)
 
-	if datasource_id not in config.get('DATASOURCES'):
+	if datasource_id not in config.get('4cat.datasources'):
 		return error(404, message="Datasource '%s' does not exist" % datasource_id)
 
 	datasource = backend.all_modules.datasources[datasource_id]
@@ -163,8 +163,7 @@ def datasource_form(datasource_id):
 	javascript_path = datasource["path"].joinpath("webtool", "tool.js")
 	has_javascript = javascript_path.exists()
 
-	html = render_template_string(form, datasource_id=datasource_id,
-								  datasource_config=config.get('DATASOURCES')[datasource_id], datasource=datasource)
+	html = render_template_string(form, datasource_id=datasource_id, datasource=datasource)
 
 	return jsonify({
 		"status": "success",
@@ -194,7 +193,7 @@ def datasource_script(datasource_id):
 	if datasource_id not in backend.all_modules.datasources:
 		return error(404, message="Datasource '%s' does not exist" % datasource_id)
 
-	if datasource_id not in config.get('DATASOURCES'):
+	if datasource_id not in config.get('4cat.datasources'):
 		return error(404, message="Datasource '%s' does not exist" % datasource_id)
 
 	datasource = backend.all_modules.datasources[datasource_id]
@@ -318,6 +317,8 @@ def queue_dataset():
 	has_confirm = bool(request.form.get("frontend-confirm", False))
 
 	if hasattr(search_worker, "validate_query"):
+		# queries are always validated, also if they have been validated before,
+		# just in case
 		try:
 			# first sanitise values
 			sanitised_query = UserInput.parse_all(search_worker.get_options(None, current_user), request.form.to_dict(), silently_correct=False)
@@ -325,13 +326,33 @@ def queue_dataset():
 			# then validate for this particular datasource
 			sanitised_query = {"frontend-confirm": has_confirm, **sanitised_query}
 			sanitised_query = search_worker.validate_query(sanitised_query, request, current_user)
+
+		except QueryNeedsFurtherInputException as e:
+			# ask the user for more input by returning a HTML snippet
+			# containing form fields to be added to the form before it is
+			# re-submitted
+			form = render_template("create-dataset-option.html", options=e.config)
+			return jsonify({"status": "extra-form", "html": form})
+
 		except QueryParametersException as e:
-			return jsonify({"status": "error", "message": "Invalid query. %s" % e})
+			# parameters need amending
+			return jsonify({"status": "error", "message": "Cannot create a dataset with these parameters. %s" % e})
+
 		except QueryNeedsExplicitConfirmationException as e:
+			# parameters are OK, but we need to be sure the user wants this
+			# (because it will e.g. take a long time)
 			return jsonify({"status": "confirm", "message": str(e)})
 
 	else:
 		raise NotImplementedError("Data sources MUST sanitise input values with validate_query")
+
+	# parameters OK, front-end can submit for real
+	# why not just continue? because the initial validation is done with
+	# potentially fragmentary input, e.g. only the first bytes of a file upload
+	# are sent for validation. This makes the front-end re-submit the full
+	# query
+	if not has_confirm:
+		return jsonify({"status": "validated", "keep": sanitised_query})
 
 	sanitised_query["datasource"] = datasource_id
 	sanitised_query["type"] = search_worker_id
@@ -355,9 +376,7 @@ def queue_dataset():
 
 	if hasattr(search_worker, "after_create"):
 		search_worker.after_create(sanitised_query, dataset, request)
-
 	queue.add_job(jobtype=search_worker_id, remote_id=dataset.key)
-
 	return jsonify({"status": "success", "message": "", "key": dataset.key})
 
 

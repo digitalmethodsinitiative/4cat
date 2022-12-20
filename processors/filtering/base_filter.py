@@ -24,7 +24,6 @@ class BaseFilter(BasicProcessor):
     title = "Base Filter"  # title displayed in UI
     description = "This should not be available."
 
-
     @classmethod
     def is_compatible_with(cls, module=None):
         """
@@ -78,6 +77,13 @@ class BaseFilter(BasicProcessor):
 
         # Request standalone
         self.create_standalone()
+
+    @classmethod
+    def is_filter(cls):
+        """
+        I'm a filter! And so are my children.
+        """
+        return True
 
     @abc.abstractmethod
     def filter_items(self):

@@ -1,11 +1,11 @@
 {% extends "layout.html" %}
 
-{% block title %}Configure {{ __tool_name }}{% endblock %}
+{% block title %}General {{ __tool_name }} settings{% endblock %}
 {% block body_class %}plain-page frontpage admin settings {{ body_class }}{% endblock %}
 
 {% block body %}
     {% set fieldset = namespace(open=false,legend="") %}
-      <article>
+      <article class="fullsize">
         <section>
             <h2><span>Configure {{ __tool_name }}</span></h2>
             <form action="{{ url_for("update_settings") }}" method="POST">
@@ -19,7 +19,14 @@
                         {% if fieldset.open %}{% set fieldset.open = False %}</fieldset>{% endif %}
                     {% endif %}
                     {% if not fieldset.open %}<fieldset>
-                        <legend>{% if fieldset.legend in categories %}{{ categories[fieldset.legend] }}{% elif fieldset.legend in modules %}Settings for '{{ modules[fieldset.legend] }}'{% else %}{{ fieldset.legend }}{% endif %}</legend>
+                        <legend>
+                            {% if fieldset.legend in categories %}{{ categories[fieldset.legend] }}{% elif fieldset.legend in modules %}Settings for '{{ modules[fieldset.legend] }}'{% else %}{{ fieldset.legend }}{% endif %}
+                            <button aria-controls="config-{{ fieldset.legend }}" class="toggle-button">
+                                <i class="fa fa-plus" aria-hidden="true"></i>
+                                <span class="sr-only">Expand options</span>
+                            </button>
+                        </legend>
+                        <div id="config-{{ fieldset.legend }}" aria-expanded="false">
                         {% set fieldset.open = True %}
                     {% endif %}
                     {% if options[option].default is none %}
@@ -30,7 +37,8 @@
                     {% endif %}
                     {% include 'components/datasource-option.html' %}
                 {% endfor %}
-                {% if fieldset_open %}</fieldset>{% endif %}
+                {% if fieldset_open %}</div></fieldset>{% endif %}
+            </fieldset>
                 <div class="submit-container">
                     <button><i class="fa fa-save" aria-hidden="true"></i> Save settings</button>
                 </div>
