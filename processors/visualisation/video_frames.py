@@ -38,7 +38,8 @@ class VideoFrames(BasicProcessor):
 		"frame_interval": {
 			"type": UserInput.OPTION_TEXT,
 			"help": "Number of frames extracted per second to extract from video",
-			"tooltip": "The default value is 1 frame per second. For 1 frame per 5 seconds pass 0.2 (1/5). For 5 fps pass 5. For short videos, more frames per second lead to less collision (unsimilar videos being marked as similar), but require more time (2 fps is double the time of 1 fps).",
+			"tooltip": "The default value is 1 frame per second. For 1 frame per 5 seconds pass 0.2 (1/5). For 5 fps "
+					   "pass 5.",
 			"coerce_type": float,
 			"default": 1,
 			"min": 0,
