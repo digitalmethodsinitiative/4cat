@@ -63,7 +63,7 @@ class VideoStripes(BasicProcessor):
         :param str module:  Module ID to determine compatibility with
         :return bool:
         """
-        return module.type in ["video-frames"]
+        return module.type in ["video-frames", "video-scene-frames"]
 
     def process(self):
         metadata = {}
