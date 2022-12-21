@@ -97,6 +97,8 @@ class SearchCustom(BasicProcessor):
                 if isinstance(item, import_formats.InvalidImportedItem):
                     # if the mapper returns this class, the item is not written
                     skipped += 1
+                    if hasattr(item, "reason"):
+                        self.dataset.log(f"Skipping item ({item.reason})")
                     continue
 
                 if not writer:

@@ -11,7 +11,10 @@ class InvalidImportedItem:
     Generic data class to pass to have the importer recognise an item as
     one that should not be written to the result CSV file
     """
-    pass
+    reason = ""
+
+    def __init__(self, reason=""):
+        self.reason = reason
 
 
 def import_crowdtangle_instagram(reader, columns, dataset, parameters):
@@ -222,7 +225,12 @@ def import_ytdt_commentlist(reader, columns, dataset, parameters):
     """
     # write to the result file
     for item in reader:
-        date = datetime.datetime.strptime(item["publishedAt"], "%Y-%m-%d %H:%M:%S")  # ex. 2022-11-11 05:30:01
+        try:
+            date = datetime.datetime.strptime(item["publishedAt"], "%Y-%m-%d %H:%M:%S")  # ex. 2022-11-11 05:30:01
+        except ValueError:
+            yield InvalidImportedItem(reason=f"Invalid date ({item['publishedAt']})")
+            continue
+
         collection_date = "_".join(dataset.parameters.get("filename").split("_")[2:]).replace(".csv", "")
 
         item = {

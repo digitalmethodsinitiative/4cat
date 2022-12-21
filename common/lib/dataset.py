@@ -498,8 +498,12 @@ class DataSet(FourcatModule):
 		# first, recursively delete children
 		children = self.db.fetchall("SELECT * FROM datasets WHERE key_parent = %s", (self.key,))
 		for child in children:
-			child = DataSet(key=child["key"], db=self.db)
-			child.delete(commit=commit)
+			try:
+				child = DataSet(key=child["key"], db=self.db)
+				child.delete(commit=commit)
+			except TypeError:
+				# dataset already deleted - race condition?
+				pass
 
 		# delete from database
 		self.db.delete("datasets", where={"key": self.key}, commit=commit)
