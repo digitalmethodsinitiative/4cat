@@ -23,8 +23,9 @@ class VideoSceneDetector(BasicProcessor):
 	"""
 	type = "video-scene-detector"  # job type ID
 	category = "Visual"  # category
-	title = "Scene Detection"  # title displayed in UI
-	description = "Detect scene starts and finishes in videos based on various parameters (change in color and intensity or cuts and fades to black)"  # description displayed in UI
+	title = "Detect scenes in video"  # title displayed in UI
+	description = "Detect distinct 'scenes' in videos based on various parameters (e.g. change in color and " \
+				  "intensity or cuts and fades to black) and extract the scene metadata."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
 	references = [
@@ -37,17 +38,22 @@ class VideoSceneDetector(BasicProcessor):
 			"help": "Type of detection algorithm",
 			"type": UserInput.OPTION_CHOICE,
 			"default": "adaptive_detector",
-			"tooltip": "See reference on Detection Algorithms",
+			"tooltip": "See the processor's reference on Detection Algorithms.",
 			"options": {
-				"contenct_detector": "ContentDetector: frame by frame detection using color and intensity change; only fast cuts",
-				"adaptive_detector": "AdaptiveDetector: ContentDetector with rolling average of frame changes to mitagate fast camera motion falsely detected as scenes",
-				"threshold_detector": "ThresholdDetector: compares multiple frame groups for both fast cuts and slow fades, but only uses pixel intensity (i.e. only detects cut or fade to black)",
+				"content_detector": "ContentDetector: frame by frame detection using color and intensity change; "
+									"mainly detects fast cuts",
+				"adaptive_detector": "AdaptiveDetector: ContentDetector with rolling average of frame changes to "
+									 "mitigate fast camera motion falsely detected as scene changes",
+				"threshold_detector": "ThresholdDetector: compares multiple frame groups for both fast cuts and slow "
+									  "fades, but only uses pixel intensity (i.e. only detects hard cut or fade to "
+									  "black)",
 			},
 		},
 		"min_scene_len": {
-			"help": "Minimum length of scene by number of frames",
+			"help": "Minimum length of scene in frames",
 			"type": UserInput.OPTION_TEXT,
-			"tooltip": "Default 15 frames; note: this can vary length of scene in time based on video framerate",
+			"tooltip": "Note: this can vary length of scene in time based on video framerate (24fps in many cases, but "
+					   "not always)",
 			"coerce_type": int,
 			"default": 15,
 			"min": 1,
@@ -56,59 +62,82 @@ class VideoSceneDetector(BasicProcessor):
 			"type": UserInput.OPTION_TOGGLE,
 			"help": "Only consider changes in luminance/brightness of video",
 			"default": False,
-			"tooltip": "Applies to ContentDetector and AdaptiveDetector. If True, only considers changes in the luminance channel of the video. The default is False, which considers changes in hue, saturation, and luma."
+			"tooltip": "Applies to ContentDetector and AdaptiveDetector. If enabled, only considers changes in the "
+					   "luminance channel of the video. If disabled, also consider changes in hue and saturation."
+		},
+		"cd_info": {
+			"type": UserInput.OPTION_INFO,
+			"help": "*Content Detector settings*"
 		},
 		"cd_threshold": {
 			"type": UserInput.OPTION_TEXT,
-			"help": "ContentDetector: Average change in pixel intensity that must be exceeded to trigger a cut",
-			"tooltip": "Default 27.0",
+			"help": "Pixel intensity delta threshold",
+			"tooltip": "Only applies when using the ContentDetector algorithm. Average change in pixel intensity that "
+					   "must be exceeded to be detected as a scene change.",
 			"coerce_type": float,
 			"default": 27.0,
 			"min": 0,
 			"max": 5,
 		},
+		"ad_info": {
+			"type": UserInput.OPTION_INFO,
+			"help": "*Adaptive Detector settings*"
+		},
 		"ad_adaptive_threshold": {
 			"type": UserInput.OPTION_TEXT,
-			"help": "AdaptiveDetector: Threshold value (float) that the calculated frame change must exceed to trigger a new scene",
-			"tooltip": "Default 3.0",
+			"help": "Change threshold",
+			"tooltip": "Only applies when using the AdaptiveDetector algorithm. Value (float) that the calculated "
+					   "frame change must exceed to be detected as a scene change.",
 			"coerce_type": float,
 			"default": 3.0,
 			"min": 0,
 		},
 		"ad_min_delta_hsv": {
 			"type": UserInput.OPTION_TEXT,
-			"help": "AdaptiveDetector: Minimum threshold color change that must be exceeded in order to register as a new scene",
-			"tooltip": "Default 15.0",
+			"help": "Colour change threshold",
+			"tooltip": "Only applies when using the AdaptiveDetector algorithm. Value (float) that the frame colour "
+					   "difference (in HSV) must exceed to be detected as a scene change.",
 			"coerce_type": float,
 			"default": 15.0,
 			"min": 0,
 		},
 		"ad_window_width": {
 			"type": UserInput.OPTION_TEXT,
-			"help": "AdaptiveDetector: Number of frames before and after each frame to average together in order to detect deviations from the mean",
-			"tooltip": "Default 2",
+			"help": "Frame window size",
+			"tooltip": "Only applies when using the AdaptiveDetector algorithm. Number of frames before and after each "
+					   "frame to average together in order to detect deviations from the mean.",
 			"coerce_type": int,
 			"default": 2,
 			"min": 1,
 		},
+		"td_info": {
+			"type": UserInput.OPTION_INFO,
+			"help": "*Threshold Detector settings*"
+		},
 		"td_threshold": {
 			"type": UserInput.OPTION_TEXT,
-			"help": "ThresholdDetector: 8-bit intensity value that each pixel value (R, G, and B) must be <= to in order to trigger a fade in/out",
-			"tooltip": "Default 12.0",
+			"help": "Brightness threshold",
+			"tooltip": "Only applies when using the ThresholdDetector algorithm. 8-bit intensity value that each pixel "
+					   "value (R, G, and B) must be <= to in order to be detected as a fade in/out",
 			"coerce_type": float,
 			"default": 12.0,
 			"min": 0,
 		},
 		"td_fade_bias": {
 			"type": UserInput.OPTION_TEXT,
-			"help": "ThresholdDetector: Float between -1.0 and +1.0 representing the percentage of timecode skew for the start of a scene",
-			"tooltip": "-1.0 causing a cut at the fade-to-black, 0.0 in the middle, and +1.0 causing the cut to be right at the position where the threshold is passed",
+			"help": "Fade eagerness",
+			"tooltip": "Only applies when using the ThresholdDetector algorithm. Float between -1.0 and +1.0 "
+					   "representing the percentage of timecode skew for the start of a scene. -1.0 causing a cut at "
+					   "the fade-to-black, 0.0 in the middle, and +1.0 causing the cut to be  right at the position "
+					   "where the threshold is passed",
 			"coerce_type": float,
 			"default": 0.0,
 			"min": -1.0,
 			"max": 1.0,
 		},
 	}
+
+	followups = ["video-scene-frames", "video-stripes"]
 
 	@classmethod
 	def is_compatible_with(cls, module=None):
