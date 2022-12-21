@@ -15,8 +15,8 @@ class VideoSceneTimelineCreator(ProcessorPreset):
     category = "Visual"  # category. 'Combined processors' are always listed first in the UI.
     title = "Create scene-by-scene timelines"  # title displayed in UI
     description = "Creates a 'timeline' for each video, a horizontal collage of sequential frames. Each 'scene' in " \
-                  "the  video is visualised as a single frame. Scenes are detected by an algorithm. The timelines for " \
-                  "all videos are then stacked vertically and rendered as a single SVG file."  # description displayed in UI
+                  "the video is visualised as a single frame. Scenes are detected algorithmically. The timelines " \
+                  "for all videos are then stacked vertically and rendered as a single SVG file."
     extension = "svg"
 
     @classmethod
