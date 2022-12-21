@@ -90,6 +90,13 @@ class VideoDownloaderPlus(BasicProcessor):
     }
 
     config = {
+        "video_downloader.ffmpeg-path": {
+            "type": UserInput.OPTION_TEXT,
+            "default": "ffmpeg",
+            "help": "Path to ffmpeg",
+            "tooltip": "Where to find the ffmpeg executable. ffmpeg is required by many of the video-related "
+                       "processors which will be unavailable if no executable is available in this path."
+        },
         "video_downloader.MAX_NUMBER_VIDEOS": {
             "type": UserInput.OPTION_TEXT,
             "coerce_type": int,

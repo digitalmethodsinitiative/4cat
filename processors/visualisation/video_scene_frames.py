@@ -6,13 +6,11 @@ Similar to 'Extract frames', but different enough that it gets its own file.
 This processor also requires ffmpeg to be installed in 4CAT's backend
 https://ffmpeg.org/
 """
-import json
-import os
 import shutil
 import subprocess
-import zipfile
-from pathlib import Path
 import shlex
+
+import common.config_manager as config
 
 from backend.abstract.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
@@ -60,7 +58,7 @@ class VideoSceneFrames(BasicProcessor):
         :param str module:  Module ID to determine compatibility with
         :return bool:
         """
-        return module.type in ["video-scene-detector"]
+        return module.type in ["video-scene-detector"] and shutil.which(config.get("video_downloader.ffmpeg-path"))
 
     def process(self):
         """
@@ -112,16 +110,15 @@ class VideoSceneFrames(BasicProcessor):
                 scene_index = scene["id"].split("_").pop()
                 scene_filename = video.stem + "_scene_" + str(scene_index) + ".jpeg"
                 command = [
-                    "ffmpeg", "-i",
-                    shlex.quote(str(video)),
+                    shutil.which(config.get("video_downloader.ffmpeg-path")),
+                    "-i", shlex.quote(str(video)),
                     "-vf", "select='eq(n\\," + scene["start_frame"] + ")'",
                     "-vframes", "1",
                     shlex.quote(str(video_folder.joinpath(scene_filename)))
                 ]
-                self.dataset.log(" ".join(command))
 
                 if frame_size != "no_modify":
-                    command += ["-s", frame_size]
+                    command += ["-s", shlex.quote(frame_size)]
 
                 result = subprocess.run(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
                                         stderr=subprocess.PIPE)

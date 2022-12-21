@@ -4,13 +4,11 @@ Create frames of videos
 This processor also requires ffmpeg to be installed in 4CAT's backend
 https://ffmpeg.org/
 """
-import json
-import os
 import shutil
 import subprocess
-import zipfile
-from pathlib import Path
 import shlex
+
+import common.config_manager as config
 
 from backend.abstract.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
@@ -39,7 +37,7 @@ class VideoFrames(BasicProcessor):
 			"type": UserInput.OPTION_TEXT,
 			"help": "Number of frames extracted per second to extract from video",
 			"tooltip": "The default value is 1 frame per second. For 1 frame per 5 seconds pass 0.2 (1/5). For 5 fps "
-					   "pass 5.",
+					   "pass 5, and so on.",
 			"coerce_type": float,
 			"default": 1,
 			"min": 0,
@@ -63,7 +61,7 @@ class VideoFrames(BasicProcessor):
 		"""
 		Allow on tiktok-search only for dev
 		"""
-		return module.type in ["video-downloader", "video-downloader-plus"]
+		return module.type in ["video-downloader", "video-downloader-plus"] and shutil.which(config.get("video_downloader.ffmpeg-path"))
 
 	def process(self):
 		"""
@@ -106,15 +104,13 @@ class VideoFrames(BasicProcessor):
 			video_dir.mkdir(exist_ok=True)
 
 			command = [
-				'ffmpeg',
-				"-i",
-				str(path),
-				"-r",
-				str(frame_interval),
+				shutil.which(config.get("video_downloader.ffmpeg-path")),
+				"-i", shlex.quote(str(path)),
+				"-r", str(frame_interval),
 			]
 			if frame_size != 'no_modify':
-				command += ['-s', frame_size]
-			command += [str(video_dir) + "/video_frame_%07d.jpeg"]
+				command += ['-s', shlex.quote(frame_size)]
+			command += [shlex.quote(str(video_dir) + "/video_frame_%07d.jpeg")]
 
 			result = subprocess.run(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
