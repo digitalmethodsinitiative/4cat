@@ -58,7 +58,9 @@ class VideoSceneFrames(BasicProcessor):
         :param str module:  Module ID to determine compatibility with
         :return bool:
         """
-        return module.type in ["video-scene-detector"] and shutil.which(config.get("video_downloader.ffmpeg-path"))
+        return module.type in ["video-scene-detector"] and \
+               config.get("video_downloader.ffmpeg-path") and \
+               shutil.which(config.get("video_downloader.ffmpeg-path"))
 
     def process(self):
         """

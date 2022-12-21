@@ -61,7 +61,9 @@ class VideoFrames(BasicProcessor):
 		"""
 		Allow on tiktok-search only for dev
 		"""
-		return module.type in ["video-downloader", "video-downloader-plus"] and shutil.which(config.get("video_downloader.ffmpeg-path"))
+		return module.type in ["video-downloader", "video-downloader-plus"] and \
+               config.get("video_downloader.ffmpeg-path") and \
+               shutil.which(config.get("video_downloader.ffmpeg-path"))
 
 	def process(self):
 		"""
