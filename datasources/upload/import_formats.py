@@ -11,7 +11,10 @@ class InvalidImportedItem:
     Generic data class to pass to have the importer recognise an item as
     one that should not be written to the result CSV file
     """
-    pass
+    reason = ""
+    
+    def __init__(self, reason=""):
+        self.reason = ""
 
 
 def import_crowdtangle_instagram(reader, columns, dataset, parameters):
