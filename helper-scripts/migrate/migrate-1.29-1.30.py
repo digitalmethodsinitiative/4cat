@@ -3,7 +3,10 @@
 # This is used to quickly fetch the last few threads if they haven't been marked
 # as inactive (i.e. archived or deleted). We need these to check the status of these
 # threads after they've disappeared off the index.
+import configparser
+import subprocess
 import shutil
+import shlex
 import sys
 import os
 
@@ -19,7 +22,9 @@ import common.config_manager as config
 db = Database(logger=log, dbname=config.get('DB_NAME'), user=config.get('DB_USER'), password=config.get('DB_PASSWORD'),
               host=config.get('DB_HOST'), port=config.get('DB_PORT'), appname="4cat-migrate")
 
-# New format for datasource enabling and settings
+# ---------------------------------------------
+#     New format for data source settings
+# ---------------------------------------------
 datasources = config.get("DATASOURCES")
 if type(datasources) is dict:
     print("  Migrating data source settings")
@@ -78,6 +83,50 @@ config.delete_setting("WARN_EMAILS")
 config.delete_setting("WARN_INTERVAL")
 config.delete_setting("image_downloader_telegram.MAX_NUMBER_IMAGES")
 
+# ---------------------------------------------
+#               Look for ffmpeg
+# ---------------------------------------------
+# this is for the new video processors which need ffmpeg to work
+# if it can't be installed, 4CAT can still run and migrate can continue
+# but the user will need to manually install it later
+print("  Looking for ffmpeg executable...")
+current_ffmpeg = config.get("video_downloader.ffmpeg-path", None)
+if current_ffmpeg and shutil.which(current_ffmpeg):
+    print(f"  - ffmpeg configured and found at {current_ffmpeg}, nothing to configure")
+else:
+    print("  - Checking if we are in Docker... ", end="")
+    in_docker = False
+    config_path = Path(__file__).parent.parent.parent.joinpath("config/config.ini")
+    if config_path.exists():
+        config_reader = configparser.ConfigParser().read(config_path)
+        in_docker = config_reader["DOCKER"].getboolean("use_docker_config")
+        print("yes" if in_docker else "no")
+    else:
+        print("no")
+
+    ffmpeg = shutil.which(config.get("video_downloader.ffmpeg-path", "ffmpeg"))
+    if ffmpeg:
+        print(f"  - ffmpeg found at {ffmpeg}, storing as config setting video_downloader.ffmpeg-path")
+        config.set_or_create_setting("video_downloader.ffmpeg-path", ffmpeg)
+    elif in_docker:
+        print("  - ffmpeg not found, detected Docker environment, installing via apt")
+        ffmpeg_install = subprocess.run(shlex.split("apt install -y ffmpeg"), stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        if ffmpeg_install.returncode == 0:
+            print("  - ffmpeg intalled with apt!")
+        else:
+            print(f"  - Error while installing ffmpeg with apt (return code {ffmpeg_install.returncode}). Some video")
+            print("    processors will be unavailable until you rebuild the Docker containers.")
+            print("    apt output is printed below:")
+            print(ffmpeg_install.stderr)
+            print(ffmpeg_install.stdout)
+    else:
+        print("  - ffmpeg not found on system! Some video processors will not be available.")
+        print("    Install ffmpeg and configure its path in the 4CAT General Settings to enable")
+        print("    these.")
+
+# ---------------------------------------------
+#         Image board datasource updates
+# ---------------------------------------------
 print("  Creating new indexes for enabled imageboard datasources...")
 
 imageboards_enabled = False
