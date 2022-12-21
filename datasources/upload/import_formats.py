@@ -12,7 +12,7 @@ class InvalidImportedItem:
     one that should not be written to the result CSV file
     """
     reason = ""
-    
+
     def __init__(self, reason=""):
         self.reason = ""
 
@@ -229,6 +229,7 @@ def import_ytdt_commentlist(reader, columns, dataset, parameters):
             date = datetime.datetime.strptime(item["publishedAt"], "%Y-%m-%d %H:%M:%S")  # ex. 2022-11-11 05:30:01
         except ValueError:
             yield InvalidImportedItem(f"Invalid date ({item['publishedAt']})")
+            continue
 
         collection_date = "_".join(dataset.parameters.get("filename").split("_")[2:]).replace(".csv", "")
 
