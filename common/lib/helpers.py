@@ -312,7 +312,7 @@ def get_4cat_canvas(path, width, height, header=None, footer="made with 4CAT", f
     :param fontsize_large:  Font size of large text (e.g. header)
     :return SVG:  SVG canvas (via svgwrite) that can be drawn to
     """
-    from svgwrite.container import SVG
+    from svgwrite.container import SVG, Hyperlink
     from svgwrite.drawing import Drawing
     from svgwrite.shapes import Rect
     from svgwrite.text import Text
@@ -344,9 +344,11 @@ def get_4cat_canvas(path, width, height, header=None, footer="made with 4CAT", f
         footersize = (fontsize_small * len(footer) * 0.7, fontsize_small * 2)
         footer_shape = SVG(insert=(width - footersize[0], height - footersize[1]), size=footersize)
         footer_shape.add(Rect(insert=(0, 0), size=("100%", "100%"), fill="#000"))
-        footer_shape.add(
+        link = Hyperlink(href="https://4cat.nl")
+        link.add(
             Text(insert=("50%", "50%"), text=footer, dominant_baseline="middle", text_anchor="middle", fill="#FFF",
                  style="font-size:%ipx" % fontsize_small))
+        footer_shape.add(link)
         canvas.add(footer_shape)
 
     return canvas
