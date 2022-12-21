@@ -166,7 +166,15 @@ config_definition = {
         "default": "100000",
         "help": "Amount of posts",
         "coerce_type": int,
-        "tooltip": "Amount of posts to show in explorer. The maximum allowed amount of rows (prevents timeouts and memory errors)",
+        "tooltip": "Amount of posts to show in Explorer. The maximum allowed amount of rows (prevents timeouts and "
+                   "memory errors)",
+    },
+    "explorer.posts_per_page": {
+        "type": UserInput.OPTION_TEXT,
+        "default": 50,
+        "help": "Posts per page",
+        "coerce_type": int,
+        "tooltip": "Posts to display per page",
     },
     # Web tool settings
     # These are used by the FlaskConfig class in config.py

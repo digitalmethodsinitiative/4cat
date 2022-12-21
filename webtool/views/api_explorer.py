@@ -58,7 +58,7 @@ def explorer_dataset(key, page):
 		return error(404, error="This dataset didn't finish executing (yet)")
 
 	# The amount of posts to show on a page
-	limit = config.EXPLORER_POSTS_ON_PAGE if hasattr(config, "EXPLORER_POSTS_ON_PAGE") else 50
+	limit = config.get("explorer.posts_per_page", 50)
 
 	# The amount of posts that may be included (limit for large datasets)
 	max_posts = config.get('explorer.max_posts', 500000)
