@@ -1,5 +1,5 @@
 """
-Create stripes from collections of video frames
+Create timelines from collections of video frames
 """
 import base64
 import json
@@ -25,25 +25,25 @@ __maintainer__ = "Stijn Peeters"
 __email__ = "4cat@oilab.eu"
 
 
-class VideoStripes(BasicProcessor):
+class VideoTimelines(BasicProcessor):
     """
-    Video Frame Stripe renderer
+    Video Frame Timeline renderer
 
     Takes a set of folders containing video frames and renders them as a horizontal collage per video
     """
-    type = "video-stripes"  # job type ID
+    type = "video-timelines"  # job type ID
     category = "Visual"  # category
-    title = "Create video stripes"  # title displayed in UI
-    description = "For each video for which frames were extracted, create a video stripe (i.e. a horizontal collage " \
-                  "of sequential frames). Stripes are then vertically stacked."  # description displayed in UI
+    title = "Create video timelines"  # title displayed in UI
+    description = "For each video for which frames were extracted, create a video timeline (i.e. a horizontal " \
+                  "collage of sequential frames). Timelines are then vertically stacked."  # description displayed in UI
     extension = "svg"  # extension of result file, used internally and in UI
 
     options = {
         "height": {
             "type": UserInput.OPTION_TEXT,
-            "help": "Stripe height",
-            "tooltip": "In pixels. Each stripe will be this height; frames are resized proportionally to fit it. Must "
-                       "be between 25 and 200.",
+            "help": "Timeline height",
+            "tooltip": "In pixels. Each timeline will be this height; frames are resized proportionally to fit it. "
+                       "Must be between 25 and 200.",
             "coerce_type": int,
             "default": 100,
             "min": 25,
@@ -58,7 +58,7 @@ class VideoStripes(BasicProcessor):
 
         Compatible with 'Extract video frames'. Can in principle run on
         anything that stores related images in separate folders in a zip
-        archive. Each folder will be rendered as a separate stripe.
+        archive. Each folder will be rendered as a separate timeline.
 
         :param str module:  Module ID to determine compatibility with
         :return bool:
@@ -70,21 +70,21 @@ class VideoStripes(BasicProcessor):
         base_height = self.parameters.get("height", 100)
         fontsize = 12
 
-        # initialise stripe loop
+        # initialise timeline loop
         previous_video = None
         offset_y = -base_height
-        stripe = None
+        timeline = None
         iterator = self.iterate_archive_contents(self.source_file)
         looping = True
-        stripes = []
-        stripe_widths = {}
+        timelines = []
+        timeline_widths = {}
 
         # why not just loop through iterate_archive_contents?
         # in SVG the order of elements matters, so we want to do some things
-        # _after_ adding the last frame of a stripe. If we do this within the
+        # _after_ adding the last frame of a timeline. If we do this within the
         # loop we need to do the same outside of the loop after it finishes the
         # last frame. But by looping in this way we can control when the loop
-        # ends and can finish up within it for all stripes including the last
+        # ends and can finish up within it for all timelines including the last
         while looping:
             if self.interrupted:
                 raise ProcessorInterruptedException("Interrupted while looping through video frames")
@@ -111,11 +111,11 @@ class VideoStripes(BasicProcessor):
 
             labels = self.get_video_labels(metadata)
 
-            # at the end of each stripe (or at the end of the archive) add a
+            # at the end of each timeline (or at the end of the archive) add a
             # footer to it and paint to the canvas
             if video != previous_video or not looping:
-                self.dataset.update_status(f"Rendering video stripe for collection {video}")
-                self.dataset.update_progress(len(stripe_widths) / self.source_dataset.num_rows)
+                self.dataset.update_status(f"Rendering video timeline for collection {video}")
+                self.dataset.update_progress(len(timeline_widths) / self.source_dataset.num_rows)
                 if previous_video is not None or not looping:
                     # draw the video filename/label on top of the rendered
                     # frame thumbnails
@@ -135,19 +135,19 @@ class VideoStripes(BasicProcessor):
                         footer_shape.add(label_element)
 
                     # sometimes the label is larger than the rendered frames!
-                    stripe["width"] = max(stripe_widths[previous_video], footersize[0])
+                    timeline["width"] = max(timeline_widths[previous_video], footersize[0])
 
                     # add to canvas
-                    stripe.add(footer_shape)
-                    stripes.append(stripe)
+                    timeline.add(footer_shape)
+                    timelines.append(timeline)
 
-                # reset and ready for the next stripe
+                # reset and ready for the next timeline
                 offset_y += base_height
                 previous_video = video
-                stripe_widths[video] = 0
-                stripe = SVG(insert=(0, offset_y), size=(0, base_height))
+                timeline_widths[video] = 0
+                timeline = SVG(insert=(0, offset_y), size=(0, base_height))
 
-            # if we have a new frame, add it to the currently active stripe
+            # if we have a new frame, add it to the currently active timeline
             if looping:
                 frame = Image.open(file)
                 frame_width = int(base_height * frame.width / frame.height)
@@ -158,23 +158,23 @@ class VideoStripes(BasicProcessor):
                 frame.save(frame_data, format="JPEG")  # JPEG probably optimal for video frames
                 frame_data = "data:image/jpeg;base64," + base64.b64encode(frame_data.getvalue()).decode("utf-8")
 
-                # add to stripe element
-                frame_element = ImageElement(href=frame_data, insert=(stripe_widths[video], 0), size=(frame_width, base_height))
-                stripe.add(frame_element)
-                stripe_widths[video] += frame_width
+                # add to timeline element
+                frame_element = ImageElement(href=frame_data, insert=(timeline_widths[video], 0), size=(frame_width, base_height))
+                timeline.add(frame_element)
+                timeline_widths[video] += frame_width
 
         # now we know all dimensions we can instantiate the canvas too
-        canvas_width = max(stripe_widths.values())
+        canvas_width = max(timeline_widths.values())
         fontsize = 12
-        canvas = get_4cat_canvas(self.dataset.get_results_path(), canvas_width, base_height * len(stripe_widths),
+        canvas = get_4cat_canvas(self.dataset.get_results_path(), canvas_width, base_height * len(timeline_widths),
                                  fontsize_small=fontsize)
-        for stripe in stripes:
-            canvas.add(stripe)
+        for timeline in timelines:
+            canvas.add(timeline)
 
         # save as svg and finish up
         canvas.save(pretty=True)
         self.dataset.log("Saved to " + str(self.dataset.get_results_path()))
-        return self.dataset.finish(len(stripe_widths))
+        return self.dataset.finish(len(timeline_widths))
 
     def get_video_labels(self, metadata):
         """

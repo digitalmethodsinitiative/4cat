@@ -137,7 +137,7 @@ class VideoSceneDetector(BasicProcessor):
 		},
 	}
 
-	followups = ["video-scene-frames", "video-stripes"]
+	followups = ["video-scene-frames", "video-timelines"]
 
 	@classmethod
 	def is_compatible_with(cls, module=None):
