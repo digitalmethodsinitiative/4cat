@@ -1,5 +1,5 @@
 """
-Extract neologisms
+Create scene-by-scene timelines
 """
 import shutil
 
@@ -9,7 +9,7 @@ from backend.abstract.preset import ProcessorPreset
 
 class VideoSceneTimelineCreator(ProcessorPreset):
     """
-    Run processor pipeline to create video scene stripes
+    Run processor pipeline to create video scene timelines
     """
     type = "preset-scene-timelines"  # job type ID
     category = "Visual"  # category. 'Combined processors' are always listed first in the UI.
@@ -24,9 +24,8 @@ class VideoSceneTimelineCreator(ProcessorPreset):
         """
         Determine compatibility
 
-        Compatible with 'Extract video frames'. Can in principle run on
-        anything that stores related images in separate folders in a zip
-        archive. Each folder will be rendered as a separate timeline.
+        Compatible with downloaded videos, and not really anything else!
+        Additionally ffmpeg needs to be available.
 
         :param str module:  Module ID to determine compatibility with
         :return bool:
