@@ -204,7 +204,7 @@ class VideoStripes(BasicProcessor):
                 labels[filename] = filename
 
         for dataset, urls in mapping_dataset.items():
-            dataset = DataSet(key=dataset, db=self.db)
+            dataset = DataSet(key=dataset, db=self.db).nearest("*-search")
 
             # determine appropriate label
             # is this the right place? should it be in the datasource?

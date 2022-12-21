@@ -1,6 +1,7 @@
 import collections
 import datetime
 import hashlib
+import fnmatch
 import shutil
 import json
 import time
@@ -939,7 +940,7 @@ class DataSet(FourcatModule):
 		genealogy = self.get_genealogy()
 		return genealogy[0]
 
-	def get_genealogy(self):
+	def get_genealogy(self, inclusive=False):
 		"""
 		Get genealogy of this dataset
 
@@ -949,7 +950,7 @@ class DataSet(FourcatModule):
 
 		:return list:  Dataset genealogy, oldest dataset first
 		"""
-		if self.genealogy:
+		if self.genealogy and not inclusive:
 			return self.genealogy
 
 		key_parent = self.key_parent
@@ -990,6 +991,24 @@ class DataSet(FourcatModule):
 				results += child.get_all_children(recursive)
 
 		return results
+
+	def nearest(self, type_filter):
+		"""
+		Return nearest dataset that matches the given type
+
+		Starting with this dataset, traverse the hierarchy upwards and return
+		whichever dataset matches the given type.
+
+		:param str type_filter:  Type filter. Can contain wildcards and is matched
+		using `fnmatch.fnmatch`.
+		:return:  Earliest matching dataset, or `None` if none match.
+		"""
+		genealogy = self.get_genealogy(inclusive=True)
+		for dataset in reversed(genealogy):
+			if fnmatch.fnmatch(dataset.type, type_filter):
+				return dataset
+
+		return None
 
 	def get_breadcrumbs(self):
 		"""
