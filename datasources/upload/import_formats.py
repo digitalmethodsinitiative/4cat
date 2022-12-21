@@ -14,7 +14,7 @@ class InvalidImportedItem:
     reason = ""
 
     def __init__(self, reason=""):
-        self.reason = ""
+        self.reason = reason
 
 
 def import_crowdtangle_instagram(reader, columns, dataset, parameters):
