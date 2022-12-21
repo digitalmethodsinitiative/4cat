@@ -384,7 +384,7 @@ class VideoDownloaderPlus(BasicProcessor):
                         self.url_files = []
                         self.last_dl_status = {}
                         self.last_post_process_status = {}
-                        self.dataset.log("Downloading %i/%i via yt-dlp: %s" % (
+                        self.dataset.update_status("Downloading %i/%i via yt-dlp: %s" % (
                         self.downloaded_videos + 1, self.total_possible_videos, url))
                         try:
                             info = ydl.extract_info(url)
@@ -472,9 +472,12 @@ class VideoDownloaderPlus(BasicProcessor):
             json.dump(metadata, outfile)
 
         # Finish up
-        self.dataset.update_status(
-            'Downloaded %i videos.' % self.downloaded_videos + ' %i URLs failed.' % failed_downloads if failed_downloads > 0 else '' + ' Check .metadata.json for individual results.',
-            is_final=True)
+        if not failed_downloads:
+            self.dataset.update_status(f"Downloaded {self.downloaded_videos} videos.")
+        else:
+            self.dataset.update_status(f"Downloaded {self.downloaded_videos}, but {failed_downloads} (probable) video "
+                                       f"URLs could not be downloaded. Check dataset log and .metadata.json for "
+                                       f"details.", is_final=True)
         self.write_archive_and_finish(results_path)
 
     def yt_dlp_monitor(self, d):
@@ -555,7 +558,7 @@ class VideoDownloaderPlus(BasicProcessor):
                     FilesizeException("Video size unknown; not allowed to download per 4CAT settings")
 
             # Download video
-            self.dataset.log(
+            self.dataset.update_status(
                 "Downloading %i/%i via requests: %s" % (self.downloaded_videos + 1, self.total_possible_videos, url))
             with open(results_path.joinpath(save_location), "wb") as f:
                 for chunk in response.iter_content(chunk_size=1024 * 1024):
