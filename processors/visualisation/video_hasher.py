@@ -20,7 +20,7 @@ __maintainer__ = "Dale Wahl"
 __email__ = "4cat@oilab.eu"
 
 
-class VideoHasher(BasicProcessor):
+class InactiveVideoHasher():  # VideoHasher(BasicProcessor):
 	"""
 	Video Hasher
 
