@@ -198,7 +198,7 @@ if args.release:
 			exit(1)
 
 	logger.info("  ...fetching tags from repository")
-	fetch = subprocess.run(shlex.split("git fetch --all"), stderr=subprocess.PIPE, stdout=subprocess.PIPE, cwd=cwd, text=True)
+	fetch = subprocess.run(shlex.split("git fetch 4cat_migrate"), stderr=subprocess.PIPE, stdout=subprocess.PIPE, cwd=cwd, text=True)
 
 	if fetch.returncode != 0:
 		logger.info("Error while fetching latest tags with git. Check that the repository URL is correct.")
