@@ -45,7 +45,7 @@ class DataSet(FourcatModule):
 	folder = None
 	is_new = True
 	no_status_updates = False
-	staging_area = None
+	staging_areas = None
 
 	def __init__(self, parameters={}, key=None, job=None, data=None, db=None, parent=None, extension=None,
 				 type=None, is_private=True, owner="anonymous"):
@@ -59,7 +59,7 @@ class DataSet(FourcatModule):
 		"""
 		self.db = db
 		self.folder = Path(config.get('PATH_ROOT'), config.get('PATH_DATA'))
-		self.staging_area = []
+		self.staging_areas = []
 
 		if key is not None:
 			self.key = key
@@ -393,9 +393,19 @@ class DataSet(FourcatModule):
 		results_path.mkdir()
 
 		# Storing the staging area with the dataset so that it can be removed later
-		self.staging_area.append(results_path)
+		self.staging_areas.append(results_path)
 
 		return results_path
+
+	def remove_staging_areas(self):
+		"""
+		Remove any staging areas that were created and all files contained in them.
+		"""
+		# Remove DataSet staging areas
+		if self.staging_areas:
+			for staging_area in self.staging_areas:
+				if staging_area.is_dir():
+					shutil.rmtree(staging_area)
 
 	def get_results_dir(self):
 		"""

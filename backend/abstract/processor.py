@@ -218,8 +218,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		if not self.dataset.is_finished():
 			self.dataset.finish()
 
-		if hasattr(self, "staging_area") and type(self.staging_area) == Path and self.staging_area.exists():
-			shutil.rmtree(self.staging_area)
+		self.dataset.remove_staging_areas()
 
 		# see if we have anything else lined up to run next
 		for next in self.parameters.get("next", []):
@@ -292,13 +291,12 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		Clean up result files and any staging files for processor to be attempted
 		later if desired.
 		"""
+		# Remove the results file that was created
 		if self.dataset.get_results_path().exists():
 			self.dataset.get_results_path().unlink()
 
-		if self.dataset.staging_area:
-			for staging_area in self.dataset.staging_area:
-				if staging_area.is_dir():
-					shutil.rmtree(staging_area)
+		# Remove any staging areas with temporary data
+		self.dataset.remove_staging_areas()
 
 	def abort(self):
 		"""
@@ -427,9 +425,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		if staging_area and (not staging_area.exists() or not staging_area.is_dir()):
 			raise RuntimeError("Staging area %s is not a valid folder")
 		else:
-			if not hasattr(self, "staging_area") and not staging_area:
-				self.staging_area = self.dataset.get_staging_area()
-				staging_area = self.staging_area
+			staging_area = self.dataset.get_staging_area()
 
 		with zipfile.ZipFile(path, "r") as archive_file:
 			archive_contents = sorted(archive_file.namelist())
@@ -440,8 +436,6 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 					continue
 
 				if self.interrupted:
-					if hasattr(self, "staging_area"):
-						shutil.rmtree(self.staging_area)
 					raise ProcessorInterruptedException("Interrupted while iterating zip file contents")
 
 				# file_name = archived_file.split("/")[-1]
@@ -449,12 +443,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 				archive_file.extract(archived_file, staging_area)
 
 				yield temp_file
-				if hasattr(self, "staging_area"):
-					temp_file.unlink()
-
-		if hasattr(self, "staging_area"):
-			shutil.rmtree(self.staging_area)
-			del self.staging_area
+				temp_file.unlink()
 
 	def unpack_archive_contents(self, path, staging_area=None):
 		"""
@@ -480,10 +469,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		if staging_area and (not staging_area.exists() or not staging_area.is_dir()):
 			raise RuntimeError("Staging area %s is not a valid folder")
 		else:
-			if not hasattr(self, "staging_area"):
-				self.staging_area = self.dataset.get_staging_area()
-
-			staging_area = self.staging_area
+			staging_area = self.dataset.get_staging_area()
 
 		paths = []
 		with zipfile.ZipFile(path, "r") as archive_file:
