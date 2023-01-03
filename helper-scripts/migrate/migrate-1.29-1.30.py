@@ -108,7 +108,7 @@ else:
     ffmpeg = shutil.which(config.get("video_downloader.ffmpeg-path", "ffmpeg"))
     if ffmpeg:
         print(f"  - ffmpeg found at {ffmpeg}, storing as config setting video_downloader.ffmpeg-path")
-        config.set_or_create_setting("video_downloader.ffmpeg-path", ffmpeg)
+        config.set_or_create_setting("video_downloader.ffmpeg-path", ffmpeg, raw=False)
     elif in_docker:
         print("  - ffmpeg not found, detected Docker environment, installing via apt")
         ffmpeg_install = subprocess.run(shlex.split("apt install -y ffmpeg"), stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
