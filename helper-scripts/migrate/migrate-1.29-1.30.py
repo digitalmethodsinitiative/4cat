@@ -114,7 +114,7 @@ else:
         ffmpeg_install = subprocess.run(shlex.split("apt install -y ffmpeg"), stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         if ffmpeg_install.returncode == 0:
             print("  - ffmpeg intalled with apt!")
-            config.set_or_create_setting("video_downloader.ffmpeg-path", shutil.which("ffmpeg"))
+            config.set_or_create_setting("video_downloader.ffmpeg-path", shutil.which("ffmpeg"), raw=False)
         else:
             print(f"  - Error while installing ffmpeg with apt (return code {ffmpeg_install.returncode}). Some video")
             print("    processors will be unavailable until you rebuild the Docker containers.")
