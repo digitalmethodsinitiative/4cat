@@ -155,7 +155,7 @@ class SearchWithTwitterAPIv2(Search):
                 params['query'] = query
             self.dataset.log("Search parameters: %s" % repr(params))
             while True:
-                
+
                 if self.interrupted:
                     raise ProcessorInterruptedException("Interrupted while getting tweets from the Twitter API")
 
@@ -728,6 +728,10 @@ class SearchWithTwitterAPIv2(Search):
         """
         tweet_time = datetime.datetime.strptime(tweet["created_at"], "%Y-%m-%dT%H:%M:%S.000Z")
 
+        # For backward compatibility
+        author_username = tweet["author_user"]["username"] if tweet.get("author_user") else tweet["author_username"]
+        author_fullname = tweet["author_user"]["name"] if tweet.get("author_user") else tweet["author_fullname"]
+
         hashtags = [tag["tag"] for tag in tweet.get("entities", {}).get("hashtags", [])]
         mentions = [tag["username"] for tag in tweet.get("entities", {}).get("mentions", [])]
         urls = [tag["expanded_url"] for tag in tweet.get("entities", {}).get("urls", [])]
@@ -752,6 +756,8 @@ class SearchWithTwitterAPIv2(Search):
                         # should only ever be one, but this verifies that there IS one and not NONE
                         tweet["text"] = "RT @" + retweeting_users[0] + ": " + retweeted_body
 
+            retweeted_user = retweeted_tweet["author_user"]["username"] if retweeted_tweet.get("author_user") else retweeted_tweet.get("author_username", "") # Reference tweets were not always enriched
+
             # Retweet entities are only included in the retweet if they occur in the first 140 characters
             # Note: open question on quotes and replies as to whether containing hashtags or mentions of their referenced tweets makes sense
             [hashtags.append(tag["tag"]) for tag in retweeted_tweet.get("entities", {}).get("hashtags", [])]
@@ -775,18 +781,18 @@ class SearchWithTwitterAPIv2(Search):
             "thread_id": tweet.get("conversation_id", tweet["id"]),
             "timestamp": tweet_time.strftime("%Y-%m-%d %H:%M:%S"),
             "unix_timestamp": int(tweet_time.timestamp()),
-            'link': "https://twitter.com/%s/status/%s" % (tweet.get('author_user').get('username'), tweet.get('id')),
+            'link': "https://twitter.com/%s/status/%s" % (author_username, tweet.get('id')),
             "subject": tweet.get('subject', ""),
             "body": tweet["text"],
-            "author": tweet["author_user"]["username"],
-            "author_fullname": tweet["author_user"]["name"],
+            "author": author_username,
+            "author_fullname": author_fullname,
             "author_id": tweet["author_id"],
             "source": tweet.get("source"),
             "language_guess": tweet.get("lang"),
             "possibly_sensitive": "yes" if tweet.get("possibly_sensitive") else "no",
             **tweet["public_metrics"],
             "is_retweet": "yes" if is_retweet else "no",
-            "retweeted_user": "" if not is_retweet else retweeted_tweet["author_user"]["username"],
+            "retweeted_user": "" if not is_retweet else retweeted_user,
             "is_quote_tweet": "yes" if is_quoted else "no",
             "quoted_user": "" if not is_quoted else [ref for ref in tweet["referenced_tweets"] if ref["type"] == "quoted"].pop().get("author_user", {}).get("username", ""),
             "is_reply": "yes" if is_reply else "no",
