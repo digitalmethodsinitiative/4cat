@@ -71,7 +71,7 @@ class SearchTikTokByID(Search):
     proxy_sleep = 1
     headers = {
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-        "Accept-Encoding": "gzip, deflate, br",
+        "Accept-Encoding": "gzip, deflate",
         "Accept-Language": "en-US,en;q=0.5",
         "Connection": "keep-alive",
         "DNT": "1",
@@ -348,4 +348,4 @@ class SearchTikTokByID(Search):
         :param item:
         :return:
         """
-        return SearchTikTokByImport.map_tiktok_item(item)
+        return SearchTikTokByImport.map_item(item)

@@ -113,7 +113,7 @@ class SearchTikTok(Search):
             "body": post["desc"],
             "timestamp": datetime.utcfromtimestamp(int(post["createTime"])).strftime('%Y-%m-%d %H:%M:%S'),
             "unix_timestamp": int(post["createTime"]),
-            "is_duet": post["duetInfo"].get("duetFromId") != "0",
+            "is_duet": post.get("duetInfo", {}).get("duetFromId") != "0" if post.get("duetInfo", {}) else False,
             "music_name": post["music"]["title"],
             "music_id": post["music"]["id"],
             "music_url": post["music"]["playUrl"],
