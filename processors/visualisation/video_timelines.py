@@ -195,13 +195,14 @@ class VideoTimelines(BasicProcessor):
             return {}
 
         for url, data in metadata.items():
-            for filename in [f["filename"] for f in data["files"]]:
-                filename = ".".join(filename.split(".")[:-1])
-                mapping_ids[filename] = data["post_ids"]
-                if data["from_dataset"] not in mapping_dataset:
-                    mapping_dataset[data["from_dataset"]] = []
-                mapping_dataset[data["from_dataset"]].append(filename)
-                labels[filename] = filename
+            if data.get('success'):
+                for filename in [f["filename"] for f in data["files"]]:
+                    filename = ".".join(filename.split(".")[:-1])
+                    mapping_ids[filename] = data["post_ids"]
+                    if data["from_dataset"] not in mapping_dataset:
+                        mapping_dataset[data["from_dataset"]] = []
+                    mapping_dataset[data["from_dataset"]].append(filename)
+                    labels[filename] = filename
 
         for dataset, urls in mapping_dataset.items():
             dataset = DataSet(key=dataset, db=self.db).nearest("*-search")
@@ -219,6 +220,3 @@ class VideoTimelines(BasicProcessor):
                         labels[filename] = mapper(item)
 
         return labels
-
-
-
