@@ -15,6 +15,7 @@ from pathlib import Path
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)) + "'/../..")
 from common.lib.database import Database
 from common.lib.logger import Logger
+from common.lib.helpers import add_notification
 
 log = Logger(output=True)
 import common.config_manager as config
@@ -83,6 +84,32 @@ config.delete_setting("WARN_EMAILS")
 config.delete_setting("WARN_INTERVAL")
 config.delete_setting("image_downloader_telegram.MAX_NUMBER_IMAGES")
 
+
+# ---------------------------------------------
+#         Check if Docker .env up to date
+# ---------------------------------------------
+in_docker = False
+notification = False
+config_path = Path(__file__).parent.parent.parent.joinpath("config/config.ini")
+if config_path.exists():
+    config_reader = configparser.ConfigParser()
+    config_reader.read(config_path)
+    in_docker = config_reader["DOCKER"].getboolean("use_docker_config")
+    if in_docker:
+        # Add notification if docker version in .env file is not updated
+        # NOTE: this checks the COPIED .env file in the Docker container not the actual file used by Docker
+        # It should still represent the version used when creating the Docker container, but if that file is updated and
+        # container is not rebuilt AND migrate runs again, this message will be added again and may cause confusion.
+        with open('.env') as f:
+            for line in f.readlines():
+                if "DOCKER_TAG" in line:
+                    docker_version = line.split('=')[-1].strip()
+                    if docker_version not in ['latest', 'stable']:
+                        notification = f"You have updated 4CAT, but your Docker .env file indicates you installed a specific version. If you recreate your 4CAT Docker containers, 4CAT will regress to {docker_version}. Consider updating DOCKER_TAG in .env to the 'stable' tag to always use the latest version."
+                        add_notification(db, "!admins", notification)
+                    break
+
+
 # ---------------------------------------------
 #               Look for ffmpeg
 # ---------------------------------------------
@@ -95,15 +122,7 @@ if current_ffmpeg and shutil.which(current_ffmpeg):
     print(f"  - ffmpeg configured and found at {current_ffmpeg}, nothing to configure")
 else:
     print("  - Checking if we are in Docker... ", end="")
-    in_docker = False
-    config_path = Path(__file__).parent.parent.parent.joinpath("config/config.ini")
-    if config_path.exists():
-        config_reader = configparser.ConfigParser()
-        config_reader.read(config_path)
-        in_docker = config_reader["DOCKER"].getboolean("use_docker_config")
-        print("yes" if in_docker else "no")
-    else:
-        print("no")
+    print("yes" if in_docker else "no")
 
     ffmpeg = shutil.which(config.get("video_downloader.ffmpeg-path", "ffmpeg"))
     if ffmpeg:
@@ -173,3 +192,6 @@ if not imageboards_enabled:
     print("  - No imageboard data sources enabled")
 else:
     print("  - Done!")
+
+if notification:
+    print("\nWARNING:" + notification + "\n")
