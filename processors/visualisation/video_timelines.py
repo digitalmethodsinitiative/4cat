@@ -114,8 +114,6 @@ class VideoTimelines(BasicProcessor):
             # at the end of each timeline (or at the end of the archive) add a
             # footer to it and paint to the canvas
             if video != previous_video or not looping:
-                self.dataset.update_status(f"Rendering video timeline for collection {video}")
-                self.dataset.update_progress(len(timeline_widths) / self.source_dataset.num_rows)
                 if previous_video is not None or not looping:
                     # draw the video filename/label on top of the rendered
                     # frame thumbnails
@@ -141,11 +139,15 @@ class VideoTimelines(BasicProcessor):
                     timeline.add(footer_shape)
                     timelines.append(timeline)
 
-                # reset and ready for the next timeline
-                offset_y += base_height
-                previous_video = video
-                timeline_widths[video] = 0
-                timeline = SVG(insert=(0, offset_y), size=(0, base_height))
+                if looping:
+                    # Only prep for new timeline if still looping
+                    self.dataset.update_status(f"Rendering video timeline for collection {video}")
+                    self.dataset.update_progress(len(timeline_widths) / self.source_dataset.num_rows)
+                    # reset and ready for the next timeline
+                    offset_y += base_height
+                    previous_video = video
+                    timeline_widths[video] = 0
+                    timeline = SVG(insert=(0, offset_y), size=(0, base_height))
 
             # if we have a new frame, add it to the currently active timeline
             if looping:
