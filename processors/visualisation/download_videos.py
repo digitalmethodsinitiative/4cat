@@ -50,10 +50,11 @@ class VideoDownloaderPlus(BasicProcessor):
                   "retrieved externally."  # description displayed in UI
     extension = "zip"  # extension of result file, used internally and in UI
 
-    references = [
-        "[YT-DLP python package](https://github.com/yt-dlp/yt-dlp/#readme)",
-        "[Supported sites](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md)",
-    ]
+    if config.get("video_downloader.allow-indirect"):
+        references = [
+            "[YT-DLP python package](https://github.com/yt-dlp/yt-dlp/#readme)",
+            "[Supported sites](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md)",
+        ]
 
     known_channels = ['youtube.com/c/', 'youtube.com/channel/']
 
@@ -312,11 +313,15 @@ class VideoDownloaderPlus(BasicProcessor):
         self.total_possible_videos = min(len(urls), amount)
         yt_dlp_archive_map = {}
         for url in urls:
+            urls[url]["success"] = False
+
             # Stop processing if worker has been asked to stop or max downloads reached
             if self.downloaded_videos >= amount:
-                break
+                urls[url]["error"] = "Max video download limit already reached."
+                continue
             if self.interrupted:
                 raise ProcessorInterruptedException("Interrupted while downloading videos.")
+
             # Check for repeated timeouts
             if consecutive_timeouts > 5 and self.downloaded_videos == 0:
                 if use_yt_dlp:
@@ -332,7 +337,6 @@ class VideoDownloaderPlus(BasicProcessor):
             # Reject known channels; unknown will still download!
             if not download_channels and any([sub_url in url for sub_url in self.known_channels]):
                 message = 'Skipping known channel: %s' % url
-                urls[url]['success'] = False
                 urls[url]['error'] = message
                 failed_downloads += 1
                 self.dataset.log(message)
@@ -352,14 +356,12 @@ class VideoDownloaderPlus(BasicProcessor):
             except requests.exceptions.SSLError as e:
                 message = "SSL error: %s" % str(e)
                 self.dataset.log(message)
-                urls[url]["success"] = False
                 urls[url]["error"] = message
                 failed_downloads += 1
                 continue
             except requests.exceptions.Timeout as e:
                 message = "Timeout error: %s" % str(e)
                 self.dataset.log(message)
-                urls[url]["success"] = False
                 urls[url]["error"] = message
                 failed_downloads += 1
                 consecutive_timeouts += 1
@@ -369,7 +371,6 @@ class VideoDownloaderPlus(BasicProcessor):
                 # FailedDownload raised when response other than 200 received
                 # NotAVideo raised due to specific Content-Type known to not be a video (or a webpage/html that could lead to a video via YT-DLP)
                 self.dataset.log(str(e))
-                urls[url]["success"] = False
                 urls[url]["error"] = str(e)
                 failed_downloads += 1
                 continue
@@ -405,7 +406,6 @@ class VideoDownloaderPlus(BasicProcessor):
                                     self.log.warning(message)
                                     if self.videos_downloaded_from_url == 0:
                                         # No videos downloaded for this URL
-                                        urls[url]['success'] = False
                                         urls[url]['error'] = message
                                         failed_downloads += 1
                                         continue
@@ -419,7 +419,6 @@ class VideoDownloaderPlus(BasicProcessor):
                                 message = 'DownloadError: %s' % str(e)
                             else:
                                 message = 'DownloadError: %s' % str(e)
-                            urls[url]['success'] = False
                             urls[url]['error'] = message
                             failed_downloads += 1
                             self.dataset.log(message)
@@ -427,7 +426,6 @@ class VideoDownloaderPlus(BasicProcessor):
                         except Exception as e:
                             # Catch all other issues w/ yt-dlp
                             message = "YT-DLP raised unexpected error: %s" % str(e)
-                            urls[url]['success'] = False
                             urls[url]['error'] = message
                             failed_downloads += 1
                             self.dataset.log(message)
@@ -445,7 +443,6 @@ class VideoDownloaderPlus(BasicProcessor):
 
                 else:
                     # No YT-DLP; move on
-                    urls[url]["success"] = False
                     urls[url]["error"] = str(e)
                     failed_downloads += 1
                     continue
