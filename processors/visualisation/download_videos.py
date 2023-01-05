@@ -124,7 +124,7 @@ class VideoDownloaderPlus(BasicProcessor):
             "type": UserInput.OPTION_TOGGLE,
             "default": False,
             "help": "Allow indirect downloads",
-            "tooltip": "Allow users to choose to download videos linked indirectly (e.g. embedded in a linked tweet). "
+            "tooltip": "Allow users to choose to download videos linked indirectly (e.g. embedded in a linked tweet, link to a YouTube video). "
                        "Enabling can be confusing for users and download more than intended."
         },
         "video_downloader.allow-multiple": {
@@ -316,7 +316,7 @@ class VideoDownloaderPlus(BasicProcessor):
             urls[url]["success"] = False
 
             # Stop processing if worker has been asked to stop or max downloads reached
-            if self.downloaded_videos >= amount:
+            if self.downloaded_videos >= amount and amount != 0:
                 urls[url]["error"] = "Max video download limit already reached."
                 continue
             if self.interrupted:
