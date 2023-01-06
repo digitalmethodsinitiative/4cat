@@ -254,6 +254,7 @@ categories = {
     "mail": "Mail settings & credentials",
     "logging": "Logging settings",
     "path": "File paths",
-    'image_downloader': 'Image downloader',
-    'text_from_images': 'OCR: Text from images',
+    "image_downloader": "Image Download Settings",
+    "video_downloader": "Video Download Settings",
+    'text_from_images': 'OCR: Extract text from images (https://github.com/digitalmethodsinitiative/ocr_server)',
 }

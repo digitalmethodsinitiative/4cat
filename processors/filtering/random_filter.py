@@ -91,7 +91,7 @@ class RandomFilter(BaseFilter):
 					match_row = posts_to_keep[written]
 				yield original_item
 
-				if written % int(sample_size/10) == 0:
+				if written % max(int(sample_size/10), 1) == 0:
 					self.dataset.update_status("Wrote %i posts" % written)
 
 			count += 1

@@ -4,7 +4,7 @@
         {% if option_settings.type == "toggle" %}
             <input type="checkbox" name="option-{{ option }}"{% if option_settings.default %} checked="checked"{% endif %}>
         {% endif %}
-        {{ option_settings.help }}
+        {{ option_settings.help|markdown|safe }}
     </label>
 
     {% if option_settings.type == "string" %}
