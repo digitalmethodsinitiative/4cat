@@ -402,7 +402,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
 		self.dataset.update_status("Parent dataset updated.")
 
-	def iterate_archive_contents(self, path, staging_area=None):
+	def iterate_archive_contents(self, path, staging_area=None, immediately_delete=True):
 		"""
 		A generator that iterates through files in an archive
 
@@ -416,16 +416,20 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		:param Path staging_area:  Where to store the files while they're
 		  being worked with. If omitted, a temporary folder is created and
 		  deleted after use
+		:param bool immediately_delete:  Temporary files are removed after yielded;
+		  False keeps files until the staging_area is removed (usually during processor
+		  cleanup)
 		:return:  An iterator with a Path item for each file
 		"""
 
 		if not path.exists():
 			return
 
-		if staging_area and (not staging_area.exists() or not staging_area.is_dir()):
-			raise RuntimeError("Staging area %s is not a valid folder")
-		else:
+		if not staging_area:
 			staging_area = self.dataset.get_staging_area()
+
+		if not staging_area.exists() or not staging_area.is_dir():
+			raise RuntimeError("Staging area %s is not a valid folder")
 
 		with zipfile.ZipFile(path, "r") as archive_file:
 			archive_contents = sorted(archive_file.namelist())
@@ -438,12 +442,12 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 				if self.interrupted:
 					raise ProcessorInterruptedException("Interrupted while iterating zip file contents")
 
-				# file_name = archived_file.split("/")[-1]
 				temp_file = staging_area.joinpath(archived_file)
 				archive_file.extract(archived_file, staging_area)
 
 				yield temp_file
-				temp_file.unlink()
+				if immediately_delete:
+					temp_file.unlink()
 
 	def unpack_archive_contents(self, path, staging_area=None):
 		"""
@@ -466,10 +470,11 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		if not path.exists():
 			return
 
-		if staging_area and (not staging_area.exists() or not staging_area.is_dir()):
-			raise RuntimeError("Staging area %s is not a valid folder")
-		else:
+		if not staging_area:
 			staging_area = self.dataset.get_staging_area()
+
+		if not staging_area.exists() or not staging_area.is_dir():
+			raise RuntimeError("Staging area %s is not a valid folder")
 
 		paths = []
 		with zipfile.ZipFile(path, "r") as archive_file:
