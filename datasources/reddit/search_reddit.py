@@ -575,7 +575,8 @@ class SearchReddit(Search):
 			expected_posts += expected_replies if expected_replies else 0
 
 		if expected_posts:
-			expected_seconds = int(expected_posts / 44)  # seems to be about this
+			pps = 672 if query.get("pushshift_track") == "beta" else 44
+			expected_seconds = int(expected_posts / pps)  # seems to be about this
 			expected_time = timify_long(expected_seconds)
 			query["expected-results"] = expected_posts
 
