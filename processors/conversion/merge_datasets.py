@@ -52,7 +52,7 @@ class DatasetMerger(BasicProcessor):
     @classmethod
     def is_compatible_with(cls, module=None):
         """
-        Allow processor on iterable files
+        Allow processor on any CSV or NDJSON file
 
         :param module: Dataset or processor to determine compatibility with
         """
@@ -78,7 +78,7 @@ class DatasetMerger(BasicProcessor):
         This merges two datasets into a new, combined dataset
 
         This is trickier than it sounds! First we need to make sure that the
-        datasets are compatible and then we need to figure out what to do with
+        datasets are compatible, and then we need to figure out what to do with
         any duplicates.
         """
         try:
@@ -91,11 +91,14 @@ class DatasetMerger(BasicProcessor):
 
         second_dataset = self.source_dataset
 
-        # this checks extension rather than processor type, because two
-        # processors may still produce datasets with the same format
+        # require same type because else we cannot account for the different
+        # formats. we could merge the attributes/columns and provide empty
+        # values if they are missing but that just leads to a mess of undefined
+        # behaviour
         if first_dataset.type != second_dataset.type or \
                 first_dataset.get_extension() != second_dataset.get_extension():
-            return self.dataset.finish_with_error("Cannot merge datasets - they need to be of the same type.")
+            return self.dataset.finish_with_error("Cannot merge datasets - they need to be of the same type and "
+                                                  "format.")
 
         # even admins cannot merge private datasets with public datasets - but
         # they can of course make a private dataset public
