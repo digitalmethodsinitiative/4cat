@@ -9,6 +9,9 @@
 
     {% if option_settings.type == "string" %}
         <input{% if option_settings.min or option_settings.max %} class="numeric"{% endif %} name="option-{{ option }}" value="{{ option_settings.default }}">
+    {% elif option_settings.type in ("json", "textarea") %}
+        <textarea name="option-{{ option }}" id="forminput-{{ option }}"
+                      placeholder="{{ option_settings.tooltip }}">{{ option_settings.default }}</textarea>
     {% elif option_settings.type == "choice" %}
         <select name="option-{{ option }}">
         {% for choice in option_settings.options %}

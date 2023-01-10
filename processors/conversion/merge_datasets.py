@@ -25,23 +25,23 @@ class DatasetMerger(BasicProcessor):
     type = "merge-datasets"  # job type ID
     category = "Conversion"  # category
     title = "Merge datasets"  # title displayed in UI
-    description = "Merge this dataset with another dataset of the same type. A new, third dataset is " \
-                  "created containing items from both original datasets."  # description displayed in UI
+    description = "Merge this dataset with other datasets of the same format. A new dataset is " \
+                  "created containing a combination of items from the original datasets."  # description displayed in UI
 
     options = {
         "source": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "Source dataset URL",
-            "tooltip": "This should be the URL of the result page of the 4CAT dataset you want to merge with this "
-                       "dataset. Note that both datasets need to be of the same type!"
+            "type": UserInput.OPTION_TEXT_LARGE,
+            "help": "Source dataset URLs",
+            "tooltip": "This should be the URL(s) of the result pages of the 4CAT dataset you want to merge with this "
+                       "dataset. Note that all datasets need to have the same format! Separate URLs with new lines or "
+                       "commas."
         },
         "merge": {
             "type": UserInput.OPTION_CHOICE,
             "help": "Merge strategy",
             "options": {
                 "remove": "Remove duplicates",
-                "keep": "Keep duplicates",
-                "commas": "Merge duplicates, combine different column values into a list"
+                "keep": "Keep duplicates"
             },
             "tooltip": "What to do with items that occur in both datasets? Items are considered duplicate if their ID "
                        "is identical, regardless of the value of other properties",
@@ -52,18 +52,18 @@ class DatasetMerger(BasicProcessor):
     @classmethod
     def is_compatible_with(cls, module=None):
         """
-        Allow processor on any CSV or NDJSON file
+        Allow processor on any top-level CSV or NDJSON file
 
         :param module: Dataset or processor to determine compatibility with
         """
-        return module.get_extension() in ("csv", "ndjson")
+        return module.get_extension() in ("csv", "ndjson") and module.type.endswith("search")
 
     @staticmethod
     def get_dataset_from_url(url, db):
         """
         Get dataset object based on dataset URL
 
-        Uses the last part of the URL path as the Datset ID
+        Uses the last part of the URL path as the Dataset ID
 
         :param str url:  Dataset URL
         :param db:  Database handler (to retrieve metadata)
@@ -81,148 +81,93 @@ class DatasetMerger(BasicProcessor):
         datasets are compatible, and then we need to figure out what to do with
         any duplicates.
         """
-        try:
-            first_dataset = self.get_dataset_from_url(self.parameters.get("source"), self.db)
-        except TypeError:
-            return self.dataset.finish_with_error("Dataset URL invalid - cannot perform merge.")
+        source_datasets = [self.source_dataset]
+        total_items = self.source_dataset.num_rows
+        for source_dataset in self.parameters.get("source").replace("\n", ",").split(","):
+            source_dataset_url = source_dataset.strip()
+            try:
+                source_dataset = self.get_dataset_from_url(source_dataset_url, self.db)
+            except TypeError:
+                return self.dataset.finish_with_error(f"Dataset URL '{source_dataset_url} not found - cannot perform "
+                                                      f"merge.")
 
-        if not first_dataset.is_finished():
-            return self.dataset.finish_with_error("Cannot merge datasets - source dataset is not finished yet.")
+            if not source_dataset.is_finished():
+                return self.dataset.finish_with_error(f"Dataset with URL {source_dataset_url} is unfinished - finish "
+                                                      f"datasets before merging.")
 
-        second_dataset = self.source_dataset
+            #if source_dataset.type != self.source_dataset.type:
+            #    return self.dataset.finish_with_error(f"Dataset with URL {source_dataset_url} is not of the right "
+            #                                          f"type - all datasets must be of the type "
+            #                                          f"'{self.source_dataset.type}")
 
-        # require same type because else we cannot account for the different
-        # formats. we could merge the attributes/columns and provide empty
-        # values if they are missing but that just leads to a mess of undefined
-        # behaviour
-        if first_dataset.type != second_dataset.type or \
-                first_dataset.get_extension() != second_dataset.get_extension():
-            return self.dataset.finish_with_error("Cannot merge datasets - they need to be of the same type and "
-                                                  "format.")
+            if source_dataset.owner != self.source_dataset.owner and (
+                    source_dataset.is_private or self.source_dataset.is_private):
+                return self.dataset.finish_with_error("Cannot merge datasets - all need to be public or have the same "
+                                                      "owner.")
 
-        # even admins cannot merge private datasets with public datasets - but
-        # they can of course make a private dataset public
-        if first_dataset.owner != second_dataset.owner and (first_dataset.is_private or second_dataset.is_private):
-            return self.dataset.finish_with_error("Cannot merge datasets - both need to be public or have the same "
-                                                  "owner.")
+            if source_dataset.key in [d.key for d in source_datasets]:
+                self.dataset.update_status(f"Skipping dataset with URL {source_dataset_url} - already in list of "
+                                           f"datasets to merge")
+            else:
+                total_items += source_dataset.num_rows
+                source_datasets.append(source_dataset)
+
+        # clean up parameters
+        self.dataset.parameters = {**self.dataset.parameters, "source": ", ".join([d.key for d in source_datasets])}
 
         # ok, now we know that the datasets are actually compatible and can be
         # merged
-        total_items = first_dataset.num_rows + second_dataset.num_rows
-        processed_items = 0
-        duplicates = {}
-        first_fieldnames = {}
-        first_processor = first_dataset.get_own_processor()
-        second_processor = second_dataset.get_own_processor()
+        processed = 0
+        duplicates = 0
+        merged = 0
+        canonical_fieldnames = None
+        sorted_canonical_fieldnames = None
+        writer = None
 
         # find potential duplicates and check if columns are compatible (if
         # merging csvs)
-        if self.parameters["merge"] != "keep":
-            for first_item in first_dataset.iterate_items(bypass_map_item=True):
-                first_fieldnames = set(first_item.keys())
-                for second_item in second_dataset.iterate_items(bypass_map_item=True):
+        seen_ids = set()
+        with self.dataset.get_results_path().open("w", encoding="utf-8", newline="") as outfile:
+            for dataset in source_datasets:
+                for original_item, mapped_item in dataset.iterate_mapped_items():
                     if self.interrupted:
                         raise ProcessorInterruptedException("Interrupted while mapping duplicates")
 
-                    second_fieldnames = set(second_item.keys())
-                    if first_dataset.get_extension() == "csv" and first_fieldnames != second_fieldnames:
-                        return self.dataset.finish_with_error(
-                            "Cannot merge datasets - not the same columns (has one been altered by a processor?)")
+                    if not canonical_fieldnames:
+                        canonical_fieldnames = set(mapped_item.keys())
+                        sorted_canonical_fieldnames = list(mapped_item.keys())
+                    else:
+                        item_fieldnames = set(mapped_item.keys())
+                        if item_fieldnames != canonical_fieldnames:
+                            return self.dataset.finish_with_error("Cannot merge datasets - not the same set of "
+                                                                  "attributes per item (are they not the same type or "
+                                                                  "has one been altered by a processor?)")
 
-                    first_id = first_item.get("item_id", first_processor.map_item(first_item)["item_id"])
-                    second_id = second_item.get("item_id", second_processor.map_item(second_item)["item_id"])
-                    if first_id != second_id:
+                    processed += 1
+                    if self.parameters["merge"] != "keep" and mapped_item.get("id") in seen_ids:
+                        duplicates += 1
                         continue
 
-                    duplicates[first_id] = second_item
-                    if self.parameters["merge"] in ("commas", "remove"):
-                        total_items -= 1
+                    seen_ids.add(mapped_item.get("id"))
+                    merged += 1
 
-        # have duplicates been detected?
-        dupe_msg = ""
-        if duplicates:
-            dupe_msg = " (%s duplicate%s)" % ("{:,}".format(len(duplicates)), "s" if len(duplicates) != 1 else "")
-            self.dataset.update_status("%s duplicate items were found. Using the '%s' strategy for duplicates." %
-                                       ("{:,}".format(len(duplicates)), self.parameters.get("merge")))
+                    if dataset.get_extension() == "csv":
+                        if not writer:
+                            writer = csv.DictWriter(outfile, fieldnames=sorted_canonical_fieldnames)
+                            writer.writeheader()
 
-        # actually merge the datasets finally!! we need a separate strategy for
-        # each file format
-        with self.dataset.get_results_path().open("w", encoding="utf-8", newline="\n") as outfile:
-            # csv files
-            if first_dataset.get_extension() == "csv":
-                writer = csv.DictWriter(outfile, fieldnames=first_fieldnames)
-                writer.writeheader()
+                        writer.writerow(original_item)
 
-                # from the first dataset, all items can be copied
-                for item in first_dataset.iterate_items():
-                    if self.interrupted:
-                        raise ProcessorInterruptedException("Interrupted while merging file 1")
+                    elif dataset.get_extension() == "ndjson":
+                        outfile.write(json.dumps(original_item) + "\n")
 
-                    if item["item_id"] in duplicates and self.parameters["merge"] == "commas":
-                        for field, value in duplicates["item_id"].items():
-                            # comma-separated list if values are different
-                            if value != item[field]:
-                                item[field] += "," + value
-
-                    writer.writerow(item)
-                    processed_items += 1
-                    self.update_progress(processed_items, total_items)
-
-                # from the second also, unless they are dupes
-                for item in second_dataset.iterate_items():
-                    if self.interrupted:
-                        raise ProcessorInterruptedException("Interrupted while merging file 2")
-
-                    self.update_progress(processed_items, total_items)
-                    if item["item_id"] in duplicates:
-                        if self.parameters["merge"] in ("commas", "remove"):
-                            continue
-                        elif self.parameters["merge"] == "keep":
-                            writer.writerow(item)
-                            processed_items += 1
-
-            # ndjson files
-            elif first_dataset.get_extension() == "ndjson":
-
-                # again, for the first all items can be written
-                for item in first_dataset.iterate_items(bypass_map_item=True):
-                    if self.interrupted:
-                        raise ProcessorInterruptedException("Interrupted while merging file 1")
-
-                    first_id = first_processor.map_item(item)["item_id"]
-
-                    if first_id in duplicates and self.parameters.get("merge") == "commas":
-                        for field, value in duplicates[first_id].items():
-                            # comma-separated if scalar, else a json list
-                            if field not in item:
-                                item[field] = value
-                            elif item[field] != value:
-                                if type(item[field]) in (str, int, float):
-                                    item[field] = str(item[field]) + "," + str(value)
-                                else:
-                                    item[field] = [item[field], value]
-
-                    outfile.write(json.dumps(item) + "\n")
-                    processed_items += 1
-                    self.update_progress(processed_items, total_items)
-
-                # for the second, merging is potentially in order
-                for item in second_dataset.iterate_items(bypass_map_item=True):
-                    if self.interrupted:
-                        raise ProcessorInterruptedException("Interrupted while merging file 2")
-
-                    second_id = second_processor.map_item(item)["item_id"]
-                    self.update_progress(processed_items, total_items)
-                    if second_id in duplicates and self.parameters.get("merge") in ("remove", "commas"):
-                        continue
-
-                    processed_items += 1
-                    outfile.write(json.dumps(item) + "\n")
+                    self.update_progress(processed, total_items)
 
         # phew, finally done
-        self.dataset.update_status("Merged %s items.%s" % ("{:,}".format(processed_items), dupe_msg), is_final=True)
+        self.dataset.update_status(f"Merged {processed:,} items ({merged:,} merged, {duplicates:,} skipped)",
+                                   is_final=True)
         self.dataset.update_progress(1)
-        self.dataset.finish(processed_items)
+        self.dataset.finish(processed)
 
     def update_progress(self, processed, total, force=False):
         """
@@ -235,7 +180,7 @@ class DatasetMerger(BasicProcessor):
         """
         if processed % 100 == 0 or force:
             self.dataset.update_status("Merged %s of %s items" % ("{:,}".format(processed), "{:,}".format(total)),
-                                         is_final=force)
+                                       is_final=force)
             if total != 0:
                 self.dataset.update_progress(processed / total)
 

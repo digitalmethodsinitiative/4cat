@@ -477,6 +477,11 @@ article.result > section:first-child {
     margin-left: 0.5em;
 }
 
+.processor-options textarea {
+    min-width: 25em;
+    min-height: 6em;
+}
+
 .multi-select-search {
     position: relative;
     display: block;
