@@ -144,6 +144,8 @@ class ImageDownloader(BasicProcessor):
 		if amount == 0:
 			amount = config.get('image_downloader.MAX_NUMBER_IMAGES', 1000)
 		columns = self.parameters.get("columns")
+		if type(columns) is str:
+			columns = [columns]
 
 		# is there anything for us to download?
 		if self.source_dataset.num_rows == 0:
