@@ -443,6 +443,7 @@ class VideoDownloaderPlus(BasicProcessor):
 
                 else:
                     # No YT-DLP; move on
+                    self.dataset.log(str(e))
                     urls[url]["error"] = str(e)
                     failed_downloads += 1
                     continue
