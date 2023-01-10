@@ -118,7 +118,7 @@ class SearchTikTok(Search):
             "music_id": post["music"]["id"],
             "music_url": post["music"]["playUrl"],
             "video_url": post["video"].get("downloadAddr", ""),
-            "tiktok_url": "https://tiktok.com/@%s/video/%s" % (user_nickname, post["id"]),
+            "tiktok_url": "https://www.tiktok.com/@%s/video/%s" % (user_nickname, post["id"]),
             "thumbnail_url": thumbnail_url,
             "likes": post["stats"]["diggCount"],
             "comments": post["stats"]["commentCount"],

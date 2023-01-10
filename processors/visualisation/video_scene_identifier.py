@@ -2,7 +2,7 @@
 Detect scenes in videos
 """
 import json
-from scenedetect import open_video, SceneManager
+from scenedetect import open_video, SceneManager, VideoOpenFailure
 
 from backend.abstract.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException, ProcessorException
@@ -167,17 +167,24 @@ class VideoSceneDetector(BasicProcessor):
 				raise ProcessorInterruptedException("Interrupted while detecting video scenes")
 
 			# Check for 4CAT's metadata JSON and copy it
-			if path.name == '.metadata.json':
+			if path.name == ".metadata.json":
 				# Keep it and move on
 				with open(path) as file:
 					video_metadata = json.load(file)
+				continue
+			elif path.name == "video_archive":
+				# yt-dlp file
 				continue
 
 			# Get new scene detector
 			scene_manager = self.get_new_scene_manager()
 
 			# Open video
-			video = open_video(str(path))
+			try:
+				video = open_video(str(path))
+			except VideoOpenFailure as e:
+				self.dataset.update_status(f'Skipping video; Unable to open {str(path.name)}: {str(e)}')
+				continue
 			total_frames = video.duration.get_frames()
 			total_duration = video.duration.get_timecode()
 
