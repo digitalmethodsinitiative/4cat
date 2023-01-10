@@ -524,7 +524,10 @@ class VideoDownloaderPlus(BasicProcessor):
         # Open stream
         user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:107.0) Gecko/20100101 Firefox/107.0"
         with requests.get(url, stream=True, timeout=20, headers={"User-Agent": user_agent}) as response:
-            if response.status_code != 200:
+            if 400 <= response.status_code < 500:
+                raise FailedDownload(
+                    f"Website denied download request (Code {response.status_code} / Reason {response.reason}): {url}")
+            elif response.status_code != 200:
                 raise FailedDownload(f"Unable to obtain URL (Code {response.status_code} / Reason {response.reason}): {url}")
 
             # Verify video
