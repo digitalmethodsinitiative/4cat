@@ -34,9 +34,9 @@ class Search8Kun(Search4Chan):
 		},
 		"board": {
 			"type": UserInput.OPTION_CHOICE,
-			"options": {b: b for b in config.get('DATASOURCES').get(prefix, {}).get("boards", [])},
+			"options": {b: b for b in config.get("eightkun.boards", [])},
 			"help": "Board",
-			"default": config.get('DATASOURCES').get(prefix, {}).get("boards", [""])[0]
+			"default": config.get("eightkun.boards", [""])[0]
 		},
 		"body_match": {
 			"type": UserInput.OPTION_TEXT,
@@ -77,5 +77,15 @@ class Search8Kun(Search4Chan):
 			"min": 30,
 			"default": 30,
 			"tooltip": "A thread must at least be this many messages long to qualify as a 'dense thread'"
+		}
+	}
+
+	config = {
+		"eightkun.boards": {
+			"type": UserInput.OPTION_TEXT_JSON,
+			"help": "Boards to index",
+			"tooltip": "These boards will be scraped and made available for searching. Provide as a JSON-formatted "
+					   "list of strings, e.g. ['pol', 'v'].",
+			"default": "[]"
 		}
 	}

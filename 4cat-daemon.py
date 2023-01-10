@@ -138,7 +138,7 @@ def start():
         # wait a few seconds and see if PIDfile was created by the bootstrapper
         # and refers to a running process
         now = time.time()
-        while time.time() < now + 10:
+        while time.time() < now + 60:
             if pidfile.is_file():
                 break
             else:

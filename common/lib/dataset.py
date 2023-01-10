@@ -1,7 +1,7 @@
 import collections
 import datetime
 import hashlib
-import random
+import fnmatch
 import shutil
 import json
 import time
@@ -45,7 +45,7 @@ class DataSet(FourcatModule):
 	folder = None
 	is_new = True
 	no_status_updates = False
-	staging_area = None
+	staging_areas = None
 
 	def __init__(self, parameters={}, key=None, job=None, data=None, db=None, parent=None, extension=None,
 				 type=None, is_private=True, owner="anonymous"):
@@ -59,7 +59,7 @@ class DataSet(FourcatModule):
 		"""
 		self.db = db
 		self.folder = Path(config.get('PATH_ROOT'), config.get('PATH_DATA'))
-		self.staging_area = []
+		self.staging_areas = []
 
 		if key is not None:
 			self.key = key
@@ -394,9 +394,19 @@ class DataSet(FourcatModule):
 		results_path.mkdir()
 
 		# Storing the staging area with the dataset so that it can be removed later
-		self.staging_area.append(results_path)
+		self.staging_areas.append(results_path)
 
 		return results_path
+
+	def remove_staging_areas(self):
+		"""
+		Remove any staging areas that were created and all files contained in them.
+		"""
+		# Remove DataSet staging areas
+		if self.staging_areas:
+			for staging_area in self.staging_areas:
+				if staging_area.is_dir():
+					shutil.rmtree(staging_area)
 
 	def get_results_dir(self):
 		"""
@@ -487,21 +497,27 @@ class DataSet(FourcatModule):
 
 		return copy
 
-	def delete(self):
+	def delete(self, commit=True):
 		"""
 		Delete the dataset, and all its children
 
 		Deletes both database records and result files. Note that manipulating
 		a dataset object after it has been deleted is undefined behaviour.
+
+		:param commit bool:  Commit SQL DELETE query?
 		"""
 		# first, recursively delete children
 		children = self.db.fetchall("SELECT * FROM datasets WHERE key_parent = %s", (self.key,))
 		for child in children:
-			child = DataSet(key=child["key"], db=self.db)
-			child.delete()
+			try:
+				child = DataSet(key=child["key"], db=self.db)
+				child.delete(commit=commit)
+			except TypeError:
+				# dataset already deleted - race condition?
+				pass
 
 		# delete from database
-		self.db.execute("DELETE FROM datasets WHERE key = %s", (self.key,))
+		self.db.delete("datasets", where={"key": self.key}, commit=commit)
 
 		# delete from drive
 		try:
@@ -939,7 +955,7 @@ class DataSet(FourcatModule):
 		genealogy = self.get_genealogy()
 		return genealogy[0]
 
-	def get_genealogy(self):
+	def get_genealogy(self, inclusive=False):
 		"""
 		Get genealogy of this dataset
 
@@ -949,7 +965,7 @@ class DataSet(FourcatModule):
 
 		:return list:  Dataset genealogy, oldest dataset first
 		"""
-		if self.genealogy:
+		if self.genealogy and not inclusive:
 			return self.genealogy
 
 		key_parent = self.key_parent
@@ -991,6 +1007,24 @@ class DataSet(FourcatModule):
 
 		return results
 
+	def nearest(self, type_filter):
+		"""
+		Return nearest dataset that matches the given type
+
+		Starting with this dataset, traverse the hierarchy upwards and return
+		whichever dataset matches the given type.
+
+		:param str type_filter:  Type filter. Can contain wildcards and is matched
+		using `fnmatch.fnmatch`.
+		:return:  Earliest matching dataset, or `None` if none match.
+		"""
+		genealogy = self.get_genealogy(inclusive=True)
+		for dataset in reversed(genealogy):
+			if fnmatch.fnmatch(dataset.type, type_filter):
+				return dataset
+
+		return None
+
 	def get_breadcrumbs(self):
 		"""
 		Get breadcrumbs navlink for use in permalinks
@@ -1000,9 +1034,28 @@ class DataSet(FourcatModule):
 
 		:return str: Nav link
 		"""
-		genealogy = self.get_genealogy()
+		if self.genealogy:
+			return ",".join([dataset.key for dataset in self.genealogy])
+		else:
+			# Collect keys only
+			key_parent = self.key  # Start at the bottom
+			genealogy = []
 
-		return ",".join([dataset.key for dataset in genealogy])
+			while key_parent:
+				try:
+					parent = self.db.fetchone("SELECT key_parent FROM datasets WHERE key = %s", (key_parent,))
+				except TypeError:
+					break
+
+				key_parent = parent["key_parent"]
+				if key_parent:
+					genealogy.append(key_parent)
+				else:
+					break
+
+			genealogy.reverse()
+			genealogy.append(self.key)
+			return ",".join(genealogy)
 
 	def get_compatible_processors(self):
 		"""
@@ -1129,7 +1182,7 @@ class DataSet(FourcatModule):
 		Used for checking processor and dataset compatibility,
 		which needs to handle both processors and datasets.
 		"""
-		if self.get_parent():
+		if self.key_parent:
 			return False
 		return True
 

@@ -38,7 +38,6 @@
             {% endif %}
             {% if current_user.is_authenticated and current_user.is_admin %}
                 <li><a href="{{ url_for('admin_frontpage') }}">Control Panel</a></li>
-                <li><a href="{{ url_for('update_settings') }}">4CAT settings</a></li>
             {% endif %}
             <li><a href="{{ url_for('show_page', page='faq') }}"><abbr title="Frequently Asked Questions">FAQ</abbr></a></li>
 			<li><a href="{{ url_for('show_frontpage') }}">About</a></li>
@@ -65,7 +64,7 @@
 		{% endif %}
 		  <li><a href="{{ url_for('show_page', page='citing') }}">How to cite</a></li>
 		  <li><a href="{{ url_for('show_page', page='issues') }}">Report issues</a></li>
-		  <li><a href="https://www.oilab.eu">Open Intelligence Lab</a>, 2018 &ndash; {{ __datenow.year }}</li>
+		  <li><a href="https://www.oilab.eu">OILab</a>, 2018 &ndash; {{ __datenow.year }}</li>
 		</ul>
 	</nav>
 	</footer>

@@ -9,22 +9,12 @@ from common.lib.helpers import UserInput
 import json
 
 config_definition = {
-    "DATASOURCES": {
+    "4cat.datasources": {
         "type": UserInput.OPTION_TEXT_JSON,
-        "default": json.dumps({
-            "bitchute": {},
-            "custom": {},
-            "douban": {},
-            "customimport": {},
-            "parler": {},
-            "reddit": {
-                "boards": "*",
-            },
-            "telegram": {},
-            "twitterv2": {"id_lookup": False}
-        }),
+        "default": json.dumps(["bitchute", "custom", "douban", "customimport", "reddit", "telegram", "twitterv2"]),
         "help": "Data Sources",
-        "tooltip": "Data sources object defining enabled datasources and their settings",
+        "tooltip": "A list of enabled data sources that people can choose from when creating a dataset page. It is "
+                   "recommended to manage this via the 'Data sources' button in the Control Panel."
     },
     # Configure how the tool is to be named in its web interface. The backend will
     # always refer to "4CAT" - the name of the software, and a "powered by 4CAT"
@@ -33,13 +23,26 @@ config_definition = {
         "type": UserInput.OPTION_TEXT,
         "default": "4CAT",
         "help": "Short tool name",
-        "tooltip": "Configure short name for the tool in its web interface. The backend will always refer to '4CAT' - the name of the software, and a 'powered by 4CAT' notice may also show up in the web interface regardless of the value entered here.",
+        "tooltip": "Configure short name for the tool in its web interface. The backend will always refer to '4CAT' - "
+                   "the name of the software, and a 'powered by 4CAT' notice may also show up in the web interface "
+                   "regardless of the value entered here.",
     },
     "4cat.name_long": {
         "type": UserInput.OPTION_TEXT,
         "default": "4CAT: Capture and Analysis Toolkit",
         "help": "Full tool name",
-        "tooltip": "The backend will always refer to '4CAT' - the name of the software, and a 'powered by 4CAT' notice may also show up in the web interface regardless of the value entered here.",
+        "tooltip": "Used in e.g. the interface header. The backend will always refer to '4CAT' - the name of the "
+                   "software, and a 'powered by 4CAT' notice may also show up in the web interface regardless of the "
+                   "value entered here.",
+    },
+    "4cat.crash_message": {
+        "type": UserInput.OPTION_TEXT_LARGE,
+        "default": "This processor has crashed; the crash has been logged. 4CAT will try again when it is restarted. "
+                   "Contact your server administrator if this error persists. You can also report issues via 4CAT's "
+                   "[GitHub repository](https://github.com/digitalmethodsinitiative/4cat/issues).",
+        "help": "Crash message",
+        "tooltip": "This message is shown to users in the interface when a processor crashes while processing their "
+                   "dataset. It can contain Markdown markup."
     },
     # The following two options should be set to ensure that every analysis step can
     # be traced to a specific version of 4CAT. This allows for reproducible
@@ -60,6 +63,14 @@ config_definition = {
         "help": "Repository URL",
         "tooltip": "URL to the github repository for this 4CAT instance",
     },
+    "4cat.phone_home_url": {
+        "type": UserInput.OPTION_TEXT,
+        "default": "https://ping.4cat.nl",
+        "help": "Phone home URL",
+        "tooltip": "This URL is called once - when 4CAT is installed. If the installing user consents, information "
+                   "is sent to this URL to help the 4CAT developers (the Digital Methods Initiative) keep track of how "
+                   "much it is used. There should be no need to change this URL after installation."
+    },
     # These settings control whether top-level datasets (i.e. those created via the
     # "Create dataset" page) are deleted automatically, and if so, after how much
     # time. You can also allow users to cancel this (i.e. opt out). Note that if
@@ -77,7 +88,16 @@ config_definition = {
         "type": UserInput.OPTION_TOGGLE,
         "default": True,
         "help": "Allow opt-out",
-        "tooltip": "Allow users to opt-out of automatic deletion. Note that if users are allowed to opt out, data sources can still force the expiration of datasets created through that data source. This cannot be overridden by the user.",
+        "tooltip": "Allow users to opt-out of automatic deletion. Note that if users are allowed to opt out, data "
+                   "sources can still force the expiration of datasets created through that data source. This cannot "
+                   "be overridden by the user.",
+    },
+    "expire.datasources": {
+        "type": UserInput.OPTION_TEXT_JSON,
+        "default": "{}",
+        "help": "Data source-specific expiration",
+        "tooltip": "Allows setting expiration settings per datasource. This always overrides the above settings. It is "
+                   "recommended to manage this via the 'Data sources' button in the Control Panel."
     },
     "logging.slack.level": {
         "type": UserInput.OPTION_CHOICE,
@@ -112,10 +132,11 @@ config_definition = {
         "tooltip": 'SMTP port to connect to for sending e-mail alerts. "0" defaults to "465" for SMTP_SSL or OS default for SMTP.',
     },
     "mail.ssl": {
-        "type": UserInput.OPTION_TOGGLE,
-        "default": False,
-        "help": "SMTP over SSL",
-        "tooltip": "Use SSL to connect to e-mail server?",
+        "type": UserInput.OPTION_CHOICE,
+        "default": "ssl",
+        "options": {"ssl": "SSL", "tls": "TLS", "none": "None"},
+        "help": "SMTP over SSL, TLS, or None",
+        "tooltip": "Security to use to connect to e-mail server",
     },
     "mail.username": {
         "type": UserInput.OPTION_TEXT,
@@ -166,7 +187,15 @@ config_definition = {
         "default": "100000",
         "help": "Amount of posts",
         "coerce_type": int,
-        "tooltip": "Amount of posts to show in explorer. The maximum allowed amount of rows (prevents timeouts and memory errors)",
+        "tooltip": "Amount of posts to show in Explorer. The maximum allowed amount of rows (prevents timeouts and "
+                   "memory errors)",
+    },
+    "explorer.posts_per_page": {
+        "type": UserInput.OPTION_TEXT,
+        "default": 50,
+        "help": "Posts per page",
+        "coerce_type": int,
+        "tooltip": "Posts to display per page",
     },
     # Web tool settings
     # These are used by the FlaskConfig class in config.py
@@ -246,7 +275,7 @@ categories = {
     "mail": "Mail settings & credentials",
     "logging": "Logging settings",
     "path": "File paths",
-    "DATASOURCES": "Data source configuration",
-    'image_downloader': 'Image downloader',
-    'text_from_images': 'OCR: Text from images',
+    "image_downloader": "Image Download Settings",
+    "video_downloader": "Video Download Settings",
+    'text_from_images': 'OCR: Extract text from images (https://github.com/digitalmethodsinitiative/ocr_server)',
 }

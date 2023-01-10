@@ -44,7 +44,7 @@
             {% if timestamp_expires %}
                 <div class="fullwidth notice">
                     <strong>Note:</strong> this dataset will no longer be available
-                    after {{ timestamp_expires|datetime("%d %b %Y, %H:%M")|safe }}. {% if not expires_by_datasource and can_unexpire %} You can <a href="{{ url_for("keep_dataset", key=dataset.key) }}">cancel deletion</a>.{% endif %}
+                    after {{ timestamp_expires|datetime("%d %b %Y, %H:%M")|safe }}. {% if can_unexpire %} You can <a href="{{ url_for("keep_dataset", key=dataset.key) }}">cancel deletion</a>.{% endif %}
 
                 </div>
             {% endif %}
@@ -70,8 +70,7 @@
                         <{% if github_link %}a href="{{ github_link }}" rel="external" target="_blank"{% else %}span{% endif %} class="property-badge fullsize" >
                         {% if github_link %}<i class="fab fa-fw fa-github" aria-hidden="true"></i>{% endif %}
                             {{ dataset.parameters.datasource }}{%
-                                if "board" in dataset.parameters and dataset.parameters.board %}/
-                                {{ dataset.parameters.board }}/{% endif %}</{% if github_link %}a{% else %}span{% endif %}>
+                                if "board" in dataset.parameters and dataset.parameters.board %}/{{ dataset.parameters.board }}/{% endif %}</{% if github_link %}a{% else %}span{% endif %}>
                         {% if dataset.parameters.datasource in datasources %}
                             {{ datasources[dataset.parameters.datasource].name }} (<a href="{{ url_for("data_overview", datasource=dataset.parameters.datasource) }}">details</a>)
                         {% endif %}
@@ -145,9 +144,11 @@
     </section>
 
     {% if dataset.num_rows > 0 and dataset.get_available_processors()|length > 0 and current_user.is_authenticated %}
-        <section class="analysis-gallery">
+        <section class="analysis-gallery available-processors">
 
-            <h3 class="blocktitle section-subheader"><span>Processors</span></h3>
+            <h3 class="blocktitle section-subheader">
+                <span>Processors</span>
+            </h3>
             {% set part = "main" %}
             <div class="intro">
                 <p>The processors below manipulate the dataset you created. These manipulations range from counting posts per month to downloading images. Read the description and tooltips for more information. Some processors also have relevant references indicated with <i class="fa fa-graduation-cap" aria-hidden="true"></i>. Click on <i class="fa fa-sitemap" aria-hidden="true"></i> to see what processors can be run afterwards.</p>
@@ -159,7 +160,7 @@
                 {% if processor.category != cat.egory %}
                     {% if cat.egory != '' %}</ol>{% endif %}
                     {% set cat.egory = processor.category %}
-                    <h4 class="blocktitle section-subheader"><span>{{ processor.category }}</span></h4>
+                    <h4 class="blocktitle section-subheader category-subheader"><span>{{ processor.category }}</span></h4>
                     <ol class="processor-list child-list">
                 {% endif %}
                 {% set git_url = dataset.get_version_url("backend/processors/" + processor.filepath) %}

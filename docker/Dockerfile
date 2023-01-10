@@ -40,7 +40,9 @@ RUN apt-get update && apt install -y \
     postgresql-client \
     postgresql-server-dev-all \
     # Called by 4CAT:
-    git
+    git \
+    # Needed for video processing only (and only technically on backend)
+    ffmpeg
 
 # Set working directory
 WORKDIR /usr/src/app

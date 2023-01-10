@@ -166,7 +166,7 @@ class ModuleCollector:
             datasource_id = datasource.DATASOURCE
 
             self.datasources[datasource_id] = {
-                "expire-datasets": config.get('DATASOURCES').get(datasource_id, {}).get("expire-datasets", None),
+                "expire-datasets": config.get("expire.datasources", {}).get(datasource_id, None),
                 "path": subdirectory,
                 "name": datasource.NAME if hasattr(datasource, "NAME") else datasource_id,
                 "id": subdirectory.parts[-1],
@@ -187,9 +187,11 @@ class ModuleCollector:
         function takes care of populating those values.
         """
         for datasource_id in self.datasources:
-            self.datasources[datasource_id]["has_worker"] = "%s-search" % datasource_id in self.workers
+            worker = self.workers.get("%s-search" % datasource_id)
+            self.datasources[datasource_id]["has_worker"] = bool(worker)
             self.datasources[datasource_id]["has_options"] = self.datasources[datasource_id]["has_worker"] and \
                                                              bool(self.workers["%s-search" % datasource_id].get_options())
+            self.datasources[datasource_id]["importable"] = worker and hasattr(worker, "is_from_extension") and worker.is_from_extension
 
     def load_worker_class(self, worker):
         """

@@ -8,8 +8,7 @@ import shutil
 import requests
 import time
 import json
-import datetime
-import dateutil.parser
+from datetime import datetime
 import csv
 import os
 from urllib.parse import unquote
@@ -143,10 +142,10 @@ class PixPlotGenerator(BasicProcessor):
 			max_images = self.get_options()["amount"]["max"]
 
 		# Get labels to send PixPlot server
-		date =  datetime.datetime.now().strftime("%Y-%m-%d-%H%M%S")
+		date = datetime.now().strftime("%Y-%m-%d-%H%M%S")
 		top_dataset = self.dataset.top_parent()
 		label_formated = ''.join(e if e.isalnum() else '_' for e in top_dataset.get_label())
-		image_label = datetime.datetime.fromtimestamp(self.source_dataset.timestamp).strftime("%Y-%m-%d-%H%M%S") + '-' + label_formated + '-' + str(top_dataset.key)
+		image_label = datetime.fromtimestamp(self.source_dataset.timestamp).strftime("%Y-%m-%d-%H%M%S") + '-' + label_formated + '-' + str(top_dataset.key)
 		plot_label = date + '-' + label_formated + '-' + str(self.dataset.key)
 
 		# Folder name is PixPlot identifier and set at dataset key
@@ -396,7 +395,7 @@ class PixPlotGenerator(BasicProcessor):
 						# If images repeat this will overwrite prior value
 						# I really dislike that the download images is not a one to one with posts...
 						if 'timestamp' in post.keys():
-							image['year'] = dateutil.parser.parse(post['timestamp']).year
+							image['year'] = datetime.strptime(post['timestamp'], "%Y-%m-%d %H:%M:%S").year
 
 			writer = csv.DictWriter(output, fieldnames=fieldnames)
 			writer.writeheader()
@@ -412,7 +411,7 @@ class PixPlotGenerator(BasicProcessor):
 		"""
 		Returns a html string to redirect to PixPlot.
 		"""
-		return f"<head><meta http-equiv='refresh' content='0; URL={url}'></head>"
+		return f"<head><meta http-equiv='refresh' charset='utf-8' content='0; URL={url}'></head>"
 
 	def clean_filename(self, s):
 		'''

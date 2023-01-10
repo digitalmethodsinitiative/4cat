@@ -62,6 +62,18 @@ class SearchWithinTCATBinsV2(Search):
         }
     }
 
+    config = {
+        "dmi-tcat.instances": {
+            "type": UserInput.OPTION_TEXT_JSON,
+            "help": "DMI-TCAT instances",
+            "tooltip": "List of DMI-TCAT instance metadata, e.g. [{'tcat_name': 'tcat2','db_name': 'twittercapture',"
+                    "'db_user': 'username','db_password': 'password','db_host': '127.0.0.1','db_port': 3306}] All of "
+                    "these values need to be provided for each instance. This needs to be formatted as a JSON list of "
+                    "objects.",
+            "default": '[]'
+        }
+    }
+
     @classmethod
     def get_options(cls, parent_dataset=None, user=None):
         """
@@ -106,7 +118,7 @@ class SearchWithinTCATBinsV2(Search):
         bin_name = bin.split("@")[0]
         tcat_name = bin.split("@").pop()
 
-        available_instances = config.get('DATASOURCES').get("dmi-tcatv2", {}).get("instances", [])
+        available_instances = config.get("dmi-tcatv2.instances", [])
         instance = [instance for instance in available_instances if instance.get('tcat_name') == tcat_name][0]
 
         db = MySQLDatabase(logger=self.log,
@@ -320,7 +332,7 @@ class SearchWithinTCATBinsV2(Search):
         """
 
         # todo: cache this somehow! and check for the cache
-        instances = config.get('DATASOURCES').get("dmi-tcatv2", {}).get("instances", [])
+        instances = config.get("dmi-tcatv2.instances", [])
 
         all_bins = {}
         for instance in instances:

@@ -65,7 +65,7 @@ for conf in confs:
 		print("...data source %s has no datasource identifier set. Skipping." % datasource_id)
 		continue
 
-	if datasource not in config.get('DATASOURCES'):
+	if datasource not in config.get('4cat.datasources'):
 		# data source is not enabled
 		print("...not enabled. Skipping.")
 		continue

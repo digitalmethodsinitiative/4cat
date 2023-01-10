@@ -118,6 +118,10 @@ i.scroll {
     font-weight: bold;
 }
 
+.flash-once {
+    animation: flash-once 1 0.5s linear;
+}
+
 table {
     margin: 1em auto;
     font-size: inherit;
@@ -143,10 +147,18 @@ table th {
     padding: 0 1em;
 }
 
+*[aria-expanded=false] {
+    height: 0;
+    overflow: hidden;
+}
 
 /** --------------------- *
             Forms
   * --------------------- */
+form.inline {
+    display: inline-block;
+}
+
 select, input, textarea {
     background: var(--gray);
     border: 1px solid var(--gray);
@@ -188,7 +200,8 @@ p.form-notice {
     display: flex;
     align-items: center;
     min-height: 3.5em;
-    margin: 0 1em 0.5em 1em;
+    margin: 0 0 0.5em 0;
+    padding: 0 0.5em;
 }
 
 .optional-form-element {
@@ -199,6 +212,26 @@ p.form-notice {
 article.small .form-element {
     display: grid;
     grid-template-columns: 34% 66%;
+}
+
+.form-element.full-width, article.small .form-element.full-width {
+    display: block;
+    margin-left: 2em;
+    margin-right: 2em;
+    min-height: auto;
+    margin-bottom: 1em;
+}
+
+.form-element.full-width label {
+    width: 100%;
+    display: block;
+    text-align: left;
+    max-width: none;
+}
+
+.form-element.full-width  input[type=text] {
+    width: 100%;
+    max-width: none;
 }
 
 .form-element > *:not(input, select, button) {
@@ -238,6 +271,10 @@ article.small .form-element > *:not([type=radio], [type=checkbox]) {
 
 .form-element button.tooltip-trigger {
     margin-left: 0.5em;
+}
+
+.datasource-extra-input {
+    overflow: hidden;
 }
 
 .submit-container {
@@ -285,6 +322,7 @@ button:hover, .button-like:not(.inactive):hover {
     padding: 1em;
     text-align: center;
     list-style: none;
+    margin-left: 0;
 }
 
 .button-container li {
@@ -298,6 +336,25 @@ button:hover, .button-like:not(.inactive):hover {
 .form-footer {
     text-align: center;
     padding-bottom: 1em;
+}
+
+h3, h2, legend {
+    position: relative;
+}
+
+h3 button, h2 button, legend button {
+    border: 0;
+    border-radius: 0;
+    position: absolute;
+    right: 0;
+    top: 0;
+    margin: 0;
+    padding: calc(0.5em + 1px);
+}
+
+h2 button {
+    padding: calc(0.5em + 1px);
+    font-size: 0.8em;
 }
 
 /** --------------------- *
@@ -496,6 +553,12 @@ button.tooltip-trigger, button.popup-trigger {
     border: 2px solid var(--contrast-dark);
 }
 
+[aria-expanded=false] {
+    height: 0;
+    overflow: hidden;
+    display: none;
+}
+
 /** --------------------- *
          Site header
   * --------------------- */
@@ -604,25 +667,25 @@ article, .block, .article-ish {
 }
 
 @media (min-width: 576px) {
-  article, .block, .article-ish {
+  article, .block, .article-ish, .site-announcement p {
     max-width: 540px;
   }
 }
 
 @media (min-width: 768px) {
-  article, .block, .article-ish{
+  article, .block, .article-ish, .site-announcement p {
     max-width: 720px;
   }
 }
 
 @media (min-width: 992px) {
-  article, .block, .article-ish {
+  article, .block, .article-ish, .site-announcement p {
     max-width: 960px;
   }
 }
 
 @media (min-width: 1200px) {
-  article, .block, .article-ish {
+  article, .block, .article-ish, .site-announcement p {
     max-width: 1140px;
   }
 }
@@ -831,6 +894,18 @@ article section.data-overview .description {
     display: block;
     max-width: 7em;
     clear: both;
+}
+
+@keyframes flash-once {
+    100% {
+        background: transparent;
+    }
+    0% {
+        background: var(--accent)
+    }
+    100% {
+        background: transparent;
+    }
 }
 
 @keyframes scroll-background {

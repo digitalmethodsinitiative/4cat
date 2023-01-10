@@ -21,7 +21,7 @@ from webtool import app, login_manager, db
 from webtool.views.api_tool import limiter
 from webtool.lib.user import User
 from webtool.lib.helpers import error
-from common.lib.helpers import send_email
+from common.lib.helpers import send_email, get_software_version
 
 from pathlib import Path
 
@@ -168,8 +168,9 @@ def create_first_user():
     if has_admin_user["amount"]:
         return error(403, message="The 'first run' page is not available")
 
+    phone_home_url = config.get("4cat.phone_home_url")
     if request.method == 'GET':
-        return render_template("account/first-run.html", incomplete=missing, form=request.form)
+        return render_template("account/first-run.html", incomplete=missing, form=request.form, phone_home_url=phone_home_url)
 
     username = request.form.get("username").strip()
     password = request.form.get("password").strip()
@@ -190,12 +191,23 @@ def create_first_user():
         return render_template("account/first-run.html", form=request.form, incomplete=missing,
                                flashes=get_flashed_messages())
 
-    if request.form.get("phone-home"):
-        with Path(config.get("path.root"), "config/.current-version").open() as outfile:
+    if phone_home_url and request.form.get("phonehome"):
+        with Path(config.get("PATH_ROOT"), "config/.current-version").open() as outfile:
             version = outfile.read(64).split("\n")[0].strip()
 
-        payload = {"version": version}
-        requests.post(config.get("phone_home_url"), payload)
+        payload = {
+            "version": version,
+            "commit": get_software_version(),
+            "role": request.form.get("role", ""),
+            "affiliation": request.form.get("affiliation", ""),
+            "email": request.form.get("email", "")
+        }
+
+        try:
+            requests.post(phone_home_url, payload, timeout=5)
+        except requests.RequestException:
+            # too bad
+            flash("Could not send install ping to 4CAT developers")
 
     db.insert("users", data={"name": username})
     db.commit()

@@ -42,8 +42,10 @@
                         {% if user.name not in ("anonymous", "autologin") %}
                             <a class="button-like" href="{{ url_for("manipulate_user", mode="edit") }}?name={{ user.name }}"><i
                                     class="fa fa-edit" aria-hidden="true"></i><span class="sr-only">Edit user</span></a>
-                            <a class="button-like" href="{{ url_for("delete_user") }}?name={{ user.name }}"><i
-                                    class="fa fa-times" aria-hidden="true"></i><span class="sr-only">Delete user</span></a>
+                            <form class="inline" action="{{ url_for("delete_user") }}" method="POST">
+                                <input type="hidden" name="name" value="{{ user.name }}">
+                                <button class="confirm-first"><i class="fa fa-times" aria-hidden="true"></i><span class="sr-only">Delete user</span></button>
+                            </form>
                         {% endif %}
                             <a class="button-like tooltip-trigger" aria-controls="tooltip-user-datasets" href="{{ url_for("show_results") }}?user={{ user.name }}&amp;depth=all"><i
                                     class="fa fa-database" aria-hidden="true"></i><span class="sr-only">View datasets for user</span></a>

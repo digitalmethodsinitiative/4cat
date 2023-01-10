@@ -44,7 +44,7 @@ class NeologismExtractor(ProcessorPreset):
 					"stem": False,
 					"strip_symbols": True,
 					"lemmatise": False,
-					"timeframe": timeframe,
+					"docs_per": timeframe,
 					"filter": ["wordlist-googlebooks-english", "stopwords-iso-all"]
 				}
 			},

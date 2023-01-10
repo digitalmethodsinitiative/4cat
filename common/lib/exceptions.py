@@ -1,5 +1,25 @@
+import traceback
+
 class FourcatException(Exception):
-	pass
+	"""
+	Base 4CAT exception class
+	"""
+	def __init__(self, message="", frame=None):
+		"""
+		Exception constructor
+
+		Takes an optional extra argument, `frame`, the traceback frame of the
+		offending code.
+
+		:param str message:  Exception message
+		:param frame:  Traceback frame. If omitted, the frame is extrapolated
+		from the context.
+		"""
+		super().__init__(message)
+		if not frame:
+			frame = traceback.extract_stack()[-2]
+
+		self.frame = frame
 
 class ConfigException(FourcatException):
 	"""
@@ -40,17 +60,31 @@ class JobNotFoundException(QueueException):
 	"""
 	pass
 
-class QueryParametersException(FourcatException):
+class QueryException(FourcatException):
+	"""
+	Raise if there is an issue with form input while creating a dataset
+	"""
+	pass
+
+class QueryParametersException(QueryException):
 	"""
 	Raise if a dataset query has invalid parameters
 	"""
 	pass
 
-class QueryNeedsExplicitConfirmationException(FourcatException):
+class QueryNeedsExplicitConfirmationException(QueryException):
 	"""
 	Raise if a dataset query needs confirmation
 	"""
 	pass
+
+class QueryNeedsFurtherInputException(QueryException):
+	"""
+	Raise if a dataset requires further user input
+	"""
+	def __init__(self, config):
+		super(QueryNeedsFurtherInputException, self).__init__()
+		self.config = config
 
 class WorkerInterruptedException(FourcatException):
 	"""
