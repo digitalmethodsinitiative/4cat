@@ -167,6 +167,7 @@ class DatasetMerger(BasicProcessor):
         self.dataset.update_status(f"Merged {processed:,} items ({merged:,} merged, {duplicates:,} skipped)",
                                    is_final=True)
         self.dataset.update_progress(1)
+
         self.dataset.finish(processed)
 
     def update_progress(self, processed, total, force=False):
@@ -204,4 +205,11 @@ class DatasetMerger(BasicProcessor):
         super().after_process()
 
         # Request standalone
-        self.create_standalone()
+        standalone = self.create_standalone()
+
+        # merged dataset has the same type as the original
+        if self.source_dataset.parameters.get("datasource"):
+            standalone.change_datasource(self.source_dataset.parameters["datasource"])
+
+        standalone.parameters = {**self.dataset.parameters, "board": "merged"}
+        standalone.type = self.source_dataset.type

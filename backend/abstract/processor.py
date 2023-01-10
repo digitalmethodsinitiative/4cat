@@ -570,6 +570,8 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
 		This has the benefit of allowing for all analyses that can be run on
 		full datasets on the new, filtered copy as well.
+
+		:return DataSet:  The new standalone dataset
 		"""
 		top_parent = self.source_dataset
 
@@ -601,6 +603,8 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		# standalone dataset, and this one is not accessible via the interface
 		# except as a link to the copied standalone dataset
 		os.unlink(self.dataset.get_results_path())
+
+		return standalone
 
 	@classmethod
 	def is_filter(cls):
