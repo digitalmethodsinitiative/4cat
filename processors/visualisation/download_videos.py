@@ -3,6 +3,7 @@ Download videos
 
 First attempt to download via request, but if that fails use yt-dlp
 """
+import time
 from pathlib import Path
 import requests
 import yt_dlp
@@ -328,16 +329,20 @@ class VideoDownloaderPlus(BasicProcessor):
                 raise ProcessorInterruptedException("Interrupted while downloading videos.")
 
             # Check for repeated timeouts
-            if consecutive_timeouts > 5 and self.downloaded_videos == 0:
+            if consecutive_timeouts > 5:
                 if use_yt_dlp:
-                    message = "Video Downloader has timed out %i consecutive times and no videos downloaded; try " \
-                              "deselecting the non-direct videos setting" % consecutive_timeouts
+                    message = "Downloaded %i videos. Timed out %i consecutive times; try " \
+                              "deselecting the non-direct videos setting" % (self.downloaded_videos, consecutive_timeouts)
                 else:
-                    message = "Video Downloader has timed out %i consecutive times and no videos downloaded; contact " \
-                              "4CAT administrator." % consecutive_timeouts
+                    message = "Downloaded %i videos. Timed out %i consecutive times; check logs to ensure " \
+                              "video URLs are working links and you are not being blocked." % (self.downloaded_videos, consecutive_timeouts)
                 self.dataset.update_status(message, is_final=True)
-                self.dataset.finish(0)
-                return
+                if self.downloaded_videos == 0:
+                    self.dataset.finish(0)
+                    return
+                else:
+                    # Finish processor with already downloaded videos
+                    break
 
             # Reject known channels; unknown will still download!
             if not download_channels and any([sub_url in url for sub_url in self.known_channels]):
@@ -422,6 +427,14 @@ class VideoDownloaderPlus(BasicProcessor):
                                 # Certain sites fail repeatedly (22-12-8 TikTok has this issue)
                                 consecutive_timeouts += 1
                                 message = 'DownloadError: %s' % str(e)
+                            elif "HTTP Error 429: Too Many Requests" in str(e):
+                                # Oh no, https://github.com/yt-dlp/yt-dlp/wiki/FAQ#http-error-429-too-many-requests-or-402-payment-required
+                                consecutive_timeouts += 1
+                                message = 'Too Many Requests: %s' % str(e)
+                                # We can try waiting...
+                                # TODO: Should we check to see if we are hitting the same domain repeatedly?
+                                time.sleep(10 * consecutive_timeouts)
+                                # TODO: Add url back to end?
                             else:
                                 message = 'DownloadError: %s' % str(e)
                             urls[url]['error'] = message
