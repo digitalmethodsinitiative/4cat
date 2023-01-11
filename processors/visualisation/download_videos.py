@@ -157,7 +157,12 @@ class VideoDownloaderPlus(BasicProcessor):
         # Update the amount max and help from config
         max_number_videos = int(config.get('video_downloader.MAX_NUMBER_VIDEOS', 100))
         options['amount']['max'] = max_number_videos
-        options['amount']['help'] = "No. of videos (max %s)" % max_number_videos
+        if max_number_videos == 0:
+            options['amount']['help'] = "No. of videos"
+            options["amount"]["tooltip"] = "Use 0 to download all videos"
+        else:
+            options['amount']['help'] = "No. of videos (max %s)" % max_number_videos
+
         # And update the max size and help from config
         max_video_size = int(config.get('video_downloader.MAX_VIDEO_SIZE', 100))
         if max_video_size == 0:
@@ -310,7 +315,7 @@ class VideoDownloaderPlus(BasicProcessor):
         self.downloaded_videos = 0
         failed_downloads = 0
         consecutive_timeouts = 0
-        self.total_possible_videos = min(len(urls), amount)
+        self.total_possible_videos = min(len(urls), amount) if amount != 0 else len(urls)
         yt_dlp_archive_map = {}
         for url in urls:
             urls[url]["success"] = False
@@ -353,18 +358,18 @@ class VideoDownloaderPlus(BasicProcessor):
                 }]
                 success = True
                 self.videos_downloaded_from_url = 1
-            except requests.exceptions.SSLError as e:
-                message = "SSL error: %s" % str(e)
-                self.dataset.log(message)
-                urls[url]["error"] = message
-                failed_downloads += 1
-                continue
             except requests.exceptions.Timeout as e:
                 message = "Timeout error: %s" % str(e)
                 self.dataset.log(message)
                 urls[url]["error"] = message
                 failed_downloads += 1
                 consecutive_timeouts += 1
+                continue
+            except (requests.exceptions.SSLError, requests.exceptions.ConnectionError) as e:
+                message = "Requests error: %s" % str(e)
+                self.dataset.log(message)
+                urls[url]["error"] = message
+                failed_downloads += 1
                 continue
             except (FilesizeException, FailedDownload, NotAVideo) as e:
                 # FilesizeException raised when file size is too large or unknown filesize (and that is disabled in 4CAT settings)
