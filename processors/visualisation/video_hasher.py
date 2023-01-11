@@ -118,6 +118,9 @@ class VideoHasher(BasicProcessor):
 				with open(path) as file:
 					video_metadata = json.load(file)
 				continue
+			elif path.name == "video_archive":
+				# yt-dlp file
+				continue
 
 			try:
 				videohash = VideoHash(path=str(path), storage_path=str(staging_area), frame_interval=frame_interval, do_not_copy=True)
@@ -126,6 +129,9 @@ class VideoHasher(BasicProcessor):
 				self.dataset.update_status("FFmpeg software not found. Please contact 4CAT maintainers.", is_final=True)
 				self.dataset.finish(0)
 				return
+			except FileNotFoundError as e:
+				self.dataset.update_status(f"Unable to create hash for {str(path)}")
+				continue
 
 			video_hashes[path.name] = {'videohash': videohash}
 
