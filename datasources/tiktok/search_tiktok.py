@@ -71,8 +71,12 @@ class SearchTikTok(Search):
 
     @staticmethod
     def map_item(post):
-        hashtags = [extra["hashtagName"] for extra in post.get("textExtra", []) if
+        hashtags = [challenge["title"] for challenge in post.get("challenges", [])]
+
+        challenges = [extra["hashtagName"] for extra in post.get("textExtra", []) if
                     "hashtagName" in extra and extra["hashtagName"]]
+
+        labels = ",".join(post["diversificationLabels"]) if type(post.get("diversificationLabels", [])) is list else ""
 
         if type(post.get("author")) is dict:
             # from intercepted API response
@@ -108,15 +112,19 @@ class SearchTikTok(Search):
             "thread_id": post["id"],
             "author": user_nickname,
             "author_full": user_fullname,
-            "author_id": user_id,
             "author_followers": post.get("authorStats", {}).get("followerCount", ""),
+            "author_likes": post.get("authorStats", {}).get("diggCount", ""),
+            "author_videos": post.get("authorStats", {}).get("videoCount", ""),
+            "author_avatar": post.get("avatarThumb", ""),
             "body": post["desc"],
             "timestamp": datetime.utcfromtimestamp(int(post["createTime"])).strftime('%Y-%m-%d %H:%M:%S'),
             "unix_timestamp": int(post["createTime"]),
-            "is_duet": post.get("duetInfo", {}).get("duetFromId") != "0" if post.get("duetInfo", {}) else False,
+            "is_duet": "yes" if (post.get("duetInfo", {}).get("duetFromId") != "0" if post.get("duetInfo", {}) else False) else "no",
+            "is_ad": "yes" if post.get("isAd", False) else "no",
             "music_name": post["music"]["title"],
             "music_id": post["music"]["id"],
             "music_url": post["music"]["playUrl"],
+            "music_thumbnail": post["music"].get("coverLarge", ""),
             "music_author": post["music"].get("authorName", ""),
             "video_url": post["video"].get("downloadAddr", ""),
             "tiktok_url": "https://www.tiktok.com/@%s/video/%s" % (user_nickname, post["id"]),
@@ -126,6 +134,9 @@ class SearchTikTok(Search):
             "shares": post["stats"]["shareCount"],
             "plays": post["stats"]["playCount"],
             "hashtags": ",".join(hashtags),
+            "challenges": ",".join(challenges),
+            "diversification_labels": labels,
+            "location_created": post.get("locationCreated", ""),
             "stickers": "\n".join(" ".join(s["stickerText"]) for s in post.get("stickersOnItem", [])),
             "effects": ",".join([e["name"] for e in post.get("effectStickers", [])]),
             "warning": ",".join([w["text"] for w in post.get("warnInfo", [])])
