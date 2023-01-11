@@ -356,6 +356,7 @@ class VideoDownloaderPlus(BasicProcessor):
             # First we'll try to see if we can directly download the URL
             try:
                 filename = self.download_video_with_requests(url, results_path, max_video_size)
+                urls[url]["downloader"] = "direct_link"
                 urls[url]["files"] = [{
                     "filename": filename,
                     "metadata": {},
@@ -449,6 +450,7 @@ class VideoDownloaderPlus(BasicProcessor):
                             self.dataset.log(message)
 
                     # Add file data collected by YT-DLP
+                    urls[url]["downloader"] = "yt_dlp"
                     urls[url]['files'] = self.url_files
                     # Add to archive mapping in case needed
                     for file in self.url_files:
@@ -648,6 +650,37 @@ class VideoDownloaderPlus(BasicProcessor):
         for string in texts:
             urls |= set([url for url in urls_from_text(string)])
         return list(urls)
+
+    @staticmethod
+    def map_metadata(url, data):
+        """
+        Iterator to yield modified metadata for CSV
+
+        :param str url:  string that may contain URLs
+        :param dict data:  dictionary with metadata collected previously
+        :yield dict:  	  iterator containing reformated metadata
+        """
+        row = {
+            "url": url,
+            "number_of_posts_with_url": len(data.get("post_ids", [])),
+            "post_ids": ", ".join(data.get("post_ids", [])),
+            "downloader": data.get("downloader", ""),
+            "download_successful": data.get('success', "")
+        }
+
+        for file in data.get("files", [{}]):
+            row["filename"] = file.get("filename", "N/A")
+
+            yt_dlp_data = file.get("metadata", {})
+            for common_column in ["title", "artist", "description", "view_count", "like_count", "repost_count", "comment_count", "uploader", "creator", "uploader_id"]:
+                if yt_dlp_data:
+                    row[f"extracted_{common_column}"] = yt_dlp_data.get(common_column)
+                else:
+                    row[f"extracted_{common_column}"] = "N/A"
+
+            row["error"] = data.get("error", "N/A")
+
+            yield row
 
 
 class MaxVideosDownloaded(ProcessorException):
