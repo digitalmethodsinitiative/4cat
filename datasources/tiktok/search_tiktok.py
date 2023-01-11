@@ -76,7 +76,7 @@ class SearchTikTok(Search):
         challenges = [extra["hashtagName"] for extra in post.get("textExtra", []) if
                     "hashtagName" in extra and extra["hashtagName"]]
 
-        labels = ",".join(post["diversificationLabels"]) if type(post.get("diversificationLabels", [])) is list else ""
+        labels = ",".join(post["diversificationLabels"]) if type(post.get("diversificationLabels")) is list else ""
 
         if type(post.get("author")) is dict:
             # from intercepted API response
