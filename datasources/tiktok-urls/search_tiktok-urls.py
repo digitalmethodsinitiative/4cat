@@ -161,7 +161,7 @@ class SearchTikTokByID(Search):
                 url = urls.pop(0)
                 url = url.replace("https://", "http://")  # https is finicky, lots of blocks
 
-                if url in seen_urls:
+                if url in seen_urls and url not in retries:
                     finished += 1
                     dupes += 1
                     self.dataset.log("Skipping duplicate of %s" % url)

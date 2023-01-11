@@ -578,9 +578,9 @@ class SearchTelegram(Search):
                     forwarded_name = forwarded_name.strip()
 
                 elif "chats" in from_data:
-                    channel_id = from_data["channel_id"]
+                    channel_id = from_data.get("channel_id")
                     for chat in from_data["chats"]:
-                        if chat["id"] == channel_id:
+                        if chat["id"] == channel_id or channel_id is None:
                             forwarded_username = chat["username"]
 
         msg = {

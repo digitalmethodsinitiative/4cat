@@ -104,7 +104,17 @@ class ImageDownloader(BasicProcessor):
 			columns = parent_dataset.get_columns()
 			options["columns"]["type"] = UserInput.OPTION_MULTI
 			options["columns"]["options"] = {v: v for v in columns}
-			options["columns"]["default"] = "body" if "body" in columns else sorted(columns, key=lambda k: "image" in k).pop()
+			# Pick a good default
+			if "image_md5" in columns:
+				# 4CHAN image column
+				options["columns"]["default"] = "image_md5"
+			elif "image_url" in columns:
+				options["columns"]["default"] = "image_url"
+			elif "image" in ''.join(columns):
+				# Any image will do
+				options["columns"]["default"] = sorted(columns, key=lambda k: "image" in k).pop()
+			else:
+				options["columns"]["default"] = "body"
 
 		return options
 
@@ -134,6 +144,8 @@ class ImageDownloader(BasicProcessor):
 		if amount == 0:
 			amount = config.get('image_downloader.MAX_NUMBER_IMAGES', 1000)
 		columns = self.parameters.get("columns")
+		if type(columns) is str:
+			columns = [columns]
 
 		# is there anything for us to download?
 		if self.source_dataset.num_rows == 0:

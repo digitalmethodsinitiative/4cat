@@ -1,6 +1,7 @@
 import collections
 import datetime
 import hashlib
+import fnmatch
 import shutil
 import json
 import time
@@ -44,7 +45,7 @@ class DataSet(FourcatModule):
 	folder = None
 	is_new = True
 	no_status_updates = False
-	staging_area = None
+	staging_areas = None
 
 	def __init__(self, parameters={}, key=None, job=None, data=None, db=None, parent=None, extension=None,
 				 type=None, is_private=True, owner="anonymous"):
@@ -58,7 +59,7 @@ class DataSet(FourcatModule):
 		"""
 		self.db = db
 		self.folder = Path(config.get('PATH_ROOT'), config.get('PATH_DATA'))
-		self.staging_area = []
+		self.staging_areas = []
 
 		if key is not None:
 			self.key = key
@@ -128,7 +129,8 @@ class DataSet(FourcatModule):
 					extension = own_processor.get_extension(parent_dataset=parent)
 				# Still no extension, default to 'csv'
 				if not extension:
-					extension = 'csv'
+					extension = "csv"
+
 			# Reserve filename and update data['result_file']
 			self.reserve_result_file(parameters, extension)
 
@@ -392,9 +394,19 @@ class DataSet(FourcatModule):
 		results_path.mkdir()
 
 		# Storing the staging area with the dataset so that it can be removed later
-		self.staging_area.append(results_path)
+		self.staging_areas.append(results_path)
 
 		return results_path
+
+	def remove_staging_areas(self):
+		"""
+		Remove any staging areas that were created and all files contained in them.
+		"""
+		# Remove DataSet staging areas
+		if self.staging_areas:
+			for staging_area in self.staging_areas:
+				if staging_area.is_dir():
+					shutil.rmtree(staging_area)
 
 	def get_results_dir(self):
 		"""
@@ -943,7 +955,7 @@ class DataSet(FourcatModule):
 		genealogy = self.get_genealogy()
 		return genealogy[0]
 
-	def get_genealogy(self):
+	def get_genealogy(self, inclusive=False):
 		"""
 		Get genealogy of this dataset
 
@@ -953,7 +965,7 @@ class DataSet(FourcatModule):
 
 		:return list:  Dataset genealogy, oldest dataset first
 		"""
-		if self.genealogy:
+		if self.genealogy and not inclusive:
 			return self.genealogy
 
 		key_parent = self.key_parent
@@ -994,6 +1006,24 @@ class DataSet(FourcatModule):
 				results += child.get_all_children(recursive)
 
 		return results
+
+	def nearest(self, type_filter):
+		"""
+		Return nearest dataset that matches the given type
+
+		Starting with this dataset, traverse the hierarchy upwards and return
+		whichever dataset matches the given type.
+
+		:param str type_filter:  Type filter. Can contain wildcards and is matched
+		using `fnmatch.fnmatch`.
+		:return:  Earliest matching dataset, or `None` if none match.
+		"""
+		genealogy = self.get_genealogy(inclusive=True)
+		for dataset in reversed(genealogy):
+			if fnmatch.fnmatch(dataset.type, type_filter):
+				return dataset
+
+		return None
 
 	def get_breadcrumbs(self):
 		"""

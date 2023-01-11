@@ -3,7 +3,10 @@
 # This is used to quickly fetch the last few threads if they haven't been marked
 # as inactive (i.e. archived or deleted). We need these to check the status of these
 # threads after they've disappeared off the index.
+import configparser
+import subprocess
 import shutil
+import shlex
 import sys
 import os
 
@@ -12,6 +15,7 @@ from pathlib import Path
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)) + "'/../..")
 from common.lib.database import Database
 from common.lib.logger import Logger
+from common.lib.helpers import add_notification
 
 log = Logger(output=True)
 import common.config_manager as config
@@ -19,7 +23,9 @@ import common.config_manager as config
 db = Database(logger=log, dbname=config.get('DB_NAME'), user=config.get('DB_USER'), password=config.get('DB_PASSWORD'),
               host=config.get('DB_HOST'), port=config.get('DB_PORT'), appname="4cat-migrate")
 
-# New format for datasource enabling and settings
+# ---------------------------------------------
+#     New format for data source settings
+# ---------------------------------------------
 datasources = config.get("DATASOURCES")
 if type(datasources) is dict:
     print("  Migrating data source settings")
@@ -78,6 +84,70 @@ config.delete_setting("WARN_EMAILS")
 config.delete_setting("WARN_INTERVAL")
 config.delete_setting("image_downloader_telegram.MAX_NUMBER_IMAGES")
 
+
+# ---------------------------------------------
+#         Check if Docker .env up to date
+# ---------------------------------------------
+in_docker = False
+notification = False
+config_path = Path(__file__).parent.parent.parent.joinpath("config/config.ini")
+if config_path.exists():
+    config_reader = configparser.ConfigParser()
+    config_reader.read(config_path)
+    in_docker = config_reader["DOCKER"].getboolean("use_docker_config")
+    if in_docker:
+        # Add notification if docker version in .env file is not updated
+        # NOTE: this checks the COPIED .env file in the Docker container not the actual file used by Docker
+        # It should still represent the version used when creating the Docker container, but if that file is updated and
+        # container is not rebuilt AND migrate runs again, this message will be added again and may cause confusion.
+        with open('.env') as f:
+            for line in f.readlines():
+                if "DOCKER_TAG" in line:
+                    docker_version = line.split('=')[-1].strip()
+                    if docker_version not in ['latest', 'stable']:
+                        notification = f"You have updated 4CAT, but your Docker .env file indicates you installed a specific version. If you recreate your 4CAT Docker containers, 4CAT will regress to {docker_version}. Consider updating DOCKER_TAG in .env to the 'stable' tag to always use the latest version."
+                        add_notification(db, "!admins", notification)
+                    break
+
+
+# ---------------------------------------------
+#               Look for ffmpeg
+# ---------------------------------------------
+# this is for the new video processors which need ffmpeg to work
+# if it can't be installed, 4CAT can still run and migrate can continue
+# but the user will need to manually install it later
+print("  Looking for ffmpeg executable...")
+current_ffmpeg = config.get("video_downloader.ffmpeg-path", None)
+if current_ffmpeg and shutil.which(current_ffmpeg):
+    print(f"  - ffmpeg configured and found at {current_ffmpeg}, nothing to configure")
+else:
+    print("  - Checking if we are in Docker... ", end="")
+    print("yes" if in_docker else "no")
+
+    ffmpeg = shutil.which(config.get("video_downloader.ffmpeg-path", "ffmpeg"))
+    if ffmpeg:
+        print(f"  - ffmpeg found at {ffmpeg}, storing as config setting video_downloader.ffmpeg-path")
+        config.set_or_create_setting("video_downloader.ffmpeg-path", ffmpeg, raw=False)
+    elif in_docker:
+        print("  - ffmpeg not found, detected Docker environment, installing via apt")
+        ffmpeg_install = subprocess.run(shlex.split("apt install -y ffmpeg"), stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        if ffmpeg_install.returncode == 0:
+            print("  - ffmpeg intalled with apt!")
+            config.set_or_create_setting("video_downloader.ffmpeg-path", shutil.which("ffmpeg"), raw=False)
+        else:
+            print(f"  - Error while installing ffmpeg with apt (return code {ffmpeg_install.returncode}). Some video")
+            print("    processors will be unavailable until you rebuild the Docker containers.")
+            print("    apt output is printed below:")
+            print(ffmpeg_install.stderr)
+            print(ffmpeg_install.stdout)
+    else:
+        print("  - ffmpeg not found on system! Some video processors will not be available.")
+        print("    Install ffmpeg and configure its path in the 4CAT General Settings to enable")
+        print("    these.")
+
+# ---------------------------------------------
+#         Image board datasource updates
+# ---------------------------------------------
 print("  Creating new indexes for enabled imageboard datasources...")
 
 imageboards_enabled = False
@@ -122,3 +192,6 @@ if not imageboards_enabled:
     print("  - No imageboard data sources enabled")
 else:
     print("  - Done!")
+
+if notification:
+    print("\nWARNING:" + notification + "\n")
