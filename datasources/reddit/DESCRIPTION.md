@@ -9,4 +9,14 @@ We offer access to the <code>regular</code> Pushshift endpoint and the new <code
 ### Missing data
 It is common for the Pushshift data to feature gaps. This may be caused by a delay in scraping or because its developers have to carry out maintenance. Always check the completeness of your data.
 
-The data might be incomplete on either endpoint. According to the Pushshift developers, the beta endpoint should be complete soon. You can check the [r/pushshift subreddit](https://reddit.com/r/pushshift) to check if there's any updates or outages. 
+The data might be incomplete on either endpoint. According to the Pushshift developers, the beta endpoint should be complete soon. You can check the [r/pushshift subreddit](https://reddit.com/r/pushshift) to check if there's any updates or outages.
+
+### A note on post scores
+Reddit famously allows people to upvote and downvote posts, giving each post a score that can be used as a proxy for its 
+relevance or popularity. However, Pushshift (the archive 4CAT queries) collects post data shortly after the post is 
+made, at which point its score is usually still 1 or in any case very close to the default. Later upvotes or downvotes
+are not reflected in the data. The 'score' column is therefore not a reflection of a post's "true" or current score and
+should not be used for analysis.
+
+For smaller datasets, the "Update Reddit scores" processor can be used to update the scores to their current, live 
+value. However, this process is slow, and therefore it is only available for datasets of 5,000 posts or fewer.
