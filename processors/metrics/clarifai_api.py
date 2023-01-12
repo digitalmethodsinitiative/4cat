@@ -41,7 +41,7 @@ class ClarifaiAPIFetcher(BasicProcessor):
 
     references = [
         "[Clarifai](https://www.clarifai.com/)",
-        "[Clarifai API Pricing & Free Usage Limits](https://www.clarifai.com/pricing)"
+        "[Clarifai API Pricing & Free Usage Limits](https://www.clarifai.com/pricing)",
         "[Clarifai model browser](https://clarifai.com/clarifai/main/models)"
     ]
 
