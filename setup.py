@@ -12,6 +12,7 @@ packages = [
 	"anytree~=2.8.0",
 	"bcrypt~=3.2.0",
 	"beautifulsoup4~=4.11.0",
+	"clarifai-grpc~=9.0",
 	"cryptography~=37.0.0",
 	"cssselect~=1.1.0",
 	"datedelta~=1.4.0",
