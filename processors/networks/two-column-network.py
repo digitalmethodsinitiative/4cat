@@ -27,8 +27,14 @@ class ColumnNetworker(BasicProcessor):
     extension = "gexf"
 
     options = {
-        "column-a": {},
-        "column-b": {},
+        "column-a": {
+            "type": UserInput.OPTION_TEXT,
+            "help": "Attribute A"
+        },
+        "column-b": {
+            "type": UserInput.OPTION_TEXT,
+            "help": "Attribute B"
+        },
         "interval": {
             "type": UserInput.OPTION_CHOICE,
             "help": "Make network dynamic by",
