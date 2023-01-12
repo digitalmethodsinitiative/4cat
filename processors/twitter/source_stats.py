@@ -90,7 +90,7 @@ class TwitterHashtagStats(TwitterStatsBase):
             "URLs": list(urls),
         }
 
-        return group_by_key_bool, post.get('source'), sum_map, static_map, list_map
+        return group_by_key_bool, post.get("source", "None"), sum_map, static_map, list_map
 
     def modify_intervals(self, key, data):
         """

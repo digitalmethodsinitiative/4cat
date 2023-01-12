@@ -4,9 +4,9 @@ View .metadata.json
 Designed to work with any processor that has a 'map_metadata' method
 """
 import json
+import zipfile
 
 from backend.abstract.processor import BasicProcessor
-from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.user_input import UserInput
 
 __author__ = "Dale Wahl"
@@ -41,29 +41,26 @@ class ViewMetadata(BasicProcessor):
 		"""
 		Allow on only
 		"""
-		# hasattr(module, "map_metadata")
+		# return (module.is_dataset() and hasattr(module.get_own_processor(), "map_metadata")) or (not module.is_dataset() and hasattr(module, "map_metadata"))
 		return module.type in ["video-downloader"]
 
 	def process(self):
 		"""
 		Grabs .metadata.json and reformats
 		"""
-		metadata_file = None
 		self.dataset.update_status("Collecting .metadata.json file")
-		for path in self.iterate_archive_contents(self.source_file):
-			if self.interrupted:
-				raise ProcessorInterruptedException("Interrupted while collecting metadata file")
+		with zipfile.ZipFile(self.source_file, "r") as archive_file:
+			archive_contents = sorted(archive_file.namelist())
+			if '.metadata.json' not in archive_contents:
+				self.dataset.update_status("Unable to identify metadata file", is_final=True)
+				self.dataset.finish(0)
+				return
 
-			if path.name == '.metadata.json':
-				# Keep it and move on
-				with open(path) as file:
-					metadata_file = json.load(file)
-				break
+			staging_area = self.dataset.get_staging_area()
+			archive_file.extract(".metadata.json", staging_area)
 
-		if metadata_file is None:
-			self.dataset.update_status("Unable to identify metadata file", is_final=True)
-			self.dataset.finish(0)
-			return
+			with open(staging_area.joinpath(".metadata.json")) as file:
+				metadata_file = json.load(file)
 
 		parent_processor = self.dataset.get_parent().get_own_processor()
 		self.dataset.log(f"Collecting metadata created by {parent_processor.type}")
