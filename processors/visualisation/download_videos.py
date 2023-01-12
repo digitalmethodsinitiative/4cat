@@ -530,64 +530,70 @@ class VideoDownloaderPlus(BasicProcessor):
         if self.interrupted:
             raise ProcessorInterruptedException("Interrupted while downloading videos.")
 
-    def download_video_with_requests(self, url, results_path, max_video_size):
+    def download_video_with_requests(self, url, results_path, max_video_size, retries=0):
         """
         Download a video with the Python requests library
 
-        This is preferred if possible, because it is simpler
-
-        :param str url:
-        :param results_path:
-        :param int max_video_size:
-        :return str:  File name
+        :param str url:             Valid URL direct to video source
+        :param results_path:        Path to location for video download
+        :param int max_video_size:  Maximum size in Bytes for video; 0 allows any size
+        :param int retries:         Current number of retries to request video
+        :return str:  File name     Returns file name of the video after download
         """
+        if retries > 1:
+            # Currently, only allow 1 retry with newly formatted URL via InvalidSchema/MissingSchema exception
+            raise FailedDownload('Retries exceeded')
         # Open stream
         user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:107.0) Gecko/20100101 Firefox/107.0"
-        with requests.get(url, stream=True, timeout=20, headers={"User-Agent": user_agent}) as response:
-            if 400 <= response.status_code < 500:
-                raise FailedDownload(
-                    f"Website denied download request (Code {response.status_code} / Reason {response.reason}): {url}")
-            elif response.status_code != 200:
-                raise FailedDownload(f"Unable to obtain URL (Code {response.status_code} / Reason {response.reason}): {url}")
+        try:
+            with requests.get(url, stream=True, timeout=20, headers={"User-Agent": user_agent}) as response:
+                if 400 <= response.status_code < 500:
+                    raise FailedDownload(
+                        f"Website denied download request (Code {response.status_code} / Reason {response.reason}): {url}")
+                elif response.status_code != 200:
+                    raise FailedDownload(f"Unable to obtain URL (Code {response.status_code} / Reason {response.reason}): {url}")
 
-            # Verify video
-            # YT-DLP will download images; so we raise them differently
-            # TODO: test/research other possible ways to verify video links; watch for additional YT-DLP oddities
-            if "image" in response.headers["Content-Type"].lower():
-                raise NotAVideo("Not a Video (%s): %s" % (response.headers["Content-Type"], url))
-            elif "video" not in response.headers["Content-Type"].lower():
-                raise VideoStreamUnavailable(f"Does not appear to be a direct to video link: {url}; "
-                                             f"Content-Type: {response.headers['Content-Type']}")
+                # Verify video
+                # YT-DLP will download images; so we raise them differently
+                # TODO: test/research other possible ways to verify video links; watch for additional YT-DLP oddities
+                if "image" in response.headers["Content-Type"].lower():
+                    raise NotAVideo("Not a Video (%s): %s" % (response.headers["Content-Type"], url))
+                elif "video" not in response.headers["Content-Type"].lower():
+                    raise VideoStreamUnavailable(f"Does not appear to be a direct to video link: {url}; "
+                                                 f"Content-Type: {response.headers['Content-Type']}")
 
-            extension = response.headers["Content-Type"].split("/")[-1]
-            # DEBUG Content-Type
-            if extension not in ["mp4", "mp3"]:
-                self.dataset.log(f"DEBUG: Odd extension type {extension}; Notify 4CAT maintainers if video. "
-                                 f"Content-Type for url {url}: {response.headers['Content-Type']}")
+                extension = response.headers["Content-Type"].split("/")[-1]
+                # DEBUG Content-Type
+                if extension not in ["mp4", "mp3"]:
+                    self.dataset.log(f"DEBUG: Odd extension type {extension}; Notify 4CAT maintainers if video. "
+                                     f"Content-Type for url {url}: {response.headers['Content-Type']}")
 
-            # Ensure unique filename
-            save_location = url_to_filename(url, extension, results_path)
+                # Ensure unique filename
+                save_location = url_to_filename(url, extension, results_path)
 
-            # Check video size (after ensuring it is actually a video above)
-            if not max_video_size == 0:
-                if response.headers.get("Content-Length", False):
-                    if int(response.headers.get("Content-Length")) > (max_video_size * 1000000):  # Use Bytes!
-                        raise FilesizeException(
-                            f"Video size {response.headers.get('Content-Length')} larger than maximum allowed per 4CAT")
-                # Size unknown
-                elif not config.get("video_downloader.DOWNLOAD_UNKNOWN_SIZE", False):
-                    FilesizeException("Video size unknown; not allowed to download per 4CAT settings")
+                # Check video size (after ensuring it is actually a video above)
+                if not max_video_size == 0:
+                    if response.headers.get("Content-Length", False):
+                        if int(response.headers.get("Content-Length")) > (max_video_size * 1000000):  # Use Bytes!
+                            raise FilesizeException(
+                                f"Video size {response.headers.get('Content-Length')} larger than maximum allowed per 4CAT")
+                    # Size unknown
+                    elif not config.get("video_downloader.DOWNLOAD_UNKNOWN_SIZE", False):
+                        FilesizeException("Video size unknown; not allowed to download per 4CAT settings")
 
-            # Download video
-            self.dataset.update_status(
-                "Downloading %i/%i via requests: %s" % (self.downloaded_videos + 1, self.total_possible_videos, url))
-            with open(results_path.joinpath(save_location), "wb") as f:
-                for chunk in response.iter_content(chunk_size=1024 * 1024):
-                    if chunk:
-                        f.write(chunk)
+                # Download video
+                self.dataset.update_status(
+                    "Downloading %i/%i via requests: %s" % (self.downloaded_videos + 1, self.total_possible_videos, url))
+                with open(results_path.joinpath(save_location), "wb") as f:
+                    for chunk in response.iter_content(chunk_size=1024 * 1024):
+                        if chunk:
+                            f.write(chunk)
 
-            # Return filename to add to metadata
-            return save_location.name
+                # Return filename to add to metadata
+                return save_location.name
+        except (requests.exceptions.InvalidSchema, requests.exceptions.MissingSchema):
+            # Reformat URLs that are missing or have invalid schema
+            return self.download_video_with_requests('https://' + url.lstrip(' :/'), results_path, max_video_size, retries=retries+1)
 
     def collect_video_urls(self):
         """
