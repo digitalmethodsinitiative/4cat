@@ -243,8 +243,9 @@ def show_login():
     if not has_admin_user:
         return redirect(url_for("create_first_user"))
 
+    have_email = config.get('mail.admin_email') and config.get('mail.server')
     if request.method == 'GET':
-        return render_template('account/login.html', flashes=get_flashed_messages())
+        return render_template('account/login.html', flashes=get_flashed_messages(), have_email=have_email)
 
     username = request.form['username']
     password = request.form['password']
