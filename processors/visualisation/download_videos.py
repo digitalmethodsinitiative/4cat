@@ -3,20 +3,22 @@ Download videos
 
 First attempt to download via request, but if that fails use yt-dlp
 """
+import json
+import re
 import time
+import zipfile
 from pathlib import Path
 import requests
 import yt_dlp
-import json
-import re
+from ural import urls_from_text
 from yt_dlp import DownloadError
 from yt_dlp.utils import ExistingVideoReached
-from ural import urls_from_text
 
 import common.config_manager as config
-from common.lib.helpers import UserInput, sets_to_lists
 from backend.abstract.processor import BasicProcessor
+from common.lib.dataset import DataSet
 from common.lib.exceptions import ProcessorInterruptedException, ProcessorException
+from common.lib.helpers import UserInput, sets_to_lists
 
 __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl"]
@@ -65,7 +67,6 @@ class VideoDownloaderPlus(BasicProcessor):
             "help": "No. of videos (max 1000)",
             "default": 100,
             "min": 0,
-            "max": 1000
         },
         "columns": {
             "type": UserInput.OPTION_TEXT,
@@ -157,11 +158,11 @@ class VideoDownloaderPlus(BasicProcessor):
 
         # Update the amount max and help from config
         max_number_videos = int(config.get('video_downloader.MAX_NUMBER_VIDEOS', 100))
-        options['amount']['max'] = max_number_videos
         if max_number_videos == 0:
             options['amount']['help'] = "No. of videos"
             options["amount"]["tooltip"] = "Use 0 to download all videos"
         else:
+            options['amount']['max'] = max_number_videos
             options['amount']['help'] = "No. of videos (max %s)" % max_number_videos
 
         # And update the max size and help from config
@@ -173,7 +174,7 @@ class VideoDownloaderPlus(BasicProcessor):
         else:
             # Limit video size
             options["max_video_size"]["max"] = max_video_size
-            options['max_video_size']['default'] = options['amount']['default'] if options['amount'][
+            options['max_video_size']['default'] = options['max_video_size']['default'] if options['max_video_size'][
                                                                                        'default'] <= max_video_size else max_video_size
             options["max_video_size"]["tooltip"] = f"Cannot be more than {max_video_size}MB."
             options['max_video_size']['min'] = 1
@@ -256,6 +257,8 @@ class VideoDownloaderPlus(BasicProcessor):
 
         self.dataset.log('Collected %i urls.' % len(urls))
 
+        vid_lib = DatasetVideoLibrary(self.dataset)
+
         # Prepare staging area for videos and video tracking
         results_path = self.dataset.get_staging_area()
 
@@ -315,11 +318,32 @@ class VideoDownloaderPlus(BasicProcessor):
         # Loop through video URLs and download
         self.downloaded_videos = 0
         failed_downloads = 0
+        copied_videos = 0
         consecutive_timeouts = 0
         self.total_possible_videos = min(len(urls), amount) if amount != 0 else len(urls)
         yt_dlp_archive_map = {}
         for url in urls:
+            # Check previously downloaded library
+            if url in vid_lib.library:
+                previous_vid_metadata = vid_lib.library[url]
+                if previous_vid_metadata.get('success', False):
+                    # Use previous downloaded video
+                    try:
+                        num_copied = self.copy_previous_video(previous_vid_metadata, results_path, vid_lib.previous_downloaders)
+                        urls[url] = previous_vid_metadata
+                        self.dataset.log(f"Copied previously downloaded video to current dataset for url: {url}")
+                        copied_videos += num_copied
+                        continue
+                    except FailedToCopy as e:
+                        # Unable to copy
+                        self.dataset.log(str(e))
+                elif previous_vid_metadata.get("retry", True) is False:
+                    urls[url] = previous_vid_metadata
+                    self.dataset.log(f"Skipping; previously identified url as not a video: {url}")
+                    continue
+
             urls[url]["success"] = False
+            urls[url]["retry"] = True
 
             # Stop processing if worker has been asked to stop or max downloads reached
             if self.downloaded_videos >= amount and amount != 0:
@@ -364,26 +388,20 @@ class VideoDownloaderPlus(BasicProcessor):
                 }]
                 success = True
                 self.videos_downloaded_from_url = 1
-            except requests.exceptions.Timeout as e:
-                message = "Timeout error: %s" % str(e)
-                self.dataset.log(message)
-                urls[url]["error"] = message
-                failed_downloads += 1
-                consecutive_timeouts += 1
-                continue
-            except (requests.exceptions.SSLError, requests.exceptions.ConnectionError) as e:
-                message = "Requests error: %s" % str(e)
-                self.dataset.log(message)
-                urls[url]["error"] = message
-                failed_downloads += 1
-                continue
-            except (FilesizeException, FailedDownload, NotAVideo) as e:
+            except (requests.exceptions.Timeout, requests.exceptions.SSLError, requests.exceptions.ConnectionError, FilesizeException, FailedDownload, NotAVideo) as e:
                 # FilesizeException raised when file size is too large or unknown filesize (and that is disabled in 4CAT settings)
                 # FailedDownload raised when response other than 200 received
-                # NotAVideo raised due to specific Content-Type known to not be a video (or a webpage/html that could lead to a video via YT-DLP)
+                # NotAVideo raised due to specific Content-Type known to not be a video (and not a webpage/html that could lead to a video via YT-DLP)
                 self.dataset.log(str(e))
                 urls[url]["error"] = str(e)
-                failed_downloads += 1
+                if type(e) is requests.exceptions.Timeout:
+                    # TODO: retry timeouts?
+                    consecutive_timeouts += 1
+                if type(e) in [requests.exceptions.Timeout, requests.exceptions.SSLError, requests.exceptions.ConnectionError, FilesizeException, FailedDownload]:
+                    failed_downloads += 1
+                if type(e) in [NotAVideo]:
+                    # No need to retry non videos
+                    urls[url]["retry"] = False
                 continue
             except VideoStreamUnavailable as e:
                 if use_yt_dlp:
@@ -418,7 +436,6 @@ class VideoDownloaderPlus(BasicProcessor):
                                     if self.videos_downloaded_from_url == 0:
                                         # No videos downloaded for this URL
                                         urls[url]['error'] = message
-                                        failed_downloads += 1
                                         continue
                         except (DownloadError, LiveVideoException) as e:
                             # LiveVideoException raised when a video is known to be live
@@ -465,7 +482,6 @@ class VideoDownloaderPlus(BasicProcessor):
                     # No YT-DLP; move on
                     self.dataset.log(str(e))
                     urls[url]["error"] = str(e)
-                    failed_downloads += 1
                     continue
 
             urls[url]["success"] = success
@@ -474,14 +490,15 @@ class VideoDownloaderPlus(BasicProcessor):
 
             # Update status
             self.downloaded_videos += self.videos_downloaded_from_url
-            self.dataset.update_status(f"Downloaded {self.downloaded_videos}/{self.total_possible_videos} videos; "
-                                       f"%s URLs failed." % (str(failed_downloads) if failed_downloads > 0 else ""))
+            self.dataset.update_status(f"Downloaded {self.downloaded_videos}/{self.total_possible_videos} videos" +
+                                       (f"; videos copied from {copied_videos} previous downloads" if copied_videos > 0 else "") +
+                                       (f"; {failed_downloads} URLs failed." if failed_downloads > 0 else ""))
             self.dataset.update_progress(self.downloaded_videos / self.total_possible_videos)
 
         # Save some metadata to be able to connect the videos to their source
         metadata = {
             url: {
-                "from_dataset": self.source_dataset.key,
+                "source_dataset": self.source_dataset.key,
                 **sets_to_lists(data)
                 # TODO: This some shenanigans until I can figure out what to do with the info returned
             } for url, data in urls.items()
@@ -490,12 +507,9 @@ class VideoDownloaderPlus(BasicProcessor):
             json.dump(metadata, outfile)
 
         # Finish up
-        if not failed_downloads:
-            self.dataset.update_status(f"Downloaded {self.downloaded_videos} videos.")
-        else:
-            self.dataset.update_status(f"Downloaded {self.downloaded_videos}, but {failed_downloads} (probable) video "
-                                       f"URLs could not be downloaded. Check dataset log and .metadata.json for "
-                                       f"details.", is_final=True)
+        self.dataset.update_status(f"Downloaded {self.downloaded_videos} videos" +
+                                   (f"; videos copied from {copied_videos} previous downloads" if copied_videos > 0 else "") +
+                                   (f"; {failed_downloads} URLs failed." if failed_downloads > 0 else ""), is_final=True)
         self.write_archive_and_finish(results_path)
 
     def yt_dlp_monitor(self, d):
@@ -657,6 +671,32 @@ class VideoDownloaderPlus(BasicProcessor):
             urls |= set([url for url in urls_from_text(string)])
         return list(urls)
 
+    def copy_previous_video(self, previous_vid_metadata, staging_area, previous_downloaders):
+        """
+        Copy existing video to new staging area
+        """
+        num_copied = 0
+        dataset_key = previous_vid_metadata.get("file_dataset_key")
+        dataset = [dataset for dataset in previous_downloaders if dataset.key == dataset_key]
+
+        if not dataset:
+            raise FailedToCopy(f"Dataset with key {dataset_key} not found")
+        else:
+            dataset = dataset[0]
+
+        with zipfile.ZipFile(dataset.get_results_path(), "r") as archive_file:
+            archive_contents = sorted(archive_file.namelist())
+
+            for file in previous_vid_metadata.get("files", []):
+                if file.get("filename") not in archive_contents:
+                    raise FailedToCopy(f"Previously downloaded video {file.get('filename')} not found")
+
+                archive_file.extract(file.get("filename"), staging_area)
+                num_copied += 1
+
+        return num_copied
+
+
     @staticmethod
     def map_metadata(url, data):
         """
@@ -687,6 +727,80 @@ class VideoDownloaderPlus(BasicProcessor):
             row["error"] = data.get("error", "N/A")
 
             yield row
+
+
+class DatasetVideoLibrary:
+
+    def __init__(self, current_dataset):
+        self.current_dataset = current_dataset
+        self.previous_downloaders = self.collect_previous_downloaders()
+        self.current_dataset.log(f"Previously video downloaders: {[downloader.key for downloader in self.previous_downloaders]}")
+
+        metadata_files = self.collect_all_metadata_files()
+
+        # Build library
+        library = {}
+        for metadata_file in metadata_files:
+            for url, data in metadata_file[1].items():
+                if data.get("success", False):
+                    # Always overwrite for success
+                    library[url] = {
+                        **data,
+                        "file_dataset_key": metadata_file[0]
+                    }
+                elif url not in library:
+                    # Do not overwrite failures, but do add if missing
+                    library[url] = {
+                        **data,
+                        "file_dataset_key": metadata_file[0]
+                    }
+
+        self.current_dataset.log(f"Total URLs previously seen: {len(library)}")
+
+        self.library = library
+
+    def collect_previous_downloaders(self):
+        """
+        Check for other video-downloader processors run on the dataset and create library for reference
+        """
+        parent_dataset = self.current_dataset.get_parent()
+        # Note: exclude current dataset
+        previous_downloaders = [child for child in parent_dataset.children if (child.type == "video-downloader" and child.key != self.current_dataset.key)]
+
+        # Check to see if filtered dataset
+        if "copied_from" in parent_dataset.parameters and parent_dataset.is_top_dataset():
+            original_dataset = DataSet(key=parent_dataset.parameters["copied_from"], db=self.current_dataset.db)
+            previous_downloaders += [child for child in original_dataset.top_parent().children if (child.type == "video-downloader" and child.key != self.current_dataset.key)]
+
+        return previous_downloaders
+
+    def collect_metadata_file(self, dataset, staging_area):
+        source_file = dataset.get_results_path()
+        if not source_file.exists():
+            return None
+
+        with zipfile.ZipFile(dataset.get_results_path(), "r") as archive_file:
+            archive_contents = sorted(archive_file.namelist())
+            if '.metadata.json' not in archive_contents:
+                return None
+
+            archive_file.extract(".metadata.json", staging_area)
+
+            with open(staging_area.joinpath(".metadata.json")) as file:
+                return json.load(file)
+
+    def collect_all_metadata_files(self):
+        import shutil
+        metadata_staging_area = self.current_dataset.get_staging_area()
+
+        metadata_files = [(downloader.key, self.collect_metadata_file(downloader, metadata_staging_area)) for downloader in self.previous_downloaders]
+        metadata_files = [file for file in metadata_files if file[1] is not None]
+        self.current_dataset.log(f"Metadata files collected: {len(metadata_files)}; with {[len(urls[0]) for urls in metadata_files]}")
+
+        # Delete staging area
+        shutil.rmtree(metadata_staging_area)
+
+        return metadata_files
 
 
 class MaxVideosDownloaded(ProcessorException):
@@ -727,5 +841,12 @@ class FilesizeException(ProcessorException):
 class LiveVideoException(ProcessorException):
     """
     Raise if live videos are not allowed
+    """
+    pass
+
+
+class FailedToCopy(ProcessorException):
+    """
+    Raise if unable to copy video from previous dataset
     """
     pass
