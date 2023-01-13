@@ -174,6 +174,7 @@ def create_first_user():
 
     username = request.form.get("username").strip()
     password = request.form.get("password").strip()
+    confirm_password = request.form.get("confirm_password").strip()
 
     if not username:
         missing.append("username")
@@ -185,11 +186,15 @@ def create_first_user():
 
     if not password:
         missing.append("password")
+    elif password != confirm_password:
+        flash("The passwords provided do not match")
+        missing.append("password")
+        missing.append("confirm_password")
 
     if missing:
         flash("Please make sure all fields are complete")
         return render_template("account/first-run.html", form=request.form, incomplete=missing,
-                               flashes=get_flashed_messages())
+                               flashes=get_flashed_messages(), phone_home_url=phone_home_url)
 
     if phone_home_url and request.form.get("phonehome"):
         with Path(config.get("PATH_ROOT"), "config/.current-version").open() as outfile:
