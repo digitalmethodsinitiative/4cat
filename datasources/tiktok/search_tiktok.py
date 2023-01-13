@@ -71,9 +71,9 @@ class SearchTikTok(Search):
 
     @staticmethod
     def map_item(post):
-        hashtags = [challenge["title"] for challenge in post.get("challenges", [])]
+        challenges = [challenge["title"] for challenge in post.get("challenges", [])]
 
-        challenges = [extra["hashtagName"] for extra in post.get("textExtra", []) if
+        hashtags = [extra["hashtagName"] for extra in post.get("textExtra", []) if
                     "hashtagName" in extra and extra["hashtagName"]]
 
         labels = ",".join(post["diversificationLabels"]) if type(post.get("diversificationLabels")) is list else ""
