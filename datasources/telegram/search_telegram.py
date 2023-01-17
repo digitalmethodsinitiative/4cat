@@ -13,17 +13,20 @@ import re
 from pathlib import Path
 
 from backend.abstract.search import Search
-from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException, ProcessorException
+from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException, ProcessorException, \
+    QueryNeedsFurtherInputException
 from common.lib.helpers import convert_to_int, UserInput
 
 from datetime import datetime
 from telethon import TelegramClient
-from telethon.errors.rpcerrorlist import UsernameInvalidError, TimeoutError, ChannelPrivateError, BadRequestError, FloodWaitError
+from telethon.errors.rpcerrorlist import UsernameInvalidError, TimeoutError, ChannelPrivateError, BadRequestError, \
+    FloodWaitError, ApiIdInvalidError, PhoneNumberInvalidError
 from telethon.tl.functions.channels import GetFullChannelRequest
 from telethon.tl.functions.users import GetFullUserRequest
 from telethon.tl.types import User
 
 import common.config_manager as config
+
 
 class SearchTelegram(Search):
     """
@@ -34,15 +37,15 @@ class SearchTelegram(Search):
     title = "Telegram API search"  # title displayed in UI
     description = "Scrapes messages from open Telegram groups via its API."  # description displayed in UI
     extension = "ndjson"  # extension of result file, used internally and in UI
-    is_local = False    # Whether this datasource is locally scraped
-    is_static = False   # Whether this datasource is still updated
+    is_local = False  # Whether this datasource is locally scraped
+    is_static = False  # Whether this datasource is still updated
 
     # cache
     details_cache = None
     failures_cache = None
     eventloop = None
     flawless = True
-    end_if_rate_limited = 600 # break if Telegram requires wait time above number of seconds
+    end_if_rate_limited = 600  # break if Telegram requires wait time above number of seconds
 
     max_workers = 1
     max_retries = 3
@@ -70,11 +73,6 @@ class SearchTelegram(Search):
             "help": "Phone number",
             "cache": True,
             "default": "+xxxxxxxxxx"
-        },
-        "security-code": {
-            "type": UserInput.OPTION_TEXT,
-            "help": "Security code",
-            "sensitive": True
         },
         "divider": {
             "type": UserInput.OPTION_DIVIDER
@@ -327,11 +325,13 @@ class SearchTelegram(Search):
                     else:
                         self.flawless = False
                         no_additional_queries = True
-                        self.dataset.update_status("Telegram wait grown large than %i minutes, ending" % int(e.seconds/60))
+                        self.dataset.update_status(
+                            "Telegram wait grown large than %i minutes, ending" % int(e.seconds / 60))
                         break
 
                 except BadRequestError as e:
-                    self.dataset.update_status("Error '%s' while collecting entity %s, skipping" % (e.__class__.__name__, query))
+                    self.dataset.update_status(
+                        "Error '%s' while collecting entity %s, skipping" % (e.__class__.__name__, query))
                     self.flawless = False
 
                 except ValueError as e:
@@ -341,20 +341,20 @@ class SearchTelegram(Search):
                 except ChannelPrivateError as e:
                     self.dataset.update_status(
                         "QUERY '%s' unable to complete due to error %s. Skipping." % (
-                        query, str(e)))
+                            query, str(e)))
                     break
 
                 except TimeoutError:
                     if retries < 3:
                         self.dataset.update_status(
                             "Tried to fetch messages for entity '%s' but timed out %i times. Skipping." % (
-                            query, retries))
+                                query, retries))
                         self.flawless = False
                         break
 
                     self.dataset.update_status(
                         "Got a timeout from Telegram while fetching messages for entity '%s'. Trying again in %i seconds." % (
-                        query, delay))
+                            query, delay))
                     time.sleep(delay)
                     delay *= 2
                     continue
@@ -406,9 +406,10 @@ class SearchTelegram(Search):
                 self.failures_cache.add(value.get("channel_id", value.get("user_id")))
                 if type(e) in (ChannelPrivateError, UsernameInvalidError):
                     self.dataset.log("Cannot resolve entity with ID %s of type %s (%s), leaving as-is" % (
-                    str(value.get("channel_id", value.get("user_id"))), value["_type"], e.__class__.__name__))
+                        str(value.get("channel_id", value.get("user_id"))), value["_type"], e.__class__.__name__))
                 else:
-                    self.dataset.log("Cannot resolve entity with ID %s of type %s, leaving as-is" % (str(value.get("channel_id", value.get("user_id"))), value["_type"]))
+                    self.dataset.log("Cannot resolve entity with ID %s of type %s, leaving as-is" % (
+                    str(value.get("channel_id", value.get("user_id"))), value["_type"]))
 
         return resolved_message
 
@@ -499,8 +500,8 @@ class SearchTelegram(Search):
             else:
                 attachment_data = ""
 
-        #elif attachment_type in ("geo", "geo_live"):
-            # untested whether geo_live is significantly different from geo
+        # elif attachment_type in ("geo", "geo_live"):
+        # untested whether geo_live is significantly different from geo
         #    attachment_data = "%s %s" % (message["geo"]["lat"], message["geo"]["long"])
 
         elif attachment_type == "photo":
@@ -545,7 +546,8 @@ class SearchTelegram(Search):
         forwarded_timestamp = ""
         forwarded_name = ""
         forwarded_username = ""
-        if message.get("fwd_from") and "from_id" in message["fwd_from"] and not (type(message["fwd_from"]["from_id"]) is int):
+        if message.get("fwd_from") and "from_id" in message["fwd_from"] and not (
+                type(message["fwd_from"]["from_id"]) is int):
             # forward information is spread out over a lot of places
             # we can identify, in order of usefulness: username, full name,
             # and ID. But not all of these are always available, and not
@@ -576,9 +578,9 @@ class SearchTelegram(Search):
                     forwarded_name = forwarded_name.strip()
 
                 elif "chats" in from_data:
-                    channel_id = from_data["channel_id"]
+                    channel_id = from_data.get("channel_id")
                     for chat in from_data["chats"]:
-                        if chat["id"] == channel_id:
+                        if chat["id"] == channel_id or channel_id is None:
                             forwarded_username = chat["username"]
 
         msg = {
@@ -594,11 +596,13 @@ class SearchTelegram(Search):
             "views": message["views"] if message["views"] else "",
             "timestamp": datetime.fromtimestamp(message["date"]).strftime("%Y-%m-%d %H:%M:%S"),
             "unix_timestamp": int(message["date"]),
-            "timestamp_edited": datetime.fromtimestamp(message["edit_date"]).strftime("%Y-%m-%d %H:%M:%S") if message["edit_date"] else "",
+            "timestamp_edited": datetime.fromtimestamp(message["edit_date"]).strftime("%Y-%m-%d %H:%M:%S") if message[
+                "edit_date"] else "",
             "unix_timestamp_edited": int(message["edit_date"]) if message["edit_date"] else "",
             "author_forwarded_from_name": forwarded_name,
             "author_forwarded_from_username": forwarded_username,
-            "timestamp_forwarded_from": datetime.fromtimestamp(forwarded_timestamp).strftime("%Y-%m-%d %H:%M:%S") if forwarded_timestamp else "",
+            "timestamp_forwarded_from": datetime.fromtimestamp(forwarded_timestamp).strftime(
+                "%Y-%m-%d %H:%M:%S") if forwarded_timestamp else "",
             "unix_timestamp_forwarded_from": forwarded_timestamp,
             "attachment_type": attachment_type,
             "attachment_data": attachment_data,
@@ -721,6 +725,85 @@ class SearchTelegram(Search):
 
         # the dates need to make sense as a range to search within
         min_date, max_date = query.get("daterange")
+
+        # now check if there is an active API session
+        if not user or not user.is_authenticated or user.is_anonymous:
+            raise QueryParametersException("Telegram scraping is only available to logged-in users with personal "
+                                           "accounts.")
+
+        # check for the information we need
+        session_id = SearchTelegram.create_session_id(query.get("api_phone"), query.get("api_id"),
+                                                      query.get("api_hash"))
+        user.set_value("telegram.session", session_id)
+        session_path = Path(config.get('PATH_ROOT')).joinpath(config.get('PATH_SESSIONS'), session_id + ".session")
+
+        client = None
+
+        # API ID is always a number, if it's not, we can immediately fail
+        try:
+            api_id = int(query.get("api_id"))
+        except ValueError:
+            raise QueryParametersException("Invalid API ID.")
+
+        # maybe we've entered a code already and submitted it with the request
+        if "option-security-code" in request.form and request.form.get("option-security-code").strip():
+            code_callback = lambda: request.form.get("option-security-code")
+            max_attempts = 1
+        else:
+            code_callback = lambda: -1
+            # max_attempts = 0 because authing will always fail: we can't wait for
+            # the code to be entered interactively, we'll need to do a new request
+            # but we can't just immediately return, we still need to call start()
+            # to get telegram to send us a code
+            max_attempts = 0
+
+        # now try authenticating
+        needs_code = False
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            client = TelegramClient(str(session_path), api_id, query.get("api_hash"), loop=loop)
+
+            try:
+                client.start(max_attempts=max_attempts, phone=query.get("api_phone"), code_callback=code_callback)
+
+            except ValueError as e:
+                # this happens if 2FA is required
+                raise QueryParametersException("Your account requires two-factor authentication. 4CAT at this time "
+                                               "does not support this authentication mode for Telegram. (%s)" % e)
+            except RuntimeError as e:
+                # A code was sent to the given phone number
+                needs_code = True
+        except FloodWaitError as e:
+            # uh oh, we got rate-limited
+            raise QueryParametersException("You were rate-limited and should wait a while before trying again. " +
+                                           str(e).split("(")[0] + ".")
+        except ApiIdInvalidError as e:
+            # wrong credentials
+            raise QueryParametersException("Your API credentials are invalid.")
+        except PhoneNumberInvalidError as e:
+            # wrong phone number
+            raise QueryParametersException(
+                "The phone number provided is not a valid phone number for these credentials.")
+        except Exception as e:
+            # ?
+            raise QueryParametersException(
+                "An unexpected error (%s) occurred and your authentication could not be verified." % e)
+        finally:
+            if client:
+                client.disconnect()
+
+        if needs_code:
+            raise QueryNeedsFurtherInputException(config={
+                "code-info": {
+                    "type": UserInput.OPTION_INFO,
+                    "help": "Please enter the security code that was sent to your Telegram app to continue."
+                },
+                "security-code": {
+                    "type": UserInput.OPTION_TEXT,
+                    "help": "Security code",
+                    "sensitive": True
+                }})
 
         # simple!
         return {

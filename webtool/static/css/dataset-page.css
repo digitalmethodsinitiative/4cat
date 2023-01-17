@@ -29,23 +29,19 @@ article.result > section:first-child {
     overflow: hidden;
 }
 
-.result h3, .result h2 {
-    position: relative;
-}
-
-.result h3 button, .result h2 button {
+.analysis-gallery .filter-processors {
     border: 0;
     border-radius: 0;
     position: absolute;
     right: 0;
     top: 0;
     margin: 0;
-    padding: calc(0.5em + 1px);
+    height: 100%;
 }
 
-.result h2 button {
-    padding: calc(0.5em + 1px);
-    font-size: 0.8em;
+.analysis-gallery .filter-processors input {
+    height: 100%;
+    box-sizing: border-box;
 }
 
 .result h2 input {
@@ -479,6 +475,11 @@ article.result > section:first-child {
 .processor-option-wrap button.tooltip-trigger {
     margin-top: 0.5em;
     margin-left: 0.5em;
+}
+
+.processor-options textarea {
+    min-width: 25em;
+    min-height: 6em;
 }
 
 .multi-select-search {

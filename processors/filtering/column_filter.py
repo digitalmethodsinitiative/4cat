@@ -5,7 +5,7 @@ import re
 import datetime
 
 from processors.filtering.base_filter import BaseFilter
-from common.lib.helpers import UserInput
+from common.lib.helpers import UserInput, convert_to_int
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters", "Dale Wahl"]
@@ -37,6 +37,8 @@ class ColumnFilter(BaseFilter):
                 "greater-than": "is greater than (numerical values only)",
                 "before": "is before (dates only)",
                 "after": "is after (dates only)",
+                "top": "is in the top n results for this attribute (use 'Match with' for n)",
+                "bottom": "is in the bottom n results for this attribute (use 'Match with' for n)"
             },
             "default": "exact"
         },
@@ -56,18 +58,8 @@ class ColumnFilter(BaseFilter):
                 "all": "Retain if all values match"
             },
             "tooltip": "When matching on multiple values, you can choose to retain items if all provided values "
-                       "match, or if any single one matches. Ignored when matching on a single value."
-        },
-        "record-matches": {
-            "type": UserInput.OPTION_CHOICE,
-            "help": "Create True/False column for each match string",
-            "default": "no",
-            "options": {
-                "yes": "Yes, create match value columns",
-                "no": "No, filter only"
-            },
-            "tooltip": "Only relevant for 'any' match type. A column is created for each match value and marked True "
-                       "if value was found in column."
+                       "match, or if any single one matches. Ignored when matching on a single value or selecting top "
+                       "results."
         }
     }
 
@@ -83,7 +75,7 @@ class ColumnFilter(BaseFilter):
 
     @classmethod
     def get_options(cls, parent_dataset=None, user=None):
-
+        
         options = cls.options
         if not parent_dataset:
             return options
@@ -96,7 +88,7 @@ class ColumnFilter(BaseFilter):
                 "options": parent_columns,
                 "help": "Column"
         }
-
+        
         return options
 
     def filter_items(self):
@@ -107,15 +99,13 @@ class ColumnFilter(BaseFilter):
 
         :return generator:
         """
-        num_of_surrounding_characters_to_select = 25
+        self.dataset.update_status("Searching for matching posts")
+        # Get match column parameters
         column = self.parameters.get("column", "")
         match_values = [value.strip() for value in self.parameters.get("match-value").split(",")]
         match_style = self.parameters.get("match-style", "")
         match_multiple = self.parameters.get("match-multiple")
         match_function = any if match_multiple == "any" else all
-        record_matches = True if self.parameters.get("record-matches") == 'yes' else False
-        self.dataset.log('Searching for matches in column %s' % column)
-        self.dataset.log('Match values: %s' % ', '.join(match_values))
 
         if match_style in ("less-than", "greater-than"):
             try:
@@ -124,6 +114,10 @@ class ColumnFilter(BaseFilter):
                 self.dataset.update_status("Cannot do '%s' comparison with non-numeric value(s)", is_final=True)
                 self.dataset.finish(0)
                 return
+
+        elif match_style in("top", "bottom"):
+            for item in self.filter_top(column, match_values[0], (match_style=="bottom")):
+                yield item
 
         # pre-process dates to compare to
         elif match_style in ("after", "before"):
@@ -148,8 +142,12 @@ class ColumnFilter(BaseFilter):
 
         matching_items = 0
         processed_items = 0
-        with self.dataset.get_results_path().open("w", encoding="utf-8") as outfile:
-            writer = None
+        date_compare = None
+        for original_item, mapped_item in self.source_dataset.iterate_mapped_items(self):
+            processed_items += 1
+            if processed_items % 500 == 0:
+                self.dataset.update_status("Processed %i items (%i matching)" % (processed_items, matching_items))
+                self.dataset.update_progress(processed_items / self.source_dataset.num_rows)
 
             # comparing dates is allowed on both unix timestamps and
             # 'human' timestamps. For that reason, if we *are* indeed
@@ -168,139 +166,63 @@ class ColumnFilter(BaseFilter):
                         self.dataset.finish(0)
                         return
 
-                    if match_multiple == "any" and record_matches:
-                        fieldnames = list(item.keys()) + match_values + ['list_matches']
-                    else:
-                        fieldnames = item.keys()
-                    # initialise csv writer - we do this explicitly rather than
-                    # using self.write_items_and_finish() because else we have
-                    # to store a potentially very large amount of items in
-                    # memory which is not a good idea
-                    writer = csv.DictWriter(outfile, fieldnames=fieldnames)
-                    writer.writeheader()
+            # depending on match type, mark as matching or not one way or
+            # another. This could be greatly optimised for some cases, e.g.
+            # when there is only a single value to compare to, and
+            # short-circuiting for 'any' matches - not clear if worth it.
+            matches = False
+            if match_style == "exact" and match_function([mapped_item.get(column) == value for value in match_values]):
+                matches = True
+            elif match_style == "exact-not" and match_function([mapped_item.get(column) != value for value in match_values]):
+                matches = True
+            elif match_style == "contains" and match_function([value in mapped_item.get(column) for value in match_values]):
+                matches = True
+            elif match_style == "contains-not" and match_function(
+                    [value not in mapped_item.get(column) for value in match_values]):
+                matches = True
+            elif match_style == "after" and match_function([value <= date_compare for value in match_values]):
+                matches = True
+            elif match_style == "before" and match_function([value >= date_compare for value in match_values]):
+                matches = True
+            else:
+                # wrap this in a try-catch because we cannot be sure that
+                # the column we're comparing to contains valid numerical
+                # values
+                try:
+                    if match_style == "greater-than" and match_function(
+                            [float(value) < float(mapped_item.get(column)) for value in match_values]):
+                        matches = True
+                    elif match_style == "less-than" and match_function(
+                            [float(value) > float(mapped_item.get(column)) for value in match_values]):
+                        matches = True
+                except (TypeError, ValueError):
+                    # do not match
+                    pass
 
-                processed_items += 1
-                if processed_items % 500 == 0:
-                    self.dataset.update_status("Processed %i items (%i matching)" % (processed_items, matching_items))
-                    self.dataset.update_progress(processed_items / self.source_dataset.num_rows)
+            if matches:
+                yield original_item
+                matching_items += 1
 
-                # Get column to be used in search for matches
-                item_column = item.get(column)
-
-                # comparing dates is allowed on both unix timestamps and
-                # 'human' timestamps. For that reason, if we *are* indeed
-                # comparing dates, do some pre-processing to make sure we can
-                # actually compare the value properly.
-                if match_style in ("before", "after"):
-                    if re.match(r"[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}", item.get(column)):
-                        item_column = datetime.datetime.strptime(item.get(column), "%Y-%m-%d %H:%M:%S").timestamp()
-                    else:
-                        try:
-                            item_column = int(item.get(column))
-                        except ValueError:
-                            self.dataset.update_status(
-                                "Invalid date value '%s', cannot determine if before or after" % item.get(column),
-                                is_final=True)
-                            self.dataset.finish(0)
-                            return
-
-                # Compare each match_value with item_column depending on match_style
-                match_list = self.get_list_of_matches(match_style, item_column, match_values)
-                # Check 'any' or 'all'
-                if match_list is not None and match_function(match_list):
-                    matches = True
-
-                    # If recording matches, then update the item to include columns for the match_values
-                    if match_multiple == "any" and record_matches:
-                        list_matches = []
-                        for i in range(len(match_values)):
-                            # Map the results to the matches
-                            if match_list[i] and type(item_column) == str:
-                                matches = []
-                                placeholder = 0
-                                start_of_match = 0
-                                target_text = match_values[i]
-                                while start_of_match >= 0:
-                                    start_of_match = item_column[placeholder:].find(target_text)
-                                    if start_of_match != -1:
-                                        current_match = item_column[max(placeholder + start_of_match - num_of_surrounding_characters_to_select,0):placeholder + start_of_match + len(target_text) + num_of_surrounding_characters_to_select]
-                                        matches.append(current_match)
-                                        placeholder = placeholder + start_of_match + len(target_text)
-                                item[match_values[i]] = ', '.join(matches)
-                            else:
-                                item[match_values[i]] = match_list[i]
-                            # Create aggregate column
-                            if match_list[i]:
-                                list_matches.append(str(match_values[i]))
-                        item['list_matches'] = list_matches
-                else:
-                    matches = False
-
-                if matches:
-                    writer.writerow(item)
-                    matching_items += 1
-
-        if matching_items == 0:
-            self.dataset.update_status("No items matched your criteria", is_final=True)
-
-        self.dataset.finish(matching_items)
-
-    def get_list_of_matches(self, match_style, item_column, match_values):
+    def filter_top(self, column, top_n, bottom=False):
         """
-        Depending on the match_style, a list of True/False is returned for each value in match_values compared to
-        item_column
+        Filter top n items
+
+        :param str column:  Column to rank by
+        :param int top_n:  Number of items to return/top n items
+        :param bool bottom:  If true, return bottom results instead
+        :return:
         """
-        # depending on match type, mark as matching or not one way or
-        # another. This could be greatly optimised for some cases, e.g.
-        # when there is only a single value to compare to, and
-        # short-circuiting for 'any' matches - not clear if worth it.
-        if match_style == "exact":
-            match_list = [item_column == value for value in match_values]
-        elif match_style == "exact-not":
-            match_list = [item_column != value for value in match_values]
-        elif match_style == "contains":
-            match_list = [value in item_column for value in match_values]
-        elif match_style == "contains-not":
-            match_list = [value not in item_column for value in match_values]
-        elif match_style == "after":
-            match_list = [value <= item_column for value in match_values]
-        elif match_style == "before":
-            match_list = [value >= item_column for value in match_values]
-        else:
-            # wrap this in a try-catch because we cannot be sure that
-            # the column we're comparing to contains valid numerical
-            # values
-            try:
-                if match_style == "greater-than":
-                    match_list = [float(value) < float(item_column) for value in match_values]
-                elif match_style == "less-than":
-                    match_list = [float(value) > float(item_column) for value in match_values]
-            except (TypeError, ValueError):
-                # do not match
-                match_list = None
+        possible_values = set()
+        top_n = convert_to_int(top_n, 10)
+        for item in self.source_dataset.iterate_items():
+            possible_values.add(item.get(column))
 
-        return match_list
+        ranked_items = 0
+        top_values = sorted(list(possible_values), reverse=(not bottom))[:top_n]
+        for original_item, item in self.source_dataset.iterate_mapped_items():
+            if item.get(column) in top_values:
+                ranked_items = 0
+                yield original_item
 
-    def surrounding_text(self, text, target, num_char):
-        """
-        Simple find some surrounding text function. Probably should use
-        regex, but whatever.
-
-        :param text string: text to be searched
-        :param target string: substring to look for in text parameter
-        :param num_char int: number of charaters to add to beginning and end of
-        target text found
-        :return: None if nothing found else target substring plus nearby text
-        plus the index number from the original text where the target begins
-        """
-        start_of_match = text.find(target)
-        if start_of_match != -1:
-            return text[max(start_of_match - num_char,0):start_of_match + len(target) + num_char], start_of_match
-        else:
-            return None
-
-    def after_process(self):
-        super().after_process()
-
-        # Request standalone
-        self.create_standalone()
+            if ranked_items >= top_n:
+                return

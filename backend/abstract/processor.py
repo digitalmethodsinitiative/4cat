@@ -218,8 +218,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		if not self.dataset.is_finished():
 			self.dataset.finish()
 
-		if hasattr(self, "staging_area") and type(self.staging_area) == Path and self.staging_area.exists():
-			shutil.rmtree(self.staging_area)
+		self.dataset.remove_staging_areas()
 
 		# see if we have anything else lined up to run next
 		for next in self.parameters.get("next", []):
@@ -292,13 +291,12 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		Clean up result files and any staging files for processor to be attempted
 		later if desired.
 		"""
+		# Remove the results file that was created
 		if self.dataset.get_results_path().exists():
 			self.dataset.get_results_path().unlink()
 
-		if self.dataset.staging_area:
-			for staging_area in self.dataset.staging_area:
-				if staging_area.is_dir():
-					shutil.rmtree(staging_area)
+		# Remove any staging areas with temporary data
+		self.dataset.remove_staging_areas()
 
 	def abort(self):
 		"""
@@ -404,7 +402,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
 		self.dataset.update_status("Parent dataset updated.")
 
-	def iterate_archive_contents(self, path, staging_area=None):
+	def iterate_archive_contents(self, path, staging_area=None, immediately_delete=True):
 		"""
 		A generator that iterates through files in an archive
 
@@ -418,39 +416,38 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		:param Path staging_area:  Where to store the files while they're
 		  being worked with. If omitted, a temporary folder is created and
 		  deleted after use
+		:param bool immediately_delete:  Temporary files are removed after yielded;
+		  False keeps files until the staging_area is removed (usually during processor
+		  cleanup)
 		:return:  An iterator with a Path item for each file
 		"""
 
 		if not path.exists():
 			return
 
-		if staging_area and (not staging_area.exists() or not staging_area.is_dir()):
+		if not staging_area:
+			staging_area = self.dataset.get_staging_area()
+
+		if not staging_area.exists() or not staging_area.is_dir():
 			raise RuntimeError("Staging area %s is not a valid folder")
-		else:
-			if not hasattr(self, "staging_area") and not staging_area:
-				self.staging_area = self.dataset.get_staging_area()
-				staging_area = self.staging_area
 
 		with zipfile.ZipFile(path, "r") as archive_file:
 			archive_contents = sorted(archive_file.namelist())
 
 			for archived_file in archive_contents:
+				info = archive_file.getinfo(archived_file)
+				if info.is_dir():
+					continue
+
 				if self.interrupted:
-					if hasattr(self, "staging_area"):
-						shutil.rmtree(self.staging_area)
 					raise ProcessorInterruptedException("Interrupted while iterating zip file contents")
 
-				file_name = archived_file.split("/")[-1]
-				temp_file = staging_area.joinpath(file_name)
-				archive_file.extract(file_name, staging_area)
+				temp_file = staging_area.joinpath(archived_file)
+				archive_file.extract(archived_file, staging_area)
 
 				yield temp_file
-				if hasattr(self, "staging_area"):
+				if immediately_delete:
 					temp_file.unlink()
-
-		if hasattr(self, "staging_area"):
-			shutil.rmtree(self.staging_area)
-			del self.staging_area
 
 	def unpack_archive_contents(self, path, staging_area=None):
 		"""
@@ -473,13 +470,11 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		if not path.exists():
 			return
 
-		if staging_area and (not staging_area.exists() or not staging_area.is_dir()):
-			raise RuntimeError("Staging area %s is not a valid folder")
-		else:
-			if not hasattr(self, "staging_area"):
-				self.staging_area = self.dataset.get_staging_area()
+		if not staging_area:
+			staging_area = self.dataset.get_staging_area()
 
-			staging_area = self.staging_area
+		if not staging_area.exists() or not staging_area.is_dir():
+			raise RuntimeError("Staging area %s is not a valid folder")
 
 		paths = []
 		with zipfile.ZipFile(path, "r") as archive_file:
@@ -507,25 +502,24 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
 		:param data: A list or tuple of dictionaries, all with the same keys
 		"""
-		if not (isinstance(data, typing.List) or isinstance(data, typing.Tuple)) or isinstance(data, str):
-			raise TypeError("write_csv_items requires a list or tuple of dictionaries as argument")
+		if not (isinstance(data, typing.List) or isinstance(data, typing.Tuple) or callable(data)) or isinstance(data, str):
+			raise TypeError("write_csv_items requires a list or tuple of dictionaries as argument (%s given)" % type(data))
 
 		if not data:
 			raise ValueError("write_csv_items requires a dictionary with at least one item")
 
-		if not isinstance(data[0], dict):
-			raise TypeError("write_csv_items requires a list or tuple of dictionaries as argument")
-
 		self.dataset.update_status("Writing results file")
+		writer = False
 		with self.dataset.get_results_path().open("w", encoding="utf-8", newline='') as results:
-			writer = csv.DictWriter(results, fieldnames=data[0].keys())
-			writer.writeheader()
-
 			for row in data:
 				if self.interrupted:
 					raise ProcessorInterruptedException("Interrupted while writing results file")
 
 				row = remove_nuls(row)
+				if not writer:
+					writer = csv.DictWriter(results, fieldnames=row.keys())
+					writer.writeheader()
+
 				writer.writerow(row)
 
 		self.dataset.update_status("Finished")
@@ -580,6 +574,8 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
 		This has the benefit of allowing for all analyses that can be run on
 		full datasets on the new, filtered copy as well.
+
+		:return DataSet:  The new standalone dataset
 		"""
 		top_parent = self.source_dataset
 
@@ -611,6 +607,8 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		# standalone dataset, and this one is not accessible via the interface
 		# except as a link to the copied standalone dataset
 		os.unlink(self.dataset.get_results_path())
+
+		return standalone
 
 	@classmethod
 	def is_filter(cls):

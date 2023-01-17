@@ -35,5 +35,4 @@ is their password and `1.2.3.4` is the IP address from which 4CAT will access th
 - wildcards are allowed in IP addresses, so in principle something like 192.168.% could give access across a local network.
 
 ## Add the database and user information to 4CAT settings
-Under the 4CAT Settings tab, add the following to the JSON in "Data source configuration":
-"dmi-tcatv2": {"instances": [{'tcat_name': 'tcat2','db_name': 'twittercapture','db_user': 'username','db_password': 'password','db_host': 'ip_or_host','db_port': 3306,},]},
+Under the 4CAT Settings tab, look for the "DMI-TCAT Search (MySQL)" settings where the instances to connect to can be configured.

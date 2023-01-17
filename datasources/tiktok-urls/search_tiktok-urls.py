@@ -71,7 +71,7 @@ class SearchTikTokByID(Search):
     proxy_sleep = 1
     headers = {
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-        "Accept-Encoding": "gzip, deflate, br",
+        "Accept-Encoding": "gzip, deflate",
         "Accept-Language": "en-US,en;q=0.5",
         "Connection": "keep-alive",
         "DNT": "1",
@@ -161,7 +161,7 @@ class SearchTikTokByID(Search):
                 url = urls.pop(0)
                 url = url.replace("https://", "http://")  # https is finicky, lots of blocks
 
-                if url in seen_urls:
+                if url in seen_urls and url not in retries:
                     finished += 1
                     dupes += 1
                     self.dataset.log("Skipping duplicate of %s" % url)
@@ -275,7 +275,7 @@ class SearchTikTokByID(Search):
             notes.append("%s URL(s) failed or did not exist anymore" % "{:,}".format(failed))
         if dupes:
             notes.append("skipped %s duplicate(s)" % "{:,}".format(dupes))
-            
+
         if notes:
             self.dataset.update_status("Dataset completed, but not all URLs were collected (%s). See "
                                        "dataset log for details." % ", ".join(notes), is_final=True)
@@ -348,4 +348,4 @@ class SearchTikTokByID(Search):
         :param item:
         :return:
         """
-        return SearchTikTokByImport.map_tiktok_item(item)
+        return SearchTikTokByImport.map_item(item)

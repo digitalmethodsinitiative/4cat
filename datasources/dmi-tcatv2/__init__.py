@@ -9,4 +9,4 @@ from common.lib.helpers import init_datasource
 
 # Internal identifier for this data source
 DATASOURCE = "dmi-tcatv2"
-NAME = "DMI-TCAT Search v2"
+NAME = "DMI-TCAT Search (MySQL)"

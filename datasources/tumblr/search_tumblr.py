@@ -565,7 +565,7 @@ class SearchTumblr(Search):
 
 					# If there's no "notes" key in the returned dict, something might be up
 					else:
-						self.log.update_status("Couldn't get notes for Tumblr request " + str(notes))
+						self.dataset.update_status("Couldn't get notes for Tumblr request " + str(notes))
 						notes_retries += 1
 						pass
 

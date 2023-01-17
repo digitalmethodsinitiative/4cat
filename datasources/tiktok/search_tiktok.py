@@ -4,13 +4,13 @@ Import scraped TikTok data
 It's prohibitively difficult to scrape data from TikTok within 4CAT itself due
 to its aggressive rate limiting. Instead, import data collected elsewhere.
 """
+from datetime import datetime
 from pathlib import Path
 from urllib.parse import urlparse, parse_qs
 import json
 import time
 
 from backend.abstract.search import Search
-from common.lib.helpers import UserInput
 from common.lib.exceptions import WorkerInterruptedException
 
 
@@ -71,29 +71,38 @@ class SearchTikTok(Search):
 
     @staticmethod
     def map_item(post):
+        challenges = [challenge["title"] for challenge in post.get("challenges", [])]
+
         hashtags = [extra["hashtagName"] for extra in post.get("textExtra", []) if
                     "hashtagName" in extra and extra["hashtagName"]]
 
-        if type(post["author"]) is dict:
+        labels = ",".join(post["diversificationLabels"]) if type(post.get("diversificationLabels")) is list else ""
+
+        if type(post.get("author")) is dict:
             # from intercepted API response
             user_nickname = post["author"]["uniqueId"]
             user_fullname = post["author"]["nickname"]
             user_id = post["author"]["id"]
-        else:
+        elif post.get("author"):
             # from embedded JSON object
             user_nickname = post["author"]
             user_fullname = post["nickname"]
+            user_id = ""
+        else:
+            user_nickname = ""
+            user_fullname = ""
             user_id = ""
 
         # there are various thumbnail URLs, some of them expire later than
         # others. Try to get the highest-resolution one that hasn't expired
         # yet
         thumbnail_options = []
-        if post["video"].get("cover"):
-            thumbnail_options.append(post["video"]["cover"])
 
         if post["video"].get("shareCover"):
             thumbnail_options.append(post["video"]["shareCover"].pop())
+
+        if post["video"].get("cover"):
+            thumbnail_options.append(post["video"]["cover"])
 
         thumbnail_url = [url for url in thumbnail_options if int(parse_qs(urlparse(url).query).get("x-expires", [time.time()])[0]) >= time.time() - 3600]
         thumbnail_url = thumbnail_url.pop() if thumbnail_url else ""
@@ -103,22 +112,31 @@ class SearchTikTok(Search):
             "thread_id": post["id"],
             "author": user_nickname,
             "author_full": user_fullname,
-            "author_id": user_id,
-            "author_followers": post["authorStats"]["followerCount"],
+            "author_followers": post.get("authorStats", {}).get("followerCount", ""),
+            "author_likes": post.get("authorStats", {}).get("diggCount", ""),
+            "author_videos": post.get("authorStats", {}).get("videoCount", ""),
+            "author_avatar": post.get("avatarThumb", ""),
             "body": post["desc"],
-            "timestamp": int(post["createTime"]),
-            "is_duet": post["duetInfo"].get("duetFromId") != "0",
+            "timestamp": datetime.utcfromtimestamp(int(post["createTime"])).strftime('%Y-%m-%d %H:%M:%S'),
+            "unix_timestamp": int(post["createTime"]),
+            "is_duet": "yes" if (post.get("duetInfo", {}).get("duetFromId") != "0" if post.get("duetInfo", {}) else False) else "no",
+            "is_ad": "yes" if post.get("isAd", False) else "no",
             "music_name": post["music"]["title"],
             "music_id": post["music"]["id"],
             "music_url": post["music"]["playUrl"],
+            "music_thumbnail": post["music"].get("coverLarge", ""),
+            "music_author": post["music"].get("authorName", ""),
             "video_url": post["video"].get("downloadAddr", ""),
-            "tiktok_url": "https://tiktok.com/@%s/video/%s" % (user_nickname, post["id"]),
+            "tiktok_url": "https://www.tiktok.com/@%s/video/%s" % (user_nickname, post["id"]),
             "thumbnail_url": thumbnail_url,
             "likes": post["stats"]["diggCount"],
             "comments": post["stats"]["commentCount"],
             "shares": post["stats"]["shareCount"],
             "plays": post["stats"]["playCount"],
             "hashtags": ",".join(hashtags),
+            "challenges": ",".join(challenges),
+            "diversification_labels": labels,
+            "location_created": post.get("locationCreated", ""),
             "stickers": "\n".join(" ".join(s["stickerText"]) for s in post.get("stickersOnItem", [])),
             "effects": ",".join([e["name"] for e in post.get("effectStickers", [])]),
             "warning": ",".join([w["text"] for w in post.get("warnInfo", [])])

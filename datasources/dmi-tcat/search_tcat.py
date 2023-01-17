@@ -111,6 +111,16 @@ class SearchWithinTCATBins(Search):
         },
     }
 
+    config = {
+        "dmi-tcat.instances": {
+            "type": UserInput.OPTION_TEXT_JSON,
+            "help": "DMI-TCAT instances",
+            "tooltip": 'List of DMI-TCAT instance URLs, e.g. ["http://username:password@tcat.instance.webpage.net"]. '
+                       'This  needs to be formatted as a JSON list of strings.',
+            "default": []
+        }
+    }
+
     @classmethod
     def get_options(cls, parent_dataset=None, user=None):
         """
@@ -127,7 +137,7 @@ class SearchWithinTCATBins(Search):
         """
         options = cls.options
 
-        instances = config.get('DATASOURCES').get("dmi-tcat", {}).get("instances", [])
+        instances = config.get("dmi-tcat.instances", [])
         all_bins = {}
         for instance in instances:
             # query each configured TCAT instance for a list of bins that can
@@ -179,7 +189,7 @@ class SearchWithinTCATBins(Search):
         # instance URL again here
         # while the parameter could be marked 'sensitive', the values would
         # still show up in e.g. the HTML of the 'create dataset' form
-        available_instances = config.get('DATASOURCES').get("dmi-tcat", {}).get("instances", [])
+        available_instances = config.get("dmi-tcat.instances", [])
         instance_url = ""
         for available_instance in available_instances:
             hostname = re.sub(r"https?://", "", available_instance).split("@").pop().rstrip("/")

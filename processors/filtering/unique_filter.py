@@ -1,13 +1,13 @@
 """
 Filter by unique posts
 """
-import hashlib
+import json
 
 from processors.filtering.base_filter import BaseFilter
 from common.lib.helpers import UserInput
 
 __author__ = "Sal Hagen"
-__credits__ = ["Sal Hagen"]
+__credits__ = ["Sal Hagen", "Stijn Peeters"]
 __maintainer__ = "Sal Hagen"
 __email__ = "4cat@oilab.eu"
 
@@ -18,18 +18,36 @@ class UniqueFilter(BaseFilter):
 	"""
 	type = "unique-filter"  # job type ID
 	category = "Filtering"  # category
-	title = "Filter for unique posts"  # title displayed in UI
-	description = "Retain posts with a unique body text. Only keeps the first encounter of a text. Useful for filtering spam. This creates a new dataset."  # description displayed in UI
+	title = "Filter for unique items"  # title displayed in UI
+	description = "Only keeps the first encounter of an item. This creates a new dataset."  # description displayed in UI
 
 	# the following determines the options available to the user via the 4CAT
 	# interface.
 	options = {
-		"case_sensitive": {
+		"columns": {
+			"type": UserInput.OPTION_TEXT,
+			"help": "Item attributes to consider for uniqueness",
+			"inline": True,
+			"default": "body"
+		},
+		"match-multiple": {
+			"type": UserInput.OPTION_CHOICE,
+			"help": "Match multiple values",
+			"default": "all",
+			"options": {
+				"all": "Consider duplicate if all selected values are identical",
+				"any": "Consider duplicate if any selected values are identical"
+			},
+			"tooltip": "When matching on multiple values, you can choose to discard items if all provided values "
+					   "match a similar combination of values in another item, or if any single value has been "
+					   "seen before. Ignored when matching on a single value."
+		},
+		"fold-case": {
 			"type": UserInput.OPTION_TOGGLE,
-			"help": "Case sensitive",
+			"help": "Case insensitive",
 			"default": False,
-			"tooltip": "Selecting this will e.g. consider 'Cat' and and 'cat' as different."
-		}
+			"tooltip": "Selecting this will e.g. consider 'Cat' and and 'cat' as identical."
+		},
 	}
 
 	@classmethod
@@ -56,29 +74,77 @@ class UniqueFilter(BaseFilter):
 		processed = 0
 		unique = 0
 
-		hashes = set()
+		match_mode = self.parameters.get("match-multiple", "all")
+		fold_case = self.parameters.get("fold-case", False)
+		columns = self.parameters.get("columns")
+		if type(columns) is str:
+			columns = {columns}
+		else:
+			columns = set(columns)
+
+		# use sets, which auto-hash and deduplicate
+		known_values = {column: set() for column in columns}
+		known_items = set()
 
 		# iterate through posts and see if they match
 		for original_item, mapped_item in self.source_dataset.iterate_mapped_items(self):
+			unique_item = False
 
-			if not mapped_item.get("body", None):
-				continue
+			if match_mode == "all":
+				# we can't hash a dictionary
+				# so instead, hash the json dump of the dictionary!
+				full_item = json.dumps({k: v for k, v in mapped_item.items() if k in columns})
+				if full_item not in known_items:
+					unique_item = True
+					known_items.add(full_item)
 
-			body = mapped_item["body"].strip()
-			if not self.parameters.get("case_sensitive", False):
-				body = body.lower()
+			elif match_mode == "any":
+				unique_columns = set()
+				for column in columns:
+					value = mapped_item.get(column)
+					if type(value) is str and fold_case:
+						value = value.lower()
 
-			hash_object = hashlib.md5(body.encode("utf-8"))
-			md5_hash = hash_object.hexdigest()
+					if value not in known_values[column]:
+						unique_columns.add(column)
+						known_values[column].add(value)
 
-			if md5_hash not in hashes:
+				if unique_columns == columns:
+					unique_item = True
+
+			if unique_item:
 				unique += 1
 				yield original_item
 
-			hashes.add(md5_hash)
-
-			if processed % 2500 == 0:
+			if processed % 500 == 0:
 				self.dataset.update_status("Processed %i posts (%i unique)" % (processed, unique))
 				self.dataset.update_progress(processed / self.source_dataset.num_rows)
 
 			processed += 1
+
+	@classmethod
+	def get_options(cls, parent_dataset=None, user=None):
+		"""
+		Get processor options
+
+		This method by default returns the class's "options" attribute, or an
+		empty dictionary. It can be redefined by processors that need more
+		fine-grained options, e.g. in cases where the availability of options
+		is partially determined by the parent dataset's parameters.
+
+		:param DataSet parent_dataset:  An object representing the dataset that
+		the processor would be run on
+		:param User user:  Flask user the options will be displayed for, in
+		case they are requested for display in the 4CAT web interface. This can
+		be used to show some options only to privileges users.
+		"""
+		options = cls.options
+
+		# Get the columns for the select columns option
+		if parent_dataset and parent_dataset.get_columns():
+			columns = parent_dataset.get_columns()
+			options["columns"]["type"] = UserInput.OPTION_MULTI
+			options["columns"]["options"] = {v: v for v in columns}
+			options["columns"]["default"] = "body" if "body" in columns else None
+
+		return options

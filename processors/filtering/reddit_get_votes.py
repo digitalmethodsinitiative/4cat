@@ -5,7 +5,7 @@ import shutil
 import praw, praw.exceptions
 import csv
 
-from prawcore.exceptions import Forbidden, NotFound
+from prawcore.exceptions import Forbidden, NotFound, PrawcoreException
 
 from backend.abstract.processor import BasicProcessor
 from common.lib.user_input import UserInput
@@ -52,7 +52,7 @@ class RedditVoteChecker(BasicProcessor):
 
 		:param module: Dataset or processor to determine compatibility with
 		"""
-		if module.is_dataset():
+		if config.get('api.reddit.client_id', False) and config.get('api.reddit.secret', False) and module.is_dataset():
 			return module.is_top_dataset() and module.type == "reddit-search" and module.num_rows <= 5000
 		return False
 
@@ -99,8 +99,11 @@ class RedditVoteChecker(BasicProcessor):
 
 				for comment in thread.comments.list():
 					post_scores[comment.id] = comment.score
-			except praw.exceptions.PRAWException:
-				self.dataset.update_status("Error while communicating with Reddit.")
+			except (praw.exceptions.PRAWException, PrawcoreException) as e:
+				if e.response.status_code == 401:
+					self.dataset.update_status("Unauthorized response from Reddit; check API keys. (%s)" % str(e))
+				else:
+					self.dataset.update_status("Error while communicating with Reddit, halting processor. (%s)" % str(e))
 				self.dataset.finish(0)
 				return
 			except Forbidden:

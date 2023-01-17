@@ -2,6 +2,5 @@
 from common.lib.helpers import init_datasource
 
 # Internal identifier for this data source
-DATASOURCE = "customimport"
-NAME = "Import from other tool (upload)"
-IS_STATIC = True
+DATASOURCE = "upload"
+NAME = "Import/upload CSV file"

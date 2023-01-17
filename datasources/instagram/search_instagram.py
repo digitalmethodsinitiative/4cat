@@ -113,7 +113,6 @@ class SearchInstagram(Search):
         if media_node["__typename"] == "GraphVideo":
             media_url = media_node["video_url"]
         elif media_node["__typename"] == "GraphImage":
-            print(json.dumps(media_node))
             resources = media_node.get("display_resources", media_node.get("thumbnail_resources"))
             try:
                 media_url = resources.pop()["src"]
@@ -198,6 +197,13 @@ class SearchInstagram(Search):
         else:
             num_comments = -1
 
+        location = {"name": "", "latlong": "", "city": ""}
+        if node.get("location"):
+            location["name"] = node["location"].get("name")
+            location["latlong"] = str(node["location"]["lat"]) + "," + str(node["location"]["lng"]) if node[
+                "location"].get("lat") else ""
+            location["city"] = node["location"].get("city")
+
         mapped_item = {
             "id": node["code"],
             "thread_id": node["code"],
@@ -217,6 +223,9 @@ class SearchInstagram(Search):
             "num_likes": node["like_count"],
             "num_comments": num_comments,
             "num_media": num_media,
+            "location_name": location["name"],
+            "location_latlong": location["latlong"],
+            "location_city": location["city"],
             "unix_timestamp": node["taken_at"]
         }
 

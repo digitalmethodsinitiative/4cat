@@ -2,6 +2,7 @@
 Download images linked in dataset
 """
 import requests
+import binascii
 import hashlib
 import base64
 import json
@@ -103,7 +104,17 @@ class ImageDownloader(BasicProcessor):
 			columns = parent_dataset.get_columns()
 			options["columns"]["type"] = UserInput.OPTION_MULTI
 			options["columns"]["options"] = {v: v for v in columns}
-			options["columns"]["default"] = "body" if "body" in columns else sorted(columns, key=lambda k: "image" in k).pop()
+			# Pick a good default
+			if "image_md5" in columns:
+				# 4CHAN image column
+				options["columns"]["default"] = "image_md5"
+			elif "image_url" in columns:
+				options["columns"]["default"] = "image_url"
+			elif "image" in ''.join(columns):
+				# Any image will do
+				options["columns"]["default"] = sorted(columns, key=lambda k: "image" in k).pop()
+			else:
+				options["columns"]["default"] = "body"
 
 		return options
 
@@ -133,6 +144,8 @@ class ImageDownloader(BasicProcessor):
 		if amount == 0:
 			amount = config.get('image_downloader.MAX_NUMBER_IMAGES', 1000)
 		columns = self.parameters.get("columns")
+		if type(columns) is str:
+			columns = [columns]
 
 		# is there anything for us to download?
 		if self.source_dataset.num_rows == 0:
@@ -504,11 +517,16 @@ class ImageDownloader(BasicProcessor):
 			self.dataset.log("DEBUG: 4chan image thumbnail %s status code: %i" % (thumbnail_url, image.status_code))
 			raise FileNotFoundError()
 
-		md5 = hashlib.md5()
-		based_hash = url.split("/")[-1].split(".")[0].replace("_", "/")
-		extension = image_url.split(".")[-1].lower()
-		md5.update(base64.b64decode(based_hash))
-		file_name = md5.hexdigest() + "." + extension
+		try:
+			md5 = hashlib.md5()
+			based_hash = url.split("/")[-1].split(".")[0].replace("_", "/")
+			extension = image_url.split(".")[-1].lower()
+			md5.update(base64.b64decode(based_hash))
+			file_name = md5.hexdigest() + "." + extension
+		except binascii.Error:
+			# raised if the base64 value is not actually base64
+			# in which case we can't re-generate the hash
+			raise FileNotFoundError()
 
 		# avoid getting rate-limited by image source
 		time.sleep(rate_limit)

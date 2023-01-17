@@ -123,7 +123,7 @@ class ImageTextDetector(BasicProcessor):
             if self.interrupted:
                 raise ProcessorInterruptedException("Interrupted while fetching data from Google Vision API")
 
-            if path.name == '.metadata.json':
+            if image_file.name == '.metadata.json':
                 continue
 
             done += 1

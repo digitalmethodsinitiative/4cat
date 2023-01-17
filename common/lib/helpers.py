@@ -1,8 +1,10 @@
 """
 Miscellaneous helper functions for the 4CAT backend
 """
-from urllib.parse import urlparse
+
+import ssl
 import subprocess
+from urllib.parse import urlparse
 import requests
 import datetime
 import smtplib
@@ -19,7 +21,6 @@ import io
 from collections.abc import MutableMapping
 from pathlib import Path
 from html.parser import HTMLParser
-from werkzeug.datastructures import FileStorage
 from calendar import monthrange
 
 from common.lib.user_input import UserInput
@@ -100,7 +101,7 @@ def sniff_encoding(file):
 
     Currently only distinguishes UTF-8 and UTF-8 with BOM
 
-    :param FileStorage file:
+    :param file:
     :return:
     """
     if hasattr(file, "getbuffer"):
@@ -329,7 +330,7 @@ def get_4cat_canvas(path, width, height, header=None, footer="made with 4CAT", f
     :param fontsize_large:  Font size of large text (e.g. header)
     :return SVG:  SVG canvas (via svgwrite) that can be drawn to
     """
-    from svgwrite.container import SVG
+    from svgwrite.container import SVG, Hyperlink
     from svgwrite.drawing import Drawing
     from svgwrite.shapes import Rect
     from svgwrite.text import Text
@@ -361,9 +362,11 @@ def get_4cat_canvas(path, width, height, header=None, footer="made with 4CAT", f
         footersize = (fontsize_small * len(footer) * 0.7, fontsize_small * 2)
         footer_shape = SVG(insert=(width - footersize[0], height - footersize[1]), size=footersize)
         footer_shape.add(Rect(insert=(0, 0), size=("100%", "100%"), fill="#000"))
-        footer_shape.add(
+        link = Hyperlink(href="https://4cat.nl")
+        link.add(
             Text(insert=("50%", "50%"), text=footer, dominant_baseline="middle", text_anchor="middle", fill="#FFF",
                  style="font-size:%ipx" % fontsize_small))
+        footer_shape.add(link)
         canvas.add(footer_shape)
 
     return canvas
@@ -810,10 +813,48 @@ def flatten_dict(d: MutableMapping, parent_key: str = '', sep: str = '.'):
             new_key = parent_key + sep + k if parent_key else k
             if isinstance(v, MutableMapping):
                 yield from flatten_dict(v, new_key, sep=sep).items()
-            elif isinstance(v, list):
+            elif isinstance(v, (list, set)):
                 yield new_key, json.dumps(
                     [flatten_dict(item, new_key, sep=sep) if isinstance(item, MutableMapping) else item for item in v])
             else:
                 yield new_key, v
 
     return dict(_flatten_dict_gen(d, parent_key, sep))
+
+
+def sets_to_lists(d: MutableMapping):
+    """
+    Return a dictionary where all nested sets have been converted to lists.
+
+    :param MutableMapping d:  Dictionary like object
+    :return dict:  A new dictionary with the no nested sets
+    """
+
+    def _check_list(l):
+        return [sets_to_lists(item) if isinstance(item, MutableMapping) else _check_list(item) if isinstance(item, (set,list)) else item for item in l]
+
+    def _sets_to_lists_gen(d):
+        for k, v in d.items():
+            if isinstance(v, MutableMapping):
+                yield k, sets_to_lists(v)
+            elif isinstance(v, (list, set)):
+                yield k, _check_list(v)
+            else:
+                yield k, v
+
+    return dict(_sets_to_lists_gen(d))
+
+
+def validate_url(x):
+    """
+    Checks that a string is a valid url. Uses urlparse from urllib.parse to check that there is both a proper scheme
+    and netloc (host) for the url.
+
+    :param str x:  string representing a url
+    :return bool:  True if string is valid url, False if not
+    """
+    if type(x) == str:
+        result = urlparse(x)
+        return all([result.scheme, result.netloc])
+    else:
+        raise ValueError('Must provide type str not type %s' % type(x))

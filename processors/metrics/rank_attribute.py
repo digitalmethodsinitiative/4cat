@@ -88,11 +88,11 @@ class AttributeRanker(BasicProcessor):
 			"tooltip": "Frequencies will be multiplied by the value in this column (e.g. 'views')."
 		},
 		"to-lowercase": {
-            "type": UserInput.OPTION_TOGGLE,
-            "default": True,
-            "help": "Convert values to lowercase",
-            "tooltip": "Merges values with varying cases"
-        }
+			"type": UserInput.OPTION_TOGGLE,
+			"default": True,
+			"help": "Convert values to lowercase",
+			"tooltip": "Merges values with varying cases"
+		}
 	}
 
 	@classmethod
@@ -122,7 +122,7 @@ class AttributeRanker(BasicProcessor):
 		cutoff = convert_to_int(self.parameters.get("top"), 15)
 		weighby = self.parameters.get("weigh")
 		to_lowercase = self.parameters.get("to-lowercase", True)
-		
+
 		try:
 			if self.parameters.get("filter"):
 				filter = re.compile(".*" + self.parameters.get("filter") + ".*")
@@ -179,7 +179,7 @@ class AttributeRanker(BasicProcessor):
 			for value in values:
 				if to_lowercase:
 						value = value.lower()
-				
+
 				if rank_style == "overall" and value not in overall_top:
 					continue
 
@@ -227,7 +227,7 @@ class AttributeRanker(BasicProcessor):
 		Get relevant values for attribute per post
 
 		:param dict post:  Post dictionary
-		:param list attribute:  Attribute to extract from post body
+		:param list attributes:  Attribute to extract from post body
 		:param filter:  A compiled regular expression to filter values with, or None
 		:param bool split_comma:  Split values by comma?
 		:return list:  Items found for attribute
@@ -267,16 +267,18 @@ class AttributeRanker(BasicProcessor):
 		www_regex = re.compile(r"^www\.")
 		values = []
 
-		if look_for in ("url", "hostname"):
+		if look_for in ("urls", "hostnames"):
 			links = link_regex.findall(value)
 
-			if look_for == "hostname":
+			if look_for == "hostnames":
 				for urlbits in links:
 					urlbits = urlbits.split("/")
 					if len(urlbits) >= 3:
 						values.append(www_regex.sub("", urlbits[2]))
 			else:
 				values += list(links)
+
+			return values
 
 		elif look_for == "hashtags":
 			hashtags = list(re.findall(r"#([a-zA-Z0-9_]+)", value))

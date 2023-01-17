@@ -96,6 +96,7 @@ cli.add_argument("--restart", "-x", default=False, action="store_true", help="Tr
 cli.add_argument("--no-migrate", "-m", default=False, action="store_true", help="Do not run scripts to upgrade between minor versions. Use if you only want to use migrate to e.g. upgrade dependencies.")
 cli.add_argument("--current-version", "-v", default="config/.current-version", help="File path to .current-version file, relative to the 4CAT root")
 cli.add_argument("--output", "-o", default="", help="By default migrate.py will send output to stdout. If this argument is set, it will write to the given path instead.")
+cli.add_argument("--component", "-c", default="both", help="Which component of 4CAT to migrate. Currently only skips check for if 4CAT is running when set to 'frontend'")
 args = cli.parse_args()
 
 print("")
@@ -149,6 +150,8 @@ if not args.yes:
 
 if not cwd.joinpath("backend/4cat.pid").exists():
 	logger.info("\n- No PID file found, assuming 4CAT is not running")
+elif args.component == "frontend":
+	logger.info("  ...updating front-end only, skipping check if daemon is running")
 else:
 	logger.info("- Making sure 4CAT is stopped... ")
 	result = subprocess.run([interpreter, "4cat-daemon.py", "--no-version-check", "force-stop"], stdout=subprocess.PIPE,
@@ -198,7 +201,7 @@ if args.release:
 			exit(1)
 
 	logger.info("  ...fetching tags from repository")
-	fetch = subprocess.run(shlex.split("git fetch --all"), stderr=subprocess.PIPE, stdout=subprocess.PIPE, cwd=cwd, text=True)
+	fetch = subprocess.run(shlex.split("git fetch 4cat_migrate"), stderr=subprocess.PIPE, stdout=subprocess.PIPE, cwd=cwd, text=True)
 
 	if fetch.returncode != 0:
 		logger.info("Error while fetching latest tags with git. Check that the repository URL is correct.")

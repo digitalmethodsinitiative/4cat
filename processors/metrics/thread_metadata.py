@@ -15,18 +15,12 @@ __email__ = "4cat@oilab.eu"
 
 class ThreadMetadata(BasicProcessor):
 	"""
-	Example post-processor
-
-	This is a very simple example post-processor.
-
-	The four configuration options should be set for all post-processors. They
-	contain information needed internally as well as information that is used
-	to describe this post-processor with in a user interface.
+	Extracts metadata on threads from the dataset.
 	"""
 	type = "thread-metadata"  # job type ID
 	category = "Post metrics"  # category
 	title = "Thread metadata"  # title displayed in UI
-	description = "Create an overview of the threads present in the dataset, containing thread IDs, subjects, and post counts."  # description displayed in UI
+	description = "Extract various metadata on the threads in the dataset, including time data and post counts. Note that this extracted only on the basis of the posts present this dataset."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
 	@classmethod

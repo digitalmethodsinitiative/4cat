@@ -132,7 +132,7 @@ class ImageWallGenerator(BasicProcessor):
 		random_values = list(range(0, self.source_dataset.num_rows))
 		random.shuffle(random_values)
 
-		for path in self.iterate_archive_contents(self.source_file, staging_area):
+		for path in self.iterate_archive_contents(self.source_file, staging_area, immediately_delete=False):
 			if self.interrupted:
 				raise ProcessorInterruptedException("Interrupted while determining image wall order")
 
