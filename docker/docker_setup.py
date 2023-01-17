@@ -152,3 +152,4 @@ if __name__ == "__main__":
             exit(1)
         else:
             config.set_or_create_setting('selenium.installed', True, raw=False)
+            config.set_or_create_setting('selenium.selenium_executable_path', "/usr/local/bin/geckodriver", raw=False)
