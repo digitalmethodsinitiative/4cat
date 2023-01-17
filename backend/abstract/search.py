@@ -178,8 +178,9 @@ class Search(BasicProcessor, ABC):
 				if self.interrupted:
 					raise WorkerInterruptedException()
 
-				line = json.loads(line)
-				yield line
+				# remove NUL bytes here because they trip up a lot of other
+				# things
+				yield json.loads(line.replace("\0", ""))["data"]
 
 		path.unlink()
 

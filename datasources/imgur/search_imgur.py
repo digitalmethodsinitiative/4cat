@@ -40,35 +40,6 @@ class SearchNineGag(Search):
         """
         raise NotImplementedError("Imgur datasets can only be created by importing data from elsewhere")
 
-    def import_from_file(self, path):
-        """
-        Import items from an external file
-
-        By default, this reads a file and parses each line as JSON, returning
-        the parsed object as an item. This works for NDJSON files. Data sources
-        that require importing from other or multiple file types can overwrite
-        this method.
-
-        The file is considered disposable and deleted after importing.
-
-        :param str path:  Path to read from
-        :return:  Yields all items in the file, item for item.
-        """
-        path = Path(path)
-        if not path.exists():
-            return []
-
-        with path.open() as infile:
-            for line in infile:
-                if self.interrupted:
-                    raise WorkerInterruptedException()
-
-                # remove NUL bytes here because they trip up a lot of other
-                # things
-                yield json.loads(line.replace("\0", ""))["data"]
-
-        path.unlink()
-
     @staticmethod
     def map_item(post):
         post_timestamp = datetime.strptime(post["created_at"], "%Y-%m-%dT%H:%M:%SZ")
