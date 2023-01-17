@@ -94,7 +94,6 @@ class HashSimilarityNetworker(BasicProcessor):
         hashes = []
         hash_metadata = {}
         bit_length = None
-        metadata_lists = None
         for item in self.source_dataset.iterate_items(self):
             if column not in item:
                 self.dataset.update_status("Column %s not found in dataset" % column, is_final=True)
@@ -145,24 +144,16 @@ class HashSimilarityNetworker(BasicProcessor):
                     identifiers.append(item_id)
                     hashes.append(np.array(item_hash))
 
-                    # Append any metadata associated with hash
-                    # Convert any list or numbers for Gephi
-                    if metadata_lists is None:
-                        metadata_lists = []
-                        metadata_numbers = []
-                        for key, value in item.items():
-                            if type(value) == list:
-                                metadata_lists.append(key)
-                            elif type(value) == str:
-                                try:
-                                    float(value)
-                                    metadata_numbers.append(key)
-                                except ValueError:
-                                    pass
-                    for key in metadata_lists:
-                        item[key] = ','.join(item[key])
-                    for key in metadata_numbers:
-                        item[key] = float(item[key])
+                    # Append any metadata associated with hash for Gephi
+                    for key, value in item.items():
+                        if type(value) == list:
+                            item[key] = ','.join(value)
+                        elif type(value) == str:
+                            try:
+                                float(value)
+                                item[key] = float(value)
+                            except ValueError:
+                                pass
 
                     if 'post_ids' in item:
                         item.pop('post_ids')
