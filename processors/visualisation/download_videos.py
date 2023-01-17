@@ -336,7 +336,7 @@ class VideoDownloaderPlus(BasicProcessor):
                         continue
                     except FailedToCopy as e:
                         # Unable to copy
-                        self.dataset.log(str(e))
+                        self.dataset.log(str(e)+"; attempting to download again")
                 elif previous_vid_metadata.get("retry", True) is False:
                     urls[url] = previous_vid_metadata
                     self.dataset.log(f"Skipping; previously identified url as not a video: {url}")
@@ -679,6 +679,14 @@ class VideoDownloaderPlus(BasicProcessor):
         dataset_key = previous_vid_metadata.get("file_dataset_key")
         dataset = [dataset for dataset in previous_downloaders if dataset.key == dataset_key]
 
+        if "files" in previous_vid_metadata:
+            files = previous_vid_metadata.get('files')
+        elif "filename" in previous_vid_metadata:
+            files = [{"filename": previous_vid_metadata.get("filename"), "success": True}]
+
+        if not files:
+            raise FailedToCopy(f"No file found in metadata")
+
         if not dataset:
             raise FailedToCopy(f"Dataset with key {dataset_key} not found")
         else:
@@ -687,7 +695,7 @@ class VideoDownloaderPlus(BasicProcessor):
         with zipfile.ZipFile(dataset.get_results_path(), "r") as archive_file:
             archive_contents = sorted(archive_file.namelist())
 
-            for file in previous_vid_metadata.get("files", []):
+            for file in files:
                 if file.get("filename") not in archive_contents:
                     raise FailedToCopy(f"Previously downloaded video {file.get('filename')} not found")
 
@@ -763,6 +771,8 @@ class DatasetVideoLibrary:
         """
         Check for other video-downloader processors run on the dataset and create library for reference
         """
+        #TODO: recursive this so we can check downloads from other filters? NO, make a central point and use the ORIGINAL key
+
         parent_dataset = self.current_dataset.get_parent()
         # Note: exclude current dataset
         previous_downloaders = [child for child in parent_dataset.children if (child.type == "video-downloader" and child.key != self.current_dataset.key)]
