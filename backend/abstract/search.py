@@ -60,7 +60,7 @@ class Search(BasicProcessor, ABC):
 		query_parameters = self.dataset.get_parameters()
 		results_file = self.dataset.get_results_path()
 
-		self.log.info("Querying: %s" % str(query_parameters))
+		self.log.info(f"Starting dataset creation for {self.type} dataset {self.dataset.key}")
 
 		# Execute the relevant query (string-based, random, countryflag-based)
 		try:
