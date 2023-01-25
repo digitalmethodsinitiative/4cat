@@ -24,6 +24,7 @@ services:
   backend:
     image: digitalmethodsinitiative/4cat:${DOCKER_TAG}
     container_name: 4cat_backend
+    init: true
     restart: unless-stopped
     env_file:
       - .env
