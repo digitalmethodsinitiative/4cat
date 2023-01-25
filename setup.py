@@ -44,6 +44,7 @@ packages = [
 	"PyTumblr==0.1.0",
 	"requests~=2.27",
 	"requests_futures",
+	"scikit-learn",
 	"scenedetect==0.6.0.3",
 	"spacy==3.4.3",
 	"svgwrite~=1.4.0",
