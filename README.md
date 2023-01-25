@@ -26,7 +26,7 @@ such as the generation and visualisation of word embedding models.
 platforms that are part of the tool, but you can also [add additional data
 sources](https://github.com/digitalmethodsinitiative/4cat/wiki/How-to-make-a-data-source)
 using 4CAT's Python API. The following data sources are currently supported
-actively:
+actively and can be used to collect data with 4CAT:
 
 * 4chan and 8kun
 * BitChute
@@ -35,12 +35,12 @@ actively:
 * Tumblr
 * Twitter API v2 (Academic and regular tracks)
 
-The following platforms are supported through other tools, from which you can
-import data into 4CAT for analysis:
+The following platforms are supported through other tools, with which you can
+collect data to import data into 4CAT for analysis:
 
+* Instagram, TikTok, 9gag, Imgur, LinkedIn, Parler (via
+  [Zeeschuimer](https://github.com/digitalmethodsinitiative/zeeschuimer))
 * Facebook and Instagram (via [CrowdTangle](https://www.crowdtangle.com) exports)
-* Instagram, TikTok, LinkedIn and Parler (via
-  [Zeeschuimer](https://github.com/digitalmethodsinitiative/zeeschuimer) or CrowdTangle)
 
 A number of other platforms have built-in support that is untested, or requires
 e.g. special API access. You can view the [data sources in our wiki](https://github.com/digitalmethodsinitiative/4cat/wiki/Available-data-sources) or review [the data
