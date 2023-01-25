@@ -657,6 +657,10 @@ h1 a {
     color: inherit;
 }
 
+footer nav ul, article section footer nav ul {
+    margin: 0;
+}
+
 
 /** --------------------- *
       Basic page layout

@@ -45,16 +45,11 @@ class SearchInstagram(Search):
         """
         raise NotImplementedError("Instagram datasets can only be created by importing data from elsewhere")
 
-    def import_from_file(self, path):
+
+    @staticmethod
+    def map_item(item):
         """
-        Import items from an external file
-
-        By default, this reads a file and parses each line as JSON, returning
-        the parsed object as an item. This works for NDJSON files. Data sources
-        that require importing from other or multiple file types can overwrite
-        this method.
-
-        The file is considered disposable and deleted after importing.
+        Map Instagram item
 
         Instagram importing is a little bit roundabout since we can expect
         input in two separate and not completely overlapping formats - an "edge
@@ -62,24 +57,9 @@ class SearchInstagram(Search):
         those, and do not contain the same data. So we find a middle ground
         here... each format has its own handler function
 
-        :param str path:  Path to read from
-        :return:  Yields all items in the file, item for item.
+        :param dict item:  Item to map
+        :return:  Mapped item
         """
-        path = Path(path)
-        if not path.exists():
-            return []
-
-        with path.open() as infile:
-            for line in infile:
-                if self.interrupted:
-                    raise WorkerInterruptedException()
-
-                yield json.loads(line.replace("\0", ""))["data"]
-
-        path.unlink()
-
-    @staticmethod
-    def map_item(item):
         is_graph_response = "__typename" in item
 
         if is_graph_response:

@@ -1,5 +1,5 @@
 """
-Initialize The Guardian data source
+Initialize 9gag data source
 """
 
 # An init_datasource function is expected to be available to initialize this
@@ -8,5 +8,5 @@ Initialize The Guardian data source
 from common.lib.helpers import init_datasource
 
 # Internal identifier for this data source
-DATASOURCE = "theguardian"
-NAME = "The Guardian Climate Change"
+DATASOURCE = "9gag"
+NAME = "9Gag"

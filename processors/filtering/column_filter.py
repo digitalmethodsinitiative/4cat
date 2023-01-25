@@ -5,7 +5,7 @@ import re
 import datetime
 
 from processors.filtering.base_filter import BaseFilter
-from common.lib.helpers import UserInput
+from common.lib.helpers import UserInput, convert_to_int
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters", "Dale Wahl"]
@@ -24,7 +24,10 @@ class ColumnFilter(BaseFilter):
                   "This will create a new dataset."
 
     options = {
-        "column": {},
+        "column": {
+            "type": UserInput.OPTION_CHOICE,
+            "help": "Column"
+        },
         "match-style": {
             "type": UserInput.OPTION_CHOICE,
             "help": "Match type",
@@ -37,6 +40,8 @@ class ColumnFilter(BaseFilter):
                 "greater-than": "is greater than (numerical values only)",
                 "before": "is before (dates only)",
                 "after": "is after (dates only)",
+                "top": "is in the top n results for this attribute (use 'Match with' for n)",
+                "bottom": "is in the bottom n results for this attribute (use 'Match with' for n)"
             },
             "default": "exact"
         },
@@ -56,7 +61,8 @@ class ColumnFilter(BaseFilter):
                 "all": "Retain if all values match"
             },
             "tooltip": "When matching on multiple values, you can choose to retain items if all provided values "
-                       "match, or if any single one matches. Ignored when matching on a single value."
+                       "match, or if any single one matches. Ignored when matching on a single value or selecting top "
+                       "results."
         }
     }
 
@@ -111,6 +117,10 @@ class ColumnFilter(BaseFilter):
                 self.dataset.update_status("Cannot do '%s' comparison with non-numeric value(s)", is_final=True)
                 self.dataset.finish(0)
                 return
+
+        elif match_style in("top", "bottom"):
+            for item in self.filter_top(column, match_values[0], (match_style=="bottom")):
+                yield item
 
         # pre-process dates to compare to
         elif match_style in ("after", "before"):
@@ -195,3 +205,27 @@ class ColumnFilter(BaseFilter):
             if matches:
                 yield original_item
                 matching_items += 1
+
+    def filter_top(self, column, top_n, bottom=False):
+        """
+        Filter top n items
+
+        :param str column:  Column to rank by
+        :param int top_n:  Number of items to return/top n items
+        :param bool bottom:  If true, return bottom results instead
+        :return:
+        """
+        possible_values = set()
+        top_n = convert_to_int(top_n, 10)
+        for item in self.source_dataset.iterate_items():
+            possible_values.add(item.get(column))
+
+        ranked_items = 0
+        top_values = sorted(list(possible_values), reverse=(not bottom))[:top_n]
+        for original_item, item in self.source_dataset.iterate_mapped_items():
+            if item.get(column) in top_values:
+                ranked_items = 0
+                yield original_item
+
+            if ranked_items >= top_n:
+                return

@@ -25,6 +25,10 @@
                 <label for="request-password">Password</label>
                 <input type="password" name="password" id="request-password" value="{{ form.password }}">
             </div>
+            <div class="form-element{% if "confirm_password" in incomplete %} missing{% endif %}">
+                <label for="request-confirm_password">Confirm password</label>
+                <input type="password" name="confirm_password" id="request-confirm_password" value="{{ form.confirm_password }}">
+            </div>
         </fieldset>
 
         {% if phone_home_url %}

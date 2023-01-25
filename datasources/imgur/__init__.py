@@ -1,5 +1,5 @@
 """
-Initialize Parliaments data source
+Initialize Imgur data source
 """
 
 # An init_datasource function is expected to be available to initialize this
@@ -8,5 +8,5 @@ Initialize Parliaments data source
 from common.lib.helpers import init_datasource
 
 # Internal identifier for this data source
-DATASOURCE = "parliaments"
-NAME = "Parliament speeches"
+DATASOURCE = "imgur"
+NAME = "Imgur"

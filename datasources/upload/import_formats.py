@@ -336,7 +336,8 @@ tools = {
     "youtube_video_list": {
         "name": "YouTube videos (via YouTube Data Tools' Video List module)",
         "columns": {"publishedAt", "videoId", "channelId", "channelTitle", "videoDescription"},
-        "mapper": import_ytdt_videolist
+        "mapper": import_ytdt_videolist,
+        "csv_dialect": {"doublequote": True}
     },
     "youtube_comment_list": {
         "name": "YouTube comments (via YouTube Data Tools' Video Info module)",
