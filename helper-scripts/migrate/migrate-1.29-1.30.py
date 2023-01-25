@@ -74,6 +74,7 @@ if type(datasources) is dict:
     config.delete_setting("DATASOURCES")
 
 print("  Deleting and migrating deprecated settings...")
+config.set_or_create_setting("4cat.phone_home_asked", False, raw=False)
 if config.get("IMAGE_INTERVAL"):
     print("  - IMAGE_INTERVAL -> fourchan.image_interval")
     config.set_or_create_setting("fourchan.image_interval", config.get("IMAGE_INTERVAL", 60), raw=False)

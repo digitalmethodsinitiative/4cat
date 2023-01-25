@@ -216,4 +216,5 @@ class FourcatRestarterAndUpgrader(BasicWorker):
 
             log_stream_restart.close()
             lock_file.unlink()
+
             self.job.finish()
