@@ -126,7 +126,7 @@ def start():
         with daemon.DaemonContext(
                 working_directory=os.path.abspath(os.path.dirname(__file__)),
                 umask=0x002,
-                stderr=open("4cat.stderr", "w+"),
+                stderr=open(Path(config.get('PATH_ROOT'), config.get('PATH_LOGS'), "4cat.stderr"), "w+"),
                 detach_process=True
         ) as context:
             import backend.bootstrap as bootstrap

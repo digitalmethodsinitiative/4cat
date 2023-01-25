@@ -47,8 +47,9 @@ def run(as_daemon=True):
 
 	# load everything
 	if config.get("USING_DOCKER"):
+		as_daemon = True
 		# Rename log if Docker setup
-		log = Logger(output=not as_daemon, filename='backend_4cat.log')
+		log = Logger(output=True, filename='backend_4cat.log')
 	else:
 		log = Logger(output=not as_daemon)
 
