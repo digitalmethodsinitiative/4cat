@@ -7,7 +7,7 @@ from pathlib import Path
 import vk_api
 
 from backend.abstract.search import Search
-from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException
+from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException, ProcessorException
 from common.lib.helpers import UserInput
 import common.config_manager as config
 
@@ -88,6 +88,12 @@ class SearchVK(Search):
                 "max": 1000,
                 "default": 100
             },
+            "include_comments": {
+                "type": UserInput.OPTION_TOGGLE,
+                "help": "Include post comments",
+                "default": False,
+                "tooltip": ""
+            },
             "divider-2": {
                 "type": UserInput.OPTION_DIVIDER
             },
@@ -121,8 +127,8 @@ class SearchVK(Search):
         tools = vk_api.VkTools(vk_session)
 
         query_type = self.parameters.get("query_type")
-
         query = self.parameters.get("query")
+        include_comments = self.parameters.get("include_comments", False)
 
         if query_type == "newsfeed":
             query_parameters = {"q": query}
@@ -140,16 +146,25 @@ class SearchVK(Search):
                                                         query_parameters,
                                                         limit=self.parameters.get("amount"))
 
-            num_items = 0
+            if include_comments:
+                vk_helper = vk_session.get_api()
+
+            num_posts = 0
             for result in results_iterator:
                 if self.interrupted:
                     raise ProcessorInterruptedException("Interrupted while fetching message data from the VK API")
 
+                result.update({'4cat_item_type': 'post'})
                 yield result
+                num_posts += 1
 
-                num_items += 1
-                self.dataset.update_status("Received %s of ~%s results from the VK API" % (num_items, self.parameters.get("amount")))
-                self.dataset.update_progress(num_items / self.parameters.get("amount"))
+                if include_comments:
+                    for comment in self.collect_all_comments(vk_helper, owner_id=result.get("owner_id"), post_id=result.get("id")):
+                        comment.update({'4cat_item_type': 'comment'})
+                        yield comment
+
+                self.dataset.update_status("Received %s of ~%s results from the VK API" % (num_posts, self.parameters.get("amount")))
+                self.dataset.update_progress(num_posts / self.parameters.get("amount"))
 
     def login(self, username, password):
         """
@@ -162,6 +177,87 @@ class SearchVK(Search):
 
         return vk_session
 
+    def collect_all_comments(self, vk_helper, owner_id, post_id):
+        """
+        Collects all comments and replies to a VK post
+
+        :param Object vk_helper:           Authorized vk_api.VkApi
+        :param int owner_id:            Owner ID provided by post/comment/etc
+        :param int post_id:             ID of post from which to collect comments
+        :return generator:              Yields comments and replies
+        """
+        # TODO: this will need modification if reply threads gain depth
+
+        # Collect top level comments from post
+        comments = self.get_comments(vk_helper, owner_id, post_id=post_id)
+
+        # Extract replies and collect more if needed
+        for comment in comments:
+            yield comment
+
+            reply_count = comment.get("thread", {}).get("count", 0)
+            replies = comment.get("thread", {}).get("items", [])
+            if reply_count > 10 and len(replies) == 10:
+                # Collect additional replies
+                replies += self.get_comments(vk_helper, owner_id, comment_id=comment.get("id"), last_collected_id=replies[-1].get("id"))[1:]
+
+            for reply in replies:
+                yield reply
+
+    def get_comments(self, vk_helper, owner_id, post_id=None, comment_id=None, last_collected_id=None, **kwargs):
+        """
+        Collect comments from either a post or another comment (i.e., replies to another comment). Must provide either
+        post_id or comment_id, but not both.
+
+        More information can be found here:
+        https://vk.com/dev/wall.getComments
+
+        :param Object vk_helper:       Authorized vk_api.VkApi
+        :param int owner_id:            Owner ID provided by post/comment/etc
+        :param int post_id:             ID of post from which to collect comments
+        :param int comment_id:          ID of comment from which to collect comments
+        :param int last_collected_id:   ID of the last comment to collected; used as start to continue collecting comments
+        :return list:                   List of comments
+        """
+        if post_id is None and comment_id is None:
+            raise ProcessorException("Must provide either post_id or comment_id to collect comments from VK")
+
+        parameters = {
+            "owner_id": owner_id,
+            "need_likes": 1,
+            "preview_lenth": 0,
+            "extended": 1,
+            "count": 100,
+            "thread_items_count": 10,
+        }
+        if post_id:
+            parameters.update({"post_id": post_id})
+        if comment_id:
+            parameters.update({"comment_id": comment_id})
+        if last_collected_id:
+            parameters.update({"start_comment_id": last_collected_id})
+
+        # Collect comments from VK
+        self.dataset.log(f"DEBUG VK getComments params: {parameters}")
+        try:
+            response = vk_helper.wall.getComments(**parameters)
+        except vk_api.exceptions.ApiError as e:
+            self.dataset.log(f"Unable to collect comments for owner_id {owner_id} and {'post_id' if post_id is not None else 'comment_id'} {post_id if post_id is not None else comment_id}: {e}")
+            return []
+        comments = response.get("items", [])
+
+        # Flesh out profiles
+        profiles = {profile.get("id"): profile for profile in response.get("profiles", [])}
+        [comment.update({"owner_profile": profiles.get(comment.get("from_id"), {})}) for comment in comments]
+
+        # Check if there are potentially additional comments
+        if response.get("count") > 100 and len(comments) == 100:
+            # Update params with last collected comment
+            parameters.update({"start_comment_id": comments[-1].get("id")})
+            # Collect additional comments from VK and remove first comment (which is duplicate)
+            comments += self.get_comments(vk_helper=vk_helper, **parameters)[1:]
+
+        return comments
 
     @staticmethod
     def validate_query(query, request, user):
@@ -193,6 +289,7 @@ class SearchVK(Search):
             "query":  query.get("query"),
             "query_type": query.get("query_type"),
             "amount": query.get("amount"),
+            "include_comments": query.get("include_comments"),
             "min_date": after,
             "max_date": before,
             "username": query.get("username"),
@@ -242,6 +339,7 @@ class SearchVK(Search):
             "timestamp": vk_item_time.strftime("%Y-%m-%d %H:%M:%S"),
             "unix_timestamp": int(vk_item_time.timestamp()),
             "link": f"https://vk.com/wall{vk_item.get('owner_id')}_{vk_item.get('id')}",
+            "item_type": vk_item.get("4cat_item_type"),
             "post_type": vk_item.get("post_type"),
             "subject": "",
             "body": vk_item.get("text"),
@@ -249,7 +347,7 @@ class SearchVK(Search):
             "source": vk_item.get("post_source", {}).get("type"),
             "views": vk_item.get("views", {}).get("count"),
             "likes": vk_item.get("likes", {}).get("count"),
-            "comments": vk_item.get("comments", {}).get("count"),
+            "post_comments": vk_item.get("comments", {}).get("count"),
             "edited": datetime.datetime.fromtimestamp(vk_item.get("edited")).strftime("%Y-%m-%d %H:%M:%S") if vk_item.get("edited", False) else False,
             "photos": ", ".join(photos),
             "videos": ", ".join(videos),
