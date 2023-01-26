@@ -30,6 +30,8 @@ class SearchVK(Search):
         "[Python API wrapper](https://github.com/python273/vk_api)"
     ]
 
+    expanded_profile_fields = "id,screen_name,first_name,last_name,name,deactivated,is_closed,is_admin,sex,city,country,photo_200,photo_100,photo_50,followers_count,members_count"  # https://vk.com/dev/objects/user & https://vk.com/dev/objects/group
+
     @classmethod
     def get_options(cls, parent_dataset=None, user=None):
         """
@@ -124,47 +126,41 @@ class SearchVK(Search):
             return []
 
         vk_session = self.login(self.parameters.get("username"), self.parameters.get("password"))
-        tools = vk_api.VkTools(vk_session)
 
         query_type = self.parameters.get("query_type")
         query = self.parameters.get("query")
         include_comments = self.parameters.get("include_comments", False)
 
         if query_type == "newsfeed":
-            query_parameters = {"q": query}
+            query_parameters = {"query": query,
+                                "max_amount": self.parameters.get("amount")}
 
-            # Add start and end dates if proviced
+            # Add start and end dates if provided
             if self.parameters.get("min_date"):
-                self.dataset.log(self.parameters.get("min_date"))
-                # query_parameters['start_time'] = 0
+                query_parameters['start_time'] = self.parameters.get("min_date")
             if self.parameters.get("max_date"):
-                self.dataset.log(self.parameters.get("max_date"))
-                # query_parameters['end_time'] = 0
+                query_parameters['end_time'] = self.parameters.get("max_date")
 
-            results_iterator = tools.get_all_slow_iter("newsfeed.search",
-                                                        100,
-                                                        query_parameters,
-                                                        limit=self.parameters.get("amount"))
+            vk_helper = vk_session.get_api()
 
-            if include_comments:
-                vk_helper = vk_session.get_api()
-
-            num_posts = 0
-            for result in results_iterator:
+            # Collect Newsfeed results
+            num_results = 0
+            for result_batch in self.search_newsfeed(vk_helper, **query_parameters):
                 if self.interrupted:
-                    raise ProcessorInterruptedException("Interrupted while fetching message data from the VK API")
+                    raise ProcessorInterruptedException("Interrupted while fetching newsfeed data from the VK API")
 
-                result.update({'4cat_item_type': 'post'})
-                yield result
-                num_posts += 1
+                for result in result_batch:
+                    result.update({'4cat_item_type': 'post'})
+                    yield result
+                    num_results += 1
 
-                if include_comments:
-                    for comment in self.collect_all_comments(vk_helper, owner_id=result.get("owner_id"), post_id=result.get("id")):
-                        comment.update({'4cat_item_type': 'comment'})
-                        yield comment
+                    if include_comments:
+                        for comment in self.collect_all_comments(vk_helper, owner_id=result.get("owner_id"), post_id=result.get("id")):
+                            comment.update({'4cat_item_type': 'comment'})
+                            yield comment
 
-                self.dataset.update_status("Received %s of ~%s results from the VK API" % (num_posts, self.parameters.get("amount")))
-                self.dataset.update_progress(num_posts / self.parameters.get("amount"))
+                    self.dataset.update_status(f"Received {num_results} results of max {self.parameters.get('amount')} from the VK API")
+                    self.dataset.update_progress(num_results / self.parameters.get('amount'))
 
     def login(self, username, password):
         """
@@ -177,6 +173,47 @@ class SearchVK(Search):
 
         return vk_session
 
+    def search_newsfeed(self, vk_helper, query, max_amount, num_collected=0, start_time=None, end_time=None, **kwargs):
+        """
+        Collects all newsfeed posts
+
+        :param Object vk_helper:    Authorized vk_api.VkApi
+        :param str query:           String representing the search query
+        :param int max_amount:      Max number of posts to collect
+        :param int num_collected:   Number of previously collected results
+        :param int start_time:      Timestamp for earliest post
+        :param int end_time:        Timestamp for latest post
+        :return generator:          Yields groups of posts
+        """
+
+        parameters = {
+            "q": query,
+            "extended": 1,
+            "count": max_amount if max_amount < 30 else 30,
+            "fields": self.expanded_profile_fields,
+        }
+        if start_time:
+            parameters["start_time"] = start_time
+        if end_time:
+            parameters["end_time"] = end_time
+
+        response = vk_helper.newsfeed.search(**parameters)
+        news_feed_results = response.get("items", [])
+        num_collected = num_collected + len(news_feed_results)
+
+        # Flesh out profiles and groups
+        profiles = {profile.get("id"): profile for profile in response.get("profiles", [])}
+        groups = {group.get("id"): group for group in response.get("groups", [])}
+        [result.update({"author_profile": profiles.get(result.get("from_id"), groups.get(abs(result.get("from_id")), {}))}) for result in news_feed_results]
+
+        yield news_feed_results
+
+        # Collect additional results
+        if response.get("next_from") and num_collected < max_amount:
+            parameters.update({"start_from": response.get("next_from")})
+            for additional_results in self.search_newsfeed(vk_helper, query, max_amount, num_collected=num_collected, **parameters):
+                yield additional_results
+
     def collect_all_comments(self, vk_helper, owner_id, post_id):
         """
         Collects all comments and replies to a VK post
@@ -186,8 +223,6 @@ class SearchVK(Search):
         :param int post_id:             ID of post from which to collect comments
         :return generator:              Yields comments and replies
         """
-        # TODO: this will need modification if reply threads gain depth
-
         # Collect top level comments from post
         comments = self.get_comments(vk_helper, owner_id, post_id=post_id)
 
@@ -203,6 +238,9 @@ class SearchVK(Search):
 
             for reply in replies:
                 yield reply
+                if reply.get("thread"):
+                    self.log.warning("VK Datasource issue with replies: additional depth needs to be handled; contact 4CAT devs")
+                    # TODO: this will need modification if reply threads gain depth
 
     def get_comments(self, vk_helper, owner_id, post_id=None, comment_id=None, last_collected_id=None, **kwargs):
         """
@@ -219,6 +257,9 @@ class SearchVK(Search):
         :param int last_collected_id:   ID of the last comment to collected; used as start to continue collecting comments
         :return list:                   List of comments
         """
+        if self.interrupted:
+            raise ProcessorInterruptedException("Interrupted while fetching comments from the VK API")
+
         if post_id is None and comment_id is None:
             raise ProcessorException("Must provide either post_id or comment_id to collect comments from VK")
 
@@ -229,6 +270,7 @@ class SearchVK(Search):
             "extended": 1,
             "count": 100,
             "thread_items_count": 10,
+            "fields": self.expanded_profile_fields,
         }
         if post_id:
             parameters.update({"post_id": post_id})
@@ -238,7 +280,6 @@ class SearchVK(Search):
             parameters.update({"start_comment_id": last_collected_id})
 
         # Collect comments from VK
-        self.dataset.log(f"DEBUG VK getComments params: {parameters}")
         try:
             response = vk_helper.wall.getComments(**parameters)
         except vk_api.exceptions.ApiError as e:
@@ -246,9 +287,12 @@ class SearchVK(Search):
             return []
         comments = response.get("items", [])
 
-        # Flesh out profiles
+        # Flesh out profiles and groups
         profiles = {profile.get("id"): profile for profile in response.get("profiles", [])}
-        [comment.update({"owner_profile": profiles.get(comment.get("from_id"), {})}) for comment in comments]
+        groups = {group.get("id"): group for group in response.get("groups", [])}
+        [comment.update({"author_profile": profiles.get(comment.get("from_id"), groups.get(abs(comment.get("from_id")), {}))}) for comment in comments]
+        # Also expand replies
+        [reply.update({"author_profile": profiles.get(reply.get("from_id"), groups.get(abs(reply.get("from_id")), {}))}) for replies in [comment.get("thread", {}).get("items", []) for comment in comments if comment.get("thread")] for reply in replies]
 
         # Check if there are potentially additional comments
         if response.get("count") > 100 and len(comments) == 100:
@@ -308,12 +352,12 @@ class SearchVK(Search):
         """
         vk_item_time = datetime.datetime.fromtimestamp(vk_item.get('date'))
 
+        # Process attachments
         photos = []
         videos = []
         audio = []
         links = []
         docs = []
-
         for attachment in vk_item.get("attachments", []):
             attachment_type = attachment.get("type")
             attachment = attachment.get(attachment_type)
@@ -333,9 +377,22 @@ class SearchVK(Search):
             elif attachment_type == "doc":
                 docs.append(attachment.get('url', str(attachment)))
 
+        # Use 4cat_item_type to populate different fields
+        tread_id = ""
+        in_reply_to_user = ""
+        in_reply_to_comment_id = ""
+        if vk_item.get("4cat_item_type") == "post":
+            tread_id = vk_item.get("id")
+        elif vk_item.get("4cat_item_type") == "comment":
+            tread_id = vk_item.get("post_id")
+            in_reply_to_user = vk_item.get("reply_to_user")
+            in_reply_to_comment_id = vk_item.get("reply_to_comment")
+
+        author_profile = vk_item.get("author_profile", {})
+
         return {
             "id": vk_item.get("id"),
-            "thread_id": "",
+            "thread_id": tread_id,
             "timestamp": vk_item_time.strftime("%Y-%m-%d %H:%M:%S"),
             "unix_timestamp": int(vk_item_time.timestamp()),
             "link": f"https://vk.com/wall{vk_item.get('owner_id')}_{vk_item.get('id')}",
@@ -343,7 +400,22 @@ class SearchVK(Search):
             "post_type": vk_item.get("post_type"),
             "subject": "",
             "body": vk_item.get("text"),
-            "author": vk_item.get("owner_id"),
+            "in_reply_to_user": in_reply_to_user,
+            "in_reply_to_comment_id": in_reply_to_comment_id,
+            "author": vk_item.get("from_id"),
+            "author_screen_name": author_profile.get("screen_name"),
+            "author_name": author_profile.get("name", " ".join([author_profile.get("first_name", ""), author_profile.get("last_name", "")])),
+            "author_sex": "F" if author_profile.get("sex") == 1 else "M" if author_profile.get("sex") == 2 else "Not Specified" if author_profile.get("sex") == 0 else "N/A",
+            "author_city": author_profile.get("city", {}).get("title", ""),
+            "author_country": author_profile.get("country", {}).get("title", ""),
+            "author_is_admin": True if author_profile.get("is_admin", "") == 1 else False if author_profile.get("is_admin", "") == 0 else "N/A",
+            "author_is_advertiser": True if author_profile.get("is_advertiser", "") == 1 else False if author_profile.get(
+                "is_advertiser", "") == 0 else "N/A",
+            "author_type": author_profile.get("type", ""),
+            "author_photo": author_profile.get("photo_200", author_profile.get("photo_100", author_profile.get("photo_50", ""))),
+            "author_deactivated": author_profile.get("is_deactivated"),
+            "author_privacy_is_closed": author_profile.get("is_closed"),
+            "author_followers": author_profile.get("followers_count", author_profile.get("members_count", "N/A")),
             "source": vk_item.get("post_source", {}).get("type"),
             "views": vk_item.get("views", {}).get("count"),
             "likes": vk_item.get("likes", {}).get("count"),
