@@ -126,7 +126,12 @@ class SearchVK(Search):
             return []
 
         self.dataset.update_status(f"Logging in to VK")
-        vk_session = self.login(self.parameters.get("username"), self.parameters.get("password"))
+        try:
+            vk_session = self.login(self.parameters.get("username"), self.parameters.get("password"))
+        except vk_api.exceptions.AuthError as e:
+            self.log.warning(f"VK Auth Issues: {e}")
+            self.dataset.update_status(f"VK unable to authorize user: {e}", is_final=True)
+            return []
 
         query_type = self.parameters.get("query_type")
         query = self.parameters.get("query")
