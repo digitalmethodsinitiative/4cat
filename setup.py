@@ -33,7 +33,7 @@ packages = [
 	"numpy>=1.19.2",
 	"opencv-python>=4.6.0.66",
 	"packaging",
-	"pandas==1.2.3",
+	"pandas==1.5.3",
 	"Pillow~=9.1",
 	"praw~=7.0",
 	"prawcore~=2.0",
@@ -60,7 +60,7 @@ packages = [
 
 # Some packages don't run on Windows
 unix_packages = [
-	"python-daemon==2.3.1"
+	"python-daemon==2.3.2"
 ]
 
 if os.name != "nt":
