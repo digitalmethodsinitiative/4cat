@@ -9,19 +9,19 @@
         <h2><span>4CAT has been upgraded</span></h2>
         <p>4CAT has been upgraded! The current version is <em>{{ version }}</em>. You can now resume using it.</p>
 
-        {% if phone_home_url %}
             <form action="{{ url_for('first_run_dialog') }}" method="POST" class="wide">
+        {% if phone_home_url %}
                 {% for notice in flashes %}
                     <p class="form-notice">{{ notice }}</p>
                 {% endfor %}
 
                 {% include "account/pingback-form.html" %}
 
+        {% endif %}
                 <div class="submit-container">
-                    <button>Submit</button>
+                    <button>Continue</button>
                 </div>
             </form>
-        {% endif %}
     </section>
     </article>
 {% endblock %}
