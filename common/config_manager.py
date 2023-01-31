@@ -7,6 +7,7 @@ import psycopg2.extras
 import configparser
 
 from common.lib.exceptions import ConfigException
+from common.lib.config_definition import config_definition
 
 
 class ConfigManager:
@@ -110,7 +111,16 @@ def get(attribute_name, default=None, connection=None, cursor=None, keep_connect
                 connection.close()
 
         if value is None:
-            return default
+            # no value explicitly defined in the database...
+            if default is not None:
+                # if an explicit default was provided, return it
+                return default
+            elif attribute_name in config_definition and "default" in config_definition[attribute_name]:
+                # if a default is available from the config definition, return that
+                return config_definition[attribute_name]["default"]
+            else:
+                # use None as the last resort
+                return None
         else:
             return value
 
