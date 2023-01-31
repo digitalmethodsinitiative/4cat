@@ -109,6 +109,15 @@ class SearchInstagram(Search):
             media_types = set([s["node"]["__typename"] for s in node["edge_sidecar_to_children"]["edges"]])
             media_type = "mixed" if len(media_types) > 1 else type_map.get(media_types.pop(), "unknown")
 
+        location = {"name": "", "latlong": "", "city": ""}
+        # location has 'id', 'has_public_page', 'name', and 'slug' keys in tested examples; no lat long or "city" though name seems
+        if node.get("location"):
+            location["name"] = node["location"].get("name")
+            # Leaving this though it does not appear to be used in this type; maybe we'll be surprised in the future...
+            location["latlong"] = str(node["location"]["lat"]) + "," + str(node["location"]["lng"]) if node[
+                "location"].get("lat") else ""
+            location["city"] = node["location"].get("city")
+
         mapped_item = {
             "id": node["shortcode"],
             "thread_id": node["shortcode"],
@@ -128,6 +137,9 @@ class SearchInstagram(Search):
             "num_likes": node["edge_media_preview_like"]["count"],
             "num_comments": node.get("edge_media_preview_comment", {}).get("count", 0),
             "num_media": num_media,
+            "location_name": location["name"],
+            "location_latlong": location["latlong"],
+            "location_city": location["city"],
             "unix_timestamp": node["taken_at_timestamp"]
         }
 
