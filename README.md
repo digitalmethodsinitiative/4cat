@@ -48,16 +48,18 @@ sources' code](https://github.com/digitalmethodsinitiative/4cat/tree/master/data
 in the GitHub repository. It is also possible to import your own CSV files into 
 4CAT for analysis.
 
-## Install
-You can install 4CAT locally or on a server via Docker or manually. Copying our `docker-compose.yml file`, `.env` file, and using
+## Installation
+You can install 4CAT locally or on a server via Docker or manually. For easiest installation, we reccomend copying our [`docker-compose.yml file`](https://raw.githubusercontent.com/digitalmethodsinitiative/4cat/master/docker-compose.yml), [`.env`](https://raw.githubusercontent.com/digitalmethodsinitiative/4cat/master/.env) file, and running this terminal command in the folder where those files have been saved:
 
 ```
 docker-compose up -d
 ```
 
-will pull the lastest version from Docker Hub. Detailed and alternative installation instructions are available
-[in our
+In depth instructions on both Docker installation and manual installation can be found [in our
 wiki](https://github.com/digitalmethodsinitiative/4cat/wiki/Installing-4CAT).
+
+A video walkthrough installing 4CAT via Docker can be found on [YouTube here](https://youtu.be/oWsB7bvNfOY).
+
 Currently scraping of 4chan, 8chan, and 8kun require additional steps; please see the wiki.
 
 Please check our
