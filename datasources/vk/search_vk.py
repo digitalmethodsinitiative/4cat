@@ -125,6 +125,7 @@ class SearchVK(Search):
                 is_final=True)
             return []
 
+        self.dataset.update_status(f"Logging in to VK")
         vk_session = self.login(self.parameters.get("username"), self.parameters.get("password"))
 
         query_type = self.parameters.get("query_type")
@@ -145,10 +146,12 @@ class SearchVK(Search):
 
             # Collect Newsfeed results
             num_results = 0
-            for result_batch in self.search_newsfeed(vk_helper, **query_parameters):
+            self.dataset.update_status(f"Submitting query...")
+            for i, result_batch in enumerate(self.search_newsfeed(vk_helper, **query_parameters)):
                 if self.interrupted:
                     raise ProcessorInterruptedException("Interrupted while fetching newsfeed data from the VK API")
 
+                self.dataset.update_status(f"Processing results batch {i+1}")
                 for result in result_batch:
                     result.update({'4cat_item_type': 'post'})
                     yield result
@@ -185,11 +188,11 @@ class SearchVK(Search):
         :param int end_time:        Timestamp for latest post
         :return generator:          Yields groups of posts
         """
-
+        remaining = max_amount - num_collected
         parameters = {
             "q": query,
             "extended": 1,
-            "count": max_amount if max_amount < 30 else 30,
+            "count": remaining if remaining < 200 else 200,
             "fields": self.expanded_profile_fields,
         }
         if start_time:
@@ -202,9 +205,8 @@ class SearchVK(Search):
         num_collected = num_collected + len(news_feed_results)
 
         # Flesh out profiles and groups
-        profiles = {profile.get("id"): profile for profile in response.get("profiles", [])}
-        groups = {group.get("id"): group for group in response.get("groups", [])}
-        [result.update({"author_profile": profiles.get(result.get("from_id"), groups.get(abs(result.get("from_id")), {}))}) for result in news_feed_results]
+        author_profiles = self.expand_profile_fields({"profiles": response.get("profiles", []), "groups": response.get("groups", [])})
+        [result.update({"author_profile": author_profiles.get(result.get("from_id"), {})}) for result in news_feed_results]
 
         yield news_feed_results
 
@@ -266,7 +268,7 @@ class SearchVK(Search):
         parameters = {
             "owner_id": owner_id,
             "need_likes": 1,
-            "preview_lenth": 0,
+            "preview_length": 0,
             "extended": 1,
             "count": 100,
             "thread_items_count": 10,
@@ -288,11 +290,10 @@ class SearchVK(Search):
         comments = response.get("items", [])
 
         # Flesh out profiles and groups
-        profiles = {profile.get("id"): profile for profile in response.get("profiles", [])}
-        groups = {group.get("id"): group for group in response.get("groups", [])}
-        [comment.update({"author_profile": profiles.get(comment.get("from_id"), groups.get(abs(comment.get("from_id")), {}))}) for comment in comments]
+        author_profiles = self.expand_profile_fields({"profiles": response.get("profiles", []), "groups": response.get("groups", [])})
+        [comment.update({"author_profile": author_profiles.get(comment.get("from_id"), {})}) for comment in comments]
         # Also expand replies
-        [reply.update({"author_profile": profiles.get(reply.get("from_id"), groups.get(abs(reply.get("from_id")), {}))}) for replies in [comment.get("thread", {}).get("items", []) for comment in comments if comment.get("thread")] for reply in replies]
+        [reply.update({"author_profile": author_profiles.get(reply.get("from_id"), {})}) for replies in [comment.get("thread", {}).get("items", []) for comment in comments if comment.get("thread")] for reply in replies]
 
         # Check if there are potentially additional comments
         if response.get("count") > 100 and len(comments) == 100:
@@ -302,6 +303,23 @@ class SearchVK(Search):
             comments += self.get_comments(vk_helper=vk_helper, **parameters)[1:]
 
         return comments
+
+    @ staticmethod
+    def expand_profile_fields(dict_of_profile_types):
+        """
+        Combine various VK profile and group author information for easy lookup. Add 4CAT_author_profile_type field to
+        differentiate source of data later.
+        """
+        author_types = {}
+        for profile_type, profiles in dict_of_profile_types.items():
+            for profile in profiles:
+                if "id" not in profile:
+                    raise ProcessorException("Profile missing id field; VK data format incorrect/changed")
+                elif profile.get("id") in author_types:
+                    raise ProcessorException("Profile id duplicated across profile types; unable to combine profiles")
+                profile.update({"4CAT_author_profile_type": profile_type})
+                author_types[profile.get("id")] = profile
+        return author_types
 
     @staticmethod
     def validate_query(query, request, user):
@@ -389,6 +407,9 @@ class SearchVK(Search):
             in_reply_to_comment_id = vk_item.get("reply_to_comment")
 
         author_profile = vk_item.get("author_profile", {})
+        profile_source = "user" if author_profile.get("4CAT_author_profile_type") == "profile" else "community" if author_profile.get("4CAT_author_profile_type") == "group" else "N/A"
+        # Use source of author profile if "type" not present (e.g., in users profiles do not seem to have type)
+        author_type = author_profile.get("type", profile_source)
 
         return {
             "id": vk_item.get("id"),
@@ -397,25 +418,24 @@ class SearchVK(Search):
             "unix_timestamp": int(vk_item_time.timestamp()),
             "link": f"https://vk.com/wall{vk_item.get('owner_id')}_{vk_item.get('id')}",
             "item_type": vk_item.get("4cat_item_type"),
-            "post_type": vk_item.get("post_type"),
-            "subject": "",
             "body": vk_item.get("text"),
-            "in_reply_to_user": in_reply_to_user,
-            "in_reply_to_comment_id": in_reply_to_comment_id,
-            "author": vk_item.get("from_id"),
+            "author_id": vk_item.get("from_id"),
+            "author_type": author_type,
             "author_screen_name": author_profile.get("screen_name"),
             "author_name": author_profile.get("name", " ".join([author_profile.get("first_name", ""), author_profile.get("last_name", "")])),
-            "author_sex": "F" if author_profile.get("sex") == 1 else "M" if author_profile.get("sex") == 2 else "Not Specified" if author_profile.get("sex") == 0 else "N/A",
+            "author_sex": "F" if author_profile.get("sex") == 1 else "M" if author_profile.get("sex") == 2 else "Not Specified" if author_profile.get("sex") == 0 else author_profile.get("sex", "N/A"),
             "author_city": author_profile.get("city", {}).get("title", ""),
             "author_country": author_profile.get("country", {}).get("title", ""),
-            "author_is_admin": True if author_profile.get("is_admin", "") == 1 else False if author_profile.get("is_admin", "") == 0 else "N/A",
-            "author_is_advertiser": True if author_profile.get("is_advertiser", "") == 1 else False if author_profile.get(
-                "is_advertiser", "") == 0 else "N/A",
-            "author_type": author_profile.get("type", ""),
-            "author_photo": author_profile.get("photo_200", author_profile.get("photo_100", author_profile.get("photo_50", ""))),
-            "author_deactivated": author_profile.get("is_deactivated"),
-            "author_privacy_is_closed": author_profile.get("is_closed"),
+            "author_photo": author_profile.get("photo_200",
+                                               author_profile.get("photo_100", author_profile.get("photo_50", ""))),
+            "author_is_admin": True if author_profile.get("is_admin") == 1 else False if author_profile.get("is_admin") == 0 else author_profile.get("is_admin", "N/A"),
+            "author_is_advertiser": True if author_profile.get("is_advertiser") == 1 else False if author_profile.get(
+                "is_advertiser") == 0 else author_profile.get("is_advertiser", "N/A"),
+            "author_deactivated": author_profile.get("is_deactivated", False),
+            "author_privacy_is_closed": 'closed' if author_profile.get("is_closed") == 1 else 'open' if author_profile.get("is_closed") == 0 else 'private' if author_profile.get("is_closed") == 2 else author_profile.get("is_closed", "N/A"),
             "author_followers": author_profile.get("followers_count", author_profile.get("members_count", "N/A")),
+            "in_reply_to_user": in_reply_to_user,
+            "in_reply_to_comment_id": in_reply_to_comment_id,
             "source": vk_item.get("post_source", {}).get("type"),
             "views": vk_item.get("views", {}).get("count"),
             "likes": vk_item.get("likes", {}).get("count"),
@@ -426,4 +446,5 @@ class SearchVK(Search):
             "audio": ", ".join(audio),
             "links": ", ".join(links),
             "docs": ", ".join(docs),
+            "subject": "",
         }
