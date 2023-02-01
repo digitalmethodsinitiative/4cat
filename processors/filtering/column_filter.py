@@ -24,7 +24,10 @@ class ColumnFilter(BaseFilter):
                   "This will create a new dataset."
 
     options = {
-        "column": {},
+        "column": {
+            "type": UserInput.OPTION_CHOICE,
+            "help": "Column"
+        },
         "match-style": {
             "type": UserInput.OPTION_CHOICE,
             "help": "Match type",

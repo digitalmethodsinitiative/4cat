@@ -608,6 +608,9 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		# except as a link to the copied standalone dataset
 		os.unlink(self.dataset.get_results_path())
 
+		# Copy the log
+		shutil.copy(self.dataset.get_log_path(), standalone.get_log_path())
+
 		return standalone
 
 	@classmethod

@@ -45,16 +45,11 @@ class SearchInstagram(Search):
         """
         raise NotImplementedError("Instagram datasets can only be created by importing data from elsewhere")
 
-    def import_from_file(self, path):
+
+    @staticmethod
+    def map_item(item):
         """
-        Import items from an external file
-
-        By default, this reads a file and parses each line as JSON, returning
-        the parsed object as an item. This works for NDJSON files. Data sources
-        that require importing from other or multiple file types can overwrite
-        this method.
-
-        The file is considered disposable and deleted after importing.
+        Map Instagram item
 
         Instagram importing is a little bit roundabout since we can expect
         input in two separate and not completely overlapping formats - an "edge
@@ -62,24 +57,9 @@ class SearchInstagram(Search):
         those, and do not contain the same data. So we find a middle ground
         here... each format has its own handler function
 
-        :param str path:  Path to read from
-        :return:  Yields all items in the file, item for item.
+        :param dict item:  Item to map
+        :return:  Mapped item
         """
-        path = Path(path)
-        if not path.exists():
-            return []
-
-        with path.open() as infile:
-            for line in infile:
-                if self.interrupted:
-                    raise WorkerInterruptedException()
-
-                yield json.loads(line.replace("\0", ""))["data"]
-
-        path.unlink()
-
-    @staticmethod
-    def map_item(item):
         is_graph_response = "__typename" in item
 
         if is_graph_response:
@@ -129,6 +109,15 @@ class SearchInstagram(Search):
             media_types = set([s["node"]["__typename"] for s in node["edge_sidecar_to_children"]["edges"]])
             media_type = "mixed" if len(media_types) > 1 else type_map.get(media_types.pop(), "unknown")
 
+        location = {"name": "", "latlong": "", "city": ""}
+        # location has 'id', 'has_public_page', 'name', and 'slug' keys in tested examples; no lat long or "city" though name seems
+        if node.get("location"):
+            location["name"] = node["location"].get("name")
+            # Leaving this though it does not appear to be used in this type; maybe we'll be surprised in the future...
+            location["latlong"] = str(node["location"]["lat"]) + "," + str(node["location"]["lng"]) if node[
+                "location"].get("lat") else ""
+            location["city"] = node["location"].get("city")
+
         mapped_item = {
             "id": node["shortcode"],
             "thread_id": node["shortcode"],
@@ -148,6 +137,9 @@ class SearchInstagram(Search):
             "num_likes": node["edge_media_preview_like"]["count"],
             "num_comments": node.get("edge_media_preview_comment", {}).get("count", 0),
             "num_media": num_media,
+            "location_name": location["name"],
+            "location_latlong": location["latlong"],
+            "location_city": location["city"],
             "unix_timestamp": node["taken_at_timestamp"]
         }
 

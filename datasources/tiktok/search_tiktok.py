@@ -4,14 +4,10 @@ Import scraped TikTok data
 It's prohibitively difficult to scrape data from TikTok within 4CAT itself due
 to its aggressive rate limiting. Instead, import data collected elsewhere.
 """
-from datetime import datetime
-from pathlib import Path
+from datetime import datetime, timezone
 from urllib.parse import urlparse, parse_qs
-import json
-import time
 
 from backend.abstract.search import Search
-from common.lib.exceptions import WorkerInterruptedException
 
 
 class SearchTikTok(Search):
@@ -39,35 +35,6 @@ class SearchTikTok(Search):
         Not available for TikTok
         """
         raise NotImplementedError("TikTok datasets can only be created by importing data from elsewhere")
-
-    def import_from_file(self, path):
-        """
-        Import items from an external file
-
-        By default, this reads a file and parses each line as JSON, returning
-        the parsed object as an item. This works for NDJSON files. Data sources
-        that require importing from other or multiple file types can overwrite
-        this method.
-
-        The file is considered disposable and deleted after importing.
-
-        :param str path:  Path to read from
-        :return:  Yields all items in the file, item for item.
-        """
-        path = Path(path)
-        if not path.exists():
-            return []
-
-        with path.open() as infile:
-            for line in infile:
-                if self.interrupted:
-                    raise WorkerInterruptedException()
-
-                # remove NUL bytes here because they trip up a lot of other
-                # things
-                yield json.loads(line.replace("\0", ""))["data"]
-
-        path.unlink()
 
     @staticmethod
     def map_item(post):
@@ -104,7 +71,8 @@ class SearchTikTok(Search):
         if post["video"].get("cover"):
             thumbnail_options.append(post["video"]["cover"])
 
-        thumbnail_url = [url for url in thumbnail_options if int(parse_qs(urlparse(url).query).get("x-expires", [time.time()])[0]) >= time.time() - 3600]
+        now = int(datetime.now(tz=timezone.utc).timestamp())
+        thumbnail_url = [url for url in thumbnail_options if int(parse_qs(urlparse(url).query).get("x-expires", [now])[0]) >= now]
         thumbnail_url = thumbnail_url.pop() if thumbnail_url else ""
 
         return {

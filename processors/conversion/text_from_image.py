@@ -196,10 +196,11 @@ class ImageTextDetector(BasicProcessor):
 
         with image_file.open("rb") as infile:
             try:
-                api_request = requests.post(server.rstrip('/') + '/api/detect_text', files={'image': infile}, data=parameters)
-            except (requests.RequestException, ConnectionError) as e:
-                self.dataset.update_status("Skipping image %s: %s" % (image_file.name, str(e)))
-                return None
+                api_request = requests.post(server.rstrip('/') + '/api/detect_text', files={'image': infile}, data=parameters, timeout=30)
+            except requests.exceptions.ConnectionError as e:
+                message = f"Unable to establish connection to OCR server {e}; contact 4CAT administrator."
+                self.dataset.update_status(message)
+                raise ProcessorException(message)
 
         if api_request.status_code != 200:
             self.dataset.update_status("Got response code %i from DMI OCR server for image %s: %s" % (api_request.status_code, image_file.name, api_request.content))

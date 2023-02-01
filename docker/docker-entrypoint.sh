@@ -1,14 +1,6 @@
 #!/bin/sh
 set -e
 
-exit_backend() {
-  echo "Exiting backend"
-  python3 4cat-daemon.py stop
-  exit 0
-}
-
-trap exit_backend INT TERM
-
 # Handle any options
 while test $# != 0
 do
@@ -56,9 +48,4 @@ echo "http://$SERVER_NAME:$PUBLIC_PORT"
 echo ''
 
 # Start 4CAT backend
-python3 4cat-daemon.py start
-
-# Hang out until SIGTERM received
-while true; do
-    sleep 1
-done
+exec python3 -u 4cat-daemon.py -i start

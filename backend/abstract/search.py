@@ -62,7 +62,7 @@ class Search(BasicProcessor, ABC):
 		query_parameters = self.dataset.get_parameters()
 		results_file = self.dataset.get_results_path()
 
-		self.log.info("Querying: %s" % str(query_parameters))
+		self.log.info("Querying: %s" % str({k: v for k, v in query_parameters.items() if not self.get_options().get(k, {}).get("sensitive", False)}))
 
 		# Execute the relevant query (string-based, random, countryflag-based)
 		try:
@@ -181,8 +181,9 @@ class Search(BasicProcessor, ABC):
 				if self.interrupted:
 					raise WorkerInterruptedException()
 
-				line = json.loads(line)
-				yield line
+				# remove NUL bytes here because they trip up a lot of other
+				# things
+				yield json.loads(line.replace("\0", ""))["data"]
 
 		path.unlink()
 

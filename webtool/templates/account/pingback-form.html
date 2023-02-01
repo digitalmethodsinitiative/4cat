@@ -1,0 +1,46 @@
+<fieldset>
+            <div class="form-element full-width form-intro">
+                <label for="request-phonehome">
+                    <input type="checkbox" id="request-phonehome" class="toggle-button" name="phonehome"{% if form.phonehome %} checked="checked"{% endif %} aria-controls="phone-home-fields">
+                    Let the 4CAT developers know you've installed it
+                </label>
+            </div>
+
+            <p>Letting us (the 4CAT developers at the <a href="https://digitalmethods.net">Digital
+                Methods Initiative</a>) know that you have installed 4CAT is <em>optional but greatly appreciated</em>
+                as it helps us justify and find funding for on-going development.</p>
+            <p>We only store the data you enter, and the approximate geographic location of the IP address it is sent
+                from (but not the IP address itself). This is a <em>one-time</em> 'ping': no information will be sent
+                during later 4CAT usage. You can check our website for <a href="{{ phone_home_url }}">more
+                information</a> on what we do with this data.</p>
+
+            <div id="phone-home-fields" aria-expanded="false">
+            <p>The following fields are optional. If you enter contact information, we may contact you to learn more
+                about how you are using 4CAT, but we will <em>never</em> send any automated newsletters or mailings.</p>
+            <div class="form-element full-width">
+                <label for="request-role">What best describes your role?</label>
+                <select name="role" id="request-role">
+                    <option value=""></option>
+                    <option value="student">Student</option>
+                    <option value="phd">PhD candidate</option>
+                    <option value="researcher">Academic researcher</option>
+                    <option value="support-staff">Other staff at an academic institute (e.g. IT support)</option>
+                    <option value="researcher">Independent researcher</option>
+                    <option value="journalist">Journalist</option>
+                    <option value="ngo">I work at an NGO</option>
+                    <option value="commercial">I work for a commercial business</option>
+                    <option value="other">Other</option>
+                </select>
+            </div>
+
+            <div class="form-element full-width">
+                <label for="request-affiliation">What is the name of the institute, organisation or company you are installing 4CAT for (if applicable)?</label>
+                <input name="affiliation" value="" id="request-affiliation" type="text" placeholder="E.g. University or company name">
+            </div>
+
+            <div class="form-element full-width">
+                <label for="request-email">What e-mail address can we contact you at?</label>
+                <input name="email" value="" id="request-email" type="text">
+            </div>
+            </div>
+        </fieldset>

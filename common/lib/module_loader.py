@@ -87,8 +87,12 @@ class ModuleCollector:
                 module_name = ".".join(file.parts[len(root_path.parts):-1] + (file.stem,))
 
                 # check if we've already loaded this module
-                if module_name in sys.modules or module_name in self.ignore:
+                if module_name in self.ignore:
                     continue
+
+                if module_name in sys.modules:
+                    # This skips processors/datasources that were loaded by others and may not yet be captured
+                    pass
 
                 # try importing
                 try:

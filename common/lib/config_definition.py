@@ -71,6 +71,13 @@ config_definition = {
                    "is sent to this URL to help the 4CAT developers (the Digital Methods Initiative) keep track of how "
                    "much it is used. There should be no need to change this URL after installation."
     },
+    "4cat.phone_home_asked": {
+        "type": UserInput.OPTION_TOGGLE,
+        "default": False,
+        "help": "Shown phone home request?",
+        "tooltip": "Whether you've seen the 'phone home request'. Set to `false` to see the request again. There "
+                   "should be no need to change this manually."
+    },
     # These settings control whether top-level datasets (i.e. those created via the
     # "Create dataset" page) are deleted automatically, and if so, after how much
     # time. You can also allow users to cancel this (i.e. opt out). Note that if
