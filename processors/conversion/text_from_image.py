@@ -198,7 +198,7 @@ class ImageTextDetector(BasicProcessor):
             try:
                 api_request = requests.post(server.rstrip('/') + '/api/detect_text', files={'image': infile}, data=parameters, timeout=30)
             except requests.exceptions.ConnectionError as e:
-                message = f"Unable to establish connection to OCR server {e}; contact 4CAT administrator."
+                message = f"Unable to establish connection to OCR server {e}. 4CAT admins notified; your processor will continue when issue is resolved."
                 self.dataset.update_status(message)
                 raise ProcessorException(message)
 
