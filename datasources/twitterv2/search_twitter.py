@@ -490,7 +490,8 @@ class SearchWithTwitterAPIv2(Search):
                           "https://developer.twitter.com/en/docs/twitter-api/tweets/search/integrate/build-a-query) "
                           "documentation for more information about this API endpoint and the syntax you can use in your "
                           "search query. You can also test queries with Twitter's [Query "
-                          "Builder](https://developer.twitter.com/apitools/query?query=).")
+                          "Builder](https://developer.twitter.com/apitools/query?query=). Retweets are included by default; "
+                          "add `-is:retweet` to exclude them.")
 
         options = {
             "intro-1": {
