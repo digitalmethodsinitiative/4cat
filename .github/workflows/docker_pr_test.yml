@@ -15,3 +15,5 @@ jobs:
       - uses: actions/checkout@v2
       - name: Run docker-compose up
         run: docker-compose -f docker-compose_build.yml up -d
+      - name: Wait and check log
+        run: sleep 5 && var=$(docker exec -it 4cat_backend tail logs/backend_4cat.log) && echo "::debug::$var"
