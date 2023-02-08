@@ -20,5 +20,10 @@ jobs:
           test_case=" INFO at api.py:65: Local API listening for requests at 4cat_bakend:4444"
           sleep 30 && var=$(docker exec 4cat_backend tail -n 1 logs/backend_4cat.log)
           echo "::group::Backend test"
-          if [ "$(echo "$var" | tr "|" "\n" | sed -n '2p')" = "$test_case" ]; then echo "::debug::Backend running as expected"; else echo "::error::Backend failed to start"; fi
+          if [ "$(echo "$var" | tr "|" "\n" | sed -n '2p')" = "$test_case" ]; then 
+              echo "::debug::Backend running as expected"
+          else 
+              echo "::error::Backend failed to start"
+              exit 1
+          fi
           echo "::endgroup::"
