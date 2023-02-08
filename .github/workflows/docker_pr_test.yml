@@ -21,7 +21,7 @@ jobs:
           sleep 30 && var=$(docker exec 4cat_backend tail -n 1 logs/backend_4cat.log)
           echo "::group::Backend test"
           if [ "$(echo "$var" | tr "|" "\n" | sed -n '2p')" = "$test_case" ]; then 
-              echo "::debug::Backend running as expected"
+              echo "Backend running as expected"
           else 
               echo "::error::Backend failed to start"
               exit 1
