@@ -16,6 +16,7 @@ jobs:
       - name: Run docker-compose up
         run: docker-compose -f docker-compose_build.yml up -d
       - name: Wait and check log
-        run: test_case=" INFO at api.py:65: Local API listening for requests at 4cat_backend:4444"
-        run: sleep 30 && var=$(docker exec 4cat_backend tail -n 1 logs/backend_4cat.log)
-        run: if [ "$(echo "$var" | tr "|" "\n" | sed -n '2p')" = "$test_case" ]; then echo "::debug::Backend running as expected"; else echo "::error::Backend failed to start"; fi
+        run: |
+          test_case=" INFO at api.py:65: Local API listening for requests at 4cat_backend:4444" \
+          sleep 30 && var=$(docker exec 4cat_backend tail -n 1 logs/backend_4cat.log) \
+          if [ "$(echo "$var" | tr "|" "\n" | sed -n '2p')" = "$test_case" ]; then echo "::debug::Backend running as expected"; else echo "::error::Backend failed to start"; fi
