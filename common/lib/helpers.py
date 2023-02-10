@@ -86,7 +86,9 @@ def sniff_encoding(file):
     :param file:
     :return:
     """
-    if hasattr(file, "getbuffer"):
+    if type(file) == bytearray:
+        maybe_bom = file[:3]
+    elif hasattr(file, "getbuffer"):
         buffer = file.getbuffer()
         maybe_bom = buffer[:3].tobytes()
     elif hasattr(file, "peek"):
