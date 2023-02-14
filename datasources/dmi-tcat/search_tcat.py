@@ -8,14 +8,13 @@ import json
 import re
 import io
 
-import ural
-
 from backend.abstract.search import Search
 from common.lib.exceptions import QueryParametersException
 from common.lib.user_input import UserInput
 from common.lib.helpers import sniff_encoding
 
 import common.config_manager as config
+from datasources.twitterv2.search_twitter import SearchWithTwitterAPIv2
 
 
 class SearchWithinTCATBins(Search):
@@ -26,7 +25,11 @@ class SearchWithinTCATBins(Search):
     Selection' panel in the DMI-TCAT analysis interface
     """
     type = "dmi-tcat-search"  # job ID
-    extension = "csv"
+    extension = "ndjson"
+
+    # TCAT has a few fields that do not exist in APIv2
+    additional_TCAT_fields = ["to_user_name", "filter_level", "favorite_count", "truncated", "from_user_favourites_count", "from_user_lang", "from_user_utcoffset",
+                              "from_user_timezone"]
 
     options = {
         "intro-1": {
@@ -217,6 +220,7 @@ class SearchWithinTCATBins(Search):
             "enddate": datetime.datetime.fromtimestamp(self.parameters.get("max_date")).strftime("%Y-%m-%d"),
             "replyto": "yes" if self.parameters.get("exclude-replies") else "no",
             "whattodo": "",
+            "exportSettings": "urls,mentions,hashtags,media,",
             "graph_resolution": "day",
             "outputformat": "csv"
         }
@@ -228,6 +232,7 @@ class SearchWithinTCATBins(Search):
         response = requests.get(request_url, params=parameters, stream=True)
         if response.status_code != 200:
             return self.dataset.finish_with_error("Query bin not available: received HTTP Error %i" % response.status_code)
+        self.dataset.log(f"URL DEBUG: {response.url}")
 
         # process the file in 1kB chunks, buffer as we go
         # If a newline is encountered, the buffer is processed as a row of csv
@@ -248,7 +253,9 @@ class SearchWithinTCATBins(Search):
                 # response.encoding is not correct sometimes, since it does not
                 # indicate that the file uses a BOM, so sniff it instead once
                 # we have some bytes
+                self.dataset.log(f'encoding: {buffer[:3]}')
                 encoding = sniff_encoding(buffer)
+                self.dataset.log(f'encoding: {encoding}')
 
             # split buffer by newlines and process each full line
             # the last line is always carried over, since it may be incomplete
@@ -272,10 +279,12 @@ class SearchWithinTCATBins(Search):
                                     doublequote=True,
                                     quoting=csv.QUOTE_MINIMAL)
                 row_data = next(reader)
+                self.dataset.log(f'row_data: {row_data}')
 
                 if row_data and not fieldnames:
                     # first line in file
                     fieldnames = row_data.copy()
+
                 elif row_data:
                     tweet = dict(zip(fieldnames, row_data))
                     items += 1
@@ -283,65 +292,175 @@ class SearchWithinTCATBins(Search):
                     if items % 250 == 0:
                         self.dataset.update_status("Loaded %i tweets from bin %s@%s" % (items, bin_name, bin_host))
 
-                    # there is more data in the downloaded csv file than this; the
-                    # format here is identical to that of the Twitter v2 data source's
-                    # `map_item()` output.
-                    # todo: do something with the other data
-                    yield {
-                        "id": tweet["id"],
-                        # For thread_id, we use in_reply_to_status_id if tweet is reply, quoted_status_id if tweet is quote tweet (aka retweet w/ comment), or its own ID
-                        # Note: tweets can have BOTH in_reply_to_status_id and quoted_status as you can retweet a quote or quote a retweet.
-                        "thread_id": tweet["in_reply_to_status_id"] if tweet["in_reply_to_status_id"] else tweet["quoted_status_id"] if tweet["quoted_status_id"] else tweet["id"],
-                        "timestamp": int(tweet["time"]),
-                        "unix_timestamp": tweet["time"],
-                        "subject": "",
-                        "body": tweet["text"],
-                        "author": tweet["from_user_name"],
-                        "author_fullname": tweet["from_user_realname"],
-                        "author_id": tweet["from_user_id"],
-                        "source": tweet["source"],
-                        "language_guess": tweet.get("lang"),
-                        "possibly_sensitive": "yes" if tweet.get("possibly_sensitive") not in ("", "0") else "no",
-                        "retweet_count": tweet["retweet_count"],
-                        "reply_count": -1,
-                        "like_count": tweet["favorite_count"],
-                        "quote_count": -1,
-                        "is_retweet": "yes" if tweet["text"][:4] == "RT @" else "no",
-                        "is_quote_tweet": "yes" if tweet["quoted_status_id"] else "no",
-                        "is_reply": "yes" if tweet["in_reply_to_status_id"] else "no",
-                        "hashtags": ",".join(re.findall(r"#([^\s!@#$%^&*()_+{}:\"|<>?\[\];'\,./`~]+)", tweet["text"])),
-                        "urls": ",".join(ural.urls_from_text(tweet["text"])),
-                        "images": ",".join(re.findall(r"https://t\.co/[a-zA-Z0-9]+$", tweet["text"])),
-                        "mentions": ",".join(re.findall(r"@([^\s!@#$%^&*()+{}:\"|<>?\[\];'\,./`~]+)", tweet["text"])),
-                        "reply_to": tweet["to_user_name"],
-                        # Additional TCAT data (compared to twitterv2 map_item function)
-                        "filter_level": tweet['filter_level'],
-                        'withheld_copyright': tweet['withheld_copyright'], # TCAT may no collect this anymore
-                        'withheld_scope': tweet['withheld_scope'], # TCAT may no collect this anymore
-                        'truncated': tweet['truncated'], # Older tweets could be truncated meaning their text was cut off due to Twitter/TCAT db character limits
-                        'location': tweet['location'],
-                        'latitude': tweet['lat'],
-                        'longitude': tweet['lng'],
-                        'author_verified': tweet['from_user_verified'],
-                        'author_description': tweet['from_user_description'],
-                        'author_url': tweet['from_user_url'],
-                        'author_profile_image': tweet['from_user_profile_image_url'],
-                        'author_timezone_UTC_offset': int((int(tweet['from_user_utcoffset']) if tweet['from_user_utcoffset'] else 0)/60/60),
-                        'author_timezone_name': tweet['from_user_timezone'],
-                        'author_language': tweet['from_user_lang'],
-                        'author_tweet_count': tweet['from_user_tweetcount'],
-                        'author_follower_count': tweet['from_user_followercount'],
-                        'author_friend_following_count': tweet['from_user_friendcount'],
-                        'author_favorite_count': tweet['from_user_favourites_count'],
-                        'author_listed_count': tweet['from_user_listed'],
-                        'author_withheld_scope': tweet['from_user_withheld_scope'],
-                        'author_created_at': tweet['from_user_created_at'],
-                    }
+                    yield self.tcat_to_APIv2(tweet)
 
             if not chunk:
                 # end of file
                 break
 
+    @ staticmethod
+    def tcat_to_4cat_time(tcat_time):
+        """
+        Twitter APIv2 time is in format "%Y-%m-%dT%H:%M:%S.000Z" while TCAT uses "%Y-%m-%d %H:%M:%S" and a timestamp.
+
+        :return datetime:
+        """
+        try:
+            tcat_time = int(tcat_time)
+            return datetime.datetime.fromtimestamp(tcat_time).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+        except ValueError:
+            return datetime.datetime.strptime(tcat_time, "%Y-%m-%d %H:%M:%S").strftime("%Y-%m-%dT%H:%M:%S.000Z")
+
+    @staticmethod
+    def tcat_to_APIv2(tcat_tweet):
+        """
+        Attempt to construct a 4CAT tweet gathered from APIv2 to allow for use of Twitter specific processors!
+
+        A great deal of information is missing so there may result in some issues. Notes are kept for the expected
+        type and, if the data is missing in TCAT, None is used. Therefor it should be possible to refactor processors
+        to handle None if necessary.
+        """
+        # We're missing lots of data here...
+
+        urls = [url.strip() for url in (tcat_tweet["urls_expanded"].split(";") if tcat_tweet["urls_expanded"] else tcat_tweet["urls_followed"].split(";") if tcat_tweet["urls_followed"] else tcat_tweet["urls_followed"].split(";")) if url]
+        # TCAT media_id: 7 = video, 3 = photo, 16 = animated_gif
+        media_type = "video" if tcat_tweet["media_id"] == "7" else "photo" if tcat_tweet["media_id"] == "3" else "animated_gif" if tcat_tweet["media_id"] == "16" else tcat_tweet["media_id"]
+
+        # 4CAT Twitter APIv2 result data structure
+        APIv2_tweet = {
+            "lang": tcat_tweet["lang"],  # str
+            "source": tcat_tweet["source"],  # REMOVED FROM TWITTER API v2
+            "possibly_sensitive": True if tcat_tweet["possibly_sensitive"] == 1 else False if tcat_tweet["possibly_sensitive"] == 0 else None,  # bool
+            "text": tcat_tweet["text"],  # str
+            "edit_history_tweet_ids": None,  # list; Missing in TCAT data
+            "public_metrics": {
+                "retweet_count": tcat_tweet["retweet_count"],  # int
+                "reply_count": None,  # int; Missing in TCAT data
+                "like_count": tcat_tweet["retweet_count"],  # int
+                "quote_count": None,  # int; Missing in TCAT data
+                "impression_count": None,  # int; Missing in TCAT data
+                # TCAT has also favorite_count
+            },
+            "entities": {
+                "mentions": [{
+                    "id": None,  # str; Missing in TCAT data
+                    "username": mention.strip(),  # str
+                    # Twitter v2 API has additional user fields
+                } for mention in tcat_tweet["mentions"].split(";")],
+                "annotations": None,  # list; Missing in TCAT data
+                "urls": [{
+                    "url": url,  # str
+                    "expanded_url": url,  # str
+                    # Twitter v2 API has additional URL fields
+                } for url in urls],
+                "hashtags": [{
+                    "tag": hashtag.strip(),  # str
+                    "start": None,  # int; Missing in TCAT data
+                    "end": None,  # int; Missing in TCAT data
+                } for hashtag in tcat_tweet["hashtags"].split(";")],
+                "cashtags": None,  # list; Missing in TCAT data
+            },
+            "created_at": SearchWithinTCATBins.tcat_to_4cat_time(tcat_tweet["time"]),  # str
+            "id": tcat_tweet["id"],  # str
+            "author_id": tcat_tweet["from_user_id"],  # str
+            "context_annotations": None,  # list; Missing in TCAT data
+            "reply_settings": None,  # str; Missing in TCAT data
+            "conversation_id": None,  # str; TCAT has a in_reply_to_status_id but this is not necessarily the original Tweet that started the conversation
+            "author_user": {
+                "protected": None,  # bool; Missing in TCAT data
+                "verified": True if tcat_tweet["from_user_verified"] == 1 else False if tcat_tweet["from_user_verified"] == 0 else None,  # bool
+                "created_at": SearchWithinTCATBins.tcat_to_4cat_time(tcat_tweet["from_user_created_at"]),  # str
+                "name": tcat_tweet["from_user_realname"],  # str
+                "entities": {
+                    "description": None,  # dict; contains entities from author description such as mentions, URLs, etc.; Missing in TCAT data
+                    "url": None,  # dict; containers entities from author url e.g. URL data; Missing in TCAT data
+                },
+                "description": tcat_tweet["from_user_description"],  # str
+                "pinned_tweet_id": None,  # str; Missing in TCAT data
+                "profile_image_url": tcat_tweet["from_user_profile_image_url"],  # str
+                "url": tcat_tweet["from_user_url"],  # str
+                "username": tcat_tweet["from_user_name"],  # str
+                "id": tcat_tweet["from_user_id"],  # str
+                "location": None,  # str; Missing in TCAT data
+                "public_metrics": {
+                    "followers_count": tcat_tweet["from_user_followercount"],  # int
+                    "following_count": tcat_tweet["from_user_friendcount"],  # int
+                    "tweet_count": tcat_tweet["from_user_tweetcount"],  # int
+                    "listed_count": tcat_tweet["from_user_listed"],  # int
+                    # TCAT has also from_user_favourites_count
+                },
+                "withheld": {
+                    "country_codes": tcat_tweet["from_user_withheld_scope"].split(";"),  # list; TODO TCAT has column, but have not seen it populated in testing... This is guess
+                },
+                # TCAT has also from_user_lang, from_user_utcoffset, from_user_timezone
+            },
+            "attachments": {
+                # TCAT has some media data, but not the URLs listed
+                "media_keys": [{
+                    "type": media_type,
+                    "url": ",".join([url for url in urls if (url.split("/")[-2] if len(url.split("/")) > 1 else "") in ["photo"]]),  # str; TCAT does not have the URL though it may be in the list of URLs
+                    "variants": [{"url": ",".join([url for url in urls if (url.split("/")[-2] if len(url.split("/")) > 1 else "") in ["video"]]), "bit_rate":0}]  # list; This is not the expected direct link to video, but it is a URL to the video
+                    # Twitter API v2 has additional data
+                }],  # list; TCAT seems to only have one type of media per tweet
+                "poll_ids": None,  # list; Missing from TCAT data
+            },
+            "geo": {
+                "place_id": None,  # str; Missing from TCAT data
+                "place": {
+                    "country": None,  # str; Missing from TCAT data
+                    "id": None,  # str; Missing from TCAT data
+                    "geo": {
+
+                    },
+                    "country_code": None,  # str; Missing from TCAT data
+                    "name": tcat_tweet["location"],  # str
+                    "place_type": None,  # str; Missing from TCAT data
+                    "full_name": tcat_tweet["location"],  # str
+                },
+                "coordindates": {
+                    "type": None,  # str; Missing from TCAT data
+                    "coordinates": [tcat_tweet["lng"], tcat_tweet["lat"]],  # list i.e. [longitude, latitude]
+                },
+            },
+            "withheld": {
+                "copyright": True if tcat_tweet["withheld_copyright"] == 1 else False if tcat_tweet["withheld_copyright"] == 0 else None,  # bool; TODO TCAT has column, but have not seen it populated in testing... This is guess
+                "country_codes": tcat_tweet["withheld_scope"].split(";"),  # list; TODO TCAT has column, but have not seen it populated in testing... This is guess
+            },
+        }
+
+        # Referenced Tweets; Twitter API v2 has entire tweet data here which we will be missing
+        referenced_tweets = []
+        if tcat_tweet["text"][:4] == "RT @":
+            # Retweet
+            referenced_tweets.append({
+                "type": "retweeted",
+                "id": None,  # str; Missing in TCAT data
+            })
+        if tcat_tweet["quoted_status_id"]:
+            # Quote
+            referenced_tweets.append({
+                "type": "quoted",
+                "id": tcat_tweet["quoted_status_id"],  # str; Missing in TCAT data
+            })
+        if tcat_tweet["in_reply_to_status_id"]:
+            # Reply
+            referenced_tweets.append({
+                "type": "replied_to",
+                "id": tcat_tweet["in_reply_to_status_id"],  # str; Missing in TCAT data
+            })
+            # These should NOT be None in case a processor/user attempts to identify a reply using these
+            APIv2_tweet["in_reply_to_user_id"] = "UNKNOWN"  # str; Missing from TCAT data
+            APIv2_tweet["in_reply_to_user"] = {"username": "UNKNOWN"}  # dict; Missing from TCAT data
+
+        APIv2_tweet["referenced_tweets"] = referenced_tweets  # list
+
+        # Append any extra TCAT data
+        additional_TCAT_data = {}
+        for field in SearchWithinTCATBins.additional_TCAT_fields:
+            additional_TCAT_data["TCAT_"+field] = tcat_tweet[field]
+        APIv2_tweet.update(additional_TCAT_data)
+
+        return APIv2_tweet
 
     @staticmethod
     def validate_query(query, request, user):
@@ -368,3 +487,16 @@ class SearchWithinTCATBins(Search):
 
         # simple!
         return query
+
+    @staticmethod
+    def map_item(tweet):
+        """
+        Use Twitter APIv2 map_item
+        """
+        mapped_tweet = SearchWithTwitterAPIv2.map_item(tweet)
+
+        # Add TCAT extra data
+        for field in SearchWithinTCATBins.additional_TCAT_fields:
+            mapped_tweet["TCAT_" + field] = tweet.get("TCAT_" + field)
+
+        return mapped_tweet

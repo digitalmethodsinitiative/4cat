@@ -797,7 +797,7 @@ class SearchWithTwitterAPIv2(Search):
             "is_quote_tweet": "yes" if is_quoted else "no",
             "quoted_user": "" if not is_quoted else [ref for ref in tweet["referenced_tweets"] if ref["type"] == "quoted"].pop().get("author_user", {}).get("username", ""),
             "is_reply": "yes" if is_reply else "no",
-            "replied_user": tweet.get("in_reply_to_user", {}).get("username"),
+            "replied_user": tweet.get("in_reply_to_user", {}).get("username", ""),
             "hashtags": ','.join(set(hashtags)),
             "urls": ','.join(set(urls)),
             "images": ','.join(set(images)),
