@@ -803,9 +803,6 @@ class SearchWithTwitterAPIv2(Search):
             "images": ','.join(set(images)),
             "videos": ','.join(set(videos)),
             "mentions": ','.join(set(mentions)),
-            "reply_to": "".join(
-                [mention["username"] for mention in tweet.get("entities", {}).get("mentions", [])[:1]]) if any(
-                [ref.get("type") == "replied_to" for ref in tweet.get("referenced_tweets", [])]) else "",
             "long_lat": ', '.join([str(x) for x in tweet.get('geo', {}).get('coordinates', {}).get('coordinates', [])]),
             'place_name': tweet.get('geo', {}).get('place', {}).get('full_name', ''),
         }
