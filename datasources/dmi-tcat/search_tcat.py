@@ -371,7 +371,7 @@ class SearchWithinTCATBins(Search):
             "public_metrics": {
                 "retweet_count": tcat_tweet["retweet_count"],  # int
                 "reply_count": None,  # int; Missing in TCAT data
-                "like_count": tcat_tweet["retweet_count"],  # int
+                "like_count": tcat_tweet["favorite_count"],  # int
                 "quote_count": None,  # int; Missing in TCAT data
                 "impression_count": None,  # int; Missing in TCAT data
                 # TCAT has also favorite_count
@@ -381,7 +381,7 @@ class SearchWithinTCATBins(Search):
                     "id": None,  # str; Missing in TCAT data
                     "username": mention.strip(),  # str
                     # Twitter v2 API has additional user fields
-                } for mention in tcat_tweet["mentions"].split(";")],
+                } for mention in tcat_tweet["mentions"].split(";") if mention],
                 "annotations": None,  # list; Missing in TCAT data
                 "urls": [{
                     "url": url,  # str
@@ -392,7 +392,7 @@ class SearchWithinTCATBins(Search):
                     "tag": hashtag.strip(),  # str
                     "start": None,  # int; Missing in TCAT data
                     "end": None,  # int; Missing in TCAT data
-                } for hashtag in tcat_tweet["hashtags"].split(";")],
+                } for hashtag in tcat_tweet["hashtags"].split(";") if hashtag],
                 "cashtags": None,  # list; Missing in TCAT data
             },
             "created_at": SearchWithinTCATBins.tcat_to_4cat_time(tcat_tweet["time"]),  # str
