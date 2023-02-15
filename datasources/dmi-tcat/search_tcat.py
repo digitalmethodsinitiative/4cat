@@ -65,10 +65,14 @@ class SearchWithinTCATBins(Search):
             "tooltip": "Match all tweets NOT from this username."
         },
         "exclude-replies": {
-            "type": UserInput.OPTION_TOGGLE,
-            "help": "Exclude 'reply' tweets",
-            "default": False,
-            "tooltip": "Enabling this will remove all replies from the data"
+            "type": UserInput.OPTION_CHOICE,
+            "options": {
+                "exclude": "Exclude replies",
+                "include": "Include replies"
+            },
+            "help": "Reply tweets",
+            "default": "include",
+            "tooltip": "Choose to exclude or include tweets that are replies from the data"
         },
         "daterange": {
             "type": UserInput.OPTION_DATERANGE,
@@ -124,6 +128,35 @@ class SearchWithinTCATBins(Search):
         }
     }
 
+    bin_data = {
+        "all_bins": {},
+        "last_collected": {},
+    }
+
+    @classmethod
+    def collect_all_bins(cls):
+        """
+        Requests bin information from TCAT instances
+        """
+        instances = config.get("dmi-tcat.instances", [])
+        for instance in instances:
+            # query each configured TCAT instance for a list of bins that can
+            # be subsetted
+            instance = instance.rstrip("/")
+            api_url = instance + "/api/bin-stats.php"
+
+            if instance not in cls.bin_data["last_collected"] or datetime.datetime.now()-datetime.timedelta(days=1) >= cls.bin_data["last_collected"][instance]:
+                # Collect Instance data
+                try:
+                    api_request = requests.get(api_url, timeout=5)
+                    instance_bins = json.loads(api_request.content)
+                    cls.bin_data["all_bins"][instance] = {k: instance_bins[k] for k in sorted(instance_bins)}
+                    cls.bin_data["last_collected"][instance] = datetime.datetime.now()
+                except (requests.RequestException, json.JSONDecodeError):
+                    cls.bin_data["all_bins"][instance] = {"failed": True}
+                    # TODO: No logger here as nothing has been initialized
+                    print(f"WARNING, unable to collect TCAT bins from instance {instance}")
+
     @classmethod
     def get_options(cls, parent_dataset=None, user=None):
         """
@@ -140,24 +173,13 @@ class SearchWithinTCATBins(Search):
         """
         options = cls.options
 
-        instances = config.get("dmi-tcat.instances", [])
-        all_bins = {}
-        for instance in instances:
-            # query each configured TCAT instance for a list of bins that can
-            # be subsetted
-            instance = instance.rstrip("/")
-            api_url = instance + "/api/bin-stats.php"
-            try:
-                # todo: cache this somehow!
-                api_request = requests.get(api_url, timeout=5)
-                instance_bins = json.loads(api_request.content)
-                all_bins[instance] = {k: instance_bins[k] for k in sorted(instance_bins)}
-            except (requests.RequestException, json.JSONDecodeError):
-                options["bin"] = {
-                    "type": UserInput.OPTION_INFO,
-                    "help": "Could not connect to DMI-TCAT instance %s. Check the 4CAT configuration." % instance
-                }
-                return options
+        cls.collect_all_bins()
+        if all([data.get("failed", False) for instance, data in cls.bin_data["all_bins"].items()]):
+            options["bin"] = {
+                "type": UserInput.OPTION_INFO,
+                "help": "Could not connect to DMI-TCAT instance(s)."
+            }
+            return options
 
         options["bin"] = {
             "type": UserInput.OPTION_CHOICE,
@@ -165,7 +187,7 @@ class SearchWithinTCATBins(Search):
             "help": "Query bin"
         }
 
-        for instance, bins in all_bins.items():
+        for instance, bins in cls.bin_data["all_bins"].items():
             # make the host somewhat human-readable
             # also strip out embedded HTTP auths
             host = re.sub(r"^https?://", "", instance).split("@").pop()
@@ -194,10 +216,12 @@ class SearchWithinTCATBins(Search):
         # still show up in e.g. the HTML of the 'create dataset' form
         available_instances = config.get("dmi-tcat.instances", [])
         instance_url = ""
+        instance = None
         for available_instance in available_instances:
             hostname = re.sub(r"https?://", "", available_instance).split("@").pop().rstrip("/")
             if hostname == bin_host:
                 instance_url = available_instance
+                instance = available_instance.rstrip("/")
                 break
 
         if not instance_url:
@@ -205,6 +229,20 @@ class SearchWithinTCATBins(Search):
 
         # now get the parameters...
         request_url = instance_url.rstrip("/") + "/analysis/mod.export_tweets.php"
+
+        # Allow for blank dates
+        if self.parameters.get("min_date"):
+            start_date = datetime.datetime.fromtimestamp(self.parameters.get("min_date")).strftime("%Y-%m-%d")
+        else:
+            # Collect the bins again (the backend may not have access to the first_tweet)
+            self.collect_all_bins()
+            try:
+                first_tweet_timestamp = self.bin_data["all_bins"][instance][bin_name].get('range').get('first_tweet')
+            except KeyError:
+                return self.dataset.finish_with_error(f"Lost connection to TCAT instance {bin_host}")
+            start_date = datetime.datetime.strptime(first_tweet_timestamp, "%Y-%m-%d %H:%M:%S").strftime("%Y-%m-%d")
+
+        end_date = datetime.datetime.fromtimestamp(self.parameters.get("max_date")).strftime("%Y-%m-%d") if self.parameters.get("max_date") else (datetime.datetime.now() + datetime.timedelta(days=1)).strftime("%Y-%m-%d")
         parameters = {
             "dataset": bin_name,
             "query": self.parameters.get("query"),
@@ -216,9 +254,9 @@ class SearchWithinTCATBins(Search):
             "lang": self.parameters.get("tweet-language"),
             "exclude_from_user_name": self.parameters.get("user-exclude"),
             "from_source": re.sub(r"<[^>]+>", "", self.parameters.get("tweet-client")),
-            "startdate": datetime.datetime.fromtimestamp(self.parameters.get("min_date")).strftime("%Y-%m-%d"),
-            "enddate": datetime.datetime.fromtimestamp(self.parameters.get("max_date")).strftime("%Y-%m-%d"),
-            "replyto": "yes" if self.parameters.get("exclude-replies") else "no",
+            "startdate": start_date,
+            "enddate": end_date,
+            "replyto": "yes" if self.parameters.get("exclude-replies") == "exclude" else "no",
             "whattodo": "",
             "exportSettings": "urls,mentions,hashtags,media,",
             "graph_resolution": "day",
@@ -232,7 +270,7 @@ class SearchWithinTCATBins(Search):
         response = requests.get(request_url, params=parameters, stream=True)
         if response.status_code != 200:
             return self.dataset.finish_with_error("Query bin not available: received HTTP Error %i" % response.status_code)
-        self.dataset.log(f"URL DEBUG: {response.url}")
+        self.dataset.log(f"DEBUG URL: {response.url}")
 
         # process the file in 1kB chunks, buffer as we go
         # If a newline is encountered, the buffer is processed as a row of csv
@@ -253,9 +291,7 @@ class SearchWithinTCATBins(Search):
                 # response.encoding is not correct sometimes, since it does not
                 # indicate that the file uses a BOM, so sniff it instead once
                 # we have some bytes
-                self.dataset.log(f'encoding: {buffer[:3]}')
                 encoding = sniff_encoding(buffer)
-                self.dataset.log(f'encoding: {encoding}')
 
             # split buffer by newlines and process each full line
             # the last line is always carried over, since it may be incomplete
@@ -279,7 +315,6 @@ class SearchWithinTCATBins(Search):
                                     doublequote=True,
                                     quoting=csv.QUOTE_MINIMAL)
                 row_data = next(reader)
-                self.dataset.log(f'row_data: {row_data}')
 
                 if row_data and not fieldnames:
                     # first line in file
@@ -476,11 +511,10 @@ class SearchWithinTCATBins(Search):
         if not query.get("bin", "").strip():
             raise QueryParametersException("You must choose a query bin to get tweets from.")
 
-        # the dates need to make sense as a range to search within
-        # and a date range is needed, to not make it too easy to just get all tweets
+        # Dates need to make sense as a range to search within
         after, before = query.get("daterange")
-        if (not after or not before) or before <= after:
-            raise QueryParametersException("A date range is required and must start before it ends")
+        if (after and before) and before <= after:
+            raise QueryParametersException("A date range must start before it ends")
 
         query["min_date"], query["max_date"] = query.get("daterange")
         del query["daterange"]
