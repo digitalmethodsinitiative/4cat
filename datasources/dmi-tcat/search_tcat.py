@@ -124,7 +124,7 @@ class SearchWithinTCATBins(Search):
             "help": "DMI-TCAT instances",
             "tooltip": 'List of DMI-TCAT instance URLs, e.g. ["http://username:password@tcat.instance.webpage.net"]. '
                        'This  needs to be formatted as a JSON list of strings.',
-            "default": []
+            "default": ''
         }
     }
 
