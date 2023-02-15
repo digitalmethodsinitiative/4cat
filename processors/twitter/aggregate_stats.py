@@ -63,7 +63,7 @@ class TwitterAggregatedStats(BasicProcessor):
 
         :param module: Dataset or processor to determine compatibility with
         """
-        return module.type == "twitterv2-search"
+        return module.type in ["twitterv2-search", "dmi-tcat-search"]
 
     def process(self):
         """
@@ -166,8 +166,7 @@ class TwitterAggregatedStats(BasicProcessor):
             if date not in intervals:
                 intervals[date] = {}
 
-            if post_category not in intervals[date]:
-                intervals[date][post_category] = {
+            post_values = {
                     "Number of Tweets per %s" % category: 1,
                     "Total Retweets of Tweets": post.get('public_metrics').get('retweet_count'),
                     "Total Replies of Tweets": post.get('public_metrics').get('reply_count'),
@@ -183,26 +182,27 @@ class TwitterAggregatedStats(BasicProcessor):
                     "Created at Timestamp": int(tweet_time.timestamp()),
                 }
 
+            # Ensure post_values are integers
+            for k, v in list(post_values.items()):
+                # Remove None values
+                if v is None:
+                    post_values.pop(k)
+                else:
+                    post_values[k] = int(v)
+
+            if post_category not in intervals[date]:
+                intervals[date][post_category] = {**post_values}
+
                 # Convenience for easy adding to above
                 if not data_types:
                     data_types = list(intervals[date][post_category].keys())
-                    self.dataset.log("Data being collected per author: %s" % data_types)
-
+                    self.dataset.log("Data being collected: %s" % data_types)
             else:
-                intervals[date][post_category]["Number of Tweets per %s" % category] += 1
-                intervals[date][post_category]["Total Retweets of Tweets"] += post.get('public_metrics').get('retweet_count')
-                intervals[date][post_category]["Total Replies of Tweets"] += post.get('public_metrics').get('reply_count')
-                intervals[date][post_category]["Total Likes of Tweets"] += post.get('public_metrics').get('like_count')
-                intervals[date][post_category]["Total Quotes of Tweets"] += post.get('public_metrics').get('quote_count')
-                intervals[date][post_category]["Number of URLs"] += len(
-                    [tag["expanded_url"] for tag in post.get("entities", {}).get("urls", [])])
-                intervals[date][post_category]["Number of Hashtags"] += len(
-                    [tag["tag"] for tag in post.get("entities", {}).get("hashtags", [])])
-                intervals[date][post_category]["Number of Mentions"] += len(
-                    [tag["username"] for tag in post.get("entities", {}).get("mentions", [])])
-                intervals[date][post_category]["Number of Images"] += len(
-                    [item["url"] for item in post.get("attachments", {}).get("media_keys", []) if
-                     type(item) is dict and item.get("type") == "photo"])
+                for key, value in post_values.items():
+                    if key == "Created at Timestamp":
+                        # Skip timestamp
+                        pass
+                    intervals[date][post_category][key] += int(value)
 
             first_interval = min(first_interval, date)
             last_interval = max(last_interval, date)
@@ -301,7 +301,7 @@ class TwitterAggregatedStatsVis(TwitterAggregatedStats):
 
         for index, (data_type, data) in enumerate(vis_data.items()):
             axs[index].boxplot(data['data'], sym='+' if self.parameters.get("show_outliers") else '')
-            axs[index].set_title('%s per %s' % (data_type, header_category))
+            axs[index].set_title('%s per %s' % (data_type.replace(f" per {category}", ""), header_category))
             axs[index].set_xticklabels(data['intervals'])
 
             if self.parameters.get("label_median"):
