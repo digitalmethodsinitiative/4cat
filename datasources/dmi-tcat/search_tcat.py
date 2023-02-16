@@ -134,7 +134,7 @@ class SearchWithinTCATBins(Search):
     }
 
     @classmethod
-    def collect_all_bins(cls):
+    def collect_all_bins(cls, force_update=False):
         """
         Requests bin information from TCAT instances
         """
@@ -145,7 +145,7 @@ class SearchWithinTCATBins(Search):
             instance = instance.rstrip("/")
             api_url = instance + "/api/bin-stats.php"
 
-            if instance not in cls.bin_data["last_collected"] or datetime.datetime.now()-datetime.timedelta(days=1) >= cls.bin_data["last_collected"][instance]:
+            if force_update or instance not in cls.bin_data["last_collected"] or datetime.datetime.now()-datetime.timedelta(days=1) >= cls.bin_data["last_collected"][instance]:
                 # Collect Instance data
                 try:
                     api_request = requests.get(api_url, timeout=5)
@@ -227,6 +227,18 @@ class SearchWithinTCATBins(Search):
         if not instance_url:
             return self.dataset.finish_with_error("Invalid DMI-TCAT instance name '%s'" % bin_host)
 
+        # Collect the bins again (ensure we have updated info in case bin is still active)
+        self.collect_all_bins(force_update=True)
+        # Add metadata to parameters
+        try:
+            current_bin = self.bin_data["all_bins"][instance][bin_name]
+        except KeyError:
+            return self.dataset.finish_with_error(f"Lost connection to TCAT instance {bin_host}")
+        # Add TCAT metadata to dataset
+        self.dataset.tcat_bin_data = current_bin
+        if current_bin.get("type") in ["follow", "track", "timeline", "geotrack"] and ("phrase_times" not in current_bin or not "user_times" not in current_bin):
+            self.dataset.update_status("Warning: TCAT not updated to send phrase and user time ranges; consider updating if you would like to retain this BIN metadata.")
+
         # now get the parameters...
         request_url = instance_url.rstrip("/") + "/analysis/mod.export_tweets.php"
 
@@ -234,12 +246,7 @@ class SearchWithinTCATBins(Search):
         if self.parameters.get("min_date"):
             start_date = datetime.datetime.fromtimestamp(self.parameters.get("min_date")).strftime("%Y-%m-%d")
         else:
-            # Collect the bins again (the backend may not have access to the first_tweet)
-            self.collect_all_bins()
-            try:
-                first_tweet_timestamp = self.bin_data["all_bins"][instance][bin_name].get('range').get('first_tweet')
-            except KeyError:
-                return self.dataset.finish_with_error(f"Lost connection to TCAT instance {bin_host}")
+            first_tweet_timestamp = current_bin.get('range').get('first_tweet')
             start_date = datetime.datetime.strptime(first_tweet_timestamp, "%Y-%m-%d %H:%M:%S").strftime("%Y-%m-%d")
 
         end_date = datetime.datetime.fromtimestamp(self.parameters.get("max_date")).strftime("%Y-%m-%d") if self.parameters.get("max_date") else (datetime.datetime.now() + datetime.timedelta(days=1)).strftime("%Y-%m-%d")
@@ -270,7 +277,6 @@ class SearchWithinTCATBins(Search):
         response = requests.get(request_url, params=parameters, stream=True)
         if response.status_code != 200:
             return self.dataset.finish_with_error("Query bin not available: received HTTP Error %i" % response.status_code)
-        self.dataset.log(f"DEBUG URL: {response.url}")
 
         # process the file in 1kB chunks, buffer as we go
         # If a newline is encountered, the buffer is processed as a row of csv
