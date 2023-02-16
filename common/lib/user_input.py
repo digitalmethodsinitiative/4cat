@@ -86,7 +86,12 @@ class UserInput:
             elif settings.get("type") == UserInput.OPTION_TOGGLE:
                 # special case too, since if a checkbox is unchecked, it simply
                 # does not show up in the input
-                parsed_input[option] = option in input
+                if option in input:
+                    # Toggle needs to be parsed
+                    parsed_input[option] = UserInput.parse_value(settings, input[option], silently_correct)
+                else:
+                    # Toggle was left blank
+                    parsed_input[option] = False
 
             elif option not in input:
                 # not provided? use default
@@ -121,8 +126,16 @@ class UserInput:
 
         elif input_type == UserInput.OPTION_TOGGLE:
             # simple boolean toggle
-            return choice is not None
-
+            if type(choice) == bool:
+                return choice
+            elif choice in ['false', 'False']:
+                # Sanitized options passed back to Flask can be converted to strings as 'false'
+                return False
+            elif choice in ['true', 'True', 'on']:
+                # Toggle will have value 'on', but may also becomes a string 'true'
+                return True
+            else:
+                raise QueryParametersException("Toggle invalid input")
         elif input_type in (UserInput.OPTION_DATE, UserInput.OPTION_DATERANGE):
             # parse either integers (unix timestamps) or try to guess the date
             # format (the latter may be used for input if JavaScript is turned
