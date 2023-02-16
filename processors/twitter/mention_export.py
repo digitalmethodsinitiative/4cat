@@ -31,7 +31,7 @@ class TwitterMentionsExport(BasicProcessor):
 
         :param module: Dataset or processor to determine compatibility with
         """
-        return module.type == "twitterv2-search"
+        return module.type in ["twitterv2-search"]
 
     def process(self):
         """
@@ -126,6 +126,71 @@ class TwitterMentionsExport(BasicProcessor):
 
                     if ref_type_matching_error:
                         item['errors'] = ', '.join(ref_type_matching_error)
+
+                    if item['to_username'] not in captured_mentions:
+                        writer.writerow(item)
+                        captured_mentions.add(item['to_username'])
+                        counter += 1
+
+                        if counter % 2500 == 0:
+                            self.dataset.update_status("Processed through " + str(counter) + " mentions.")
+
+            self.dataset.update_status("Finished")
+            self.dataset.finish(counter)
+
+
+class TCATMentionsExport(BasicProcessor):
+    """
+    Collect User stats as both author and mention.
+    """
+    type = "tcat-mentions-export"  # job type ID
+    category = "Twitter Analysis"  # category
+    title = "Mentions Export"  # title displayed in UI
+    description = "Identifies mentions types and creates mentions table (tweet id, from author id, from username, to username)"  # description displayed in UI
+    extension = "csv"  # extension of result file, used internally and in UI
+
+    @classmethod
+    def is_compatible_with(cls, module=None):
+        """
+        Determine if processor is compatible with dataset
+
+        :param module: Dataset or processor to determine compatibility with
+        """
+        return module.type in ["dmi-tcat-search"]
+
+    def process(self):
+        """
+        This takes a TCAT imported dataset file as input, and outputs a csv w/ Mention table. TCAT does not retain
+        enough information to be sure of the mention type, and it does not included mentioned user IDs.
+        """
+        self.dataset.update_status("Processing posts")
+
+        with self.dataset.get_results_path().open("w", encoding="utf-8", newline="") as outfile:
+            item = {'tweet_id': None, 'from_user_id': None, 'from_username': None, 'to_username': None}
+            writer = csv.DictWriter(outfile, fieldnames=item.keys())
+            writer.writeheader()
+
+            counter = 0
+            # Iterate through each post and collect data for each interval
+            for post in self.source_dataset.iterate_items(self, bypass_map_item=True):
+                if self.interrupted:
+                    raise ProcessorInterruptedException("Interrupted while processing Tweets")
+
+                item = {
+                    'tweet_id': post.get('id'),
+                    'from_user_id': post.get("author_id"),
+                    'from_username': post.get("author_user").get("username"),
+                }
+                # Check for Mentions
+                mentions = [tag["username"] for tag in
+                            post.get("entities", {}).get("mentions", [])]
+                captured_mentions = set()
+
+                if item['from_username'] == 'REDACTED':
+                    raise ProcessorException("Author information has been removed; cannot proceed")
+
+                for mention in mentions:
+                    item['to_username'] = mention
 
                     if item['to_username'] not in captured_mentions:
                         writer.writerow(item)

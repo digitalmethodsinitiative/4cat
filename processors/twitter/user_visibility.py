@@ -42,7 +42,7 @@ class TwitterUserVisibility(BasicProcessor):
 
         :param module: Dataset or processor to determine compatibility with
         """
-        return module.type == "twitterv2-search"
+        return module.type in ["twitterv2-search", "dmi-tcat-search"]
 
     def process(self):
         """

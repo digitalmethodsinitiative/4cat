@@ -490,7 +490,8 @@ class SearchWithTwitterAPIv2(Search):
                           "https://developer.twitter.com/en/docs/twitter-api/tweets/search/integrate/build-a-query) "
                           "documentation for more information about this API endpoint and the syntax you can use in your "
                           "search query. You can also test queries with Twitter's [Query "
-                          "Builder](https://developer.twitter.com/apitools/query?query=).")
+                          "Builder](https://developer.twitter.com/apitools/query?query=). Retweets are included by default; "
+                          "add `-is:retweet` to exclude them.")
 
         options = {
             "intro-1": {
@@ -796,15 +797,12 @@ class SearchWithTwitterAPIv2(Search):
             "is_quote_tweet": "yes" if is_quoted else "no",
             "quoted_user": "" if not is_quoted else [ref for ref in tweet["referenced_tweets"] if ref["type"] == "quoted"].pop().get("author_user", {}).get("username", ""),
             "is_reply": "yes" if is_reply else "no",
-            "replied_user": "" if not is_reply else [ref for ref in tweet["referenced_tweets"] if ref["type"] == "replied_to"].pop().get("author_user", {}).get("username", ""),
+            "replied_user": tweet.get("in_reply_to_user", {}).get("username", ""),
             "hashtags": ','.join(set(hashtags)),
             "urls": ','.join(set(urls)),
             "images": ','.join(set(images)),
             "videos": ','.join(set(videos)),
             "mentions": ','.join(set(mentions)),
-            "reply_to": "".join(
-                [mention["username"] for mention in tweet.get("entities", {}).get("mentions", [])[:1]]) if any(
-                [ref.get("type") == "replied_to" for ref in tweet.get("referenced_tweets", [])]) else "",
             "long_lat": ', '.join([str(x) for x in tweet.get('geo', {}).get('coordinates', {}).get('coordinates', [])]),
             'place_name': tweet.get('geo', {}).get('place', {}).get('full_name', ''),
         }

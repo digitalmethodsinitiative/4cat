@@ -16,7 +16,6 @@ services:
   backend:
     image: digitalmethodsinitiative/4cat:${DOCKER_TAG}
     container_name: 4cat_backend
-    init: true
     restart: unless-stopped
     env_file:
       - .env
@@ -38,8 +37,8 @@ services:
       - db
       - backend
     ports:
-      - ${TELEGRAM_PORT}:443
       - ${PUBLIC_PORT}:5000
+      - ${TELEGRAM_PORT}:443
     volumes:
       - 4cat_data:/usr/src/app/data/
       - 4cat_share:/usr/src/app/config/

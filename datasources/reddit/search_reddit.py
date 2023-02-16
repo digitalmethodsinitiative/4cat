@@ -87,7 +87,8 @@ class SearchReddit(Search):
 		},
 		"subject_url": {
 			"type": UserInput.OPTION_TEXT,
-			"help": "URL/domain in post"
+			"help": "URL/domain in post",
+			"tooltip": "Regular API only; Filter for posts that link to certain sites or domains (e.g. only posts linking to reddit.com)",
 		},
 		"divider-2": {
 			"type": UserInput.OPTION_DIVIDER

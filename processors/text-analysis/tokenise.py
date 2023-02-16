@@ -5,7 +5,9 @@ import ahocorasick
 import string
 import json
 import re
+import os
 
+import nltk
 from nltk.stem.snowball import SnowballStemmer
 from nltk.stem import WordNetLemmatizer
 from nltk.tokenize import word_tokenize, TweetTokenizer, sent_tokenize
@@ -238,6 +240,18 @@ class Tokenise(BasicProcessor):
 		def dummy_function(x, *args, **kwargs):
 			return [x]
 
+		# if told so, first split the post into separate sentences
+		if grouping == "sentence":
+			if language not in [lang.split('.')[0] for lang in os.listdir(nltk.data.find('tokenizers/punkt')) if
+								'pickle' in lang]:
+				self.dataset.update_status(
+					f"Language {language} not available for sentence tokenizer; grouping by item/post instead.")
+				sentence_method = dummy_function
+			else:
+				sentence_method = sent_tokenize
+		else:
+			sentence_method = dummy_function
+
 		# Collect metadata
 		metadata = {'parameters':{'columns':columns, 'grouped_by':grouping, 'intervals':set()}}
 		multiple_docs_per_post = True if grouping == 'sentence' or len(columns) > 1 else False
@@ -265,8 +279,6 @@ class Tokenise(BasicProcessor):
 								'documents': {}, # Only needed if there are more than one document per post/item
 								}
 
-			# if told so, first split the post into separate sentences
-			sentence_method = sent_tokenize if grouping == "sentence" else dummy_function
 			groupings = []
 			for column in columns:
 				column_value = post.get(column)
