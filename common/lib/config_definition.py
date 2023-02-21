@@ -238,7 +238,7 @@ config_definition = {
         "type": UserInput.OPTION_TOGGLE,
         "default": False,
         "help": "Use HTTPS",
-        "tooltip": "Enable to make 4CAT use 'https' in absolute URLs; DOES NOT CURRENTLY WORK WITH DOCKER SETUP",
+        "tooltip": "If your server is using 'https', set to True and 4CAT will use HTTPS links.",
     },
     "flask.autologin.name": {
         "type": UserInput.OPTION_TEXT,
