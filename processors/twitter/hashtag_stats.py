@@ -48,7 +48,7 @@ class TwitterHashtagStats(TwitterStatsBase):
 
         :param module: Dataset or processor to determine compatibility with
         """
-        return module.type in ["twitterv2-search", "dmi-tcat-search"]
+        return module.type in ["twitterv2-search", "dmi-tcat-search", "twitter_dmi_stream-search"]
 
     def map_data(self, post):
         """
