@@ -81,6 +81,17 @@ class SearchWithTwitterDMI(Search):
 
         return options
 
+    def collect_twitter_rules(self):
+        """
+        Collect the rule sets used to filter the tweets stored on the DMI server
+        """
+        dmi_twitter_server = config.get("twitter_dmi-search.server", False)
+        if not dmi_twitter_server:
+            return False
+        # TODO: there is no API to directly talk to Mongo alone...
+        return False
+
+
     def get_items(self, query):
         """
         :param query:
@@ -90,6 +101,7 @@ class SearchWithTwitterDMI(Search):
         if not dmi_twitter_server:
             self.dataset.update_status("A DMI Twitter Collection server has not been configured.", is_final=True)
             return
+        dmi_twitter_server = dmi_twitter_server.rstrip("/") + "/api/tweets/search/"  # Other collections may exist; TODO this will need to be abstracted further
 
         # Collect parameters
         query_string = json.dumps(self.parameters.get("query"))
@@ -112,7 +124,7 @@ class SearchWithTwitterDMI(Search):
             "query": json.dumps(query),
             "mongo_index": "data.id",
             "sort": json.dumps({"created_at": {"order": "desc"}}),  # This forces returning most recent tweets first
-            "object_id_bool": "no",  # "yes" would use the Mongo DB `_id`
+            "object_id_bool": "no",  # "yes" would use the Mongo DB `_id` which Twitter does not use
         }
 
         curser = False
@@ -128,7 +140,11 @@ class SearchWithTwitterDMI(Search):
 
             response = requests.post(dmi_twitter_server, data=request_data)
 
-            if response.status_code != 200:
+            if response.status_code == 400:
+                self.dataset.update_status(f"Query appears to contain an error({response.status_code}): {response.reason}", is_final=True)
+                return
+            elif response.status_code != 200:
+                # 500 something is wrong with the server (possibly the query returned something unexpected)
                 self.dataset.update_status(f"DMI server mad ({response.status_code}): {response.reason}", is_final=True)
                 return
 
