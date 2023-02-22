@@ -1,0 +1,2 @@
+DMI has developed a Twitter data collector that continuously records tweets based on certain criteria. This 4CAT 
+datasource allows you to query previously collected tweets and import them into 4CAT for analysis.
