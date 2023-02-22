@@ -298,6 +298,9 @@ class SearchWithTwitterAPIv2(Search):
                 if any(key not in expected_error_types for key in missing_objects.keys()):
                     self.log.warning("Twitter API v2 returned unknown error types: %s" % str([key for key in missing_objects.keys() if key not in expected_error_types]))
 
+                # Enhance our included tweets (reference tweets) first as they will be added to individual tweets that reference them
+                enriched_included_tweets = [self.enrich_tweet(included_tweet, included_users, included_media, included_polls, included_places, copy.deepcopy(included_tweets), missing_objects) for included_tweet in included_tweets]
+
                 # Loop through and collect tweets
                 for tweet in api_response.get("data", []):
 
@@ -307,7 +310,7 @@ class SearchWithTwitterAPIv2(Search):
                     # splice referenced data back in
                     # we use copy.deepcopy here because else we run into a
                     # pass-by-reference quagmire
-                    tweet = self.enrich_tweet(tweet, included_users, included_media, included_polls, included_places, copy.deepcopy(included_tweets), missing_objects)
+                    tweet = self.enrich_tweet(tweet, included_users, included_media, included_polls, included_places, copy.deepcopy(enriched_included_tweets), missing_objects)
 
                     tweets += 1
                     if tweets % 500 == 0:
@@ -336,7 +339,8 @@ class SearchWithTwitterAPIv2(Search):
             self.dataset.log('Error Report:\n' + '\n'.join(error_report))
             self.dataset.update_status("Completed with errors; Check log for Error Report.", is_final=True)
 
-    def enrich_tweet(self, tweet, users, media, polls, places, referenced_tweets, missing_objects):
+    @staticmethod
+    def enrich_tweet(tweet, users, media, polls, places, referenced_tweets, missing_objects):
         """
         Enrich tweet with user and attachment metadata
 
@@ -398,7 +402,6 @@ class SearchWithTwitterAPIv2(Search):
             elif mention["id"] in missing_objects.get('user', {}):
                 tweet["entities"]["mentions"][index] = {**tweet["entities"]["mentions"][index], **{'error': missing_objects['user'][mention["id"]]}}
 
-
         # add poll metadata
         for index, poll_id in enumerate(tweet.get("attachments", {}).get("poll_ids", [])):
             if poll_id in polls_by_id:
@@ -426,7 +429,7 @@ class SearchWithTwitterAPIv2(Search):
         # referenced tweets (should we?)
         for index, reference in enumerate(tweet.get("referenced_tweets", [])):
             if reference["id"] in tweets_by_id:
-                tweet["referenced_tweets"][index] = {**reference, **self.enrich_tweet(tweets_by_id[reference["id"]], users, media, polls, places, [], missing_objects)}
+                tweet["referenced_tweets"][index] = {**reference, **tweets_by_id[reference["id"]]}
             elif reference["id"] in missing_objects.get('tweet', {}):
                 tweet["referenced_tweets"][index] = {**reference, **{'error': missing_objects['tweet'][reference["id"]]}}
 
