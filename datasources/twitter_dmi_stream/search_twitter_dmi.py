@@ -127,7 +127,7 @@ class SearchWithTwitterDMI(Search):
             "object_id_bool": "no",  # "yes" would use the Mongo DB `_id` which Twitter does not use
         }
 
-        curser = False
+        cursor = False
         collected_tweets = 0
         keep_searching = True
         while keep_searching:
@@ -135,7 +135,7 @@ class SearchWithTwitterDMI(Search):
                 raise ProcessorInterruptedException("Interrupted while getting tweets from the Twitter API")
 
             # Add a curser if it exists
-            if curser:
+            if cursor:
                 request_data.update({"cursor": cursor})
 
             response = requests.post(dmi_twitter_server, data=request_data)
