@@ -7,7 +7,8 @@ import copy
 import json
 
 from backend.abstract.search import Search
-from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException, QueryNeedsExplicitConfirmationException
+from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException, \
+    QueryNeedsExplicitConfirmationException, ProcessorException
 from common.lib.helpers import convert_to_int, UserInput, timify_long
 import common.config_manager as config
 from datasources.twitterv2.search_twitter import SearchWithTwitterAPIv2
@@ -54,6 +55,10 @@ class SearchWithTwitterDMI(Search):
                 "type": UserInput.OPTION_INFO,
                 "help": intro_text
             },
+            "stream_type": {
+                "type": UserInput.OPTION_CHOICE,
+                "help": "Stream Type",
+            },
             "query": {
                 "type": UserInput.OPTION_TEXT_LARGE,
                 "help": "Query"
@@ -70,8 +75,6 @@ class SearchWithTwitterDMI(Search):
             },
             "daterange-info": {
                 "type": UserInput.OPTION_INFO,
-                "help": "By default, Twitter returns tweets up til 30 days ago. If you want to go back further, you "
-                        "need to explicitly set a date range."
             },
             "daterange": {
                 "type": UserInput.OPTION_DATERANGE,
@@ -79,18 +82,53 @@ class SearchWithTwitterDMI(Search):
             },
         }
 
+        twitter_activity = SearchWithTwitterDMI.collect_dmi_api_info("/api/twitter_activity/")
+        # Update stream_type options
+        stream_options = {}
+        daterange_info = ""
+        filtered_dates = twitter_activity.get("filtered_stream").get("date_ranges")
+        if filtered_dates:
+            stream_options["filtered_stream"] = "Filtered Stream (rule based)"
+            filtered_timedelta = SearchWithTwitterDMI.calculate_downtime(filtered_dates)
+            daterange_info += f"The Filtered Stream has collected data from {filtered_dates[0]['start']} to {'today' if filtered_dates[-1]['stop'] == 'N/A' else filtered_dates[-1]['stop']}{f' with gaps totaling in {filtered_timedelta}' if filtered_timedelta.total_seconds() > 0 else ''}.\n"
+        sample_dates = twitter_activity.get("sample_stream").get("date_ranges")
+        if sample_dates:
+            stream_options["sample_stream"] = "Sample Stream"
+            sample_timedelta = SearchWithTwitterDMI.calculate_downtime(sample_dates)
+            daterange_info += f"The Sample Stream has collected data from {sample_dates[0]['start']} to {'today' if sample_dates[-1]['stop'] == 'N/A' else sample_dates[-1]['stop']}{f' with gaps totaling in {sample_timedelta}' if sample_timedelta.total_seconds() > 0 else ''}. "
+
+        options["stream_type"].update({
+            "options": stream_options,
+        })
+
+        # Update daterange with collected data
+        options["daterange-info"]["help"] = daterange_info
+
         return options
 
-    def collect_twitter_rules(self):
+    @staticmethod
+    def collect_dmi_api_info(api_endpoint):
         """
         Collect the rule sets used to filter the tweets stored on the DMI server
+
+        api_endpoint current options: "/api/twitter_rules/" and "/api/twitter_activity/"
         """
         dmi_twitter_server = config.get("twitter_dmi-search.server", False)
         if not dmi_twitter_server:
-            return False
-        # TODO: there is no API to directly talk to Mongo alone...
-        return False
+            raise DmiServerException("DMI Server not configured")
 
+        dmi_api_url = dmi_twitter_server.rstrip("/") + api_endpoint
+
+        # Request data
+        response = requests.get(dmi_api_url)
+
+        if response.status_code != 200:
+            raise DmiServerException(f"DMI Server responded with error ({response.status_code}): {response.reason}")
+
+        response_json = response.json()
+        if response_json.get("status") != "success":
+            raise DmiServerException(f"DMI Server returned status error: {response_json.get('status')}")
+        return response_json["results"]
 
     def get_items(self, query):
         """
@@ -239,3 +277,39 @@ class SearchWithTwitterDMI(Search):
         Use Twitter APIv2 map_item
         """
         return SearchWithTwitterAPIv2.map_item(tweet)
+
+    @staticmethod
+    def calculate_downtime(dateranges):
+        """
+        :param list dateranges: List of dicts with "start" and "stop" datetimes
+        :return datetime.timedelta(): Difference in seconds between stop and start times
+        """
+        downtime = datetime.timedelta()
+        last_stop = None
+        start_time = None
+        for daterange in dateranges:
+            # Check if we have a last_stop and a new start
+            if last_stop is not None and daterange.get("start") != "UNKNOWN":
+                # Add to downtime
+                start_time = datetime.datetime.strptime(daterange.get("start"), "%Y-%m-%dT%H:%M:%SZ")
+                if daterange.get("backfill_minutes"):
+                    # Adjust for backfill
+                    start_time = start_time - datetime.timedelta(minutes=int(daterange.get("backfill_minutes")))
+                # Backfill may have caught all time needed
+                if start_time > last_stop:
+                    td = start_time - last_stop
+                    downtime += td
+            # Check for new last_stop
+            if daterange.get("stop") != "N/A":
+                last_stop = datetime.datetime.strptime(daterange.get("stop"), "%Y-%m-%dT%H:%M:%SZ")
+            elif last_stop is not None and start_time is not None and start_time != "UNKNOWN":
+                # time delta from this last_stop has already been added and the current time
+                last_stop = start_time
+        return downtime
+
+
+class DmiServerException(ProcessorException):
+    """
+    Raise is unable to connect to DMI Server
+    """
+    pass
