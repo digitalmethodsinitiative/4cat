@@ -498,7 +498,7 @@ const query = {
                         return;
                     }
 
-                    let status_field = container.find('.dataset-status')
+                    let status_field = container.find('.dataset-status .result-status')
                     let current_status = status_field.html();
                     applyProgress(status_field, json.progress);
                     if (current_status !== json.status_html) {
