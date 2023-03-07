@@ -147,12 +147,13 @@ class PixPlotGenerator(BasicProcessor):
 		label_formated = ''.join(e if e.isalnum() else '_' for e in top_dataset.get_label())
 		image_label = datetime.fromtimestamp(self.source_dataset.timestamp).strftime("%Y-%m-%d-%H%M%S") + '-' + label_formated + '-' + str(top_dataset.key)
 		plot_label = date + '-' + label_formated + '-' + str(self.dataset.key)
+		pixplot_server = config.get('pix-plot.PIXPLOT_SERVER', user=self.owner).rstrip("/")
 
 		# Folder name is PixPlot identifier and set at dataset key
 		data = {'folder_name': image_label}
 
 		# Check if images have already been sent
-		filename_url = config.get('pix-plot.PIXPLOT_SERVER').rstrip('/') + '/api/list_filenames?folder_name=' + image_label
+		filename_url = pixplot_server + '/api/list_filenames?folder_name=' + image_label
 		filename_response = requests.get(filename_url, timeout=30)
 
 		# Check if 4CAT has access to this PixPlot server
@@ -186,13 +187,13 @@ class PixPlotGenerator(BasicProcessor):
 		self.dataset.update_status("Collecting metadata")
 		metadata_file_path = self.format_metadata(staging_area)
 		# Metadata
-		upload_url = config.get('pix-plot.PIXPLOT_SERVER').rstrip('/') + '/api/send_metadata'
+		upload_url = pixplot_server + '/api/send_metadata'
 		metadata_response = requests.post(upload_url, files={'metadata': open(metadata_file_path, 'rb')}, data=data, timeout=120)
 
 		# Now send photos to PixPlot
 		self.dataset.update_status("Uploading images to PixPlot")
 		# Configure upload photo url
-		upload_url = config.get('pix-plot.PIXPLOT_SERVER').rstrip('/') + '/api/send_photo'
+		upload_url = pixplot_server + '/api/send_photo'
 		images_uploaded = 0
 		estimated_num_images = len(filenames)
 		self.dataset.update_status("Uploading %i images" % (estimated_num_images))
@@ -217,7 +218,7 @@ class PixPlotGenerator(BasicProcessor):
 
 		# Request PixPlot server create PixPlot
 		self.dataset.update_status("Sending create PixPlot request")
-		create_plot_url = config.get('pix-plot.PIXPLOT_SERVER').rstrip('/') + '/api/pixplot'
+		create_plot_url = pixplot_server + '/api/pixplot'
 		# Gather info from PixPlot server response
 		create_pixplot_post_info = metadata_response.json()['create_pixplot_post_info']
 		# Create json package for creation request
@@ -241,7 +242,7 @@ class PixPlotGenerator(BasicProcessor):
 		if resp.status_code == 202:
 			# new request
 			new_request = True
-			results_url = config.get('pix-plot.PIXPLOT_SERVER').rstrip('/') + '/api/pixplot?key=' + resp.json()['key']
+			results_url = pixplot_server + '/api/pixplot?key=' + resp.json()['key']
 		elif 'already exists' in resp.json()['error']:
 			# repeat request
 			new_request = False
@@ -270,7 +271,7 @@ class PixPlotGenerator(BasicProcessor):
 				elif 'report' in result.json().keys() and result.json()['report'][-6:-1] == 'Done!':
 					# Complete without error
 					self.dataset.update_status("PixPlot Completed!")
-					self.log.info('PixPlot saved on : ' + config.get('pix-plot.PIXPLOT_SERVER'))
+					self.log.info('PixPlot saved on : ' + pixplot_server)
 					break
 				else:
 					# Something botched
@@ -279,7 +280,7 @@ class PixPlotGenerator(BasicProcessor):
 					return
 
 		# Create HTML file
-		plot_url = config.get('pix-plot.PIXPLOT_SERVER').rstrip('/') + '/plots/' + plot_label + '/index.html'
+		plot_url = pixplot_server + '/plots/' + plot_label + '/index.html'
 		html_file = self.get_html_page(plot_url)
 
 		# Write HTML file

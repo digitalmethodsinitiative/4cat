@@ -183,7 +183,7 @@ class ImageTextDetector(BasicProcessor):
         :param Path image_file:  Path to file to annotate
         :return dict:  Lists of detected features, one key for each feature
         """
-        server = config.get('text_from_images.DMI_OCR_SERVER', '')
+        server = config.get('text_from_images.DMI_OCR_SERVER', '', user=self.owner)
 
         # Get model_type if available
         parameters = {}

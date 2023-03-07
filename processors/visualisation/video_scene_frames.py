@@ -118,7 +118,7 @@ class VideoSceneFrames(BasicProcessor):
                 scene_index = scene["id"].split("_").pop()
                 scene_filename = video.stem + "_scene_" + str(scene_index) + ".jpeg"
                 command = [
-                    shutil.which(config.get("video_downloader.ffmpeg-path")),
+                    shutil.which(config.get("video_downloader.ffmpeg-path", user=self.owner)),
                     "-i", shlex.quote(str(video)),
                     "-vf", "select='eq(n\\," + scene["start_frame"] + ")'",
                     "-vframes", "1",

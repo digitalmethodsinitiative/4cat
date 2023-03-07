@@ -85,14 +85,16 @@ class FourcatToDmiTcatUploader(BasicProcessor):
         :param User user:  User that will be uploading it
         :return dict:  Option definition
         """
-        if config.get('tcat-auto-upload.TCAT_SERVER') and type(config.get('tcat-auto-upload.TCAT_SERVER')) in (set, list, tuple) and len(config.get('tcat-auto-upload.TCAT_SERVER')) > 1:
+        if config.get('tcat-auto-upload.TCAT_SERVER', user=user) \
+                and type(config.get('tcat-auto-upload.TCAT_SERVER', user=user)) in (set, list, tuple) \
+                and len(config.get('tcat-auto-upload.TCAT_SERVER', user=user)) > 1:
             return {
                 "server": {
                     "type": UserInput.OPTION_CHOICE,
                     "options": {
                         "random": "Choose one based on available capacity",
                         **{
-                            url: url for url in config.get('tcat-auto-upload.TCAT_SERVER')
+                            url: url for url in config.get('tcat-auto-upload.TCAT_SERVER', user=user)
                         }
                     },
                     "default": "random",
@@ -120,15 +122,15 @@ class FourcatToDmiTcatUploader(BasicProcessor):
         self.dataset.log('Twitter query: ' + query)
 
         # TCAT authorization information
-        auth = (config.get('tcat-auto-upload.TCAT_USERNAME'), config.get('tcat-auto-upload.TCAT_PASSWORD'))
+        auth = (config.get('tcat-auto-upload.TCAT_USERNAME', user=self.owner), config.get('tcat-auto-upload.TCAT_PASSWORD', user=self.owner))
 
         # find server URL
         server_choice = self.parameters.get("server", "random")
-        if type(config.get('tcat-auto-upload.TCAT_SERVER')) in (list, set, tuple):
-            if server_choice == "random" or server_choice not in config.get('tcat-auto-upload.TCAT_SERVER'):
-                server_choice = random.choice(config.get('tcat-auto-upload.TCAT_SERVER'))
+        if type(config.get('tcat-auto-upload.TCAT_SERVER', user=self.owner)) in (list, set, tuple):
+            if server_choice == "random" or server_choice not in config.get('tcat-auto-upload.TCAT_SERVER', user=self.owner):
+                server_choice = random.choice(config.get('tcat-auto-upload.TCAT_SERVER', user=self.owner))
         else:
-            server_choice = config.get('tcat-auto-upload.TCAT_SERVER')
+            server_choice = config.get('tcat-auto-upload.TCAT_SERVER', user=self.owner)
 
         # DOCKER shenanigans
         if 'host.docker.internal' in server_choice:
@@ -215,7 +217,7 @@ class FourcatToDmiTcatUploader(BasicProcessor):
                                                 'url': url_to_file,
                                                 'name': bin_name,
                                                 'query': query,
-                                                'token': config.get('tcat-auto-upload.TCAT_TOKEN'),
+                                                'token': config.get('tcat-auto-upload.TCAT_TOKEN', user=self.owner),
                                                 })
         return response
 

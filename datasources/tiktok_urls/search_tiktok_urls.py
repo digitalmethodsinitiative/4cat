@@ -147,8 +147,8 @@ class TikTokScraper:
 
         :return:
         """
-        all_proxies = config.get("tiktok-urls.proxies")
-        self.proxy_sleep = config.get("tiktok-urls.proxies.wait", self.proxy_sleep)
+        all_proxies = config.get("tiktok-urls.proxies", user=self.owner)
+        self.proxy_sleep = config.get("tiktok-urls.proxies.wait", self.proxy_sleep, user=self.owner)
         if not all_proxies:
             # no proxies? just request directly
             all_proxies = ["__localhost__"]

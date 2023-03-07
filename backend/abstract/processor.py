@@ -56,6 +56,9 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 	#: The dataset object that the processor is *creating*.
 	dataset = None
 
+	#: Owner (username) of the dataset
+	owner = None
+
 	#: The dataset object that the processor is *processing*.
 	source_dataset = None
 
@@ -94,6 +97,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		"""
 		try:
 			self.dataset = DataSet(key=self.job.data["remote_id"], db=self.db)
+			self.owner = self.dataset["owner"]
 		except TypeError:
 			# query has been deleted in the meantime. finish without error,
 			# as deleting it will have been a conscious choice by a user

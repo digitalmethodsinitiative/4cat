@@ -69,7 +69,7 @@ def quick_db_connect():
     return connection, cursor
 
 
-def get(attribute_name, default=None, connection=None, cursor=None, keep_connection_open=False, raw=False):
+def get(attribute_name, default=None, connection=None, cursor=None, keep_connection_open=False, raw=False, user=None):
     """
     Get a setting's value from the database
 
@@ -81,6 +81,8 @@ def get(attribute_name, default=None, connection=None, cursor=None, keep_connect
     :param cursor:  Database cursor, if None then a new cursor will be created
     :param bool keep_connection_open:  Close connection after query?
     :param bool raw:  True returns value as JSON serialized string; False returns JSON object
+    :param user:  A User object. If none, get the 'global' value. If given,
+    check if it is overridden for this user and if so return that instead
     :return:  Setting value, or the provided fallback, or `None`.
     """
     if attribute_name in dir(ConfigManager):
@@ -93,9 +95,18 @@ def get(attribute_name, default=None, connection=None, cursor=None, keep_connect
             if not connection or not cursor:
                 connection, cursor = quick_db_connect()
 
-            query = "SELECT value FROM settings WHERE name = %s"
-            cursor.execute(query, (attribute_name,))
-            row = cursor.fetchone()
+            row = None
+            if user:
+                if user.__class__.__name__ == "User":
+                    user = user.get_id()
+
+                cursor.execute("SELECT * FROM user_settings WHERE user = %s AND name = %s", (user, attribute_name))
+                row = cursor.fetchone()
+
+            if not row:
+                query = "SELECT value FROM settings WHERE name = %s"
+                cursor.execute(query, (attribute_name,))
+                row = cursor.fetchone()
 
             if not keep_connection_open:
                 connection.close()
