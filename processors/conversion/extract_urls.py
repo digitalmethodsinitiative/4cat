@@ -236,6 +236,7 @@ class ExtractURLs(BasicProcessor):
             processed_items = 0
             url_matches_found = 0
             total_items = self.source_dataset.num_rows
+            progress_interval_size = max(int(total_items / 10), 1)  # 1/10 of total number of records
             for item in self.source_dataset.iterate_items(self):
                 if self.interrupted:
                     raise ProcessorInterruptedException("Interrupted while iterating through items")
@@ -274,7 +275,7 @@ class ExtractURLs(BasicProcessor):
                     url_matches_found += 1
 
                 processed_items += 1
-                if processed_items % int(total_items / 10) == 0:
+                if processed_items % progress_interval_size == 0:
                     self.dataset.update_status(f"Processed {processed_items}/{total_items} items; {url_matches_found} items with url(s)")
                     self.dataset.update_progress(processed_items / total_items)
 
