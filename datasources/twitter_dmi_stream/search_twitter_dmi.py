@@ -80,6 +80,8 @@ class SearchWithTwitterDMI(Search):
                 "type": UserInput.OPTION_DATERANGE,
                 "help": "Date range"
             },
+            "rules": {
+            },
         }
 
         twitter_activity = SearchWithTwitterDMI.collect_dmi_api_info("/api/twitter_activity/")
@@ -90,7 +92,7 @@ class SearchWithTwitterDMI(Search):
         if filtered_dates:
             stream_options["filtered_stream"] = "Filtered Stream (rule based)"
             filtered_timedelta = SearchWithTwitterDMI.calculate_downtime(filtered_dates)
-            daterange_info += f"The Filtered Stream has collected data from {filtered_dates[0]['start']} to {'today' if filtered_dates[-1]['stop'] == 'N/A' else filtered_dates[-1]['stop']}{f' with gaps totaling in {filtered_timedelta}' if filtered_timedelta.total_seconds() > 0 else ''}.\n"
+            daterange_info += f"The Filtered Stream has collected data from {filtered_dates[0]['start']} to {'today' if filtered_dates[-1]['stop'] == 'N/A' else filtered_dates[-1]['stop']}{f' with gaps totaling in {filtered_timedelta}' if filtered_timedelta.total_seconds() > 0 else ''}.\n\n"
         sample_dates = twitter_activity.get("sample_stream").get("date_ranges")
         if sample_dates:
             stream_options["sample_stream"] = "Sample Stream"
@@ -103,6 +105,18 @@ class SearchWithTwitterDMI(Search):
 
         # Update daterange with collected data
         options["daterange-info"]["help"] = daterange_info
+
+        if "filtered_stream" in stream_options:
+            # Update filtered stream rules
+            twitter_rules = SearchWithTwitterDMI.collect_dmi_api_info("/api/twitter_rules/")
+            rule_options = [f"{rule['query']} ({rule['date_ranges'][0]['start']} - {'now' if rule['date_ranges'][0]['stop'] == 'N/A' else rule['date_ranges'][0]['stop']})" for rule in twitter_rules.values()]
+            rule_options.sort()
+            options["rules"].update({
+                "type": UserInput.OPTION_MULTI,
+                "help": "Rules (only applies to filtered stream)",
+                "default": "",
+                "options": {option: option for option in rule_options}
+            })
 
         return options
 
@@ -146,6 +160,8 @@ class SearchWithTwitterDMI(Search):
         min_date = self.parameters.get("min_date", False)
         max_date = self.parameters.get("max_date", False)
         amount = self.parameters.get("amount")
+
+        #TODO: filter by stream_type & if stream_type == 'filtered_stream' also filter by selected rules
 
         query = {"query_string": {"query": query_string, "default_field": "text"}}
         if min_date or max_date:
