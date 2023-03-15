@@ -16,7 +16,7 @@ from bs4 import BeautifulSoup
 import common.config_manager as config
 from backend.abstract.search import Search
 from common.lib.helpers import UserInput
-from common.lib.exceptions import WorkerInterruptedException, QueryParametersException
+from common.lib.exceptions import WorkerInterruptedException, QueryParametersException, ProcessorInterruptedException
 from datasources.tiktok.search_tiktok import SearchTikTok as SearchTikTokByImport
 
 
@@ -203,19 +203,24 @@ class TikTokScraper:
 
             # find out whether there is any connection we can use to send the
             # next request
-            available_proxy = [proxy for proxy in self.proxy_map if not self.proxy_map[proxy]["busy"] and self.proxy_map[proxy]["next_request"] <= time.time()]
-            available_proxy = available_proxy[0] if available_proxy else None
+            available_proxies = [proxy for proxy in self.proxy_map if not self.proxy_map[proxy]["busy"] and self.proxy_map[proxy]["next_request"] <= time.time()]
 
-            if available_proxy and urls:
-                url = urls.pop(0)
-                url = url.replace("https://", "http://")  # https is finicky, lots of blocks
+            for available_proxy in available_proxies:
+                url = None
+                while urls and url is None:
+                    url = urls.pop(0)
+                    url = url.replace("https://", "http://")  # https is finicky, lots of blocks
 
-                if url in seen_urls and url not in retries:
-                    finished += 1
-                    dupes += 1
-                    processor.dataset.log("Skipping duplicate of %s" % url)
+                    # Check if url already collected or should be retried
+                    if url in seen_urls and url not in retries:
+                        finished += 1
+                        dupes += 1
+                        processor.dataset.log("Skipping duplicate of %s" % url)
+                        url = None
+                        continue
 
-                else:
+                    # Add url to be collected
+                    processor.dataset.log(f"Adding to page requests: {url}")
                     proxy = {"http": available_proxy,
                              "https": available_proxy} if available_proxy != "__localhost__" else None
                     tiktok_requests[url] = session.get(url, proxies=proxy, timeout=30)
@@ -285,8 +290,7 @@ class TikTokScraper:
                 elif response.status_code != 200:
                     failed += 1
                     processor.dataset.update_status(
-                        "Received unexpected HTTP response %i for %s, skipping." % (
-                            response.status_code, response.url), is_final=True)
+                        "Received unexpected HTTP response %i for %s, skipping." % (response.status_code, response.url))
                     continue
 
                 # now! try to extract the JSON from the page
@@ -306,7 +310,10 @@ class TikTokScraper:
                     continue
 
                 try:
-                    metadata = json.loads(sigil.text)
+                    if sigil.text:
+                        metadata = json.loads(sigil.text)
+                    else:
+                        metadata = json.loads(sigil.contents[0])
                 except json.JSONDecodeError:
                     failed += 1
                     processor.dataset.log(
@@ -351,3 +358,102 @@ class TikTokScraper:
                     comments = {}
 
                 yield {**item, "comments": list(comments.values())}
+
+    def download_videos(self, video_ids, staging_area, max_videos, processor):
+        """
+        Download TikTok Videos
+        """
+
+        download_results = {}
+        downloaded_videos = 0
+        for video_id in video_ids:
+            if processor.interrupted:
+                raise ProcessorInterruptedException("Interrupted while downloading videos.")
+
+            if downloaded_videos > max_videos:
+                break
+
+            url = f"https://www.tiktok.com/embed/v2/{video_id}"
+            source = requests.get(url)
+            if source.status_code == 400:
+                error_message = f"Video {video_id} not found"
+                download_results[video_id] = {
+                    "success": False,
+                    "error": error_message,
+                }
+                processor.dataset.log(error_message)
+                continue
+
+            soup = BeautifulSoup(source.text, "html.parser")
+            json_source = soup.select_one("script#__FRONTITY_CONNECT_STATE__")
+            metadata = None
+            try:
+                if json_source.text:
+                    metadata = json.loads(json_source.text)
+                elif json_source.contents[0]:
+                    metadata = json.loads(json_source.contents[0])
+            except json.JSONDecodeError as e:
+                processor.dataset.log(f"JSONDecodeError for video {video_id} metadata: {e}\n{json_source}")
+
+            if not metadata:
+                # Failed to collect metadata
+                error_message = f"Failed to find metadata for video {video_id}"
+                download_results[video_id] = {
+                    "success": False,
+                    "error": error_message,
+                }
+                processor.dataset.log(error_message)
+                continue
+
+            try:
+                url = list(metadata["source"]["data"].values())[0]["videoData"]["itemInfos"]["video"]["urls"][0]
+            except KeyError:
+                error_message = f"vid: {video_id} - failed to find video download URL"
+                download_results[video_id] = {
+                    "success": False,
+                    "error": error_message,
+                }
+                processor.dataset.log(error_message)
+                processor.dataset.log(metadata["source"]["data"].values())
+                continue
+
+            # Request actual video
+            z = requests.get(url, headers={
+                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:109.0) Gecko/20100101 Firefox/110.0",
+                "Accept": "video/webm,video/ogg,video/*;q=0.9,application/ogg;q=0.7,audio/*;q=0.6,*/*;q=0.5",
+                "Accept-Language": "en-US,en;q=0.5",
+                # "Range": "bytes=0-",
+                "Connection": "keep-alive",
+                "Referer": "https://www.tiktok.com/",
+                "Sec-Fetch-Dest": "video",
+                "Sec-Fetch-Mode": "no-cors",
+                "Sec-Fetch-Site": "cross-site",
+                "Accept-Encoding": "identity"
+            })
+
+            if z.status_code != 200:
+                error_message = f"Video url {url} returned status ({z.status_code}): {z.reason})"
+                download_results[video_id] = {
+                    "success": False,
+                    "error": error_message,
+                }
+                processor.dataset.log(error_message)
+                continue
+
+            # Download the video
+            with open(staging_area.joinpath(video_id).with_suffix('.mp4'), "wb") as f:
+                for chunk in z.iter_content(chunk_size=1024 * 1024):
+                    if chunk:
+                        f.write(chunk)
+            download_results[video_id] = {
+                "success": True,
+                "filename": video_id + ".mp4",
+                "error": None,
+            }
+
+            downloaded_videos += 1
+            processor.dataset.update_status("Downloaded %i/%i videos" %
+                                       (downloaded_videos, max_videos))
+            processor.dataset.update_progress(downloaded_videos / max_videos)
+
+        return download_results
