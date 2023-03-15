@@ -214,6 +214,8 @@ class Tokenise(BasicProcessor):
 				automaton.add_word(word, 1)
 
 		# initialise pre-processors if needed
+		stemmer = None
+		lemmatizer = None
 		if self.parameters.get("language") != "other":
 			if self.parameters.get("stem"):
 				stemmer = SnowballStemmer(language)
@@ -316,10 +318,10 @@ class Tokenise(BasicProcessor):
 					if not token or token in automaton:
 						continue
 
-					if self.parameters["stem"]:
+					if self.parameters["stem"] and stemmer:
 						token = stemmer.stem(token)
 
-					if self.parameters["lemmatise"]:
+					if self.parameters["lemmatise"] and lemmatizer:
 						token = lemmatizer.lemmatize(token)
 
 					# append tokens to the post's token list
