@@ -167,6 +167,17 @@ class TikTokScraper:
             if proxy not in all_proxies:
                 del self.proxy_map[proxy]
 
+    def release_proxy(self, url):
+        """
+        Release a proxy to be used later
+        """
+        # Release proxy
+        used_proxy = [proxy for proxy in self.proxy_map if self.proxy_map[proxy]["url"] == url][0]
+        self.proxy_map[used_proxy].update({
+            "busy": False,
+            "next_request": time.time() + self.proxy_sleep
+        })
+
     async def request_metadata(self, urls, processor):
         """
         Request TikTok metadata for a list of URLs
@@ -249,11 +260,7 @@ class TikTokScraper:
                     continue
 
                 finished += 1
-                used_proxy = [proxy for proxy in self.proxy_map if self.proxy_map[proxy]["url"] == url][0]
-                self.proxy_map[used_proxy].update({
-                    "busy": False,
-                    "next_request": time.time() + self.proxy_sleep
-                })
+                self.release_proxy(url)
 
                 # handle the exceptions we know to expect - else just raise and
                 # log
@@ -359,66 +366,13 @@ class TikTokScraper:
 
                 yield {**item, "comments": list(comments.values())}
 
-    def download_videos(self, video_ids, staging_area, max_videos, processor):
+    async def download_videos(self, video_ids, staging_area, max_videos, processor):
         """
         Download TikTok Videos
+
+        This is based on the TikTok downloader from https://jdownloader.org/
         """
-
-        download_results = {}
-        downloaded_videos = 0
-        for video_id in video_ids:
-            if processor.interrupted:
-                raise ProcessorInterruptedException("Interrupted while downloading videos.")
-
-            if downloaded_videos > max_videos:
-                break
-
-            url = f"https://www.tiktok.com/embed/v2/{video_id}"
-            source = requests.get(url)
-            if source.status_code == 400:
-                error_message = f"Video {video_id} not found"
-                download_results[video_id] = {
-                    "success": False,
-                    "error": error_message,
-                }
-                processor.dataset.log(error_message)
-                continue
-
-            soup = BeautifulSoup(source.text, "html.parser")
-            json_source = soup.select_one("script#__FRONTITY_CONNECT_STATE__")
-            metadata = None
-            try:
-                if json_source.text:
-                    metadata = json.loads(json_source.text)
-                elif json_source.contents[0]:
-                    metadata = json.loads(json_source.contents[0])
-            except json.JSONDecodeError as e:
-                processor.dataset.log(f"JSONDecodeError for video {video_id} metadata: {e}\n{json_source}")
-
-            if not metadata:
-                # Failed to collect metadata
-                error_message = f"Failed to find metadata for video {video_id}"
-                download_results[video_id] = {
-                    "success": False,
-                    "error": error_message,
-                }
-                processor.dataset.log(error_message)
-                continue
-
-            try:
-                url = list(metadata["source"]["data"].values())[0]["videoData"]["itemInfos"]["video"]["urls"][0]
-            except KeyError:
-                error_message = f"vid: {video_id} - failed to find video download URL"
-                download_results[video_id] = {
-                    "success": False,
-                    "error": error_message,
-                }
-                processor.dataset.log(error_message)
-                processor.dataset.log(metadata["source"]["data"].values())
-                continue
-
-            # Request actual video
-            z = requests.get(url, headers={
+        video_download_headers = {
                 "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:109.0) Gecko/20100101 Firefox/110.0",
                 "Accept": "video/webm,video/ogg,video/*;q=0.9,application/ogg;q=0.7,audio/*;q=0.6,*/*;q=0.5",
                 "Accept-Language": "en-US,en;q=0.5",
@@ -429,31 +383,167 @@ class TikTokScraper:
                 "Sec-Fetch-Mode": "no-cors",
                 "Sec-Fetch-Site": "cross-site",
                 "Accept-Encoding": "identity"
-            })
-
-            if z.status_code != 200:
-                error_message = f"Video url {url} returned status ({z.status_code}): {z.reason})"
-                download_results[video_id] = {
-                    "success": False,
-                    "error": error_message,
-                }
-                processor.dataset.log(error_message)
-                continue
-
-            # Download the video
-            with open(staging_area.joinpath(video_id).with_suffix('.mp4'), "wb") as f:
-                for chunk in z.iter_content(chunk_size=1024 * 1024):
-                    if chunk:
-                        f.write(chunk)
-            download_results[video_id] = {
-                "success": True,
-                "filename": video_id + ".mp4",
-                "error": None,
             }
+        session = FuturesSession()
 
-            downloaded_videos += 1
-            processor.dataset.update_status("Downloaded %i/%i videos" %
-                                       (downloaded_videos, max_videos))
-            processor.dataset.update_progress(downloaded_videos / max_videos)
+        download_results = {}
+        downloaded_videos = 0
+        metadata_collected = 0
+        video_requests = {}
+        video_download_urls = []
+        last_proxy_update = 0
+
+        while video_ids or video_download_urls or video_requests:
+            # give tasks time to run
+            await asyncio.sleep(0.1)
+
+            # update proxies every 5 seconds so we can potentially update them
+            # while the scrape is running
+            if last_proxy_update < time.time():
+                self.update_proxies()
+                last_proxy_update = time.time() + 5
+
+            # find out whether there is any connection we can use to send the
+            # next request
+            available_proxies = [proxy for proxy in self.proxy_map if not self.proxy_map[proxy]["busy"] and self.proxy_map[proxy]["next_request"] <= time.time()]
+
+            for available_proxy in available_proxies:
+                # First collect video metadata
+                if video_ids:
+                    video_id = video_ids.pop(0)
+                    url = f"https://www.tiktok.com/embed/v2/{video_id}"
+
+                    proxy = {"http": available_proxy,
+                             "https": available_proxy} if available_proxy != "__localhost__" else None
+                    session.headers.update(self.headers)
+                    video_requests[url] = {
+                        "request": session.get(url, proxies=proxy, timeout=30),
+                        "video_id": video_id,
+                        "type": "metadata",
+                    }
+                    self.proxy_map[available_proxy].update({
+                        "busy": True,
+                        "url": url
+                    })
+                # Then download videos
+                elif video_download_urls:
+                    video_id, video_download_url = video_download_urls.pop(0)
+                    proxy = {"http": available_proxy,
+                             "https": available_proxy} if available_proxy != "__localhost__" else None
+                    session.headers.update(video_download_headers)
+                    video_requests[video_download_url] = {
+                        "request": session.get(video_download_url, proxies=proxy, timeout=30),
+                        "video_id": video_id,
+                        "type": "download",
+                    }
+                    self.proxy_map[available_proxy].update({
+                        "busy": True,
+                        "url": video_download_url
+                    })
+
+            # wait for async requests to end (after cancelling) before quitting
+            # the worker
+            if processor.interrupted:
+                for request in video_requests.values():
+                    request["request"].cancel()
+
+                max_timeout = time.time() + 20
+                while not all([r["request"] for r in video_requests.values() if r["request"].done()]) and time.time() < max_timeout:
+                    await asyncio.sleep(0.5)
+
+                raise WorkerInterruptedException("Interrupted while downloading TikTok videos")
+
+            # Extract video download URLs
+            for url in list(video_requests.keys()):
+                video_id = video_requests[url]["video_id"]
+                request = video_requests[url]["request"]
+                request_type = video_requests[url]["type"]
+                if not request.done():
+                    continue
+
+                # Release proxy
+                self.release_proxy(url)
+
+                # Collect response
+                try:
+                    response = request.result()
+                except requests.exceptions.RequestException as e:
+                    error_message =  f"URL {url} could not be retrieved ({type(e).__name__}: {e})"
+                    download_results[video_id] = {
+                        "success": False,
+                        "error": error_message,
+                    }
+                    processor.dataset.log(error_message)
+                    continue
+                finally:
+                    del video_requests[url]
+
+                if response.status_code != 200:
+                    error_message = f"Received unexpected HTTP response ({response.status_code}) {response.reason} for {url}, skipping."
+                    download_results[video_id] = {
+                        "success": False,
+                        "error": error_message,
+                    }
+                    processor.dataset.log(error_message)
+                    continue
+
+                if request_type == "metadata":
+                    # Collect Video Download URL
+                    soup = BeautifulSoup(response.text, "html.parser")
+                    json_source = soup.select_one("script#__FRONTITY_CONNECT_STATE__")
+                    metadata = None
+                    try:
+                        if json_source.text:
+                            metadata = json.loads(json_source.text)
+                        elif json_source.contents[0]:
+                            metadata = json.loads(json_source.contents[0])
+                    except json.JSONDecodeError as e:
+                        processor.dataset.log(f"JSONDecodeError for video {video_id} metadata: {e}\n{json_source}")
+
+                    if not metadata:
+                        # Failed to collect metadata
+                        error_message = f"Failed to find metadata for video {video_id}"
+                        download_results[video_id] = {
+                            "success": False,
+                            "error": error_message,
+                        }
+                        processor.dataset.log(error_message)
+                        continue
+
+                    try:
+                        url = list(metadata["source"]["data"].values())[0]["videoData"]["itemInfos"]["video"]["urls"][0]
+                    except KeyError:
+                        error_message = f"vid: {video_id} - failed to find video download URL"
+                        download_results[video_id] = {
+                            "success": False,
+                            "error": error_message,
+                        }
+                        processor.dataset.log(error_message)
+                        processor.dataset.log(metadata["source"]["data"].values())
+                        continue
+
+                    # Add new download URL to be collected
+                    video_download_urls.append((video_id, url))
+                    metadata_collected += 1
+                    processor.dataset.update_status("Collected metadata for %i/%i videos" %
+                                                    (metadata_collected, max_videos))
+                    processor.dataset.update_progress(metadata_collected / max_videos)
+
+                elif request_type == "download":
+                    # Download video
+                    with open(staging_area.joinpath(video_id).with_suffix('.mp4'), "wb") as f:
+                        for chunk in response.iter_content(chunk_size=1024 * 1024):
+                            if chunk:
+                                f.write(chunk)
+                    download_results[video_id] = {
+                        "success": True,
+                        "filename": video_id + ".mp4",
+                        "error": None,
+                    }
+
+                    downloaded_videos += 1
+                    processor.dataset.update_status("Downloaded %i/%i videos" %
+                                                    (downloaded_videos, max_videos))
+                    processor.dataset.update_progress(downloaded_videos / max_videos)
 
         return download_results

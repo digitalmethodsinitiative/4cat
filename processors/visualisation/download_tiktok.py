@@ -3,6 +3,7 @@ Refresh a TikTok datasource
 """
 import asyncio
 import datetime
+import json
 from io import BytesIO
 from PIL import Image, UnidentifiedImageError
 from urllib.parse import urlparse, parse_qs
@@ -109,9 +110,13 @@ class TikTokMediaDownloader(BasicProcessor):
                 video_ids_to_download.append(mapped_item.get("id"))
 
             tiktok_scraper = TikTokScraper()
-            results = tiktok_scraper.download_videos(video_ids_to_download, results_path, max_amount, self)
+            loop = asyncio.new_event_loop()
+            # Refresh only number of URLs needed to complete image downloads
+            results = loop.run_until_complete(tiktok_scraper.download_videos(video_ids_to_download, results_path, max_amount, processor=self))
 
             downloaded_media += len(results)
+            with results_path.joinpath(".metadata.json").open("w", encoding="utf-8") as outfile:
+                json.dump(results, outfile)
 
         elif url_column in ["thumbnail_url", "music_thumbnail"]:
             urls_to_refresh = []
