@@ -3,6 +3,7 @@ Tokenize post bodies
 """
 import ahocorasick
 import string
+import jieba
 import json
 import re
 import os
@@ -58,13 +59,17 @@ class Tokenise(BasicProcessor):
 		"tokenizer_type": {
 			"type": UserInput.OPTION_CHOICE,
 			"default": "twitter",
-			"options": {"twitter": "nltk TweetTokenizer", "regular": "nltk word_tokenize"},
+			"options": {"twitter": "nltk TweetTokenizer", "regular": "nltk word_tokenize", "jieba": "jieba (for Chinese text)"},
 			"help": "Tokeniser",
 			"tooltip": "TweetTokenizer is recommended for social media content, as it is optimised for informal language."
 		},
 		"language": {
 			"type": UserInput.OPTION_CHOICE,
-			"options": {language: language[0].upper() + language[1:] for language in SnowballStemmer.languages},
+			"options": {
+				**{language: language[0].upper() + language[1:] for language in SnowballStemmer.languages},
+				"other": "Other (language-specific options such as stemming, lemmatizing and sentence splitting will "
+						 "have no effect)"
+			},
 			"default": "english",
 			"help": "Language"
 		},
@@ -110,6 +115,7 @@ class Tokenise(BasicProcessor):
 				#"stopwords-terrier-english": "English stopwords (terrier, recommended)",
 				"stopwords-iso-english": "English stopwords (stopwords-iso, recommended)",
 				"stopwords-iso-dutch": "Dutch stopwords (stopwords-iso)",
+				"stopwords-iso-zh": "Chinese stopwords (stopwords-iso)",
 				"stopwords-iso-all": "Stopwords for many languages (including Dutch/English, stopwords-iso)",
 				#"wordlist-infochimps-english": "English word list (infochimps)",
 				"wordlist-googlebooks-english": "English word list (Google One Million Books pre-2008 top unigrams, recommended)",
@@ -172,8 +178,12 @@ class Tokenise(BasicProcessor):
 
 		# Twitter tokenizer if indicated
 		language = self.parameters.get("language", "english")
-		tokenizer = TweetTokenizer(preserve_case=False).tokenize if self.parameters.get("tokenizer_type") == "twitter" else word_tokenize
-		tokenizer_args = {} if self.parameters.get("tokenizer_type") == "twitter" else {"language": language}
+		if self.parameters.get("tokenizer_type") == "jieba":
+			tokenizer = jieba.cut
+			tokenizer_args = {"cut_all": True}
+		else:
+			tokenizer = TweetTokenizer(preserve_case=False).tokenize if self.parameters.get("tokenizer_type") == "twitter" else word_tokenize
+			tokenizer_args = {} if self.parameters.get("tokenizer_type") == "twitter" else {"language": language}
 
 		# load word filters - words to exclude from tokenisation
 		word_filter = set()
@@ -204,11 +214,12 @@ class Tokenise(BasicProcessor):
 				automaton.add_word(word, 1)
 
 		# initialise pre-processors if needed
-		if self.parameters.get("stem"):
-			stemmer = SnowballStemmer(language)
+		if self.parameters.get("language") != "other":
+			if self.parameters.get("stem"):
+				stemmer = SnowballStemmer(language)
 
-		if self.parameters.get("lemmatise"):
-			lemmatizer = WordNetLemmatizer()
+			if self.parameters.get("lemmatise"):
+				lemmatizer = WordNetLemmatizer()
 
 		# Only keep unique words?
 		only_unique = self.parameters.get("only_unique")
