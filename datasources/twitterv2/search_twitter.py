@@ -76,7 +76,7 @@ class SearchWithTwitterAPIv2(Search):
         # memory
         have_api_key = config.get("twitterv2-search.academic_api_key")
         bearer_token = self.parameters.get("api_bearer_token") if not have_api_key else have_api_key
-        api_type = query.get("api_type") if not have_api_key else "all"
+        api_type = query.get("api_type", "all") if not have_api_key else "all"
         auth = {"Authorization": "Bearer %s" % bearer_token}
         expected_tweets = query.get("expected-tweets", "unknown")
 
@@ -614,7 +614,7 @@ class SearchWithTwitterAPIv2(Search):
         params = {
             "query": twitter_query,
             "api_bearer_token": query.get("api_bearer_token"),
-            "api_type": query.get("api_type"),
+            "api_type": query.get("api_type", "all"),
             "query_type": query.get("query_type", "query"),
             "min_date": after,
             "max_date": before
@@ -630,7 +630,7 @@ class SearchWithTwitterAPIv2(Search):
         # figure out how many tweets we expect to get back - we can use this
         # to dissuade users from running huge queries that will take forever
         # to process
-        if params["query_type"] == "query" and (params["api_type"] == "all" or have_api_key):
+        if params["query_type"] == "query" and (params.get("api_type") == "all" or have_api_key):
             count_url = "https://api.twitter.com/2/tweets/counts/all"
             count_params = {
                 "granularity": "day",
