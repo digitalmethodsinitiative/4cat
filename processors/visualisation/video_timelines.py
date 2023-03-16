@@ -201,9 +201,9 @@ class VideoTimelines(BasicProcessor):
                 for filename in [f["filename"] for f in data["files"]]:
                     filename = ".".join(filename.split(".")[:-1])
                     mapping_ids[filename] = data["post_ids"]
-                    if data["from_dataset"] not in mapping_dataset:
-                        mapping_dataset[data["from_dataset"]] = []
-                    mapping_dataset[data["from_dataset"]].append(filename)
+                    if data.get("from_dataset", data.get("source_dataset")) not in mapping_dataset:
+                        mapping_dataset[data.get("from_dataset", data.get("source_dataset"))] = []
+                    mapping_dataset[data.get("from_dataset", data.get("source_dataset"))].append(filename)
                     labels[filename] = filename
 
         for dataset, urls in mapping_dataset.items():

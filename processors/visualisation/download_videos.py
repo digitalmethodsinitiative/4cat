@@ -498,7 +498,7 @@ class VideoDownloaderPlus(BasicProcessor):
         # Save some metadata to be able to connect the videos to their source
         metadata = {
             url: {
-                "source_dataset": self.source_dataset.key,
+                "from_dataset": self.source_dataset.key,
                 **sets_to_lists(data)
                 # TODO: This some shenanigans until I can figure out what to do with the info returned
             } for url, data in urls.items()
