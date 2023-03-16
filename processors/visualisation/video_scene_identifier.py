@@ -144,7 +144,7 @@ class VideoSceneDetector(BasicProcessor):
 		"""
 		Allow on videos
 		"""
-		return module.type in ["video-downloader", "video-downloader-plus"]
+		return module.type.startswith("video-downloader")
 
 	def process(self):
 		"""
