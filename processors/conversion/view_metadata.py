@@ -42,7 +42,7 @@ class ViewMetadata(BasicProcessor):
 		Allow on only
 		"""
 		# return (module.is_dataset() and hasattr(module.get_own_processor(), "map_metadata")) or (not module.is_dataset() and hasattr(module, "map_metadata"))
-		return module.type in ["video-downloader"]
+		return module.type.startswith("video-downloader")
 
 	def process(self):
 		"""
