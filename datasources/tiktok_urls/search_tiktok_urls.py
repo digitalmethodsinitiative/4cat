@@ -231,7 +231,7 @@ class TikTokScraper:
                         continue
 
                     # Add url to be collected
-                    processor.dataset.log(f"Adding to page requests: {url}")
+                    processor.dataset.log(f"Requesting: {url}")
                     proxy = {"http": available_proxy,
                              "https": available_proxy} if available_proxy != "__localhost__" else None
                     tiktok_requests[url] = session.get(url, proxies=proxy, timeout=30)
@@ -468,9 +468,10 @@ class TikTokScraper:
                 try:
                     response = request.result()
                 except requests.exceptions.RequestException as e:
-                    error_message =  f"URL {url} could not be retrieved ({type(e).__name__}: {e})"
+                    error_message = f"URL {url} could not be retrieved ({type(e).__name__}: {e})"
                     download_results[video_id] = {
                         "success": False,
+                        "url": url,
                         "error": error_message,
                     }
                     processor.dataset.log(error_message)
@@ -482,6 +483,7 @@ class TikTokScraper:
                     error_message = f"Received unexpected HTTP response ({response.status_code}) {response.reason} for {url}, skipping."
                     download_results[video_id] = {
                         "success": False,
+                        "url": response.url,
                         "error": error_message,
                     }
                     processor.dataset.log(error_message)
@@ -505,6 +507,7 @@ class TikTokScraper:
                         error_message = f"Failed to find metadata for video {video_id}"
                         download_results[video_id] = {
                             "success": False,
+                            "url": response.url,
                             "error": error_message,
                         }
                         processor.dataset.log(error_message)
@@ -516,6 +519,7 @@ class TikTokScraper:
                         error_message = f"vid: {video_id} - failed to find video download URL"
                         download_results[video_id] = {
                             "success": False,
+                            "url": response.url,
                             "error": error_message,
                         }
                         processor.dataset.log(error_message)
@@ -537,7 +541,8 @@ class TikTokScraper:
                                 f.write(chunk)
                     download_results[video_id] = {
                         "success": True,
-                        "filename": video_id + ".mp4",
+                        "url": response.url,
+                        "files": [{"filename": video_id + ".mp4", "success": True}],
                         "error": None,
                     }
 
