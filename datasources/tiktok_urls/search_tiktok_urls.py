@@ -458,6 +458,13 @@ class TikTokScraper:
                 video_id = video_requests[url]["video_id"]
                 request = video_requests[url]["request"]
                 request_type = video_requests[url]["type"]
+                metadata = {
+                    "success": False,
+                    "url": url,
+                    "error": None,
+                    "from_dataset": processor.source_dataset.key,
+                    "post_ids": [video_id],
+                }
                 if not request.done():
                     continue
 
@@ -469,11 +476,8 @@ class TikTokScraper:
                     response = request.result()
                 except requests.exceptions.RequestException as e:
                     error_message = f"URL {url} could not be retrieved ({type(e).__name__}: {e})"
-                    download_results[video_id] = {
-                        "success": False,
-                        "url": url,
-                        "error": error_message,
-                    }
+                    metadata["error"] = error_message
+                    download_results[video_id] = metadata
                     processor.dataset.log(error_message)
                     continue
                 finally:
@@ -481,11 +485,8 @@ class TikTokScraper:
 
                 if response.status_code != 200:
                     error_message = f"Received unexpected HTTP response ({response.status_code}) {response.reason} for {url}, skipping."
-                    download_results[video_id] = {
-                        "success": False,
-                        "url": response.url,
-                        "error": error_message,
-                    }
+                    metadata["error"] = error_message
+                    download_results[video_id] = metadata
                     processor.dataset.log(error_message)
                     continue
 
@@ -505,11 +506,8 @@ class TikTokScraper:
                     if not metadata:
                         # Failed to collect metadata
                         error_message = f"Failed to find metadata for video {video_id}"
-                        download_results[video_id] = {
-                            "success": False,
-                            "url": response.url,
-                            "error": error_message,
-                        }
+                        metadata["error"] = error_message
+                        download_results[video_id] = metadata
                         processor.dataset.log(error_message)
                         continue
 
@@ -517,11 +515,8 @@ class TikTokScraper:
                         url = list(metadata["source"]["data"].values())[0]["videoData"]["itemInfos"]["video"]["urls"][0]
                     except KeyError:
                         error_message = f"vid: {video_id} - failed to find video download URL"
-                        download_results[video_id] = {
-                            "success": False,
-                            "url": response.url,
-                            "error": error_message,
-                        }
+                        metadata["error"] = error_message
+                        download_results[video_id] = metadata
                         processor.dataset.log(error_message)
                         processor.dataset.log(metadata["source"]["data"].values())
                         continue
@@ -539,12 +534,9 @@ class TikTokScraper:
                         for chunk in response.iter_content(chunk_size=1024 * 1024):
                             if chunk:
                                 f.write(chunk)
-                    download_results[video_id] = {
-                        "success": True,
-                        "url": response.url,
-                        "files": [{"filename": video_id + ".mp4", "success": True}],
-                        "error": None,
-                    }
+                    metadata["success"] = True
+                    metadata["files"] = [{"filename": video_id + ".mp4", "success": True}]
+                    download_results[video_id] = metadata
 
                     downloaded_videos += 1
                     processor.dataset.update_status("Downloaded %i/%i videos" %

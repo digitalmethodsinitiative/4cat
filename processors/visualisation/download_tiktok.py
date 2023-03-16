@@ -110,16 +110,15 @@ class TikTokVideoDownloader(BasicProcessor):
         """
         Iterator to yield modified metadata for CSV
 
-        :param str url:  string that may contain URLs
+        :param str video_id:  string that may contain URLs
         :param dict data:  dictionary with metadata collected previously
         :yield dict:  	  iterator containing reformated metadata
         """
+        filename = data.pop("files")[0].get("filename") if "files" in data else None
         row = {
             "video_id": video_id,
-            "url": data.get("url"),
-            "success": data.get("success"),
-            "filename": data.get("files", [{}])[0].get("filename")
-            "error": data.get("error"),
+            "filename": filename,
+            **data
         }
         yield row
 
