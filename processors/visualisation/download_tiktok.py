@@ -200,7 +200,9 @@ class TikTokImageDownloader(BasicProcessor):
         elif self.parameters.get("thumb_type") == "music":
             url_column = "music_thumbnail"
         else:
-            raise ProcessorException("No image column selected")
+            self.dataset.update_status("No image column selected.", is_final=True)
+            self.dataset.finish(0)
+            return
 
         # Prepare staging area for downloads
         results_path = self.dataset.get_staging_area()
@@ -230,8 +232,12 @@ class TikTokImageDownloader(BasicProcessor):
                     refresh_tiktok_urls = True
                 else:
                     # Collect image
-                    image, extension = self.collect_image(url)
-                    success = self.save_image(image, mapped_item.get("id") + "." + extension, results_path)
+                    try:
+                        image, extension = self.collect_image(url)
+                        success = self.save_image(image, mapped_item.get("id") + "." + extension, results_path)
+                    except FileNotFoundError as e:
+                        self.dataset.log(f"{e} for {url}, refreshing")
+                        success = False
 
                     if not success:
                         # Add TikTok post to be refreshed
@@ -271,14 +277,19 @@ class TikTokImageDownloader(BasicProcessor):
                     refreshed_mapped_item = self.source_dataset.get_own_processor().map_item(refreshed_item)
 
                     # Collect image
-                    image, extension = self.collect_image(refreshed_mapped_item.get(url_column))
-                    success = self.save_image(image, refreshed_mapped_item.get("id") + "." + extension, results_path)
+                    try:
+                        image, extension = self.collect_image(refreshed_mapped_item.get(url_column))
+                        success = self.save_image(image, refreshed_mapped_item.get("id") + "." + extension,
+                                                  results_path)
+                    except FileNotFoundError as e:
+                        self.dataset.log(f"{e} for {refreshed_mapped_item.get(url_column)}, skipping")
+                        success = False
 
                     if success:
                         self.dataset.update_status(f"Downloaded image for {url}")
                         downloaded_media += 1
                     else:
-                        self.dataset.log(f"Error '{e}' saving image for {url}, skipping")
+                        self.dataset.log(f"Error saving image for {url}, skipping")
 
                 # In case some images failed to download, we update our starting points
                 last_url_index += need_more
