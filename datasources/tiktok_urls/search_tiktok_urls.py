@@ -408,6 +408,11 @@ class TikTokScraper:
             available_proxies = [proxy for proxy in self.proxy_map if not self.proxy_map[proxy]["busy"] and self.proxy_map[proxy]["next_request"] <= time.time()]
 
             for available_proxy in available_proxies:
+                if downloaded_videos > max_videos:
+                    # We're done here
+                    video_ids = []
+                    video_download_urls = []
+                    break
                 # First collect video metadata
                 if video_ids:
                     video_id = video_ids.pop(0)
