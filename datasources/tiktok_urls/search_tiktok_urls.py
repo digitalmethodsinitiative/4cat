@@ -413,8 +413,24 @@ class TikTokScraper:
                     video_ids = []
                     video_download_urls = []
                     break
-                # First collect video metadata
-                if video_ids:
+
+                # Download videos (if available)
+                if video_download_urls:
+                    video_id, video_download_url = video_download_urls.pop(0)
+                    proxy = {"http": available_proxy,
+                             "https": available_proxy} if available_proxy != "__localhost__" else None
+                    session.headers.update(video_download_headers)
+                    video_requests[video_download_url] = {
+                        "request": session.get(video_download_url, proxies=proxy, timeout=30),
+                        "video_id": video_id,
+                        "type": "download",
+                    }
+                    self.proxy_map[available_proxy].update({
+                        "busy": True,
+                        "url": video_download_url
+                    })
+                # Collect video metadata (to find videos to download)
+                elif video_ids:
                     video_id = video_ids.pop(0)
                     url = f"https://www.tiktok.com/embed/v2/{video_id}"
 
@@ -429,21 +445,6 @@ class TikTokScraper:
                     self.proxy_map[available_proxy].update({
                         "busy": True,
                         "url": url
-                    })
-                # Then download videos
-                elif video_download_urls:
-                    video_id, video_download_url = video_download_urls.pop(0)
-                    proxy = {"http": available_proxy,
-                             "https": available_proxy} if available_proxy != "__localhost__" else None
-                    session.headers.update(video_download_headers)
-                    video_requests[video_download_url] = {
-                        "request": session.get(video_download_url, proxies=proxy, timeout=30),
-                        "video_id": video_id,
-                        "type": "download",
-                    }
-                    self.proxy_map[available_proxy].update({
-                        "busy": True,
-                        "url": video_download_url
                     })
 
             # wait for async requests to end (after cancelling) before quitting
