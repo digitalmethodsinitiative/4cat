@@ -519,7 +519,7 @@ class TikTokScraper:
 
                     try:
                         url = list(metadata["source"]["data"].values())[0]["videoData"]["itemInfos"]["video"]["urls"][0]
-                    except KeyError:
+                    except (KeyError, IndexError):
                         error_message = f"vid: {video_id} - failed to find video download URL"
                         metadata["error"] = error_message
                         download_results[video_id] = metadata
