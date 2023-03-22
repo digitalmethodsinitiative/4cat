@@ -244,7 +244,7 @@ class TikTokScraper:
             # wait for async requests to end (after cancelling) before quitting
             # the worker
             if processor.interrupted:
-                for request in tiktok_requests:
+                for request in tiktok_requests.values():
                     request.cancel()
 
                 max_timeout = time.time() + 20
