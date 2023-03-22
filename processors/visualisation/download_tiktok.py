@@ -329,8 +329,8 @@ class TikTokImageDownloader(BasicProcessor):
         """
         try:
             response = requests.get(url, stream=True, timeout=20, headers={"User-Agent": user_agent})
-        except requests.exceptions.ConnectionError as e:
-            raise FileNotFoundError(f"Unable to connect to TikTok {e}")
+        except requests.exceptions.RequestException as e:
+            raise FileNotFoundError(f"Unable to download TikTok image via {url} ({e}), skipping")
 
         if response.status_code != 200 or "image" not in response.headers.get("content-type", ""):
             raise FileNotFoundError(f"Unable to download image; status_code:{response.status_code} content-type:{response.headers.get('content-type', '')}")
