@@ -11,7 +11,7 @@ from urllib.parse import urlparse, parse_qs
 import requests
 
 import common.config_manager as config
-from common.lib.exceptions import ProcessorException
+from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.user_input import UserInput
 from datasources.tiktok_urls.search_tiktok_urls import TikTokScraper
 from backend.abstract.processor import BasicProcessor
@@ -212,13 +212,18 @@ class TikTokImageDownloader(BasicProcessor):
         urls_to_refresh = []
         url_to_item_id = {}
         max_fails_exceeded = 0
+        metadata = {}
 
         # Loop through items and collect URLs
         for original_item, mapped_item in self.source_dataset.iterate_mapped_items(self):
+            if self.interrupted:
+                raise ProcessorInterruptedException("Interrupted while downloading TikTok images")
+
             if downloaded_media >= max_amount:
                 break
 
             url = mapped_item.get(url_column)
+            post_id = mapped_item.get("id")
 
             if max_fails_exceeded > 4:
                 # Let's just refresh remaining URLs if it is clear the dataset is old
@@ -234,10 +239,11 @@ class TikTokImageDownloader(BasicProcessor):
                     # Collect image
                     try:
                         image, extension = self.collect_image(url)
-                        success = self.save_image(image, mapped_item.get("id") + "." + extension, results_path)
+                        success, filename = self.save_image(image, mapped_item.get("id") + "." + extension, results_path)
                     except FileNotFoundError as e:
                         self.dataset.log(f"{e} for {url}, refreshing")
                         success = False
+                        filename = ''
 
                     if not success:
                         # Add TikTok post to be refreshed
@@ -247,6 +253,14 @@ class TikTokImageDownloader(BasicProcessor):
                     else:
                         self.dataset.update_status(f"Downloaded image for {url}")
                         downloaded_media += 1
+
+                        metadata[url] = {
+                                "filename": filename,
+                                "success": success,
+                                "from_dataset": self.source_dataset.key,
+                                "post_ids": [post_id]
+                        }
+
 
             if refresh_tiktok_urls:
                 # Add URL to later refresh TikTok data
@@ -271,20 +285,32 @@ class TikTokImageDownloader(BasicProcessor):
                 loop = asyncio.new_event_loop()
                 # Refresh only number of URLs needed to complete image downloads
                 refreshed_items = loop.run_until_complete(tiktok_scraper.request_metadata(url_slice, processor=self))
-                self.dataset.update_status(f"Refreshed {len(url_slice)} TikTok posts")
+                self.dataset.update_status(f"Refreshed {len(refreshed_items)} TikTok posts")
 
                 for refreshed_item in refreshed_items:
+                    if self.interrupted:
+                        raise ProcessorInterruptedException("Interrupted while downloading TikTok images")
+
                     refreshed_mapped_item = self.source_dataset.get_own_processor().map_item(refreshed_item)
+                    post_id = refreshed_mapped_item.get("id")
+                    url = refreshed_mapped_item.get(url_column)
 
                     # Collect image
                     try:
-                        image, extension = self.collect_image(refreshed_mapped_item.get(url_column))
-                        success = self.save_image(image, refreshed_mapped_item.get("id") + "." + extension,
+                        image, extension = self.collect_image(url)
+                        success, filename = self.save_image(image, post_id + "." + extension,
                                                   results_path)
                     except FileNotFoundError as e:
-                        self.dataset.log(f"{e} for {refreshed_mapped_item.get(url_column)}, skipping")
+                        self.dataset.log(f"{e} for {url}, skipping")
                         success = False
+                        filename = ''
 
+                    metadata[url] = {
+                            "filename": filename,
+                            "success": success,
+                            "from_dataset": self.source_dataset.key,
+                            "post_ids": [post_id]
+                    }
                     if success:
                         self.dataset.update_status(f"Downloaded image for {url}")
                         downloaded_media += 1
@@ -294,6 +320,10 @@ class TikTokImageDownloader(BasicProcessor):
                 # In case some images failed to download, we update our starting points
                 last_url_index += need_more
                 need_more = max_amount - downloaded_media
+
+        # Write metadata file
+        with results_path.joinpath(".metadata.json").open("w", encoding="utf-8") as outfile:
+            json.dump(metadata, outfile)
 
         self.write_archive_and_finish(results_path, downloaded_media)
 
@@ -305,21 +335,22 @@ class TikTokImageDownloader(BasicProcessor):
         :param Image image:         Opened image object to be saved
         :param str image_name:      Filename for image
         :param Path directory_path: Path where image should be saved
-        :return bool:               True if saved successfully, False otherwise
+        :return bool, str:          True if saved successfully, False otherwise; and str of filename
         """
         try:
             image.save(str(directory_path.joinpath(image_name)))
-            return True
+            return True, image_name
         except OSError:
             # Some images may need to be converted to RGB to be saved
             try:
                 picture = image.convert('RGB')
-                picture.save(str(directory_path.joinpath(Path(image_name).with_suffix(".png"))))
-                return True
+                image_name = Path(image_name).with_suffix(".png")
+                picture.save(str(directory_path.joinpath(image_name)))
+                return True, str(image_name)
             except OSError:
-                return False
+                return False, ''
         except ValueError:
-            return False
+            return False, ''
 
     @staticmethod
     def collect_image(url, user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/12.1.1 Safari/605.1.15"):
