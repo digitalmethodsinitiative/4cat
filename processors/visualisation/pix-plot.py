@@ -118,11 +118,11 @@ class PixPlotGenerator(BasicProcessor):
     @classmethod
     def is_compatible_with(cls, module=None):
         """
-		Allow processor on token sets;
-		Checks if pix-plot.PIXPLOT_SERVER set
+        Allow processor on token sets;
+        Checks if pix-plot.PIXPLOT_SERVER set
 
-		:param module: Dataset or processor to determine compatibility with
-		"""
+        :param module: Dataset or processor to determine compatibility with
+        """
         return module.type.startswith("image-downloader") and config.get('pix-plot.PIXPLOT_SERVER')
 
     def process(self):
@@ -196,6 +196,8 @@ class PixPlotGenerator(BasicProcessor):
             upload_url = config.get('pix-plot.PIXPLOT_SERVER').rstrip('/') + '/api/send_metadata'
             metadata_response = requests.post(upload_url, files={'metadata': open(metadata_file_path, 'rb')}, data=data,
                                               timeout=120)
+        else:
+            self.dataset.log("No metadata file found")
 
         # Now send photos to PixPlot
         self.dataset.update_status("Uploading images to PixPlot")
@@ -349,6 +351,10 @@ class PixPlotGenerator(BasicProcessor):
 
 		"""
         # Get image data
+        if not os.path.isfile(os.path.join(temp_path, '.metadata.json')):
+            # No metadata
+            return False
+
         with open(os.path.join(temp_path, '.metadata.json')) as file:
             image_data = json.load(file)
         # Get path for metadata file
