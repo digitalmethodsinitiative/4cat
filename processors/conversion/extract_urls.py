@@ -278,7 +278,8 @@ class ExtractURLs(BasicProcessor):
                 if processed_items % progress_interval_size == 0:
                     self.dataset.update_status(f"Processed {processed_items}/{total_items} items; {url_matches_found} items with url(s)")
                     self.dataset.update_progress(processed_items / total_items)
-
+        if cache:
+            self.dataset.log(f"Expanded {len(cache)} URLs in dataset")
         self.dataset.finish(url_matches_found)
 
     @staticmethod
