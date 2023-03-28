@@ -135,7 +135,7 @@ def upgrade_frontend():
 
     try:
         response = subprocess.run(shlex.split(command), stdout=log_stream, stderr=subprocess.STDOUT, text=True,
-                                  check=True, cwd=config.get("PATH_ROOT"), stdin=subprocess.DEVNULL)
+                                  check=True, cwd=str(config.get("PATH_ROOT")), stdin=subprocess.DEVNULL)
         if response.returncode != 0:
             raise RuntimeError("Unexpected return code %s" % str(response.returncode))
         upgrade_ok = True

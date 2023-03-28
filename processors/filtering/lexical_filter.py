@@ -89,7 +89,7 @@ class LexicalFilter(BaseFilter):
         # load lexicons from word lists
         lexicons = {}
         for lexicon_id in self.parameters.get("lexicon", []):
-            lexicon_file = Path(config.get('PATH_ROOT'), "common/assets/wordlists/%s.txt" % lexicon_id)
+            lexicon_file = config.get('PATH_ROOT').joinpath(f"common/assets/wordlists/{{lexicon_id}}.txt")
             if not lexicon_file.exists():
                 continue
 

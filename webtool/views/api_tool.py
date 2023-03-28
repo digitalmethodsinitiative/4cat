@@ -851,7 +851,7 @@ def queue_processor(key=None, processor=None):
 			return error(400, error="File must contain a 'body' column")
 
 		filename = secure_filename(input_file.filename)
-		input_file.save(config.get('PATH_DATA') + "/")
+		input_file.save(str(config.get('PATH_DATA')) + "/")
 
 	elif not key:
 		key = request.form.get("key", "")
