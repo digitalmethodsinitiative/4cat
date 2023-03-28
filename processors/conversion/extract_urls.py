@@ -180,7 +180,7 @@ class ExtractURLs(BasicProcessor):
         "➨.ws", "➯.ws", "➹.ws", "➽.ws",
 
         # additions by 4CAT
-        "api.parler.com", "trib.al"
+        "api.parler.com", "trib.al", "fb.watch",
     )
 
     @classmethod
