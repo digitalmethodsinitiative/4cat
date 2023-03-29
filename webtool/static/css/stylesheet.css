@@ -1,4 +1,6 @@
 @import url('reset.css');
+@import url('colours.css');
+
 @import url('dataset-page.css');
 @import url('control-panel.css');
 
@@ -35,28 +37,6 @@
 @font-face {
     font-family: 'Fixedsys';
     src: url("../fonts/fsex300-webfont.woff")
-}
-
-/** --------------------- *
-      Colour definitions
-  * --------------------- */
-:root {
-    --accent: #CE1B28;
-    --highlight: #FF2231;
-    --accent-alternate: #19B0A3;
-    --accent-okay: #26b018;
-    --accent-okay-light: #bee0ba;
-    --accent-warning: #b05d13;
-    --accent-error: #ff2231;
-    --gray-dark: #DFDFDF;
-    --gray-darker: #6C6C6C;
-    --gray: #E9E9E9;
-    --gray-light: #EEE;
-    --contrast-bright: #F5F5F5;
-    --contrast-dark: #21202E;
-    --always-white: #FFF;
-    --text: #37373C;
-    --warning: var(--accent);
 }
 
 
@@ -280,6 +260,18 @@ article.small .form-element > *:not([type=radio], [type=checkbox]) {
 .submit-container {
     text-align: center;
     padding: 1em;
+}
+
+#colour-example {
+    display: inline-block;
+    width: 1em;
+    height: 1em;
+    border: 1px solid var(--contrast-dark);
+    background: var(--accent);
+    min-width: auto;
+    max-width: none;
+    position: relative;
+    top: -0.4em;
 }
 
 .data-overview-link {

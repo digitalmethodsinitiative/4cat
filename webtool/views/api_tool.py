@@ -238,8 +238,13 @@ def import_dataset():
 	if not platform or platform not in backend.all_modules.datasources:
 		return error(404, message="Unknown platform or source format")
 
-	worker_type = "%s-search" % platform
-	worker = backend.all_modules.workers.get(worker_type)
+	worker_types = (f"{platform}-import", f"{platform}-search")
+	worker = None
+	for worker_type in worker_types:
+		worker = backend.all_modules.workers.get(worker_type)
+		if worker:
+			break
+
 	if not worker:
 		return error(404, message="Unknown platform or source format")
 
