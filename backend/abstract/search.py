@@ -169,7 +169,8 @@ class Search(BasicProcessor, ABC):
 		:param str path:  Path to read from
 		:return Generator:  Yields all items in the file, item for item.
 		"""
-		path = Path(path)
+		if type(path) is not Path:
+			path = Path(path)
 		if not path.exists():
 			return []
 
