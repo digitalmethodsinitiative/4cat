@@ -71,7 +71,7 @@ class HatebaseAnalyser(BasicProcessor):
 			return
 
 		# read and convert to a way we can easily match whether any word occurs
-		with config.get('PATH_ROOT').joinpath(f"common/assets/hatebase/hatebase-{{language}}.json").open() as hatebasedata:
+		with config.get('PATH_ROOT').joinpath(f"common/assets/hatebase/hatebase-{language}.json").open() as hatebasedata:
 			hatebase = json.loads(hatebasedata.read())
 
 		hatebase = {term.lower(): hatebase[term] for term in hatebase}
