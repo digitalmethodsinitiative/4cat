@@ -201,7 +201,7 @@ class ConsolidateURLs(BasicProcessor):
             },
             {
                 # Users
-                "rule": lambda parsed_url: True if ("user" == parsed_url.path.lstrip("/").split("/")[0].lower() or parsed_url.path.lstrip("/").split("/")[0][0] == "@") else False,
+                "rule": lambda parsed_url: True if ("user" == parsed_url.path.lstrip("/").split("/")[0].lower() or parsed_url.path.lstrip("/").split("/")[0][:1] == "@") else False,
                 "result": lambda parsed_url: "youtube.com/@" + parsed_url.path.lstrip("/").split("/")[0].lstrip("@")
             },
             {
