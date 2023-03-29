@@ -27,6 +27,7 @@ from common.lib.logger import Logger
 from common.lib.queue import JobQueue
 
 from webtool.lib.user import User
+from webtool.lib.helpers import generate_css_colours
 
 # initialize global objects for interacting with all the things
 database_name = config.get('DB_NAME')
@@ -101,6 +102,9 @@ import webtool.views.api_tool
 
 # import custom jinja2 template filters
 import webtool.lib.template_filters
+
+# ensure that colour definition CSS file is present
+generate_css_colours()
 
 # run it
 if __name__ == "__main__":

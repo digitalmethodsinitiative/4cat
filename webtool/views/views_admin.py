@@ -20,7 +20,7 @@ from flask import render_template, jsonify, request, abort, flash, get_flashed_m
 from flask_login import current_user, login_required
 
 from webtool import app, db
-from webtool.lib.helpers import admin_required, error, Pagination, make_html_colour
+from webtool.lib.helpers import admin_required, error, Pagination, generate_css_colours
 from webtool.lib.user import User
 
 from common.lib.helpers import call_api, send_email, UserInput
@@ -372,20 +372,7 @@ def update_settings():
                     # todo: make this 'side-effects' thing generically applicable
                     # this setting has a side-effect because it requires the
                     # updating of the colour definitions in the CSS
-                    interface_hue = value / 360
-                    main_colour = colorsys.hsv_to_rgb(interface_hue, 0.87, 0.81)
-                    accent_colour = colorsys.hsv_to_rgb(interface_hue, 0.87, 1)
-                    opposite_colour = colorsys.hsv_to_rgb(math.fmod(interface_hue + 0.5, 1), 0.87, 1)
-
-                    with Path(config.get("PATH_ROOT"), "webtool/static/css/colours.css.template").open() as infile:
-                        template = infile.read()
-                        template = template \
-                            .replace("{{ accent_colour }}", make_html_colour(main_colour)) \
-                            .replace("{{ highlight_colour }}", make_html_colour(accent_colour)) \
-                            .replace("{{ highlight_alternate }}", make_html_colour(opposite_colour))
-
-                        with Path(config.get("PATH_ROOT"), "webtool/static/css/colours.css").open("w") as outfile:
-                            outfile.write(template)
+                    generate_css_colours(force=True)
 
             flash("Settings saved")
         except QueryParametersException as e:

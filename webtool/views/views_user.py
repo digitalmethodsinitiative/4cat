@@ -23,7 +23,7 @@ from flask_login import login_user, login_required, logout_user, current_user
 from webtool import app, login_manager, db
 from webtool.views.api_tool import limiter
 from webtool.lib.user import User
-from webtool.lib.helpers import error, make_html_colour
+from webtool.lib.helpers import error, make_html_colour, generate_css_colours
 from common.lib.helpers import send_email, get_software_version
 
 from pathlib import Path
@@ -250,23 +250,11 @@ def first_run_dialog():
         try:
             interface_hue = int(interface_hue)
             interface_hue = interface_hue if 0 <= interface_hue <= 360 else random.randrange(0, 360)
-            interface_hue /= 360
         except (ValueError, TypeError):
-            interface_hue = random.random()
+            interface_hue = random.randrange(0, 360)
 
-        main_colour = colorsys.hsv_to_rgb(interface_hue, 0.87, 0.81)
-        accent_colour = colorsys.hsv_to_rgb(interface_hue, 0.87, 1)
-        opposite_colour = colorsys.hsv_to_rgb(math.fmod(interface_hue + 0.5, 1), 0.87, 1)
-
-        with Path(config.get("PATH_ROOT"), "webtool/static/css/colours.css.template").open() as infile:
-            template = infile.read()
-            template = template\
-                .replace("{{ accent_colour }}", make_html_colour(main_colour))\
-                .replace("{{ highlight_colour }}", make_html_colour(accent_colour))\
-                .replace("{{ highlight_alternate }}", make_html_colour(opposite_colour))
-
-            with Path(config.get("PATH_ROOT"), "webtool/static/css/colours.css").open("w") as outfile:
-                outfile.write(template)
+        config.set_or_create_setting("4cat.layout_hue", interface_hue, raw=True)
+        generate_css_colours(force=True)
 
         # make user an admin
         db.update("users", where={"name": username}, data={"is_admin": True, "is_deactivated": False})
