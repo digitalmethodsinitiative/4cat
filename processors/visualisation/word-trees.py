@@ -157,6 +157,7 @@ class MakeWordtree(BasicProcessor):
 		window = max(1, window)
 
 		# determine what tokenisation strategy to use
+		tokeniser_args = {}
 		if self.parameters.get("tokeniser_type") == "jieba-cut":
 			tokeniser = jieba.cut
 			tokeniser_args = {"cut_all": False}
