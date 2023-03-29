@@ -3,9 +3,11 @@
 """
 import re
 import time
+import math
 import json
 import smtplib
 import psycopg2
+import colorsys
 import markdown2
 
 from pathlib import Path
@@ -18,7 +20,7 @@ from flask import render_template, jsonify, request, abort, flash, get_flashed_m
 from flask_login import current_user, login_required
 
 from webtool import app, db
-from webtool.lib.helpers import admin_required, error, Pagination
+from webtool.lib.helpers import admin_required, error, Pagination, make_html_colour
 from webtool.lib.user import User
 
 from common.lib.helpers import call_api, send_email, UserInput
@@ -361,9 +363,29 @@ def update_settings():
             for setting, value in new_settings.items():
                 valid = config.set_or_create_setting(setting, value,
                                                      raw=definition[setting].get("type") == UserInput.OPTION_TEXT_JSON)
-                print("%s: %s" % (setting, repr(valid)))
+
                 if valid is None:
                     flash("Invalid value for %s" % setting)
+                    continue
+
+                if setting == "4cat.layout_hue":
+                    # todo: make this 'side-effects' thing generically applicable
+                    # this setting has a side-effect because it requires the
+                    # updating of the colour definitions in the CSS
+                    interface_hue = value / 360
+                    main_colour = colorsys.hsv_to_rgb(interface_hue, 0.87, 0.81)
+                    accent_colour = colorsys.hsv_to_rgb(interface_hue, 0.87, 1)
+                    opposite_colour = colorsys.hsv_to_rgb(math.fmod(interface_hue + 0.5, 1), 0.87, 1)
+
+                    with Path(config.get("PATH_ROOT"), "webtool/static/css/colours.css.template").open() as infile:
+                        template = infile.read()
+                        template = template \
+                            .replace("{{ accent_colour }}", make_html_colour(main_colour)) \
+                            .replace("{{ highlight_colour }}", make_html_colour(accent_colour)) \
+                            .replace("{{ highlight_alternate }}", make_html_colour(opposite_colour))
+
+                        with Path(config.get("PATH_ROOT"), "webtool/static/css/colours.css").open("w") as outfile:
+                            outfile.write(template)
 
             flash("Settings saved")
         except QueryParametersException as e:

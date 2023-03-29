@@ -78,6 +78,17 @@ config_definition = {
         "tooltip": "Whether you've seen the 'phone home request'. Set to `false` to see the request again. There "
                    "should be no need to change this manually."
     },
+    "4cat.layout_hue": {
+        "type": UserInput.OPTION_HUE,
+        "default": 356,
+        "help": "Interface accent colour",
+        "saturation": 77,
+        "luminance": 46,
+        "update_layout": True,
+        "min": 0,
+        "max": 360,
+        "coerce_type": int
+    },
     # These settings control whether top-level datasets (i.e. those created via the
     # "Create dataset" page) are deleted automatically, and if so, after how much
     # time. You can also allow users to cancel this (i.e. opt out). Note that if
