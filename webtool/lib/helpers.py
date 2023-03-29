@@ -200,6 +200,22 @@ def pad_interval(intervals, first_interval=None, last_interval=None):
 
 	return missing, intervals
 
+def make_html_colour(rgb):
+	"""
+	Make HTML colour code from RGB values
+
+	Turns an array of three 0-1 RGB values
+	:param rgb:
+	:return:
+	"""
+	colour = "#"
+	for bit in rgb:
+		bit *= 255
+		bit = int(bit)
+		colour += str(hex(bit)).split("x")[1].zfill(2).upper()
+
+	return colour
+
 def get_preview(query):
 	"""
 	Generate a data preview of 25 rows of a results csv
