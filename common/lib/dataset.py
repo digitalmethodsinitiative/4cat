@@ -58,7 +58,7 @@ class DataSet(FourcatModule):
 		:param db:  Database connection
 		"""
 		self.db = db
-		self.folder = Path(config.get('PATH_ROOT'), config.get('PATH_DATA'))
+		self.folder = config.get('PATH_ROOT').joinpath(config.get('PATH_DATA'))
 		self.staging_areas = []
 
 		if key is not None:

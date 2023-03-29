@@ -113,7 +113,7 @@ def get_software_version():
 
     :return str:  4CAT version
     """
-    versionpath = Path(config.get('PATH_ROOT'), config.get('path.versionfile'))
+    versionpath = config.get('PATH_ROOT').joinpath(config.get('path.versionfile'))
 
     if versionpath.exists() and not versionpath.is_file():
         return ""
