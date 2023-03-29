@@ -4,6 +4,7 @@ Filter posts by a given column
 import re
 import datetime
 
+from backend.abstract.processor import BasicProcessor
 from processors.filtering.base_filter import BaseFilter
 from common.lib.helpers import UserInput, convert_to_int
 
@@ -229,3 +230,32 @@ class ColumnFilter(BaseFilter):
 
             if ranked_items >= top_n:
                 return
+
+
+class ColumnProcessorFilter(ColumnFilter):
+    """
+    Retain only posts where a given column matches a given value
+    """
+    type = "column-processor-filter"  # job type ID
+    category = "Filtering"  # category
+    title = "Filter by value"  # title displayed in UI
+    description = "A generic filter that checks whether a value in a selected column matches a custom requirement. "
+
+    @classmethod
+    def is_compatible_with(cls, module=None):
+        """
+        Allow processor on top datasets.
+
+        :param module: Dataset or processor to determine compatibility with
+        """
+        return module.get_extension() in ("csv", "ndjson") and not module.is_top_dataset()
+
+    @classmethod
+    def is_filter(cls):
+        """
+        I'm a filter! And so are my children.
+        """
+        return False
+
+    def after_process(self):
+        BasicProcessor.after_process(self)

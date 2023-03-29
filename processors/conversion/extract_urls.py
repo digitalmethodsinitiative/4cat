@@ -40,6 +40,12 @@ class ExtractURLs(BasicProcessor):
             "inline": True,
             "tooltip": "If column contains a single URL, use that URL; else, try to find image URLs in the column's content",
         },
+        "correct_croudtangle": {
+            "type": UserInput.OPTION_TOGGLE,
+            "default": False,
+            "help": "CroudTangle dataset",
+            "tooltip": "CroudTangle text contains resolved links using :=: symbols; these are extracted directly",
+        },
         "expand_urls": {
             "type": UserInput.OPTION_TOGGLE,
             "default": False,
@@ -221,6 +227,7 @@ class ExtractURLs(BasicProcessor):
             columns = [columns]
         expand_urls = self.parameters.get("expand_urls", False)
         return_matches_only = self.parameters.get("return_matches_only", True)
+        correct_croudtangle = self.parameters.get("correct_croudtangle", False)
 
         # Create fieldnames
         fieldnames = self.source_dataset.get_item_keys(self) + ["4CAT_number_unique_urls", "4CAT_extracted_urls"] + ["4CAT_extracted_from_" + column for column in columns]
@@ -256,6 +263,8 @@ class ExtractURLs(BasicProcessor):
 
                     # Check for links
                     identified_urls = self.identify_links(value, self.parameters.get("split-comma", True))
+                    if correct_croudtangle:
+                        identified_urls = ["".join(id_url.split(":=:")[1:]) if ":=:" in id_url else id_url for id_url in identified_urls]
 
                     # Expand url shorteners
                     if expand_urls:
