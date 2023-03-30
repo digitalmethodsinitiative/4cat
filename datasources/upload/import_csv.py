@@ -209,6 +209,8 @@ class SearchCustom(BasicProcessor):
                             "type": UserInput.OPTION_CHOICE,
                             "options": {
                                 "": "",
+                                **({"__4cat_auto_sequence": "[generate sequential IDs]"} if mappable_column in (
+                                "id", "thread_id") else {}),
                                 **{column: column for column in fields}
                             },
                             "default": mappable_column if mappable_column in fields else "",
@@ -221,7 +223,8 @@ class SearchCustom(BasicProcessor):
             missing_mapping = []
             for field in tool_format["columns"]:
                 mapping_field = "option-mapping-%s" % field
-                if request.form.get(mapping_field) not in fields or not request.form.get(mapping_field):
+                provided_field = request.form.get(mapping_field)
+                if (provided_field not in fields and provided_field != "__4cat_auto_sequence") or not provided_field:
                     missing_mapping.append(field)
                 else:
                     column_mapping["mapping-" + field] = request.form.get(mapping_field)

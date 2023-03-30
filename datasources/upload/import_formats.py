@@ -263,12 +263,21 @@ def map_csv_items(reader, columns, dataset, parameters):
     :return tuple:  Items written, items skipped
     """
     # write to the result file
+    indexes = {}
     for row in reader:
         mapped_row = {}
         for field in columns:
             mapping = parameters.get("mapping-" + field)
             if mapping:
-                mapped_row[field] = row[mapping]
+                if mapping == "__4cat_auto_sequence":
+                    # auto-numbering
+                    if field not in indexes:
+                        indexes[field] = 1
+                    mapped_row[field] = indexes[field]
+                    indexes[field] += 1
+                else:
+                    # actual mapping
+                    mapped_row[field] = row[mapping]
 
         # ensure that timestamp is YYYY-MM-DD HH:MM:SS and that there
         # is a unix timestamp. this will override the columns if they
