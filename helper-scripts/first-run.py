@@ -36,7 +36,7 @@ shutil.copy(version_file, current_version_file)
 
 # Now check for presence of required NLTK packages
 import nltk
-nltk_downloads = ("wordnet", "punkt")
+nltk_downloads = ("wordnet", "punkt", "omw-1.4")
 for package in nltk_downloads:
     # if it already exists, .download() will just NOP
     try:
