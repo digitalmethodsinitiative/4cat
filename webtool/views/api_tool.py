@@ -381,7 +381,10 @@ def queue_dataset():
 
 	if hasattr(search_worker, "after_create"):
 		search_worker.after_create(sanitised_query, dataset, request)
+
 	queue.add_job(jobtype=search_worker_id, remote_id=dataset.key)
+	dataset.link_job(Job.get_by_remote_ID(dataset.key, db))
+
 	return jsonify({"status": "success", "message": "", "key": dataset.key})
 
 
