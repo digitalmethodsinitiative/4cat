@@ -53,7 +53,7 @@ class SearchLinkedIn(Search):
         # annoyingly, posts don't come with a timestamp
         # approximate it by using the time of collection and the "time ago"
         # included with the post (e.g. 'published 18h ago')
-        # post = node["data"]
+        post = node
 
         if not post.get("actor"):
             return {}
