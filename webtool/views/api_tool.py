@@ -206,6 +206,7 @@ def datasource_script(datasource_id):
 
 
 @app.route("/api/import-dataset/", methods=["POST"])
+@login_required
 @limiter.limit("5 per minute")
 @openapi.endpoint("tool")
 def import_dataset():
