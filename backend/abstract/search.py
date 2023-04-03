@@ -181,7 +181,12 @@ class Search(BasicProcessor, ABC):
 
 				# remove NUL bytes here because they trip up a lot of other
 				# things
-				yield json.loads(line.replace("\0", ""))["data"]
+				# also include import metadata in item
+				item = json.loads(line.replace("\0", ""))
+				yield {
+					**item["data"],
+					"__import_meta": {k: v for k, v in item.items() if k != "data"}
+				}
 
 		path.unlink()
 
