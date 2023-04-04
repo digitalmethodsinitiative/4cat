@@ -253,7 +253,7 @@ def first_run_dialog():
         except (ValueError, TypeError):
             interface_hue = random.randrange(0, 360)
 
-        config.set_or_create_setting("4cat.layout_hue", interface_hue, raw=True)
+        config.set_or_create_setting("4cat.layout_hue", interface_hue, raw=False)
         generate_css_colours(force=True)
 
         # make user an admin
