@@ -54,6 +54,10 @@ table td[colspan] {
     text-align: left;
 }
 
+.user-byline {
+    font-size: 0.8em;
+}
+
 .settings fieldset {
     border: 0;
 }
