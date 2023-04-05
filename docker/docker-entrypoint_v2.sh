@@ -52,6 +52,9 @@ python3 helper-scripts/migrate.py -y
 # Run docker_setup to update any environment variables if they were changed
 python3 docker/docker_setup.py
 
+# Add a setting to identify this as a single Docker container
+python3 -c "import common.config_manager as config;config.set_or_create_setting('SINGLE_DOCKER', True, raw=False)"
+
 # Start 4CAT backend
 python3 4cat-daemon.py start
 
