@@ -149,8 +149,8 @@ class FourcatRestarterAndUpgrader(BasicWorker):
             api_host = "https://" if config.get("flask.https") else "http://"
             api_host += "localhost:80" if (config.get("USING_DOCKER") and config.get("SINGLE_DOCKER", False)) else "4cat_frontend:5000" if config.get("USING_DOCKER") else config.get("flask.server_name")
 
-            if self.job.data["remote_id"] == "upgrade" and config.get("USING_DOCKER"):
-                # when using Docker, the front-end needs to update separately
+            if self.job.data["remote_id"] == "upgrade" and config.get("USING_DOCKER") and not config.get("SINGLE_DOCKER", False):
+                # when using Docker, the front-end needs to update separately (unless it is a single Docker container)
                 log_stream_restart.write("Telling front-end Docker container to upgrade...\n")
                 log_stream_restart.close()  # close, because front-end will be writing to it
                 upgrade_ok = False
