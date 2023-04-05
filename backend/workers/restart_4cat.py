@@ -147,7 +147,7 @@ class FourcatRestarterAndUpgrader(BasicWorker):
             # we're gonna use some specific Flask routes to trigger this, i.e.
             # we're interacting with the front-end through HTTP
             api_host = "https://" if config.get("flask.https") else "http://"
-            api_host += "4cat_frontend:5000" if config.get("USING_DOCKER") else config.get("flask.server_name")
+            api_host += "localhost:80" if (config.get("USING_DOCKER") and config.get("SINGLE_DOCKER", False)) else "4cat_frontend:5000" if config.get("USING_DOCKER") else config.get("flask.server_name")
 
             if self.job.data["remote_id"] == "upgrade" and config.get("USING_DOCKER"):
                 # when using Docker, the front-end needs to update separately
