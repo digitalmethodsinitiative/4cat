@@ -215,7 +215,7 @@ class YouTubeImageWall(BasicProcessor):
 			wall.paste(wall_old, box=(0,0))
 			# Draw the category on the side
 			# Get a font
-			font = ImageFont.truetype(config.get('PATH_ROOT') + "/common/assets/Inconsolata-Bold.ttf", 50)
+			font = ImageFont.truetype(str(config.get('PATH_ROOT').joinpath("common/assets/Inconsolata-Bold.ttf")), 50)
 			# Get a drawing context
 			draw = ImageDraw.Draw(wall)
 

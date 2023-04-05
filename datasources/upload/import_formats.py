@@ -248,6 +248,48 @@ def import_ytdt_commentlist(reader, columns, dataset, parameters):
         yield item
 
 
+def import_bzy_weibo(reader, columns, dataset, parameter):
+    """
+    Import Weibo item collected by Bazhuayu
+
+    :param csv.DictReader reader:  Reader object of input file
+    :param Iterable columns:  Required columns
+    :param DataSet dataset:  Dataset to import into
+    :param dict parameters:  Dataset parameters
+    :return tuple:  Items written, items skipped
+    """
+    index = 1
+    year = datetime.datetime.now().year
+
+    for item in reader:
+        raw_timestamp = item["from1"].strip()
+        timestamp_bits = re.split(r"[年月日\s:]+", raw_timestamp)
+        print(timestamp_bits)
+        if re.match(r"[0-9]{2}月[0-9]{2}日 [0-9]{2}:[0-9]{2}", raw_timestamp):
+            timestamp = datetime.datetime(year, int(timestamp_bits[0]), int(timestamp_bits[1]), int(timestamp_bits[2]),
+                                          int(timestamp_bits[3]))
+        elif re.match(r"[0-9]{4}[0-9]{2}月[0-9]{2}日 [0-9]{2}:[0-9]{2}", raw_timestamp):
+
+            timestamp = datetime.datetime(int(timestamp_bits[0]), int(timestamp_bits[1]), int(timestamp_bits[2]),
+                                          int(timestamp_bits[3]), int(timestamp_bits[4]))
+        else:
+            yield InvalidImportedItem(f"Cannot parse timestamp {raw_timestamp}")
+
+        item = {
+            "id": index,
+            "thread_id": index,
+            "author": item["标题"],
+            "body": item["txt"],
+            "timestamp": timestamp.strftime("%Y-%m-%d %H:%M:%S"),
+            "image_url": item["图片"],
+            **item,
+            "unix_timestamp": int(timestamp.timestamp())
+        }
+
+        index += 1
+        yield item
+
+
 def map_csv_items(reader, columns, dataset, parameters):
     """
     Read CSV items and put them in the 4CAT dataset file
@@ -263,12 +305,21 @@ def map_csv_items(reader, columns, dataset, parameters):
     :return tuple:  Items written, items skipped
     """
     # write to the result file
+    indexes = {}
     for row in reader:
         mapped_row = {}
         for field in columns:
             mapping = parameters.get("mapping-" + field)
             if mapping:
-                mapped_row[field] = row[mapping]
+                if mapping == "__4cat_auto_sequence":
+                    # auto-numbering
+                    if field not in indexes:
+                        indexes[field] = 1
+                    mapped_row[field] = indexes[field]
+                    indexes[field] += 1
+                else:
+                    # actual mapping
+                    mapped_row[field] = row[mapping]
 
         # ensure that timestamp is YYYY-MM-DD HH:MM:SS and that there
         # is a unix timestamp. this will override the columns if they
@@ -344,6 +395,11 @@ tools = {
         "columns": {"id", "isReplyTo", "authorName", "text", "publishedAt"},
         "mapper": import_ytdt_commentlist,
         "csv_dialect": {"doublequote": True}
+    },
+    "bazhuayu_weibo": {
+        "name": "Sina Weibo (via Bazhuayu)",
+        "columns": {},
+        "mapper": import_bzy_weibo
     },
     "custom": {
         "name": "Custom/other",

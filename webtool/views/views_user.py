@@ -2,11 +2,14 @@
 Control access to web tool - views and functions used in handling user access
 """
 import html2text
+import colorsys
 import requests
 import smtplib
 import fnmatch
 import socket
+import random
 import time
+import math
 import sys
 import os
 
@@ -20,7 +23,7 @@ from flask_login import login_user, login_required, logout_user, current_user
 from webtool import app, login_manager, db
 from webtool.views.api_tool import limiter
 from webtool.lib.user import User
-from webtool.lib.helpers import error
+from webtool.lib.helpers import error, make_html_colour, generate_css_colours
 from common.lib.helpers import send_email, get_software_version
 
 from pathlib import Path
@@ -186,14 +189,30 @@ def first_run_dialog():
     if has_admin_user and not wants_phone_home:
         return error(403, message="The 'first run' page is not available")
 
+    # choose a random adjective to differentiate this 4CAT instance (this can
+    # be edited by the user)
+    adjective_file = Path(config.get("PATH_ROOT"), "common/assets/wordlists/positive-adjectives.txt")
+    if not adjective_file.exists():
+        adjectives = ["Awesome"]
+    else:
+        with adjective_file.open() as infile:
+            adjectives = [line.strip().title() for line in infile.readlines()]
+    adjective = random.choice(adjectives)
+
+    # choose a random accent colour (this can also be edited)
+    interface_hue = random.random()
+
     phone_home_url = config.get("4cat.phone_home_url")
     if request.method == 'GET':
         template = "account/first-run.html" if not has_admin_user else "account/first-run-after-update.html"
-        return render_template(template, incomplete=missing, form=request.form, phone_home_url=phone_home_url, version=version)
+        return render_template(template, incomplete=missing, form=request.form, phone_home_url=phone_home_url,
+                               version=version, adjective=adjective, interface_hue=interface_hue)
 
     if not has_admin_user:
         username = request.form.get("username").strip()
         password = request.form.get("password").strip()
+        instance_name = request.form.get("4cat_name").strip()
+        interface_hue = request.form.get("interface_hue").strip()
         confirm_password = request.form.get("confirm_password").strip()
 
         if not username:
@@ -211,16 +230,33 @@ def first_run_dialog():
             missing.append("password")
             missing.append("confirm_password")
 
+        if not instance_name:
+            missing.append("4cat_name")
+
         if missing:
             flash("Please make sure all fields are complete")
             return render_template("account/first-run.html", form=request.form, incomplete=missing,
-                                   flashes=get_flashed_messages(), phone_home_url=phone_home_url)
+                                   flashes=get_flashed_messages(), phone_home_url=phone_home_url,
+                                   adjective=adjective, interface_hue=interface_hue)
 
         db.insert("users", data={"name": username})
         db.commit()
         user = User.get_by_name(db=db, name=username)
         user.set_password(password)
 
+        config.set_or_create_setting("4cat.name_long", instance_name, raw=False)
+
+        # handle hue colour
+        try:
+            interface_hue = int(interface_hue)
+            interface_hue = interface_hue if 0 <= interface_hue <= 360 else random.randrange(0, 360)
+        except (ValueError, TypeError):
+            interface_hue = random.randrange(0, 360)
+
+        config.set_or_create_setting("4cat.layout_hue", interface_hue, raw=False)
+        generate_css_colours(force=True)
+
+        # make user an admin
         db.update("users", where={"name": username}, data={"is_admin": True, "is_deactivated": False})
         db.commit()
 

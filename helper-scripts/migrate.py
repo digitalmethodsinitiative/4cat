@@ -76,6 +76,8 @@ def check_for_nltk():
 		nltk.data.find('corpora/wordnet')
 	except LookupError:
 		nltk.download("wordnet", quiet=True)
+	
+	nltk.download("omw-1.4", quiet=True)
 
 
 def finish(args, logger):

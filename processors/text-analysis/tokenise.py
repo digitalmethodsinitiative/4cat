@@ -59,7 +59,13 @@ class Tokenise(BasicProcessor):
 		"tokenizer_type": {
 			"type": UserInput.OPTION_CHOICE,
 			"default": "twitter",
-			"options": {"twitter": "nltk TweetTokenizer", "regular": "nltk word_tokenize", "jieba": "jieba (for Chinese text)"},
+			"options": {
+				"twitter": "nltk TweetTokenizer",
+				"regular": "nltk word_tokenize",
+				"jieba-cut": "jieba (for Chinese text; accurate mode)",
+				"jieba-cut-all": "jieba (for Chinese text; full mode)",
+				"jieba-search": "jieba (for Chinese text; search engine suggestion style)",
+			},
 			"help": "Tokeniser",
 			"tooltip": "TweetTokenizer is recommended for social media content, as it is optimised for informal language."
 		},
@@ -178,9 +184,15 @@ class Tokenise(BasicProcessor):
 
 		# Twitter tokenizer if indicated
 		language = self.parameters.get("language", "english")
-		if self.parameters.get("tokenizer_type") == "jieba":
+		if self.parameters.get("tokenizer_type") == "jieba-cut":
+			tokenizer = jieba.cut
+			tokenizer_args = {"cut_all": False}
+		elif self.parameters.get("tokenizer_type") == "jieba-cut-all":
 			tokenizer = jieba.cut
 			tokenizer_args = {"cut_all": True}
+		elif self.parameters.get("tokenizer_type") == "jieba-search":
+			tokenizer = jieba.cut_for_search
+			tokenizer_args = {}
 		else:
 			tokenizer = TweetTokenizer(preserve_case=False).tokenize if self.parameters.get("tokenizer_type") == "twitter" else word_tokenize
 			tokenizer_args = {} if self.parameters.get("tokenizer_type") == "twitter" else {"language": language}
@@ -188,7 +200,7 @@ class Tokenise(BasicProcessor):
 		# load word filters - words to exclude from tokenisation
 		word_filter = set()
 		for wordlist in self.parameters.get("filter", []):
-			with open(config.get('PATH_ROOT') + "/common/assets/wordlists/%s.txt" % wordlist, encoding="utf-8") as input:
+			with config.get('PATH_ROOT').joinpath(f"common/assets/wordlists/{wordlist}.txt").open(encoding="utf-8") as input:
 				word_filter = set.union(word_filter, input.read().splitlines())
 
 		# Extend or limit the word filter with optionally added words

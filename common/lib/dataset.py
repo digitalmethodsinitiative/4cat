@@ -58,7 +58,7 @@ class DataSet(FourcatModule):
 		:param db:  Database connection
 		"""
 		self.db = db
-		self.folder = Path(config.get('PATH_ROOT'), config.get('PATH_DATA'))
+		self.folder = config.get('PATH_ROOT').joinpath(config.get('PATH_DATA'))
 		self.staging_areas = []
 
 		if key is not None:
@@ -1072,7 +1072,7 @@ class DataSet(FourcatModule):
 
 		available = {}
 		for processor_type, processor in processors.items():
-			if processor_type.endswith("-search"):
+			if processor.is_from_collector():
 				continue
 
 			# consider a processor compatible if its is_compatible_with
@@ -1185,6 +1185,15 @@ class DataSet(FourcatModule):
 		if self.key_parent:
 			return False
 		return True
+
+	def is_from_collector(self):
+		"""
+		Check if this dataset was made by a processor that collects data, i.e.
+		a search or import worker.
+
+		:return bool:
+		"""
+		return self.type.endswith("-search") or self.type.endswith("-import")
 
 	def get_extension(self):
 		"""

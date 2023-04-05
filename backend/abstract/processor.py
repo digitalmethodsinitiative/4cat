@@ -700,6 +700,16 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		return False
 
 	@classmethod
+	def is_from_collector(cls):
+		"""
+		Check if this processor is one that collects data, i.e. a search or
+		import worker.
+
+		:return bool:
+		"""
+		return cls.type.endswith("-search") or cls.type.endswith("-import")
+
+	@classmethod
 	def get_extension(self, parent_dataset=None):
 		"""
 		Return the extension of the processor's dataset

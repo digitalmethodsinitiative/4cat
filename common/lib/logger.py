@@ -185,7 +185,7 @@ class Logger:
             return
 
         self.print_logs = output
-        log_folder = Path(config.get('PATH_ROOT'), config.get('PATH_LOGS'))
+        log_folder = config.get('PATH_ROOT').joinpath(config.get('PATH_LOGS'))
         if not log_folder.exists():
             log_folder.mkdir(parents=True)
 

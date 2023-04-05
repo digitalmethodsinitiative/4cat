@@ -206,6 +206,7 @@ def datasource_script(datasource_id):
 
 
 @app.route("/api/import-dataset/", methods=["POST"])
+@login_required
 @limiter.limit("5 per minute")
 @openapi.endpoint("tool")
 def import_dataset():
@@ -238,8 +239,13 @@ def import_dataset():
 	if not platform or platform not in backend.all_modules.datasources:
 		return error(404, message="Unknown platform or source format")
 
-	worker_type = "%s-search" % platform
-	worker = backend.all_modules.workers.get(worker_type)
+	worker_types = (f"{platform}-import", f"{platform}-search")
+	worker = None
+	for worker_type in worker_types:
+		worker = backend.all_modules.workers.get(worker_type)
+		if worker:
+			break
+
 	if not worker:
 		return error(404, message="Unknown platform or source format")
 
@@ -376,7 +382,10 @@ def queue_dataset():
 
 	if hasattr(search_worker, "after_create"):
 		search_worker.after_create(sanitised_query, dataset, request)
+
 	queue.add_job(jobtype=search_worker_id, remote_id=dataset.key)
+	dataset.link_job(Job.get_by_remote_ID(dataset.key, db))
+
 	return jsonify({"status": "success", "message": "", "key": dataset.key})
 
 
@@ -851,7 +860,7 @@ def queue_processor(key=None, processor=None):
 			return error(400, error="File must contain a 'body' column")
 
 		filename = secure_filename(input_file.filename)
-		input_file.save(config.get('PATH_DATA') + "/")
+		input_file.save(str(config.get('PATH_DATA')) + "/")
 
 	elif not key:
 		key = request.form.get("key", "")

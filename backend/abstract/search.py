@@ -169,7 +169,8 @@ class Search(BasicProcessor, ABC):
 		:param str path:  Path to read from
 		:return Generator:  Yields all items in the file, item for item.
 		"""
-		path = Path(path)
+		if type(path) is not Path:
+			path = Path(path)
 		if not path.exists():
 			return []
 
@@ -180,7 +181,12 @@ class Search(BasicProcessor, ABC):
 
 				# remove NUL bytes here because they trip up a lot of other
 				# things
-				yield json.loads(line.replace("\0", ""))["data"]
+				# also include import metadata in item
+				item = json.loads(line.replace("\0", ""))
+				yield {
+					**item["data"],
+					"__import_meta": {k: v for k, v in item.items() if k != "data"}
+				}
 
 		path.unlink()
 

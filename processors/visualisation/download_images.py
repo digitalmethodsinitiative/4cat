@@ -125,7 +125,7 @@ class ImageDownloader(BasicProcessor):
 
 		:param module: Dataset or processor to determine compatibility with
 		"""
-		return (module.type == "top-images" or module.type.endswith("search")) \
+		return (module.type == "top-images" or module.is_from_collector()) \
 			   and module.type not in ["tiktok-search", "tiktok-urls-search", "telegram-search"]
 
 	def process(self):
