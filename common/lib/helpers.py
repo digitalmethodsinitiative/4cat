@@ -8,6 +8,7 @@ import requests
 import datetime
 import smtplib
 import socket
+import psutil
 import copy
 import time
 import json
@@ -824,3 +825,15 @@ def validate_url(x):
         return all([result.scheme, result.netloc])
     else:
         raise ValueError('Must provide type str not type %s' % type(x))
+
+
+def get_parent_gunicorn_pid():
+    """
+    Function to find gunicorn's Main PID
+    """
+    for proc in psutil.process_iter():
+        if "gunicorn" in proc.name() and proc.parent().name() != "gunicorn":
+            return proc.pid
+
+    # None found
+    return False

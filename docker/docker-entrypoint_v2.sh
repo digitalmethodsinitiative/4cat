@@ -4,6 +4,9 @@ set -e
 exit_backend() {
   echo "Exiting backend"
   python3 4cat-daemon.py stop
+  echo "Exiting frontend"
+  python3 -c "from common.lib.helpers import get_parent_gunicorn_pid;import os;import signal;os.kill(get_parent_gunicorn_pid(), signal.SIGTERM)"
+  echo "Shutdown complete; Bye!"
   exit 0
 }
 
@@ -59,4 +62,7 @@ python3 -c "import common.config_manager as config;config.set_or_create_setting(
 python3 4cat-daemon.py start
 
 # Start 4CAT frontend
-exec gunicorn --worker-tmp-dir /dev/shm --workers 2 --threads 4 --worker-class gthread --access-logfile /4cat/logs/access_gunicorn.log --log-level info --bind 0.0.0.0:80 webtool:app & wait $!
+gunicorn --worker-tmp-dir /dev/shm --workers 2 --threads 4 --worker-class gthread --access-logfile /4cat/logs/access_gunicorn.log --log-level info --daemon --bind 0.0.0.0:80 webtool:app
+
+# Tail logs and wait for SIGTERM
+exec tail -f -n 3 logs/backend_4cat.log & wait $!

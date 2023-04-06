@@ -80,4 +80,4 @@ ENV PYTHONUNBUFFERED=1 \
  # Telegram apparently needs its own port
  TELEGRAM_PORT=443
 
-ENTRYPOINT docker/docker-entrypoint_v2.sh
+ENTRYPOINT ["docker/docker-entrypoint_v2.sh"]

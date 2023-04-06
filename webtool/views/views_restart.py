@@ -25,7 +25,7 @@ from flask_login import login_required
 from webtool import app, queue
 from webtool.lib.helpers import admin_required, check_restart_request
 
-from common.lib.helpers import get_github_version
+from common.lib.helpers import get_github_version, get_parent_gunicorn_pid
 
 
 @app.route("/admin/trigger-restart/", methods=["POST", "GET"])
@@ -188,12 +188,6 @@ def trigger_restart_frontend():
     # we currently do not support these (but they may be easy to add)
     message = ""
     if "gunicorn" in os.environ.get("SERVER_SOFTWARE", ""):
-        import psutil
-
-        def get_parent_gunicorn_pid():
-            for proc in psutil.process_iter():
-                if "gunicorn" in proc.name() and proc.parent().name() != "gunicorn":
-                    return proc.pid
         # gunicorn
         message = "Detected Flask running in Gunicorn, sending SIGUP."
         kill_thread = threading.Thread(target=server_killer(get_parent_gunicorn_pid(), signal.SIGHUP))
