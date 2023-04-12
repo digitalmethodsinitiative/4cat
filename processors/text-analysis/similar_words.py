@@ -115,17 +115,29 @@ class SimilarWord2VecWords(BasicProcessor):
 					except KeyError:
 						continue
 
+					# Some words may have been excluded from the embedding model due to thresholds
+					excluded_words = set()
 					for similar_word in similar_words:
 						if similar_word[1] < threshold:
 							continue
+
+						try:
+							input_occurrences = model.get_vecattr(word, "count")
+						except KeyError:
+							if word not in excluded_words:
+								excluded_words.add(word)
+								self.dataset.log(f"'{word}' outside thresholds used for embedding model; no occurrences")
+							input_occurrences = 0
+
+						item_occurrences = model.get_vecattr(similar_word[0], "count")
 
 						result.append({
 							"date": interval,
 							"input": word,
 							"item": similar_word[0],
 							"value": similar_word[1],
-							"input_occurences": model.get_vecattr(word, "count"),
-							"item_occurences": model.get_vecattr(similar_word[0], "count"),
+							"input_occurrences": input_occurrences,
+							"item_occurrences": item_occurrences,
 							"depth": level
 						})
 
