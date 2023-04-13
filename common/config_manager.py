@@ -95,7 +95,7 @@ def get(attribute_name, default=None, connection=None, cursor=None, keep_connect
     """
     if config_manager is None:
         raise ConfigException("config.ini file does not exist!")
-    
+
     if attribute_name in dir(config_manager):
         # an explicitly defined attribute should always be called in favour
         # of this passthrough
