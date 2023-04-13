@@ -11,6 +11,9 @@ read by a docker-compose.yml.
 This should be run from the command line and is used by docker-entrypoint files.
 """
 import configparser
+import os
+import bcrypt
+from pathlib import Path
 
 
 def update_config_from_environment(CONFIG_FILE, config_parser):
@@ -108,10 +111,6 @@ def create_config_ini_file(CONFIG_FILE):
 
 
 if __name__ == "__main__":
-    import os
-    import bcrypt
-    from pathlib import Path
-
     # Configuration file location
     CONFIG_FILE = 'data/config/config.ini'
 
