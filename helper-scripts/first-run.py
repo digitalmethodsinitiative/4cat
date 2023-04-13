@@ -32,7 +32,7 @@ if current_version_file.exists():
     # need to do further on-boarding since 4CAT has already been run
     exit(0)
 
-shutil.copy(version_file, current_version_file)
+# shutil.copy(version_file, current_version_file)
 
 # Now check for presence of required NLTK packages
 import nltk
