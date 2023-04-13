@@ -25,6 +25,8 @@ class SimilarWord2VecWords(BasicProcessor):
 	description = "Uses a Word2Vec model to find words used in a similar context"  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
+	flawless = True
+
 	options = {
 		"words": {
 			"type": UserInput.OPTION_TEXT,
@@ -126,8 +128,9 @@ class SimilarWord2VecWords(BasicProcessor):
 						except KeyError:
 							if word not in excluded_words:
 								excluded_words.add(word)
-								self.dataset.log(f"'{word}' outside thresholds used for embedding model; no occurrences")
+								self.dataset.log(f"'{word}' outside thresholds used for embedding model {model_file.name}; no occurrences")
 							input_occurrences = 0
+							self.flawless = False
 
 						item_occurrences = model.get_vecattr(similar_word[0], "count")
 
@@ -159,4 +162,7 @@ class SimilarWord2VecWords(BasicProcessor):
 			self.dataset.update_status("None of the words were found in the word embedding model.", is_final=True)
 			self.dataset.finish(0)
 		else:
+			if not self.flawless:
+				self.dataset.update_status(
+					"Dataset complete, but some input words were not found in the embedding models (0 occurances in model due to chosen thresholds). Similar words are still identified; check log for specifics.", is_final=True)
 			self.write_csv_items_and_finish(result)
