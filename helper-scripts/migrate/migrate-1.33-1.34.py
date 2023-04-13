@@ -66,4 +66,4 @@ if not new_config_file.exists():
         print("  Please edit config/config.ini-example, rename as config.ini, and move to data/config/")
 
 else:
-    print("  ...Yes, nothing to update.")
+    print("  ...no, nothing to update.")

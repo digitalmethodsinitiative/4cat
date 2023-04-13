@@ -149,10 +149,10 @@ current_version_file = cwd.joinpath(args.current_version)
 # Check for current-version file in old locations
 if not current_version_file.exists() and cwd.joinpath(".current-version").exists():
 	logger.info("Moving .current-version to new location")
-	cwd.joinpath(".current-version").rename(current_version_file)
+	shutil.move(cwd.joinpath(".current-version"), current_version_file)
 elif not current_version_file.exists() and cwd.joinpath("config/.current-version").exists():
 	logger.info("Moving .current-version to new location")
-	cwd.joinpath("config/.current-version").rename(current_version_file)
+	shutil.move(cwd.joinpath("config/.current-version"), current_version_file)
 
 if not current_version_file.exists():
 	logger.info("Creating .current-version file ")

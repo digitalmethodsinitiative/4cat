@@ -54,7 +54,11 @@ class ConfigManager:
 
 
 # Instantiate the default manager to be used with helper functions below
-config_manager = ConfigManager()
+try:
+    config_manager = ConfigManager()
+except ConfigException as e:
+    # No config.ini file yet; cannot use database
+    config_manager = None
 
 
 def quick_db_connect():
@@ -66,6 +70,8 @@ def quick_db_connect():
 
     :return list: [connection, cursor]
     """
+    if config_manager is None:
+        raise ConfigException("config.ini file does not exist!")
     connection = psycopg2.connect(dbname=config_manager.DB_NAME, user=config_manager.DB_USER,
                                   password=config_manager.DB_PASSWORD, host=config_manager.DB_HOST,
                                   port=config_manager.DB_PORT)
@@ -87,6 +93,9 @@ def get(attribute_name, default=None, connection=None, cursor=None, keep_connect
     :param bool raw:  True returns value as JSON serialized string; False returns JSON object
     :return:  Setting value, or the provided fallback, or `None`.
     """
+    if config_manager is None:
+        raise ConfigException("config.ini file does not exist!")
+    
     if attribute_name in dir(config_manager):
         # an explicitly defined attribute should always be called in favour
         # of this passthrough
