@@ -32,7 +32,7 @@ done
 echo "PostgreSQL started"
 
 # Create Database if it does not already exist
-if [ "$(psql --host="$POSTGRES_HOST" --port=5432 --user="$POSTGRES_USER" --dbname="$POSTGRES_DB" -tAc "SELECT EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'jobs')")" = 't' ]; then
+if [ "$(psql --quiet --host="$POSTGRES_HOST" --port=5432 --user="$POSTGRES_USER" --dbname="$POSTGRES_DB" -tAc "SELECT EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'jobs')")" = 't' ]; then
   # Table already exists
   echo "Database already created"
 else
@@ -43,7 +43,7 @@ else
   sudo -u postgres psql -c " GRANT ALL PRIVILEGES ON DATABASE $POSTGRES_DB to $POSTGRES_USER;"
   psql --host="$POSTGRES_HOST" --port=5432 --user="$POSTGRES_USER" --dbname="$POSTGRES_DB" < backend/database.sql
   # Create .current-version file
-  cp VERSION config/.current-version
+  if [ ! -e data/config ] ; then mkdir data/config ; else : ; fi && cp VERSION data/config/.current-version
 fi
 
 # If backend did not gracefully shutdown, PID lockfile remains; Remove lockfile
@@ -56,13 +56,14 @@ python3 helper-scripts/migrate.py -y
 python3 docker/docker_setup.py
 
 # Add a setting to identify this as a single Docker container
+# Technically only need to do this once, but has to be done after docker_setup.py
 python3 -c "import common.config_manager as config;config.set_or_create_setting('SINGLE_DOCKER', True, raw=False)"
 
 # Start 4CAT backend
 python3 4cat-daemon.py start
 
 # Start 4CAT frontend
-gunicorn --worker-tmp-dir /dev/shm --workers 2 --threads 4 --worker-class gthread --access-logfile /4cat/logs/access_gunicorn.log --log-level info --daemon --bind 0.0.0.0:80 webtool:app
+gunicorn --worker-tmp-dir /dev/shm --workers 2 --threads 4 --worker-class gthread --access-logfile /4cat/data/logs/access_gunicorn.log --log-level info --daemon --bind 0.0.0.0:80 webtool:app
 
 # Tail logs and wait for SIGTERM
-exec tail -f -n 3 logs/backend_4cat.log & wait $!
+exec tail -f -n 3 data/logs/backend_4cat.log & wait $!

@@ -33,9 +33,6 @@ COPY --from=compile-image /opt/venv /opt/venv
 # Make virtual env available
 ENV PATH="/opt/venv/bin:$PATH" POSTGRES_HOST_AUTH_METHOD=trust
 
-# Postgres; until I can figure out how to build from two images and what exactly to bring from the postgres one...
-#RUN apt-get update && apt-get install -y lsb-release wget gnupg && echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list && wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add -
-
 RUN apt-get update && apt-get install -y \
     # Called in docker-entrypoint.sh:
     curl \
@@ -58,15 +55,13 @@ COPY . /4cat/
 # Permission
 RUN chmod +x docker/wait-for-backend.sh docker/docker-entrypoint.sh
 
-# Create Volumes
-VOLUME /4cat/data/ /4cat/config/ /4cat/logs/ /var/lib/postgresql/data/
-
 # Expose ports (gunicorn 80, 4CAT api 4444, telegram 443)
 EXPOSE 80 4444 443
 
 # Environment variables
 # Database setup
-ENV PYTHONUNBUFFERED=1 \
+ENV AM_I_IN_A_DOCKER_CONTAINER=Yes \
+ PYTHONUNBUFFERED=1 \
  POSTGRES_USER=fourcat \
  POSTGRES_PASSWORD=supers3cr3t \
  POSTGRES_DB=fourcat \

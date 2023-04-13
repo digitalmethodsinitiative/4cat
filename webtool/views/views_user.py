@@ -178,7 +178,7 @@ def first_run_dialog():
     has_admin_user = db.fetchone("SELECT COUNT(*) AS amount FROM users WHERE is_admin = True")["amount"]
     wants_phone_home = not config.get("4cat.phone_home_asked", False)
 
-    version_file = Path(config.get("PATH_ROOT"), "config/.current-version")
+    version_file = Path(config.get("PATH_ROOT"), "data/config/.current-version")
     if version_file.exists():
         with version_file.open() as infile:
             version = infile.readline().strip()
@@ -263,7 +263,7 @@ def first_run_dialog():
         flash("The admin user '%s' was created, you can now use it to log in." % username)
 
     if phone_home_url and request.form.get("phonehome"):
-        with Path(config.get("PATH_ROOT"), "config/.current-version").open() as outfile:
+        with Path(config.get("PATH_ROOT"), "data/config/.current-version").open() as outfile:
             version = outfile.read(64).split("\n")[0].strip()
 
         payload = {

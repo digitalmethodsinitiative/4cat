@@ -38,7 +38,7 @@ else
   # Seed DB
   cd /usr/src/app && psql --host=$POSTGRES_HOST --port=5432 --user=$POSTGRES_USER --dbname=$POSTGRES_DB < backend/database.sql
   # No database exists, new build, no need to migrate so create .current-version file
-  cp VERSION config/.current-version
+  if [ ! -e data/config ] ; then mkdir data/config ; else : ; fi && cp VERSION data/config/.current-version
 fi
 
 # If backend did gracefully shutdown, PID lockfile remains; Remove lockfile

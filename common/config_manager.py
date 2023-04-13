@@ -18,39 +18,43 @@ class ConfigManager:
     Note: some options are here until additional changes are made and they can
     be moved to more appropriate locations.
     """
-    CONFIG_FILE = Path(__file__).parent.parent.joinpath("config/config.ini")
+    def __init__(self, config_ini_path="data/config/config.ini"):
+        self.CONFIG_FILE = Path(__file__).parent.parent.joinpath(config_ini_path)
 
-    # TODO: work out best structure for docker vs non-docker
-    # Do not need two configs, BUT Docker config.ini has to be in shared volume for both front and backend to access it
-    config_reader = configparser.ConfigParser()
-    USING_DOCKER = False
-    if CONFIG_FILE.exists():
-        config_reader.read(CONFIG_FILE)
-        if config_reader["DOCKER"].getboolean("use_docker_config"):
-            # Can use throughtout 4CAT to know if Docker environment
-            USING_DOCKER = True
-    else:
-        # config should be created!
-        raise ConfigException("No config/config.ini file exists! Update and rename the config.ini-example file.")
+        # Do not need two configs, BUT Docker config.ini has to be in shared volume for both front and backend to access it
+        config_reader = configparser.ConfigParser()
+        self.USING_DOCKER = False
+        if self.CONFIG_FILE.exists():
+            config_reader.read(self.CONFIG_FILE)
+            if config_reader["DOCKER"].getboolean("use_docker_config"):
+                # Can use throughtout 4CAT to know if Docker environment
+                self.USING_DOCKER = True
+        else:
+            # config should be created!
+            raise ConfigException("No data/config/config.ini file exists! Update and rename the config.ini-example file.")
 
-    DB_HOST = config_reader["DATABASE"].get("db_host")
-    DB_PORT = config_reader["DATABASE"].getint("db_port")
-    DB_USER = config_reader["DATABASE"].get("db_user")
-    DB_NAME = config_reader["DATABASE"].get("db_name")
-    DB_PASSWORD = config_reader["DATABASE"].get("db_password")
+        self.DB_HOST = config_reader["DATABASE"].get("db_host")
+        self.DB_PORT = config_reader["DATABASE"].getint("db_port")
+        self.DB_USER = config_reader["DATABASE"].get("db_user")
+        self.DB_NAME = config_reader["DATABASE"].get("db_name")
+        self.DB_PASSWORD = config_reader["DATABASE"].get("db_password")
 
-    API_HOST = config_reader["API"].get("api_host")
-    API_PORT = config_reader["API"].getint("api_port")
+        self.API_HOST = config_reader["API"].get("api_host")
+        self.API_PORT = config_reader["API"].getint("api_port")
 
-    PATH_ROOT = Path(os.path.abspath(os.path.dirname(__file__))).joinpath("..").resolve()  # better don"t change this
-    PATH_LOGS = Path(config_reader["PATHS"].get("path_logs", ""))
-    PATH_IMAGES = Path(config_reader["PATHS"].get("path_images", ""))
-    PATH_DATA = Path(config_reader["PATHS"].get("path_data", ""))
-    PATH_LOCKFILE = Path(config_reader["PATHS"].get("path_lockfile", ""))
-    PATH_SESSIONS = Path(config_reader["PATHS"].get("path_sessions", ""))
+        self.PATH_ROOT = Path(os.path.abspath(os.path.dirname(__file__))).joinpath("..").resolve()  # better don"t change this
+        self.PATH_LOGS = Path(config_reader["PATHS"].get("path_logs", ""))
+        self.PATH_IMAGES = Path(config_reader["PATHS"].get("path_images", ""))
+        self.PATH_DATA = Path(config_reader["PATHS"].get("path_data", ""))
+        self.PATH_LOCKFILE = Path(config_reader["PATHS"].get("path_lockfile", ""))
+        self.PATH_SESSIONS = Path(config_reader["PATHS"].get("path_sessions", ""))
 
-    ANONYMISATION_SALT = config_reader["GENERATE"].get("anonymisation_salt")
-    SECRET_KEY = config_reader["GENERATE"].get("secret_key")
+        self.ANONYMISATION_SALT = config_reader["GENERATE"].get("anonymisation_salt")
+        self.SECRET_KEY = config_reader["GENERATE"].get("secret_key")
+
+
+# Instantiate the default manager to be used with helper functions below
+config_manager = ConfigManager()
 
 
 def quick_db_connect():
@@ -62,9 +66,9 @@ def quick_db_connect():
 
     :return list: [connection, cursor]
     """
-    connection = psycopg2.connect(dbname=ConfigManager.DB_NAME, user=ConfigManager.DB_USER,
-                                  password=ConfigManager.DB_PASSWORD, host=ConfigManager.DB_HOST,
-                                  port=ConfigManager.DB_PORT)
+    connection = psycopg2.connect(dbname=config_manager.DB_NAME, user=config_manager.DB_USER,
+                                  password=config_manager.DB_PASSWORD, host=config_manager.DB_HOST,
+                                  port=config_manager.DB_PORT)
     cursor = connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     return connection, cursor
 
@@ -83,10 +87,10 @@ def get(attribute_name, default=None, connection=None, cursor=None, keep_connect
     :param bool raw:  True returns value as JSON serialized string; False returns JSON object
     :return:  Setting value, or the provided fallback, or `None`.
     """
-    if attribute_name in dir(ConfigManager):
+    if attribute_name in dir(config_manager):
         # an explicitly defined attribute should always be called in favour
         # of this passthrough
-        attribute = getattr(ConfigManager, attribute_name)
+        attribute = getattr(config_manager, attribute_name)
         return attribute
     else:
         try:

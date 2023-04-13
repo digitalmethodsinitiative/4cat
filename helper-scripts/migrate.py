@@ -113,7 +113,7 @@ cli.add_argument("--release", "-l", default=False, action="store_true", help="Pu
 cli.add_argument("--repository", "-r", default="https://github.com/digitalmethodsinitiative/4cat.git", help="URL of the repository to pull from")
 cli.add_argument("--restart", "-x", default=False, action="store_true", help="Try to restart the 4CAT daemon after finishing migration, and 'touch' the WSGI file to trigger a front-end reload")
 cli.add_argument("--no-migrate", "-m", default=False, action="store_true", help="Do not run scripts to upgrade between minor versions. Use if you only want to use migrate to e.g. upgrade dependencies.")
-cli.add_argument("--current-version", "-v", default="config/.current-version", help="File path to .current-version file, relative to the 4CAT root")
+cli.add_argument("--current-version", "-v", default="data/config/.current-version", help="File path to .current-version file, relative to the 4CAT root")
 cli.add_argument("--output", "-o", default="", help="By default migrate.py will send output to stdout. If this argument is set, it will write to the given path instead.")
 cli.add_argument("--component", "-c", default="both", help="Which component of 4CAT to migrate. Currently only skips check for if 4CAT is running when set to 'frontend'")
 args = cli.parse_args()
@@ -146,9 +146,13 @@ logger.info(".current-version path:   " + args.current_version)
 # ---------------------------------------------
 target_version_file = cwd.joinpath("VERSION")
 current_version_file = cwd.joinpath(args.current_version)
+# Check for current-version file in old locations
 if not current_version_file.exists() and cwd.joinpath(".current-version").exists():
 	logger.info("Moving .current-version to new location")
 	cwd.joinpath(".current-version").rename(current_version_file)
+elif not current_version_file.exists() and cwd.joinpath("config/.current-version").exists():
+	logger.info("Moving .current-version to new location")
+	cwd.joinpath("config/.current-version").rename(current_version_file)
 
 if not current_version_file.exists():
 	logger.info("Creating .current-version file ")
