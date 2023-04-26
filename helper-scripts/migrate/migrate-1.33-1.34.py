@@ -2,8 +2,10 @@
 MOVE FOLDERS TO data...
 """
 import os
+import sys
 import shutil
 from pathlib import Path
+import importlib
 
 
 def move_directory(source, destination):
@@ -33,7 +35,10 @@ if not new_config_file.exists():
 
             # Now config_manager can be imported as normal
             # Move data from previous paths
+            importlib.reload(sys.modules['common.config_manager'])
             import common.config_manager as new_config_manager
+            print(old_config_manager.PATH_IMAGES)
+            print(new_config_manager.get("PATH_IMAGES"))
 
             # We move all the old data to the new data structure (which all should exist in one directory/volume)
             if old_config_manager.PATH_DATA != new_config_manager.get("PATH_DATA"):

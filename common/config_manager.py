@@ -58,6 +58,7 @@ try:
     config_manager = ConfigManager()
 except ConfigException as e:
     # No config.ini file yet; cannot use database
+    print(e)
     config_manager = None
 
 
