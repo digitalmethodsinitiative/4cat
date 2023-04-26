@@ -12,6 +12,7 @@ This should be run from the command line and is used by docker-entrypoint files.
 """
 import configparser
 import os
+import sys
 import bcrypt
 from pathlib import Path
 
@@ -83,7 +84,11 @@ def create_config_ini_file(CONFIG_FILE):
     print(f"Created {CONFIG_FILE} file")
 
     # Ensure filepaths exist
+    if "common.config_manager" in sys.modules:
+        import importlib
+        importlib.reload(sys.modules['common.config_manager'])
     import common.config_manager as config
+
     for path in [config.get('PATH_DATA'),
                  config.get('PATH_IMAGES'),
                  config.get('PATH_LOGS'),

@@ -26,6 +26,7 @@ if not new_config_file.exists():
         # Collect old config paths
         from common.config_manager import ConfigManager
         old_config_manager = ConfigManager("config/config.ini")
+        print("Loading old config.ini file")
 
         if old_config_manager.USING_DOCKER or os.environ.get('AM_I_IN_A_DOCKER_CONTAINER', False):
 
