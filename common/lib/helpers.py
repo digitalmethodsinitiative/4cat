@@ -832,7 +832,8 @@ def get_parent_gunicorn_pid():
     Function to find gunicorn's Main PID
     """
     for proc in psutil.process_iter():
-        if "gunicorn" in proc.name() and proc.parent().name() != "gunicorn":
+        # if it is the main process OR it is a gunicorn process started by something other than gunicorn itself (e.g. 4CAT)
+        if "gunicorn" in proc.name() and (proc.parent() is None or proc.parent().name()) != "gunicorn":
             return proc.pid
 
     # None found
