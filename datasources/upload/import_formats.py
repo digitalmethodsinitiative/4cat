@@ -4,6 +4,14 @@ import csv
 import re
 
 from dateutil.parser import parse as parse_datetime
+from common.lib.exceptions import ProcessorException
+
+
+class InvalidCustomFormat(ProcessorException):
+    """
+    Raise if processor throws an exception
+    """
+    pass
 
 
 class InvalidImportedItem:
@@ -262,6 +270,8 @@ def import_bzy_weibo(reader, columns, dataset, parameter):
     year = datetime.datetime.now().year
 
     for item in reader:
+        if "from1" not in item:
+            raise InvalidCustomFormat("CSV does not appear to be Bazhuayu format for Sina Weibo; please try importing again with CSV format set to \"Custom/other\".")
         raw_timestamp = item["from1"].strip()
         timestamp_bits = re.split(r"[年月日\s:]+", raw_timestamp)
         print(timestamp_bits)

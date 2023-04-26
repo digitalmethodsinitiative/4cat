@@ -188,14 +188,14 @@ class MakeWordtree(BasicProcessor):
 				body = punkt_replace.sub("", body)
 
 			body = tokeniser(body, **tokeniser_args)
-			positions = [i for i, x in enumerate(body) if x.lower() == query.lower()]
+			positions = [(i, x) for i, x in enumerate(body) if x.lower() == query.lower()]
 
 			# get lists of tokens for both the left and right side of the tree
 			# on the left side, all lists end with the query, on the right side,
 			# they start with the query
-			for position in positions:
-				right_branches.append(body[position:position + window])
-				left_branches.append(body[max(0, position - window):position + 1])
+			for position, body_tokens in positions:
+				right_branches.append(body_tokens[position:position + window])
+				left_branches.append(body_tokens[max(0, position - window):position + 1])
 
 		# Some settings for rendering the tree later
 		self.step = self.fontsize * 0.6  # approximately the width of a monospace char

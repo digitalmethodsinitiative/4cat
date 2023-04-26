@@ -172,11 +172,16 @@ class TikTokScraper:
         Release a proxy to be used later
         """
         # Release proxy
-        used_proxy = [proxy for proxy in self.proxy_map if self.proxy_map[proxy]["url"] == url][0]
-        self.proxy_map[used_proxy].update({
-            "busy": False,
-            "next_request": time.time() + self.proxy_sleep
-        })
+        used_proxy = [proxy for proxy in self.proxy_map if self.proxy_map[proxy]["url"] == url]
+        if used_proxy:
+            used_proxy = used_proxy[0]
+            self.proxy_map[used_proxy].update({
+                "busy": False,
+                "next_request": time.time() + self.proxy_sleep
+            })
+        else:
+            # TODO: why are we releasing a proxy without a URL?
+            pass
 
     async def request_metadata(self, urls, processor):
         """
