@@ -75,7 +75,7 @@ class TwitterUserVisibility(BasicProcessor):
             # Add author
             author = post.get("author_user").get("username")
             if author == 'REDACTED':
-                raise self.dataset.finish_with_error("Author information has been removed; cannot calculate frequencies")
+                return self.dataset.finish_with_error("Author information has been removed; cannot calculate frequencies")
 
             if author not in intervals[date]:
                 intervals[date][author] = {
