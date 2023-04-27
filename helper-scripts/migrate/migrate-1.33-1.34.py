@@ -10,7 +10,7 @@ import importlib
 
 def move_directory(source, destination):
     for src_file in source.glob('*.*'):
-        shutil.move(src_file, destination)
+        shutil.copy(src_file, destination)
 
 
 print("  Checking if config.ini file needs to be moved...")
@@ -38,8 +38,6 @@ if not new_config_file.exists():
             # Move data from previous paths
             importlib.reload(sys.modules['common.config_manager'])
             import common.config_manager as new_config_manager
-            print(old_config_manager.PATH_IMAGES)
-            print(new_config_manager.get("PATH_IMAGES"))
 
             # We move all the old data to the new data structure (which all should exist in one directory/volume)
             if old_config_manager.PATH_DATA != new_config_manager.get("PATH_DATA"):
@@ -70,7 +68,7 @@ if not new_config_file.exists():
         # We're upgrading but there is no old config.ini file?!
         print("  No old config.ini file found!")
         print("  Please edit config/config.ini-example, rename as config.ini, and move to data/config/")
-        
+
     # Check on .current-version file
     # If migrate.py is from before v1.34, it will copy the file of the old config/ path which is unhelpful
     target_version_file = cwd.joinpath("VERSION")

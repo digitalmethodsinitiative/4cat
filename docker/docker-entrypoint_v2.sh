@@ -53,7 +53,7 @@ rm -f ./backend/4cat.pid
 python3 helper-scripts/migrate.py -y
 
 # Run docker_setup to update any environment variables if they were changed
-python3 docker/docker_setup.py
+python3 -m docker.docker_setup
 
 # Add a setting to identify this as a single Docker container
 # Technically only need to do this once, but has to be done after docker_setup.py

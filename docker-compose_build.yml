@@ -25,9 +25,9 @@ services:
     ports:
       - ${PUBLIC_API_PORT}:4444
     volumes:
-      - 4cat_data:/usr/src/app/data/
-      - 4cat_share:/usr/src/app/config/
-      - 4cat_logs:/usr/src/app/logs/
+      - 4cat_data:/usr/src/app/data/datasets/
+      - 4cat_share:/usr/src/app/data/config/
+      - 4cat_logs:/usr/src/app/data/logs/
     entrypoint: docker/docker-entrypoint.sh
 
   frontend:
@@ -40,10 +40,10 @@ services:
       - ${PUBLIC_PORT}:5000
       - ${TELEGRAM_PORT}:443
     volumes:
-      - 4cat_data:/usr/src/app/data/
-      - 4cat_share:/usr/src/app/config/
-      - 4cat_logs:/usr/src/app/logs/
-    command: ["docker/wait-for-backend.sh", "gunicorn", "--worker-tmp-dir", "/dev/shm", "--workers", "2", "--threads", "4", "--worker-class", "gthread", "--access-logfile", "/usr/src/app/logs/access_gunicorn.log", "--log-level", "info", "--bind", "0.0.0.0:5000", "webtool:app"]
+      - 4cat_data:/usr/src/app/data/datasets/
+      - 4cat_share:/usr/src/app/data/config/
+      - 4cat_logs:/usr/src/app/data/logs/
+    command: ["docker/wait-for-backend.sh", "gunicorn", "--worker-tmp-dir", "/dev/shm", "--workers", "2", "--threads", "4", "--worker-class", "gthread", "--access-logfile", "/usr/src/app/data/logs/access_gunicorn.log", "--log-level", "info", "--bind", "0.0.0.0:5000", "webtool:app"]
 
 volumes:
   4cat_db: {}

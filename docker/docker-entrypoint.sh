@@ -48,10 +48,10 @@ rm -f ./backend/4cat.pid
 python3 helper-scripts/migrate.py -y
 
 # Run docker_setup to update any environment variables if they were changed
-python3 docker/docker_setup.py
+python3 -m docker.docker_setup
 
 # Start 4CAT backend
 python3 4cat-daemon.py start
 
 # Tail logs and wait for SIGTERM
-exec tail -f -n 3 logs/backend_4cat.log & wait $!
+exec tail -f -n 3 data/logs/backend_4cat.log & wait $!
