@@ -39,6 +39,48 @@ def update_config_from_environment(CONFIG_FILE, config_parser):
     config_parser['DATABASE']['db_password'] = os.environ['POSTGRES_PASSWORD']
     config_parser['DATABASE']['db_host_auth'] = os.environ['POSTGRES_HOST_AUTH_METHOD']
 
+    # File paths
+    config_parser.add_section('PATHS')
+    config_parser['PATHS']['path_lockfile'] = 'backend'  # docker-entrypoint.sh looks for pid file here (in event Docker shutdown was not clean)
+
+    if os.environ['FOURCAT_DATA']:
+        # Single volume
+        print("FOURCAT_DATA found!")
+        config_parser['PATHS']['path_data'] = os.environ['FOURCAT_DATA'] + 'datasets/'
+        config_parser['PATHS']['path_images'] = os.environ['FOURCAT_DATA'] + 'images/'
+        config_parser['PATHS']['path_logs'] = os.environ['FOURCAT_DATA'] + 'logs/'
+        config_parser['PATHS']['path_sessions'] = os.environ['FOURCAT_DATA'] + 'config/sessions/'
+
+    # Pre 1.34 shared volumes defined in .env and docker-compose.yml
+    if os.environ['DATASETS_PATH']:
+        # Multi-volumes
+        print("Pre 4CAT v1.34 data volume detected")
+        config_parser['PATHS']['path_data'] = os.environ['DATASETS_PATH']
+        config_parser['PATHS']['path_images'] = os.environ['DATASETS_PATH']
+    elif not os.environ['FOURCAT_DATA']:
+        # Pre 1.34 setup
+        print("Sysadmin has not updated .env or docker-compose.yml; using default data path")
+        config_parser['PATHS']['path_data'] = 'data/'
+        config_parser['PATHS']['path_images'] = 'data/'
+
+    if os.environ['LOGS_PATH']:
+        # Multi-volumes
+        print("Pre 4CAT v1.34 logs volume detected")
+        config_parser['PATHS']['path_logs'] = os.environ['LOGS_PATH']
+    elif not os.environ['FOURCAT_DATA']:
+        # Pre 1.34 setup
+        print("Sysadmin has not updated .env or docker-compose.yml; using default log path")
+        config_parser['PATHS']['path_logs'] = 'logs/'
+
+    if os.environ['CONFIG_PATH']:
+        # Multi-volumes
+        print("Pre 4CAT v1.34 config volume detected")
+        config_parser['PATHS']['path_sessions'] = os.environ['CONFIG_PATH'] + 'sessions/'
+    elif not os.environ['FOURCAT_DATA']:
+        # Pre 1.34 setup
+        print("Sysadmin has not updated .env or docker-compose.yml; using default config path")
+        config_parser['PATHS']['path_sessions'] = 'config/sessions/'
+
     # Save config file
     with open(CONFIG_FILE, 'w') as configfile:
         config_parser.write(configfile)
@@ -62,15 +104,6 @@ def create_config_ini_file(CONFIG_FILE):
     # Backend API
     config_parser.add_section('API')
     config_parser['API']['api_port'] = '4444'  # backend internal port set in docker-compose.py; NOT API_PUBLIC_PORT as that is what port Docker exposes to host network
-
-    # File paths
-    config_parser.add_section('PATHS')
-    config_parser['PATHS']['path_images'] = 'data/images'  # shared volume defined in docker-compose.yml
-    config_parser['PATHS']['path_data'] = 'data/datasets'  # shared volume defined in docker-compose.yml
-    config_parser['PATHS'][
-        'path_lockfile'] = 'backend'  # docker-entrypoint.sh looks for pid file here (in event Docker shutdown was not clean)
-    config_parser['PATHS']['path_sessions'] = 'data/config/sessions'  # shared volume defined in docker-compose.yml
-    config_parser['PATHS']['path_logs'] = 'data/logs/'  # shared volume defined in docker-compose.yml
 
     # Generated variables
     config_parser.add_section('GENERATE')

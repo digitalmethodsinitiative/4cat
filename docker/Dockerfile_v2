@@ -74,5 +74,7 @@ ENV AM_I_IN_A_DOCKER_CONTAINER=Yes \
  PUBLIC_API_PORT=4444 \
  # Telegram apparently needs its own port
  TELEGRAM_PORT=443
+ # File path (for Docker volume)
+ FOURCAT_DATA=/4cat/data/
 
 ENTRYPOINT ["docker/docker-entrypoint_v2.sh"]

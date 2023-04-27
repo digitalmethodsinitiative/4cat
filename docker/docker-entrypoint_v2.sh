@@ -38,7 +38,7 @@ if [ "$(psql --quiet --host="$POSTGRES_HOST" --port=5432 --user="$POSTGRES_USER"
 else
   echo "Creating Database"
   # No database exists, build and seed
-  cd /4cat && sudo -u postgres psql -c "CREATE USER $POSTGRES_USER WITH ENCRYPTED PASSWORD '$POSTGRES_PASSWORD' CREATEDB;"
+  sudo -u postgres psql -c "CREATE USER $POSTGRES_USER WITH ENCRYPTED PASSWORD '$POSTGRES_PASSWORD' CREATEDB;"
   sudo -u postgres psql -c "CREATE database $POSTGRES_DB;"
   sudo -u postgres psql -c " GRANT ALL PRIVILEGES ON DATABASE $POSTGRES_DB to $POSTGRES_USER;"
   psql --host="$POSTGRES_HOST" --port=5432 --user="$POSTGRES_USER" --dbname="$POSTGRES_DB" < backend/database.sql
@@ -63,7 +63,7 @@ python3 -c "import common.config_manager as config;config.set_or_create_setting(
 python3 4cat-daemon.py start
 
 # Start 4CAT frontend
-gunicorn --worker-tmp-dir /dev/shm --workers 2 --threads 4 --worker-class gthread --access-logfile /4cat/data/logs/access_gunicorn.log --log-level info --daemon --bind 0.0.0.0:80 webtool:app
+gunicorn --worker-tmp-dir /dev/shm --workers 2 --threads 4 --worker-class gthread --access-logfile "$FOURCAT_DATA"logs/access_gunicorn.log --log-level info --daemon --bind 0.0.0.0:80 webtool:app
 
 # Tail logs and wait for SIGTERM
-exec tail -f -n 3 data/logs/backend_4cat.log & wait $!
+exec tail -f -n 3 "$FOURCAT_DATA"logs/backend_4cat.log & wait $!

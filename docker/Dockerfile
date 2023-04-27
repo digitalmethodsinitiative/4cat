@@ -7,7 +7,7 @@ RUN apt-get update && apt install -y \
     python3-pip
 
 # Set working directory
-WORKDIR /usr/src/app
+WORKDIR /4cat
 
 # Make and use virtual environment
 RUN python3 -m venv /opt/venv
@@ -15,13 +15,13 @@ ENV PATH="/opt/venv/bin:$PATH"
 
 # Install dependencies
 RUN pip3 install --upgrade pip
-COPY ./requirements.txt /usr/src/app/requirements.txt
-COPY ./setup.py /usr/src/app/setup.py
-COPY ./VERSION /usr/src/app/VERSION
-COPY ./README.md /usr/src/app/README.md
-RUN mkdir /usr/src/app/backend
-RUN mkdir /usr/src/app/webtool
-RUN mkdir /usr/src/app/datasources
+COPY ./requirements.txt /4cat/requirements.txt
+COPY ./setup.py /4cat/setup.py
+COPY ./VERSION /4cat/VERSION
+COPY ./README.md /4cat/README.md
+RUN mkdir /4cat/backend
+RUN mkdir /4cat/webtool
+RUN mkdir /4cat/datasources
 RUN pip3 install -r requirements.txt
 
 # Install frontend Docker requirements
@@ -47,10 +47,10 @@ RUN apt-get update && apt install -y \
     ffmpeg
 
 # Set working directory
-WORKDIR /usr/src/app
+WORKDIR /4cat
 
 # Copy project
-COPY . /usr/src/app/
+COPY . /4cat/
 
 # Permission
 RUN chmod +x docker/wait-for-backend.sh docker/docker-entrypoint.sh

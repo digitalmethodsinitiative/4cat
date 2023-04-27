@@ -24,9 +24,11 @@ services:
     ports:
       - ${PUBLIC_API_PORT}:4444
     volumes:
-      - 4cat_data:/usr/src/app/data/datasets/
-      - 4cat_share:/usr/src/app/data/config/
-      - 4cat_logs:/usr/src/app/data/logs/
+      - 4cat_volume:${FOURCAT_DATA}
+      # Pre 1.34 Docker setups required three volumes; if upgrading from pre 1.34, uncomment these here and in .env
+      #- 4cat_data:${DATASETS_PATH}
+      #- 4cat_share:${CONFIG_PATH}
+      #- 4cat_logs:${LOGS_PATH}
     entrypoint: docker/docker-entrypoint.sh
 
   frontend:
@@ -40,13 +42,16 @@ services:
       - ${PUBLIC_PORT}:5000
       - ${TELEGRAM_PORT}:443
     volumes:
-      - 4cat_data:/usr/src/app/data/datasets/
-      - 4cat_share:/usr/src/app/data/config/
-      - 4cat_logs:/usr/src/app/data/logs/
-    command: ["docker/wait-for-backend.sh", "gunicorn", "--worker-tmp-dir", "/dev/shm", "--workers", "2", "--threads", "4", "--worker-class", "gthread", "--access-logfile", "/usr/src/app/logs/access_gunicorn.log", "--log-level", "info", "--bind", "0.0.0.0:5000", "webtool:app"]
+      - 4cat_volume:${FOURCAT_DATA}
+      # Pre 1.34 Docker setups required three volumes; if upgrading from pre 1.34, uncomment these here and in .env
+      #- 4cat_data:${DATASETS_PATH}
+      #- 4cat_share:${CONFIG_PATH}
+      #- 4cat_logs:${LOGS_PATH}
+    command: ["docker/wait-for-backend.sh", "gunicorn", "--worker-tmp-dir", "/dev/shm", "--workers", "2", "--threads", "4", "--worker-class", "gthread", "--access-logfile", "${FOURCAT_DATA}logs/access_gunicorn.log", "--log-level", "info", "--bind", "0.0.0.0:5000", "webtool:app"]
 
 volumes:
   4cat_db: {}
-  4cat_data: {}
-  4cat_share: {}
-  4cat_logs: {}
+  4cat_volume: {}
+  #4cat_data: {}
+  #4cat_share: {}
+  #4cat_logs: {}

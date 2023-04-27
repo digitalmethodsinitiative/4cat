@@ -36,7 +36,7 @@ if [ `psql --host=$POSTGRES_HOST --port=5432 --user=$POSTGRES_USER --dbname=$POS
 else
   echo "Creating Database"
   # Seed DB
-  cd /usr/src/app && psql --host=$POSTGRES_HOST --port=5432 --user=$POSTGRES_USER --dbname=$POSTGRES_DB < backend/database.sql
+  psql --host=$POSTGRES_HOST --port=5432 --user=$POSTGRES_USER --dbname=$POSTGRES_DB < backend/database.sql
   # No database exists, new build, no need to migrate so create .current-version file
   if [ ! -e data/config ] ; then mkdir data/config ; else : ; fi && cp VERSION data/config/.current-version
 fi
@@ -54,4 +54,4 @@ python3 -m docker.docker_setup
 python3 4cat-daemon.py start
 
 # Tail logs and wait for SIGTERM
-exec tail -f -n 3 data/logs/backend_4cat.log & wait $!
+exec tail -f -n 3 "$FOURCAT_DATA"logs/backend_4cat.log & wait $!
