@@ -26,7 +26,7 @@ def update_config_from_environment(CONFIG_FILE, config_parser):
     ################
     # Per the Docker .env file; required for docker-entrypoint.sh and db setup
 
-    # Server information (Public Port can be updated via .env, but server name can also be update via frontend)
+    # Server information (Public Port can be updated via .env, but server name can also be updated via frontend)
     config_parser['SERVER']['public_port'] = os.environ['PUBLIC_PORT']
 
     # Set API
@@ -61,8 +61,7 @@ def create_config_ini_file(CONFIG_FILE):
 
     # Backend API
     config_parser.add_section('API')
-    config_parser['API'][
-        'api_port'] = '4444'  # backend internal port set in docker-compose.py; NOT API_PUBLIC_PORT as that is what port Docker exposes to host network
+    config_parser['API']['api_port'] = '4444'  # backend internal port set in docker-compose.py; NOT API_PUBLIC_PORT as that is what port Docker exposes to host network
 
     # File paths
     config_parser.add_section('PATHS')
@@ -143,7 +142,7 @@ if __name__ == "__main__":
         frontend_servername = config.get('flask.server_name').split(":")[0]
 
         if old_docker_port is None:
-            # Updated from previous version
+            # Updated from previous 4CAT version
             config.set_or_create_setting('docker.frontend_port', new_docker_port, raw=False)
             if not port_forwarded:
                 # No frontend_port set, update server_name based on Docker

@@ -9,8 +9,8 @@ import importlib
 
 
 def move_directory(source, destination):
-    for src_file in source.glob('*.*'):
-        shutil.copy(src_file, destination)
+    shutil.copytree(source, destination)
+    # TODO: remove previous?
 
 
 print("  Checking if config.ini file needs to be moved...")
@@ -64,9 +64,10 @@ if not new_config_file.exists():
             # Move old config.ini
             old_config_file.rename(new_config_file)
 
+
     else:
         # We're upgrading but there is no old config.ini file?!
-        print("  No old config.ini file found!")
+        print("  No config.ini file found!")
         print("  Please edit config/config.ini-example, rename as config.ini, and move to data/config/")
 
     # Check on .current-version file
