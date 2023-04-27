@@ -109,8 +109,13 @@ class SearchDouban(Search):
                 fetch_url = group_url + str(offset)
                 request = self.get_douban_url(fetch_url, headers=headers)
 
-                # this would usually mean the group doesn't exist, or we hit some rate limit
-                if request.status_code != 200:
+                # we hit some rate limit
+                if request.status_code == 403:
+                    self.dataset.update_status(
+                        f"Unable to continue collecting; Response received: ({request.status_code}) {request.reason}", is_final=True)
+                    break
+                # this would usually mean the group doesn't exist
+                elif request.status_code != 200:
                     self.dataset.update_status(
                         "Got response code %i for group %s. Continuing with next group..." % (request.status_code, group))
                     break
@@ -122,6 +127,7 @@ class SearchDouban(Search):
                 group_name = overview_page.select_one(".group-item .title a").text
 
                 for topic in overview_page.select("table.olt tr:not(.th)"):
+                    offset += 1
                     if self.interrupted:
                         raise ProcessorInterruptedException("Interrupted while scraping Douban topics")
 
@@ -132,21 +138,28 @@ class SearchDouban(Search):
                     topic_url = topic.find("a").get("href")
                     topic_is_elite = "yes" if bool(topic.select_one(".elite_topic_lable")) else "no"
                     topic_id = topic_url.split("/topic/").pop().split("/")[0]
+                    # Pinned topics at the top
+                    topic_is_pinned = "yes" if bool(topic.select_one(".pl")) else "no"
 
                     # date can be in either of two formats, with or without time
                     try:
-                        topic_updated = int(
-                            datetime.datetime.strptime(topic.select_one(".time").text, "%m-%d %H:%M").timestamp())
+                        topic_updated = int(datetime.datetime.strptime(topic.select_one(".time").text, "%m-%d %H:%M").replace(year=datetime.datetime.now().year).timestamp())
                     except ValueError:
                         topic_updated = int(
                             datetime.datetime.strptime(topic.select_one(".time").text, "%Y-%m-%d").timestamp())
 
                     # if a date range is given, ignore topics outside of it
                     if start and topic_updated < start:
-                        continue
+                        if topic_is_pinned:
+                            # Pinned topics ignore dates
+                            continue
+                        else:
+                            # Can stop search as we have reached topics with no responses since start date
+                            break
 
+                    # TODO This only looks at the last response date, which does not mean there are not responses to the topic within the date range!
                     if end and topic_updated > end:
-                        break
+                        continue
 
                     self.dataset.update_status("%i posts scraped. Scraping topics %i-%i from group %s" % (
                     posts_processed, offset, min(max_topics, offset + 50), group_name))
@@ -177,6 +190,7 @@ class SearchDouban(Search):
                             "is_highlighted": "no",
                             "is_reply": "no",
                             "is_topic_elite": topic_is_elite,
+                            "is_topic_pinned": topic_is_pinned,
                             "image_urls": ",".join([img.get("src") for img in topic.select(".topic-richtext img")])
                         }
                     except (AttributeError, ValueError):
@@ -191,6 +205,9 @@ class SearchDouban(Search):
 
                     # now loop through all comments on the page
                     for comment in topic_page.select("ul#comments > li"):
+                        comment_timestamp = int(datetime.datetime.strptime(comment.select_one(".pubtime").text.strip()[:19],
+                                                                        "%Y-%m-%d %H:%M:%S").timestamp())
+
                         comment_data = {
                             "id": comment.get("data-cid"),
                             "group_id": group,
@@ -202,8 +219,7 @@ class SearchDouban(Search):
                             "author_id":
                                 comment.select_one(".user-face a").get("href").split("/people/").pop().split("/")[0],
                             "author_avatar": comment.select_one(".user-face img").get("src").replace("/u", "/ul"),
-                            "timestamp": int(datetime.datetime.strptime(comment.select_one(".pubtime").text.strip()[:19],
-                                                                        "%Y-%m-%d %H:%M:%S").timestamp()),
+                            "timestamp": comment_timestamp,
                             "likes": convert_to_int(
                                 re.sub(r"[^0-9]", "", comment.select_one(".comment-vote.lnk-fav").text), 0),
                             "is_highlighted": "yes" if comment.get("data-cid") in [hl.get("data-cid") for hl in
@@ -220,10 +236,10 @@ class SearchDouban(Search):
                         posts_processed += 1
                         yield comment_data
 
-                if offset < max_topics - 50:
-                    offset += 50
-                else:
-                    break
+                # if offset < max_topics - 50:
+                #     offset += 50
+                # else:
+                #     break
 
     def get_douban_url(self, url, **kwargs):
         """
