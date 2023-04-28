@@ -46,9 +46,12 @@ if not new_config_file.exists():
             shutil.copy(target_version_file, new_current_version_file)
 
         # Pre v1.34 restart lock file located in old config location
-        if not cwd.joinpath("data/config/restart.lock").exists():
+        new_restart_lock = cwd.joinpath("data/config/restart.lock")
+        old_restart_lock = cwd.joinpath("config/restart.lock")
+        if not new_restart_lock.exists() and old_restart_lock.exists():
             # Pre 1.34 restart.lock
-            Path("config/restart.lock").rename("data/config/restart.lock")
+            shutil.copy(old_restart_lock, new_restart_lock)
+            old_restart_lock.unlink()
 
         print("  Done!")
 
