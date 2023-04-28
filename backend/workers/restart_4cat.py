@@ -169,6 +169,7 @@ class FourcatRestarterAndUpgrader(BasicWorker):
                 if not upgrade_ok:
                     if upgrade_timeout:
                         log_stream_restart.write("Upgrade timed out.")
+                    log_stream_restart.write(f"{frontend_upgrade.json().get('message', '')}\n")
                     log_stream_restart.write("Error upgrading front-end container. You may need to upgrade and restart"
                                              "containers manually.\n")
                     lock_file.unlink()
@@ -216,5 +217,10 @@ class FourcatRestarterAndUpgrader(BasicWorker):
 
             log_stream_restart.close()
             lock_file.unlink()
+
+            # Check for pre v1.34 lock_file (could not remove in migrate as frontend would not yet know where to find it)
+            old_lock_file = Path(config.get("PATH_ROOT")).joinpath("config/restart.lock")
+            if old_lock_file.exists():
+                old_lock_file.unlink()
 
             self.job.finish()

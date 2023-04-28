@@ -51,7 +51,6 @@ if not new_config_file.exists():
         if not new_restart_lock.exists() and old_restart_lock.exists():
             # Pre 1.34 restart.lock
             shutil.copy(old_restart_lock, new_restart_lock)
-            old_restart_lock.unlink()
 
         print("  Done!")
 
