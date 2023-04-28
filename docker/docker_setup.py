@@ -150,7 +150,10 @@ def create_config_ini_file(CONFIG_FILE):
 
 if __name__ == "__main__":
     # Configuration file location
-    CONFIG_FILE = 'data/config/config.ini'
+    if 'FOURCAT_DATA' in os.environ:
+        CONFIG_FILE = str(Path(os.environ['FOURCAT_DATA']).joinpath("config/config.ini"))
+    else:
+        CONFIG_FILE = 'data/config/config.ini'
 
     # Check if file does not already exist
     if not os.path.exists(CONFIG_FILE):

@@ -62,7 +62,7 @@ def trigger_restart():
     can_upgrade = not (github_version == "unknown" or code_version == "unknown" or packaging.version.parse(
         current_version) >= packaging.version.parse(github_version))
 
-    lock_file = Path(config.get("PATH_ROOT"), "data/config/restart.lock")
+    lock_file = Path(config.get("PATH_ROOT")).joinpath(config.get("PATH_CONFIG"), "restart.lock")
     if request.method == "POST" and lock_file.exists():
         flash("A restart is already in progress. Wait for it to complete. Check the process log for more details.")
 

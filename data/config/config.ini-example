@@ -31,7 +31,7 @@ path_data = data
 path_lockfile = backend
  # Sessions: folder where API session data is stored (e.g., Telegram)
 path_sessions = sessions
-# Losts: store logs here - empty means the 4CAT root folder
+# Logs: store logs here - empty means the 4CAT root folder
 path_logs = logs/
 
 [GENERATE]

@@ -33,10 +33,12 @@ if not new_config_file.exists():
             create_config_ini_file(new_config_file)
 
         else:
-            # Not in Docker, DO NOT move any files
-            # Move old config.ini
+            # Not in Docker, move old config.ini
             print("  Moving old config.ini file to data/config/")
             old_config_file.rename(new_config_file)
+
+            # Move restart lock file
+            Path("config/restart.lock").rename("data/config/restart.lock")
 
         print("  Done!")
 

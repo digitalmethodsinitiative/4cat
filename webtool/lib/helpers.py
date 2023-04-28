@@ -298,7 +298,7 @@ def check_restart_request():
 	file. This ensures a restart is in progress and the request belongs to that
 	specific restart.
 	"""
-	lock_file = Path(config.get("PATH_ROOT"), "data/config/restart.lock")
+	lock_file = Path(config.get("PATH_ROOT")).joinpath(config.get("PATH_CONFIG"), "restart.lock")
 	if not lock_file.exists():
 		return False
 

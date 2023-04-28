@@ -53,7 +53,7 @@ class FourcatRestarterAndUpgrader(BasicWorker):
         # this file will keep the output of the process started to restart or
         # upgrade 4cat
         log_file_backend = Path(config.get("PATH_ROOT"), config.get("PATH_LOGS"), "restart-backend.log")
-        lock_file = Path(config.get("PATH_ROOT"), "data/config/restart.lock")
+        lock_file = Path(config.get("PATH_ROOT")).joinpath(config.get("PATH_CONFIG"), "restart.lock")
 
         # this file has the log of the restart worker itself and is checked by
         # the frontend to see how far we are

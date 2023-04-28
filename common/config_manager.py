@@ -47,15 +47,24 @@ class ConfigManager:
         self.PATH_IMAGES = Path(config_reader["PATHS"].get("path_images", ""))
         self.PATH_DATA = Path(config_reader["PATHS"].get("path_data", ""))
         self.PATH_LOCKFILE = Path(config_reader["PATHS"].get("path_lockfile", ""))
+        self.PATH_CONFIG = Path("data/config/")
         self.PATH_SESSIONS = Path(config_reader["PATHS"].get("path_sessions", ""))
+        if 'FOURCAT_DATA' in os.environ:
+            self.PATH_CONFIG = Path(os.environ['FOURCAT_DATA']).joinpath("config/")
+        else:
+            self.PATH_CONFIG = Path("data/config/")
 
         self.ANONYMISATION_SALT = config_reader["GENERATE"].get("anonymisation_salt")
         self.SECRET_KEY = config_reader["GENERATE"].get("secret_key")
 
 
 # Instantiate the default manager to be used with helper functions below
+if 'FOURCAT_DATA' in os.environ:
+    CONFIG_FILE = str(Path(os.environ['FOURCAT_DATA']).joinpath("config/config.ini"))
+else:
+    CONFIG_FILE = 'data/config/config.ini'
 try:
-    config_manager = ConfigManager()
+    config_manager = ConfigManager(CONFIG_FILE)
 except ConfigException as e:
     # No config.ini file yet; cannot use database
     print(f"Warning: config.ini file not yet created...")
