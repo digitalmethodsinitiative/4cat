@@ -37,7 +37,17 @@ if not new_config_file.exists():
             print("  Moving old config.ini file to data/config/")
             old_config_file.rename(new_config_file)
 
-            # Move restart lock file
+        # Check on .current-version file
+        # If migrate.py is from before v1.34, it will copy the file of the old config/ path which is unhelpful
+        target_version_file = cwd.joinpath("VERSION")
+        new_current_version_file = cwd.joinpath("data/config/.current-version")
+        if not new_current_version_file.exists():
+            print("  Moving .current-version file")
+            shutil.copy(target_version_file, new_current_version_file)
+
+        # Pre v1.34 restart lock file located in old config location
+        if not cwd.joinpath("data/config/restart.lock").exists():
+            # Pre 1.34 restart.lock
             Path("config/restart.lock").rename("data/config/restart.lock")
 
         print("  Done!")
@@ -48,13 +58,7 @@ if not new_config_file.exists():
         print("  Please edit data/config/config.ini-example and rename as config.ini")
         exit(1)
 
-    # Check on .current-version file
-    # If migrate.py is from before v1.34, it will copy the file of the old config/ path which is unhelpful
-    target_version_file = cwd.joinpath("VERSION")
-    new_current_version_file = cwd.joinpath("data/config/.current-version")
-    if not new_current_version_file.exists():
-        print("  Moving .current-version file")
-        shutil.copy(target_version_file, new_current_version_file)
+
 
 else:
     print("  ...no, nothing to update.")
