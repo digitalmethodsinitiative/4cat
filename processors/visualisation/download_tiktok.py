@@ -96,9 +96,9 @@ class TikTokVideoDownloader(BasicProcessor):
         for original_item, mapped_item in self.source_dataset.iterate_mapped_items(self):
             video_ids_to_download.append(mapped_item.get("id"))
 
-        tiktok_scraper = TikTokScraper()
+        tiktok_scraper = TikTokScraper(processor=self)
         loop = asyncio.new_event_loop()
-        results = loop.run_until_complete(tiktok_scraper.download_videos(video_ids_to_download, results_path, max_amount, processor=self))
+        results = loop.run_until_complete(tiktok_scraper.download_videos(video_ids_to_download, results_path, max_amount))
 
         with results_path.joinpath(".metadata.json").open("w", encoding="utf-8") as outfile:
             json.dump(results, outfile)
@@ -273,7 +273,7 @@ class TikTokImageDownloader(BasicProcessor):
 
         if downloaded_media < max_amount and urls_to_refresh:
             # Refresh and collect more images
-            tiktok_scraper = TikTokScraper()
+            tiktok_scraper = TikTokScraper(processor=self)
             need_more = max_amount - downloaded_media
             last_url_index = 0
             while need_more > 0:
@@ -284,7 +284,7 @@ class TikTokImageDownloader(BasicProcessor):
                 self.dataset.update_status(f"Refreshing {len(url_slice)} TikTok posts")
                 loop = asyncio.new_event_loop()
                 # Refresh only number of URLs needed to complete image downloads
-                refreshed_items = loop.run_until_complete(tiktok_scraper.request_metadata(url_slice, processor=self))
+                refreshed_items = loop.run_until_complete(tiktok_scraper.request_metadata(url_slice))
                 self.dataset.update_status(f"Refreshed {len(refreshed_items)} TikTok posts")
 
                 for refreshed_item in refreshed_items:
@@ -295,27 +295,36 @@ class TikTokImageDownloader(BasicProcessor):
                     post_id = refreshed_mapped_item.get("id")
                     url = refreshed_mapped_item.get(url_column)
 
-                    # Collect image
-                    try:
-                        image, extension = self.collect_image(url)
-                        success, filename = self.save_image(image, post_id + "." + extension,
-                                                  results_path)
-                    except FileNotFoundError as e:
-                        self.dataset.log(f"{e} for {url}, skipping")
+                    if not url:
+                        # Unable to request and save image
                         success = False
                         filename = ''
+                    else:
+                        # Collect image
+                        try:
+                            image, extension = self.collect_image(url)
+                            success, filename = self.save_image(image, post_id + "." + extension, results_path)
+                        except FileNotFoundError as e:
+                            self.dataset.log(f"Error with {url}: {e}")
+                            success = False
+                            filename = ''
 
+                    # Record metadata
                     metadata[url] = {
                             "filename": filename,
                             "success": success,
                             "from_dataset": self.source_dataset.key,
                             "post_ids": [post_id]
                     }
+
                     if success:
                         self.dataset.update_status(f"Downloaded image for {url}")
                         downloaded_media += 1
+                    elif not url:
+                        self.dataset.log(
+                            f"No {url_column} identified for {refreshed_mapped_item.get('tiktok_url')}, skipping")
                     else:
-                        self.dataset.log(f"Error saving image for {url}, skipping")
+                        self.dataset.log(f"Unable to save image for {url}, skipping")
 
                 # In case some images failed to download, we update our starting points
                 last_url_index += need_more

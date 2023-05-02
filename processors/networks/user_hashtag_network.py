@@ -31,17 +31,8 @@ class HashtagUserBipartiteGrapherPreset(ProcessorPreset):
         usable_columns = {"tags", "hashtags", "groups"}
 
         if module.is_dataset():
-            if module.get_extension() == "csv":
-                # csv can just be sniffed for the presence of a column
-                with module.get_results_path().open(encoding="utf-8") as infile:
-                    reader = csv.DictReader(infile)
-                    try:
-                        return bool(set(reader.fieldnames) & usable_columns)
-                    except (TypeError, ValueError):
-                        return False
-
-            elif module.get_extension() == "ndjson":
-                return bool(set(module.get_columns()) & usable_columns)
+            columns = module.get_columns()
+            return bool(set(columns) & usable_columns) if columns else False
         else:
             return False
 
