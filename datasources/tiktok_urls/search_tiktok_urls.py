@@ -346,7 +346,7 @@ class TikTokScraper:
 
         if notes:
             processor.dataset.update_status("Dataset completed, but not all URLs were collected (%s). See "
-                                       "dataset log for details." % ", ".join(notes), is_final=True)
+                                       "dataset log for details." % ", ".join(notes))
 
         return results
 
