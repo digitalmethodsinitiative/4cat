@@ -285,8 +285,11 @@ class DataSet(FourcatModule):
 		# go through items one by one, optionally mapping them
 		if path.suffix.lower() == ".csv":
 			with path.open("rb") as infile:
+				own_processor = self.get_own_processor()
+				csv_parameters = own_processor.get_csv_parameters(csv) if own_processor else {}
+
 				wrapped_infile = NullAwareTextIOWrapper(infile, encoding="utf-8")
-				reader = csv.DictReader(wrapped_infile)
+				reader = csv.DictReader(wrapped_infile, **csv_parameters)
 
 				for item in reader:
 					if hasattr(processor, "interrupted") and processor.interrupted:
@@ -570,7 +573,10 @@ class DataSet(FourcatModule):
 			column_options.add("word_1")
 
 		with self.get_results_path().open(encoding="utf-8") as infile:
-			reader = csv.DictReader(infile)
+			own_processor = self.get_own_processor()
+			csv_parameters = own_processor.get_csv_parameters(csv) if own_processor else {}
+
+			reader = csv.DictReader(infile, **csv_parameters)
 			try:
 				return len(set(reader.fieldnames) & column_options) >= 3
 			except (TypeError, ValueError):
@@ -610,7 +616,10 @@ class DataSet(FourcatModule):
 
 		if self.get_results_path().suffix.lower() == ".csv":
 			with self.get_results_path().open(encoding="utf-8") as infile:
-				reader = csv.DictReader(infile)
+				own_processor = self.get_own_processor()
+				csv_parameters = own_processor.get_csv_parameters(csv) if own_processor else {}
+
+				reader = csv.DictReader(infile, **csv_parameters)
 				try:
 					return list(reader.fieldnames)
 				except (TypeError, ValueError):
