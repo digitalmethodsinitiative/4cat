@@ -24,7 +24,7 @@ def update_config_from_environment(CONFIG_FILE, config_parser):
     ################
     # User Defined #
     ################
-    # Per the Docker .env file; required for docker-entrypoint.sh and db setup
+    # Per the Docker .env file; required for docker-entrypoint-backend-only.sh and db setup
 
     # Server information (Public Port can be updated via .env, but server name can also be updated via frontend)
     config_parser['SERVER']['public_port'] = os.environ['PUBLIC_PORT']
@@ -40,8 +40,9 @@ def update_config_from_environment(CONFIG_FILE, config_parser):
     config_parser['DATABASE']['db_host_auth'] = os.environ['POSTGRES_HOST_AUTH_METHOD']
 
     # File paths
-    config_parser.add_section('PATHS')
-    config_parser['PATHS']['path_lockfile'] = 'backend'  # docker-entrypoint.sh looks for pid file here (in event Docker shutdown was not clean)
+    if "PATHS" not in config_parser:
+        config_parser.add_section("PATHS")
+    config_parser['PATHS']['path_lockfile'] = 'backend'  # docker-entrypoint files look for pid file here (in event Docker shutdown was not clean)
 
     if 'FOURCAT_DATA' in os.environ:
         # Single volume

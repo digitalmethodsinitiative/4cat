@@ -29,7 +29,7 @@ services:
       #- 4cat_data:${DATASETS_PATH}
       #- 4cat_share:${CONFIG_PATH}
       #- 4cat_logs:${LOGS_PATH}
-    entrypoint: docker/docker-entrypoint.sh
+    entrypoint: docker/docker-entrypoint-backend-only.sh
 
   frontend:
     image: digitalmethodsinitiative/4cat:${DOCKER_TAG}
@@ -47,7 +47,7 @@ services:
       #- 4cat_data:${DATASETS_PATH}
       #- 4cat_share:${CONFIG_PATH}
       #- 4cat_logs:${LOGS_PATH}
-    command: ["docker/wait-for-backend.sh", "gunicorn", "--worker-tmp-dir", "/dev/shm", "--workers", "2", "--threads", "4", "--worker-class", "gthread", "--access-logfile", "${FOURCAT_DATA}logs/access_gunicorn.log", "--log-level", "info", "--bind", "0.0.0.0:5000", "webtool:app"]
+    entrypoint: ["docker/wait-for-backend.sh", "gunicorn", "--worker-tmp-dir", "/dev/shm", "--workers", "2", "--threads", "4", "--worker-class", "gthread", "--access-logfile", "${FOURCAT_DATA}logs/access_gunicorn.log", "--log-level", "info", "--bind", "0.0.0.0:5000", "webtool:app"]
 
 volumes:
   4cat_db: {}

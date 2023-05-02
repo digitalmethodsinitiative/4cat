@@ -30,12 +30,17 @@ RUN pip3 install gunicorn
 # Build image from compile-image
 FROM python:3.8-slim AS build-image
 COPY --from=compile-image /opt/venv /opt/venv
-# Make virtual env available
+
+# Make virtual env available and set some needed 4CAT environment variables
 ENV PATH="/opt/venv/bin:$PATH" \
     PYTHONUNBUFFERED=1 \
     AM_I_IN_A_DOCKER_CONTAINER=Yes
 
+# Install necessary packages
 RUN apt-get update && apt install -y \
+    # Needed specifically for single container version of 4CAT
+    sudo \
+    postgresql \
     # Called in docker-entrypoint.sh:
     curl \
     netcat \
@@ -52,5 +57,28 @@ WORKDIR /4cat
 # Copy project
 COPY . /4cat/
 
-# Permission
-RUN chmod +x docker/wait-for-backend.sh docker/docker-entrypoint.sh
+# Permissions for Docker container
+RUN chmod +x docker/wait-for-backend.sh docker/docker-entrypoint-backend-only.sh docker/docker-entrypoint-single-container.sh
+
+# Expose ports (gunicorn 80, 4CAT api 4444, telegram 443)
+EXPOSE 80 4444 443
+
+# Environment variables that can be overwritten (most commonly via in .env file)
+# Database setup
+ENV POSTGRES_USER=fourcat \
+ POSTGRES_PASSWORD=supers3cr3t \
+ POSTGRES_DB=fourcat \
+ POSTGRES_HOST=localhost \
+ POSTGRES_HOST_AUTH_METHOD=trust \
+ # Server information
+ SERVER_NAME=localhost \
+ PUBLIC_PORT=80 \
+ API_HOST=localhost \
+ PUBLIC_API_PORT=4444 \
+ # Telegram needs its own port
+ TELEGRAM_PORT=443 \
+ # File path (for Docker volume)
+ FOURCAT_DATA=/4cat/data/
+
+# Default entrypoint creates one container running 4cat backend, frontend, and a postgres database
+ENTRYPOINT ["docker/docker-entrypoint-single-container.sh"]

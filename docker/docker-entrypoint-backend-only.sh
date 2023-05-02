@@ -30,7 +30,7 @@ done
 echo "PostgreSQL started"
 
 # Create Database if it does not already exist
-if [ `psql --host=$POSTGRES_HOST --port=5432 --user=$POSTGRES_USER --dbname=$POSTGRES_DB -tAc "SELECT EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'jobs')"` = 't' ]; then
+if [ "$(psql --quiet --host="$POSTGRES_HOST" --port=5432 --user="$POSTGRES_USER" --dbname="$POSTGRES_DB" -tAc "SELECT EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'jobs')")" = 't' ]; then
   # Table already exists
   echo "Database already created"
 else
