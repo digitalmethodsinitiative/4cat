@@ -2,9 +2,11 @@
 set -e
 
 exit_backend() {
-  echo "Exiting backend"
+  echo "Exiting database..."
+#  service postgresql stop
+  echo "Exiting backend..."
   python3 4cat-daemon.py stop
-  echo "Exiting frontend"
+  echo "Exiting frontend..."
   python3 -c "from common.lib.helpers import get_parent_gunicorn_pid;import os;import signal;os.kill(get_parent_gunicorn_pid(), signal.SIGTERM)"
   echo "Shutdown complete; Bye!"
   exit 0
@@ -12,23 +14,45 @@ exit_backend() {
 
 trap exit_backend INT TERM
 
-# Check postgresql password setup
-if [ -e ~/.pgpass ]
-then
-  :
-else
-  echo "$POSTGRES_HOST:5432:$POSTGRES_DB:$POSTGRES_USER:$POSTGRES_PASSWORD" > ~/.pgpass
-  chmod 600 ~/.pgpass
-  export PGPASSFILE=~/.pgpass
-  echo ".pgpass created"
-fi
+## Check postgresql password setup
+#if [ -e ~/.pgpass ]
+#then
+#  :
+#else
+#  echo "$POSTGRES_HOST:5432:$POSTGRES_DB:$POSTGRES_USER:$POSTGRES_PASSWORD" > ~/.pgpass
+#  chmod 600 ~/.pgpass
+#  export PGPASSFILE=~/.pgpass
+#  echo ".pgpass created"
+#
+##  echo "create_main_cluster = true" >> /etc/postgresql-common/createcluster.conf
+##  echo "data_directory = '${PGDATA}'" >> /etc/postgresql-common/createcluster.conf
+##  apt-get install -y postgresql
+#fi
+echo "Waiting for postgres..."
+# This is the entrypoint borrowed from Postgres's Docker image
+if [ ! -e "${FOURCAT_DATA}logs" ] ; then mkdir "${FOURCAT_DATA}logs" ; else : ; fi
+/usr/local/bin/docker-entrypoint.sh postgres -D ${PGDATA} > ${FOURCAT_DATA}logs/postgresql.log 2>&1 &
+#docker/docker_setup_db.sh postgres -D ${PGDATA}
 
 # Start postgresql
-service postgresql start
-echo "Waiting for postgres..."
-while ! nc -z "$POSTGRES_HOST" 5432; do
+#service postgresql start
+#sudo su postgres -c "postgres -D ${PGDATA} > ${PGDATA}postgresql.log 2>&1 &"
+if ! [ -s "$PGDATA/PG_VERSION" ]; then
+  echo "Database initializing..."
+fi
+# Wait for startup
+while ! nc -z "$POSTGRES_HOST" 5432 ; do
   sleep 0.1
 done
+# Wait for database to be created
+while ! [ "$(psql --quiet --host="$POSTGRES_HOST" --port=5432 --user="$POSTGRES_USER" -XtAc "SELECT 1 FROM pg_database WHERE datname='${POSTGRES_DB}'")" ] ; do
+  sleep 0.1
+done
+#else
+#  while ! nc -z "$POSTGRES_HOST" 5432 ; do
+#    sleep 0.1
+#  done
+#fi
 echo "PostgreSQL started"
 
 # Create Database if it does not already exist
@@ -38,9 +62,9 @@ if [ "$(psql --quiet --host="$POSTGRES_HOST" --port=5432 --user="$POSTGRES_USER"
 else
   echo "Creating Database"
   # No database exists, build and seed
-  sudo -u postgres psql -c "CREATE USER $POSTGRES_USER WITH ENCRYPTED PASSWORD '$POSTGRES_PASSWORD' CREATEDB;"
-  sudo -u postgres psql -c "CREATE database $POSTGRES_DB;"
-  sudo -u postgres psql -c " GRANT ALL PRIVILEGES ON DATABASE $POSTGRES_DB to $POSTGRES_USER;"
+#  sudo -u postgres psql -c "CREATE USER $POSTGRES_USER WITH ENCRYPTED PASSWORD '$POSTGRES_PASSWORD' CREATEDB;"
+#  sudo -u postgres psql -c "CREATE database $POSTGRES_DB;"
+#  sudo -u postgres psql -c " GRANT ALL PRIVILEGES ON DATABASE $POSTGRES_DB to $POSTGRES_USER;"
   psql --host="$POSTGRES_HOST" --port=5432 --user="$POSTGRES_USER" --dbname="$POSTGRES_DB" < backend/database.sql
   # Create .current-version file
   if [ ! -e data/config ] ; then mkdir data/config ; else : ; fi && cp VERSION data/config/.current-version
