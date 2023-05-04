@@ -47,10 +47,10 @@ def update_config_from_environment(CONFIG_FILE, config_parser):
     if 'FOURCAT_DATA' in os.environ:
         # Single volume (or no volume)
         print(f"All persistent data to be saved in {os.environ['FOURCAT_DATA']}")
-        config_parser['PATHS']['path_data'] = os.environ['FOURCAT_DATA'] + 'datasets/'
-        config_parser['PATHS']['path_images'] = os.environ['FOURCAT_DATA'] + 'images/'
-        config_parser['PATHS']['path_logs'] = os.environ['FOURCAT_DATA'] + 'logs/'
-        config_parser['PATHS']['path_sessions'] = os.environ['FOURCAT_DATA'] + 'config/sessions/'
+        config_parser['PATHS']['path_data'] = os.environ['FOURCAT_DATA'] + '/datasets/'
+        config_parser['PATHS']['path_images'] = os.environ['FOURCAT_DATA'] + '/images/'
+        config_parser['PATHS']['path_logs'] = os.environ['FOURCAT_DATA'] + '/logs/'
+        config_parser['PATHS']['path_sessions'] = os.environ['FOURCAT_DATA'] + '/config/sessions/'
 
     # Pre 1.34 shared volumes defined in .env and docker-compose.yml
     # These are preferred over FOURCAT_DATA as they are more specific and may not follow the single volume logic

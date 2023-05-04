@@ -54,4 +54,4 @@ python3 -m docker.docker_setup
 python3 4cat-daemon.py start
 
 # Tail logs and wait for SIGTERM
-exec tail -f -n 3 "$FOURCAT_DATA"logs/backend_4cat.log & wait $!
+exec tail -f -n 3 "$FOURCAT_DATA"/logs/backend_4cat.log & wait $!
