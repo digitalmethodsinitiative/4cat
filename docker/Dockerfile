@@ -1,10 +1,23 @@
-FROM python:3.8-slim AS compile-image
+FROM postgres:latest
 
 RUN apt-get update && apt install -y \
     # General requirements:
     libpq-dev \
     python3-dev \
-    python3-pip
+    python3-pip \
+    python3-venv \
+    # Needed specifically for single container version of 4CAT
+    sudo \
+    procps \
+    # Called in docker-entrypoint.sh:
+    curl \
+    netcat \
+    postgresql-client \
+    postgresql-server-dev-all \
+    # Called by 4CAT:
+    git \
+    # Needed for video processing only (and only technically on backend)
+    ffmpeg
 
 # Set working directory
 WORKDIR /4cat
@@ -27,33 +40,6 @@ RUN pip3 install -r requirements.txt
 # Install frontend Docker requirements
 RUN pip3 install gunicorn
 
-# Build image from compile-image
-FROM python:3.8-slim AS build-image
-COPY --from=compile-image /opt/venv /opt/venv
-
-# Make virtual env available and set some needed 4CAT environment variables
-ENV PATH="/opt/venv/bin:$PATH" \
-    PYTHONUNBUFFERED=1 \
-    AM_I_IN_A_DOCKER_CONTAINER=Yes
-
-# Install necessary packages
-RUN apt-get update && apt install -y \
-    # Needed specifically for single container version of 4CAT
-    sudo \
-    postgresql \
-    # Called in docker-entrypoint.sh:
-    curl \
-    netcat \
-    postgresql-client \
-    postgresql-server-dev-all \
-    # Called by 4CAT:
-    git \
-    # Needed for video processing only (and only technically on backend)
-    ffmpeg
-
-# Set working directory
-WORKDIR /4cat
-
 # Copy project
 COPY . /4cat/
 
@@ -64,8 +50,10 @@ RUN chmod +x docker/wait-for-backend.sh docker/docker-entrypoint-backend-only.sh
 EXPOSE 80 4444 443
 
 # Environment variables that can be overwritten (most commonly via in .env file)
-# Database setup
-ENV POSTGRES_USER=fourcat \
+ENV PYTHONUNBUFFERED=1 \
+ AM_I_IN_A_DOCKER_CONTAINER=Yes \
+ # Database setup
+ POSTGRES_USER=fourcat \
  POSTGRES_PASSWORD=supers3cr3t \
  POSTGRES_DB=fourcat \
  POSTGRES_HOST=localhost \
@@ -78,7 +66,9 @@ ENV POSTGRES_USER=fourcat \
  # Telegram needs its own port
  TELEGRAM_PORT=443 \
  # File path (for Docker volume)
- FOURCAT_DATA=/4cat/data/
+ FOURCAT_DATA=/4cat/data/ \
+ # Ensure PGDATA is a subfolder of FOURCAT_DATA to ensure Docker volume saves database data!
+ PGDATA=/4cat/data/postgres/
 
 # Default entrypoint creates one container running 4cat backend, frontend, and a postgres database
 ENTRYPOINT ["docker/docker-entrypoint-single-container.sh"]
