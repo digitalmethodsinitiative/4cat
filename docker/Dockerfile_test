@@ -8,6 +8,7 @@ RUN apt-get update && apt install -y \
     python3-venv \
     # Needed specifically for single container version of 4CAT
     sudo \
+    procps \
     # Called in docker-entrypoint.sh:
     curl \
     netcat \
@@ -43,7 +44,7 @@ RUN pip3 install gunicorn
 COPY . /4cat/
 
 # Permissions for Docker container
-RUN chmod +x docker/wait-for-backend.sh docker/docker-entrypoint-backend-only.sh docker/docker-entrypoint-single-container.sh docker/docker_setup_db.sh
+RUN chmod +x docker/wait-for-backend.sh docker/docker-entrypoint-backend-only.sh docker/docker-entrypoint-single-container.sh
 
 # Expose ports (gunicorn 80, 4CAT api 4444, telegram 443)
 EXPOSE 80 4444 443
@@ -66,6 +67,7 @@ ENV PYTHONUNBUFFERED=1 \
  TELEGRAM_PORT=443 \
  # File path (for Docker volume)
  FOURCAT_DATA=/4cat/data/ \
+ # Ensure PGDATA is a subfolder of FOURCAT_DATA to ensure Docker volume saves database data!
  PGDATA=/4cat/data/postgres/
 
 # Default entrypoint creates one container running 4cat backend, frontend, and a postgres database

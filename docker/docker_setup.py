@@ -45,8 +45,8 @@ def update_config_from_environment(CONFIG_FILE, config_parser):
     config_parser['PATHS']['path_lockfile'] = 'backend'  # docker-entrypoint files look for pid file here (in event Docker shutdown was not clean)
 
     if 'FOURCAT_DATA' in os.environ:
-        # Single volume
-        print(f"All persistent data to be saved in volume mapped to {os.environ['FOURCAT_DATA']}")
+        # Single volume (or no volume)
+        print(f"All persistent data to be saved in {os.environ['FOURCAT_DATA']}")
         config_parser['PATHS']['path_data'] = os.environ['FOURCAT_DATA'] + 'datasets/'
         config_parser['PATHS']['path_images'] = os.environ['FOURCAT_DATA'] + 'images/'
         config_parser['PATHS']['path_logs'] = os.environ['FOURCAT_DATA'] + 'logs/'
