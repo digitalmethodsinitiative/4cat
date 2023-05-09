@@ -125,14 +125,14 @@ class ImageDownloader(BasicProcessor):
 
 		:param module: Dataset or processor to determine compatibility with
 		"""
-		return (module.type == "top-images" or module.type.endswith("search")) \
-			   and module.type != "telegram-search"
+		return (module.type == "top-images" or module.is_from_collector()) \
+			   and module.type not in ["tiktok-search", "tiktok-urls-search", "telegram-search"]
 
 	def process(self):
 		"""
-		This takes a 4CAT results file as input, and outputs a new CSV file
-		with one column with image hashes, one with the first file name used
-		for the image, and one with the amount of times the image was used
+		This takes a 4CAT results file as input, and outputs a zip file with
+		images along with a file, .metadata.json, that contains identifying
+		information.
 		"""
 
 		# Get the source file data path

@@ -73,6 +73,14 @@ class TwitterStatsBase(BasicProcessor):
                 self.dataset.update_status(0)
                 return
 
+            # Ensure sum_map is integers
+            for k, v in list(sum_map.items()):
+                # Remove None values
+                if v is None:
+                    sum_map.pop(k)
+                else:
+                    sum_map[k] = int(v)
+
             # Additional groupings in intervals
             if group_by_keys_category is not False:
                 if type(group_by_keys) is str:
@@ -97,7 +105,7 @@ class TwitterStatsBase(BasicProcessor):
                     else:
                         # Update existing record for this grouping
                         for key, value in sum_map.items():
-                            intervals[date][group_by_key][key] += value
+                            intervals[date][group_by_key][key] += int(value)
                         for key, value in list_map.items():
                             intervals[date][group_by_key][key].extend(value)
 
@@ -119,7 +127,7 @@ class TwitterStatsBase(BasicProcessor):
                 else:
                     # Update existing record for this grouping
                     for key, value in sum_map.items():
-                        intervals[date][key] += value
+                        intervals[date][key] += int(value)
                     for key, value in list_map.items():
                         intervals[date][key].extend(value)
 
@@ -207,6 +215,6 @@ class TwitterStatsBase(BasicProcessor):
         # These are user-specific metrics and not per tweet/post like above
         static_map = {}
         # These keys contain list of items (e.g. hashtags)
-        list_map = list()
+        list_map = {}
 
         return group_by_key_category, group_by_keys, sum_map, static_map, list_map

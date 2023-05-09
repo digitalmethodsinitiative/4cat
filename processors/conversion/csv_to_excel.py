@@ -74,3 +74,21 @@ class ConvertCSVToMacExcel(BasicProcessor):
 		# done!
 		self.dataset.update_status("Finished.")
 		self.dataset.finish(num_rows=posts)
+
+	@classmethod
+	def get_csv_parameters(cls, csv_library):
+		"""
+		Returns CSV parameters if they are changed from 4CAT's defaults.
+		"""
+		csv_library.register_dialect("excel-mac",
+			delimiter = ";",
+			doublequote = True,
+			escapechar = None,
+			lineterminator = "\r\n",
+			quotechar = '"',
+			quoting = csv.QUOTE_MINIMAL,
+			skipinitialspace = False,
+			strict = False
+		)
+
+		return {"dialect": "excel-mac"}

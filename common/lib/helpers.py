@@ -86,7 +86,9 @@ def sniff_encoding(file):
     :param file:
     :return:
     """
-    if hasattr(file, "getbuffer"):
+    if type(file) == bytearray:
+        maybe_bom = file[:3]
+    elif hasattr(file, "getbuffer"):
         buffer = file.getbuffer()
         maybe_bom = buffer[:3].tobytes()
     elif hasattr(file, "peek"):
@@ -111,7 +113,7 @@ def get_software_version():
 
     :return str:  4CAT version
     """
-    versionpath = Path(config.get('PATH_ROOT'), config.get('path.versionfile'))
+    versionpath = config.get('PATH_ROOT').joinpath(config.get('path.versionfile'))
 
     if versionpath.exists() and not versionpath.is_file():
         return ""
@@ -575,23 +577,6 @@ def pad_interval(intervals, first_interval=None, last_interval=None):
     intervals = {key: intervals[key] for key in sorted(intervals)}
 
     return missing, intervals
-
-
-def is_rankable(dataset):
-    """
-    Determine if a dataset is rankable
-
-    :todo:  Should this be part of the DataSet class?
-
-    :param DataSet dataset:  Dataset to inspect
-    :return bool:  Whether the dataset is rankable or not
-    """
-    if dataset.get_results_path().suffix != ".csv":
-        return False
-
-    with dataset.get_results_path().open(encoding="utf-8") as infile:
-        reader = csv.DictReader(infile)
-        return len(set(reader.fieldnames) & {"date", "value", "item", "word_1"}) >= 3
 
 
 def remove_nuls(value):

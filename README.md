@@ -26,7 +26,7 @@ such as the generation and visualisation of word embedding models.
 platforms that are part of the tool, but you can also [add additional data
 sources](https://github.com/digitalmethodsinitiative/4cat/wiki/How-to-make-a-data-source)
 using 4CAT's Python API. The following data sources are currently supported
-actively:
+actively and can be used to collect data with 4CAT:
 
 * 4chan and 8kun
 * BitChute
@@ -35,12 +35,12 @@ actively:
 * Tumblr
 * Twitter API v2 (Academic and regular tracks)
 
-The following platforms are supported through other tools, from which you can
-import data into 4CAT for analysis:
+The following platforms are supported through other tools, with which you can
+collect data to import data into 4CAT for analysis:
 
+* Instagram, TikTok, 9gag, Imgur, LinkedIn, Parler (via
+  [Zeeschuimer](https://github.com/digitalmethodsinitiative/zeeschuimer))
 * Facebook and Instagram (via [CrowdTangle](https://www.crowdtangle.com) exports)
-* Instagram, TikTok, LinkedIn and Parler (via
-  [Zeeschuimer](https://github.com/digitalmethodsinitiative/zeeschuimer) or CrowdTangle)
 
 A number of other platforms have built-in support that is untested, or requires
 e.g. special API access. You can view the [data sources in our wiki](https://github.com/digitalmethodsinitiative/4cat/wiki/Available-data-sources) or review [the data
@@ -48,16 +48,18 @@ sources' code](https://github.com/digitalmethodsinitiative/4cat/tree/master/data
 in the GitHub repository. It is also possible to import your own CSV files into 
 4CAT for analysis.
 
-## Install
-You can install 4CAT locally or on a server via Docker or manually. Copying our `docker-compose.yml file`, `.env` file, and using
+## Installation
+You can install 4CAT locally or on a server via Docker or manually. For easiest installation, we reccomend copying our [`docker-compose.yml file`](https://raw.githubusercontent.com/digitalmethodsinitiative/4cat/master/docker-compose.yml), [`.env`](https://raw.githubusercontent.com/digitalmethodsinitiative/4cat/master/.env) file, and running this terminal command in the folder where those files have been saved:
 
 ```
 docker-compose up -d
 ```
 
-will pull the lastest version from Docker Hub. Detailed and alternative installation instructions are available
-[in our
+In depth instructions on both Docker installation and manual installation can be found [in our
 wiki](https://github.com/digitalmethodsinitiative/4cat/wiki/Installing-4CAT).
+
+A video walkthrough installing 4CAT via Docker can be found on [YouTube here](https://youtu.be/oWsB7bvNfOY).
+
 Currently scraping of 4chan, 8chan, and 8kun require additional steps; please see the wiki.
 
 Please check our

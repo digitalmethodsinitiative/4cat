@@ -62,6 +62,24 @@ def make_version_comparable(version):
 	return version[0].zfill(3) + "." + version[1].zfill(3)
 
 
+def check_for_nltk():
+	# ---------------------------------------------
+	#        Check for and install packages
+	# ---------------------------------------------
+	# NLTK
+	import nltk
+	try:
+		nltk.data.find('tokenizers/punkt')
+	except LookupError:
+		nltk.download('punkt', quiet=True)
+	try:
+		nltk.data.find('corpora/wordnet')
+	except LookupError:
+		nltk.download("wordnet", quiet=True)
+	
+	nltk.download("omw-1.4", quiet=True)
+
+
 def finish(args, logger):
 	"""
 	Finish migration
@@ -70,6 +88,7 @@ def finish(args, logger):
 	this is made a function that can be called from any point in the script to
 	wrap up and exit.
 	"""
+	check_for_nltk()
 	logger.info("\nMigration finished. You can now safely restart 4CAT.\n")
 
 	if args.restart:
@@ -320,21 +339,6 @@ if current_version_file.exists():
 	current_version_file.unlink()
 shutil.copy(target_version_file, current_version_file)
 logger.info("  ...done")
-
-
-# ---------------------------------------------
-#        Check for and install packages
-# ---------------------------------------------
-# NLTK
-import nltk
-try:
-	nltk.data.find('tokenizers/punkt')
-except LookupError:
-	nltk.download('punkt', quiet=True)
-try:
-	nltk.data.find('corpora/wordnet')
-except LookupError:
-	nltk.download("wordnet", quiet=True)
 
 # ---------------------------------------------
 #            Done! Wrap up and finish

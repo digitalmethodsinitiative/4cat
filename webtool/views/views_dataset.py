@@ -160,7 +160,7 @@ def get_result(query_file):
     :return:  Result file
     :rmime: text/csv
     """
-    directory = config.get('PATH_ROOT') + "/" + config.get('PATH_DATA')
+    directory = str(config.get('PATH_ROOT').joinpath(config.get('PATH_DATA')))
     return send_from_directory(directory=directory, path=query_file)
 
 

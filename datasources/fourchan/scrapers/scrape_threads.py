@@ -36,6 +36,8 @@ from common.lib.exceptions import JobAlreadyExistsException
 from common.lib.helpers import strip_tags
 
 import common.config_manager as config
+from common.lib.user_input import UserInput
+
 
 class ThreadScraper4chan(BasicJSONScraper):
 	"""
@@ -61,6 +63,15 @@ class ThreadScraper4chan(BasicJSONScraper):
 	# these fields should be present for every single post, and if they're not something weird is going on
 	required_fields = ["no", "resto", "now", "time"]
 	required_fields_op = ["no", "resto", "now", "time", "replies", "images"]
+
+	config = {
+		"4chan-thread.save_images": {
+			"type": UserInput.OPTION_TOGGLE,
+			"default": False,
+			"help": "Save 4chan Images",
+			"tooltip": "Saves images to path_images."
+		}
+	}
 
 	def process(self, data):
 		"""
@@ -252,7 +263,7 @@ class ThreadScraper4chan(BasicJSONScraper):
 			self.log.error("ValueError (%s) during scrape of thread %s" % (e, post["no"]))
 
 		# Download images (exclude .webm files)
-		if "filename" in post and post["ext"] != ".webm":
+		if "filename" in post and post["ext"] != ".webm" and config.get("4chan-thread.save_images"):
 			self.queue_image(post, thread)
 
 		return return_value
@@ -273,7 +284,7 @@ class ThreadScraper4chan(BasicJSONScraper):
 		md5 = hashlib.md5()
 		md5.update(base64.b64decode(post["md5"]))
 
-		image_folder = Path(config.get('PATH_ROOT'), config.get('PATH_IMAGES'))
+		image_folder = config.get('PATH_ROOT').joinpath(config.get('PATH_IMAGES'))
 		image_path = image_folder.joinpath(md5.hexdigest() + post["ext"])
 
 		if config.get('PATH_IMAGES') and image_folder.is_dir() and not image_path.is_file():

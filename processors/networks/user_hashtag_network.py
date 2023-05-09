@@ -28,18 +28,11 @@ class HashtagUserBipartiteGrapherPreset(ProcessorPreset):
 
         :param module: Dataset or processor to determine compatibility with
         """
-        if module.type == "twitterv2-search":
-            # ndjson, difficult to sniff
-            return True
-        elif module.is_dataset():
-            if module.get_extension() == "csv":
-                # csv can just be sniffed for the presence of a column
-                with module.get_results_path().open(encoding="utf-8") as infile:
-                    reader = csv.DictReader(infile)
-                    try:
-                        return bool(set(reader.fieldnames) & {"tags", "hashtags", "groups"})
-                    except (TypeError, ValueError):
-                        return False
+        usable_columns = {"tags", "hashtags", "groups"}
+
+        if module.is_dataset():
+            columns = module.get_columns()
+            return bool(set(columns) & usable_columns) if columns else False
         else:
             return False
 

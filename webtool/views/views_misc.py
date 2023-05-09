@@ -87,7 +87,6 @@ def show_frontpage():
 
     datasources = {k: v for k, v in backend.all_modules.datasources.items() if k in config.get("4cat.datasources") and not v["importable"]}
     importables = {k: v for k, v in backend.all_modules.datasources.items() if v["importable"]}
-    print(importables)
 
     return render_template("frontpage.html", stats=stats, news=news, datasources=datasources, importables=importables)
 

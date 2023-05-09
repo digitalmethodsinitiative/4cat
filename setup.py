@@ -13,7 +13,7 @@ packages = [
 	"bcrypt~=3.2.0",
 	"beautifulsoup4~=4.11.0",
 	"clarifai-grpc~=9.0",
-	"cryptography~=37.0.0",
+	"cryptography>=39.0.1",
 	"cssselect~=1.1.0",
 	"datedelta~=1.4.0",
 	"dateparser~=1.1.0",
@@ -25,15 +25,16 @@ packages = [
 	"google_api_python_client==2.0.2",
 	"html2text==2020.*",
 	"ImageHash~=4.2.0",
+	"jieba~=0.42",
 	"lxml~=4.9.0",
 	"markdown==3.0.1",
 	"markdown2==2.4.2",
-	"nltk==3.5",
+	"nltk==3.6.7",
 	"networkx~=2.8.0",
 	"numpy>=1.19.2",
 	"opencv-python>=4.6.0.66",
 	"packaging",
-	"pandas==1.2.3",
+	"pandas==1.5.3",
 	"Pillow~=9.1",
 	"praw~=7.0",
 	"prawcore~=2.0",
@@ -46,6 +47,7 @@ packages = [
 	"requests_futures",
 	"scikit-learn",
 	"scenedetect==0.6.0.3",
+	"shapely",
 	"spacy==3.4.3",
 	"svgwrite~=1.4.0",
 	"Telethon~=1.25.2",
@@ -61,7 +63,7 @@ packages = [
 
 # Some packages don't run on Windows
 unix_packages = [
-	"python-daemon==2.3.1"
+	"python-daemon==2.3.2"
 ]
 
 if os.name != "nt":

@@ -2,8 +2,10 @@
 General helper functions for Flask templating and 4CAT views
 """
 import datetime
-import re
+import colorsys
+import math
 import csv
+import re
 
 from functools import wraps
 from math import ceil
@@ -199,6 +201,59 @@ def pad_interval(intervals, first_interval=None, last_interval=None):
 	intervals = {key: intervals[key] for key in sorted(intervals)}
 
 	return missing, intervals
+
+def make_html_colour(rgb):
+	"""
+	Make HTML colour code from RGB values
+
+	Turns an array of three 0-1 RGB values
+	:param rgb:
+	:return:
+	"""
+	colour = "#"
+	for bit in rgb:
+		bit *= 255
+		bit = int(bit)
+		colour += str(hex(bit)).split("x")[1].zfill(2).upper()
+
+	return colour
+
+
+def generate_css_colours(force=False):
+	"""
+	Write the colours.css CSS file based on configuration
+
+	4CAT admins can change the interface colour in the 4CAT settings. Updating
+	these necessitates also updating the relevant CSS files, which this method
+	does.
+
+	:param bool force:  Create colour definition file even if it exists already
+	:return:
+	"""
+	interface_hue = config.get("4cat.layout_hue")
+	interface_hue /= 360  # colorsys expects 0-1 values
+	main_colour = colorsys.hsv_to_rgb(interface_hue, 0.87, 0.81)
+	accent_colour = colorsys.hsv_to_rgb(interface_hue, 0.87, 1)
+	# get opposite by adjusting the hue by 50%
+	opposite_colour = colorsys.hsv_to_rgb(math.fmod(interface_hue + 0.5, 1), 0.87, 1)
+
+	template_file = config.get("PATH_ROOT").joinpath("webtool/static/css/colours.css.template")
+	colour_file = config.get("PATH_ROOT").joinpath("webtool/static/css/colours.css")
+
+	if colour_file.exists() and not force:
+		# exists already, don't overwrite
+		return
+
+	with template_file.open() as infile:
+		template = infile.read()
+		template = template \
+			.replace("{{ accent_colour }}", make_html_colour(main_colour)) \
+			.replace("{{ highlight_colour }}", make_html_colour(accent_colour)) \
+			.replace("{{ highlight_alternate }}", make_html_colour(opposite_colour))
+
+		with colour_file.open("w") as outfile:
+			outfile.write(template)
+
 
 def get_preview(query):
 	"""

@@ -122,7 +122,7 @@
 
                     <div class="fullwidth" id="dataset-result">
                         <dt>Result</dt>
-                        <dd data-key="{{ dataset.key }}"{% if not dataset.is_finished() %} class="dataset-unfinished"{% endif %}>
+                        <dd data-key="{{ dataset.key }}" class="{% if not dataset.is_finished() %}dataset-unfinished{% endif %}">
                             {% include "result-result-row.html" %}
                         </dd>
                     </div>

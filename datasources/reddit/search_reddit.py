@@ -87,7 +87,8 @@ class SearchReddit(Search):
 		},
 		"subject_url": {
 			"type": UserInput.OPTION_TEXT,
-			"help": "URL/domain in post"
+			"help": "URL/domain in post",
+			"tooltip": "Regular API only; Filter for posts that link to certain sites or domains (e.g. only posts linking to reddit.com)",
 		},
 		"divider-2": {
 			"type": UserInput.OPTION_DIVIDER
@@ -390,7 +391,7 @@ class SearchReddit(Search):
 			"author": thread["author"],
 			"author_flair": thread.get("author_flair_text", ""),
 			"post_flair": thread.get("link_flair_text", ""),
-			"image_file": thread.get("url", "") if image_match.search(thread.get("url", "")) else "",
+			"image_file": thread.get("url", "") if thread.get("url") and image_match.search(thread.get("url", "")) else "",
 			"domain": thread.get("domain", ""),
 			"url": thread.get("url", ""),
 			"image_md5": "",

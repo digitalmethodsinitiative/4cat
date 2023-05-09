@@ -95,7 +95,7 @@ class FourcatRestarterAndUpgrader(BasicWorker):
                 # subprocess (man, that was a fun bug to hunt down)
                 log_stream_backend = log_file_backend.open("a")
                 self.log.info("Running command %s" % command)
-                process = subprocess.Popen(shlex.split(command), cwd=config.get("PATH_ROOT"),
+                process = subprocess.Popen(shlex.split(command), cwd=str(config.get("PATH_ROOT")),
                                            stdout=log_stream_backend, stderr=log_stream_backend, stdin=subprocess.DEVNULL)
 
                 while not self.interrupted:
@@ -216,4 +216,5 @@ class FourcatRestarterAndUpgrader(BasicWorker):
 
             log_stream_restart.close()
             lock_file.unlink()
+
             self.job.finish()

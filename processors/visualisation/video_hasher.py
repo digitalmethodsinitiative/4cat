@@ -45,7 +45,7 @@ class VideoHasherPreset(ProcessorPreset):
         :param str module:  Module ID to determine compatibility with
         :return bool:
         """
-        return module.type in ["video-downloader"] and \
+        return module.type.startswith("video-downloader") and \
                config.get("video_downloader.ffmpeg-path") and \
                shutil.which(config.get("video_downloader.ffmpeg-path"))
 
@@ -110,7 +110,7 @@ class VideoHasher(BasicProcessor):
 		"""
 		Allow on videos only
 		"""
-		return module.type in ["video-downloader"]
+		return module.type.startswith("video-downloader")
 
 	def process(self):
 		"""

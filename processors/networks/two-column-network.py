@@ -155,7 +155,7 @@ class ColumnNetworker(BasicProcessor):
         for item in self.source_dataset.iterate_items(self):
             if column_a not in item or column_b not in item:
                 missing = "'" + "' and '".join([c for c in (column_a, column_b) if c not in item]) + "'"
-                self.dataset.update_status("Column(s) %s not found in dataset" % missing, is_final=True)
+                self.dataset.update_status(f"Column(s) {missing} not found in dataset", is_final=True)
                 self.dataset.finish(0)
                 return
 
@@ -197,7 +197,7 @@ class ColumnNetworker(BasicProcessor):
             try:
                 interval = get_interval_descriptor(item, interval_type)
             except ValueError as e:
-                self.dataset.update_status("%s, cannot count posts per %s" % (str(e), interval_type), is_final=True)
+                self.dataset.update_status(f"{e}, cannot count posts per {interval_type}", is_final=True)
                 self.dataset.update_status(0)
                 return
 
@@ -269,12 +269,14 @@ class ColumnNetworker(BasicProcessor):
         # since gexf can only handle per-day data, generate weights for each
         # day in the interval at the required resolution
         if interval_type != "overall":
+            self.dataset.update_progress(0)
             num_items = len(network.nodes) + len(network.edges)
             transformed = 1
             for component in (network.nodes, network.edges):
                 for item in component:
                     if transformed % 500 == 0:
-                        self.dataset.update_status("Transforming dynamic nodes and edges (%i/%i)" % (transformed, num_items))
+                        self.dataset.update_status(f"Transforming dynamic nodes and edges ({transformed:,} of {num_items:,} done)")
+                        self.dataset.update_progress(transformed / num_items)
 
                     transformed += 1
                     for interval, weight in component[item]["intervals"].copy().items():

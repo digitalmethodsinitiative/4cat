@@ -4,14 +4,10 @@ Import scraped TikTok data
 It's prohibitively difficult to scrape data from TikTok within 4CAT itself due
 to its aggressive rate limiting. Instead, import data collected elsewhere.
 """
-from datetime import datetime
-from pathlib import Path
+from datetime import datetime, timezone
 from urllib.parse import urlparse, parse_qs
-import json
-import time
 
 from backend.abstract.search import Search
-from common.lib.exceptions import WorkerInterruptedException
 
 
 class SearchTikTok(Search):
@@ -75,7 +71,8 @@ class SearchTikTok(Search):
         if post["video"].get("cover"):
             thumbnail_options.append(post["video"]["cover"])
 
-        thumbnail_url = [url for url in thumbnail_options if int(parse_qs(urlparse(url).query).get("x-expires", [time.time()])[0]) >= time.time() - 3600]
+        now = int(datetime.now(tz=timezone.utc).timestamp())
+        thumbnail_url = [url for url in thumbnail_options if int(parse_qs(urlparse(url).query).get("x-expires", [now])[0]) >= now]
         thumbnail_url = thumbnail_url.pop() if thumbnail_url else ""
 
         return {

@@ -2,6 +2,7 @@
 Generate word tree from dataset
 """
 import string
+import jieba
 import re
 
 from backend.abstract.processor import BasicProcessor
@@ -79,6 +80,18 @@ class MakeWordtree(BasicProcessor):
 			},
 			"help": "Visual alignment"
 		},
+		"tokeniser_type": {
+			"type": UserInput.OPTION_CHOICE,
+			"default": "regular",
+			"options": {
+				"regular": "nltk word_tokenize",
+				"jieba-cut": "jieba (for Chinese text; accurate mode, recommended)",
+				"jieba-cut-all": "jieba (for Chinese text; full mode)",
+				"jieba-search": "jieba (for Chinese text; search engine suggestion style)",
+			},
+			"help": "Tokeniser",
+			"tooltip": "What heuristic to use to split up the text into separate words."
+		},
 		"strip-urls": {
 			"type": UserInput.OPTION_TOGGLE,
 			"default": True,
@@ -143,6 +156,20 @@ class MakeWordtree(BasicProcessor):
 		window = min(window, self.get_options()["window"]["max"] + 1)
 		window = max(1, window)
 
+		# determine what tokenisation strategy to use
+		tokeniser_args = {}
+		if self.parameters.get("tokeniser_type") == "jieba-cut":
+			tokeniser = jieba.cut
+			tokeniser_args = {"cut_all": False}
+		elif self.parameters.get("tokeniser_type") == "jieba-cut-all":
+			tokeniser = jieba.cut
+			tokeniser_args = {"cut_all": True}
+		elif self.parameters.get("tokeniser_type") == "jieba-search":
+			tokeniser = jieba.cut_for_search
+			tokeniser_args = {}
+		else:
+			tokeniser = word_tokenize
+
 		# find matching posts
 		processed = 0
 		punkt_replace = re.compile(r"[" + re.escape(string.punctuation) + "]")
@@ -160,15 +187,15 @@ class MakeWordtree(BasicProcessor):
 			if strip_symbols:
 				body = punkt_replace.sub("", body)
 
-			body = word_tokenize(body)
-			positions = [i for i, x in enumerate(body) if x.lower() == query.lower()]
+			body = tokeniser(body, **tokeniser_args)
+			positions = [(i, x) for i, x in enumerate(body) if x.lower() == query.lower()]
 
 			# get lists of tokens for both the left and right side of the tree
 			# on the left side, all lists end with the query, on the right side,
 			# they start with the query
-			for position in positions:
-				right_branches.append(body[position:position + window])
-				left_branches.append(body[max(0, position - window):position + 1])
+			for position, body_tokens in positions:
+				right_branches.append(body_tokens[position:position + window])
+				left_branches.append(body_tokens[max(0, position - window):position + 1])
 
 		# Some settings for rendering the tree later
 		self.step = self.fontsize * 0.6  # approximately the width of a monospace char
