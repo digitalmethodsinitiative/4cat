@@ -20,9 +20,9 @@ from pathlib import Path
 from flask import render_template, request, flash, get_flashed_messages, jsonify
 
 import common.config_manager as config
-from flask_login import login_required
+from flask_login import login_required, current_user
 
-from webtool import app, queue
+from webtool import app, queue, log
 from webtool.lib.helpers import admin_required, check_restart_request
 
 from common.lib.helpers import get_github_version, get_parent_gunicorn_pid
@@ -72,6 +72,7 @@ def trigger_restart():
         if mode not in ("upgrade", "restart"):
             return "Invalid mode", 400
 
+        log.info(f"Restart triggered by {current_user.get_name()}")
         # ensure lockfile exists - will be written to later by worker
         lock_file.touch()
 
@@ -118,6 +119,7 @@ def upgrade_frontend():
     # this route only makes sense in a Docker context
     if not config.get("USING_DOCKER") or not check_restart_request():
         return app.login_manager.unauthorized()
+    log.info(f"Frontend upgrade triggered by {current_user.get_name()}")
 
     restart_log_file = Path(config.get("PATH_ROOT"), config.get("PATH_LOGS"), "restart.log")
     frontend_version_file = Path(config.get("PATH_ROOT"), "data/config/.current-version-frontend")

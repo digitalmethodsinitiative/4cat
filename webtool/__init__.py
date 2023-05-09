@@ -38,7 +38,7 @@ app = Flask(__name__)
 if config.get("USING_DOCKER"):
     # rename 4cat.log to 4cat_frontend.log
     # Normally this is mostly empty; could combine it, but may be useful to identify processes running on both front and backend
-    log = Logger(filename='frontend_4cat.log')
+    log = Logger(filename='frontend_4cat.log', logger_name="4cat-frontend")
 
     # Add Gunicorn error log to main app logger
     gunicorn_logger = logging.getLogger('gunicorn.error')
@@ -57,7 +57,7 @@ if config.get("USING_DOCKER"):
     app.logger.addHandler(file_handler)
 
 else:
-    log = Logger()
+    log = Logger(logger_name="4cat-frontend")
 
 db = Database(logger=log, dbname=database_name, appname="frontend")
 queue = JobQueue(logger=log, database=db)
