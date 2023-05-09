@@ -213,6 +213,8 @@ class VideoTimelines(BasicProcessor):
             # is this the right place? should it be in the datasource?
             if dataset.type == "tiktok-search":
                 mapper = lambda item: item.get("tiktok_url")
+            elif dataset.type == "upload-search" and dataset.parameters.get("board") == "youtube-video-list":
+                mapper = lambda item: item.get("youtube_url")
             else:
                 mapper = lambda item: item.get("id")
 
