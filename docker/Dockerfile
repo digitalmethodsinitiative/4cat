@@ -6,10 +6,8 @@ RUN apt-get update && apt install -y \
     python3-dev \
     python3-pip \
     python3-venv \
-    # Needed specifically for single container version of 4CAT
-    sudo \
+    # Called in docker-entrypoint files
     procps \
-    # Called in docker-entrypoint.sh:
     curl \
     netcat \
     postgresql-client \
