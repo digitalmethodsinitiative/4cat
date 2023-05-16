@@ -1,6 +1,6 @@
 @import url('reset.css');
 @import url('dataset-page.css');
-
+@import url('colours.css');
 
 /** --------------------- *
             Fonts
@@ -32,26 +32,6 @@
 @font-face {
     font-family: 'Fixedsys';
     src: url("../fonts/fsex300-webfont.woff")
-}
-
-/** --------------------- *
-      Colour definitions
-  * --------------------- */
-:root {
-    --accent: #CE1B28;
-    --highlight: #FF2231;
-    --accent-alternate: #19B0A3;
-    --accent-okay: #26b018;
-    --accent-warning: #b05d13;
-    --accent-error: #ff2231;
-    --gray-dark: #DFDFDF;
-    --gray: #E9E9E9;
-    --gray-light: #EEE;
-    --contrast-bright: #F5F5F5;
-    --contrast-dark: #21202E;
-    --always-white: #FFF;
-    --text: #37373C;
-    --warning: var(--accent);
 }
 
 
@@ -277,4 +257,13 @@ hr {
 
 i.invisible {
     display: none;
+}
+
+.gephi-link {
+    position: absolute;
+    bottom: 0.5em;
+    right: 0.5em;
+    font-size: 0.8em;
+    background-color: rgba(250, 250, 250, 0.8);
+    padding: 0.25em;
 }
