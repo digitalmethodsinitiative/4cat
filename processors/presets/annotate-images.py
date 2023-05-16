@@ -84,6 +84,7 @@ class AnnotateImages(ProcessorPreset):
                 "type": "image-downloader",
                 "parameters": {
                     "amount": amount,
+                    "columns": "item",
                     "overwrite": False
                 }
             },
