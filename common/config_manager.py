@@ -149,9 +149,15 @@ class ConfigManager:
                 raise TypeError("get() expects None, a User object or a string for argument 'user'")
 
         # user-specific settings are just a special type of tag (which takes
-        # precedence)
+        # precedence), same goes for user groups
         if user:
+            groups = self.db.fetchall("SELECT group FROM user_groups WHERE user = %s", (user,))
+
+            for group in groups:
+                tags.insert(0, f"group:{group['group']}")
+
             tags.insert(0, f"user:{user}")
+
 
         # query database for any values within the required tags
         tags.append("")  # empty tag = default value
