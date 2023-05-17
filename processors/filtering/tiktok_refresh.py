@@ -50,9 +50,9 @@ class UpdateTikTok(BasicProcessor):
             self.dataset.finish(0)
 
         self.dataset.update_status(f"Collected {len(urls)} to refresh.")
-        tiktok_scraper = TikTokScraper()
+        tiktok_scraper = TikTokScraper(processor=self)
         loop = asyncio.new_event_loop()
-        items = loop.run_until_complete(tiktok_scraper.request_metadata(urls, processor=self))
+        items = loop.run_until_complete(tiktok_scraper.request_metadata(urls))
 
         with self.dataset.get_results_path().open("w", encoding="utf-8", newline="") as outfile:
             for post in items:

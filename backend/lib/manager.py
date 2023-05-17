@@ -141,7 +141,7 @@ class WorkerManager:
 		"""
 
 		for datasource in all_modules.datasources:
-			if datasource + "-search" not in all_modules.workers:
+			if datasource + "-search" not in all_modules.workers and datasource + "-import" not in all_modules.workers:
 				self.log.error("No search worker defined for datasource %s or its modules are missing. Search queries will not be executed." % datasource)
 
 			all_modules.datasources[datasource]["init"](self.db, self.log, self.queue, datasource)

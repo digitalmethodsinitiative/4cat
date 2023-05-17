@@ -704,6 +704,16 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		return False
 
 	@classmethod
+	def is_from_collector(cls):
+		"""
+		Check if this processor is one that collects data, i.e. a search or
+		import worker.
+
+		:return bool:
+		"""
+		return cls.type.endswith("-search") or cls.type.endswith("-import")
+
+	@classmethod
 	def get_extension(self, parent_dataset=None):
 		"""
 		Return the extension of the processor's dataset
@@ -738,6 +748,14 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		  item (e.g. word_1, word_2, etc)? Included for compatibility
 		"""
 		return False
+
+
+	@classmethod
+	def get_csv_parameters(cls, csv_library):
+		"""
+		Returns CSV parameters if they are changed from 4CAT's defaults.
+		"""
+		return {}
 
 	@abc.abstractmethod
 	def process(self):

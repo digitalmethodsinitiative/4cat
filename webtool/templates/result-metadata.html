@@ -3,9 +3,12 @@
     <span role="tooltip" aria-hidden="true" id="tooltip-{{ dataset.key }}-private">This dataset is private and can only be viewed by your user and instance maintainers</span>
 {% endif %}
 
-{% if "pseudonymise" in dataset.parameters and dataset.parameters.pseudonymise %}
-    <i class="fa fa-user-secret tooltip-trigger" aria-hidden="true" aria-controls="tooltip-{{ dataset.key }}-pseudonymised"></i> <span class="sr-only">Usernames have been pseudonymised</span>
-    <span role="tooltip" aria-hidden="true" id="tooltip-{{ dataset.key }}-pseudonymised">Usernames have been pseudonymised</span>
+{% if "pseudonymise" in dataset.parameters and (dataset.parameters.pseudonymise == True or dataset.parameters.pseudonymise == "pseudonymise") %}
+    <i class="fa fa-user-secret tooltip-trigger" aria-hidden="true" aria-controls="tooltip-{{ dataset.key }}-pseudonymised"></i> <span class="sr-only">Author data has been pseudonymised</span>
+    <span role="tooltip" aria-hidden="true" id="tooltip-{{ dataset.key }}-pseudonymised">Author data has been pseudonymised</span>
+{% elif "pseudonymise" in dataset.parameters and dataset.parameters.pseudonymise == "anonymise" %}
+    <i class="fa fa-ghost tooltip-trigger" aria-hidden="true" aria-controls="tooltip-{{ dataset.key }}-anonymised"></i> <span class="sr-only">Author data has been anonymised</span>
+    <span role="tooltip" aria-hidden="true" id="tooltip-{{ dataset.key }}-anonymised">Author data has been anonymised</span>
 {% endif %}
 
 {% for parameter in dataset.parameters %}

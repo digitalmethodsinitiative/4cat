@@ -135,7 +135,7 @@ def upgrade_frontend():
 
     try:
         response = subprocess.run(shlex.split(command), stdout=log_stream, stderr=subprocess.STDOUT, text=True,
-                                  check=True, cwd=config.get("PATH_ROOT"), stdin=subprocess.DEVNULL)
+                                  check=True, cwd=str(config.get("PATH_ROOT")), stdin=subprocess.DEVNULL)
         if response.returncode != 0:
             raise RuntimeError("Unexpected return code %s" % str(response.returncode))
         upgrade_ok = True
@@ -188,9 +188,15 @@ def trigger_restart_frontend():
     # we currently do not support these (but they may be easy to add)
     message = ""
     if "gunicorn" in os.environ.get("SERVER_SOFTWARE", ""):
+        import psutil
+
+        def get_parent_gunicorn_pid():
+            for proc in psutil.process_iter():
+                if "gunicorn" in proc.name() and proc.parent().name() != "gunicorn":
+                    return proc.pid
         # gunicorn
         message = "Detected Flask running in Gunicorn, sending SIGUP."
-        kill_thread = threading.Thread(target=server_killer(os.getpid(), signal.SIGHUP))
+        kill_thread = threading.Thread(target=server_killer(get_parent_gunicorn_pid(), signal.SIGHUP))
         kill_thread.start()
 
     elif os.environ.get("APACHE_PID_FILE", "") != "":

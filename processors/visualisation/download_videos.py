@@ -234,7 +234,7 @@ class VideoDownloaderPlus(BasicProcessor):
         :param str module:  Module ID to determine compatibility with
         :return bool:
         """
-        return module.type.endswith("search")
+        return (module.type.endswith("-search") or module.is_from_collector()) and module.type not in ["tiktok-search", "tiktok-urls-search"]
 
     def process(self):
         """
@@ -498,7 +498,7 @@ class VideoDownloaderPlus(BasicProcessor):
         # Save some metadata to be able to connect the videos to their source
         metadata = {
             url: {
-                "source_dataset": self.source_dataset.key,
+                "from_dataset": self.source_dataset.key,
                 **sets_to_lists(data)
                 # TODO: This some shenanigans until I can figure out what to do with the info returned
             } for url, data in urls.items()

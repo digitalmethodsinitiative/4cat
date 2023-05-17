@@ -56,7 +56,7 @@ class DatasetMerger(BasicProcessor):
 
         :param module: Dataset or processor to determine compatibility with
         """
-        return module.get_extension() in ("csv", "ndjson") and module.type.endswith("search")
+        return module.get_extension() in ("csv", "ndjson") and (module.is_from_collector())
 
     @staticmethod
     def get_dataset_from_url(url, db):

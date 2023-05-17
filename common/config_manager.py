@@ -42,12 +42,12 @@ class ConfigManager:
     API_HOST = config_reader["API"].get("api_host")
     API_PORT = config_reader["API"].getint("api_port")
 
-    PATH_ROOT = str(Path(os.path.abspath(os.path.dirname(__file__))).joinpath(".."))  # better don"t change this
-    PATH_LOGS = config_reader["PATHS"].get("path_logs", "")
-    PATH_IMAGES = config_reader["PATHS"].get("path_images", "")
-    PATH_DATA = config_reader["PATHS"].get("path_data", "")
-    PATH_LOCKFILE = config_reader["PATHS"].get("path_lockfile", "")
-    PATH_SESSIONS = config_reader["PATHS"].get("path_sessions", "")
+    PATH_ROOT = Path(os.path.abspath(os.path.dirname(__file__))).joinpath("..").resolve()  # better don"t change this
+    PATH_LOGS = Path(config_reader["PATHS"].get("path_logs", ""))
+    PATH_IMAGES = Path(config_reader["PATHS"].get("path_images", ""))
+    PATH_DATA = Path(config_reader["PATHS"].get("path_data", ""))
+    PATH_LOCKFILE = Path(config_reader["PATHS"].get("path_lockfile", ""))
+    PATH_SESSIONS = Path(config_reader["PATHS"].get("path_sessions", ""))
 
     ANONYMISATION_SALT = config_reader["GENERATE"].get("anonymisation_salt")
     SECRET_KEY = config_reader["GENERATE"].get("secret_key")

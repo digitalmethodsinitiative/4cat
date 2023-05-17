@@ -206,6 +206,7 @@ def datasource_script(datasource_id):
 
 
 @app.route("/api/import-dataset/", methods=["POST"])
+@login_required
 @limiter.limit("5 per minute")
 @openapi.endpoint("tool")
 def import_dataset():
@@ -238,8 +239,13 @@ def import_dataset():
 	if not platform or platform not in backend.all_modules.datasources:
 		return error(404, message="Unknown platform or source format")
 
-	worker_type = "%s-search" % platform
-	worker = backend.all_modules.workers.get(worker_type)
+	worker_types = (f"{platform}-import", f"{platform}-search")
+	worker = None
+	for worker_type in worker_types:
+		worker = backend.all_modules.workers.get(worker_type)
+		if worker:
+			break
+
 	if not worker:
 		return error(404, message="Unknown platform or source format")
 
@@ -357,8 +363,10 @@ def queue_dataset():
 	sanitised_query["datasource"] = datasource_id
 	sanitised_query["type"] = search_worker_id
 
+	if request.form.to_dict().get("pseudonymise") in ("pseudonymise", "anonymise"):
+		sanitised_query["pseudonymise"] = request.form.to_dict().get("pseudonymise")
+
 	# unchecked checkboxes do not send data in html forms, so key will not exist if box is left unchecked
-	sanitised_query["pseudonymise"] = bool(request.form.to_dict().get("pseudonymise", False))
 	is_private = bool(request.form.get("make-private", False))
 
 	extension = search_worker.extension if hasattr(search_worker, "extension") else "csv"
@@ -376,7 +384,10 @@ def queue_dataset():
 
 	if hasattr(search_worker, "after_create"):
 		search_worker.after_create(sanitised_query, dataset, request)
+
 	queue.add_job(jobtype=search_worker_id, remote_id=dataset.key)
+	dataset.link_job(Job.get_by_remote_ID(dataset.key, db))
+
 	return jsonify({"status": "success", "message": "", "key": dataset.key})
 
 
@@ -851,7 +862,7 @@ def queue_processor(key=None, processor=None):
 			return error(400, error="File must contain a 'body' column")
 
 		filename = secure_filename(input_file.filename)
-		input_file.save(config.get('PATH_DATA') + "/")
+		input_file.save(str(config.get('PATH_DATA')) + "/")
 
 	elif not key:
 		key = request.form.get("key", "")

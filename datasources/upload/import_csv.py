@@ -1,19 +1,22 @@
 """
 Custom data upload to create bespoke datasets
 """
+import secrets
+import hashlib
 import time
 import csv
 import re
 import io
 
 import datasources.upload.import_formats as import_formats
+import common.config_manager as config
 
 from dateutil.parser import parse as parse_datetime
 from datetime import datetime
 
 from backend.abstract.processor import BasicProcessor
 from common.lib.exceptions import QueryParametersException, QueryNeedsFurtherInputException
-from common.lib.helpers import strip_tags, sniff_encoding, UserInput
+from common.lib.helpers import strip_tags, sniff_encoding, UserInput, HashCache
 
 
 class SearchCustom(BasicProcessor):
@@ -87,35 +90,57 @@ class SearchCustom(BasicProcessor):
                 set(tool_format["columns"]) != set(tool_format["columns"]):
             raise QueryParametersException("Not all columns are present")
 
+        # hasher for pseudonymisation
+        salt = secrets.token_bytes(16)
+        hasher = hashlib.blake2b(digest_size=24, salt=salt)
+        hash_cache = HashCache(hasher)
+
         # write the resulting dataset
         writer = None
         done = 0
         skipped = 0
         with self.dataset.get_results_path().open("w", encoding="utf-8", newline="") as output_csv:
             # mapper is defined in import_formats
-            for item in tool_format["mapper"](reader, tool_format["columns"], self.dataset, self.parameters):
-                if isinstance(item, import_formats.InvalidImportedItem):
-                    # if the mapper returns this class, the item is not written
-                    skipped += 1
-                    if hasattr(item, "reason"):
-                        self.dataset.log(f"Skipping item ({item.reason})")
-                    continue
+            try:
+                for item in tool_format["mapper"](reader, tool_format["columns"], self.dataset, self.parameters):
+                    if isinstance(item, import_formats.InvalidImportedItem):
+                        # if the mapper returns this class, the item is not written
+                        skipped += 1
+                        if hasattr(item, "reason"):
+                            self.dataset.log(f"Skipping item ({item.reason})")
+                        continue
 
-                if not writer:
-                    writer = csv.DictWriter(output_csv, fieldnames=list(item.keys()))
-                    header = list(item.keys())
-                    writer.writeheader()
+                    if not writer:
+                        writer = csv.DictWriter(output_csv, fieldnames=list(item.keys()))
+                        writer.writeheader()
 
-                if self.parameters.get("strip_html") and "body" in item:
-                    item["body"] = strip_tags(item["body"])
+                    if self.parameters.get("strip_html") and "body" in item:
+                        item["body"] = strip_tags(item["body"])
 
-                try:
-                    writer.writerow(item)
-                except ValueError as e:
-                    return self.dataset.finish_with_error("Could not parse CSV file. Have you selected the correct "
-                                                          "format?")
-                
-                done += 1
+                    # pseudonymise or anonymise as needed
+                    filtering = self.parameters.get("pseudonymise")
+                    if filtering:
+                        for field, value in item.items():
+                            if field.startswith("author"):
+                                if filtering == "anonymise":
+                                    item[field] = "REDACTED"
+                                elif filtering == "pseudonymise":
+                                    item[field] = hash_cache.update_cache(value)
+
+                    try:
+                        writer.writerow(item)
+                    except ValueError as e:
+                        return self.dataset.finish_with_error("Could not parse CSV file. Have you selected the correct "
+                                                              "format?")
+
+                    done += 1
+
+            except import_formats.InvalidCustomFormat as e:
+                self.log.warning(f"Unable to import improperly formatted file for {tool_format['name']}. See dataset "
+                                 "log for details.")
+                infile.close()
+                temp_file.unlink()
+                return self.dataset.finish_with_error(str(e))
 
         # done!
         infile.close()
@@ -209,6 +234,8 @@ class SearchCustom(BasicProcessor):
                             "type": UserInput.OPTION_CHOICE,
                             "options": {
                                 "": "",
+                                **({"__4cat_auto_sequence": "[generate sequential IDs]"} if mappable_column in (
+                                "id", "thread_id") else {}),
                                 **{column: column for column in fields}
                             },
                             "default": mappable_column if mappable_column in fields else "",
@@ -221,7 +248,8 @@ class SearchCustom(BasicProcessor):
             missing_mapping = []
             for field in tool_format["columns"]:
                 mapping_field = "option-mapping-%s" % field
-                if request.form.get(mapping_field) not in fields or not request.form.get(mapping_field):
+                provided_field = request.form.get(mapping_field)
+                if (provided_field not in fields and provided_field != "__4cat_auto_sequence") or not provided_field:
                     missing_mapping.append(field)
                 else:
                     column_mapping["mapping-" + field] = request.form.get(mapping_field)

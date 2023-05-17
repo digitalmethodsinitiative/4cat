@@ -79,7 +79,7 @@ class VideoSceneFrames(BasicProcessor):
         frame_size = self.parameters.get("frame_size", "no_modify")
 
         # unpack source videos to get frames from
-        video_dataset = self.source_dataset.nearest("video-downloader")
+        video_dataset = self.source_dataset.nearest("video-downloader*")
         if not video_dataset:
             self.log.error(
                 f"Trying to extract video data from non-video dataset {video_dataset.key} (type '{video_dataset.type}')")

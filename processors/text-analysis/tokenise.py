@@ -3,6 +3,7 @@ Tokenize post bodies
 """
 import ahocorasick
 import string
+import jieba
 import json
 import re
 import os
@@ -58,13 +59,23 @@ class Tokenise(BasicProcessor):
 		"tokenizer_type": {
 			"type": UserInput.OPTION_CHOICE,
 			"default": "twitter",
-			"options": {"twitter": "nltk TweetTokenizer", "regular": "nltk word_tokenize"},
+			"options": {
+				"twitter": "nltk TweetTokenizer",
+				"regular": "nltk word_tokenize",
+				"jieba-cut": "jieba (for Chinese text; accurate mode)",
+				"jieba-cut-all": "jieba (for Chinese text; full mode)",
+				"jieba-search": "jieba (for Chinese text; search engine suggestion style)",
+			},
 			"help": "Tokeniser",
 			"tooltip": "TweetTokenizer is recommended for social media content, as it is optimised for informal language."
 		},
 		"language": {
 			"type": UserInput.OPTION_CHOICE,
-			"options": {language: language[0].upper() + language[1:] for language in SnowballStemmer.languages},
+			"options": {
+				**{language: language[0].upper() + language[1:] for language in SnowballStemmer.languages},
+				"other": "Other (language-specific options such as stemming, lemmatizing and sentence splitting will "
+						 "have no effect)"
+			},
 			"default": "english",
 			"help": "Language"
 		},
@@ -110,6 +121,7 @@ class Tokenise(BasicProcessor):
 				#"stopwords-terrier-english": "English stopwords (terrier, recommended)",
 				"stopwords-iso-english": "English stopwords (stopwords-iso, recommended)",
 				"stopwords-iso-dutch": "Dutch stopwords (stopwords-iso)",
+				"stopwords-iso-zh": "Chinese stopwords (stopwords-iso)",
 				"stopwords-iso-all": "Stopwords for many languages (including Dutch/English, stopwords-iso)",
 				#"wordlist-infochimps-english": "English word list (infochimps)",
 				"wordlist-googlebooks-english": "English word list (Google One Million Books pre-2008 top unigrams, recommended)",
@@ -172,13 +184,23 @@ class Tokenise(BasicProcessor):
 
 		# Twitter tokenizer if indicated
 		language = self.parameters.get("language", "english")
-		tokenizer = TweetTokenizer(preserve_case=False).tokenize if self.parameters.get("tokenizer_type") == "twitter" else word_tokenize
-		tokenizer_args = {} if self.parameters.get("tokenizer_type") == "twitter" else {"language": language}
+		if self.parameters.get("tokenizer_type") == "jieba-cut":
+			tokenizer = jieba.cut
+			tokenizer_args = {"cut_all": False}
+		elif self.parameters.get("tokenizer_type") == "jieba-cut-all":
+			tokenizer = jieba.cut
+			tokenizer_args = {"cut_all": True}
+		elif self.parameters.get("tokenizer_type") == "jieba-search":
+			tokenizer = jieba.cut_for_search
+			tokenizer_args = {}
+		else:
+			tokenizer = TweetTokenizer(preserve_case=False).tokenize if self.parameters.get("tokenizer_type") == "twitter" else word_tokenize
+			tokenizer_args = {} if self.parameters.get("tokenizer_type") == "twitter" else {"language": language}
 
 		# load word filters - words to exclude from tokenisation
 		word_filter = set()
 		for wordlist in self.parameters.get("filter", []):
-			with open(config.get('PATH_ROOT') + "/common/assets/wordlists/%s.txt" % wordlist, encoding="utf-8") as input:
+			with config.get('PATH_ROOT').joinpath(f"common/assets/wordlists/{wordlist}.txt").open(encoding="utf-8") as input:
 				word_filter = set.union(word_filter, input.read().splitlines())
 
 		# Extend or limit the word filter with optionally added words
@@ -204,11 +226,14 @@ class Tokenise(BasicProcessor):
 				automaton.add_word(word, 1)
 
 		# initialise pre-processors if needed
-		if self.parameters.get("stem"):
-			stemmer = SnowballStemmer(language)
+		stemmer = None
+		lemmatizer = None
+		if self.parameters.get("language") != "other":
+			if self.parameters.get("stem"):
+				stemmer = SnowballStemmer(language)
 
-		if self.parameters.get("lemmatise"):
-			lemmatizer = WordNetLemmatizer()
+			if self.parameters.get("lemmatise"):
+				lemmatizer = WordNetLemmatizer()
 
 		# Only keep unique words?
 		only_unique = self.parameters.get("only_unique")
@@ -305,10 +330,10 @@ class Tokenise(BasicProcessor):
 					if not token or token in automaton:
 						continue
 
-					if self.parameters["stem"]:
+					if self.parameters["stem"] and stemmer:
 						token = stemmer.stem(token)
 
-					if self.parameters["lemmatise"]:
+					if self.parameters["lemmatise"] and lemmatizer:
 						token = lemmatizer.lemmatize(token)
 
 					# append tokens to the post's token list

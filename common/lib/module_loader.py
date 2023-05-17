@@ -76,7 +76,7 @@ class ModuleCollector:
         paths = [Path(config.get('PATH_ROOT'), "processors"), Path(config.get('PATH_ROOT'), "backend", "workers"),
                  *[self.datasources[datasource]["path"] for datasource in self.datasources]]
 
-        root_match = re.compile(r"^%s" % re.escape(config.get('PATH_ROOT')))
+        root_match = re.compile(r"^%s" % re.escape(str(config.get('PATH_ROOT'))))
         root_path = Path(config.get('PATH_ROOT'))
 
         for folder in paths:

@@ -1,25 +1,24 @@
 """
 Miscellaneous helper functions for the 4CAT backend
 """
-import ssl
 import subprocess
-from urllib.parse import urlparse
 import requests
 import datetime
 import smtplib
+import fnmatch
 import socket
 import copy
 import time
 import json
 import math
-import csv
+import ssl
 import re
 import os
 import io
 
 from collections.abc import MutableMapping
-from pathlib import Path
 from html.parser import HTMLParser
+from urllib.parse import urlparse
 from calendar import monthrange
 
 from common.lib.user_input import UserInput
@@ -113,7 +112,7 @@ def get_software_version():
 
     :return str:  4CAT version
     """
-    versionpath = Path(config.get('PATH_ROOT'), config.get('path.versionfile'))
+    versionpath = config.get('PATH_ROOT').joinpath(config.get('path.versionfile'))
 
     if versionpath.exists() and not versionpath.is_file():
         return ""
@@ -579,23 +578,6 @@ def pad_interval(intervals, first_interval=None, last_interval=None):
     return missing, intervals
 
 
-def is_rankable(dataset):
-    """
-    Determine if a dataset is rankable
-
-    :todo:  Should this be part of the DataSet class?
-
-    :param DataSet dataset:  Dataset to inspect
-    :return bool:  Whether the dataset is rankable or not
-    """
-    if dataset.get_results_path().suffix != ".csv":
-        return False
-
-    with dataset.get_results_path().open(encoding="utf-8") as infile:
-        reader = csv.DictReader(infile)
-        return len(set(reader.fieldnames) & {"date", "value", "item", "word_1"}) >= 3
-
-
 def remove_nuls(value):
     """
     Remove \0 from a value
@@ -632,30 +614,67 @@ class NullAwareTextIOWrapper(io.TextIOWrapper):
     This can be used as a file reader that silently discards any null bytes it
     encounters.
     """
+
     def __next__(self):
         value = super().__next__()
         return remove_nuls(value)
 
+
+class HashCache:
+    """
+    Simple cache handler to cache hashed values
+
+    Avoids having to calculate a hash for values that have been hashed before
+    """
+
+    def __init__(self, hasher):
+        self.hash_cache = {}
+        self.hasher = hasher
+
+    def update_cache(self, value):
+        """
+        Checks the hash_cache to see if the value has been cached previously,
+        updates the hash_cache if needed, and returns the hashed value.
+        """
+        # value = str(value)
+        if value not in self.hash_cache:
+            author_hasher = self.hasher.copy()
+            author_hasher.update(str(value).encode("utf-8"))
+            self.hash_cache[value] = author_hasher.hexdigest()
+            del author_hasher
+        return self.hash_cache[value]
+
+
 def dict_search_and_update(item, keyword_matches, function):
     """
-    Apply a function to every item and sub item of a dictionary if the key contains one of the provided match terms.
+    Filter fields in an object recursively
 
-    Function loops through a dictionary or list and compares dictionary keys to the strings defined by keyword_matches.
-    It then applies the change_function to corresponding values.
+    Apply a function to every item and sub item of a dictionary if the key
+    contains one of the provided match terms.
 
-    Note: if a matching term is found, all nested values will have the function applied to them. e.g.,
-    all these values would be changed even those with not_key_match:
+    Function loops through a dictionary or list and compares dictionary keys to
+    the strings defined by keyword_matches. It then applies the change_function
+    to corresponding values.
+
+    Note: if a matching term is found, all nested values will have the function
+    applied to them. e.g., all these values would be changed even those with
+    not_key_match:
+
     {'key_match' : 'changed',
     'also_key_match' : {'not_key_match' : 'but_value_still_changed'},
     'another_key_match': ['this_is_changed', 'and_this', {'not_key_match' : 'even_this_is_changed'}]}
 
     This is a comprehensive (and expensive) approach to updating a dictionary.
-    IF a dictionary structure is known, a better solution would be to update using specific keys.
+    IF a dictionary structure is known, a better solution would be to update
+    using specific keys.
 
     :param Dict/List item:  dictionary/list/json to loop through
-    :param String keyword_matches:  list of strings that will be matched to dictionary keys
-    :param Function function:  function appled to all values of any items nested under a matching key
-    :return Dict/List: Copy of original item
+    :param String keyword_matches:  list of strings that will be matched to
+    dictionary keys. Can contain wildcards which are matched using fnmatch.
+    :param Function function:  function appled to all values of any items
+    nested under a matching key
+
+    :return Dict/List: Copy of original item, but filtered
     """
 
     def loop_helper_function(d_or_l, match_terms, change_function):
@@ -665,7 +684,7 @@ def dict_search_and_update(item, keyword_matches, function):
         if isinstance(d_or_l, dict):
             # Iterate through dictionary
             for key, value in iter(d_or_l.items()):
-                if match_terms == 'True' or any([match in key.lower() for match in match_terms]):
+                if match_terms == 'True' or any([fnmatch.fnmatch(key, match_term) for match_term in match_terms]):
                     # Match found; apply function to all items and sub-items
                     if isinstance(value, (list, dict)):
                         # Pass item through again with match_terms = True
@@ -743,7 +762,9 @@ def send_email(recipient, message):
     context = ssl.create_default_context()
 
     # Decide which connection type
-    with smtplib.SMTP_SSL(config.get('mail.server'), port=config.get('mail.port', 0), context=context) if config.get('mail.ssl') == 'ssl' else smtplib.SMTP(config.get('mail.server'), port=config.get('mail.port', 0)) as server:
+    with smtplib.SMTP_SSL(config.get('mail.server'), port=config.get('mail.port', 0), context=context) if config.get(
+            'mail.ssl') == 'ssl' else smtplib.SMTP(config.get('mail.server'),
+                                                   port=config.get('mail.port', 0)) as server:
         if config.get('mail.ssl') == 'tls':
             # smtplib.SMTP adds TLS context here
             server.starttls(context=context)
@@ -758,7 +779,6 @@ def send_email(recipient, message):
             server.sendmail(config.get('mail.noreply'), recipient, message)
         else:
             server.sendmail(config.get('mail.noreply'), recipient, message.as_string())
-
 
 
 def flatten_dict(d: MutableMapping, parent_key: str = '', sep: str = '.'):
@@ -797,7 +817,8 @@ def sets_to_lists(d: MutableMapping):
     """
 
     def _check_list(l):
-        return [sets_to_lists(item) if isinstance(item, MutableMapping) else _check_list(item) if isinstance(item, (set,list)) else item for item in l]
+        return [sets_to_lists(item) if isinstance(item, MutableMapping) else _check_list(item) if isinstance(item, (
+        set, list)) else item for item in l]
 
     def _sets_to_lists_gen(d):
         for k, v in d.items():

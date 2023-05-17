@@ -96,8 +96,7 @@ else:
     import daemon
 
 # determine PID file
-pidfile = Path(config.get('PATH_ROOT'), config.get('PATH_LOCKFILE'), "4cat.pid")  # pid file location
-
+pidfile = config.get('PATH_ROOT').joinpath(config.get('PATH_LOCKFILE'), "4cat.pid")  # pid file location
 
 # ---------------------------------------------
 #   These functions start and stop the daemon
