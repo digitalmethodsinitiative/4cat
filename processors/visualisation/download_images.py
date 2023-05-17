@@ -448,7 +448,10 @@ class ImageDownloader(BasicProcessor):
 			# Check if we succeeded; content type should be an image
 			if image.status_code != 200 or image.headers.get("content-type", "")[:5] != "image":
 				raise FileNotFoundError()
-			image = BytesIO(image.content)
+			try:
+				image = BytesIO(image.content)
+			except requests.exceptions.ConnectionError:
+				raise FileNotFoundError()
 			image_name = image_url.split("/")[-1].split("?")[0]
 		else:
 			raise FileNotFoundError()
