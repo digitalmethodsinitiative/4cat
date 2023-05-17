@@ -22,6 +22,8 @@ import common.config_manager as config
 import backend
 from common.lib.dataset import DataSet
 from common.lib.queue import JobQueue
+from common.lib.job import Job
+from common.lib.exceptions import JobNotFoundException
 
 csv.field_size_limit(1024 * 1024 * 1024)
 
@@ -134,9 +136,16 @@ def show_results(page):
     # some housekeeping to prepare data for the template
     pagination = Pagination(page, page_size, num_datasets)
     filtered = []
+    dataset_queue = {}
 
     for dataset in datasets:
-        filtered.append(DataSet(key=dataset["key"], db=db))
+        dataset = DataSet(key=dataset["key"], db=db)
+        filtered.append(dataset)
+        if dataset.job:
+            try:
+                dataset_queue[dataset.key] = Job.get_by_ID(dataset.job, db)
+            except JobNotFoundException:
+                pass
 
     favourites = [row["key"] for row in
                   db.fetchall("SELECT key FROM users_favourites WHERE name = %s", (current_user.get_id(),))]
@@ -145,7 +154,7 @@ def show_results(page):
                    metadata["has_worker"] and metadata["has_options"]}
 
     return render_template("results.html", filter=filters, depth=depth, datasources=datasources,
-                           datasets=filtered, pagination=pagination, favourites=favourites)
+                           datasets=filtered, pagination=pagination, favourites=favourites, dataset_queue=dataset_queue)
 
 
 """
@@ -365,10 +374,19 @@ def show_result(key):
     standalone = "processors" not in request.url
     template = "result.html" if standalone else "result-details.html"
 
+    dataset_queue = {}
+    if dataset.job:
+        try:
+            dataset_queue[dataset.key] = Job.get_by_ID(dataset.job, db)
+        except JobNotFoundException:
+            pass
+
+
     return render_template(template, dataset=dataset, parent_key=dataset.key, processors=backend.all_modules.processors,
                            is_processor_running=is_processor_running, messages=get_flashed_messages(),
                            is_favourite=is_favourite, timestamp_expires=timestamp_expires, has_credentials=has_credentials,
-                           expires_by_datasource=expires_datasource, can_unexpire=can_unexpire, datasources=datasources)
+                           expires_by_datasource=expires_datasource, can_unexpire=can_unexpire, datasources=datasources,
+                           dataset_queue=dataset_queue)
 
 
 @app.route('/results/<string:key>/processors/queue/<string:processor>/', methods=["GET", "POST"])

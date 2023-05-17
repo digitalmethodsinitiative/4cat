@@ -104,7 +104,7 @@ import webtool.views.api_tool
 import webtool.lib.template_filters
 
 # ensure that colour definition CSS file is present
-generate_css_colours()
+generate_css_colours(force=True)
 
 # run it
 if __name__ == "__main__":

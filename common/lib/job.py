@@ -45,7 +45,14 @@ class Job:
 		:param database:  Database handler
 		:return Job: Job object
 		"""
-		data = database.fetchone("SELECT * FROM jobs WHERE id = %s", (id,))
+		data = database.fetchone("SELECT main_queue.*, ( " \
+			"  SELECT COUNT(*) as queue_ahead FROM jobs AS ahead WHERE ahead.jobtype = main_queue.jobtype AND (" \
+			"	(main_queue.timestamp_after > 0 AND ahead.timestamp_after = 0 AND ahead.timestamp < main_queue.timestamp_after ) " \
+			"	OR (main_queue.timestamp_after > 0 AND ahead.timestamp_after > 0 AND ahead.timestamp_after < main_queue.timestamp_after) " \
+			"   OR (main_queue.timestamp_after = 0 AND ahead.timestamp_after > 0 AND ahead.timestamp_after < main_queue.timestamp) " \
+			"   OR (main_queue.timestamp_after = 0 AND ahead.timestamp_after = 0 AND ahead.timestamp < main_queue.timestamp) " \
+			"  ) " \
+			") AS queue_ahead FROM jobs AS main_queue WHERE main_queue.id = %s", (id,))
 		if not data:
 			raise JobNotFoundException
 
@@ -73,9 +80,23 @@ class Job:
 		:return Job: Job object
 		"""
 		if jobtype != "*":
-			data = database.fetchone("SELECT * FROM jobs WHERE jobtype = %s AND remote_id = %s", (jobtype, remote_id))
+			data = database.fetchone("SELECT main_queue.*, ( " \
+			"  SELECT COUNT(*) as queue_ahead FROM jobs AS ahead WHERE ahead.jobtype = main_queue.jobtype AND (" \
+			"	(main_queue.timestamp_after > 0 AND ahead.timestamp_after = 0 AND ahead.timestamp < main_queue.timestamp_after ) " \
+			"	OR (main_queue.timestamp_after > 0 AND ahead.timestamp_after > 0 AND ahead.timestamp_after < main_queue.timestamp_after) " \
+			"   OR (main_queue.timestamp_after = 0 AND ahead.timestamp_after > 0 AND ahead.timestamp_after < main_queue.timestamp) " \
+			"   OR (main_queue.timestamp_after = 0 AND ahead.timestamp_after = 0 AND ahead.timestamp < main_queue.timestamp) " \
+			"  ) " \
+			") AS queue_ahead FROM jobs AS main_queue WHERE main_queue.jobtype = %s AND main_queue.remote_id = %s", (jobtype, remote_id))
 		else:
-			data = database.fetchone("SELECT * FROM jobs WHERE remote_id = %s", (remote_id,))
+			data = database.fetchone("SELECT main_queue.*, ( " \
+			"  SELECT COUNT(*) as queue_ahead FROM jobs AS ahead WHERE ahead.jobtype = main_queue.jobtype AND (" \
+			"	(main_queue.timestamp_after > 0 AND ahead.timestamp_after = 0 AND ahead.timestamp < main_queue.timestamp_after ) " \
+			"	OR (main_queue.timestamp_after > 0 AND ahead.timestamp_after > 0 AND ahead.timestamp_after < main_queue.timestamp_after) " \
+			"   OR (main_queue.timestamp_after = 0 AND ahead.timestamp_after > 0 AND ahead.timestamp_after < main_queue.timestamp) " \
+			"   OR (main_queue.timestamp_after = 0 AND ahead.timestamp_after = 0 AND ahead.timestamp < main_queue.timestamp) " \
+			"  ) " \
+			") AS queue_ahead FROM jobs AS main_queue WHERE main_queue.remote_id = %s", (remote_id,))
 
 		if not data:
 			raise JobNotFoundException

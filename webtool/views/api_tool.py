@@ -24,7 +24,8 @@ from werkzeug.utils import secure_filename
 from webtool import app, db, log, openapi, limiter, queue
 from webtool.lib.helpers import error
 
-from common.lib.exceptions import QueryParametersException, JobNotFoundException, QueryNeedsExplicitConfirmationException, QueryNeedsFurtherInputException
+from common.lib.exceptions import QueryParametersException, JobNotFoundException, \
+	QueryNeedsExplicitConfirmationException, QueryNeedsFurtherInputException
 from common.lib.queue import JobQueue
 from common.lib.job import Job
 from common.lib.dataset import DataSet
@@ -443,12 +444,19 @@ def check_dataset():
 	else:
 		path = ""
 
+	dataset_queue = {}
+	if dataset.job:
+		try:
+			dataset_queue[dataset.key] = Job.get_by_ID(dataset.job, db)
+		except JobNotFoundException:
+			pass
+
 	template = "result-status.html" if block == "status" else "result-result-row.html"
 
 	status = {
 		"datasource": dataset.parameters.get("datasource"),
 		"status": dataset.get_status(),
-		"status_html": render_template(template, dataset=dataset),
+		"status_html": render_template(template, dataset=dataset, dataset_queue=dataset_queue),
 		"label": dataset.get_label(),
 		"rows": dataset.data["num_rows"],
 		"key": dataset_key,
