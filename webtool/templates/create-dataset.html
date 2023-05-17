@@ -37,13 +37,18 @@
                 </div>
 
                 <div id="data-options">
-                    <p class="form-intro">4CAT can replace author names with their <a href="https://techterms.com/definition/hash">hashed</a> value. Other personal
-                        information may persist; it is your responsibility to further anonymise data where
+                    <p class="form-intro">4CAT can remove information it identifies as relating to an item's author, or
+                        replace it with a <a href="https://techterms.com/definition/hash">hashed</a> value. Other
+                        personal information may persist; it is your responsibility to further anonymise data where
                         appropriate.</p>
                     <div class="form-element">
                         <label for="data-pseudonymise">Pseudonymise:</label>
                         <div class="filter-parameters">
-                            <label><input type="checkbox" checked="checked" name="pseudonymise" id="data-pseudonymise"> Replace author names with hashed values</label>
+                            <select name="pseudonymise" id="data-pseudonymise">
+                                <option value="anonymise">Replace author information with 'REDACTED'</option>
+                                <option value="pseudonymise" selected="selected">Replace author information with hashed values</option>
+                                <option value="none">Leave author information as-is</option>
+                            </select>
                         </div>
                     </div>
                     <div class="form-element">

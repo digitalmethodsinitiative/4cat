@@ -363,8 +363,10 @@ def queue_dataset():
 	sanitised_query["datasource"] = datasource_id
 	sanitised_query["type"] = search_worker_id
 
+	if request.form.to_dict().get("pseudonymise") in ("pseudonymise", "anonymise"):
+		sanitised_query["pseudonymise"] = request.form.to_dict().get("pseudonymise")
+
 	# unchecked checkboxes do not send data in html forms, so key will not exist if box is left unchecked
-	sanitised_query["pseudonymise"] = bool(request.form.to_dict().get("pseudonymise", False))
 	is_private = bool(request.form.get("make-private", False))
 
 	extension = search_worker.extension if hasattr(search_worker, "extension") else "csv"

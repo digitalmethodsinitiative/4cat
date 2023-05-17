@@ -1,10 +1,10 @@
 import hashlib
+import secrets
 import shutil
 import random
 import json
 import math
 import csv
-import copy
 
 from pathlib import Path
 from abc import ABC, abstractmethod
@@ -12,7 +12,7 @@ from abc import ABC, abstractmethod
 import common.config_manager as config
 from common.lib.dataset import DataSet
 from backend.abstract.processor import BasicProcessor
-from common.lib.helpers import strip_tags, dict_search_and_update, remove_nuls
+from common.lib.helpers import strip_tags, dict_search_and_update, remove_nuls, HashCache
 from common.lib.exceptions import WorkerInterruptedException, ProcessorInterruptedException
 
 
@@ -212,15 +212,16 @@ class Search(BasicProcessor, ABC):
 
 		# cache hashed author names, so the hashing function (which is
 		# relatively expensive) is not run too often
-		pseudonymise_author = bool(self.parameters.get("pseudonymise", None))
-		hash_cache = {}
+		pseudonymise_author = self.parameters.get("pseudonymise", None) == "pseudonymise"
+		anonymise_author = self.parameters.get("pseudonymise", None) == "anonymise"
 
 		# prepare hasher (which we may or may not need)
 		# we use BLAKE2	for its (so far!) resistance against cryptanalysis and
 		# speed, since we will potentially need to calculate a large amount of
 		# hashes
-		hasher = hashlib.blake2b(digest_size=24)
-		hasher.update(str(config.get('ANONYMISATION_SALT')).encode("utf-8"))
+		salt = secrets.token_bytes(16)
+		hasher = hashlib.blake2b(digest_size=24, salt=salt)
+		hash_cache = HashCache(hasher)
 
 		processed = 0
 		header_written = False
@@ -276,10 +277,15 @@ class Search(BasicProcessor, ABC):
 				# replace author column with salted hash of the author name, if
 				# pseudonymisation is enabled
 				if pseudonymise_author:
-					check_cache = CheckCache(hash_cache, hasher)
-					author_fields = [field for field in row.keys() if "author" in field]
+					author_fields = [field for field in row.keys() if field.startswith("author")]
 					for author_field in author_fields:
-						row[author_field] = check_cache.update_cache(row[author_field])
+						row[author_field] = hash_cache.update_cache(row[author_field])
+
+				# or remove data altogether, if it's anonymisation instead
+				elif anonymise_author:
+					for field in row.keys():
+						if field.startswith("author"):
+							row[field] = "REDACTED"
 
 				row = remove_nuls(row)
 				writer.writerow(row)
@@ -303,14 +309,14 @@ class Search(BasicProcessor, ABC):
 		if not filepath:
 			raise ResourceWarning("No valid results path supplied")
 
-		# cache hashed author names, so the hashing function (which is
-		# relatively expensive) is not run too often
-		pseudonymise_author = bool(self.parameters.get("pseudonymise", None))
-		if pseudonymise_author:
-			hash_cache = {}
+		# figure out if we need to filter the data somehow
+		hash_cache = None
+		if self.parameters.get("pseudonymise") == "pseudonymise":
+			# cache hashed author names, so the hashing function (which is
+			# relatively expensive) is not run too often
 			hasher = hashlib.blake2b(digest_size=24)
 			hasher.update(str(config.get('ANONYMISATION_SALT')).encode("utf-8"))
-			check_cache = CheckCache(hash_cache, hasher)
+			hash_cache = HashCache(hasher)
 
 		processed = 0
 		with filepath.open("w", encoding="utf-8", newline="") as outfile:
@@ -318,36 +324,16 @@ class Search(BasicProcessor, ABC):
 				if self.interrupted:
 					raise ProcessorInterruptedException("Interrupted while writing results to file")
 
-				# replace author column with salted hash of the author name, if
-				# pseudonymisation is enabled
-				if pseudonymise_author:
-					item = dict_search_and_update(item, ['author'], check_cache.update_cache)
+				# if pseudo/anonymising, filter data recursively
+				if self.parameters.get("pseudonymise") == "pseudonymise":
+					item = dict_search_and_update(item, ["author*"], hash_cache.update_cache)
+				elif self.parameters.get("anonymise") == "anonymise":
+					item = dict_search_and_update(item, ["author*"], lambda v: "REDACTED")
 
 				outfile.write(json.dumps(item) + "\n")
 				processed += 1
 
 		return processed
-
-class CheckCache():
-	"""
-	Handler for the hasher
-	"""
-	def __init__(self, hash_cache, hasher):
-		self.hash_cache = hash_cache
-		self.hasher = hasher
-
-	def update_cache(self, value):
-		"""
-		Checks the hash_cache to see if the value has been cached previously,
-		updates the hash_cache if needed, and returns the hashed value.
-		"""
-		# value = str(value)
-		if value not in self.hash_cache:
-			author_hasher = self.hasher.copy()
-			author_hasher.update(str(value).encode("utf-8"))
-			self.hash_cache[value] = author_hasher.hexdigest()
-			del author_hasher
-		return self.hash_cache[value]
 
 
 class SearchWithScope(Search, ABC):
