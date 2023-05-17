@@ -13,12 +13,11 @@ import re
 from requests_futures.sessions import FuturesSession
 from bs4 import BeautifulSoup
 
-import common.config_manager as config
 from backend.abstract.search import Search
 from common.lib.helpers import UserInput
-from common.lib.exceptions import WorkerInterruptedException, QueryParametersException, ProcessorInterruptedException, ProcessorException
+from common.lib.exceptions import WorkerInterruptedException, QueryParametersException, ProcessorException
 from datasources.tiktok.search_tiktok import SearchTikTok as SearchTikTokByImport
-
+from common.config_manager import config
 
 class SearchTikTokByID(Search):
     """

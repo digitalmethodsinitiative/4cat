@@ -1,253 +1,239 @@
-""" 4CAT configuration """
-import os
 import json
+
 from pathlib import Path
-import psycopg2
-import psycopg2.extras
-import configparser
+from common.lib.database import Database
 
 from common.lib.exceptions import ConfigException
 from common.lib.config_definition import config_definition
 
+import configparser
+import os
+
 
 class ConfigManager:
-    """
-    Manage 4CAT configuration options that cannot be recorded in database
-    (generally because they are used to get to the database!).
+    db = None
+    dbconn = None
+    cache = {}
 
-    Note: some options are here until additional changes are made and they can
-    be moved to more appropriate locations.
-    """
-    CONFIG_FILE = Path(__file__).parent.parent.joinpath("config/config.ini")
+    core_settings = {}
+    config_definition = {}
+    tag_context = []  # todo
 
-    # TODO: work out best structure for docker vs non-docker
-    # Do not need two configs, BUT Docker config.ini has to be in shared volume for both front and backend to access it
-    config_reader = configparser.ConfigParser()
-    USING_DOCKER = False
-    if CONFIG_FILE.exists():
-        config_reader.read(CONFIG_FILE)
-        if config_reader["DOCKER"].getboolean("use_docker_config"):
-            # Can use throughtout 4CAT to know if Docker environment
-            USING_DOCKER = True
-    else:
-        # config should be created!
-        raise ConfigException("No config/config.ini file exists! Update and rename the config.ini-example file.")
+    def __init__(self, db=None):
+        # ensure core settings (including database config) are loaded
+        self.load_core_settings()
+        self.load_user_settings()
 
-    DB_HOST = config_reader["DATABASE"].get("db_host")
-    DB_PORT = config_reader["DATABASE"].getint("db_port")
-    DB_USER = config_reader["DATABASE"].get("db_user")
-    DB_NAME = config_reader["DATABASE"].get("db_name")
-    DB_PASSWORD = config_reader["DATABASE"].get("db_password")
+        # establish database connection if none available
+        self.db = db
 
-    API_HOST = config_reader["API"].get("api_host")
-    API_PORT = config_reader["API"].getint("api_port")
+    def with_db(self, db=None):
+        """
+        Initialise database
 
-    PATH_ROOT = Path(os.path.abspath(os.path.dirname(__file__))).joinpath("..").resolve()  # better don"t change this
-    PATH_LOGS = Path(config_reader["PATHS"].get("path_logs", ""))
-    PATH_IMAGES = Path(config_reader["PATHS"].get("path_images", ""))
-    PATH_DATA = Path(config_reader["PATHS"].get("path_data", ""))
-    PATH_LOCKFILE = Path(config_reader["PATHS"].get("path_lockfile", ""))
-    PATH_SESSIONS = Path(config_reader["PATHS"].get("path_sessions", ""))
+        Not done on init, because something may need core settings before the
+        database can be initialised
 
-    ANONYMISATION_SALT = config_reader["GENERATE"].get("anonymisation_salt")
-    SECRET_KEY = config_reader["GENERATE"].get("secret_key")
+        :param db:  Database object. If None, initialise it using the core config
+        """
+        self.db = db if db else Database(logger=None, dbname=self.get("DB_NAME"), user=self.get("DB_USER"),
+                           password=self.get("DB_PASSWORD"), host=self.get("DB_HOST"),
+                           port=self.get("DB_PORT"), appname="config-reader") if not db else db
 
+    def load_user_settings(self):
+        """
+        Load settings configurable by the user
 
-def quick_db_connect():
-    """
-    Create a connection and cursor with the database
+        Does not load the settings themselves, but rather the definition so
+        values can be validated, etc
+        """
+        # basic 4CAT settings
+        self.config_definition.update(config_definition)
 
-    We're not using lib.database.Database because that one relies on some
-    config options, which would get paradoxical really fast.
+        # module settings can't be loaded directly because modules need the
+        # config manager to load, so that becomes circular
+        # instead, this is cached on startup and then loaded here
+        module_config_path = self.get("PATH_ROOT").joinpath("backend/module_config.json")
+        if module_config_path.exists():
+            try:
+                with module_config_path.open() as infile:
+                    self.config_definition.update(json.load(infile))
+            except (json.JSONDecodeError, TypeError):
+                pass
 
-    :return list: [connection, cursor]
-    """
-    connection = psycopg2.connect(dbname=ConfigManager.DB_NAME, user=ConfigManager.DB_USER,
-                                  password=ConfigManager.DB_PASSWORD, host=ConfigManager.DB_HOST,
-                                  port=ConfigManager.DB_PORT)
-    cursor = connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-    return connection, cursor
+    def load_core_settings(self):
+        """
+        Load 4CAT core settings
 
+        These are (mostly) stored in config.ini and cannot be changed from the
+        web interface.
 
-def get(attribute_name, default=None, connection=None, cursor=None, keep_connection_open=False, raw=False, user=None):
-    """
-    Get a setting's value from the database
+        :return:
+        """
+        config_file = Path(__file__).parent.parent.joinpath("config/config.ini")
 
-    If the setting does not exist, the provided fallback value is returned.
+        config_reader = configparser.ConfigParser()
+        in_docker = False
+        if config_file.exists():
+            config_reader.read(config_file)
+            if config_reader["DOCKER"].getboolean("use_docker_config"):
+                # Can use throughtout 4CAT to know if Docker environment
+                in_docker = True
+        else:
+            # config should be created!
+            raise ConfigException("No config/config.ini file exists! Update and rename the config.ini-example file.")
 
-    :param str attribute_name:  Setting to return
-    :param default:  Value to return if setting does not exist
-    :param connection:  Database connection, if None then a new connection will be created
-    :param cursor:  Database cursor, if None then a new cursor will be created
-    :param bool keep_connection_open:  Close connection after query?
-    :param bool raw:  True returns value as JSON serialized string; False returns JSON object
-    :param user:  A User object. If none, get the 'global' value. If given,
-    check if it is overridden for this user and if so return that instead
-    :return:  Setting value, or the provided fallback, or `None`.
-    """
-    if attribute_name in dir(ConfigManager):
-        # an explicitly defined attribute should always be called in favour
-        # of this passthrough
-        attribute = getattr(ConfigManager, attribute_name)
-        return attribute
-    else:
-        try:
-            if not connection or not cursor:
-                connection, cursor = quick_db_connect()
+        self.core_settings.update({
+            "CONFIG_FILE": config_file.resolve(),
+            "USING_DOCKER": in_docker,
+            "DB_HOST": config_reader["DATABASE"].get("db_host"),
+            "DB_PORT": config_reader["DATABASE"].get("db_port"),
+            "DB_USER": config_reader["DATABASE"].get("db_user"),
+            "DB_NAME": config_reader["DATABASE"].get("db_name"),
+            "DB_PASSWORD": config_reader["DATABASE"].get("db_password"),
 
-            row = None
-            if user:
-                if user.__class__.__name__ == "User":
-                    user = user.get_id()
+            "API_HOST": config_reader["API"].get("api_host"),
+            "API_PORT": config_reader["API"].getint("api_port"),
 
-                cursor.execute("SELECT * FROM user_settings WHERE user = %s AND name = %s", (user, attribute_name))
-                row = cursor.fetchone()
+            "PATH_ROOT": Path(os.path.abspath(os.path.dirname(__file__))).joinpath(
+                "..").resolve(),  # better don"t change this
+            "PATH_LOGS": Path(config_reader["PATHS"].get("path_logs", "")),
+            "PATH_IMAGES": Path(config_reader["PATHS"].get("path_images", "")),
+            "PATH_DATA": Path(config_reader["PATHS"].get("path_data", "")),
+            "PATH_LOCKFILE": Path(config_reader["PATHS"].get("path_lockfile", "")),
+            "PATH_SESSIONS": Path(config_reader["PATHS"].get("path_sessions", "")),
 
-            if not row:
-                query = "SELECT value FROM settings WHERE name = %s"
-                cursor.execute(query, (attribute_name,))
-                row = cursor.fetchone()
+            "ANONYMISATION_SALT": config_reader["GENERATE"].get("anonymisation_salt"),
+            "SECRET_KEY": config_reader["GENERATE"].get("secret_key")
+        })
 
-            if not keep_connection_open:
-                connection.close()
+    def get(self, attribute_name, default=None, raw=False, user=None, tags=None):
+        """
+        Get a setting's value from the database
 
-            value = row.get("value", None) if row else None
-            if not raw and value is not None:
-                value = json.loads(value)
-        except (Exception, psycopg2.DatabaseError) as error:
-            raise ConfigException("Error getting setting {}: {}".format(attribute_name, repr(error)))
+        If the setting does not exist, the provided fallback value is returned.
 
-        finally:
-            if connection is not None and not keep_connection_open:
-                connection.close()
+        :param str attribute_name:  Setting to return
+        :param default:  Value to return if setting does not exist
+        :param bool raw:  if True, the value is returned as stored and not
+        interpreted as JSON if it comes from the database
+        :param user:  User object or name. Adds a tag `user:[username]` in
+        front of the tag list.
+        :param tags:  Tag or tags for the required setting. If a tag is
+        provided, the method checks if a special value for the setting exists
+        with the given tag, and returns that if one exists. First matching tag
+        wins.
 
-        if value is None:
-            # no value explicitly defined in the database...
-            if default is not None:
-                # if an explicit default was provided, return it
-                return default
-            elif attribute_name in config_definition and "default" in config_definition[attribute_name]:
-                # if a default is available from the config definition, return that
-                return config_definition[attribute_name]["default"]
-            else:
-                # use None as the last resort
+        :return:  Setting value, or the provided fallback, or `None`.
+        """
+        # core settings are not from the database
+        if attribute_name in self.core_settings:
+            return self.core_settings[attribute_name]
+
+        # if trying to access a setting that's not a core setting, attempt to
+        # initialise the database connection
+        if not self.db:
+            self.with_db()
+
+        # be flexible about the input types here
+        if tags is None:
+            tags = []
+        elif type(tags) is str:
+            tags = [tags]
+
+        # can provide either a string or user object
+        if type(user) is not str:
+            if hasattr(user, "get_id"):
+                user = user.get_id()
+            elif user is not None:
+                raise TypeError("get() expects None, a User object or a string for argument 'user'")
+
+        # user-specific settings are just a special type of tag (which takes
+        # precedence)
+        if user:
+            tags.insert(0, f"user:{user}")
+
+        # query database for any values within the required tags
+        tags.append("")  # empty tag = default value
+        settings = {s["tag"]: s["value"] for s in
+                    self.db.fetchall("SELECT * FROM settings WHERE name = %s AND tag IN %s", (attribute_name, tuple(tags)))}
+
+        # return first matching setting with a required tag, in the order the
+        # tags were provided
+        value = None
+        if settings:
+            for tag in tags:
+                if tag in settings:
+                    value = settings[tag]
+                    break
+
+        # no matching tags? try empty tag
+        if value is None and "" in settings:
+            value = settings[""]
+
+        if not raw and value is not None:
+            value = json.loads(value)
+        elif default is not None:
+            value = default
+        elif value is None and attribute_name in config_definition and "default" in config_definition[attribute_name]:
+            value = config_definition[attribute_name]["default"]
+
+        return value
+
+    def __getattr__(self, attr):
+        """
+        Getter so we can directly request values
+
+        :param attr:  Config setting to get
+        :return:  Value
+        """
+
+        if attr in dir(self):
+            # an explicitly defined attribute should always be called in favour
+            # of this passthrough
+            attribute = getattr(self, attr)
+            return attribute
+        else:
+            return self.get(attr)
+
+    def set(self, attribute_name, value, is_json, overwrite_existing=True, connection=None, cursor=None,
+            keep_connection_open=False):
+        """
+        Insert OR set value for a setting
+
+        If overwrite_existing=True and the setting exists, the setting is updated; if overwrite_existing=False and the
+        setting exists the setting is not updated.
+
+        :param str attribute_name:  Attribute to set
+        :param value:  Value to set (will be serialised as JSON)
+        :param bool is_json:  True for a value that is already a serialised JSON string; False if value is object that needs to
+                          be serialised into a JSON string
+        :param bool overwrite_existing: True will overwrite existing setting, False will do nothing if setting exists
+        :param connection: Database connection, if None then a new connection will be created
+        :param cursor: Database cursor, if None then a new cursor will be created
+        :param keep_connection_open: Close connection after query?
+        :return int: number of updated rows
+        """
+        # Check value is valid JSON
+        if is_json:
+            try:
+                json.dumps(json.loads(value))
+            except json.JSONDecodeError:
                 return None
         else:
-            return value
-
-
-def get_all(connection=None, cursor=None, keep_connection_open=False, raw=False):
-    """
-    Gets all database settings in 4cat_settings table. These are editable,
-    while other attributes (part of the ConfigManager class are not directly
-    editable)
-
-    :param connection: Database connection, if None then a new connection will
-    be created
-    :param cursor: Database cursor, if None then a new cursor will be created
-    :param keep_connection_open: Close connection after query?
-    :param bool raw:  True returns values as JSON serialized strings; False returns JSON objects
-    :return dict:  Settings, as setting -> value. Values are decoded from JSON
-    """
-    try:
-        if not connection or not cursor:
-            connection, cursor = quick_db_connect()
-
-        query = "SELECT name, value FROM settings"
-        cursor.execute(query)
-        rows = cursor.fetchall()
-
-        if not keep_connection_open:
-            connection.close()
-
-        values = {}
-        for row in rows:
-            value = row.get("value", None) if row else None
-            if not raw and value is not None:
-                value = json.loads(value)
-            values[row["name"]] = value
-    except (Exception, psycopg2.DatabaseError) as error:
-        raise ConfigException("Error getting settings: {}".format(repr(error)))
-
-    finally:
-        if connection is not None and not keep_connection_open:
-            connection.close()
-
-    return values
-
-
-def set_or_create_setting(attribute_name, value, raw, overwrite_existing=True, connection=None, cursor=None, keep_connection_open=False):
-    """
-    Insert OR set value for a setting
-
-    If overwrite_existing=True and the setting exists, the setting is updated; if overwrite_existing=False and the
-    setting exists the setting is not updated.
-
-    :param str attribute_name:  Attribute to set
-    :param value:  Value to set (will be serialised as JSON)
-    :param bool raw:  True for a value that is already a serialised JSON string; False if value is object that needs to
-                      be serialised into a JSON string
-    :param bool overwrite_existing: True will overwrite existing setting, False will do nothing if setting exists
-    :param connection: Database connection, if None then a new connection will be created
-    :param cursor: Database cursor, if None then a new cursor will be created
-    :param keep_connection_open: Close connection after query?
-    :return int: number of updated rows
-    """
-    # Check value is valid JSON
-    if raw:
-        try:
-            json.dumps(json.loads(value))
-        except json.JSONDecodeError:
-            return None
-    else:
-        try:
-            value = json.dumps(value)
-        except json.JSONDecodeError:
-            return None
-
-    try:
-        if not connection or not cursor:
-            connection, cursor = quick_db_connect()
+            try:
+                value = json.dumps(value)
+            except json.JSONDecodeError:
+                return None
 
         if overwrite_existing:
             query = "INSERT INTO settings (name, value) Values (%s, %s) ON CONFLICT (name) DO UPDATE SET value = EXCLUDED.value"
         else:
             query = "INSERT INTO settings (name, value) Values (%s, %s) ON CONFLICT DO NOTHING"
-        cursor.execute(query, (attribute_name, value))
+
+        self.db.execute(query, (attribute_name, value))
         updated_rows = cursor.rowcount
-        connection.commit()
-
-        if not keep_connection_open:
-            connection.close()
-
-    except (Exception, psycopg2.DatabaseError) as error:
-        raise ConfigException("Error setting setting {}: {}".format(attribute_name, repr(error)))
-
-    finally:
-        if connection is not None and not keep_connection_open:
-            connection.close()
-
-    return updated_rows
-
-
-def delete_setting(attribute_name):
-    """
-    Delete a setting from the database
-
-    :poram str attribute_name:  Name of the setting to delete
-    :return int:  Affected rows
-    """
-    try:
-        connection, cursor = quick_db_connect()
-        cursor.execute("DELETE FROM settings WHERE name = %s", (attribute_name,))
-        updated_rows = cursor.rowcount
-        connection.commit()
 
         return updated_rows
 
-    except (Exception, psycopg2.DatabaseError) as error:
-        raise ConfigException("Error setting setting {}: {}".format(attribute_name, repr(error)))
-
-    finally:
-        if connection is not None:
-            connection.close()
+config = ConfigManager()

@@ -83,12 +83,12 @@ if __name__ == "__main__":
         config_parser['GENERATE']['secret_key'] = bcrypt.gensalt().decode('utf-8')
 
         # Write environment variables to database
-        # Must write prior to import common.config_manager as config
+        # Must write prior to importing config (where the values are read)
         update_config_from_environment(CONFIG_FILE, config_parser)
         print('Created config/config.ini file')
 
         # Ensure filepaths exist
-        import common.config_manager as config
+        from common.config_manager import config
         for path in [config.get('PATH_DATA'),
                      config.get('PATH_IMAGES'),
                      config.get('PATH_LOGS'),
@@ -104,9 +104,9 @@ if __name__ == "__main__":
         frontend_servername = os.environ['SERVER_NAME']
         public_port = int(config_parser['SERVER']['public_port'])
         if public_port == 80:
-            config.set_or_create_setting('flask.server_name', frontend_servername, raw=False)
+            config.set('flask.server_name', frontend_servername, raw=False)
         else:
-            config.set_or_create_setting('flask.server_name', f"{frontend_servername}:{public_port}", raw=False)
+            config.set('flask.server_name', f"{frontend_servername}:{public_port}", raw=False)
 
     # Config file already exists; Update .env variables if they changed
     else:
@@ -116,11 +116,11 @@ if __name__ == "__main__":
         config_parser.read(CONFIG_FILE)
 
         # Write environment variables to database
-        # Must write prior to import common.config_manager as config
+        # Must write prior to importing config (which reads these values)
         update_config_from_environment(CONFIG_FILE, config_parser)
 
         # Check to see if flask.server_name needs to be updated
-        import common.config_manager as config
+        from common.config_manager import config
         public_port = int(config_parser['SERVER']['public_port'])
         frontend_port = int(config.get('flask.server_name').split(":")[-1]) if ":" in config.get('flask.server_name') else 80
         frontend_servername = config.get('flask.server_name').split(":")[0]
@@ -128,11 +128,11 @@ if __name__ == "__main__":
         if frontend_port != public_port:
             if public_port == 80:
                 # Set flask.server to existing frontend_servername with no port
-                config.set_or_create_setting('flask.server_name', f"{frontend_servername}", raw=False)
+                config.set('flask.server_name', f"{frontend_servername}", raw=False)
                 print(f"Updated flask.server_name: {frontend_servername}")
             else:
                 # Set flask.server to existing frontend_servername with the new public_port
-                config.set_or_create_setting('flask.server_name', f"{frontend_servername}:{public_port}", raw=False)
+                config.set('flask.server_name', f"{frontend_servername}:{public_port}", raw=False)
                 print(f"Updated flask.server_name with new public port: {frontend_servername}:{public_port}")
 
     print(f"\nStarting app\n"

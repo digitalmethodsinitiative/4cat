@@ -5,8 +5,7 @@ import requests
 import random
 
 from backend.abstract.worker import BasicWorker
-
-import common.config_manager as config
+from common.config_manager import config
 
 class ImageDownloader(BasicWorker):
 	"""

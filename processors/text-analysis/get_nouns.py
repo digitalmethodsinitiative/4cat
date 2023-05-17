@@ -2,10 +2,7 @@
 Extract nouns from SpaCy NLP docs.
 
 """
-
-import csv
 import pickle
-import shutil
 import spacy
 
 from collections import Counter

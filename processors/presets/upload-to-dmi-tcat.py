@@ -4,7 +4,7 @@ Upload Twitter dataset to DMI-TCAT instance
 from backend.abstract.preset import ProcessorPreset
 from common.lib.helpers import UserInput
 
-import common.config_manager as config
+from common.config_manager import config
 
 class FourcatToDmiTcatConverterAndUploader(ProcessorPreset):
     """

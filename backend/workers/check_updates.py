@@ -3,7 +3,7 @@ import requests
 import json
 import re
 
-import common.config_manager as config
+from common.config_manager import config
 from common.lib.helpers import add_notification, get_github_version
 from backend.abstract.worker import BasicWorker
 from pathlib import Path

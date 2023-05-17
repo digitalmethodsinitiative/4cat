@@ -7,8 +7,7 @@ and to show how many posts a local datasource contains.
 from datetime import datetime, time, timezone
 
 from backend.abstract.worker import BasicWorker
-
-import common.config_manager as config
+from common.config_manager import config
 
 class DatasourceMetrics(BasicWorker):
 	"""

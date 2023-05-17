@@ -19,14 +19,13 @@ from email.mime.text import MIMEText
 from flask import render_template, jsonify, request, abort, flash, get_flashed_messages, url_for, redirect
 from flask_login import current_user, login_required
 
-from webtool import app, db
+from webtool import app, db, config
 from webtool.lib.helpers import admin_required, error, Pagination, generate_css_colours
 from webtool.lib.user import User
 
 from common.lib.helpers import call_api, send_email, UserInput
 from common.lib.exceptions import QueryParametersException
 from common.lib.dataset import DataSet
-import common.config_manager as config
 import common.lib.config_definition as config_definition
 
 @app.route('/admin/', defaults={'page': 1})
@@ -361,7 +360,7 @@ def update_settings():
                                                silently_correct=False)
 
             for setting, value in new_settings.items():
-                valid = config.set_or_create_setting(setting, value,
+                valid = config.set(setting, value,
                                                      raw=definition[setting].get("type") == UserInput.OPTION_TEXT_JSON)
 
                 if valid is None:
@@ -406,7 +405,7 @@ def toggle_datasources():
     if request.method == "POST":
         # enabled datasources is just a list of datasources with a check in the form
         datasources = [datasource for datasource in backend.all_modules.datasources if request.form.get("enable-" + datasource)]
-        config.set_or_create_setting("4cat.datasources", datasources, raw=False)
+        config.set("4cat.datasources", datasources, raw=False)
 
         # process per-datasource dataset expiration settings
         expires = {}
@@ -419,7 +418,7 @@ def toggle_datasources():
 
                 expires[datasource]["allow_optout"] = (request.form.get("optout-" + datasource) == "on")
 
-        config.set_or_create_setting("expire.datasources", expires, raw=False)
+        config.set("expire.datasources", expires, raw=False)
         flash("Enabled data sources updated.")
 
     datasources = {

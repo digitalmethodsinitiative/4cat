@@ -10,7 +10,7 @@ import shutil
 import subprocess
 import shlex
 
-import common.config_manager as config
+from common.config_manager import config
 
 from backend.abstract.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException

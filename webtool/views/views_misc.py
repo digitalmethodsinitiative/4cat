@@ -6,7 +6,6 @@ import csv
 import json
 import markdown
 
-import common.config_manager as config
 from pathlib import Path
 from datetime import datetime
 
@@ -15,7 +14,7 @@ import backend
 from flask import render_template, jsonify, Response
 from flask_login import login_required, current_user
 
-from webtool import app, db
+from webtool import app, db, config
 from webtool.lib.helpers import pad_interval, error
 
 csv.field_size_limit(1024 * 1024 * 1024)

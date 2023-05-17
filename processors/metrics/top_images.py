@@ -4,10 +4,8 @@ Extract most-used images from corpus
 import hashlib
 import base64
 import re
-import common.config_manager as config
-import csv
-import shutil
 
+from common.config_manager import config
 from collections import Counter, OrderedDict
 from backend.abstract.processor import BasicProcessor
 from common.lib.exceptions import ProcessorException

@@ -12,8 +12,8 @@ from backend.abstract.search import Search
 from common.lib.exceptions import QueryParametersException
 from common.lib.user_input import UserInput
 from common.lib.helpers import sniff_encoding
+from common.config_manager import config
 
-import common.config_manager as config
 from datasources.twitterv2.search_twitter import SearchWithTwitterAPIv2
 
 

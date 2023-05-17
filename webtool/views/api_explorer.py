@@ -3,7 +3,6 @@
 """
 
 import datetime
-import common.config_manager as config
 import json
 import csv
 import re
@@ -19,7 +18,7 @@ from pathlib import Path
 from flask import jsonify, abort, send_file, request, render_template
 from flask_login import login_required, current_user
 
-from webtool import app, db, log, openapi, limiter
+from webtool import app, db, log, openapi, limiter, config
 from webtool.lib.helpers import format_chan_post, error
 from common.lib.dataset import DataSet
 from common.lib.helpers import strip_tags

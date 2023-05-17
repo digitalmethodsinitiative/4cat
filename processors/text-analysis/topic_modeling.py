@@ -8,7 +8,6 @@ from common.lib.exceptions import ProcessorInterruptedException
 
 import json, pickle
 import shutil
-import numpy as np
 
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 from sklearn.decomposition import LatentDirichletAllocation

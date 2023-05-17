@@ -9,7 +9,7 @@ import vk_api
 from backend.abstract.search import Search
 from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException, ProcessorException
 from common.lib.helpers import UserInput
-import common.config_manager as config
+from common.config_manager import config
 
 
 class SearchVK(Search):

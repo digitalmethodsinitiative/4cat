@@ -14,7 +14,7 @@ from flask_login import current_user
 from flask import (current_app, request, jsonify)
 from pathlib import Path
 
-import common.config_manager as config
+from common.config_manager import config
 csv.field_size_limit(1024 * 1024 * 1024)
 
 class Pagination(object):

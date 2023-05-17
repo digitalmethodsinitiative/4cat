@@ -12,7 +12,7 @@ import requests
 import json
 import os
 
-import common.config_manager as config
+from common.config_manager import config
 from common.lib.helpers import UserInput, convert_to_int
 from backend.abstract.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException, ProcessorException

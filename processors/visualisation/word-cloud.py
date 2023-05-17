@@ -5,7 +5,6 @@ Make word clouds of columns with text and values
 
 from wordcloud import WordCloud
 
-import common.config_manager as config
 from backend.abstract.processor import BasicProcessor
 from common.lib.helpers import UserInput
 

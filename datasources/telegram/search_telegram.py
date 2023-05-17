@@ -16,6 +16,7 @@ from backend.abstract.search import Search
 from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException, ProcessorException, \
     QueryNeedsFurtherInputException
 from common.lib.helpers import convert_to_int, UserInput
+from common.config_manager import config
 
 from datetime import datetime
 from telethon import TelegramClient
@@ -25,7 +26,6 @@ from telethon.tl.functions.channels import GetFullChannelRequest
 from telethon.tl.functions.users import GetFullUserRequest
 from telethon.tl.types import User
 
-import common.config_manager as config
 
 
 class SearchTelegram(Search):

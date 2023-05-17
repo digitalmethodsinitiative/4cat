@@ -17,10 +17,9 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
 sys.path.insert(0, os.path.dirname(__file__) + '/../..')
-import common.config_manager as config
 from flask import request, abort, render_template, redirect, url_for, flash, get_flashed_messages, jsonify
 from flask_login import login_user, login_required, logout_user, current_user
-from webtool import app, login_manager, db
+from webtool import app, login_manager, db, config
 from webtool.views.api_tool import limiter
 from webtool.lib.user import User
 from webtool.lib.helpers import error, make_html_colour, generate_css_colours
@@ -244,7 +243,7 @@ def first_run_dialog():
         user = User.get_by_name(db=db, name=username)
         user.set_password(password)
 
-        config.set_or_create_setting("4cat.name_long", instance_name, raw=False)
+        config.set("4cat.name_long", instance_name, raw=False)
 
         # handle hue colour
         try:
@@ -253,7 +252,7 @@ def first_run_dialog():
         except (ValueError, TypeError):
             interface_hue = random.randrange(0, 360)
 
-        config.set_or_create_setting("4cat.layout_hue", interface_hue, raw=False)
+        config.set("4cat.layout_hue", interface_hue, raw=False)
         generate_css_colours(force=True)
 
         # make user an admin
@@ -281,7 +280,7 @@ def first_run_dialog():
             flash("Could not send install ping to 4CAT developers")
 
     # don't ask phone home again until next update
-    config.set_or_create_setting("4cat.phone_home_asked", True, raw=False)
+    config.set("4cat.phone_home_asked", True, raw=False)
 
     redirect_path = "show_login" if not has_admin_user else "show_frontpage"
     return redirect(url_for(redirect_path))

@@ -5,17 +5,14 @@ Direct database connection
 import datetime
 import re
 import ural
-import io
 import pymysql
 
 
 from backend.abstract.search import Search
 from common.lib.exceptions import QueryParametersException
 from common.lib.user_input import UserInput
-from common.lib.helpers import sniff_encoding
 from backend.lib.database_mysql import MySQLDatabase
-
-import common.config_manager as config
+from common.config_manager import config
 
 
 class SearchWithinTCATBinsV2(Search):

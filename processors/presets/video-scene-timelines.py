@@ -3,7 +3,7 @@ Create scene-by-scene timelines
 """
 import shutil
 
-import common.config_manager as config
+from common.config_manager import config
 from backend.abstract.preset import ProcessorPreset
 
 

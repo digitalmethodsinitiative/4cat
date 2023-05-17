@@ -14,7 +14,7 @@ from ural import urls_from_text
 from yt_dlp import DownloadError
 from yt_dlp.utils import ExistingVideoReached
 
-import common.config_manager as config
+from common.config_manager import config
 from backend.abstract.processor import BasicProcessor
 from common.lib.dataset import DataSet
 from common.lib.exceptions import ProcessorInterruptedException, ProcessorException

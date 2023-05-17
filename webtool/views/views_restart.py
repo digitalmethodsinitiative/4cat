@@ -19,10 +19,9 @@ import os
 from pathlib import Path
 from flask import render_template, request, flash, get_flashed_messages, jsonify
 
-import common.config_manager as config
 from flask_login import login_required
 
-from webtool import app, queue
+from webtool import app, queue, config
 from webtool.lib.helpers import admin_required, check_restart_request
 
 from common.lib.helpers import get_github_version

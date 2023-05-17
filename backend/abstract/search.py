@@ -9,7 +9,7 @@ import csv
 from pathlib import Path
 from abc import ABC, abstractmethod
 
-import common.config_manager as config
+from common.config_manager import config
 from common.lib.dataset import DataSet
 from backend.abstract.processor import BasicProcessor
 from common.lib.helpers import strip_tags, dict_search_and_update, remove_nuls, HashCache

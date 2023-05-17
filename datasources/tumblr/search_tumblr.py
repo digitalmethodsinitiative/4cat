@@ -9,7 +9,7 @@ import pytumblr
 from requests.exceptions import ConnectionError
 from datetime import datetime
 
-import common.config_manager as config
+from common.config_manager import config
 from backend.abstract.search import Search
 from common.lib.helpers import UserInput
 from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException

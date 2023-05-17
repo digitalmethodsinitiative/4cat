@@ -10,8 +10,8 @@ import re
 
 from pathlib import Path
 
-import common.config_manager as config
 import backend
+from common.config_manager import config
 from common.lib.job import Job, JobNotFoundException
 from common.lib.helpers import get_software_version, NullAwareTextIOWrapper
 from common.lib.fourcat_module import FourcatModule

@@ -11,7 +11,7 @@ import re
 from backend.abstract.search import Search
 from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException, QueryNeedsExplicitConfirmationException
 from common.lib.helpers import convert_to_int, UserInput, timify_long
-import common.config_manager as config
+from common.config_manager import config
 
 
 class SearchWithTwitterAPIv2(Search):

@@ -5,7 +5,7 @@ Possible options and their default values. Options are actually set in 4CAT"s
 Database. Additional options can be defined in Datasources or Processors as
 `config` objects.
 """
-from common.lib.helpers import UserInput
+from common.lib.user_input import UserInput
 import json
 
 config_definition = {

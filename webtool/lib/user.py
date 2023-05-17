@@ -13,8 +13,7 @@ import os
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from common.lib.helpers import send_email
-
-import common.config_manager as config
+from common.config_manager import config
 
 
 class User:

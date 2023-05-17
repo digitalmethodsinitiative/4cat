@@ -1,21 +1,17 @@
 import datetime
 import markdown
 import json
-import time
 import uuid
 import math
 import os
 import re
 import requests
 
-from pathlib import Path
 from urllib.parse import urlencode, urlparse
-from webtool import app, db
+from webtool import app, config
 from common.lib.helpers import timify_long
 
 from flask_login import current_user
-
-import common.config_manager as config
 
 @app.template_filter('datetime')
 def _jinja2_filter_datetime(date, fmt=None, wrap=True):
@@ -119,7 +115,7 @@ def _jinja2_filter_json(data):
 @app.template_filter('config_override')
 def _jinja2_filter_conf(data, property=""):
 	try:
-		return config.get("flask." + property)
+		return config.get("flask." + property, user=current_user)
 	except AttributeError:
 		return data
 
@@ -331,13 +327,13 @@ def inject_now():
 	notifications = current_user.get_notifications()
 
 	return {
-		"__datasources_config": config.get('4cat.datasources'),
-		"__has_https": config.get("flask.https"),
+		"__datasources_config": config.get('4cat.datasources', user=current_user),
+		"__has_https": config.get("flask.https", user=current_user),
 		"__datenow": datetime.datetime.utcnow(),
-		"__tool_name": config.get("4cat.name"),
-		"__tool_name_long": config.get("4cat.name_long"),
+		"__tool_name": config.get("4cat.name", user=current_user),
+		"__tool_name_long": config.get("4cat.name_long", user=current_user),
 		"__notifications": notifications,
-		"__expire_datasets": config.get("expire.timeout"),
-		"__expire_optout": config.get("expire.allow_optout"),
+		"__expire_datasets": config.get("expire.timeout", user=current_user),
+		"__expire_optout": config.get("expire.allow_optout", user=current_user),
 		"uniqid": uniqid
 	}

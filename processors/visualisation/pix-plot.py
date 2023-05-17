@@ -15,8 +15,8 @@ import csv
 import os
 from urllib.parse import unquote
 from werkzeug.utils import secure_filename
-import common.config_manager as config
-from common.lib.exceptions import ProcessorInterruptedException, ProcessorException
+
+from common.config_manager import config
 from common.lib.helpers import UserInput, convert_to_int
 from backend.abstract.processor import BasicProcessor
 

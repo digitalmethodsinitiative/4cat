@@ -29,13 +29,10 @@ import json
 import time
 import six
 
-from pathlib import Path
-
 from backend.abstract.scraper import BasicJSONScraper
 from common.lib.exceptions import JobAlreadyExistsException
 from common.lib.helpers import strip_tags
-
-import common.config_manager as config
+from common.config_manager import config
 from common.lib.user_input import UserInput
 
 

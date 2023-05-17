@@ -9,8 +9,8 @@ from urllib.parse import urlparse
 from backend.abstract.processor import BasicProcessor
 from common.lib.user_input import UserInput
 from common.lib.helpers import get_last_line
+from common.config_manager import config
 
-import common.config_manager as config
 __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl", "Stijn Peeters"]
 __maintainer__ = "Dale Wahl"

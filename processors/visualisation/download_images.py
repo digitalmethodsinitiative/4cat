@@ -16,7 +16,7 @@ from lxml import etree
 from lxml.cssselect import CSSSelector as css
 from io import StringIO, BytesIO
 
-import common.config_manager as config
+from common.config_manager import config
 from common.lib.helpers import UserInput
 from backend.abstract.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException

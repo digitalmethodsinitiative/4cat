@@ -4,7 +4,7 @@ Extracts topics per model and top associated words
 
 from common.lib.helpers import UserInput
 from backend.abstract.processor import BasicProcessor
-from common.lib.exceptions import ProcessorInterruptedException, ProcessorException
+from common.lib.exceptions import ProcessorInterruptedException
 
 import csv
 import json

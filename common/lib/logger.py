@@ -2,7 +2,6 @@
 Log handler
 """
 import traceback
-import importlib
 import platform
 import logging
 import time
@@ -13,7 +12,7 @@ from pathlib import Path
 from logging.handlers import RotatingFileHandler, HTTPHandler
 from importlib.machinery import SourceFileLoader
 
-import common.config_manager as config
+from common.config_manager import config
 
 
 class WebHookLogHandler(HTTPHandler):

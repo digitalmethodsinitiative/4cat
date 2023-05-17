@@ -7,7 +7,6 @@ import time
 
 from backend.abstract.processor import BasicProcessor
 
-import common.config_manager as config
 __author__ = "Sal Hagen"
 __credits__ = ["Sal Hagen"]
 __maintainer__ = "Sal Hagen"

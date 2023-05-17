@@ -13,12 +13,11 @@ from flask import render_template, request, redirect, send_from_directory, flash
     url_for, stream_with_context
 from flask_login import login_required, current_user
 
-from webtool import app, db, log
+from webtool import app, db, log, config
 from webtool.lib.helpers import Pagination, error
 from webtool.views.api_tool import delete_dataset, toggle_favourite, toggle_private, queue_processor, nuke_dataset, \
     erase_credentials
 
-import common.config_manager as config
 import backend
 from common.lib.dataset import DataSet
 from common.lib.queue import JobQueue

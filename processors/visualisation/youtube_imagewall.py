@@ -6,13 +6,13 @@ import shutil
 import pandas as pd
 import math
 
-import common.config_manager as config
 from pathlib import Path
 from collections import Counter
 from PIL import Image, ImageOps, ImageDraw, ImageFont
 
 from backend.abstract.processor import BasicProcessor
 from common.lib.helpers import UserInput, convert_to_int
+from common.config_manager import config
 
 __author__ = "Sal Hagen"
 __credits__ = ["Sal Hagen", "Partha Das"]

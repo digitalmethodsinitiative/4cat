@@ -4,11 +4,12 @@ Load modules and datasources dynamically
 from pathlib import Path
 import importlib
 import inspect
-import common.config_manager as config
 import pickle
 import sys
 import re
 import os
+
+from common.config_manager import config
 
 from backend.abstract.worker import BasicWorker
 from backend.abstract.processor import BasicProcessor

@@ -18,7 +18,7 @@ from common.lib.logger import Logger
 from common.lib.helpers import add_notification
 
 log = Logger(output=True)
-import common.config_manager as config
+from common.config_manager import config
 
 db = Database(logger=log, dbname=config.get('DB_NAME'), user=config.get('DB_USER'), password=config.get('DB_PASSWORD'),
               host=config.get('DB_HOST'), port=config.get('DB_PORT'), appname="4cat-migrate")
@@ -55,29 +55,29 @@ if type(datasources) is dict:
         for setting in ("boards", "no_scrape", "autoscrape", "interval"):
             if platform in datasources and datasources[platform].get(setting):
                 print(f"  - Migrating setting {platform}.{setting}...")
-                config.set_or_create_setting(platform.replace("4", "four").replace("8", "eight") + "." + setting,
+                config.set(platform.replace("4", "four").replace("8", "eight") + "." + setting,
                                              datasources[platform][setting], raw=False)
 
     for platform in ("dmi-tcat", "dmi-tcatv2"):
         for setting in ("instances",):
             if platform in datasources and datasources[platform].get(setting):
                 print(f"  - Migrating setting {platform}.{setting}...")
-                config.set_or_create_setting(platform + "." + setting, datasources[platform][setting], raw=False)
+                config.set(platform + "." + setting, datasources[platform][setting], raw=False)
 
     print(f"  - Migrating data source-specific expiration settings...")
     expiration = {datasource: {"timeout": info["expire-datasets"], "allow_optout": False} for datasource, info in
                   datasources.items() if "expire-datasets" in info}
-    config.set_or_create_setting("expire.datasources", expiration, raw=False)
+    config.set("expire.datasources", expiration, raw=False)
 
     print("  - Updating DATASOURCES setting...")
-    config.set_or_create_setting("4cat.datasources", new_datasources, raw=False)
+    config.set("4cat.datasources", new_datasources, raw=False)
     config.delete_setting("DATASOURCES")
 
 print("  Deleting and migrating deprecated settings...")
-config.set_or_create_setting("4cat.phone_home_asked", False, raw=False)
+config.set("4cat.phone_home_asked", False, raw=False)
 if config.get("IMAGE_INTERVAL"):
     print("  - IMAGE_INTERVAL -> fourchan.image_interval")
-    config.set_or_create_setting("fourchan.image_interval", config.get("IMAGE_INTERVAL", 60), raw=False)
+    config.set("fourchan.image_interval", config.get("IMAGE_INTERVAL", 60), raw=False)
     config.delete_setting("IMAGE_INTERVAL")
 
 print("  - WARN_EMAILS, WARN_INTERVAL, image_downloader_telegram.MAX_NUMBER_IMAGES -> removed")
@@ -128,13 +128,13 @@ else:
     ffmpeg = shutil.which(config.get("video_downloader.ffmpeg-path", "ffmpeg"))
     if ffmpeg:
         print(f"  - ffmpeg found at {ffmpeg}, storing as config setting video_downloader.ffmpeg-path")
-        config.set_or_create_setting("video_downloader.ffmpeg-path", ffmpeg, raw=False)
+        config.set("video_downloader.ffmpeg-path", ffmpeg, raw=False)
     elif in_docker:
         print("  - ffmpeg not found, detected Docker environment, installing via apt")
         ffmpeg_install = subprocess.run(shlex.split("apt install -y ffmpeg"), stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         if ffmpeg_install.returncode == 0:
             print("  - ffmpeg intalled with apt!")
-            config.set_or_create_setting("video_downloader.ffmpeg-path", shutil.which("ffmpeg"), raw=False)
+            config.set("video_downloader.ffmpeg-path", shutil.which("ffmpeg"), raw=False)
         else:
             print(f"  - Error while installing ffmpeg with apt (return code {ffmpeg_install.returncode}). Some video")
             print("    processors will be unavailable until you rebuild the Docker containers.")

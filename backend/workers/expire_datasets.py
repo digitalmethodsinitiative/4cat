@@ -5,7 +5,7 @@ import time
 
 from backend.abstract.worker import BasicWorker
 from common.lib.dataset import DataSet
-import common.config_manager as config
+from common.config_manager import config
 
 class ThingExpirer(BasicWorker):
 	"""

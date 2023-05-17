@@ -2,7 +2,7 @@ import socket
 import time
 import json
 
-import common.config_manager as config
+from common.config_manager import config
 from backend.abstract.worker import BasicWorker
 
 

@@ -9,7 +9,6 @@ import re
 import io
 
 import datasources.upload.import_formats as import_formats
-import common.config_manager as config
 
 from dateutil.parser import parse as parse_datetime
 from datetime import datetime

@@ -11,7 +11,7 @@ from common.lib.database import Database
 from backend.lib.manager import WorkerManager
 from common.lib.logger import Logger
 
-import common.config_manager as config
+from common.config_manager import config
 
 def run(as_daemon=True):
 	pidfile = Path(config.get('PATH_ROOT'), config.get('PATH_LOCKFILE'), "4cat.pid")
