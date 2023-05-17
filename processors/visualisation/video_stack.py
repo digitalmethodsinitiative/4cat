@@ -65,7 +65,8 @@ class VideoStack(BasicProcessor):
             "options": {
                 "longest": "Use audio from longest video in stack",
                 "none": "Remove audio"
-            }
+            },
+            "default": "longest"
         }
     }
 
@@ -87,7 +88,6 @@ class VideoStack(BasicProcessor):
         ffprobe_path = shutil.which("ffprobe".join(ffmpeg_path.rsplit("ffmpeg", 1)))
 
         return module.type.startswith("video-downloader") and \
-               config.get("video_downloader.ffmpeg-path") and \
                ffmpeg_path and \
                ffprobe_path
 
@@ -118,15 +118,13 @@ class VideoStack(BasicProcessor):
                 f"Trying to extract video data from non-video dataset {video_dataset.key} (type '{video_dataset.type}')")
             return self.dataset.finish_with_error("Video data missing. Cannot stack videos.")
 
-        # two separate staging areas:
-        # one to store the videos we're reading from
-        # one to store the frames we're capturing
+        # a staging area to store the videos we're reading from
         video_staging_area = video_dataset.get_staging_area()
 
         # command to stack input videos
         transparency_filter = []
         merge_filter = []
-        command = [ffmpeg_path, "-y", "-hide_banner", "-loglevel", "error"]
+        command = [ffmpeg_path, "-y", "-hide_banner", "-loglevel", "error", "-fps_mode", "vfr"]
         index = 0
         try:
             transparency = self.parameters.get("transparency", 0.5)
@@ -159,6 +157,7 @@ class VideoStack(BasicProcessor):
             length_output = length.stdout.decode("utf-8")
             length_error = length.stderr.decode("utf-8")
             if length_error:
+                shutil.rmtree(video_staging_area, ignore_errors=True)
                 return self.dataset.finish_with_error("Cannot determine length of video {video.name}. Cannot stack "
                                                       "videos without knowing the video lengths.")
             else:
