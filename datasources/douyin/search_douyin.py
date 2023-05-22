@@ -1,6 +1,7 @@
 """
 Import scraped Douyin data
 """
+import urllib
 from datetime import datetime
 
 from backend.abstract.search import Search
@@ -49,7 +50,7 @@ class SearchDouyin(Search):
             "subject": "",
             "body": post["desc"],
             "timestamp": post_timestamp.strftime("%Y-%m-%d %H:%M:%S"),
-            "post_source_domain": metadata.get("source_platform_url"),  # Adding this as different Douyin pages contain different data
+            "post_source_domain": urllib.parse.unquote(metadata.get("source_platform_url")),  # Adding this as different Douyin pages contain different data
             "post_url": f"https://www.douyin.com/video/{post['aweme_id']}",
             "region": post.get("region"),
             "hashtags": ",".join([item["hashtag_name"] for item in (post["text_extra"] if post["text_extra"] is not None else []) if "hashtag_name" in item]),
@@ -73,5 +74,10 @@ class SearchDouyin(Search):
             "author_thumbnail_url": post["author"]["avatar_thumb"].get("url_list", [''])[0],
             "author_region": post["author"].get("region"),
             "author_is_ad_fake": post["author"].get("is_ad_fake"),
+            # Collection/Mix
+            "part_of_collection": "yes" if "mix_info" in post else "no",
+            "collection_id": post.get("mix_info", {}).get("mix_id", "N/A"),
+            "collection_name": post.get("mix_info", {}).get("mix_name", "N/A"),
+            "place_in_collection": post.get("mix_info", {}).get("statis", {}).get("current_episode", "N/A"),
             "unix_timestamp": int(post_timestamp.timestamp()),
         }
