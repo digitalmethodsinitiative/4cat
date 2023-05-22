@@ -11,7 +11,9 @@ import json
 config_definition = {
     "4cat.datasources": {
         "type": UserInput.OPTION_TEXT_JSON,
-        "default": json.dumps(["bitchute", "custom", "douban", "customimport", "reddit", "telegram", "twitterv2"]),
+        "default": json.dumps(["bitchute", "custom", "douban", "customimport", "reddit", "telegram", "twitterv2",
+                               "douyin", "imgur", "instagram", "linkedin", "ninegag", "parler", "tiktok",
+                               "twitter-import"]),
         "help": "Data Sources",
         "tooltip": "A list of enabled data sources that people can choose from when creating a dataset page. It is "
                    "recommended to manage this via the 'Data sources' button in the Control Panel."
