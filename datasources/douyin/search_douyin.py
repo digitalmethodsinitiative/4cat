@@ -44,6 +44,11 @@ class SearchDouyin(Search):
         videos = sorted([vid for vid in post["video"]["bit_rate"]], key=lambda d: d.get("bit_rate"),
                         reverse=True)
 
+        # Some videos are collected from "mixes"/"collections"; only the first video is definitely displayed while others may or may not be viewed
+        displayed = True
+        if post.get("ZS_collected_from_mix") and not post.get("ZS_first_mix_vid"):
+            displayed = False
+
         return {
             "id": post["aweme_id"],
             "thread_id": post["group_id"],
@@ -76,6 +81,7 @@ class SearchDouyin(Search):
             "author_is_ad_fake": post["author"].get("is_ad_fake"),
             # Collection/Mix
             "part_of_collection": "yes" if "mix_info" in post else "no",
+            "4CAT_first_video_displayed": "yes" if displayed else "no", # other videos may have been viewed, but this is unknown to us
             "collection_id": post.get("mix_info", {}).get("mix_id", "N/A"),
             "collection_name": post.get("mix_info", {}).get("mix_name", "N/A"),
             "place_in_collection": post.get("mix_info", {}).get("statis", {}).get("current_episode", "N/A"),
