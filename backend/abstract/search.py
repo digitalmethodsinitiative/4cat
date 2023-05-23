@@ -48,6 +48,8 @@ class Search(BasicProcessor, ABC):
 	# Mandatory columns: ['thread_id', 'body', 'subject', 'timestamp']
 	return_cols = ['thread_id', 'body', 'subject', 'timestamp']
 
+	flawless = True
+
 	def process(self):
 		"""
 		Create 4CAT dataset from a data source
@@ -112,8 +114,11 @@ class Search(BasicProcessor, ABC):
 				# file exists somewhere, so we create it as an empty file
 				with open(query_parameters.get("copy_to"), "w") as empty_file:
 					empty_file.write("")
-
-		self.dataset.finish(num_rows=num_items)
+		if self.flawless:
+			self.dataset.finish(num_rows=num_items)
+		else:
+			self.dataset.update_status("Some items did not map correctly; check logs for details", is_final=True)
+			self.dataset.finish(num_rows=num_items)
 
 	def search(self, query):
 		"""
@@ -175,7 +180,7 @@ class Search(BasicProcessor, ABC):
 			return []
 
 		with path.open() as infile:
-			for line in infile:
+			for i, line in enumerate(infile):
 				if self.interrupted:
 					raise WorkerInterruptedException()
 
@@ -183,10 +188,20 @@ class Search(BasicProcessor, ABC):
 				# things
 				# also include import metadata in item
 				item = json.loads(line.replace("\0", ""))
-				yield {
+				new_item = {
 					**item["data"],
 					"__import_meta": {k: v for k, v in item.items() if k != "data"}
 				}
+				# Check map item here!
+				if hasattr(self, "map_item"):
+					mapped_item = self.map_item(new_item)
+					if not mapped_item:
+						self.flawless = False
+						self.dataset.warn_bad_item(i, self)
+				else:
+					self.log.warning(f"Processor {self.type} importing item without map_item method for dataset {self.dataset.key}")
+
+				yield new_item
 
 		path.unlink()
 

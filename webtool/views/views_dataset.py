@@ -192,8 +192,6 @@ def get_mapped_result(key):
         # cannot map without a mapping method
         return error(404, error="File not found.")
 
-    mapper = dataset.get_own_processor().map_item
-
     def map_response():
         """
         Yield a CSV file line by line
@@ -204,20 +202,18 @@ def get_mapped_result(key):
         """
         writer = None
         buffer = io.StringIO()
-        with dataset.get_results_path().open() as infile:
-            for line in infile:
-                mapped_item = mapper(json.loads(line))
-                if not writer:
-                    writer = csv.DictWriter(buffer, fieldnames=tuple(mapped_item.keys()))
-                    writer.writeheader()
-                    yield buffer.getvalue()
-                    buffer.truncate(0)
-                    buffer.seek(0)
-
-                writer.writerow(mapped_item)
+        for mapped_item in dataset.iterate_items(processor=dataset.get_own_processor()):
+            if not writer:
+                writer = csv.DictWriter(buffer, fieldnames=tuple(mapped_item.keys()))
+                writer.writeheader()
                 yield buffer.getvalue()
                 buffer.truncate(0)
                 buffer.seek(0)
+
+            writer.writerow(mapped_item)
+            yield buffer.getvalue()
+            buffer.truncate(0)
+            buffer.seek(0)
 
     disposition = 'attachment; filename="%s"' % dataset.get_results_path().with_suffix(".csv").name
     return app.response_class(stream_with_context(map_response()), mimetype="text/csv",

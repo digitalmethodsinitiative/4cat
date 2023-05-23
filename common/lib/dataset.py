@@ -15,7 +15,7 @@ import backend
 from common.lib.job import Job, JobNotFoundException
 from common.lib.helpers import get_software_version, NullAwareTextIOWrapper
 from common.lib.fourcat_module import FourcatModule
-from common.lib.exceptions import ProcessorInterruptedException
+from common.lib.exceptions import ProcessorInterruptedException, DataSetException
 
 
 class DataSet(FourcatModule):
@@ -304,13 +304,17 @@ class DataSet(FourcatModule):
 			# in this format each line in the file is a self-contained JSON
 			# file
 			with path.open(encoding="utf-8") as infile:
-				for line in infile:
+				for i, line in enumerate(infile):
 					if hasattr(processor, "interrupted") and processor.interrupted:
 						raise ProcessorInterruptedException("Processor interrupted while iterating through NDJSON file")
 
 					item = json.loads(line)
 					if item_mapper:
 						item = item_mapper(item)
+						if not item:
+							# Bad data found; Warn administrators and add log to dataset
+							self.warn_bad_item(i, processor)
+							continue
 
 					yield item
 
@@ -334,13 +338,17 @@ class DataSet(FourcatModule):
 			item_mapper = own_processor.map_item
 
 		# Loop through items
-		for item in self.iterate_items(processor=processor, bypass_map_item=True):
+		for i, item in enumerate(self.iterate_items(processor=processor, bypass_map_item=True)):
 			# Save original to yield
 			original_item = item.copy()
 
 			# Map item for filter
 			if item_mapper:
 				mapped_item = item_mapper(item)
+				if not mapped_item:
+					# Bad data found; Warn administrators and add log to dataset
+					self.warn_bad_item(i, processor)
+					continue
 			else:
 				mapped_item = original_item
 
@@ -614,32 +622,7 @@ class DataSet(FourcatModule):
 			# no file to get columns from
 			return False
 
-		if self.get_results_path().suffix.lower() == ".csv":
-			with self.get_results_path().open(encoding="utf-8") as infile:
-				own_processor = self.get_own_processor()
-				csv_parameters = own_processor.get_csv_parameters(csv) if own_processor else {}
-
-				reader = csv.DictReader(infile, **csv_parameters)
-				try:
-					return list(reader.fieldnames)
-				except (TypeError, ValueError):
-					# not a valid CSV file?
-					return []
-
-		elif self.get_results_path().suffix.lower() == ".ndjson" and hasattr(self.get_own_processor(), "map_item"):
-			with self.get_results_path().open(encoding="utf-8") as infile:
-				first_line = infile.readline()
-
-			try:
-				item = json.loads(first_line)
-				return list(self.get_own_processor().map_item(item).keys())
-			except (json.JSONDecodeError, ValueError):
-				# not a valid NDJSON file?
-				return []
-
-		else:
-			# not a CSV or NDJSON file, or no map_item function available
-			return []
+		return self.get_item_keys(processor=self.get_own_processor())
 
 	def get_annotation_fields(self):
 		"""
@@ -1229,6 +1212,16 @@ class DataSet(FourcatModule):
 		url_to_file = ('https://' if config.get("flask.https") else 'http://') + \
 						config.get("flask.server_name") + '/result/' + filename
 		return url_to_file
+
+	def warn_bad_item(self, i, processor):
+		self.log(f"Item {i} is unable to be mapped! Check raw datafile.")
+		if hasattr(processor, "log") and processor.log is not None:
+			processor.log.warning(
+				f"Processor {processor.type} unable to map item {i} for dataset {self.key}.")
+		elif hasattr(self.db, "log"):
+			self.db.log.warning(f"Dataset {self.type} unable to map item {i} for dataset {self.key}.")
+		else:
+			raise DataSetException(f"Unable to map item {i} and properly warn")
 
 	def __getattr__(self, attr):
 		"""

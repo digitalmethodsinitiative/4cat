@@ -40,6 +40,13 @@ class ProcessorException(FourcatException):
 	pass
 
 
+class DataSetException(FourcatException):
+	"""
+	Raise if dataset throws an exception
+	"""
+	pass
+
+
 class JobClaimedException(QueueException):
 	"""
 	Raise if job is claimed, but is already marked as such

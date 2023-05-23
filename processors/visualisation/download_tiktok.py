@@ -14,6 +14,7 @@ import common.config_manager as config
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.user_input import UserInput
 from datasources.tiktok_urls.search_tiktok_urls import TikTokScraper
+from datasources.tiktok.search_tiktok import SearchTikTok as SearchTikTokByImport
 from backend.abstract.processor import BasicProcessor
 
 
@@ -291,7 +292,7 @@ class TikTokImageDownloader(BasicProcessor):
                     if self.interrupted:
                         raise ProcessorInterruptedException("Interrupted while downloading TikTok images")
 
-                    refreshed_mapped_item = self.source_dataset.get_own_processor().map_item(refreshed_item)
+                    refreshed_mapped_item = SearchTikTokByImport.map_item(refreshed_item)
                     post_id = refreshed_mapped_item.get("id")
                     url = refreshed_mapped_item.get(url_column)
 
