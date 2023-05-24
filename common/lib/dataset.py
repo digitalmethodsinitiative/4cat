@@ -15,7 +15,7 @@ import backend
 from common.lib.job import Job, JobNotFoundException
 from common.lib.helpers import get_software_version, NullAwareTextIOWrapper
 from common.lib.fourcat_module import FourcatModule
-from common.lib.exceptions import ProcessorInterruptedException, DataSetException
+from common.lib.exceptions import ProcessorInterruptedException, DataSetException, MapItemException
 
 
 class DataSet(FourcatModule):
@@ -270,33 +270,30 @@ class DataSet(FourcatModule):
 		# see if an item mapping function has been defined
 		# open question if 'source_dataset' shouldn't be an attribute of the dataset
 		# instead of the processor...
-		item_mapper = None
-
+		item_mapper = False
+		own_processor = self.get_own_processor()
 		if not bypass_map_item:
-			own_processor = self.get_own_processor()
-			# only run item mapper if extension of processor == extension of
-			# data file, for the scenario where a csv file was uploaded and
-			# converted to an ndjson-based data source, for example
-			# todo: this is kind of ugly, and a better fix may be possible
-			extension_fits = hasattr(own_processor, "extension") and own_processor.extension == self.get_extension()
-			if hasattr(own_processor, "map_item") and extension_fits:
-				item_mapper = own_processor.map_item
+			if own_processor.map_item_method_available(dataset=self):
+				item_mapper = True
 
 		# go through items one by one, optionally mapping them
 		if path.suffix.lower() == ".csv":
 			with path.open("rb") as infile:
-				own_processor = self.get_own_processor()
 				csv_parameters = own_processor.get_csv_parameters(csv) if own_processor else {}
 
 				wrapped_infile = NullAwareTextIOWrapper(infile, encoding="utf-8")
 				reader = csv.DictReader(wrapped_infile, **csv_parameters)
 
-				for item in reader:
+				for i, item in enumerate(reader):
 					if hasattr(processor, "interrupted") and processor.interrupted:
 						raise ProcessorInterruptedException("Processor interrupted while iterating through CSV file")
 
 					if item_mapper:
-						item = item_mapper(item)
+						try:
+							item = own_processor.get_mapped_item(item)
+						except MapItemException:
+							self.warn_unmappable_item(i, processor)
+							continue
 
 					yield item
 
@@ -310,10 +307,10 @@ class DataSet(FourcatModule):
 
 					item = json.loads(line)
 					if item_mapper:
-						item = item_mapper(item)
-						if not item:
-							# Bad data found; Warn administrators and add log to dataset
-							self.warn_bad_item(i, processor)
+						try:
+							item = own_processor.get_mapped_item(item)
+						except MapItemException:
+							self.warn_unmappable_item(i, processor)
 							continue
 
 					yield item
@@ -334,20 +331,20 @@ class DataSet(FourcatModule):
 		# Collect item_mapper for use with filter
 		item_mapper = None
 		own_processor = self.get_own_processor()
-		if hasattr(own_processor, "map_item"):
-			item_mapper = own_processor.map_item
+		if own_processor.map_item_method_available(dataset=self):
+			item_mapper = own_processor.get_mapped_item
 
 		# Loop through items
 		for i, item in enumerate(self.iterate_items(processor=processor, bypass_map_item=True)):
 			# Save original to yield
 			original_item = item.copy()
 
-			# Map item for filter
+			# Map item
 			if item_mapper:
-				mapped_item = item_mapper(item)
-				if not mapped_item:
-					# Bad data found; Warn administrators and add log to dataset
-					self.warn_bad_item(i, processor)
+				try:
+					mapped_item = item_mapper(item)
+				except MapItemException:
+					self.warn_unmappable_item(i, processor)
 					continue
 			else:
 				mapped_item = original_item
@@ -1213,15 +1210,25 @@ class DataSet(FourcatModule):
 						config.get("flask.server_name") + '/result/' + filename
 		return url_to_file
 
-	def warn_bad_item(self, i, processor):
-		self.log(f"Item {i} is unable to be mapped! Check raw datafile.")
-		if hasattr(processor, "log") and processor.log is not None:
-			processor.log.warning(
-				f"Processor {processor.type} unable to map item {i} for dataset {self.key}.")
-		elif hasattr(self.db, "log"):
-			self.db.log.warning(f"Dataset {self.type} unable to map item {i} for dataset {self.key}.")
+	def warn_unmappable_item(self, item_count, processor=None):
+		"""
+		Log an item that is unable to be mapped and warn administrators.
+
+		:param int item_count:			Item index
+		:param Processor processor:		Processor calling function
+		"""
+		if processor is not None:
+			# Log to dataset that is using map_item
+			processor.dataset.log(f"Item {item_count} is unable to be mapped! Check raw datafile.")
 		else:
-			raise DataSetException(f"Unable to map item {i} and properly warn")
+			# Log to this dataset
+			self.log(f"Item {item_count} is unable to be mapped! Check raw datafile.")
+
+		if hasattr(self.db, "log"):
+			self.db.log.warning(f"Processor {processor.type if processor is not None else self.get_own_processor().type} unable to map item {item_count} for dataset {self.key}.")
+		else:
+			# No other log available
+			raise DataSetException(f"Unable to map item {item_count} and properly warn")
 
 	def __getattr__(self, attr):
 		"""

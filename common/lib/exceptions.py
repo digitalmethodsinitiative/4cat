@@ -40,6 +40,13 @@ class ProcessorException(FourcatException):
 	pass
 
 
+class MapItemException(ProcessorException):
+	"""
+	Raise if processor throws an exception
+	"""
+	pass
+
+
 class DataSetException(FourcatException):
 	"""
 	Raise if dataset throws an exception

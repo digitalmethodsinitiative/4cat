@@ -13,7 +13,7 @@ import common.config_manager as config
 from common.lib.dataset import DataSet
 from backend.abstract.processor import BasicProcessor
 from common.lib.helpers import strip_tags, dict_search_and_update, remove_nuls, HashCache
-from common.lib.exceptions import WorkerInterruptedException, ProcessorInterruptedException
+from common.lib.exceptions import WorkerInterruptedException, ProcessorInterruptedException, MapItemException
 
 
 class Search(BasicProcessor, ABC):
@@ -117,7 +117,7 @@ class Search(BasicProcessor, ABC):
 		if self.flawless:
 			self.dataset.finish(num_rows=num_items)
 		else:
-			self.dataset.update_status("Some items did not map correctly; check logs for details", is_final=True)
+			self.dataset.update_status("Some items did not map correctly. Data is maintained, but will not be available in 4CAT; check logs for details", is_final=True)
 			self.dataset.finish(num_rows=num_items)
 
 	def search(self, query):
@@ -179,6 +179,12 @@ class Search(BasicProcessor, ABC):
 		if not path.exists():
 			return []
 
+		# Check if processor and dataset can use map_item
+		check_map_item = self.map_item_method_available(dataset=self.dataset)
+		if not check_map_item:
+			self.log.warning(
+				f"Processor {self.type} importing item without map_item method for Dataset {self.dataset.type} - {self.dataset.key}")
+
 		with path.open() as infile:
 			for i, line in enumerate(infile):
 				if self.interrupted:
@@ -193,13 +199,12 @@ class Search(BasicProcessor, ABC):
 					"__import_meta": {k: v for k, v in item.items() if k != "data"}
 				}
 				# Check map item here!
-				if hasattr(self, "map_item"):
-					mapped_item = self.map_item(new_item)
-					if not mapped_item:
+				if check_map_item:
+					try:
+						self.get_mapped_item(new_item)
+					except MapItemException:
 						self.flawless = False
-						self.dataset.warn_bad_item(i, self)
-				else:
-					self.log.warning(f"Processor {self.type} importing item without map_item method for dataset {self.dataset.key}")
+						self.dataset.warn_unmappable_item(i, processor=self)
 
 				yield new_item
 
