@@ -203,6 +203,7 @@ class Search(BasicProcessor, ABC):
 					try:
 						self.get_mapped_item(new_item)
 					except MapItemException:
+						# NOTE: we still yield the unmappable item; perhaps we need to update a processor's map_item method to account for this new item
 						self.flawless = False
 						self.dataset.warn_unmappable_item(i, processor=self)
 

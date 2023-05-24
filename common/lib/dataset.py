@@ -329,10 +329,10 @@ class DataSet(FourcatModule):
 		:return generator:  A generator that yields a tuple with the unmapped item followed by the mapped item
 		"""
 		# Collect item_mapper for use with filter
-		item_mapper = None
+		item_mapper = False
 		own_processor = self.get_own_processor()
 		if own_processor.map_item_method_available(dataset=self):
-			item_mapper = own_processor.get_mapped_item
+			item_mapper = True
 
 		# Loop through items
 		for i, item in enumerate(self.iterate_items(processor=processor, bypass_map_item=True)):
@@ -342,7 +342,7 @@ class DataSet(FourcatModule):
 			# Map item
 			if item_mapper:
 				try:
-					mapped_item = item_mapper(item)
+					mapped_item = own_processor.get_mapped_item(item)
 				except MapItemException:
 					self.warn_unmappable_item(i, processor)
 					continue
