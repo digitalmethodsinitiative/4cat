@@ -67,7 +67,6 @@ class SearchTwitterViaZeeschuimer(Search):
             # sometimes this is one level deeper, sometimes not...
             quote_tweet["result"] = quote_tweet["result"]["tweet"]
 
-        print(json.dumps(quote_tweet))
         return {
             "id": tweet["rest_id"],
             "thread_id": tweet["legacy"]["conversation_id_str"],
