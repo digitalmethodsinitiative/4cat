@@ -619,7 +619,11 @@ class DataSet(FourcatModule):
 			# no file to get columns from
 			return False
 
-		return self.get_item_keys(processor=self.get_own_processor())
+		if (self.get_results_path().suffix.lower() == ".csv") or (self.get_results_path().suffix.lower() == ".ndjson" and self.get_own_processor().map_item_method_available(dataset=self)):
+			return self.get_item_keys(processor=self.get_own_processor())
+		else:
+			# Filetype not CSV or an NDJSON with `map_item`
+			return []
 
 	def get_annotation_fields(self):
 		"""
