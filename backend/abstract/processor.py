@@ -71,18 +71,19 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 	#: Extension of the file created by the processor
 	extension = "csv"
 
-	#: Configurable options for this processor
-	options = {}
-
-	#: Values for the processor's options, populated by user input
-	parameters = {}
-
 	#: Is this processor running 'within' a preset processor?
 	is_running_in_preset = False
 
 	#: This will be defined automatically upon loading the processor. There is
 	#: no need to override manually
 	filepath = None
+
+	# def __init__(self, logger, job, queue=None, manager=None, modules=None):
+	# 	super().__init__(logger, job, queue=queue, manager=manager, modules=modules)
+	# 	#: Configurable options for this processor
+	# 	self.options = {}
+	# 	#: Values for the processor's options, populated by user input
+	# 	self.parameters = {}
 
 	def work(self):
 		"""
