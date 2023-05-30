@@ -51,6 +51,7 @@ packages = [
 	"spacy==3.4.3",
 	"svgwrite~=1.4.0",
 	"Telethon~=1.25.2",
+	"typing_extensions<4.6.0",
 	"ural~=0.33",
 	"unidecode~=1.3",
 	"Werkzeug~=2.2",
