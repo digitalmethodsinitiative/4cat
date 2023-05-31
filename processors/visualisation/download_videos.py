@@ -218,7 +218,7 @@ class VideoDownloaderPlus(BasicProcessor):
                                             "min": 0,
                                             "max": 5,
                                             "tooltip": "If more than 0, links leading to multiple videos will be downloaded (e.g. a YouTube user's channel)"
-                                        },
+                                        }
 
         return options
 
