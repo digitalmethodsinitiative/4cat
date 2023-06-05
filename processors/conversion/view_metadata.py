@@ -39,9 +39,10 @@ class ViewMetadata(BasicProcessor):
 	@classmethod
 	def is_compatible_with(cls, module=None):
 		"""
-		Allow on only
+		Determine if processor is compatible with dataset
+
+		:param module: Module to determine compatibility with
 		"""
-		# return (module.is_dataset() and hasattr(module.get_own_processor(), "map_metadata")) or (not module.is_dataset() and hasattr(module, "map_metadata"))
 		return module.type.startswith("video-downloader")
 
 	def process(self):

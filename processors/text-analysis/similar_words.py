@@ -59,7 +59,7 @@ class SimilarWord2VecWords(BasicProcessor):
 		"""
 		Allow processor on word embedding models
 
-		:param module: Dataset or processor to determine compatibility with
+		:param module: Module to determine compatibility with
 		"""
 		return module.type == "generate-embeddings"
 

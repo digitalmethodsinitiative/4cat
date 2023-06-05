@@ -70,7 +70,7 @@ class LexicalFilter(BaseFilter):
         """
         Allow processor on NDJSON and CSV files
 
-        :param module: Dataset or processor to determine compatibility with
+        :param module: Module to determine compatibility with
         """
         return module.is_top_dataset() and module.get_extension() in ("csv", "ndjson")
 

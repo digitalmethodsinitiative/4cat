@@ -72,7 +72,7 @@ class ColumnFilter(BaseFilter):
         """
         Allow processor on top datasets.
 
-        :param module: Dataset or processor to determine compatibility with
+        :param module: Module to determine compatibility with
         """
         # TODO: could run on any ndjson or csv IF adjustments were made to `get_options()`
         return module.is_top_dataset()

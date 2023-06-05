@@ -100,7 +100,7 @@ class AttributeRanker(BasicProcessor):
 		"""
 		Allow processor on top image rankings
 
-		:param module: Dataset or processor to determine compatibility with
+		:param module: Module to determine compatibility with
 		"""
 		return module.get_extension() in ["csv", "ndjson"]
 

@@ -26,7 +26,7 @@ class ConvertNDJSONToJSON(BasicProcessor):
         """
         Determine if processor is compatible with dataset
 
-        :param module: Dataset or processor to determine compatibility with
+        :param module: Module to determine compatibility with
         """
         return module.type == "twitterv2-search"
 

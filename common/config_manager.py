@@ -37,8 +37,8 @@ class ConfigManager:
         :param db:  Database object. If None, initialise it using the core config
         """
         self.db = db if db else Database(logger=None, dbname=self.get("DB_NAME"), user=self.get("DB_USER"),
-                           password=self.get("DB_PASSWORD"), host=self.get("DB_HOST"),
-                           port=self.get("DB_PORT"), appname="config-reader") if not db else db
+                                         password=self.get("DB_PASSWORD"), host=self.get("DB_HOST"),
+                                         port=self.get("DB_PORT"), appname="config-reader") if not db else db
 
     def load_user_settings(self):
         """
@@ -158,11 +158,11 @@ class ConfigManager:
 
             tags.insert(0, f"user:{user}")
 
-
         # query database for any values within the required tags
         tags.append("")  # empty tag = default value
         settings = {s["tag"]: s["value"] for s in
-                    self.db.fetchall("SELECT * FROM settings WHERE name = %s AND tag IN %s", (attribute_name, tuple(tags)))}
+                    self.db.fetchall("SELECT * FROM settings WHERE name = %s AND tag IN %s",
+                                     (attribute_name, tuple(tags)))}
 
         # return first matching setting with a required tag, in the order the
         # tags were provided
@@ -241,5 +241,80 @@ class ConfigManager:
         updated_rows = cursor.rowcount
 
         return updated_rows
+
+
+class ConfigWrapper:
+    """
+    Wrapper for the config manager
+
+    Allows setting a default set of tags or user, so that all subsequent calls
+    to `get()` are done for those tags or that user.
+    """
+    def __init__(self, config, user=None, tags=None):
+        """
+        Initialise config wrapper
+
+        :param ConfigManager config:  Initialised config manager
+        :param user:  User to get settings for
+        :param tags:  Tags to get settings for
+        """
+        self.config = config
+        self.user = user
+        self.tags = tags
+
+    def get(self, attribute_name, default=None, raw=False):
+        """
+        Get setting value
+
+        Uses pre-defined user and tags arguments.
+
+        :param str attribute_name:  Setting to return
+        :param default:  Value to return if setting does not exist
+        :param bool raw:  if True, the value is returned as stored and not
+        interpreted as JSON if it comes from the database
+        :return:  Setting value
+        """
+        return config.get(attribute_name, default, raw, self.user, self.tags)
+
+    def set(self, **kwargs):
+        """
+        Set value
+
+        Raises NotImplementedError: cannot set values for given context
+        :param kwargs:
+        :return:
+        """
+        raise NotImplementedError("Settings cannot be set from ConfigWrapper")
+
+    def get_all(self):
+        """
+        Get all settings
+
+        Raises NotImplementedError: cannot set values for given context
+        :param kwargs:
+        :return:
+        """
+        raise NotImplementedError("get_all() is not available in ConfigWrapper")
+
+
+class ConfigDummy:
+    """
+    Dummy class to use as initial value for class-based configs
+
+    The config manager in processor objects takes the owner of the dataset of
+    the processor into account. This is only available after the object has
+    been inititated, so until then use this dummy wrapper that throws an error
+    when used to access config variables
+    """
+    def __getattribute__(self, item):
+        """
+        Access class attribute
+
+        :param item:
+        :raises NotImplementedError:
+        """
+        raise NotImplementedError("Cannot call processor config object in a class or static method - call global "
+                                  "configuration manager instead.")
+
 
 config = ConfigManager()

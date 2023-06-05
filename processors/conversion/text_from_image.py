@@ -85,7 +85,7 @@ class ImageTextDetector(BasicProcessor):
         """
         Allow processor on image sets
 
-        :param module: Dataset or processor to determine compatibility with
+        :param module: Module to determine compatibility with
         """
         return module.type.startswith("image-downloader") and config.get('text_from_images.DMI_OCR_SERVER', False)
 

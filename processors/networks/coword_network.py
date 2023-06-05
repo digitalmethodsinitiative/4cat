@@ -27,7 +27,7 @@ class CowordNetworker(ProcessorPreset):
         """
         Allow processor to run on collocations
 
-        :param module: Dataset or processor to determine compatibility with
+        :param module: Module to determine compatibility with
         """
         return module.type == "collocations"
 

@@ -54,7 +54,7 @@ class DatasetMerger(BasicProcessor):
         """
         Allow processor on any top-level CSV or NDJSON file
 
-        :param module: Dataset or processor to determine compatibility with
+        :param module: Module to determine compatibility with
         """
         return module.get_extension() in ("csv", "ndjson") and (module.is_from_collector())
 

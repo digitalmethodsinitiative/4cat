@@ -194,7 +194,7 @@ class ExtractURLs(BasicProcessor):
         """
         All processor on CSV and NDJSON datasets
         """
-        return module.is_dataset() and module.get_extension() in ["csv", "ndjson"]
+        return module.get_extension() in ["csv", "ndjson"]
 
     @classmethod
     def get_options(cls, parent_dataset=None, user=None):

@@ -64,7 +64,7 @@ class FourcatToDmiTcatUploader(BasicProcessor):
         It is if TCAT credentials have been configured and the input is a
         TCAT-compatible file.
 
-        :param module: Dataset or processor to determine compatibility with
+        :param module: Module to determine compatibility with
         """
         return module.type == "convert-ndjson-for-tcat" and \
             config.get('tcat-auto-upload.TCAT_SERVER') and \

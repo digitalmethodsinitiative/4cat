@@ -18,6 +18,7 @@ from common.lib.dataset import DataSet
 from common.lib.fourcat_module import FourcatModule
 from common.lib.helpers import get_software_version, remove_nuls
 from common.lib.exceptions import WorkerInterruptedException, ProcessorInterruptedException, ProcessorException
+from common.config_manager import config, ConfigWrapper, ConfigDummy
 
 csv.field_size_limit(1024 * 1024 * 1024)
 
@@ -34,9 +35,8 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 
 	To determine whether a processor can process a given dataset, you can
 	define a `is_compatible_with(FourcatModule module=None):) -> bool` class
-	method which takes a dataset *or* processor as argument and returns a bool
-	that determines if this processor is considered compatible with that
-	dataset or processor. For example:
+	method which takes a dataset as argument and returns a bool that determines
+	if this processor is considered compatible with that dataset. For example:
 
 	.. code-block:: python
 
@@ -77,6 +77,9 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 	#: Configurable options for this processor
 	options = {}
 
+	#: 4CAT settings from the perspective of the dataset's owner
+	config = ConfigDummy()
+
 	#: Values for the processor's options, populated by user input
 	parameters = {}
 
@@ -103,6 +106,12 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 			# as deleting it will have been a conscious choice by a user
 			self.job.finish()
 			return
+
+		# set up config reader using the worker's DB connection and the dataset
+		# owner. This ensures that if a value has been overriden for the owner,
+		# the overridden value is used instead.
+		config.with_db(self.db)
+		self.config = ConfigWrapper(config=config, user=self.owner)
 
 		if self.dataset.data.get("key_parent", None):
 			# search workers never have parents (for now), so we don't need to
@@ -654,45 +663,6 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		return cls.status if hasattr(cls, "status") else None
 
 	@classmethod
-	def get_available_processors(cls, self):
-		"""
-		Get list of processors compatible with this processor
-
-		Checks whether this dataset type is one that is listed as being accepted
-		by the processor, for each known type: if the processor does not
-		specify accepted types (via the `is_compatible_with` method), it is
-		assumed it accepts any top-level datasets
-
-		:return dict:  Compatible processors, `name => class` mapping
-		"""
-		processors = backend.all_modules.processors
-
-		available = []
-		for processor_type, processor in processors.items():
-			if processor_type.endswith("-search"):
-				continue
-
-			# consider a processor compatible if its is_compatible_with
-			# method returns True *or* if it has no explicit compatibility
-			# check and this dataset is top-level (i.e. has no parent)
-			if hasattr(processor, "is_compatible_with"):
-				if processor.is_compatible_with(module=self):
-					available.append(processor)
-
-		return available
-
-	@classmethod
-	def is_dataset(cls):
-		"""
-		Confirm this is *not* a dataset, but a processor.
-
-		Used for processor compatibility checks.
-
-		:return bool:  Always `False`, because this is a processor.
-		"""
-		return False
-
-	@classmethod
 	def is_top_dataset(cls):
 		"""
 		Confirm this is *not* a top dataset, but a processor.
@@ -765,3 +735,5 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		To be defined by the child processor.
 		"""
 		pass
+
+

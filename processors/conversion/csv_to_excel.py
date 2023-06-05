@@ -29,7 +29,7 @@ class ConvertCSVToMacExcel(BasicProcessor):
 		"""
 		Determine if processor is compatible with dataset
 
-		:param module: Dataset or processor to determine compatibility with
+		:param module: Module to determine compatibility with
 		"""
 		if module.type == cls.type:
 			return False
@@ -37,7 +37,7 @@ class ConvertCSVToMacExcel(BasicProcessor):
 		if module.get_extension() == "csv":
 			return True
 		elif module.get_extension() == "ndjson":
-			return (module.__class__ is DataSet and hasattr(module.get_own_processor(), "map_item")) or hasattr(module, "map_item")
+			return hasattr(module.get_own_processor(), "map_item")
 
 	def process(self):
 		"""

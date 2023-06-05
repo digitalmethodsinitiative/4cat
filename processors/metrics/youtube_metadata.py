@@ -70,7 +70,7 @@ class YouTubeMetadata(BasicProcessor):
 		"""
 		Allow processor on datasets probably containing youtube links
 
-		:param module: Dataset or processor to determine compatibility with
+		:param module: Module to determine compatibility with
 		"""
 		# Compatible with every top-level dataset.
 		return module.is_top_dataset()

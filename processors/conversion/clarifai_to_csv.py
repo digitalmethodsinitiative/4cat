@@ -31,9 +31,9 @@ class ConvertClarifaiOutputToCSV(BasicProcessor):
     @classmethod
     def is_compatible_with(cls, module=None):
         """
-        Determine if processor is compatible with dataset
+        Determine if processor is compatible
 
-        :param module: Dataset or processor to determine compatibility with
+        :param module: Module determine compatibility with
         """
         return module.type == "clarifai-api"
 

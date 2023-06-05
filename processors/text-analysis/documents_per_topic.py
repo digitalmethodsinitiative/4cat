@@ -29,7 +29,7 @@ class TopicModelWordExtractor(BasicProcessor):
         """
         Allow processor on topic models
 
-        :param module: Dataset or processor to determine compatibility with
+        :param module: Module to determine compatibility with
         """
         return module.type == "topic-modeller"
 

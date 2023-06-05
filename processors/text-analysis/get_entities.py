@@ -66,7 +66,7 @@ class ExtractNouns(BasicProcessor):  # TEMPORARILY DISABLED
         """
         Allow processor on linguistic feature data
 
-        :param module: Dataset or processor to determine compatibility with
+        :param module: Module to determine compatibility with
         """
 
         return module.type == "linguistic-features"

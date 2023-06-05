@@ -34,10 +34,10 @@ class TopImageCounter(BasicProcessor):
         """
         All top-level datasets, excluding Telegram, which has a different image logic
 
-        :param module: Dataset or processor to determine compatibility with
+        :param module: Module to determine compatibility with
         """
 
-        if module.is_dataset() and module.is_top_dataset() and module.type != "telegram-search":
+        if module.is_top_dataset() and module.type != "telegram-search":
             return True
         else:
             return False

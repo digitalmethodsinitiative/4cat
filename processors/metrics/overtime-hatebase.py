@@ -39,11 +39,9 @@ class OvertimeHatefulAnalysis(BasicProcessor):
 
 		Don't quite remember why these three...
 
-		:param module: Dataset or processor to determine compatibility with
+		:param module: Module to determine compatibility with
 		"""
-		if module.is_dataset():
-			return module.parameters.get("datasource") in ("telegram", "instagram", "reddit")
-		return False
+		return module.parameters.get("datasource") in ("telegram", "instagram", "reddit")
 
 	# the following determines the options available to the user via the 4CAT
 	# interface.

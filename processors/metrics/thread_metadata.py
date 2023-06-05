@@ -19,7 +19,8 @@ class ThreadMetadata(BasicProcessor):
 	type = "thread-metadata"  # job type ID
 	category = "Post metrics"  # category
 	title = "Thread metadata"  # title displayed in UI
-	description = "Extract various metadata on the threads in the dataset, including time data and post counts. Note that this extracted only on the basis of the posts present this dataset."  # description displayed in UI
+	description = "Extract various metadata on the threads in the dataset, including time data and post counts. Note " \
+				  "that this extracted only on the basis of the items present this dataset."  # description displayed in UI
 	extension = "csv"  # extension of result file, used internally and in UI
 
 	def process(self):

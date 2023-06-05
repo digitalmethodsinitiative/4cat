@@ -31,7 +31,7 @@ class HatebaseRanker(BasicProcessor):
 		"""
 		Allow processor on previous Hatebase analyses
 
-		:param module: Dataset or processor to determine compatibility with
+		:param module: Module to determine compatibility with
 		"""
 		return module.type == "hatebase-data"
 
