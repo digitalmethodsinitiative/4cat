@@ -732,6 +732,7 @@ class SearchWithTwitterAPIv2(Search):
         # For backward compatibility
         author_username = tweet["author_user"]["username"] if tweet.get("author_user") else tweet["author_username"]
         author_fullname = tweet["author_user"]["name"] if tweet.get("author_user") else tweet["author_fullname"]
+        author_followers = tweet["author_user"]["public_metrics"]["followers_count"] if tweet.get("author_user") else ""
 
         hashtags = [tag["tag"] for tag in tweet.get("entities", {}).get("hashtags", [])]
         mentions = [tag["username"] for tag in tweet.get("entities", {}).get("mentions", [])]
@@ -788,6 +789,7 @@ class SearchWithTwitterAPIv2(Search):
             "author": author_username,
             "author_fullname": author_fullname,
             "author_id": tweet["author_id"],
+            "author_followers": author_followers,
             "source": tweet.get("source"),
             "language_guess": tweet.get("lang"),
             "possibly_sensitive": "yes" if tweet.get("possibly_sensitive") else "no",
