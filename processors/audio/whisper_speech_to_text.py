@@ -233,11 +233,12 @@ class AudioToText(BasicProcessor):
                     "segments": ",\n".join([f"text: {segment['text']} (start: {segment['start']}; end: {segment['end']})" for segment in result_data['segments']])
                 }
                 if video_metadata:
+                    # TODO: need to pass along filename/videoname/postid/SOMETHING consistent
                     video_name = ".".join(result_filename.split(".")[:-1])
                     audio_metadata = video_metadata.get(video_name)
-                    row["video_url"] = audio_metadata.get("url")
-                    row["post_ids"] = ", ".join(audio_metadata.get("post_ids"))
-                    row["from_dataset"] = audio_metadata.get("from_dataset")
+                    row["video_url"] = audio_metadata.get("url") if audio_metadata else ""
+                    row["post_ids"] = ", ".join(audio_metadata.get("post_ids")) if audio_metadata else ""
+                    row["from_dataset"] = audio_metadata.get("from_dataset") if audio_metadata else ""
 
                 rows.append(row)
 
