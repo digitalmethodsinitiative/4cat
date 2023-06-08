@@ -298,4 +298,5 @@ categories = {
     "image_downloader": "Image Download Settings",
     "video_downloader": "Video Download Settings",
     'text_from_images': 'OCR: Extract text from images (https://github.com/digitalmethodsinitiative/ocr_server)',
+    "dmi_service_manager": "DMI Service Manager (for additional processors run outside 4CAT)",
 }
