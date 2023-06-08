@@ -135,7 +135,7 @@ class AudioToText(BasicProcessor):
         mounted_staging_area = staging_area.absolute().relative_to(config.get("PATH_DATA").absolute())
 
         # Collect filenames (skip .json metadata files)
-        audio_filenames = [filename for filename in os.listdir(staging_area) if filename[-5:] != ".json"]
+        audio_filenames = [filename for filename in os.listdir(staging_area) if filename.split('.')[-1] not in ["json", "log"]]
         if self.parameters.get("amount", 100) != 0:
             audio_filenames = audio_filenames[:self.parameters.get("amount", 100)]
         total_audio_files = len(audio_filenames)
