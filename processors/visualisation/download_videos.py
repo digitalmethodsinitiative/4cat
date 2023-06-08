@@ -779,8 +779,13 @@ class DatasetVideoLibrary:
 
         # Check to see if filtered dataset
         if "copied_from" in parent_dataset.parameters and parent_dataset.is_top_dataset():
-            original_dataset = DataSet(key=parent_dataset.parameters["copied_from"], db=self.current_dataset.db)
-            previous_downloaders += [child for child in original_dataset.top_parent().children if (child.type == "video-downloader" and child.key != self.current_dataset.key)]
+            try:
+                original_dataset = DataSet(key=parent_dataset.parameters["copied_from"], db=self.current_dataset.db)
+                previous_downloaders += [child for child in original_dataset.top_parent().children if
+                                         (child.type == "video-downloader" and child.key != self.current_dataset.key)]
+            except TypeError:
+                # parent dataset no longer exists!
+                pass
 
         return previous_downloaders
 
