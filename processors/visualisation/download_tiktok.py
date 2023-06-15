@@ -114,11 +114,16 @@ class TikTokVideoDownloader(BasicProcessor):
         :param dict data:  dictionary with metadata collected previously
         :yield dict:  	  iterator containing reformated metadata
         """
+        # TODO: could provide additional metadata via video downloader, but need to map those fields
         filename = data.pop("files")[0].get("filename") if "files" in data else None
         row = {
             "video_id": video_id,
             "filename": filename,
-            **data
+            "success": data.get("success", "Metadata read error"),
+            "url": data.get("url", "Metadata read error"),
+            "error": data.get("error", "Metadata read error"),
+            "from_dataset": data.get("from_dataset", "Metadata read error"),
+            "post_ids": ", ".join(data.get("post_ids", ["Metadata read error"])),
         }
         yield row
 
