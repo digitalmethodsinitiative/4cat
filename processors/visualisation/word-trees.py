@@ -300,7 +300,6 @@ class MakeWordtree(BasicProcessor):
 		# of "terminal nodes"
 		breadths_left = [self.max_breadth(node) for node in filtered_tokens_left if node.is_top_root]
 		breadths_right = [self.max_breadth(node) for node in filtered_tokens_right if node.is_top_root]
-		self.dataset.log(f"Collected {len(breadths_left)} left top root tokens (max breadth {max(breadths_left)}) and {len(breadths_right)} right top root tokens (max breadth {max(breadths_right)})")
 
 		if not breadths_left:
 			if sides == "left":
