@@ -39,6 +39,7 @@ class AudioToText(BasicProcessor):
         ]
 
     config = {
+        # "host.docker.internal" if 4CAT Dockerized
         "dmi_service_manager.server_address": {
             "type": UserInput.OPTION_TEXT,
             "default": "",
@@ -132,6 +133,14 @@ class AudioToText(BasicProcessor):
             "tooltip": "Prompts can aid the model in specific vocabulary detection, to add punctuation or filler words."
         }
 
+        options["advanced"] = {
+            "type": UserInput.OPTION_TEXT_JSON,
+            "help": "[Advanced settings](https://github.com/openai/whisper/blob/248b6cb124225dd263bb9bd32d060b6517e067f8/whisper/transcribe.py#LL374C3-L374C3)",
+            "default": {},
+            "tooltip": "Additional settings can be provided as a JSON e.g., {\"--no_speech_threshold\": 0.2, \"--logprob_threshold\": -0.5}."
+        }
+
+
         return options
 
     def process(self):
@@ -142,6 +151,15 @@ class AudioToText(BasicProcessor):
             # 1 because there is always a metadata file
             self.dataset.finish_with_error("No audio files found.")
             return
+
+        # Check advanced_settings
+        advanced_settings = self.parameters.get("advanced", False)
+        if advanced_settings:
+            try:
+                advanced_settings = json.loads(advanced_settings)
+            except ValueError:
+                self.dataset.finish_with_error("Unable to parse Advanced settings. Please format as JSON.")
+                return
 
         local_or_remote = config.get("dmi_service_manager.local_or_remote")
 
@@ -229,10 +247,15 @@ class AudioToText(BasicProcessor):
                 }
         prompt = self.parameters.get("prompt", "")
         if prompt:
-            data["args"].extend(["--prompt", prompt])
+            data["args"].extend(["--initial_prompt", prompt])
+        if advanced_settings:
+            for setting, value in advanced_settings.items():
+                setting = setting if setting[:2] == "--" else "--" + setting.lstrip("-")
+                data["args"].extend([setting, str(value)])
         # Finally, add audio files to args
         data["args"].extend([f"data/{mounted_staging_area.joinpath(filename)}" for filename in audio_filenames])
 
+        self.dataset.update_status(f"Requesting service from DMI Service Manager...")
         api_endpoint = config.get("dmi_service_manager.server_address").rstrip("/") + "/api/" + whisper_endpoint
         resp = requests.post(api_endpoint, json=data, timeout=30)
         if resp.status_code == 202:
