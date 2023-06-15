@@ -805,7 +805,7 @@ def toggle_private(key):
 	except TypeError:
 		return error(404, error="Dataset does not exist.")
 
-	if dataset.owner != current_user.get_id() and not current_user.is_admin():
+	if dataset.owner != current_user.get_id() and not current_user.is_admin:
 		return error(403, error="This dataset is private")
 
 	# apply status to dataset and all children
