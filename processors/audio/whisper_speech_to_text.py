@@ -1,10 +1,12 @@
 """
 Whisper convert speech in audio to text
 """
+import datetime
 import os
 import json
 import time
 import requests
+from pathlib import Path
 from json import JSONDecodeError
 
 
@@ -25,9 +27,16 @@ class AudioToText(BasicProcessor):
     """
     type = "audio-to-text"  # job type ID
     category = "Audio"  # category
-    title = "Convert speech to text"  # title displayed in UI
+    title = "Whisper: Convert speech to text"  # title displayed in UI
     description = "Detect speech in audion and convert to text."  # description displayed in UI
     extension = "csv"  # extension of result file, used internally and in UI
+
+    references = [
+        "[OpenAI Whisper blog](https://openai.com/research/whisper)",
+        "[Whisper paper: Robust Speech Recognition via Large-Scale Weak Supervision](https://arxiv.org/abs/2212.04356)",
+        "[OpenAI Whisper statistics & code](https://github.com/openai/whisper#whisper)",
+        "[How to use prompts](https://platform.openai.com/docs/guides/speech-to-text/prompting)",
+        ]
 
     config = {
         "dmi_service_manager.server_address": {
@@ -116,6 +125,13 @@ class AudioToText(BasicProcessor):
             },
         }
 
+        options["prompt"] = {
+            "type": UserInput.OPTION_TEXT,
+            "help": "Prompt model (see references)",
+            "default": "",
+            "tooltip": "Prompts can aid the model in specific vocabulary detection, to add punctuation or filler words."
+        }
+
         return options
 
     def process(self):
@@ -127,12 +143,12 @@ class AudioToText(BasicProcessor):
             self.dataset.finish_with_error("No audio files found.")
             return
 
+        local_or_remote = config.get("dmi_service_manager.local_or_remote")
+
         # Unpack the audio files into a staging_area
         self.dataset.update_status("Unzipping audio files")
         staging_area = self.unpack_archive_contents(self.source_file)
-        # Relative to PATH_DATA which should be where Docker mounts the whisper container volume
-        # TODO: shore this up
-        mounted_staging_area = staging_area.absolute().relative_to(config.get("PATH_DATA").absolute())
+
 
         # Collect filenames (skip .json metadata files)
         audio_filenames = [filename for filename in os.listdir(staging_area) if filename.split('.')[-1] not in ["json", "log"]]
@@ -142,20 +158,81 @@ class AudioToText(BasicProcessor):
 
         # Make output dir
         output_dir = self.dataset.get_staging_area()
-        # Relative to PATH_DATA which should be where Docker mounts the whisper container volume
-        # TODO: shore this up
-        mounted_output_dir = output_dir.absolute().relative_to(config.get("PATH_DATA").absolute())
+
+        # Send Request
+        if local_or_remote == "local":
+            # Whisper has direct access to files
+            whisper_endpoint = "whisper_local"
+
+            # Relative to PATH_DATA which should be where Docker mounts the whisper container volume
+            # TODO: path is just the staging_area name, but what if we move staging areas? DMI Service manager needs to know...
+            mounted_staging_area = staging_area.absolute().relative_to(config.get("PATH_DATA").absolute())
+            mounted_output_dir = output_dir.absolute().relative_to(config.get("PATH_DATA").absolute())
+
+        elif local_or_remote == "remote":
+            # Upload files to whisper
+            whisper_endpoint = "whisper_remote"
+
+            # Get labels to send server
+            top_dataset = self.dataset.top_parent()
+            folder_name = datetime.datetime.fromtimestamp(self.source_dataset.timestamp).strftime("%Y-%m-%d-%H%M%S") + '-' + \
+                          ''.join(e if e.isalnum() else '_' for e in top_dataset.get_label()) + '-' + \
+                          str(top_dataset.key)
+
+            data = {'folder_name': folder_name}
+
+            # Check if images have already been sent
+            self.dataset.update_status("Connecting to DMI Service Manager...")
+            filename_url = config.get("dmi_service_manager.server_address").rstrip("/") + '/api/list_filenames?folder_name=' + folder_name
+            filename_response = requests.get(filename_url, timeout=30)
+
+            # Check if 4CAT has access to this PixPlot server
+            if filename_response.status_code == 403:
+                self.dataset.update_status("403: 4CAT does not have permission to use the DMI Service Manager server",
+                                           is_final=True)
+                self.dataset.finish(0)
+                return
+
+            uploaded_audio_files = filename_response.json().get('audio', [])
+            if len(uploaded_audio_files) > 0:
+                self.dataset.update_status("Found %i images previously uploaded" % (len(uploaded_audio_files)))
+
+            # Compare audio files with previously uploaded
+            to_upload_filenames = [filename for filename in audio_filenames if filename not in uploaded_audio_files]
+            total_audio_files = len(to_upload_filenames) + len(uploaded_audio_files)
+
+            # if len(to_upload_filenames) > 0:
+            #TODO: perhaps upload one at a time?
+            api_upload_endpoint = config.get("dmi_service_manager.server_address").rstrip("/") + "/api/send_files"
+            #TODO: don't create a silly empty file just to trick the service manager into creating a new folder
+            with open(staging_area.joinpath("blank.txt"), 'w') as file:
+                file.write('')
+            self.dataset.update_status(f"Uploading {len(to_upload_filenames)} audio files")
+            response = requests.post(api_upload_endpoint, files=[('audio', open(staging_area.joinpath(file), 'rb')) for file in to_upload_filenames] + [('texts', open(staging_area.joinpath("blank.txt"), 'rb'))], data=data, timeout=120)
+            if response.status_code == 200:
+                self.dataset.update_status(f"Audio files uploaded: {len(to_upload_filenames)}")
+            else:
+                self.dataset.update_status(f"Unable to upload {len(to_upload_filenames)} files!")
+                self.log.error(f"Whisper upload error: {response.status_code} - {response.reason}")
+
+            mounted_staging_area = Path(folder_name).joinpath("audio")
+            mounted_output_dir = Path(folder_name).joinpath("texts")
+
+        else:
+            raise ProcessorException("dmi_service_manager.local_or_remote setting must be 'local' or 'remote'")
 
         # Whisper args
         data = {"args": ['--output_dir', f"data/{mounted_output_dir}",
                          "--verbose", "False",
                          '--output_format', "json",
-                         "--model", self.parameters.get("model")] +
-                        [f"data/{mounted_staging_area.joinpath(filename)}" for filename in audio_filenames]
+                         "--model", self.parameters.get("model")],
                 }
+        prompt = self.parameters.get("prompt", "")
+        if prompt:
+            data["args"].extend(["--prompt", prompt])
+        # Finally, add audio files to args
+        data["args"].extend([f"data/{mounted_staging_area.joinpath(filename)}" for filename in audio_filenames])
 
-        # Send Request
-        whisper_endpoint = "whisper"
         api_endpoint = config.get("dmi_service_manager.server_address").rstrip("/") + "/api/" + whisper_endpoint
         resp = requests.post(api_endpoint, json=data, timeout=30)
         if resp.status_code == 202:
@@ -186,11 +263,16 @@ class AudioToText(BasicProcessor):
             # Send request to check status every 60 seconds
             if int(time.time() - start_time) % 60 == 0:
                 # Update progress
-                num_completed = self.count_result_files(output_dir)
-                if num_completed != prev_completed:
-                    self.dataset.update_status(f"Collected text from {num_completed} of {total_audio_files} audio files")
-                    self.dataset.update_progress(num_completed / total_audio_files)
-                    prev_completed = num_completed
+                if local_or_remote == "local":
+                    num_completed = self.count_result_files(output_dir)
+                    if num_completed != prev_completed:
+                        self.dataset.update_status(f"Collected text from {num_completed} of {total_audio_files} audio files")
+                        self.dataset.update_progress(num_completed / total_audio_files)
+                        prev_completed = num_completed
+                elif local_or_remote == "remote":
+                    # TODO could check API endpoint if desired...
+                    num_completed = 1 # in case.... yeah, unsure yet, but do not want to kill a dataset that may have results
+                    pass
 
                 result = requests.get(results_url, timeout=30)
                 if 'status' in result.json().keys() and result.json()['status'] == 'running':
@@ -223,6 +305,24 @@ class AudioToText(BasicProcessor):
 
         self.dataset.update_status("Processing Whisper results...")
         rows = []
+        if local_or_remote == "local":
+            # Output files are local
+            pass
+        elif local_or_remote == "remote":
+            # Update list of uploaded files
+            filename_response = requests.get(filename_url, timeout=30)
+            result_files = filename_response.json().get('texts', [])
+
+            # Download the result files
+            api_upload_endpoint = config.get("dmi_service_manager.server_address").rstrip("/") + "/api/uploads/"
+            for filename in result_files:
+                file_response = requests.get(api_upload_endpoint + f"{folder_name}/texts/{filename}", timeout=30)
+                with open(output_dir.joinpath(filename), 'w') as file:
+                    file.write(file_response.content)
+        else:
+            # This should have raised already...
+            raise ProcessorException("dmi_service_manager.local_or_remote setting must be 'local' or 'remote'")
+
         for result_filename in os.listdir(output_dir):
             with open(output_dir.joinpath(result_filename), "r") as result_file:
                 result_data = json.loads(''.join(result_file.readlines()))
@@ -230,7 +330,9 @@ class AudioToText(BasicProcessor):
                     "filename": result_filename,
                     "text": result_data["text"],
                     "language": result_data["language"],
-                    "segments": ",\n".join([f"text: {segment['text']} (start: {segment['start']}; end: {segment['end']})" for segment in result_data['segments']])
+                    "segments": ",\n".join(
+                        [f"text: {segment['text']} (start: {segment['start']}; end: {segment['end']})" for segment in
+                         result_data['segments']])
                 }
                 if video_metadata:
                     # TODO: need to pass along filename/videoname/postid/SOMETHING consistent
