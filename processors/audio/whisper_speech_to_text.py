@@ -11,7 +11,7 @@ from json import JSONDecodeError
 
 
 from backend.abstract.processor import BasicProcessor
-from common.lib.exceptions import ProcessorException
+from common.lib.exceptions import ProcessorException, ProcessorInterruptedException
 from common.lib.user_input import UserInput
 import common.config_manager as config
 
@@ -29,7 +29,7 @@ class AudioToText(BasicProcessor):
     category = "Audio"  # category
     title = "Whisper: Convert speech to text"  # title displayed in UI
     description = "Detect speech in audion and convert to text."  # description displayed in UI
-    extension = "csv"  # extension of result file, used internally and in UI
+    extension = "ndjson"  # extension of result file, used internally and in UI
 
     references = [
         "[OpenAI Whisper blog](https://openai.com/research/whisper)",
@@ -199,7 +199,7 @@ class AudioToText(BasicProcessor):
 
             data = {'folder_name': folder_name}
 
-            # Check if images have already been sent
+            # Check if audio files have already been sent
             self.dataset.update_status("Connecting to DMI Service Manager...")
             filename_url = config.get("dmi_service_manager.server_address").rstrip("/") + '/api/list_filenames?folder_name=' + folder_name
             filename_response = requests.get(filename_url, timeout=30)
@@ -213,25 +213,25 @@ class AudioToText(BasicProcessor):
 
             uploaded_audio_files = filename_response.json().get('audio', [])
             if len(uploaded_audio_files) > 0:
-                self.dataset.update_status("Found %i images previously uploaded" % (len(uploaded_audio_files)))
+                self.dataset.update_status("Found %i audio files previously uploaded" % (len(uploaded_audio_files)))
 
             # Compare audio files with previously uploaded
             to_upload_filenames = [filename for filename in audio_filenames if filename not in uploaded_audio_files]
             total_audio_files = len(to_upload_filenames) + len(uploaded_audio_files)
 
-            # if len(to_upload_filenames) > 0:
-            #TODO: perhaps upload one at a time?
-            api_upload_endpoint = config.get("dmi_service_manager.server_address").rstrip("/") + "/api/send_files"
-            #TODO: don't create a silly empty file just to trick the service manager into creating a new folder
-            with open(staging_area.joinpath("blank.txt"), 'w') as file:
-                file.write('')
-            self.dataset.update_status(f"Uploading {len(to_upload_filenames)} audio files")
-            response = requests.post(api_upload_endpoint, files=[('audio', open(staging_area.joinpath(file), 'rb')) for file in to_upload_filenames] + [('texts', open(staging_area.joinpath("blank.txt"), 'rb'))], data=data, timeout=120)
-            if response.status_code == 200:
-                self.dataset.update_status(f"Audio files uploaded: {len(to_upload_filenames)}")
-            else:
-                self.dataset.update_status(f"Unable to upload {len(to_upload_filenames)} files!")
-                self.log.error(f"Whisper upload error: {response.status_code} - {response.reason}")
+            if len(to_upload_filenames) > 0 or "texts" not in filename_response.json():
+                # TODO: perhaps upload one at a time?
+                api_upload_endpoint = config.get("dmi_service_manager.server_address").rstrip("/") + "/api/send_files"
+                # TODO: don't create a silly empty file just to trick the service manager into creating a new folder
+                with open(staging_area.joinpath("blank.txt"), 'w') as file:
+                    file.write('')
+                self.dataset.update_status(f"Uploading {len(to_upload_filenames)} audio files")
+                response = requests.post(api_upload_endpoint, files=[('audio', open(staging_area.joinpath(file), 'rb')) for file in to_upload_filenames] + [('texts', open(staging_area.joinpath("blank.txt"), 'rb'))], data=data, timeout=120)
+                if response.status_code == 200:
+                    self.dataset.update_status(f"Audio files uploaded: {len(to_upload_filenames)}")
+                else:
+                    self.dataset.update_status(f"Unable to upload {len(to_upload_filenames)} files!")
+                    self.log.error(f"Whisper upload error: {response.status_code} - {response.reason}")
 
             mounted_staging_area = Path(folder_name).joinpath("audio")
             mounted_output_dir = Path(folder_name).joinpath("texts")
@@ -327,7 +327,6 @@ class AudioToText(BasicProcessor):
                 self.dataset.log("Found and loaded video metadata")
 
         self.dataset.update_status("Processing Whisper results...")
-        rows = []
         if local_or_remote == "local":
             # Output files are local
             pass
@@ -340,38 +339,57 @@ class AudioToText(BasicProcessor):
             api_upload_endpoint = config.get("dmi_service_manager.server_address").rstrip("/") + "/api/uploads/"
             for filename in result_files:
                 file_response = requests.get(api_upload_endpoint + f"{folder_name}/texts/{filename}", timeout=30)
-                with open(output_dir.joinpath(filename), 'w') as file:
+                self.dataset.log(f"Downloading {filename}...")
+                with open(output_dir.joinpath(filename), 'wb') as file:
                     file.write(file_response.content)
         else:
             # This should have raised already...
             raise ProcessorException("dmi_service_manager.local_or_remote setting must be 'local' or 'remote'")
 
-        for result_filename in os.listdir(output_dir):
-            with open(output_dir.joinpath(result_filename), "r") as result_file:
-                result_data = json.loads(''.join(result_file.readlines()))
-                row = {
-                    "filename": result_filename,
-                    "text": result_data["text"],
-                    "language": result_data["language"],
-                    "segments": ",\n".join(
-                        [f"text: {segment['text']} (start: {segment['start']}; end: {segment['end']})" for segment in
-                         result_data['segments']])
-                }
-                if video_metadata:
-                    # TODO: need to pass along filename/videoname/postid/SOMETHING consistent
-                    video_name = ".".join(result_filename.split(".")[:-1])
-                    audio_metadata = video_metadata.get(video_name)
-                    row["video_url"] = audio_metadata.get("url") if audio_metadata else ""
-                    row["post_ids"] = ", ".join(audio_metadata.get("post_ids")) if audio_metadata else ""
-                    row["from_dataset"] = audio_metadata.get("from_dataset") if audio_metadata else ""
+        # Save files as NDJSON, then use map_item for 4CAT to interact
+        processed = 0
+        with self.dataset.get_results_path().open("w", encoding="utf-8", newline="") as outfile:
+            for result_filename in os.listdir(output_dir):
+                if self.interrupted:
+                    raise ProcessorInterruptedException("Interrupted while writing results to file")
 
-                rows.append(row)
+                self.dataset.log(f"Writing {result_filename}...")
+                with open(output_dir.joinpath(result_filename), "r") as result_file:
+                    result_data = json.loads(''.join(result_file))
+                    audio_name = ".".join(result_filename.split(".")[:-1])
+                    self.dataset.log(f"text: {result_data.get('text')}")
+                    fourcat_metadata = {
+                        "audio_id": audio_name,
+                        # TODO: need to pass along filename/videoname/postid/SOMETHING consistent
+                        "audio_metadata": video_metadata.get(audio_name, {}) if video_metadata else {},
+                    }
+                    result_data.update({"4CAT_metadata": fourcat_metadata})
+                    outfile.write(json.dumps(result_data) + "\n")
 
-        if rows:
-            self.dataset.update_status(f"Detected speech in {len(rows)} of {total_audio_files} audio files")
-            self.write_csv_items_and_finish(rows)
-        else:
-            return self.dataset.finish_with_error("No speech detected by Whisper.")
+                    processed += 1
+
+        self.dataset.update_status(f"Detected speech in {processed} of {total_audio_files} audio files")
+        self.dataset.finish(processed)
+
+    @staticmethod
+    def map_item(item):
+        """
+        :param item:
+        :return:
+        """
+        fourcat_metadata = item.get("4CAT_metadata")
+        audio_metadata = fourcat_metadata.get("audio_metadata")
+        return {
+            "audio_id": fourcat_metadata.get("audio_id"),
+            "text": item.get("text", ""),
+            "language": item.get("language", ""),
+            "segments": ",\n".join(
+                [f"text: {segment['text']} (start: {segment['start']}; end: {segment['end']}; )" for segment in
+                 item.get("segments", [])]),
+            "original_video_url": audio_metadata.get("url", ""),
+            "post_ids": ", ".join(audio_metadata.get("post_ids", [])),
+            "from_dataset": audio_metadata.get("from_dataset", "")
+        }
 
     @staticmethod
     def count_result_files(directory):
