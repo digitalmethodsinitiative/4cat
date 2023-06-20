@@ -18,6 +18,8 @@ __credits__ = ["Dale Wahl"]
 __maintainer__ = "Dale Wahl"
 __email__ = "4cat@oilab.eu"
 
+from common.lib.user_input import UserInput
+
 
 class AudioExtractor(BasicProcessor):
 	"""
@@ -40,6 +42,22 @@ class AudioExtractor(BasicProcessor):
 			   config.get("video_downloader.ffmpeg-path") and \
 			   shutil.which(config.get("video_downloader.ffmpeg-path"))
 
+	@classmethod
+	def get_options(cls, parent_dataset=None, user=None):
+		"""
+		Collect maximum number of audio files from configuration and update options accordingly
+		"""
+		options = {
+			"amount": {
+				"type": UserInput.OPTION_TEXT,
+				"help": "Number of audio files to extract (0 will extract all)",
+				"default": 10,
+				"min": 0,
+			}
+		}
+
+		return options
+
 	def process(self):
 		"""
 		This takes a zipped set of videos and uses https://ffmpeg.org/ to collect audio into a zip archive
@@ -50,11 +68,13 @@ class AudioExtractor(BasicProcessor):
 			self.dataset.finish(0)
 			return
 
+		max_files = self.parameters.get("amount", 100)
+
 		# Prepare staging area for videos and video tracking
 		staging_area = self.dataset.get_staging_area()
 		self.dataset.log('Staging directory location: %s' % staging_area)
 
-		total_possible_videos = self.source_dataset.num_rows - 1  # for the metadata file that is included in archives
+		total_possible_videos = max_files if max_files != 0 else self.source_dataset.num_rows - 1  # for the metadata file that is included in archives
 		processed_videos = 0
 
 		self.dataset.update_status("Extracting video audio")
@@ -66,6 +86,9 @@ class AudioExtractor(BasicProcessor):
 			if path.name == '.metadata.json':
 				shutil.copy(path, staging_area.joinpath(".video_metadata.json"))
 				continue
+
+			if max_files != 0 and processed_videos > max_files:
+				break
 
 			vid_name = path.stem
 			# ffmpeg -i video.mkv -map 0:a -acodec libmp3lame audio.mp4
