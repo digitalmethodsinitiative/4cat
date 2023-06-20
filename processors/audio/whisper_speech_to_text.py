@@ -114,6 +114,12 @@ class AudioToText(BasicProcessor):
                 "default": "",
                 "tooltip": "Prompts can aid the model in specific vocabulary detection, to add punctuation or filler words."
             },
+            "translate": {
+                "type": UserInput.OPTION_TOGGLE,
+                "help": "Translate transcriptions to English",
+                "default": False,
+                "tooltip": "Original language still listed in \"language\" column"
+            },
             "advanced": {
                 "type": UserInput.OPTION_TEXT_JSON,
                 "help": "[Advanced settings](https://github.com/openai/whisper/blob/248b6cb124225dd263bb9bd32d060b6517e067f8/whisper/transcribe.py#LL374C3-L374C3)",
@@ -242,6 +248,9 @@ class AudioToText(BasicProcessor):
         prompt = self.parameters.get("prompt", "")
         if prompt:
             data["args"].extend(["--initial_prompt", prompt])
+        translate = self.parameters.get("translate", False)
+        if translate:
+            data["args"].extend(["--task", 'translate'])
         if advanced_settings:
             for setting, value in advanced_settings.items():
                 setting = setting if setting[:2] == "--" else "--" + setting.lstrip("-")
