@@ -382,8 +382,8 @@ class AudioToText(BasicProcessor):
         fourcat_metadata = item.get("4CAT_metadata")
         audio_metadata = fourcat_metadata.get("audio_metadata")
         return {
-            "audio_id": fourcat_metadata.get("audio_id"),
-            "text": item.get("text", ""),
+            "id": fourcat_metadata.get("audio_id"),
+            "body": item.get("text", ""),
             "language": item.get("language", ""),
             "segments": ",\n".join(
                 [f"text: {segment['text']} (start: {segment['start']}; end: {segment['end']}; )" for segment in
