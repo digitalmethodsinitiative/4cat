@@ -161,7 +161,6 @@ class AudioToText(BasicProcessor):
         self.dataset.update_status("Unzipping audio files")
         staging_area = self.unpack_archive_contents(self.source_file)
 
-
         # Collect filenames (skip .json metadata files)
         audio_filenames = [filename for filename in os.listdir(staging_area) if filename.split('.')[-1] not in ["json", "log"]]
         if self.parameters.get("amount", 100) != 0:
@@ -184,6 +183,8 @@ class AudioToText(BasicProcessor):
         elif local_or_remote == "remote":
             # Upload files to whisper
             whisper_endpoint = "whisper_remote"
+
+            texts_folder = f"texts_{self.dataset.key}"
 
             # Get labels to send server
             top_dataset = self.dataset.top_parent()
@@ -211,16 +212,15 @@ class AudioToText(BasicProcessor):
 
             # Compare audio files with previously uploaded
             to_upload_filenames = [filename for filename in audio_filenames if filename not in uploaded_audio_files]
-            total_audio_files = len(to_upload_filenames) + len(uploaded_audio_files)
 
-            if len(to_upload_filenames) > 0 or "texts" not in filename_response.json():
+            if len(to_upload_filenames) > 0 or texts_folder not in filename_response.json():
                 # TODO: perhaps upload one at a time?
                 api_upload_endpoint = config.get("dmi_service_manager.server_address").rstrip("/") + "/api/send_files"
                 # TODO: don't create a silly empty file just to trick the service manager into creating a new folder
                 with open(staging_area.joinpath("blank.txt"), 'w') as file:
                     file.write('')
                 self.dataset.update_status(f"Uploading {len(to_upload_filenames)} audio files")
-                response = requests.post(api_upload_endpoint, files=[('audio', open(staging_area.joinpath(file), 'rb')) for file in to_upload_filenames] + [('texts', open(staging_area.joinpath("blank.txt"), 'rb'))], data=data, timeout=120)
+                response = requests.post(api_upload_endpoint, files=[('audio', open(staging_area.joinpath(file), 'rb')) for file in to_upload_filenames] + [(texts_folder, open(staging_area.joinpath("blank.txt"), 'rb'))], data=data, timeout=120)
                 if response.status_code == 200:
                     self.dataset.update_status(f"Audio files uploaded: {len(to_upload_filenames)}")
                 else:
@@ -228,7 +228,7 @@ class AudioToText(BasicProcessor):
                     self.log.error(f"Whisper upload error: {response.status_code} - {response.reason}")
 
             mounted_staging_area = Path(folder_name).joinpath("audio")
-            mounted_output_dir = Path(folder_name).joinpath("texts")
+            mounted_output_dir = Path(folder_name).joinpath(texts_folder)
 
         else:
             raise ProcessorException("dmi_service_manager.local_or_remote setting must be 'local' or 'remote'")
@@ -327,12 +327,12 @@ class AudioToText(BasicProcessor):
         elif local_or_remote == "remote":
             # Update list of uploaded files
             filename_response = requests.get(filename_url, timeout=30)
-            result_files = filename_response.json().get('texts', [])
+            result_files = filename_response.json().get(texts_folder, [])
 
             # Download the result files
             api_upload_endpoint = config.get("dmi_service_manager.server_address").rstrip("/") + "/api/uploads/"
             for filename in result_files:
-                file_response = requests.get(api_upload_endpoint + f"{folder_name}/texts/{filename}", timeout=30)
+                file_response = requests.get(api_upload_endpoint + f"{folder_name}/{texts_folder}/{filename}", timeout=30)
                 self.dataset.log(f"Downloading {filename}...")
                 with open(output_dir.joinpath(filename), 'wb') as file:
                     file.write(file_response.content)
@@ -351,7 +351,6 @@ class AudioToText(BasicProcessor):
                 with open(output_dir.joinpath(result_filename), "r") as result_file:
                     result_data = json.loads(''.join(result_file))
                     audio_name = ".".join(result_filename.split(".")[:-1])
-                    self.dataset.log(f"text: {result_data.get('text')}")
                     fourcat_metadata = {
                         "audio_id": audio_name,
                         # TODO: need to pass along filename/videoname/postid/SOMETHING consistent
