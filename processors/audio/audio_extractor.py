@@ -70,9 +70,9 @@ class AudioExtractor(BasicProcessor):
 
 		max_files = self.parameters.get("amount", 100)
 
-		# Prepare staging area for videos and video tracking
+		# Prepare staging areas for videos and video tracking
 		staging_area = self.dataset.get_staging_area()
-		self.dataset.log('Staging directory location: %s' % staging_area)
+		output_dir = self.dataset.get_staging_area()
 
 		total_possible_videos = max_files if max_files != 0 else self.source_dataset.num_rows - 1  # for the metadata file that is included in archives
 		processed_videos = 0
@@ -84,10 +84,10 @@ class AudioExtractor(BasicProcessor):
 
 			# Check for 4CAT's metadata JSON and copy it
 			if path.name == '.metadata.json':
-				shutil.copy(path, staging_area.joinpath(".video_metadata.json"))
+				shutil.copy(path, output_dir.joinpath(".video_metadata.json"))
 				continue
 
-			if max_files != 0 and processed_videos > max_files:
+			if max_files != 0 and processed_videos >= max_files:
 				break
 
 			vid_name = path.stem
@@ -96,7 +96,7 @@ class AudioExtractor(BasicProcessor):
 				shutil.which(config.get("video_downloader.ffmpeg-path")),
 				"-i", shlex.quote(str(path)),
 				"-ar", str(16000),
-				shlex.quote(str(staging_area.joinpath(f"{vid_name}.wav")))
+				shlex.quote(str(output_dir.joinpath(f"{vid_name}.wav")))
 			]
 
 			result = subprocess.run(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -106,12 +106,12 @@ class AudioExtractor(BasicProcessor):
 			ffmpeg_error = result.stderr.decode("utf-8")
 
 			if ffmpeg_output:
-				with open(str(staging_area.joinpath(f"{vid_name}_stdout.log")), 'w') as outfile:
+				with open(str(output_dir.joinpath(f"{vid_name}_stdout.log")), 'w') as outfile:
 					outfile.write(ffmpeg_output)
 
 			if ffmpeg_error:
 				# TODO: Currently, appears all output is here; perhaps subprocess.PIPE?
-				with open(str(staging_area.joinpath(f"{vid_name}_stderr.log")), 'w') as outfile:
+				with open(str(output_dir.joinpath(f"{vid_name}_stderr.log")), 'w') as outfile:
 					outfile.write(ffmpeg_error)
 
 			if result.returncode != 0:
@@ -124,4 +124,4 @@ class AudioExtractor(BasicProcessor):
 			self.dataset.update_progress(processed_videos / total_possible_videos)
 
 		# Finish up
-		self.write_archive_and_finish(staging_area, num_items=processed_videos)
+		self.write_archive_and_finish(output_dir, num_items=processed_videos)
