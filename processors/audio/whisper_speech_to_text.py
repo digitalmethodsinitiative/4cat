@@ -85,61 +85,55 @@ class AudioToText(BasicProcessor):
         """
         Collect maximum number of audio files from configuration and update options accordingly
         """
-        options = cls.options if hasattr(cls, "options") else {}
+        options = {
+            "amount": {
+                "type": UserInput.OPTION_TEXT
+            },
+            # Whisper model options
+            # TODO: Could limit model availability in conjunction with "amount"
+            "model": {
+                "type": UserInput.OPTION_CHOICE,
+                "help": f"Whisper model",
+                "default": "base",
+                "tooltip": "Larger sizes increase quality at expense of greatly increasing the amount of time to process. Try the Base model and increase as needed.",
+                "options": {
+                    "tiny.en": "Tiny English",
+                    "tiny": "Tiny Detect Language",
+                    "base.en": "Base English",
+                    "base": "Base Detect Language",
+                    "small.en": "Small English",
+                    "small": "Small Detect Language",
+                    "medium.en": "Medium English",
+                    "medium": "Medium Detect Language",
+                    "large": "Large Detect Language"
+                }
+            },
+            "prompt": {
+                "type": UserInput.OPTION_TEXT,
+                "help": "Prompt model (see references)",
+                "default": "",
+                "tooltip": "Prompts can aid the model in specific vocabulary detection, to add punctuation or filler words."
+            },
+            "advanced": {
+                "type": UserInput.OPTION_TEXT_JSON,
+                "help": "[Advanced settings](https://github.com/openai/whisper/blob/248b6cb124225dd263bb9bd32d060b6517e067f8/whisper/transcribe.py#LL374C3-L374C3)",
+                "default": {},
+                "tooltip": "Additional settings can be provided as a JSON e.g., {\"--no_speech_threshold\": 0.2, \"--logprob_threshold\": -0.5}."
+            }
+        }
 
         # Update the amount max and help from config
         max_number_audio_files = int(config.get("dmi_service_manager.whisper_num_files", 100))
         if max_number_audio_files == 0:  # Unlimited allowed
-            options["amount"] = {
-                "type": UserInput.OPTION_TEXT,
-                "help": "Number of audio files",
-                "default": 100,
-                "min": 0,
-                "tooltip": "Use '0' to convert all audio (this can take a very long time)"
-            }
+            options["amount"]["help"] = "Number of audio files"
+            options["amount"]["default"] = 100
+            options["amount"]["min"] = 0
+            options["amount"]["tooltip"] = "Use '0' to convert all audio (this can take a very long time)"
         else:
-            options["amount"] = {
-                "type": UserInput.OPTION_TEXT,
-                "help": f"Number of audio files (max {max_number_audio_files})",
-                "default": min(max_number_audio_files, 100),
-                "max": max_number_audio_files,
-                "min": 1,
-            }
-
-        # Whisper model options
-        # TODO: Could limit model availability in conjunction with "amount"
-        options["model"] = {
-            "type": UserInput.OPTION_CHOICE,
-            "help": f"Whisper model",
-            "default": "base",
-            "tooltip": "Larger sizes increase quality at expense of greatly increasing the amount of time to process. Try the Base model and increase as needed.",
-            "options": {
-                "tiny.en": "Tiny English",
-                "tiny": "Tiny Detect Language",
-                "base.en": "Base English",
-                "base": "Base Detect Language",
-                "small.en": "Small English",
-                "small": "Small Detect Language",
-                "medium.en": "Medium English",
-                "medium": "Medium Detect Language",
-                "large": "Large Detect Language"
-            },
-        }
-
-        options["prompt"] = {
-            "type": UserInput.OPTION_TEXT,
-            "help": "Prompt model (see references)",
-            "default": "",
-            "tooltip": "Prompts can aid the model in specific vocabulary detection, to add punctuation or filler words."
-        }
-
-        options["advanced"] = {
-            "type": UserInput.OPTION_TEXT_JSON,
-            "help": "[Advanced settings](https://github.com/openai/whisper/blob/248b6cb124225dd263bb9bd32d060b6517e067f8/whisper/transcribe.py#LL374C3-L374C3)",
-            "default": {},
-            "tooltip": "Additional settings can be provided as a JSON e.g., {\"--no_speech_threshold\": 0.2, \"--logprob_threshold\": -0.5}."
-        }
-
+            options["amount"]["help"] = f"Number of audio files (max {max_number_audio_files})"
+            options["amount"]["default"] = min(max_number_audio_files, 100)
+            options["amount"]["max"] = max_number_audio_files
+            options["amount"]["min"] = 1
 
         return options
 
