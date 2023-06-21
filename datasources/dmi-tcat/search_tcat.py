@@ -155,7 +155,8 @@ class SearchWithinTCATBins(Search):
                 except (requests.RequestException, json.JSONDecodeError):
                     cls.bin_data["all_bins"][instance] = {"failed": True}
                     # TODO: No logger here as nothing has been initialized
-                    print(f"WARNING, unable to collect TCAT bins from instance {instance}")
+                    # print(f"WARNING, unable to collect TCAT bins from instance {instance}")
+                    pass
 
     @classmethod
     def get_options(cls, parent_dataset=None, user=None):
