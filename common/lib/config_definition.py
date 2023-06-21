@@ -198,15 +198,6 @@ config_definition = {
         "help": "List scrape proxies",
         "tooltip": "Items in this list should be formatted like 'http://111.222.33.44:1234' and seperated by commas",
     },
-    # TODO: I don"t know what this actually does - Dale
-    # Probably just timeout specific for images
-    "IMAGE_INTERVAL": {
-        "type": UserInput.OPTION_TEXT,
-        "default": "3600",
-        "help": "Image Interval",
-        "coerce_type": int,
-        "tooltip": "",
-    },
     # Explorer settings
     # The maximum allowed amount of rows (prevents timeouts and memory errors)
     "explorer.max_posts": {
