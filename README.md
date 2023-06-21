@@ -66,6 +66,9 @@ Please check our
 [issues](https://github.com/digitalmethodsinitiative/4cat/issues) and create
 one if you experience any problems (pull requests are also very welcome).
 
+### Upgrading 4CAT
+Instructions on upgrading 4CAT from previous versions [can be found in our wiki](https://github.com/digitalmethodsinitiative/4cat/wiki/Upgrading-4CAT).
+
 ## Modules
 4CAT is a modular tool and easy to extend. The following two folders in the 
 repository are of interest for this: 
