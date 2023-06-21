@@ -44,6 +44,7 @@ class SearchTumblr(Search):
 
 	seen_ids = set()
 	failed_notes = []
+	failed_reblogs = []
 
 	config = {
 		# Tumblr API keys to use for data capturing
@@ -200,11 +201,22 @@ class SearchTumblr(Search):
 
 			# Get the full data for text reblogs.
 			if text_reblogs:
-
+				connection_retries = 0
 				for i, text_reblog in enumerate(text_reblogs):
 					self.dataset.update_status("Got %i/%i text reblogs" % (i, len(text_reblogs)))
+					if connection_retries >= 5:
+						self.dataset.update_status("Multiple connection refused errors; unable to continue collection of reblogs.")
+						break
 					for key, value in text_reblog.items():
-						reblog_post = self.get_post_by_id(key, value)
+						if connection_retries >= 5:
+							break
+						try:
+							reblog_post = self.get_post_by_id(key, value)
+						except ConnectionRefusedError:
+							connection_retries += 1
+							self.failed_reblogs.append(key)
+							self.dataset.update_status(f"ConnectionRefused: Unable to collect reblogs for post {key}")
+							continue
 						if reblog_post:
 							reblog_post = self.parse_tumblr_posts([reblog_post], reblog=True)
 							results.append(reblog_post[0])
@@ -786,5 +798,5 @@ class SearchTumblr(Search):
 
 		"""
 		super().after_process()
-		if len(self.failed_notes) > 0:
-			self.dataset.update_status("API error(s) when fetching notes %s" % ", ".join(self.failed_notes))
+		if len(self.failed_notes) > 0 or len(self.failed_reblogs) > 0:
+			self.dataset.update_status("API error(s) when fetching notes %s" % ", ".join(self.failed_notes) if len(self.failed_notes) > 0 else "" + "API error(s) when fetching reblogs %s" % ", ".join(self.failed_reblogs) if len(self.failed_reblogs) > 0 else "")
