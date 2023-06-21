@@ -3,6 +3,7 @@ The heart of the app - manages jobs and workers
 """
 import signal
 import time
+import json
 
 from backend import all_modules
 from common.lib.exceptions import JobClaimedException
@@ -43,9 +44,13 @@ class WorkerManager:
 		self.validate_datasources()
 
 		# queue jobs for workers that always need one
+		module_config = {}
 		for worker_name, worker in all_modules.workers.items():
 			if hasattr(worker, "ensure_job"):
 				self.queue.add_job(jobtype=worker_name, **worker.ensure_job)
+
+			if hasattr(worker, "config") and type(worker.config) is dict:
+				module_config.update(worker.config)
 
 		self.log.info('4CAT Started')
 

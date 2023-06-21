@@ -7,7 +7,6 @@ import inspect
 import pickle
 import sys
 import re
-import os
 
 from common.config_manager import config
 
@@ -52,6 +51,18 @@ class ModuleCollector:
         # now we know all workers, we can add some extra metadata to the
         # datasources, e.g. whether they have an associated search worker
         self.expand_datasources()
+
+        # cache module-defined config options for use by the config manager
+        module_config = {}
+        for worker in self.processors.values():
+            if hasattr(worker, "config") and type(worker.config) is dict:
+                module_config.update(worker.config)
+
+        with config.get("PATH_ROOT").joinpath("backend/module_config.bin").open("wb") as outfile:
+            pickle.dump(module_config, outfile)
+
+        # load from cache
+        config.load_user_settings()
 
     @staticmethod
     def is_4cat_class(object):

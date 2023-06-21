@@ -12,7 +12,6 @@ import os
 
 from pathlib import Path, PurePath
 
-import backend
 from backend.abstract.worker import BasicWorker
 from common.lib.dataset import DataSet
 from common.lib.fourcat_module import FourcatModule
@@ -78,7 +77,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 	options = {}
 
 	#: 4CAT settings from the perspective of the dataset's owner
-	config = ConfigDummy()
+	config = None
 
 	#: Values for the processor's options, populated by user input
 	parameters = {}

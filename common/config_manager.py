@@ -1,4 +1,5 @@
 import json
+import pickle
 
 from pathlib import Path
 from common.lib.database import Database
@@ -53,12 +54,13 @@ class ConfigManager:
         # module settings can't be loaded directly because modules need the
         # config manager to load, so that becomes circular
         # instead, this is cached on startup and then loaded here
-        module_config_path = self.get("PATH_ROOT").joinpath("backend/module_config.json")
+        module_config_path = self.get("PATH_ROOT").joinpath("backend/module_config.bin")
         if module_config_path.exists():
             try:
-                with module_config_path.open() as infile:
-                    self.config_definition.update(json.load(infile))
-            except (json.JSONDecodeError, TypeError):
+                with module_config_path.open("rb") as infile:
+                    module_config = pickle.load(infile)
+                    self.config_definition.update(module_config)
+            except (ValueError, TypeError):
                 pass
 
     def load_core_settings(self):
@@ -151,10 +153,14 @@ class ConfigManager:
         # user-specific settings are just a special type of tag (which takes
         # precedence), same goes for user groups
         if user:
-            groups = self.db.fetchall("SELECT group FROM user_groups WHERE user = %s", (user,))
-
-            for group in groups:
-                tags.insert(0, f"group:{group['group']}")
+            groups = self.db.fetchone("SELECT tags FROM users WHERE name = %s", (user,))
+            if groups:
+                try:
+                    for group in json.loads(groups["tags"]):
+                        tags.insert(0, group)
+                except (TypeError, ValueError):
+                    # should be a JSON list, but isn't
+                    pass
 
             tags.insert(0, f"user:{user}")
 
