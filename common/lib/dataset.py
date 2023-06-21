@@ -17,6 +17,8 @@ from common.lib.helpers import get_software_version, NullAwareTextIOWrapper
 from common.lib.fourcat_module import FourcatModule
 from common.lib.exceptions import ProcessorInterruptedException
 
+from webtool.lib.user import User
+
 
 class DataSet(FourcatModule):
 	"""
@@ -581,6 +583,56 @@ class DataSet(FourcatModule):
 				return len(set(reader.fieldnames) & column_options) >= 3
 			except (TypeError, ValueError):
 				return False
+
+	def has_owner(self, username):
+		"""
+		Check if dataset has given user as owner
+
+		:param str|User username: Username to check for
+		:return bool:
+		"""
+		if type(username) is User:
+			username = username.get_id()
+		elif type(username) is not str:
+			raise TypeError("User must be a str or User object")
+
+		return self.data["owner"] == username
+
+	def get_owners(self):
+		"""
+		Get list of dataset owners
+
+		:return tuple:
+		"""
+		return (self.data["owner"],)
+
+	def add_owner(self, username):
+		"""
+		Set dataset owner
+
+		:param str|User username:  Username to set as owner
+		"""
+		if type(username) is User:
+			username = username.get_id()
+		elif type(username) is not str:
+			raise TypeError("User must be a str or User object")
+
+		self["owner"] = username
+
+	def remove_owner(self, username):
+		"""
+		Remove dataset owner
+
+		If no owner is set, the dataset is assigned to the anonymous user.
+
+		:param str|User username:  Username to remove as owner
+		"""
+		if type(username) is User:
+			username = username.get_id()
+		elif type(username) is not str:
+			raise TypeError("User must be a str or User object")
+
+		self["owner"] = "anonymous"
 
 	def get_parameters(self):
 		"""

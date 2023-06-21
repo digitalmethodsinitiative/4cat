@@ -46,7 +46,7 @@ def explorer_dataset(key, page):
 	except TypeError:
 		return error(404, error="Dataset not found.")
 
-	if dataset.is_private and not (current_user.is_admin or dataset.owner == current_user.get_id()):
+	if dataset.is_private and not (current_user.is_admin or dataset.has_owner(current_user)):
 		return error(403, error="This dataset is private.")
 
 	if len(dataset.get_genealogy()) > 1:

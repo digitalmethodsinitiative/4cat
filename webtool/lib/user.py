@@ -14,6 +14,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from common.lib.helpers import send_email
 from common.config_manager import config
+from common.lib.dataset import DataSet
 
 
 class User:
@@ -103,10 +104,10 @@ class User:
         elif self.is_admin:
             return True
 
-        elif self.get_id() == dataset.owner:
+        elif dataset.has_owner(self):
             return True
 
-        elif dataset.owner == "anonymous":
+        elif dataset.get_owners == ("anonymous",):
             return True
 
         else:
@@ -205,7 +206,11 @@ class User:
 
         :return bool:
         """
-        return self.data["is_admin"]
+        try:
+            return "admin" in self.data["tags"]
+        except (ValueError, TypeError):
+            # invalid JSON?
+            return False
 
     @property
     def is_deactivated(self):
@@ -386,7 +391,7 @@ class User:
         """
         self.db.execute("DELETE FROM users_notifications WHERE id IN ( SELECT n.id FROM users_notifications AS n, users AS u "
             "WHERE u.name = %s AND n.id = %s "
-            "AND (u.name = n.username OR (u.is_admin AND n.username = '!admins') OR n.username = '!everyone'))", (self.get_id(), notification_id))
+            "AND (u.name = n.username OR (u.tags @> '[\"admin\"]' AND n.username = '!admins') OR n.username = '!everyone'))", (self.get_id(), notification_id))
 
     def get_notifications(self):
         """
@@ -400,6 +405,31 @@ class User:
         notifications = self.db.fetchall(
             "SELECT n.* FROM users_notifications AS n, users AS u "
             "WHERE u.name = %s "
-            "AND (u.name = n.username OR (u.is_admin AND n.username = '!admins') OR n.username = '!everyone')", (self.get_id(),))
+            "AND (u.name = n.username OR (u.tags @> '[\"admin\"]' AND n.username = '!admins') OR n.username = '!everyone')", (self.get_id(),))
 
         return notifications
+
+    def delete(self, also_datasets=True):
+        username = self.data["name"]
+
+        self.db.delete("users_favourites", where={"name": username}, commit=False),
+        self.db.delete("users_notifications", where={"username": username}, commit=False)
+        self.db.delete("access_tokens", where={"name": username}, commit=False)
+
+        # find datasets and delete
+        datasets = self.db.fetchall("SELECT key FROM datasets WHERE owner = %s", (username,))
+
+        # delete any datasets and jobs related to deleted datasets
+        if datasets:
+            for dataset in datasets:
+                dataset = DataSet(key=dataset["key"], db=self.db)
+
+                if len(dataset.get_owners()) == 1 and also_datasets:
+                    dataset.delete(commit=False)
+                    self.db.delete("jobs", where={"remote_id": dataset.key}, commit=False)
+                else:
+                    dataset.remove_owner(self)
+
+        # and finally the user
+        self.db.delete("users", where={"name": username}, commit=False)
+        self.db.commit()

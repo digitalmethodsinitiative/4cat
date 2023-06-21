@@ -498,7 +498,7 @@ def edit_dataset_label(key):
 	except TypeError:
 		return error(404, error="Dataset does not exist.")
 
-	if not current_user.is_admin and not current_user.get_id() == dataset.owner:
+	if not current_user.is_admin and not dataset.has_owner(current_user):
 		return error(403, message="Not allowed")
 
 	dataset.update_label(label)
@@ -660,7 +660,7 @@ def delete_dataset(key=None):
 	except TypeError:
 		return error(404, error="Dataset does not exist.")
 
-	if not current_user.is_admin and not current_user.get_id() == dataset.owner:
+	if not current_user.is_admin and not dataset.has_owner(current_user):
 		return error(403, message="Not allowed")
 
 	# if there is an active or queued job for some child dataset, cancel and
@@ -721,7 +721,7 @@ def erase_credentials(key=None):
 	except TypeError:
 		return error(404, error="Dataset does not exist.")
 
-	if not current_user.is_admin and not current_user.get_id() == dataset.owner:
+	if not current_user.is_admin and not dataset.has_owner(current_user):
 		return error(403, message="Not allowed")
 
 	for field in dataset.parameters:
@@ -804,7 +804,7 @@ def toggle_private(key):
 	except TypeError:
 		return error(404, error="Dataset does not exist.")
 
-	if dataset.owner != current_user.get_id() and not current_user.is_admin():
+	if not dataset.has_owner(current_user) and not current_user.is_admin:
 		return error(403, error="This dataset is private")
 
 	# apply status to dataset and all children
