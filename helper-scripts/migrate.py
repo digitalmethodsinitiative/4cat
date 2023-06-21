@@ -193,7 +193,11 @@ migrate_to_run = []
 # ---------------------------------------------
 if args.release:
 	logger.info("- Finding latest release in remote git repository %s..." % args.repository)
-	repo_id = "/".join(args.repository.split("/")[-2:]).split(".git")[0]
+	if args.repository[:4] == "git@":
+		repo_id = "/".join(args.repository.split(":")[1].split("/")[-2:]).split(".git")[0]
+	else:
+		repo_id = "/".join(args.repository.split("/")[-2:]).split(".git")[0]
+	print(f"repo id= {repo_id}")
 	api_url = "https://api.github.com/repos/%s/releases/latest" % repo_id
 
 	try:
@@ -214,7 +218,16 @@ if args.release:
 	remote = subprocess.run(shlex.split("git remote add 4cat_migrate %s" % args.repository), stdout=subprocess.PIPE,
 						stderr=subprocess.PIPE, cwd=cwd, text=True)
 	if remote.stderr:
-		if remote.stderr.strip() != "error: remote 4cat_migrate already exists.":
+		if remote.stderr.strip() == "error: remote 4cat_migrate already exists.":
+			# Update URL
+			remote = subprocess.run(shlex.split("git remote set-url 4cat_migrate %s" % args.repository),
+									stdout=subprocess.PIPE,
+									stderr=subprocess.PIPE, cwd=cwd, text=True)
+			if remote.stderr:
+				logger.info("Error while updating git remote for %s" % args.repository)
+				logger.info(remote.stderr)
+				exit(1)
+		else:
 			logger.info("Error while adding git remote for %s" % args.repository)
 			logger.info(remote.stderr)
 			exit(1)
@@ -223,6 +236,19 @@ if args.release:
 	fetch = subprocess.run(shlex.split("git fetch 4cat_migrate"), stderr=subprocess.PIPE, stdout=subprocess.PIPE, cwd=cwd, text=True)
 
 	if fetch.returncode != 0:
+		if "fatal: could not read Username" in fetch.stderr:
+			# git requiring login
+			import common.config_manager as config
+			if config.get("USING_DOCKER"):
+				# update git config setting
+				unset_authorization = subprocess.run(shlex.split("git config --unset http.https://github.com/.extraheader"), stderr=subprocess.PIPE, stdout=subprocess.PIPE, cwd=cwd, text=True)
+				fetch = subprocess.run(shlex.split("git fetch 4cat_migrate"), stderr=subprocess.PIPE,
+									   stdout=subprocess.PIPE, cwd=cwd, text=True)
+				if fetch.returncode != 0:
+					logger.info("Error while fetching latest tags with git. Check that the repository URL is correct.")
+					logger.info(fetch.stderr)
+					exit(1)
+
 		logger.info("Error while fetching latest tags with git. Check that the repository URL is correct.")
 		logger.info(fetch.stderr)
 		exit(1)
