@@ -6,7 +6,8 @@
 -- 4CAT settings table
 CREATE TABLE IF NOT EXISTS settings (
   name                   TEXT UNIQUE PRIMARY KEY,
-  value                  TEXT DEFAULT '{}'
+  value                  TEXT DEFAULT '{}',
+  tag                    TEXT DEFAULT ''
 );
 
 -- jobs table
@@ -38,7 +39,6 @@ CREATE TABLE IF NOT EXISTS datasets (
   key               text,
   type              text DEFAULT 'search',
   key_parent        text DEFAULT '',
-  owner             VARCHAR DEFAULT 'anonymous',
   query             text,
   job               integer DEFAULT 0,
   parameters        text,
@@ -53,6 +53,14 @@ CREATE TABLE IF NOT EXISTS datasets (
   software_file     text DEFAULT '',
   annotation_fields text DEFAULT ''
 );
+
+CREATE TABLE datasets_owners (
+    "user" text DEFAULT 'anonymous'::text,
+    key text NOT NULL
+);
+
+CREATE UNIQUE INDEX datasets_owners_user_key_idx ON datasets_owners("user" text_ops,key text_ops);
+
 
 -- annotations
 CREATE TABLE IF NOT EXISTS annotations (
@@ -77,8 +85,9 @@ CREATE TABLE IF NOT EXISTS users (
   register_token     TEXT DEFAULT '',
   timestamp_token    INTEGER DEFAULT 0,
   timestamp_seen     INTEGER DEFAULT 0,
-  userdata           TEXT DEFAULT '{}',
-  is_deactivated     BOOLEAN DEFAULT FALSE
+  userdata           JSONB DEFAULT '{}',
+  is_deactivated     BOOLEAN DEFAULT FALSE,
+  tags               JSONB DEFAULT '{}'
 );
 
 INSERT INTO users

@@ -29,7 +29,7 @@ has_column = db.fetchone(
     "SELECT COUNT(*) AS num FROM information_schema.columns WHERE table_name = 'settings' AND column_name = 'tag'")
 if has_column["num"] == 0:
     print("  ...No, adding.")
-    db.execute("ALTER TABLE settings ADD COLUMN tag TEXT DEFAULT '{}'")
+    db.execute("ALTER TABLE settings ADD COLUMN tag TEXT DEFAULT ''")
     db.commit()
 else:
     print("  ...Yes, nothing to update.")
