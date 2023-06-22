@@ -24,6 +24,7 @@ jobs:
               echo "Backend running as expected"
           else 
               echo "::error::Backend failed to start"
+              echo "$var"
               exit 1
           fi
           echo "::endgroup::"

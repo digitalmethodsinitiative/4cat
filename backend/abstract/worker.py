@@ -111,7 +111,6 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
 			self.work()
 		except WorkerInterruptedException:
 			self.log.info("Worker %s interrupted - cancelling." % self.type)
-			
 
 			# interrupted - retry later or cancel job altogether?
 			if self.interrupted == self.INTERRUPT_RETRY:
