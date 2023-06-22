@@ -93,8 +93,12 @@ class GoogleVisionAPIFetcher(BasicProcessor):
         features = [{"type": feature} for feature in features]
 
         if not api_key:
-            self.dataset.update_status("You need to provide a valid API key", is_final=True)
-            self.dataset.finish(0)
+            self.dataset.finish_with_error("You need to provide a valid API key")
+            return
+
+        # is there anything for us to download?
+        if self.source_dataset.num_rows == 0:
+            self.dataset.finish_with_error("No images to download.")
             return
 
         max_images = convert_to_int(self.parameters.get("amount", 0), 100)

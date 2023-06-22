@@ -7,6 +7,7 @@ collected elsewhere.
 """
 import datetime
 import json
+import time
 import re
 
 from backend.abstract.search import Search
@@ -53,12 +54,17 @@ class SearchLinkedIn(Search):
         # annoyingly, posts don't come with a timestamp
         # approximate it by using the time of collection and the "time ago"
         # included with the post (e.g. 'published 18h ago')
-        post = node["data"]
+        post = node
 
         if not post.get("actor"):
             return {}
 
-        time_collected = int(node["timestamp_collected"] / 1000)  # milliseconds
+        if "__import_meta" in node:
+            time_collected = int(node["__import_meta"]["timestamp_collected"] / 1000)  # milliseconds
+        else:
+            # best we got
+            time_collected = int(time.time())
+
         time_ago = post["actor"]["subDescription"]["text"] if post["actor"].get("subDescription") else ""
         timestamp = int(time_collected - SearchLinkedIn.parse_time_ago(time_ago))
 

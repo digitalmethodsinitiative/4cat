@@ -11,7 +11,9 @@ import json
 config_definition = {
     "4cat.datasources": {
         "type": UserInput.OPTION_TEXT_JSON,
-        "default": json.dumps(["bitchute", "custom", "douban", "customimport", "reddit", "telegram", "twitterv2"]),
+        "default": json.dumps(["bitchute", "custom", "douban", "customimport", "reddit", "telegram", "twitterv2",
+                               "douyin", "imgur", "instagram", "linkedin", "ninegag", "parler", "tiktok",
+                               "twitter-import"]),
         "help": "Data Sources",
         "tooltip": "A list of enabled data sources that people can choose from when creating a dataset page. It is "
                    "recommended to manage this via the 'Data sources' button in the Control Panel."
@@ -77,6 +79,24 @@ config_definition = {
         "help": "Shown phone home request?",
         "tooltip": "Whether you've seen the 'phone home request'. Set to `false` to see the request again. There "
                    "should be no need to change this manually."
+    },
+    "4cat.layout_hue": {
+        "type": UserInput.OPTION_HUE,
+        "default": 356,
+        "help": "Interface accent colour",
+        "saturation": 77,
+        "luminance": 46,
+        "update_layout": True,
+        "min": 0,
+        "max": 360,
+        "coerce_type": int
+    },
+    "4cat.allow_access_request": {
+        "type": UserInput.OPTION_TOGGLE,
+        "default": True,
+        "help": "Allow access requests",
+        "tooltip": "When enabled, users can request a 4CAT account via the login page if they do not have one, "
+                   "provided e-mail settings are configured."
     },
     # These settings control whether top-level datasets (i.e. those created via the
     # "Create dataset" page) are deleted automatically, and if so, after how much
@@ -178,15 +198,6 @@ config_definition = {
         "help": "List scrape proxies",
         "tooltip": "Items in this list should be formatted like 'http://111.222.33.44:1234' and seperated by commas",
     },
-    # TODO: I don"t know what this actually does - Dale
-    # Probably just timeout specific for images
-    "IMAGE_INTERVAL": {
-        "type": UserInput.OPTION_TEXT,
-        "default": "3600",
-        "help": "Image Interval",
-        "coerce_type": int,
-        "tooltip": "",
-    },
     # Explorer settings
     # The maximum allowed amount of rows (prevents timeouts and memory errors)
     "explorer.max_posts": {
@@ -238,7 +249,7 @@ config_definition = {
         "type": UserInput.OPTION_TOGGLE,
         "default": False,
         "help": "Use HTTPS",
-        "tooltip": "Enable to make 4CAT use 'https' in absolute URLs; DOES NOT CURRENTLY WORK WITH DOCKER SETUP",
+        "tooltip": "If your server is using 'https', set to True and 4CAT will use HTTPS links.",
     },
     "flask.autologin.name": {
         "type": UserInput.OPTION_TEXT,
@@ -285,4 +296,5 @@ categories = {
     "image_downloader": "Image Download Settings",
     "video_downloader": "Video Download Settings",
     'text_from_images': 'OCR: Extract text from images (https://github.com/digitalmethodsinitiative/ocr_server)',
+    "dmi_service_manager": "DMI Service Manager (for additional processors run outside 4CAT)",
 }

@@ -62,6 +62,24 @@ def make_version_comparable(version):
 	return version[0].zfill(3) + "." + version[1].zfill(3)
 
 
+def check_for_nltk():
+	# ---------------------------------------------
+	#        Check for and install packages
+	# ---------------------------------------------
+	# NLTK
+	import nltk
+	try:
+		nltk.data.find('tokenizers/punkt')
+	except LookupError:
+		nltk.download('punkt', quiet=True)
+	try:
+		nltk.data.find('corpora/wordnet')
+	except LookupError:
+		nltk.download("wordnet", quiet=True)
+	
+	nltk.download("omw-1.4", quiet=True)
+
+
 def finish(args, logger):
 	"""
 	Finish migration
@@ -70,6 +88,7 @@ def finish(args, logger):
 	this is made a function that can be called from any point in the script to
 	wrap up and exit.
 	"""
+	check_for_nltk()
 	logger.info("\nMigration finished. You can now safely restart 4CAT.\n")
 
 	if args.restart:
@@ -174,7 +193,11 @@ migrate_to_run = []
 # ---------------------------------------------
 if args.release:
 	logger.info("- Finding latest release in remote git repository %s..." % args.repository)
-	repo_id = "/".join(args.repository.split("/")[-2:]).split(".git")[0]
+	if args.repository[:4] == "git@":
+		repo_id = "/".join(args.repository.split(":")[1].split("/")[-2:]).split(".git")[0]
+	else:
+		repo_id = "/".join(args.repository.split("/")[-2:]).split(".git")[0]
+	print(f"repo id= {repo_id}")
 	api_url = "https://api.github.com/repos/%s/releases/latest" % repo_id
 
 	try:
@@ -195,7 +218,16 @@ if args.release:
 	remote = subprocess.run(shlex.split("git remote add 4cat_migrate %s" % args.repository), stdout=subprocess.PIPE,
 						stderr=subprocess.PIPE, cwd=cwd, text=True)
 	if remote.stderr:
-		if remote.stderr.strip() != "error: remote 4cat_migrate already exists.":
+		if remote.stderr.strip() == "error: remote 4cat_migrate already exists.":
+			# Update URL
+			remote = subprocess.run(shlex.split("git remote set-url 4cat_migrate %s" % args.repository),
+									stdout=subprocess.PIPE,
+									stderr=subprocess.PIPE, cwd=cwd, text=True)
+			if remote.stderr:
+				logger.info("Error while updating git remote for %s" % args.repository)
+				logger.info(remote.stderr)
+				exit(1)
+		else:
 			logger.info("Error while adding git remote for %s" % args.repository)
 			logger.info(remote.stderr)
 			exit(1)
@@ -204,6 +236,19 @@ if args.release:
 	fetch = subprocess.run(shlex.split("git fetch 4cat_migrate"), stderr=subprocess.PIPE, stdout=subprocess.PIPE, cwd=cwd, text=True)
 
 	if fetch.returncode != 0:
+		if "fatal: could not read Username" in fetch.stderr:
+			# git requiring login
+			import common.config_manager as config
+			if config.get("USING_DOCKER"):
+				# update git config setting
+				unset_authorization = subprocess.run(shlex.split("git config --unset http.https://github.com/.extraheader"), stderr=subprocess.PIPE, stdout=subprocess.PIPE, cwd=cwd, text=True)
+				fetch = subprocess.run(shlex.split("git fetch 4cat_migrate"), stderr=subprocess.PIPE,
+									   stdout=subprocess.PIPE, cwd=cwd, text=True)
+				if fetch.returncode != 0:
+					logger.info("Error while fetching latest tags with git. Check that the repository URL is correct.")
+					logger.info(fetch.stderr)
+					exit(1)
+
 		logger.info("Error while fetching latest tags with git. Check that the repository URL is correct.")
 		logger.info(fetch.stderr)
 		exit(1)
@@ -320,21 +365,6 @@ if current_version_file.exists():
 	current_version_file.unlink()
 shutil.copy(target_version_file, current_version_file)
 logger.info("  ...done")
-
-
-# ---------------------------------------------
-#        Check for and install packages
-# ---------------------------------------------
-# NLTK
-import nltk
-try:
-	nltk.data.find('tokenizers/punkt')
-except LookupError:
-	nltk.download('punkt', quiet=True)
-try:
-	nltk.data.find('corpora/wordnet')
-except LookupError:
-	nltk.download("wordnet", quiet=True)
 
 # ---------------------------------------------
 #            Done! Wrap up and finish

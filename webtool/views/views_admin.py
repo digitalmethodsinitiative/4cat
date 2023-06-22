@@ -3,9 +3,11 @@
 """
 import re
 import time
+import math
 import json
 import smtplib
 import psycopg2
+import colorsys
 import markdown2
 
 from pathlib import Path
@@ -18,7 +20,7 @@ from flask import render_template, jsonify, request, abort, flash, get_flashed_m
 from flask_login import current_user, login_required
 
 from webtool import app, db
-from webtool.lib.helpers import admin_required, error, Pagination
+from webtool.lib.helpers import admin_required, error, Pagination, generate_css_colours
 from webtool.lib.user import User
 
 from common.lib.helpers import call_api, send_email, UserInput
@@ -361,9 +363,16 @@ def update_settings():
             for setting, value in new_settings.items():
                 valid = config.set_or_create_setting(setting, value,
                                                      raw=definition[setting].get("type") == UserInput.OPTION_TEXT_JSON)
-                print("%s: %s" % (setting, repr(valid)))
+
                 if valid is None:
                     flash("Invalid value for %s" % setting)
+                    continue
+
+                if setting == "4cat.layout_hue":
+                    # todo: make this 'side-effects' thing generically applicable
+                    # this setting has a side-effect because it requires the
+                    # updating of the colour definitions in the CSS
+                    generate_css_colours(force=True)
 
             flash("Settings saved")
         except QueryParametersException as e:

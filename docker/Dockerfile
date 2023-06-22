@@ -31,12 +31,12 @@ RUN pip3 install gunicorn
 FROM python:3.8-slim AS build-image
 COPY --from=compile-image /opt/venv /opt/venv
 # Make virtual env available
-ENV PATH="/opt/venv/bin:$PATH"
+ENV PATH="/opt/venv/bin:$PATH" PYTHONUNBUFFERED=1
 
 RUN apt-get update && apt install -y \
     # Called in docker-entrypoint.sh:
     curl \
-    netcat \
+    netcat-traditional \
     postgresql-client \
     postgresql-server-dev-all \
     # Called by 4CAT:

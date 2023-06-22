@@ -151,7 +151,7 @@ def show_results(page):
 """
 Downloading results
 """
-@app.route('/result/<string:query_file>/')
+@app.route('/result/<string:query_file>')
 def get_result(query_file):
     """
     Get dataset result file
@@ -160,7 +160,7 @@ def get_result(query_file):
     :return:  Result file
     :rmime: text/csv
     """
-    directory = config.get('PATH_ROOT') + "/" + config.get('PATH_DATA')
+    directory = str(config.get('PATH_ROOT').joinpath(config.get('PATH_DATA')))
     return send_from_directory(directory=directory, path=query_file)
 
 
@@ -272,7 +272,10 @@ def preview_items(key):
                                message="No preview is available for this file.")
 
     if dataset.get_extension() == "gexf":
-        return render_template("preview/gexf.html", dataset=dataset)
+        hostname = config.get("flask.server_name").split(":")[0]
+        in_localhost = hostname in ("localhost", "127.0.0.1") or hostname.endswith(".local") or \
+            hostname.endswith(".localhost")
+        return render_template("preview/gexf.html", dataset=dataset, with_gephi_lite=(not in_localhost))
 
     elif dataset.get_extension() in ("svg", "png", "jpeg", "jpg", "gif", "webp"):
         return render_template("preview/image.html", dataset=dataset)

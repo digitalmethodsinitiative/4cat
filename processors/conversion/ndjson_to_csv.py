@@ -39,37 +39,47 @@ class ConvertNDJSONtoCSV(BasicProcessor):
 		"""
 		This takes a NDJSON file as input, flattens the dictionaries, and writes the same data as a CSV file
 		"""
-		processed = 0
 		total_items = self.source_dataset.num_rows
-		self.dataset.update_status("Converting file")
 
 		# We first collect all possible columns for the csv file, then
 		# for each item make sure there is a value for all the columns (in the
 		# second step)
-		all_keys = list()
-		for item in self.source_dataset.iterate_items(self):
-			if self.interrupted:
-				raise ProcessorInterruptedException("Interrupted while writing temporary results to file")
+		all_keys = self.source_dataset.get_item_keys()
 
-			# Flatten the dict
-			# if map_item was used this does (effectively) nothing, if it
-			# wasn't this makes sure the values are all scalar
-			item = flatten_dict(item)
+		self.dataset.update_status("Converting file")
+		staging_area = self.dataset.get_staging_area()
+		with staging_area.joinpath('temp.ndjson').open("w") as output:
+			for original_item, mapped_item in self.source_dataset.iterate_mapped_items(self):
+				if self.interrupted:
+					raise ProcessorInterruptedException("Interrupted while writing temporary results to file")
 
-			# why not use a set() and |? because we want to preserve the key
-			# order as much as possible
-			for field in item.keys():
-				if field not in all_keys:
-					all_keys.append(field)
+				# Flatten the dict
+				item = flatten_dict(original_item)
+				# Add any new keys to all_keys
+				for field in item.keys():
+					if field not in all_keys:
+						all_keys.append(field)
 
-		# Create CSV file
+				# Add mapped keys to flattened original item
+				item.update(mapped_item)
+
+				# Write this new json to our temp file
+				output.write(json.dumps(item) + "\n")
+
+		processed = 0
+		# Create new CSV file
 		with self.dataset.get_results_path().open("w", newline="") as output:
 			writer = csv.DictWriter(output, fieldnames=all_keys)
 			writer.writeheader()
 
-			for item in self.source_dataset.iterate_items(self):
-				writer.writerow({key: item.get(key, "") for key in all_keys})
-				processed += 1
+			with staging_area.joinpath('temp.ndjson').open("r") as infile:
+				for line in infile:
+					if self.interrupted:
+						raise ProcessorInterruptedException("Interrupted while writing results to file")
+
+					item = json.loads(line)
+					writer.writerow({key: item.get(key, "") for key in all_keys})
+					processed += 1
 
 				if processed % 100 == 0:
 					self.dataset.update_status(

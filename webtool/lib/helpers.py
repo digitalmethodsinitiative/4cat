@@ -2,14 +2,17 @@
 General helper functions for Flask templating and 4CAT views
 """
 import datetime
-import re
+import colorsys
+import math
 import csv
+import re
 
 from functools import wraps
 from math import ceil
 from calendar import monthrange
 from flask_login import current_user
 from flask import (current_app, request, jsonify)
+from PIL import Image, ImageColor, ImageOps
 from pathlib import Path
 
 import common.config_manager as config
@@ -199,6 +202,101 @@ def pad_interval(intervals, first_interval=None, last_interval=None):
 	intervals = {key: intervals[key] for key in sorted(intervals)}
 
 	return missing, intervals
+
+def make_html_colour(rgb):
+	"""
+	Make HTML colour code from RGB values
+
+	Turns an array of three 0-1 RGB values
+	:param rgb:
+	:return:
+	"""
+	colour = "#"
+	for bit in rgb:
+		bit *= 255
+		bit = int(bit)
+		colour += str(hex(bit)).split("x")[1].zfill(2).upper()
+
+	return colour
+
+
+def new_favicon_color(color, input_filepath="favicon-bw.ico", output_filepath="favicon.ico"):
+	"""
+	Converts an RGBA image to a different color by first converting to black and then colorizing the image
+	and readding the alpha stream. It works best with Black and White images (already colored images appear
+	washed out).
+
+	:param str/RGB color:   Accepts either a string represening a color from ImageColor.colormap or a
+								     RGB tuple (e.g., (0, 0, 255) for blue)
+	:param str input_filepath :   	 String path to image; preferably black and white
+	:param str output_filepath :     String path to save new image
+	"""
+	possible_colors = [k for k, v in ImageColor.colormap.items()]
+	if (type(color) != tuple or len(color) != 3) and (color not in possible_colors):
+		raise Exception("Color not available")
+
+	img = Image.open(input_filepath)
+
+	# Collect original alpha data
+	image_alpha = [item[3] for item in img.getdata()]
+
+	# Convert image to black and white and then use colorize with new color
+	bw_img = img.convert("L")
+	new_img = ImageOps.colorize(bw_img, black=color, white="white")
+
+	# Convert back to RGB w/ Alpha and add in the alpha from the original
+	new_img = new_img.convert("RGBA")
+	new_image = []
+	for i, item in enumerate(new_img.getdata()):
+		new_image.append((item[0], item[1], item[2], image_alpha[i]))
+
+	# Update image with new data
+	new_img.putdata(new_image)
+	new_img.save(output_filepath)
+
+
+def generate_css_colours(force=False):
+	"""
+	Write the colours.css CSS file based on configuration
+
+	4CAT admins can change the interface colour in the 4CAT settings. Updating
+	these necessitates also updating the relevant CSS files, which this method
+	does.
+
+	:param bool force:  Create colour definition file even if it exists already
+	:return:
+	"""
+	interface_hue = config.get("4cat.layout_hue")
+	interface_hue /= 360  # colorsys expects 0-1 values
+	main_colour = colorsys.hsv_to_rgb(interface_hue, 0.87, 0.81)
+	accent_colour = colorsys.hsv_to_rgb(interface_hue, 0.87, 1)
+	# get opposite by adjusting the hue by 50%
+	opposite_colour = colorsys.hsv_to_rgb(math.fmod(interface_hue + 0.5, 1), 0.87, 1)
+
+	template_file = config.get("PATH_ROOT").joinpath("webtool/static/css/colours.css.template")
+	colour_file = config.get("PATH_ROOT").joinpath("webtool/static/css/colours.css")
+
+	if colour_file.exists() and not force:
+		# exists already, don't overwrite
+		return
+
+	with template_file.open() as infile:
+		template = infile.read()
+		template = template \
+			.replace("{{ accent_colour }}", make_html_colour(main_colour)) \
+			.replace("{{ highlight_colour }}", make_html_colour(accent_colour)) \
+			.replace("{{ highlight_alternate }}", make_html_colour(opposite_colour))
+
+		with colour_file.open("w") as outfile:
+			outfile.write(template)
+
+	# Update the favicon
+	new_favicon_color(
+		color=tuple([int(bit*255) for bit in main_colour]),
+		input_filepath=config.get("PATH_ROOT").joinpath("webtool/static/img/favicon/favicon-bw.ico"),
+		output_filepath=config.get("PATH_ROOT").joinpath("webtool/static/img/favicon/favicon.ico")
+	)
+
 
 def get_preview(query):
 	"""

@@ -373,7 +373,7 @@ class SearchBitChute(Search):
                     video["category"] = "moderated-nsfl"
                     return (video, [])
 
-                elif "Contains Incitement to Hatred" in video_page.text:
+                elif "Incitement to Hatred" in video_page.text:
                     video["category"] = "moderated-incitement-hatred"
                     return (video, [])
 
@@ -395,6 +395,10 @@ class SearchBitChute(Search):
 
                 elif "Contains Holocaust Denial" in video_page.text:
                     video["category"] = "moderated-holocaust-denial"
+                    return (video, [])
+
+                elif "Harmful Activities" in video_page.text:
+                    video["category"] = "moderated-harmful-activity"
                     return (video, [])
 
                 else:

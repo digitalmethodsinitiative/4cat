@@ -128,7 +128,7 @@ class TopicModeler(BasicProcessor):
                 self.dataset.finish(0)
                 return
 
-            features = vectoriser.get_feature_names()
+            features = vectoriser.get_feature_names_out()
 
             self.dataset.update_status("Fitting token clusters for token set '%s'" % token_file.stem)
             if self.interrupted:

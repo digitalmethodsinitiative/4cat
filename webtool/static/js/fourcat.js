@@ -443,8 +443,8 @@ const query = {
                 let status_box = $('#query-status .message');
                 let current_status = status_box.html();
 
-                if (json.status !== current_status && json.status !== "") {
-                    status_box.html(json.status);
+                if (json.status !== current_status && json.status_html !== "") {
+                    status_box.html(json.status_html);
                 }
 
                 if (json.done) {
@@ -498,7 +498,7 @@ const query = {
                         return;
                     }
 
-                    let status_field = container.find('.dataset-status')
+                    let status_field = container.find('.dataset-status .result-status')
                     let current_status = status_field.html();
                     applyProgress(status_field, json.progress);
                     if (current_status !== json.status_html) {
@@ -1349,6 +1349,30 @@ const ui_helpers = {
         $('body').on('change', '#forminput-data_upload', function () {
             $('.datasource-extra-input').remove();
         });
+
+        // special case - first-run colour picker for the interface
+        $('body').on('input', '.hue-picker', function() {
+            let h = $(this).val();
+            let s = $(this).attr('data-saturation') ? $(this).attr('data-saturation') : 77;
+            let l = $(this).attr('data-luminance') ? $(this).attr('data-luminance') : 46;
+            let target = $(this).attr('data-update-background');
+            let sl = ', ' + s + '%, ' + l + '%';
+            let hsl = 'hsl(' + h + sl + ')';
+            if($(this).attr('data-update-layout')) {
+                document.querySelector(':root').style.setProperty('--accent', hsl);
+                document.querySelector(':root').style.setProperty('--accent-alternate', 'hsl(' + h + ', 100%, 46%');
+                document.querySelector(':root').style.setProperty('--highlight', 'hsl(' + ((h + 180) % 360) + ', 100%, 46%');
+            }
+            $(target).css('background-color', hsl);
+        });
+        $('.hue-picker').trigger('input');
+
+        // special case - 4CAT name picker
+        $('body').on('input', '#request-4cat_name', function() {
+            let label = $(this).val();
+            $('h1 span a').text(label);
+        });
+        $('#request-4cat_name').trigger('input');
     },
 
     /**

@@ -93,6 +93,13 @@
                 </p>
             {% endif %}
             </div>
+        {% elif settings.type == "hue" %}
+                <div>
+                    <input type="range" min="0" max="360" step="1" name="option-{{ option }}" id="forminput-{{ option }}"
+                           class="hue-picker" value="{{ settings.default }}" data-saturation="{% if settings.saturation %}{{ settings.saturation }}{% else %}77{% endif %}"
+                           data-luminance="{% if settings.luminance %}{{ settings.luminance }}{% else %}46{% endif %}"{% if settings.update_layout %} data-update-layout="true"{% endif %} data-update-background="#colour-example">
+                    <span id="colour-example"></span>
+                </div>
         {% endif %}
         </div>
 {% endif %}
