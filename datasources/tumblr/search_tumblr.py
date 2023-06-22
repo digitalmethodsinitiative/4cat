@@ -43,6 +43,7 @@ class SearchTumblr(Search):
 	api_limit_reached = False
 
 	seen_ids = set()
+	client = None
 	failed_notes = []
 	failed_reblogs = []
 
@@ -151,6 +152,14 @@ class SearchTumblr(Search):
 		else:
 			max_date = int(time.time())
 
+		# Connect to Tumblr API
+		try:
+			self.client = self.connect_to_tumblr()
+		except ConnectionRefusedError as e:
+			self.log.warning(f"Could not connect to Tumblr API: {e}; client_info: {self.client.info()}")
+			self.dataset.finish_with_error(f"Could not connect to Tumblr API: {self.client.info().get('status', '')} - {self.client.info().get('msg', '')}")
+			return
+
 		# for each tag or blog, get post
 		for query in queries:
 
@@ -229,13 +238,10 @@ class SearchTumblr(Search):
 		Get Tumblr posts posts with a certain tag
 		:param tag, str: the tag you want to look for
 		:param min_date: a unix timestamp, indicates posts should be min_date this date.
-	    :param max_date: a unix timestamp, indicates posts should be max_date this date.
+		:param max_date: a unix timestamp, indicates posts should be max_date this date.
 
-	    :returns: a dict created from the JSON response
+		:returns: a dict created from the JSON response
 		"""
-
-		client = self.connect_to_tumblr()
-
 		# Store all posts in here
 		all_posts = []
 
@@ -268,7 +274,7 @@ class SearchTumblr(Search):
 
 			try:
 				# Use the pytumblr library to make the API call
-				posts = client.tagged(tag, before=max_date, limit=20, filter="raw")
+				posts = self.client.tagged(tag, before=max_date, limit=20, filter="raw")
 			except ConnectionError:
 				self.update_status("Encountered a connection error, waiting 10 seconds.")
 				time.sleep(10)
@@ -431,9 +437,7 @@ class SearchTumblr(Search):
 
 	    :returns: a dict created from the JSON response
 		"""
-
 		blog = blog + ".tumblr.com"
-		client = self.connect_to_tumblr()
 
 		if not max_date:
 			max_date = int(time.time())
@@ -460,7 +464,7 @@ class SearchTumblr(Search):
 
 			try:
 				# Use the pytumblr library to make the API call
-				posts = client.posts(blog, before=max_date, limit=20, reblog_info=True, notes_info=True, filter="raw")
+				posts = self.client.posts(blog, before=max_date, limit=20, reblog_info=True, notes_info=True, filter="raw")
 				posts = posts["posts"]
 
 				#if (max_date - posts[0]["timestamp"]) > 500000:
@@ -527,9 +531,6 @@ class SearchTumblr(Search):
 		:param di_blogs_ids, dict: A dictionary with blog names as keys and post IDs as values.
 		:param only_text_reblogs, bool: Whether to only keep notes that are text reblogs.
 		"""
-
-		client = self.connect_to_tumblr()
-
 		# List of dict to get reblogs. Items are: [{"blog_name": post_id}]
 		text_reblogs = []
 
@@ -555,7 +556,7 @@ class SearchTumblr(Search):
 			while True:
 
 				# Requests a post's notes
-				notes = client.notes(key, id=value, before_timestamp=max_date)
+				notes = self.client.notes(key, id=value, before_timestamp=max_date)
 
 				if only_text_reblogs:
 
@@ -600,10 +601,8 @@ class SearchTumblr(Search):
 		if self.interrupted:
 			raise ProcessorInterruptedException("Interrupted while fetching post from Tumblr")
 
-		client = self.connect_to_tumblr()
-
 		# Request the specific post.
-		post = client.posts(blog_name, id=post_id)
+		post = self.client.posts(blog_name, id=post_id)
 
 		# Tumblr API can sometimes return with this kind of error:
 		# {'meta': {'status': 500, 'msg': 'Server Error'}, 'response': {'error': 'Malformed JSON or HTML was returned.'}}
@@ -620,22 +619,20 @@ class SearchTumblr(Search):
 		Returns a connection to the Tumblr API using the pytumblr library.
 
 		"""
-		client = pytumblr.TumblrRestClient(
+		self.client = pytumblr.TumblrRestClient(
 			config.get("api.tumblr.consumer_key"),
 			config.get("api.tumblr.consumer_secret"),
 			config.get("api.tumblr.key"),
 			config.get("api.tumblr.secret_key")
 		)
-		client_info = client.info()
+		client_info = self.client.info()
 
 		# Check if there's any errors
 		if client_info.get("meta"):
 			if client_info["meta"].get("status") == 429:
-				self.log.info("Tumblr API timed out during query %s" % self.dataset.key)
-				self.dataset.update_status("Tumblr API timed out during query '%s', try again in 24 hours." % self.dataset.key)
-				raise ConnectionRefusedError("Tumblr API timed out during query %s" % self.dataset.key)
+				raise ConnectionRefusedError("Tumblr API timed out")
 
-		return client
+		return self.client
 
 	def validate_query(query, request, user):
 		"""
@@ -798,5 +795,11 @@ class SearchTumblr(Search):
 
 		"""
 		super().after_process()
-		if len(self.failed_notes) > 0 or len(self.failed_reblogs) > 0:
-			self.dataset.update_status("API error(s) when fetching notes %s" % ", ".join(self.failed_notes) if len(self.failed_notes) > 0 else "" + "API error(s) when fetching reblogs %s" % ", ".join(self.failed_reblogs) if len(self.failed_reblogs) > 0 else "")
+		self.client = None
+		errors = []
+		if len(self.failed_notes) > 0:
+			errors.append("API error(s) when fetching notes %s" % ", ".join(self.failed_notes))
+		if len(self.failed_reblogs) > 0:
+			errors.append("API error(s) when fetching reblogs %s" % ", ".join(self.failed_reblogs))
+		if errors:
+			self.dataset.update_status(";\n ".join(errors))
