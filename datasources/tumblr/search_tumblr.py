@@ -156,8 +156,9 @@ class SearchTumblr(Search):
 		try:
 			self.client = self.connect_to_tumblr()
 		except ConnectionRefusedError as e:
-			self.log.warning(f"Could not connect to Tumblr API: {e}; client_info: {self.client.info()}")
-			self.dataset.finish_with_error(f"Could not connect to Tumblr API: {self.client.info().get('status', '')} - {self.client.info().get('msg', '')}")
+			client_info = self.client.info()
+			self.log.warning(f"Could not connect to Tumblr API: {e}; client_info: {client_info}")
+			self.dataset.update_status(f"Could not connect to Tumblr API: {client_info.get('meta', {}).get('status', '')} - {client_info.get('meta', {}).get('msg', '')}")
 			return
 
 		# for each tag or blog, get post
