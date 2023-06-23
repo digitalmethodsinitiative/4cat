@@ -677,17 +677,11 @@ class SearchTelegram(Search):
                 mapped_obj[item] = SearchTelegram.serialize_obj(value)
             elif type(value) is list:
                 mapped_obj[item] = [SearchTelegram.serialize_obj(item) for item in value]
-            elif type(value).__module__[0:8] == "telethon":
-                # some type of internal telethon struct
-                continue
             elif type(value) is bytes:
                 mapped_obj[item] = value.hex()
             elif type(value) not in scalars and value is not None:
                 # type we can't make sense of here
                 continue
-            elif type(value) is dict:
-                for key, vvalue in value:
-                    mapped_obj[item][key] = SearchTelegram.serialize_obj(vvalue)
             else:
                 mapped_obj[item] = value
 
