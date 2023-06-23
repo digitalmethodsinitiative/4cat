@@ -6,7 +6,7 @@ import random
 import json
 from urllib.parse import urlparse
 
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 from common.lib.user_input import UserInput
 from common.lib.helpers import get_last_line
 from common.config_manager import config

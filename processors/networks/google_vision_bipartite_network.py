@@ -1,7 +1,7 @@
 """
 Google Vision API co-label network
 """
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 from common.lib.helpers import UserInput
 from common.lib.exceptions import ProcessorInterruptedException
 

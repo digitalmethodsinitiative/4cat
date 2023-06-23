@@ -4,7 +4,7 @@ Filter posts by a given column
 import re
 import datetime
 
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 from processors.filtering.base_filter import BaseFilter
 from common.lib.helpers import UserInput, convert_to_int
 

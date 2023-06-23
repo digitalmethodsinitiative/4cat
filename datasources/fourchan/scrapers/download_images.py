@@ -4,7 +4,7 @@
 import requests
 import random
 
-from backend.abstract.worker import BasicWorker
+from backend.lib.worker import BasicWorker
 from common.config_manager import config
 
 class ImageDownloader(BasicWorker):

@@ -11,7 +11,7 @@ from sklearn.decomposition import PCA, TruncatedSVD
 
 from gensim.models import KeyedVectors
 
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 from common.lib.helpers import UserInput, convert_to_int, get_4cat_canvas
 from common.lib.exceptions import ProcessorInterruptedException
 

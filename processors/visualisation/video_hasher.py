@@ -12,8 +12,8 @@ import zipfile
 from videohash import VideoHash
 from videohash.exceptions import FFmpegNotFound
 
-from backend.abstract.processor import BasicProcessor
-from backend.abstract.preset import ProcessorPreset
+from backend.lib.processor import BasicProcessor
+from backend.lib.preset import ProcessorPreset
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.user_input import UserInput
 from common.config_manager import config

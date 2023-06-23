@@ -1,9 +1,8 @@
 """
 Generate co-tag network of co-occurring (hash)tags in items
 """
-import csv
 
-from backend.abstract.preset import ProcessorPreset
+from backend.lib.preset import ProcessorPreset
 from common.lib.helpers import UserInput
 
 __author__ = "Stijn Peeters"

@@ -2,14 +2,12 @@
 Control access to web tool - views and functions used in handling user access
 """
 import html2text
-import colorsys
 import requests
 import smtplib
 import fnmatch
 import socket
 import random
 import time
-import math
 import sys
 import os
 
@@ -21,8 +19,8 @@ from flask import request, abort, render_template, redirect, url_for, flash, get
 from flask_login import login_user, login_required, logout_user, current_user
 from webtool import app, login_manager, db, config
 from webtool.views.api_tool import limiter
-from webtool.lib.user import User
-from webtool.lib.helpers import error, make_html_colour, generate_css_colours
+from common.lib.user import User
+from webtool.lib.helpers import error, generate_css_colours
 from common.lib.helpers import send_email, get_software_version
 
 from pathlib import Path

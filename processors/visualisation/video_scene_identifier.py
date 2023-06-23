@@ -4,7 +4,7 @@ Detect scenes in videos
 import json
 from scenedetect import open_video, SceneManager, VideoOpenFailure
 
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException, ProcessorException
 from common.lib.user_input import UserInput
 

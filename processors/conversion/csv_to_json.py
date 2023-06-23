@@ -3,8 +3,7 @@ Convert a CSV file to JSON
 """
 import json
 
-from backend.abstract.processor import BasicProcessor
-from common.lib.exceptions import ProcessorInterruptedException
+from backend.lib.processor import BasicProcessor
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]

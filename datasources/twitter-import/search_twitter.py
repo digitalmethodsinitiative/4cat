@@ -7,9 +7,7 @@ to its aggressive rate limiting. Instead, import data collected elsewhere.
 from datetime import datetime
 import json
 
-from shapely.geometry import box
-
-from backend.abstract.search import Search
+from backend.lib.search import Search
 from common.lib.helpers import strip_tags
 
 

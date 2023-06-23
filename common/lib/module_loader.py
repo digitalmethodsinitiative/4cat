@@ -10,9 +10,6 @@ import re
 
 from common.config_manager import config
 
-from backend.abstract.worker import BasicWorker
-from backend.abstract.processor import BasicProcessor
-
 
 class ModuleCollector:
     """
@@ -58,7 +55,7 @@ class ModuleCollector:
             if hasattr(worker, "config") and type(worker.config) is dict:
                 module_config.update(worker.config)
 
-        with config.get("PATH_ROOT").joinpath("backend/module_config.bin").open("wb") as outfile:
+        with config.get("PATH_ROOT").joinpath("backend/cache/module_config.bin").open("wb") as outfile:
             pickle.dump(module_config, outfile)
 
         # load from cache
@@ -67,11 +64,11 @@ class ModuleCollector:
     @staticmethod
     def is_4cat_class(object):
         """
-        Determine if a module member is a Search class we can use
+        Determine if a module member is a worker class we can use
         """
         return inspect.isclass(object) and \
-               issubclass(object, BasicWorker) and \
-               object is not BasicWorker and \
+               "BasicWorker" in [f.__name__ for f in object.__bases__] and \
+               object.__name__ != "BasicWorker" and \
                not inspect.isabstract(object)
 
     def load_modules(self):
@@ -134,8 +131,10 @@ class ModuleCollector:
                     self.workers[component[1].type] = component[1]
                     self.workers[component[1].type].filepath = relative_path
 
-                    if issubclass(component[1], BasicProcessor):
-                        # maintain a separate cache of processors
+                    # we can't use issubclass() because for that we would need
+                    # to import BasicProcessor, which would lead to a circular
+                    # import
+                    if "BasicProcessor" in [f.__name__ for f in component[1].__bases__]:
                         self.processors[component[1].type] = self.workers[component[1].type]
 
         # sort by category for more convenient display in interfaces

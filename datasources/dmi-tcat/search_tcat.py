@@ -8,7 +8,7 @@ import json
 import re
 import io
 
-from backend.abstract.search import Search
+from backend.lib.search import Search
 from common.lib.exceptions import QueryParametersException
 from common.lib.user_input import UserInput
 from common.lib.helpers import sniff_encoding

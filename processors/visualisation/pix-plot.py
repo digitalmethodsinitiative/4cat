@@ -19,7 +19,7 @@ from werkzeug.utils import secure_filename
 from common.config_manager import config
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.helpers import UserInput, convert_to_int
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 
 __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl"]

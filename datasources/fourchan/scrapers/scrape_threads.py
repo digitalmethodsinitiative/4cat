@@ -29,7 +29,7 @@ import json
 import time
 import six
 
-from backend.abstract.scraper import BasicJSONScraper
+from backend.lib.scraper import BasicJSONScraper
 from common.lib.exceptions import JobAlreadyExistsException
 from common.lib.helpers import strip_tags
 from common.config_manager import config

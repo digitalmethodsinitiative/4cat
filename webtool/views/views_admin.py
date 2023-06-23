@@ -3,11 +3,9 @@
 """
 import re
 import time
-import math
 import json
 import smtplib
 import psycopg2
-import colorsys
 import markdown2
 
 from pathlib import Path
@@ -16,16 +14,15 @@ import backend
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
-from flask import render_template, jsonify, request, abort, flash, get_flashed_messages, url_for, redirect
+from flask import render_template, jsonify, request, flash, get_flashed_messages, url_for, redirect
 from flask_login import current_user, login_required
 
 from webtool import app, db, config
 from webtool.lib.helpers import admin_required, error, Pagination, generate_css_colours
-from webtool.lib.user import User
+from common.lib.user import User
 
 from common.lib.helpers import call_api, send_email, UserInput
 from common.lib.exceptions import QueryParametersException
-from common.lib.dataset import DataSet
 import common.lib.config_definition as config_definition
 
 @app.route('/admin/', defaults={'page': 1})

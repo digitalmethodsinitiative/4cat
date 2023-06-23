@@ -5,7 +5,7 @@ import json
 import csv
 import re
 
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 from common.lib.helpers import UserInput, get_interval_descriptor
 from common.config_manager import config
 

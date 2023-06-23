@@ -4,7 +4,7 @@ Merge one dataset with another (creating a new dataset)
 import csv
 import json
 
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 from common.lib.dataset import DataSet
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.helpers import UserInput

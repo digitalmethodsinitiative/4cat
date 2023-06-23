@@ -15,7 +15,7 @@ from yt_dlp import DownloadError
 from yt_dlp.utils import ExistingVideoReached
 
 from common.config_manager import config
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 from common.lib.dataset import DataSet
 from common.lib.exceptions import ProcessorInterruptedException, ProcessorException
 from common.lib.helpers import UserInput, sets_to_lists

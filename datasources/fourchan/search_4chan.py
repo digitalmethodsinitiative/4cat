@@ -10,7 +10,7 @@ from pymysql.err import Warning as SphinxWarning
 from common.config_manager import config
 from backend.lib.database_mysql import MySQLDatabase
 from common.lib.helpers import UserInput
-from backend.abstract.search import SearchWithScope
+from backend.lib.search import SearchWithScope
 from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException
 
 

@@ -18,7 +18,7 @@ from io import StringIO, BytesIO
 
 from common.config_manager import config
 from common.lib.helpers import UserInput
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
 
 __author__ = "Stijn Peeters, Sal Hagen"

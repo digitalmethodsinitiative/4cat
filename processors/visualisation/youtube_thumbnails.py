@@ -6,7 +6,7 @@ import urllib.request
 
 from apiclient.discovery import build
 
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.helpers import get_yt_compatible_ids
 from common.config_manager import config

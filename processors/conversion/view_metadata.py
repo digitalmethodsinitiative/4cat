@@ -6,7 +6,7 @@ Designed to work with any processor that has a 'map_metadata' method
 import json
 import zipfile
 
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 from common.lib.user_input import UserInput
 
 __author__ = "Dale Wahl"

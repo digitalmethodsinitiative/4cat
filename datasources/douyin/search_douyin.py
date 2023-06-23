@@ -3,7 +3,7 @@ Import scraped Douyin data
 """
 from datetime import datetime
 
-from backend.abstract.search import Search
+from backend.lib.search import Search
 
 
 class SearchDouyin(Search):

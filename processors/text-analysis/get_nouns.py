@@ -8,7 +8,7 @@ import spacy
 from collections import Counter
 from spacy.tokens import DocBin
 from common.lib.helpers import UserInput
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 
 __author__ = "Sal Hagen"
 __credits__ = ["Sal Hagen"]

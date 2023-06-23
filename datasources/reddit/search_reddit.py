@@ -3,7 +3,7 @@ import json
 import time
 import re
 
-from backend.abstract.search import Search
+from backend.lib.search import Search
 from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException, QueryNeedsExplicitConfirmationException
 from common.lib.helpers import UserInput, timify_long
 

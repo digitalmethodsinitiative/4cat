@@ -3,7 +3,7 @@ Extract most-used images from corpus
 """
 import re
 
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 
 import networkx as nx
 

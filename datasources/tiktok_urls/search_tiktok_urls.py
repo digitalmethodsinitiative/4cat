@@ -13,7 +13,7 @@ import re
 from requests_futures.sessions import FuturesSession
 from bs4 import BeautifulSoup
 
-from backend.abstract.search import Search
+from backend.lib.search import Search
 from common.lib.helpers import UserInput
 from common.lib.exceptions import WorkerInterruptedException, QueryParametersException, ProcessorException
 from datasources.tiktok.search_tiktok import SearchTikTok as SearchTikTokByImport

@@ -9,7 +9,7 @@ import subprocess
 import shlex
 
 from common.config_manager import config
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.user_input import UserInput
 

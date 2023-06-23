@@ -3,7 +3,7 @@ Generate co-link network of URLs in posts
 """
 import re
 
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 from common.lib.helpers import UserInput
 
 import networkx as nx

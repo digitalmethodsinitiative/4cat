@@ -14,7 +14,6 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from common.lib.helpers import send_email
 from common.config_manager import config
-from common.lib.dataset import DataSet
 
 
 class User:
@@ -23,10 +22,12 @@ class User:
 
     Compatible with Flask-Login
     """
-    data = {}
+    data = None
+    userdata = None
     is_authenticated = False
     is_active = False
     is_anonymous = True
+    db = None
 
     name = "anonymous"
 
@@ -125,6 +126,10 @@ class User:
         """
         self.db = db
         self.data = data
+        try:
+            self.userdata = json.loads(self.data["userdata"])
+        except (TypeError, json.JSONDecodeError):
+            self.userdata = {}
 
         if self.data["name"] != "anonymous":
             self.is_anonymous = False
@@ -208,7 +213,7 @@ class User:
         """
         try:
             return "admin" in self.data["tags"]
-        except (ValueError, TypeError):
+        except (ValueError, TypeError) as e:
             # invalid JSON?
             return False
 
@@ -410,6 +415,8 @@ class User:
         return notifications
 
     def delete(self, also_datasets=True):
+        from common.lib.dataset import DataSet
+
         username = self.data["name"]
 
         self.db.delete("users_favourites", where={"name": username}, commit=False),
@@ -433,3 +440,52 @@ class User:
         # and finally the user
         self.db.delete("users", where={"name": username}, commit=False)
         self.db.commit()
+
+    def __getattr__(self, attr):
+        """
+        Getter so we don't have to use .data all the time
+
+        :param attr:  Data key to get
+        :return:  Value
+        """
+
+        if attr in dir(self):
+            # an explicitly defined attribute should always be called in favour
+            # of this passthrough
+            attribute = getattr(self, attr)
+            return attribute
+        elif attr in self.data:
+            return self.data[attr]
+        else:
+            raise AttributeError("User object has no attribute %s" % attr)
+
+    def __setattr__(self, attr, value):
+        """
+        Setter so we can flexibly update the database
+
+        Also updates internal data stores (.data etc). If the attribute is
+        unknown, it is stored within the 'userdata' attribute.
+
+        :param str attr:  Attribute to update
+        :param value:  New value
+        """
+
+        # don't override behaviour for *actual* class attributes
+        if attr in dir(self):
+            super().__setattr__(attr, value)
+            return
+
+        if attr not in self.data:
+            self.userdata[attr] = value
+            attr = "userdata"
+            value = self.userdata
+
+        if attr == "userdata":
+            value = json.dumps(value)
+
+        self.db.update("users", where={"name": self.get_id()}, data={attr: value})
+
+        self.data[attr] = value
+
+        if attr == "userdata":
+            self.userdata = json.loads(value)

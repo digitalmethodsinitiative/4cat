@@ -9,7 +9,7 @@ import urllib.request
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 from common.lib.helpers import UserInput
 from common.config_manager import config
 

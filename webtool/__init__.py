@@ -26,7 +26,7 @@ from common.lib.database import Database
 from common.lib.logger import Logger
 from common.lib.queue import JobQueue
 
-from webtool.lib.user import User
+from common.lib.user import User
 from webtool.lib.helpers import generate_css_colours
 
 # initialize global objects for interacting with all the things

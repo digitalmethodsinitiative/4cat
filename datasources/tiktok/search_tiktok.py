@@ -7,7 +7,7 @@ to its aggressive rate limiting. Instead, import data collected elsewhere.
 from datetime import datetime, timezone
 from urllib.parse import urlparse, parse_qs
 
-from backend.abstract.search import Search
+from backend.lib.search import Search
 
 
 class SearchTikTok(Search):

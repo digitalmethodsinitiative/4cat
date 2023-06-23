@@ -14,7 +14,7 @@ from nltk.stem import WordNetLemmatizer
 from nltk.tokenize import word_tokenize, TweetTokenizer, sent_tokenize
 
 from common.lib.helpers import UserInput, get_interval_descriptor
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 from common.config_manager import config
 
 __author__ = ["Stijn Peeters", "Sal Hagen"]

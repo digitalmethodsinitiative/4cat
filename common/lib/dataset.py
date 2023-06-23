@@ -17,8 +17,6 @@ from common.lib.helpers import get_software_version, NullAwareTextIOWrapper
 from common.lib.fourcat_module import FourcatModule
 from common.lib.exceptions import ProcessorInterruptedException
 
-from webtool.lib.user import User
-
 
 class DataSet(FourcatModule):
 	"""
@@ -591,10 +589,11 @@ class DataSet(FourcatModule):
 		:param str|User username: Username to check for
 		:return bool:
 		"""
-		if type(username) is User:
-			username = username.get_id()
-		elif type(username) is not str:
-			raise TypeError("User must be a str or User object")
+		if type(username) is not str:
+			if hasattr(username, "get_id"):
+				username = username.get_id()
+			else:
+				raise TypeError("User must be a str or User object")
 
 		return self.data["owner"] == username
 
@@ -612,10 +611,11 @@ class DataSet(FourcatModule):
 
 		:param str|User username:  Username to set as owner
 		"""
-		if type(username) is User:
-			username = username.get_id()
-		elif type(username) is not str:
-			raise TypeError("User must be a str or User object")
+		if type(username) is not str:
+			if hasattr(username, "get_id"):
+				username = username.get_id()
+			else:
+				raise TypeError("User must be a str or User object")
 
 		self["owner"] = username
 
@@ -627,10 +627,11 @@ class DataSet(FourcatModule):
 
 		:param str|User username:  Username to remove as owner
 		"""
-		if type(username) is User:
-			username = username.get_id()
-		elif type(username) is not str:
-			raise TypeError("User must be a str or User object")
+		if type(username) is not str:
+			if hasattr(username, "get_id"):
+				username = username.get_id()
+			else:
+				raise TypeError("User must be a str or User object")
 
 		self["owner"] = "anonymous"
 

@@ -12,12 +12,12 @@ import os
 
 from pathlib import Path, PurePath
 
-from backend.abstract.worker import BasicWorker
+from backend.lib.worker import BasicWorker
 from common.lib.dataset import DataSet
 from common.lib.fourcat_module import FourcatModule
 from common.lib.helpers import get_software_version, remove_nuls
 from common.lib.exceptions import WorkerInterruptedException, ProcessorInterruptedException, ProcessorException
-from common.config_manager import config, ConfigWrapper, ConfigDummy
+from common.config_manager import config, ConfigWrapper
 
 csv.field_size_limit(1024 * 1024 * 1024)
 

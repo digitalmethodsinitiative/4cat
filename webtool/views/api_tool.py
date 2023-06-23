@@ -28,7 +28,7 @@ from common.lib.queue import JobQueue
 from common.lib.job import Job
 from common.lib.dataset import DataSet
 from common.lib.helpers import UserInput, call_api
-from backend.abstract.worker import BasicWorker
+from backend.lib.worker import BasicWorker
 
 api_ratelimit = limiter.shared_limit("3 per second", scope="api")
 

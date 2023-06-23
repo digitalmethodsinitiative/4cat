@@ -13,7 +13,7 @@ from itertools import chain
 from bs4 import BeautifulSoup
 
 from common.lib.helpers import UserInput, strip_tags
-from backend.abstract.search import Search
+from backend.lib.search import Search
 from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException
 
 

@@ -6,7 +6,7 @@ Only supports bit based hashes currently (e.g., 101010101110110011)
 import networkx as nx
 import numpy as np
 
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorException
 from common.lib.helpers import UserInput
 

@@ -13,7 +13,7 @@ from svgwrite.image import Image as ImageElement
 
 from ural import is_url
 
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.user_input import UserInput
 from common.lib.helpers import get_4cat_canvas

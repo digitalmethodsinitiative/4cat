@@ -1,7 +1,7 @@
 """
 Generate bipartite user-hashtag graph of posts
 """
-from backend.abstract.preset import ProcessorPreset
+from backend.lib.preset import ProcessorPreset
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]

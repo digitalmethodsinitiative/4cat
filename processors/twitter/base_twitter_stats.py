@@ -5,7 +5,7 @@ import abc
 import datetime
 
 from common.lib.helpers import pad_interval, get_interval_descriptor
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorException, ProcessorInterruptedException
 
 __author__ = "Dale Wahl"

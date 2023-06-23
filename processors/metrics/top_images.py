@@ -7,7 +7,7 @@ import re
 
 from common.config_manager import config
 from collections import Counter, OrderedDict
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorException
 from common.lib.helpers import UserInput
 

@@ -7,7 +7,7 @@ import csv
 
 from prawcore.exceptions import Forbidden, NotFound, PrawcoreException
 
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 from common.lib.user_input import UserInput
 from common.lib.exceptions import ProcessorInterruptedException
 from common.config_manager import config

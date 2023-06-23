@@ -330,9 +330,7 @@ def show_result(key):
         url = "/results/%s/#nav=%s" % (genealogy[0].key, nav)
         return redirect(url)
 
-    # load list of processors compatible with this dataset
     is_processor_running = False
-
     is_favourite = (db.fetchone("SELECT COUNT(*) AS num FROM users_favourites WHERE name = %s AND key = %s",
                                 (current_user.get_id(), dataset.key))["num"] > 0)
 

@@ -1,11 +1,9 @@
 """
 Split results by thread
 """
-import zipfile
-import shutil
 import csv
 
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]

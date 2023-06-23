@@ -1,7 +1,7 @@
 """
 Upload Twitter dataset to DMI-TCAT instance
 """
-from backend.abstract.preset import ProcessorPreset
+from backend.lib.preset import ProcessorPreset
 from common.lib.helpers import UserInput
 
 from common.config_manager import config

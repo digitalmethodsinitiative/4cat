@@ -1,7 +1,7 @@
 """
 Extract neologisms
 """
-from backend.abstract.preset import ProcessorPreset
+from backend.lib.preset import ProcessorPreset
 
 from common.lib.helpers import UserInput
 

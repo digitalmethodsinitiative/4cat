@@ -4,7 +4,7 @@
 
 import json
 
-from backend.abstract.scraper import BasicJSONScraper
+from backend.lib.scraper import BasicJSONScraper
 from common.lib.exceptions import JobAlreadyExistsException
 
 

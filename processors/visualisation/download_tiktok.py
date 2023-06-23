@@ -14,7 +14,7 @@ from common.config_manager import config
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.user_input import UserInput
 from datasources.tiktok_urls.search_tiktok_urls import TikTokScraper
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 
 
 __author__ = "Dale Wahl"

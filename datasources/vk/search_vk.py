@@ -6,7 +6,7 @@ from pathlib import Path
 
 import vk_api
 
-from backend.abstract.search import Search
+from backend.lib.search import Search
 from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException, ProcessorException
 from common.lib.helpers import UserInput
 from common.config_manager import config

@@ -5,7 +5,7 @@ import abc
 import csv
 import json
 
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 
 __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl"]

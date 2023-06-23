@@ -8,7 +8,7 @@ import pandas as pd
 import itertools
 
 from common.lib.helpers import UserInput, convert_to_int
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 
 from sklearn.feature_extraction.text import TfidfVectorizer
 from gensim.models import TfidfModel

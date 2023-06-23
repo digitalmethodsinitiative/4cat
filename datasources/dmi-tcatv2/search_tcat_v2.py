@@ -8,7 +8,7 @@ import ural
 import pymysql
 
 
-from backend.abstract.search import Search
+from backend.lib.search import Search
 from common.lib.exceptions import QueryParametersException
 from common.lib.user_input import UserInput
 from backend.lib.database_mysql import MySQLDatabase

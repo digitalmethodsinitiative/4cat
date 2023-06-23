@@ -3,9 +3,7 @@ Convert a CSV file to Excel-compatible CSV
 """
 import csv
 
-from backend.abstract.processor import BasicProcessor
-from common.lib.exceptions import ProcessorInterruptedException
-from common.lib.dataset import DataSet
+from backend.lib.processor import BasicProcessor
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]

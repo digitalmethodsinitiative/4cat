@@ -3,7 +3,7 @@ Generate network of values from two columns
 """
 from dateutil.relativedelta import relativedelta
 
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 from common.lib.helpers import UserInput, get_interval_descriptor
 
 import networkx as nx
