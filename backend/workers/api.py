@@ -3,7 +3,7 @@ import time
 import json
 
 from common.config_manager import config
-from backend.abstract.worker import BasicWorker
+from backend.lib.worker import BasicWorker
 
 
 class InternalAPI(BasicWorker):

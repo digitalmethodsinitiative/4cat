@@ -12,7 +12,7 @@ import sys
 
 from pathlib import Path
 
-from backend.abstract.worker import BasicWorker
+from backend.lib.worker import BasicWorker
 from common.lib.exceptions import WorkerInterruptedException
 from common.config_manager import config
 

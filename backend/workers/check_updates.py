@@ -1,11 +1,10 @@
 import packaging.version
 import requests
 import json
-import re
 
 from common.config_manager import config
 from common.lib.helpers import add_notification, get_github_version
-from backend.abstract.worker import BasicWorker
+from backend.lib.worker import BasicWorker
 from pathlib import Path
 
 

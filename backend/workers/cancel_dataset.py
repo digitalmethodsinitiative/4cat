@@ -1,7 +1,7 @@
 """
 Delete and cancel a dataset
 """
-from backend.abstract.worker import BasicWorker
+from backend.lib.worker import BasicWorker
 from common.lib.exceptions import JobNotFoundException
 from common.lib.dataset import DataSet
 from common.lib.job import Job

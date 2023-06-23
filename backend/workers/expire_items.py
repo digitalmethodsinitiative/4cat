@@ -6,11 +6,11 @@ import time
 import json
 import re
 
-from backend.abstract.worker import BasicWorker
+from backend.lib.worker import BasicWorker
 from common.lib.dataset import DataSet
 from common.config_manager import config
 
-from webtool.lib.user import User
+from common.lib.user import User
 
 
 class ThingExpirer(BasicWorker):
