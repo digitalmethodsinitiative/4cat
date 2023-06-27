@@ -382,6 +382,27 @@ config_definition = {
         "help": "YouTube API Key",
         "tooltip": "The developer key from your API console"
     },
+    # service manager
+    # this is a service that 4CAT can connect to to run e.g. ML models
+    # it is used by a number of processors
+    "dmi-service-manager.server_address": {
+        "type": UserInput.OPTION_TEXT,
+        "default": "",
+        "help": "DMI Service Manager server/URL",
+        "tooltip": "https://github.com/digitalmethodsinitiative/dmi_service_manager",
+        "global": True
+    },
+    "dmi-service-manager.local_or_remote": {
+        "type": UserInput.OPTION_CHOICE,
+        "default": 0,
+        "help": "DMI Services Local or Remote",
+        "tooltip": "Services have local access to 4CAT files or must be transferred from remote via DMI Service Manager",
+        "options": {
+            "local": "Local",
+            "remote": "Remote",
+        },
+        "global": True
+    }
 }
 
 # These are used in the web interface for more readable names

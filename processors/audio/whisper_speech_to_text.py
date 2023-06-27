@@ -39,36 +39,19 @@ class AudioToText(BasicProcessor):
         ]
 
     config = {
-        # "host.docker.internal" if 4CAT Dockerized
-        "dmi_service_manager.server_address": {
-            "type": UserInput.OPTION_TEXT,
-            "default": "",
-            "help": "DMI Service Manager server/URL",
-            "tooltip": "https://github.com/digitalmethodsinitiative/dmi_service_manager"
-        },
-        "dmi_service_manager.local_or_remote": {
-            "type": UserInput.OPTION_CHOICE,
-            "default": 0,
-            "help": "DMI Services Local or Remote",
-            "tooltip": "Services have local access to 4CAT files or must be transferred from remote via DMI Service Manager",
-            "options": {
-                "local": "Local",
-                "remote": "Remote",
-            },
-        },
-        "dmi_service_manager.whisper_enabled": {
+        "audio-to-text.whisper_enabled": {
             "type": UserInput.OPTION_TOGGLE,
             "default": False,
             "help": "Enable Whisper Speech to Text",
             "tooltip": "Docker must be installed and the Whisper image downloaded/built."
         },
-        "dmi_service_manager.whisper_num_files": {
+        "audio-to-text.whisper_num_files": {
             "type": UserInput.OPTION_TEXT,
             "coerce_type": int,
             "default": 0,
             "help": "Whisper max number of audio files",
             "tooltip": "Use '0' to allow unlimited number"
-        },
+        }
     }
 
     @classmethod
@@ -76,8 +59,8 @@ class AudioToText(BasicProcessor):
         """
         Allow on audio archives if enabled in Control Panel
         """
-        return config.get("dmi_service_manager.whisper_enabled", False) and \
-               config.get("dmi_service_manager.server_address", False) and \
+        return config.get("audio-to-text.whisper_enabled", False) and \
+               config.get("dmi-service-manager.server_address", False) and \
                module.type.startswith("audio-extractor")
 
     @classmethod
@@ -129,7 +112,7 @@ class AudioToText(BasicProcessor):
         }
 
         # Update the amount max and help from config
-        max_number_audio_files = int(config.get("dmi_service_manager.whisper_num_files", 100))
+        max_number_audio_files = int(config.get("audio-to-text.whisper_num_files", 100, user=user))
         if max_number_audio_files == 0:  # Unlimited allowed
             options["amount"]["help"] = "Number of audio files"
             options["amount"]["default"] = 100
@@ -161,7 +144,7 @@ class AudioToText(BasicProcessor):
                 self.dataset.finish_with_error("Unable to parse Advanced settings. Please format as JSON.")
                 return
 
-        local_or_remote = config.get("dmi_service_manager.local_or_remote")
+        local_or_remote = self.config.get("dmi-service-manager.local_or_remote")
 
         # Unpack the audio files into a staging_area
         self.dataset.update_status("Unzipping audio files")
@@ -183,8 +166,8 @@ class AudioToText(BasicProcessor):
 
             # Relative to PATH_DATA which should be where Docker mounts the whisper container volume
             # TODO: path is just the staging_area name, but what if we move staging areas? DMI Service manager needs to know...
-            mounted_staging_area = staging_area.absolute().relative_to(config.get("PATH_DATA").absolute())
-            mounted_output_dir = output_dir.absolute().relative_to(config.get("PATH_DATA").absolute())
+            mounted_staging_area = staging_area.absolute().relative_to(self.config.get("PATH_DATA").absolute())
+            mounted_output_dir = output_dir.absolute().relative_to(self.config.get("PATH_DATA").absolute())
 
         elif local_or_remote == "remote":
             # Upload files to whisper
@@ -202,7 +185,7 @@ class AudioToText(BasicProcessor):
 
             # Check if audio files have already been sent
             self.dataset.update_status("Connecting to DMI Service Manager...")
-            filename_url = config.get("dmi_service_manager.server_address").rstrip("/") + '/api/list_filenames?folder_name=' + folder_name
+            filename_url = self.config.get("dmi-service-manager.server_address").rstrip("/") + '/api/list_filenames?folder_name=' + folder_name
             filename_response = requests.get(filename_url, timeout=30)
 
             # Check if 4CAT has access to this PixPlot server
@@ -221,7 +204,7 @@ class AudioToText(BasicProcessor):
 
             if len(to_upload_filenames) > 0 or texts_folder not in filename_response.json():
                 # TODO: perhaps upload one at a time?
-                api_upload_endpoint = config.get("dmi_service_manager.server_address").rstrip("/") + "/api/send_files"
+                api_upload_endpoint = self.config.get("dmi-service-manager.server_address").rstrip("/") + "/api/send_files"
                 # TODO: don't create a silly empty file just to trick the service manager into creating a new folder
                 with open(staging_area.joinpath("blank.txt"), 'w') as file:
                     file.write('')
@@ -259,7 +242,7 @@ class AudioToText(BasicProcessor):
         data["args"].extend([f"data/{mounted_staging_area.joinpath(filename)}" for filename in audio_filenames])
 
         self.dataset.update_status(f"Requesting service from DMI Service Manager...")
-        api_endpoint = config.get("dmi_service_manager.server_address").rstrip("/") + "/api/" + whisper_endpoint
+        api_endpoint = self.config.get("dmi-service-manager.server_address").rstrip("/") + "/api/" + whisper_endpoint
         resp = requests.post(api_endpoint, json=data, timeout=30)
         if resp.status_code == 202:
             # New request successful
@@ -339,7 +322,7 @@ class AudioToText(BasicProcessor):
             result_files = filename_response.json().get(texts_folder, [])
 
             # Download the result files
-            api_upload_endpoint = config.get("dmi_service_manager.server_address").rstrip("/") + "/api/uploads/"
+            api_upload_endpoint = self.config.get("dmi-service-manager.server_address").rstrip("/") + "/api/uploads/"
             for filename in result_files:
                 file_response = requests.get(api_upload_endpoint + f"{folder_name}/{texts_folder}/{filename}", timeout=30)
                 self.dataset.log(f"Downloading {filename}...")
