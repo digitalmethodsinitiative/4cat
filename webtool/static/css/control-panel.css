@@ -1,3 +1,12 @@
+.admin-nav .button-container {
+    padding-top: 0;
+    padding-bottom: 2em;
+}
+
+.admin-nav .button-container li {
+    margin: 0;
+}
+
 .worker-list li > * {
     display: inline-block
 }
@@ -29,7 +38,8 @@ table.cp-table td {
 }
 
 table.cp-table .actions {
-    width: 8em;
+    width: 12em;
+    vertical-align: middle;
 }
 
 table td[colspan] {
@@ -62,7 +72,7 @@ table td[colspan] {
     border: 0;
 }
 
-.settings article {
+.settings article:not(.fullsize) {
     max-width: 50%;
 }
 
@@ -70,7 +80,7 @@ table td[colspan] {
     min-width: 15em;
 }
 
-.settings input[type=text] {
+.settings .tab-container input[type=text] {
     width: 25em;
     max-width: 25em;
 }
@@ -82,4 +92,63 @@ table td[colspan] {
 .datasource-toggle-form fieldset {
     padding-top: 0.5em;
     padding-bottom: 0.5em;
+}
+
+.user-controls > div, .user-controls > form > * {
+    margin: 1em auto;
+}
+
+.user-controls > form > * {
+    display: block;
+}
+
+.user-controls > div {
+    text-align: center;
+}
+
+.tab-container > div {
+    padding-top: 1em;
+}
+
+.tab-controls .matching {
+    border-right: 5px solid var(--accent-alternate);
+}
+
+.config-tag-info {
+    text-align: center;
+    border-bottom: 1px dashed var(--contrast-dark);
+    padding: 1em;
+}
+
+.is-changed input, .is-changed select, .is-changed textarea {
+    border-color: var(--accent);
+}
+
+.is-changed label {
+    color: var(--accent);
+}
+
+#tag-order i {
+    border: 2px solid var(--contrast-dark);
+    background: var(--contrast-bright);
+    color: var(--text);
+    display: inline-block;
+    border-radius: 0.2em;
+    padding: 0.1em 0;
+}
+
+#tag-order i.handle {
+    cursor: ns-resize;
+}
+
+ol#tag-order li:nth-child(2n) {
+    background: inherit;
+}
+
+#tag-order li:not(:last-child) {
+    border-bottom: 1px dotted var(--contrast-dark)
+}
+
+#tag-order li:first-child {
+    border-top: 1px dotted var(--contrast-dark)
 }

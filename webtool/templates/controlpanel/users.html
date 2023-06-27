@@ -1,72 +1,125 @@
-<section class="result-list">
-    <h2><span>Users</span></h2>
-    <div class="user-panel">
-        <nav class="view-controls block">
-            <form action="{{ url_for("admin_frontpage") }}" method="GET">
-                <ul>
-                    <li><a href="{{ url_for("manipulate_user", mode="create") }}" class="button-like"><i class="fa fa-user-plus" aria-hidden="true"></i> Create user</a></li>
-                    <li><input aria-label="User filter" placeholder="Filter users..." name="filter"
-                               value="{{ filter.filter }}"></li>
-                </ul>
-                <button>Filter</button>
-            </form>
-        </nav>
-        <table class="fullwidth user-table cp-table">
-            <colgroup>
-                <col class="name">
-                <col class="actions">
-            </colgroup>
-            <tr>
-                <th>Account</th>
-                <th>Actions</th>
-            </tr>
-            {% for user in users %}
-                <tr>
-                    <td>
-                        <div class="user-name">
-                            {{ user.name }}
-                            {% if user.is_admin %}
-                            <span class="tooltip-trigger" aria-controls="tooltip-user-admin">
+{% extends "controlpanel/layout.html" %}
+
+{% block title %}User list{% endblock %}
+{% block body_class %}plain-page admin {{ body_class }}{% endblock %}
+
+{% block body %}
+    <article class="with-aside">
+        <section class="result-list">
+            <h2><span>Users{% if tag %} with tag <span class="property-badge">{{ tag }}</span>{% endif %}</span></h2>
+            <div class="user-panel">
+                <table class="fullwidth user-table cp-table">
+                    <colgroup>
+                        <col class="name">
+                        <col class="actions">
+                    </colgroup>
+                    <tr>
+                        <th>Account</th>
+                        <th>Actions</th>
+                    </tr>
+                    {% for user in users %}
+                        <tr>
+                            <td>
+                                <div class="user-name">
+                                    {{ user.name }}
+                                    {% if user.is_admin %}
+                                        <span class="tooltip-trigger" aria-controls="tooltip-user-admin">
                                 <i class="fa fa-user-shield" aria-hidden="true"></i>
                                 <span class="sr-only"> (Admin user)</span>
                             </span>
-                            {% endif %}
-                            {% if user.is_deactivated %}
-                            <i class="fa fa-ban tooltip-trigger" aria-hidden="true" aria-controls="tooltip-user-deactivates"></i>
-                            <span class="sr-only"> (Deactivated user)</span>
-                            {% endif %}
-                            {% if not user.password and user.name not in ("anonymous", "autologin") %}
-                            <i class="fas fa-user-clock tooltip-trigger" aria-hidden="true" aria-controls="tooltip-user-registration"></i>
-                            <span class="sr-only"> (User has not completed registration)</span>
-                            {% endif %}
-                        </div>
-                        <div class="user-byline">
-                            {% if not user.tags %}
-                                <span class="property-badge"><a href="{{ url_for("admin_frontpage") }}">common</a></span>
-                            {% endif %}
-                        </div>
-                    </td>
-                    <td>
-                        {% if user.name not in ("anonymous", "autologin") %}
-                            <a class="button-like" href="{{ url_for("manipulate_user", mode="edit") }}?name={{ user.name }}"><i
-                                    class="fa fa-edit" aria-hidden="true"></i><span class="sr-only">Edit user</span></a>
-                            <form class="inline" action="{{ url_for("delete_user") }}" method="POST">
-                                <input type="hidden" name="name" value="{{ user.name }}">
-                                <button class="confirm-first"><i class="fa fa-times" aria-hidden="true"></i><span class="sr-only">Delete user</span></button>
-                            </form>
-                        {% endif %}
-                            <a class="button-like tooltip-trigger" aria-controls="tooltip-user-datasets" href="{{ url_for("show_results") }}?user={{ user.name }}&amp;depth=all"><i
-                                    class="fa fa-database" aria-hidden="true"></i><span class="sr-only">View datasets for user</span></a>
-                    </td>
-                </tr>
-            {% endfor %}
-        </table>
+                                    {% endif %}
+                                    {% if user.is_deactivated %}
+                                        <i class="fa fa-ban tooltip-trigger" aria-hidden="true"
+                                           aria-controls="tooltip-user-deactivates"></i>
+                                        <span class="sr-only"> (Deactivated user)</span>
+                                    {% endif %}
+                                    {% if not user.password and user.name not in ("anonymous", "autologin") %}
+                                        <i class="fas fa-user-clock tooltip-trigger" aria-hidden="true"
+                                           aria-controls="tooltip-user-registration"></i>
+                                        <span class="sr-only"> (User has not completed registration)</span>
+                                    {% endif %}
+                                </div>
+                                <div class="user-byline">
+                                    {% if user.tags %}
+                                        {% for user_tag in user.tags %}
+                                            <span class="property-badge"><a
+                                                    href="{{ url_for("list_users") }}?tag={{ user_tag }}">{{ user_tag }}</a></span>
+                                        {% endfor %}
+                                    {% endif %}
+                                </div>
+                            </td>
+                            <td class="actions">
+                                {% if user.name not in ("anonymous", "autologin") %}
+                                    <a class="button-like"
+                                       href="{{ url_for("manipulate_user", mode="edit") }}?name={{ user.name }}"><i
+                                            class="fa fa-edit" aria-hidden="true"></i><span
+                                            class="sr-only">Edit user</span></a>
+                                    <form class="inline" action="{{ url_for("delete_user") }}" method="POST">
+                                        <input type="hidden" name="name" value="{{ user.name }}">
+                                        <button class="confirm-first"><i class="fa fa-times"
+                                                                         aria-hidden="true"></i><span class="sr-only">Delete user</span>
+                                        </button>
+                                    </form>
+                                {% endif %}
+                                <a class="button-like tooltip-trigger" aria-controls="tooltip-user-datasets"
+                                   href="{{ url_for("show_results") }}?user={{ user.name }}&amp;depth=all"><i
+                                        class="fa fa-database" aria-hidden="true"></i><span class="sr-only">View datasets for user</span></a>
 
-        {% include "components/pagination.html" %}
+                                <a class="button-like"
+                                   href="{{ url_for("update_settings") }}?tag=user:{{ user.name }}"><i
+                                        class="fa fa-user-gear" aria-hidden="true"></i><span
+                                        class="sr-only">User settings</span></a>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </table>
 
-        <p role="tooltip" class="multiple" id="tooltip-user-admin" aria-hidden="true">Admin user</p>
-        <p role="tooltip" class="multiple" id="tooltip-user-datasets" aria-hidden="true">View datasets for user</p>
-        <p role="tooltip" class="multiple" id="tooltip-user-deactivated" aria-hidden="true">User is deactivated and can no longer use this 4CAT instance</p>
-        <p role="tooltip" class="multiple" id="tooltip-user-registration" aria-hidden="true">User has not yet completed registration by setting a password</p>
-    </div>
-</section>
+                {% include "components/pagination.html" %}
+
+                <p role="tooltip" class="multiple" id="tooltip-user-admin" aria-hidden="true">Admin user</p>
+                <p role="tooltip" class="multiple" id="tooltip-user-datasets" aria-hidden="true">View datasets for
+                    user</p>
+                <p role="tooltip" class="multiple" id="tooltip-user-deactivated" aria-hidden="true">User is deactivated
+                    and can no longer use this 4CAT instance</p>
+                <p role="tooltip" class="multiple" id="tooltip-user-registration" aria-hidden="true">User has not yet
+                    completed registration by setting a password</p>
+            </div>
+        </section>
+        <aside>
+            <h2><span>Manage</span></h2>
+            <nav class="user-controls">
+                <div>
+                    <a href="{{ url_for("manipulate_user", mode="create") }}" class="button-like"><i
+                            class="fa fa-user-plus" aria-hidden="true"></i> Create user</a>
+                    {% if __user_config("privileges.admin.can_manage_tags") %}
+                    <a href="{{ url_for("manipulate_tags") }}" class="button-like"><i
+                            class="fa fa-arrow-down-1-9" aria-hidden="true"></i> Manage tags</a>
+                    {% endif %}
+                </div>
+                <hr>
+                <form action="{{ url_for("list_users") }}" method="GET">
+                    <input aria-label="User filter" placeholder="Search by username" name="name"
+                           value="{{ filter.name }}" list="all-users">
+
+                    <input aria-label="User filter" placeholder="Search by tag" name="tag"
+                           value="{{ filter.tag }}" list="all-tags">
+                    <button><i class="fa fa-search" aria-hidden="true"></i> Search</button>
+                </form>
+                <datalist id="all-tags">
+                    {% for tag in all_tags %}
+                        <option>{{ tag }}</option>{% endfor %}
+                </datalist>
+                <datalist id="all-users">
+                    {% for user in all_users %}
+                        <option>{{ user }}</option>{% endfor %}
+                </datalist>
+                {% if filter.name or filter.tag %}
+                    <hr>
+                    <form action="{{ url_for("list_users") }}" method="GET">
+                        <button><i class="fa fa-times" aria-hidden="true"></i> Clear filter</button>
+                    </form>
+                {% endif %}
+            </nav>
+        </aside>
+    </article>
+{% endblock %}

@@ -41,9 +41,11 @@
         </li>
     {% endif %}
     <li>
+    {% if __user_config("privileges.can_use_explorer") %}
     <a href="{{ url_for('explorer_dataset', key=dataset.key) }}">
         <i class="fa fa-binoculars" aria-hidden="true"></i> Explore
     </a>
+    {% endif %}
     </li>
     </ul>
   {% endif %}

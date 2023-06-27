@@ -67,7 +67,7 @@ def show_results(page):
     # 'all' is limited to admins
     depth = request.args.get("depth", "own")
     available_depths = ["own", "favourites"]
-    if current_user.is_admin:
+    if config.get("privileges.can_view_all_datasets", user=current_user):
         available_depths.append("all")
 
     if depth not in available_depths:
@@ -89,7 +89,7 @@ def show_results(page):
         replacements.append("%" + filters["filter"] + "%")
 
     # hide private datasets for non-owners and non-admins
-    if not current_user.is_admin:
+    if not config.get("privileges.can_view_private_datasets", user=current_user):
         where.append("(is_private = FALSE OR owner = %s)")
         replacements.append(current_user.get_id())
 
@@ -101,7 +101,7 @@ def show_results(page):
     # the user filter is only exposed to admins, and otherwise emulates the
     # 'own' option
     if filters["user"]:
-        if (current_user.is_admin or current_user.get_id() == filters["user"]):
+        if (config.get("privileges.can_view_all_datasets", user=current_user) or current_user.get_id() == filters["user"]):
             where.append("owner = %s")
             replacements.append(filters["user"])
         else:
@@ -180,7 +180,7 @@ def get_mapped_result(key):
     except TypeError:
         return error(404, error="Dataset not found.")
 
-    if dataset.is_private and not (current_user.is_admin or dataset.has_owner(current_user)):
+    if dataset.is_private and not (config.get("privileges.can_view_private_datasets", user=current_user) or dataset.has_owner(current_user)):
         return error(403, error="This dataset is private.")
 
     if dataset.get_extension() == ".csv":
@@ -231,7 +231,7 @@ def view_log(key):
     except TypeError:
         return error(404, error="Dataset not found.")
 
-    if dataset.is_private and not (current_user.is_admin or dataset.has_owner(current_user)):
+    if dataset.is_private and not (config.get("privileges.can_view_private_datasets", user=current_user) or dataset.has_owner(current_user)):
         return error(403, error="This dataset is private.")
 
     logfile = dataset.get_log_path()
@@ -260,7 +260,7 @@ def preview_items(key):
     except TypeError:
         return error(404, error="Dataset not found.")
 
-    if dataset.is_private and not (current_user.is_admin or dataset.has_owner(current_user)):
+    if dataset.is_private and not (config.get("privileges.can_view_private_datasets", user=current_user) or dataset.has_owner(current_user)):
         return error(403, error="This dataset is private.")
 
     preview_size = 1000
@@ -460,8 +460,11 @@ def restart_dataset(key):
     except TypeError:
         return error(404, message="Dataset not found.")
 
-    if dataset.is_private and not (current_user.is_admin or dataset.has_owner(current_user)):
+    if dataset.is_private and not (config.get("privileges.can_view_private_datasets", user=current_user) or dataset.has_owner(current_user)):
         return error(403, error="This dataset is private.")
+
+    if not config.get("privileges.can_rerun_dataset", user=current_user):
+        return error(403, message="Not allowed.")
 
     if not dataset.has_owner(current_user) and not current_user.is_admin:
         return error(403, message="Not allowed.")

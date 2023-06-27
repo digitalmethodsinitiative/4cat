@@ -19,7 +19,7 @@ from flask import jsonify, abort, send_file, request, render_template
 from flask_login import login_required, current_user
 
 from webtool import app, db, log, openapi, limiter, config
-from webtool.lib.helpers import format_chan_post, error
+from webtool.lib.helpers import format_chan_post, error, setting_required
 from common.lib.dataset import DataSet
 from common.lib.helpers import strip_tags
 
@@ -28,6 +28,8 @@ api_ratelimit = limiter.shared_limit("45 per minute", scope="api")
 @app.route('/explorer/dataset/<string:key>/', defaults={'page': 0})
 @app.route('/explorer/dataset/<string:key>/<int:page>')
 @api_ratelimit
+@login_required
+@setting_required("privileges.can_use_explorer")
 @openapi.endpoint("explorer")
 def explorer_dataset(key, page):
 	"""
@@ -164,6 +166,8 @@ def explorer_dataset(key, page):
 
 @app.route('/explorer/thread/<datasource>/<board>/<string:thread_id>')
 @api_ratelimit
+@login_required
+@setting_required("privileges.can_use_explorer")
 @openapi.endpoint("explorer")
 def explorer_thread(datasource, board, thread_id):
 	"""
@@ -209,6 +213,8 @@ def explorer_thread(datasource, board, thread_id):
 
 @app.route('/explorer/post/<datasource>/<board>/<string:post_id>')
 @api_ratelimit
+@login_required
+@setting_required("privileges.can_use_explorer")
 @openapi.endpoint("explorer")
 def explorer_post(datasource, board, thread_id):
 	"""
@@ -248,6 +254,9 @@ def explorer_post(datasource, board, thread_id):
 
 @app.route("/explorer/save_annotation_fields/<string:key>", methods=["POST"])
 @api_ratelimit
+@login_required
+@setting_required("privileges.can_run_processors")
+@setting_required("privileges.can_use_explorer")
 @openapi.endpoint("explorer")
 def save_annotation_fields(key):
 	"""
@@ -417,6 +426,9 @@ def save_annotation_fields(key):
 
 @app.route("/explorer/save_annotations/<string:key>", methods=["POST"])
 @api_ratelimit
+@login_required
+@setting_required("privileges.can_run_processors")
+@setting_required("privileges.can_use_explorer")
 @openapi.endpoint("explorer")
 def save_annotations(key):
 	"""
@@ -464,6 +476,8 @@ def save_annotations(key):
 
 @app.route('/api/<datasource>/boards.json')
 @api_ratelimit
+@login_required
+@setting_required("privileges.can_use_explorer")
 @openapi.endpoint("data")
 def get_boards(datasource):
 	"""
@@ -489,6 +503,8 @@ def get_boards(datasource):
 
 @app.route('/api/image/<img_file>')
 @app.route('/api/imagefile/<img_file>')
+@login_required
+@setting_required("privileges.can_use_explorer")
 def get_image_file(img_file, limit=0):
 	"""
 	Returns an image based on filename

@@ -89,6 +89,13 @@ def _jinja2_filter_timify_long(number):
 	"""
 	return timify_long(number)
 
+@app.template_filter("fromjson")
+def _jinja2_filter_fromjson(data):
+	try:
+		return json.loads(data)
+	except TypeError:
+		return data
+
 @app.template_filter("http_query")
 def _jinja2_filter_httpquery(data):
 	data = {key: data[key] for key in data if data[key]}
@@ -324,16 +331,11 @@ def inject_now():
 		"""
 		return str(uuid.uuid4())
 
-	notifications = current_user.get_notifications()
-
 	return {
-		"__datasources_config": config.get('4cat.datasources', user=current_user),
 		"__has_https": config.get("flask.https", user=current_user),
 		"__datenow": datetime.datetime.utcnow(),
-		"__tool_name": config.get("4cat.name", user=current_user),
-		"__tool_name_long": config.get("4cat.name_long", user=current_user),
-		"__notifications": notifications,
-		"__expire_datasets": config.get("expire.timeout", user=current_user),
-		"__expire_optout": config.get("expire.allow_optout", user=current_user),
+		"__notifications": current_user.get_notifications(),
+		"__user_config": lambda setting: config.get(setting, user=current_user),
+		"__user_cp_access": any([config.get(p, user=current_user) for p in config.config_definition.keys() if p.startswith("privileges.admin")]),
 		"uniqid": uniqid
 	}

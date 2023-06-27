@@ -1,47 +1,92 @@
-{% extends "layout.html" %}
+{% extends "controlpanel/layout.html" %}
 
-{% block title %}General {{ __tool_name }} settings{% endblock %}
+{% block title %}General {{ __user_config("4cat.name") }} settings{% endblock %}
 {% block body_class %}plain-page frontpage admin settings {{ body_class }}{% endblock %}
 
 {% block body %}
-    {% set fieldset = namespace(open=false,legend="") %}
-      <article class="fullsize">
+    <article class="fullsize">
         <section>
-            <h2><span>Configure {{ __tool_name }}</span></h2>
-            <form action="{{ url_for("update_settings") }}" method="POST">
-                {% for notice in flashes %}
-                    <p class="form-notice">{{ notice|safe }}</p>
-                {% endfor %}
-                {% for option in options %}
-                    {% set new_legend = option.split(".")[0] %}
-                    {% if new_legend != fieldset.legend %}
-                        {% set fieldset.legend = new_legend %}
-                        {% if fieldset.open %}{% set fieldset.open = False %}</fieldset>{% endif %}
-                    {% endif %}
-                    {% if not fieldset.open %}<fieldset>
-                        <legend>
-                            {% if fieldset.legend in categories %}{{ categories[fieldset.legend] }}{% elif fieldset.legend in modules %}Settings for '{{ modules[fieldset.legend] }}'{% else %}{{ fieldset.legend }}{% endif %}
-                            <button aria-controls="config-{{ fieldset.legend }}" class="toggle-button">
-                                <i class="fa fa-plus" aria-hidden="true"></i>
-                                <span class="sr-only">Expand options</span>
-                            </button>
-                        </legend>
-                        <div id="config-{{ fieldset.legend }}" aria-expanded="false">
-                        {% set fieldset.open = True %}
-                    {% endif %}
-                    {% if options[option].default is none %}
-                        {% set x=options[option].__setitem__("default", "") %}
-                        {% set settings = options[option] %}
-                    {% else %}
-                        {% set settings = options[option] %}
-                    {% endif %}
-                    {% include 'components/datasource-option.html' %}
-                {% endfor %}
-                {% if fieldset_open %}</div></fieldset>{% endif %}
-            </fieldset>
-                <div class="submit-container">
-                    <button><i class="fa fa-save" aria-hidden="true"></i> Save settings</button>
+            <h2>
+                <span>Configure {{ __user_config("4cat.name") }}</span>
+                <label class="inline-search">
+                    <i class="fa fa-search" aria-hidden="true"></i><span class="sr-only">Search:</span>
+                    <input type="text" placeholder="Filter">
+                </label>
+            </h2>
+            <div class="config-tag-info">
+            {% if tag %}
+                Editing configuration for tag <span class="property-badge">{{ tag }}</span>. <a href="{{ url_for("update_settings") }}">Return to global settings</a>.
+            {% else %}
+                Editing <em>global configuration</em>. View for tag instead: <form class="inline" action="{{ url_for("update_settings") }}" method="GET"><input type="text" name="tag" placeholder="tag" style="width:5em;"> <button>View</button></form></button></form>
+            {% endif %}
+            </div>
+            {% set tab = namespace(name="", open=False, first=True) %}
+            <form action="{{ url_for("update_settings") }}?tag={{ tag }}" method="POST" class="tabbed">
+                <nav class="tab-controls">
+                    <ul>
+                        {% set tab.name = '' %}
+                        {% for option in options %}
+                            {% set option_category = option.split(".")[0] %}
+                            {% if option_category != tab.name %}
+                                {% set tab.name = option_category %}
+                                <li{% if tab.first %} class="highlighted"{% set tab.first = False %}{% endif %}>
+                                    <a href="#tab-{{ tab.name }}" id="tablabel-{{ tab.name }}"
+                                       aria-controls="tab-{{ tab.name }}">
+                                        {% if tab.name in categories %}
+                                            {{ categories[tab.name] }}
+                                        {% elif tab.name in modules %}
+                                            {{ modules[tab.name] }}
+                                        {% else %}
+                                            {{ tab.name }}
+                                        {% endif %}
+                                    </a>
+                                </li>
+                            {% endif %}
+                        {% endfor %}
+                    </ul>
+                </nav>
+
+                {% set tab = namespace(name="", open=False, first=True) %}
+                <div class="tab-container">
+                    {% for notice in flashes %}
+                        <p class="form-notice">{{ notice|safe }}</p>
+                    {% endfor %}
+                    {% for option in options %}
+                        {% set option_category = option.split(".")[0] %}
+                        {% if option_category != tab.name %}
+                            {% set tab.name = option_category %}
+                            {% if tab.open %}
+                                </ul>
+                                </div>
+                            {% endif %}
+                            <div id="tab-{{ tab.name }}" aria-labelledby="tablabel-{{ tab.name }}"
+                                 aria-expanded="{% if tab.first %}true{% else %}false{% endif %}{% set tab.first = False %}"
+                                 class="tab-content">
+                            <ul>
+                            {% set tab.open = True %}
+                        {% endif %}
+                        <div
+                                {% if tag and options[option].global %} aria-disabled="true" class="disabled tooltip-trigger" aria-controls="tooltip-setting-disabled"
+                                {% elif options[option].is_changed %} class="is-changed tooltip-trigger" aria-controls="tooltip-setting-changed"{% endif %}
+                        >
+                        {% if options[option].default is none %}
+                            {% set x=options[option].__setitem__("default", "") %}
+                            {% set settings = options[option] %}
+                        {% else %}
+                            {% set settings = options[option] %}
+                        {% endif %}
+                        {% include 'components/datasource-option.html' %}
+                        </div>
+                    {% endfor %}
+                    </ul>
+                    </div>
+
+                    <div class="submit-container">
+                        <button><i class="fa fa-save" aria-hidden="true"></i> Save settings</button>
+                    </div>
                 </div>
+                <p role="tooltip" class="multiple" id="tooltip-setting-disabled" aria-hidden="true">This setting can only be changed globally, not per tag</p>
+                <p role="tooltip" class="multiple" id="tooltip-setting-changed" aria-hidden="true">This setting was changed for the '{{ tag }}' tag</p>
             </form>
         </section>
     </article>

@@ -80,9 +80,9 @@ def reroute_requests():
     # Displays a 'sorry, no 4cat for you' message to banned or deactivated users.
     if current_user and current_user.is_authenticated and current_user.is_deactivated:
         message = "Your 4CAT account has been deactivated and you can no longer access this page."
-        if current_user.get_attribute("deactivated.reason"):
+        if current_user.get_value("deactivated.reason"):
             message += "\n\nThe following reason was recorded for your account's deactivation: *"
-            message += current_user.get_attribute("deactivated.reason") + "*"
+            message += current_user.get_value("deactivated.reason") + "*"
 
         return render_template("error.html", title="Your account has been deactivated", message=message), 403
 
@@ -172,7 +172,7 @@ def first_run_dialog():
 
     :return:
     """
-    has_admin_user = db.fetchone("SELECT COUNT(*) AS amount FROM users WHERE is_admin = True")["amount"]
+    has_admin_user = db.fetchone("SELECT COUNT(*) AS amount FROM users WHERE tags @> '[\"admin\"]'")["amount"]
     wants_phone_home = not config.get("4cat.phone_home_asked", False)
 
     version_file = Path(config.get("PATH_ROOT"), "config/.current-version")
@@ -240,8 +240,9 @@ def first_run_dialog():
         db.commit()
         user = User.get_by_name(db=db, name=username)
         user.set_password(password)
+        user.add_tag("admin")  # first user is always admin
 
-        config.set("4cat.name_long", instance_name, raw=False)
+        config.set("4cat.name_long", instance_name, is_json=False)
 
         # handle hue colour
         try:
@@ -250,11 +251,11 @@ def first_run_dialog():
         except (ValueError, TypeError):
             interface_hue = random.randrange(0, 360)
 
-        config.set("4cat.layout_hue", interface_hue, raw=False)
+        config.set("4cat.layout_hue", interface_hue, is_json=False)
         generate_css_colours(force=True)
 
         # make user an admin
-        db.update("users", where={"name": username}, data={"is_admin": True, "is_deactivated": False})
+        db.update("users", where={"name": username}, data={"is_deactivated": False})
         db.commit()
 
         flash("The admin user '%s' was created, you can now use it to log in." % username)
@@ -278,7 +279,7 @@ def first_run_dialog():
             flash("Could not send install ping to 4CAT developers")
 
     # don't ask phone home again until next update
-    config.set("4cat.phone_home_asked", True, raw=False)
+    config.set("4cat.phone_home_asked", True, is_json=False)
 
     redirect_path = "show_login" if not has_admin_user else "show_frontpage"
     return redirect(url_for(redirect_path))
@@ -297,7 +298,7 @@ def show_login():
     if current_user.is_authenticated:
         return redirect(url_for("show_index"))
 
-    has_admin_user = db.fetchone("SELECT * FROM users WHERE is_admin = True")
+    has_admin_user = db.fetchone("SELECT * FROM users WHERE tags @> '[\"admin\"]'")
     if not has_admin_user:
         return redirect(url_for("first_run_dialog"))
 

@@ -180,6 +180,7 @@
         </ol>
 
         {# Possible further analyses #}
+        {% if __user_config("privileges.can_run_processors") %}
         <ol class="children-processors">
             {% for processor in item.get_available_processors().values() %}
 
@@ -190,5 +191,6 @@
                 {% set inline = false %}
             {% endfor %}
         </ol>
+        {% endif %}
     </div>
 </li>

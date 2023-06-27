@@ -1,4 +1,4 @@
-{% extends "layout.html" %}
+{% extends "controlpanel/layout.html" %}
 
 {% block title %}{% if mode == "edit" %}Edit user '{{ user.name }}'{% else %}Create user{% endif %}{% endblock %}
 {% block body_class %}plain-page frontpage admin {{ body_class }}{% endblock %}
@@ -34,6 +34,11 @@
                         <p role="tooltip" id="tooltip-resend-mail">Warning: this resets the user's password &
                             re-generates their reset token</p>
                     </li>
+
+                {% if __user_config("privileges.admin.can_manage_settings") %}
+                    <li><a href="{{ url_for("update_settings") }}?tag=user:{{ user.name }}"
+                               class="button-like"><i class="fa fa-user-gear" aria-hidden="true"></i> User settings</a></li>
+                {% endif %}
                 </ul>
             </nav>
         </section>
@@ -47,7 +52,7 @@
                 <p><i class="fa fa-warning" aria-hidden="true"></i> This user has not yet completed their registration and set a password.</p>
             {% endif %}
 
-            <form action="{{ url_for('manipulate_user', mode=mode) }}" method="POST" class="wide">
+            <form action="{{ url_for('manipulate_user', mode=mode) }}{% if mode == "edit" %}?name={{ user.name }}{% endif %}" method="POST" class="wide">
                 {% for notice in flashes %}
                     <p class="form-notice">{{ notice|safe }}</p>
                 {% endfor %}
@@ -56,12 +61,12 @@
                     <input type="text" name="name" id="user-name" value="{{ user.name }}">
                 </div>
                 <div class="form-element">
-                    <label for="user-admin">Is admin?</label>
-                    <input type="checkbox"{% if user.is_admin %} checked="checked"{% endif %} id="user-admin" name="is_admin">
-                </div>
-                <div class="form-element">
-                    <label for="user-deactivated">Is deactivated?</label>
-                    <input type="checkbox"{% if user.is_deactivated %} checked="checked"{% endif %} id="user-deactivated" name="is_deactivated">
+                    <label for="user-tags">Tags</label>
+                    <div>
+                    <input type="text" id="user-tags" name="tags" value="{{ ", ".join(user.tags|fromjson) }}">
+                    <button class="tooltip-trigger" aria-controls="tooltip-tags-label" aria-label="Extended help for option">?</button>
+                    <p role="tooltip" id="tooltip-tags-label" class="force-width">Tags can be used to override 4CAT settings, for example to allow certain features only for certain users. Case-insensitive. Separate with commas.</p>
+                        </div>
                 </div>
                 {% if mode != "edit" %}
                 <div class="form-element">
@@ -69,9 +74,17 @@
                     <input type="password" id="user-password" name="password">
                 </div>
                 {% endif %}
-                <div class="form-element{% if "userdata" in incomplete %} missing{% endif %}">
-                    <label for="user-userdata">User data (JSON)</label>
-                    <textarea rows="10" cols="50" id="user-userdata" name="userdata" data-validate-format="json" class="code">{{ user.userdata }}</textarea>
+                <div class="form-element">
+                    <label for="user-deactivated">Is deactivated?</label>
+                    <input type="checkbox"{% if user.is_deactivated %} checked="checked"{% endif %} id="user-deactivated" name="is_deactivated">
+                </div>
+                <div class="form-element">
+                    <label for="user-autodelete">Delete after</label>
+                    <div>
+                        <input type="text" placeholder="YYYY-MM-DD hh:mm" {% if user.get_value("delete-after") %} value="{{ user.get_value("delete-after")|datetime("%Y-%m-%d %H:%M", wrap=False) }}"{% endif %} id="user-autodelete" name="autodelete">
+                        <button class="tooltip-trigger" aria-controls="tooltip-autodelete-label" aria-label="Extended help for option">?</button>
+                        <p role="tooltip" id="tooltip-autodelete-label" class="force-width">Automatically delete the user at this time. They will see a warning in the interface starting one week before.</div>
+                    </div>
                 </div>
                 <div class="submit-container">
                     <input type="hidden" name="current-name" value="{{ user.name }}">

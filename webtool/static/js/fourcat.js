@@ -58,8 +58,8 @@ const result_page = {
             }, 25);
         }
 
-        $('<label class="filter-processors"><i class="fa fa-search" aria-hidden="true"></i><span class="sr-only">Filter:</span> <input type="text" id="processor-filter" placeholder="Filter"></label>').appendTo('.available-processors .section-subheader:first-child');
-        $('body').on('keyup', '#processor-filter', result_page.filterProcessors);
+        $('<label class="inline-search"><i class="fa fa-search" aria-hidden="true"></i><span class="sr-only">Filter:</span> <input type="text" placeholder="Filter"></label>').appendTo('.available-processors .section-subheader:first-child');
+        $(document).on('keyup', '.result-page .inline-search input', result_page.filterProcessors);
     },
 
     filterProcessors: function (e) {
@@ -1328,6 +1328,11 @@ const ui_helpers = {
         //long texts with '...more' link
         $(document).on('click', 'div.expandable a', ui_helpers.expandExpandable);
 
+        //autocomplete text boxes
+        $(document).on('input', 'input.autocomplete', ui_helpers.autocomplete);
+
+        //tabbed interfaces
+        $(document).on('click', '.tabbed .tab-controls a', ui_helpers.tabs);
 
         // Controls to change which results show up in overview
         $('.view-controls button').hide();
@@ -1352,18 +1357,17 @@ const ui_helpers = {
 
         // special case - first-run colour picker for the interface
         $('body').on('input', '.hue-picker', function() {
-            let h = $(this).val();
-            let s = $(this).attr('data-saturation') ? $(this).attr('data-saturation') : 77;
-            let l = $(this).attr('data-luminance') ? $(this).attr('data-luminance') : 46;
+            let h = parseInt($(this).val());
+            let s = $(this).attr('data-saturation') ? parseInt($(this).attr('data-saturation')) : 87;
+            let v = $(this).attr('data-value') ? parseInt($(this).attr('data-value')) : 81;
             let target = $(this).attr('data-update-background');
-            let sl = ', ' + s + '%, ' + l + '%';
-            let hsl = 'hsl(' + h + sl + ')';
+
             if($(this).attr('data-update-layout')) {
-                document.querySelector(':root').style.setProperty('--accent', hsl);
-                document.querySelector(':root').style.setProperty('--accent-alternate', 'hsl(' + h + ', 100%, 46%');
-                document.querySelector(':root').style.setProperty('--highlight', 'hsl(' + ((h + 180) % 360) + ', 100%, 46%');
+                document.querySelector(':root').style.setProperty('--accent', hsv2hsl(h, s, v));
+                document.querySelector(':root').style.setProperty('--highlight', hsv2hsl(h, s, 100));
+                document.querySelector(':root').style.setProperty('--accent-alternate', hsv2hsl((h + 180) % 360, s, 90));
             }
-            $(target).css('background-color', hsl);
+            $(target).css('background-color', hsv2hsl(h, s, v));
         });
         $('.hue-picker').trigger('input');
 
@@ -1373,6 +1377,57 @@ const ui_helpers = {
             $('h1 span a').text(label);
         });
         $('#request-4cat_name').trigger('input');
+
+        // special case - settings panel filter
+        $(document).on('input', '.settings .inline-search input', function(e) {
+            let matching_tabs = [];
+            let query = e.target.value.toLowerCase();
+            document.querySelectorAll('.tab-content').forEach((tab) => {
+                let tab_id = tab.getAttribute('id').replace(/^tab-/, 'tablabel-');
+                if(document.querySelector('#' + tab_id).textContent.toLowerCase().indexOf(query) >= 0) {
+                    matching_tabs.push(tab_id);
+                    return;
+                }
+
+                tab.querySelectorAll('.form-element').forEach((element) => {
+                    let label = element.querySelector('label').textContent;
+                    let help = element.querySelector('[role=tooltip]');
+                    if(
+                        label.toLowerCase().indexOf(query) >= 0
+                        || (help && help.textContent.toLowerCase().indexOf(query) >= 0)
+                    ) {
+                        matching_tabs.push(tab_id);
+                    }
+                })
+            });
+            document.querySelectorAll('.tab-controls .matching').forEach((e) => e.classList.remove('matching'));
+            if(query) {
+                matching_tabs.forEach((tab_id) => document.querySelector('#' + tab_id).classList.add('matching'));
+            }
+        });
+
+        // special case - admin user tags sorting
+        $('#tag-order').sortable({
+            cursor: 'ns-resize',
+            handle: '.handle',
+            items: '.implicit, .explicit',
+            axis: 'y',
+            update: function(e, ui) {
+                let tag_order = Array.from(document.querySelectorAll('#tag-order li[data-tag]')).map(t => t.getAttribute('data-tag')).join(',');
+                let body = new FormData();
+                body.append('order', tag_order);
+                fetch(document.querySelector('#tag-order').getAttribute('data-url'), {
+                    method: 'POST',
+                    body: body
+                }).then(response => {
+                    if(response.ok) {
+                        ui.item.addClass('flash-once');
+                    } else {
+                        ui.item.addClass('flash-once-error');
+                    }
+                });
+            }
+        });
     },
 
     /**
@@ -1480,9 +1535,9 @@ const ui_helpers = {
             e.preventDefault();
         }
 
-        target = '#' + $(this).attr('aria-controls');
+        let target = '#' + $(this).attr('aria-controls');
+        let is_open = $(target).attr('aria-expanded') !== 'false';
 
-        is_open = $(target).attr('aria-expanded') !== 'false';
         if (is_open || force_close) {
             $(target).animate({'height': 0}, 250, function () {
                 $(this).attr('aria-expanded', false).css('height', '');
@@ -1506,6 +1561,40 @@ const ui_helpers = {
                 $(this).find('i.fa.fa-plus').addClass('fa-minus').removeClass('fa-plus');
             }
         }
+    },
+
+    autocomplete: function(e) {
+        let source = e.target.getAttribute('data-url');
+        if(!source) { return; }
+
+        let datalist = e.target.getAttribute('list');
+        if(!datalist) { return; }
+
+        datalist = document.querySelector('#' + datalist);
+        if(!datalist) { return; }
+
+        let value = e.target.value;
+        fetch(source, {method: 'POST', body: value})
+            .then(e => e.json())
+            .then(response => {
+                datalist.querySelectorAll('option').forEach(o => o.remove());
+                response.forEach(o => {
+                    let option = document.createElement('option');
+                    option.innerText = o;
+                    datalist.appendChild(option);
+                });
+            });
+    },
+
+    tabs: function(e) {
+        e.preventDefault();
+        let link = e.target;
+        let target_id = link.getAttribute('aria-controls');
+        let controls = link.parentNode.parentNode;
+        controls.querySelector('.highlighted').classList.remove('highlighted');
+        link.parentNode.classList.add('highlighted');
+        controls.parentNode.parentNode.querySelector('.tab-container *[aria-expanded=true]').setAttribute('aria-expanded', 'false');
+        document.querySelector('#' + target_id).setAttribute('aria-expanded', 'true');
     }
 }
 
@@ -1560,4 +1649,31 @@ function FileReaderPromise(file) {
         }
         fr.readAsArrayBuffer(file);
     });
+}
+
+/**
+ * Convert HSV colour to HSL
+ *
+ * Expects a {0-360}, {0-100}, {0-100} value.
+ *
+ * @param h
+ * @param s
+ * @param v
+ * @returns {(*|number)[]}
+ */
+function hsv2hsl(h, s, v) {
+    s /= 100;
+    v /= 100;
+    const vmin = Math.max(v, 0.01);
+    let sl;
+    let l;
+
+    l = (2 - s) * v;
+    const lmin = (2 - s) * vmin;
+    sl = s * vmin;
+    sl /= (lmin <= 1) ? lmin : 2 - lmin;
+    sl = sl || 0;
+    l /= 2;
+
+    return 'hsl(' + h + 'deg, ' + (sl * 100) + '%, ' + (l * 100) + '%)';
 }

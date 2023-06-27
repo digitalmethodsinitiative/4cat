@@ -22,7 +22,7 @@
                     <li><a href="{{ url_for('show_result', key=dataset.key) }}"><i class="fas fa-link"
                                                                                    aria-hidden="true"></i> Permalink</a>
                     </li>
-                    {% if dataset.has_owner(current_user) or current_user.is_admin %}
+                    {% if (__user_config("privileges.can_rerun_dataset") and dataset.has_owner(current_user)) or current_user.is_admin %}
                         <li><a href="{{ url_for('delete_dataset_interactive', key=dataset.key) }}" class="confirm-first"
                                data-confirm-action="delete this dataset"><i class="fas fa-trash-alt"
                                                                             aria-hidden="true"></i>
@@ -143,7 +143,7 @@
         </ol>
     </section>
 
-    {% if dataset.num_rows > 0 and dataset.get_available_processors()|length > 0 and current_user.is_authenticated %}
+    {% if current_user.is_authenticated and __user_config("privileges.can_run_processors") and dataset.num_rows > 0 and dataset.get_available_processors()|length > 0 %}
         <section class="analysis-gallery available-processors">
 
             <h3 class="blocktitle section-subheader">

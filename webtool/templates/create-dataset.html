@@ -12,12 +12,12 @@
 
             <form id="query-form" action="{{ url_for('queue_dataset') }}" method="POST" enctype="multipart/form-data">
                 <fieldset class="datasource-form">
-                    <p><br>Please be considerate of other users; {{ __tool_name }} is a shared resource and large dataset queries may
+                    <p><br>Please be considerate of other users; {{ __user_config("4cat.name") }} is a shared resource and large dataset queries may
                         prevent others from using it if they take a very long time to complete. We recommend to start
                         with smaller date ranges and specific queries and then cast a wider net if needed.</p>
-                {%  if __expire_datasets %}
-                    <p>Note that datasets will be deleted automatically after {{ __expire_datasets|timify_long }}.
-                        {% if __expire_optout %} You can choose to keep the dataset for longer from the result
+                {%  if __user_config("expire.timeout") %}
+                    <p>Note that datasets will be deleted automatically after {{ __user_config("expire.timeout")|timify_long }}.
+                        {% if __user_config("expire.allow_optout") %} You can choose to keep the dataset for longer from the result
                             page.{% endif %}</p>
                 {% endif %}
                     <div class="form-element">

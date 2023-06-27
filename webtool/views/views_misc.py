@@ -15,7 +15,7 @@ from flask import render_template, jsonify, Response
 from flask_login import login_required, current_user
 
 from webtool import app, db, config
-from webtool.lib.helpers import pad_interval, error
+from webtool.lib.helpers import pad_interval, error, setting_required
 
 csv.field_size_limit(1024 * 1024 * 1024)
 
@@ -92,6 +92,7 @@ def show_frontpage():
 
 @app.route('/create-dataset/')
 @login_required
+@setting_required("privileges.can_create_dataset")
 def show_index():
     """
     Main tool frontend
@@ -186,7 +187,7 @@ def getboards(datasource):
     if datasource not in config.get("4cat.datasources"):
         result = False
     else:
-        result = config.get(datasource + ".boards", False)
+        result = config.get(datasource + "-search.boards", False)
 
     return jsonify(result)
 

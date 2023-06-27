@@ -21,7 +21,7 @@ from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 
 from webtool import app, db, log, openapi, limiter, queue, config
-from webtool.lib.helpers import error
+from webtool.lib.helpers import error, setting_required
 
 from common.lib.exceptions import QueryParametersException, JobNotFoundException, QueryNeedsExplicitConfirmationException, QueryNeedsFurtherInputException
 from common.lib.queue import JobQueue
@@ -106,6 +106,7 @@ def api_status():
 
 @app.route("/api/datasource-form/<string:datasource_id>/")
 @login_required
+@setting_required("privileges.can_create_dataset")
 def datasource_form(datasource_id):
 	"""
 	Get data source query form HTML
@@ -175,6 +176,7 @@ def datasource_form(datasource_id):
 
 @app.route("/api/datasource-script/<string:datasource_id>/")
 @login_required
+@setting_required("privileges.can_create_dataset")
 def datasource_script(datasource_id):
 	"""
 	Get data source query form HTML
@@ -208,6 +210,7 @@ def datasource_script(datasource_id):
 @login_required
 @limiter.limit("5 per minute")
 @openapi.endpoint("tool")
+@setting_required("privileges.can_create_dataset")
 def import_dataset():
 	"""
 	Import a dataset from another tool via upload
@@ -283,6 +286,7 @@ def import_dataset():
 
 @app.route("/api/queue-query/", methods=["POST"])
 @login_required
+@setting_required("privileges.can_create_dataset")
 @limiter.limit("5 per minute")
 @openapi.endpoint("tool")
 def queue_dataset():
@@ -391,6 +395,7 @@ def queue_dataset():
 
 
 @app.route('/api/check-query/')
+@setting_required("privileges.can_create_dataset")
 @openapi.endpoint("tool")
 def check_dataset():
 	"""
@@ -816,6 +821,7 @@ def toggle_private(key):
 @app.route("/api/queue-processor/", methods=["POST"])
 @api_ratelimit
 @login_required
+@setting_required("privileges.can_run_processors")
 @openapi.endpoint("tool")
 def queue_processor(key=None, processor=None):
 	"""
@@ -976,55 +982,9 @@ def check_processor():
 	return jsonify(children)
 
 
-@app.route("/api/datasource-call/<string:datasource>/<string:action>/", methods=["GET", "POST"])
-@login_required
-@openapi.endpoint("tool")
-def datasource_call(datasource, action):
-	"""
-	Call datasource function
-
-	Datasources may define custom API calls as functions in a file
-	'webtool/views_misc.py'. These are then available as 'actions' with this API
-	endpoint. Any GET parameters are passed as keyword arguments to the
-	function.
-
-	:param str action:  Action to call
-	:return:  A JSON object
-	"""
-	# allow prettier URLs
-	action = action.replace("-", "_")
-
-	if datasource not in backend.all_modules.datasources:
-		return error(404, error="Datasource not found.")
-
-	forbidden_call_name = re.compile(r"[^a-zA-Z0-9_]")
-	if forbidden_call_name.findall(action) or action[0:2] == "__":
-		return error(400, error="Datasource '%s' has no call '%s'" % (datasource, action))
-
-	folder = backend.all_modules.datasources[datasource]["path"]
-	views_file = folder.joinpath("webtool", "views.py")
-	if not views_file.exists():
-		return error(400, error="Datasource '%s' has no call '%s'" % (datasource, action))
-
-	datasource_id = backend.all_modules.datasources[datasource]["id"]
-	datasource_calls = importlib.import_module("datasources.%s.webtool.views" % datasource_id)
-
-	if not hasattr(datasource_calls, action) or not callable(getattr(datasource_calls, action)):
-		return error(400, error="Datasource '%s' has no call '%s'" % (datasource, action))
-
-	parameters = request.args if request.method == "GET" else request.form
-	response = getattr(datasource_calls, action).__call__(request, current_user, **parameters)
-
-	if not response:
-		return error(400, success=False)
-	elif response is True:
-		return jsonify({"success": True})
-	else:
-		return jsonify({"success": True, "data": response})
-
-
 @app.route("/api/request-token/")
 @login_required
+@setting_required("privileges.can_create_api_token")
 @openapi.endpoint("tool")
 def request_token():
 	"""

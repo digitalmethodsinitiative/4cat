@@ -1,9 +1,12 @@
-<section class="result-list">
+<section class="admin-nav">
     <nav>
         <ul class="button-container">
-            <li><a href="{{ url_for("trigger_restart") }}" class="button-like"><i class="fa fa-power-off" aria-hidden="true"></i> Restart or Upgrade</a></li>
-            <li><a href="{{ url_for("toggle_datasources") }}" class="button-like"><i class="fa fa-cloud" aria-hidden="true"></i> Data source settings</a></li>
-            <li><a href="{{ url_for("update_settings") }}" class="button-like"><i class="fa fa-cog" aria-hidden="true"></i> General settings</a></li>
+            {% if __user_config("privileges.admin.can_restart") %}<li><a href="{{ url_for("trigger_restart") }}" class="button-like"><i class="fa fa-power-off" aria-hidden="true"></i> Restart or Upgrade</a></li>{% endif %}
+            {% if __user_config("privileges.admin.can_manage_datasources") %}<li><a href="{{ url_for("toggle_datasources") }}" class="button-like"><i class="fa fa-cloud" aria-hidden="true"></i> Data source settings</a></li>{% endif %}
+            {% if __user_config("privileges.admin.can_manage_settings") %}<li><a href="{{ url_for("update_settings") }}" class="button-like"><i class="fa fa-cog" aria-hidden="true"></i> General settings</a></li>{% endif %}
+            {% if __user_config("privileges.admin.can_manage_users") %}<li><a href="{{ url_for("list_users") }}" class="button-like"><i class="fa fa-users" aria-hidden="true"></i> Users</a></li>{% endif %}
+            {% if __user_config("privileges.admin.can_manage_tags") %}<li><a href="{{ url_for("manipulate_tags") }}" class="button-like"><i class="fa fa-user-tag" aria-hidden="true"></i> User Tags</a></li>{% endif %}
+            {% if __user_config("privileges.admin.can_manage_notifications") %}<li><a href="{{ url_for("create_notification") }}" class="button-like"><i class="fa fa-bell" aria-hidden="true"></i> Notifications</a></li>{% endif %}
         </ul>
     </nav>
 </section>

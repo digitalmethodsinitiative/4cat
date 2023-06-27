@@ -82,6 +82,11 @@ em, strong {
     font-weight: bold;
 }
 
+hr {
+    border: 0;
+    border-top: 1px dotted var(--contrast-dark);
+}
+
 i {
     font-style: italic;
 }
@@ -100,6 +105,10 @@ i.scroll {
 
 .flash-once {
     animation: flash-once 1 0.5s linear;
+}
+
+.flash-once-error {
+    animation: flash-once-error 1 0.5s linear;
 }
 
 table {
@@ -182,6 +191,11 @@ p.form-notice {
     min-height: 3.5em;
     margin: 0 0 0.5em 0;
     padding: 0 0.5em;
+}
+
+.form-element.disabled, .form-element.disabled *, .disabled > .form-element, .disabled > .form-element * {
+    color: darkgray;
+    cursor: not-allowed;
 }
 
 .optional-form-element {
@@ -319,6 +333,7 @@ button:hover, .button-like:not(.inactive):hover {
 
 .button-container li {
     display: inline-block;
+    margin: 0.5em 0;
 }
 
 .form-intro {
@@ -347,6 +362,25 @@ h3 button, h2 button, legend button {
 h2 button {
     padding: calc(0.5em + 1px);
     font-size: 0.8em;
+}
+
+h2 .inline-search, h3 .inline-search {
+    border: 0;
+    border-radius: 0;
+    position: absolute;
+    right: 0;
+    top: 0;
+    margin: 0;
+    height: 100%;
+}
+
+h2 .inline-search {
+    font-size: 0.6em;
+}
+
+h2 .inline-search input, h3 .inline-search input {
+    height: 100%;
+    box-sizing: border-box;
 }
 
 /** --------------------- *
@@ -423,6 +457,46 @@ button.tooltip-trigger, button.popup-trigger {
     padding: 0 0.5em;
     border-width: 1px;
     border-color: var(--gray-dark);
+}
+
+
+/** --------------------- *
+          Tab containers
+  * --------------------- */
+.tabbed {
+    display: grid;
+    grid-template-columns: 25% 75%;
+}
+
+.tab-controls {
+    border-right: 2px solid var(--contrast-dark);
+}
+
+.tab-controls ul {
+    list-style: none;
+    margin: 0;
+}
+
+.tab-controls li {
+    border-bottom: 1px dotted var(--contrast-dark);
+}
+
+.tab-controls li a {
+    padding: 1em;
+    display: block;
+}
+
+.tab-controls .highlighted, .tab-controls li:hover{
+    background: var(--accent);
+    color: var(--contrast-bright);
+}
+
+.tab-controls li a {
+    color: inherit;
+}
+
+.tab-container > .tab-content:not([aria-expanded=true]) {
+    display: none;
 }
 
 /** --------------------- *
@@ -898,6 +972,18 @@ article section.data-overview .description {
     }
     0% {
         background: var(--accent)
+    }
+    100% {
+        background: transparent;
+    }
+}
+
+@keyframes flash-once-error {
+    100% {
+        background: transparent;
+    }
+    0% {
+        background: var(--accent-error);
     }
     100% {
         background: transparent;

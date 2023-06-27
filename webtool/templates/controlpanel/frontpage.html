@@ -1,19 +1,19 @@
-{% extends "layout.html" %}
+{% extends "controlpanel/layout.html" %}
 
 {% block title %}Control Panel{% endblock %}
 {% block body_class %}plain-page frontpage admin {{ body_class }}{% endblock %}
 
 {% block body %}
-    <article class="with-aside">
+    <article{% if __user_config("privileges.admin.can_view_status") %} class="with-aside"{% endif %}>
         <section>
-        {% for notice in flashes %}
-            <p class="form-notice">{{ notice|safe }}</p>
-        {% endfor %}
-            {% include "controlpanel/controls.html" %}
-            {% include "controlpanel/notifications.html" %}
-            {% include "controlpanel/users.html" %}
+            <h2><span>Control panel</span></h2>
+            {% for notice in flashes %}
+                <p class="form-notice">{{ notice|safe }}</p>
+            {% endfor %}
+            <p>Welcome, welcome to the control panel. It's safer here.</p>
         </section>
 
+        {% if __user_config("privileges.admin.can_view_status") %}
         <aside>
             <h2><span>Active workers</span></h2>
             <div class="content-container" data-source="{{ url_for('get_worker_status') }}" data-interval="5">
@@ -25,5 +25,6 @@
                 <p class="content-placeholder">Loading worker status...</p>
             </div>
         </aside>
+        {% endif %}
     </article>
 {% endblock %}
