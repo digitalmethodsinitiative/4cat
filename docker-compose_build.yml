@@ -52,6 +52,7 @@ services:
 volumes:
   4cat_db: {}
   4cat_volume: {}
+  # Pre 1.34 Docker setups required three volumes; if upgrading from pre 1.34, uncomment these here and in .env
   #4cat_data: {}
   #4cat_share: {}
   #4cat_logs: {}
