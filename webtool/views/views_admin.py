@@ -295,11 +295,21 @@ def manipulate_user(mode):
             flash("User name cannot contain whitespace.")
             incomplete.append("name")
 
+        # ensure there is always at least one admin user
+        old_tags = user.tags if user else []
+        new_tags = [re.sub(r"[^a-z0-9_]", "", t.strip().lower()) for t in request.form.get("tags", "").split(",")]
+        if "admin" in old_tags and "admin" not in new_tags:
+            admin_users = db.fetchall("SELECT name FROM users WHERE tags @> '[\"admin\"]'")
+            if len(admin_users) == 1:
+                # one admin user that would no longer be an admin - not OK
+                flash("There always needs to be at least one user with the 'admin' tag.")
+                incomplete.append("tags")
+
         if not incomplete:
             user_data = {
                 "name": request.form.get("name"),
                 "is_deactivated": request.form.get("is_deactivated") == "on",
-                "tags": json.dumps([re.sub(r"[^a-z0-9_]", "", t.strip().lower()) for t in request.form.get("tags", "").split(",")])
+                "tags": json.dumps(new_tags)
             }
 
             if mode == "edit":
@@ -442,6 +452,10 @@ def update_settings():
                 if tag:
                     # don't override global settings on a tag level
                     if definition.get(setting, {}).get("global"):
+                        continue
+
+                    # admin is a special tag that always has all admin privileges
+                    if tag == "admin" and setting.startswith("privileges.admin"):
                         continue
 
                     # test if value is changed from global
