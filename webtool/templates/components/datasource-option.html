@@ -53,6 +53,12 @@
         {% elif settings.type in ("json", "textarea") %}
             <textarea name="option-{{ option }}" id="forminput-{{ option }}"
                       placeholder="{{ settings.tooltip }}">{{ settings.default }}</textarea>
+            {% if "tooltip" in settings %}
+                <button class="tooltip-trigger" aria-controls="tooltip-option-{{ option }}" aria-label="Extended help for option">?</button>
+    	        <p role="tooltip" id="tooltip-option-{{ option }}">
+                    {{ settings.tooltip }}
+                </p>
+            {% endif %}
         {% elif settings.type == "choice" %}
             <select name="option-{{ option }}" id="forminput-{{ option }}">
             {% for value, label in settings.options.items() %}
