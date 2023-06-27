@@ -61,7 +61,7 @@
                     <label for="user-name">Name (e-mail)</label>
                     <input type="text" name="name" id="user-name" value="{{ user.name }}">
                 </div>
-                <div class="form-element">
+                <div class="form-element{% if "tags" in incomplete %} missing{% endif %}">
                     <label for="user-tags">Tags</label>
                     <div>
                     <input type="text" id="user-tags" name="tags" value="{{ ", ".join(user.tags|fromjson) }}">
@@ -70,7 +70,7 @@
                         </div>
                 </div>
                 {% if mode != "edit" %}
-                <div class="form-element">
+                <div class="form-element{% if "password" in incomplete %} missing{% endif %}">
                     <label for="user-password">Password</label>
                     <input type="password" id="user-password" name="password">
                 </div>

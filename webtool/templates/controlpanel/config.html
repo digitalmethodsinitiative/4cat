@@ -67,7 +67,7 @@
                             {% set tab.open = True %}
                         {% endif %}
                         <div
-                                {% if tag and options[option].global %} aria-disabled="true" class="disabled tooltip-trigger" aria-controls="tooltip-setting-disabled"
+                                {% if (tag and options[option].global) or (tag == "admin" and option.startswith("privileges.admin")) %} aria-disabled="true" class="disabled tooltip-trigger" aria-controls="tooltip-setting-disabled"
                                 {% elif options[option].is_changed %} class="is-changed tooltip-trigger" aria-controls="tooltip-setting-changed"{% endif %}
                         >
                         {% if options[option].default is none %}
