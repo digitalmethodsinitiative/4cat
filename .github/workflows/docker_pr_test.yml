@@ -16,7 +16,7 @@ jobs:
       - name: Run docker compose up
         run: docker compose -f docker-compose_build.yml up -d
       - name: Start containers
-          run: docker compose start
+        run: docker compose start
       - name: Wait and check log
         run: |
           test_case=" INFO at api.py:65: Local API listening for requests at backend:4444"
