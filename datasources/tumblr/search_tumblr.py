@@ -803,4 +803,5 @@ class SearchTumblr(Search):
 		if len(self.failed_reblogs) > 0:
 			errors.append("API error(s) when fetching reblogs %s" % ", ".join(self.failed_reblogs))
 		if errors:
-			self.dataset.update_status(";\n ".join(errors))
+			self.dataset.log(";\n ".join(errors))
+			self.dataset.update_status(f"Dataset completed but failed to capture some notes/reblogs; see log for details.")
