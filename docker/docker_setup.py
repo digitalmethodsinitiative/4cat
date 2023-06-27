@@ -90,6 +90,10 @@ if __name__ == "__main__":
 
         # Ensure filepaths exist
         from common.config_manager import config
+        from common.lib.database import Database
+        config.with_db(Database(logger=None, appname="docker-setup",
+				  dbname=config.DB_NAME, user=config.DB_USER, password=config.DB_PASSWORD, host=config.DB_HOST, port=config.DB_PORT))
+
         for path in [config.get('PATH_DATA'),
                      config.get('PATH_IMAGES'),
                      config.get('PATH_LOGS'),
@@ -122,6 +126,10 @@ if __name__ == "__main__":
 
         # Check to see if flask.server_name needs to be updated
         from common.config_manager import config
+        from common.lib.database import Database
+        config.with_db(Database(logger=None, appname="docker-setup",
+				  dbname=config.DB_NAME, user=config.DB_USER, password=config.DB_PASSWORD, host=config.DB_HOST, port=config.DB_PORT))
+        
         public_port = int(config_parser['SERVER']['public_port'])
         frontend_port = int(config.get('flask.server_name').split(":")[-1]) if ":" in config.get('flask.server_name') else 80
         frontend_servername = config.get('flask.server_name').split(":")[0]
