@@ -84,7 +84,6 @@ def unauthorized():
     if current_user.is_authenticated:
         return render_template("error.html", message="You cannot view this page."), 403
     else:
-        flash("You cannot view this page.")
         return redirect(url_for("show_login"))
 
 
@@ -253,7 +252,7 @@ def first_run_dialog():
                                    flashes=get_flashed_messages(), phone_home_url=phone_home_url,
                                    adjective=adjective, interface_hue=interface_hue)
 
-        db.insert("users", data={"name": username})
+        db.insert("users", data={"name": username, "timestamp_created": int(time.time())})
         db.commit()
         user = User.get_by_name(db=db, name=username)
         user.set_password(password)

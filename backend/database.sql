@@ -5,9 +5,9 @@
 
 -- 4CAT settings table
 CREATE TABLE IF NOT EXISTS settings (
-  name                   TEXT DEFAULT '',
-  value                  TEXT DEFAULT '{}',
-  tag                    TEXT DEFAULT ''
+  name                   TEXT DEFAULT '' NOT NULL,
+  value                  TEXT DEFAULT '{}' NOT NULL,
+  tag                    TEXT DEFAULT '' NOT NULL
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS unique_setting

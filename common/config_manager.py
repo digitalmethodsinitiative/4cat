@@ -275,9 +275,8 @@ class ConfigManager:
         :param bool is_json:  True for a value that is already a serialised JSON string; False if value is object that needs to
                           be serialised into a JSON string
         :param bool overwrite_existing: True will overwrite existing setting, False will do nothing if setting exists
-        :param connection: Database connection, if None then a new connection will be created
-        :param cursor: Database cursor, if None then a new cursor will be created
-        :param keep_connection_open: Close connection after query?
+        :param str tag:  Tag to write setting for
+
         :return int: number of updated rows
         """
         # Check value is valid JSON
@@ -359,7 +358,8 @@ class ConfigWrapper:
         :param kwargs:
         :return:
         """
-        if "tag" not in kwargs:
+        if "tag" not in kwargs and self.tags:
+            tag = self.tags if type(self.tags) is str else self.tags[0]
             kwargs["tag"] = self.tags
 
         return self.config.set(*args, **kwargs)
@@ -372,10 +372,10 @@ class ConfigWrapper:
         :param kwargs:
         :return:
         """
-        if "user" not in kwargs:
+        if "user" not in kwargs and self.user:
             kwargs["user"] = self.user
 
-        if "tags" not in kwargs:
+        if "tags" not in kwargs and self.tags:
             kwargs["tags"] = self.tags
 
         return self.config.get_all(*args, **kwargs)
