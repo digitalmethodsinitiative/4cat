@@ -32,7 +32,7 @@ jobs:
       - name: Print log on failure
         if: failure()
         run: |
-          docker cp 4cat_backend:/4cat/data/logs/backend_4cat.log ./backend_4cat.log
+          docker cp 4cat_backend:/usr/src/app/logs/backend_4cat.log ./backend_4cat.log
           echo "::group::Backend logs"
           cat backend_4cat.log
           echo "::endgroup::"
