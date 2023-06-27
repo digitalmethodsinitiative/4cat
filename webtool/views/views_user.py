@@ -73,6 +73,20 @@ def load_user_from_request(request):
         user.authenticate()
         return user
 
+@login_manager.unauthorized_handler
+def unauthorized():
+    """
+    Handle unauthorized requests
+
+    Shows an error message, or if the user is not logged in yet redirects them
+    to the login page.
+    """
+    if current_user.is_authenticated:
+        return render_template("error.html", message="You cannot view this page."), 403
+    else:
+        flash("You cannot view this page.")
+        return redirect(url_for("show_login"))
+
 
 @app.before_request
 def reroute_requests():

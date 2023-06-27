@@ -35,7 +35,7 @@ if not args.noemail and not re.match(r"[^@]+\@.*?\.[a-zA-Z]+", args.username):
 
 try:
 	tags = json.dumps(["admin"]) if args.admin else "[]"
-	db.insert("users", data={"name": args.username, "timestamp_token": int(time.time()), "tags": json.dumps(tags)})
+	db.insert("users", data={"name": args.username, "timestamp_token": int(time.time()), "timestamp_created": int(time.time()), "tags": json.dumps(tags)})
 except psycopg2.IntegrityError:
 	print("Error: User %s already exists." % args.username)
 	sys.exit(1)

@@ -416,5 +416,6 @@ categories = {
     "mail": "Mail settings & credentials",
     "logging": "Logging",
     "path": "File paths",
-    "privileges": "User privileges"
+    "privileges": "User privileges",
+    "dmi-service-manager": "DMI Service Manager"
 }

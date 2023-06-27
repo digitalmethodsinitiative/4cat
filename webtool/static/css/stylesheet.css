@@ -819,7 +819,7 @@ article p {
     margin: 0 1em 0.5em 1em;
 }
 
-p.banner {
+p.banner, footer.banner {
     text-align: center;
     padding: 1em;
 }

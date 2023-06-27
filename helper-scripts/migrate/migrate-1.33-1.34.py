@@ -27,6 +27,16 @@ if has_column["num"] == 0:
 else:
     print("  ...Yes, nothing to update.")
 
+print("  Checking if users table has a column 'timestamp_created'...")
+has_column = db.fetchone(
+    "SELECT COUNT(*) AS num FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'timestamp_created'")
+if has_column["num"] == 0:
+    print("  ...No, adding.")
+    db.execute("ALTER TABLE users ADD COLUMN timestamp_created INTEGER DEFAULT 0")
+    db.commit()
+else:
+    print("  ...Yes, nothing to update.")
+
 print("  Checking if settings table has a column 'tag'...")
 has_column = db.fetchone(
     "SELECT COUNT(*) AS num FROM information_schema.columns WHERE table_name = 'settings' AND column_name = 'tag'")

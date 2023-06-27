@@ -220,7 +220,7 @@ class ConfigManager:
         tags.append("")  # empty tag = default value
         if attribute_name:
             query = "SELECT * FROM settings WHERE name IN %s AND tag IN %s"
-            replacements = (attribute_name, tuple(tags))
+            replacements = (tuple(attribute_name), tuple(tags))
         else:
             query = "SELECT * FROM settings WHERE tag IN %s"
             replacements = (tuple(tags), )
@@ -258,12 +258,12 @@ class ConfigManager:
             final_settings[setting_name] = value
 
         if len(final_settings) == 1:
+            print(f"{user}: {attribute_name[0]} = {list(final_settings.values())[0]}")
             return list(final_settings.values())[0]
         else:
             return final_settings
 
-    def set(self, attribute_name, value, is_json, tag="", overwrite_existing=True, connection=None, cursor=None,
-            keep_connection_open=False):
+    def set(self, attribute_name, value, is_json, tag="", overwrite_existing=True):
         """
         Insert OR set value for a setting
 
@@ -351,40 +351,69 @@ class ConfigWrapper:
         self.user = user
         self.tags = tags
 
-    def get(self, attribute_name, default=None, is_json=False):
+    def set(self, *args, **kwargs):
         """
-        Get setting value
+        Wrap `set()`
 
-        Uses pre-defined user and tags arguments.
-
-        :param str attribute_name:  Setting to return
-        :param default:  Value to return if setting does not exist
-        :param bool raw:  if True, the value is returned as stored and not
-        interpreted as JSON if it comes from the database
-        :return:  Setting value
-        """
-        return config.get(attribute_name, default, is_json, self.user, self.tags)
-
-    def set(self, **kwargs):
-        """
-        Set value
-
-        Raises NotImplementedError: cannot set values for given context
+        :param args:
         :param kwargs:
         :return:
         """
-        raise NotImplementedError("Settings cannot be set from ConfigWrapper")
+        if "user" not in kwargs:
+            kwargs["user"] = self.user
 
-    def get_all(self):
+        if "tag" not in kwargs:
+            kwargs["tag"] = self.tags
+
+        return self.config.set(*args, **kwargs)
+
+    def get_all(self, *args, **kwargs):
         """
-        Get all settings
+        Wrap `get_all()`
 
-        Raises NotImplementedError: cannot set values for given context
+        :param args:
         :param kwargs:
         :return:
         """
-        raise NotImplementedError("get_all() is not available in ConfigWrapper")
+        if "user" not in kwargs:
+            kwargs["user"] = self.user
 
+        if "tags" not in kwargs:
+            kwargs["tags"] = self.tags
+
+        return self.config.get_all(*args, **kwargs)
+
+    def get(self, *args, **kwargs):
+        """
+        Wrap `get()`
+
+        :param args:
+        :param kwargs:
+        :return:
+        """
+        if "user" not in kwargs:
+            kwargs["user"] = self.user
+
+        if "tags" not in kwargs:
+            kwargs["tags"] = self.tags
+
+        return self.config.get(*args, **kwargs)
+
+    def __getattr__(self, item):
+        """
+        Generic wrapper
+
+        Just pipe everything through to the config object
+
+        :param item:
+        :return:
+        """
+        if hasattr(self.config, item):
+            return getattr(self.config, item)
+        elif hasattr(self, item):
+            return getattr(self, item)
+        else:
+            raise AttributeError(f"'{self.__name__}' object has no attribute '{item}'")
 
 class ConfigDummy:
     """

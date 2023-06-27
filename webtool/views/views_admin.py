@@ -33,13 +33,12 @@ config = ConfigWrapper(config, user=current_user)
 @login_required
 def admin_frontpage():
     # can be viewed if user has any admin privileges
-    can_view_admin = any(
-        [config.get(setting) for setting in [
-            key for key in config.config_definition.keys() if key.startswith("privileges.admin")
-        ]]
-    )
+    print("START CHECK")
+    admin_privileges = config.get([key for key in config.config_definition.keys() if key.startswith("privileges.admin")])
+    print(admin_privileges)
+    print("END CHECK")
 
-    if not can_view_admin:
+    if not any(admin_privileges.values()):
         return render_template("error.html", message="You cannot view this page."), 403
 
     return render_template("controlpanel/frontpage.html", flashes=get_flashed_messages())
@@ -131,7 +130,7 @@ def add_user():
     else:
         username = email
         try:
-            db.insert("users", data={"name": username, "timestamp_token": int(time.time())})
+            db.insert("users", data={"name": username, "timestamp_token": int(time.time()), "timestamp_created": int(time.time())})
 
             user = User.get_by_name(db, username)
             if user is None:
@@ -327,17 +326,23 @@ def manipulate_user(mode):
                     incomplete.append("name")
                     db.rollback()
 
-            if request.form.get("autodelete"):
+            if "autodelete" in request.form:
                 autodelete = request.form.get("autodelete").replace("T", " ")[:16]
-                print(autodelete)
-                if not re.match("[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}", autodelete):
+                if not autodelete:
+                    user.set_value("delete-after", "")
+
+                elif not re.match("[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}", autodelete):
                     incomplete.append("autodelete")
                     flash("'Delete after' date must be in YYYY-MM-DD hh:mm format")
 
-                autodelete = datetime.datetime.strptime(autodelete, "%Y-%m-%d %H:%M")
-                # I fucking hate timezones
-                autodelete = autodelete.replace(tzinfo=datetime.timezone.utc)
-                user.set_value("delete-after", int(autodelete.timestamp()))
+                else:
+                    autodelete = datetime.datetime.strptime(autodelete, "%Y-%m-%d %H:%M")
+                    # I fucking hate timezones
+                    autodelete = autodelete.replace(tzinfo=datetime.timezone.utc)
+                    user.set_value("delete-after", int(autodelete.timestamp()))
+
+            if request.form.get("notes"):
+                user.set_value("notes", request.form.get("notes"))
 
             if not incomplete:
                 user.sort_user_tags()

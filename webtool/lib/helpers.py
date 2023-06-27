@@ -354,16 +354,15 @@ def check_restart_request():
 
 def setting_required(setting, required_value=True):
 	"""
-	Like admin_required, but instead checks if the value of a certain setting
-	is the required value.
+	Decorater that checks if the value of a certain setting is the required
+	value before a route is parsed. If not, the user CANNOT PASS!
 
 	Use like:
 
-	@setting_required("privilege.can_restart", user=current_user)
+	@setting_required("privilege.can_restart")
 
 	:param func: The view function to decorate.
 	:param str setting: Name of the setting to check
-	:param user: User context. If not set, use the global configuration
 	:param required_value: Value to check against.
 	:type func: function
 	"""

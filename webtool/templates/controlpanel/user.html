@@ -86,6 +86,14 @@
                         <p role="tooltip" id="tooltip-autodelete-label" class="force-width">Automatically delete the user at this time. They will see a warning in the interface starting one week before.</div>
                     </div>
                 </div>
+                <div class="form-element">
+                    <label for="user-notes">Notes</label>
+                    <div>
+                        <textarea name="notes" id="user-notes">{{ user.get_value("notes", "") }}</textarea>
+                        <button class="tooltip-trigger" aria-controls="tooltip-notes-label" aria-label="Extended help for option">?</button>
+                        <p role="tooltip" id="tooltip-notes-label" class="force-width">Notes for this user. This is for your own convenience and not used by 4CAT.</div>
+                    </div>
+                </div>
                 <div class="submit-container">
                     <input type="hidden" name="current-name" value="{{ user.name }}">
                     <button>
@@ -97,6 +105,7 @@
                     </button>
                 </div>
             </form>
+            <footer class="banner">{% if user.timestamp_created %}User created on {{  user.timestamp_created|datetime }}{% else %}User known since time immemorial{% endif %}.</footer>
         </section>
     </article>
 {% endblock %}
