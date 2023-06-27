@@ -13,8 +13,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - name: Run docker-compose up
-        run: docker-compose -f docker-compose_build.yml up -d
+      - name: Run docker compose up
+        run: docker compose -f docker-compose_build.yml up -d
       - name: Wait and check log
         run: |
           test_case=" INFO at api.py:65: Local API listening for requests at backend:4444"
@@ -28,4 +28,11 @@ jobs:
               echo "Log :$(echo "$var" | tr "|" "\n" | sed -n '2p')"
               exit 1
           fi
+          echo "::endgroup::"
+      - name: Print log on failure
+        if: failure()
+        run: |
+          docker cp 4cat_backend:/4cat/data/logs/backend_4cat.log ./backend_4cat.log
+          echo "::group::Backend logs"
+          cat backend_4cat.log
           echo "::endgroup::"
