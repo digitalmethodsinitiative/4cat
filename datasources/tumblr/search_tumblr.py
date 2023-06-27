@@ -103,7 +103,8 @@ class SearchTumblr(Search):
 		},
 		"fetch_reblogs": {
 			"type": UserInput.OPTION_TOGGLE,
-			"help": "Also fetch reblogs with text? (warning: slow)"
+			"help": "Also fetch reblogs with text? (warning: slow)",
+			"default": False
 		},
 		"divider": {
 			"type": UserInput.OPTION_DIVIDER
@@ -134,6 +135,7 @@ class SearchTumblr(Search):
 		parameters = self.dataset.get_parameters()
 		scope = parameters.get("search_scope", "")
 		queries = parameters.get("query").split(", ")
+		fetch_reblogs = parameters.get("fetch_reblogs", False)
 
 		# Store all info here
 		results = []
@@ -186,7 +188,7 @@ class SearchTumblr(Search):
 					break
 
 		# If we also want the posts that reblogged the fetched posts:
-		if parameters.get("fetch_reblogs") and not self.max_posts_reached and not self.api_limit_reached:
+		if fetch_reblogs and not self.max_posts_reached and not self.api_limit_reached:
 			self.dataset.update_status("Getting notes from all posts")
 
 			# Reblog information is already returned for blog-level searches
