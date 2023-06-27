@@ -3,7 +3,7 @@ FROM postgres:latest
 RUN apt-get update && apt install -y \
     # General requirements:
     libpq-dev \
-    python3-dev \
+    python3.9-dev \
     python3-pip \
     python3-venv \
     # Called in docker-entrypoint files
