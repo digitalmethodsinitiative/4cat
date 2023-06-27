@@ -52,6 +52,7 @@ ENV PYTHONUNBUFFERED=1 \
  POSTGRES_PASSWORD=supers3cr3t \
  POSTGRES_DB=fourcat \
  POSTGRES_HOST=localhost \
+ POSTGRES_PORT=5432 \
  POSTGRES_HOST_AUTH_METHOD=trust \
  # Server information
  SERVER_NAME=localhost \
