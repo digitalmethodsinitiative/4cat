@@ -770,6 +770,8 @@ class DataSet(FourcatModule):
 			return parameters["filename"]
 		elif parameters.get("board") and "datasource" in parameters:
 			return parameters["datasource"] + "/" + parameters["board"]
+		elif "datasource" in parameters and parameters["datasource"] in backend.all_modules.datasources:
+			return backend.all_modules.datasources[parameters["datasource"]]["name"] + " Dataset"
 		else:
 			return default
 
