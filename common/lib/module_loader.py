@@ -26,6 +26,7 @@ class ModuleCollector:
     """
     ignore = []
     missing_modules = {}
+    log_buffer = None
 
     PROCESSOR = 1
     WORKER = 2
@@ -41,6 +42,8 @@ class ModuleCollector:
         Datasources are loaded first so that the datasource folders may be
         scanned for workers subsequently.
         """
+        # this can be flushed later once the logger is available
+        self.log_buffer = ""
 
         self.load_datasources()
         self.load_modules()
@@ -135,7 +138,7 @@ class ModuleCollector:
                     # we can't use issubclass() because for that we would need
                     # to import BasicProcessor, which would lead to a circular
                     # import
-                    if "BasicProcessor" in [f.__name__ for f in component[1].__bases__]:
+                    if self.is_4cat_class(component[1], only_processors=True):
                         self.processors[component[1].type] = self.workers[component[1].type]
 
         # sort by category for more convenient display in interfaces
@@ -148,11 +151,13 @@ class ModuleCollector:
 
         # Give a heads-up if not all modules were installed properly
         if self.missing_modules:
-            print_msg = "Warning: Not all modules could be found, which might cause data sources and modules to not function.\nMissing modules:\n"
+            warning = "Warning: Not all modules could be found, which might cause data sources and modules to not " \
+                      "function.\nMissing modules:\n"
             for missing_module, processor_list in self.missing_modules.items():
-                print_msg += "\t%s (for processors %s)\n" % (missing_module, ", ".join(processor_list))
+                warning += "\t%s (for %s)\n" % (missing_module, ", ".join(processor_list))
 
-            print(print_msg, file=sys.stderr)
+            self.log_buffer = warning
+
 
         self.processors = categorised_processors
 

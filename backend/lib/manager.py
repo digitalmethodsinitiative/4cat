@@ -47,7 +47,14 @@ class WorkerManager:
 			if hasattr(worker, "ensure_job"):
 				self.queue.add_job(jobtype=worker_name, **worker.ensure_job)
 
-		self.log.info('4CAT Started')
+		self.log.info("4CAT Started")
+
+		# flush module collector log buffer
+		# the logger is not available when this initialises
+		# but it is now!
+		if all_modules.log_buffer:
+			self.log.warning(all_modules.log_buffer)
+			all_modules.log_buffer = ""
 
 		# it's time
 		self.loop()
@@ -87,7 +94,6 @@ class WorkerManager:
 				# worker slots, start a new worker to run it
 				if len(self.worker_pool[jobtype]) < worker_class.max_workers:
 					try:
-						self.log.debug("Starting new worker for job %s" % jobtype)
 						job.claim()
 						worker = worker_class(logger=self.log, manager=self, job=job, modules=all_modules)
 						worker.start()
