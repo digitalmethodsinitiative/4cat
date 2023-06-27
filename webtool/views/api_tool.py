@@ -448,7 +448,7 @@ def check_dataset():
 	else:
 		path = ""
 
-	template = "result-status.html" if block == "status" else "result-result-row.html"
+	template = "components/result-status.html" if block == "status" else "components/result-result-row.html"
 
 	status = {
 		"datasource": dataset.parameters.get("datasource"),
@@ -918,7 +918,7 @@ def queue_processor(key=None, processor=None):
 		"status": "success",
 		"container": "*[data-dataset-key=" + dataset.key + "]",
 		"key": analysis.key,
-		"html": render_template("result-child.html", child=analysis, dataset=dataset, parent_key=dataset.key,
+		"html": render_template("components/result-child.html", child=analysis, dataset=dataset, parent_key=dataset.key,
                                 processors=backend.all_modules.processors) if analysis.is_new else "",
 		"messages": get_flashed_messages(),
 		"is_filter": available_processors[processor].is_filter()
@@ -971,10 +971,10 @@ def check_processor():
 			"key": dataset.key,
 			"finished": dataset.is_finished(),
 			"progress": round(dataset.get_progress() * 100),
-			"html": render_template("result-child.html", child=dataset, dataset=parent,
+			"html": render_template("components/result-child.html", child=dataset, dataset=parent,
                                     query=dataset.get_genealogy()[0], parent_key=top_parent.key,
                                     processors=backend.all_modules.processors),
-			"resultrow_html": render_template("result-result-row.html", dataset=top_parent),
+			"resultrow_html": render_template("components/result-result-row.html", dataset=top_parent),
 			"url": "/result/" + dataset.data["result_file"]
 		})
 

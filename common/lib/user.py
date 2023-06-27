@@ -380,7 +380,7 @@ class User:
         self.db.insert("users_notifications", {
             "username": self.get_id(),
             "notification": notification,
-            "expires": expires,
+            "timestamp_expires": expires,
             "allow_dismiss": allow_dismiss
         }, safe=True)
 
