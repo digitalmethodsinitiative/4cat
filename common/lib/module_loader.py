@@ -65,13 +65,21 @@ class ModuleCollector:
         config.load_user_settings()
 
     @staticmethod
-    def is_4cat_class(object):
+    def is_4cat_class(object, only_processors=False):
         """
         Determine if a module member is a worker class we can use
         """
-        worker_classes = {"BasicWorker", "BasicProcessor", "Search", "SearchWithScope", "Search4Chan"}
+        # it would be super cool to just use issubclass() here!
+        # but that requires importing the classes themselves, which leads to
+        # circular imports
+        # todo: fix this because this sucks
+        parent_classes = {"BasicWorker", "BasicProcessor", "Search", "SearchWithScope", "Search4Chan",
+                          "ProcessorPreset", "TwitterStatsBase", "BaseFilter", "TwitterAggregatedStats", "ColumnFilter"}
+        if only_processors:
+            parent_classes.remove("BasicWorker")
+
         return inspect.isclass(object) and \
-               worker_classes & set([f.__name__ for f in object.__bases__]) and \
+               parent_classes & set([f.__name__ for f in object.__bases__]) and \
                object.__name__ not in("BasicProcessor", "BasicWorker") and \
                not inspect.isabstract(object)
 
