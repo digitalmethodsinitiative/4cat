@@ -15,7 +15,7 @@ class ImageDownloader(BasicWorker):
 
 	todo: shrink images or keep archive at a manageable size otherwise
 	"""
-	type = "4chan-image"
+	type = "fourchan-image"
 	pause = 1
 	max_workers = 10
 

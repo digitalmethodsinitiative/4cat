@@ -7,6 +7,8 @@ from backend.lib.search import Search
 from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException, QueryNeedsExplicitConfirmationException
 from common.lib.helpers import UserInput, timify_long
 
+from common.config_manager import config
+
 
 class SearchReddit(Search):
 	"""
@@ -43,7 +45,7 @@ class SearchReddit(Search):
 			"help": "The requirement for searching by keyword has been lifted for your account; you can search by "
 					"date range only. This can potentially return hundreds of millions of posts, so **please be "
 					"careful** when using this privilege.",
-			"requires": "reddit.can_query_without_keyword"
+			"requires": "reddit-search.can_query_without_keyword"
 		},
 		"pushshift_track": {
 			"type": UserInput.OPTION_CHOICE,
@@ -105,6 +107,15 @@ class SearchReddit(Search):
 				"posts-only": "All matching posts",
 			},
 			"default": "posts-only"
+		}
+	}
+
+	config = {
+		"reddit-search.can_query_without_keyword": {
+			"type": UserInput.OPTION_TOGGLE,
+			"help": "Can query without keyword",
+			"default": False,
+			"tooltip": "Allows users to query Pushshift without specifying a keyword. This can lead to HUGE datasets!"
 		}
 	}
 
@@ -514,8 +525,10 @@ class SearchReddit(Search):
 		# ignore leading r/ for boards
 		query["board"] = ",".join(boards)
 
+		keywordless_query = config.get("reddit-search.can_query_without_keyword", False, user=user)
+
 		# this is the bare minimum, else we can't narrow down the full data set
-		if not user.is_admin and not user.get_value("reddit.can_query_without_keyword", False) and not query.get(
+		if not user.is_admin and not keywordless_query and not query.get(
 				"body_match", "").strip() and not query.get("subject_match", "").strip() and not query.get(
 			"subject_url", ""):
 			raise QueryParametersException("Please provide a body query or subject query.")
@@ -551,11 +564,11 @@ class SearchReddit(Search):
 		# the dates need to make sense as a range to search within
 		query["min_date"], query["max_date"] = query.get("daterange")
 
-		if "*" in query.get("body_match", "") and not user.get_value("reddit.can_query_without_keyword", False):
+		if "*" in query.get("body_match", "") and not keywordless_query:
 			raise QueryParametersException(
 				"Wildcard queries are not allowed as they typically return too many results to properly process.")
 
-		if "*" in query.get("board", "") and not user.get_value("reddit.can_query_without_keyword"):
+		if "*" in query.get("board", "") and not keywordless_query:
 			raise QueryParametersException(
 				"Wildcards are not allowed for boards as this typically returns too many results to properly process.")
 

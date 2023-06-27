@@ -66,7 +66,7 @@ class ImageDownloader(BasicProcessor):
 	}
 
 	config = {
-		"image_downloader.MAX_NUMBER_IMAGES": {
+		"image-downloader.max": {
 			"type": UserInput.OPTION_TEXT,
 			"coerce_type": int,
 			"default": 1000,
@@ -95,7 +95,7 @@ class ImageDownloader(BasicProcessor):
 		options = cls.options
 
 		# Update the amount max and help from config
-		max_number_images = int(config.get('image_downloader.MAX_NUMBER_IMAGES', 1000, user=user))
+		max_number_images = int(config.get('image-downloader.max', 1000, user=user))
 		options['amount']['max'] = max_number_images
 		options['amount']['help'] = "No. of images (max %s)" % max_number_images
 
@@ -142,7 +142,7 @@ class ImageDownloader(BasicProcessor):
 		split_comma = self.parameters.get("split-comma", False)
 
 		if amount == 0:
-			amount = config.get('image_downloader.MAX_NUMBER_IMAGES', 1000, user=self.owner)
+			amount = config.get('image-downloader.max', 1000, user=self.owner)
 		columns = self.parameters.get("columns")
 		if type(columns) is str:
 			columns = [columns]

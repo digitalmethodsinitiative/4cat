@@ -129,6 +129,15 @@ class SearchTelegram(Search):
         }
     }
 
+    config = {
+        "telegram-search.can_query_all_messages": {
+            "type": UserInput.OPTION_TOGGLE,
+            "help": "Remove message amount limit",
+            "default": False,
+            "tooltip": "Allows users to query unlimited messages from Telegram. This can lead to HUGE datasets!"
+        }
+    }
+
     def get_items(self, query):
         """
         Execute a query; get messages for given parameters
@@ -703,7 +712,7 @@ class SearchTelegram(Search):
         if not query.get("api_id", None) or not query.get("api_hash", None) or not query.get("api_phone", None):
             raise QueryParametersException("You need to provide valid Telegram API credentials first.")
 
-        privileged = user.get_value("telegram.can_query_all_messages", False)
+        privileged = config.get("telegram-search.can_query_all_messages", False, user=user)
 
         # reformat queries to be a comma-separated list with no wrapping
         # whitespace
@@ -851,7 +860,7 @@ class SearchTelegram(Search):
         """
         options = cls.options.copy()
 
-        if user and user.get_value("telegram.can_query_all_messages", False):
+        if user and config.get("telegram-search.can_query_all_messages", False, user=user):
             if "max" in options["max_posts"]:
                 del options["max_posts"]["max"]
 

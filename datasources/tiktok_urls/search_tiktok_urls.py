@@ -35,12 +35,12 @@ class SearchTikTokByID(Search):
     accepts = [None]
 
     config = {
-        "tiktok-urls.proxies": {
+        "tiktok-urls-search.proxies": {
             "type": UserInput.OPTION_TEXT_JSON,
             "default": [],
             "help": "Proxies for TikTok data collection"
         },
-        "tiktok-urls.proxies.wait": {
+        "tiktok-urls-search.proxies.wait": {
             "type": UserInput.OPTION_TEXT,
             "coerce_type": float,
             "default": 1,
@@ -155,8 +155,8 @@ class TikTokScraper:
 
         :return:
         """
-        all_proxies = config.get("tiktok-urls.proxies", user=self.owner)
-        self.proxy_sleep = config.get("tiktok-urls.proxies.wait", self.proxy_sleep, user=self.owner)
+        all_proxies = config.get("tiktok-urls-search.proxies", user=self.owner)
+        self.proxy_sleep = config.get("tiktok-urls-search.proxies.wait", self.proxy_sleep, user=self.owner)
         if not all_proxies:
             # no proxies? just request directly
             all_proxies = ["__localhost__"]

@@ -49,7 +49,7 @@ class ImageTextDetector(BasicProcessor):
     ]
 
     config = {
-        "text_from_images.DMI_OCR_SERVER": {
+        "text-from-images.server_url": {
             "type": UserInput.OPTION_TEXT,
             "default": "",
             "help": 'URL to the OCR server',
@@ -87,7 +87,7 @@ class ImageTextDetector(BasicProcessor):
 
         :param module: Module to determine compatibility with
         """
-        return module.type.startswith("image-downloader") and config.get('text_from_images.DMI_OCR_SERVER', False)
+        return module.type.startswith("image-downloader") and config.get('text-from-images.server_url', False)
 
     def process(self):
         """
@@ -183,7 +183,7 @@ class ImageTextDetector(BasicProcessor):
         :param Path image_file:  Path to file to annotate
         :return dict:  Lists of detected features, one key for each feature
         """
-        server = config.get('text_from_images.DMI_OCR_SERVER', '', user=self.owner)
+        server = config.get('text-from-images.server_url', '', user=self.owner)
 
         # Get model_type if available
         parameters = {}

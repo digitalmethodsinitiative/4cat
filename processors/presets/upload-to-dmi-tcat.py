@@ -29,16 +29,16 @@ class FourcatToDmiTcatConverterAndUploader(ProcessorPreset):
         :param User user:  User that will be uploading it
         :return dict:  Option definition
         """
-        if config.get('tcat-auto-upload.TCAT_SERVER', user=user) \
-                and type(config.get('tcat-auto-upload.TCAT_SERVER', user=user)) in (set, list, tuple) \
-                and len(config.get('tcat-auto-upload.TCAT_SERVER', user=user)) > 1:
+        if config.get('tcat-auto-upload.server_url', user=user) \
+                and type(config.get('tcat-auto-upload.server_url', user=user)) in (set, list, tuple) \
+                and len(config.get('tcat-auto-upload.server_url', user=user)) > 1:
             return {
                 "server": {
                     "type": UserInput.OPTION_CHOICE,
                     "options": {
                         "random": "Choose one based on available capacity",
                         **{
-                            url: url for url in config.get('tcat-auto-upload.TCAT_SERVER', user=user)
+                            url: url for url in config.get('tcat-auto-upload.server_url', user=user)
                         }
                     },
                     "default": "random",
@@ -59,10 +59,10 @@ class FourcatToDmiTcatConverterAndUploader(ProcessorPreset):
         :param module: Dataset or processor to determine compatibility with
         """
         return module.type == "twitterv2-search" and \
-               config.get('tcat-auto-upload.TCAT_SERVER') and \
-               config.get('tcat-auto-upload.TCAT_TOKEN') and \
-               config.get('tcat-auto-upload.TCAT_USERNAME') and \
-               config.get('tcat-auto-upload.TCAT_PASSWORD')
+               config.get('tcat-auto-upload.server_url') and \
+               config.get('tcat-auto-upload.token') and \
+               config.get('tcat-auto-upload.username') and \
+               config.get('tcat-auto-upload.password')
 
     def get_processor_pipeline(self):
         """

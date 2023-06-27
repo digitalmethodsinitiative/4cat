@@ -46,8 +46,8 @@ class VideoHasherPreset(ProcessorPreset):
         :return bool:
         """
         return module.type.startswith("video-downloader") and \
-               config.get("video_downloader.ffmpeg-path") and \
-               shutil.which(config.get("video_downloader.ffmpeg-path"))
+               config.get("video-downloader.ffmpeg_path") and \
+               shutil.which(config.get("video-downloader.ffmpeg_path"))
 
     def get_processor_pipeline(self):
         """

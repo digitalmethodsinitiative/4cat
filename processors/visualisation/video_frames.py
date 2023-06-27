@@ -63,8 +63,8 @@ class VideoFrames(BasicProcessor):
 		Allow on tiktok-search only for dev
 		"""
 		return module.type.startswith("video-downloader") and \
-			   config.get("video_downloader.ffmpeg-path") and \
-			   shutil.which(config.get("video_downloader.ffmpeg-path"))
+			   config.get("video-downloader.ffmpeg_path") and \
+			   shutil.which(config.get("video-downloader.ffmpeg_path"))
 
 	def process(self):
 		"""
@@ -107,7 +107,7 @@ class VideoFrames(BasicProcessor):
 			video_dir.mkdir(exist_ok=True)
 
 			command = [
-				shutil.which(config.get("video_downloader.ffmpeg-path", user=self.owner)),
+				shutil.which(config.get("video-downloader.ffmpeg_path", user=self.owner)),
 				"-i", shlex.quote(str(path)),
 				"-r", str(frame_interval),
 			]

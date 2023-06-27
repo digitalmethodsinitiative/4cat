@@ -52,7 +52,7 @@ class PixPlotGenerator(BasicProcessor):
     config = {
         # If you host a version of https://github.com/digitalmethodsinitiative/dmi_pix_plot, you can use a processor to publish
         # downloaded images into a PixPlot there
-        'pix-plot.PIXPLOT_SERVER': {
+        'pix-plot.server_url': {
             'type': UserInput.OPTION_TEXT,
             'default': "",
             'help': 'PixPlot Server Address/URL',
@@ -120,11 +120,11 @@ class PixPlotGenerator(BasicProcessor):
     def is_compatible_with(cls, module=None):
         """
         Allow processor on token sets;
-        Checks if pix-plot.PIXPLOT_SERVER set
+        Checks if pix-plot.server_url set
 
         :param module: Dataset or processor to determine compatibility with
         """
-        return module.type.startswith("image-downloader") and config.get('pix-plot.PIXPLOT_SERVER')
+        return module.type.startswith("image-downloader") and config.get('pix-plot.server_url')
 
     def process(self):
         """
@@ -150,7 +150,7 @@ class PixPlotGenerator(BasicProcessor):
         label_formated = ''.join(e if e.isalnum() else '_' for e in top_dataset.get_label())
         image_label = datetime.fromtimestamp(self.source_dataset.timestamp).strftime("%Y-%m-%d-%H%M%S") + '-' + label_formated + '-' + str(top_dataset.key)
         plot_label = date + '-' + label_formated + '-' + str(self.dataset.key)
-        pixplot_server = config.get('pix-plot.PIXPLOT_SERVER', user=self.owner).rstrip("/")
+        pixplot_server = config.get('pix-plot.server_url', user=self.owner).rstrip("/")
 
         # Folder name is PixPlot identifier and set at dataset key
         data = {'folder_name': image_label}
@@ -248,7 +248,7 @@ class PixPlotGenerator(BasicProcessor):
         if resp.status_code == 202:
             # new request
             new_request = True
-            results_url = config.get('pix-plot.PIXPLOT_SERVER', user=self.owner).rstrip('/') + '/api/pixplot?key=' + resp.json()['key']
+            results_url = config.get('pix-plot.server_url', user=self.owner).rstrip('/') + '/api/pixplot?key=' + resp.json()['key']
         else:
             try:
                 resp_json = resp.json()

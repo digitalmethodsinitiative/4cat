@@ -37,7 +37,7 @@ class TelegramImageDownloader(BasicProcessor):
     flawless = True
 
     config = {
-        'image-downloader-telegram.MAX_NUMBER_IMAGES': {
+        "image-downloader-telegram.max": {
             'type': UserInput.OPTION_TEXT,
             'default' : "1000",
             'help': 'Max images',
@@ -58,7 +58,7 @@ class TelegramImageDownloader(BasicProcessor):
         :param User user:  User that will be uploading it
         :return dict:  Option definition
         """
-        max_number_images = int(config.get('image-downloader-telegram.MAX_NUMBER_IMAGES', 1000, user=user))
+        max_number_images = int(config.get('image-downloader-telegram.max', 1000, user=user))
 
         return {
             "amount": {
