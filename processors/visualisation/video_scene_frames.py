@@ -134,7 +134,7 @@ class VideoSceneFrames(BasicProcessor):
                 if result.returncode != 0:
                     self.dataset.log(
                         f"Error extracting frame for scene {scene_index} of video file {video.name}, skipping.")
-                    print(result.stderr)
+
                     errors += 1
 
                 processed_frames += 1
