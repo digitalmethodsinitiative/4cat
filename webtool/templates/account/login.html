@@ -29,7 +29,9 @@
                 <nav>
                     <ul class="flat">
                         {% if have_email %}
-                            <li><a href="{{ url_for('request_access') }}">Request access</a></li>
+                            {% if can_request_access %}
+                                <li><a href="{{ url_for('request_access') }}">Request access</a></li>
+                            {% endif %}
                             <li><a href="{{ url_for('request_password') }}">Recover password</a></li>
                         {% endif %}
                         <li><a href="{{ url_for('show_page', page='data-policy') }}">Data policy</a></li>

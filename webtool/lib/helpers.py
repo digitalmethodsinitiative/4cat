@@ -12,6 +12,7 @@ from math import ceil
 from calendar import monthrange
 from flask_login import current_user
 from flask import (current_app, request, jsonify)
+from PIL import Image, ImageColor, ImageOps
 from pathlib import Path
 
 from common.config_manager import config
@@ -219,6 +220,41 @@ def make_html_colour(rgb):
 	return colour
 
 
+def new_favicon_color(color, input_filepath="favicon-bw.ico", output_filepath="favicon.ico"):
+	"""
+	Converts an RGBA image to a different color by first converting to black and then colorizing the image
+	and readding the alpha stream. It works best with Black and White images (already colored images appear
+	washed out).
+
+	:param str/RGB color:   Accepts either a string represening a color from ImageColor.colormap or a
+								     RGB tuple (e.g., (0, 0, 255) for blue)
+	:param str input_filepath :   	 String path to image; preferably black and white
+	:param str output_filepath :     String path to save new image
+	"""
+	possible_colors = [k for k, v in ImageColor.colormap.items()]
+	if (type(color) != tuple or len(color) != 3) and (color not in possible_colors):
+		raise Exception("Color not available")
+
+	img = Image.open(input_filepath)
+
+	# Collect original alpha data
+	image_alpha = [item[3] for item in img.getdata()]
+
+	# Convert image to black and white and then use colorize with new color
+	bw_img = img.convert("L")
+	new_img = ImageOps.colorize(bw_img, black=color, white="white")
+
+	# Convert back to RGB w/ Alpha and add in the alpha from the original
+	new_img = new_img.convert("RGBA")
+	new_image = []
+	for i, item in enumerate(new_img.getdata()):
+		new_image.append((item[0], item[1], item[2], image_alpha[i]))
+
+	# Update image with new data
+	new_img.putdata(new_image)
+	new_img.save(output_filepath)
+
+
 def generate_css_colours(force=False):
 	"""
 	Write the colours.css CSS file based on configuration
@@ -253,6 +289,13 @@ def generate_css_colours(force=False):
 
 		with colour_file.open("w") as outfile:
 			outfile.write(template)
+
+	# Update the favicon
+	new_favicon_color(
+		color=tuple([int(bit*255) for bit in main_colour]),
+		input_filepath=config.get("PATH_ROOT").joinpath("webtool/static/img/favicon/favicon-bw.ico"),
+		output_filepath=config.get("PATH_ROOT").joinpath("webtool/static/img/favicon/favicon.ico")
+	)
 
 
 def get_preview(query):

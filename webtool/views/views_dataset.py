@@ -150,7 +150,7 @@ def show_results(page):
 """
 Downloading results
 """
-@app.route('/result/<string:query_file>/')
+@app.route('/result/<string:query_file>')
 def get_result(query_file):
     """
     Get dataset result file

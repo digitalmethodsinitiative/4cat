@@ -1,6 +1,7 @@
 """
 Import scraped Douyin data
 """
+import urllib
 from datetime import datetime
 
 from backend.lib.search import Search
@@ -43,13 +44,18 @@ class SearchDouyin(Search):
         videos = sorted([vid for vid in post["video"]["bit_rate"]], key=lambda d: d.get("bit_rate"),
                         reverse=True)
 
+        # Some videos are collected from "mixes"/"collections"; only the first video is definitely displayed while others may or may not be viewed
+        displayed = True
+        if post.get("ZS_collected_from_mix") and not post.get("ZS_first_mix_vid"):
+            displayed = False
+
         return {
             "id": post["aweme_id"],
             "thread_id": post["group_id"],
             "subject": "",
             "body": post["desc"],
             "timestamp": post_timestamp.strftime("%Y-%m-%d %H:%M:%S"),
-            "post_source_domain": metadata.get("source_platform_url"),  # Adding this as different Douyin pages contain different data
+            "post_source_domain": urllib.parse.unquote(metadata.get("source_platform_url")),  # Adding this as different Douyin pages contain different data
             "post_url": f"https://www.douyin.com/video/{post['aweme_id']}",
             "region": post.get("region"),
             "hashtags": ",".join([item["hashtag_name"] for item in (post["text_extra"] if post["text_extra"] is not None else []) if "hashtag_name" in item]),
@@ -73,5 +79,11 @@ class SearchDouyin(Search):
             "author_thumbnail_url": post["author"]["avatar_thumb"].get("url_list", [''])[0],
             "author_region": post["author"].get("region"),
             "author_is_ad_fake": post["author"].get("is_ad_fake"),
+            # Collection/Mix
+            "part_of_collection": "yes" if "mix_info" in post else "no",
+            "4CAT_first_video_displayed": "yes" if displayed else "no", # other videos may have been viewed, but this is unknown to us
+            "collection_id": post.get("mix_info", {}).get("mix_id", "N/A"),
+            "collection_name": post.get("mix_info", {}).get("mix_name", "N/A"),
+            "place_in_collection": post.get("mix_info", {}).get("statis", {}).get("current_episode", "N/A"),
             "unix_timestamp": int(post_timestamp.timestamp()),
         }

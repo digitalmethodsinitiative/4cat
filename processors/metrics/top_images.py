@@ -161,7 +161,7 @@ class TopImageCounter(BasicProcessor):
             } for k, v in img_ranked.items()]
 
         if not results:
-            self.dataset.update_status("Zero image URLs detected.")
+            self.dataset.finish_with_error("Zero image URLs detected.")
             return
 
         # Also add the data to the original file, if indicated.

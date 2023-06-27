@@ -183,6 +183,13 @@ config_definition = {
         "max": 360,
         "coerce_type": int
     },
+    "4cat.allow_access_request": {
+        "type": UserInput.OPTION_TOGGLE,
+        "default": True,
+        "help": "Allow access requests",
+        "tooltip": "When enabled, users can request a 4CAT account via the login page if they do not have one, "
+                   "provided e-mail settings are configured."
+    },
     # These settings control whether top-level datasets (i.e. those created via the
     # "Create dataset" page) are deleted automatically, and if so, after how much
     # time. You can also allow users to cancel this (i.e. opt out). Note that if
