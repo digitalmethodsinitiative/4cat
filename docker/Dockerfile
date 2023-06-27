@@ -1,11 +1,11 @@
 FROM postgres:latest
 
-RUN  add-apt-repository universe && apt-get update && apt-get install -y \
+RUN  apt-get update && apt-get install -y \
     # General requirements:
     libpq-dev \
-    python3.9-dev \
-    python3.9-pip \
-    python3.9-venv \
+    python3-dev \
+    python3-pip \
+    python3-venv \
     # Called in docker-entrypoint files
     procps \
     curl \
