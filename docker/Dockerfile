@@ -9,7 +9,7 @@ RUN apt-get update && apt install -y \
     # Called in docker-entrypoint files
     procps \
     curl \
-    netcat \
+    netcat-traditional \
     postgresql-client \
     postgresql-server-dev-all \
     # Called by 4CAT:

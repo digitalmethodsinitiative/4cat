@@ -306,7 +306,8 @@ def show_login():
 
     have_email = config.get('mail.admin_email') and config.get('mail.server')
     if request.method == 'GET':
-        return render_template('account/login.html', flashes=get_flashed_messages(), have_email=have_email)
+        return render_template('account/login.html', flashes=get_flashed_messages(), have_email=have_email,
+                               can_request_access=config.get("4cat.allow_access_request"))
 
     username = request.form['username']
     password = request.form['password']
@@ -343,6 +344,10 @@ def request_access():
     sent to the 4CAT admin via e-mail so they can create an account (if
     approved)
     """
+    if not config.get("4cat.allow_access_request"):
+        return render_template("error.html",
+                               message="Account requests are disabled for this 4CAT server.")
+
     if not config.get('mail.admin_email'):
         return render_template("error.html",
                                message="No administrator e-mail is configured; the request form cannot be displayed.")

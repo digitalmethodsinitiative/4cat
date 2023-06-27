@@ -490,7 +490,7 @@ class TikTokScraper:
                 video_id = video_requests[url]["video_id"]
                 request = video_requests[url]["request"]
                 request_type = video_requests[url]["type"]
-                metadata = {
+                request_metadata = {
                     "success": False,
                     "url": url,
                     "error": None,
@@ -508,8 +508,8 @@ class TikTokScraper:
                     response = request.result()
                 except requests.exceptions.RequestException as e:
                     error_message = f"URL {url} could not be retrieved ({type(e).__name__}: {e})"
-                    metadata["error"] = error_message
-                    download_results[video_id] = metadata
+                    request_metadata["error"] = error_message
+                    download_results[video_id] = request_metadata
                     self.processor.dataset.log(error_message)
                     continue
                 finally:
@@ -517,8 +517,8 @@ class TikTokScraper:
 
                 if response.status_code != 200:
                     error_message = f"Received unexpected HTTP response ({response.status_code}) {response.reason} for {url}, skipping."
-                    metadata["error"] = error_message
-                    download_results[video_id] = metadata
+                    request_metadata["error"] = error_message
+                    download_results[video_id] = request_metadata
                     self.processor.dataset.log(error_message)
                     continue
 
@@ -526,31 +526,31 @@ class TikTokScraper:
                     # Collect Video Download URL
                     soup = BeautifulSoup(response.text, "html.parser")
                     json_source = soup.select_one("script#__FRONTITY_CONNECT_STATE__")
-                    metadata = None
+                    video_metadata = None
                     try:
                         if json_source.text:
-                            metadata = json.loads(json_source.text)
+                            video_metadata = json.loads(json_source.text)
                         elif json_source.contents[0]:
-                            metadata = json.loads(json_source.contents[0])
+                            video_metadata = json.loads(json_source.contents[0])
                     except json.JSONDecodeError as e:
                         self.processor.dataset.log(f"JSONDecodeError for video {video_id} metadata: {e}\n{json_source}")
 
-                    if not metadata:
+                    if not video_metadata:
                         # Failed to collect metadata
                         error_message = f"Failed to find metadata for video {video_id}"
-                        metadata["error"] = error_message
-                        download_results[video_id] = metadata
+                        request_metadata["error"] = error_message
+                        download_results[video_id] = request_metadata
                         self.processor.dataset.log(error_message)
                         continue
 
                     try:
-                        url = list(metadata["source"]["data"].values())[0]["videoData"]["itemInfos"]["video"]["urls"][0]
+                        url = list(video_metadata["source"]["data"].values())[0]["videoData"]["itemInfos"]["video"]["urls"][0]
                     except (KeyError, IndexError):
                         error_message = f"vid: {video_id} - failed to find video download URL"
-                        metadata["error"] = error_message
-                        download_results[video_id] = metadata
+                        request_metadata["error"] = error_message
+                        download_results[video_id] = request_metadata
                         self.processor.dataset.log(error_message)
-                        self.processor.dataset.log(metadata["source"]["data"].values())
+                        self.processor.dataset.log(video_metadata["source"]["data"].values())
                         continue
 
                     # Add new download URL to be collected
@@ -566,9 +566,9 @@ class TikTokScraper:
                         for chunk in response.iter_content(chunk_size=1024 * 1024):
                             if chunk:
                                 f.write(chunk)
-                    metadata["success"] = True
-                    metadata["files"] = [{"filename": video_id + ".mp4", "success": True}]
-                    download_results[video_id] = metadata
+                    request_metadata["success"] = True
+                    request_metadata["files"] = [{"filename": video_id + ".mp4", "success": True}]
+                    download_results[video_id] = request_metadata
 
                     downloaded_videos += 1
                     self.processor.dataset.update_status("Downloaded %i/%i videos" %

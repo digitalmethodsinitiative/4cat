@@ -489,9 +489,7 @@ class SearchWithTwitterAPIv2(Search):
         intro_text += ("\n\nPlease refer to the [Twitter API documentation]("
                           "https://developer.twitter.com/en/docs/twitter-api/tweets/search/integrate/build-a-query) "
                           "documentation for more information about this API endpoint and the syntax you can use in your "
-                          "search query. You can also test queries with Twitter's [Query "
-                          "Builder](https://developer.twitter.com/apitools/query?query=). Retweets are included by default; "
-                          "add `-is:retweet` to exclude them.")
+                          "search query. Retweets are included by default; add `-is:retweet` to exclude them.")
 
         options = {
             "intro-1": {
@@ -674,7 +672,9 @@ class SearchWithTwitterAPIv2(Search):
                 elif response.status_code == 400:
                     raise QueryParametersException("Your query is invalid. Please make sure the date range does not "
                                                    "extend into the future, or to before Twitter's founding, and that "
-                                                   "your query is shorter than 1024 characters.")
+                                                   "your query is shorter than 1024 characters. Using AND in the query "
+                                                   "is not possible (AND is implied; OR can be used). Use \"and\" to "
+                                                   "search for the literal word.")
 
                 else:
                     # we can still continue without the expected tweets
@@ -732,6 +732,7 @@ class SearchWithTwitterAPIv2(Search):
         # For backward compatibility
         author_username = tweet["author_user"]["username"] if tweet.get("author_user") else tweet["author_username"]
         author_fullname = tweet["author_user"]["name"] if tweet.get("author_user") else tweet["author_fullname"]
+        author_followers = tweet["author_user"]["public_metrics"]["followers_count"] if tweet.get("author_user") else ""
 
         hashtags = [tag["tag"] for tag in tweet.get("entities", {}).get("hashtags", [])]
         mentions = [tag["username"] for tag in tweet.get("entities", {}).get("mentions", [])]
@@ -788,6 +789,7 @@ class SearchWithTwitterAPIv2(Search):
             "author": author_username,
             "author_fullname": author_fullname,
             "author_id": tweet["author_id"],
+            "author_followers": author_followers,
             "source": tweet.get("source"),
             "language_guess": tweet.get("lang"),
             "possibly_sensitive": "yes" if tweet.get("possibly_sensitive") else "no",

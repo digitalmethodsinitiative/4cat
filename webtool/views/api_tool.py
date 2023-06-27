@@ -236,7 +236,7 @@ def import_dataset():
 	}
 	"""
 	platform = request.headers.get("X-Zeeschuimer-Platform").split(".")[0]
-	if not platform or platform not in backend.all_modules.datasources:
+	if not platform or platform not in backend.all_modules.datasources or platform not in config.get('4cat.datasources'):
 		return error(404, message="Unknown platform or source format")
 
 	worker_types = (f"{platform}-import", f"{platform}-search")
@@ -363,8 +363,10 @@ def queue_dataset():
 	sanitised_query["datasource"] = datasource_id
 	sanitised_query["type"] = search_worker_id
 
+	if request.form.to_dict().get("pseudonymise") in ("pseudonymise", "anonymise"):
+		sanitised_query["pseudonymise"] = request.form.to_dict().get("pseudonymise")
+
 	# unchecked checkboxes do not send data in html forms, so key will not exist if box is left unchecked
-	sanitised_query["pseudonymise"] = bool(request.form.to_dict().get("pseudonymise", False))
 	is_private = bool(request.form.get("make-private", False))
 
 	extension = search_worker.extension if hasattr(search_worker, "extension") else "csv"
@@ -803,7 +805,7 @@ def toggle_private(key):
 	except TypeError:
 		return error(404, error="Dataset does not exist.")
 
-	if dataset.owner != current_user.get_id() and not current_user.is_admin():
+	if dataset.owner != current_user.get_id() and not current_user.is_admin:
 		return error(403, error="This dataset is private")
 
 	# apply status to dataset and all children

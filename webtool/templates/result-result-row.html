@@ -17,7 +17,7 @@
   {% if dataset.is_finished() and dataset.num_rows > 0 %}
     <ul class="dataset-actions">
     <li>
-    <a href="{{ url_for('get_result', query_file=dataset.result_file)[:-1] }}">
+    <a href="{{ url_for('get_result', query_file=dataset.result_file) }}">
         <i class="fas fa-download" aria-hidden="true"></i>
         {{ dataset.result_file.split(".")[-1] }} ({{ dataset.get_results_path()|filesize }})
     </a>

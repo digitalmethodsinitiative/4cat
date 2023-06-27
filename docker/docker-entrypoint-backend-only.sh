@@ -24,7 +24,7 @@ do
 done
 
 echo "Waiting for postgres..."
-while ! nc -z $POSTGRES_HOST 5432; do
+while ! nc -z $POSTGRES_HOST $POSTGRES_PORT; do
   sleep 0.1
 done
 echo "PostgreSQL started"
@@ -36,7 +36,7 @@ if [ "$(psql --quiet --host="$POSTGRES_HOST" --port=5432 --user="$POSTGRES_USER"
 else
   echo "Creating Database"
   # Seed DB
-  psql --host=$POSTGRES_HOST --port=5432 --user=$POSTGRES_USER --dbname=$POSTGRES_DB < backend/database.sql
+  cd /usr/src/app && psql --host=$POSTGRES_HOST --port=$POSTGRES_PORT --user=$POSTGRES_USER --dbname=$POSTGRES_DB < backend/database.sql
   # No database exists, new build, no need to migrate so create .current-version file
   if [ ! -e data/config ] ; then mkdir data/config ; else : ; fi && cp VERSION data/config/.current-version
 fi
