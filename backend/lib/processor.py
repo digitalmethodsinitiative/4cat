@@ -99,8 +99,8 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		"""
 		try:
 			self.dataset = DataSet(key=self.job.data["remote_id"], db=self.db)
-			self.owner = self.dataset["owner"]
-		except TypeError:
+			self.owner = self.dataset.get_owners()[0]
+		except TypeError as e:
 			# query has been deleted in the meantime. finish without error,
 			# as deleting it will have been a conscious choice by a user
 			self.job.finish()
