@@ -17,6 +17,9 @@ from flask_login import login_required, current_user
 from webtool import app, db, config
 from webtool.lib.helpers import pad_interval, error, setting_required
 
+from common.config_manager import ConfigWrapper
+config = ConfigWrapper(config, user=current_user)
+
 csv.field_size_limit(1024 * 1024 * 1024)
 
 

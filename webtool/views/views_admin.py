@@ -26,12 +26,15 @@ from common.lib.helpers import call_api, send_email, UserInput
 from common.lib.exceptions import QueryParametersException
 import common.lib.config_definition as config_definition
 
+from common.config_manager import ConfigWrapper
+config = ConfigWrapper(config, user=current_user)
+
 @app.route("/admin/")
 @login_required
 def admin_frontpage():
     # can be viewed if user has any admin privileges
     can_view_admin = any(
-        [config.get(setting, user=current_user) for setting in [
+        [config.get(setting) for setting in [
             key for key in config.config_definition.keys() if key.startswith("privileges.admin")
         ]]
     )
