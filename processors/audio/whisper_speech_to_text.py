@@ -10,7 +10,7 @@ from pathlib import Path
 from json import JSONDecodeError
 
 
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorException, ProcessorInterruptedException
 from common.lib.user_input import UserInput
 import common.config_manager as config

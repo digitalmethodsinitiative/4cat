@@ -22,7 +22,7 @@ has_column = db.fetchone(
     "SELECT COUNT(*) AS num FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'tags'")
 if has_column["num"] == 0:
     print("  ...No, adding.")
-    db.execute("ALTER TABLE users ADD COLUMN tags JSONB DEFAULT '{}'")
+    db.execute("ALTER TABLE users ADD COLUMN tags JSONB DEFAULT '[]'")
     db.commit()
 else:
     print("  ...Yes, nothing to update.")
@@ -46,6 +46,13 @@ if has_column["num"] == 0:
     db.commit()
 else:
     print("  ...Yes, nothing to update.")
+
+print("  Ensuring uniqueness of settings...")
+index_name = db.fetchone("SELECT constraint_name FROM information_schema.table_constraints WHERE table_schema = 'public' AND table_name = 'settings' AND constraint_type = 'PRIMARY KEY'")
+if index_name:
+    db.execute(f"ALTER TABLE settings DROP CONSTRAINT {index_name['constraint_name']}")
+
+db.execute("CREATE UNIQUE INDEX IF NOT EXISTS unique_setting ON settings (name, tag);")
 
 # ---------------------------------------------
 #      Ensure admin users are still admins

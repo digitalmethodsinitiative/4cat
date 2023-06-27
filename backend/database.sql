@@ -5,10 +5,15 @@
 
 -- 4CAT settings table
 CREATE TABLE IF NOT EXISTS settings (
-  name                   TEXT UNIQUE PRIMARY KEY,
+  name                   TEXT DEFAULT '',
   value                  TEXT DEFAULT '{}',
   tag                    TEXT DEFAULT ''
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS unique_setting
+  ON settings (
+    name, tag
+  );
 
 -- jobs table
 CREATE TABLE IF NOT EXISTS jobs (
@@ -86,9 +91,9 @@ CREATE TABLE IF NOT EXISTS users (
   timestamp_created  INTEGER DEFAULT 0,
   timestamp_token    INTEGER DEFAULT 0,
   timestamp_seen     INTEGER DEFAULT 0,
-  userdata           JSONB DEFAULT '{}',
+  userdata           TEXT DEFAULT '{}',
   is_deactivated     BOOLEAN DEFAULT FALSE,
-  tags               JSONB DEFAULT '{}'
+  tags               JSONB DEFAULT '[]'
 );
 
 INSERT INTO users

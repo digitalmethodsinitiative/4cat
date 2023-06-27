@@ -121,7 +121,7 @@ class ConfigManager:
         # delete unknown keys
         known_keys = tuple(config.config_definition.keys())
         unknown_keys = self.db.fetchall("SELECT DISTINCT name FROM settings WHERE name NOT IN %s", (known_keys,))
-        print([key["name"] for key in unknown_keys])
+
         if unknown_keys:
             self.db.delete("settings", where={"name": tuple([key["name"] for key in unknown_keys])}, commit=False)
 
@@ -258,7 +258,7 @@ class ConfigManager:
             final_settings[setting_name] = value
 
         if len(final_settings) == 1:
-            print(f"{user}: {attribute_name[0]} = {list(final_settings.values())[0]}")
+            # print(f"{user}: {attribute_name[0]} = {list(final_settings.values())[0]}")
             return list(final_settings.values())[0]
         else:
             return final_settings
@@ -359,9 +359,6 @@ class ConfigWrapper:
         :param kwargs:
         :return:
         """
-        if "user" not in kwargs:
-            kwargs["user"] = self.user
-
         if "tag" not in kwargs:
             kwargs["tag"] = self.tags
 

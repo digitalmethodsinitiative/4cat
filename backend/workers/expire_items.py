@@ -95,12 +95,11 @@ class ThingExpirer(BasicWorker):
 		now = datetime.datetime.now()
 
 		for expiring_user in expiring_users:
-			user = User.get_by_name(self.db, expiring_user["username"])
+			user = User.get_by_name(self.db, expiring_user["name"])
 			username = user.data["name"]
 
 			# parse expiration date if available
 			delete_after = user.get_value("delete-after")
-			userdata = json.loads(expiring_user["userdata"])
 			if re.match(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", delete_after):
 				expires_at = datetime.datetime.strptime("%Y-%m-%d", delete_after)
 			elif re.match(r"[0-9]+", delete_after):
