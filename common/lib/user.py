@@ -226,9 +226,6 @@ class User:
         """
         return self.data.get("is_deactivated", False)
 
-    def get_attribute(self, attribute):
-        return json.loads(self.data["userdata"]).get(attribute, None)
-
     def email_token(self, new=False):
         """
         Send user an e-mail with a password reset link
@@ -348,6 +345,7 @@ class User:
         :return:
         """
         self.userdata[key] = value
+        self.data["userdata"] = json.dumps(self.userdata)
 
         self.db.update("users", where={"name": self.get_id()}, data={"userdata": json.dumps(self.userdata)})
 
@@ -413,6 +411,56 @@ class User:
             "AND (u.name = n.username OR (u.tags @> '[\"admin\"]' AND n.username = '!admins') OR n.username = '!everyone')", (self.get_id(),))
 
         return notifications
+
+    def add_tag(self, tag):
+        """
+        Add tag to user
+
+        If the tag is already in the tag list, nothing happens.
+
+        :param str tag:  Tag
+        """
+        if tag not in self.data["tags"]:
+            self.data["tags"].append(tag)
+            self.sort_user_tags()
+
+    def remove_tag(self, tag):
+        """
+        Remove tag from user
+
+        If the tag is not part of the tag list, nothing happens.
+
+        :param str tag:  Tag
+        """
+        if tag in self.data["tags"]:
+            self.data["tags"].remove(tag)
+            self.sort_user_tags()
+
+    def sort_user_tags(self):
+        """
+        Ensure user tags are stored in the correct order
+
+        The order of the tags matters, since it decides which one will get to
+        override the global configuration. To avoid having to cross-reference
+        the canonical order every time the tags are queried, we ensure that the
+        tags are stored in the database in the right order to begin with. This
+        method ensures that.
+        """
+        tags = self.data["tags"]
+        sorted_tags = []
+
+        for tag in config.get("flask.tag_order"):
+            if tag in tags:
+                sorted_tags.append(tag)
+
+        for tag in tags:
+            if tag not in sorted_tags:
+                sorted_tags.append(tag)
+
+        self.data["tags"] = sorted_tags
+        self.db.update("users", where={"name": self.get_id()}, data={"tags": json.dumps(sorted_tags)})
+
+
 
     def delete(self, also_datasets=True):
         from common.lib.dataset import DataSet

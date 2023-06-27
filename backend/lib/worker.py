@@ -9,7 +9,7 @@ import abc
 from common.lib.queue import JobQueue
 from common.lib.database import Database
 from common.lib.exceptions import WorkerInterruptedException, ProcessorException
-from common.config_manager import ConfigDummy
+from common.config_manager import config, ConfigDummy
 
 
 class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
@@ -94,7 +94,8 @@ class BasicWorker(threading.Thread, metaclass=abc.ABCMeta):
 		self.all_modules = modules
 
 		database_appname = "%s-%s" % (self.type, self.job.data["id"])
-		self.db = Database(logger=self.log, appname=database_appname)
+		self.db = Database(logger=self.log, appname=database_appname,
+						   dbname=config.DB_NAME, user=config.DB_USER, password=config.DB_PASSWORD, host=config.DB_HOST, port=config.DB_PORT)
 		self.queue = JobQueue(logger=self.log, database=self.db) if not queue else queue
 
 	def run(self):

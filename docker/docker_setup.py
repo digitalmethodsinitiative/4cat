@@ -104,9 +104,9 @@ if __name__ == "__main__":
         frontend_servername = os.environ['SERVER_NAME']
         public_port = int(config_parser['SERVER']['public_port'])
         if public_port == 80:
-            config.set('flask.server_name', frontend_servername, raw=False)
+            config.set('flask.server_name', frontend_servername, is_json=False)
         else:
-            config.set('flask.server_name', f"{frontend_servername}:{public_port}", raw=False)
+            config.set('flask.server_name', f"{frontend_servername}:{public_port}", is_json=False)
 
     # Config file already exists; Update .env variables if they changed
     else:
@@ -128,11 +128,11 @@ if __name__ == "__main__":
         if frontend_port != public_port:
             if public_port == 80:
                 # Set flask.server to existing frontend_servername with no port
-                config.set('flask.server_name', f"{frontend_servername}", raw=False)
+                config.set('flask.server_name', f"{frontend_servername}", is_json=False)
                 print(f"Updated flask.server_name: {frontend_servername}")
             else:
                 # Set flask.server to existing frontend_servername with the new public_port
-                config.set('flask.server_name', f"{frontend_servername}:{public_port}", raw=False)
+                config.set('flask.server_name', f"{frontend_servername}:{public_port}", is_json=False)
                 print(f"Updated flask.server_name with new public port: {frontend_servername}:{public_port}")
 
     print(f"\nStarting app\n"

@@ -109,15 +109,63 @@ class ConfigManager:
             "SECRET_KEY": config_reader["GENERATE"].get("secret_key")
         })
 
-    def get(self, attribute_name, default=None, raw=False, user=None, tags=None):
+    def ensure_database(self):
+        """
+        Ensure the database is in sync with the config definition
+
+        Deletes all stored settings not defined in 4CAT, and creates a global
+        setting for all settings not yet in the database.
+        """
+        self.with_db()
+
+        # delete unknown keys
+        known_keys = tuple(config.config_definition.keys())
+        unknown_keys = self.db.fetchall("SELECT DISTINCT name FROM settings WHERE name NOT IN %s", (known_keys,))
+        print([key["name"] for key in unknown_keys])
+        if unknown_keys:
+            self.db.delete("settings", where={"name": tuple([key["name"] for key in unknown_keys])}, commit=False)
+
+        self.db.commit()
+
+        # create global values for known keys with the default
+        known_settings = self.get_all()
+        for setting, parameters in self.config_definition.items():
+            if setting in known_settings:
+                continue
+
+            self.set(setting, parameters.get("default", ""), is_json=False)
+
+        self.db.commit()
+
+    def get_all(self, is_json=False, user=None, tags=None):
+        """
+        Get all known settings
+
+        :param bool is_json:  if True, the value is returned as stored and not
+        interpreted as JSON if it comes from the database
+        :param user:  User object or name. Adds a tag `user:[username]` in
+        front of the tag list.
+        :param tags:  Tag or tags for the required setting. If a tag is
+        provided, the method checks if a special value for the setting exists
+        with the given tag, and returns that if one exists. First matching tag
+        wins.
+
+        :return dict: Setting value, as a dictionary with setting names as keys
+        and setting values as values.
+        """
+        return self.get(attribute_name=None, default=None, is_json=is_json, user=user, tags=tags)
+
+    def get(self, attribute_name, default=None, is_json=False, user=None, tags=None):
         """
         Get a setting's value from the database
 
         If the setting does not exist, the provided fallback value is returned.
 
-        :param str attribute_name:  Setting to return
+        :param str|list|None attribute_name:  Setting to return. If a string,
+        return that setting's value. If a list, return a dictionary of values.
+        If none, return a dictionary with all settings.
         :param default:  Value to return if setting does not exist
-        :param bool raw:  if True, the value is returned as stored and not
+        :param bool is_json:  if True, the value is returned as stored and not
         interpreted as JSON if it comes from the database
         :param user:  User object or name. Adds a tag `user:[username]` in
         front of the tag list.
@@ -129,8 +177,13 @@ class ConfigManager:
         :return:  Setting value, or the provided fallback, or `None`.
         """
         # core settings are not from the database
-        if attribute_name in self.core_settings:
-            return self.core_settings[attribute_name]
+        if type(attribute_name) is str:
+            if attribute_name in self.core_settings:
+                return self.core_settings[attribute_name]
+            else:
+                attribute_name = (attribute_name,)
+        elif type(attribute_name) in (set, str):
+            attribute_name = tuple(attribute_name)
 
         # if trying to access a setting that's not a core setting, attempt to
         # initialise the database connection
@@ -153,11 +206,10 @@ class ConfigManager:
         # user-specific settings are just a special type of tag (which takes
         # precedence), same goes for user groups
         if user:
-            groups = self.db.fetchone("SELECT tags FROM users WHERE name = %s", (user,))
-            if groups:
+            user_tags = self.db.fetchone("SELECT tags FROM users WHERE name = %s", (user,))
+            if user_tags:
                 try:
-                    for group in json.loads(groups["tags"]):
-                        tags.insert(0, group)
+                    tags.extend(user_tags["tags"])
                 except (TypeError, ValueError):
                     # should be a JSON list, but isn't
                     pass
@@ -166,49 +218,51 @@ class ConfigManager:
 
         # query database for any values within the required tags
         tags.append("")  # empty tag = default value
-        settings = {s["tag"]: s["value"] for s in
-                    self.db.fetchall("SELECT * FROM settings WHERE name = %s AND tag IN %s",
-                                     (attribute_name, tuple(tags)))}
-
-        # return first matching setting with a required tag, in the order the
-        # tags were provided
-        value = None
-        if settings:
-            for tag in tags:
-                if tag in settings:
-                    value = settings[tag]
-                    break
-
-        # no matching tags? try empty tag
-        if value is None and "" in settings:
-            value = settings[""]
-
-        if not raw and value is not None:
-            value = json.loads(value)
-        elif default is not None:
-            value = default
-        elif value is None and attribute_name in config_definition and "default" in config_definition[attribute_name]:
-            value = config_definition[attribute_name]["default"]
-
-        return value
-
-    def __getattr__(self, attr):
-        """
-        Getter so we can directly request values
-
-        :param attr:  Config setting to get
-        :return:  Value
-        """
-
-        if attr in dir(self):
-            # an explicitly defined attribute should always be called in favour
-            # of this passthrough
-            attribute = getattr(self, attr)
-            return attribute
+        if attribute_name:
+            query = "SELECT * FROM settings WHERE name IN %s AND tag IN %s"
+            replacements = (attribute_name, tuple(tags))
         else:
-            return self.get(attr)
+            query = "SELECT * FROM settings WHERE tag IN %s"
+            replacements = (tuple(tags), )
 
-    def set(self, attribute_name, value, is_json, overwrite_existing=True, connection=None, cursor=None,
+        settings = {setting: {} for setting in attribute_name} if attribute_name else {}
+
+        for setting in self.db.fetchall(query, replacements):
+            if setting["name"] not in settings:
+                settings[setting["name"]] = {}
+
+            settings[setting["name"]][setting["tag"]] = setting["value"]
+
+        final_settings = {}
+        for setting_name, setting in settings.items():
+            # return first matching setting with a required tag, in the order the
+            # tags were provided
+            value = None
+            if setting:
+                for tag in tags:
+                    if tag in setting:
+                        value = setting[tag]
+                        break
+
+            # no matching tags? try empty tag
+            if value is None and "" in setting:
+                value = setting[""]
+
+            if not is_json and value is not None:
+                value = json.loads(value)
+            elif default is not None:
+                value = default
+            elif value is None and setting_name in config_definition and "default" in config_definition[setting_name]:
+                value = config_definition[setting_name]["default"]
+
+            final_settings[setting_name] = value
+
+        if len(final_settings) == 1:
+            return list(final_settings.values())[0]
+        else:
+            return final_settings
+
+    def set(self, attribute_name, value, is_json, tag="", overwrite_existing=True, connection=None, cursor=None,
             keep_connection_open=False):
         """
         Insert OR set value for a setting
@@ -239,14 +293,43 @@ class ConfigManager:
                 return None
 
         if overwrite_existing:
-            query = "INSERT INTO settings (name, value) Values (%s, %s) ON CONFLICT (name) DO UPDATE SET value = EXCLUDED.value"
+            query = "INSERT INTO settings (name, value, tag) VALUES (%s, %s, %s) ON CONFLICT (name, tag) DO UPDATE SET value = EXCLUDED.value"
         else:
-            query = "INSERT INTO settings (name, value) Values (%s, %s) ON CONFLICT DO NOTHING"
+            query = "INSERT INTO settings (name, value, tag) VALUES (%s, %s, %s) ON CONFLICT DO NOTHING"
 
-        self.db.execute(query, (attribute_name, value))
-        updated_rows = cursor.rowcount
+        self.db.execute(query, (attribute_name, value, tag))
+        updated_rows = self.db.cursor.rowcount
 
         return updated_rows
+
+    def delete_for_tag(self, attribute_name, tag):
+        """
+        Delete config override for a given tag
+
+        :param str attribute_name:
+        :param str tag:
+        :return int: number of deleted rows
+        """
+        self.db.delete("settings", where={"name": attribute_name, "tag": tag})
+        updated_rows = self.db.cursor.rowcount
+
+        return updated_rows
+
+    def __getattr__(self, attr):
+        """
+        Getter so we can directly request values
+
+        :param attr:  Config setting to get
+        :return:  Value
+        """
+
+        if attr in dir(self):
+            # an explicitly defined attribute should always be called in favour
+            # of this passthrough
+            attribute = getattr(self, attr)
+            return attribute
+        else:
+            return self.get(attr)
 
 
 class ConfigWrapper:
@@ -268,7 +351,7 @@ class ConfigWrapper:
         self.user = user
         self.tags = tags
 
-    def get(self, attribute_name, default=None, raw=False):
+    def get(self, attribute_name, default=None, is_json=False):
         """
         Get setting value
 
@@ -280,7 +363,7 @@ class ConfigWrapper:
         interpreted as JSON if it comes from the database
         :return:  Setting value
         """
-        return config.get(attribute_name, default, raw, self.user, self.tags)
+        return config.get(attribute_name, default, is_json, self.user, self.tags)
 
     def set(self, **kwargs):
         """

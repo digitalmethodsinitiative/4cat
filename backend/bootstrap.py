@@ -54,12 +54,17 @@ def run(as_daemon=True):
 		log = Logger(output=not as_daemon)
 
 	log.info("4CAT Backend started, logger initialised")
-	db = Database(logger=log, appname="main")
+	db = Database(logger=log, appname="main",
+				  dbname=config.DB_NAME, user=config.DB_USER, password=config.DB_PASSWORD, host=config.DB_HOST, port=config.DB_PORT)
 	queue = JobQueue(logger=log, database=db)
 
 	# clean up after ourselves
 	db.commit()
 	queue.release_all()
+
+	# ensure database consistency for settings table
+	config.with_db(db)
+	config.ensure_database()
 
 	# make it happen
 	# this is blocking until the back-end is shut down
