@@ -33,10 +33,7 @@ config = ConfigWrapper(config, user=current_user)
 @login_required
 def admin_frontpage():
     # can be viewed if user has any admin privileges
-    print("START CHECK")
     admin_privileges = config.get([key for key in config.config_definition.keys() if key.startswith("privileges.admin")])
-    print(admin_privileges)
-    print("END CHECK")
 
     if not any(admin_privileges.values()):
         return render_template("error.html", message="You cannot view this page."), 403
@@ -57,6 +54,7 @@ def list_users(page):
     tag = request.args.get("tag", "")
     offset = (page - 1) * page_size
     filter_name = request.args.get("name", "")
+    order = request.args.get("sort", "name")
 
     # craft SQL query to filter users with
     filter_bits = []
@@ -70,10 +68,15 @@ def list_users(page):
         replacements.append('["' + tag + '"]')
 
     filter_bit = "WHERE " + (" AND ".join(filter_bits)) if filter_bits else ""
+    order_bit = "name ASC"
+    if order == "age":
+        order_bit = "timestamp_created ASC"
+    elif order == "status":
+        order_bit = "tags @> '[\"admin\"]' DESC, timestamp_token > 0 DESC, is_deactivated DESC"
 
     num_users = db.fetchone("SELECT COUNT(*) AS num FROM users " + filter_bit, replacements)["num"]
     users = db.fetchall(
-        f"SELECT * FROM users {filter_bit} ORDER BY name ASC LIMIT {page_size} OFFSET {offset}",
+        f"SELECT * FROM users {filter_bit} ORDER BY {order_bit} LIMIT {page_size} OFFSET {offset}",
         replacements)
 
     # these are used for autocompletion in the filter form
@@ -82,7 +85,7 @@ def list_users(page):
 
     pagination = Pagination(page, page_size, num_users, "list_users")
     return render_template("controlpanel/users.html", users=[User(db, user) for user in users],
-                           filter={"tag": tag, "name": filter_name}, pagination=pagination,
+                           filter={"tag": tag, "name": filter_name, "sort": order}, pagination=pagination,
                            flashes=get_flashed_messages(), tag=tag, all_tags=distinct_tags, all_users=distinct_users)
 
 @app.route("/admin/worker-status/")

@@ -9,6 +9,12 @@
         <section class="result-list">
             <h2><span>Users{% if tag %} with tag <span class="property-badge">{{ tag }}</span>{% endif %}</span></h2>
             <div class="user-panel">
+                <nav class="view-controls block">
+                    Sort by
+                    <a class="button-like" href="{{ url_for("list_users") }}?sort=name"><i class="fa fa-arrow-down-a-z" aria-hidden="true"></i> Name</a>
+                    <a class="button-like" href="{{ url_for("list_users") }}?sort=age"><i class="fa fa-arrow-down-1-9" aria-hidden="true"></i> Age</a>
+                    <a class="button-like" href="{{ url_for("list_users") }}?sort=status"><i class="fa fa-user-shield" aria-hidden="true"></i> Status</a>
+                </nav>
                 <table class="fullwidth user-table cp-table">
                     <colgroup>
                         <col class="name">
