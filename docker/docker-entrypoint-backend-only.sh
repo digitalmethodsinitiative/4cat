@@ -36,7 +36,7 @@ if [ "$(psql --quiet --host="$POSTGRES_HOST" --port=$POSTGRES_PORT --user="$POST
 else
   echo "Creating Database"
   # Seed DB
-  cd /usr/src/app && psql --host=$POSTGRES_HOST --port=$POSTGRES_PORT --user=$POSTGRES_USER --dbname=$POSTGRES_DB < backend/database.sql
+  psql --host=$POSTGRES_HOST --port=$POSTGRES_PORT --user=$POSTGRES_USER --dbname=$POSTGRES_DB < backend/database.sql
   # No database exists, new build, no need to migrate so create .current-version file
   if [ ! -e data/config ] ; then mkdir data/config ; else : ; fi && cp VERSION data/config/.current-version
 fi
