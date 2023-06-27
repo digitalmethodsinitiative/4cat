@@ -10,8 +10,6 @@ RUN apt-get update && apt install -y \
     procps \
     curl \
     netcat-traditional \
-    postgresql-client \
-    postgresql-server-dev-all \
     # Called by 4CAT:
     git \
     # Needed for video processing only (and only technically on backend)
@@ -25,7 +23,6 @@ RUN python3 -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
 # Install dependencies
-RUN pip3 install --upgrade pip
 COPY ./requirements.txt /4cat/requirements.txt
 COPY ./setup.py /4cat/setup.py
 COPY ./VERSION /4cat/VERSION
@@ -33,7 +30,7 @@ COPY ./README.md /4cat/README.md
 RUN mkdir /4cat/backend
 RUN mkdir /4cat/webtool
 RUN mkdir /4cat/datasources
-RUN pip3 install -r requirements.txt
+RUN pip3 install --upgrade pip && pip3 install -r requirements.txt
 
 # Install frontend Docker requirements
 RUN pip3 install gunicorn
