@@ -116,7 +116,7 @@ class ThingExpirer(BasicWorker):
 				# and if not, add notification if expiring soon
 				delta = expires_at - now
 				if delta.days < 7:
-					warning_notification = f"WARNING: This account will be deleted at <time datetime=\"{expires_at.strftime('%C')}\">{expires_at.strftime('%Y-%m-%d H:%M:%S')}</time>. Make sure to back up your data before then."
+					warning_notification = f"WARNING: This account will be deleted at <time datetime=\"{expires_at.strftime('%C')}\">{expires_at.strftime('%Y-%m-%d %H:%M')}</time>. Make sure to back up your data before then."
 					user.add_notification(warning_notification)
 
 	def expire_notifications(self):
