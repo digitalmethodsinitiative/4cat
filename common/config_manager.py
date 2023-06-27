@@ -54,7 +54,7 @@ class ConfigManager:
         # module settings can't be loaded directly because modules need the
         # config manager to load, so that becomes circular
         # instead, this is cached on startup and then loaded here
-        module_config_path = self.get("PATH_ROOT").joinpath("backend/cache/module_config.bin")
+        module_config_path = self.get("PATH_ROOT").joinpath("config/module_config.bin")
         if module_config_path.exists():
             try:
                 with module_config_path.open("rb") as infile:

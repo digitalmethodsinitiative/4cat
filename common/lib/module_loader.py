@@ -55,7 +55,7 @@ class ModuleCollector:
             if hasattr(worker, "config") and type(worker.config) is dict:
                 module_config.update(worker.config)
 
-        with config.get("PATH_ROOT").joinpath("backend/cache/module_config.bin").open("wb") as outfile:
+        with config.get("PATH_ROOT").joinpath("config/module_config.bin").open("wb") as outfile:
             pickle.dump(module_config, outfile)
 
         # load from cache
