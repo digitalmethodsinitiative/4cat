@@ -1,6 +1,6 @@
 FROM postgres:latest
 
-RUN apt-get update && apt-get install -y \
+RUN  add-apt-repository universe && apt-get update && apt-get install -y \
     # General requirements:
     libpq-dev \
     python3.9-dev \
