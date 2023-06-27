@@ -84,7 +84,7 @@ class VideoStack(BasicProcessor):
 
         # also need ffprobe to determine video lengths
         # is usually installed in same place as ffmpeg
-        ffmpeg_path = shutil.which(config.get("video_downloader.ffmpeg-path"))
+        ffmpeg_path = shutil.which(config.get("video_downloader.ffmpeg-path")) if config.get("video_downloader.ffmpeg-path") else None
         ffprobe_path = shutil.which("ffprobe".join(ffmpeg_path.rsplit("ffmpeg", 1))) if ffmpeg_path else None
 
         return module.type.startswith("video-downloader") and \
