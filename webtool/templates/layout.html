@@ -30,7 +30,10 @@
 </head>
 {% set can_access_control_panel = __user_is_admin %}
 <body class="{% block body_class%}{% endblock %} style-{{ "default"|config_override("STYLE") }}" data-url-root="{{ url_for("show_frontpage") }}">
-	<h1><span><a href="{{ url_for('show_frontpage') }}">{% block site_header %}{{ __user_config("4cat.name_long") }}{% endblock %}</a></span></h1>
+	<h1>
+        <img src="{{ url_for("static", filename="img/4cat-heads.svg") }}">
+        <span><a href="{{ url_for('show_frontpage') }}">{% block site_header %}{{ __user_config("4cat.name_long") }}{% endblock %}</a></span>
+    </h1>
 	<nav class="main-nav">
 		<ul>
             {% if __user_config("privileges.can_create_dataset") %}

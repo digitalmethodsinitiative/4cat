@@ -642,6 +642,13 @@ h1 a {
     text-decoration: none;
 }
 
+h1 img {
+    height: 1em;
+    display: inline-block;
+    position: relative;
+    top: 0.1em;
+}
+
 .main-nav {
     background: var(--contrast-dark);
     margin-bottom: 2em;
