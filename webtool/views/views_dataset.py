@@ -363,7 +363,7 @@ def show_result(key):
     # we can either show this view as a separate page or as a bunch of html
     # to be retrieved via XHR
     standalone = "processors" not in request.url
-    template = "result.html" if standalone else "result-details.html"
+    template = "result.html" if standalone else "components/result-details.html"
 
     return render_template(template, dataset=dataset, parent_key=dataset.key, processors=backend.all_modules.processors,
                            is_processor_running=is_processor_running, messages=get_flashed_messages(),

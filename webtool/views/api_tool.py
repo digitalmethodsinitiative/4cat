@@ -158,7 +158,7 @@ def datasource_form(datasource_id):
 	if status:
 		labels.append(status)
 
-	form = render_template("create-dataset-option.html", options=worker_options, labels=labels)
+	form = render_template("components/create-dataset-option.html", options=worker_options, labels=labels)
 	javascript_path = datasource["path"].joinpath("webtool", "tool.js")
 	has_javascript = javascript_path.exists()
 
@@ -339,7 +339,7 @@ def queue_dataset():
 			# ask the user for more input by returning a HTML snippet
 			# containing form fields to be added to the form before it is
 			# re-submitted
-			form = render_template("create-dataset-option.html", options=e.config)
+			form = render_template("components/create-dataset-option.html", options=e.config)
 			return jsonify({"status": "extra-form", "html": form})
 
 		except QueryParametersException as e:
