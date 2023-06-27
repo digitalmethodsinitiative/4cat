@@ -100,9 +100,9 @@ class ThingExpirer(BasicWorker):
 
 			# parse expiration date if available
 			delete_after = user.get_value("delete-after")
-			if re.match(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", delete_after):
+			if re.match(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", str(delete_after)):
 				expires_at = datetime.datetime.strptime("%Y-%m-%d", delete_after)
-			elif re.match(r"[0-9]+", delete_after):
+			elif re.match(r"[0-9]+", str(delete_after)):
 				expires_at = datetime.datetime.fromtimestamp(int(delete_after))
 			else:
 				self.log.warning(f"User {username} has invalid expiration date {delete_after}")
