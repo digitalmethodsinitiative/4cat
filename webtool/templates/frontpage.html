@@ -1,6 +1,7 @@
 {% extends "layout.html" %}
 
 {% block body_class %}plain-page frontpage {{ body_class }}{% endblock %}
+{% block breadcrumbs %}{% set navigation.current = "about" %}{% endblock %}
 
 {% block body %}
     <article class="with-aside">

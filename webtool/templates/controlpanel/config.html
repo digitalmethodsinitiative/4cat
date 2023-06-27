@@ -2,6 +2,7 @@
 
 {% block title %}General {{ __user_config("4cat.name") }} settings{% endblock %}
 {% block body_class %}plain-page frontpage admin settings {{ body_class }}{% endblock %}
+{% block subbreadcrumbs %}{% set navigation.sub = "config" %}{% endblock %}
 
 {% block body %}
     <article class="fullsize">

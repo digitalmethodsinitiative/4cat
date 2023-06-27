@@ -2,6 +2,7 @@
 
 {% block title %}{% if mode == "edit" %}Edit user '{{ user.name }}'{% else %}Create user{% endif %}{% endblock %}
 {% block body_class %}plain-page frontpage admin {{ body_class }}{% endblock %}
+{% block subbreadcrumbs %}{% set navigation.sub = "user" %}{% endblock %}
 
 {% block body %}
     <article class="small">
@@ -105,7 +106,7 @@
                     </button>
                 </div>
             </form>
-            <footer class="banner">{% if user.timestamp_created %}User created on {{  user.timestamp_created|datetime }}{% else %}User known since time immemorial{% endif %}.</footer>
+            <footer class="banner">{% if user.timestamp_created %}User created on {{  user.timestamp_created|datetime|safe }}{% else %}User known since time immemorial{% endif %}.</footer>
         </section>
     </article>
 {% endblock %}

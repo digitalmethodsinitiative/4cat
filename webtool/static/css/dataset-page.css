@@ -206,7 +206,7 @@ article.result > section:first-child {
     position: absolute;
     top: 1.25em;
     left: -1.5em;
-    font-family: 'Font Awesome 5 Pro', 'Font Awesome 5 Free';
+    font-family: 'Font Awesome 6 Pro', 'Font Awesome 6 Free';
     font-weight: 900;
     content: '\f061';
     color: var(--gray-dark);

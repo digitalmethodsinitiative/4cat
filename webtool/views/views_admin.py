@@ -538,13 +538,14 @@ def toggle_datasources():
 @app.route("/manage-notifications/", methods=["GET", "POST"])
 @login_required
 @setting_required("privileges.admin.can_manage_notifications")
-def create_notification():
+def manipulate_notifications():
     """
     Create new notification
 
     :return:
     """
     incomplete = []
+    notification = {}
 
     if request.method == "POST":
         params = request.form.to_dict()
@@ -568,21 +569,23 @@ def create_notification():
         else:
             expires = None
 
-        if not incomplete:
-            db.insert("users_notifications", {
-                "username": params["username"],
-                "notification": params["notification"],
+        notification = {
+                "username": params.get("username"),
+                "notification": params.get("notification"),
                 "timestamp_expires": int(time.time() + expires) if expires else None,
-                "allow_dismiss": not not params.get("allow_dismiss")}, safe=True)
+                "allow_dismiss": not not params.get("allow_dismiss")
+        }
+
+        if not incomplete:
+            db.insert("users_notifications", notification, safe=True)
             flash("Notification added")
-            return redirect(url_for("admin_frontpage"))
 
         else:
             flash("Please ensure all fields contain a valid value.")
 
     notifications = db.fetchall("SELECT * FROM users_notifications ORDER BY username ASC, id ASC")
     return render_template("controlpanel/notifications.html", incomplete=incomplete, flashes=get_flashed_messages(),
-                           notification=notifications)
+                           notification=notification, notifications=notifications)
 
 
 @app.route("/delete-notification/<int:notification_id>")

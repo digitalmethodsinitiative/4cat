@@ -157,7 +157,7 @@ INSERT INTO settings (name, value, tag) VALUES
   ('privileges.admin.can_manage_users', 'true', 'admin'),
   ('privileges.admin.can_manage_settings', 'true', 'admin'),
   ('privileges.admin.can_manage_datasources', 'true', 'admin'),
-  ('privileges.admin.can_manage_notification', 'true', 'admin'),
+  ('privileges.admin.can_manage_notifications', 'true', 'admin'),
   ('privileges.admin.can_manage_tags', 'true', 'admin'),
   ('privileges.admin.can_restart', 'true', 'admin'),
   ('privileges.can_view_all_datasets', 'true', 'admin'),

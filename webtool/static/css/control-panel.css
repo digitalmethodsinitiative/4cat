@@ -116,7 +116,7 @@ table td[colspan] {
 
 .config-tag-info {
     text-align: center;
-    border-bottom: 1px dashed var(--contrast-dark);
+    border-bottom: 2px solid var(--contrast-dark);
     padding: 1em;
 }
 

@@ -2,6 +2,7 @@
 
 {% block title %}User list{% endblock %}
 {% block body_class %}plain-page admin {{ body_class }}{% endblock %}
+{% block subbreadcrumbs %}{% set navigation.sub = "user" %}{% endblock %}
 
 {% block body %}
     <article class="with-aside">

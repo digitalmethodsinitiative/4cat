@@ -95,13 +95,13 @@
                 </li>
                 {% endif %}
                 <li rel="external">
-                    <a class="property-badge permalink tooltip-trigger" aria-controls="tooltip-permalink-{{ item.key }}" href="{{ url_for('show_results') }}{{ parent_key }}/#nav={{ item.get_breadcrumbs() }}" target="_blank"><i class="fa fa-fw fa-hashtag" aria-hidden="true"></i> <span class="sr-only">Permalink to this result (with context)</span></a>
+                    <a class="property-badge permalink tooltip-trigger" aria-controls="tooltip-permalink-{{ item.key }}" href="{{ url_for('show_results') }}{{ parent_key }}/webtool/static#nav={{ item.get_breadcrumbs() }}" target="_blank"><i class="fa fa-fw fa-hashtag" aria-hidden="true"></i> <span class="sr-only">Permalink to this result (with context)</span></a>
                     <p role="tooltip" id="tooltip-permalink-{{ item.key }}" aria-hidden="true">Permanent link to this analysis (with context)</p>
                 </li>
                 {% if item.type in processors %}
                 {% if processors[item.type]["references"] %}
                 <li>
-                    {% set ref_name = processors[item.type].title %}{% set ref_refs = processors[item.type]["references"] %}{% set ref_id = item.key %}{% include "processor-references.html" %}
+                    {% set ref_name = processors[item.type].title %}{% set ref_refs = processors[item.type]["references"] %}{% set ref_id = item.key %}{% include "components/processor-references.html" %}
                 </li>
                 {% endif %}
                 {% if item.get_version_url("backend/processors/" + processors[item.type].filepath) %}
@@ -175,7 +175,7 @@
         {# Child processors, recursively #}
         <ol class="children-datasets child-list">
             {% for child in item.children %}
-                {% include "result-child.html" %}
+                {% include "components/result-child.html" %}
             {% endfor %}
         </ol>
 
@@ -187,7 +187,7 @@
                 {% set git_url = item.get_version_url("backend/processors/" + processor.filepath)%}
                 {% set dataset = item %}
                 {% set inline = true %}
-                {% include "processor-details.html" %}
+                {% include "components/processor-details.html" %}
                 {% set inline = false %}
             {% endfor %}
         </ol>

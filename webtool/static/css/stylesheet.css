@@ -647,16 +647,21 @@ h1 a {
     margin-bottom: 2em;
     color: var(--contrast-bright);
     box-shadow: 0 5px 10px #888;
-    border: 1em solid var(--contrast-dark);
-    border-width: 0.4em 0 0 0;
 }
 
 .main-nav ul {
     list-style: none;
     text-align: center;
-    margin: 0.25em 0 0 0;
-    padding-bottom: 0.5em;
+    padding: 0.5em 0;
     background: var(--contrast-dark);
+}
+
+.main-nav li.current a {
+    text-decoration: underline;
+}
+
+.main-nav > *:not(:first-child) {
+    border-top: 1px dotted var(--contrast-bright);
 }
 
 .main-nav li {
@@ -665,7 +670,7 @@ h1 a {
 
 .main-nav li:not(:last-child):after {
     content: '\02022';
-    margin-left: 0.5em;
+    margin-left: 0.3em;
 }
 
 .main-nav li a {
@@ -689,7 +694,7 @@ h1 a {
 }
 
 .site-announcement p::before {
-    font-family: 'Font Awesome 5 Pro', 'Font Awesome 5 Free';
+    font-family: 'Font Awesome 6 Pro', 'Font Awesome 6 Free';
     content: '\f0f3';
     margin-right: 0.5em;
     font-weight: bold;

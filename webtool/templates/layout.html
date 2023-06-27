@@ -1,3 +1,4 @@
+{% set navigation = namespace(current="") %}{% block breadcrumbs %}{% endblock %}{% block subbreadcrumbs %}{% endblock %}
 <!DOCTYPE html>
 <head>
 	<title>{% block title %}{{ __user_config("4cat.name_long") }}{% endblock %} &bull; {{ __user_config("4cat.name") }}</title>
@@ -33,19 +34,21 @@
 	<nav class="main-nav">
 		<ul>
             {% if __user_config("privileges.can_create_dataset") %}
-			    <li><a href="{{ url_for('show_index') }}">Create dataset</a></li>
+			    <li{% if navigation.current == "create-dataset" %} class="current"{% endif %}><a href="{{ url_for('show_index') }}">Create dataset</a></li>
             {% endif %}
-			<li><a href="{{ url_for('show_results') }}">Datasets</a></li>
-            <li><a href="{{ url_for('data_overview') }}">Data sources</a></li>
+			<li{% if navigation.current == "dataset" %} class="current"{% endif %}><a href="{{ url_for('show_results') }}">Datasets</a></li>
+            <li{% if navigation.current == "datasources" %} class="current"{% endif %}><a href="{{ url_for('data_overview') }}">Data sources</a></li>
             {% if current_user.is_authenticated and not current_user.is_special and __user_config("privileges.can_create_api_token") %}
-                <li><a href="{{ url_for('show_access_tokens') }}">API Access</a></li>
+                <li{% if navigation.current == "api-access" %} class="current"{% endif %}><a href="{{ url_for('show_access_tokens') }}">API Access</a></li>
             {% endif %}
             {% if __user_cp_access %}
-                <li><a href="{{ url_for('admin_frontpage') }}">Control Panel</a></li>
+                <li{% if navigation.current == "control-panel" %} class="current"{% endif %}><a href="{{ url_for('admin_frontpage') }}">Control Panel</a></li>
             {% endif %}
-            <li><a href="{{ url_for('show_page', page='faq') }}"><abbr title="Frequently Asked Questions">FAQ</abbr></a></li>
-			<li><a href="{{ url_for('show_frontpage') }}">About</a></li>
+            <li{% if navigation.current == "faq" %} class="current"{% endif %}><a href="{{ url_for('show_page', page='faq') }}"><abbr title="Frequently Asked Questions">FAQ</abbr></a></li>
+			<li{% if navigation.current == "about" %} class="current"{% endif %}><a href="{{ url_for('show_frontpage') }}">About</a></li>
 		</ul>
+    {% block subnavigation %}
+    {% endblock %}
     {% for notification in __notifications %}
         <div class="site-announcement">
             {{ notification.notification|markdown|safe }}

@@ -90,7 +90,7 @@
 
                     <div class="fullwidth">
                         <dt>Parameters</dt>
-                        <dd>{% include 'result-metadata.html' %}</dd>
+                        <dd>{% include 'components/result-metadata.html' %}</dd>
                     </div>
 
                     {% if has_credentials and current_user.is_authenticated and (current_user.is_admin or dataset.has_owner(current_user)) %}
@@ -123,7 +123,7 @@
                     <div class="fullwidth" id="dataset-result">
                         <dt>Result</dt>
                         <dd data-key="{{ dataset.key }}" class="{% if not dataset.is_finished() %}dataset-unfinished{% endif %}">
-                            {% include "result-result-row.html" %}
+                            {% include "components/result-result-row.html" %}
                         </dd>
                     </div>
                 </dl>
@@ -138,7 +138,7 @@
         </h3>
         <ol class="child-list top-level">
             {% for child in dataset.children %}
-                {% include "result-child.html" %}
+                {% include "components/result-child.html" %}
             {% endfor %}
         </ol>
     </section>
@@ -164,7 +164,7 @@
                     <ol class="processor-list child-list">
                 {% endif %}
                 {% set git_url = dataset.get_version_url("backend/processors/" + processor.filepath) %}
-                {% include "processor-details.html" %}
+                {% include "components/processor-details.html" %}
             {% endfor %}
         </section>
     {% endif %}
