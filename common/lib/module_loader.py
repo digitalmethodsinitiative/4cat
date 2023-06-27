@@ -51,7 +51,7 @@ class ModuleCollector:
 
         # cache module-defined config options for use by the config manager
         module_config = {}
-        for worker in self.processors.values():
+        for worker in self.workers.values():
             if hasattr(worker, "config") and type(worker.config) is dict:
                 module_config.update(worker.config)
 
@@ -66,9 +66,10 @@ class ModuleCollector:
         """
         Determine if a module member is a worker class we can use
         """
+        worker_classes = {"BasicWorker", "BasicProcessor", "Search", "SearchWithScope", "Search4Chan"}
         return inspect.isclass(object) and \
-               "BasicWorker" in [f.__name__ for f in object.__bases__] and \
-               object.__name__ != "BasicWorker" and \
+               worker_classes & set([f.__name__ for f in object.__bases__]) and \
+               object.__name__ not in("BasicProcessor", "BasicWorker") and \
                not inspect.isabstract(object)
 
     def load_modules(self):

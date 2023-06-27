@@ -54,13 +54,13 @@ class ConfigManager:
         # module settings can't be loaded directly because modules need the
         # config manager to load, so that becomes circular
         # instead, this is cached on startup and then loaded here
-        module_config_path = self.get("PATH_ROOT").joinpath("backend/module_config.bin")
+        module_config_path = self.get("PATH_ROOT").joinpath("backend/cache/module_config.bin")
         if module_config_path.exists():
             try:
                 with module_config_path.open("rb") as infile:
                     module_config = pickle.load(infile)
                     self.config_definition.update(module_config)
-            except (ValueError, TypeError):
+            except (ValueError, TypeError) as e:
                 pass
 
     def load_core_settings(self):
