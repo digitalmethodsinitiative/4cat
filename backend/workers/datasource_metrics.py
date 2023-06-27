@@ -71,7 +71,7 @@ class DatasourceMetrics(BasicWorker):
 				elif datasource_id == "8chan":
 					settings_id = "eightchan"
 				
-				boards = [b for b in config.get(settings_id + ".boards", [])]
+				boards = [b for b in config.get(settings_id + "-search.boards", [])]
 
 				# If a datasource is static (so not updated) and it
 				# is already present in the metrics table, we don't
