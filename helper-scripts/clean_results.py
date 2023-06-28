@@ -22,4 +22,4 @@ for file in files:
 		query = DataSet(key=key, db=database)
 	except TypeError:
 		print("Not linked to a query: %s" % file)
-		os.unlink(config.get('PATH_DATA') + "/" + file)
+		os.unlink(config.get('PATH_DATA').joinpath(file))

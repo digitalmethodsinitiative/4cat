@@ -30,6 +30,7 @@ def update_config_from_environment(CONFIG_FILE, config_parser):
     # Database configuration
     config_parser['DATABASE']['db_name'] = os.environ['POSTGRES_DB']
     config_parser['DATABASE']['db_host'] = os.environ['POSTGRES_HOST']
+    config_parser['DATABASE']['db_port'] = os.environ['POSTGRES_PORT']
     config_parser['DATABASE']['db_user'] = os.environ['POSTGRES_USER']
     config_parser['DATABASE']['db_password'] = os.environ['POSTGRES_PASSWORD']
     config_parser['DATABASE']['db_host_auth'] = os.environ['POSTGRES_HOST_AUTH_METHOD']
@@ -59,8 +60,8 @@ if __name__ == "__main__":
         config_parser.add_section('DOCKER')
         config_parser['DOCKER']['use_docker_config'] = 'True'
 
+        # Database information stored here
         config_parser.add_section('DATABASE')
-        config_parser['DATABASE']['db_port'] = '5432'  # port exposed by postgres image
 
         # Flask server information
         config_parser.add_section('SERVER')

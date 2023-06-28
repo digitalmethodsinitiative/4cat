@@ -25,6 +25,7 @@ class UserInput:
     OPTION_DATERANGE = "daterange"  # a beginning and end date
     OPTION_DIVIDER = "divider"  # meta-option, divides related sets of options
     OPTION_FILE = "file"  # file upload
+    OPTION_HUE = "hue"  # colour hue
 
     @staticmethod
     def parse_all(options, input, silently_correct=True):
@@ -188,7 +189,7 @@ class UserInput:
 
             return redumped_value
 
-        elif input_type in (UserInput.OPTION_TEXT, UserInput.OPTION_TEXT_LARGE):
+        elif input_type in (UserInput.OPTION_TEXT, UserInput.OPTION_TEXT_LARGE, UserInput.OPTION_HUE):
             # text string
             # optionally clamp it as an integer; return default if not a valid
             # integer (or float; inferred from default or made explicit via the

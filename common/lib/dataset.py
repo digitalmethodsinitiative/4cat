@@ -58,7 +58,7 @@ class DataSet(FourcatModule):
 		:param db:  Database connection
 		"""
 		self.db = db
-		self.folder = Path(config.get('PATH_ROOT'), config.get('PATH_DATA'))
+		self.folder = config.get('PATH_ROOT').joinpath(config.get('PATH_DATA'))
 		self.staging_areas = []
 
 		if key is not None:
@@ -285,8 +285,11 @@ class DataSet(FourcatModule):
 		# go through items one by one, optionally mapping them
 		if path.suffix.lower() == ".csv":
 			with path.open("rb") as infile:
+				own_processor = self.get_own_processor()
+				csv_parameters = own_processor.get_csv_parameters(csv) if own_processor else {}
+
 				wrapped_infile = NullAwareTextIOWrapper(infile, encoding="utf-8")
-				reader = csv.DictReader(wrapped_infile)
+				reader = csv.DictReader(wrapped_infile, **csv_parameters)
 
 				for item in reader:
 					if hasattr(processor, "interrupted") and processor.interrupted:
@@ -570,7 +573,10 @@ class DataSet(FourcatModule):
 			column_options.add("word_1")
 
 		with self.get_results_path().open(encoding="utf-8") as infile:
-			reader = csv.DictReader(infile)
+			own_processor = self.get_own_processor()
+			csv_parameters = own_processor.get_csv_parameters(csv) if own_processor else {}
+
+			reader = csv.DictReader(infile, **csv_parameters)
 			try:
 				return len(set(reader.fieldnames) & column_options) >= 3
 			except (TypeError, ValueError):
@@ -610,7 +616,10 @@ class DataSet(FourcatModule):
 
 		if self.get_results_path().suffix.lower() == ".csv":
 			with self.get_results_path().open(encoding="utf-8") as infile:
-				reader = csv.DictReader(infile)
+				own_processor = self.get_own_processor()
+				csv_parameters = own_processor.get_csv_parameters(csv) if own_processor else {}
+
+				reader = csv.DictReader(infile, **csv_parameters)
 				try:
 					return list(reader.fieldnames)
 				except (TypeError, ValueError):
@@ -1072,7 +1081,7 @@ class DataSet(FourcatModule):
 
 		available = {}
 		for processor_type, processor in processors.items():
-			if processor_type.endswith("-search"):
+			if processor.is_from_collector():
 				continue
 
 			# consider a processor compatible if its is_compatible_with
@@ -1185,6 +1194,15 @@ class DataSet(FourcatModule):
 		if self.key_parent:
 			return False
 		return True
+
+	def is_from_collector(self):
+		"""
+		Check if this dataset was made by a processor that collects data, i.e.
+		a search or import worker.
+
+		:return bool:
+		"""
+		return self.type.endswith("-search") or self.type.endswith("-import")
 
 	def get_extension(self):
 		"""

@@ -125,8 +125,8 @@ class ImageDownloader(BasicProcessor):
 
 		:param module: Dataset or processor to determine compatibility with
 		"""
-		return (module.type == "top-images" or module.type.endswith("search")) \
-			   and module.type != "telegram-search"
+		return (module.type == "top-images" or module.is_from_collector()) \
+			   and module.type not in ["tiktok-search", "tiktok-urls-search", "telegram-search"]
 
 	def process(self):
 		"""
@@ -448,7 +448,10 @@ class ImageDownloader(BasicProcessor):
 			# Check if we succeeded; content type should be an image
 			if image.status_code != 200 or image.headers.get("content-type", "")[:5] != "image":
 				raise FileNotFoundError()
-			image = BytesIO(image.content)
+			try:
+				image = BytesIO(image.content)
+			except requests.exceptions.ConnectionError:
+				raise FileNotFoundError()
 			image_name = image_url.split("/")[-1].split("?")[0]
 		else:
 			raise FileNotFoundError()

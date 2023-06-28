@@ -218,7 +218,7 @@ class VideoDownloaderPlus(BasicProcessor):
                                             "min": 0,
                                             "max": 5,
                                             "tooltip": "If more than 0, links leading to multiple videos will be downloaded (e.g. a YouTube user's channel)"
-                                        },
+                                        }
 
         return options
 
@@ -234,7 +234,7 @@ class VideoDownloaderPlus(BasicProcessor):
         :param str module:  Module ID to determine compatibility with
         :return bool:
         """
-        return module.type.endswith("search")
+        return (module.type.endswith("-search") or module.is_from_collector()) and module.type not in ["tiktok-search", "tiktok-urls-search"]
 
     def process(self):
         """
@@ -498,7 +498,7 @@ class VideoDownloaderPlus(BasicProcessor):
         # Save some metadata to be able to connect the videos to their source
         metadata = {
             url: {
-                "source_dataset": self.source_dataset.key,
+                "from_dataset": self.source_dataset.key,
                 **sets_to_lists(data)
                 # TODO: This some shenanigans until I can figure out what to do with the info returned
             } for url, data in urls.items()
@@ -779,8 +779,13 @@ class DatasetVideoLibrary:
 
         # Check to see if filtered dataset
         if "copied_from" in parent_dataset.parameters and parent_dataset.is_top_dataset():
-            original_dataset = DataSet(key=parent_dataset.parameters["copied_from"], db=self.current_dataset.db)
-            previous_downloaders += [child for child in original_dataset.top_parent().children if (child.type == "video-downloader" and child.key != self.current_dataset.key)]
+            try:
+                original_dataset = DataSet(key=parent_dataset.parameters["copied_from"], db=self.current_dataset.db)
+                previous_downloaders += [child for child in original_dataset.top_parent().children if
+                                         (child.type == "video-downloader" and child.key != self.current_dataset.key)]
+            except TypeError:
+                # parent dataset no longer exists!
+                pass
 
         return previous_downloaders
 

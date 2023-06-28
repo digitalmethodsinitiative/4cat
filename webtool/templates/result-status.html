@@ -1,8 +1,25 @@
 {% if not dataset.is_finished() %}
     {% if not dataset.get_status() or "queued" in dataset.get_status().lower() %}
-        <i class="fas fa-hourglass-half" aria-label="Query in progress..."></i> Queued...
+        <i class="fas fa-hourglass-half" aria-label="Query in progress..."></i> In a queue{% if dataset_queue and dataset.key in dataset_queue and dataset_queue[dataset.key].data.queue_ahead > 0 %}
+          (#{{ dataset_queue[dataset.key].data.queue_ahead }})
+        {% endif %}, waiting for other datasets
+        to finish...
     {% else %}
         <i class="fas fa-arrow-down scroll" aria-label="Query in progress..."></i>
     {% endif %}
-{% endif %}{% if dataset.get_status() %}
-    {{ dataset.get_status() }}{% if dataset.get_status()[-1] != '.' %}.{% endif %}{% endif %}
+{% endif %}
+{% if dataset.is_finished() %}
+    {% if dataset.num_rows == 0 %}
+        <i class="fa fa-skull" aria-hidden="true"></i> <em>No results.</em>
+    {% elif dataset.num_rows < 0 %}
+        <i class="fa fa-warning" aria-hidden="true"></i> <em>Error while capturing data.</em>
+    {% else %}
+        <i class="fa fa-check" aria-hidden="true"></i>
+    {% endif %}
+{% endif %}
+{% if dataset.get_status() %}
+    {{ dataset.get_status() }}{% if dataset.get_status()[-1] != '.' %}.{% endif %}
+{% endif %}
+{% if dataset.is_finished() and dataset.num_rows > 0 %}
+    {{ dataset.num_rows|commafy }} item{% if dataset.num_rows != 1 %}s{% endif %} captured.
+{% endif %}

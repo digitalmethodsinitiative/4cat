@@ -90,6 +90,14 @@ class TopicModelWordExtractor(BasicProcessor):
         staging_area = self.dataset.get_staging_area()
         # Unzip archived files
         with zipfile.ZipFile(self.source_file, "r") as archive_file:
+            zip_filenames = archive_file.namelist()
+            if any([filename not in zip_filenames for filename in ['.token_metadata.json', '.model_metadata.json']]):
+                self.dataset.update_status(
+                    "Metadata files not found; cannot perform analysis (if Tolenise is from previous 4CAT version; try running previous analysis again)",
+                    is_final=True)
+                self.dataset.update_status(0)
+                return
+
             # Extract our metadata files
             archive_file.extract('.token_metadata.json', staging_area)
             archive_file.extract('.model_metadata.json', staging_area)
@@ -98,11 +106,6 @@ class TopicModelWordExtractor(BasicProcessor):
                 token_metadata = json.load(metadata_file)
             with staging_area.joinpath('.model_metadata.json').open("rb") as metadata_file:
                 model_metadata = json.load(metadata_file)
-
-        if token_metadata is None or model_metadata is None:
-            self.dataset.update_status("Metadata files not found; cannot perform analysis (if Tolenise is from previous 4CAT version; try starting over from there again)", is_final=True)
-            self.dataset.update_status(0)
-            return
 
         # Grab the parameters from out metadata files
         token_metadata_parameters = token_metadata.pop('parameters')
@@ -138,11 +141,11 @@ class TopicModelWordExtractor(BasicProcessor):
                     raise ProcessorInterruptedException("Interrupted while writing results file")
 
                 # Grab metadata related to post
-                token_data = token_metadata[post.get('id')]
+                token_data = token_metadata[str(post.get('id'))]
                 model_data = model_metadata[token_data.get('filename')]
                 interval = token_data['interval']
 
-                combined_data = {'post_id':post.get('id'), 'interval':interval}
+                combined_data = {'post_id': str(post.get('id')), 'interval':interval}
                 # Add original post data
                 for post_column in post_column_names:
                     combined_data[post_column] = post.get(post_column)
@@ -157,7 +160,7 @@ class TopicModelWordExtractor(BasicProcessor):
 
                 # Collect predictions for post
                 for document_number in token_data['document_numbers']:
-                    combined_data['id'] = post.get('id') + '-' + str(document_number)
+                    combined_data['id'] = str(post.get('id')) + '-' + str(document_number)
                     combined_data['document_id'] = document_number
 
                     # Add specific document resulting in prediction if unclear (i.e. multiple documents per item/post)

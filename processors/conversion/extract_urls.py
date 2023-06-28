@@ -40,6 +40,12 @@ class ExtractURLs(BasicProcessor):
             "inline": True,
             "tooltip": "If column contains a single URL, use that URL; else, try to find image URLs in the column's content",
         },
+        "correct_croudtangle": {
+            "type": UserInput.OPTION_TOGGLE,
+            "default": False,
+            "help": "CroudTangle dataset",
+            "tooltip": "CroudTangle text contains resolved links using :=: symbols; these are extracted directly",
+        },
         "expand_urls": {
             "type": UserInput.OPTION_TOGGLE,
             "default": False,
@@ -180,7 +186,7 @@ class ExtractURLs(BasicProcessor):
         "➨.ws", "➯.ws", "➹.ws", "➽.ws",
 
         # additions by 4CAT
-        "api.parler.com", "trib.al"
+        "api.parler.com", "trib.al", "fb.watch",
     )
 
     @classmethod
@@ -221,6 +227,7 @@ class ExtractURLs(BasicProcessor):
             columns = [columns]
         expand_urls = self.parameters.get("expand_urls", False)
         return_matches_only = self.parameters.get("return_matches_only", True)
+        correct_croudtangle = self.parameters.get("correct_croudtangle", False)
 
         # Create fieldnames
         fieldnames = self.source_dataset.get_item_keys(self) + ["4CAT_number_unique_urls", "4CAT_extracted_urls"] + ["4CAT_extracted_from_" + column for column in columns]
@@ -236,6 +243,7 @@ class ExtractURLs(BasicProcessor):
             processed_items = 0
             url_matches_found = 0
             total_items = self.source_dataset.num_rows
+            progress_interval_size = max(int(total_items / 10), 1)  # 1/10 of total number of records
             for item in self.source_dataset.iterate_items(self):
                 if self.interrupted:
                     raise ProcessorInterruptedException("Interrupted while iterating through items")
@@ -255,6 +263,8 @@ class ExtractURLs(BasicProcessor):
 
                     # Check for links
                     identified_urls = self.identify_links(value, self.parameters.get("split-comma", True))
+                    if correct_croudtangle:
+                        identified_urls = ["".join(id_url.split(":=:")[1:]) if ":=:" in id_url else id_url for id_url in identified_urls]
 
                     # Expand url shorteners
                     if expand_urls:
@@ -274,10 +284,11 @@ class ExtractURLs(BasicProcessor):
                     url_matches_found += 1
 
                 processed_items += 1
-                if processed_items % int(total_items / 10) == 0:
+                if processed_items % progress_interval_size == 0:
                     self.dataset.update_status(f"Processed {processed_items}/{total_items} items; {url_matches_found} items with url(s)")
                     self.dataset.update_progress(processed_items / total_items)
-
+        if cache:
+            self.dataset.log(f"Expanded {len(cache)} URLs in dataset")
         self.dataset.finish(url_matches_found)
 
     @staticmethod
