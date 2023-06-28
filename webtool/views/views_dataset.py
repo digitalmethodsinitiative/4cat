@@ -21,6 +21,7 @@ from webtool.views.api_tool import delete_dataset, toggle_favourite, toggle_priv
 import backend
 from common.lib.dataset import DataSet
 from common.lib.queue import JobQueue
+from common.lib.user import User
 
 from common.config_manager import ConfigWrapper
 config = ConfigWrapper(config, user=current_user)
@@ -76,9 +77,10 @@ def show_results(page):
     if depth not in available_depths:
         depth = "own"
 
+    owner_match = tuple([current_user.get_id(), *[f"tag:{t}" for t in current_user.tags]])
     if depth == "own":
-        where.append("key IN ( SELECT key FROM datasets_owners WHERE name = %s AND key = datasets.key)")
-        replacements.append(current_user.get_id())
+        where.append("key IN ( SELECT key FROM datasets_owners WHERE name IN %s AND key = datasets.key)")
+        replacements.append(owner_match)
 
     if depth == "favourites":
         where.append("key IN ( SELECT key FROM users_favourites WHERE name = %s )")
@@ -93,8 +95,8 @@ def show_results(page):
 
     # hide private datasets for non-owners and non-admins
     if not config.get("privileges.can_view_private_datasets"):
-        where.append("(is_private = FALSE OR key IN ( SELECT key FROM datasets_owners WHERE name = %s AND key = datasets.key))")
-        replacements.append(current_user.get_id())
+        where.append("(is_private = FALSE OR key IN ( SELECT key FROM datasets_owners WHERE name IN %s AND key = datasets.key))")
+        replacements.append(owner_match)
 
     # empty datasets could just have no results, or be failures. we make no
     # distinction here
@@ -103,11 +105,13 @@ def show_results(page):
 
     # the user filter is only exposed to admins
     if filters["user"]:
-        if (config.get("privileges.can_view_all_datasets") or current_user.get_id() == filters["user"]):
-            where.append("key IN ( SELECT key FROM datasets_owners WHERE name = %s AND key = datasets.key)")
-            replacements.append(filters["user"])
+        if config.get("privileges.can_view_all_datasets"):
+            target_user = User.get_by_name(db, filters["user"])
+            tags = [] if target_user is None else target_user.tags
+            where.append("key IN ( SELECT key FROM datasets_owners WHERE name IN %s AND key = datasets.key)")
+            replacements.append(owner_match)
         else:
-            return error(403, "You cannot use this filter.")
+            return error(403, error="You cannot use this filter.")
 
     # not all datasets have a datsource defined, but that is fine, since if
     # we are looking for all datasources the query just excludes this part
@@ -123,9 +127,10 @@ def show_results(page):
     # then get the current page of results
     replacements.append(page_size)
     replacements.append(offset)
-    datasets = db.fetchall(
-        "SELECT key FROM datasets WHERE " + where + " ORDER BY " + filters["sort_by"] + " DESC LIMIT %s OFFSET %s",
-        tuple(replacements))
+    query = "SELECT key FROM datasets WHERE " + where + " ORDER BY " + filters["sort_by"] + " DESC LIMIT %s OFFSET %s"
+    print(query)
+    print(replacements)
+    datasets = db.fetchall(query, tuple(replacements))
 
     if not datasets and page != 1:
         return error(404)
@@ -495,6 +500,10 @@ def keep_dataset(key):
         return render_template("error.html", title="Dataset cannot be kept",
                                message="All datasets are scheduled for automatic deletion. This cannot be "
                                        "overridden."), 403
+
+    if not current_user.can_access_dataset(dataset, role="owner"):
+        return error(403, message="You cannot cancel deletion for this dataset.")
+
     if not dataset.key_parent:
         # top-level dataset
         # check if data source forces expiration - in that case, the user

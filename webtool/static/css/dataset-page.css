@@ -128,11 +128,24 @@ article.result > section:first-child {
 
 .metadata-wrapper {
     display: grid;
-    grid-template-columns: 50% 50%;
+    grid-template-columns: 12.5% 12.5% 12.5% 12.5% 12.5% 12.5% 12.5% 12.5%;
     border-bottom: 1px solid var(--gray);
 }
-.metadata-wrapper div.fullwidth {
-    grid-column: 1 / span 2;
+
+.metadata-wrapper > div {
+    grid-column: span 4;
+}
+
+.metadata-wrapper > div.fullwidth {
+    grid-column: 1 / span 8;
+}
+
+.metadata-wrapper > div.onequarter {
+    grid-column: 1 / span 3;
+}
+
+.metadata-wrapper > div.threequarters {
+    grid-column: 4 / span 5;
 }
 
 .metadata-wrapper > div:not(.filter-list) {

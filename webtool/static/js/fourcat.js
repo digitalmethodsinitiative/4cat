@@ -698,9 +698,7 @@ const query = {
                 $('#query-form').removeClass();
                 $('#query-form').addClass(datasource);
                 $('#datasource-form').html(data.html);
-                if (data.has_javascript) {
-                    $('<script id="query-form-script">').attr('src', getRelativeURL('api/datasource-script/' + data.datasource + '/')).appendTo('body');
-                }
+
                 //automatically fill in cached parameters
                 $('#datasource-form .cacheable input').each(function () {
                     let item_name = datasource + '.' + $(this).attr('name');

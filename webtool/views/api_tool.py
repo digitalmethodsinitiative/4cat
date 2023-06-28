@@ -125,9 +125,8 @@ def datasource_form(datasource_id):
 
 	:param datasource_id:  Data source ID, as specified in the data source and
 						   config.py
-	:return: A JSON object with the `html` of the template,
-	         a boolean `has_javascript` determining whether javascript should be
-	         loaded for this template, a `status` code and the `datasource` ID.
+	:return: A JSON object with the `html` of the template, a `status` code and
+	the `datasource` ID.
 
 	:return-error 404: If the datasource does not exist.
 	"""
@@ -160,50 +159,14 @@ def datasource_form(datasource_id):
 		labels.append(status)
 
 	form = render_template("components/create-dataset-option.html", options=worker_options, labels=labels)
-	javascript_path = datasource["path"].joinpath("webtool", "tool.js")
-	has_javascript = javascript_path.exists()
-
 	html = render_template_string(form, datasource_id=datasource_id, datasource=datasource)
 
 	return jsonify({
 		"status": "success",
 		"datasource": datasource_id,
-		"has_javascript": has_javascript,
 		"type": labels,
 		"html": html
 	})
-
-
-@app.route("/api/datasource-script/<string:datasource_id>/")
-@login_required
-@setting_required("privileges.can_create_dataset")
-def datasource_script(datasource_id):
-	"""
-	Get data source query form HTML
-
-	The data source needs to have been loaded as a module with a
-	`ModuleCollector`, and also needs to be present in `config.py`. If so, this
-	endpoint returns the data source's tool javascript file, if it exists as
-	`tool.js` in the data source's `webtool` folder.
-
-	:param datasource_id:  Datasource ID, as specified in the datasource and
-						   config.py
-	:return: A javascript file
-	:return-error 404: If the datasource does not exist.
-	"""
-	if datasource_id not in backend.all_modules.datasources:
-		return error(404, message="Datasource '%s' does not exist" % datasource_id)
-
-	if datasource_id not in config.get('4cat.datasources'):
-		return error(404, message="Datasource '%s' does not exist" % datasource_id)
-
-	datasource = backend.all_modules.datasources[datasource_id]
-	script_path = datasource["path"].joinpath("webtool", "tool.js")
-
-	if not script_path.exists():
-		return error(404, message="Datasource '%s' does not exist" % datasource_id)
-
-	return send_file(str(script_path))
 
 
 @app.route("/api/import-dataset/", methods=["POST"])
