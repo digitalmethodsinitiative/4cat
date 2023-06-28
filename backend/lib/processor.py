@@ -98,8 +98,10 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 		up.
 		"""
 		try:
+			# a dataset can have multiple owners, but the creator is the user
+			# that actually queued the processor, so their config is relevant
 			self.dataset = DataSet(key=self.job.data["remote_id"], db=self.db)
-			self.owner = self.dataset.get_owners()[0]
+			self.owner = self.dataset.creator
 		except TypeError as e:
 			# query has been deleted in the meantime. finish without error,
 			# as deleting it will have been a conscious choice by a user
@@ -107,7 +109,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 			return
 
 		# set up config reader using the worker's DB connection and the dataset
-		# owner. This ensures that if a value has been overriden for the owner,
+		# creator. This ensures that if a value has been overriden for the owner,
 		# the overridden value is used instead.
 		config.with_db(self.db)
 		self.config = ConfigWrapper(config=config, user=self.owner)

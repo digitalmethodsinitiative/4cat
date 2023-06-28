@@ -82,7 +82,7 @@
                 <div class="form-element">
                     <label for="user-autodelete">Delete after</label>
                     <div>
-                        <input type="text" placeholder="YYYY-MM-DD hh:mm" {% if user.get_value("delete-after") %} value="{{ user.get_value("delete-after")|datetime("%Y-%m-%d %H:%M", wrap=False) }}"{% endif %} id="user-autodelete" name="autodelete">
+                        <input type="text" placeholder="YYYY-MM-DD hh:mm" {% if user.get_value and user.get_value("delete-after") %} value="{{ user.get_value("delete-after")|datetime("%Y-%m-%d %H:%M", wrap=False) }}"{% endif %} id="user-autodelete" name="autodelete">
                         <button class="tooltip-trigger" aria-controls="tooltip-autodelete-label" aria-label="Extended help for option">?</button>
                         <p role="tooltip" id="tooltip-autodelete-label" class="force-width">Automatically delete the user at this time. They will see a warning in the interface starting one week before.</div>
                     </div>
@@ -90,7 +90,7 @@
                 <div class="form-element">
                     <label for="user-notes">Notes</label>
                     <div>
-                        <textarea name="notes" id="user-notes">{{ user.get_value("notes", "") }}</textarea>
+                        <textarea name="notes" id="user-notes">{% if user.get_value %}{{ user.get_value("notes", "") }}{% endif %}</textarea>
                         <button class="tooltip-trigger" aria-controls="tooltip-notes-label" aria-label="Extended help for option">?</button>
                         <p role="tooltip" id="tooltip-notes-label" class="force-width">Notes for this user. This is for your own convenience and not used by 4CAT.</div>
                     </div>

@@ -299,6 +299,10 @@ const query = {
 
         // convert dataset
         $(document).on('change', '#convert-dataset', query.convert_dataset)
+
+        // dataset ownership
+        $(document).on('click', '#add-dataset-owner', query.add_owner);
+        $(document).on('click', '.remove-dataset-owner', query.remove_owner);
     },
 
     /**
@@ -872,7 +876,85 @@ const query = {
                 }
             });
         }
+    },
+
+    add_owner: function (e) {
+        e.preventDefault();
+        let target = e.target;
+        if(target.tagName !== 'A') {
+            target = $(target).parents('a')[0];
+        }
+
+        popup.dialog(
+            '<p>Owners have full privileges; viewers can only view a dataset. You can add users as owners, or all ' +
+            'users with a given tag by adding <samp>tag:example</samp> as username.</p>' +
+            '<label>Username: <input type="text" id="new-dataset-owner" name="owner"></label>' +
+            '<label>Role: ' +
+            '  <select id="new-dataset-role" name="role"><option value="owner">Owner</option><option value="viewer">Viewer</option>' +
+            '</select></label>',
+            'Add owner to dataset',
+            function () {
+                let dataset_key = document.querySelector('article.result').getAttribute('data-dataset-key');
+                let name = document.querySelector('#new-dataset-owner').value;
+                let role = document.querySelector('#new-dataset-role').value;
+                let body = new FormData();
+                body.append('name', name);
+                body.append('key', dataset_key);
+                body.append('role', role);
+                fetch(target.getAttribute('href'), {
+                    method: 'POST',
+                    body: body
+                })
+                    .then((response) => response.json())
+                    .then((data) => {
+                        if(!data['html']) {
+                            popup.alert('There was an error adding the owner to the dataset. ' + data['error']);
+                        } else {
+                            document.querySelector('#add-dataset-owner').insertAdjacentHTML('beforebegin', data['html']);
+                        }
+                    })
+                    .catch((error) => {
+                        document.querySelector('.dataset-owner-list').classList.add('flash-once-error');
+                        popup.alert('There was an error adding the owner to the dataset. Refresh and try again later.');
+                    })
+            }
+        );
+    },
+
+    remove_owner: function (e) {
+        e.preventDefault();
+        let target = e.target;
+        if(target.tagName !== 'A') {
+            target = $(target).parents('a')[0];
+        }
+
+        popup.confirm('Are you sure you want to remove this owner? This cannot be undone.', 'Confirm', function () {
+            let owner = target.parentNode.getAttribute('data-owner');
+            let dataset_key = document.querySelector('article.result').getAttribute('data-dataset-key');
+            let body = new FormData();
+            body.append('name', owner);
+            body.append('key', dataset_key);
+            fetch(target.getAttribute('href'), {
+                method: 'DELETE',
+                body: body
+            })
+                .then((response) => response.json())
+                .then(data => {
+                    console.log(data);
+                    if (data['error']) {
+                        popup.alert('There was an error removing the owner from the dataset. ' + data['error']);
+                    } else {
+                        document.querySelector('[data-owner="' + owner + '"]').remove();
+                    }
+                })
+                .catch((error) => {
+                    console.log(error);
+                    document.querySelector('.dataset-owner-list').classList.add('flash-once-error');
+                    popup.alert('There was an error removing the owner from the dataset. Refresh and try again later.');
+                })
+        });
     }
+
 };
 
 /**
@@ -1009,7 +1091,7 @@ const popup = {
             popup.init();
         }
 
-        $('#popup').removeClass('confirm').removeClass('render').addClass('alert');
+        $('#popup').removeClass('confirm').removeClass('render').removeClass('dialog').addClass('alert');
 
         let wrapper = $('<div><h2 id="popup-title">' + title + '</h2><p id="popup-text">' + message + '</p><div class="controls"><button class="popup-close"><i class="fa fa-check" aria-hidden="true"></i> OK</button></div></div>');
         popup.render(wrapper.html(), false, false);
@@ -1024,8 +1106,22 @@ const popup = {
             popup.current_callback = callback;
         }
 
-        $('#popup').removeClass('alert').removeClass('render').addClass('confirm');
+        $('#popup').removeClass('alert').removeClass('render').removeClass('dialog').addClass('confirm');
         let wrapper = $('<div><h2 id="popup-title">' + title + '</h2><p id="popup-text">' + message + '</p><div class="controls"><button class="popup-close"><i class="fa fa-times" aria-hidden="true"></i> Cancel</button><button class="popup-execute-callback"><i class="fa fa-check" aria-hidden="true"></i> OK</button></div></div>');
+        popup.render(wrapper.html(), false, false);
+    },
+
+    dialog: function(body, title = 'Confirm', callback = false) {
+        if (!popup.is_initialised) {
+            popup.init();
+        }
+
+        if (callback) {
+            popup.current_callback = callback;
+        }
+
+        $('#popup').removeClass('alert').removeClass('render').removeClass('confirm').addClass('dialog');
+        let wrapper = $('<div><h2 id="popup-title">' + title + '</h2><div id="popup-dialog">' + body + '</div><div class="controls"><button class="popup-close"><i class="fa fa-times" aria-hidden="true"></i> Cancel</button><button class="popup-execute-callback"><i class="fa fa-check" aria-hidden="true"></i> OK</button></div></div>');
         popup.render(wrapper.html(), false, false);
     },
 

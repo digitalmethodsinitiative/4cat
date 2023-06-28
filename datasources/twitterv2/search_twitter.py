@@ -74,7 +74,7 @@ class SearchWithTwitterAPIv2(Search):
         error_report = []
         # this is pretty sensitive so delete it immediately after storing in
         # memory
-        have_api_key = config.get("twitterv2-search.academic_api_key", user=self.owner)
+        have_api_key = self.config.get("twitterv2-search.academic_api_key")
         bearer_token = self.parameters.get("api_bearer_token") if not have_api_key else have_api_key
         api_type = query.get("api_type", "all") if not have_api_key else "all"
         auth = {"Authorization": "Bearer %s" % bearer_token}
@@ -108,7 +108,7 @@ class SearchWithTwitterAPIv2(Search):
             "media.fields": ",".join(media_fields),
         }
 
-        if self.parameters.get("query_type", "query") == "id_lookup" and config.get("twitterv2-search.id_lookup", user=self.owner):
+        if self.parameters.get("query_type", "query") == "id_lookup" and self.config.get("twitterv2-search.id_lookup"):
             endpoint = "https://api.twitter.com/2/tweets"
 
             tweet_ids = self.parameters.get("query", []).split(',')
@@ -317,7 +317,7 @@ class SearchWithTwitterAPIv2(Search):
 
                     yield tweet
 
-                if self.parameters.get("query_type", "query") == "id_lookup" and config.get("twitterv2-search.id_lookup", user=self.owner):
+                if self.parameters.get("query_type", "query") == "id_lookup" and self.config.get("twitterv2-search.id_lookup"):
                     # If id_lookup return errors in collecting tweets
                     for tweet_error in api_response.get("errors", []):
                         tweet_id = str(tweet_error.get('resource_id'))

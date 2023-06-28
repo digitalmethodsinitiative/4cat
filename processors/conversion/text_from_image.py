@@ -183,7 +183,7 @@ class ImageTextDetector(BasicProcessor):
         :param Path image_file:  Path to file to annotate
         :return dict:  Lists of detected features, one key for each feature
         """
-        server = config.get('text-from-images.server_url', '', user=self.owner)
+        server = self.config.get('text-from-images.server_url', '')
 
         # Get model_type if available
         parameters = {}

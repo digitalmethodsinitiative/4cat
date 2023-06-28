@@ -86,7 +86,7 @@ class YouTubeMetadata(BasicProcessor):
 		"""
 
 		# First check if there's a YouTube Developer API key in config
-		if not config.get('api.youtube.key', user=self.owner):
+		if not self.config.get('api.youtube.key'):
 			self.dataset.update_status("No API key found")
 			self.dataset.finish(0)
 			return
@@ -419,7 +419,7 @@ class YouTubeMetadata(BasicProcessor):
 		if custom_key:
 			api_key = custom_key
 		else:
-			api_key = config.get('api.youtube.key', user=self.owner)
+			api_key = self.config.get('api.youtube.key')
 
 		for i, ids_string in enumerate(ids_list):
 
@@ -428,7 +428,7 @@ class YouTubeMetadata(BasicProcessor):
 
 			try:
 				# Use YouTubeDL and the YouTube API to request video data
-				youtube = build(config.get('api.youtube.name', user=self.owner), config.get('api.youtube.version', user=self.owner),
+				youtube = build(self.config.get('api.youtube.name'), self.config.get('api.youtube.version'),
 												developerKey=api_key)
 			# Catch invalid API keys
 			except HttpError as e:

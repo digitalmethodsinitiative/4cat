@@ -143,7 +143,7 @@ class TikTokScraper:
     last_time_proxy_available = None
     no_available_proxy_timeout = 600
 
-    def __init__(self, processor):
+    def __init__(self, processor, config):
         """
         :param Processor processor:  The processor using this function and needing updates
         """
@@ -155,8 +155,8 @@ class TikTokScraper:
 
         :return:
         """
-        all_proxies = config.get("tiktok-urls-search.proxies", user=self.owner)
-        self.proxy_sleep = config.get("tiktok-urls-search.proxies.wait", self.proxy_sleep, user=self.owner)
+        all_proxies = self.processor.config.get("tiktok-urls-search.proxies")
+        self.proxy_sleep = self.processor.config.get("tiktok-urls-search.proxies.wait", self.proxy_sleep)
         if not all_proxies:
             # no proxies? just request directly
             all_proxies = ["__localhost__"]

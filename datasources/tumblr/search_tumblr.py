@@ -621,10 +621,10 @@ class SearchTumblr(Search):
 
 		"""
 		client = pytumblr.TumblrRestClient(
-			config.get("api.tumblr.consumer_key", user=self.owner),
-			config.get("api.tumblr.consumer_secret", user=self.owner),
-			config.get("api.tumblr.key", user=self.owner),
-			config.get("api.tumblr.secret_key", user=self.owner)
+			self.config.get("api.tumblr.consumer_key"),
+			self.config.get("api.tumblr.consumer_secret"),
+			self.config.get("api.tumblr.key"),
+			self.config.get("api.tumblr.secret_key")
 		)
 		client_info = self.client.info()
 

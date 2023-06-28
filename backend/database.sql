@@ -60,11 +60,12 @@ CREATE TABLE IF NOT EXISTS datasets (
 );
 
 CREATE TABLE datasets_owners (
-    "user" text DEFAULT 'anonymous'::text,
-    key text NOT NULL
+    "name" text DEFAULT 'anonymous'::text,
+    key text NOT NULL,
+    role TEXT DEFAULT 'owner'
 );
 
-CREATE UNIQUE INDEX datasets_owners_user_key_idx ON datasets_owners("user" text_ops,key text_ops);
+CREATE UNIQUE INDEX datasets_owners_user_key_idx ON datasets_owners("name" text_ops,key text_ops);
 
 
 -- annotations

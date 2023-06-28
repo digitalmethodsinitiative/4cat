@@ -107,7 +107,7 @@ class VideoFrames(BasicProcessor):
 			video_dir.mkdir(exist_ok=True)
 
 			command = [
-				shutil.which(config.get("video-downloader.ffmpeg_path", user=self.owner)),
+				shutil.which(self.config.get("video-downloader.ffmpeg_path")),
 				"-i", shlex.quote(str(path)),
 				"-r", str(frame_interval),
 			]

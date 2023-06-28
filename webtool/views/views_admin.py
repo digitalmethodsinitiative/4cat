@@ -315,7 +315,7 @@ def manipulate_user(mode):
             if mode == "edit":
                 db.update("users", where={"name": request.form.get("current-name")}, data=user_data)
                 user = User.get_by_name(db, user_data["name"])  # ensure updated data
-                userdata = json.loads(user.data["userdata"])
+                print(user)
 
             else:
                 try:
@@ -332,16 +332,16 @@ def manipulate_user(mode):
 
                     # show the edit form for the user next
                     mode = "edit"
-                    userdata = {}
 
                 except psycopg2.IntegrityError:
                     flash("A user with this e-mail address already exists.")
                     incomplete.append("name")
                     db.rollback()
 
-            if "autodelete" in request.form:
+            if not incomplete and "autodelete" in request.form:
                 autodelete = request.form.get("autodelete").replace("T", " ")[:16]
                 if not autodelete:
+                    print(user)
                     user.set_value("delete-after", "")
 
                 elif not re.match("[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}", autodelete):
@@ -354,7 +354,7 @@ def manipulate_user(mode):
                     autodelete = autodelete.replace(tzinfo=datetime.timezone.utc)
                     user.set_value("delete-after", int(autodelete.timestamp()))
 
-            if request.form.get("notes"):
+            if not incomplete and request.form.get("notes"):
                 user.set_value("notes", request.form.get("notes"))
 
             if not incomplete:

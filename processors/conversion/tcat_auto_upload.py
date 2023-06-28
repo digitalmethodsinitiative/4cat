@@ -126,15 +126,15 @@ class FourcatToDmiTcatUploader(BasicProcessor):
         self.dataset.log('Twitter query: ' + query)
 
         # TCAT authorization information
-        auth = (config.get('tcat-auto-upload.username', user=self.owner), config.get('tcat-auto-upload.password', user=self.owner))
+        auth = (self.config.get('tcat-auto-upload.username'), self.config.get('tcat-auto-upload.password'))
 
         # find server URL
         server_choice = self.parameters.get("server", "random")
-        if type(config.get('tcat-auto-upload.server_url', user=self.owner)) in (list, set, tuple):
-            if server_choice == "random" or server_choice not in config.get('tcat-auto-upload.server_url', user=self.owner):
-                server_choice = random.choice(config.get('tcat-auto-upload.server_url', user=self.owner))
+        if type(self.config.get('tcat-auto-upload.server_url')) in (list, set, tuple):
+            if server_choice == "random" or server_choice not in self.config.get('tcat-auto-upload.server_url'):
+                server_choice = random.choice(self.config.get('tcat-auto-upload.server_url'))
         else:
-            server_choice = config.get('tcat-auto-upload.server_url', user=self.owner)
+            server_choice = self.config.get('tcat-auto-upload.server_url')
 
         # DOCKER shenanigans
         if 'host.docker.internal' in server_choice:
@@ -221,7 +221,7 @@ class FourcatToDmiTcatUploader(BasicProcessor):
                                                 'url': url_to_file,
                                                 'name': bin_name,
                                                 'query': query,
-                                                'token': config.get('tcat-auto-upload.token', user=self.owner),
+                                                'token': self.config.get('tcat-auto-upload.token'),
                                                 })
         return response
 

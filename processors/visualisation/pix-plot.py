@@ -150,7 +150,7 @@ class PixPlotGenerator(BasicProcessor):
         label_formated = ''.join(e if e.isalnum() else '_' for e in top_dataset.get_label())
         image_label = datetime.fromtimestamp(self.source_dataset.timestamp).strftime("%Y-%m-%d-%H%M%S") + '-' + label_formated + '-' + str(top_dataset.key)
         plot_label = date + '-' + label_formated + '-' + str(self.dataset.key)
-        pixplot_server = config.get('pix-plot.server_url', user=self.owner).rstrip("/")
+        pixplot_server = self.config.get('pix-plot.server_url').rstrip("/")
 
         # Folder name is PixPlot identifier and set at dataset key
         data = {'folder_name': image_label}
@@ -248,7 +248,7 @@ class PixPlotGenerator(BasicProcessor):
         if resp.status_code == 202:
             # new request
             new_request = True
-            results_url = config.get('pix-plot.server_url', user=self.owner).rstrip('/') + '/api/pixplot?key=' + resp.json()['key']
+            results_url = self.config.get('pix-plot.server_url').rstrip('/') + '/api/pixplot?key=' + resp.json()['key']
         else:
             try:
                 resp_json = resp.json()

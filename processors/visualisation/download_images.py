@@ -142,7 +142,7 @@ class ImageDownloader(BasicProcessor):
 		split_comma = self.parameters.get("split-comma", False)
 
 		if amount == 0:
-			amount = config.get('image-downloader.max', 1000, user=self.owner)
+			amount = self.config.get('image-downloader.max', 1000)
 		columns = self.parameters.get("columns")
 		if type(columns) is str:
 			columns = [columns]

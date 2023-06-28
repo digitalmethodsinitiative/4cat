@@ -77,7 +77,7 @@ def show_results(page):
         depth = "own"
 
     if depth == "own":
-        where.append("owner = %s")
+        where.append("key IN ( SELECT key FROM datasets_owners WHERE name = %s AND key = datasets.key)")
         replacements.append(current_user.get_id())
 
     if depth == "favourites":
@@ -93,7 +93,7 @@ def show_results(page):
 
     # hide private datasets for non-owners and non-admins
     if not config.get("privileges.can_view_private_datasets"):
-        where.append("(is_private = FALSE OR owner = %s)")
+        where.append("(is_private = FALSE OR key IN ( SELECT key FROM datasets_owners WHERE name = %s AND key = datasets.key))")
         replacements.append(current_user.get_id())
 
     # empty datasets could just have no results, or be failures. we make no
@@ -101,16 +101,13 @@ def show_results(page):
     if filters["hide_empty"]:
         where.append("num_rows > 0")
 
-    # the user filter is only exposed to admins, and otherwise emulates the
-    # 'own' option
+    # the user filter is only exposed to admins
     if filters["user"]:
         if (config.get("privileges.can_view_all_datasets") or current_user.get_id() == filters["user"]):
-            where.append("owner = %s")
+            where.append("key IN ( SELECT key FROM datasets_owners WHERE name = %s AND key = datasets.key)")
             replacements.append(filters["user"])
         else:
-            where.append("(owner = %s AND (owner = %s OR is_private = FALSE))")
-            replacements.append(filters["user"])
-            replacements.append(current_user.get_id())
+            return error(403, "You cannot use this filter.")
 
     # not all datasets have a datsource defined, but that is fine, since if
     # we are looking for all datasources the query just excludes this part
@@ -463,13 +460,13 @@ def restart_dataset(key):
     except TypeError:
         return error(404, message="Dataset not found.")
 
-    if dataset.is_private and not (config.get("privileges.can_view_private_datasets") or dataset.has_owner(current_user)):
+    if dataset.is_private and not (config.get("privileges.can_view_private_datasets") or dataset.has_owner(current_user, "owner")):
         return error(403, error="This dataset is private.")
 
     if not config.get("privileges.can_rerun_dataset"):
         return error(403, message="Not allowed.")
 
-    if not dataset.has_owner(current_user) and not current_user.is_admin:
+    if not dataset.has_owner(current_user, "owner") and not config.get("privileges.can_view_all_datasets"):
         return error(403, message="Not allowed.")
 
     if not dataset.is_finished():
@@ -532,7 +529,7 @@ def nuke_dataset_interactive(key):
     except TypeError:
         return error(404, message="Dataset not found.")
 
-    if not current_user.can_access_dataset(dataset):
+    if not current_user.can_access_dataset(dataset, role="owner"):
         return error(403, error="This dataset is private.")
 
     top_key = dataset.top_parent().key
@@ -566,7 +563,7 @@ def delete_dataset_interactive(key):
     except TypeError:
         return error(404, message="Dataset not found.")
 
-    if not current_user.can_access_dataset(dataset):
+    if not current_user.can_access_dataset(dataset, role="owner"):
         return error(403, error="This dataset is private.")
 
     top_key = dataset.top_parent().key
@@ -605,7 +602,7 @@ def erase_credentials_interactive(key):
     except TypeError:
         return error(404, error="Dataset does not exist.")
 
-    if not current_user.is_admin and not dataset.has_owner(current_user):
+    if not current_user.is_admin and not dataset.has_owner(current_user, "owner"):
         return error(403, message="Not allowed")
 
     success = erase_credentials(key)

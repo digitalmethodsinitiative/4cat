@@ -64,7 +64,7 @@ a:hover {
     text-decoration: underline;
 }
 
-code {
+code, samp {
     color: var(--accent-alternate);
     font-weight: bold;
 }
@@ -76,6 +76,10 @@ pre {
     color: var(--accent-alternate);
     overflow: auto;
     padding: 0.5em;
+}
+
+samp {
+    font-family: monospace;
 }
 
 em, strong {
@@ -533,14 +537,14 @@ button.tooltip-trigger, button.popup-trigger {
     max-width: 90%;
 }
 
-#popup.alert, #popup.confirm {
+#popup.alert, #popup.confirm, #popup.dialog {
     padding: 0;
     width: auto;
     height: auto;
     min-width: 20em;
 }
 
-#popup.confirm h2, #popup.alert h2 {
+#popup.confirm h2, #popup.alert h2, #popup.dialog h2 {
     background: var(--contrast-dark);
     color: var(--contrast-bright);
     text-align: center;
@@ -548,7 +552,7 @@ button.tooltip-trigger, button.popup-trigger {
     padding: 0.5em;
 }
 
-#popup.confirm .controls, #popup.alert .controls {
+#popup.confirm .controls, #popup.alert .controls, #popup.dialog .controls {
     display: flex;
     column-gap: 1em;
     justify-content: center;
@@ -623,6 +627,26 @@ button.tooltip-trigger, button.popup-trigger {
     height: 0;
     overflow: hidden;
     display: none;
+}
+
+#popup-dialog {
+    min-height: 14em;
+    padding: 1em;
+    text-align: center;
+    max-width: 30em;
+}
+
+#popup-dialog label {
+    display: block;
+    margin-bottom: 0.5em;
+}
+
+#popup-dialog p {
+    margin-bottom: 1em;
+}
+
+#popup-dialog select, #popup-dialog textarea, #popup-dialog input[type=text] {
+    background: var(--contrast-bright);
 }
 
 /** --------------------- *

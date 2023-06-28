@@ -235,7 +235,7 @@ class InternalAPI(BasicWorker):
 				else:
 					if hasattr(worker, "dataset") and worker.dataset:
 						running_key = worker.dataset.key
-						running_user = worker.dataset.owner
+						running_user = worker.dataset.creator
 						running_parent = worker.dataset.top_parent().key
 					else:
 						running_key = None

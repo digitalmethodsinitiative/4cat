@@ -57,25 +57,31 @@ db.execute("CREATE UNIQUE INDEX IF NOT EXISTS unique_setting ON settings (name, 
 # ---------------------------------------------
 #      Ensure admin users are still admins
 # ---------------------------------------------
-print("  Giving all admins the 'admin' user tag...")
-for admin in db.fetchall("SELECT * FROM users WHERE is_admin = True"):
+print("  Checking if users table has a column 'is_admin'...")
+has_column = db.fetchone(
+    "SELECT COUNT(*) AS num FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'is_admin'")
+if has_column["num"] != 0:
+    print("  ...yes, giving all admins the 'admin' user tag...")
+    for admin in db.fetchall("SELECT * FROM users WHERE is_admin = True"):
+        try:
+            tags = json.loads(admin["tags"])
+        except ValueError:
+            tags = {}
+
+        if "admin" not in tags:
+            tags.append("admin")
+
+        print(f"  ...admin user {admin['name']}")
+        db.update("users", where={"name": admin["name"]}, data={"tags": json.dumps(tags)})
+
+    print("  Dropping 'is_admin' column from users table...")
     try:
-        tags = json.loads(admin["tags"])
-    except ValueError:
-        tags = {}
-
-    if "admin" not in tags:
-        tags.append("admin")
-
-    print(f"  ...admin user {admin['name']}")
-    db.update("users", where={"name": admin["name"]}, data={"tags": json.dumps(tags)})
-
-print("  Dropping 'is_admin' column from users table...")
-try:
-    db.execute("ALTER TABLE users DROP COLUMN is_admin")
-    print("  ...column dropped")
-except Exception:
-    print("  ...column already dropped")
+        db.execute("ALTER TABLE users DROP COLUMN is_admin")
+        print("  ...column dropped")
+    except Exception:
+        print("  ...column already dropped")
+else:
+    print("  ...no, already migrated")
 
 # ---------------------------------------------
 #  Create separate table for dataset ownership
@@ -83,8 +89,9 @@ except Exception:
 print("  Ensuring datasets_owners table exists...")
 db.execute("""
 CREATE TABLE IF NOT EXISTS datasets_owners (
-    "user" text DEFAULT 'anonymous'::text,
-    key text NOT NULL
+    "name" text DEFAULT 'anonymous'::text,
+    key text NOT NULL,
+    role TEXT DEFAULT 'owner'
 );
 """)
 db.execute("""
@@ -94,19 +101,19 @@ CREATE UNIQUE INDEX IF NOT EXISTS dataset_owners_user_key_idx ON datasets_owners
 # ---------------------------------------------
 #  Migrate dataset ownership to new structure
 # ---------------------------------------------
-print("  Checking if users table has a column 'owner'...")
+print("  Checking if datasets table has a column 'owner'...")
 has_column = db.fetchone(
-    "SELECT COUNT(*) AS num FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'owner'")
-if has_column:
+    "SELECT COUNT(*) AS num FROM information_schema.columns WHERE table_name = 'datasets' AND column_name = 'owner'")
+if has_column["num"] != 0:
     print("  ...column exists")
     print("  Migrating dataset ownership to datasets_owners table...")
-    owners = db.fetchall("SELECT key, owner FROM datasets")
+    owners = db.fetchall("SELECT key, owner AS name FROM datasets")
     for owner in owners:
-        db.insert("datasets_owners", data=owner)
+        db.insert("datasets_owners", data=owner, safe=True)
 
     print(f"  ...migrated ownership for {len(owners)} datasets")
-    print("  Dropping column...")
-    db.execute("ALTER TABLE users DROP COLUMN owner")
+    print("  Renaming 'owner' column to 'creator'...")
+    db.execute("ALTER TABLE datasets RENAME COLUMN owner TO creator")
     print("  ...done")
 else:
     print("  ...column does not exists, assuming ownership has already been migrated.")
@@ -119,10 +126,10 @@ admin_keys = ("can_view_status", "can_manage_users", "can_manage_settings", "can
               "can_manage_notification", "can_manage_tags", "can_restart")
 for admin_key in admin_keys:
     print(f"  - privileges.admin.{admin_key} = True")
-    config.set(f"privileges.admin.{admin_key}", True, is_json=False, tag="admin", commit=False)
+    config.set(f"privileges.admin.{admin_key}", True, is_json=False, tag="admin")
 
-config.set(f"privileges.can_view_all_datasets", True, is_json=False, tag="admin", commit=False)
-config.set(f"privileges.can_view_private_datasets", True, is_json=False, tag="admin", commit=False)
+config.set(f"privileges.can_view_all_datasets", True, is_json=False, tag="admin")
+config.set(f"privileges.can_view_private_datasets", True, is_json=False, tag="admin")
 
 # ---------------------------------------------
 #         More consistent setting names
@@ -160,7 +167,7 @@ changes = {
     "tcat-auto-upload.TCAT_PASSWORD": "tcat-auto-upload.password"
 }
 for from_name, to_name in changes.items():
-    db.execute("UPDATE settings SET name = %s WHERE name = %s", (to_name, from_name), commit=False)
+    db.execute("UPDATE settings SET name = %s WHERE name = %s", (to_name, from_name))
     print(f"  - {from_name} -> {to_name}")
 
 # ------------------------------------------------
@@ -171,12 +178,12 @@ changes = {
     "4chan.can_query_without_keyword": "fourchan-search.can_query_without_keyword",
     "telegram.can_query_all_messages": "telegram-search.can_query_all_messages"
 }
-for from_name, to_name in changes:
+for from_name, to_name in changes.items():
     print(f"  - {from_name} -> {to_name}")
     users = db.fetchall(f"SELECT * FROM users WHERE userdata::json->>'{from_name}' IS NOT NULL")
     for user in users:
         userdata = json.loads(user["userdata"])
-        config.set(to_name, userdata[from_name], is_json=False, tag=f"user:{user['name']}", commit=False)
+        config.set(to_name, userdata[from_name], is_json=False, tag=f"user:{user['name']}")
         del userdata[from_name]
         db.update("users", where={"name": user["name"]}, data={"userdata": json.dumps(userdata)}, commit=False)
 
@@ -192,10 +199,10 @@ changes = {
 }
 for from_name, to_name in changes.items():
     print("  ...updating jobs")
-    db.execute(f"UPDATE jobs SET jobtype = REPLACE(jobtype, '{from_name}', '{to_name}') WHERE jobtype LIKE '{from_name}-%'", commit=False)
+    db.execute(f"UPDATE jobs SET jobtype = REPLACE(jobtype, '{from_name}', '{to_name}') WHERE jobtype LIKE '{from_name}-%'")
 
     print("  ...updating dataset types")
-    db.execute(f"UPDATE datasets SET type = REPLACE(jobtype, '{from_name}', '{to_name}') WHERE type LIKE '{from_name}-%'", commit=False)
+    db.execute(f"UPDATE datasets SET type = REPLACE(type, '{from_name}', '{to_name}') WHERE type LIKE '{from_name}-%'")
 
     # ugh
     print("  ...updating dataset parameters")

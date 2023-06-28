@@ -87,7 +87,7 @@ class User:
         else:
             return User(db, user)
 
-    def can_access_dataset(self, dataset):
+    def can_access_dataset(self, dataset, role=None):
         """
         Check if this user should be able to access a given dataset.
 
@@ -105,7 +105,7 @@ class User:
         elif self.is_admin:
             return True
 
-        elif dataset.has_owner(self):
+        elif dataset.has_owner(self, role=role):
             return True
 
         elif dataset.get_owners == ("anonymous",):

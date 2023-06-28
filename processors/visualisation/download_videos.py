@@ -293,7 +293,7 @@ class VideoDownloaderPlus(BasicProcessor):
         # Collect parameters
         amount = self.parameters.get("amount", 100)
         if amount == 0:  # unlimited
-            amount = config.get('video-downloader.max', 100, user=self.owner)
+            amount = self.config.get('video-downloader.max', 100)
 
         # Set a maximum amount of videos that can be downloaded per URL and set
         # if known channels should be downloaded at all
@@ -306,7 +306,7 @@ class VideoDownloaderPlus(BasicProcessor):
             download_channels = True
 
         # YT-DLP by default attempts to download the best quality videos
-        allow_unknown_sizes = config.get('video-downloader.allow-unknown-size', False, user=self.owner)
+        allow_unknown_sizes = self.config.get('video-downloader.allow-unknown-size', False)
         max_video_size = self.parameters.get("max_video_size", 100)
         max_size = str(max_video_size) + "M"
         if not max_video_size == 0:
@@ -592,7 +592,7 @@ class VideoDownloaderPlus(BasicProcessor):
                             raise FilesizeException(
                                 f"Video size {response.headers.get('Content-Length')} larger than maximum allowed per 4CAT")
                     # Size unknown
-                    elif not config.get("video-downloader.allow-unknown-size", False, user=self.owner):
+                    elif not self.config.get("video-downloader.allow-unknown-size", False):
                         FilesizeException("Video size unknown; not allowed to download per 4CAT settings")
 
                 # Download video

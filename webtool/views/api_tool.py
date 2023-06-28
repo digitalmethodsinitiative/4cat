@@ -26,6 +26,7 @@ from common.lib.job import Job
 from common.config_manager import ConfigWrapper
 from common.lib.dataset import DataSet
 from common.lib.helpers import UserInput, call_api
+from common.lib.user import User
 from backend.lib.worker import BasicWorker
 
 api_ratelimit = limiter.shared_limit("3 per second", scope="api")
@@ -502,7 +503,7 @@ def edit_dataset_label(key):
 	except TypeError:
 		return error(404, error="Dataset does not exist.")
 
-	if not current_user.is_admin and not dataset.has_owner(current_user):
+	if not current_user.is_admin and not dataset.has_owner(current_user, "owner"):
 		return error(403, message="Not allowed")
 
 	dataset.update_label(label)
@@ -664,7 +665,7 @@ def delete_dataset(key=None):
 	except TypeError:
 		return error(404, error="Dataset does not exist.")
 
-	if not current_user.is_admin and not dataset.has_owner(current_user):
+	if not current_user.is_admin and not dataset.has_owner(current_user, "owner"):
 		return error(403, message="Not allowed")
 
 	# if there is an active or queued job for some child dataset, cancel and
@@ -725,13 +726,117 @@ def erase_credentials(key=None):
 	except TypeError:
 		return error(404, error="Dataset does not exist.")
 
-	if not current_user.is_admin and not dataset.has_owner(current_user):
+	if not current_user.is_admin and not dataset.has_owner(current_user, "owner"):
 		return error(403, message="Not allowed")
 
 	for field in dataset.parameters:
 		if field.startswith("api_"):
 			dataset.delete_parameter(field, instant=True)
 
+	return jsonify({"status": "success", "key": dataset.key})
+
+
+@app.route("/api/add-dataset-owner/", methods=["POST"])
+@api_ratelimit
+@login_required
+@openapi.endpoint("tool")
+def add_dataset_owner(key=None, username=None, role=None):
+	"""
+	Add an owner to the dataset
+
+	Add a user (if they exist) as an owner to the given dataset. The role of
+	the owner can be specified ('owner' or 'viewer') and will determine what
+	they can do with the dataset. If the user is already an owner, the role
+	is potentially updated.
+
+	:request-param str key:  ID of the dataset to add an owner to
+	:request-param str username:  Username to add as owner
+	:request-param str role?:  Role to add. Defaults to 'owner'.
+
+	:return: A dictionary with a successful `status`.
+
+	:return-schema: {type=object,properties={status={type=string},html={type=string},key={type=string}}}
+
+	:return-error 404:  If the dataset or user do not exist.
+	:return-error 403:  If the user is not an administrator or the owner
+
+	:param str key:  Dataset key; `None` will use the GET parameter
+	:param str username:  Username; `None` will use the GET parameter
+	:param str role:  Role; `None` will use the GET parameter
+	"""
+	dataset_key = request.form.get("key", "") if not key else key
+	username = request.form.get("name", "") if not username else username
+
+	try:
+		dataset = DataSet(key=dataset_key, db=db)
+	except TypeError:
+		return error(404, error="Dataset does not exist.")
+
+	if not current_user.is_admin and not dataset.has_owner(current_user, "owner"):
+		return error(403, message="Not allowed")
+
+	new_owner = User.get_by_name(db, username)
+	if new_owner is None and not username.startswith("tag:"):
+		return error(404, error=f"The user '{username}' does not exist. Use tag:example to add a tag as an owner.")
+
+	role = request.form.get("role", "owner") if not role else role
+	if role not in ("owner", "viewer"):
+		role = "owner"
+
+	dataset.add_owner(username, role)
+	html = render_template("components/dataset-owner.html", owner=username, role=role,
+								  current_user=current_user, dataset=dataset)
+
+	return jsonify({
+		"status": "success",
+		"key": dataset.key,
+		"html": html
+	})
+
+
+@app.route("/api/remove-dataset-owner/", methods=["DELETE"])
+@api_ratelimit
+@login_required
+@openapi.endpoint("tool")
+def remove_dataset_owner(key=None, username=None):
+	"""
+	Add an owner to the dataset
+
+	Remove a user (if they exist) as an owner from the given dataset. If no
+	owners are left afterwards, the dataset will be owned by 'anonymous'.
+
+	:request-param str key:  ID of the dataset to remove an owner from
+	:request-param str username:  Username to remove as owner
+
+	:return: A dictionary with a successful `status`.
+
+	:return-schema: {type=object,properties={status={type=string},key={type=string}}}
+
+	:return-error 404:  If the dataset or user do not exist.
+	:return-error 403:  If the user is not an administrator or the owner
+
+	:param str key:  Dataset key; `None` will use the GET parameter
+	:param str username:  Username; `None` will use the GET parameter
+	"""
+	dataset_key = request.form.get("key", "") if not key else key
+	username = request.form.get("name", "") if not username else username
+
+	try:
+		dataset = DataSet(key=dataset_key, db=db)
+	except TypeError:
+		return error(404, error="Dataset does not exist.")
+
+	if not current_user.is_admin and not dataset.has_owner(current_user, "owner"):
+		return error(403, error="Not allowed")
+
+	if username == current_user.get_id():
+		return error(403, error="You cannot remove yourself from a dataset.")
+
+	owner = User.get_by_name(db, username)
+	if owner is None and not username.startswith("tag:"):
+		return error(404, error="User does not exist.")
+
+	dataset.remove_owner(username)
 	return jsonify({"status": "success", "key": dataset.key})
 
 
@@ -808,7 +913,7 @@ def toggle_private(key):
 	except TypeError:
 		return error(404, error="Dataset does not exist.")
 
-	if not dataset.has_owner(current_user) and not current_user.is_admin:
+	if not dataset.has_owner(current_user, "owner") and not current_user.is_admin:
 		return error(403, error="This dataset is private")
 
 	# apply status to dataset and all children

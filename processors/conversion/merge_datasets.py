@@ -100,10 +100,11 @@ class DatasetMerger(BasicProcessor):
             #                                          f"type - all datasets must be of the type "
             #                                          f"'{self.source_dataset.type}")
 
-            if source_dataset.owner != self.source_dataset.owner and (
+            if not set(source_dataset.get_owners_users("owner")).intersection(
+                    set(self.source_dataset.get_owners_users("owner"))) and (
                     source_dataset.is_private or self.source_dataset.is_private):
-                return self.dataset.finish_with_error("Cannot merge datasets - all need to be public or have the same "
-                                                      "owner.")
+                return self.dataset.finish_with_error("Cannot merge datasets - all need to be public or have "
+                                                      "overlapping ownership.")
 
             if source_dataset.key in [d.key for d in source_datasets]:
                 self.dataset.update_status(f"Skipping dataset with URL {source_dataset_url} - already in list of "
