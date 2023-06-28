@@ -15,13 +15,12 @@
 	<meta name="msapplication-config" content="static/img/favicon/browserconfig.xml">
 	<meta name="theme-color" content="#ffffff">
 
-	
 	<script type="text/javascript" src="{{url_for('static', filename='js/jquery-3.6.3.min.js')}}"></script>
 	<script type="text/javascript" src="{{url_for('static', filename='js/explorer.js')}}"></script>
 
 	<!-- Possible annotation fields -->
 	<script type="text/javascript">
-	var annotation_fields = {% if annotation_fields %}{{ annotation_fields | safe }}{% else %}{}{% endif %}
+	var annotation_fields = {% if annotation_fields %}{{ annotation_fields | safe }}{% endif %}
 	</script>
 
 	<!-- Include datasource-specific css if it exists -->

@@ -628,12 +628,21 @@ def get_custom_css(datasource):
 		datasource_dir = datasource
 
 	css_path = Path(config.get('PATH_ROOT'), "datasources", datasource_dir, "explorer", datasource.lower() + "-explorer.css")
+	read = False
 	if css_path.exists():
+		read = True
+	else:
+		# Allow both hypens and underscores in datasource name (to avoid some legacy issues)
+		css_path = re.sub(datasource, datasource.replace("-", "_"), str(css_path.absolute()))
+		if Path(css_path).exists():
+			read = True
+
+	# Read the css file if it exists
+	if read:
 		with open(css_path, "r", encoding="utf-8") as css:
 			css = css.read()
 	else:
 		css = None
-		#css = Path(config.get('PATH_ROOT'), "datasources", datasource_dir, "explorer", datasource.lower() + "-explorer.css")
 
 	return css
 
@@ -665,7 +674,17 @@ def get_custom_fields(datasource, filetype=None):
 		datasource_dir = datasource
 
 	json_path = Path(config.get('PATH_ROOT'), "datasources", datasource_dir, "explorer", datasource.lower() + "-explorer.json")
+	read = False
+
 	if json_path.exists():
+		read = True
+	else:
+		# Allow both hypens and underscores in datasource name (to avoid some legacy issues)
+		json_path = re.sub(datasource, datasource.replace("-", "_"), str(json_path.absolute()))
+		if Path(json_path).exists():
+			read = True
+	
+	if read:
 		with open(json_path, "r", encoding="utf-8") as json_file:
 			try:
 				custom_fields = json.load(json_file)
@@ -680,7 +699,7 @@ def get_custom_fields(datasource, filetype=None):
 			custom_fields = custom_fields[filetype]
 	else:
 		custom_fields = None
-
+		
 	return custom_fields
 
 def get_nested_value(di, keys):
