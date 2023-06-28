@@ -189,6 +189,7 @@ class Search(BasicProcessor, ABC):
 				}
 
 		path.unlink()
+		self.dataset.delete_parameter("file")
 
 	def items_to_csv(self, results, filepath):
 		"""
