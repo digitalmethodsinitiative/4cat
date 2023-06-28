@@ -105,7 +105,7 @@ class User:
         elif self.is_admin:
             return True
 
-        elif dataset.has_owner(self, role=role):
+        elif dataset.is_accessible_by(self, role=role):
             return True
 
         elif dataset.get_owners == ("anonymous",):

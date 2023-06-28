@@ -180,7 +180,7 @@ def get_mapped_result(key):
     except TypeError:
         return error(404, error="Dataset not found.")
 
-    if dataset.is_private and not (config.get("privileges.can_view_private_datasets") or dataset.has_owner(current_user)):
+    if dataset.is_private and not (config.get("privileges.can_view_private_datasets") or dataset.is_accessible_by(current_user)):
         return error(403, error="This dataset is private.")
 
     if dataset.get_extension() == ".csv":
@@ -231,7 +231,7 @@ def view_log(key):
     except TypeError:
         return error(404, error="Dataset not found.")
 
-    if dataset.is_private and not (config.get("privileges.can_view_private_datasets") or dataset.has_owner(current_user)):
+    if dataset.is_private and not (config.get("privileges.can_view_private_datasets") or dataset.is_accessible_by(current_user)):
         return error(403, error="This dataset is private.")
 
     logfile = dataset.get_log_path()
@@ -260,7 +260,7 @@ def preview_items(key):
     except TypeError:
         return error(404, error="Dataset not found.")
 
-    if dataset.is_private and not (config.get("privileges.can_view_private_datasets") or dataset.has_owner(current_user)):
+    if dataset.is_private and not (config.get("privileges.can_view_private_datasets") or dataset.is_accessible_by(current_user)):
         return error(403, error="This dataset is private.")
 
     preview_size = 1000
@@ -341,7 +341,7 @@ def show_result(key):
     expires_datasource = False
     can_unexpire = ((config.get('expire.allow_optout') and  \
                            datasource_expiration.get("allow_optout", True)) or datasource_expiration.get("allow_optout", False)) \
-                   and (current_user.is_admin or dataset.has_owner(current_user))
+                   and (current_user.is_admin or dataset.is_accessible_by(current_user, "owner"))
 
     if datasource_expiration and datasource_expiration.get("timeout"):
         timestamp_expires = dataset.timestamp + int(datasource_expiration.get("timeout"))
@@ -460,13 +460,13 @@ def restart_dataset(key):
     except TypeError:
         return error(404, message="Dataset not found.")
 
-    if dataset.is_private and not (config.get("privileges.can_view_private_datasets") or dataset.has_owner(current_user, "owner")):
+    if dataset.is_private and not (config.get("privileges.can_view_private_datasets") or dataset.is_accessible_by(current_user, "owner")):
         return error(403, error="This dataset is private.")
 
     if not config.get("privileges.can_rerun_dataset"):
         return error(403, message="Not allowed.")
 
-    if not dataset.has_owner(current_user, "owner") and not config.get("privileges.can_view_all_datasets"):
+    if not dataset.is_accessible_by(current_user, "owner") and not config.get("privileges.can_view_all_datasets"):
         return error(403, message="Not allowed.")
 
     if not dataset.is_finished():
@@ -602,7 +602,7 @@ def erase_credentials_interactive(key):
     except TypeError:
         return error(404, error="Dataset does not exist.")
 
-    if not current_user.is_admin and not dataset.has_owner(current_user, "owner"):
+    if not current_user.is_admin and not dataset.is_accessible_by(current_user, "owner"):
         return error(403, message="Not allowed")
 
     success = erase_credentials(key)

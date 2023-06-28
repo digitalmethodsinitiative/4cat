@@ -590,7 +590,7 @@ class DataSet(FourcatModule):
 			except (TypeError, ValueError):
 				return False
 
-	def has_owner(self, username, role="owner"):
+	def is_accessible_by(self, username, role="owner"):
 		"""
 		Check if dataset has given user as owner
 

@@ -3,9 +3,13 @@
     {% if current_user.is_authenticated and __user_config("privileges.admin.can_manage_users") and not owner[:4] == "tag:" %}
         <a href="{{ url_for("manipulate_user", mode="edit") }}?name={{ owner }}">{{ owner }}</a>
     {% else %}
-        {{ owner }}
+        {% if owner[:4] == "tag:" %}
+            <code>tag:</code>{{ owner[4:] }}
+        {% else %}
+            {{ owner }}
+        {% endif %}
     {% endif %}
-    {% if dataset.get_owners()|length > 0 and dataset.has_owner(current_user, role="owner") and owner != current_user.get_id() %}
+    {% if dataset.get_owners()|length > 0 and dataset.is_accessible_by(current_user, role="owner") and owner != current_user.get_id() %}
         <a class="button-like-small remove-dataset-owner" href="{{ url_for("remove_dataset_owner") }}"><i class="fa fa-times" aria-hidden="true"></i><span
                 class="sr-only">Remove owner</span></a>
     {% endif %}
