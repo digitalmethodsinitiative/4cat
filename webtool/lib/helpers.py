@@ -266,12 +266,12 @@ def generate_css_colours(force=False):
 	:param bool force:  Create colour definition file even if it exists already
 	:return:
 	"""
-	interface_hue = config.get("4cat.layout_hue")
-	interface_hue /= 360  # colorsys expects 0-1 values
+	interface_hue = config.get("4cat.layout_hue") / 360  # colorsys expects 0-1 values
+	secondary_hue = config.get("4cat.layout_hue_secondary") / 360
 	main_colour = colorsys.hsv_to_rgb(interface_hue, 0.87, 0.81)
 	accent_colour = colorsys.hsv_to_rgb(interface_hue, 0.87, 1)
 	# get opposite by adjusting the hue by 50%
-	opposite_colour = colorsys.hsv_to_rgb(math.fmod(interface_hue + 0.5, 1), 0.87, 0.9)
+	opposite_colour = colorsys.hsv_to_rgb(secondary_hue, 0.87, 0.9)
 
 	template_file = config.get("PATH_ROOT").joinpath("webtool/static/css/colours.css.template")
 	colour_file = config.get("PATH_ROOT").joinpath("webtool/static/css/colours.css")

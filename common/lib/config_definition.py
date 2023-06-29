@@ -183,6 +183,16 @@ config_definition = {
         "max": 360,
         "coerce_type": int
     },
+    "4cat.layout_hue_secondary": {
+        "type": UserInput.OPTION_HUE,
+        "default": 86,
+        "help": "Interface secondary colour",
+        "saturation": 87,
+        "value": 90,
+        "min": 0,
+        "max": 360,
+        "coerce_type": int
+    },
     "4cat.allow_access_request": {
         "type": UserInput.OPTION_TOGGLE,
         "default": True,
