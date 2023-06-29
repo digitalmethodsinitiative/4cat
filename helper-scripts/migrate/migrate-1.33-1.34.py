@@ -65,11 +65,11 @@ if has_column["num"] != 0:
     for admin in db.fetchall("SELECT * FROM users WHERE is_admin = True"):
         try:
             tags = json.loads(admin["tags"])
-        except ValueError:
-            tags = {}
+        except (TypeError, ValueError):
+            tags = []
 
         if "admin" not in tags:
-            tags.append("admin")
+            tags.insert(0, "admin")
 
         print(f"  ...admin user {admin['name']}")
         db.update("users", where={"name": admin["name"]}, data={"tags": json.dumps(tags)})
@@ -95,7 +95,7 @@ CREATE TABLE IF NOT EXISTS datasets_owners (
 );
 """)
 db.execute("""
-CREATE UNIQUE INDEX IF NOT EXISTS dataset_owners_user_key_idx ON datasets_owners("user" text_ops,key text_ops);
+CREATE UNIQUE INDEX IF NOT EXISTS dataset_owners_user_key_idx ON datasets_owners("name" text_ops,key text_ops);
 """)
 
 # ---------------------------------------------
