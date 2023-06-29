@@ -407,6 +407,7 @@ class SearchTelegram(Search):
                         self.details_cache[value["user_id"]] = SearchTelegram.serialize_obj(user)
 
                     resolved_message[key] = self.details_cache[value["user_id"]]
+                    resolved_message[key]["user_id"] = value["user_id"]
                 else:
                     resolved_message[key] = await self.resolve_groups(client, value)
 
