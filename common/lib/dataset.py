@@ -291,8 +291,8 @@ class DataSet(FourcatModule):
 					if item_mapper:
 						try:
 							item = own_processor.get_mapped_item(item)
-						except MapItemException:
-							self.warn_unmappable_item(i, processor)
+						except MapItemException as e:
+							self.warn_unmappable_item(i, processor, e)
 							continue
 
 					yield item
@@ -309,8 +309,8 @@ class DataSet(FourcatModule):
 					if item_mapper:
 						try:
 							item = own_processor.get_mapped_item(item)
-						except MapItemException:
-							self.warn_unmappable_item(i, processor)
+						except MapItemException as e:
+							self.warn_unmappable_item(i, processor, e)
 							continue
 
 					yield item
@@ -343,8 +343,8 @@ class DataSet(FourcatModule):
 			if item_mapper:
 				try:
 					mapped_item = own_processor.get_mapped_item(item)
-				except MapItemException:
-					self.warn_unmappable_item(i, processor)
+				except MapItemException as e:
+					self.warn_unmappable_item(i, processor, e)
 					continue
 			else:
 				mapped_item = original_item
@@ -1214,19 +1214,20 @@ class DataSet(FourcatModule):
 						config.get("flask.server_name") + '/result/' + filename
 		return url_to_file
 
-	def warn_unmappable_item(self, item_count, processor=None):
+	def warn_unmappable_item(self, item_count, processor=None, error_message=None):
 		"""
 		Log an item that is unable to be mapped and warn administrators.
 
 		:param int item_count:			Item index
 		:param Processor processor:		Processor calling function
 		"""
+		dataset_error_message = f"MapItemException (item {item_count}): {'is unable to be mapped! Check raw datafile.' if error_message is None else error_message}"
 		if processor is not None:
 			# Log to dataset that is using map_item
-			processor.dataset.log(f"Item {item_count} is unable to be mapped! Check raw datafile.")
+			processor.dataset.log(dataset_error_message)
 		else:
 			# Log to this dataset
-			self.log(f"Item {item_count} is unable to be mapped! Check raw datafile.")
+			self.log(dataset_error_message)
 
 		if hasattr(self.db, "log"):
 			self.db.log.warning(f"Processor {processor.type if processor is not None else self.get_own_processor().type} unable to map item {item_count} for dataset {self.key}.")
