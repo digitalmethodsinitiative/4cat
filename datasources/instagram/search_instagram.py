@@ -60,6 +60,11 @@ class SearchInstagram(Search):
         :param dict item:  Item to map
         :return:  Mapped item
         """
+        if (item.get("product_type", "") == "ad") or \
+                (item.get("link", "").startswith("https://www.facebook.com/ads/ig_redirect")):
+            # These are ads
+            return {}
+
         is_graph_response = "__typename" in item
 
         if is_graph_response:
