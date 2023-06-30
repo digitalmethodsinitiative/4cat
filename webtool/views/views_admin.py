@@ -38,7 +38,23 @@ def admin_frontpage():
     if not any(admin_privileges.values()):
         return render_template("error.html", message="You cannot view this page."), 403
 
-    return render_template("controlpanel/frontpage.html", flashes=get_flashed_messages())
+    # collect some stats
+    now = time.time()
+    num_items = {
+        "day": db.fetchone("SELECT SUM(num_rows) AS num FROM datasets WHERE timestamp > %s", (now - 86400,))["num"],
+        "week": db.fetchone("SELECT SUM(num_rows) AS num FROM datasets WHERE timestamp > %s", (now - (86400 * 7),))["num"],
+        "overall": db.fetchone("SELECT SUM(num_rows) AS num FROM datasets")["num"]
+    }
+
+    num_datasets = {
+        "day": db.fetchone("SELECT COUNT(*) AS num FROM datasets WHERE timestamp > %s", (now - 86400,))["num"],
+        "week": db.fetchone("SELECT COUNT(*) AS num FROM datasets WHERE timestamp > %s", (now - (86400 * 7),))["num"],
+        "overall": db.fetchone("SELECT COUNT(*) AS num FROM datasets")["num"]
+    }
+
+    return render_template("controlpanel/frontpage.html", flashes=get_flashed_messages(), stats = {
+        "captured": num_items, "datasets": num_datasets
+    })
 
 @app.route("/admin/users/", defaults={"page": 1})
 @app.route("/admin/users/page/<int:page>/")

@@ -10,7 +10,30 @@
             {% for notice in flashes %}
                 <p class="form-notice">{{ notice|safe }}</p>
             {% endfor %}
-            <p>Welcome, welcome to the control panel. It's safer here.</p>
+            <ul class="stats-container">
+                <div class="cp-stats">
+                    <h3>Items captured or imported</h3>
+                    <dl>
+                        <div><dt>Past 24 hours</dt>
+                        <dd>{{ stats.captured.day|numberify }}</dd></div>
+                        <div><dt>Past week</dt>
+                        <dd>{{ stats.captured.week|numberify }}</dd></div>
+                        <div><dt>All time</dt>
+                        <dd>{{ stats.captured.overall|numberify }}</dd></div>
+                    </dl>
+                </div>
+                <div class="cp-stats">
+                    <h3>Datasets created</h3>
+                    <dl>
+                        <div><dt>Past 24 hours</dt>
+                        <dd>{{ stats.datasets.day|numberify }}</dd></div>
+                        <div><dt>Past week</dt>
+                        <dd>{{ stats.datasets.week|numberify }}</dd></div>
+                        <div><dt>All time</dt>
+                        <dd>{{ stats.datasets.overall|numberify }}</dd></div>
+                    </dl>
+                </div>
+            </ul>
         </section>
 
         {% if __user_config("privileges.admin.can_view_status") %}

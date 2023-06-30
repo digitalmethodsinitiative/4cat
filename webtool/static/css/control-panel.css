@@ -152,3 +152,34 @@ ol#tag-order li:nth-child(2n) {
 #tag-order li:first-child {
     border-top: 1px dotted var(--contrast-dark)
 }
+
+.stats-container {
+    list-style: none;
+    display: flex;
+    justify-content: space-evenly;
+    margin-top: 2em;
+}
+
+.stats-container > div {
+    width: 17.5em;
+    background: var(--gray);
+}
+
+article .stats-container h3:not(.blocktitle) {
+    background: var(--contrast-dark);
+    color: var(--contrast-bright);
+    margin: 0;
+    font-size: 1em;
+    text-align: center;
+    padding: 0.5em 0;
+}
+
+.stats-container dl div {
+    display: grid;
+    grid-template-columns: 60% 40%;
+    padding: 0.5em;
+}
+
+.stats-container dl div:not(:last-child) {
+    border-bottom: 1px dotted var(--contrast-dark);
+}

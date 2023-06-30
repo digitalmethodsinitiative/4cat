@@ -59,7 +59,7 @@ def _jinja2_filter_commafy(number):
 	return f"{number:,}"
 
 @app.template_filter('timify')
-def _jinja2_filter_numberify(number):
+def _jinja2_filter_timify(number):
 	try:
 		number = int(number)
 	except TypeError:
@@ -335,11 +335,19 @@ def inject_now():
 		"""
 		return str(uuid.uuid4())
 
+	cv_path = config.get("PATH_ROOT").joinpath("config/.current-version")
+	if cv_path.exists():
+		with cv_path.open() as infile:
+			version = infile.readline().strip()
+	else:
+		version = "???"
+
 	return {
 		"__has_https": config.get("flask.https", user=current_user),
 		"__datenow": datetime.datetime.utcnow(),
 		"__notifications": current_user.get_notifications(),
 		"__user_config": lambda setting: config.get(setting, user=current_user),
 		"__user_cp_access": any([config.get(p, user=current_user) for p in config.config_definition.keys() if p.startswith("privileges.admin")]),
+		"__version": version,
 		"uniqid": uniqid
 	}
