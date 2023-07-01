@@ -526,15 +526,7 @@ def update_settings():
     all_settings = config.get_all(tags=[tag])
     options = {}
 
-    # general options first; then processor options; then anything else
-    # the fromkeys thing is to de-duplicate
-    ordered_keys = list(dict.fromkeys(itertools.chain(
-        sorted(config_definition.config_definition.keys()),
-        sorted(config.config_definition.keys()),
-        sorted(all_settings.keys())
-    )).keys())
-
-    for option in ordered_keys:
+    for option in sorted({*all_settings.keys(), *definition.keys()}):
         tag_value = all_settings.get(option, definition.get(option, {}).get("default"))
         global_value = global_settings.get(option, definition.get(option, {}).get("default"))
         is_changed = tag and global_value != tag_value
