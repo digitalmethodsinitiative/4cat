@@ -21,6 +21,7 @@ class Search4Chan(SearchWithScope):
 	Defines methods that are used to query the 4chan data indexed and saved.
 	"""
 	type = "fourchan-search"  # job ID
+	title = "4chan search"
 	sphinx_index = "4chan"  # prefix for sphinx indexes for this data source. Should usually match sphinx.conf
 	prefix = "4chan"  # table identifier for this datasource; see below for usage
 	is_local = True  # Whether this datasource is locally scraped

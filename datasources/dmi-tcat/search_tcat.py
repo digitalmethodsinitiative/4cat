@@ -26,6 +26,7 @@ class SearchWithinTCATBins(Search):
     """
     type = "dmi-tcat-search"  # job ID
     extension = "ndjson"
+    title = "TCAT Search (HTTP)"
 
     # TCAT has a few fields that do not exist in APIv2
     additional_TCAT_fields = ["to_user_name", "filter_level", "favorite_count", "truncated", "from_user_favourites_count", "from_user_lang", "from_user_utcoffset",

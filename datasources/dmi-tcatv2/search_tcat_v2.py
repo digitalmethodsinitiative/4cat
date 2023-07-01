@@ -24,6 +24,7 @@ class SearchWithinTCATBinsV2(Search):
     """
     type = "dmi-tcatv2-search"  # job ID
     extension = "csv"
+    title = "TCAT Search (SQL)"
 
     options = {
         "intro-1": {
