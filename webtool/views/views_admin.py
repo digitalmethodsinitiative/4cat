@@ -537,8 +537,10 @@ def update_settings():
             "is_changed": is_changed
         }
 
+    tab = "" if not request.form.get("current-tab") else request.form.get("current-tab")
+
     return render_template("controlpanel/config.html", options=options, flashes=get_flashed_messages(),
-                           categories=categories, modules=modules, tag=tag)
+                           categories=categories, modules=modules, tag=tag, current_tab=tab)
 
 @app.route("/admin/toggle-datasources/", methods=["GET", "POST"])
 @login_required

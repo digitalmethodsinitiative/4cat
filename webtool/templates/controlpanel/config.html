@@ -30,7 +30,7 @@
                             {% set option_category = option.split(".")[0] %}
                             {% if option_category != tab.name %}
                                 {% set tab.name = option_category %}
-                                <li{% if tab.first %} class="highlighted"{% set tab.first = False %}{% endif %}>
+                                <li{% if (tab.first and not current_tab) or tab.name == current_tab %} class="highlighted"{% set tab.first = False %}{% endif %}>
                                     <a href="#tab-{{ tab.name }}" id="tablabel-{{ tab.name }}"
                                        aria-controls="tab-{{ tab.name }}">
                                         {% if tab.name in categories %}
@@ -61,7 +61,7 @@
                                 </div>
                             {% endif %}
                             <div id="tab-{{ tab.name }}" aria-labelledby="tablabel-{{ tab.name }}"
-                                 aria-expanded="{% if tab.first %}true{% else %}false{% endif %}{% set tab.first = False %}"
+                                 aria-expanded="{% if (not current_tab and tab.first) or current_tab == tab.name %}true{% else %}false{% endif %}{% set tab.first = False %}"
                                  class="tab-content">
                             <ul>
                             {% set tab.open = True %}

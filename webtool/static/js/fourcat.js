@@ -1689,6 +1689,12 @@ const ui_helpers = {
         link.parentNode.classList.add('highlighted');
         controls.parentNode.parentNode.querySelector('.tab-container *[aria-expanded=true]').setAttribute('aria-expanded', 'false');
         document.querySelector('#' + target_id).setAttribute('aria-expanded', 'true');
+        let current_tab = controls.querySelector('input[name="current-tab"]');
+        if(!current_tab) {
+            controls.insertAdjacentHTML('afterbegin', '<input type="hidden" name="current-tab" value="">');
+            current_tab = controls.querySelector('input[name="current-tab"]');
+        }
+        current_tab.value = target_id.replace(/^tab-/, '');
     }
 }
 
