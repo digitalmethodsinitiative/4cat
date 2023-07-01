@@ -33,6 +33,26 @@
                         <dd>{{ stats.datasets.overall|numberify }}</dd></div>
                     </dl>
                 </div>
+                <div class="cp-stats">
+                    <h3>Disk usage</h3>
+                    <dl>
+                        <div><dt>Data files</dt>
+                        <dd>{{ stats.disk.data|filesizeformat }}</dd></div>
+                        <div><dt>Database</dt>
+                        <dd>{{ stats.disk.db|filesizeformat }}</dd></div>
+                        <div><dt>Logs</dt>
+                        <dd>{{ stats.disk.logs|filesizeformat }}</dd></div>
+                    </dl>
+                </div>
+                <div class="cp-stats">
+                    <h3>Version</h3>
+                    <dl>
+                        <div><dt>4CAT version</dt>
+                        <dd>{{ __version }}</dd></div>
+                        <div><dt>Up to date?</dt>
+                        <dd>{% if upgrade_available %}<a href="{{ url_for("trigger_restart") }}">Upgrade now</a>{% else %}<i class="fa fa-check" aria-hidden="true"></i><span class="sr-only">Yes</span>{% endif %}</dd></div>
+                    </dl>
+                </div>
             </ul>
         </section>
 

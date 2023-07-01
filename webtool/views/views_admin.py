@@ -1,13 +1,14 @@
 """
 4CAT Web Tool views - pages to be viewed by the user
 """
+import markdown2
 import datetime
-import re
+import psycopg2
+import smtplib
 import time
 import json
-import smtplib
-import psycopg2
-import markdown2
+import os
+import re
 
 from pathlib import Path
 
@@ -52,9 +53,17 @@ def admin_frontpage():
         "overall": db.fetchone("SELECT COUNT(*) AS num FROM datasets")["num"]
     }
 
+    disk_stats = {
+        "data": sum([f.stat().st_size for f in config.get("PATH_DATA").glob("**/*") if f.is_file()]),
+        "logs": sum([f.stat().st_size for f in config.get("PATH_LOGS").glob("**/*") if f.is_file()]),
+        "db": db.fetchone("SELECT pg_database_size(%s) AS num", (config.get("DB_NAME"),))["num"]
+    }
+
+    upgrade_available = not not db.fetchone("SELECT * FROM users_notifications WHERE username = '!admins' AND notification LIKE 'A new version of 4CAT%'")
+
     return render_template("controlpanel/frontpage.html", flashes=get_flashed_messages(), stats = {
-        "captured": num_items, "datasets": num_datasets
-    })
+        "captured": num_items, "datasets": num_datasets, "disk": disk_stats
+    }, upgrade_available=upgrade_available)
 
 @app.route("/admin/users/", defaults={"page": 1})
 @app.route("/admin/users/page/<int:page>/")

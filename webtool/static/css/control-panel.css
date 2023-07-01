@@ -165,11 +165,15 @@ ol#tag-order li:nth-child(2n) {
     display: flex;
     justify-content: space-evenly;
     margin-top: 2em;
+    column-gap: 1em;
+    flex-wrap: wrap;
+    margin-left: 0;
 }
 
 .stats-container > div {
-    width: 17.5em;
+    min-width: 17.5em;
     background: var(--gray);
+    margin-bottom: 2em;
 }
 
 article .stats-container h3:not(.blocktitle) {
