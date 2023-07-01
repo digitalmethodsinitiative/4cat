@@ -7,14 +7,14 @@
             <nav class="dataset-toolbox" aria-label="Actions for dataset">
                 <ul>
                     {% if current_user.is_authenticated and dataset.is_accessible_by(current_user) %}
-                    <li><a href="{{ url_for('toggle_favourite_interactive', key=dataset.key) }}"
+                    <li><a href="{{ url_for("toggle_favourite", key=dataset.key) }}?redirect"
                            class="toggle-favourites"><i class="fa{% if is_favourite %}r{% else %}s{% endif %} fa-star"
                                                         aria-hidden="true"></i> {% if is_favourite %}Delete
                         from{% else %}
                         Add to{% endif %} favourites</a></li>
                     {% endif %}
                     {% if current_user.is_authenticated and (current_user.is_admin or dataset.is_accessible_by(current_user, "owner")) %}
-                        <li><a href="{{ url_for('toggle_private_interactive', key=dataset.key) }}"
+                        <li><a href="{{ url_for('toggle_private', key=dataset.key) }}?redirect"
                                class="toggle-private"><i
                                 class="fas fa-lock{% if dataset.is_private %}-open{% endif %}" aria-hidden="true"></i>
                             {% if dataset.is_private %}Make public{% else %}Make private{% endif %}</a></li>
@@ -23,7 +23,7 @@
                                                                                    aria-hidden="true"></i> Permalink</a>
                     </li>
                     {% if (__user_config("privileges.can_rerun_dataset") and dataset.is_accessible_by(current_user, "owner")) or current_user.is_admin %}
-                        <li><a href="{{ url_for('delete_dataset_interactive', key=dataset.key) }}" class="confirm-first"
+                        <li><a href="{{ url_for('delete_dataset', key=dataset.key) }}?redirect" class="confirm-first"
                                data-confirm-action="delete this dataset"><i class="fas fa-trash-alt"
                                                                             aria-hidden="true"></i>
                             Delete dataset</a></li>
@@ -33,7 +33,7 @@
                                 class="fas fa-sync-alt" aria-hidden="true"></i> Re-run dataset</a></li>
                     {% endif %}
                     {% if current_user.is_admin and not dataset.is_finished() %}
-                        <li><a href="{{ url_for('nuke_dataset_interactive', key=dataset.key) }}" class="prompt-first"
+                        <li><a href="{{ url_for('nuke_dataset', key=dataset.key) }}?redirect" class="prompt-first"
                                data-confirm-method="POST" data-confirm-var="reason"
                                data-confirm-action="cancel this dataset? You can provide a reason that will be displayed to the user"><i
                                 class="fas fa-radiation" aria-hidden="true"></i> Cancel dataset</a></li>
@@ -113,7 +113,7 @@
                       <dt>API Credentials</dt>
                       <dd>
                         {% for credential in has_credentials %}<span class="property-badge">{{ credential }}</span> {% endfor %}
-                        (<a href="{{ url_for("erase_credentials_interactive", key=dataset.key) }}">erase</a>)
+                        (<a href="{{ url_for("erase_credentials", key=dataset.key) }}?redirect">erase</a>)
                       </dd>
                     </div>
                     {% endif %}

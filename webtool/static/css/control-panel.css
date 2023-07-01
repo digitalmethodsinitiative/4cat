@@ -128,7 +128,7 @@ table td[colspan] {
     color: var(--accent);
 }
 
-#tag-order i {
+#tag-order i.handle, #tag-order i.semi-handle {
     border: 2px solid var(--contrast-dark);
     background: var(--contrast-bright);
     color: var(--text);
@@ -137,7 +137,14 @@ table td[colspan] {
     padding: 0.1em 0;
 }
 
-#tag-order i.handle {
+#tag-order .button-like {
+    display: inline-block;
+    border-radius: 0.2em;
+    padding: 0;
+    line-height: 1.25em;
+}
+
+#tag-order i.handle, #tag-order i.semi-handle {
     cursor: ns-resize;
 }
 

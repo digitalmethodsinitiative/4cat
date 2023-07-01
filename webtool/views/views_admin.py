@@ -143,6 +143,7 @@ def add_user():
     email = request.form.get("email", request.args.get("email", "")).strip()
     fmt = request.form.get("format", request.args.get("format", "")).strip()
     force = request.form.get("force", request.args.get("force", None))
+    redirect_to_page = False
 
     if not email or not re.match(r"[^@]+\@.*?\.[a-zA-Z]+", email):
         response = {**response, **{"message": "Please provide a valid e-mail address."}}
@@ -181,6 +182,7 @@ def add_user():
 
                 try:
                     url = user.email_token(new=True)
+                    redirect_to_page = True
                     response["success"] = True
                     response = {**response, **{
                         "message": "A new registration e-mail has been sent to %s. The registration link is [%s](%s)" % (
@@ -190,7 +192,11 @@ def add_user():
                         "message": "Token was reset but registration e-mail could not be sent (%s)." % e}}
 
     if fmt == "html":
-        return render_template("error.html", message=response["message"],
+        if redirect_to_page:
+            flash(response["message"])
+            return redirect(url_for("manipulate_user", values={"name": username}))
+        else:
+            return render_template("error.html", message=response["message"],
                                title=("New account created" if response["success"] else "Error"))
     else:
         return jsonify(response)
@@ -437,7 +443,7 @@ def manipulate_tags():
         # always async
         return jsonify({"success": True})
 
-    return render_template("controlpanel/user-tags.html", tags=tags)
+    return render_template("controlpanel/user-tags.html", tags=tags, flashes=get_flashed_messages())
 
 @app.route("/admin/settings", methods=["GET", "POST"])
 @login_required

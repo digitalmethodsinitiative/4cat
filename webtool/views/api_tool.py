@@ -1,6 +1,7 @@
 """
 4CAT Tool API - To be used to queue and check datasets
 """
+import itertools
 import hashlib
 import psutil
 import json
@@ -596,7 +597,10 @@ def nuke_dataset(key=None, reason=None):
 	dataset.update_status("Dataset cancelled by instance administrator. Reason: %s" % reason)
 	dataset.finish(0)
 
-	return jsonify({"status": "success", "key": dataset.key})
+	if request.args.get("redirect") is not None:
+		return redirect(url_for("show_result", key=dataset.key))
+	else:
+		return jsonify({"status": "success", "key": dataset.key})
 
 
 @app.route("/api/delete-query/", methods=["DELETE", "POST"])
@@ -657,7 +661,10 @@ def delete_dataset(key=None):
 	# and delete the dataset and child datasets
 	dataset.delete()
 
-	return jsonify({"status": "success", "key": dataset.key})
+	if request.args.get("redirect") is not None:
+		return redirect(url_for("show_results"))
+	else:
+		return jsonify({"status": "success", "key": dataset.key})
 
 
 @app.route("/api/erase-credentials/", methods=["DELETE"])
@@ -696,8 +703,47 @@ def erase_credentials(key=None):
 		if field.startswith("api_"):
 			dataset.delete_parameter(field, instant=True)
 
-	return jsonify({"status": "success", "key": dataset.key})
+	if request.args.get("redirect") is not None:
+		flash("Credentials erased.")
+		return redirect(url_for("show_result", key=dataset.key))
+	else:
+		return jsonify({"status": "success", "key": dataset.key})
 
+
+@app.route("/api/remove-tag/", methods=["GET"])
+@api_ratelimit
+@login_required
+@setting_required("privileges.admin.can_manage_tags")
+@openapi.endpoint("tool")
+def remove_tag():
+	"""
+	Remove tag from all users with that tag
+
+	:return: A dictionary with a successful `status`.
+
+	:return-schema: {type=object,properties={status={type=string}}}
+
+	:return-error 403:  If the user is not an administrator or the owner
+	:request-param str tag:  Tag to remove
+	"""
+	tag = request.args.get("tag")
+
+	tagged_users = db.fetchall("SELECT * FROM users WHERE tags @> %s ", (json.dumps([tag]),))
+	all_tags = list(set(itertools.chain(*[u["tags"] for u in db.fetchall("SELECT DISTINCT tags FROM users")])))
+
+	for user in tagged_users:
+		user = User.get_by_name(db, user["name"])
+		user.remove_tag(tag)
+
+	if tag in all_tags:
+		all_tags.remove(tag)
+		config.set("flask.tag_order", all_tags, is_json=False, tag="")
+
+	if request.args.get("redirect") is not None:
+		flash("Tag removed.")
+		return redirect(url_for("manipulate_tags"))
+	else:
+		return jsonify({"status": "success"})
 
 @app.route("/api/add-dataset-owner/", methods=["POST"])
 @api_ratelimit
@@ -750,11 +796,15 @@ def add_dataset_owner(key=None, username=None, role=None):
 	html = render_template("components/dataset-owner.html", owner=username, role=role,
 								  current_user=current_user, dataset=dataset)
 
-	return jsonify({
-		"status": "success",
-		"key": dataset.key,
-		"html": html
-	})
+	if request.args.get("redirect") is not None:
+		flash("Dataset owner added.")
+		return redirect(url_for("show_result", key=dataset_key))
+	else:
+		return jsonify({
+			"status": "success",
+			"key": dataset.key,
+			"html": html
+		})
 
 
 @app.route("/api/remove-dataset-owner/", methods=["DELETE"])
@@ -800,7 +850,12 @@ def remove_dataset_owner(key=None, username=None):
 		return error(404, error="User does not exist.")
 
 	dataset.remove_owner(username)
-	return jsonify({"status": "success", "key": dataset.key})
+
+	if request.args.get("redirect") is not None:
+		flash("Dataset owner removed.")
+		return redirect(url_for("show_result", key=dataset_key))
+	else:
+		return jsonify({"status": "success", "key": dataset.key})
 
 
 @app.route("/api/check-search-queue/")
@@ -847,10 +902,14 @@ def toggle_favourite(key):
 								 (current_user.get_id(), dataset.key))
 	if not current_status:
 		db.insert("users_favourites", data={"name": current_user.get_id(), "key": dataset.key})
-		return jsonify({"success": True, "favourite_status": True})
 	else:
 		db.delete("users_favourites", where={"name": current_user.get_id(), "key": dataset.key})
-		return jsonify({"success": True, "favourite_status": False})
+
+	if request.args.get("redirect") is not None:
+		flash("Dataset favourite status updated.")
+		return redirect(url_for("show_result", key=dataset.key))
+	else:
+		return jsonify({"success": True, "favourite_status": not current_status})
 
 @app.route("/api/toggle-dataset-private/<string:key>")
 @login_required
@@ -883,7 +942,11 @@ def toggle_private(key):
 	dataset.is_private = not dataset.is_private
 	dataset.update_children(is_private=dataset.is_private)
 
-	return jsonify({"success": True, "is_private": dataset.is_private})
+	if request.args.get("redirect") is not None:
+		flash("Dataset private status toggled.")
+		return redirect(url_for("show_result", key=dataset.key))
+	else:
+		return jsonify({"success": True, "is_private": dataset.is_private})
 
 @app.route("/api/queue-processor/", methods=["POST"])
 @api_ratelimit

@@ -899,7 +899,7 @@ const query = {
                 body.append('name', name);
                 body.append('key', dataset_key);
                 body.append('role', role);
-                fetch(target.getAttribute('href'), {
+                fetch(target.getAttribute('href').replace(/redirect/, ''), {
                     method: 'POST',
                     body: body
                 })
@@ -932,7 +932,7 @@ const query = {
             let body = new FormData();
             body.append('name', owner);
             body.append('key', dataset_key);
-            fetch(target.getAttribute('href'), {
+            fetch(target.getAttribute('href').replace(/redirect/, ''), {
                 method: 'DELETE',
                 body: body
             })
