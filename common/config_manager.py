@@ -252,8 +252,8 @@ class ConfigManager:
                 value = json.loads(value)
             elif default is not None:
                 value = default
-            elif value is None and setting_name in config_definition and "default" in config_definition[setting_name]:
-                value = config_definition[setting_name]["default"]
+            elif value is None and setting_name in self.config_definition and "default" in self.config_definition[setting_name]:
+                value = self.config_definition[setting_name]["default"]
 
             final_settings[setting_name] = value
 
@@ -290,6 +290,9 @@ class ConfigManager:
                 value = json.dumps(value)
             except json.JSONDecodeError:
                 return None
+
+        if attribute_name in self.config_definition and self.config_definition.get(attribute_name).get("global"):
+            tag = ""
 
         if overwrite_existing:
             query = "INSERT INTO settings (name, value, tag) VALUES (%s, %s, %s) ON CONFLICT (name, tag) DO UPDATE SET value = EXCLUDED.value"
