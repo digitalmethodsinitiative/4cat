@@ -163,7 +163,7 @@ class VideoDownloaderPlus(BasicProcessor):
             options["amount"]["tooltip"] = "Use 0 to download all videos"
         else:
             options['amount']['max'] = max_number_videos
-            options['amount']['help'] = "No. of videos (max %s)" % max_number_videos
+            options['amount']['help'] = f"No. of videos (max {max_number_videos:,}"
 
         # And update the max size and help from config
         max_video_size = int(config.get('video-downloader.max-size', 100, user=user))
