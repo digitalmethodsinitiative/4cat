@@ -1487,7 +1487,8 @@ const ui_helpers = {
                     let label = element.querySelector('label').textContent;
                     let help = element.querySelector('[role=tooltip]');
                     if(
-                        label.toLowerCase().indexOf(query) >= 0
+                        element.querySelector('[name]').getAttribute('name').indexOf(query) >= 0
+                        || label.toLowerCase().indexOf(query) >= 0
                         || (help && help.textContent.toLowerCase().indexOf(query) >= 0)
                     ) {
                         matching_tabs.push(tab_id);

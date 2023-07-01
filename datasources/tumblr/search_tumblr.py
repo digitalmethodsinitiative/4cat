@@ -632,7 +632,7 @@ class SearchTumblr(Search):
 			self.config.get("api.tumblr.consumer_secret"),
 			self.config.get("api.tumblr.key"),
 			self.config.get("api.tumblr.secret_key")]
-		
+
 		if not all(config_keys):
 			raise ConfigException("Not all Tumblr API credentials are configured. Cannot query Tumblr API.")
 
