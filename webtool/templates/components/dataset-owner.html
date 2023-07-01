@@ -4,7 +4,7 @@
         <a href="{{ url_for("manipulate_user", mode="edit") }}?name={{ owner }}">{{ owner }}</a>
     {% else %}
         {% if owner[:4] == "tag:" %}
-            <code>tag:</code>{{ owner[4:] }}
+            <span class="owner-tag">tag:</span>{{ owner[4:] }}
         {% else %}
             {{ owner }}
         {% endif %}

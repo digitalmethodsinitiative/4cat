@@ -128,8 +128,7 @@ def show_results(page):
     replacements.append(page_size)
     replacements.append(offset)
     query = "SELECT key FROM datasets WHERE " + where + " ORDER BY " + filters["sort_by"] + " DESC LIMIT %s OFFSET %s"
-    print(query)
-    print(replacements)
+
     datasets = db.fetchall(query, tuple(replacements))
 
     if not datasets and page != 1:
@@ -139,8 +138,14 @@ def show_results(page):
     pagination = Pagination(page, page_size, num_datasets)
     filtered = []
 
+    expiring_datasets = set()
     for dataset in datasets:
-        filtered.append(DataSet(key=dataset["key"], db=db))
+        dataset = DataSet(key=dataset["key"], db=db)
+        datasource = dataset.parameters.get("datasource", "")
+        if dataset.parameters.get("expires-after") or config.get("expire.datasources", {}).get(datasource, {}).get("timeout"):
+            expiring_datasets.add(dataset.key)
+
+        filtered.append(dataset)
 
     favourites = [row["key"] for row in
                   db.fetchall("SELECT key FROM users_favourites WHERE name = %s", (current_user.get_id(),))]
@@ -149,7 +154,7 @@ def show_results(page):
                    metadata["has_worker"] and metadata["has_options"]}
 
     return render_template("results.html", filter=filters, depth=depth, datasources=datasources,
-                           datasets=filtered, pagination=pagination, favourites=favourites)
+                           datasets=filtered, pagination=pagination, favourites=favourites, expiring=expiring_datasets)
 
 
 """

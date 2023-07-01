@@ -85,7 +85,7 @@
                     </div>
 
                     <div class="threequarters dataset-owner-list">
-                        <dt>Access</dt>
+                        <dt>Dataset access</dt>
                         <dd>
                             <ul>
                             {% for owner in dataset.get_owners("owner") %}
@@ -96,10 +96,10 @@
                                 {% set role = "viewer" %}
                                 {% include "components/dataset-owner.html" %}
                             {% endfor %}
+                            </ul>
                             {% if dataset.is_accessible_by(current_user, "owner") %}
                                 <a class="button-like-small" id="add-dataset-owner" href="{{ url_for("add_dataset_owner") }}"><i class="fa fa-user-plus" aria-hidden="true"></i> Share</a>
                             {% endif %}
-                            </ul>
                         </dd>
                     </div>
 

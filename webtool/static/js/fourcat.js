@@ -890,7 +890,7 @@ const query = {
             '<label>Role: ' +
             '  <select id="new-dataset-role" name="role"><option value="owner">Owner</option><option value="viewer">Viewer</option>' +
             '</select></label>',
-            'Add owner to dataset',
+            'Grant access to dataset',
             function () {
                 let dataset_key = document.querySelector('article.result').getAttribute('data-dataset-key');
                 let name = document.querySelector('#new-dataset-owner').value;
@@ -908,7 +908,7 @@ const query = {
                         if(!data['html']) {
                             popup.alert('There was an error adding the owner to the dataset. ' + data['error']);
                         } else {
-                            document.querySelector('#add-dataset-owner').insertAdjacentHTML('beforebegin', data['html']);
+                            document.querySelector('.dataset-owner-list ul').insertAdjacentHTML('beforeend', data['html']);
                         }
                     })
                     .catch((error) => {
@@ -926,7 +926,7 @@ const query = {
             target = $(target).parents('a')[0];
         }
 
-        popup.confirm('Are you sure you want to remove this owner? This cannot be undone.', 'Confirm', function () {
+        popup.confirm('Are you sure you want to remove access from the dataset for this user or tag? This cannot be undone.', 'Confirm', function () {
             let owner = target.parentNode.getAttribute('data-owner');
             let dataset_key = document.querySelector('article.result').getAttribute('data-dataset-key');
             let body = new FormData();

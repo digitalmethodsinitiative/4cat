@@ -172,9 +172,14 @@ article.result > section:first-child {
     position: relative;
 }
 
+.dataset-owner-list .owner-tag {
+    font-family: monospace;
+}
+
 .dataset-owner-list ul {
     list-style: none;
     margin: 0;
+    padding-right: 5em;
 }
 
 .dataset-owner-list #add-dataset-owner {
@@ -191,6 +196,14 @@ article.result > section:first-child {
     padding: 0 0.25em 0.25em 0.25em;
     position: relative;
     line-height: 1.3em;
+}
+
+.dataset-owner-list li {
+    display: inline-block;
+}
+
+.dataset-owner-list li:not(:last-child)::after {
+    content: '\02022';
 }
 
 /** dataset toolbox **/
