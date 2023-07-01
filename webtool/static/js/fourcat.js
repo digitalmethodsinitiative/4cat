@@ -1449,7 +1449,7 @@ const ui_helpers = {
             $('.datasource-extra-input').remove();
         });
 
-        // special case - first-run colour picker for the interface
+        // special case - colour picker for the interface
         $('body').on('input', '.hue-picker', function() {
             let h = parseInt($(this).val());
             let s = $(this).attr('data-saturation') ? parseInt($(this).attr('data-saturation')) : 87;

@@ -178,7 +178,6 @@ config_definition = {
         "help": "Interface accent colour",
         "saturation": 87,
         "value": 81,
-        "update_layout": True,
         "min": 0,
         "max": 360,
         "coerce_type": int

@@ -101,10 +101,11 @@
             </div>
         {% elif settings.type == "hue" %}
                 <div>
+                    {% set hue_id = uniqid() %}
                     <input type="range" min="0" max="360" step="1" name="option-{{ option }}" id="forminput-{{ option }}"
                            class="hue-picker" value="{{ settings.default }}" data-saturation="{% if settings.saturation %}{{ settings.saturation }}{% else %}77{% endif %}"
-                           data-value="{% if settings.value %}{{ settings.value }}{% else %}46{% endif %}"{% if settings.update_layout %} data-update-layout="true"{% endif %} data-update-background="#colour-example">
-                    <span id="colour-example"></span>
+                           data-value="{% if settings.value %}{{ settings.value }}{% else %}46{% endif %}" data-update-background="#colour-example-{{ hue_id }}">
+                    <span class="colour-example" id="colour-example-{{ hue_id }}"></span>
                 </div>
         {% endif %}
         </div>

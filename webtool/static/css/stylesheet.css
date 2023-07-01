@@ -280,7 +280,7 @@ article.small .form-element > *:not([type=radio], [type=checkbox]) {
     padding: 1em;
 }
 
-#colour-example {
+.colour-example {
     display: inline-block;
     width: 1em;
     height: 1em;

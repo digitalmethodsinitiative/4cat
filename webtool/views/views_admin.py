@@ -473,6 +473,7 @@ def update_settings():
     }
 
     global_settings = config.get_all()
+    update_css = False
 
     if request.method == "POST":
         try:
@@ -513,11 +514,11 @@ def update_settings():
                     flash("Invalid value for %s" % setting)
                     continue
 
-                if setting == "4cat.layout_hue":
-                    # todo: make this 'side-effects' thing generically applicable
-                    # this setting has a side-effect because it requires the
-                    # updating of the colour definitions in the CSS
-                    generate_css_colours(force=True)
+                if definition.get(setting, {}).get("type") == UserInput.OPTION_HUE:
+                    update_css = True
+
+            if update_css:
+                generate_css_colours(force=True)
 
             flash("Settings saved")
         except QueryParametersException as e:
