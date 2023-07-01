@@ -85,13 +85,15 @@ table td[colspan] {
     max-width: 25em;
 }
 
-.datasource-toggle-form .form-element {
-    min-height: auto;
+.settings .datasource-toggle-form table {
+    position: relative;
+    left: -15em;
+    background: var(--always-white);
+    width: calc(100% + 12em);
 }
 
-.datasource-toggle-form fieldset {
-    padding-top: 0.5em;
-    padding-bottom: 0.5em;
+.settings .datasource-toggle-form input[type=text] {
+    width: 5em;
 }
 
 .user-controls > div, .user-controls > form > * {

@@ -24,6 +24,7 @@
             {% set tab = namespace(name="", open=False, first=True) %}
             <form action="{{ url_for("update_settings") }}?tag={{ tag }}" method="POST" class="tabbed">
                 <nav class="tab-controls">
+                    <input type="hidden" name="current-tab" value="{{ current_tab }}">
                     <ul>
                         {% set tab.name = '' %}
                         {% for option in options %}
@@ -67,7 +68,7 @@
                             {% set tab.open = True %}
                         {% endif %}
                         <div
-                                {% if (tag and options[option].global) or (tag == "admin" and option.startswith("privileges.admin")) %} aria-disabled="true" class="disabled tooltip-trigger" aria-controls="tooltip-setting-disabled"
+                                {% if options[option].indirect or (tag and options[option].global) or (tag == "admin" and option.startswith("privileges.admin")) %} aria-disabled="true" class="disabled tooltip-trigger" aria-controls="tooltip-setting-{% if options[option].indirect %}indirect{% else %}disabled{% endif %}"
                                 {% elif options[option].is_changed %} class="is-changed tooltip-trigger" aria-controls="tooltip-setting-changed"{% endif %}
                         >
                         {% if options[option].default is none %}
@@ -87,6 +88,7 @@
                     </div>
                 </div>
                 <p role="tooltip" class="multiple" id="tooltip-setting-disabled" aria-hidden="true">This setting can only be changed globally, not per tag</p>
+                <p role="tooltip" class="multiple" id="tooltip-setting-indirect" aria-hidden="true">This setting cannot be changed directly</p>
                 <p role="tooltip" class="multiple" id="tooltip-setting-changed" aria-hidden="true">This setting was changed for the '{{ tag }}' tag</p>
             </form>
         </section>

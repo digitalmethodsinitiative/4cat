@@ -164,7 +164,9 @@ changes = {
     "tcat-auto-upload.TCAT_SERVER": "tcat-auto-upload.server_url",
     "tcat-auto-upload.TCAT_TOKEN": "tcat-auto-upload.token",
     "tcat-auto-upload.TCAT_USERNAME": "tcat-auto-upload.username",
-    "tcat-auto-upload.TCAT_PASSWORD": "tcat-auto-upload.password"
+    "tcat-auto-upload.TCAT_PASSWORD": "tcat-auto-upload.password",
+    "4cat.datasources": "datasources.enabled",
+    "expire.datasources": "datasources.expiration"
 }
 for from_name, to_name in changes.items():
     db.execute("UPDATE settings SET name = %s WHERE name = %s", (to_name, from_name))

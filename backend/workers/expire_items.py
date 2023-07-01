@@ -51,7 +51,7 @@ class ThingExpirer(BasicWorker):
 		delete old datasets, do so for all qualifying datasets.
 		"""
 		datasets = []
-		expiration = config.get("expire.datasources", {})
+		expiration = config.get("datasources.expiration", {})
 
 		# first get datasets for which the data source specifies that they need
 		# to be deleted after a certain amount of time

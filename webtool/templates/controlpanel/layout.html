@@ -6,11 +6,8 @@
 <ul>
     {% if __user_config("privileges.admin.can_restart") %}
         <li{% if navigation.sub == "restart" %} class="current"{% endif %}><a href="{{ url_for("trigger_restart") }}">Restart or Upgrade</a></li>{% endif %}
-    {% if __user_config("privileges.admin.can_manage_datasources") %}
-        <li{% if navigation.sub == "datasources" %} class="current"{% endif %}><a href="{{ url_for("toggle_datasources") }}">Data source
-            settings</a></li>{% endif %}
     {% if __user_config("privileges.admin.can_manage_settings") %}
-        <li{% if navigation.sub == "config" %} class="current"{% endif %}><a href="{{ url_for("update_settings") }}">General settings</a></li>{% endif %}
+        <li{% if navigation.sub == "config" %} class="current"{% endif %}><a href="{{ url_for("update_settings") }}">Settings</a></li>{% endif %}
     {% if __user_config("privileges.admin.can_manage_users") %}
         <li{% if navigation.sub == "user" %} class="current"{% endif %}><a href="{{ url_for("list_users") }}">Users</a></li>{% endif %}
     {% if __user_config("privileges.admin.can_manage_tags") %}

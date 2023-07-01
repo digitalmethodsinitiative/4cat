@@ -9,13 +9,27 @@ from common.lib.user_input import UserInput
 import json
 
 config_definition = {
-    "4cat.datasources": {
-        "type": UserInput.OPTION_TEXT_JSON,
+    "datasources._intro": {
+        "type": UserInput.OPTION_INFO,
+        "help": "Data sources enabled below will be offered to people on the 'Create Dataset' page. Additionally, "
+                "people can upload datasets for these by for example exporting them with "
+                "[Zeeschuimer](https://github.com/digitalmethodsinitiative/zeeschuimer) to this 4CAT instance.\n\n"
+                "Some data sources offer further settings which may be configured on other tabs."
+    },
+    "datasources.enabled": {
+        "type": UserInput.OPTION_DATASOURCES,
         "default": ["bitchute", "custom", "douban", "customimport", "telegram", "instagram", "tiktok", "twitter",
                     "imgur", "parler", "douyin", "linkedin", "ninegag"],
         "help": "Data Sources",
-        "tooltip": "A list of enabled data sources that people can choose from when creating a dataset page. It is "
-                   "recommended to manage this via the 'Data sources' button in the Control Panel."
+        "tooltip": "A list of enabled data sources that people can choose from when creating a dataset page."
+    },
+    "datasources.expiration": {
+        "type": UserInput.OPTION_TEXT_JSON,
+        "default": {},
+        "help": "Data source-specific expiration",
+        "tooltip": "Allows setting expiration settings per datasource. Configured by proxy via the 'data sources' "
+                   "setting.",
+        "indirect": True
     },
     # Configure how the tool is to be named in its web interface. The backend will
     # always refer to "4CAT" - the name of the software, and a "powered by 4CAT"
@@ -220,13 +234,6 @@ config_definition = {
                    "sources can still force the expiration of datasets created through that data source. This cannot "
                    "be overridden by the user.",
     },
-    "expire.datasources": {
-        "type": UserInput.OPTION_TEXT_JSON,
-        "default": {},
-        "help": "Data source-specific expiration",
-        "tooltip": "Allows setting expiration settings per datasource. This always overrides the above settings. It is "
-                   "recommended to manage this via the 'Data sources' button in the Control Panel.",
-    },
     "logging.slack.level": {
         "type": UserInput.OPTION_CHOICE,
         "default": "WARNING",
@@ -421,6 +428,7 @@ categories = {
     "api": "API credentials",
     "flask": "Flask settings",
     "explorer": "Data Explorer",
+    "datasources": "Data sources",
     "expire": "Dataset expiration settings",
     "mail": "Mail settings & credentials",
     "logging": "Logging",

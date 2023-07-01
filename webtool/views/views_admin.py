@@ -346,7 +346,6 @@ def manipulate_user(mode):
             if mode == "edit":
                 db.update("users", where={"name": request.form.get("current-name")}, data=user_data)
                 user = User.get_by_name(db, user_data["name"])  # ensure updated data
-                print(user)
 
             else:
                 try:
@@ -372,7 +371,6 @@ def manipulate_user(mode):
             if not incomplete and "autodelete" in request.form:
                 autodelete = request.form.get("autodelete").replace("T", " ")[:16]
                 if not autodelete:
-                    print(user)
                     user.set_value("delete-after", "")
 
                 elif not re.match("[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}", autodelete):
@@ -549,42 +547,17 @@ def update_settings():
 
     tab = "" if not request.form.get("current-tab") else request.form.get("current-tab")
 
-    return render_template("controlpanel/config.html", options=options, flashes=get_flashed_messages(),
-                           categories=categories, modules=modules, tag=tag, current_tab=tab)
-
-@app.route("/admin/toggle-datasources/", methods=["GET", "POST"])
-@login_required
-@setting_required("privileges.admin.can_manage_datasources")
-def toggle_datasources():
-    if request.method == "POST":
-        # enabled datasources is just a list of datasources with a check in the form
-        datasources = [datasource for datasource in backend.all_modules.datasources if request.form.get("enable-" + datasource)]
-        config.set("4cat.datasources", datasources, is_json=False)
-
-        # process per-datasource dataset expiration settings
-        expires = {}
-        for datasource in datasources:
-            if request.form.get("expire-" + datasource) or request.form.get("optout-" + datasource) == "on":
-                expires[datasource] = {}
-
-                if request.form.get("expire-" + datasource):
-                    expires[datasource]["timeout"] = request.form.get("expire-" + datasource)
-
-                expires[datasource]["allow_optout"] = (request.form.get("optout-" + datasource) == "on")
-
-        config.set("expire.datasources", expires, is_json=False)
-        flash("Enabled data sources updated.")
-
     datasources = {
         datasource: {
             **info,
-            "enabled": datasource in config.get("4cat.datasources"),
-            "expires": config.get("expire.datasources").get(datasource, {})
+            "enabled": datasource in config.get("datasources.enabled"),
+            "expires": config.get("datasources.expiration").get(datasource, {})
         }
         for datasource, info in backend.all_modules.datasources.items()}
 
-    return render_template("controlpanel/datasources.html", datasources=datasources, flashes=get_flashed_messages())
-
+    return render_template("controlpanel/config.html", options=options, flashes=get_flashed_messages(),
+                           categories=categories, modules=modules, tag=tag, current_tab=tab,
+                           datasources_config=datasources)
 
 @app.route("/manage-notifications/", methods=["GET", "POST"])
 @login_required

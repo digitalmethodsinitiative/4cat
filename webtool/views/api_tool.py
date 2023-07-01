@@ -134,7 +134,7 @@ def datasource_form(datasource_id):
 	if datasource_id not in backend.all_modules.datasources:
 		return error(404, message="Datasource '%s' does not exist" % datasource_id)
 
-	if datasource_id not in config.get('4cat.datasources'):
+	if datasource_id not in config.get('datasources.enabled'):
 		return error(404, message="Datasource '%s' does not exist" % datasource_id)
 
 	datasource = backend.all_modules.datasources[datasource_id]
@@ -202,7 +202,7 @@ def import_dataset():
 	}
 	"""
 	platform = request.headers.get("X-Zeeschuimer-Platform").split(".")[0]
-	if not platform or platform not in backend.all_modules.datasources or platform not in config.get('4cat.datasources'):
+	if not platform or platform not in backend.all_modules.datasources or platform not in config.get('datasources.enabled'):
 		return error(404, message="Unknown platform or source format")
 
 	worker_types = (f"{platform}-import", f"{platform}-search")
@@ -603,7 +603,7 @@ def nuke_dataset(key=None, reason=None):
 		return jsonify({"status": "success", "key": dataset.key})
 
 
-@app.route("/api/delete-query/", methods=["DELETE", "POST"])
+@app.route("/api/datasources.enabled/", methods=["DELETE", "POST"])
 @api_ratelimit
 @login_required
 @openapi.endpoint("tool")

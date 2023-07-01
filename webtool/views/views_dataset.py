@@ -142,7 +142,7 @@ def show_results(page):
     for dataset in datasets:
         dataset = DataSet(key=dataset["key"], db=db)
         datasource = dataset.parameters.get("datasource", "")
-        if dataset.parameters.get("expires-after") or config.get("expire.datasources", {}).get(datasource, {}).get("timeout"):
+        if dataset.parameters.get("expires-after") or config.get("datasources.expiration", {}).get(datasource, {}).get("timeout"):
             expiring_datasets.add(dataset.key)
 
         filtered.append(dataset)
@@ -347,7 +347,7 @@ def show_result(key):
     # if the datasource is configured for it, this dataset may be deleted at some point
     datasource = dataset.parameters.get("datasource", "")
     datasources = backend.all_modules.datasources
-    datasource_expiration = config.get("expire.datasources", {}).get(datasource, {})
+    datasource_expiration = config.get("datasources.expiration", {}).get(datasource, {})
     expires_datasource = False
     can_unexpire = ((config.get('expire.allow_optout') and  \
                            datasource_expiration.get("allow_optout", True)) or datasource_expiration.get("allow_optout", False)) \
@@ -514,7 +514,7 @@ def keep_dataset(key):
         # check if data source forces expiration - in that case, the user
         # cannot reset this
         datasource = dataset.parameters.get("datasource")
-        datasource_expiration = config.get("expire.datasources", {}).get(datasource, {})
+        datasource_expiration = config.get("datasources.expiration", {}).get(datasource, {})
         if (datasource_expiration and not datasource_expiration.get("allow_optout")) or not config.get("expire.allow_optout"):
             return render_template("error.html", title="Dataset cannot be kept",
                                    message="All datasets of this data source (%s) are scheduled for automatic "
