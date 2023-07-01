@@ -12,7 +12,7 @@ from datetime import datetime
 from common.config_manager import config
 from backend.lib.search import Search
 from common.lib.helpers import UserInput
-from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException
+from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException, ConfigException
 
 __author__ = "Sal Hagen"
 __credits__ = ["Sal Hagen", "Tumblr API (api.tumblr.com)"]
@@ -157,10 +157,14 @@ class SearchTumblr(Search):
 		# Connect to Tumblr API
 		try:
 			self.client = self.connect_to_tumblr()
+		except ConfigException as e:
+			self.log.warning(f"Could not connect to Tumblr API: API keys invalid or not set")
+			self.dataset.finish_with_error(f"Could not connect to Tumblr API: API keys invalid or not set")
+			return
 		except ConnectionRefusedError as e:
 			client_info = self.client.info()
 			self.log.warning(f"Could not connect to Tumblr API: {e}; client_info: {client_info}")
-			self.dataset.update_status(f"Could not connect to Tumblr API: {client_info.get('meta', {}).get('status', '')} - {client_info.get('meta', {}).get('msg', '')}")
+			self.dataset.finish_with_error(f"Could not connect to Tumblr API: {client_info.get('meta', {}).get('status', '')} - {client_info.get('meta', {}).get('msg', '')}")
 			return
 
 		# for each tag or blog, get post
@@ -291,7 +295,7 @@ class SearchTumblr(Search):
 			for check_post in posts:
 				# Sometimes the API repsonds just with "meta", "response", or "errors".
 				if isinstance(check_post, str):
-					self.dataset.update_status("Couldnt add post:", check_post)
+					self.dataset.update_status("Couldn't add post:", check_post)
 					retries += 1
 					break
 				else:
@@ -622,11 +626,15 @@ class SearchTumblr(Search):
 		Returns a connection to the Tumblr API using the pytumblr library.
 
 		"""
-		client = pytumblr.TumblrRestClient(
+        config_keys = [
 			self.config.get("api.tumblr.consumer_key"),
 			self.config.get("api.tumblr.consumer_secret"),
 			self.config.get("api.tumblr.key"),
-			self.config.get("api.tumblr.secret_key")
+			self.config.get("api.tumblr.secret_key")]
+		if not all(config_keys):
+			raise ConfigException("Not all Tumblr API credentials are configured. Cannot query Tumblr API.")
+
+		self.client = pytumblr.TumblrRestClient(*config_keys)
 		)
 		client_info = self.client.info()
 
