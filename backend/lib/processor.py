@@ -256,7 +256,7 @@ class BasicProcessor(FourcatModule, BasicWorker, metaclass=abc.ABCMeta):
 					parent=self.dataset.key,
 					extension=available_processors[next_type].extension,
 					is_private=self.dataset.is_private,
-					owner=self.dataset.owner
+					owner=self.dataset.creator
 				)
 				self.queue.add_job(next_type, remote_id=next_analysis.key)
 			else:
