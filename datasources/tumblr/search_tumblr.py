@@ -626,16 +626,18 @@ class SearchTumblr(Search):
 		Returns a connection to the Tumblr API using the pytumblr library.
 
 		"""
-        config_keys = [
+
+		config_keys = [
 			self.config.get("api.tumblr.consumer_key"),
 			self.config.get("api.tumblr.consumer_secret"),
 			self.config.get("api.tumblr.key"),
 			self.config.get("api.tumblr.secret_key")]
+		
 		if not all(config_keys):
 			raise ConfigException("Not all Tumblr API credentials are configured. Cannot query Tumblr API.")
 
 		self.client = pytumblr.TumblrRestClient(*config_keys)
-		)
+
 		client_info = self.client.info()
 
 		# Check if there's any errors
