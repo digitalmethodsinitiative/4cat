@@ -96,7 +96,7 @@ class TikTokVideoDownloader(BasicProcessor):
         for original_item, mapped_item in self.source_dataset.iterate_mapped_items(self):
             video_ids_to_download.append(mapped_item.get("id"))
 
-        tiktok_scraper = TikTokScraper(processor=self)
+        tiktok_scraper = TikTokScraper(processor=self, config=self.config)
         loop = asyncio.new_event_loop()
         results = loop.run_until_complete(tiktok_scraper.download_videos(video_ids_to_download, results_path, max_amount))
 
@@ -278,7 +278,7 @@ class TikTokImageDownloader(BasicProcessor):
 
         if downloaded_media < max_amount and urls_to_refresh:
             # Refresh and collect more images
-            tiktok_scraper = TikTokScraper(processor=self)
+            tiktok_scraper = TikTokScraper(processor=self, config=self.config)
             need_more = max_amount - downloaded_media
             last_url_index = 0
             while need_more > 0:
