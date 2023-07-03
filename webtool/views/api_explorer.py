@@ -76,6 +76,7 @@ def explorer_dataset(key, page):
 	# If the dataset is local, we can add some more features
 	# (like the ability to navigate to threads)
 	is_local = False
+
 	if datasource in list(all_modules.datasources.keys()):
 		is_local = True if all_modules.datasources[datasource].get("is_local") else False
 
@@ -603,11 +604,14 @@ def get_custom_css(datasource):
 	"""
 
 	# Set the directory name of this datasource.
-	# Do some conversion for some imageboard names (4chan, 8chan).
+	# Some naming inconsistensies are caught here
 	if datasource.startswith("4"):
 		datasource_dir = datasource.replace("4", "four")
 	elif datasource.startswith("8"):
 		datasource_dir = datasource.replace("8", "eight")
+	elif datasource == "twitter":
+		datasource_dir = "twitter-import"
+		datasource = "twitter-import"
 	else:
 		datasource_dir = datasource
 
@@ -654,6 +658,9 @@ def get_custom_fields(datasource, filetype=None):
 	elif "facebook" in datasource or "instagram" in datasource:
 		datasource_dir = "import-from-tool"
 		datasource = "import-from-tool"
+	elif datasource == "twitter":
+		datasource_dir = "twitter-import"
+		datasource = "twitter-import"
 	else:
 		datasource_dir = datasource
 
