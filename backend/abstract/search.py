@@ -174,7 +174,7 @@ class Search(BasicProcessor, ABC):
 		if not path.exists():
 			return []
 
-		with path.open() as infile:
+		with path.open(encoding="utf-8") as infile:
 			for line in infile:
 				if self.interrupted:
 					raise WorkerInterruptedException()
