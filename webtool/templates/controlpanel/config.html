@@ -16,13 +16,13 @@
             </h2>
             <div class="config-tag-info">
             {% if tag %}
-                Editing configuration for tag <span class="property-badge">{{ tag }}</span>. <a href="{{ url_for("update_settings") }}">Return to global settings</a>.
+                Editing configuration for tag <span class="property-badge">{{ tag }}</span>. <a href="{{ url_for("manipulate_settings") }}">Return to global settings</a>.
             {% else %}
-                Editing <em>global configuration</em>. View for tag instead: <form class="inline" action="{{ url_for("update_settings") }}" method="GET"><input type="text" name="tag" placeholder="tag" style="width:5em;"> <button>View</button></form></button></form>
+                Editing <em>global configuration</em>. View for tag instead: <form class="inline" action="{{ url_for("manipulate_settings") }}" method="GET"><input type="text" name="tag" placeholder="tag" style="width:5em;"> <button>View</button></form></button></form>
             {% endif %}
             </div>
             {% set tab = namespace(name="", open=False, first=True) %}
-            <form action="{{ url_for("update_settings") }}?tag={{ tag }}" method="POST" class="tabbed">
+            <form action="{{ url_for("manipulate_settings") }}?tag={{ tag }}" method="POST" class="tabbed">
                 <nav class="tab-controls">
                     <input type="hidden" name="current-tab" value="{{ current_tab }}">
                     <ul>

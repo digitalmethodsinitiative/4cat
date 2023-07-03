@@ -37,7 +37,7 @@
                     </li>
 
                 {% if __user_config("privileges.admin.can_manage_settings") %}
-                    <li><a href="{{ url_for("update_settings") }}?tag=user:{{ user.name }}"
+                    <li><a href="{{ url_for("manipulate_settings") }}?tag=user:{{ user.name }}"
                                class="button-like"><i class="fa fa-user-gear" aria-hidden="true"></i> User settings</a></li>
                 {% endif %}
                 </ul>

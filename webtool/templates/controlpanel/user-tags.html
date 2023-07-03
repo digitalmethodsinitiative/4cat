@@ -29,20 +29,20 @@
             <ol id="tag-order" data-url="{{ url_for("manipulate_tags") }}">
                 <li data-tag="admin">
                     <i class="fa fa-fw fa-minus semi-handle" aria-hidden="true"></i>
-                    admin (<a href="{{ url_for("update_settings") }}?tag=admin">settings</a>)
+                    admin (<a href="{{ url_for("manipulate_settings") }}?tag=admin">settings</a>)
                 </li>
                 {% for tag in tags %}{% if tag.tag != "admin" %}
                 <li class="{% if tag.explicit %}ex{% else %}im{% endif %}plicit" data-tag="{{ tag.tag }}">
                     <i class="fa fa-fw fa-sort handle" aria-hidden="true"></i>
                     <a class="button-like confirm remove-tag" data-confirm-action="delete this tag from all users" href="{{ url_for("remove_tag") }}?redirect&amp;tag={{ tag.tag }}"><i class="fa fa-fw fa-times" aria-hidden="true"></i><span class="sr-only"> Remove tag from all users</span></a>
                     {% if tag.tag %}
-                        {{ tag.tag }} (<a href="{{ url_for("update_settings") }}?tag={{ tag.tag }}">settings</a>)
+                        {{ tag.tag }} (<a href="{{ url_for("manipulate_settings") }}?tag={{ tag.tag }}">settings</a>)
                     {% endif %}
                 </li>
                 {% endif %}{% endfor %}
                 <li>
                     <i class="fa fa-fw fa-minus semi-handle" aria-hidden="true"></i>
-                    (<a href="{{ url_for("update_settings") }}">global configuration</a>)
+                    (<a href="{{ url_for("manipulate_settings") }}">global configuration</a>)
                 </li>
             </ol>
         </section>

@@ -456,7 +456,7 @@ def manipulate_tags():
 @app.route("/admin/settings", methods=["GET", "POST"])
 @login_required
 @setting_required("privileges.admin.can_manage_settings")
-def update_settings():
+def manipulate_settings():
     """
     Update 4CAT settings
     """
@@ -523,7 +523,7 @@ def update_settings():
         except QueryParametersException as e:
             flash("Invalid settings: %s" % str(e))
 
-    all_settings = config.get_all(tags=[tag])
+    all_settings = config.get_all(user=None, tags=[tag])
     options = {}
 
     changed_categories = set()
