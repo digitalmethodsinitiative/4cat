@@ -93,13 +93,6 @@ config_definition = {
         "help": "Can create API token",
         "tooltip": "Controls whether users can create a token for authentication with 4CAT's Web API."
     },
-    "privileges.can_rerun_dataset": {
-        "type": UserInput.OPTION_TOGGLE,
-        "default": True,
-        "help": "Can re-run processors",
-        "tooltip": "Controls whether users can re-run datasets they own, i.e. run the parent processor again with the "
-                   "same parameters, replacing the original dataset."
-    },
     "privileges.can_use_explorer": {
         "type": UserInput.OPTION_TOGGLE,
         "default": True,

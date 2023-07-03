@@ -452,47 +452,6 @@ def toggle_private_interactive(key):
     else:
         return render_template("error.html", message="Error while toggling private status for dataset %s." % key)
 
-
-@app.route("/results/<string:key>/restart/")
-@login_required
-def restart_dataset(key):
-    """
-    Run a dataset's query again
-
-    Deletes all underlying datasets, marks dataset as unfinished, and queues a
-    job for it.
-
-    :param str key:  Dataset key
-    :return:
-    """
-    try:
-        dataset = DataSet(key=key, db=db)
-    except TypeError:
-        return error(404, message="Dataset not found.")
-
-    if dataset.is_private and not (config.get("privileges.can_view_private_datasets") or dataset.is_accessible_by(current_user, "owner")):
-        return error(403, error="This dataset is private.")
-
-    if not config.get("privileges.can_rerun_dataset"):
-        return error(403, message="Not allowed.")
-
-    if not dataset.is_accessible_by(current_user, "owner") and not config.get("privileges.can_view_all_datasets"):
-        return error(403, message="Not allowed.")
-
-    if not dataset.is_finished():
-        return render_template("error.html", message="This dataset is not finished yet - you cannot re-run it.")
-
-    for child in dataset.children:
-        child.delete()
-
-    dataset.unfinish()
-    queue = JobQueue(logger=log, database=db)
-    queue.add_job(jobtype=dataset.type, remote_id=dataset.key)
-
-    flash("Dataset queued for re-running.")
-    return redirect("/results/" + dataset.key + "/")
-
-
 @app.route("/results/<string:key>/keep/", methods=["GET"])
 @login_required
 def keep_dataset(key):

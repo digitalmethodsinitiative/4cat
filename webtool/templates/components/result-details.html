@@ -22,15 +22,11 @@
                     <li><a href="{{ url_for('show_result', key=dataset.key) }}"><i class="fas fa-link"
                                                                                    aria-hidden="true"></i> Permalink</a>
                     </li>
-                    {% if (__user_config("privileges.can_rerun_dataset") and dataset.is_accessible_by(current_user, "owner")) or current_user.is_admin %}
+                    {% if current_user.is_authenticated and (current_user.is_admin or dataset.is_accessible_by(current_user, "owner")) %}
                         <li><a href="{{ url_for('delete_dataset', key=dataset.key) }}?redirect" class="confirm-first"
                                data-confirm-action="delete this dataset"><i class="fas fa-trash-alt"
                                                                             aria-hidden="true"></i>
                             Delete dataset</a></li>
-                        <li><a href="{{ url_for('restart_dataset', key=dataset.key) }}" class="confirm-first"
-                               data-confirm-method="POST"
-                               data-confirm-action="delete all results for this dataset, including processor results, and re-run the query"><i
-                                class="fas fa-sync-alt" aria-hidden="true"></i> Re-run dataset</a></li>
                     {% endif %}
                     {% if current_user.is_admin and not dataset.is_finished() %}
                         <li><a href="{{ url_for('nuke_dataset', key=dataset.key) }}?redirect" class="prompt-first"
