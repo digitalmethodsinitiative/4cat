@@ -227,7 +227,7 @@ const processor = {
             return;
         }
 
-        $.ajax(getRelativeURL('api/delete-query/'), {
+        $.ajax(getRelativeURL('api/delete-dataset/'), {
             method: 'DELETE',
             data: {key: $(this).attr('data-key')},
             success: function (json) {

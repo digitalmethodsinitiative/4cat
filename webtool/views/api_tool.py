@@ -603,7 +603,7 @@ def nuke_dataset(key=None, reason=None):
 		return jsonify({"status": "success", "key": dataset.key})
 
 
-@app.route("/api/datasources.enabled/", methods=["DELETE", "POST"])
+@app.route("/api/delete-dataset/<string:key>/")
 @api_ratelimit
 @login_required
 @openapi.endpoint("tool")
