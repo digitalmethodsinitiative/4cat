@@ -1,5 +1,6 @@
 # Add 'tags' column to user table
 # and 'tag' column to settings table
+# and migrate settings and so on
 import json
 import sys
 import os

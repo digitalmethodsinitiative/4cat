@@ -133,7 +133,7 @@ class ConfigManager:
             if setting in known_settings:
                 continue
 
-            self.set(setting, parameters.get("default", ""), is_json=False)
+            self.set(setting, parameters.get("default", ""))
 
         self.db.commit()
 
@@ -263,7 +263,7 @@ class ConfigManager:
         else:
             return final_settings
 
-    def set(self, attribute_name, value, is_json, tag="", overwrite_existing=True):
+    def set(self, attribute_name, value, is_json=False, tag="", overwrite_existing=True):
         """
         Insert OR set value for a setting
 
