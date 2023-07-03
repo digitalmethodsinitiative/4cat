@@ -1042,11 +1042,6 @@ const tooltip = {
      * @param e  Event that triggered the toggle
      */
     toggle: function (e) {
-        if (this.tagName.toLowerCase() !== 'a') {
-            // Allow links to have tooltips and still work
-            e.preventDefault();
-        }
-
         let tooltip_container = $(document.getElementById($(this).attr('aria-controls')));
         if (tooltip_container.is(':hidden')) {
             tooltip.show(e, this);
