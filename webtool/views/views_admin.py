@@ -471,7 +471,7 @@ def update_settings():
            backend.all_modules.processors.values()}
     }
 
-    global_settings = config.get_all()
+    global_settings = config.get_all(user=None, tags=None)
     update_css = False
 
     if request.method == "POST":
@@ -526,6 +526,7 @@ def update_settings():
     all_settings = config.get_all(tags=[tag])
     options = {}
 
+    changed_categories = set()
     for option in sorted({*all_settings.keys(), *definition.keys()}):
         tag_value = all_settings.get(option, definition.get(option, {}).get("default"))
         global_value = global_settings.get(option, definition.get(option, {}).get("default"))
@@ -546,6 +547,9 @@ def update_settings():
             "is_changed": is_changed
         }
 
+        if tag and is_changed:
+            changed_categories.add(option.split(".")[0])
+
     tab = "" if not request.form.get("current-tab") else request.form.get("current-tab")
 
     datasources = {
@@ -558,7 +562,7 @@ def update_settings():
 
     return render_template("controlpanel/config.html", options=options, flashes=get_flashed_messages(),
                            categories=categories, modules=modules, tag=tag, current_tab=tab,
-                           datasources_config=datasources)
+                           datasources_config=datasources, changed=changed_categories)
 
 @app.route("/manage-notifications/", methods=["GET", "POST"])
 @login_required

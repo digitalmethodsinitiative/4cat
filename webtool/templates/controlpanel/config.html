@@ -31,7 +31,7 @@
                             {% set option_category = option.split(".")[0] %}
                             {% if option_category != tab.name %}
                                 {% set tab.name = option_category %}
-                                <li{% if (tab.first and not current_tab) or tab.name == current_tab %} class="highlighted"{% set tab.first = False %}{% endif %}>
+                                <li class="{% if tab.name in changed %}changed{% endif %}{% if (tab.first and not current_tab) or tab.name == current_tab %} highlighted{% set tab.first = False %}{% endif %}">
                                     <a href="#tab-{{ tab.name }}" id="tablabel-{{ tab.name }}"
                                        aria-controls="tab-{{ tab.name }}">
                                         {% if tab.name in categories %}

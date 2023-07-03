@@ -116,6 +116,10 @@ table td[colspan] {
     border-right: 5px solid var(--accent-alternate);
 }
 
+.tab-controls .changed {
+    color: var(--accent-alternate)
+}
+
 .config-tag-info {
     text-align: center;
     border-bottom: 2px solid var(--contrast-dark);
