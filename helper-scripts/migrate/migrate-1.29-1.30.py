@@ -56,28 +56,28 @@ if type(datasources) is dict:
             if platform in datasources and datasources[platform].get(setting):
                 print(f"  - Migrating setting {platform}.{setting}...")
                 config.set(platform.replace("4", "four").replace("8", "eight") + "." + setting,
-                           datasources[platform][setting], is_json=False)
+                           datasources[platform][setting])
 
     for platform in ("dmi-tcat", "dmi-tcatv2"):
         for setting in ("instances",):
             if platform in datasources and datasources[platform].get(setting):
                 print(f"  - Migrating setting {platform}.{setting}...")
-                config.set(platform + "." + setting, datasources[platform][setting], is_json=False)
+                config.set(platform + "." + setting, datasources[platform][setting])
 
     print(f"  - Migrating data source-specific expiration settings...")
     expiration = {datasource: {"timeout": info["expire-datasets"], "allow_optout": False} for datasource, info in
                   datasources.items() if "expire-datasets" in info}
-    config.set("expire.datasources", expiration, is_json=False)
+    config.set("expire.datasources", expiration)
 
     print("  - Updating DATASOURCES setting...")
-    config.set("4cat.datasources", new_datasources, is_json=False)
+    config.set("4cat.datasources", new_datasources)
     config.delete_setting("DATASOURCES")
 
 print("  Deleting and migrating deprecated settings...")
-config.set("4cat.phone_home_asked", False, is_json=False)
+config.set("4cat.phone_home_asked", False)
 if config.get("IMAGE_INTERVAL"):
     print("  - IMAGE_INTERVAL -> fourchan.image_interval")
-    config.set("fourchan.image_interval", config.get("IMAGE_INTERVAL", 60), is_json=False)
+    config.set("fourchan.image_interval", config.get("IMAGE_INTERVAL", 60))
     config.delete_setting("IMAGE_INTERVAL")
 
 print("  - WARN_EMAILS, WARN_INTERVAL, image_downloader_telegram.MAX_NUMBER_IMAGES -> removed")
@@ -128,13 +128,13 @@ else:
     ffmpeg = shutil.which(config.get("video_downloader.ffmpeg-path", "ffmpeg"))
     if ffmpeg:
         print(f"  - ffmpeg found at {ffmpeg}, storing as config setting video_downloader.ffmpeg-path")
-        config.set("video_downloader.ffmpeg-path", ffmpeg, is_json=False)
+        config.set("video_downloader.ffmpeg-path", ffmpeg)
     elif in_docker:
         print("  - ffmpeg not found, detected Docker environment, installing via apt")
         ffmpeg_install = subprocess.run(shlex.split("apt install -y ffmpeg"), stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         if ffmpeg_install.returncode == 0:
             print("  - ffmpeg intalled with apt!")
-            config.set("video_downloader.ffmpeg-path", shutil.which("ffmpeg"), is_json=False)
+            config.set("video_downloader.ffmpeg-path", shutil.which("ffmpeg"))
         else:
             print(f"  - Error while installing ffmpeg with apt (return code {ffmpeg_install.returncode}). Some video")
             print("    processors will be unavailable until you rebuild the Docker containers.")

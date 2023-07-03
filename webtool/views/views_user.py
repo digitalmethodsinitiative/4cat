@@ -258,7 +258,7 @@ def first_run_dialog():
         user.set_password(password)
         user.add_tag("admin")  # first user is always admin
 
-        config.set("4cat.name_long", instance_name, is_json=False)
+        config.set("4cat.name_long", instance_name)
 
         # handle hue colour
         try:
@@ -267,7 +267,7 @@ def first_run_dialog():
         except (ValueError, TypeError):
             interface_hue = random.randrange(0, 360)
 
-        config.set("4cat.layout_hue", interface_hue, is_json=False)
+        config.set("4cat.layout_hue", interface_hue)
         generate_css_colours(force=True)
 
         # make user an admin
@@ -295,7 +295,7 @@ def first_run_dialog():
             flash("Could not send install ping to 4CAT developers")
 
     # don't ask phone home again until next update
-    config.set("4cat.phone_home_asked", True, is_json=False)
+    config.set("4cat.phone_home_asked", True)
 
     redirect_path = "show_login" if not has_admin_user else "show_frontpage"
     return redirect(url_for(redirect_path))

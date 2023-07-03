@@ -126,10 +126,10 @@ admin_keys = ("can_view_status", "can_manage_users", "can_manage_settings", "can
               "can_manage_notification", "can_manage_tags", "can_restart")
 for admin_key in admin_keys:
     print(f"  - privileges.admin.{admin_key} = True")
-    config.set(f"privileges.admin.{admin_key}", True, is_json=False, tag="admin")
+    config.set(f"privileges.admin.{admin_key}", True, tag="admin")
 
-config.set(f"privileges.can_view_all_datasets", True, is_json=False, tag="admin")
-config.set(f"privileges.can_view_private_datasets", True, is_json=False, tag="admin")
+config.set(f"privileges.can_view_all_datasets", True, tag="admin")
+config.set(f"privileges.can_view_private_datasets", True, tag="admin")
 
 # ---------------------------------------------
 #         More consistent setting names
@@ -185,7 +185,7 @@ for from_name, to_name in changes.items():
     users = db.fetchall(f"SELECT * FROM users WHERE userdata::json->>'{from_name}' IS NOT NULL")
     for user in users:
         userdata = json.loads(user["userdata"])
-        config.set(to_name, userdata[from_name], is_json=False, tag=f"user:{user['name']}")
+        config.set(to_name, userdata[from_name], tag=f"user:{user['name']}")
         del userdata[from_name]
         db.update("users", where={"name": user["name"]}, data={"userdata": json.dumps(userdata)}, commit=False)
 

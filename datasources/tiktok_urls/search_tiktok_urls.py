@@ -43,7 +43,7 @@ class SearchTikTokByID(Search):
         "tiktok-urls-search.proxies.wait": {
             "type": UserInput.OPTION_TEXT,
             "coerce_type": float,
-            "default": 1,
+            "default": 1.0,
             "help": "Request wait",
             "tooltip": "Time to wait before sending a new request from the same IP"
         }

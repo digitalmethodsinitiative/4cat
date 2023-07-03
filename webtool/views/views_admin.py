@@ -446,7 +446,7 @@ def manipulate_tags():
         db.commit()
 
         # save global order, too
-        config.set("flask.tag_order", json.dumps(order), is_json=True)
+        config.set("flask.tag_order", json.dumps(order))
 
         # always async
         return jsonify({"success": True})
@@ -476,6 +476,8 @@ def manipulate_settings():
 
     if request.method == "POST":
         try:
+            # this gives us the parsed values, as Python variables, i.e. before
+            # potentially encoding them as JSON
             new_settings = UserInput.parse_all(definition, request.form.to_dict(),
                                                silently_correct=False)
 
@@ -489,25 +491,27 @@ def manipulate_settings():
                     if tag == "admin" and setting.startswith("privileges.admin"):
                         continue
 
-                    # test if value is changed from global
-                    # this is a bit finicky because we need to make sure we're not
-                    # e.g. comparing the JSON representation to the actual value
+                    # global_settings has the values in 'raw' format, i.e. as
+                    # stored in the database, i.e. as JSON
                     global_value = global_settings.get(setting)
-
-                    if type(global_value) not in (int, float, str, bool):
-                        global_value = json.dumps(global_value)
 
                     # only update if value is not the same as global config
                     # else remove override, so if the global changes the tag
                     # isn't stuck in history
                     # if None, the value is not set explicitly, so whatever has
                     # been set here is different (because it is explicit) for now
+                    #
+                    # so here we compare the JSON from global_settings to the
+                    # parsed value, encoded as JSON
                     if global_value == value and global_value is not None:
                         config.delete_for_tag(setting, tag)
                         continue
+                    else:
+                        print(f"{repr(global_value)} ({type(global_value)}) <> {repr(value)} ({type(value)})")
+                        print(f"same: {global_value == value}")
+                        print(f"global is not None: {global_value is not None}")
 
-                valid = config.set(setting, value, tag=tag,
-                                   is_json=definition[setting].get("type") == UserInput.OPTION_TEXT_JSON)
+                valid = config.set(setting, value, tag=tag)
 
                 if valid is None:
                     flash("Invalid value for %s" % setting)
@@ -532,10 +536,9 @@ def manipulate_settings():
         global_value = global_settings.get(option, definition.get(option, {}).get("default"))
         is_changed = tag and global_value != tag_value
 
-        if definition.get(option, {}).get("type") != UserInput.OPTION_TEXT_JSON:
-            default = all_settings.get(option, definition.get(option, {}).get("default"))
-        else:
-            default = json.dumps(all_settings.get(option, definition.get(option, {}).get("default")))
+        default = all_settings.get(option, definition.get(option, {}).get("default"))
+        if definition.get(option, {}).get("type") == UserInput.OPTION_TEXT_JSON:
+            default = json.dumps(default)
 
         options[option] = {
             **definition.get(option, {

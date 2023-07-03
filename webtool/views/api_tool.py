@@ -738,7 +738,7 @@ def remove_tag():
 	if tag in all_tags:
 		all_tags.remove(tag)
 		db.delete("settings", where={"tag": tag})
-		config.set("flask.tag_order", all_tags, is_json=False, tag="")
+		config.set("flask.tag_order", all_tags, tag="")
 
 	if request.args.get("redirect") is not None:
 		flash("Tag removed.")

@@ -13,7 +13,7 @@ class SearchNineGag(Search):
     """
     Import scraped 9gag data
     """
-    type = "9gag-search"  # job ID
+    type = "ninegag-search"  # job ID
     category = "Search"  # category
     title = "Import scraped 9gag data"  # title displayed in UI
     description = "Import 9gag data collected with an external tool such as Zeeschuimer."  # description displayed in UI
