@@ -472,7 +472,7 @@ class User:
         self.db.delete("access_tokens", where={"name": username}, commit=False)
 
         # find datasets and delete
-        datasets = self.db.fetchall("SELECT key FROM datasets WHERE owner = %s", (username,))
+        datasets = self.db.fetchall("SELECT key FROM datasets_owners WHERE name = %s", (username,))
 
         # delete any datasets and jobs related to deleted datasets
         if datasets:

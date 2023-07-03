@@ -111,7 +111,7 @@ class UserInput:
                 } for datasource in input[option].split(",")}
 
                 parsed_input[option] = [datasource for datasource, v in datasources.items() if v["enabled"]]
-                parsed_input[option.split(".")[0] + ".expiration"] = json.dumps(datasources)
+                parsed_input[option.split(".")[0] + ".expiration"] = datasources
 
             elif option not in input:
                 # not provided? use default
@@ -156,6 +156,7 @@ class UserInput:
                 return True
             else:
                 raise QueryParametersException("Toggle invalid input")
+
         elif input_type in (UserInput.OPTION_DATE, UserInput.OPTION_DATERANGE):
             # parse either integers (unix timestamps) or try to guess the date
             # format (the latter may be used for input if JavaScript is turned
@@ -200,13 +201,13 @@ class UserInput:
                 return choice
 
         elif input_type == UserInput.OPTION_TEXT_JSON:
-            # needs to be parsed as JSON
+            # verify that this is actually json
             try:
                 redumped_value = json.dumps(json.loads(choice))
             except json.JSONDecodeError:
                 raise QueryParametersException("Invalid JSON value '%s'" % choice)
 
-            return redumped_value
+            return json.loads(choice)
 
         elif input_type in (UserInput.OPTION_TEXT, UserInput.OPTION_TEXT_LARGE, UserInput.OPTION_HUE):
             # text string

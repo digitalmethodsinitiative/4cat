@@ -18,14 +18,14 @@ config_definition = {
     },
     "datasources.enabled": {
         "type": UserInput.OPTION_DATASOURCES,
-        "default": ["bitchute", "custom", "douban", "customimport", "telegram", "instagram", "tiktok", "twitter",
-                    "imgur", "parler", "douyin", "linkedin", "ninegag"],
+        "default": ["ninegag", "bitchute", "douban", "douyin", "imgur", "upload", "instagram", "linkedin", "parler",
+                    "telegram", "tiktok", "twitter"],
         "help": "Data Sources",
         "tooltip": "A list of enabled data sources that people can choose from when creating a dataset page."
     },
     "datasources.expiration": {
         "type": UserInput.OPTION_TEXT_JSON,
-        "default": {},
+        "default": {"fourchan": {"enabled": False, "allow_optout": False, "timeout": 0}, "eightchan": {"enabled": False, "allow_optout": False, "timeout": 0}, "eightkun": {"enabled": False, "allow_optout": False, "timeout": 0}, "ninegag": {"enabled": True, "allow_optout": False, "timeout": 0}, "bitchute": {"enabled": True, "allow_optout": False, "timeout": 0}, "dmi-tcat": {"enabled": False, "allow_optout": False, "timeout": 0}, "dmi-tcatv2": {"enabled": False, "allow_optout": False, "timeout": 0}, "douban": {"enabled": True, "allow_optout": False, "timeout": 0}, "douyin": {"enabled": True, "allow_optout": False, "timeout": 0}, "imgur": {"enabled": True, "allow_optout": False, "timeout": 0}, "upload": {"enabled": True, "allow_optout": False, "timeout": 0}, "instagram": {"enabled": True, "allow_optout": False, "timeout": 0}, "linkedin": {"enabled": True, "allow_optout": False, "timeout": 0}, "parler": {"enabled": True, "allow_optout": False, "timeout": 0}, "reddit": {"enabled": False, "allow_optout": False, "timeout": 0}, "telegram": {"enabled": True, "allow_optout": False, "timeout": 0}, "tiktok": {"enabled": True, "allow_optout": False, "timeout": 0}, "tiktok-urls": {"enabled": False, "allow_optout": False, "timeout": 0}, "tumblr": {"enabled": False, "allow_optout": False, "timeout": 0}, "twitter": {"enabled": True, "allow_optout": False, "timeout": 0}, "twitterv2": {"enabled": False, "allow_optout": False, "timeout": 0}, "usenet": {"enabled": False, "allow_optout": False, "timeout": 0}, "vk": {"enabled": False, "allow_optout": False, "timeout": 0}},
         "help": "Data source-specific expiration",
         "tooltip": "Allows setting expiration settings per datasource. Configured by proxy via the 'data sources' "
                    "setting.",
@@ -180,9 +180,9 @@ config_definition = {
     },
     "4cat.phone_home_asked": {
         "type": UserInput.OPTION_TOGGLE,
-        "default": False,
+        "default": True,
         "help": "Shown phone home request?",
-        "tooltip": "Whether you've seen the 'phone home request'. Set to `false` to see the request again. There "
+        "tooltip": "Whether you've seen the 'phone home request'. Set to `False` to see the request again. There "
                    "should be no need to change this manually.",
         "global": True
     },
@@ -265,7 +265,7 @@ config_definition = {
     },
     "mail.port": {
         "type": UserInput.OPTION_TEXT,
-        "default": "0",
+        "default": 0,
         "coerce_type": int,
         "help": "SMTP port",
         "tooltip": 'SMTP port to connect to for sending e-mail alerts. "0" defaults to "465" for SMTP_SSL or OS default for SMTP.',
@@ -328,7 +328,7 @@ config_definition = {
     },
     "flask.server_name": {
         "type": UserInput.OPTION_TEXT,
-        "default": "localhost",
+        "default": "4cat.local:5000",
         "help": "Host name",
         "tooltip": "e.g., my4CAT.com, localhost, 127.0.0.1. Default is localhost; when running 4CAT in Docker this "
                    "setting is ignored as any domain/port binding should be handled outside of the Docker container"
@@ -338,14 +338,14 @@ config_definition = {
     },
     "flask.autologin.hostnames": {
         "type": UserInput.OPTION_TEXT_JSON,
-        "default": ["localhost"],
+        "default": [],
         "help": "White-listed hostnames",
         "tooltip": "A list of host names or IP addresses to automatically log in. Docker should include localhost and Server Name",
         "global": True
     },
     "flask.autologin.api": {
         "type": UserInput.OPTION_TEXT_JSON,
-        "default": ["localhost"],
+        "default": [],
         "help": "White-list for API",
         "tooltip": "A list of host names or IP addresses to allow access to API endpoints with no rate limiting. Docker should include localhost and Server Name",
         "global": True
