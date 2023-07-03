@@ -280,7 +280,7 @@ def import_bzy_weibo(reader, columns, dataset, parameter):
             raise InvalidCustomFormat("CSV does not appear to be Bazhuayu format for Sina Weibo; please try importing again with CSV format set to \"Custom/other\".")
         raw_timestamp = item["from1"].strip()
         timestamp_bits = re.split(r"[年月日\s:]+", raw_timestamp)
-        print(timestamp_bits)
+
         if re.match(r"[0-9]{2}月[0-9]{2}日 [0-9]{2}:[0-9]{2}", raw_timestamp):
             timestamp = datetime.datetime(year, int(timestamp_bits[0]), int(timestamp_bits[1]), int(timestamp_bits[2]),
                                           int(timestamp_bits[3]))

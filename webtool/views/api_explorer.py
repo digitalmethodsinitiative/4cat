@@ -3,7 +3,6 @@
 """
 
 import datetime
-import common.config_manager as config
 import json
 import csv
 import re
@@ -13,22 +12,25 @@ import markdown2
 
 from backend import all_modules
 
-from collections import OrderedDict
 from pathlib import Path
 
 from flask import jsonify, abort, send_file, request, render_template
 from flask_login import login_required, current_user
 
-from webtool import app, db, log, openapi, limiter
-from webtool.lib.helpers import format_chan_post, error
+from webtool import app, db, openapi, limiter, config
+from webtool.lib.helpers import format_chan_post, error, setting_required
 from common.lib.dataset import DataSet
 from common.lib.helpers import strip_tags
 
+from common.config_manager import ConfigWrapper
+config = ConfigWrapper(config, user=current_user)
 api_ratelimit = limiter.shared_limit("45 per minute", scope="api")
 
 @app.route('/explorer/dataset/<string:key>/', defaults={'page': 0})
 @app.route('/explorer/dataset/<string:key>/<int:page>')
 @api_ratelimit
+@login_required
+@setting_required("privileges.can_use_explorer")
 @openapi.endpoint("explorer")
 def explorer_dataset(key, page):
 	"""
@@ -47,7 +49,7 @@ def explorer_dataset(key, page):
 	except TypeError:
 		return error(404, error="Dataset not found.")
 
-	if dataset.is_private and not (current_user.is_admin or dataset.owner == current_user.get_id()):
+	if dataset.is_private and not (config.get("privileges.can_view_all_datasets") or dataset.is_accessible_by(current_user)):
 		return error(403, error="This dataset is private.")
 
 	if len(dataset.get_genealogy()) > 1:
@@ -166,6 +168,8 @@ def explorer_dataset(key, page):
 
 @app.route('/explorer/thread/<datasource>/<board>/<string:thread_id>')
 @api_ratelimit
+@login_required
+@setting_required("privileges.can_use_explorer")
 @openapi.endpoint("explorer")
 def explorer_thread(datasource, board, thread_id):
 	"""
@@ -180,7 +184,7 @@ def explorer_thread(datasource, board, thread_id):
 
 	if not datasource:
 		return error(404, error="No datasource provided")
-	if datasource not in config.get('4cat.datasources'):
+	if datasource not in config.get('datasources.enabled'):
 		return error(404, error="Invalid data source")
 	if not board:
 		return error(404, error="No board provided")
@@ -211,6 +215,8 @@ def explorer_thread(datasource, board, thread_id):
 
 @app.route('/explorer/post/<datasource>/<board>/<string:post_id>')
 @api_ratelimit
+@login_required
+@setting_required("privileges.can_use_explorer")
 @openapi.endpoint("explorer")
 def explorer_post(datasource, board, thread_id):
 	"""
@@ -225,7 +231,7 @@ def explorer_post(datasource, board, thread_id):
 
 	if not datasource:
 		return error(404, error="No datasource provided")
-	if datasource not in config.get('4cat.datasources'):
+	if datasource not in config.get('datasources.enabled'):
 		return error(404, error="Invalid data source")
 	if not board:
 		return error(404, error="No board provided")
@@ -250,6 +256,9 @@ def explorer_post(datasource, board, thread_id):
 
 @app.route("/explorer/save_annotation_fields/<string:key>", methods=["POST"])
 @api_ratelimit
+@login_required
+@setting_required("privileges.can_run_processors")
+@setting_required("privileges.can_use_explorer")
 @openapi.endpoint("explorer")
 def save_annotation_fields(key):
 	"""
@@ -419,6 +428,9 @@ def save_annotation_fields(key):
 
 @app.route("/explorer/save_annotations/<string:key>", methods=["POST"])
 @api_ratelimit
+@login_required
+@setting_required("privileges.can_run_processors")
+@setting_required("privileges.can_use_explorer")
 @openapi.endpoint("explorer")
 def save_annotations(key):
 	"""
@@ -466,6 +478,8 @@ def save_annotations(key):
 
 @app.route('/api/<datasource>/boards.json')
 @api_ratelimit
+@login_required
+@setting_required("privileges.can_use_explorer")
 @openapi.endpoint("data")
 def get_boards(datasource):
 	"""
@@ -483,7 +497,7 @@ def get_boards(datasource):
 
 	:return-error 404: If the datasource does not exist.
 	"""
-	if datasource not in config.get('4cat.datasources'):
+	if datasource not in config.get('datasources.enabled'):
 		return error(404, error="Invalid data source")
 
 	boards = db.fetchall("SELECT DISTINCT board FROM threads_" + datasource)
@@ -491,6 +505,8 @@ def get_boards(datasource):
 
 @app.route('/api/image/<img_file>')
 @app.route('/api/imagefile/<img_file>')
+@login_required
+@setting_required("privileges.can_use_explorer")
 def get_image_file(img_file, limit=0):
 	"""
 	Returns an image based on filename

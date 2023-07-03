@@ -10,9 +10,9 @@ import shutil
 import subprocess
 import shlex
 
-import common.config_manager as config
+from common.config_manager import config
 
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.user_input import UserInput
 
@@ -84,7 +84,7 @@ class VideoStack(BasicProcessor):
 
         # also need ffprobe to determine video lengths
         # is usually installed in same place as ffmpeg
-        ffmpeg_path = shutil.which(config.get("video_downloader.ffmpeg-path"))
+        ffmpeg_path = shutil.which(config.get("video-downloader.ffmpeg_path"))
         ffprobe_path = shutil.which("ffprobe".join(ffmpeg_path.rsplit("ffmpeg", 1))) if ffmpeg_path else None
 
         return module.type.startswith("video-downloader") and \
@@ -108,7 +108,7 @@ class VideoStack(BasicProcessor):
 
         # To figure out the length of a video we use ffprobe, if available
         with_errors = False
-        ffmpeg_path = shutil.which(config.get("video_downloader.ffmpeg-path"))
+        ffmpeg_path = shutil.which(config.get("video-downloader.ffmpeg_path"))
         ffprobe_path = shutil.which("ffprobe".join(ffmpeg_path.rsplit("ffmpeg", 1)))
 
         # unpack source videos to stack

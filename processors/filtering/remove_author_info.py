@@ -8,7 +8,7 @@ import shutil
 import json
 import csv
 
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 from common.lib.helpers import dict_search_and_update, UserInput, HashCache
 
 __author__ = "Stijn Peeters"
@@ -60,7 +60,7 @@ class AuthorInfoRemover(BasicProcessor):
         """
         Allow processor on CSV files
 
-        :param module: Dataset or processor to determine compatibility with
+        :param module: Module to determine compatibility with
         """
         return module.is_top_dataset() and module.get_extension() in ["csv", 'ndjson']
 

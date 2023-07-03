@@ -1,14 +1,15 @@
 """
 4CAT Web Tool views - pages to be viewed by the user
 """
-import re
-import time
-import math
-import json
-import smtplib
-import psycopg2
-import colorsys
+import itertools
 import markdown2
+import datetime
+import psycopg2
+import smtplib
+import time
+import json
+import os
+import re
 
 from pathlib import Path
 
@@ -16,47 +17,106 @@ import backend
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
-from flask import render_template, jsonify, request, abort, flash, get_flashed_messages, url_for, redirect
+from flask import render_template, jsonify, request, flash, get_flashed_messages, url_for, redirect
 from flask_login import current_user, login_required
 
-from webtool import app, db
-from webtool.lib.helpers import admin_required, error, Pagination, generate_css_colours
-from webtool.lib.user import User
+from webtool import app, db, config
+from webtool.lib.helpers import error, Pagination, generate_css_colours, setting_required
+from common.lib.user import User
 
 from common.lib.helpers import call_api, send_email, UserInput
 from common.lib.exceptions import QueryParametersException
-from common.lib.dataset import DataSet
-import common.config_manager as config
 import common.lib.config_definition as config_definition
 
-@app.route('/admin/', defaults={'page': 1})
-@app.route('/admin/page/<int:page>/')
+from common.config_manager import ConfigWrapper
+config = ConfigWrapper(config, user=current_user)
+
+@app.route("/admin/")
 @login_required
-@admin_required
-def admin_frontpage(page):
-    offset = (page - 1) * 20
-    filter = request.args.get("filter", "")
+def admin_frontpage():
+    # can be viewed if user has any admin privileges
+    admin_privileges = config.get([key for key in config.config_definition.keys() if key.startswith("privileges.admin")])
 
-    filter_bit = ""
+    if not any(admin_privileges.values()):
+        return render_template("error.html", message="You cannot view this page."), 403
+
+    # collect some stats
+    now = time.time()
+    num_items = {
+        "day": db.fetchone("SELECT SUM(num_rows) AS num FROM datasets WHERE timestamp > %s", (now - 86400,))["num"],
+        "week": db.fetchone("SELECT SUM(num_rows) AS num FROM datasets WHERE timestamp > %s", (now - (86400 * 7),))["num"],
+        "overall": db.fetchone("SELECT SUM(num_rows) AS num FROM datasets")["num"]
+    }
+
+    num_datasets = {
+        "day": db.fetchone("SELECT COUNT(*) AS num FROM datasets WHERE timestamp > %s", (now - 86400,))["num"],
+        "week": db.fetchone("SELECT COUNT(*) AS num FROM datasets WHERE timestamp > %s", (now - (86400 * 7),))["num"],
+        "overall": db.fetchone("SELECT COUNT(*) AS num FROM datasets")["num"]
+    }
+
+    disk_stats = {
+        "data": sum([f.stat().st_size for f in config.get("PATH_DATA").glob("**/*") if f.is_file()]),
+        "logs": sum([f.stat().st_size for f in config.get("PATH_LOGS").glob("**/*") if f.is_file()]),
+        "db": db.fetchone("SELECT pg_database_size(%s) AS num", (config.get("DB_NAME"),))["num"]
+    }
+
+    upgrade_available = not not db.fetchone("SELECT * FROM users_notifications WHERE username = '!admins' AND notification LIKE 'A new version of 4CAT%'")
+
+    return render_template("controlpanel/frontpage.html", flashes=get_flashed_messages(), stats = {
+        "captured": num_items, "datasets": num_datasets, "disk": disk_stats
+    }, upgrade_available=upgrade_available)
+
+@app.route("/admin/users/", defaults={"page": 1})
+@app.route("/admin/users/page/<int:page>/")
+@login_required
+@setting_required("privileges.admin.can_manage_users")
+def list_users(page):
+    """
+    List users
+
+    :param int page:
+    """
+    page_size = 25
+    tag = request.args.get("tag", "")
+    offset = (page - 1) * page_size
+    filter_name = request.args.get("name", "")
+    order = request.args.get("sort", "name")
+
+    # craft SQL query to filter users with
+    filter_bits = []
     replacements = []
-    if filter:
-        filter_bit = "WHERE name LIKE %s"
-        replacements = ["%" + filter + "%"]
+    if filter_name:
+        filter_bits.append("name LIKE %s")
+        replacements.append("%" + filter_name + "%")
 
-    num_users = db.fetchone("SELECT COUNT(*) FROM USERS " + filter_bit, replacements)["count"]
+    if tag:
+        filter_bits.append("tags != '[]' AND tags @> %s")
+        replacements.append('["' + tag + '"]')
+
+    filter_bit = "WHERE " + (" AND ".join(filter_bits)) if filter_bits else ""
+    order_bit = "name ASC"
+    if order == "age":
+        order_bit = "timestamp_created ASC"
+    elif order == "status":
+        order_bit = "tags @> '[\"admin\"]' DESC, timestamp_token > 0 DESC, is_deactivated DESC"
+
+    num_users = db.fetchone("SELECT COUNT(*) AS num FROM users " + filter_bit, replacements)["num"]
     users = db.fetchall(
-        "SELECT * FROM users " + filter_bit + "ORDER BY is_admin DESC, name ASC LIMIT 20 OFFSET %i" % offset,
+        f"SELECT * FROM users {filter_bit} ORDER BY {order_bit} LIMIT {page_size} OFFSET {offset}",
         replacements)
-    notifications = db.fetchall("SELECT * FROM users_notifications ORDER BY username ASC, id ASC")
-    pagination = Pagination(page, 20, num_users, "admin_frontpage")
 
-    return render_template("controlpanel/frontpage.html", notifications=notifications, users=users,
-                           filter={"filter": filter}, pagination=pagination, flashes=get_flashed_messages())
+    # these are used for autocompletion in the filter form
+    distinct_tags = set.union(*[set(u["tags"]) for u in db.fetchall("SELECT DISTINCT tags FROM users")])
+    distinct_users = [u["name"] for u in db.fetchall("SELECT DISTINCT name FROM users")]
 
+    pagination = Pagination(page, page_size, num_users, "list_users")
+    return render_template("controlpanel/users.html", users=[User(db, user) for user in users],
+                           filter={"tag": tag, "name": filter_name, "sort": order}, pagination=pagination,
+                           flashes=get_flashed_messages(), tag=tag, all_tags=distinct_tags, all_users=distinct_users)
 
 @app.route("/admin/worker-status/")
 @login_required
-@admin_required
+@setting_required("privileges.admin.can_view_status")
 def get_worker_status():
     workers = call_api("worker-status")["response"]["running"]
     return render_template("controlpanel/worker-status.html", workers=workers, worker_types=backend.all_modules.workers,
@@ -65,7 +125,7 @@ def get_worker_status():
 
 @app.route("/admin/queue-status/")
 @login_required
-@admin_required
+@setting_required("privileges.admin.can_view_status")
 def get_queue_status():
     queue = call_api("worker-status")["response"]["queued"]
     return render_template("controlpanel/queue-status.html", queue=queue, worker_types=backend.all_modules.workers,
@@ -74,6 +134,7 @@ def get_queue_status():
 
 @app.route("/admin/add-user/")
 @login_required
+@setting_required("privileges.admin.can_manage_users")
 def add_user():
     """
     Create a new user
@@ -87,21 +148,19 @@ def add_user():
     :return: Either an html page with a message, or a JSON response, depending
     on whether ?format == html
     """
-    if not current_user.is_authenticated or not current_user.is_admin:
-        return error(403, message="This page is off-limits to you.")
-
     response = {"success": False}
 
     email = request.form.get("email", request.args.get("email", "")).strip()
     fmt = request.form.get("format", request.args.get("format", "")).strip()
     force = request.form.get("force", request.args.get("force", None))
+    redirect_to_page = False
 
     if not email or not re.match(r"[^@]+\@.*?\.[a-zA-Z]+", email):
         response = {**response, **{"message": "Please provide a valid e-mail address."}}
     else:
         username = email
         try:
-            db.insert("users", data={"name": username, "timestamp_token": int(time.time())})
+            db.insert("users", data={"name": username, "timestamp_token": int(time.time()), "timestamp_created": int(time.time())})
 
             user = User.get_by_name(db, username)
             if user is None:
@@ -133,6 +192,7 @@ def add_user():
 
                 try:
                     url = user.email_token(new=True)
+                    redirect_to_page = True
                     response["success"] = True
                     response = {**response, **{
                         "message": "A new registration e-mail has been sent to %s. The registration link is [%s](%s)" % (
@@ -142,7 +202,11 @@ def add_user():
                         "message": "Token was reset but registration e-mail could not be sent (%s)." % e}}
 
     if fmt == "html":
-        return render_template("error.html", message=response["message"],
+        if redirect_to_page:
+            flash(response["message"])
+            return redirect(url_for("manipulate_user", values={"name": username}))
+        else:
+            return render_template("error.html", message=response["message"],
                                title=("New account created" if response["success"] else "Error"))
     else:
         return jsonify(response)
@@ -150,6 +214,7 @@ def add_user():
 
 @app.route("/admin/reject-user/", methods=["GET", "POST"])
 @login_required
+@setting_required("privileges.admin.can_manage_users")
 def reject_user():
     """
     (Politely) reject an account request
@@ -159,9 +224,6 @@ def reject_user():
 
     :return: HTML form, or message containing the e-mail send status
     """
-    if not current_user.is_authenticated or not current_user.is_admin:
-        return error(403, message="This page is off-limits to you.")
-
     email_address = request.form.get("email", request.args.get("email", "")).strip()
     name = request.form.get("name", request.args.get("name", "")).strip()
     form_message = request.form.get("message", request.args.get("message", "")).strip()
@@ -209,7 +271,7 @@ def reject_user():
 
 @app.route("/admin/delete-user", methods=["POST"])
 @login_required
-@admin_required
+@setting_required("privileges.admin.can_manage_users")
 def delete_user():
     """
     Delete a user
@@ -231,25 +293,7 @@ def delete_user():
                                title="User cannot be deleted"), 403
 
     # first delete favourites and notifications and api tokens
-    db.delete("users_favourites", where={"name": username}, commit=False),
-    db.delete("users_notifications", where={"username": username}, commit=False)
-    db.delete("access_tokens", where={"name": username}, commit=False)
-
-    # find datasets and delete
-    datasets = db.fetchall("SELECT * FROM datasets WHERE owner = %s", (username,))
-
-    # delete any jobs related to deleted datasets
-    if datasets:
-        db.delete("jobs", where={"remote_id": [d["key"] for d in datasets]}, commit=False)
-
-    # delete the datasets themselves
-    for dataset in datasets:
-        dataset = DataSet(data=dataset, db=db)
-        dataset.delete(commit=False)
-
-    # and finally the user
-    db.delete("users", where={"name": username}, commit=False)
-    db.commit()
+    user.delete()
 
     flash(f"User {username} and their datasets have been deleted.")
     return redirect(url_for("admin_frontpage"))
@@ -257,7 +301,7 @@ def delete_user():
 
 @app.route("/admin/<string:mode>-user/", methods=["GET", "POST"])
 @login_required
-@admin_required
+@setting_required("privileges.admin.can_manage_users")
 def manipulate_user(mode):
     """
     Edit or create a user
@@ -265,46 +309,45 @@ def manipulate_user(mode):
     :param str mode: Edit an existing user or create a new one?
     :return:
     """
-    if not current_user.is_authenticated or not current_user.is_admin:
-        return error(403, message="This page is off-limits to you.")
-
     user_email = request.args.get("name", request.form.get("current-name"))
     if user_email in ("anonymous", "autologin"):
         return error(403, message="System users cannot be edited")
 
-    user = db.fetchone("SELECT * FROM users WHERE name = %s", (user_email,)) if mode == "edit" else {}
+    user = User.get_by_name(db, request.args.get("name")) if mode == "edit" else {}
+    if user is None:
+        return error(404, message="User not found")
 
     incomplete = []
     if request.method == "POST":
         if not request.form.get("name", request.args.get("name")):
             incomplete.append("name")
 
-        # userdata needs to be valid JSON, or empty
-        if request.form.get("userdata"):
-            try:
-                json.loads(request.form.get("userdata"))
-            except ValueError:
-                incomplete.append("userdata")
-
         # names cannot contain whitespace
         if request.form.get("name") and re.findall(r"\s", request.form.get("name")):
             flash("User name cannot contain whitespace.")
             incomplete.append("name")
 
+        # ensure there is always at least one admin user
+        old_tags = user.tags if user else []
+        new_tags = [re.sub(r"[^a-z0-9_]", "", t.strip().lower()) for t in request.form.get("tags", "").split(",")]
+        if "admin" in old_tags and "admin" not in new_tags:
+            admin_users = db.fetchall("SELECT name FROM users WHERE tags @> '[\"admin\"]'")
+            if len(admin_users) == 1:
+                # one admin user that would no longer be an admin - not OK
+                flash("There always needs to be at least one user with the 'admin' tag.")
+                incomplete.append("tags")
+
         if not incomplete:
             user_data = {
                 "name": request.form.get("name"),
-                "is_admin": request.form.get("is_admin") == "on",
                 "is_deactivated": request.form.get("is_deactivated") == "on",
-                "userdata": request.form.get("userdata", "").strip()
+                "tags": json.dumps(new_tags)
             }
-            if not user_data["userdata"]:
-                # it's expected that this parses to a JSON object
-                user_data["userdata"] = "{}"
 
             if mode == "edit":
                 db.update("users", where={"name": request.form.get("current-name")}, data=user_data)
-                user = request.form
+                user = User.get_by_name(db, user_data["name"])  # ensure updated data
+
             else:
                 try:
                     db.insert("users", user_data)
@@ -320,14 +363,32 @@ def manipulate_user(mode):
 
                     # show the edit form for the user next
                     mode = "edit"
-                    user = user.data
 
                 except psycopg2.IntegrityError:
                     flash("A user with this e-mail address already exists.")
                     incomplete.append("name")
                     db.rollback()
 
+            if not incomplete and "autodelete" in request.form:
+                autodelete = request.form.get("autodelete").replace("T", " ")[:16]
+                if not autodelete:
+                    user.set_value("delete-after", "")
+
+                elif not re.match("[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}", autodelete):
+                    incomplete.append("autodelete")
+                    flash("'Delete after' date must be in YYYY-MM-DD hh:mm format")
+
+                else:
+                    autodelete = datetime.datetime.strptime(autodelete, "%Y-%m-%d %H:%M")
+                    # I fucking hate timezones
+                    autodelete = autodelete.replace(tzinfo=datetime.timezone.utc)
+                    user.set_value("delete-after", int(autodelete.timestamp()))
+
+            if not incomplete and request.form.get("notes"):
+                user.set_value("notes", request.form.get("notes"))
+
             if not incomplete:
+                user.sort_user_tags()
                 flash("User data saved")
         else:
             flash("Pleasure ensure all fields contain a valid value.")
@@ -335,57 +396,149 @@ def manipulate_user(mode):
     return render_template("controlpanel/user.html", user=user, incomplete=incomplete, flashes=get_flashed_messages(),
                            mode=mode)
 
+@app.route("/admin/user-tags/", methods=["GET", "POST"])
+@login_required
+@setting_required("privileges.admin.can_manage_tags")
+def manipulate_tags():
+    tag_priority = config.get("flask.tag_order")
+
+    # explicit tags are already ordered; implicit tags have not been given a
+    # place in the order yet, but are used for at least one user
+    all_tags = set.union(*[set(user["tags"]) for user in db.fetchall("SELECT tags FROM users")])
+    tags = [{"tag": tag, "explicit": True} for tag in tag_priority]
+    tags.extend([{"tag": tag, "explicit": False} for tag in all_tags if tag not in tag_priority])
+
+    if not tags:
+        # admin tag always exists
+        tags = [{"tag": "admin", "explicit": True}]
+
+    if request.method == "POST":
+        try:
+            # no empty tags
+            order = [tag for tag in request.form.get("order", "").split(",") if tag.strip()]
+            if not order:
+                raise ValueError
+        except (TypeError, ValueError):
+            return error(406, message="Tag order required")
+
+        # ensure admin is always first in the list
+        if "admin" in order and order.index("admin") != 0:
+            order.remove("admin")
+
+        if "admin" not in order:
+            order.insert(0, "admin")
+
+        # update tags for each user
+        # this means we can just use the tags saved for the user directly
+        # instead of having to cross-reference with the tag order value, at the
+        # expense of some overhead when sorting tags (but that should not
+        # happen often)
+        tagged_users = db.fetchall("SELECT name, tags FROM users WHERE tags != '{}'")
+
+        for user in tagged_users:
+            sorted_tags = []
+            for tag in order:
+                if tag in user["tags"]:
+                    sorted_tags.append(tag)
+
+            db.update("users", where={"name": user["name"]}, data={"tags": json.dumps(sorted_tags)}, commit=False)
+
+        db.commit()
+
+        # save global order, too
+        config.set("flask.tag_order", json.dumps(order))
+
+        # always async
+        return jsonify({"success": True})
+
+    return render_template("controlpanel/user-tags.html", tags=tags, flashes=get_flashed_messages())
 
 @app.route("/admin/settings", methods=["GET", "POST"])
 @login_required
-@admin_required
-def update_settings():
+@setting_required("privileges.admin.can_manage_settings")
+def manipulate_settings():
     """
     Update 4CAT settings
     """
-    definition = config_definition.config_definition
+    tag = request.args.get("tag", "")
+
+    definition = config.config_definition
     categories = config_definition.categories
+
     modules = {
-        **{datasource: definition["name"] for datasource, definition in backend.all_modules.datasources.items()},
+        **{datasource + "-search": definition["name"] for datasource, definition in backend.all_modules.datasources.items()},
         **{processor.type: processor.title if hasattr(processor, "title") else processor.type for processor in
            backend.all_modules.processors.values()}
     }
 
-    for processor in backend.all_modules.processors.values():
-        if hasattr(processor, "config"):
-            definition.update(processor.config)
+    global_settings = config.get_all(user=None, tags=None)
+    update_css = False
 
     if request.method == "POST":
         try:
+            # this gives us the parsed values, as Python variables, i.e. before
+            # potentially encoding them as JSON
             new_settings = UserInput.parse_all(definition, request.form.to_dict(),
                                                silently_correct=False)
 
             for setting, value in new_settings.items():
-                valid = config.set_or_create_setting(setting, value,
-                                                     raw=definition[setting].get("type") == UserInput.OPTION_TEXT_JSON)
+                if tag:
+                    # don't override global settings on a tag level
+                    if definition.get(setting, {}).get("global"):
+                        continue
+
+                    # admin is a special tag that always has all admin privileges
+                    if tag == "admin" and setting.startswith("privileges.admin"):
+                        continue
+
+                    # global_settings has the values in 'raw' format, i.e. as
+                    # stored in the database, i.e. as JSON
+                    global_value = global_settings.get(setting)
+
+                    # only update if value is not the same as global config
+                    # else remove override, so if the global changes the tag
+                    # isn't stuck in history
+                    # if None, the value is not set explicitly, so whatever has
+                    # been set here is different (because it is explicit) for now
+                    #
+                    # so here we compare the JSON from global_settings to the
+                    # parsed value, encoded as JSON
+                    if global_value == value and global_value is not None:
+                        config.delete_for_tag(setting, tag)
+                        continue
+                    else:
+                        print(f"{repr(global_value)} ({type(global_value)}) <> {repr(value)} ({type(value)})")
+                        print(f"same: {global_value == value}")
+                        print(f"global is not None: {global_value is not None}")
+
+                valid = config.set(setting, value, tag=tag)
 
                 if valid is None:
                     flash("Invalid value for %s" % setting)
                     continue
 
-                if setting == "4cat.layout_hue":
-                    # todo: make this 'side-effects' thing generically applicable
-                    # this setting has a side-effect because it requires the
-                    # updating of the colour definitions in the CSS
-                    generate_css_colours(force=True)
+                if definition.get(setting, {}).get("type") == UserInput.OPTION_HUE:
+                    update_css = True
+
+            if update_css:
+                generate_css_colours(force=True)
 
             flash("Settings saved")
         except QueryParametersException as e:
             flash("Invalid settings: %s" % str(e))
 
-    all_settings = config.get_all()
+    all_settings = config.get_all(user=None, tags=[tag])
     options = {}
 
+    changed_categories = set()
     for option in sorted({*all_settings.keys(), *definition.keys()}):
-        if definition.get(option, {}).get("type") != UserInput.OPTION_TEXT_JSON:
-            default = all_settings.get(option, definition.get(option, {}).get("default"))
-        else:
-            default = json.dumps(all_settings.get(option, definition.get(option, {}).get("default")))
+        tag_value = all_settings.get(option, definition.get(option, {}).get("default"))
+        global_value = global_settings.get(option, definition.get(option, {}).get("default"))
+        is_changed = tag and global_value != tag_value
+
+        default = all_settings.get(option, definition.get(option, {}).get("default"))
+        if definition.get(option, {}).get("type") == UserInput.OPTION_TEXT_JSON:
+            default = json.dumps(default)
 
         options[option] = {
             **definition.get(option, {
@@ -393,56 +546,39 @@ def update_settings():
                 "help": option,
                 "default": all_settings.get(option)
             }),
-            "default": default
+            "default": default,
+            "is_changed": is_changed
         }
 
-    return render_template("controlpanel/config.html", options=options, flashes=get_flashed_messages(),
-                           categories=categories, modules=modules)
+        if tag and is_changed:
+            changed_categories.add(option.split(".")[0])
 
-@app.route("/admin/toggle-datasources/", methods=["GET", "POST"])
-@login_required
-@admin_required
-def toggle_datasources():
-    if request.method == "POST":
-        # enabled datasources is just a list of datasources with a check in the form
-        datasources = [datasource for datasource in backend.all_modules.datasources if request.form.get("enable-" + datasource)]
-        config.set_or_create_setting("4cat.datasources", datasources, raw=False)
-
-        # process per-datasource dataset expiration settings
-        expires = {}
-        for datasource in datasources:
-            if request.form.get("expire-" + datasource) or request.form.get("optout-" + datasource) == "on":
-                expires[datasource] = {}
-
-                if request.form.get("expire-" + datasource):
-                    expires[datasource]["timeout"] = request.form.get("expire-" + datasource)
-
-                expires[datasource]["allow_optout"] = (request.form.get("optout-" + datasource) == "on")
-
-        config.set_or_create_setting("expire.datasources", expires, raw=False)
-        flash("Enabled data sources updated.")
+    tab = "" if not request.form.get("current-tab") else request.form.get("current-tab")
 
     datasources = {
         datasource: {
             **info,
-            "enabled": datasource in config.get("4cat.datasources"),
-            "expires": config.get("expire.datasources").get(datasource, {})
+            "enabled": datasource in config.get("datasources.enabled"),
+            "expires": config.get("datasources.expiration").get(datasource, {})
         }
         for datasource, info in backend.all_modules.datasources.items()}
 
-    return render_template("controlpanel/datasources.html", datasources=datasources, flashes=get_flashed_messages())
+    return render_template("controlpanel/config.html", options=options, flashes=get_flashed_messages(),
+                           categories=categories, modules=modules, tag=tag, current_tab=tab,
+                           datasources_config=datasources, changed=changed_categories)
 
-@app.route("/create-notification/", methods=["GET", "POST"])
+@app.route("/manage-notifications/", methods=["GET", "POST"])
 @login_required
-@admin_required
-def create_notification():
+@setting_required("privileges.admin.can_manage_notifications")
+def manipulate_notifications():
     """
     Create new notification
 
     :return:
     """
     incomplete = []
-    params = {}
+    notification = {}
+
     if request.method == "POST":
         params = request.form.to_dict()
 
@@ -465,25 +601,28 @@ def create_notification():
         else:
             expires = None
 
-        if not incomplete:
-            db.insert("users_notifications", {
-                "username": params["username"],
-                "notification": params["notification"],
+        notification = {
+                "username": params.get("username"),
+                "notification": params.get("notification"),
                 "timestamp_expires": int(time.time() + expires) if expires else None,
-                "allow_dismiss": not not params.get("allow_dismiss")}, safe=True)
+                "allow_dismiss": not not params.get("allow_dismiss")
+        }
+
+        if not incomplete:
+            db.insert("users_notifications", notification, safe=True)
             flash("Notification added")
-            return redirect(url_for("admin_frontpage"))
 
         else:
             flash("Please ensure all fields contain a valid value.")
 
-    return render_template("controlpanel/add-notification.html", incomplete=incomplete, flashes=get_flashed_messages(),
-                           notification=params)
+    notifications = db.fetchall("SELECT * FROM users_notifications ORDER BY username ASC, id ASC")
+    return render_template("controlpanel/notifications.html", incomplete=incomplete, flashes=get_flashed_messages(),
+                           notification=notification, notifications=notifications)
 
 
 @app.route("/delete-notification/<int:notification_id>")
 @login_required
-@admin_required
+@setting_required("privileges.admin.can_manage_notifications")
 def delete_notification(notification_id):
     """
     Delete notification

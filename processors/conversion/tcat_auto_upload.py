@@ -6,11 +6,11 @@ import random
 import json
 from urllib.parse import urlparse
 
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 from common.lib.user_input import UserInput
 from common.lib.helpers import get_last_line
+from common.config_manager import config
 
-import common.config_manager as config
 __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl", "Stijn Peeters"]
 __maintainer__ = "Dale Wahl"
@@ -29,32 +29,36 @@ class FourcatToDmiTcatUploader(BasicProcessor):
     extension = "html"  # extension of result file, used internally and in UI
 
     config = {
-    	# TCAT Server Connection Info
-        'tcat-auto-upload.TCAT_SERVER': {
+        # TCAT Server Connection Info
+        'tcat-auto-upload.server_url': {
             'type': UserInput.OPTION_TEXT,
-            'default' : "",
+            'default': "",
             'help': 'TCAT Server URL',
             'tooltip': "",
-            },
-        'tcat-auto-upload.TCAT_USERNAME': {
+            "global": True
+        },
+        'tcat-auto-upload.username': {
             'type': UserInput.OPTION_TEXT,
-            'default' : "",
+            'default': "",
             'help': 'TCAT Username',
             'tooltip': "",
-            },
-        'tcat-auto-upload.TCAT_PASSWORD': {
+            "global": True
+        },
+        'tcat-auto-upload.password': {
             'type': UserInput.OPTION_TEXT,
-            'default' : "",
+            'default': "",
             'help': 'TCAT Password',
             'tooltip': "",
-            },
-        'tcat-auto-upload.TCAT_TOKEN': {
+            "global": True
+        },
+        'tcat-auto-upload.token': {
             'type': UserInput.OPTION_TEXT,
-            'default' : "",
+            'default': "",
             'help': 'TCAT Security Token',
             'tooltip': "An Optional TCAT settting",
-            },
-        }
+            "global": True
+        },
+    }
 
     @classmethod
     def is_compatible_with(cls, module=None):
@@ -64,13 +68,13 @@ class FourcatToDmiTcatUploader(BasicProcessor):
         It is if TCAT credentials have been configured and the input is a
         TCAT-compatible file.
 
-        :param module: Dataset or processor to determine compatibility with
+        :param module: Module to determine compatibility with
         """
         return module.type == "convert-ndjson-for-tcat" and \
-            config.get('tcat-auto-upload.TCAT_SERVER') and \
-            config.get('tcat-auto-upload.TCAT_TOKEN') and \
-            config.get('tcat-auto-upload.TCAT_USERNAME') and \
-            config.get('tcat-auto-upload.TCAT_PASSWORD')
+            config.get('tcat-auto-upload.server_url') and \
+            config.get('tcat-auto-upload.token') and \
+            config.get('tcat-auto-upload.username') and \
+            config.get('tcat-auto-upload.password')
 
     @classmethod
     def get_options(cls, parent_dataset=None, user=None):
@@ -85,14 +89,16 @@ class FourcatToDmiTcatUploader(BasicProcessor):
         :param User user:  User that will be uploading it
         :return dict:  Option definition
         """
-        if config.get('tcat-auto-upload.TCAT_SERVER') and type(config.get('tcat-auto-upload.TCAT_SERVER')) in (set, list, tuple) and len(config.get('tcat-auto-upload.TCAT_SERVER')) > 1:
+        if config.get('tcat-auto-upload.server_url', user=user) \
+                and type(config.get('tcat-auto-upload.server_url', user=user)) in (set, list, tuple) \
+                and len(config.get('tcat-auto-upload.server_url', user=user)) > 1:
             return {
                 "server": {
                     "type": UserInput.OPTION_CHOICE,
                     "options": {
                         "random": "Choose one based on available capacity",
                         **{
-                            url: url for url in config.get('tcat-auto-upload.TCAT_SERVER')
+                            url: url for url in config.get('tcat-auto-upload.server_url', user=user)
                         }
                     },
                     "default": "random",
@@ -120,15 +126,15 @@ class FourcatToDmiTcatUploader(BasicProcessor):
         self.dataset.log('Twitter query: ' + query)
 
         # TCAT authorization information
-        auth = (config.get('tcat-auto-upload.TCAT_USERNAME'), config.get('tcat-auto-upload.TCAT_PASSWORD'))
+        auth = (self.config.get('tcat-auto-upload.username'), self.config.get('tcat-auto-upload.password'))
 
         # find server URL
         server_choice = self.parameters.get("server", "random")
-        if type(config.get('tcat-auto-upload.TCAT_SERVER')) in (list, set, tuple):
-            if server_choice == "random" or server_choice not in config.get('tcat-auto-upload.TCAT_SERVER'):
-                server_choice = random.choice(config.get('tcat-auto-upload.TCAT_SERVER'))
+        if type(self.config.get('tcat-auto-upload.server_url')) in (list, set, tuple):
+            if server_choice == "random" or server_choice not in self.config.get('tcat-auto-upload.server_url'):
+                server_choice = random.choice(self.config.get('tcat-auto-upload.server_url'))
         else:
-            server_choice = config.get('tcat-auto-upload.TCAT_SERVER')
+            server_choice = self.config.get('tcat-auto-upload.server_url')
 
         # DOCKER shenanigans
         if 'host.docker.internal' in server_choice:
@@ -215,7 +221,7 @@ class FourcatToDmiTcatUploader(BasicProcessor):
                                                 'url': url_to_file,
                                                 'name': bin_name,
                                                 'query': query,
-                                                'token': config.get('tcat-auto-upload.TCAT_TOKEN'),
+                                                'token': self.config.get('tcat-auto-upload.token'),
                                                 })
         return response
 

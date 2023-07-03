@@ -7,9 +7,7 @@ to its aggressive rate limiting. Instead, import data collected elsewhere.
 from datetime import datetime
 import json
 
-from shapely.geometry import box
-
-from backend.abstract.search import Search
+from backend.lib.search import Search
 from common.lib.helpers import strip_tags
 
 
@@ -67,7 +65,6 @@ class SearchTwitterViaZeeschuimer(Search):
             # sometimes this is one level deeper, sometimes not...
             quote_tweet["result"] = quote_tweet["result"]["tweet"]
 
-        print(json.dumps(quote_tweet))
         return {
             "id": tweet["rest_id"],
             "thread_id": tweet["legacy"]["conversation_id_str"],

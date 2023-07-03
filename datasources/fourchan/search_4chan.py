@@ -7,10 +7,10 @@ import time
 from pymysql import OperationalError, ProgrammingError
 from pymysql.err import Warning as SphinxWarning
 
-import common.config_manager as config
+from common.config_manager import config
 from backend.lib.database_mysql import MySQLDatabase
 from common.lib.helpers import UserInput
-from backend.abstract.search import SearchWithScope
+from backend.lib.search import SearchWithScope
 from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException
 
 
@@ -20,7 +20,8 @@ class Search4Chan(SearchWithScope):
 
 	Defines methods that are used to query the 4chan data indexed and saved.
 	"""
-	type = "4chan-search"  # job ID
+	type = "fourchan-search"  # job ID
+	title = "4chan search"
 	sphinx_index = "4chan"  # prefix for sphinx indexes for this data source. Should usually match sphinx.conf
 	prefix = "4chan"  # table identifier for this datasource; see below for usage
 	is_local = True  # Whether this datasource is locally scraped
@@ -48,9 +49,9 @@ class Search4Chan(SearchWithScope):
 		},
 		"board": {
 			"type": UserInput.OPTION_CHOICE,
-			"options": {b: b for b in config.get("fourchan.boards", [])},
+			"options": {b: b for b in config.get("fourchan-search.boards", [])},
 			"help": "Board",
-			"default": config.get("fourchan.boards", [""])[0]
+			"default": config.get("fourchan-search.boards", [""])[0]
 		},
 		"body_match": {
 			"type": UserInput.OPTION_TEXT,
@@ -399,12 +400,41 @@ class Search4Chan(SearchWithScope):
 	}
 
 	config = {
-		"fourchan.boards": {
+		"fourchan-search.boards": {
 			"type": UserInput.OPTION_TEXT_JSON,
 			"help": "Boards to index",
 			"tooltip": "These boards will be scraped and made available for searching. Provide as a JSON-formatted "
 					   "list of strings, e.g. ['pol', 'v'].",
-			"default": "[]"
+			"default": [""],
+			"global": True
+		},
+		"fourchan-search.interval": {
+			"type": UserInput.OPTION_TEXT,
+			"coerce_type": int,
+			"help": "Scrape interval",
+			"tooltip": "Scrape new threads every this many seconds",
+			"default": 60,
+			"global": True
+		},
+		"fourchan-search.no_scrape": {
+			"type": UserInput.OPTION_TEXT_JSON,
+			"help": "Boards not to scrape",
+			"tooltip": "These boards will not be scraped, but can still be indexed if added to 'Boards to index'",
+			"default": [],
+			"global": True
+		},
+		"fourchan-search.save_images": {
+			"type": UserInput.OPTION_TOGGLE,
+			"default": False,
+			"help": "Save 4chan Images",
+			"tooltip": "Saves images to path_images.",
+			"global": True
+		},
+		"fourchan-search.can_query_without_keyword": {
+			"type": UserInput.OPTION_TOGGLE,
+			"help": "Can query without keyword",
+			"default": False,
+			"tooltip": "Allows users to query the 4chan data without specifying a keyword. This can lead to HUGE datasets!"
 		}
 	}
 
@@ -809,7 +839,11 @@ class Search4Chan(SearchWithScope):
 		"""
 
 		# this is the bare minimum, else we can't narrow down the full data set
-		if not user.is_admin and not user.get_value("4chan.can_query_without_keyword", False) and not query.get("body_match", None) and not query.get("subject_match", None) and query.get("search_scope", "") != "random-sample" and query.get("search_scope","") != "match-ids":
+		if not user.is_admin and not config.get("fourchan-search.can_query_without_keyword", False, user=user) \
+				and not query.get("body_match", None) \
+				and not query.get("subject_match", None) \
+				and query.get("search_scope", "") != "random-sample" \
+				and query.get("search_scope","") != "match-ids":
 			raise QueryParametersException("Please provide a message or subject search query")
 
 		query["min_date"], query["max_date"] = query["daterange"]

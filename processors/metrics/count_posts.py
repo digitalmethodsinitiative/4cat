@@ -1,10 +1,9 @@
 """
 Collapse post bodies into one long string
 """
-import datetime
 
 from common.lib.helpers import UserInput, pad_interval, get_interval_descriptor
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -96,8 +95,8 @@ class CountPosts(BasicProcessor):
 				self.dataset.update_status("Calculating relative counts.")
 
 				# Set a board, if used for this dataset
-				board = self.source_dataset.parameters["board"]
-				datasource = self.source_dataset.parameters["datasource"]
+				board = self.source_dataset.parameters.get("board")
+				datasource = self.source_dataset.parameters.get("datasource")
 				board_sql = "AND board = '" + board + "'" if board else ""
 
 				# Make sure we're using the same right date format.

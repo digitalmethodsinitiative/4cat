@@ -8,7 +8,7 @@ import re
 
 from bs4 import BeautifulSoup
 
-from backend.abstract.search import Search
+from backend.lib.search import Search
 from common.lib.helpers import convert_to_int, strip_tags, UserInput
 from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException
 

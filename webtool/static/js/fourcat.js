@@ -58,8 +58,8 @@ const result_page = {
             }, 25);
         }
 
-        $('<label class="filter-processors"><i class="fa fa-search" aria-hidden="true"></i><span class="sr-only">Filter:</span> <input type="text" id="processor-filter" placeholder="Filter"></label>').appendTo('.available-processors .section-subheader:first-child');
-        $('body').on('keyup', '#processor-filter', result_page.filterProcessors);
+        $('<label class="inline-search"><i class="fa fa-search" aria-hidden="true"></i><span class="sr-only">Filter:</span> <input type="text" placeholder="Filter"></label>').appendTo('.available-processors .section-subheader:first-child');
+        $(document).on('keyup', '.result-page .inline-search input', result_page.filterProcessors);
     },
 
     filterProcessors: function (e) {
@@ -227,7 +227,7 @@ const processor = {
             return;
         }
 
-        $.ajax(getRelativeURL('api/delete-query/'), {
+        $.ajax(getRelativeURL('api/delete-dataset/'), {
             method: 'DELETE',
             data: {key: $(this).attr('data-key')},
             success: function (json) {
@@ -299,6 +299,10 @@ const query = {
 
         // convert dataset
         $(document).on('change', '#convert-dataset', query.convert_dataset)
+
+        // dataset ownership
+        $(document).on('click', '#add-dataset-owner', query.add_owner);
+        $(document).on('click', '.remove-dataset-owner', query.remove_owner);
     },
 
     /**
@@ -694,9 +698,7 @@ const query = {
                 $('#query-form').removeClass();
                 $('#query-form').addClass(datasource);
                 $('#datasource-form').html(data.html);
-                if (data.has_javascript) {
-                    $('<script id="query-form-script">').attr('src', getRelativeURL('api/datasource-script/' + data.datasource + '/')).appendTo('body');
-                }
+
                 //automatically fill in cached parameters
                 $('#datasource-form .cacheable input').each(function () {
                     let item_name = datasource + '.' + $(this).attr('name');
@@ -872,7 +874,85 @@ const query = {
                 }
             });
         }
+    },
+
+    add_owner: function (e) {
+        e.preventDefault();
+        let target = e.target;
+        if(target.tagName !== 'A') {
+            target = $(target).parents('a')[0];
+        }
+
+        popup.dialog(
+            '<p>Owners have full privileges; viewers can only view a dataset. You can add users as owners, or all ' +
+            'users with a given tag by adding <samp>tag:example</samp> as username.</p>' +
+            '<label>Username: <input type="text" id="new-dataset-owner" name="owner"></label>' +
+            '<label>Role: ' +
+            '  <select id="new-dataset-role" name="role"><option value="owner">Owner</option><option value="viewer">Viewer</option>' +
+            '</select></label>',
+            'Grant access to dataset',
+            function () {
+                let dataset_key = document.querySelector('article.result').getAttribute('data-dataset-key');
+                let name = document.querySelector('#new-dataset-owner').value;
+                let role = document.querySelector('#new-dataset-role').value;
+                let body = new FormData();
+                body.append('name', name);
+                body.append('key', dataset_key);
+                body.append('role', role);
+                fetch(target.getAttribute('href').replace(/redirect/, ''), {
+                    method: 'POST',
+                    body: body
+                })
+                    .then((response) => response.json())
+                    .then((data) => {
+                        if(!data['html']) {
+                            popup.alert('There was an error adding the owner to the dataset. ' + data['error']);
+                        } else {
+                            document.querySelector('.dataset-owner-list ul').insertAdjacentHTML('beforeend', data['html']);
+                        }
+                    })
+                    .catch((error) => {
+                        document.querySelector('.dataset-owner-list').classList.add('flash-once-error');
+                        popup.alert('There was an error adding the owner to the dataset. Refresh and try again later.');
+                    })
+            }
+        );
+    },
+
+    remove_owner: function (e) {
+        e.preventDefault();
+        let target = e.target;
+        if(target.tagName !== 'A') {
+            target = $(target).parents('a')[0];
+        }
+
+        popup.confirm('Are you sure you want to remove access from the dataset for this user or tag? This cannot be undone.', 'Confirm', function () {
+            let owner = target.parentNode.getAttribute('data-owner');
+            let dataset_key = document.querySelector('article.result').getAttribute('data-dataset-key');
+            let body = new FormData();
+            body.append('name', owner);
+            body.append('key', dataset_key);
+            fetch(target.getAttribute('href').replace(/redirect/, ''), {
+                method: 'DELETE',
+                body: body
+            })
+                .then((response) => response.json())
+                .then(data => {
+                    console.log(data);
+                    if (data['error']) {
+                        popup.alert('There was an error removing the owner from the dataset. ' + data['error']);
+                    } else {
+                        document.querySelector('[data-owner="' + owner + '"]').remove();
+                    }
+                })
+                .catch((error) => {
+                    console.log(error);
+                    document.querySelector('.dataset-owner-list').classList.add('flash-once-error');
+                    popup.alert('There was an error removing the owner from the dataset. Refresh and try again later.');
+                })
+        });
     }
+
 };
 
 /**
@@ -962,11 +1042,6 @@ const tooltip = {
      * @param e  Event that triggered the toggle
      */
     toggle: function (e) {
-        if (this.tagName.toLowerCase() !== 'a') {
-            // Allow links to have tooltips and still work
-            e.preventDefault();
-        }
-
         let tooltip_container = $(document.getElementById($(this).attr('aria-controls')));
         if (tooltip_container.is(':hidden')) {
             tooltip.show(e, this);
@@ -1009,7 +1084,7 @@ const popup = {
             popup.init();
         }
 
-        $('#popup').removeClass('confirm').removeClass('render').addClass('alert');
+        $('#popup').removeClass('confirm').removeClass('render').removeClass('dialog').addClass('alert');
 
         let wrapper = $('<div><h2 id="popup-title">' + title + '</h2><p id="popup-text">' + message + '</p><div class="controls"><button class="popup-close"><i class="fa fa-check" aria-hidden="true"></i> OK</button></div></div>');
         popup.render(wrapper.html(), false, false);
@@ -1024,8 +1099,22 @@ const popup = {
             popup.current_callback = callback;
         }
 
-        $('#popup').removeClass('alert').removeClass('render').addClass('confirm');
+        $('#popup').removeClass('alert').removeClass('render').removeClass('dialog').addClass('confirm');
         let wrapper = $('<div><h2 id="popup-title">' + title + '</h2><p id="popup-text">' + message + '</p><div class="controls"><button class="popup-close"><i class="fa fa-times" aria-hidden="true"></i> Cancel</button><button class="popup-execute-callback"><i class="fa fa-check" aria-hidden="true"></i> OK</button></div></div>');
+        popup.render(wrapper.html(), false, false);
+    },
+
+    dialog: function(body, title = 'Confirm', callback = false) {
+        if (!popup.is_initialised) {
+            popup.init();
+        }
+
+        if (callback) {
+            popup.current_callback = callback;
+        }
+
+        $('#popup').removeClass('alert').removeClass('render').removeClass('confirm').addClass('dialog');
+        let wrapper = $('<div><h2 id="popup-title">' + title + '</h2><div id="popup-dialog">' + body + '</div><div class="controls"><button class="popup-close"><i class="fa fa-times" aria-hidden="true"></i> Cancel</button><button class="popup-execute-callback"><i class="fa fa-check" aria-hidden="true"></i> OK</button></div></div>');
         popup.render(wrapper.html(), false, false);
     },
 
@@ -1328,6 +1417,11 @@ const ui_helpers = {
         //long texts with '...more' link
         $(document).on('click', 'div.expandable a', ui_helpers.expandExpandable);
 
+        //autocomplete text boxes
+        $(document).on('input', 'input.autocomplete', ui_helpers.autocomplete);
+
+        //tabbed interfaces
+        $(document).on('click', '.tabbed .tab-controls a', ui_helpers.tabs);
 
         // Controls to change which results show up in overview
         $('.view-controls button').hide();
@@ -1350,20 +1444,19 @@ const ui_helpers = {
             $('.datasource-extra-input').remove();
         });
 
-        // special case - first-run colour picker for the interface
+        // special case - colour picker for the interface
         $('body').on('input', '.hue-picker', function() {
-            let h = $(this).val();
-            let s = $(this).attr('data-saturation') ? $(this).attr('data-saturation') : 77;
-            let l = $(this).attr('data-luminance') ? $(this).attr('data-luminance') : 46;
+            let h = parseInt($(this).val());
+            let s = $(this).attr('data-saturation') ? parseInt($(this).attr('data-saturation')) : 87;
+            let v = $(this).attr('data-value') ? parseInt($(this).attr('data-value')) : 81;
             let target = $(this).attr('data-update-background');
-            let sl = ', ' + s + '%, ' + l + '%';
-            let hsl = 'hsl(' + h + sl + ')';
+
             if($(this).attr('data-update-layout')) {
-                document.querySelector(':root').style.setProperty('--accent', hsl);
-                document.querySelector(':root').style.setProperty('--accent-alternate', 'hsl(' + h + ', 100%, 46%');
-                document.querySelector(':root').style.setProperty('--highlight', 'hsl(' + ((h + 180) % 360) + ', 100%, 46%');
+                document.querySelector(':root').style.setProperty('--accent', hsv2hsl(h, s, v));
+                document.querySelector(':root').style.setProperty('--highlight', hsv2hsl(h, s, 100));
+                document.querySelector(':root').style.setProperty('--accent-alternate', hsv2hsl((h + 180) % 360, s, 90));
             }
-            $(target).css('background-color', hsl);
+            $(target).css('background-color', hsv2hsl(h, s, v));
         });
         $('.hue-picker').trigger('input');
 
@@ -1373,6 +1466,58 @@ const ui_helpers = {
             $('h1 span a').text(label);
         });
         $('#request-4cat_name').trigger('input');
+
+        // special case - settings panel filter
+        $(document).on('input', '.settings .inline-search input', function(e) {
+            let matching_tabs = [];
+            let query = e.target.value.toLowerCase();
+            document.querySelectorAll('.tab-content').forEach((tab) => {
+                let tab_id = tab.getAttribute('id').replace(/^tab-/, 'tablabel-');
+                if(document.querySelector('#' + tab_id).textContent.toLowerCase().indexOf(query) >= 0) {
+                    matching_tabs.push(tab_id);
+                    return;
+                }
+
+                tab.querySelectorAll('.form-element').forEach((element) => {
+                    let label = element.querySelector('label').textContent;
+                    let help = element.querySelector('[role=tooltip]');
+                    if(
+                        element.querySelector('[name]').getAttribute('name').indexOf(query) >= 0
+                        || label.toLowerCase().indexOf(query) >= 0
+                        || (help && help.textContent.toLowerCase().indexOf(query) >= 0)
+                    ) {
+                        matching_tabs.push(tab_id);
+                    }
+                })
+            });
+            document.querySelectorAll('.tab-controls .matching').forEach((e) => e.classList.remove('matching'));
+            if(query) {
+                matching_tabs.forEach((tab_id) => document.querySelector('#' + tab_id).classList.add('matching'));
+            }
+        });
+
+        // special case - admin user tags sorting
+        $('#tag-order').sortable({
+            cursor: 'ns-resize',
+            handle: '.handle',
+            items: '.implicit, .explicit',
+            axis: 'y',
+            update: function(e, ui) {
+                let tag_order = Array.from(document.querySelectorAll('#tag-order li[data-tag]')).map(t => t.getAttribute('data-tag')).join(',');
+                let body = new FormData();
+                body.append('order', tag_order);
+                fetch(document.querySelector('#tag-order').getAttribute('data-url'), {
+                    method: 'POST',
+                    body: body
+                }).then(response => {
+                    if(response.ok) {
+                        ui.item.addClass('flash-once');
+                    } else {
+                        ui.item.addClass('flash-once-error');
+                    }
+                });
+            }
+        });
     },
 
     /**
@@ -1480,9 +1625,9 @@ const ui_helpers = {
             e.preventDefault();
         }
 
-        target = '#' + $(this).attr('aria-controls');
+        let target = '#' + $(this).attr('aria-controls');
+        let is_open = $(target).attr('aria-expanded') !== 'false';
 
-        is_open = $(target).attr('aria-expanded') !== 'false';
         if (is_open || force_close) {
             $(target).animate({'height': 0}, 250, function () {
                 $(this).attr('aria-expanded', false).css('height', '');
@@ -1506,6 +1651,46 @@ const ui_helpers = {
                 $(this).find('i.fa.fa-plus').addClass('fa-minus').removeClass('fa-plus');
             }
         }
+    },
+
+    autocomplete: function(e) {
+        let source = e.target.getAttribute('data-url');
+        if(!source) { return; }
+
+        let datalist = e.target.getAttribute('list');
+        if(!datalist) { return; }
+
+        datalist = document.querySelector('#' + datalist);
+        if(!datalist) { return; }
+
+        let value = e.target.value;
+        fetch(source, {method: 'POST', body: value})
+            .then(e => e.json())
+            .then(response => {
+                datalist.querySelectorAll('option').forEach(o => o.remove());
+                response.forEach(o => {
+                    let option = document.createElement('option');
+                    option.innerText = o;
+                    datalist.appendChild(option);
+                });
+            });
+    },
+
+    tabs: function(e) {
+        e.preventDefault();
+        let link = e.target;
+        let target_id = link.getAttribute('aria-controls');
+        let controls = link.parentNode.parentNode;
+        controls.querySelector('.highlighted').classList.remove('highlighted');
+        link.parentNode.classList.add('highlighted');
+        controls.parentNode.parentNode.querySelector('.tab-container *[aria-expanded=true]').setAttribute('aria-expanded', 'false');
+        document.querySelector('#' + target_id).setAttribute('aria-expanded', 'true');
+        let current_tab = controls.parentNode.querySelector('input[name="current-tab"]');
+        if(!current_tab) {
+            controls.parentNode.insertAdjacentHTML('afterbegin', '<input type="hidden" name="current-tab" value="">');
+            current_tab = controls.parentNode.querySelector('input[name="current-tab"]');
+        }
+        current_tab.value = target_id.replace(/^tab-/, '');
     }
 }
 
@@ -1560,4 +1745,31 @@ function FileReaderPromise(file) {
         }
         fr.readAsArrayBuffer(file);
     });
+}
+
+/**
+ * Convert HSV colour to HSL
+ *
+ * Expects a {0-360}, {0-100}, {0-100} value.
+ *
+ * @param h
+ * @param s
+ * @param v
+ * @returns {(*|number)[]}
+ */
+function hsv2hsl(h, s, v) {
+    s /= 100;
+    v /= 100;
+    const vmin = Math.max(v, 0.01);
+    let sl;
+    let l;
+
+    l = (2 - s) * v;
+    const lmin = (2 - s) * vmin;
+    sl = s * vmin;
+    sl /= (lmin <= 1) ? lmin : 2 - lmin;
+    sl = sl || 0;
+    l /= 2;
+
+    return 'hsl(' + h + 'deg, ' + (sl * 100) + '%, ' + (l * 100) + '%)';
 }

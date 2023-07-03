@@ -3,8 +3,7 @@ Convert Google Vision API annotations to CSV
 """
 import csv
 
-from backend.abstract.processor import BasicProcessor
-from common.lib.exceptions import ProcessorInterruptedException
+from backend.lib.processor import BasicProcessor
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -33,7 +32,7 @@ class ConvertVisionOutputToCSV(BasicProcessor):
         """
         Determine if processor is compatible with dataset
 
-        :param module: Dataset or processor to determine compatibility with
+        :param module: Module to determine compatibility with
         """
         return module.type == "google-vision-api"
 

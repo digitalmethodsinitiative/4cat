@@ -8,9 +8,9 @@ import shutil
 import subprocess
 import shlex
 
-import common.config_manager as config
+from common.config_manager import config
 
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
 
 __author__ = "Dale Wahl"
@@ -39,8 +39,8 @@ class AudioExtractor(BasicProcessor):
 		Allow on tiktok-search only for dev
 		"""
 		return module.type.startswith("video-downloader") and \
-			   config.get("video_downloader.ffmpeg-path") and \
-			   shutil.which(config.get("video_downloader.ffmpeg-path"))
+			   config.get("video-downloader.ffmpeg_path") and \
+			   shutil.which(config.get("video-downloader.ffmpeg_path"))
 
 	@classmethod
 	def get_options(cls, parent_dataset=None, user=None):
@@ -93,7 +93,7 @@ class AudioExtractor(BasicProcessor):
 			vid_name = path.stem
 			# ffmpeg -i video.mkv -map 0:a -acodec libmp3lame audio.mp4
 			command = [
-				shutil.which(config.get("video_downloader.ffmpeg-path")),
+				shutil.which(config.get("video-downloader.ffmpeg_path")),
 				"-i", shlex.quote(str(path)),
 				"-ar", str(16000),
 				shlex.quote(str(output_dir.joinpath(f"{vid_name}.wav")))

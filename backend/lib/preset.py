@@ -2,7 +2,7 @@
 Queue a series of processors at once via a preset
 """
 import abc
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 
 from common.lib.dataset import DataSet
 

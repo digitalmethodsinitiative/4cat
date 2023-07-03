@@ -15,7 +15,7 @@ from flask import (current_app, request, jsonify)
 from PIL import Image, ImageColor, ImageOps
 from pathlib import Path
 
-import common.config_manager as config
+from common.config_manager import config
 csv.field_size_limit(1024 * 1024 * 1024)
 
 class Pagination(object):
@@ -266,12 +266,12 @@ def generate_css_colours(force=False):
 	:param bool force:  Create colour definition file even if it exists already
 	:return:
 	"""
-	interface_hue = config.get("4cat.layout_hue")
-	interface_hue /= 360  # colorsys expects 0-1 values
+	interface_hue = config.get("4cat.layout_hue") / 360  # colorsys expects 0-1 values
+	secondary_hue = config.get("4cat.layout_hue_secondary") / 360
 	main_colour = colorsys.hsv_to_rgb(interface_hue, 0.87, 0.81)
 	accent_colour = colorsys.hsv_to_rgb(interface_hue, 0.87, 1)
 	# get opposite by adjusting the hue by 50%
-	opposite_colour = colorsys.hsv_to_rgb(math.fmod(interface_hue + 0.5, 1), 0.87, 1)
+	opposite_colour = colorsys.hsv_to_rgb(secondary_hue, 0.87, 0.9)
 
 	template_file = config.get("PATH_ROOT").joinpath("webtool/static/css/colours.css.template")
 	colour_file = config.get("PATH_ROOT").joinpath("webtool/static/css/colours.css")
@@ -283,9 +283,9 @@ def generate_css_colours(force=False):
 	with template_file.open() as infile:
 		template = infile.read()
 		template = template \
-			.replace("{{ accent_colour }}", make_html_colour(main_colour)) \
-			.replace("{{ highlight_colour }}", make_html_colour(accent_colour)) \
-			.replace("{{ highlight_alternate }}", make_html_colour(opposite_colour))
+			.replace("{{ main_colour }}", make_html_colour(main_colour)) \
+			.replace("{{ accent_colour }}", make_html_colour(accent_colour)) \
+			.replace("{{ opposite_colour }}", make_html_colour(opposite_colour))
 
 		with colour_file.open("w") as outfile:
 			outfile.write(template)
@@ -352,44 +352,27 @@ def check_restart_request():
 	return request_is_legit
 
 
-def admin_required(func):
-	'''
-	If you decorate a view with this, it will ensure that the current user is
-	logged in and authenticated before calling the actual view. (If they are
-	not, it calls the :attr:`LoginManager.unauthorized` callback.) For
-	example::
+def setting_required(setting, required_value=True):
+	"""
+	Decorater that checks if the value of a certain setting is the required
+	value before a route is parsed. If not, the user CANNOT PASS!
 
-		@app.route('/post')
-		@login_required
-		def post():
-			pass
+	Use like:
 
-	If there are only certain times you need to require that your user is
-	logged in, you can do so with::
-
-		if not current_user.is_authenticated:
-			return current_app.login_manager.unauthorized()
-
-	...which is essentially the code that this function adds to your views.
-
-	It can be convenient to globally turn off authentication when unit testing.
-	To enable this, if the application configuration variable `LOGIN_DISABLED`
-	is set to `True`, this decorator will be ignored.
-
-	.. Note ::
-
-		Per `W3 guidelines for CORS preflight requests
-		<http://www.w3.org/TR/cors/#cross-origin-request-with-preflight-0>`_,
-		HTTP ``OPTIONS`` requests are exempt from login checks.
+	@setting_required("privilege.can_restart")
 
 	:param func: The view function to decorate.
+	:param str setting: Name of the setting to check
+	:param required_value: Value to check against.
 	:type func: function
-	'''
+	"""
+	def checking_decorator(func):
+		@wraps(func)
+		def decorated_view(*args, **kwargs):
+			if not config.get(setting, user=current_user) == required_value:
+				return current_app.login_manager.unauthorized()
+			return func(*args, **kwargs)
 
-	@wraps(func)
-	def decorated_view(*args, **kwargs):
-		if not current_user.is_admin:
-			return current_app.login_manager.unauthorized()
-		return func(*args, **kwargs)
+		return decorated_view
 
-	return decorated_view
+	return checking_decorator

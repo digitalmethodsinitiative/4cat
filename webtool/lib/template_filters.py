@@ -1,21 +1,17 @@
 import datetime
 import markdown
 import json
-import time
 import uuid
 import math
 import os
 import re
 import requests
 
-from pathlib import Path
 from urllib.parse import urlencode, urlparse
-from webtool import app, db
+from webtool import app, config
 from common.lib.helpers import timify_long
 
 from flask_login import current_user
-
-import common.config_manager as config
 
 @app.template_filter('datetime')
 def _jinja2_filter_datetime(date, fmt=None, wrap=True):
@@ -63,7 +59,7 @@ def _jinja2_filter_commafy(number):
 	return f"{number:,}"
 
 @app.template_filter('timify')
-def _jinja2_filter_numberify(number):
+def _jinja2_filter_timify(number):
 	try:
 		number = int(number)
 	except TypeError:
@@ -97,6 +93,13 @@ def _jinja2_filter_timify_long(number):
 	"""
 	return timify_long(number)
 
+@app.template_filter("fromjson")
+def _jinja2_filter_fromjson(data):
+	try:
+		return json.loads(data)
+	except TypeError:
+		return data
+
 @app.template_filter("http_query")
 def _jinja2_filter_httpquery(data):
 	data = {key: data[key] for key in data if data[key]}
@@ -123,7 +126,7 @@ def _jinja2_filter_json(data):
 @app.template_filter('config_override')
 def _jinja2_filter_conf(data, property=""):
 	try:
-		return config.get("flask." + property)
+		return config.get("flask." + property, user=current_user)
 	except AttributeError:
 		return data
 
@@ -332,16 +335,19 @@ def inject_now():
 		"""
 		return str(uuid.uuid4())
 
-	notifications = current_user.get_notifications()
+	cv_path = config.get("PATH_ROOT").joinpath("config/.current-version")
+	if cv_path.exists():
+		with cv_path.open() as infile:
+			version = infile.readline().strip()
+	else:
+		version = "???"
 
 	return {
-		"__datasources_config": config.get('4cat.datasources'),
-		"__has_https": config.get("flask.https"),
+		"__has_https": config.get("flask.https", user=current_user),
 		"__datenow": datetime.datetime.utcnow(),
-		"__tool_name": config.get("4cat.name"),
-		"__tool_name_long": config.get("4cat.name_long"),
-		"__notifications": notifications,
-		"__expire_datasets": config.get("expire.timeout"),
-		"__expire_optout": config.get("expire.allow_optout"),
+		"__notifications": current_user.get_notifications(),
+		"__user_config": lambda setting: config.get(setting, user=current_user),
+		"__user_cp_access": any([config.get(p, user=current_user) for p in config.config_definition.keys() if p.startswith("privileges.admin")]),
+		"__version": version,
 		"uniqid": uniqid
 	}

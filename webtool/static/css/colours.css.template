@@ -2,9 +2,9 @@
       Colour definitions
   * --------------------- */
 :root {
-    --accent: {{ accent_colour }};
-    --highlight: {{ highlight_colour }};
-    --accent-alternate: {{ highlight_alternate }};
+    --accent: {{ main_colour }};
+    --highlight: {{ accent_colour }};
+    --accent-alternate: {{ opposite_colour }};
     --accent-okay: #26b018;
     --accent-okay-light: #bee0ba;
     --accent-warning: #b05d13;

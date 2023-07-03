@@ -2,14 +2,12 @@
 Control access to web tool - views and functions used in handling user access
 """
 import html2text
-import colorsys
 import requests
 import smtplib
 import fnmatch
 import socket
 import random
 import time
-import math
 import sys
 import os
 
@@ -17,16 +15,18 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
 sys.path.insert(0, os.path.dirname(__file__) + '/../..')
-import common.config_manager as config
 from flask import request, abort, render_template, redirect, url_for, flash, get_flashed_messages, jsonify
 from flask_login import login_user, login_required, logout_user, current_user
-from webtool import app, login_manager, db
+from webtool import app, login_manager, db, config
 from webtool.views.api_tool import limiter
-from webtool.lib.user import User
-from webtool.lib.helpers import error, make_html_colour, generate_css_colours
+from common.lib.user import User
+from webtool.lib.helpers import error, generate_css_colours, setting_required
 from common.lib.helpers import send_email, get_software_version
 
 from pathlib import Path
+
+from common.config_manager import ConfigWrapper
+config = ConfigWrapper(config, user=current_user)
 
 
 @login_manager.user_loader
@@ -73,6 +73,19 @@ def load_user_from_request(request):
         user.authenticate()
         return user
 
+@login_manager.unauthorized_handler
+def unauthorized():
+    """
+    Handle unauthorized requests
+
+    Shows an error message, or if the user is not logged in yet redirects them
+    to the login page.
+    """
+    if current_user.is_authenticated:
+        return render_template("error.html", message="You cannot view this page."), 403
+    else:
+        return redirect(url_for("show_login"))
+
 
 @app.before_request
 def reroute_requests():
@@ -83,9 +96,9 @@ def reroute_requests():
     # Displays a 'sorry, no 4cat for you' message to banned or deactivated users.
     if current_user and current_user.is_authenticated and current_user.is_deactivated:
         message = "Your 4CAT account has been deactivated and you can no longer access this page."
-        if current_user.get_attribute("deactivated.reason"):
+        if current_user.get_value("deactivated.reason"):
             message += "\n\nThe following reason was recorded for your account's deactivation: *"
-            message += current_user.get_attribute("deactivated.reason") + "*"
+            message += current_user.get_value("deactivated.reason") + "*"
 
         return render_template("error.html", title="Your account has been deactivated", message=message), 403
 
@@ -175,7 +188,7 @@ def first_run_dialog():
 
     :return:
     """
-    has_admin_user = db.fetchone("SELECT COUNT(*) AS amount FROM users WHERE is_admin = True")["amount"]
+    has_admin_user = db.fetchone("SELECT COUNT(*) AS amount FROM users WHERE tags @> '[\"admin\"]'")["amount"]
     wants_phone_home = not config.get("4cat.phone_home_asked", False)
 
     version_file = Path(config.get("PATH_ROOT"), "config/.current-version")
@@ -239,12 +252,13 @@ def first_run_dialog():
                                    flashes=get_flashed_messages(), phone_home_url=phone_home_url,
                                    adjective=adjective, interface_hue=interface_hue)
 
-        db.insert("users", data={"name": username})
+        db.insert("users", data={"name": username, "timestamp_created": int(time.time())})
         db.commit()
         user = User.get_by_name(db=db, name=username)
         user.set_password(password)
+        user.add_tag("admin")  # first user is always admin
 
-        config.set_or_create_setting("4cat.name_long", instance_name, raw=False)
+        config.set("4cat.name_long", instance_name)
 
         # handle hue colour
         try:
@@ -253,11 +267,11 @@ def first_run_dialog():
         except (ValueError, TypeError):
             interface_hue = random.randrange(0, 360)
 
-        config.set_or_create_setting("4cat.layout_hue", interface_hue, raw=False)
+        config.set("4cat.layout_hue", interface_hue)
         generate_css_colours(force=True)
 
         # make user an admin
-        db.update("users", where={"name": username}, data={"is_admin": True, "is_deactivated": False})
+        db.update("users", where={"name": username}, data={"is_deactivated": False})
         db.commit()
 
         flash("The admin user '%s' was created, you can now use it to log in." % username)
@@ -281,7 +295,7 @@ def first_run_dialog():
             flash("Could not send install ping to 4CAT developers")
 
     # don't ask phone home again until next update
-    config.set_or_create_setting("4cat.phone_home_asked", True, raw=False)
+    config.set("4cat.phone_home_asked", True)
 
     redirect_path = "show_login" if not has_admin_user else "show_frontpage"
     return redirect(url_for(redirect_path))
@@ -300,14 +314,13 @@ def show_login():
     if current_user.is_authenticated:
         return redirect(url_for("show_index"))
 
-    has_admin_user = db.fetchone("SELECT * FROM users WHERE is_admin = True")
+    has_admin_user = db.fetchone("SELECT * FROM users WHERE tags @> '[\"admin\"]'")
     if not has_admin_user:
         return redirect(url_for("first_run_dialog"))
 
     have_email = config.get('mail.admin_email') and config.get('mail.server')
     if request.method == 'GET':
-        return render_template('account/login.html', flashes=get_flashed_messages(), have_email=have_email,
-                               can_request_access=config.get("4cat.allow_access_request"))
+        return render_template('account/login.html', flashes=get_flashed_messages(), have_email=have_email)
 
     username = request.form['username']
     password = request.form['password']
@@ -336,6 +349,7 @@ def logout():
 
 
 @app.route("/request-access/", methods=["GET", "POST"])
+@setting_required("4cat.allow_access_request")
 def request_access():
     """
     Request a 4CAT Account
@@ -344,10 +358,6 @@ def request_access():
     sent to the 4CAT admin via e-mail so they can create an account (if
     approved)
     """
-    if not config.get("4cat.allow_access_request"):
-        return render_template("error.html",
-                               message="Account requests are disabled for this 4CAT server.")
-
     if not config.get('mail.admin_email'):
         return render_template("error.html",
                                message="No administrator e-mail is configured; the request form cannot be displayed.")

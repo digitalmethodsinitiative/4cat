@@ -12,9 +12,9 @@ import requests
 import json
 import os
 
-import common.config_manager as config
+from common.config_manager import config
 from common.lib.helpers import UserInput, convert_to_int
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException, ProcessorException
 
 __author__ = "Dale Wahl"
@@ -49,7 +49,7 @@ class ImageTextDetector(BasicProcessor):
     ]
 
     config = {
-        "text_from_images.DMI_OCR_SERVER": {
+        "text-from-images.server_url": {
             "type": UserInput.OPTION_TEXT,
             "default": "",
             "help": 'URL to the OCR server',
@@ -85,9 +85,9 @@ class ImageTextDetector(BasicProcessor):
         """
         Allow processor on image sets
 
-        :param module: Dataset or processor to determine compatibility with
+        :param module: Module to determine compatibility with
         """
-        return module.type.startswith("image-downloader") and config.get('text_from_images.DMI_OCR_SERVER', False)
+        return module.type.startswith("image-downloader") and config.get('text-from-images.server_url', False)
 
     def process(self):
         """
@@ -183,7 +183,7 @@ class ImageTextDetector(BasicProcessor):
         :param Path image_file:  Path to file to annotate
         :return dict:  Lists of detected features, one key for each feature
         """
-        server = config.get('text_from_images.DMI_OCR_SERVER', '')
+        server = self.config.get('text-from-images.server_url', '')
 
         # Get model_type if available
         parameters = {}

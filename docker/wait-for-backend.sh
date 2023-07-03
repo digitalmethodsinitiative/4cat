@@ -9,4 +9,5 @@ until python3 -m docker.wait-for-backend; do
 done
 
 >&2 echo "Backend is up"
+sleep 2
 exec "$@"

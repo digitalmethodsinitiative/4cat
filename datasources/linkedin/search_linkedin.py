@@ -6,11 +6,10 @@ due to its aggressive rate limiting and login wall. Instead, import data
 collected elsewhere.
 """
 import datetime
-import json
 import time
 import re
 
-from backend.abstract.search import Search
+from backend.lib.search import Search
 
 
 class SearchLinkedIn(Search):
@@ -68,7 +67,7 @@ class SearchLinkedIn(Search):
         time_ago = post["actor"]["subDescription"]["text"] if post["actor"].get("subDescription") else ""
         timestamp = int(time_collected - SearchLinkedIn.parse_time_ago(time_ago))
 
-        # extact username from profile URL link
+        # extract username from profile URL link
         username = post["actor"]["navigationContext"]["actionTarget"].split("linkedin.com/").pop().split("?")[0]
 
         # images are stored in some convoluted way

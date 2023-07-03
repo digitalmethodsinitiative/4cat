@@ -16,9 +16,9 @@ from lxml import etree
 from lxml.cssselect import CSSSelector as css
 from io import StringIO, BytesIO
 
-import common.config_manager as config
+from common.config_manager import config
 from common.lib.helpers import UserInput
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
 
 __author__ = "Stijn Peeters, Sal Hagen"
@@ -66,7 +66,7 @@ class ImageDownloader(BasicProcessor):
 	}
 
 	config = {
-		"image_downloader.MAX_NUMBER_IMAGES": {
+		"image-downloader.max": {
 			"type": UserInput.OPTION_TEXT,
 			"coerce_type": int,
 			"default": 1000,
@@ -95,7 +95,7 @@ class ImageDownloader(BasicProcessor):
 		options = cls.options
 
 		# Update the amount max and help from config
-		max_number_images = int(config.get('image_downloader.MAX_NUMBER_IMAGES', 1000))
+		max_number_images = int(config.get('image-downloader.max', 1000, user=user))
 		options['amount']['max'] = max_number_images
 		options['amount']['help'] = "No. of images (max %s)" % max_number_images
 
@@ -142,7 +142,7 @@ class ImageDownloader(BasicProcessor):
 		split_comma = self.parameters.get("split-comma", False)
 
 		if amount == 0:
-			amount = config.get('image_downloader.MAX_NUMBER_IMAGES', 1000)
+			amount = self.config.get('image-downloader.max', 1000)
 		columns = self.parameters.get("columns")
 		if type(columns) is str:
 			columns = [columns]

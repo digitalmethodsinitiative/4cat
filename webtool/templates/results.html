@@ -2,6 +2,7 @@
 
 {% block title %}Datasets &amp; previous results{% endblock %}
 {% block body_class %}result-list plain-page{% endblock %}
+{% block breadcrumbs %}{% set navigation.current = "dataset" %}{% endblock %}
 
 {% block body %}
     <nav class="view-controls block">
@@ -36,7 +37,7 @@
             <h2><span>Recently created datasets</span></h2>
             <nav class="tabs">
                 <ul>
-                    {% if current_user.is_admin %}<li{% if depth == "all" %} class="current"{% endif %}><a href="{{ url_for('show_results') }}?{{ filter|http_query }}&amp;depth=all">All datasets</a></li>{% endif %}
+                    {% if __user_config("privileges.can_view_all_datasets") %}<li{% if depth == "all" %} class="current"{% endif %}><a href="{{ url_for('show_results') }}?{{ filter|http_query }}&amp;depth=all">All datasets</a></li>{% endif %}
                     <li{% if not depth or depth == "own" %} class="current"{% endif %}><a href="{{ url_for('show_results') }}?{{ filter|http_query }}&amp;depth=own">My own datasets</a></li>
                     <li{% if depth == "favourites" %} class="current"{% endif %}><a href="{{ url_for('show_results') }}?{{ filter|http_query }}&amp;depth=favourites">Favourites only</a></li>
                 </ul>
@@ -57,12 +58,12 @@
                                     <span class="result">({{ "{:,}".format(dataset.num_rows) }} item{% if dataset.num_rows != 1 %}s{% endif %})</span>
                                 {% endif %}
                             </div>
-                            <div>{% include 'result-metadata.html' %}</div>
+                            <div>{% include 'components/result-metadata.html' %}</div>
                         </div>
 
                         <div class="property-container status">
                         {% if not dataset.is_finished() or dataset.num_rows == 0 %}
-                            <p class="button-like inactive{% if dataset.progress and dataset.progress > 0 and not dataset.is_finished() %} progress progress-{{ (dataset.progress * 100)|round(0)|int }}{% endif %}"><span class="dataset-status">{% include "result-status.html" %}</span></p>
+                            <p class="button-like inactive{% if dataset.progress and dataset.progress > 0 and not dataset.is_finished() %} progress progress-{{ (dataset.progress * 100)|round(0)|int }}{% endif %}"><span class="dataset-status">{% include "components/result-status.html" %}</span></p>
                         {% else %}
                             <a class="button-like" href="{{ url_for('get_result', query_file=dataset.result_file) }}"><i class="fas fa-download" aria-hidden="true"></i> {{ dataset.get_results_path()|filesize }}, {{ dataset.result_file.split(".")[-1] }}</a>
                         {% endif %}

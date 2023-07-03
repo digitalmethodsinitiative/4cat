@@ -13,8 +13,7 @@ import os
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from common.lib.helpers import send_email
-
-import common.config_manager as config
+from common.config_manager import config
 
 
 class User:
@@ -23,10 +22,12 @@ class User:
 
     Compatible with Flask-Login
     """
-    data = {}
+    data = None
+    userdata = None
     is_authenticated = False
     is_active = False
     is_anonymous = True
+    db = None
 
     name = "anonymous"
 
@@ -86,7 +87,7 @@ class User:
         else:
             return User(db, user)
 
-    def can_access_dataset(self, dataset):
+    def can_access_dataset(self, dataset, role=None):
         """
         Check if this user should be able to access a given dataset.
 
@@ -104,10 +105,10 @@ class User:
         elif self.is_admin:
             return True
 
-        elif self.get_id() == dataset.owner:
+        elif dataset.is_accessible_by(self, role=role):
             return True
 
-        elif dataset.owner == "anonymous":
+        elif dataset.get_owners == ("anonymous",):
             return True
 
         else:
@@ -125,6 +126,10 @@ class User:
         """
         self.db = db
         self.data = data
+        try:
+            self.userdata = json.loads(self.data["userdata"])
+        except (TypeError, json.JSONDecodeError):
+            self.userdata = {}
 
         if self.data["name"] != "anonymous":
             self.is_anonymous = False
@@ -206,7 +211,11 @@ class User:
 
         :return bool:
         """
-        return self.data["is_admin"]
+        try:
+            return "admin" in self.data["tags"]
+        except (ValueError, TypeError) as e:
+            # invalid JSON?
+            return False
 
     @property
     def is_deactivated(self):
@@ -216,9 +225,6 @@ class User:
         :return bool:
         """
         return self.data.get("is_deactivated", False)
-
-    def get_attribute(self, attribute):
-        return json.loads(self.data["userdata"]).get(attribute, None)
 
     def email_token(self, new=False):
         """
@@ -339,6 +345,7 @@ class User:
         :return:
         """
         self.userdata[key] = value
+        self.data["userdata"] = json.dumps(self.userdata)
 
         self.db.update("users", where={"name": self.get_id()}, data={"userdata": json.dumps(self.userdata)})
 
@@ -373,7 +380,7 @@ class User:
         self.db.insert("users_notifications", {
             "username": self.get_id(),
             "notification": notification,
-            "expires": expires,
+            "timestamp_expires": expires,
             "allow_dismiss": allow_dismiss
         }, safe=True)
 
@@ -387,7 +394,7 @@ class User:
         """
         self.db.execute("DELETE FROM users_notifications WHERE id IN ( SELECT n.id FROM users_notifications AS n, users AS u "
             "WHERE u.name = %s AND n.id = %s "
-            "AND (u.name = n.username OR (u.is_admin AND n.username = '!admins') OR n.username = '!everyone'))", (self.get_id(), notification_id))
+            "AND (u.name = n.username OR (u.tags @> '[\"admin\"]' AND n.username = '!admins') OR n.username = '!everyone'))", (self.get_id(), notification_id))
 
     def get_notifications(self):
         """
@@ -401,6 +408,132 @@ class User:
         notifications = self.db.fetchall(
             "SELECT n.* FROM users_notifications AS n, users AS u "
             "WHERE u.name = %s "
-            "AND (u.name = n.username OR (u.is_admin AND n.username = '!admins') OR n.username = '!everyone')", (self.get_id(),))
+            "AND (u.name = n.username OR (u.tags @> '[\"admin\"]' AND n.username = '!admins') OR n.username = '!everyone')", (self.get_id(),))
 
         return notifications
+
+    def add_tag(self, tag):
+        """
+        Add tag to user
+
+        If the tag is already in the tag list, nothing happens.
+
+        :param str tag:  Tag
+        """
+        if tag not in self.data["tags"]:
+            self.data["tags"].append(tag)
+            self.sort_user_tags()
+
+    def remove_tag(self, tag):
+        """
+        Remove tag from user
+
+        If the tag is not part of the tag list, nothing happens.
+
+        :param str tag:  Tag
+        """
+        if tag in self.data["tags"]:
+            self.data["tags"].remove(tag)
+            self.sort_user_tags()
+
+    def sort_user_tags(self):
+        """
+        Ensure user tags are stored in the correct order
+
+        The order of the tags matters, since it decides which one will get to
+        override the global configuration. To avoid having to cross-reference
+        the canonical order every time the tags are queried, we ensure that the
+        tags are stored in the database in the right order to begin with. This
+        method ensures that.
+        """
+        tags = self.data["tags"]
+        sorted_tags = []
+
+        for tag in config.get("flask.tag_order"):
+            if tag in tags:
+                sorted_tags.append(tag)
+
+        for tag in tags:
+            if tag not in sorted_tags:
+                sorted_tags.append(tag)
+
+        self.data["tags"] = sorted_tags
+        self.db.update("users", where={"name": self.get_id()}, data={"tags": json.dumps(sorted_tags)})
+
+
+
+    def delete(self, also_datasets=True):
+        from common.lib.dataset import DataSet
+
+        username = self.data["name"]
+
+        self.db.delete("users_favourites", where={"name": username}, commit=False),
+        self.db.delete("users_notifications", where={"username": username}, commit=False)
+        self.db.delete("access_tokens", where={"name": username}, commit=False)
+
+        # find datasets and delete
+        datasets = self.db.fetchall("SELECT key FROM datasets_owners WHERE name = %s", (username,))
+
+        # delete any datasets and jobs related to deleted datasets
+        if datasets:
+            for dataset in datasets:
+                dataset = DataSet(key=dataset["key"], db=self.db)
+
+                if len(dataset.get_owners()) == 1 and also_datasets:
+                    dataset.delete(commit=False)
+                    self.db.delete("jobs", where={"remote_id": dataset.key}, commit=False)
+                else:
+                    dataset.remove_owner(self)
+
+        # and finally the user
+        self.db.delete("users", where={"name": username}, commit=False)
+        self.db.commit()
+
+    def __getattr__(self, attr):
+        """
+        Getter so we don't have to use .data all the time
+
+        :param attr:  Data key to get
+        :return:  Value
+        """
+
+        if attr in dir(self):
+            # an explicitly defined attribute should always be called in favour
+            # of this passthrough
+            attribute = getattr(self, attr)
+            return attribute
+        elif attr in self.data:
+            return self.data[attr]
+        else:
+            raise AttributeError("User object has no attribute %s" % attr)
+
+    def __setattr__(self, attr, value):
+        """
+        Setter so we can flexibly update the database
+
+        Also updates internal data stores (.data etc). If the attribute is
+        unknown, it is stored within the 'userdata' attribute.
+
+        :param str attr:  Attribute to update
+        :param value:  New value
+        """
+
+        # don't override behaviour for *actual* class attributes
+        if attr in dir(self):
+            super().__setattr__(attr, value)
+            return
+
+        if attr not in self.data:
+            self.userdata[attr] = value
+            attr = "userdata"
+            value = self.userdata
+
+        if attr == "userdata":
+            value = json.dumps(value)
+
+        self.db.update("users", where={"name": self.get_id()}, data={attr: value})
+
+        self.data[attr] = value
+
+        if attr == "userdata":
+            self.userdata = json.loads(value)

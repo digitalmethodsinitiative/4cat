@@ -9,14 +9,12 @@ import json
 import time
 import uuid
 import sys
-import os
 
 from pathlib import Path
 
-import common.config_manager as config
-
-from backend.abstract.worker import BasicWorker
+from backend.lib.worker import BasicWorker
 from common.lib.exceptions import WorkerInterruptedException
+from common.config_manager import config
 
 
 class FourcatRestarterAndUpgrader(BasicWorker):
@@ -96,7 +94,8 @@ class FourcatRestarterAndUpgrader(BasicWorker):
                 log_stream_backend = log_file_backend.open("a")
                 self.log.info("Running command %s" % command)
                 process = subprocess.Popen(shlex.split(command), cwd=str(config.get("PATH_ROOT")),
-                                           stdout=log_stream_backend, stderr=log_stream_backend, stdin=subprocess.DEVNULL)
+                                           stdout=log_stream_backend, stderr=log_stream_backend,
+                                           stdin=subprocess.DEVNULL)
 
                 while not self.interrupted:
                     # basically wait for either the process to quit or 4CAT to
@@ -110,7 +109,8 @@ class FourcatRestarterAndUpgrader(BasicWorker):
 
                 if process.returncode is not None:
                     # if we reach this, 4CAT was never restarted, and so the job failed
-                    log_stream_restart.write("\nUnexpected outcome of restart call (%s).\n" % (repr(process.returncode)))
+                    log_stream_restart.write(
+                        "\nUnexpected outcome of restart call (%s).\n" % (repr(process.returncode)))
 
                     raise RuntimeError()
                 else:
@@ -120,8 +120,9 @@ class FourcatRestarterAndUpgrader(BasicWorker):
 
             except (RuntimeError, subprocess.CalledProcessError) as e:
                 log_stream_restart.write(str(e))
-                log_stream_restart.write("[Worker] Error while restarting 4CAT. The script returned a non-standard error code "
-                                 "(see above). You may need to restart 4CAT manually.\n")
+                log_stream_restart.write(
+                    "[Worker] Error while restarting 4CAT. The script returned a non-standard error code "
+                    "(see above). You may need to restart 4CAT manually.\n")
                 self.log.error("Error restarting 4CAT. See %s for details." % log_stream_restart.name)
                 lock_file.unlink()
                 self.job.finish()

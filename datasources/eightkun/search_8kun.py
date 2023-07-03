@@ -3,7 +3,7 @@
 """
 from datasources.fourchan.search_4chan import Search4Chan
 
-import common.config_manager as config
+from common.config_manager import config
 from common.lib.helpers import UserInput
 
 
@@ -16,8 +16,9 @@ class Search8Kun(Search4Chan):
 	Apart from the prefixes, this works identically to the 4chan searcher, so
 	most methods are inherited from there.
 	"""
-	type = "8kun-search"
+	type = "eightkun-search"
 	sphinx_index = "8kun"
+	title = "8kun search"
 	prefix = "8kun"
 	is_local = True	# Whether this datasource is locally scraped
 	is_static = False	# Whether this datasource is still updated
@@ -34,9 +35,9 @@ class Search8Kun(Search4Chan):
 		},
 		"board": {
 			"type": UserInput.OPTION_CHOICE,
-			"options": {b: b for b in config.get("eightkun.boards", [])},
+			"options": {b: b for b in config.get("eightkun-search.boards", [])},
 			"help": "Board",
-			"default": config.get("eightkun.boards", [""])[0]
+			"default": config.get("eightkun-search.boards", [""])[0]
 		},
 		"body_match": {
 			"type": UserInput.OPTION_TEXT,
@@ -81,11 +82,27 @@ class Search8Kun(Search4Chan):
 	}
 
 	config = {
-		"eightkun.boards": {
+		"eightkun-search.boards": {
 			"type": UserInput.OPTION_TEXT_JSON,
 			"help": "Boards to index",
 			"tooltip": "These boards will be scraped and made available for searching. Provide as a JSON-formatted "
 					   "list of strings, e.g. ['pol', 'v'].",
-			"default": "[]"
+			"default": [""],
+			"global": True
+		},
+		"eightkun-search.interval": {
+			"type": UserInput.OPTION_TEXT,
+			"coerce_type": int,
+			"help": "Scrape interval",
+			"tooltip": "Scrape new threads every this many seconds",
+			"default": 60,
+			"global": True
+		},
+		"eightkun-search.no_scrape": {
+			"type": UserInput.OPTION_TEXT_JSON,
+			"help": "Boards not to scrape",
+			"tooltip": "These boards will not be scraped, but can still be indexed if added to 'Boards to index'",
+			"default": [],
+			"global": True
 		}
 	}

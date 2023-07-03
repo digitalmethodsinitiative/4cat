@@ -14,7 +14,7 @@ from flask import jsonify, request, send_file, after_this_request
 from flask_login import login_required, current_user
 
 from webtool import app, db, log, openapi, limiter
-from webtool.lib.helpers import error
+from webtool.lib.helpers import error, setting_required
 
 from common.lib.exceptions import JobNotFoundException
 from common.lib.queue import JobQueue
@@ -67,6 +67,7 @@ def get_standalone_processors():
 @app.route("/api/process/<processor>/", methods=["POST"])
 @api_ratelimit
 @login_required
+@setting_required("privileges.can_run_processors")
 @openapi.endpoint("standalone")
 def process_standalone(processor):
 	"""

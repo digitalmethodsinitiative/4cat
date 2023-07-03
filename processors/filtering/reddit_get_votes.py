@@ -7,11 +7,11 @@ import csv
 
 from prawcore.exceptions import Forbidden, NotFound, PrawcoreException
 
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 from common.lib.user_input import UserInput
 from common.lib.exceptions import ProcessorInterruptedException
+from common.config_manager import config
 
-import common.config_manager as config
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
 __maintainer__ = "Stijn Peeters"
@@ -50,9 +50,9 @@ class RedditVoteChecker(BasicProcessor):
 		"""
 		Allow processor if dataset is a Reddit dataset
 
-		:param module: Dataset or processor to determine compatibility with
+		:param module: Module to determine compatibility with
 		"""
-		if config.get('api.reddit.client_id', False) and config.get('api.reddit.secret', False) and module.is_dataset():
+		if config.get('api.reddit.client_id', False) and config.get('api.reddit.secret', False):
 			return module.is_top_dataset() and module.type == "reddit-search" and module.num_rows <= 5000
 		return False
 
@@ -63,8 +63,8 @@ class RedditVoteChecker(BasicProcessor):
 		"""
 		try:
 			user_agent = "4cat:4cat:v1.0 (by /u/oilab-4cat)"
-			reddit = praw.Reddit(client_id=config.get('api.reddit.client_id'),
-							 client_secret=config.get('api.reddit.secret'),
+			reddit = praw.Reddit(client_id=self.config.get('api.reddit.client_id'),
+							 client_secret=self.config.get('api.reddit.secret'),
 							 user_agent=user_agent)
 		except praw.exceptions.PRAWException:
 			# unclear what kind of expression gets thrown here

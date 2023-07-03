@@ -17,6 +17,7 @@
 
 # actual files that are part of 4CAT but should not be included
 config.py
+module_config.bin
 .current-version
 deploy.sh
 module_cache.pb

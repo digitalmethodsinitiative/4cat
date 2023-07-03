@@ -6,7 +6,6 @@ import csv
 import json
 import markdown
 
-import common.config_manager as config
 from pathlib import Path
 from datetime import datetime
 
@@ -15,8 +14,11 @@ import backend
 from flask import render_template, jsonify, Response
 from flask_login import login_required, current_user
 
-from webtool import app, db
-from webtool.lib.helpers import pad_interval, error
+from webtool import app, db, config
+from webtool.lib.helpers import pad_interval, error, setting_required
+
+from common.config_manager import ConfigWrapper
+config = ConfigWrapper(config, user=current_user)
 
 csv.field_size_limit(1024 * 1024 * 1024)
 
@@ -85,7 +87,7 @@ def show_frontpage():
     else:
         news = None
 
-    datasources = {k: v for k, v in backend.all_modules.datasources.items() if k in config.get("4cat.datasources") and not v["importable"]}
+    datasources = {k: v for k, v in backend.all_modules.datasources.items() if k in config.get("datasources.enabled") and not v["importable"]}
     importables = {k: v for k, v in backend.all_modules.datasources.items() if v["importable"]}
 
     return render_template("frontpage.html", stats=stats, news=news, datasources=datasources, importables=importables)
@@ -93,12 +95,13 @@ def show_frontpage():
 
 @app.route('/create-dataset/')
 @login_required
+@setting_required("privileges.can_create_dataset")
 def show_index():
     """
     Main tool frontend
     """
     datasources = {datasource: metadata for datasource, metadata in backend.all_modules.datasources.items() if
-                   metadata["has_worker"] and metadata["has_options"] and datasource in config.get("4cat.datasources", {})}
+                   metadata["has_worker"] and metadata["has_options"] and datasource in config.get("datasources.enabled", {})}
 
     return render_template('create-dataset.html', datasources=datasources)
 
@@ -111,7 +114,7 @@ def data_overview(datasource=None):
     Main tool frontend
     """
     datasources = {datasource: metadata for datasource, metadata in backend.all_modules.datasources.items() if
-                   metadata["has_worker"] and datasource in config.get("4cat.datasources")}
+                   metadata["has_worker"] and datasource in config.get("datasources.enabled")}
 
     if datasource not in datasources:
         datasource = None
@@ -184,10 +187,10 @@ def data_overview(datasource=None):
 @app.route('/get-boards/<string:datasource>/')
 @login_required
 def getboards(datasource):
-    if datasource not in config.get("4cat.datasources"):
+    if datasource not in config.get("datasources.enabled"):
         result = False
     else:
-        result = config.get(datasource + ".boards", False)
+        result = config.get(datasource + "-search.boards", False)
 
     return jsonify(result)
 

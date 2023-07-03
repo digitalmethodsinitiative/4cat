@@ -26,6 +26,7 @@ class UserInput:
     OPTION_DIVIDER = "divider"  # meta-option, divides related sets of options
     OPTION_FILE = "file"  # file upload
     OPTION_HUE = "hue"  # colour hue
+    OPTION_DATASOURCES = "datasources"  # data source toggling
 
     @staticmethod
     def parse_all(options, input, silently_correct=True):
@@ -48,6 +49,7 @@ class UserInput:
 
         :return dict:  Sanitised form input
         """
+        from common.lib.helpers import convert_to_int
         parsed_input = {}
 
         # all parameters are submitted as option-[parameter ID], this is an 
@@ -56,6 +58,11 @@ class UserInput:
         input = {re.sub(r"^option-", "", field): input[field] for field in input}
 
         for option, settings in options.items():
+            if settings.get("indirect"):
+                # these are settings that are derived from and set by other
+                # settings
+                continue
+
             if settings.get("type") in (UserInput.OPTION_DIVIDER, UserInput.OPTION_INFO):
                 # these are structural form elements and never have a value
                 continue
@@ -93,6 +100,18 @@ class UserInput:
                 else:
                     # Toggle was left blank
                     parsed_input[option] = False
+
+            elif settings.get("type") == UserInput.OPTION_DATASOURCES:
+                # special case, because this combines multiple inputs to
+                # configure data source availability and expiration
+                datasources = {datasource: {
+                    "enabled": f"{option}-enable-{datasource}" in input,
+                    "allow_optout": f"{option}-optout-{datasource}" in input,
+                    "timeout": convert_to_int(input[f"{option}-timeout-{datasource}"], 0)
+                } for datasource in input[option].split(",")}
+
+                parsed_input[option] = [datasource for datasource, v in datasources.items() if v["enabled"]]
+                parsed_input[option.split(".")[0] + ".expiration"] = datasources
 
             elif option not in input:
                 # not provided? use default
@@ -137,6 +156,7 @@ class UserInput:
                 return True
             else:
                 raise QueryParametersException("Toggle invalid input")
+
         elif input_type in (UserInput.OPTION_DATE, UserInput.OPTION_DATERANGE):
             # parse either integers (unix timestamps) or try to guess the date
             # format (the latter may be used for input if JavaScript is turned
@@ -181,13 +201,13 @@ class UserInput:
                 return choice
 
         elif input_type == UserInput.OPTION_TEXT_JSON:
-            # needs to be parsed as JSON
+            # verify that this is actually json
             try:
                 redumped_value = json.dumps(json.loads(choice))
             except json.JSONDecodeError:
                 raise QueryParametersException("Invalid JSON value '%s'" % choice)
 
-            return redumped_value
+            return json.loads(choice)
 
         elif input_type in (UserInput.OPTION_TEXT, UserInput.OPTION_TEXT_LARGE, UserInput.OPTION_HUE):
             # text string

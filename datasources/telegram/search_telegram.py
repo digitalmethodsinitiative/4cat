@@ -2,7 +2,6 @@
 Search Telegram via API
 """
 import traceback
-import binascii
 import datetime
 import hashlib
 import asyncio
@@ -12,10 +11,11 @@ import re
 
 from pathlib import Path
 
-from backend.abstract.search import Search
+from backend.lib.search import Search
 from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException, ProcessorException, \
     QueryNeedsFurtherInputException
 from common.lib.helpers import convert_to_int, UserInput
+from common.config_manager import config
 
 from datetime import datetime
 from telethon import TelegramClient
@@ -25,7 +25,6 @@ from telethon.tl.functions.channels import GetFullChannelRequest
 from telethon.tl.functions.users import GetFullUserRequest
 from telethon.tl.types import User
 
-import common.config_manager as config
 
 
 class SearchTelegram(Search):
@@ -127,6 +126,15 @@ class SearchTelegram(Search):
             "type": UserInput.OPTION_TOGGLE,
             "help": "Resolve references",
             "default": False,
+        }
+    }
+
+    config = {
+        "telegram-search.can_query_all_messages": {
+            "type": UserInput.OPTION_TOGGLE,
+            "help": "Remove message amount limit",
+            "default": False,
+            "tooltip": "Allows users to query unlimited messages from Telegram. This can lead to HUGE datasets!"
         }
     }
 
@@ -704,7 +712,7 @@ class SearchTelegram(Search):
         if not query.get("api_id", None) or not query.get("api_hash", None) or not query.get("api_phone", None):
             raise QueryParametersException("You need to provide valid Telegram API credentials first.")
 
-        privileged = user.get_value("telegram.can_query_all_messages", False)
+        privileged = config.get("telegram-search.can_query_all_messages", False, user=user)
 
         # reformat queries to be a comma-separated list with no wrapping
         # whitespace
@@ -852,7 +860,7 @@ class SearchTelegram(Search):
         """
         options = cls.options.copy()
 
-        if user and user.get_value("telegram.can_query_all_messages", False):
+        if user and config.get("telegram-search.can_query_all_messages", False, user=user):
             if "max" in options["max_posts"]:
                 del options["max_posts"]["max"]
 

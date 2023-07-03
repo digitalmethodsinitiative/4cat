@@ -13,12 +13,11 @@ import re
 from requests_futures.sessions import FuturesSession
 from bs4 import BeautifulSoup
 
-import common.config_manager as config
-from backend.abstract.search import Search
+from backend.lib.search import Search
 from common.lib.helpers import UserInput
-from common.lib.exceptions import WorkerInterruptedException, QueryParametersException, ProcessorInterruptedException, ProcessorException
+from common.lib.exceptions import WorkerInterruptedException, QueryParametersException, ProcessorException
 from datasources.tiktok.search_tiktok import SearchTikTok as SearchTikTokByImport
-
+from common.config_manager import config
 
 class SearchTikTokByID(Search):
     """
@@ -36,15 +35,15 @@ class SearchTikTokByID(Search):
     accepts = [None]
 
     config = {
-        "tiktok-urls.proxies": {
+        "tiktok-urls-search.proxies": {
             "type": UserInput.OPTION_TEXT_JSON,
             "default": [],
             "help": "Proxies for TikTok data collection"
         },
-        "tiktok-urls.proxies.wait": {
+        "tiktok-urls-search.proxies.wait": {
             "type": UserInput.OPTION_TEXT,
             "coerce_type": float,
-            "default": 1,
+            "default": 1.0,
             "help": "Request wait",
             "tooltip": "Time to wait before sending a new request from the same IP"
         }
@@ -144,7 +143,7 @@ class TikTokScraper:
     last_time_proxy_available = None
     no_available_proxy_timeout = 600
 
-    def __init__(self, processor):
+    def __init__(self, processor, config):
         """
         :param Processor processor:  The processor using this function and needing updates
         """
@@ -156,8 +155,8 @@ class TikTokScraper:
 
         :return:
         """
-        all_proxies = config.get("tiktok-urls.proxies")
-        self.proxy_sleep = config.get("tiktok-urls.proxies.wait", self.proxy_sleep)
+        all_proxies = self.processor.config.get("tiktok-urls-search.proxies")
+        self.proxy_sleep = self.processor.config.get("tiktok-urls-search.proxies.wait", self.proxy_sleep)
         if not all_proxies:
             # no proxies? just request directly
             all_proxies = ["__localhost__"]

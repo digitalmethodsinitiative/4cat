@@ -9,8 +9,8 @@ import pytumblr
 from requests.exceptions import ConnectionError
 from datetime import datetime
 
-import common.config_manager as config
-from backend.abstract.search import Search
+from common.config_manager import config
+from backend.lib.search import Search
 from common.lib.helpers import UserInput
 from common.lib.exceptions import QueryParametersException, ProcessorInterruptedException, ConfigException
 
@@ -627,22 +627,17 @@ class SearchTumblr(Search):
 
 		"""
 
-		# First we check whether all API keys are set correctly
-		keys = ["api.tumblr.consumer_key", "api.tumblr.consumer_secret", "api.tumblr.key", "api.tumblr.secret_key"]
-		missing_keys = []
-		valid_keys = []
-		for key in keys:
-			config_key = config.get(key)
-			if not config_key:
-				raise ConfigException("Tumblr API keys incorrect")
-			valid_keys.append(config_key)
+		config_keys = [
+			self.config.get("api.tumblr.consumer_key"),
+			self.config.get("api.tumblr.consumer_secret"),
+			self.config.get("api.tumblr.key"),
+			self.config.get("api.tumblr.secret_key")]
 
-		self.client = pytumblr.TumblrRestClient(
-			valid_keys[0],
-			valid_keys[1],
-			valid_keys[2],
-			valid_keys[3]
-		)
+		if not all(config_keys):
+			raise ConfigException("Not all Tumblr API credentials are configured. Cannot query Tumblr API.")
+
+		self.client = pytumblr.TumblrRestClient(*config_keys)
+
 		client_info = self.client.info()
 
 		# Check if there's any errors

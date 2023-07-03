@@ -4,8 +4,7 @@ Generate network of wikipedia pages + categories in posts
 import re
 import requests
 
-from backend.abstract.processor import BasicProcessor
-from common.lib.helpers import UserInput
+from backend.lib.processor import BasicProcessor
 from lxml import etree
 from lxml.cssselect import CSSSelector as css
 from io import StringIO

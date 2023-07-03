@@ -4,12 +4,10 @@ Extract most-used images from corpus
 import hashlib
 import base64
 import re
-import common.config_manager as config
-import csv
-import shutil
 
+from common.config_manager import config
 from collections import Counter, OrderedDict
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorException
 from common.lib.helpers import UserInput
 
@@ -36,10 +34,10 @@ class TopImageCounter(BasicProcessor):
         """
         All top-level datasets, excluding Telegram, which has a different image logic
 
-        :param module: Dataset or processor to determine compatibility with
+        :param module: Module to determine compatibility with
         """
 
-        if module.is_dataset() and module.is_top_dataset() and module.type != "telegram-search":
+        if module.is_top_dataset() and module.type != "telegram-search":
             return True
         else:
             return False

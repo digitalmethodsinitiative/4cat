@@ -1,21 +1,15 @@
 """
 Request tags and labels from the Google Vision API for a given set of images
 """
-import itertools
-import requests
-import base64
 import json
 import csv
-
-from pathlib import Path
 
 from clarifai_grpc.grpc.api import service_pb2, resources_pb2, service_pb2_grpc
 from clarifai_grpc.grpc.api.status import status_code_pb2
 from clarifai_grpc.channel.clarifai_channel import ClarifaiChannel
 
 from common.lib.helpers import UserInput, convert_to_int
-from backend.abstract.processor import BasicProcessor
-from common.lib.exceptions import ProcessorInterruptedException
+from backend.lib.processor import BasicProcessor
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -50,7 +44,7 @@ class ClarifaiAPIFetcher(BasicProcessor):
         """
         Allow processor on image sets
 
-        :param module: Dataset or processor to determine compatibility with
+        :param module: Module to determine compatibility with
         """
         return module.type.startswith("image-downloader")
 

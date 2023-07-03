@@ -13,7 +13,7 @@ class ThreadScraper8chan(ThreadScraper4chan):
 	8chan's API is compatible with 4chan's, so we extend the 4chan thread scraper to
 	work with the 8chan API instead
 	"""
-	type = "8chan-thread"
+	type = "eightchan-thread"
 	max_workers = 4
 
 	# for new posts, any fields not in here will be saved in the "unsorted_data" column for that post as part of a

@@ -1,9 +1,7 @@
 """
 Generate bipartite user-hashtag graph of posts
 """
-import csv
-
-from backend.abstract.preset import ProcessorPreset
+from backend.lib.preset import ProcessorPreset
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -26,15 +24,11 @@ class HashtagUserBipartiteGrapherPreset(ProcessorPreset):
         """
         Allow processor on datasets containing a tags column
 
-        :param module: Dataset or processor to determine compatibility with
+        :param module: Module to determine compatibility with
         """
         usable_columns = {"tags", "hashtags", "groups"}
-
-        if module.is_dataset():
-            columns = module.get_columns()
-            return bool(set(columns) & usable_columns) if columns else False
-        else:
-            return False
+        columns = module.get_columns()
+        return bool(set(columns) & usable_columns) if columns else False
 
     def get_processor_pipeline(self):
         """

@@ -4,7 +4,7 @@ Filter posts by a given column
 import re
 import datetime
 
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 from processors.filtering.base_filter import BaseFilter
 from common.lib.helpers import UserInput, convert_to_int
 
@@ -77,7 +77,7 @@ class ColumnFilter(BaseFilter):
         """
         Allow processor on top datasets.
 
-        :param module: Dataset or processor to determine compatibility with
+        :param module: Module to determine compatibility with
         """
         return module.is_top_dataset()
 

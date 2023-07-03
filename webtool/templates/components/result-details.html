@@ -1,20 +1,20 @@
 <article class="result" data-dataset-key="{{ dataset.key }}">
     <section class="result-tree">
         <div class="card query{% if not dataset.is_finished() %} unfinished{% endif %}">
-            <h2 class="blocktitle{% if current_user.is_authenticated and (current_user.is_admin or current_user.get_id() == dataset.owner) %} editable{% endif %}">
+            <h2 class="blocktitle{% if current_user.is_authenticated and (current_user.is_admin or dataset.is_accessible_by(current_user, "owner")) %} editable{% endif %}">
                 <span><a href="{{ url_for('show_results', key=dataset.key) }}">{{ dataset.get_label() }}</a></span>
             </h2>
             <nav class="dataset-toolbox" aria-label="Actions for dataset">
                 <ul>
-                    {% if current_user.is_authenticated %}
-                    <li><a href="{{ url_for('toggle_favourite_interactive', key=dataset.key) }}"
+                    {% if current_user.is_authenticated and dataset.is_accessible_by(current_user) %}
+                    <li><a href="{{ url_for("toggle_favourite", key=dataset.key) }}?redirect"
                            class="toggle-favourites"><i class="fa{% if is_favourite %}r{% else %}s{% endif %} fa-star"
                                                         aria-hidden="true"></i> {% if is_favourite %}Delete
                         from{% else %}
                         Add to{% endif %} favourites</a></li>
                     {% endif %}
-                    {% if current_user.is_authenticated and (current_user.is_admin or current_user.get_id() == dataset.owner) %}
-                        <li><a href="{{ url_for('toggle_private_interactive', key=dataset.key) }}"
+                    {% if current_user.is_authenticated and (current_user.is_admin or dataset.is_accessible_by(current_user, "owner")) %}
+                        <li><a href="{{ url_for('toggle_private', key=dataset.key) }}?redirect"
                                class="toggle-private"><i
                                 class="fas fa-lock{% if dataset.is_private %}-open{% endif %}" aria-hidden="true"></i>
                             {% if dataset.is_private %}Make public{% else %}Make private{% endif %}</a></li>
@@ -22,18 +22,14 @@
                     <li><a href="{{ url_for('show_result', key=dataset.key) }}"><i class="fas fa-link"
                                                                                    aria-hidden="true"></i> Permalink</a>
                     </li>
-                    {% if current_user.get_id() == dataset.owner or current_user.is_admin %}
-                        <li><a href="{{ url_for('delete_dataset_interactive', key=dataset.key) }}" class="confirm-first"
+                    {% if current_user.is_authenticated and (current_user.is_admin or dataset.is_accessible_by(current_user, "owner")) %}
+                        <li><a href="{{ url_for('delete_dataset', key=dataset.key) }}?redirect" class="confirm-first"
                                data-confirm-action="delete this dataset"><i class="fas fa-trash-alt"
                                                                             aria-hidden="true"></i>
                             Delete dataset</a></li>
-                        <li><a href="{{ url_for('restart_dataset', key=dataset.key) }}" class="confirm-first"
-                               data-confirm-method="POST"
-                               data-confirm-action="delete all results for this dataset, including processor results, and re-run the query"><i
-                                class="fas fa-sync-alt" aria-hidden="true"></i> Re-run dataset</a></li>
                     {% endif %}
                     {% if current_user.is_admin and not dataset.is_finished() %}
-                        <li><a href="{{ url_for('nuke_dataset_interactive', key=dataset.key) }}" class="prompt-first"
+                        <li><a href="{{ url_for('nuke_dataset', key=dataset.key) }}?redirect" class="prompt-first"
                                data-confirm-method="POST" data-confirm-var="reason"
                                data-confirm-action="cancel this dataset? You can provide a reason that will be displayed to the user"><i
                                 class="fas fa-radiation" aria-hidden="true"></i> Cancel dataset</a></li>
@@ -77,28 +73,43 @@
                         </dd>
                     </div>
 
-                    <div class="fullwidth">
+                    <div class="onequarter">
                         <dt>Created</dt>
                         <dd>
                             {{ dataset.timestamp|datetime(fmt="%d %B %Y, %H:%M")|safe }}
-                            {% if current_user.is_authenticated and current_user.is_admin and dataset.owner %}
-                                by
-                                <a href="{{ url_for("manipulate_user", mode="edit") }}?name={{ dataset.owner }}">{{ dataset.owner }}</a>
+                        </dd>
+                    </div>
+
+                    <div class="threequarters dataset-owner-list">
+                        <dt>Dataset access</dt>
+                        <dd>
+                            <ul>
+                            {% for owner in dataset.get_owners("owner") %}
+                                {% set role = "owner" %}
+                                {% include "components/dataset-owner.html" %}
+                            {% endfor %}
+                            {% for owner in dataset.get_owners("viewer") %}
+                                {% set role = "viewer" %}
+                                {% include "components/dataset-owner.html" %}
+                            {% endfor %}
+                            </ul>
+                            {% if dataset.is_accessible_by(current_user, "owner") %}
+                                <a class="button-like-small" id="add-dataset-owner" href="{{ url_for("add_dataset_owner") }}"><i class="fa fa-user-plus" aria-hidden="true"></i> Share</a>
                             {% endif %}
                         </dd>
                     </div>
 
                     <div class="fullwidth">
                         <dt>Parameters</dt>
-                        <dd>{% include 'result-metadata.html' %}</dd>
+                        <dd>{% include 'components/result-metadata.html' %}</dd>
                     </div>
 
-                    {% if has_credentials and current_user.is_authenticated and (current_user.is_admin or dataset.owner == current_user.get_id()) %}
+                    {% if has_credentials and current_user.is_authenticated and (current_user.is_admin or dataset.is_accessible_by(current_user, "owner")) %}
                     <div class="fullwidth">
                       <dt>API Credentials</dt>
                       <dd>
                         {% for credential in has_credentials %}<span class="property-badge">{{ credential }}</span> {% endfor %}
-                        (<a href="{{ url_for("erase_credentials_interactive", key=dataset.key) }}">erase</a>)
+                        (<a href="{{ url_for("erase_credentials", key=dataset.key) }}?redirect">erase</a>)
                       </dd>
                     </div>
                     {% endif %}
@@ -123,12 +134,15 @@
                     <div class="fullwidth" id="dataset-result">
                         <dt>Result</dt>
                         <dd data-key="{{ dataset.key }}" class="{% if not dataset.is_finished() %}dataset-unfinished{% endif %}">
-                            {% include "result-result-row.html" %}
+                            {% include "components/result-result-row.html" %}
                         </dd>
                     </div>
                 </dl>
             </div>
         </div>
+
+        <p role="tooltip" class="multiple" id="tooltip-owner" aria-hidden="true">Dataset owner; full access</p>
+        <p role="tooltip" class="multiple" id="tooltip-viewer" aria-hidden="true">Viewer</p>
     </section>
 
     <section class="analysis-gallery">
@@ -138,12 +152,12 @@
         </h3>
         <ol class="child-list top-level">
             {% for child in dataset.children %}
-                {% include "result-child.html" %}
+                {% include "components/result-child.html" %}
             {% endfor %}
         </ol>
     </section>
 
-    {% if dataset.num_rows > 0 and dataset.get_available_processors()|length > 0 and current_user.is_authenticated %}
+    {% if current_user.is_authenticated and __user_config("privileges.can_run_processors") and dataset.num_rows > 0 and dataset.get_available_processors()|length > 0 and dataset.is_accessible_by(current_user, role="owner") %}
         <section class="analysis-gallery available-processors">
 
             <h3 class="blocktitle section-subheader">
@@ -164,7 +178,7 @@
                     <ol class="processor-list child-list">
                 {% endif %}
                 {% set git_url = dataset.get_version_url("backend/processors/" + processor.filepath) %}
-                {% include "processor-details.html" %}
+                {% include "components/processor-details.html" %}
             {% endfor %}
         </section>
     {% endif %}

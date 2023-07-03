@@ -10,7 +10,7 @@ import requests
 from ural import urls_from_text
 
 from common.lib.exceptions import ProcessorInterruptedException
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 from common.lib.helpers import UserInput
 
 __author__ = "Dale Wahl"
@@ -194,7 +194,7 @@ class ExtractURLs(BasicProcessor):
         """
         All processor on CSV and NDJSON datasets
         """
-        return module.is_dataset() and module.get_extension() in ["csv", "ndjson"]
+        return module.get_extension() in ["csv", "ndjson"]
 
     @classmethod
     def get_options(cls, parent_dataset=None, user=None):

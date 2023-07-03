@@ -12,11 +12,11 @@ import zipfile
 from videohash import VideoHash
 from videohash.exceptions import FFmpegNotFound
 
-from backend.abstract.processor import BasicProcessor
-from backend.abstract.preset import ProcessorPreset
+from backend.lib.processor import BasicProcessor
+from backend.lib.preset import ProcessorPreset
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.user_input import UserInput
-import common.config_manager as config
+from common.config_manager import config
 
 __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl"]
@@ -46,8 +46,8 @@ class VideoHasherPreset(ProcessorPreset):
         :return bool:
         """
         return module.type.startswith("video-downloader") and \
-               config.get("video_downloader.ffmpeg-path") and \
-               shutil.which(config.get("video_downloader.ffmpeg-path"))
+               config.get("video-downloader.ffmpeg_path") and \
+               shutil.which(config.get("video-downloader.ffmpeg_path"))
 
     def get_processor_pipeline(self):
         """

@@ -5,7 +5,7 @@ import json
 import pickle
 import itertools
 
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -28,7 +28,7 @@ class Vectorise(BasicProcessor):
 		"""
 		Allow processor on token sets
 
-		:param module: Dataset or processor to determine compatibility with
+		:param module: Module to determine compatibility with
 		"""
 		return module.type == "tokenise-posts"
 

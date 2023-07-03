@@ -5,10 +5,10 @@ import json
 import csv
 import re
 
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 from common.lib.helpers import UserInput, get_interval_descriptor
+from common.config_manager import config
 
-import common.config_manager as config
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
 __maintainer__ = "Stijn Peeters"
@@ -39,11 +39,9 @@ class OvertimeHatefulAnalysis(BasicProcessor):
 
 		Don't quite remember why these three...
 
-		:param module: Dataset or processor to determine compatibility with
+		:param module: Module to determine compatibility with
 		"""
-		if module.is_dataset():
-			return module.parameters.get("datasource") in ("telegram", "instagram", "reddit")
-		return False
+		return module.parameters.get("datasource") in ("telegram", "instagram", "reddit")
 
 	# the following determines the options available to the user via the 4CAT
 	# interface.

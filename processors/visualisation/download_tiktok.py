@@ -10,11 +10,11 @@ from PIL import Image, UnidentifiedImageError
 from urllib.parse import urlparse, parse_qs
 import requests
 
-import common.config_manager as config
+from common.config_manager import config
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.user_input import UserInput
 from datasources.tiktok_urls.search_tiktok_urls import TikTokScraper
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 
 
 __author__ = "Dale Wahl"
@@ -59,9 +59,9 @@ class TikTokVideoDownloader(BasicProcessor):
         options = cls.options
 
         # Update the amount max and help from config
-        max_number_videos = int(config.get('video_downloader.MAX_NUMBER_VIDEOS', 1000))
+        max_number_videos = int(config.get('video-downloader.max', 1000, user=user))
         options['amount']['max'] = max_number_videos
-        options['amount']['help'] = "No. of images (max %s)" % max_number_videos
+        options['amount']['help'] = f"No. of images (max {max_number_videos:,})"
 
         return options
 
@@ -96,7 +96,7 @@ class TikTokVideoDownloader(BasicProcessor):
         for original_item, mapped_item in self.source_dataset.iterate_mapped_items(self):
             video_ids_to_download.append(mapped_item.get("id"))
 
-        tiktok_scraper = TikTokScraper(processor=self)
+        tiktok_scraper = TikTokScraper(processor=self, config=self.config)
         loop = asyncio.new_event_loop()
         results = loop.run_until_complete(tiktok_scraper.download_videos(video_ids_to_download, results_path, max_amount))
 
@@ -172,7 +172,7 @@ class TikTokImageDownloader(BasicProcessor):
         options = cls.options
 
         # Update the amount max and help from config
-        max_number_images = int(config.get('image_downloader.MAX_NUMBER_IMAGES', 1000))
+        max_number_images = int(config.get('image-downloader.max', 1000))
         options['amount']['max'] = max_number_images
         options['amount']['help'] = "No. of images (max %s)" % max_number_images
 
@@ -278,7 +278,7 @@ class TikTokImageDownloader(BasicProcessor):
 
         if downloaded_media < max_amount and urls_to_refresh:
             # Refresh and collect more images
-            tiktok_scraper = TikTokScraper(processor=self)
+            tiktok_scraper = TikTokScraper(processor=self, config=self.config)
             need_more = max_amount - downloaded_media
             last_url_index = 0
             while need_more > 0:

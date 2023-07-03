@@ -10,7 +10,7 @@
     {% if processors[processor].further %}
         <ul>
         {% for processor in processors[processor].further %}
-            {% include "processor-tree.html" %}
+            {% include "components/processor-tree.html" %}
         {% endfor %}
         </ul>
     {% endif %}

@@ -4,7 +4,7 @@ Generate multiple area graphs and project them isometrically
 import csv
 import re
 
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 from common.lib.helpers import UserInput, convert_to_int, pad_interval, get_4cat_canvas
 
 from calendar import month_abbr

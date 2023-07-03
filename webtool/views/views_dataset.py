@@ -13,15 +13,18 @@ from flask import render_template, request, redirect, send_from_directory, flash
     url_for, stream_with_context
 from flask_login import login_required, current_user
 
-from webtool import app, db, log
+from webtool import app, db, log, config
 from webtool.lib.helpers import Pagination, error
 from webtool.views.api_tool import delete_dataset, toggle_favourite, toggle_private, queue_processor, nuke_dataset, \
     erase_credentials
 
-import common.config_manager as config
 import backend
 from common.lib.dataset import DataSet
 from common.lib.queue import JobQueue
+from common.lib.user import User
+
+from common.config_manager import ConfigWrapper
+config = ConfigWrapper(config, user=current_user)
 
 csv.field_size_limit(1024 * 1024 * 1024)
 
@@ -68,15 +71,16 @@ def show_results(page):
     # 'all' is limited to admins
     depth = request.args.get("depth", "own")
     available_depths = ["own", "favourites"]
-    if current_user.is_admin:
+    if config.get("privileges.can_view_all_datasets"):
         available_depths.append("all")
 
     if depth not in available_depths:
         depth = "own"
 
+    owner_match = tuple([current_user.get_id(), *[f"tag:{t}" for t in current_user.tags]])
     if depth == "own":
-        where.append("owner = %s")
-        replacements.append(current_user.get_id())
+        where.append("key IN ( SELECT key FROM datasets_owners WHERE name IN %s AND key = datasets.key)")
+        replacements.append(owner_match)
 
     if depth == "favourites":
         where.append("key IN ( SELECT key FROM users_favourites WHERE name = %s )")
@@ -90,25 +94,24 @@ def show_results(page):
         replacements.append("%" + filters["filter"] + "%")
 
     # hide private datasets for non-owners and non-admins
-    if not current_user.is_admin:
-        where.append("(is_private = FALSE OR owner = %s)")
-        replacements.append(current_user.get_id())
+    if not config.get("privileges.can_view_private_datasets"):
+        where.append("(is_private = FALSE OR key IN ( SELECT key FROM datasets_owners WHERE name IN %s AND key = datasets.key))")
+        replacements.append(owner_match)
 
     # empty datasets could just have no results, or be failures. we make no
     # distinction here
     if filters["hide_empty"]:
         where.append("num_rows > 0")
 
-    # the user filter is only exposed to admins, and otherwise emulates the
-    # 'own' option
+    # the user filter is only exposed to admins
     if filters["user"]:
-        if (current_user.is_admin or current_user.get_id() == filters["user"]):
-            where.append("owner = %s")
-            replacements.append(filters["user"])
+        if config.get("privileges.can_view_all_datasets"):
+            target_user = User.get_by_name(db, filters["user"])
+            tags = [] if target_user is None else target_user.tags
+            where.append("key IN ( SELECT key FROM datasets_owners WHERE name IN %s AND key = datasets.key)")
+            replacements.append(owner_match)
         else:
-            where.append("(owner = %s AND (owner = %s OR is_private = FALSE))")
-            replacements.append(filters["user"])
-            replacements.append(current_user.get_id())
+            return error(403, error="You cannot use this filter.")
 
     # not all datasets have a datsource defined, but that is fine, since if
     # we are looking for all datasources the query just excludes this part
@@ -124,9 +127,9 @@ def show_results(page):
     # then get the current page of results
     replacements.append(page_size)
     replacements.append(offset)
-    datasets = db.fetchall(
-        "SELECT key FROM datasets WHERE " + where + " ORDER BY " + filters["sort_by"] + " DESC LIMIT %s OFFSET %s",
-        tuple(replacements))
+    query = "SELECT key FROM datasets WHERE " + where + " ORDER BY " + filters["sort_by"] + " DESC LIMIT %s OFFSET %s"
+
+    datasets = db.fetchall(query, tuple(replacements))
 
     if not datasets and page != 1:
         return error(404)
@@ -135,8 +138,14 @@ def show_results(page):
     pagination = Pagination(page, page_size, num_datasets)
     filtered = []
 
+    expiring_datasets = set()
     for dataset in datasets:
-        filtered.append(DataSet(key=dataset["key"], db=db))
+        dataset = DataSet(key=dataset["key"], db=db)
+        datasource = dataset.parameters.get("datasource", "")
+        if dataset.parameters.get("expires-after") or config.get("datasources.expiration", {}).get(datasource, {}).get("timeout"):
+            expiring_datasets.add(dataset.key)
+
+        filtered.append(dataset)
 
     favourites = [row["key"] for row in
                   db.fetchall("SELECT key FROM users_favourites WHERE name = %s", (current_user.get_id(),))]
@@ -145,7 +154,7 @@ def show_results(page):
                    metadata["has_worker"] and metadata["has_options"]}
 
     return render_template("results.html", filter=filters, depth=depth, datasources=datasources,
-                           datasets=filtered, pagination=pagination, favourites=favourites)
+                           datasets=filtered, pagination=pagination, favourites=favourites, expiring=expiring_datasets)
 
 
 """
@@ -181,7 +190,7 @@ def get_mapped_result(key):
     except TypeError:
         return error(404, error="Dataset not found.")
 
-    if dataset.is_private and not (current_user.is_admin or dataset.owner == current_user.get_id()):
+    if dataset.is_private and not (config.get("privileges.can_view_private_datasets") or dataset.is_accessible_by(current_user)):
         return error(403, error="This dataset is private.")
 
     if dataset.get_extension() == ".csv":
@@ -232,7 +241,7 @@ def view_log(key):
     except TypeError:
         return error(404, error="Dataset not found.")
 
-    if dataset.is_private and not (current_user.is_admin or dataset.owner == current_user.get_id()):
+    if dataset.is_private and not (config.get("privileges.can_view_private_datasets") or dataset.is_accessible_by(current_user)):
         return error(403, error="This dataset is private.")
 
     logfile = dataset.get_log_path()
@@ -261,7 +270,7 @@ def preview_items(key):
     except TypeError:
         return error(404, error="Dataset not found.")
 
-    if dataset.is_private and not (current_user.is_admin or dataset.owner == current_user.get_id()):
+    if dataset.is_private and not (config.get("privileges.can_view_private_datasets") or dataset.is_accessible_by(current_user)):
         return error(403, error="This dataset is private.")
 
     preview_size = 1000
@@ -331,20 +340,18 @@ def show_result(key):
         url = "/results/%s/#nav=%s" % (genealogy[0].key, nav)
         return redirect(url)
 
-    # load list of processors compatible with this dataset
     is_processor_running = False
-
     is_favourite = (db.fetchone("SELECT COUNT(*) AS num FROM users_favourites WHERE name = %s AND key = %s",
                                 (current_user.get_id(), dataset.key))["num"] > 0)
 
     # if the datasource is configured for it, this dataset may be deleted at some point
     datasource = dataset.parameters.get("datasource", "")
     datasources = backend.all_modules.datasources
-    datasource_expiration = config.get("expire.datasources", {}).get(datasource, {})
+    datasource_expiration = config.get("datasources.expiration", {}).get(datasource, {})
     expires_datasource = False
     can_unexpire = ((config.get('expire.allow_optout') and  \
                            datasource_expiration.get("allow_optout", True)) or datasource_expiration.get("allow_optout", False)) \
-                   and (current_user.is_admin or dataset.owner == current_user.get_id())
+                   and (current_user.is_admin or dataset.is_accessible_by(current_user, "owner"))
 
     if datasource_expiration and datasource_expiration.get("timeout"):
         timestamp_expires = dataset.timestamp + int(datasource_expiration.get("timeout"))
@@ -363,7 +370,7 @@ def show_result(key):
     # we can either show this view as a separate page or as a bunch of html
     # to be retrieved via XHR
     standalone = "processors" not in request.url
-    template = "result.html" if standalone else "result-details.html"
+    template = "result.html" if standalone else "components/result-details.html"
 
     return render_template(template, dataset=dataset, parent_key=dataset.key, processors=backend.all_modules.processors,
                            is_processor_running=is_processor_running, messages=get_flashed_messages(),
@@ -445,44 +452,6 @@ def toggle_private_interactive(key):
     else:
         return render_template("error.html", message="Error while toggling private status for dataset %s." % key)
 
-
-@app.route("/results/<string:key>/restart/")
-@login_required
-def restart_dataset(key):
-    """
-    Run a dataset's query again
-
-    Deletes all underlying datasets, marks dataset as unfinished, and queues a
-    job for it.
-
-    :param str key:  Dataset key
-    :return:
-    """
-    try:
-        dataset = DataSet(key=key, db=db)
-    except TypeError:
-        return error(404, message="Dataset not found.")
-
-    if dataset.is_private and not (current_user.is_admin or dataset.owner == current_user.get_id()):
-        return error(403, error="This dataset is private.")
-
-    if current_user.get_id() != dataset.owner and not current_user.is_admin:
-        return error(403, message="Not allowed.")
-
-    if not dataset.is_finished():
-        return render_template("error.html", message="This dataset is not finished yet - you cannot re-run it.")
-
-    for child in dataset.children:
-        child.delete()
-
-    dataset.unfinish()
-    queue = JobQueue(logger=log, database=db)
-    queue.add_job(jobtype=dataset.type, remote_id=dataset.key)
-
-    flash("Dataset queued for re-running.")
-    return redirect("/results/" + dataset.key + "/")
-
-
 @app.route("/results/<string:key>/keep/", methods=["GET"])
 @login_required
 def keep_dataset(key):
@@ -495,12 +464,16 @@ def keep_dataset(key):
         return render_template("error.html", title="Dataset cannot be kept",
                                message="All datasets are scheduled for automatic deletion. This cannot be "
                                        "overridden."), 403
+
+    if not current_user.can_access_dataset(dataset, role="owner"):
+        return error(403, message="You cannot cancel deletion for this dataset.")
+
     if not dataset.key_parent:
         # top-level dataset
         # check if data source forces expiration - in that case, the user
         # cannot reset this
         datasource = dataset.parameters.get("datasource")
-        datasource_expiration = config.get("expire.datasources", {}).get(datasource, {})
+        datasource_expiration = config.get("datasources.expiration", {}).get(datasource, {})
         if (datasource_expiration and not datasource_expiration.get("allow_optout")) or not config.get("expire.allow_optout"):
             return render_template("error.html", title="Dataset cannot be kept",
                                    message="All datasets of this data source (%s) are scheduled for automatic "
@@ -509,106 +482,3 @@ def keep_dataset(key):
     dataset.delete_parameter("expires-after")
     flash("Dataset expiration data removed. The dataset will no longer be deleted automatically.")
     return redirect(url_for("show_result", key=key))
-
-
-@app.route("/results/<string:key>/nuke/", methods=["GET", "DELETE", "POST"])
-@login_required
-def nuke_dataset_interactive(key):
-    """
-    Nuke dataset
-
-    Uses code from corresponding API endpoint, but redirects to a normal page
-    rather than returning JSON as the API does, so this can be used for
-    'normal' links.
-
-    :param str key:  Dataset key
-    :return:
-    """
-    try:
-        dataset = DataSet(key=key, db=db)
-    except TypeError:
-        return error(404, message="Dataset not found.")
-
-    if not current_user.can_access_dataset(dataset):
-        return error(403, error="This dataset is private.")
-
-    top_key = dataset.top_parent().key
-    reason = request.form.get("reason", "")
-
-    success = nuke_dataset(key, reason)
-
-    if not success.is_json:
-        return success
-    else:
-        # If it's a child processor, refresh the page.
-        # Else go to the results overview page.
-        return redirect(url_for('show_result', key=top_key))
-
-
-@app.route("/results/<string:key>/delete/", methods=["GET", "DELETE", "POST"])
-@login_required
-def delete_dataset_interactive(key):
-    """
-    Delete dataset
-
-    Uses code from corresponding API endpoint, but redirects to a normal page
-    rather than returning JSON as the API does, so this can be used for
-    'normal' links.
-
-    :param str key:  Dataset key
-    :return:
-    """
-    try:
-        dataset = DataSet(key=key, db=db)
-    except TypeError:
-        return error(404, message="Dataset not found.")
-
-    if not current_user.can_access_dataset(dataset):
-        return error(403, error="This dataset is private.")
-
-    top_key = dataset.top_parent().key
-
-    success = delete_dataset(key)
-
-    if not success.is_json:
-        return success
-    else:
-        # If it's a child processor, refresh the page.
-        # Else go to the results overview page.
-        if key == top_key:
-            return redirect(url_for('show_results'))
-        else:
-            return redirect(url_for('show_result', key=top_key))
-
-
-@app.route("/results/<string:key>/erase-credentials/", methods=["GET", "DELETE", "POST"])
-@login_required
-def erase_credentials_interactive(key):
-    """
-    Erase sensitive parameters from dataset
-
-    Removes all parameters starting with `api_`. This heuristic could be made
-    more expansive if more fine-grained control is required.
-
-    Uses code from corresponding API endpoint, but redirects to a normal page
-    rather than returning JSON as the API does, so this can be used for
-    'normal' links.
-
-    :param str key:  Dataset key
-    :return:
-    """
-    try:
-        dataset = DataSet(key=key, db=db)
-    except TypeError:
-        return error(404, error="Dataset does not exist.")
-
-    if not current_user.is_admin and not current_user.get_id() == dataset.owner:
-        return error(403, message="Not allowed")
-
-    success = erase_credentials(key)
-
-    if not success.is_json:
-        return success
-    else:
-        flash("Dataset credentials erased.")
-        return redirect(url_for('show_result', key=key))

@@ -8,9 +8,8 @@ import shutil
 import subprocess
 import shlex
 
-import common.config_manager as config
-
-from backend.abstract.processor import BasicProcessor
+from common.config_manager import config
+from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.user_input import UserInput
 
@@ -64,8 +63,8 @@ class VideoFrames(BasicProcessor):
 		Allow on tiktok-search only for dev
 		"""
 		return module.type.startswith("video-downloader") and \
-			   config.get("video_downloader.ffmpeg-path") and \
-			   shutil.which(config.get("video_downloader.ffmpeg-path"))
+			   config.get("video-downloader.ffmpeg_path") and \
+			   shutil.which(config.get("video-downloader.ffmpeg_path"))
 
 	def process(self):
 		"""
@@ -108,7 +107,7 @@ class VideoFrames(BasicProcessor):
 			video_dir.mkdir(exist_ok=True)
 
 			command = [
-				shutil.which(config.get("video_downloader.ffmpeg-path")),
+				shutil.which(self.config.get("video-downloader.ffmpeg_path")),
 				"-i", shlex.quote(str(path)),
 				"-r", str(frame_interval),
 			]

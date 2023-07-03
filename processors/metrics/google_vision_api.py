@@ -9,7 +9,7 @@ import csv
 from pathlib import Path
 
 from common.lib.helpers import UserInput, convert_to_int
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
 
 __author__ = "Stijn Peeters"
@@ -44,7 +44,7 @@ class GoogleVisionAPIFetcher(BasicProcessor):
         """
         Allow processor on image sets
 
-        :param module: Dataset or processor to determine compatibility with
+        :param module: Module to determine compatibility with
         """
         return module.type.startswith("image-downloader")
 

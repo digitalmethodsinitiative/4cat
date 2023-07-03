@@ -6,7 +6,7 @@ import csv
 import json
 
 from common.lib.helpers import UserInput, convert_to_int
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -44,7 +44,7 @@ class VectorRanker(BasicProcessor):
 		"""
 		Allow processor on token vectors
 
-		:param module: Dataset or processor to determine compatibility with
+		:param module: Module to determine compatibility with
 		"""
 		return module.type == "vectorise-tokens"
 

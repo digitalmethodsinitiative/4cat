@@ -54,4 +54,5 @@ python3 -m docker.docker_setup
 python3 4cat-daemon.py start
 
 # Tail logs and wait for SIGTERM
+sleep 1  # give the logger time to initialise
 exec tail -f -n 3 logs/backend_4cat.log & wait $!

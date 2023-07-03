@@ -1,11 +1,9 @@
 """
 Split results by thread
 """
-import zipfile
-import shutil
 import csv
 
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -32,11 +30,9 @@ class ThreadSplitter(BasicProcessor):
 		"""
 		Determine if processor is compatible with dataset
 
-		:param module: Dataset or processor to determine compatibility with
+		:param module: Module to determine compatibility with
 		"""
-		if module.is_dataset():
-			return module.parameters.get("datasource") in ("4chan", "8chan", "reddit", "breitbart")
-		return False
+		return module.parameters.get("datasource") in ("4chan", "8chan", "reddit", "breitbart")
 		
 	def process(self):
 		"""

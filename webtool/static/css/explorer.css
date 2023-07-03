@@ -4,6 +4,8 @@ See https://github.com/digitalmethodsinitiative/4cat/wiki/Exploring-and-annotati
  
  */
 
+@import url('colours.css');
+
 @font-face {
     font-family: 'Open Sans';
     src: url("../fonts/OpenSans-Regular.ttf")
@@ -26,28 +28,6 @@ See https://github.com/digitalmethodsinitiative/4cat/wiki/Exploring-and-annotati
     font-weight: bold;
     font-style: italic;
     src: url("../fonts/OpenSans-BoldItalic.ttf")
-}
-
-
-/** --------------------- *
-      Colour definitions
-  * --------------------- */
-:root {
-    --accent: #CE1B28;
-    --highlight: #FF2231;
-    --accent-alternate: #19B0A3;
-    --accent-okay: #26b018;
-    --accent-warning: #b05d13;
-    --accent-error: #ff2231;
-    --gray-dark: #DFDFDF;
-    --gray-darker: #6C6C6C;
-    --gray: #E9E9E9;
-    --gray-light: #EEE;
-    --contrast-bright: #F5F5F5;
-    --contrast-dark: #21202E;
-    --always-white: #FFF;
-    --text: #37373C;
-    --warning: var(--accent);
 }
 
 /** --------------------- *

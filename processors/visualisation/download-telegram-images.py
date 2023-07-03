@@ -9,8 +9,8 @@ from pathlib import Path
 
 from telethon import TelegramClient
 
-import common.config_manager as config
-from backend.abstract.processor import BasicProcessor
+from common.config_manager import config
+from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorInterruptedException
 from common.lib.helpers import UserInput
 from common.lib.dataset import DataSet
@@ -37,7 +37,7 @@ class TelegramImageDownloader(BasicProcessor):
     flawless = True
 
     config = {
-        'image-downloader-telegram.MAX_NUMBER_IMAGES': {
+        "image-downloader-telegram.max": {
             'type': UserInput.OPTION_TEXT,
             'default' : "1000",
             'help': 'Max images',
@@ -58,7 +58,7 @@ class TelegramImageDownloader(BasicProcessor):
         :param User user:  User that will be uploading it
         :return dict:  Option definition
         """
-        max_number_images = int(config.get('image-downloader-telegram.MAX_NUMBER_IMAGES', 1000))
+        max_number_images = int(config.get('image-downloader-telegram.max', 1000, user=user))
 
         return {
             "amount": {

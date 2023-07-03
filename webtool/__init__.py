@@ -21,16 +21,15 @@ from flask_login import LoginManager
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 
-import common.config_manager as config
+from common.config_manager import config
 from common.lib.database import Database
 from common.lib.logger import Logger
 from common.lib.queue import JobQueue
 
-from webtool.lib.user import User
+from common.lib.user import User
 from webtool.lib.helpers import generate_css_colours
 
 # initialize global objects for interacting with all the things
-database_name = config.get('DB_NAME')
 login_manager = LoginManager()
 app = Flask(__name__)
 
@@ -59,7 +58,10 @@ if config.get("USING_DOCKER"):
 else:
     log = Logger()
 
-db = Database(logger=log, dbname=database_name, appname="frontend")
+db = Database(logger=log, dbname=config.get("DB_NAME"), user=config.get("DB_USER"),
+              password=config.get("DB_PASSWORD"), host=config.get("DB_HOST"),
+              port=config.get("DB_PORT"), appname="frontend")
+config.with_db(db)
 queue = JobQueue(logger=log, database=db)
 
 # initialize openapi endpoint collector for later specification generation
@@ -94,7 +96,6 @@ import webtool.views.views_user
 
 import webtool.views.views_misc
 import webtool.views.views_dataset
-import webtool.views.views_processors
 
 import webtool.views.api_explorer
 import webtool.views.api_standalone

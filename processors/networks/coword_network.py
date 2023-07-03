@@ -2,7 +2,7 @@
 Generate co-word network of word collocations
 """
 
-from backend.abstract.preset import ProcessorPreset
+from backend.lib.preset import ProcessorPreset
 
 __author__ = "Sal Hagen"
 __credits__ = ["Sal Hagen"]
@@ -27,7 +27,7 @@ class CowordNetworker(ProcessorPreset):
         """
         Allow processor to run on collocations
 
-        :param module: Dataset or processor to determine compatibility with
+        :param module: Module to determine compatibility with
         """
         return module.type == "collocations"
 

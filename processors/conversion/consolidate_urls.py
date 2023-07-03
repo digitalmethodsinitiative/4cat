@@ -6,7 +6,7 @@ from urllib.parse import urlparse, urlunparse
 
 from processors.conversion.extract_urls import ExtractURLs
 from common.lib.exceptions import ProcessorInterruptedException
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 from common.lib.helpers import UserInput
 
 __author__ = "Dale Wahl"
@@ -242,9 +242,9 @@ class ConsolidateURLs(BasicProcessor):
         """
         This is meant to be inherited by other child classes
 
-        :param module: Dataset or processor to determine compatibility with
+        :param module: Module to determine compatibility with
         """
-        return module.is_dataset() and module.get_extension() in ["csv", "ndjson"]
+        return module.get_extension() in ["csv", "ndjson"]
 
     def process(self):
         method = self.parameters.get("method", False)

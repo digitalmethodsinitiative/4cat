@@ -3,15 +3,13 @@ Twitter APIv2 base stats class
 """
 import csv
 
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 from common.lib.exceptions import ProcessorException, ProcessorInterruptedException
 
 __author__ = "Dale Wahl"
 __credits__ = ["Dale Wahl"]
 __maintainer__ = "Dale Wahl"
 __email__ = "4cat@oilab.eu"
-
-from common.lib.user_input import UserInput
 
 
 class TwitterMentionsExport(BasicProcessor):

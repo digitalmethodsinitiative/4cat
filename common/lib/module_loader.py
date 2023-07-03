@@ -4,14 +4,11 @@ Load modules and datasources dynamically
 from pathlib import Path
 import importlib
 import inspect
-import common.config_manager as config
 import pickle
 import sys
 import re
-import os
 
-from backend.abstract.worker import BasicWorker
-from backend.abstract.processor import BasicProcessor
+from common.config_manager import config
 
 
 class ModuleCollector:
@@ -29,6 +26,7 @@ class ModuleCollector:
     """
     ignore = []
     missing_modules = {}
+    log_buffer = None
 
     PROCESSOR = 1
     WORKER = 2
@@ -44,6 +42,8 @@ class ModuleCollector:
         Datasources are loaded first so that the datasource folders may be
         scanned for workers subsequently.
         """
+        # this can be flushed later once the logger is available
+        self.log_buffer = ""
 
         self.load_datasources()
         self.load_modules()
@@ -52,14 +52,35 @@ class ModuleCollector:
         # datasources, e.g. whether they have an associated search worker
         self.expand_datasources()
 
+        # cache module-defined config options for use by the config manager
+        module_config = {}
+        for worker in self.workers.values():
+            if hasattr(worker, "config") and type(worker.config) is dict:
+                module_config.update(worker.config)
+
+        with config.get("PATH_ROOT").joinpath("config/module_config.bin").open("wb") as outfile:
+            pickle.dump(module_config, outfile)
+
+        # load from cache
+        config.load_user_settings()
+
     @staticmethod
-    def is_4cat_class(object):
+    def is_4cat_class(object, only_processors=False):
         """
-        Determine if a module member is a Search class we can use
+        Determine if a module member is a worker class we can use
         """
+        # it would be super cool to just use issubclass() here!
+        # but that requires importing the classes themselves, which leads to
+        # circular imports
+        # todo: fix this because this sucks
+        parent_classes = {"BasicWorker", "BasicProcessor", "Search", "SearchWithScope", "Search4Chan",
+                          "ProcessorPreset", "TwitterStatsBase", "BaseFilter", "TwitterAggregatedStats", "ColumnFilter"}
+        if only_processors:
+            parent_classes.remove("BasicWorker")
+
         return inspect.isclass(object) and \
-               issubclass(object, BasicWorker) and \
-               object is not BasicWorker and \
+               parent_classes & set([f.__name__ for f in object.__bases__]) and \
+               object.__name__ not in("BasicProcessor", "BasicWorker") and \
                not inspect.isabstract(object)
 
     def load_modules(self):
@@ -122,8 +143,10 @@ class ModuleCollector:
                     self.workers[component[1].type] = component[1]
                     self.workers[component[1].type].filepath = relative_path
 
-                    if issubclass(component[1], BasicProcessor):
-                        # maintain a separate cache of processors
+                    # we can't use issubclass() because for that we would need
+                    # to import BasicProcessor, which would lead to a circular
+                    # import
+                    if self.is_4cat_class(component[1], only_processors=True):
                         self.processors[component[1].type] = self.workers[component[1].type]
 
         # sort by category for more convenient display in interfaces
@@ -136,11 +159,13 @@ class ModuleCollector:
 
         # Give a heads-up if not all modules were installed properly
         if self.missing_modules:
-            print_msg = "Warning: Not all modules could be found, which might cause data sources and modules to not function.\nMissing modules:\n"
+            warning = "Warning: Not all modules could be found, which might cause data sources and modules to not " \
+                      "function.\nMissing modules:\n"
             for missing_module, processor_list in self.missing_modules.items():
-                print_msg += "\t%s (for processors %s)\n" % (missing_module, ", ".join(processor_list))
+                warning += "\t%s (for %s)\n" % (missing_module, ", ".join(processor_list))
 
-            print(print_msg, file=sys.stderr)
+            self.log_buffer = warning
+
 
         self.processors = categorised_processors
 
@@ -170,7 +195,7 @@ class ModuleCollector:
             datasource_id = datasource.DATASOURCE
 
             self.datasources[datasource_id] = {
-                "expire-datasets": config.get("expire.datasources", {}).get(datasource_id, None),
+                "expire-datasets": config.get("datasources.expiration", {}).get(datasource_id, None),
                 "path": subdirectory,
                 "name": datasource.NAME if hasattr(datasource, "NAME") else datasource_id,
                 "id": subdirectory.parts[-1],

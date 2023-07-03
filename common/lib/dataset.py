@@ -1,4 +1,5 @@
 import collections
+import itertools
 import datetime
 import hashlib
 import fnmatch
@@ -10,8 +11,8 @@ import re
 
 from pathlib import Path
 
-import common.config_manager as config
 import backend
+from common.config_manager import config
 from common.lib.job import Job, JobNotFoundException
 from common.lib.helpers import get_software_version, NullAwareTextIOWrapper
 from common.lib.fourcat_module import FourcatModule
@@ -40,6 +41,9 @@ class DataSet(FourcatModule):
 	genealogy = []
 	preset_parent = None
 	parameters = {}
+
+	owners = None
+	tagged_owners = None
 
 	db = None
 	folder = None
@@ -104,9 +108,9 @@ class DataSet(FourcatModule):
 			self.data = {
 				"key": self.key,
 				"query": self.get_label(parameters, default=type),
-				"owner": owner,
 				"parameters": json.dumps(parameters),
 				"result_file": "",
+				"creator": owner,
 				"status": "",
 				"type": type,
 				"timestamp": int(time.time()),
@@ -121,6 +125,8 @@ class DataSet(FourcatModule):
 			self.parameters = parameters
 
 			self.db.insert("datasets", data=self.data)
+			self.refresh_owners()
+			self.add_owner(owner)
 
 			# Find desired extension from processor if not explicitly set
 			if extension is None:
@@ -138,6 +144,8 @@ class DataSet(FourcatModule):
 		analyses = self.db.fetchall("SELECT * FROM datasets WHERE key_parent = %s ORDER BY timestamp ASC", (self.key,))
 		self.children = sorted([DataSet(data=analysis, db=self.db) for analysis in analyses],
 							   key=lambda dataset: dataset.is_finished(), reverse=True)
+
+		self.refresh_owners()
 
 	def check_dataset_finished(self):
 		"""
@@ -582,6 +590,148 @@ class DataSet(FourcatModule):
 			except (TypeError, ValueError):
 				return False
 
+	def is_accessible_by(self, username, role="owner"):
+		"""
+		Check if dataset has given user as owner
+
+		:param str|User username: Username to check for
+		:return bool:
+		"""
+		if type(username) is not str:
+			if hasattr(username, "get_id"):
+				username = username.get_id()
+			else:
+				raise TypeError("User must be a str or User object")
+
+		# 'normal' owners
+		if username in [owner for owner, meta in self.owners.items() if (role is None or meta["role"] == role)]:
+			return True
+
+		# owners that are owner by being part of a tag
+		if username in itertools.chain(*[tagged_owners for tag, tagged_owners in self.tagged_owners.items() if (role is None or self.owners[f"tag:{tag}"]["role"] == role)]):
+			return True
+
+		return False
+
+	def get_owners_users(self, role="owner"):
+		"""
+		Get list of dataset owners
+
+		This returns a list of *users* that are considered owners. Tags are
+		transparently replaced with the users with that tag.
+
+		:param str|None role:  Role to check for. If `None`, all owners are
+		returned regardless of role.
+
+		:return set:  De-duplicated owner list
+		"""
+		# 'normal' owners
+		owners = [owner for owner, meta in self.owners.items() if
+				  (role is None or meta["role"] == role) and not owner.startswith("tag:")]
+
+		# owners that are owner by being part of a tag
+		owners.extend(itertools.chain(*[tagged_owners for tag, tagged_owners in self.tagged_owners.items() if
+									   role is None or self.owners[f"tag:{tag}"]["role"] == role]))
+
+		# de-duplicate before returning
+		return set(owners)
+
+	def get_owners(self, role="owner"):
+		"""
+		Get list of dataset owners
+
+		This returns a list of all owners, and does not transparently resolve
+		tags (like `get_owners_users` does).
+
+		:param str|None role:  Role to check for. If `None`, all owners are
+		returned regardless of role.
+
+		:return set:  De-duplicated owner list
+		"""
+		return [owner for owner, meta in self.owners.items() if (role is None or meta["role"] == role)]
+
+	def add_owner(self, username, role="owner"):
+		"""
+		Set dataset owner
+
+		If the user is already an owner, but with a different role, the role is
+		updated. If the user is already an owner with the same role, nothing happens.
+
+		:param str|User username:  Username to set as owner
+		:param str|None role:  Role to add user with.
+		"""
+		if type(username) is not str:
+			if hasattr(username, "get_id"):
+				username = username.get_id()
+			else:
+				raise TypeError("User must be a str or User object")
+
+		if username not in self.owners:
+			self.owners[username] = {
+				"name": username,
+				"key": self.key,
+				"role": role
+			}
+			self.db.insert("datasets_owners", data=self.owners[username], safe=True)
+
+		elif username in self.owners and self.owners[username]["role"] != role:
+			self.db.update("datasets_owners", data={"role": role}, where={"name": username, "key": self.key})
+			self.owners[username]["role"] = role
+
+		if username.startswith("tag:"):
+			# this is a bit more complicated than just adding to the list of
+			# owners, so do a full refresh
+			self.refresh_owners()
+
+		# make sure children's owners remain in sync
+		for child in self.children:
+			child.add_owner(username, role)
+
+	def refresh_owners(self):
+		# retrieve owners
+		self.owners = {owner["name"]: owner for owner in self.db.fetchall("SELECT * FROM datasets_owners WHERE key = %s", (self.key,))}
+
+		# determine which users (if any) are owners of the dataset by having a
+		# tag that is listed as an owner
+		owner_tags = [name[4:] for name in self.owners if name.startswith("tag:")]
+		if owner_tags:
+			tagged_owners = self.db.fetchall("SELECT name, tags FROM users WHERE tags ?| %s ", (owner_tags,))
+			self.tagged_owners = {
+				owner_tag: [user["name"] for user in tagged_owners if owner_tag in user["tags"]]
+				for owner_tag in owner_tags
+			}
+		else:
+			self.tagged_owners = {}
+
+	def remove_owner(self, username):
+		"""
+		Remove dataset owner
+
+		If no owner is set, the dataset is assigned to the anonymous user.
+		If the user is not an owner, nothing happens.
+
+		:param str|User username:  Username to set as owner
+		"""
+		if type(username) is not str:
+			if hasattr(username, "get_id"):
+				username = username.get_id()
+			else:
+				raise TypeError("User must be a str or User object")
+
+		if username in self.owners:
+			del self.owners[username]
+			self.db.delete("datasets_owners", where={"name": username, "key": self.key})
+
+			if not self.owners:
+				self.add_owner("anonymous")
+
+		if username in self.tagged_owners:
+			del self.tagged_owners[username]
+
+		# make sure children's owners remain in sync
+		for child in self.children:
+			child.remove_owner(username)
+
 	def get_parameters(self):
 		"""
 		Get dataset parameters
@@ -717,6 +867,8 @@ class DataSet(FourcatModule):
 			return parameters["filename"]
 		elif parameters.get("board") and "datasource" in parameters:
 			return parameters["datasource"] + "/" + parameters["board"]
+		elif "datasource" in parameters and parameters["datasource"] in backend.all_modules.datasources:
+			return backend.all_modules.datasources[parameters["datasource"]]["name"] + " Dataset"
 		else:
 			return default
 

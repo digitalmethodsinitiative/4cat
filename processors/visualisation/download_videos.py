@@ -14,8 +14,8 @@ from ural import urls_from_text
 from yt_dlp import DownloadError
 from yt_dlp.utils import ExistingVideoReached
 
-import common.config_manager as config
-from backend.abstract.processor import BasicProcessor
+from common.config_manager import config
+from backend.lib.processor import BasicProcessor
 from common.lib.dataset import DataSet
 from common.lib.exceptions import ProcessorInterruptedException, ProcessorException
 from common.lib.helpers import UserInput, sets_to_lists
@@ -53,7 +53,7 @@ class VideoDownloaderPlus(BasicProcessor):
                   "retrieved externally."  # description displayed in UI
     extension = "zip"  # extension of result file, used internally and in UI
 
-    if config.get("video_downloader.allow-indirect"):
+    if config.get("video-downloader.allow-indirect"):
         references = [
             "[YT-DLP python package](https://github.com/yt-dlp/yt-dlp/#readme)",
             "[Supported sites](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md)",
@@ -93,14 +93,14 @@ class VideoDownloaderPlus(BasicProcessor):
     }
 
     config = {
-        "video_downloader.ffmpeg-path": {
+        "video-downloader.ffmpeg_path": {
             "type": UserInput.OPTION_TEXT,
             "default": "ffmpeg",
             "help": "Path to ffmpeg",
             "tooltip": "Where to find the ffmpeg executable. ffmpeg is required by many of the video-related "
                        "processors which will be unavailable if no executable is available in this path."
         },
-        "video_downloader.MAX_NUMBER_VIDEOS": {
+        "video-downloader.max": {
             "type": UserInput.OPTION_TEXT,
             "coerce_type": int,
             "default": 1000,
@@ -108,28 +108,28 @@ class VideoDownloaderPlus(BasicProcessor):
             "tooltip": "Only allow downloading up to this many videos per batch. Increasing this can lead to "
                        "long-running processors and large datasets."
         },
-        "video_downloader.MAX_VIDEO_SIZE": {
+        "video-downloader.max-size": {
             "type": UserInput.OPTION_TEXT,
             "coerce_type": int,
             "default": 100,
             "help": "Max allowed MB size per video",
             "tooltip": "Size in MB/Megabytes; default 100. 0 will allow any size."
         },
-        "video_downloader.DOWNLOAD_UNKNOWN_SIZE": {
+        "video-downloader.allow-unknown-size": {
             "type": UserInput.OPTION_TOGGLE,
             "default": True,
             "help": "Allow video download of unknown size",
             "tooltip": "Video size is not always available before downloading. If True, users may choose to download "
                        "videos with unknown sizes."
         },
-        "video_downloader.allow-indirect": {
+        "video-downloader.allow-indirect": {
             "type": UserInput.OPTION_TOGGLE,
             "default": False,
             "help": "Allow indirect downloads",
             "tooltip": "Allow users to choose to download videos linked indirectly (e.g. embedded in a linked tweet, link to a YouTube video). "
                        "Enabling can be confusing for users and download more than intended."
         },
-        "video_downloader.allow-multiple": {
+        "video-downloader.allow-multiple": {
             "type": UserInput.OPTION_TOGGLE,
             "default": False,
             "help": "Allow multiple videos per item",
@@ -157,16 +157,16 @@ class VideoDownloaderPlus(BasicProcessor):
         options = cls.options
 
         # Update the amount max and help from config
-        max_number_videos = int(config.get('video_downloader.MAX_NUMBER_VIDEOS', 100))
+        max_number_videos = int(config.get('video-downloader.max', 100, user=user))
         if max_number_videos == 0:
             options['amount']['help'] = "No. of videos"
             options["amount"]["tooltip"] = "Use 0 to download all videos"
         else:
             options['amount']['max'] = max_number_videos
-            options['amount']['help'] = "No. of videos (max %s)" % max_number_videos
+            options['amount']['help'] = f"No. of videos (max {max_number_videos:,}"
 
         # And update the max size and help from config
-        max_video_size = int(config.get('video_downloader.MAX_VIDEO_SIZE', 100))
+        max_video_size = int(config.get('video-downloader.max-size', 100, user=user))
         if max_video_size == 0:
             # Allow video of any size
             options["max_video_size"]["tooltip"] = "Set to 0 if all sizes are to be downloaded."
@@ -202,7 +202,7 @@ class VideoDownloaderPlus(BasicProcessor):
 
         # these two options are likely to be unwanted on instances with many
         # users, so they are behind an admin config options
-        if config.get("video_downloader.allow-indirect"):
+        if config.get("video-downloader.allow-indirect", user=user):
             options["use_yt_dlp"] = {
                 "type": UserInput.OPTION_TOGGLE,
                 "help": "Also attempt to download non-direct video links (such YouTube and other video hosting sites)",
@@ -210,7 +210,7 @@ class VideoDownloaderPlus(BasicProcessor):
                 "tooltip": "If False, 4CAT will only download directly linked videos (works with fields like Twitter's \"video\", TikTok's \"video_url\" or Instagram's \"media_url\"), but if True 4CAT uses YT-DLP to download from YouTube and a number of other video hosting sites (see references)."
             }
 
-        if config.get("video_downloader.allow-multiple"):
+        if config.get("video-downloader.allow-multiple", user=user):
             options["channel_videos"] = {
                                             "type": UserInput.OPTION_TEXT,
                                             "help": "Download multiple videos per link? (only works w/ non-direct video links)",
@@ -293,7 +293,7 @@ class VideoDownloaderPlus(BasicProcessor):
         # Collect parameters
         amount = self.parameters.get("amount", 100)
         if amount == 0:  # unlimited
-            amount = config.get('video_downloader.MAX_NUMBER_VIDEOS', 100)
+            amount = self.config.get('video-downloader.max', 100)
 
         # Set a maximum amount of videos that can be downloaded per URL and set
         # if known channels should be downloaded at all
@@ -306,7 +306,7 @@ class VideoDownloaderPlus(BasicProcessor):
             download_channels = True
 
         # YT-DLP by default attempts to download the best quality videos
-        allow_unknown_sizes = config.get('video_downloader.DOWNLOAD_UNKNOWN_SIZE', False)
+        allow_unknown_sizes = self.config.get('video-downloader.allow-unknown-size', False)
         max_video_size = self.parameters.get("max_video_size", 100)
         max_size = str(max_video_size) + "M"
         if not max_video_size == 0:
@@ -592,7 +592,7 @@ class VideoDownloaderPlus(BasicProcessor):
                             raise FilesizeException(
                                 f"Video size {response.headers.get('Content-Length')} larger than maximum allowed per 4CAT")
                     # Size unknown
-                    elif not config.get("video_downloader.DOWNLOAD_UNKNOWN_SIZE", False):
+                    elif not self.config.get("video-downloader.allow-unknown-size", False):
                         FilesizeException("Video size unknown; not allowed to download per 4CAT settings")
 
                 # Download video

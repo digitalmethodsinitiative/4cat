@@ -1,11 +1,9 @@
 """
 Google Vision API co-label network
 """
-from backend.abstract.processor import BasicProcessor
+from backend.lib.processor import BasicProcessor
 from common.lib.helpers import UserInput
 from common.lib.exceptions import ProcessorInterruptedException
-
-import networkx as nx
 
 __author__ = "Stijn Peeters"
 __credits__ = ["Stijn Peeters"]
@@ -57,7 +55,7 @@ class VisionTagBiPartiteNetworker(BasicProcessor):
         """
         Allow processor to run on Google Vision API data
 
-        :param module: Dataset or processor to determine compatibility with
+        :param module: Module to determine compatibility with
         """
         return module.type == "google-vision-api"
 

@@ -25,23 +25,12 @@
             <span>
                 <ul>
                     <li>
-                        {% set ref_name = processor.title %}{% set ref_refs = processor.references %}{% set ref_id = processor.type %}{% include "processor-references.html" %}
+                        {% set ref_name = processor.title %}{% set ref_refs = processor.references %}{% set ref_id = processor.type %}{% include "components/processor-references.html" %}
                     </li>
                 </ul>
             </span>
             {% endif %}
 
-            {# 'Allows for' area to preview further analysis #}
-            {% set processors_available = processor.get_available_processors(processor) %}
-            {% if processors_available and processor not in processors_available %}
-            <span>
-                <ul>
-                    <li>
-                    {% include "processor-processors-available.html" %}
-                    </li>
-                </ul>
-            </span>
-            {% endif %}
             {# Processor status #}
             {% if processor.status %}
             <span>

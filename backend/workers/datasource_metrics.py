@@ -6,9 +6,8 @@ and to show how many posts a local datasource contains.
 
 from datetime import datetime, time, timezone
 
-from backend.abstract.worker import BasicWorker
-
-import common.config_manager as config
+from backend.lib.worker import BasicWorker
+from common.config_manager import config
 
 class DatasourceMetrics(BasicWorker):
 	"""
@@ -49,7 +48,7 @@ class DatasourceMetrics(BasicWorker):
 			""")
 
 		added_datasources = [row["datasource"] for row in self.db.fetchall("SELECT DISTINCT(datasource) FROM metrics")]
-		enabled_datasources = config.get("4cat.datasources", {})
+		enabled_datasources = config.get("datasources.enabled", {})
 
 		for datasource_id in self.all_modules.datasources:
 			if datasource_id not in enabled_datasources:
@@ -72,7 +71,7 @@ class DatasourceMetrics(BasicWorker):
 				elif datasource_id == "8chan":
 					settings_id = "eightchan"
 				
-				boards = [b for b in config.get(settings_id + ".boards", [])]
+				boards = [b for b in config.get(settings_id + "-search.boards", [])]
 
 				# If a datasource is static (so not updated) and it
 				# is already present in the metrics table, we don't

@@ -1,7 +1,7 @@
 <div id="dataset-{{ dataset.key }}-status" class="full-block dataset-status" {% if dataset.is_finished() %}data-num-results="{{ dataset.num_rows }}"{% endif %}>
   <div class="result-row">
     <div class="result-status">
-        {% include "result-status.html" %}
+        {% include "components/result-status.html" %}
     </div>
     {% if dataset.get_log_path().exists() and current_user.is_authenticated %}
         <div class="result-log">
@@ -41,9 +41,11 @@
         </li>
     {% endif %}
     <li>
+    {% if __user_config("privileges.can_use_explorer") %}
     <a href="{{ url_for('explorer_dataset', key=dataset.key) }}">
         <i class="fa fa-binoculars" aria-hidden="true"></i> Explore
     </a>
+    {% endif %}
     </li>
     </ul>
   {% endif %}
