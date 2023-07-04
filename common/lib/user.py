@@ -477,7 +477,11 @@ class User:
         # delete any datasets and jobs related to deleted datasets
         if datasets:
             for dataset in datasets:
-                dataset = DataSet(key=dataset["key"], db=self.db)
+                try:
+                    dataset = DataSet(key=dataset["key"], db=self.db)
+                except (ValueError, TypeError):
+                    # dataset already deleted?
+                    pass
 
                 if len(dataset.get_owners()) == 1 and also_datasets:
                     dataset.delete(commit=False)
